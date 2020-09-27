@@ -7,6 +7,8 @@
 |-----|---------------------|-------------------|
 | JPA | DB설계도를 보고 JPA구현 |   |
 | 프로파일관리 | 개발, 배포 등 각 단계마다 프로파일 관리 | https://github.com/sungwookspring/profiles.git |
+| 보안 | 인증,인가 관리 | https://github.com/sungwookspring/security.git  |
+| https | | |
 
 
 <br>
