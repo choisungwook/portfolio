@@ -1,7 +1,7 @@
- # npm이란?
+ # 1. npm이란?
  * Node package manager
  
- # install
+ # 2. 설치
  * 기본 설치
  ```sh
  npm install [패키지 이름] --save
