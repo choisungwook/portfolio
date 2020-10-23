@@ -1,13 +1,10 @@
-# To-do
-
-
 # 프로젝트
 | 번호 | 설명 | 기술요약 | 프로젝트 바로가기 링크 |
 | ---- | ------- | --------- | ----------- |
 | 1 | 온 프레미스 쿠버네티스 자동 설치 | vagrant, ansible, k8s 이해 | [이동](https://github.com/choisungwook/installK8s_in_vagrantWithAnsible) |
 | 2 | 웹 터미널 | xtermjs, webpack | [이동](https://github.com/choisungwook/web_terminal.git) |
 
-------
+---
 
 
 # 1. 백엔드
