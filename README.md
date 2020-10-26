@@ -12,7 +12,7 @@
 ## 스프링부트
 | 번호 | 제목 | 설명 | 바로가기 링크 |
 | ---- | ----- | --------------------- | -------------------|
-| 1 | 인메모리 로그인 | 계정을 인메모리로 관리, 인증 설정 | [github 링크](https://github.com/choisungwook/springsecurity-InMemory-Authentication) |
+| 1 | 인메모리 로그인 인증 | 계정을 인메모리로 관리, 인증 설정 | [github 링크](https://github.com/choisungwook/springsecurity-InMemory-Authentication) |
 | JPA | DB설계도를 보고 JPA구현 |   |
 | 프로파일관리 | 개발, 배포 등 각 단계마다 프로파일 관리 | https://github.com/sungwookspring/profiles.git |
 | 보안 | 인증,인가 관리 | https://github.com/sungwookspring/security.git  |
