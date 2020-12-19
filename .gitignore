@@ -87,3 +87,6 @@ geckodriver.log
 *.code-workspace
 .history
 .vscode
+
+# hcl
+*.hcl
