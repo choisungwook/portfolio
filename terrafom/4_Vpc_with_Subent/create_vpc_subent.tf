@@ -16,6 +16,7 @@ resource "aws_subnet" "terraform-subent1" {
   vpc_id     = aws_vpc.terraform-vpc1.id
   cidr_block = "172.20.1.0/24"
   availability_zone = "ap-northeast-2a"
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "tf-subnet1"
@@ -27,6 +28,7 @@ resource "aws_subnet" "terraform-subent2" {
   vpc_id     = aws_vpc.terraform-vpc1.id
   cidr_block = "172.20.2.0/24"
   availability_zone = "ap-northeast-2b"
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "tf-subnet2"
