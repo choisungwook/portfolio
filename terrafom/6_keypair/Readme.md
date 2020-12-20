@@ -22,3 +22,7 @@ terraform apply
 ```
 
 ![](imgs/result.jpg)
+
+# 참고자료
+* [1] 블로그: https://www.44bits.io/ko/post/terraform_introduction_infrastrucute_as_code#%ED%85%8C%EB%9D%BC%ED%8F%BC-%EC%84%A4%EC%B9%98
+* [2] terraform 공식문서-aws_key_pair: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/key_pair
