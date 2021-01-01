@@ -1,9 +1,29 @@
 
 # 1. 준비
 ## 1.1 aws cli 설치
+```sh
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
 ## 1.2 aws configure
-## 1.3 eksctl, kubectl 설치
-## 1.4 ssh 키 생성
+
+
+## 1.3 eksctl 설치
+```sh
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+```
+
+## 1.4 kubectl 설치
+```sh
+curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.8/2020-09-18/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin
+```
+
+## 1.5 ssh 키 생성
 ```
 ssh-keygen
 ```
