@@ -34,3 +34,13 @@ eksctl create cluster \
 ```
 eksctl get cluster
 ```
+
+# 4. eks 삭제
+```sh
+ eksctl delete cluster  eks-demo
+```
+
+# 참고자료
+* [1] ec2 instance 요금: https://aws.amazon.com/ko/ec2/spot/pricing/
+* [2] spot : https://aws.amazon.com/ko/ec2/spot/instance-advisor/
+* [3] eksctl 설치: https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/getting-started-eksctl.html
