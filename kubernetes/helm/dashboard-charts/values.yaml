@@ -1,0 +1,14 @@
+service:
+  type: NodePort
+
+ingress:
+  enabled: true
+  # change here
+  hosts:
+    - "helloworld.com"
+  paths:
+    - "/dashboard/(.*)"
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"

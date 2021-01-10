@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nexus.fullname" . }}
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "nexus.fullname" . }}
+  volumeClaimTemplates:
+    {{- if .Values.persistence.enabled }}
+    - metadata:
+        name: {{ template "nexus.fullname" . }}-data
+        labels:
+{{ include "nexus.labels" . | indent 10 }}
+        {{- if .Values.persistence.annotations }}
+        annotations:
+{{ toYaml .Values.persistence.annotations | indent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.storageSize | quote }}
+        {{- if .Values.persistence.storageClass }}
+        {{- if (eq "-" .Values.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: "{{ .Values.persistence.storageClass }}"
+        {{- end }}
+        {{- end }}
+    {{- end }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nexus.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nexus.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nexus.serviceAccountName" . }}
+      {{- if .Values.nexus.securityContextEnabled }}
+      securityContext:
+{{ toYaml .Values.nexus.securityContext | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.nexus.image.repository }}:{{ .Values.nexus.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.nexus.image.pullPolicy }}
+          env:
+{{ toYaml .Values.nexus.env | indent 12 }}
+            {{- if ingress.enabled }}
+{{ toYaml .Values.ingress.env | indent 12 }}
+            {{- end }}
+            - name: NEXUS_DATA_CHOWN
+              value: {{ .Values.nexus.chownNexusData | quote }}
+          ports:
+            - containerPort: {{ .Values.nexus.dockerPort }}
+              name: nexus-docker-g
+            - containerPort: {{ .Values.nexus.nexusPort }}
+              name: nexus-http
+          volumeMounts:
+            - mountPath: /nexus-data
+              name: {{ template "nexus.fullname" . }}-data   
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,24 @@
+alertmanager:
+  ingress:
+    enabled: false
+    # change here
+    hosts:
+      - helloworld.com
+prometheus:
+  # change here
+  prometheusSpec:
+    routePrefix: /prom
+  ingress:
+    enabled: true
+    # change here
+    hosts:
+      - helloworld.com
+    # change here
+    paths:
+      - /prom
+grafana:
+  ingress:
+    enabled: true
+    # change here
+    hosts:
+      - helloworld.com

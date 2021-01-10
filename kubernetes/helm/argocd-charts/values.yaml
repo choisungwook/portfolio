@@ -1,0 +1,15 @@
+server:
+  extraArgs:
+    - --insecure
+    - --rootpath
+    - /argocd
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    # change here
+    hosts:
+      - "helloworld.com"
+    # change here
+    paths:
+      - "/argocd"
