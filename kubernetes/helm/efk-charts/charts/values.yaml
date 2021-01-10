@@ -1,0 +1,39 @@
+elasticsearch:
+  replicas: 2
+
+  # Hard means that by default pods will only be scheduled if there are enough nodes for them
+  # # and that they will never end up on the same node. Setting this to soft will do this "best effort"
+  antiAffinity: "soft"
+
+  volumeClaimTemplate:
+    storageClassName: nfs
+    accessModes: [ "ReadWriteOnce" ]
+    resources:
+      requests:
+        storage: 10Gi
+
+kibana:
+  service:
+    type: NodePort
+
+  healthCheckPath: "/kibana/app/kibana"
+
+  kibanaConfig:
+    kibana.yml: |
+      server.basePath: /kibana
+      server.rewriteBasePath: true
+
+  ingress:
+    enabled: true
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+
+    hosts:
+      - host: "helloworld.com"
+        paths:
+          - path: /kibana
+    tls: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
