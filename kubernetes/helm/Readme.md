@@ -14,3 +14,4 @@
 | 4 | argocd | [링크](./argocd-charts) |
 | 5 | nexus | [링크](./nexus-charts) |
 | 6 | efk(Elasticsearch, Fluent-bit, Kibana) | [링크](./efk-charts) |
+| 7 | jenkins | [링크](./jenkins-charts) |

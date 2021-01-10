@@ -1,0 +1,13 @@
+persistence:
+  storageClass: nfs
+  size: 20Gi
+  existingClaim: jenkins-pvc
+
+controller:
+  serviceType: NodePort
+  jenkinsUriPrefix: "/jenkins"
+
+  ingress:
+    enabled: true
+    hostName: "helloworld.com"
+    path: "/jenkins"
