@@ -1,0 +1,78 @@
+IMAGE_NAME = "centos/7"
+N = 1
+INET = "kubernetes_network"
+ANSIBLE_SERVERIP = "192.168.0.231"
+K8SMASTER_IP = "192.168.0.210"
+K8SWORKER_IP = "192.168.0."
+MASTER_NAME = "dcos-master"
+ANSIBLE_SERVER_NAME = "ansible-serve-5"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # master node
+  config.vm.define MASTER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "private_network", ip: K8SMASTER_IP, virtualbox__intnet: INET
+    cfg.vm.hostname = MASTER_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = MASTER_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+  end
+
+  # worker node
+  (1..N).each do |i|
+    config.vm.define "worker-#{i}" do |cfg|
+      cfg.vm.box = IMAGE_NAME
+      cfg.vm.network "private_network", ip: K8SWORKER_IP + "#{i+210}", virtualbox__intnet: INET
+      cfg.vm.hostname = "client-#{i}"
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 4096
+        v.cpus = 2
+        v.name = "worker#{i}"
+      end
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+      SCRIPT
+    end
+  end
+
+
+  # ansible-server
+  config.vm.define ANSIBLE_SERVER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.hostname = ANSIBLE_SERVER_NAME
+    cfg.vm.network "private_network", ip: ANSIBLE_SERVERIP, virtualbox__intnet: INET
+
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+      v.cpus = 2
+      v.name =  ANSIBLE_SERVER_NAME
+    end
+    cfg.vm.provision  "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install python36 libselinux-python3 -y 
+      yum install sshpass -y
+      sudo pip3 install ansible
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # copy ansible files
+    cfg.vm.provision "file", source: "./ansible_workspace", destination: "ansible_workspace"
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/add_hosts.yaml", privileged: false
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/configure_ssh.yaml -i /home/vagrant/hosts", privileged: false
+
+    # run ansible playbook-role
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/roles/site.yml -i /home/vagrant/hosts", privileged: false
+  end
+end
