@@ -1,0 +1,9 @@
+---
+- name: Install k8s-master
+  hosts: bootstrap
+  remote_user: vagrant
+  become: yes
+  become_method: sudo
+
+  roles:
+    - bootstrap

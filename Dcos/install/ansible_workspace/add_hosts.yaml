@@ -10,5 +10,9 @@
         content: |
           [master]
           192.168.0.210
-          [worker]
+
+          [bootstrap]
           192.168.0.211
+
+          [agent]
+          192.168.0.212
