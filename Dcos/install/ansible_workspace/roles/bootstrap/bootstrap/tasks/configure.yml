@@ -8,12 +8,11 @@
   community.general.timezone:
     name: Asia/Seoul
 
-- name: Set timezone to Asia/Seoul
-  community.general.timezone:
-    name: Asia/Seoul
-
 - name: Disable sudo password prompts
   lineinfile:
     path: /etc/sudoers
     line: "%wheel ALL=(ALL) NOPASSWD: ALL" 
     state: present
+
+- name: Locale requirements
+  command: "localectl set-locale LANG=en_US.utf8"
