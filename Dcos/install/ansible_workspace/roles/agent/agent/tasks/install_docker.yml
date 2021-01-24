@@ -1,7 +1,7 @@
-- name: Install lvm2
-  yum:
-    name: lvm2
-    state: latest
+# - name: Install lvm2
+#   yum:
+#     name: lvm2
+#     state: latest
 
 - name: Install yum-utils
   yum:
