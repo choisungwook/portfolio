@@ -5,3 +5,62 @@
     
 - include_tasks: configure.yml
 - include_tasks: install_docker.yml
+
+- name: Create genconf directory
+  file:
+    path: /home/vagrant/genconf
+    state: directory
+    owner: vagrant
+    group: vagrant
+    mode: 0755
+
+- name: Create ip-detect
+  file:
+    path: /home/vagrant/genconf/ip-detect
+    state: touch
+    owner: vagrant
+    group: vagrant
+    mode: 0755
+    
+- name: Add line to a ip-detect file
+  copy:
+    dest: /home/vagrant/genconf/ip-detect
+    content: |
+      #!/usr/bin/env bash
+      set -o nounset -o errexit
+      export PATH=/usr/sbin:/usr/bin:$PATH
+      echo $(ip addr show eth1 | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -1)
+
+- name: Create ip-detect
+  file:
+    path: /home/vagrant/genconf/config.yaml
+    state: touch
+    owner: vagrant
+    group: vagrant
+    mode: 0755
+
+- name: Add line to a config.yaml file
+  copy:
+    dest: /home/vagrant/genconf/config.yaml
+    content: |
+      bootstrap_url: http://192.168.219.72:8888
+      cluster_name: dcos
+      exhibitor_storage_backend: static
+      master_discovery: static
+      ip_detect_public_filename: genconf/config.yaml
+      master_list:
+      - 192.168.219.71
+      resolvers:
+      - 8.8.8.8
+
+- name: copy dcos dcos_generate_config.sh
+  copy: 
+    src: dcos_generate_config.sh
+    dest: /home/vagrant/dcos_generate_config.sh
+    owner: vagrant
+    group: vagrant
+    mode: 0755
+
+# this task has error
+# - name: execute dcos_generate_config.sh
+#   script: bash /home/vagrant/dcos_generate_config.sh
