@@ -17,5 +17,5 @@
 - name: Locale requirements
   command: "localectl set-locale LANG=en_US.utf8"
 
-- name: sestatus
-  command: sestatus
+- name: change sestatus enforcing to permissive 
+  shell: sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
