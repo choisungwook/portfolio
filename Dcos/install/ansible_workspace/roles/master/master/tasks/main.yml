@@ -2,6 +2,11 @@
   yum:
     name: epel-release
     state: latest
-    
+
+- name: Add the unzip
+  yum:
+    name: unzip
+    state: latest 
+
 - include_tasks: configure.yml
 - include_tasks: install_docker.yml
