@@ -16,3 +16,6 @@
 
 - name: Locale requirements
   command: "localectl set-locale LANG=en_US.utf8"
+
+- name: sestatus
+  command: sestatus
