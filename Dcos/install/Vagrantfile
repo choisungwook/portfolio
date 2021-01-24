@@ -1,12 +1,11 @@
 IMAGE_NAME = "centos/7"
 N = 1
-INET = "kubernetes_network"
-ANSIBLE_SERVERIP = "192.168.0.231"
+ANSIBLE_SERVERIP = "192.168.219.70"
 
 # IP Configuration
-MASTER_IP = "192.168.0.210"
-BOOTSTRAP_IP = "192.168.0.211"
-WORKER_IP = "192.168.0."
+MASTER_IP = "192.168.219.71"
+BOOTSTRAP_IP = "192.168.219.72"
+WORKER_IP = "192.168.219."
 
 # Host names
 MASTER_NAME = "dcos-master"
@@ -19,7 +18,7 @@ Vagrant.configure("2") do |config|
   # master node
   config.vm.define MASTER_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "private_network", ip: MASTER_IP, virtualbox__intnet: INET
+    cfg.vm.network "public_network", ip: MASTER_IP
     cfg.vm.hostname = MASTER_NAME
     
     cfg.vm.provider "virtualbox" do |v|
@@ -36,7 +35,7 @@ Vagrant.configure("2") do |config|
   # bootstrap node
   config.vm.define BOOTSTRAP_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "private_network", ip: BOOTSTRAP_IP, virtualbox__intnet: INET
+    cfg.vm.network "public_network", ip: BOOTSTRAP_IP
     cfg.vm.hostname = BOOTSTRAP_NAME
     
     cfg.vm.provider "virtualbox" do |v|
@@ -52,15 +51,15 @@ Vagrant.configure("2") do |config|
 
   # worker node
   (1..N).each do |i|
-    config.vm.define "worker-#{i}" do |cfg|
+    config.vm.define "agent-#{i}" do |cfg|
       cfg.vm.box = IMAGE_NAME
-      cfg.vm.network "private_network", ip: WORKER_IP + "#{i+211}", virtualbox__intnet: INET
+      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
       cfg.vm.hostname = "client-#{i}"
       
       cfg.vm.provider "virtualbox" do |v|
         v.memory = 4096
         v.cpus = 2
-        v.name = "worker#{i}"
+        v.name = "agent#{i}"
       end
       cfg.vm.provision "shell", inline: <<-SCRIPT
         sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -74,7 +73,7 @@ Vagrant.configure("2") do |config|
   config.vm.define ANSIBLE_SERVER_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
     cfg.vm.hostname = ANSIBLE_SERVER_NAME
-    cfg.vm.network "private_network", ip: ANSIBLE_SERVERIP, virtualbox__intnet: INET
+    cfg.vm.network "public_network", ip: ANSIBLE_SERVERIP
 
     cfg.vm.provider "virtualbox" do |v|
       v.memory = 2048
@@ -90,12 +89,14 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     SCRIPT
 
-    # copy ansible files
+    # copy ansible files and configur ansible
     cfg.vm.provision "file", source: "./ansible_workspace", destination: "ansible_workspace"
     cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/add_hosts.yaml", privileged: false
     cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/configure_ssh.yaml -i /home/vagrant/hosts", privileged: false
 
-    # run master role
+    # run bootstrap, master, agent role
     cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/roles/master/site.yml -i /home/vagrant/hosts", privileged: false
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/roles/bootstrap/site.yml -i /home/vagrant/hosts", privileged: false
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/roles/agent/site.yml -i /home/vagrant/hosts", privileged: false
   end
 end
