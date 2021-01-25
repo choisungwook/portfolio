@@ -1,5 +1,6 @@
 # 개요
 * dcos 설치 vagrantfile
+* **현재 동작 안함**
 
 # 준비
 * dcos_generate_config.sh 다운로드
