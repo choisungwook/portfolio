@@ -42,7 +42,11 @@ cd /home/vagrant
 sudo bash dcos_generate_config.sh
 ```
 
-* your-port를 외부에 접속할 포트로 변경(예: 8080)
+![](imgs/run_dcos_generate_config.png)
+
+![](imgs/run_dcos_generate_config_result.png.png)
+
+* your-port를 외부에 접속할 포트로 변경(예: 8888)
 ```sh
 sudo docker run -d -p <your-port>:80 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx
 ```
