@@ -1,0 +1,4 @@
+- name: Add the epel-release
+  yum:
+    name: epel-release
+    state: latest
