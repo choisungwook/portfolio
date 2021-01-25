@@ -19,6 +19,22 @@
     name: docker-ce
     state: present
 
+- name: Create docker directory
+  file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: copy docker daemon.json
+  copy: 
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: 0644
+
 - name: "Starting and Enabling Docker service"
   service:
     name: docker

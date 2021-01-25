@@ -15,3 +15,16 @@
 
 - name: change sestatus enforcing to permissive 
   shell: sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+
+- name: sestatus enforcing to permissive 
+  command: setenforce permissive
+
+- name: Add group docker
+  group:
+    name: docker
+    state: present
+
+- name: Add group nogroup
+  group:
+    name: nogroup
+    state: present
