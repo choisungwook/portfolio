@@ -1,0 +1,59 @@
+IMAGE_NAME = "centos/7"
+
+# IP Configuration
+DEMO_IP = "192.168.219.88"
+ANSIBLE_SERVERIP = "192.168.219.89"
+
+# Host names
+DEMO_NAME = "demo"
+ANSIBLE_SERVER_NAME = "ansible-serve-6"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # master node
+  config.vm.define DEMO_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: DEMO_IP
+    cfg.vm.hostname = DEMO_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+      v.cpus = 2
+      v.name = DEMO_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+  end
+
+  # ansible-server
+  config.vm.define ANSIBLE_SERVER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.hostname = ANSIBLE_SERVER_NAME
+    cfg.vm.network "public_network", ip: ANSIBLE_SERVERIP
+
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+      v.cpus = 2
+      v.name =  ANSIBLE_SERVER_NAME
+    end
+    cfg.vm.provision  "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install python36 libselinux-python3 -y 
+      yum install sshpass -y
+      sudo pip3 install ansible
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # copy ansible files and configur ansible
+    cfg.vm.provision "file", source: "./ansible_workspace", destination: "ansible_workspace"
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/add_hosts.yaml", privileged: false
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/configure_ssh.yaml -i /home/vagrant/hosts", privileged: false
+
+    # run demo
+    cfg.vm.provision "shell", inline: "ansible-playbook ./ansible_workspace/roles/demo/site.yml -i /home/vagrant/hosts", privileged: false
+  end
+end
