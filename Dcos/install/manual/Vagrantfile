@@ -1,0 +1,73 @@
+IMAGE_NAME = "centos/7"
+N = 1
+
+# IP Configuration
+MASTER_IP = "192.168.219.71"
+BOOTSTRAP_IP = "192.168.219.72"
+WORKER_IP = "192.168.219."
+
+# Host names
+MASTER_NAME = "dcos-master"
+BOOTSTRAP_NAME = "bootstrap"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # master node
+#   config.vm.define MASTER_NAME do |cfg|
+#     cfg.vm.box = IMAGE_NAME
+#     cfg.vm.network "public_network", ip: MASTER_IP
+#     cfg.vm.hostname = MASTER_NAME
+    
+#     cfg.vm.provider "virtualbox" do |v|
+#       v.memory = 8192
+#       v.cpus = 4
+#       v.name = MASTER_NAME
+#     end
+#     cfg.vm.provision "shell", inline: <<-SCRIPT
+#       sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+#       systemctl restart sshd
+#     SCRIPT
+#   end
+
+  # bootstrap node
+  config.vm.define BOOTSTRAP_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: BOOTSTRAP_IP
+    cfg.vm.hostname = BOOTSTRAP_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = BOOTSTRAP_NAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # copy dcos_generate_config.sh
+    cfg.vm.provision "file", source: "files", destination: "files"
+    cfg.vm.provision "shell", inline: "files/configuration.sh"
+  end
+
+  # worker node
+#   (1..N).each do |i|
+#     config.vm.define "agent-#{i}" do |cfg|
+#       cfg.vm.box = IMAGE_NAME
+#       cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
+#       cfg.vm.hostname = "client-#{i}"
+      
+#       cfg.vm.provider "virtualbox" do |v|
+#         v.memory = 4096
+#         v.cpus = 2
+#         v.name = "agent#{i}"
+#       end
+#       cfg.vm.provision "shell", inline: <<-SCRIPT
+#         sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+#         systemctl restart sshd
+#       SCRIPT
+#     end
+#   end
+end
