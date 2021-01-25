@@ -1,0 +1,33 @@
+---
+- name: Automate SSH connections
+  hosts: all
+  connection: local
+  serial: 1
+  gather_facts: no
+  vars:
+    ansible_password: vagrant
+
+  tasks:
+    - name: ssh-keyscan for known-hosts
+      command: /usr/bin/ssh-keyscan -t ecdsa {{ ansible_host }}
+      register: keyscan
+
+    - name: input key
+      lineinfile:
+        path: ~/.ssh/known_hosts
+        line: "{{item}}"
+        create: yes
+      with_items:
+        - "{{keyscan.stdout_lines}}" # keyscan변수 값을 knwon_hosts파일에 저장
+
+    - name: ssh-keygen for authorized_keys
+      command: "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''"
+      ignore_errors: yes
+      run_once: true
+
+    - name: input key for each client
+      connection: ssh
+      authorized_key:
+        user: vagrant
+        state: present
+        key: "{{lookup('file','~/.ssh/id_rsa.pub')}}"
