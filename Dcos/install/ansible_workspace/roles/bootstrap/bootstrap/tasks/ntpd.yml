@@ -1,0 +1,28 @@
+- name: Set timezone to Asia/Seoul
+  community.general.timezone:
+    name: Asia/Seoul
+
+- name: timedatectl sync
+  command: timedatectl set-ntp yes
+
+- name: install a ntp
+  yum:
+    name: ntp
+    state: latest
+
+- name: copy dcos dcos_generate_config.sh
+  copy: 
+    src: ntp.conf
+    dest: /etc/ntp.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: sync ntp
+  command: ntpq -p
+
+- name: start ntp
+  service:
+    name: ntpd
+    state: started
+    enabled: True

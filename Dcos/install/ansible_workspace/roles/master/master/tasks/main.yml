@@ -8,5 +8,6 @@
     name: unzip
     state: latest 
 
+- include_tasks: ntpd.yml
 - include_tasks: configure.yml
 - include_tasks: install_docker.yml
