@@ -49,7 +49,7 @@ Vagrant.configure("2") do |config|
 
     # copy dcos_generate_config.sh
     cfg.vm.provision "file", source: "files", destination: "files"
-    cfg.vm.provision "shell", inline: "files/configuration.sh"
+    cfg.vm.provision "shell", inline: "files/configuration.sh", privileged: true
   end
 
   # worker node
