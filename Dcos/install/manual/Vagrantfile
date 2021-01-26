@@ -29,9 +29,12 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     SCRIPT
 
-    cfg.vm.provision "file", source: "files", destination: "files"
-    cfg.vm.provision "shell", inline: "chmod u+x files/configuration.sh"
-    cfg.vm.provision "shell", inline: "files/configuration.sh"
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
 
   end
 
@@ -42,7 +45,7 @@ Vagrant.configure("2") do |config|
     cfg.vm.hostname = BOOTSTRAP_NAME
     
     cfg.vm.provider "virtualbox" do |v|
-      v.memory = 8192
+      v.memory = 4096
       v.cpus = 4
       v.name = BOOTSTRAP_NAME
     end
@@ -52,12 +55,18 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     SCRIPT
 
-    # copy dcos_generate_config.sh
-    cfg.vm.provision "file", source: "files", destination: "files"
-    cfg.vm.provision "shell", inline: "chmod u+x files/configuration.sh"
-    cfg.vm.provision "shell", inline: "chmod u+x files/genconf/ip-detect"
-    cfg.vm.provision "shell", inline: "files/configuration.sh"
-    cfg.vm.provision "shell", inline: "/bin/bash files/dcos_generate_config.sh"
+    # copy 
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+    
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+    
+    # cfg.vm.provision "shell", inline: "chmod u+x files/genconf/ip-detect"
+    cfg.vm.provision "file", source: "files/genconf", destination: "genconf"
+    cfg.vm.provision "file", source: "files/dcos_generate_config.sh", destination: "dcos_generate_config.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash dcos_generate_config.sh"
   end
 
   # worker node
