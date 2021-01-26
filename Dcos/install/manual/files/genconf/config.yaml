@@ -1,0 +1,29 @@
+bootstrap_url: http://192.168.219.72:80
+cluster_name: dcos
+# superuser_username: 
+# superuser_password_hash: 
+exhibitor_storage_backend: static
+master_discovery: static
+ip_detect_public_filename: genconf/ip-detect
+master_list:
+- 192.168.219.71
+resolvers:
+- 168.126.63.1
+- 8.8.8.8
+# Choose your security mode: permissive or strict
+security: permissive
+#superuser_password_hash: <hashed-password> # Generated above
+#superuser_username: <username> # This can be whatever you like
+# A custom proxy is optional. For details, see the configuration documentation.
+use_proxy: 'false'
+#http_proxy: http://<user>:<pass>@<proxy_host>:<http_proxy_port>
+#https_proxy: https://<user>:<pass>@<proxy_host>:<https_proxy_port>
+#no_proxy:
+#- 'foo.bar.com'
+#- '.baz.com'
+#fault_domain_enabled: false
+#If IPv6 is disabled in your kernel, you must disable it in the config.yaml
+#enable_ipv6: 'false'
+enable_ipv6: 'false'
+dcos_l4lb_enable_ipv6: 'false'
+enable_docker_gc: 'true'

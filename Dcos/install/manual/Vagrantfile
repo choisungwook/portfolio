@@ -14,21 +14,26 @@ Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
 
   # master node
-#   config.vm.define MASTER_NAME do |cfg|
-#     cfg.vm.box = IMAGE_NAME
-#     cfg.vm.network "public_network", ip: MASTER_IP
-#     cfg.vm.hostname = MASTER_NAME
+  config.vm.define MASTER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: MASTER_IP
+    cfg.vm.hostname = MASTER_NAME
     
-#     cfg.vm.provider "virtualbox" do |v|
-#       v.memory = 8192
-#       v.cpus = 4
-#       v.name = MASTER_NAME
-#     end
-#     cfg.vm.provision "shell", inline: <<-SCRIPT
-#       sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-#       systemctl restart sshd
-#     SCRIPT
-#   end
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = MASTER_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files", destination: "files"
+    cfg.vm.provision "shell", inline: "chmod u+x files/configuration.sh"
+    cfg.vm.provision "shell", inline: "files/configuration.sh"
+
+  end
 
   # bootstrap node
   config.vm.define BOOTSTRAP_NAME do |cfg|
@@ -50,7 +55,9 @@ Vagrant.configure("2") do |config|
     # copy dcos_generate_config.sh
     cfg.vm.provision "file", source: "files", destination: "files"
     cfg.vm.provision "shell", inline: "chmod u+x files/configuration.sh"
+    cfg.vm.provision "shell", inline: "chmod u+x files/genconf/ip-detect"
     cfg.vm.provision "shell", inline: "files/configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash files/dcos_generate_config.sh"
   end
 
   # worker node
