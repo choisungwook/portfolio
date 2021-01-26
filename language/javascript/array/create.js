@@ -6,3 +6,6 @@ console.log(typeof arr2 === "object")
 
 console.log(arr);
 console.log(Object.values(arr));
+
+arr.push(4);
+console.log(arr);
