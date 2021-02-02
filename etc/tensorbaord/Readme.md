@@ -7,8 +7,16 @@
 * tensorboard 디렉터리: 텐서보드 파일 예제
 
 # 텐서보드 실행 방법
+## torch
 ```sh
-tensorboard  --logdir=tensorboard
+tensorboard  --logdir=torch
 ```
 
-![](result.png)
+![](./imgs/torch.png)
+
+## keras
+```sh
+tensorboard  --logdir=keras
+```
+
+![](./imgs/keras.png)
