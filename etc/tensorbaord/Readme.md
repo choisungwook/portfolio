@@ -21,3 +21,6 @@ tensorboard  --logdir=keras
 ```
 
 ![](./imgs/keras.png)
+
+# 참고자료
+* [1] https://towardsdatascience.com/pytorch-performance-analysis-with-tensorboard-7c61f91071aa
