@@ -42,6 +42,7 @@ Vagrant.configure("2") do |config|
       yum install git net-tools wget -y
       git clone https://github.com/kubernetes-sigs/kubespray.git
       sudo pip3 install -r kubespray/requirements.txt
+      chmod -R vagrant:vagrant kubespray
       echo 'vagrant ALL=NOPASSWD: ALL' >> /etc/sudoers
     SHELL
   end
