@@ -33,18 +33,9 @@ Vagrant.configure("2") do |config|
       v.name = BOOSTSTRAP_HOSTNAME
     end
     
-    cfg.vm.provision "shell", inline: <<-SHELL
-      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-      systemctl restart sshd
-      timedatectl set-timezone Asia/Seoul
-      yum install epel-release -y
-      yum install python3 python3-pip -y
-      yum install git net-tools wget -y
-      git clone https://github.com/kubernetes-sigs/kubespray.git
-      sudo pip3 install -r kubespray/requirements.txt
-      chmod -R vagrant:vagrant kubespray
-      echo 'vagrant ALL=NOPASSWD: ALL' >> /etc/sudoers
-    SHELL
+    # set environment
+    cfg.vm.provision "file", source: "bootstrap.sh", destination: "bootstrap.sh"
+    cfg.vm.provision "shell", inline: "bash bootstrap.sh"
   end
 
   # master node
@@ -58,13 +49,10 @@ Vagrant.configure("2") do |config|
       node.vm.box = IMAGE_NAME
       node.vm.network "public_network", ip: MASTER_IP
       node.vm.hostname = MASTER_HOSTNAME
-      node.vm.provision "shell", inline: <<-SHELL
-        timedatectl set-timezone Asia/Seoul
-        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-        systemctl restart sshd
-        yum install epel-release -y
-        echo 'vagrant ALL=NOPASSWD: ALL' >> /etc/sudoers
-      SHELL
+      
+      # set environment
+      cfg.vm.provision "file", source: "node.sh", destination: "node.sh"
+      cfg.vm.provision "shell", inline: "bash node.sh"
     end
 
   # worker node
@@ -78,14 +66,11 @@ Vagrant.configure("2") do |config|
 
         node.vm.box = IMAGE_NAME
         node.vm.network "public_network", ip: NODE_IP + "#{i + 211}"
-        node.vm.hostname = "node-#{i}"      
-        node.vm.provision "shell", inline: <<-SHELL
-          timedatectl set-timezone Asia/Seoul
-          sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-          systemctl restart sshd
-          yum install epel-release -y
-          echo 'vagrant ALL=NOPASSWD: ALL' >> /etc/sudoers
-        SHELL
+        node.vm.hostname = "node-#{i}"
+
+        # set environment
+        cfg.vm.provision "file", source: "node.sh", destination: "node.sh"
+        cfg.vm.provision "shell", inline: "bash node.sh"
       end
   end
 end
