@@ -2,7 +2,7 @@
 | 번호 | 이름 | 설명 |  링크 |
 | ---- | ---- | ---- | ---- |
 | 1 | aws lambda | lambda로 백엔드 기능 연습 | [링크](./aws/lambda/Readme.md) |
-| 2 | aws codepipeline lambda | github에 소스코드 업로드되면 aws codepipeline이 자동실행되어 lambda함수와 기타 리소스(api gateway 등) 생성 | 팀원 요청으로 비공개 |
+| 2 | aws codepipeline lambda | 1. github webhook설정을 통한 codepipeline 자동 실행 <br> 2. lambda, api gateway, role 연동 등 실행 | 팀원 요청으로 비공개 |
 
 # 프로젝트
 | 번호 | 설명 | 기술요약 | 프로젝트 바로가기 링크 |
