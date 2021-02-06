@@ -22,4 +22,7 @@ git clone https://github.com/kubernetes-sigs/kubespray.git
 sudo pip3 install -r kubespray/requirements.txt
 
 # set directory permission
-chmod -R vagrant:vagrant kubespray
+chown -R vagrant:vagrant kubespray
+
+# change root password
+echo 'toor' | passwd --stdin root
