@@ -5,7 +5,8 @@ N = 2
 
 # IP config
 NODE_IP = "192.168.219."
-MASTER_IP = "192.168.219.210"
+MASTER_IP = "192.168.219.211"
+BOOTSTRAP_IP = "192.168.219.210"
 
 # System config
 MASTER_CPU = 4
@@ -15,20 +16,21 @@ WORKER_MEMORY = 16384
 
 # hostname
 MASTER_HOSTNAME = "kube-master"
+BOOSTSTRAP_HOSTNAME = "kube-bootstrap"
 
 Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
 
-  # master node
-  config.vm.define MASTER_HOSTNAME do |cfg|
+  # bootstrap
+  config.vm.define BOOSTSTRAP_HOSTNAME do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "public_network", ip: MASTER_IP
-    cfg.vm.hostname = MASTER_HOSTNAME
+    cfg.vm.network "public_network", ip: BOOTSTRAP_IP
+    cfg.vm.hostname = BOOSTSTRAP_HOSTNAME
     
     cfg.vm.provider "virtualbox" do |v|
       v.memory = MASTER_MEMORY
       v.cpus = MASTER_CPU
-      v.name = MASTER_HOSTNAME
+      v.name = BOOSTSTRAP_HOSTNAME
     end
     
     cfg.vm.provision "shell", inline: <<-SHELL
@@ -44,6 +46,26 @@ Vagrant.configure("2") do |config|
     SHELL
   end
 
+  # master node
+  config.vm.define MASTER_HOSTNAME do |node|
+      node.vm.provider "virtualbox" do |v|
+        v.memory = MASTER_MEMORY
+        v.cpus = MASTER_CPU
+        v.name = MASTER_HOSTNAME
+      end
+
+      node.vm.box = IMAGE_NAME
+      node.vm.network "public_network", ip: MASTER_IP
+      node.vm.hostname = MASTER_HOSTNAME
+      node.vm.provision "shell", inline: <<-SHELL
+        timedatectl set-timezone Asia/Seoul
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+        yum install epel-release -y
+        echo 'vagrant ALL=NOPASSWD: ALL' >> /etc/sudoers
+      SHELL
+    end
+
   # worker node
   (1..N).each do |i|
     config.vm.define "node-#{i}" do |node|
@@ -54,7 +76,7 @@ Vagrant.configure("2") do |config|
         end
 
         node.vm.box = IMAGE_NAME
-        node.vm.network "public_network", ip: NODE_IP + "#{i + 210}"
+        node.vm.network "public_network", ip: NODE_IP + "#{i + 211}"
         node.vm.hostname = "node-#{i}"      
         node.vm.provision "shell", inline: <<-SHELL
           timedatectl set-timezone Asia/Seoul
