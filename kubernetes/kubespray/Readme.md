@@ -22,6 +22,7 @@ ssh-copy-id root@192.168.219.211
 ## ansible 인벤토리 설정
 ```sh
 cp -rfp inventory/sample inventory/mycluster
+vi inventory/mycluster/inventory.ini
 
 [all]
 master ansible_host=192.168.219.211
@@ -48,12 +49,12 @@ calico-rr
 
 ## 인벤토리 설정 확인
 ```
-ansible all -i inventory/mycluster/inventory.ini -m ping
+/usr/local/bin/ansible all -i inventory/mycluster/inventory.ini -m ping
 ```
 
 ## 설치
 ```sh
-ansible-playbook -i inventory/mycluster/inventory.ini -become --become-user=root cluster.yml
+/usr/local/bin/ansible-playbook -i inventory/mycluster/inventory.ini -become --become-user=root cluster.yml
 ```
 
 # 참고자료
