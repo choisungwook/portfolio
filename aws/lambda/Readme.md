@@ -5,7 +5,7 @@
 * low-level 인터페이스: boto3.client('s3')
 * high-level 인터페이스: boto3.resource('s3')
 
-# 파일 업로드
+# 버킷에 파일 업로드
 * 준비: 존재하는 버킷 이름
 * 예제: [예제 링크](s3_upload.py)
 * 핵심 소스코드
@@ -13,6 +13,19 @@
 ```python
 s3_client = boto3.client('s3')
 s3_client.upload_file(src, bucket_name, dst)
+```
+
+# 버킷 리스트 출력
+* 준비: 존재하는 버킷 이름
+* 예제: [예제 링크](s3_upload.py))
+* 핵심 소스코드
+
+```python
+bucket_name = "boannews"
+bucket_object = s3_resource.Bucket(bucket_name)
+
+for obj in bucket_object.objects.all():
+    print(obj.key)
 ```
 
 # 참고자료
