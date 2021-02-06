@@ -1,3 +1,10 @@
+# 개요
+* python기반 boto3 package 사용
+
+# boto3 패키지 인터페이스
+* low-level 인터페이스: boto3.client('s3')
+* high-level 인터페이스: boto3.resource('s3')
+
 # 파일 업로드
 * 준비: 존재하는 버킷 이름
 * 예제: [예제 링크](s3_upload.py)
