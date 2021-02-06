@@ -37,4 +37,4 @@ for obj in bucket_object.objects.all():
 <br>
 
 # 참고자료
-* [1] 블로그-boto3 client, resource 설명- https://planbs.tistory.com/entry/boto3resource%EC%99%80-boto3client%EC%9D%98-%EC%B0%A8%EC%9D%B4
+* [1] (블로그)[https://planbs.tistory.com/entry/boto3resource%EC%99%80-boto3client%EC%9D%98-%EC%B0%A8%EC%9D%B4] - boto3 client, resource 설명- 
