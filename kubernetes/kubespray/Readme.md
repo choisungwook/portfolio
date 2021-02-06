@@ -1,6 +1,9 @@
 # 개요
 * kubesrpay 설치를 위한 인프라
 * 이미지: centos 7
+
+# 주의사항
+* vagrant 설치 후 NAT 네트워크 인터페이스 제거
  
 # 설치 방법
 ## bootstrap 접속
