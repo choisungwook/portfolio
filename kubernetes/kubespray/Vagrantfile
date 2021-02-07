@@ -1,11 +1,12 @@
 IMAGE_NAME = "centos/7"
 
 # number of worker nodes
-N = 2
+WORKER_N = 2
+MASTER_N = 2
 
 # IP config
+MASTER_IP = "192.168.219."
 NODE_IP = "192.168.219."
-MASTER_IP = "192.168.219.211"
 BOOTSTRAP_IP = "192.168.219.210"
 
 # System config
@@ -39,24 +40,29 @@ Vagrant.configure("2") do |config|
   end
 
   # master node
-  config.vm.define MASTER_HOSTNAME do |node|
-      node.vm.provider "virtualbox" do |v|
-        v.memory = MASTER_MEMORY
-        v.cpus = MASTER_CPU
-        v.name = MASTER_HOSTNAME
-      end
+  (1..MASTER_N).each do |i|
+    config.vm.define "master-#{i}" do |node|
+        node.vm.provider "virtualbox" do |v|
+          v.memory = MASTER_MEMORY
+          v.cpus = MASTER_CPU
+          v.name = "master-#{i}"
+        end
 
-      node.vm.box = IMAGE_NAME
-      node.vm.network "public_network", ip: MASTER_IP
-      node.vm.hostname = MASTER_HOSTNAME
-      
-      # set environment
-      node.vm.provision "file", source: "node.sh", destination: "node.sh"
-      node.vm.provision "shell", inline: "bash node.sh"
-    end
+        node.vm.box = IMAGE_NAME
+        node.vm.network "public_network", ip: MASTER_IP + "#{i + 221}"
+        node.vm.hostname = "master-#{i}"
+        
+        # set environment
+        node.vm.provision "file", source: "node.sh", destination: "node.sh"
+        node.vm.provision "shell", inline: "bash node.sh"
+
+        # copy ansible inventory
+        node.vm.provision "file", source: "inventory.ini", destination: "inventory/mycluster/inventory.ini"
+      end
+  end
 
   # worker node
-  (1..N).each do |i|
+  (1..WORKER_N).each do |i|
     config.vm.define "node-#{i}" do |node|
         node.vm.provider "virtualbox" do |v|
           v.memory = WORKER_MEMORY
@@ -65,7 +71,7 @@ Vagrant.configure("2") do |config|
         end
 
         node.vm.box = IMAGE_NAME
-        node.vm.network "public_network", ip: NODE_IP + "#{i + 211}"
+        node.vm.network "public_network", ip: NODE_IP + "#{i + 231}"
         node.vm.hostname = "node-#{i}"
 
         # set environment
