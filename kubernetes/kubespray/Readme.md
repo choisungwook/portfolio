@@ -5,6 +5,19 @@
 # 주의사항
 * vagrant 설치 후 NAT 네트워크 인터페이스 제거
  
+# 설치준비
+## ip 포워딩
+```sh
+modprobe br_netfilter
+sudo sh -c "echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables"
+sudo sh -c "echo '1' > /proc/sys/net/ipv4/ip_forward"
+```
+
+## 방화벽 비활성화
+```sh
+ systemctl disable firewalld
+```
+
 # 설치 방법
 ## bootstrap 접속
 ```
