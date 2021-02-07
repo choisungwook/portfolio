@@ -4,3 +4,4 @@
 | -- | --- | ---- |
 | 1 | centos7 정적 IP | [링크](configure_centos7_staticIP.md) | 
 | 2 | centos7 저장소 등록 | [링크](centos_repository.md) | 
+| 3 | k8s 접속토큰 출력 | [링크](k8s_print_token.md) | 
