@@ -24,6 +24,7 @@ yum install git net-tools wget -y
 
 # clone kubespray project
 git clone https://github.com/kubernetes-sigs/kubespray.git
+cp -rfp kubespray/inventory/sample kubespray/inventory/mycluster
 
 # install python package
 sudo pip3 install -r kubespray/requirements.txt
