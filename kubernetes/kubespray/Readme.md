@@ -59,3 +59,4 @@ cat inventory/mycluster/inventory.ini
 # 참고자료
 * [1] https://memory-hub.tistory.com/8
 * [2] [computingforgeeks 설치 메뉴얼](https://computingforgeeks.com/deploy-kubernetes-cluster-centos-kubespray/)
+* [3] [TroubleShooting-coredns 갯수](https://github.com/kubernetes-sigs/kubespray/issues/3880)
