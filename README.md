@@ -4,6 +4,9 @@
 | 1 | aws lambda | lambda로 백엔드 기능 연습 | [링크](./aws/lambda/Readme.md) |
 | 2 | aws codepipeline lambda | 1. github webhook설정을 통한 codepipeline 자동 실행 <br> 2. lambda, api gateway, role 연동 등 실행 | 팀원 요청으로 비공개 |
 | 3 | kubernetes helm | prometheus, efk 등 helm 연습  | [링크](./kubernetes/helm/Readme.md) |
+| 4 | kubernetes basic | 쿠버네티스 공부  | [링크](./kubernetes/basic/Readme.md) |
+
+<br>
 
 # 프로젝트
 | 번호 | 설명 | 기술요약 | 프로젝트 바로가기 링크 |
@@ -14,8 +17,7 @@
 
 ---
 
-
-
+<br>
 
 # 1. 백엔드 (제거 예정)
 ## 스프링부트
