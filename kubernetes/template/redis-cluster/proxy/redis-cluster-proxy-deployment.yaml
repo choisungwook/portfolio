@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-proxy
+  template:
+    metadata:
+      labels:
+        app: redis-proxy
+    spec:
+      imagePullSecrets:
+        - name: harbor
+      containers:
+        - name: redis-proxy
+          image: choisunguk/redis-cluster-proxy:latest
+          imagePullPolicy: Always
+          command: ["redis-cluster-proxy"]
+          args:
+            - -c
+            - /data/proxy.conf
+          ports:
+            - name: redis-6379
+              containerPort: 6379
+              protocol: TCP
+          volumeMounts:
+            - name: redis-proxy-conf
+              mountPath: /data/
+      volumes:
+        - name: redis-proxy-conf
+          configMap:
+            name: redis-proxy
