@@ -55,12 +55,12 @@ spec:
   selector:
     matchLabels:
       app: redis-cluster-1
-    annotations:
-      "cni.projectcalico.org/ipAddrs": "[\"10.233.96.21\"]"
   template:
     metadata:
       labels:
         app: redis-cluster-1
+      annotations:
+      "cni.projectcalico.org/ipAddrs": "[\"10.233.96.21\"]"
     spec:
       nodeSelector:
         kubernetes.io/hostname: node3
