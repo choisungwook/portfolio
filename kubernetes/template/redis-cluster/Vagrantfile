@@ -1,0 +1,52 @@
+IMAGE_NAME = "centos/7"
+IP = "192.168.219.133"
+HOST_NAME = "tmp"
+CPU = "4"
+MEMORY = "8096"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # master node
+  config.vm.define HOST_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: IP
+    cfg.vm.hostname = HOST_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = MEMORY
+      v.cpus = CPU
+      v.name = HOST_NAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install vim git tree wget -y
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # install gcc
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+        yum install centos-release-scl -y
+        yum install gcc devtoolset-8-gcc devtoolset-8-gcc-c++ -y
+        scl enable devtoolset-8 bash
+    SCRIPT
+
+    # install docker
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      yum install -y yum-utils
+      yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      yum install docker-ce docker-ce-cli containerd.io docker-compose -y
+      systemctl enable docker
+      systemctl start docker
+    SCRIPT
+
+    # build
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+        git clone https://github.com/artix75/redis-cluster-proxy
+        cd redis-cluster-proxy
+        make PREFIX=/usr/local/redis_cluster_proxy install
+    SCRIPT
+  end
+end
