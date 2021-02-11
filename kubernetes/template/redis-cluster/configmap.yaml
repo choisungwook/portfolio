@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster
+data:
+  redis.conf: |
+    cluster-enabled yes
+    port 6379
+    protected-mode no
+    masterauth "toor"
+    requirepass "toor"
+    dir /var/lib/redis
+    cluster-config-file nodes.conf
+    cluster-migration-barrier 1
+    cluster-require-full-coverage no

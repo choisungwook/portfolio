@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cluster-0
+  labels:
+    app: redis-cluster-0
+    cluster: redis-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-cluster-0
+  template:
+    metadata:
+      labels:
+        app: redis-cluster-0
+      annotations:
+        "cni.projectcalico.org/ipAddrs": "[\"10.233.96.20\"]"
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node2
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        command: ["redis-server"]
+        args:
+        - /etc/redis/redis.conf
+        volumeMounts:
+        - name: redis-conf
+          mountPath: /etc/redis/
+        - name: redis-data
+          mountPath: /var/lib/redis/
+      volumes:
+      - name: redis-conf
+        configMap:
+          name: redis-cluster
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cluster-1
+  labels:
+    app: redis-cluster-1
+    cluster: redis-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-cluster-1
+    annotations:
+      "cni.projectcalico.org/ipAddrs": "[\"10.233.96.21\"]"
+  template:
+    metadata:
+      labels:
+        app: redis-cluster-1
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node3
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        command: ["redis-server"]
+        args:
+        - /etc/redis/redis.conf
+        volumeMounts:
+        - name: redis-conf
+          mountPath: /etc/redis/
+        - name: redis-data
+          mountPath: /var/lib/redis/
+      volumes:
+      - name: redis-conf
+        configMap:
+          name: redis-cluster
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cluster-2
+  labels:
+    app: redis-cluster-2
+    cluster: redis-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-cluster-2
+  template:
+    metadata:
+      labels:
+        app: redis-cluster-2
+      annotations:
+        "cni.projectcalico.org/ipAddrs": "[\"10.233.96.22\"]"
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node4
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+          name: client
+        - containerPort: 16379
+          name: gossip
+        command: ["redis-server"]
+        args:
+        - /etc/redis/redis.conf
+        volumeMounts:
+        - name: redis-conf
+          mountPath: /etc/redis/
+        - name: redis-data
+          mountPath: /var/lib/redis/
+      volumes:
+      - name: redis-conf
+        configMap:
+          name: redis-cluster
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-2

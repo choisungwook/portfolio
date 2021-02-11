@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-0
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/redis"
+  claimRef:
+    name: redis-0
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-1
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/redis"
+  claimRef:
+    name: redis-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-2
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/redis"
+  claimRef:
+    name: redis-2
