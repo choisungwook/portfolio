@@ -14,6 +14,7 @@ spec:
     metadata:
       labels:
         app: redis-cluster-0
+        cluster: redis-cluster
       annotations:
         "cni.projectcalico.org/ipAddrs": "[\"10.233.96.20\"]"
     spec:
@@ -59,6 +60,7 @@ spec:
     metadata:
       labels:
         app: redis-cluster-1
+        cluster: redis-cluster
       annotations:
         "cni.projectcalico.org/ipAddrs": "[\"10.233.96.21\"]"
     spec:
@@ -104,6 +106,7 @@ spec:
     metadata:
       labels:
         app: redis-cluster-2
+        cluster: redis-cluster
       annotations:
         "cni.projectcalico.org/ipAddrs": "[\"10.233.96.22\"]"
     spec:
