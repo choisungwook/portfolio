@@ -29,6 +29,9 @@ cp ntp.conf /etc/ntp.conf
 ntpq -p
 systemctl start ntpd && systemctl enable ntpd
 
+# disable chronyd
+systemctl disable chronyd
+
 echo "[*] disable dnsmasq"
 systemctl stop dnsmasq && disable dnsmasq
 
