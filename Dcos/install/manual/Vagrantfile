@@ -65,8 +65,10 @@ Vagrant.configure("2") do |config|
     
     # cfg.vm.provision "shell", inline: "chmod u+x files/genconf/ip-detect"
     cfg.vm.provision "file", source: "files/genconf", destination: "genconf"
-    cfg.vm.provision "file", source: "files/dcos_generate_config.sh", destination: "dcos_generate_config.sh"
-    cfg.vm.provision "shell", inline: "/bin/bash dcos_generate_config.sh"
+
+    # Download DC/OS Release 2.0
+    cfg.vm.provision "shell", inline: "yum install -y wget"
+    cfg.vm.provision "shell", inline: "wget https://downloads.dcos.io/dcos/stable/2.0.6/dcos_generate_config.sh?_ga=2.41591330.1285352321.1613436440-900489850.1613436440"
   end
 
   # worker node
