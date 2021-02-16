@@ -8,7 +8,7 @@ WORKER_IP = "192.168.219."
 
 # Host names
 MASTER_NAME = "dcos-master"
-BOOTSTRAP_NAME = "bootstrap"
+BOOTSTRAP_NAME = "dcos-bootstrap"
 
 Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
@@ -70,21 +70,21 @@ Vagrant.configure("2") do |config|
   end
 
   # worker node
-#   (1..N).each do |i|
-#     config.vm.define "agent-#{i}" do |cfg|
-#       cfg.vm.box = IMAGE_NAME
-#       cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
-#       cfg.vm.hostname = "client-#{i}"
+  (1..N).each do |i|
+    config.vm.define "dcos-agent-#{i}" do |cfg|
+      cfg.vm.box = IMAGE_NAME
+      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
+      cfg.vm.hostname = "dcos-agent-#{i}"
       
-#       cfg.vm.provider "virtualbox" do |v|
-#         v.memory = 4096
-#         v.cpus = 2
-#         v.name = "agent#{i}"
-#       end
-#       cfg.vm.provision "shell", inline: <<-SCRIPT
-#         sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-#         systemctl restart sshd
-#       SCRIPT
-#     end
-#   end
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 4096
+        v.cpus = 2
+        v.name = "dcos-agent#{i}"
+      end
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+      SCRIPT
+    end
+  end
 end
