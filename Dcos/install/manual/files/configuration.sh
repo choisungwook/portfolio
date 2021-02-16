@@ -15,8 +15,8 @@ yum groupinstall -y "Development Tools"
 yum -y --tolerant install perl tar xz unzip curl bind-utils net-tools ipset libtool-ltdl rsync nfs-utils kernel-devel pciutils
 
 # echo "[*] disable selinux"
-# sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
-# setenforce permissive
+sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+setenforce permissive
 
 echo "[*] disable firewall"
 systemctl stop firewalld && systemctl disable firewalld
