@@ -32,7 +32,7 @@ export AWS_DEFAULT_REGION="ap-northeast-2"
 ```
 * ssh 키쌍 생성
 ```
-ssh-keygen t rsa b 4096 N "" f test
+ssh-keygen -t rsa -b 4096 -N "" -f test
 ```
 
 <br>
