@@ -30,12 +30,17 @@ export AWS_ACCESS_KEY_ID="<AWS_ACCESS_KEY_ID>"
 export AWS_SECRET_ACCESS_KEY="<AWS_SECRET_ACCESS_KEY>"
 export AWS_DEFAULT_REGION="ap-northeast-2"
 ```
+* ssh 키쌍 생성
+```
+ssh keygen t rsa b 4096 N "" f test
+```
 
 <br>
 
 # 실행
 ```sh
-terrafom apply
+terraform init
+terraform apply
 ```
 
 <br>
