@@ -1,3 +1,13 @@
+# 개요
+* ec2 keypair, security group, ec2 생성
+
+# 준비
+## aws 접속 정보를 환경변수로 설정
+```sh
+export AWS_ACCESS_KEY_ID="<AWS_ACCESS_KEY_ID>"
+export AWS_SECRET_ACCESS_KEY="<AWS_SECRET_ACCESS_KEY>"
+```
+
 # Provisioners
 * 인스턴스 리소스가 최초 생성될 때 실행되는 액션을 설정
 
