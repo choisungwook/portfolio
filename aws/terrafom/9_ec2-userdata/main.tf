@@ -25,7 +25,8 @@ resource "null_resource" "name" {
   }
 
   provisioner "remote-exec" {
-    inline = [      
+    inline = [
+      "until [ -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
       "sudo apt update",
       "sudo apt install apache2 -y && sudo systemctl start apache2",
       "sudo chown -R ubuntu:ubuntu /var/www/html",

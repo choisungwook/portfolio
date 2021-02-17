@@ -63,3 +63,4 @@ terraform destroy
 * [terrafrom 공식문서-aws_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance)
 * [블로그-apache2 권한설정](https://stackoverflow.com/questions/50378664/permission-denied-inside-var-www-html-when-creating-a-website-and-its-files-wi/50379288)
 * [블로그-apache2 권한설정](https://itreport.tistory.com/630)
+* [aws ubuntu AMI untill](https://stackoverflow.com/questions/42279763/why-does-terraform-apt-get-fail-intermittently)
