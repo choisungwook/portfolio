@@ -1,5 +1,4 @@
 # 목차
-- [실습영상링크](https://youtu.be/rHm6C2-77uA)
 - [목차](#목차)
 - [목적](#목적)
 - [목표](#목표)
@@ -68,3 +67,4 @@ terraform destroy
 * [블로그-apache2 권한설정](https://itreport.tistory.com/630)
 * [aws ubuntu AMI untill](https://stackoverflow.com/questions/42279763/why-does-terraform-apt-get-fail-intermittently)
 * [ubuntu ami finder](https://cloud-images.ubuntu.com/locator/ec2/)
+* [terraform 공식문서-aws_ami_from_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ami_from_instance)
