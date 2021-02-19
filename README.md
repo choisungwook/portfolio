@@ -10,7 +10,7 @@
 <br>
 
 # 상세 목차
-| 분류 | 문서 링크 | 영상링크 |
+| 분류 | 문서 | 링크 | 영상링크 |
 | --- | --- | ----- | ------ |
 | aws와 terraform | EC2 인스턴스와 공개키 인증방식 설정 | [Readme 링크](../terrafom/9_ec2-userdata/Readme.md) | [유투브 링크](https://youtu.be/rHm6C2-77uA) |
 | aws와 terraform | EC2 인스턴스를 AMI로 생성 | [Readme 링크](../terrafom/11_create-ami/Readme.md) | |
