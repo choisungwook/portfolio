@@ -12,5 +12,6 @@
 
 | 설명 | 문서링크 | 실습영상 링크 |
 | ---- | ---- | ------------ |
-| EC2 인스턴스와 공개키 인증방식 설정 | [Readme 링크](../terraform/9_ec2-userdata/Readme.md) | [유투브 링크](https://youtu.be/rHm6C2-77uA) |
-| EC2 인스턴스를 AMI로 생성 | [Readme 링크](../terraform/11_create-ami/Readme.md) | |
+| EC2 인스턴스와 공개키 인증방식 설정 | [Readme 링크](./9_ec2-userdata/Readme.md) | [유투브 링크](https://youtu.be/rHm6C2-77uA) |
+| EC2 인스턴스를 AMI로 생성 | [Readme 링크](./11_create-ami/Readme.md) | |
+| EC2 인스턴스 user data설정 | [Readme 링크](./12_ec2-user-data/Readme.md) | |
