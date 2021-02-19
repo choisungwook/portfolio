@@ -74,3 +74,4 @@ systemctl disable chronyd
 
 # 참고자료
 * [1] [블로그-DCOS 설치](https://github.com/5wjdgns2/DC-OS)
+* [2] [git issue-chronyd와 ntpd 충돌](https://groups.google.com/a/dcos.io/g/users/c/UYvMnVioOs8?pli=1)
