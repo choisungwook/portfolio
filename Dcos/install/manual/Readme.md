@@ -43,35 +43,12 @@ curl -O http://<your_bootstrap_ip>:<your_bootstrap_port>/dcos...
 <br>
 
 # 설치
-## bootstrap
-* dcos_generate_config.sh 실행
+* 설정 후 vagrantfile 실행
 ```sh
-cd /home/vagrant
-sudo su ; 루트계정 로그인
-bash dcos_generate_config.sh
+vagrant up
 ```
 
-* your-port를 getconf/config.yaml에 설정한 bootstrap_url포트로 변경
-  * 편의상 http default port인 80번으로 설정
-```sh
-sudo docker run -d -p <your-port>:8888 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx
-```
-
-## master
-```sh
-mkdir /tmp/dcos && cd /tmp/dcos
-curl -O http://<bootstrap-ip>:<bootstrap-port>>/dcos_install.sh
-sudo bash dcos_install.sh master
-sudo bash dcos_install.sh master
-```
-
-## agent
-```sh
-mkdir /tmp/dcos && cd /tmp/dcos
-curl -O http://<bootstrap-ip>:<bootstrap-port>/dcos_install.sh
-sudo bash dcos_install.sh slave
-sudo bash dcos_install.sh slave
-```
+<br>
 
 # 접속
 * http://master_ip
