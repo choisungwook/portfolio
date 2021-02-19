@@ -55,7 +55,7 @@ terraform destroy
 <br>
 
 # 테라폼 스크립트 상세설명
-* pdf참고 챕터1-EC2인스턴스참고: [pdf링크](../terraform-aws.pdf)
+* pdf참고 챕터3- EC2인스턴스 userdata 참고: [pdf링크](../terraform-aws.pdf)
 
 <br>
 
