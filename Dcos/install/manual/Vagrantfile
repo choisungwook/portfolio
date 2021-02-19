@@ -13,49 +13,6 @@ BOOTSTRAP_NAME = "dcos-bootstrap"
 Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
 
-  # master node
-  config.vm.define MASTER_NAME do |cfg|
-    cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "public_network", ip: MASTER_IP
-    cfg.vm.hostname = MASTER_NAME
-    
-    cfg.vm.provider "virtualbox" do |v|
-      v.memory = 8192
-      v.cpus = 4
-      v.name = MASTER_NAME
-    end
-    cfg.vm.provision "shell", inline: <<-SCRIPT
-      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-      systemctl restart sshd
-    SCRIPT
-
-    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
-    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
-    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
-
-    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
-    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
-  end
-
-  # worker node
-  (1..N).each do |i|
-    config.vm.define "dcos-agent-#{i}" do |cfg|
-      cfg.vm.box = IMAGE_NAME
-      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
-      cfg.vm.hostname = "dcos-agent-#{i}"
-      
-      cfg.vm.provider "virtualbox" do |v|
-        v.memory = 4096
-        v.cpus = 2
-        v.name = "dcos-agent#{i}"
-      end
-      cfg.vm.provision "shell", inline: <<-SCRIPT
-        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-        systemctl restart sshd
-      SCRIPT
-    end
-  end
-
   # bootstrap node
   config.vm.define BOOTSTRAP_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
@@ -86,7 +43,56 @@ Vagrant.configure("2") do |config|
 
     # Download DC/OS Release 2.0
     cfg.vm.provision "shell", inline: "curl --output test.sh https://downloads.dcos.io/dcos/stable/2.0.6/dcos_generate_config.sh?_ga=2.41591330.1285352321.1613436440-900489850.1613436440"
+
+    # run DC/OS release.sh
+    cfg.vm.provision "shell", inline: "bash test.sh"
+
+    # run booststrap server using docker
+    cfg.vm.provision "shell", inline: "docker run -d -p 80:80 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx"
   end
 
+  # master node
+  config.vm.define MASTER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: MASTER_IP
+    cfg.vm.hostname = MASTER_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = MASTER_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+
+  end
+
+  # worker node
+  (1..N).each do |i|
+    config.vm.define "dcos-agent-#{i}" do |cfg|
+      cfg.vm.box = IMAGE_NAME
+      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
+      cfg.vm.hostname = "dcos-agent-#{i}"
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 4096
+        v.cpus = 2
+        v.name = "dcos-agent#{i}"
+      end
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+      SCRIPT
+    end
+  end
   
 end
