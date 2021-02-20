@@ -4,9 +4,15 @@
 
 <br>
 
-# 인프라
-* vagrantfile로 vm 구성
-  * bootstrap, master, agent
+# 인프라 구성
+* Virtualbox를 사용하여 노드를 구성하고 Vagrantfile로 자동화
+* 노드 구성
+  * bootstrap
+  * master
+  * private worker
+  * public worker
+
+![](imgs/architecture.png)
 
 <br>
 

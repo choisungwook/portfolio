@@ -9,6 +9,7 @@ DC/OS에서 로드밸런서는 마라톤 로드밸런서를(Marathon-LB) 사용
 <br>
 
 # Marathon-LB 설치
+## 선택지1
 * UI에서 Catalog메뉴 -> marathon 클릭 후 설치
 ![](imgs/install_marathon.png)
 
@@ -16,3 +17,6 @@ DC/OS에서 로드밸런서는 마라톤 로드밸런서를(Marathon-LB) 사용
 
 * UI에서 Service메뉴 -> marathon-user가 Running상태인지 확인
 ![](imgs/install_marathon3.png)
+
+## 선택지2
+[marathone-lb.json](./marathon-lb.json)을 이용해서 서비스 생성
