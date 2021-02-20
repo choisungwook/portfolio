@@ -52,13 +52,8 @@ vagrant up
 <br>
 
 # TroubleShooting
-## chronyd 충돌
-* chronyd는 ntpd랑 충돌이 나므로 비활성화
-```sh
-systemctl disable chronyd
-```
-
-<br>
+## timesync는 chronyd사용 
+* ntpd가 재부팅시 자동실행 안되는 문제가 있어 chronyd사용
 
 ## 버전 다운
 * 최신 버전은 설치 하지 말 것: 최신 버전은 설치 불가
