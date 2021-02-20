@@ -12,7 +12,7 @@
   * private worker
   * public worker
 
-![](imgs/architecture.png)
+![](imgs/infra.png)
 
 <br>
 
