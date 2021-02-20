@@ -11,7 +11,7 @@
 <br>
 
 ## ip 설정
-* master node ip
+### master node ip
 ```yaml
 ; files/genconf/config.yaml 8번째줄 IP 수정
 master_list:
@@ -23,7 +23,7 @@ master_list:
 MASTER_IP = <your_master_ip>
 ```
 
-* bootstrap node ip
+### bootstrap node ip
 ```yaml
 ; files/genconf/config.yaml 1번째줄 IP와 포트 수정
 bootstrap_url: http://<your_ip>:<your_port>
@@ -32,12 +32,6 @@ bootstrap_url: http://<your_ip>:<your_port>
 ```
 ; Vagrantfile 수정 6번째줄 IP 수정
 BOOTSTRAP_IP = <your_bootstrap_ip>
-
-; Vagrantfile 79번째줄 IP수정
-curl -O http://<your_bootstrap_ip>:<your_bootstrap_port>/dcos...
-
-; Vagrantfile 109번째줄 IP수정
-curl -O http://<your_bootstrap_ip>:<your_bootstrap_port>/dcos...
 ```
 
 <br>
