@@ -40,6 +40,18 @@ bootstrap_url: http://<your_ip>:<your_port>
 BOOTSTRAP_IP = <your_bootstrap_ip>
 ```
 
+### public worker node ip
+```yaml
+; files/genconf/config.yaml 7번째줄 IP와 포트 수정
+PUBLIC_AGENT_IP: http://<your_ip>:<your_port>
+```
+
+### private worker node ip
+```yaml
+; files/genconf/config.yaml 8번째줄 IP와 포트 수정
+PRIVATE_AGENT_IP: http://<your_ip>:<your_port>
+```
+
 <br>
 
 # 설치
