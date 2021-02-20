@@ -76,3 +76,4 @@ sudo bash dcos_install.sh slave
 * [2] 설치git wiki: https://github.com/amitpandit09/DCOS-setup-on-ubuntu/wiki/Configure-bootstrap-node
 * [3] 공식문서 troubleshooting: https://docs.d2iq.com/mesosphere/dcos/2.0/installing/troubleshooting/#gen-resolvconf
 * [4] 설치 git: https://gist.github.com/cantbewong/38a4f5dc8c78b17c9ca8881e00310498
+* [5] [블로그-chronyd](https://www.lesstif.com/lpt/linux-chrony-time-synchronizing-82215032.html)
