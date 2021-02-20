@@ -23,14 +23,12 @@ systemctl stop firewalld && systemctl disable firewalld
 
 echo "[*] install ntp and sync time"
 yum install -y ntp
+yum remove chrony
 timedatectl set-timezone Asia/Seoul
 timedatectl set-ntp yes
 cp ntp.conf /etc/ntp.conf
 ntpq -p
 systemctl start ntpd && systemctl enable ntpd
-
-# disable chronyd
-systemctl disable chronyd
 
 echo "[*] disable dnsmasq"
 systemctl stop dnsmasq && disable dnsmasq
