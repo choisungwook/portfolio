@@ -1,10 +1,11 @@
 IMAGE_NAME = "centos/7"
-N = 2
+N = 1
 
 # IP Configuration
 MASTER_IP = "192.168.219.71"
 BOOTSTRAP_IP = "192.168.219.72"
-WORKER_IP = "192.168.219."
+PUBLIC_AGENT_IP = "192.168.219.73"
+PRIVATE_AGENT_IP = "192.168.219."
 
 # Host names
 MASTER_NAME = "dcos-master"
@@ -82,15 +83,15 @@ Vagrant.configure("2") do |config|
 
   # private agent node
   (1..N).each do |i|
-    config.vm.define "dcos-agent-#{i}" do |cfg|
+    config.vm.define "dcos-privateagent-#{i}" do |cfg|
       cfg.vm.box = IMAGE_NAME
-      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+72}"
-      cfg.vm.hostname = "dcos-agent-#{i}"
+      cfg.vm.network "public_network", ip: PRIVATE_AGENT_IP + "#{i+73}"
+      cfg.vm.hostname = "dcos-privateagent-#{i}"
       
       cfg.vm.provider "virtualbox" do |v|
-        v.memory = 4096
-        v.cpus = 2
-        v.name = "dcos-agent#{i}"
+        v.memory = 8192
+        v.cpus = 4
+        v.name = "dcos-privateagent#{i}"
       end
       cfg.vm.provision "shell", inline: <<-SCRIPT
         sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -109,6 +110,36 @@ Vagrant.configure("2") do |config|
       cfg.vm.provision "shell", inline: "curl -O http://#{BOOTSTRAP_IP}:80/dcos_install.sh"
       cfg.vm.provision "shell", inline: "bash dcos_install.sh slave"
     end
+  end
+
+  # public agent node
+  
+  config.vm.define "dcos-publicagent" do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: PUBLIC_AGENT_IP
+    cfg.vm.hostname = "dcos-publicagent"
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 4096
+      v.cpus = 4
+      v.name = "dcos-publicagent"
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+
+    # install worker node
+    cfg.vm.provision "shell", inline: "mkdir /tmp/dcos && cd /tmp/dcos"
+    cfg.vm.provision "shell", inline: "curl -O http://#{BOOTSTRAP_IP}:80/dcos_install.sh"
+    cfg.vm.provision "shell", inline: "bash dcos_install.sh slave_public"
   end
   
 end
