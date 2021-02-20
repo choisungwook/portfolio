@@ -67,3 +67,4 @@ vagrant up
 * [3] [공식문서-dcos troubleshooting](https://mesosphere.github.io/field-notes/troubleshooting/installation-faq.html)
 * [4] [공식문서-DCOS 설치](https://docs.d2iq.com/mesosphere/dcos/1.11/installing/production/deploying-dcos/installation/)
 * [5] [블로그-Mesos 아키텍처 설명](https://steemit.com/kubernets/@giljae/kubernetes-vs-mesos-with-marathon)
+* [6] [공식문서-DCOS marathon-lb](https://docs.d2iq.com/mesosphere/dcos/services/marathon-lb/1.13/release-notes/)
