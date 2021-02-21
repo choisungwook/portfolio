@@ -10,3 +10,6 @@ RUN chmod +x /root/configuration.sh && /root/configuration.sh
 USER jenkins
 COPY plugins.txt /usr/share/jenkins/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/plugins.txt
+
+EXPOSE 8080/tcp
+EXPOSE 50000/tcp
