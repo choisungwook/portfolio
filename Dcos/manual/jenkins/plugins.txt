@@ -11,3 +11,4 @@ github-branch-source
 pipeline-github-lib
 pipeline-stage-view
 ssh-slaves
+locale
