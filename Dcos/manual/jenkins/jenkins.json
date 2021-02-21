@@ -13,6 +13,11 @@
         "containerPath": "/usr/local/bin/dcos",
         "hostPath": "/usr/local/bin/dcos",
         "mode": "RW"
+      },
+      {
+        "containerPath": "/var/run/docker.sock",
+        "hostPath": "/var/run/docker.sock",
+        "mode": "RW"
       }
     ],
     "docker": {
