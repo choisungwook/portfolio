@@ -1,9 +1,6 @@
-FROM jenkins:2.46.2
+FROM jenkins/jenkins:lts
 
 USER root
-
-# Remove old repository
-RUN sed -i '/jessie-updates/d' /etc/apt/sources.list
 
 # install linux packages(docker ... etc)
 COPY configuration.sh /configuration.sh
