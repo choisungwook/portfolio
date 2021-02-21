@@ -18,7 +18,7 @@
 | aws와 terraform | EC2 인스턴스를 AMI로 생성 | [Readme 링크](./aws/terraform/11_create-ami/Readme.md) | [유투브 링크](https://youtu.be/j4O1nrworMU) |
 | kubernetes | kubespray설치(인프라 환경: vagrant) | [Readme 링크](./kubernetes/kubespray/Readme.md) | |
 | DC/OS | DCOS 설치 | [Readme 링크](./Dcos/install/manual/Readme.md) | [유투브 링크](https://youtu.be/y1rOk_c_a-o) |
-| DC/OS | DCOS-CLI 설치 | [Readme 링크](./DCos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
+| DC/OS | DCOS-CLI 설치 | [Readme 링크](./Dcos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
 
 <br>
 
