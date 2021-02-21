@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # install docker
-apt install -y --no-install-recommends \
+apt update && apt install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     curl \
