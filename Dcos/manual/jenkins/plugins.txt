@@ -1,7 +1,7 @@
 maven-plugin
 git
 nodejs
-Folders
+cloudbees-folder
 build-timeout
 timestamper
 ws-cleanup
