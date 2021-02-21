@@ -14,12 +14,12 @@ docker build -t [이미지 이름] .
 ## 기본 컨테이너 생성
 * 타임존을 한국으로 변경
 ```sh
-docker run -d -p 8080:8080 -p 50000:50000 -v /var/run/docker.sock:/var/run/docker.sock --env "TZ=Asia/Seoul" [빌드된 도커 이미지]
+docker run -d -p 8080:8080 -p 50000:50000 -v /var/run/docker.sock:/var/run/docker.sock -v /home/vagrant/workspace:/var/jenkins_home --env "TZ=Asia/Seoul" [빌드된 도커 이미지]
 ```
 
 ## 메모리 제한 컨테이너 생성
 ```
-docker run -d -p 8080:8080 -p 50000:50000 /var/run/docker.sock --env "TZ=Asia/Seoul" --env JAVA_OPTS="-Xmx8192m -Xms8192m" [빌드된 도커 이미지]
+docker run -d -p 8080:8080 -p 50000:50000 /var/run/docker.sock -v /home/vagrant/workspace:/var/jenkins_home --env "TZ=Asia/Seoul" --env JAVA_OPTS="-Xmx8192m -Xms8192m" [빌드된 도커 이미지]
 ```
 
 <br>
