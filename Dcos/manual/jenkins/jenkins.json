@@ -1,0 +1,60 @@
+{
+  "id": "/jenkins",
+  "instances": 1,
+  "container": {
+    "type": "MESOS",
+    "volumes": [
+      {
+        "containerPath": "/var/jenkins_home",
+        "hostPath": "/dcos_workspace/jenkins",
+        "mode": "RW"
+      },
+      {
+        "containerPath": "/usr/local/bin/dcos",
+        "hostPath": "/usr/local/bin/dcos",
+        "mode": "RW"
+      }
+    ],
+    "docker": {
+      "image": "choisunguk/jenkins:v2"
+    },
+    "portMappings": [
+      {
+        "containerPort": 8080,
+        "hostPort": 0,
+        "protocol": "tcp",
+        "name": "http"
+      },
+      {
+        "containerPort": 50000,
+        "hostPort": 0,
+        "protocol": "tcp",
+        "name": "controller"
+      }
+    ]
+  },
+  "cpus": 4,
+  "requirePorts": false,
+  "networks": [
+    {
+      "mode": "container/bridge"
+    }
+  ],
+  "healthChecks": [],
+  "fetch": [],
+  "constraints": [
+    [
+      "hostname",
+      "IS",
+      "192.168.219.74"
+    ]
+  ],
+  "mem": 4096,
+  "env": {
+    "JAVA_OPTS": "-Xms4096m -Xmx4096m",
+    "TZ": "Asia/Seoul"
+  },
+  "labels": {
+    "HAPROXY_GROUP": "external"
+  }
+}
