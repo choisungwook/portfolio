@@ -1,3 +1,13 @@
 maven-plugin
 git
 nodejs
+Folders
+build-timeout
+timestamper
+ws-cleanup
+credentials-binding
+workflow-aggregator
+github-branch-source
+pipeline-github-lib
+pipeline-stage-view
+ssh-slaves
