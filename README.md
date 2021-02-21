@@ -19,6 +19,7 @@
 | kubernetes | kubespray설치(인프라 환경: vagrant) | [Readme 링크](./kubernetes/kubespray/Readme.md) | |
 | DC/OS | DCOS 설치 | [Readme 링크](./Dcos/install/manual/Readme.md) | [유투브 링크](https://youtu.be/y1rOk_c_a-o) |
 | DC/OS | DCOS-CLI 설치 | [Readme 링크](./Dcos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
+| docker | 커스텀 젠킨스 Dockerfile | [Readme 링크](./docker/jenkins-dood/Readme.md) | |
 
 <br>
 
