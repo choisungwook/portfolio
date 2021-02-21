@@ -19,6 +19,7 @@ add-apt-repository \
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io
 usermod -aG docker jenkins
+chown root:docker /var/run/docker.sock
 
 # install jdk8
 wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | apt-key add -
