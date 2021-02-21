@@ -21,7 +21,7 @@
       }
     ],
     "docker": {
-      "image": "choisunguk/jenkins:v2"
+      "image": "choisunguk/jenkins:v3"
     },
     "portMappings": [
       {
