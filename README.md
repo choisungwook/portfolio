@@ -6,6 +6,7 @@
 | 3 | kubernetes helm | prometheus, efk 등 helm 연습  | [Readme 링크](./kubernetes/helm/Readme.md) |
 | 4 | kubernetes basic | 쿠버네티스 공부  | [Readme 링크](./kubernetes/basic/Readme.md) |
 | 5 | terraform과 aws연동 | VPC, EC2 인스턴스 생성 등 | [Readme 링크](./aws/terraform/Readme.md) |
+| 6 | DC/OS 설치 | vagrant로 DC/OS 설치 자동화 | [Readme 링크](./Dcos/install/manual/Readme.md) |
 
 <br>
 
@@ -16,6 +17,8 @@
 | aws와 terraform | EC2 인스턴스 user data설정 | [Readme 링크](./aws/terraform/12_ec2-user-data/Readme.md) | [유투브 링크](https://youtu.be/qAvSbUEjWnU) |
 | aws와 terraform | EC2 인스턴스를 AMI로 생성 | [Readme 링크](./aws/terraform/11_create-ami/Readme.md) | [유투브 링크](https://youtu.be/j4O1nrworMU) |
 | kubernetes | kubespray설치(인프라 환경: vagrant) | [Readme 링크](./kubernetes/kubespray/Readme.md) | |
+| DC/OS | DCOS 설치 | [Readme.md 링크](./Dcos/install/manual/Readme.md) | [유투브 링크](https://youtu.be/y1rOk_c_a-o) |
+| DC/OS | DCOS-CLI 설치 | [Readme.md 링크](./DCos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
 
 <br>
 
