@@ -68,3 +68,4 @@ jenkins-plugin-cli --plugin-file plugins.txt
 * [4] [블로그-젠킨스 커스텀 Dockerfile](https://coding-start.tistory.com/329)
 * [5] [젠킨스 공식 dockerhub](https://hub.docker.com/r/jenkins/jenkins)
 * [6] [블로그-젠킨스 리소스 제한 환경변수 설정](https://technology.riotgames.com/news/putting-jenkins-docker-container)
+* [7] [젠킨스 공식문서-언어설정](https://www.jenkins.io/doc/book/using/using-local-language/)
