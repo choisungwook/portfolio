@@ -1,0 +1,14 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Hello') {
+            steps {
+                withCredentials([string(credentialsId: 'hello', variable: 'HELLO')]) {
+                    sh 'echo ${HELLO}'
+                    echo "${env.HELLO}"
+                }
+            }
+        }
+    }
+}
