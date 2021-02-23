@@ -4,6 +4,7 @@
 <br>
 
 # 실행방법
+* 초기비밀번호는 마운트 된 volume에 admin.password파일에 존재
 ```
 kubectl apply -f .
 ```
