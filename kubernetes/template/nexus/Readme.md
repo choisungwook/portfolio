@@ -30,7 +30,9 @@ kubectl delete -f
 
 <br>
 
-# 쿠버네티스 도커 레지스트리 등록
+# 쿠버네티스 private 도커 레지스트리 등록
+* .dockerconfigjson내용에는 "~/.docker/config.json" 내용을 설정
+  * config.json파일은 private 도커 레지스트리에 로그인 성공해야 생성됨
 ```yaml
 apiVersion: v1
 kind: Secret
