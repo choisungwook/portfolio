@@ -17,6 +17,9 @@ spec:
         image: sonatype/nexus3
         ports:
         - containerPort: 8081
+          name: http
+        - containerPort: 5000
+          name: docker
         volumeMounts:
         - name: nexus
           mountPath: /nexus-data
