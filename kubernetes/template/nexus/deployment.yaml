@@ -12,6 +12,13 @@ spec:
       labels:
         app: nexus
     spec:
+      initContainers:
+      - name: set-mount-permission
+        image: busybox
+        command: ['sh', '-c', 'chown -R 200:200 /nexus-data']
+        volumeMounts:
+        - name: nexus
+          mountPath: /nexus-data
       containers:
       - name: nexus
         image: sonatype/nexus3
