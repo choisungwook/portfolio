@@ -21,12 +21,6 @@ kubectl delete -f
 # 설정
 ## persistentvolume
 * 마운트경로: hostpath 수정
-  * 마운트 디렉터리는 200:200으로 수정
-```sh
-; 예
-chown -R 200:200 /mnt/nexus-data
-```
-
 * 용량: capacity 수정
 
 ## persistentvolume
