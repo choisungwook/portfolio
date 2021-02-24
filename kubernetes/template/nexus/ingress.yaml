@@ -11,6 +11,7 @@ spec:
   - hosts:
     - docker.my.com
     - nexus.my.com
+    secretName: server-tls
   rules:
     - host: nexus.my.com
       http:
