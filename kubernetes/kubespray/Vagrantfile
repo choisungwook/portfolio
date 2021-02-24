@@ -2,7 +2,7 @@ IMAGE_NAME = "centos/7"
 
 # number of worker nodes
 WORKER_N = 2
-MASTER_N = 2
+MASTER_N = 1
 
 # IP config
 MASTER_IP = "192.168.219."
@@ -52,7 +52,7 @@ Vagrant.configure("2") do |config|
         end
 
         node.vm.box = IMAGE_NAME
-        node.vm.network "public_network", ip: MASTER_IP + "#{i + 221}"
+        node.vm.network "public_network", ip: MASTER_IP + "#{i + 231}"
         node.vm.hostname = "master-#{i}"
         
         # set environment
