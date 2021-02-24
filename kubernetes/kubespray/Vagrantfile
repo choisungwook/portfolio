@@ -17,6 +17,7 @@ WORKER_MEMORY = 16384
 
 # hostname
 MASTER_HOSTNAME = "kube-master"
+WORKER_HOSTNAME = "kube-worker"
 BOOSTSTRAP_HOSTNAME = "kube-bootstrap"
 
 Vagrant.configure("2") do |config|
@@ -44,16 +45,16 @@ Vagrant.configure("2") do |config|
 
   # master node
   (1..MASTER_N).each do |i|
-    config.vm.define "master-#{i}" do |node|
+    config.vm.define "#{MASTER_HOSTNAME}-#{i}" do |node|
         node.vm.provider "virtualbox" do |v|
           v.memory = MASTER_MEMORY
           v.cpus = MASTER_CPU
-          v.name = "master-#{i}"
+          v.name = "#{MASTER_HOSTNAME}-#{i}"
         end
 
         node.vm.box = IMAGE_NAME
         node.vm.network "public_network", ip: MASTER_IP + "#{i + 231}"
-        node.vm.hostname = "master-#{i}"
+        node.vm.hostname = "#{MASTER_HOSTNAME}-#{i}"
         
         # set environment
         node.vm.provision "file", source: "node.sh", destination: "node.sh"
@@ -63,16 +64,16 @@ Vagrant.configure("2") do |config|
 
   # worker node
   (1..WORKER_N).each do |i|
-    config.vm.define "node-#{i}" do |node|
+    config.vm.define "#{WORKER_HOSTNAME}-#{i}" do |node|
         node.vm.provider "virtualbox" do |v|
           v.memory = WORKER_MEMORY
           v.cpus = WORKER_CPU
-          v.name = "kube-worker-#{i}"
+          v.name = "#{WORKER_HOSTNAME}-#{i}"
         end
 
         node.vm.box = IMAGE_NAME
         node.vm.network "public_network", ip: NODE_IP + "#{i + 231}"
-        node.vm.hostname = "node-#{i}"
+        node.vm.hostname = "#{WORKER_HOSTNAME}-#{i}"
 
         # set environment
         node.vm.provision "file", source: "node.sh", destination: "node.sh"
