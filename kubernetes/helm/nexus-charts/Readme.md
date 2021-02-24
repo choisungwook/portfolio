@@ -1,6 +1,27 @@
 # 개요
 * nexus-helm
 
+<br>
+
+# 준비
+* helm3 설치
+
+<br>
+
+# 실행 방법
+```sh
+helm install -n [namespace] --create-namespace nexus .
+```
+
+<br>
+
+# 삭제
+```
+helm uninstall -n [namespace] nexus
+```
+
+<br>
+
 # 설정
 | Parameter | Description |	Default |
 | -------- | ------------ | --------- |
