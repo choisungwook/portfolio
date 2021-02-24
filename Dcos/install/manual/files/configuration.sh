@@ -12,7 +12,7 @@ yum install -y epel-release
 
 echo "[*] install centos packages"
 yum groupinstall -y "Development Tools"
-yum -y --tolerant install perl tar xz unzip curl bind-utils net-tools ipset libtool-ltdl rsync nfs-utils kernel-devel pciutils
+yum -y --tolerant install perl tar xz unzip curl bind-utils net-tools ipset libtool-ltdl rsync nfs-utils kernel-devel pciutils wget git tmux
 
 # echo "[*] disable selinux"
 sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
