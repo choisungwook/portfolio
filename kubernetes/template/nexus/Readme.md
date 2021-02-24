@@ -49,3 +49,4 @@ type: kubernetes.io/dockerconfigjson
 # 참고자료
 * [1] [nexus docker hub](https://hub.docker.com/r/sonatype/nexus3)
 * [2] [쿠버네티스 공식문서-도커레티스트리 등록](https://kubernetes.io/ko/docs/tasks/configure-pod-container/pull-image-private-registry/)
+* [3] [git issue-nexus 볼륨마운트 권한설정 initContainer](https://github.com/sonatype/docker-nexus/issues/31)
