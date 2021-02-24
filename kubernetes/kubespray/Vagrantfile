@@ -39,7 +39,7 @@ Vagrant.configure("2") do |config|
     cfg.vm.provision "shell", inline: "bash bootstrap.sh"
 
     # copy ansible inventory
-    node.vm.provision "file", source: "inventory.ini", destination: "inventory/mycluster/inventory.ini"
+    cfg.vm.provision "file", source: "inventory.ini", destination: "inventory/mycluster/inventory.ini"
   end
 
   # master node
