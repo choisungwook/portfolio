@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "nexus-charts.fullname" . }}-test-connection"
+  labels:
+    {{- include "nexus-charts.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "nexus-charts.fullname" . }}:{{ .Values.service.httpport }}']
+  restartPolicy: Never
