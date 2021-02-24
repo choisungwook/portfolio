@@ -18,6 +18,7 @@ systemctl restart sshd
 
 # update repository
 yum install epel-release -y
+yum install net-tools -y
 
 # change root password
 echo 'toor' | passwd --stdin root
