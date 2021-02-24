@@ -22,7 +22,7 @@ spec:
             service:
               name: nexus
               port:
-                number: 80
+                number: 8081
     - host: docker.my.com
       http:
         paths:
