@@ -1,20 +1,22 @@
-- [개요](#개요)
-- [백업](#백업)
-- [복원](#복원)
-  - [준비](#준비)
-  - [백업](#백업-1)
-  - [서비스 재실행](#서비스-재실행)
-- [정기백업 설정](#정기백업-설정)
-- [백업 설정](#백업-설정)
-  - [백업파일 라이플사이클](#백업파일-라이플사이클)
-- [참고자료](#참고자료)
+- [1. 개요](#1-개요)
+- [2. 백업](#2-백업)
+- [3. 복원](#3-복원)
+  - [3.1 준비](#31-준비)
+  - [3.2 백업](#32-백업)
+  - [3.3 서비스 재실행](#33-서비스-재실행)
+- [4 정기백업 설정](#4-정기백업-설정)
+- [5. 백업 설정](#5-백업-설정)
+  - [5.1 백업파일 라이플사이클](#51-백업파일-라이플사이클)
+- [6. 참고자료](#6-참고자료)
 
-# 개요
+<br>
+
+# 1. 개요
 * gitlab 백업
 
 <br>
 
-# 백업
+# 2. 백업
 * 백업 명령어
   * tar파일로 백업
 ```
@@ -30,8 +32,8 @@ vi /etc/gitlab/gitlab.rb
 gitlab_rails['backup_path'] = "/var/opt/gitlab/backups"
 ```
 
-# 복원
-## 준비
+# 3. 복원
+## 3.1 준비
 * gitlab-ctl 실행
 ```
 sudo gitlab-ctl start
@@ -46,19 +48,19 @@ sudo gitlab-ctl stop sidekiq
 sudo gitlab-ctl status
 ```
 
-## 백업
+## 3.2 백업
 ```
 sudo gitlab-rake gitlab:backup:restore BACKUP=[백업파일 이름]
 ```
 
-## 서비스 재실행
+## 3.3 서비스 재실행
 ```
 sudo gitlab-ctl reconfigure
 sudo gitlab-ctl restart
 sudo gitlab-rake gitlab:check SANITIZE=true
 ```
 
-# 정기백업 설정
+# 4 정기백업 설정
 * 매일 2시에 백업하는 cronjob 생성
 ```
 sudo crontab -e
@@ -67,8 +69,8 @@ sudo crontab -e
 
 <br>
 
-# 백업 설정
-## 백업파일 라이플사이클
+# 5. 백업 설정
+## 5.1 백업파일 라이플사이클
 ```
 sudo vi /etc/gitlab/gitlab.rb
 
@@ -77,7 +79,7 @@ gitlab_rails['backup_keep_time'] = 604800
 
 <br>
 
-# 참고자료
+# 6. 참고자료
 * [1] [블로그](https://judo0179.tistory.com/50)
 * [2] [gitlab 공식문서-백업](https://docs.gitlab.com/ee/raketasks/backup_restore.html)
 * [3] [블로그](https://blog.naver.com/punxoi/220296044529)
