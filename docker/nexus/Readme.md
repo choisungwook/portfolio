@@ -34,7 +34,23 @@ $ docker volume inspect nexus-data
 
 ```
 
+# docker insecure 설정
+```
+{
+  "insecure-registries" : ["ip 또는 도메인:5000"]
+}
+```
+
+<br>
+
+# docker login
+```sh
+docker login ip:5000
+```
+
 <br>
 
 # 참고자료
+
 * [1] [nexus docker hub](https://hub.docker.com/r/sonatype/nexus3)
+* [2] [도커 공식문서-insecure](https://docs.docker.com/registry/insecure/)
