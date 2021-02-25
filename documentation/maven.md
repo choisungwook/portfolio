@@ -1,6 +1,15 @@
 # 개요
 * maven 공부 정리
 
+# maven 명령어
+* validate - validate the project is correct and all necessary information is available
+* compile - compile the source code of the project
+* test - test the compiled source code using a suitable unit testing framework. These tests should not require the code be packaged or deployed
+* package - take the compiled code and package it in its distributable format, such as a JAR.
+* verify - run any checks on results of integration tests to ensure quality criteria are met
+* install - install the package into the local repository, for use as a dependency in other projects locally
+* deploy - done in the build environment, copies the final package to the remote repository for sharing with other developers and projects.
+
 # 빌드
 ```
 mvn clean package
@@ -37,3 +46,4 @@ mvn clean package
 
 # 참고자료
 * [1] [블로그-maven과 nexus연동](https://www.lesstif.com/sonatype-nexus/%EB%A9%94%EC%9D%B4%EB%B8%90%EA%B3%BC-%EC%97%B0%EA%B3%84-31850837.html)
+* [2] [블로그-maven 명령어](https://yongary.tistory.com/255)
