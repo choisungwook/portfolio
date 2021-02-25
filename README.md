@@ -21,6 +21,7 @@
 | DC/OS | DCOS-CLI 설치 | [Readme 링크](./Dcos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
 | docker | 커스텀 젠킨스 Dockerfile | [Readme 링크](./docker/jenkins-dood/Readme.md) | [유투브 링크](https://youtu.be/CLCLIV3IBrk) |
 | docker | private docker registry - nexus 활용 | [Readme 링크](./docker/nexus/Readme.md) | [유투브 링크](https://youtu.be/2whuSZdKpwE) |
+| 운영 | gitlab 백업 | [Readme 링크](./documentation/gitlab-backup.md) | |
 
 <br>
 
