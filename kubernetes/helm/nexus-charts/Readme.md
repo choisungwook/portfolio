@@ -85,4 +85,4 @@ helm uninstall -n nexus nexus
 
 # 6. 참고자료
 * [1] stackoverflow-nexus external_url configuration: https://stackoverflow.com/questions/42058873/nexus-3-2-base-url-is-ignored
-* [2] nexus 공식 helm: https://github.com/Oteemo/charts/tree/master/charts/sonatype-nexus
+* [2] redhat-nexus helm: https://github.com/Oteemo/charts/tree/master/charts/sonatype-nexus
