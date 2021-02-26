@@ -16,17 +16,28 @@ mvn clean package
 ```
 
 # maven과 nexus연동
-```
+```xml
 <distributionManagement>
     <repository>
         <id>releases</id> //FORMAT
-        <url>https://nexus.example.com/content/repositories/releases</url> //FORMAT
+        <url>https://nexus.example.com/content/repositories/releases</url>
     </repository>
     <snapshotRepository>
         <id>snapshots</id> //FORMAT
-        <url>https://nexus.example.com/content/repositories/snapshots</url> //FORMAT
+        <url>https://nexus.example.com/content/repositories/snapshots</url>
     </snapshotRepository>
 </distributionManagement>
+```
+
+# maven 로컬 라이브러리 설정
+```
+<dependency>
+    <groupId>oracle.jdbc</groupId>
+    <artifactId>jdbc</artifactId>
+    <version>xxxx</version>
+    <scope>system</scope>
+    <systemPath>${project.basedir}/src/main/webapp/WEB-INF/lib/ojdbc6.jar</systemPath>
+</dependency>
 ```
 
 # 인코딩 오류
