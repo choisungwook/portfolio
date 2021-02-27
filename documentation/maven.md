@@ -16,6 +16,25 @@ mvn clean package
 ```
 
 # maven과 nexus연동
+# 다운로드
+```xml
+<repositories>
+    <repository>
+        <id>nexus</id>
+        <name>maven repository</name>
+        <url>http://192.168.219.222:31690/repository/maven-public/</url>
+    </repository>
+</repositories>
+
+<pluginRepositories>
+    <pluginRepository>
+        <id>nexus</id>
+        <url>http://192.168.219.222:31690/repository/maven-public/</url>
+    </pluginRepository>
+</pluginRepositories>
+```
+
+## 업로드
 ```xml
 <distributionManagement>
     <repository>
