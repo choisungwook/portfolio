@@ -28,7 +28,7 @@ helm uninstall -n [namespace] nexus
 | image.repository | image name | sonatype/nexus3 |
 | image.tag | image tag | latest |
 | persistence.storage | 용량 | 3Gi |
-| persistence.mountpath | 마운트 경로 | /mnt/nexus-dasta |
+| persistence.mountpath | 마운트 경로 | /mnt/nexus-data |
 | persistence.storageClass | storageclass | nil |
 | service.type | service type | NodePort |
 | service.httpport | nexus http port | 80 |
