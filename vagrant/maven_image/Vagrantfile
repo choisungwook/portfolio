@@ -1,0 +1,29 @@
+IP = "192.168.219.133"
+MEMORY = 2048
+CPU = 4
+IMAGE = "bento/ubuntu-18.04"
+HOSTNAME = "maven"
+
+Vagrant.configure("2") do |config|
+  # global setting
+  config.ssh.insert_key = false
+
+  config.vm.define HOSTNAME do |cfg|
+    cfg.vm.box = IMAGE
+    cfg.vm.network "public_network", ip: IP
+    cfg.vm.hostname = HOSTNAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = MEMORY
+      v.cpus = CPU
+      v.name = HOSTNAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+      apt-get update
+      apt-get install -y maven openjdk-8-jdk
+    SCRIPT
+  end
+end
