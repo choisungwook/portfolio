@@ -17,11 +17,13 @@
 | aws와 terraform | EC2 인스턴스 user data설정 | [Readme 링크](./aws/terraform/12_ec2-user-data/Readme.md) | [유투브 링크](https://youtu.be/qAvSbUEjWnU) |
 | aws와 terraform | EC2 인스턴스를 AMI로 생성 | [Readme 링크](./aws/terraform/11_create-ami/Readme.md) | [유투브 링크](https://youtu.be/j4O1nrworMU) |
 | kubernetes | kubespray설치(인프라 환경: vagrant) | [Readme 링크](./kubernetes/kubespray/Readme.md) | |
+| kubernetes | helm nexus | [Readme 링크](./kubernetes/helm/nexus-charts/Readme.md) | [유부트 링크](https://youtu.be/9hXz-GCTQ2w) |
 | DC/OS | DCOS 설치 | [Readme 링크](./Dcos/install/manual/Readme.md) | [유투브 링크](https://youtu.be/y1rOk_c_a-o) |
 | DC/OS | DCOS-CLI 설치 | [Readme 링크](./Dcos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
 | docker | 커스텀 젠킨스 Dockerfile | [Readme 링크](./docker/jenkins-dood/Readme.md) | [유투브 링크](https://youtu.be/CLCLIV3IBrk) |
 | docker | private docker registry - nexus 활용 | [Readme 링크](./docker/nexus/Readme.md) | [유투브 링크](https://youtu.be/2whuSZdKpwE) |
 | 운영 | gitlab 백업 | [Readme 링크](./documentation/gitlab-backup.md) | |
+| 운영 | nexus maven 연동 | [Readme 링크](./documentation/maven.md)) | [유투브 링크](https://youtu.be/e0Dt0jb40xU) |
 
 <br>
 
