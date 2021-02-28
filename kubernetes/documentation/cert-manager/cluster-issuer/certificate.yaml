@@ -3,9 +3,10 @@ kind: Certificate
 metadata:
   name: demo-crt
 spec:
+  dnsNames:
+    - choilab.com
   secretName: demo-crt
   commonName: demo-crt
-  isCA: true
   issuerRef:
     name: letsencrypt-cluster-issuser
     kind: ClusterIssuer
