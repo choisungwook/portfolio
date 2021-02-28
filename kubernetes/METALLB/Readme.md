@@ -7,6 +7,9 @@
   - [4.1 nginx ingress 설치](#41-nginx-ingress-설치)
   - [4.2 서비스 external-ip 확인](#42-서비스-external-ip-확인)
   - [4.3 nginx 접속](#43-nginx-접속)
+- [6. nginx-ingress controller 연동](#6-nginx-ingress-controller-연동)
+  - [6.1 nginx-ingres controller 설치](#61-nginx-ingres-controller-설치)
+  - [](#)
 - [5. 참고자료](#5-참고자료)
 
 <br>
@@ -75,6 +78,15 @@ kubectl get svc my-nginx
 ![](img/../imgs/access%20nginx.png)
 
 <br>
+
+# 6. nginx-ingress controller 연동
+## 6.1 nginx-ingres controller 설치
+* [ingress 설치문서 링크](../helm/nginx-ingress-charts/Readme.md)
+  * service 타입은 loadbalancer로 설정
+
+![](./imgs/nginx-ingress.png)
+
+## 
 
 # 5. 참고자료
 * [1] [metal-lb 설치 공식문서](https://metallb.universe.tf/installation/)
