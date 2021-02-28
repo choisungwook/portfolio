@@ -1,0 +1,11 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: demo-crt
+spec:
+  secretName: demo-crt
+  commonName: demo-crt
+  isCA: true
+  issuerRef:
+    name: letsencrypt-cluster-issuser
+    kind: ClusterIssuer
