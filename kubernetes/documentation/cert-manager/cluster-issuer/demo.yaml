@@ -40,7 +40,7 @@ metadata:
   name: demo-nginx
   annotations:
     kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    cert-manager.io/cluster-issuer: "letsencrypt-cluster-issuser"
 spec:
   tls:
   - hosts:
