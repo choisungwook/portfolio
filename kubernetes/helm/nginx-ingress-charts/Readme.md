@@ -3,7 +3,8 @@
 * helm은 https://github.com/kubernetes/ingress-nginx/tree/master/charts/ingress-nginx 에서 가져왔습니다.
 
 # values.yaml 내용
-* service port: NodePort
+## svc 
+* (옵션1) NodePort
 ```yaml
 type: NodePort
 nodePorts:
@@ -13,11 +14,14 @@ nodePorts:
     8080: 32808
 ```
 
+* (옵션2) loadbalancer
+
+
 # 설치
 * namespace는 ingress-controller 사용
 * 실행시간이 약 30초 이상 소요
 ```sh
-helm install ingress -n ingress-controller --create-namespace ./ingress-nginx
+helm install ingress -n ingress-controller --create-namespace -f values.yaml ./ingress-nginx
 ```
 
 # 실행확인
