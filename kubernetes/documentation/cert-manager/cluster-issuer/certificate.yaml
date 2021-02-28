@@ -4,9 +4,9 @@ metadata:
   name: demo-crt
 spec:
   dnsNames:
-    - choilab.com
+    - "choilab.com"
   secretName: demo-crt
-  commonName: demo-crt
+  commonName: "choilab.com"
   issuerRef:
     name: letsencrypt-cluster-issuser
     kind: ClusterIssuer
