@@ -31,7 +31,7 @@ spec:
   - port: 80
     protocol: TCP
   selector:
-    app: nginx
+    app: nginx-ingress
   type: ClusterIP
 ---
 apiVersion: networking.k8s.io/v1
