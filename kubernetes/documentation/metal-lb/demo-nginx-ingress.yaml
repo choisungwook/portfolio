@@ -42,7 +42,8 @@ metadata:
     kubernetes.io/ingress.class: nginx
 spec:
   rules:
-  - http:
+  - host: choilab.com
+    http:
       paths:
       - path: /
         pathType: Prefix
