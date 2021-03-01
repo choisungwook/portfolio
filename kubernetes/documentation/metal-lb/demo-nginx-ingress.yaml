@@ -40,12 +40,7 @@ metadata:
   name: minimal-ingress
   annotations:
     kubernetes.io/ingress.class: nginx
-    # nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  tls:
-  - hosts:
-      - https-example.foo.com
-    secretName: server-tls
   rules:
   - http:
       paths:
