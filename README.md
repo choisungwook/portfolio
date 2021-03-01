@@ -18,6 +18,7 @@
 | aws와 terraform | EC2 인스턴스를 AMI로 생성 | [Readme 링크](./aws/terraform/11_create-ami/Readme.md) | [유투브 링크](https://youtu.be/j4O1nrworMU) |
 | kubernetes | kubespray설치(인프라 환경: vagrant) | [Readme 링크](./kubernetes/kubespray/Readme.md) | |
 | kubernetes | helm nexus | [Readme 링크](./kubernetes/helm/nexus-charts/Readme.md) | [유부트 링크](https://youtu.be/9hXz-GCTQ2w) |
+| kubernetes | metal-lb를 활용한 온프레미스 환경 loadbalancer 서비스 사용 | [Readme 링크](./kubernetes/documentation/metal-lb/Readme.md) | [유부트 링크](https://youtu.be/la_7lumpkvw) |
 | DC/OS | DCOS 설치 | [Readme 링크](./Dcos/install/manual/Readme.md) | [유투브 링크](https://youtu.be/y1rOk_c_a-o) |
 | DC/OS | DCOS-CLI 설치 | [Readme 링크](./Dcos/manual/dcos_cli.md) | [유투브 링크](https://youtu.be/7QWhCVIiEVo) |
 | docker | 커스텀 젠킨스 Dockerfile | [Readme 링크](./docker/jenkins-dood/Readme.md) | [유투브 링크](https://youtu.be/CLCLIV3IBrk) |
