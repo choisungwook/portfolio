@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-outbound
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  - Ingress
+  ingress:
+  - {}
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 172.217.161.174/32
+    ports:
+    - port: 80
+      protocol: UDP
+  - to:
+    - namespaceSelector: {}
