@@ -192,6 +192,10 @@ spec:
             - mountPath: {{ .Values.controller.httpsKeyStore.path }}
               name: jenkins-https-keystore
             {{- end }}
+            {{- if .Values.docker.enable }}
+            - mountPath: /var/run/docker.sock
+              name: docker-sock
+            {{- end }}
             - mountPath: {{ .Values.controller.jenkinsHome }}
               name: jenkins-home
               readOnly: false
@@ -266,6 +270,11 @@ spec:
 {{- if .Values.persistence.volumes }}
 {{ tpl (toYaml .Values.persistence.volumes | indent 6) . }}
 {{- end }}
+      {{- if .Values.docker.enable }}
+      - name: docker-sock
+        hostPath: 
+          path: /var/run/docker.sock
+      {{- end }}
       - name: plugins
         emptyDir: {}
       - name: jenkins-config

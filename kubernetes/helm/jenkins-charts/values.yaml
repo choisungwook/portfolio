@@ -11,3 +11,9 @@ controller:
     enabled: true
     hostName: "helloworld.com"
     path: "/jenkins"
+
+  runAsGroup: 0
+  runAsUser: 0
+
+docker:
+  enable: true
