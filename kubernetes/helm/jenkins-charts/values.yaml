@@ -12,9 +12,6 @@ controller:
     hostName: "helloworld.com"
     path: "/jenkins"
 
-Agent:
-  volumes:
-  - volumeName: docker-sock
-    hostPath: /var/run/docker.sock
-    mountPath: /var/run/docker.sock
-    type: HostPath
+controller:
+  image: "choisunguk/jenkins"
+  tag: "v3"
