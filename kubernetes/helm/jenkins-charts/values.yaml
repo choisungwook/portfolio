@@ -7,7 +7,8 @@ controller:
   image: "choisunguk/jenkins"
   tag: "v3"
   jenkinsUriPrefix: "/jenkins"
-  
+  installPlugins: []
+
   ingress:
     enabled: true
     hostName: "helloworld.com"
