@@ -1,15 +1,15 @@
 persistence:
-  storageClass: nfs
   size: 20Gi
   existingClaim: jenkins-pvc
 
 controller:
   image: "choisunguk/jenkins"
   tag: "v3"
+  serviceType: ClusterIP
   jenkinsUriPrefix: "/jenkins"
   installPlugins: []
 
   ingress:
     enabled: true
-    hostName: "helloworld.com"
+    hostName: "choilab.com"
     path: "/jenkins"
