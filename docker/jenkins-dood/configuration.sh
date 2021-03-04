@@ -1,5 +1,7 @@
 #!/bin/sh
 
+yum install epel-release -y
+
 # install docker
 yum install -y yum-utils
 yum-config-manager \
