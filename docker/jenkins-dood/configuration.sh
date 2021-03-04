@@ -12,9 +12,8 @@ usermod -aG docker jenkins
 chown root:jenkins /var/run/docker.sock
 
 # install other packages
-yum install -y java-1.8.0-openjdk
-yum install -y 
 yum install -y \
     maven \
     nodejs \
-    npm
+    npm \
+    java-1.8.0-openjdk
