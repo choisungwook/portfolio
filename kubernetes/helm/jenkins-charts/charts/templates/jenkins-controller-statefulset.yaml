@@ -104,10 +104,8 @@ spec:
           resources:
 {{ toYaml .Values.controller.resources | indent 12 }}
           volumeMounts:
-            {{- if .Values.docker.enabled }}
             - mountPath: /var/run/docker.sock
               name: docker-sock
-            {{- end}}
             - mountPath: {{ .Values.controller.jenkinsHome }}
               name: jenkins-home
               {{- if .Values.persistence.subPath }}
@@ -270,11 +268,9 @@ spec:
 {{- if .Values.persistence.volumes }}
 {{ tpl (toYaml .Values.persistence.volumes | indent 6) . }}
 {{- end }}
-      {{- if .Values.docker.enabled }}
       - hostPath: 
           path: /var/run/docker.sock
         name: docker-sock
-      {{- end}}
       - name: plugins
         emptyDir: {}
       - name: jenkins-config
