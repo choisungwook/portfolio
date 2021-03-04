@@ -52,3 +52,4 @@ kubectl exec --namespace jenkins -it svc/jenkins -c jenkins -- /bin/cat /run/sec
 # 5. 참고자료
 * [1] 젠킨스 설치 공식문서: https://www.jenkins.io/doc/book/installing/kubernetes/
 * [2] 젠킨스 공식 helm chart: https://github.com/jenkinsci/helm-charts
+* [3] [gitIssue-docker.sock]: https://github.com/helm/charts/issues/7002
