@@ -13,3 +13,9 @@ controller:
     enabled: true
     hostName: "choilab.com"
     path: "/jenkins"
+
+  runAsUser: 0
+  fsGroup: 0
+
+docker:
+  enable: true
