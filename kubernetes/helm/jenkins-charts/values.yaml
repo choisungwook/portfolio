@@ -4,14 +4,11 @@ persistence:
   existingClaim: jenkins-pvc
 
 controller:
-  serviceType: NodePort
+  image: "choisunguk/jenkins"
+  tag: "v3"
   jenkinsUriPrefix: "/jenkins"
-
+  
   ingress:
     enabled: true
     hostName: "helloworld.com"
     path: "/jenkins"
-
-controller:
-  image: "choisunguk/jenkins"
-  tag: "v3"
