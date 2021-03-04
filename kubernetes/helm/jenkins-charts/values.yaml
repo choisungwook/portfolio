@@ -14,7 +14,7 @@ controller:
 
 Agent:
   volumes:
-  - name: docker-sock
+  - volumeName: docker-sock
     hostPath: /var/run/docker.sock
     mountPath: /var/run/docker.sock
     type: HostPath
