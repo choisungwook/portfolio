@@ -1,21 +1,37 @@
 #!/bin/sh
 
-yum install epel-release -y
-
 # install docker
-yum install -y yum-utils
-yum-config-manager \
-    --add-repo \
-    https://download.docker.com/linux/centos/docker-ce.repo
-curl -fsSL https://download.docker.com/linux/debian/gpg| apt-key add -
-yum install docker-ce docker-ce-cli containerd.io -y
+apt update
+apt install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg-agent \
+    software-properties-common
 
+curl -fsSL https://download.docker.com/linux/debian/gpg| apt-key add -
+
+add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/debian \
+   $(lsb_release -cs) \
+   stable"
+
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io
 usermod -aG docker jenkins
 chown root:jenkins /var/run/docker.sock
 
-# install other packages
-yum install -y \
+# install jdk8
+wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | apt-key add -
+add-apt-repository --yes https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/
+apt update
+apt install -y adoptopenjdk-8-hotspot
+
+apt install -y \
     maven \
     nodejs \
     npm \
-    java-1.8.0-openjdk
+    vim
+
+# install yarn
+npm install yarn
