@@ -24,3 +24,12 @@
 ![](imgs/instance.png)
 
 [출처: aws 공식문서-ec2 instance](https://aws.amazon.com/ko/ec2/instance-types/)
+
+<br>
+
+## pod 갯수
+* 58개
+
+![](imgs/numberOfpods.png)
+
+[출처: aws github](https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt)
