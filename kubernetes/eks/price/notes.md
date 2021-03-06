@@ -9,6 +9,8 @@
 ![](imgs/buyinstance.png)
 출처: aws 예약 인스턴스 주문 시 나오는 창
 
+<br>
+
 ![](imgs/monthly.png)
 
 [출처: aws 공식문서-예약 인스턴스 요금](https://aws.amazon.com/ko/ec2/pricing/reserved-instances/pricing/)
