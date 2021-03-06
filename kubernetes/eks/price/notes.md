@@ -10,6 +10,9 @@
 출처: aws 예약 인스턴스 주문 시 나오는 창
 
 ![](imgs/monthly.png)
+
+<br>
+
 [출처: aws 공식문서-예약 인스턴스 요금](https://aws.amazon.com/ko/ec2/pricing/reserved-instances/pricing/)
 
 <br>
@@ -19,4 +22,7 @@
 * 메모리: 16GB
 
 ![](imgs/instance.png)
+
+<br>
+
 [출처: aws 공식문서-ec2 instance](https://aws.amazon.com/ko/ec2/instance-types/)
