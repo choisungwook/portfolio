@@ -33,3 +33,10 @@
 ![](imgs/numberOfpods.png)
 
 [출처: aws github](https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt)
+
+<br>
+
+## 적용방법
+* 결제 시 즉시 적용
+
+[출처: aws 공식문서](https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt)
