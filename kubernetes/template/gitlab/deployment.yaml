@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  labels:
+    app: gitlab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: kbsys-k8s-worker2
+      containers:
+      - name: gitlab
+        image: gitlab-ce:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 22
+        - containerPort: 443
+        volumeMounts:
+        - name: data
+          mountPath: /var/opt/gitlab 
+        - name: log
+          mountPath: /var/log/gitlab
+        - name: config
+          mountPath: /etc/gitlab
+        - name: backup
+          mountPath: /var/opt/gitlab/backups
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitlab-data
+        - name: log
+          persistentVolumeClaim:
+            claimName: gitlab-log
+        - name: config
+          persistentVolumeClaim:
+            claimName: gitlab-config
+        - name: backup
+          persistentVolumeClaim:
+            claimName: gitlab-backup 
