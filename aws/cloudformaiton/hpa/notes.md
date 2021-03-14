@@ -31,3 +31,9 @@ Resources:
 ```
 
 ![](images/notes_asg_propagate.png)
+
+* (todo) autoscaling threshold
+
+* securitygroup groupname은 unique
+
+![](images/notes_sg1.png)
