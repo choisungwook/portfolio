@@ -1,5 +1,6 @@
 - [cloudformation 템플릿 실행](#cloudformation-템플릿-실행)
 - [cloudformation 템플릭 삭제](#cloudformation-템플릭-삭제)
+- [todo](#todo)
 - [기록](#기록)
 - [create stack](#create-stack)
 - [udpate stack](#udpate-stack)
@@ -20,6 +21,12 @@ aws cloudformation create-stack --stack-namem [스택이름] --template-body [fi
 ```sh
 aws cloudformation delete-stack --stack-name [스택이름]
 ```
+
+<br>
+
+# todo
+* [ ] autoscaling threshold(기본: 300초로 추청)
+  * cloudformation alarm 설정을 변경해야 하는 것으로 추측
 
 <br>
 
