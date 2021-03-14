@@ -1,3 +1,27 @@
+- [cloudformation 템플릿 실행](#cloudformation-템플릿-실행)
+- [cloudformation 템플릭 삭제](#cloudformation-템플릭-삭제)
+- [기록](#기록)
+- [create stack](#create-stack)
+- [udpate stack](#udpate-stack)
+- [VPC](#vpc)
+- [subnet](#subnet)
+  - [public subnet](#public-subnet)
+  - [private subent](#private-subent)
+- [참고자료](#참고자료)
+
+# cloudformation 템플릿 실행
+```sh
+aws cloudformation create-stack --stack-namem [스택이름] --template-body [file://파일경로]
+```
+
+<br>
+
+# cloudformation 템플릭 삭제
+```sh
+aws cloudformation delete-stack --stack-name [스택이름]
+```
+
+<br>
 
 # 기록
 * 운영입장에서는 테라폼이 안정적으로 보인다.
