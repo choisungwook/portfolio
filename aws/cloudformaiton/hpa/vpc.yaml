@@ -128,43 +128,39 @@ Resources:
       ProtocolVersion: HTTP2
       TargetType: instance
       VpcId: !Ref VPC
-  # AutoScalingGroup:
-  #   Type: AWS::AutoScaling::AutoScalingGroup
-  #   Properties:
-  #     AutoScalingGroupName: example
-  #     AvailabilityZones:
-  #       - String
-  #     CapacityRebalance: Boolean
-  #     Cooldown: String
-  #     DesiredCapacity: String
-  #     HealthCheckGracePeriod: Integer
-  #     HealthCheckType: String
-  #     LaunchConfigurationName: String
-  #     LaunchTemplate:
-  #       LaunchTemplateSpecification
-  #     LifecycleHookSpecificationList:
-  #       - LifecycleHookSpecification
-  #     LoadBalancerNames:
-  #       - example
-  #     MaxInstanceLifetime: Integer
-  #     MaxSize: 2 #required
-  #     MetricsCollection:
-  #       - MetricsCollection
-  #     MinSize: 1 #required
-  #     MixedInstancesPolicy:
-  #       MixedInstancesPolicy
-  #     NewInstancesProtectedFromScaleIn: Boolean
-  #     NotificationConfigurations:
-  #       - NotificationConfiguration
-  #     PlacementGroup: String
-  #     ServiceLinkedRoleARN: String
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub ${AWS::StackName}
-  #     TargetGroupARNs:
-  #       - String
-  #     TerminationPolicies:
-  #       - String
-  #     VPCZoneIdentifier:
-  #       - !Ref PublicSubnetA
-  #       - !Ref PublicSubnetB
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: example
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 90
+      # HealthCheckType: String # (todo) alb
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      # LoadBalancerNames:
+      #   - example
+      MaxSize: 2 #required
+      # MetricsCollection:
+      #   - MetricsCollection
+      MinSize: 1 #required
+      # ServiceLinkedRoleARN: String # IAM role
+      Tags:
+        - Key: Environment
+          Value: dev
+          PropagateAtLaunch: "true"
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      # TerminationPolicies:
+      #   - String
+      VPCZoneIdentifier:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+  ScalingOutPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup #required
+      EstimatedInstanceWarmup: 30
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 10.0
