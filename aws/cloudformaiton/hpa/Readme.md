@@ -1,5 +1,6 @@
 - [cloudformation 템플릿 실행](#cloudformation-템플릿-실행)
 - [cloudformation 템플릭 삭제](#cloudformation-템플릭-삭제)
+- [기본 autoscaling-policy](#기본-autoscaling-policy)
 - [todo](#todo)
 - [기록](#기록)
 - [create stack](#create-stack)
@@ -23,6 +24,9 @@ aws cloudformation delete-stack --stack-name [스택이름]
 ```
 
 <br>
+
+# 기본 autoscaling-policy
+* ASGAverageCPUUtilization는 5분?을 대기하여 ec2 인스턴스 정책을 적용
 
 # todo
 * [ ] autoscaling threshold(기본: 300초로 추청)
@@ -98,3 +102,4 @@ PublicSubnetA:
 
 # 참고자료
 * [1] [블로그](https://www.infoq.com/articles/aws-vpc-cloudformation/)
+* [2] [custom-alarm](https://lvthillo.medium.com/aws-auto-scaling-based-on-memory-utilization-in-cloudformation-159676b6f4d6)
