@@ -115,7 +115,7 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}
       VpcId: !Ref VPC
-  TargetGroup:
+  TargetGroup2:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckEnabled: true
@@ -126,10 +126,9 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
-      Name: example
+      Name: example2
       Port: 80
       Protocol: HTTP
-      ProtocolVersion: HTTP2
       TargetType: instance
       VpcId: !Ref VPC
   AutoScalingGroup:
@@ -140,8 +139,8 @@ Resources:
       HealthCheckGracePeriod: 90
       # HealthCheckType: String # (todo) alb
       LaunchConfigurationName: !Ref LaunchConfiguration
-      # LoadBalancerNames:
-      #   - example
+      TargetGroupARNs:
+      - !Ref LoadBalancer
       MaxSize: 2 #required
       # MetricsCollection:
       #   - MetricsCollection
@@ -152,7 +151,7 @@ Resources:
           Value: dev
           PropagateAtLaunch: "true"
       TargetGroupARNs:
-        - !Ref TargetGroup
+        - !Ref TargetGroup2
       # TerminationPolicies:
       #   - String
       VPCZoneIdentifier:
@@ -185,3 +184,23 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}
       VpcId: !Ref VPC
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: example
+      SecurityGroups:
+        - !Ref SecurityGroupALB
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+      Type: application
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: #required
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup2
+      LoadBalancerArn: !Ref LoadBalancer #required
+      Port: 80
+      Protocol: HTTP    
