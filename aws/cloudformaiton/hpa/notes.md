@@ -19,3 +19,15 @@ Resources:
 ```
 
 ![](images/notes_alltraffic.png)
+
+* autoscaling을 만들 떄 필수 Tag 존재
+```yaml
+Resources:
+  AutoScalingGroup:
+    Tags:
+    - Key: Environment
+      Value: dev
+      PropagateAtLaunch: "true"
+```
+
+![](images/notes_asg_propagate.png)
