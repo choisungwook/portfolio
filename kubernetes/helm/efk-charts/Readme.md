@@ -1,8 +1,66 @@
+* 2021.03.15 수정중
+
 # 1. 개요
+> fluentbit 또는 fluent와 연동 시 elasticsearch, kibana버전 연동성 꼭 체크
+
 * efk helm charts
   * elasticsearch, fluent-bit, kibana
 
 <br>
+
+# elasticsearch
+
+## chart 다운
+```
+git clone 
+```
+
+## pv 생성(옵션)
+> 동적 프로비저닝이 없을 경우 수동으로 pv 생성
+> 생성한 디렉터리는 chown 1000:1000으로 소유자를 1000으로 변경 필수
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ealsticsearch-1
+  namespace: efk
+  labels:
+    type: efk
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/efk/elasticsearch-1"
+  claimRef:
+    namespace: efk
+    name: elasticsearch-master-elasticsearch-master-1
+```
+
+## 커스텀 value.yaml 생성(설정)
+> 아래 예제는 1개 elastic-master를 생성하는 예제
+* 이미지 수정시 image와 imageTag필드 수정
+```yaml
+replicas: 1
+minimumMasterNodes: 1
+clusterHealthCheckParams: 'wait_for_status=yellow&timeout=200s'
+image: "docker.elastic.co/elasticsearch/elasticsearch"
+imageTag: "7.11.2"
+volumeClaimTemplate:
+  # storageClassName: ""
+  accessModes: [ "ReadWriteOnce" ]
+  resources:
+    requests:
+      storage: 100Gi
+extraInitContainers: |
+  - name: file-permissions
+    image: "{{ .Values.image }}:{{ .Values.imageTag }}"
+    command: ['chown', '-R', '1000:1000', '/usr/share/elasticsearch/data']
+```
+
 
 # 2. 설정
 ## 2.1 elasticsearch
