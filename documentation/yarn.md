@@ -18,3 +18,8 @@ npm install -g yarn
 ```json
  "increase-memory-limit": "^1.0.3",
 ```
+
+# 빌드 (힙)메모리 제한
+```sh
+export NODE_OPTIONS=--max_old_space_size=4096
+```
