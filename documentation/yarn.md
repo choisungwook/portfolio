@@ -10,6 +10,7 @@ yum remove -y nodejs
 dnf module reset nodejs
 dnf module enable nodejs:12
 dnf install nodejs
+npm install -g yarn
 ```
 
 # build 메모리 제한
