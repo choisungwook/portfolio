@@ -61,7 +61,26 @@ extraInitContainers: |
     command: ['chown', '-R', '1000:1000', '/usr/share/elasticsearch/data']
 ```
 
+# kibana
 
+## 커스텀 value.yaml 생성(설정)
+* 이미지 수정시 image와 imageTag필드 수정
+* (옵션) xpack 라이센스 모니터링 비활성화를 위한 환경설정
+* elasticsearch 주소 설정
+```yaml
+image: "docker.elastic.co/kibana/kibana"
+imageTag: "7.11.2"
+extraEnvs:
+  - name: "NODE_OPTIONS"
+    value: "--max-old-space-size=1800"
+  - name: "XPACK_LICENCE_MONITORING"
+    value: "XPACK_MONITORING_ENABLED=false"
+elasticsearchHosts: "http://elasticsearch-master.efk.svc:9200"
+service:
+  type: NodePort
+```
+
+------------------------------------- 구버전 (deprecated) --------------------------------
 # 2. 설정
 ## 2.1 elasticsearch
 > 설정파일 ./charts/values.yaml
