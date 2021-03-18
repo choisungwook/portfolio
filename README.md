@@ -1,3 +1,9 @@
+- [요약 목차](#요약-목차)
+- [상세 목차](#상세-목차)
+- [프로젝트](#프로젝트)
+- [백엔드 (deprecated)](#백엔드-deprecated)
+  - [스프링부트](#스프링부트)
+
 # 요약 목차
 | 번호 | 이름 | 설명 | 링크 |
 | ---- | ---- | ---- | ---- |
@@ -7,6 +13,7 @@
 | 4 | kubernetes basic | 쿠버네티스 공부  | [Readme 링크](./kubernetes/basic/Readme.md) |
 | 5 | terraform과 aws연동 | VPC, EC2 인스턴스 생성 등 | [Readme 링크](./aws/terraform/Readme.md) |
 | 6 | DC/OS 설치 | vagrant로 DC/OS 설치 자동화 | [Readme 링크](./Dcos/install/manual/Readme.md) |
+| 7 | 공부기록 | 공부노트 정리 | [Readme 링크](./documentation/Readme.md) |
 
 <br>
 
@@ -39,7 +46,7 @@
 
 <br>
 
-# 1. 백엔드 (제거 예정)
+# 백엔드 (deprecated)
 ## 스프링부트
 | 번호 | 제목 | 설명 | 바로가기 링크 |
 | ---- | ----- | --------------------- | -------------------|
