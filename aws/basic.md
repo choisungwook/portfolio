@@ -7,13 +7,13 @@
 
 ![](imgs/ec2_hypervisor.png)
 
-- 출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
 * 하드웨어 사양은 aws가 미리 정의한 인스턴스 유형을 선택
 
 ![](imgs/ec2_type.png)
 
-- 출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
 # Storage
 ## EBS
