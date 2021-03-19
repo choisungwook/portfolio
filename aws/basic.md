@@ -15,6 +15,8 @@
 
 출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
+<br>
+
 # Storage
 
 ![](imgs/storage_type.png)
@@ -43,8 +45,22 @@
 * object유형의 불륨으로 마운트하지 않아도 사용이 가능
 * EC2 인스턴스 뿐만 아니라 다른 리소스에서도 사용 가능(예: cloudformation, codebuild 등)
 
+## sftp service
+* aws에서 FTP 서비스를 제공
+
+![](imgs/sftp.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
 ## EFS
+* aws가 관리하는 공유 파일 시스템(마치 NFS처럼...)
+* EC2가 시작되면 자동 마운트
+* 온프레미스 환경에서도 마운트해서 사용 가능
+
+![](imgs/efs.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+
 ## FTP service
 
 <br>
