@@ -59,3 +59,4 @@ AWS Elemental MediaConvert는 브로드캐스트 수준의 기능을 제공하�
 * [1] [미디어 파일 포맷설명](https://docs.microsoft.com/ko-kr/azure/media-services/latest/dynamic-packaging-overview)
 * [2] [Simple Serverless Video On Demand (VOD) Workflow](https://aws.amazon.com/blogs/networking-and-content-delivery/serverless-video-on-demand-vod-workflow/)
 * [3] [pooq aws 도입사례](https://www.slideshare.net/awskorea/pooq-ott-case-for-live-vod-build-on-aws)
+* [4] [slide share](https://www.slideshare.net/AmazonWebServices/customize-a-vod-on-aws-transcoding-solution-with-qc-drm-and-more-ctd412-aws-reinvent-2018)
