@@ -61,3 +61,4 @@ AWS Elemental MediaConvert는 브로드캐스트 수준의 기능을 제공하�
 * [3] [pooq aws 도입사례](https://www.slideshare.net/awskorea/pooq-ott-case-for-live-vod-build-on-aws)
 * [4] [slide share](https://www.slideshare.net/AmazonWebServices/customize-a-vod-on-aws-transcoding-solution-with-qc-drm-and-more-ctd412-aws-reinvent-2018)
 * [5] [블로그 media convert 파해치기](https://ianjang.github.io/aws-media-convert-%EB%82%B4%EC%9A%A9%EC%A0%95%EB%A6%AC/)
+* [6] [s3 mp4 metainfo 추출](https://aws.amazon.com/ko/blogs/compute/extracting-video-metadata-using-lambda-and-mediainfo/)
