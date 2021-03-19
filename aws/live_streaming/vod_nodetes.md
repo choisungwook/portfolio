@@ -2,6 +2,7 @@
 - [아키텍처1](#아키텍처1)
 - [아키텍처2 - pooq사례](#아키텍처2---pooq사례)
 - [아키텍처3](#아키텍처3)
+- [아키텍처4](#아키텍처4)
 - [aws 리소스](#aws-리소스)
   - [AWS Elemental MediaConvert](#aws-elemental-mediaconvert)
 - [참고자료](#참고자료)
@@ -36,6 +37,13 @@
 ![](imges/arch3.png)
 
 출처 - https://aws.amazon.com/ko/media/resources/education/
+
+
+# 아키텍처4
+
+![](images/../imges/arch4.png)
+
+<br>
 
 # aws 리소스
 ## AWS Elemental MediaConvert
