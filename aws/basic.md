@@ -1,5 +1,29 @@
+- [개요](#개요)
+- [목표](#목표)
+- [EC2](#ec2)
+- [Storage](#storage)
+  - [EC2 인스턴스 불륨](#ec2-인스턴스-불륨)
+  - [EBS](#ebs)
+  - [S3](#s3)
+  - [sftp service](#sftp-service)
+  - [EFS](#efs)
+- [Network(VPC)](#networkvpc)
+- [Database Service](#database-service)
+- [참고자료](#참고자료)
+
 # 개요
 * aws 리소스 기초 내용
+
+<br>
+
+# 목표
+* vpc, ec2, rds, elb, sg를 사용해서 기초 아키텍처를 구성
+ 
+![](imgs/basic_arch.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+
+<br>
 
 # EC2
 * AWS가 구축해 놓은 물리적 호스트에 올라가는 가상 서버
@@ -61,11 +85,27 @@
 
 출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
-## FTP service
-
 <br>
 
 # Network(VPC)
+* 생략
+
+<br>
+
+# Database Service
+* 업그레이드, 가용성(HAP), 확장(scaling) 등 운영관리를 쉽게 지원
+
+![](imgs/database.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+
+![](imgs/db_hpa.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
+
+![](imgs/scaling.png)
+
+출처: aws 세미나(https://youtu.be/1zzBgCRDqeo)
 
 <br>
 
