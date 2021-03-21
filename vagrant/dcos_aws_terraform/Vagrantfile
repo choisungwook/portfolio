@@ -26,11 +26,18 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     SCRIPT
 
-    # install docker
+    # install terraform and aws-cli
     cfg.vm.provision "shell", inline: <<-SCRIPT
       yum install -y yum-utils unzip
-      wget https://releases.hashicorp.com/terraform/0.11.0/terraform_0.11.0_linux_amd64.zip
-      unzip terraform_0.11.0_linux_amd64.zip -d /usr/local/bin/
+      wget https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip
+      unzip terraform_0.11.13_linux_amd64.zip -d /usr/local/bin/
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      unzip awscliv2.zip
+      ./aws/install
+    SCRIPT
+
+    cfg.vm.provision "shell", privileged:false, inline: <<-SCRIPT
+      git clone https://github.com/dcos-terraform/terraform-aws-dcos.git
     SCRIPT
   end
 end
