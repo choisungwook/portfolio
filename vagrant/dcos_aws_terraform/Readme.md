@@ -15,3 +15,4 @@ terraform init
 # 참고자료
 * [1] [terrform version 목록](https://releases.hashicorp.com/terraform/)
 * [2] [dcos terraform git](https://github.com/dcos-terraform/terraform-aws-dcos)
+* [3] [블로그 dcos terraform 설치](https://www.business2community.com/cloud-computing/what-is-dc-os-02389262)
