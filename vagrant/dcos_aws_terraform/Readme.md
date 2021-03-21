@@ -1,6 +1,17 @@
 # 개요
 * aws dcos terraform을 실행하기 위한 os구축
 
+# 사용방법
+* aws 접속정보 설정: admin role 필요
+```sh
+aws configure
+```
+
+* 테라폼 모듈 설치
+```sh
+terraform init
+```
+
 # 참고자료
 * [1] [terrform version 목록](https://releases.hashicorp.com/terraform/)
 * [2] [dcos terraform git](https://github.com/dcos-terraform/terraform-aws-dcos)
