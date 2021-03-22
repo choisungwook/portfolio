@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thumbor
+  namespace: kdax-portal
+  labels:
+    app: thumbor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thumbor
+  template:
+    metadata:
+      labels:
+        app: thumbor
+    spec:
+      containers:
+      - name: thumbor
+        image: apsl/thumbor
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "2"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+        ports:
+        - containerPort: 8888
+        env:
+        - name: TZ
+          value: Asia/Seoul
+        command: ["/bin/sh"]
+        args: ["-c" , "thumbor"]
