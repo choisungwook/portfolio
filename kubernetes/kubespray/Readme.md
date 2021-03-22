@@ -2,15 +2,6 @@
 * kubesrpay 설치를 위한 인프라
 * 이미지: centos 7
 
-# 주의사항
-* vagrant 설치 후 NAT 네트워크 인터페이스 제거
-* 최소 사양
-  * CPU: 2? <-- 확인필요
-  * RAM: 1024? <-- 확인필요
-* 최소 갯수
-  * 마스터 노드 2개
-  * 워커노드 1개 <-- 확인 필요
- 
 # 설치 순서
 ## 설정
 * bootstrap, 마스터, 워커노드 IP설정
@@ -26,9 +17,6 @@ vagrant up
 vagrant ssh kube-bootstrap
 cd kubespray
 ```
-
-## 네트워크 인터페이스 제거
-* 가상머신 > settings > 네트워크 > NAT제거
 
 ## 키 생성
 ```sh
