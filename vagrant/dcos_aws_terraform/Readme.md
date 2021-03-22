@@ -1,8 +1,15 @@
 # 개요
 * aws dcos terraform을 실행하기 위한 os구축
 
-# 사용방법
-* aws 접속정보 설정: admin role 필요
+# 설치
+
+## ssh 키 생성
+```sh
+ssh-keygen -t rsa
+```
+
+## aws 설정 정보 설정
+* admin role 필요
 ```sh
 aws configure
 ```
