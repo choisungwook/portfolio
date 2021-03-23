@@ -1,0 +1,148 @@
+IMAGE_NAME = "centos/7"
+N = 1
+
+# IP Configuration
+MASTER_IP = "192.168.219.71"
+BOOTSTRAP_IP = "192.168.219.72"
+PUBLIC_AGENT_IP = "192.168.219.73"
+PRIVATE_AGENT_IP = "192.168.219."
+
+# Host names
+MASTER_NAME = "dcos-master"
+BOOTSTRAP_NAME = "dcos-bootstrap"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # bootstrap node
+  config.vm.define BOOTSTRAP_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "private_network", ip: BOOTSTRAP_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.hostname = BOOTSTRAP_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 4096
+      v.cpus = 4
+      v.name = BOOTSTRAP_NAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # copy 
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+    
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+    
+    # cfg.vm.provision "shell", inline: "chmod u+x files/genconf/ip-detect"
+    cfg.vm.provision "file", source: "files/genconf", destination: "genconf"
+
+    # Download DC/OS Release 2.0
+    cfg.vm.provision "shell", inline: "curl --output dcos_generate_config.ee.sh http://downloads.mesosphere.com/dcos-enterprise/stable/1.13.4/dcos_generate_config.ee.sh"
+
+    # generate password
+    cfg.vm.provision "shell", inline: "bash dcos_generate_config.ee.sh --hash-password password1234"
+
+    # run DC/OS release.sh
+    # cfg.vm.provision "shell", inline: "bash dcos_generate_config.ee.sh"
+
+    # run booststrap server using docker
+    # cfg.vm.provision "shell", inline: "docker run -d -p 80:80 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx"
+  end
+
+  # master node
+  config.vm.define MASTER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "private_network", ip: MASTER_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.hostname = MASTER_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = MASTER_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+
+    # install master node
+    cfg.vm.provision "shell", inline: "mkdir /tmp/dcos && cd /tmp/dcos"
+    # cfg.vm.provision "shell", inline: "curl -O http://#{BOOTSTRAP_IP}:80/dcos_install.sh"
+    # cfg.vm.provision "shell", inline: "bash dcos_install.sh master"
+  end
+
+  # private agent node
+  (1..N).each do |i|
+    config.vm.define "dcos-privateagent-#{i}" do |cfg|
+      cfg.vm.box = IMAGE_NAME
+      cfg.vm.network "private_network", ip: PRIVATE_AGENT_IP + "#{i+73}", virtualbox__intnet: "mynetwork"
+      cfg.vm.hostname = "dcos-privateagent-#{i}"
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 8192
+        v.cpus = 4
+        v.name = "dcos-privateagent#{i}"
+      end
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+      SCRIPT
+
+      cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+      cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+      cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+      cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+      cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+
+      # install worker node
+      cfg.vm.provision "shell", inline: "mkdir /tmp/dcos && cd /tmp/dcos"
+      # cfg.vm.provision "shell", inline: "curl -O http://#{BOOTSTRAP_IP}:80/dcos_install.sh"
+      # cfg.vm.provision "shell", inline: "bash dcos_install.sh slave"
+    end
+  end
+
+  # public agent node
+  
+  config.vm.define "dcos-publicagent" do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "private_network", ip: PUBLIC_AGENT_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.hostname = "dcos-publicagent"
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 4096
+      v.cpus = 4
+      v.name = "dcos-publicagent"
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files/configuration.sh", destination: "configuration.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/ntp.conf", destination: "ntp.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x configuration.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash configuration.sh"
+
+    # install worker node
+    cfg.vm.provision "shell", inline: "mkdir /tmp/dcos && cd /tmp/dcos"
+    # cfg.vm.provision "shell", inline: "curl -O http://#{BOOTSTRAP_IP}:80/dcos_install.sh"
+    # cfg.vm.provision "shell", inline: "bash dcos_install.sh slave_public"
+  end
+  
+end

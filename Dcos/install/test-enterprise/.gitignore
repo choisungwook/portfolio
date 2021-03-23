@@ -1,0 +1,8 @@
+# vagrant
+.vagrant/
+
+# dcos install.sh
+dcos_generate_config.sh
+
+# license
+license.txt
