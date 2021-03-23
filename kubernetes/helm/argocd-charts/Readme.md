@@ -2,17 +2,14 @@
 * argocd helm
 * https://github.com/argoproj/argo-helm/tree/master/charts/argo-cd 에서 가져왔습니다.
 
+# helm 다운로드
+```
+git clone https://github.com/argoproj/argo-helm.git
+cd charts/argo-cd
+```
+
 # 설정
 ## ingress
-* http 프로토콜 사용하고 자동으로 https리다이렉트
-    * 설정 안할지 https포트만 접속
-```yaml
-extraArgs:
-    - --insecure
-annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
-```
-## ingress path
 ```yaml
 server:
   extraArgs:
