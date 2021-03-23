@@ -49,6 +49,8 @@ server:
 helm install argocd -n argocd -f override_value.yaml --dependency-update --create-namespace ./
 ```
 
+![](imgs/success.png)
+
 <br>
 
 # 삭제
@@ -56,11 +58,6 @@ helm install argocd -n argocd -f override_value.yaml --dependency-update --creat
 helm uninstall argocd -n argocd
 kubectl delete ns argocd
 ```
-
-<br>
-
-* argocd 접속
-![](imgs/success.png)
 
 <br>
 
