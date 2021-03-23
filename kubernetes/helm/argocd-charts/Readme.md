@@ -1,6 +1,16 @@
+- [개요](#개요)
+- [helm 다운로드](#helm-다운로드)
+- [설정](#설정)
+  - [ingress](#ingress)
+- [설치](#설치)
+- [삭제](#삭제)
+- [로그인 계정/비밀번호](#로그인-계정비밀번호)
+- [참고자료](#참고자료)
+
 # 개요
 * argocd helm
-* https://github.com/argoproj/argo-helm/tree/master/charts/argo-cd 에서 가져왔습니다.
+
+<br>
 
 # helm 다운로드
 ```
@@ -8,8 +18,15 @@ git clone https://github.com/argoproj/argo-helm.git
 cd charts/argo-cd
 ```
 
+<br>
+
 # 설정
 ## ingress
+
+```sh
+touch override_value.yaml
+```
+
 ```yaml
 server:
   extraArgs:
@@ -24,11 +41,15 @@ server:
       - "/argocd"
 ```
 
+<br>
+
 # 설치
 * argocd 네임스페이스에 설치
 ```sh
-helm install argocd -n argocd -f values.yaml --dependency-update --create-namespace ./charts
+helm install argocd -n argocd -f override_value.yaml --dependency-update --create-namespace ./
 ```
+
+<br>
 
 # 삭제
 ```sh
@@ -36,16 +57,21 @@ helm uninstall argocd -n argocd
 kubectl delete ns argocd
 ```
 
-# 실행확인
-* ingres-controller 서비스 포트 확인
-![](imgs/svc.png)
+<br>
 
 * argocd 접속
 ![](imgs/success.png)
 
+<br>
+
 # 로그인 계정/비밀번호
 * 계정: admin
-* 비밀번호 argocd-srever pod이름
+* 비밀번호 argocd-srever pod이름 또는 아래 쉘 스크립트 실행
+```sh
+kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name | cut -d'/' -f 2
+```
+
+<br>
 
 # 참고자료
 * [1] ingress 설정 공식문서: https://argoproj.github.io/argo-cd/operator-manual/ingress/
