@@ -1,0 +1,61 @@
+IMAGE_NAME = "centos/7"
+WEBTOB_IP = "192.168.0.233"
+WEBTOB_HOSTNAME = "webtob"
+CPU = 2
+RAM = 2048
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # webtob node
+  config.vm.define WEBTOB_HOSTNAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: WEBTOB_IP
+    cfg.vm.hostname = WEBTOB_HOSTNAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = RAM
+      v.cpus = CPU
+      v.name = WEBTOB_HOSTNAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install vim git tree wget net-tools tmux -y
+      yum install java-1.8.0-openjdk-devel.x86_64 -y
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "webtob.bin", destination: "webtob.bin"
+    cfg.vm.provision "file", source: "license.dat", destination: "license.dat"
+    cfg.vm.provision "file", source: "jeus.bin", destination: "jeus.bin"
+    cfg.vm.provision "file", source: "license", destination: "license"
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install vim git tree wget net-tools tmux -y
+      yum install java-1.8.0-openjdk-devel.x86_64 -y
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # set environment
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      echo "export JAVA_HOME=/usr/lib/jvm/java-1.8.0" >> /etc/profile
+      echo "export PATH=${PATH}:${JAVA_HOME}/bin" >> /etc/profile
+      echo "export WEBTOBDIR=/root/webtob" >> /etc/profile
+      echo "export PATH=${WEBTOBDIR}/bin:${PATH}" >> /etc/profile
+      echo "export LD_LIBRARY_PATH=${WEBTOBDIR}/lib:${LD_LIBRARY_PATH}" >> /etc/profile
+      export JEUS_HOME=/root/jeus5
+      export PATH=${PATH}:${JEUS_HOME}/bin
+      source /etc/profile
+    SCRIPT
+
+    # configure libc.so.6
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      ln -s /lib64/libc.so.6 /lib/libc.so.6
+    SCRIPT
+  end
+
+end
