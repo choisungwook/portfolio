@@ -1,0 +1,16 @@
+control-plane:
+  hosts:
+    192.168.25.121:
+      ansible_host: "192.168.25.121"
+node:
+  hosts:
+    192.168.25.122:
+      ansible_host: "192.168.25.122"
+      node_pool: worker
+bastion: {}
+all:
+  vars:
+    ansible_port: 22
+    ansible_user: "root"
+    order: sorted
+    version: v1beta1
