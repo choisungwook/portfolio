@@ -1,0 +1,89 @@
+IMAGE_NAME = "centos/7"
+N = 1
+
+# IP Configuration
+MASTER_IP = "192.168.25.121"
+BOOTSTRAP_IP = "192.168.25.120"
+WORKER_IP = "192.168.25."
+
+# Host names
+MASTER_NAME = "konvoy-master"
+BOOTSTRAP_NAME = "konvoy-bootstrap"
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  # bootstrap node
+  config.vm.define BOOTSTRAP_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: BOOTSTRAP_IP
+    cfg.vm.hostname = BOOTSTRAP_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 4096
+      v.cpus = 4
+      v.name = BOOTSTRAP_NAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # copy 
+    cfg.vm.provision "file", source: "files/bootstrap.sh", destination: "bootstrap.sh"
+    cfg.vm.provision "file", source: "files/daemon.json", destination: "daemon.json"
+    cfg.vm.provision "file", source: "files/chrony.conf", destination: "chrony.conf"
+    
+    cfg.vm.provision "shell", inline: "chmod u+x bootstrap.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash bootstrap.sh"
+  end
+
+  # master node
+  config.vm.define MASTER_NAME do |cfg|
+    cfg.vm.box = IMAGE_NAME
+    cfg.vm.network "public_network", ip: MASTER_IP
+    cfg.vm.hostname = MASTER_NAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = 8192
+      v.cpus = 4
+      v.name = MASTER_NAME
+    end
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    cfg.vm.provision "file", source: "files/other_node.sh", destination: "other_node.sh"
+    cfg.vm.provision "file", source: "files/chrony.conf", destination: "chrony.conf"
+
+    cfg.vm.provision "shell", inline: "chmod u+x other_node.sh"
+    cfg.vm.provision "shell", inline: "/bin/bash other_node.sh"
+  end
+
+  # workernode
+  (1..N).each do |i|
+    config.vm.define "konvoy-privateagent-#{i}" do |cfg|
+      cfg.vm.box = IMAGE_NAME
+      cfg.vm.network "public_network", ip: WORKER_IP + "#{i+121}"
+      cfg.vm.hostname = "konvoy-privateagent-#{i}"
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 8192
+        v.cpus = 4
+        v.name = "konvoy-privateagent#{i}"
+      end
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        systemctl restart sshd
+      SCRIPT
+
+      cfg.vm.provision "file", source: "files/other_node.sh", destination: "other_node.sh"
+      cfg.vm.provision "file", source: "files/chrony.conf", destination: "chrony.conf"
+
+      cfg.vm.provision "shell", inline: "chmod u+x other_node.sh"
+      cfg.vm.provision "shell", inline: "/bin/bash other_node.sh"
+    end
+  end  
+end
