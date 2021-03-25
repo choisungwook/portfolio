@@ -105,5 +105,5 @@ spec:
       configVersion: stable-1.18-1.2.0
       addonsList:
         - name: kommander
-          enabled: true
+          enabled: false
   version: v1.6.0
