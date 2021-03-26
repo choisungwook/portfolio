@@ -12,3 +12,4 @@ pipeline-github-lib
 pipeline-stage-view
 ssh-slaves
 locale
+jenkins-plugin-cli
