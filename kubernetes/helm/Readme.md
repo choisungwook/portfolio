@@ -15,5 +15,5 @@
 | 4 | argocd | [링크](./argocd-charts) |
 | 5 | nexus | [링크](./nexus-charts) |
 | 6 | efk(Elasticsearch, Fluent-bit, Kibana) | [링크](./efk-charts) |
-| 7 | jenkins | [링크](https://github.com/choisungwook/argocd-helm/tree/main/jenkins) |
+| 7 | jenkins | [링크](./jenkins-charts/Readme.md) |
 | 8 | jmeter | [링크](https://github.com/choisungwook/argocd-helm/tree/main/jmeter) |
