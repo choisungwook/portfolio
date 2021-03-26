@@ -22,6 +22,7 @@ usermod -aG docker jenkins
 chown root:jenkins /var/run/docker.sock
 
 # enable chrony
+cp /root/chrony.conf /etc/chrony.conf
 service chrony start
 service chrony enable 
 
