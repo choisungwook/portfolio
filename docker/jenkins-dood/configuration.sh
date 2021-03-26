@@ -17,14 +17,8 @@ add-apt-repository \
    stable"
 
 apt update
-apt install -y docker-ce docker-ce-cli containerd.io chrony
+apt install -y docker-ce docker-ce-cli containerd.io
 usermod -aG docker jenkins
-chown root:jenkins /var/run/docker.sock
-
-# enable chrony
-cp /root/chrony.conf /etc/chrony.conf
-service chrony start
-service chrony enable 
 
 # install jdk8
 wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | apt-key add -
