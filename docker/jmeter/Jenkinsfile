@@ -1,6 +1,6 @@
-def DOCKER_REGISTRY = "110.45.156.133:10159"
+def DOCKER_REGISTRY = "registry.hub.docker.com"
 def TAG = "v1"
-def DOCKER_IMAGE = "${DOCKER_REGISTRY}/jmeter:${TAG}"
+def DOCKER_IMAGE = "choisunguk/jmeter:${TAG}"
 
 pipeline {
    agent any
@@ -16,7 +16,7 @@ pipeline {
       stage('push docker image') {
          steps {
             script{
-              docker.withRegistry("""http://${DOCKER_REGISTRY}""", 'IDCNEXUS') {
+              docker.withRegistry("""http://${DOCKER_REGISTRY}""", 'publicdocker') {
                   image.push()
               }
             }
