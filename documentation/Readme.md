@@ -8,3 +8,4 @@
 | 4 | 클러스터 제외 | [링크](./k8s_reset_cluster.md) | 
 | 5 | gitlab 백업 | [링크](./gitlab-backup.md) | 
 | 6 | nodejs 재설치 | [링크](./yarn.md#centos8-nodejs-재설치)
+| 7 | chrony.conf | [링크](./chrony.conf)
