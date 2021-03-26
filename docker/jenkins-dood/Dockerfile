@@ -3,6 +3,7 @@ FROM jenkins/jenkins:lts
 USER root
 
 # install linux packages(docker ... etc)
+COPY chrony.sh /root/chrony.conf
 COPY configuration.sh /root/configuration.sh
 RUN chmod +x /root/configuration.sh && /root/configuration.sh
 
