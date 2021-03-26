@@ -6,7 +6,6 @@
 * helm3 설치
 
 # 차트 목록
-* 3번 그라파나 ingress는 아직 미처리
 
 | 번호 | 이름 | 링크 |
 | ---- | ---- | ---- |
@@ -16,4 +15,5 @@
 | 4 | argocd | [링크](./argocd-charts) |
 | 5 | nexus | [링크](./nexus-charts) |
 | 6 | efk(Elasticsearch, Fluent-bit, Kibana) | [링크](./efk-charts) |
-| 7 | jenkins | [링크](./jenkins-charts) |
+| 7 | jenkins | [링크](https://github.com/choisungwook/argocd-helm/tree/main/jenkins) |
+| 8 | jmeter | [링크](https://github.com/choisungwook/argocd-helm/tree/main/jmeter) |
