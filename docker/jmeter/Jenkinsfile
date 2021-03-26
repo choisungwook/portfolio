@@ -1,0 +1,33 @@
+def DOCKER_REGISTRY = "110.45.156.133:10159"
+def TAG = "v1"
+def DOCKER_IMAGE = "${DOCKER_REGISTRY}/jmeter:${TAG}"
+
+pipeline {
+   agent any
+
+   stages {
+      stage('build docker image') {
+         steps {
+            script{
+              image = docker.build("""${DOCKER_IMAGE}""")
+            }
+         }
+      }
+      stage('push docker image') {
+         steps {
+            script{
+              docker.withRegistry("""http://${DOCKER_REGISTRY}""", 'IDCNEXUS') {
+                  image.push()
+              }
+            }
+         }
+      }
+      stage('remove docker image') {
+         steps {
+            script{
+              sh(script:"""docker rmi ${DOCKER_IMAGE}""")
+            }
+         }
+      }      
+   }
+}
