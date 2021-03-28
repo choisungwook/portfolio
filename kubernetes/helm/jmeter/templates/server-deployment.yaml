@@ -1,0 +1,30 @@
+kind: Deployment
+metadata:
+  name: jmeter-server
+  labels:
+    jmeter_role: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      jmeter_role: server
+  template:
+    metadata:
+      labels:
+        jmeter_role: server
+    spec:
+      containers:
+      - name: jmeter-server
+        image: choisunguk/jmeter:server
+        imagePullPolicy: IfNotPresent
+        # volumeMounts:
+        #   - name: loadtest
+        #     mountPath: /load_test
+        #     subPath: "load_test"
+        ports:
+        - containerPort: 1099
+        - containerPort: 50000
+      # volumes:
+      # - name: loadtest 
+      #   configMap:
+      #    name: jmeter-load-test
