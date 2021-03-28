@@ -17,7 +17,7 @@ spec:
       containers:
       - name: jmeter-server
         image: choisunguk/jmeter:server
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         # volumeMounts:
         #   - name: loadtest
         #     mountPath: /load_test
