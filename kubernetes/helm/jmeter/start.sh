@@ -12,4 +12,4 @@ fi
 kubectl cp "$jmx" -n $namespace "$master_pod:/$jmx"
 
 # execute script.jmx
-kubectl exec -ti -n $namespace $master_pod -- /bin/bash /load_test "$jmx"
+kubectl exec -ti -n $namespace $master_pod -- /bin/bash /load_test "/$jmx"
