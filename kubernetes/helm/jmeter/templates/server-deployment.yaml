@@ -5,7 +5,7 @@ metadata:
   labels:
     jmeter_role: server
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       jmeter_role: server
