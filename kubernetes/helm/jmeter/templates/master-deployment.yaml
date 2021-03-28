@@ -18,13 +18,14 @@ spec:
       - name: jmeter-master
         image: choisunguk/jmeter:master
         imagePullPolicy: Always
-        # volumeMounts:
-        #   - name: loadtest
-        #     mountPath: /load_test
-        #     subPath: "load_test"
+        volumeMounts:
+          - name: loadtest
+            mountPath: /load_test
+            subPath: "load_test"
         ports:
         - containerPort: 60000
-      # volumes:
-      # - name: loadtest 
-      #   configMap:
-      #    name: jmeter-load-test
+      volumes:
+      - name: loadtest 
+        configMap:
+         name: jmeter-load-test
+         
