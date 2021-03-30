@@ -20,6 +20,6 @@ spec:
         imagePullPolicy: {{ .Values.master.image.imagePullPolicy }}
         ports:
         - containerPort: 60000
-        resource:
+        resources:
 {{ toYaml .Values.resources | indent 10 }}
          
