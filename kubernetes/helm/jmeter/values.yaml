@@ -7,6 +7,7 @@ server:
   image: 
     name: choisunguk/jmeter:server
     imagePullPolicy: IfNotPresent
+  replicas: 1
 
 resources:
   requests:

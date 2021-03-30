@@ -5,7 +5,7 @@ metadata:
   labels:
     jmeter_role: server
 spec:
-  replicas: 3
+  replicas: {{ .Values.server.image.replicas }}
   selector:
     matchLabels:
       jmeter_role: server
