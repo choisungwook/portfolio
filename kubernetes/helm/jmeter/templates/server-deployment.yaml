@@ -21,6 +21,6 @@ spec:
         ports:
         - containerPort: 1099
         - containerPort: 50000
-        resource:
+        resources:
 {{ toYaml .Values.resources | indent 10 }}
         
