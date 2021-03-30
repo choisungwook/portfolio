@@ -16,9 +16,11 @@ spec:
     spec:
       containers:
       - name: jmeter-server
-        image: choisunguk/jmeter:server
-        imagePullPolicy: Always
+        image: {{ .Values.server.image.name }}
+        imagePullPolicy: {{ .Values.server.image.imagePullPolicy }}
         ports:
         - containerPort: 1099
         - containerPort: 50000
+        resource:
+{{ toYaml .Values.resources | indent 10 }}
         

@@ -1,0 +1,17 @@
+master:
+  image: 
+    name: choisunguk/jmeter:master
+    imagePullPolicy: IfNotPresent
+
+server:
+  image: 
+    name: choisunguk/jmeter:server
+    imagePullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: "1000m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
