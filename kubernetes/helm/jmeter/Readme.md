@@ -12,6 +12,7 @@
 | master.image.name | master jmeter 이미지 | choisunguk/jmeter:master |
 | server.image.name | server jmeter 이미지 | choisunguk/jmeter:server |
 | resource | master, server 컨테이너 리소스 제한 | request, limits 모두 1core, 1GB |
+| server.replicas | server pod 수 | 1 |
 
 # helm 설치
 ```sh
