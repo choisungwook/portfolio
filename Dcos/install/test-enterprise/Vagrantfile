@@ -2,10 +2,10 @@ IMAGE_NAME = "centos/7"
 N = 1
 
 # IP Configuration
-MASTER_IP = "192.168.219.71"
-BOOTSTRAP_IP = "192.168.219.72"
-PUBLIC_AGENT_IP = "192.168.219.73"
-PRIVATE_AGENT_IP = "192.168.219."
+MASTER_IP = "192.168.25.71"
+BOOTSTRAP_IP = "192.168.25.72"
+PUBLIC_AGENT_IP = "192.168.25.73"
+PRIVATE_AGENT_IP = "192.168.25."
 
 # Host names
 MASTER_NAME = "dcos-master"
@@ -17,7 +17,7 @@ Vagrant.configure("2") do |config|
   # bootstrap node
   config.vm.define BOOTSTRAP_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "private_network", ip: BOOTSTRAP_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.network "public_network", ip: BOOTSTRAP_IP
     cfg.vm.hostname = BOOTSTRAP_NAME
     
     cfg.vm.provider "virtualbox" do |v|
@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
   # master node
   config.vm.define MASTER_NAME do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "private_network", ip: MASTER_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.network "public_network", ip: MASTER_IP
     cfg.vm.hostname = MASTER_NAME
     
     cfg.vm.provider "virtualbox" do |v|
@@ -88,7 +88,7 @@ Vagrant.configure("2") do |config|
   (1..N).each do |i|
     config.vm.define "dcos-privateagent-#{i}" do |cfg|
       cfg.vm.box = IMAGE_NAME
-      cfg.vm.network "private_network", ip: PRIVATE_AGENT_IP + "#{i+73}", virtualbox__intnet: "mynetwork"
+      cfg.vm.network "public_network", ip: PRIVATE_AGENT_IP + "#{i+73}"
       cfg.vm.hostname = "dcos-privateagent-#{i}"
       
       cfg.vm.provider "virtualbox" do |v|
@@ -119,7 +119,7 @@ Vagrant.configure("2") do |config|
   
   config.vm.define "dcos-publicagent" do |cfg|
     cfg.vm.box = IMAGE_NAME
-    cfg.vm.network "private_network", ip: PUBLIC_AGENT_IP, virtualbox__intnet: "mynetwork"
+    cfg.vm.network "public_network", ip: PUBLIC_AGENT_IP
     cfg.vm.hostname = "dcos-publicagent"
     
     cfg.vm.provider "virtualbox" do |v|
