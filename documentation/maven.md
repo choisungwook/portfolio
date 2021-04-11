@@ -10,7 +10,14 @@
 * install - install the package into the local repository, for use as a dependency in other projects locally
 * deploy - done in the build environment, copies the final package to the remote repository for sharing with other developers and projects.
 
-# 빌드
+# clean
+* maven 환경을 초기화
+
+# compile
+* 프로젝트 빌드
+
+# package
+* 패키징 수행: jar파일 또는 war파일 생성
 ```
 mvn clean package
 ```
