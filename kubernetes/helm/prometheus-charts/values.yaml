@@ -2,9 +2,6 @@ prometheus:
   # change here
   prometheusSpec:
     routePrefix: /prom
-    # change here
-    nodeSelector:
-      kubernetes.io/hostname: k8s-worker-1
     storageSpec:
       volumeClaimTemplate:
         spec:
