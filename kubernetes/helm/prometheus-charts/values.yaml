@@ -1,24 +1,42 @@
-alertmanager:
-  ingress:
-    enabled: false
-    # change here
-    hosts:
-      - helloworld.com
 prometheus:
   # change here
   prometheusSpec:
     routePrefix: /prom
+    # change here
+    nodeSelector:
+      kubernetes.io/hostname: k8s-worker-1
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+          selector:
+            matchLabels:
+              app: my-example-prometheus
   ingress:
-    enabled: true
+    enabled: false
     # change here
     hosts:
-      - helloworld.com
+      - choilab.com
     # change here
     paths:
       - /prom
+      
 grafana:
+  adminPassword: password1234
   ingress:
-    enabled: true
+    enabled: false
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
     # change here
+    path: /test(/|$)(.*)
     hosts:
-      - helloworld.com
+      - choilab.com
+  grafana.ini:
+    server:
+      # change here
+      domain: choilab.com
+      root_url: http://choilab/test/
+      serve_from_sub_path: true
