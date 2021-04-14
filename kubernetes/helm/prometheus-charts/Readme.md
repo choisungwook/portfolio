@@ -4,6 +4,7 @@
 - [설정](#설정)
   - [ingress 도메인 설정](#ingress-도메인-설정)
   - [persistentvolume](#persistentvolume)
+  - [그라파나 비밀번호 설정](#그라파나-비밀번호-설정)
 - [실행](#실행)
 - [삭제](#삭제)
 - [주의사항](#주의사항)
@@ -42,6 +43,13 @@ helm dependency update [차트경로: 예) ./kube-prometheus-stack]
 kubectl apply -f pv.yaml
 ```
 * override_values.yaml에 pv설정
+
+## 그라파나 비밀번호 설정
+* grafana.adminPassword 필드 값 변경
+```
+grafana:
+  adminPassword: password1234
+```
 
 <br>
 
