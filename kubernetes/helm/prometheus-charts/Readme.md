@@ -25,7 +25,7 @@ git clone https://github.com/prometheus-community/helm-charts
 
 # dependency 설치
 ```sh
-helm dependency update [차트경로: 예) ./kube-prometheus-stack]
+helm dependency update .
 ```
 
 <br>
