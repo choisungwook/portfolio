@@ -7,7 +7,6 @@
   - [그라파나 비밀번호 설정](#그라파나-비밀번호-설정)
 - [실행](#실행)
 - [삭제](#삭제)
-- [주의사항](#주의사항)
 - [exporter 목록](#exporter-목록)
 - [TroubleShooting](#troubleshooting)
 - [참고자료](#참고자료)
@@ -64,12 +63,6 @@ helm install prometheus -n logging --create-namespace  -f ./override_values.yaml
 ```
 helm delete -n logging prometheus 
 ```
-
-<br>
-
-# 주의사항
-* grafana는 ingress path가 "/" 고정
-* path변경하려면 configmap grafana.ini 수정 필요(참고자료 : https://stackoverflow.com/questions/57170106/trying-to-rewrite-url-for-grafana-with-ingress)
 
 <br>
 
