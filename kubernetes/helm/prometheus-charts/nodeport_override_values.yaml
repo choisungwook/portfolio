@@ -1,7 +1,5 @@
 prometheus:
-  # change here
   prometheusSpec:
-    routePrefix: /prom
     storageSpec:
       volumeClaimTemplate:
         spec:
