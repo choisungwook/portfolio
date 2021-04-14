@@ -1,0 +1,21 @@
+prometheus:
+  # change here
+  prometheusSpec:
+    routePrefix: /prom
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+          selector:
+            matchLabels:
+              app: my-example-prometheus
+  service:
+    type: NodePort
+      
+grafana:
+  adminPassword: password1234
+  service:
+    type: NodePort
