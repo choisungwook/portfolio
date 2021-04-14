@@ -41,13 +41,13 @@ helm dependency update [차트경로: 예) ./kube-prometheus-stack]
 ```sh
 kubectl apply -f pv.yaml
 ```
-* values.yaml에 pv설정
+* override_values.yaml에 pv설정
 
 <br>
 
 # 실행
 ```sh
-helm install prometheus -n logging --create-namespace  -f ./values.yaml  [차트경로: 예) ./kube-prometheus-stack]
+helm install prometheus -n logging --create-namespace  -f ./override_values.yaml  [차트경로: 예) ./kube-prometheus-stack]
 ```
 
 <br>
