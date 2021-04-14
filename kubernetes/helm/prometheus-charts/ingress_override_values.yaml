@@ -13,7 +13,7 @@ prometheus:
             matchLabels:
               app: my-example-prometheus
   ingress:
-    enabled: false
+    enabled: true
     # change here
     hosts:
       - choilab.com
@@ -24,7 +24,7 @@ prometheus:
 grafana:
   adminPassword: password1234
   ingress:
-    enabled: false
+    enabled: true
     annotations:
       nginx.ingress.kubernetes.io/rewrite-target: /$2
     # change here
