@@ -36,17 +36,3 @@ spec:
     workspaces:
     - name: maven-repo
       workspace: local-maven-repo
-  - name: gen-report
-    taskRef:
-      name: mvn
-    runAfter: ["build"]
-    resources:
-      inputs:
-      - name: source
-        resource: springboot-git
-    params:
-    - name: GOALS
-      value: ["site"] 
-    workspaces:
-    - name: maven-repo
-      workspace: local-maven-repo
