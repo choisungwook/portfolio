@@ -22,17 +22,3 @@ spec:
     workspaces:
     - name: maven-repo
       workspace: local-maven-repo
-  - name: int-test
-    taskRef:
-      name: mvn
-    runAfter: ["build"]
-    resources:
-      inputs:
-      - name: source
-        resource: springboot-git
-    params:
-    - name: GOALS
-      value: ["verify"]
-    workspaces:
-    - name: maven-repo
-      workspace: local-maven-repo
