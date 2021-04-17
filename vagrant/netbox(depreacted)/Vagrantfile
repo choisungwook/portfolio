@@ -1,0 +1,54 @@
+IP = "192.168.25.55"
+AGENT_IP = "192.168.25."
+SERVER_HOSTNAME = "netbox-server"
+CPU = 6
+RAM = 8192
+N = 2
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  config.vm.define SERVER_HOSTNAME do |cfg|
+    cfg.vm.box = "ubuntu/bionic64"
+    cfg.vm.network "public_network", ip: IP
+    cfg.vm.hostname = SERVER_HOSTNAME
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = RAM
+      v.cpus = CPU
+      v.name = SERVER_HOSTNAME
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      apt install update
+      apt install wget net-tools
+      
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # # install
+    # cfg.vm.provision "file", source: "entrypoint.sh", destination: "entrypoint.sh"
+    # cfg.vm.provision "shell", inline: "bash entrypoint.sh"
+  end
+
+  (1..N).each do |i|
+    config.vm.define "netboxagent-#{i}" do |cfg|
+      cfg.vm.box = "centos/7"
+      cfg.vm.network "public_network", ip: AGENT_IP + "#{i+77}"
+      cfg.vm.hostname = "netboxagent-#{i}"
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.memory = 2048
+        v.cpus = 2
+        v.name = "netboxagent-#{i}"
+      end
+
+      cfg.vm.provision "shell", inline: <<-SCRIPT
+        sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        yum install -y git net-tools
+        systemctl restart sshd
+      SCRIPT
+    end
+  end
+end
