@@ -8,5 +8,4 @@ spec:
       storage: 5Gi
   volumeMode: Filesystem
   accessModes:
-    - ReadWriteOnce  
-  persistentVolumeReclaimPolicy: Retain 
+    - ReadWriteOnce
