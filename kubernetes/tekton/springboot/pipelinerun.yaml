@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1alpha1
 kind: PipelineRun
 metadata:
-  generateName: springboot-demo
+  name: springboot-demo
 spec:
   pipelineRef:
     name: maven-build
