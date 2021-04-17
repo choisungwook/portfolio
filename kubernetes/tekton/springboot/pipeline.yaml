@@ -1,0 +1,52 @@
+apiVersion: tekton.dev/v1alpha1
+kind: Pipeline
+metadata:
+  name: maven-build
+spec:
+  workspaces:
+  - name: local-maven-repo
+  resources:
+  - name: springboot-git
+    type: git
+  tasks:
+  - name: build
+    taskRef:
+      name: mvn
+    resources:
+      inputs:
+      - name: source
+        resource: springboot-git
+    params:
+    - name: GOALS
+      value: ["package"]
+    workspaces:
+    - name: maven-repo
+      workspace: local-maven-repo
+  - name: int-test
+    taskRef:
+      name: mvn
+    runAfter: ["build"]
+    resources:
+      inputs:
+      - name: source
+        resource: springboot-git
+    params:
+    - name: GOALS
+      value: ["verify"]
+    workspaces:
+    - name: maven-repo
+      workspace: local-maven-repo
+  - name: gen-report
+    taskRef:
+      name: mvn
+    runAfter: ["build"]
+    resources:
+      inputs:
+      - name: source
+        resource: springboot-git
+    params:
+    - name: GOALS
+      value: ["site"] 
+    workspaces:
+    - name: maven-repo
+      workspace: local-maven-repo

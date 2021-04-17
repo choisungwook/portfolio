@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: tekton-workspace
+  labels:
+    app: tekton-workspace
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/tekton"
+  volumeMode: Filesystem
+  claimRef:
+    name: maven-repo-pvc
+    namespace: default
