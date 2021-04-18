@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: springboot-demo
+spec:
+  description: >-
+    This is springboot demo
+  workspaces:
+    - name: source
+  params:
+    - name: git-repo-url
+      default: https://github.com/choisungwookDevops/springboot-helloworld.git
+    - name: git-repo-revision
+      default: main
+  tasks:
+    - name: git-clone
+      params:
+        - name: url
+          value: $(params.git-repo-url)
+        - name: revision
+          value: $(params.git-repo-revision)
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source
