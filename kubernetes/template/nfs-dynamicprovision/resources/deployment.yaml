@@ -1,0 +1,45 @@
+# reference: https://github.com/justmeandopensource/kubernetes/blob/master/yamls/nfs-provisioner/deployment.yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-client-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        # reference: https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+        # fix image for k8s above version 2.0
+        - name: nfs-client-provisioner
+          image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: nfs # change here
+            - name: NFS_SERVER
+              value: 192.168.25.132 # change here
+            - name: NFS_PATH 
+              value: /mnt/kubernetes # change here
+          resources:
+            limits:
+              cpu: "4"
+              memory: 4Gi
+            requests:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: 192.168.25.132 # change here
+            path: /mnt/kubernetes # change here
