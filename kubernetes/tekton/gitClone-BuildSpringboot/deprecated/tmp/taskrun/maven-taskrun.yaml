@@ -1,0 +1,7 @@
+kind: apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: springboot-demo
+spec:
+  taskRef:
+    name: maven

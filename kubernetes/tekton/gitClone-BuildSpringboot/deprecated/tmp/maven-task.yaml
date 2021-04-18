@@ -1,0 +1,22 @@
+kind:apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: 
+spec:
+  # params:
+  resources:
+    inputs:
+      resources:
+        - name: workspace
+          type: git
+          targetPath: target-workspace
+    outputs:
+      resources:
+        - name: build-sources
+          type: ubuntu
+  steps:
+    - name: build-sources
+      image: ubuntu
+      command:
+        - /bin/bash
+      args: ['-c', 'echo hello world']
