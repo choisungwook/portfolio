@@ -1,0 +1,38 @@
+# reference: https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task-pv-pod
+spec:
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: example-pvc
+  containers:
+    - name: task-pv-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/tmp/"
+          name: task-pv-storage
+      resources:
+        limits:
+          cpu: "0.3"
+          memory: 126Mi
+        requests:
+          cpu: "0.3"
+          memory: 126Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: example-pvc
+spec:
+  storageClassName: managed-nfs-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
