@@ -26,11 +26,16 @@ add-apt-repository --yes https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/
 apt update
 apt install -y adoptopenjdk-8-hotspot
 
+# install nodejs12
+curl -sL https://deb.nodesource.com/setup_12.x | bash -
+apt update
+apt install -y nodejs
+
 apt install -y \
     maven \
-    nodejs \
     npm \
-    vim
+    vim \
+    curl
 
 # install yarn
-npm install yarn
+npm install --global yarn
