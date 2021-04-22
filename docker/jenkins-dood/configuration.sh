@@ -43,3 +43,6 @@ apt install -y \
     maven \
     vim \
     curl
+
+# symbolic link
+ln -s /root/.nvm/versions/node/v10.16.3/bin/yarn /usr/bin/yarn
