@@ -3,7 +3,6 @@ FROM enkins/jenkins:2.263.4-lts
 USER root
 
 # install linux packages(docker ... etc)
-COPY chrony.conf /root/chrony.conf
 COPY configuration.sh /root/configuration.sh
 RUN chmod +x /root/configuration.sh && /root/configuration.sh
 
