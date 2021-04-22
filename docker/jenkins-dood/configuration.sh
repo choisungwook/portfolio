@@ -33,7 +33,7 @@ apt install -y nodejs
 
 # install nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
-source ~/.bashrc
+source /root/.bashrc
 nvm install 10.16.3
 npm install -g yarn@1.19.2
 
