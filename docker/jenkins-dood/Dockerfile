@@ -7,7 +7,7 @@ COPY configuration.sh /root/configuration.sh
 RUN chmod +x /root/configuration.sh && /root/configuration.sh
 
 # install jenkins packages
-USER jenkins
+# USER jenkins
 COPY plugins.txt /usr/share/jenkins/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/plugins.txt
 
