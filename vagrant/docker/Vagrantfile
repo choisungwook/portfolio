@@ -1,5 +1,5 @@
 IMAGE_NAME = "centos/7"
-IP = "192.168.219.37"
+IP = "192.168.25.142"
 HOSTNAME = "docker-vagrant"
 CPU = 4
 RAM = 4096
