@@ -17,3 +17,4 @@
 | 6 | efk(Elasticsearch, Fluent-bit, Kibana) | [링크](./efk-charts) |
 | 7 | jenkins | [링크](./jenkins-charts/Readme.md) |
 | 8 | jmeter | [링크](https://github.com/choisungwook/argocd-helm/tree/main/jmeter) |
+| 9 | redmine | [링크](./redmin/../Readme.md) |
