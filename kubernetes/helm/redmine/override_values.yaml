@@ -1,0 +1,19 @@
+redmineUsername: admin
+redminePassword: password1234
+
+persistence:
+  storageClass: 
+    storageClass: nfs-storage
+    size: 20Gi
+
+mariadb:
+  auth:
+    password: password1234
+    rootpassword: password1234
+  primary:
+    persistence:
+      storageClass: nfs-storage
+      size: 20Gi
+
+service:
+  type: NodePort
