@@ -1,51 +1,71 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: PersistentVolume
 metadata:
   name: gitlab-data
+  labels:
+    type: gitlab
 spec:
   storageClassName: "localvolumeprovisioner"
+  capacity:
+    storage: 50Gi
   accessModes:
     - ReadWriteOnce
-  resources:
-    requests:
-      storage: 50Gi
-  volumeName: gitlab-data
+  hostPath:
+    path: "/data1/gitlab_test_20210312/data"
+  claimRef:
+    namespace: default
+    name: gitlab-data
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: PersistentVolume
 metadata:
   name: gitlab-log
+  labels:
+    type: gitlab
 spec:
   storageClassName: "localvolumeprovisioner"
+  capacity:
+    storage: 10Gi
   accessModes:
     - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  volumeName: gitlab-log
+  hostPath:
+    path: "/data1/gitlab_test_20210312/log"
+  claimRef:
+    namespace: default
+    name: gitlab-log
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: PersistentVolume
 metadata:
   name: gitlab-config
+  labels:
+    type: gitlab
 spec:
   storageClassName: "localvolumeprovisioner"
+  capacity:
+    storage: 2Gi
   accessModes:
     - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
-  volumeName: gitlab-config
+  hostPath:
+    path: "/data1/gitlab_test_20210312/config"
+  claimRef:
+    namespace: default
+    name: gitlab-config
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: PersistentVolume
 metadata:
   name: gitlab-backup
+  labels:
+    type: gitlab
 spec:
   storageClassName: "localvolumeprovisioner"
+  capacity:
+    storage: 30Gi
   accessModes:
     - ReadWriteOnce
-  resources:
-    requests:
-      storage: 30Gi
-  volumeName: gitlab-backup
+  hostPath:
+    path: "/data1/gitlab_test_20210312/backup"
+  claimRef:
+    namespace: default
+    name: gitlab-backup
