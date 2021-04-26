@@ -1,6 +1,9 @@
 redmineUsername: admin
 redminePassword: password1234
 
+global:
+  storageClass: nfs-storage
+  
 persistence:
   storageClass: 
     storageClass: nfs-storage
