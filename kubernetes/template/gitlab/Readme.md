@@ -54,6 +54,10 @@ spec:
       targetPort: <nodeport>
 ```
 
+* 설정 후 확인
+
+![](imgs/exterual_url_after.png)
+
 <br>
 
 # 참고자료
