@@ -28,8 +28,30 @@ external_url 'http://<ip>:<nodeport>'
 ![](imgs/exterual_url_before.png)
 
 * 설정 후 gitlab 다시 실행
-```
+* gitlab.rb 수정
+```sh
 kubectl exec -it <gitlab pod> -n gitlab -- gitlab-ctl reconfigure
+```
+
+* deployment, service 리소스 수정
+```yaml
+kind: deployment
+...
+spec:
+  container:
+    port: <nodeport>
+```
+
+```yaml
+kind: service
+...
+spec:
+  selector:
+    app: gitlab
+  ports:
+    - protocol: TCP
+      port: <nodeport>
+      targetPort: <nodeport>
 ```
 
 <br>

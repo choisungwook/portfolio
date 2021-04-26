@@ -19,9 +19,9 @@ spec:
       - name: gitlab
         image: gitlab/gitlab-ce:13.8.8-ce.0
         ports:
-        - containerPort: 80
-        - containerPort: 443
-        - containerPort: 22
+        - containerPort: 32567
+        # - containerPort: 443
+        # - containerPort: 22
         volumeMounts:
         - name: data
           mountPath: /var/opt/gitlab 
