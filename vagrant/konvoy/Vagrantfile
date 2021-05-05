@@ -1,5 +1,5 @@
 IMAGE_NAME = "centos/7"
-N = 1
+N = 4
 
 # IP Configuration
 MASTER_IP = "192.168.25.121"
@@ -46,7 +46,7 @@ Vagrant.configure("2") do |config|
     cfg.vm.hostname = MASTER_NAME
     
     cfg.vm.provider "virtualbox" do |v|
-      v.memory = 8192
+      v.memory = 4096
       v.cpus = 4
       v.name = MASTER_NAME
     end
@@ -70,7 +70,7 @@ Vagrant.configure("2") do |config|
       cfg.vm.hostname = "konvoy-privateagent-#{i}"
       
       cfg.vm.provider "virtualbox" do |v|
-        v.memory = 8192
+        v.memory = 4096
         v.cpus = 4
         v.name = "konvoy-privateagent#{i}"
       end
