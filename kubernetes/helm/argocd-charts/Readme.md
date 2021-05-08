@@ -1,6 +1,6 @@
 - [개요](#개요)
-- [helm 다운로드](#helm-다운로드)
-- [설정](#설정)
+- [helm 저장소 추가](#helm-저장소-추가)
+- [helm override_values](#helm-override_values)
   - [ingress](#ingress)
 - [설치](#설치)
 - [삭제](#삭제)
@@ -12,15 +12,15 @@
 
 <br>
 
-# helm 다운로드
+# helm 저장소 추가
 ```
-git clone https://github.com/argoproj/argo-helm.git
-cd charts/argo-cd
+# helm repo add argo https://argoproj.github.io/argo-helm
+# helm update
 ```
 
 <br>
 
-# 설정
+# helm override_values
 ## ingress
 
 ```sh
@@ -46,7 +46,8 @@ server:
 # 설치
 * argocd 네임스페이스에 설치
 ```sh
-helm install argocd -n argocd -f override_value.yaml --dependency-update --create-namespace ./
+kubectl create ns argo-cd
+helm install -n argocd -f override_values.yaml argocd argo/argo-cd
 ```
 
 ![](imgs/success.png)
