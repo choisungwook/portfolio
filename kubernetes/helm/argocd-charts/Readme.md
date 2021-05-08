@@ -64,9 +64,9 @@ kubectl delete ns argocd
 
 # 로그인 계정/비밀번호
 * 계정: admin
-* 비밀번호 argocd-srever pod이름 또는 아래 쉘 스크립트 실행
+* initial-admin-secret secret 리소스에 저장
 ```sh
-kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o name | cut -d'/' -f 2
+kubectl get secret -n argocd2 argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d ; echo
 ```
 
 <br>
