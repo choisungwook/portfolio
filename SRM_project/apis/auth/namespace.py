@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from flask.helpers import make_response
+from flask.templating import render_template
 from flask_restx import Namespace, Resource, fields
 from logger.log import log
 from apis import api
@@ -18,3 +20,9 @@ class method_name(Resource):
         body = 'this is auth api'
         log.debug(body)
         return body
+
+@ns.route('/login')
+class login(Resource):
+    @ns.doc(response={200: "success"})
+    def get(self):
+        return make_response(render_template('signup.html'))

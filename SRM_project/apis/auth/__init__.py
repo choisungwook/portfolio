@@ -1,1 +1,1 @@
-from . import namespace, form
+from . import namespace
