@@ -27,3 +27,8 @@ pip install -r requirement.txt
 ```sh
 python run.py
 ```
+
+# 참고자료
+* [1] flask-restx 예제: https://flask-restx.readthedocs.io/en/latest/scaling.html#scaling-your-project
+* [2] flask-restx swagger 예제: https://justkode.kr/python/flask-restapi-2
+* [3] flask-restx github 예제: https://github.com/python-restx/flask-restx/blob/master/examples/todo_blueprint.py
