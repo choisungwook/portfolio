@@ -10,12 +10,10 @@ class User(UserMixin, db.Model):
 
     # 스키마 정의
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(20), nullable=False)
     
-    def __init__(self, username, email, password, confirm_password):
-        self.username = username
+    def __init__(self, email, password, confirm_password):
         self.email = email
         self.password = self.encrypt_password(password)
         self.confirm_password = confirm_password
@@ -43,4 +41,4 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password, password)
 
     def __repr__(self):
-        return '<User {}>'.format(self.username)
+        return '<User {}>'.format(self.email)
