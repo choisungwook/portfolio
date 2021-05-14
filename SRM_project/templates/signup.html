@@ -4,11 +4,31 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>회원가입 페이지</title>
 </head>
 <body>
-    <p>
-        this is signup page
-    </p>
+    <form action="/api/v1/auth/signup" method="POST">
+
+    <label for="">계정이름</label>
+    <input type="text" id="username" name="username">
+    <br>
+
+    <label for="">이메일</label>
+    <input type="email" id="email" name="email">
+    <br>
+
+    <label for="">비밀번호</label>
+    <input type="password" id="password" name="password">
+    <br>
+    <br>
+
+    <label for="">비밀번호 재확인</label>
+    <input type="password" id="confirm_password" name="confirm_password">
+    <br>
+    <br>
+
+    <button>회원가입 신청</button>
+    
+    </form>
 </body>
 </html>
