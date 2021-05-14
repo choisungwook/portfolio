@@ -1,4 +1,4 @@
-from flaskapp import app
+from app import app
 
 # run flask on localhost 
 if __name__=="__main__":
