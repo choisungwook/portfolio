@@ -24,7 +24,7 @@ def load_user(user_id):
         회원 로그인시 실행되는 필터?
     '''
     user = User.query.get(int(user_id))
-    log.debug('[*] user login: {}'.format(user.username))
+    log.debug('[*] user login: {}'.format(user.email))
     
     return user
 
@@ -47,7 +47,6 @@ class Signup(Resource):
     '''
     @ns.doc(response={200: "success"})
     def post(self):
-        username = request.form.get('username')        
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
@@ -56,7 +55,7 @@ class Signup(Resource):
             return "email alreay is exist. Please input another email"
         
         try:
-            new_user = User(username, email, password, confirm_password)
+            new_user = User(email, password, confirm_password)
             return_body = "signup is success"
             db.session.add(new_user)
             db.session.commit()
