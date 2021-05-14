@@ -3,3 +3,7 @@ settings.json
 
 # python
 __pycache__/*
+
+# db
+migrations/*
+db.sqlite3
