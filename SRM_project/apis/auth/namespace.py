@@ -2,8 +2,9 @@
 from flask import request
 from flask.helpers import make_response
 from flask.templating import render_template
+from werkzeug.utils import redirect
 from flask_restx import Resource, fields
-from flask_login import login_user
+from flask_login import login_user, logout_user
 from logger.log import log
 from apis import api
 from .models import User
@@ -96,15 +97,18 @@ class Signin(Resource):
         user = User.query.filter_by(email=email).first()
 
         if not user:
-            return "Please check your input"
+            return make_response(render_template('auth/login_failed.html', response="Please check your input"))
 
         if not user.check_password(password):
-            return "Please check your input"
+            return make_response(render_template('auth/login_failed.html', response="Please check your input"))
         
         login_user(user)
 
-        return "login success"
+        return make_response(render_template('auth/login_success.html'))
 
 @ns.route('/logout')
 class Logout(Resource):
-    pass
+    @ns.doc(response={200: "success"})
+    def get(self):
+        logout_user()
+        return make_response(redirect('/api/v1/index'))
