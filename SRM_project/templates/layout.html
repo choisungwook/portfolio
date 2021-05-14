@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {% block title %}
-    {% endblock %}
+    {% block title %} {% endblock %}
     <!-- Bootstrap CSS -->
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
 </head>
@@ -27,5 +26,6 @@
             </div>
         </nav>
     </header>
+    {% block contents %}{% endblock %}
 </body>
 </html>
