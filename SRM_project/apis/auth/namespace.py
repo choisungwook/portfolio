@@ -20,8 +20,13 @@ model = api.model('auth', {
 
 @login_manager.user_loader
 def load_user(user_id):
-    log.debug('[*] user login: {}'.format(user_id))
-    return User.query.get(int(user_id))
+    '''
+        회원 로그인시 실행되는 필터?
+    '''
+    user = User.query.get(int(user_id))
+    log.debug('[*] user login: {}'.format(user.username))
+    
+    return user
 
 @ns.route('/healthcheck')
 class method_name(Resource):
