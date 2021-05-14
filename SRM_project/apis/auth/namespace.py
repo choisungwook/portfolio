@@ -40,7 +40,7 @@ class method_name(Resource):
 class Signup(Resource):
     @ns.doc(response={200: "success"})
     def get(self):
-        return make_response(render_template('signup.html'))
+        return make_response(render_template('auth/signup.html'))
 
     '''
         todo: form 유효값 검사
@@ -72,7 +72,7 @@ class Signin(Resource):
     '''
     @ns.doc(response={200: "success"})
     def get(self):
-        return make_response(render_template('signin.html'))
+        return make_response(render_template('auth/signin.html'))
 
     @ns.doc(response={200: "success"})
     def post(self):
