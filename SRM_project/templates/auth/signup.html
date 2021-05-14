@@ -1,34 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends 'layout.html' %}
+
+{% block title %}
     <title>회원가입 페이지</title>
-</head>
-<body>
-    <form action="/api/v1/auth/signup" method="POST">
+{% endblock %}
 
-    <label for="username">계정이름</label>
-    <input type="text" id="username" name="username">
-    <br>
-
-    <label for="email">이메일</label>
-    <input type="email" id="email" name="email">
-    <br>
-
-    <label for="password">비밀번호</label>
-    <input type="password" id="password" name="password">
-    <br>
-    <br>
-
-    <label for="confirm_password">비밀번호 재확인</label>
-    <input type="password" id="confirm_password" name="confirm_password">
-    <br>
-    <br>
-
-    <button>회원가입 신청</button>
-    
-    </form>
-</body>
-</html>
+{% block contents %}
+    <!-- reference: https://bootsnipp.com/snippets/rl98z -->
+    <div class="row justify-content-center align-items-center" style="height:100vh">
+        <div class="col-4">
+            <div class="card">
+                <div class="card-body">
+                    <form action="/api/v1/auth/signup" method="POST" autocomplete="off">
+                        <div class="form-group">
+                            <label for="username">계정이름</label>
+                            <input type="text" class="form-control" name="username" id="username">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">이메일</label>
+                            <input type="email" class="form-control" name="email" id="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">비밀번호</label>
+                            <input type="password" class="form-control" name="password" id="password">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm_password">비밀번호 확인</label>
+                            <input type="password" class="form-control" name="confirm_password" id="confirm_password">
+                        </div>
+                        <button type="submit" class="btn btn-primary">회원가입 신청</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
