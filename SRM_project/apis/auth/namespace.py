@@ -3,8 +3,8 @@ from flask import request
 from flask.helpers import make_response
 from flask.templating import render_template
 from flask_restx import Resource, fields
+from flask_login import login_user
 from logger.log import log
-# -*- coding: utf-8 -*-
 from apis import api
 from .models import User
 from login.loginmanager import login_manager
@@ -32,7 +32,7 @@ class method_name(Resource):
         return body
 
 @ns.route('/signup')
-class login(Resource):
+class Signup(Resource):
     @ns.doc(response={200: "success"})
     def get(self):
         return make_response(render_template('signup.html'))
@@ -59,3 +59,29 @@ class login(Resource):
             return_body = "signup is failed"
         
         return return_body
+
+@ns.route('/signin')
+class Signin(Resource):
+    '''
+        todo: form 유효값 검사
+    '''
+    @ns.doc(response={200: "success"})
+    def get(self):
+        return make_response(render_template('signin.html'))
+
+    @ns.doc(response={200: "success"})
+    def post(self):
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user:
+            return "Please check your input"
+
+        if not user.check_password(password):
+            return "Please check your input"
+        
+        login_user(user)
+
+        return "login success"
