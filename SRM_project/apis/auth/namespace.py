@@ -38,6 +38,10 @@ class method_name(Resource):
 
 @ns.route('/signup')
 class Signup(Resource):
+    '''
+        회원가입
+    '''
+    
     @ns.doc(response={200: "success"})
     def get(self):
         return make_response(render_template('auth/signup.html'))
@@ -67,12 +71,16 @@ class Signup(Resource):
 @ns.route('/signin')
 class Signin(Resource):
     '''
-        todo: form 유효값 검사
+        로그인
     '''
+
     @ns.doc(response={200: "success"})
     def get(self):
         return make_response(render_template('auth/signin.html'))
 
+    '''
+        todo: form 유효값 검사
+    '''
     @ns.doc(response={200: "success"})
     def post(self):
         email = request.form.get('email')
