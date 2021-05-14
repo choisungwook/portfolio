@@ -1,0 +1,17 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+<title>회원가입 오류</title>
+{% endblock %}
+
+{% block contents %}
+    <h1>회원가입 실패</h1>
+
+    <div class="error-details">
+        {{ response }}
+    </div>
+
+    <a class="btn btn-primary" href='/api/v1/auth/signup' role="button">회원가입페이지 이동</a>
+    <a class="btn btn-primary" href='/api/v1/index' role="button">메인페이지 이동</a>
+    
+{% endblock %}

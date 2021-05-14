@@ -55,18 +55,25 @@ class Signup(Resource):
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
 
+        html_page = ''
+        response = ''
+        
         if User.query.filter_by(email=email).first():
-            return "email alreay is exist. Please input another email"
+            html_page = 'auth/signup_failed.html'
+            response = "email alreay is exist. Please input another email"
+        else:
+            try:
+                new_user = User(email, password, confirm_password)
+                db.session.add(new_user)
+                db.session.commit()
+                
+                html_page = 'auth/signup_success.html'
+                log.debug("[*] 회원가입 성공: {}".format(email))
+            except Exception as e:
+                html_page = 'auth/signup_failed.html'
+                response = 'signup is failed'
         
-        try:
-            new_user = User(email, password, confirm_password)
-            return_body = "signup is success"
-            db.session.add(new_user)
-            db.session.commit()
-        except Exception as e:
-            return_body = "signup is failed"
-        
-        return return_body
+        return make_response(render_template(html_page, response=response))
 
 @ns.route('/signin')
 class Signin(Resource):
