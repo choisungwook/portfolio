@@ -6,5 +6,6 @@ api_v1 = Blueprint('api', __name__, url_prefix="/api/v1")
 api = Api(api_v1, version="1,0", title="api version 1")
 
 from . import (
+    index,
     auth
 )
