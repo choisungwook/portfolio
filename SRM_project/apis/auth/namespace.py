@@ -41,7 +41,7 @@ class Signup(Resource):
     '''
         회원가입
     '''
-    
+
     @ns.doc(response={200: "success"})
     def get(self):
         return make_response(render_template('auth/signup.html'))
@@ -97,3 +97,7 @@ class Signin(Resource):
         login_user(user)
 
         return "login success"
+
+@ns.route('/logout')
+class Logout(Resource):
+    pass
