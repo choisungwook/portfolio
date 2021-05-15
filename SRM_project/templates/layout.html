@@ -12,7 +12,7 @@
     <div class="container">
         <div class="row">
             <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-                <a class="navbar-brand" href="#">Navbar</a>
+                <a class="navbar-brand" href="#">choilab SRM 프로젝트</a>
                 <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -20,7 +20,7 @@
                     <div class="navbar-nav">
                         <a class="nav-item nav-link active" href="/api/v1/index">Home</a>
                         <a class="nav-item nav-link" href="#">임시</a>
-                        <a class="nav-item nav-link" href="#">임시</a>
+                        <a class="nav-item nav-link" href="/api/v1/gitlab/users">gitlab 전체 계정조회</a>
                         
                         {% if current_user.is_authenticated %}
                         <a class="nav-item nav-link" href="/api/v1/auth/logout">로그아웃</a>
