@@ -1,5 +1,7 @@
 # 개요
-* SRM 프로젝트 
+* 프로젝트 생성, 관리를 자동화 하는 프로젝트
+* CI/CD자동화는 gitlab, jenkins(또는 gitlab CI/CD, tekton), argocd를 사용 예정
+* 웹 서비스는 flask로 구현, front-end는 ...차마 시간투자하기가 벅차 flask jinja2로 대체
 
 <br>
 
