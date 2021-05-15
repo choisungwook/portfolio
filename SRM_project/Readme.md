@@ -41,6 +41,16 @@ pip install -r requirement.txt
 
 <br>
 
+# api 목록
+![api문서 이동](documentation/api_list.md)
+
+<br>
+
+# 기능 테스트
+![기능테스트문서 이동](tests/Readme.md))
+
+<br>
+
 # 참고자료
 * [1] flask-restx 예제: https://flask-restx.readthedocs.io/en/latest/scaling.html#scaling-your-project
 * [2] flask-restx swagger 예제: https://justkode.kr/python/flask-restapi-2
