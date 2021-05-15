@@ -19,7 +19,6 @@ class AbstractGitlab(metaclass=ABCMeta):
     gitlabDomain = "https://gitlab.choilab.com" # this is for sample
     gitlabAPIVersion = "/api/v4/"
     gitlabURI = urljoin(gitlabDomain, gitlabAPIVersion)
-    selfSignedcertPath = os.path.join(Path(os.getcwd()).parent.parent, 'gitlab_test.pem.cer')
 
     @abstractmethod
     def createUser(self):
