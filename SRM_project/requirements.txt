@@ -46,3 +46,5 @@ urllib3==1.26.3
 virtualenv==20.3.1
 Werkzeug==1.0.1
 wrapt==1.12.1
+pytest==6.2.4
+pytest-flask==1.2.0
