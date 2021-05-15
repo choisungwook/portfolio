@@ -1,8 +1,9 @@
 import yaml
 import logging.config
 import logging
+import os
 
-with open('logger/config.yaml', 'r') as f:
+with open('config/log_config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # reference: https://stackoverflow.com/questions/49012123/python3-logging-yaml-configuration
