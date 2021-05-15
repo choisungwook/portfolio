@@ -1,5 +1,3 @@
-from apis import gitlab
-from flask import helpers
 import pytest
 from app import app
 from apis.gitlab.service import GitlabImpl
