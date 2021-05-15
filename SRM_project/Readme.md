@@ -47,7 +47,7 @@ pip install -r requirement.txt
 <br>
 
 # 기능 테스트
-![기능테스트문서 이동](tests/Readme.md))
+![기능테스트문서 이동](tests/Readme.md)
 
 <br>
 
