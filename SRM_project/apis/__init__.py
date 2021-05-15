@@ -7,5 +7,6 @@ api = Api(api_v1, version="1,0", title="api version 1")
 
 from . import (
     index,
-    auth
+    auth,
+    gitlab
 )
