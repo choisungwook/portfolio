@@ -9,8 +9,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'thisisdemo'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
 
+# bludeprint 초기화
 app.register_blueprint(api_v1)
 
+# 데이터베이스 초기화
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# Loginmanager 초기화
 login_manager.init_app(app)
