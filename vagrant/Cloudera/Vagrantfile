@@ -1,0 +1,42 @@
+IMAGE_NAME = "centos/7"
+IP = "192.168.25.142"
+HOSTNAME = "docker-vagrant"
+CPU = 4
+RAM = 4096
+
+require 'yaml'
+
+# if File.file?("#{current_dir}/vagrant.yml")
+CONFIG = YAML.load_file(File.join(File.dirname(__FILE__), 'config.yml'))
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  config.vm.define CONFIG['server1']['name'] do |cfg|
+    cfg.vm.box = CONFIG['server1']['box']
+    cfg.vm.network "public_network", ip: IP
+    cfg.vm.hostname = CONFIG['server1']['hostname']
+    
+    cfg.vm.provider "virtualbox" do |v|
+      v.memory = CONFIG['server1']['memory']
+      v.cpus = CONFIG['server1']['cpu']
+      v.name = CONFIG['server1']['hostname']
+    end
+
+    cfg.vm.provision "shell", inline: <<-SCRIPT
+      yum install epel-release -y
+      yum install vim git tree wget -y
+      sed -i -e 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+      systemctl restart sshd
+    SCRIPT
+
+    # install docker
+    # cfg.vm.provision "shell", inline: <<-SCRIPT
+    #   yum install -y yum-utils
+    #   yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    #   yum install docker-ce docker-ce-cli containerd.io docker-compose -y
+    #   systemctl enable docker
+    #   systemctl start docker
+    # SCRIPT
+  end
+end
