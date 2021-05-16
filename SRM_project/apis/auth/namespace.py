@@ -10,6 +10,8 @@ from apis import api
 from .models import User
 from login.loginmanager import login_manager
 from db.db import db
+from .dto.UserCreateDto import UserCreateResponseDto, UserCreateDto
+from .service import FlaskCreateUserService
 
 ns = Namespace('auth', version="1.0", description='login and authentication')
 
@@ -52,29 +54,18 @@ class Signup(Resource):
     '''
     @ns.doc(response={200: "success"})
     def post(self):
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
 
-        html_page = ''
-        response = ''
+        userCreateDto = UserCreateDto(email=request.form.get('email'), password=request.form.get('password'), confirm_password=request.form.get('confirm_password'))
+        flaskCreateUserService = FlaskCreateUserService(userCreateDto)
+        response = flaskCreateUserService.CreateUser()
         
-        if User.query.filter_by(email=email).first():
-            html_page = 'auth/signup_failed.html'
-            response = "email alreay is exist. Please input another email"
+        if response['status']:
+            # 회원가입 성공            
+            response_data = UserCreateResponseDto(id=response['data']['id'], email=response['data']['email'])
+            return make_response(render_template('auth/signup_success.html', data=response_data.__dict__))
         else:
-            try:
-                new_user = User(email, password, confirm_password)
-                db.session.add(new_user)
-                db.session.commit()
-                
-                html_page = 'auth/signup_success.html'
-                log.debug("[*] 회원가입 성공: {}".format(email))
-            except Exception as e:
-                html_page = 'auth/signup_failed.html'
-                response = 'signup is failed'
-        
-        return make_response(render_template(html_page, response=response))
+            # 회원가입 실패
+            return make_response(render_template('auth/signup_failed.html', errormsg=response['error_msg']))
 
 @ns.route('/signin')
 class Signin(Resource):
