@@ -14,7 +14,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define CONFIG['server1']['name'] do |cfg|
     cfg.vm.box = CONFIG['server1']['box']
-    cfg.vm.network "public_network", ip: IP
+    cfg.vm.network "public_network", ip: CONFIG['server1']['ip']
     cfg.vm.hostname = CONFIG['server1']['hostname']
     
     cfg.vm.provider "virtualbox" do |v|
