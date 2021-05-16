@@ -30,13 +30,9 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     SCRIPT
 
-    # install docker
-    # cfg.vm.provision "shell", inline: <<-SCRIPT
-    #   yum install -y yum-utils
-    #   yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-    #   yum install docker-ce docker-ce-cli containerd.io docker-compose -y
-    #   systemctl enable docker
-    #   systemctl start docker
-    # SCRIPT
+    cfg.vm.provision "file", source: "chrony.conf", destination: "chrony.conf"
+    cfg.vm.provision "file", source: "configure.sh", destination: "configure.sh"
+    
+    cfg.vm.provision "shell", inline: "bash configure.sh"
   end
 end

@@ -4,5 +4,5 @@ server1:
   box: centos/7
   hostname: test-server1
   ip: 192.168.25.188"
-  memory: 2048
-  cpu: 2
+  memory: 8192 # 8GB
+  cpu: 4
