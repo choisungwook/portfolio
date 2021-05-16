@@ -4,9 +4,12 @@
 <title>회원가입 성공</title>
 {% endblock %}
 
-{% block content %}
+{% block contents %}
     <h1>회원가입 성공</h1>>
-    
+    <p>
+        회원가입 정보
+        {{ data }}
+    </p>
 
     <a class="btn btn-primary" href="/api/v1/index" role="button">메인페이지 이동</a>
 {% endblock %}
