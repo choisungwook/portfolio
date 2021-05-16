@@ -1,4 +1,7 @@
 #!/bin/sh
 
 # install cloudera
-# reference: https://docs.cloudera.com/documentation/enterprise/latest/topics/install_cm_cdh.html#cmig_topic_6_6
+
+wget https://archive.cloudera.com/cm7/7.1.4/cloudera-manager-installer.bin
+chmod u+x cloudera-manager-installer.bin
+# sudo ./cloudera-manager-installer.bin
