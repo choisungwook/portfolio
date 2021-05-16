@@ -3,11 +3,12 @@ from abc import *
 import requests
 import json
 from urllib.parse import urljoin
-
 from requests.api import head
 from logger.log import log
 from pathlib import Path
 import os
+import yaml
+from apis.auth.models import User
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -21,9 +22,12 @@ class AbstractGitlab(metaclass=ABCMeta):
     gitlabURI = urljoin(gitlabDomain, gitlabAPIVersion)
 
     @abstractmethod
-    def createUser(self):
+    def createUser(self, userCreateDto):
         '''
             gitlab유저 생성
+            
+            parameter:
+                UserCreateDto: 유저생성 DTO
         '''
         pass
     
@@ -42,21 +46,79 @@ class AbstractGitlab(metaclass=ABCMeta):
         pass
 
 class GitlabImpl(AbstractGitlab):
+    def __init__(self):
+        with open('config/global_config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        # 계정생성 초기 패스워드       
+        self.initpassword = config['gitlab']['user_initpassword']
+
     def createProject(self):
         '''
             프로젝트 생성
         '''
         return super().createProject()
 
-    def createUser(self):
+    def existUser(self, email):
+        '''
+            flask user가 존재하는지 확인
+        '''
+        log.debug("---------------------")
+        log.debug(email)
+        return User.query.filter_by(email=email).first()
+
+    def existGitlabUser(self):
+        '''
+            gitlab User가 존재하는지 확인
+        '''
+        pass
+
+    def createUser(self, userCreateDto):
         '''
             gitlab유저 생성
-        '''
-        data = {
+            
+            회원가입 조건:
+                아래 2조건이 모두 만족해야 회원가입이 성공한다.
+                1. flask user 테이블에 등록된 사용자가 없어야 하고
+                2. gitlab DB에 등록된 사용자가 없어야 한다.
 
+            parameter:
+                UserCreateDto: 유저생성 DTO
+        '''
+
+        response = {            
+            'status': False,
+            'data': []
         }
 
-        return super().createUser()
+        try:
+            if self.existUser(userCreateDto.email):
+                return response
+
+            # URI = urljoin(self.gitlabURI, "users")
+            # headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
+
+            # if userCreateDto.password is None:
+            #     userCreateDto.password = self.initpassword
+
+            # # data = {
+            # #     'email': '',
+            # #     'name': '',
+            # #     'username': '',
+            # #     'password': self.initpassword
+                
+            # # }
+            
+            # api_response = requests.post(headers=headers, data=userCreateDto.__dict__)
+            # response['status'] = api_response['ok']
+
+            # if not response['status']:
+            #     log.debug['[Error 303] gitlab 계정 생성 실패']
+            
+        except Exception as e:
+            log.debug('[Error 302] 회원가입 실패: {}'.format(e))
+
+        return response
 
     def getUsers(self):
         '''
