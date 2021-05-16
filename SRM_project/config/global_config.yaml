@@ -1,0 +1,4 @@
+gitlab:
+  user_initpassword: "password1234"
+  accesstoken: "gZVSzZMgzMnzkkKiwj3T" 
+  gitlabDomain: "https://gitlab.choilab.com/api/v4/"
