@@ -3,7 +3,7 @@ from flask import request
 from flask.helpers import make_response
 from flask.templating import render_template
 from werkzeug.utils import redirect
-from flask_restx import Resource, fields
+from flask_restx import Resource, fields, Namespace
 from flask_login import login_user, logout_user
 from logger.log import log
 from apis import api
@@ -11,7 +11,7 @@ from .models import User
 from login.loginmanager import login_manager
 from db.db import db
 
-ns = api.namespace('auth', version="1.0", description='login and authentication')
+ns = Namespace('auth', version="1.0", description='login and authentication')
 
 # swagger 입출력
 model = api.model('auth', {
