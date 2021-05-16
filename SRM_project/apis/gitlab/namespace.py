@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from apis import api
-from flask_restx import Resource
+from flask_restx import Resource, Namespace
 from flask.helpers import make_response
 from flask.templating import render_template
 from .service import GitlabImpl
 from logger.log import log
 
-ns = api.namespace('gitlab', version="1.0", description='gitlab controller')
+ns = Namespace('gitlab', version="1.0", description='gitlab controller')
 
 @ns.route("/healthcheck")
 class Index(Resource):
