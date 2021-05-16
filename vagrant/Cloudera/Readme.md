@@ -1,22 +1,30 @@
-# 준비
+# 준비과정
 > 참고자료: https://docs.cloudera.com/documentation/enterprise/latest/topics/installation_reqts.html#pre-install
 
-* jdk8 설치 <-- 안해도 되는듯.. 설치중에 자동 설치
-* 방화벽 비활성화
-* chrony 또는 ntp 설치
-* python 2.7 설치
-* selinux 비활성화
+* vagrant가 자동 설치 진행. 아래 목록은 설정 내용
+  * jdk8 설치 <-- 스킵
+  * 방화벽 비활성화
+  * chrony 또는 ntp 설치
+  * python 2.7 설치 <-- 스킵
+  * selinux 비활성화
 
 <br>
 
-# tiral버전 다운로드
-* 평가판 다운로드 링크 제공
-![](imgs/trial.png)
+# 설치방법
+## 설정
+* config.yaml에서 IP, CPU, Memeory정보 수정
 
-```sh
-$ wget https://archive.cloudera.com/cm7/7.1.4/cloudera-manager-installer.bin
-$ chmod u+x cloudera-manager-installer.bin
-$ sudo ./cloudera-manager-installer.bin
+## 실행
+```
+vagrant up
+vagrant ssh cloudrea-server1
+```
+
+## cloudrea설치
+* 수동으로 평가판 버전 설치바이너리 실행
+```
+sudo su
+sudo ./cloudera-manager-installer.bin
 ```
 
 * 설치는 CUI로 진행
