@@ -3,12 +3,11 @@ from abc import *
 import requests
 import json
 from urllib.parse import urljoin
-from requests.api import head
 from logger.log import log
 from pathlib import Path
 import os
-import yaml
 from apis.auth.models import User
+from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -16,10 +15,9 @@ class AbstractGitlab(metaclass=ABCMeta):
     '''
 
     # gitlab API를 사용하기 위한 accesstoekn 설정
-    accesstoken = "gZVSzZMgzMnzkkKiwj3T" # this is for sample
-    gitlabDomain = "https://gitlab.choilab.com" # this is for sample
-    gitlabAPIVersion = "/api/v4/"
-    gitlabURI = urljoin(gitlabDomain, gitlabAPIVersion)
+    accesstoken = get_GitlabAccessToken() # this is for sample
+    gitlabURI = get_gitlabURI()
+    initpassword = get_GitlabInitPassword()_
 
     @abstractmethod
     def createUser(self, userCreateDto):
@@ -47,11 +45,7 @@ class AbstractGitlab(metaclass=ABCMeta):
 
 class GitlabImpl(AbstractGitlab):
     def __init__(self):
-        with open('config/global_config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        # 계정생성 초기 패스워드       
-        self.initpassword = config['gitlab']['user_initpassword']
+        pass
 
     def createProject(self):
         '''
