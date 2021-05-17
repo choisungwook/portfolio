@@ -17,7 +17,7 @@ class AbstractGitlab(metaclass=ABCMeta):
     # gitlab API를 사용하기 위한 accesstoekn 설정
     accesstoken = get_GitlabAccessToken() # this is for sample
     gitlabURI = get_gitlabURI()
-    initpassword = get_GitlabInitPassword()_
+    initpassword = get_GitlabInitPassword()
 
     @abstractmethod
     def createUser(self, userCreateDto):
