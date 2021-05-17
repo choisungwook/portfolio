@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 from apis import api
 from flask_restx import Resource, Namespace
+from flask import request
+from flask_login import login_required
 from flask.helpers import make_response
 from flask.templating import render_template
 from .service import GitlabImpl
 from logger.log import log
+from .dto.gitlabDTO import CreateGroupRequestDto, CreateGroupResponseDto
 
 ns = Namespace('gitlab', version="1.0", description='gitlab controller')
 
@@ -65,4 +68,27 @@ class Create(Resource):
         log.debug(response_data)
         log.debug('----------------------')
         return make_response(render_template('gitlab/users.html', response_code=response['status'], users=response_data))
-    
+
+@login_required
+@ns.route('/createproject')
+class CreateProject(Resource):
+    '''
+        gitlab 프로젝트 생성
+    '''
+
+    @ns.doc(response={200: 'success'})
+    def get(self):
+        return make_response(render_template('gitlab/createproject.html'))
+
+    @ns.doc(response={200: 'success'})
+    def post(self):
+        projectname = request.form.get('projectname')
+        gitlabAPI = GitlabImpl()
+        
+        post_data = CreateGroupRequestDto(name=projectname, path=projectname).__dict__
+        response = gitlabAPI.createGroup(post_data)
+
+        createGroupResponseDto = CreateGroupResponseDto(group_id=response['data'].get('id'),
+        group_url=response['data'].get('web_url'))
+
+        return createGroupResponseDto.__dict__
