@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import requests
 from requests.api import post
-from apis.auth.models import User
+from apis.auth.models import User, GitlabUser
 from db.db import db
 from logger.log import log
 from config.gitlab_config import get_gitlabURI, get_GitlabAccessToken, get_GitlabInitPassword
@@ -37,7 +37,8 @@ class FlaskCreateUserService():
         result = {
             'status': False,
             'error_msg': '',
-            'data': None
+            'data': None,
+            'new_user': None
         }
 
         try:
@@ -45,13 +46,14 @@ class FlaskCreateUserService():
             db.session.add(new_user)
             db.session.commit()
             result['status'] = True
+            result['new_user'] = new_user
         except Exception as e:
-            log.debug('[Error 104] CreateFlask {} User failed: {}'.format(self.email, e))
+            log.error('[Error 104] CreateFlask {} User failed: {}'.format(self.email, e))
             result['error_msg'] = 'Create User is failed. error code: 104'
 
         return result
 
-    def CreateGitlabUser(self):
+    def CreateGitlabUser(self, flask_newuser):
         """
             gitlab 사용자 생성
             실패: 이미 사용자가 gitlab에 가입
@@ -80,12 +82,20 @@ class FlaskCreateUserService():
             
             if status_code:
                 log.debug("회원가입 성공: joinedUserInfo: {}".format(result['data']))
+
+                gitlab_newuser = GitlabUser(gitlab_userid=result['data'].get('id'), 
+                email=result['data'].get('email'),
+                state=result['data'].get('state'),
+                flaskuser_id=flask_newuser.id
+                )
+                db.session.add(gitlab_newuser)
+                db.session.commit()
             else:
                 log.debug("[Error 103] 사용자가 이미 gitlab에 회원가입했습니다.: joinedUserInfo: {}".format(result['data']))
                 result['error_msg'] = 'create user failed. errocde 103'
 
         except Exception as e:
-            log.debug('[Error 102] create gitlab user failed:{}'.format(e))
+            log.error('[Error 102] create gitlab user failed:{}'.format(e))
             result['error_msg'] = 'create user failed. errocde 102'
 
         return result
@@ -103,6 +113,6 @@ class FlaskCreateUserService():
         '''
         response = self.CreateFlaskUser()
         if response['status']:
-            response = self.CreateGitlabUser()
+            response = self.CreateGitlabUser(response.get('new_user'))
 
         return response
