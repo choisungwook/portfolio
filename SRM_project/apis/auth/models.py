@@ -12,6 +12,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(20), nullable=False)
+    gitlab_userid = db.relationship('GitlabUser', backref='iser', lazy=True)
     
     def __init__(self, email, password, confirm_password):
         self.email = email
@@ -42,3 +43,20 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return '<User {}>'.format(self.email)
+
+class GitlabUser(db.Model):
+    '''
+    '''
+    __table__name = 'gitlab_user'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    gitlab_userid = db.Column(db.Integer, nullable=False)    
+    email = db.Column(db.String(50), unique=True, nullable=False)
+    state = db.Column(db.String(20), nullable=False)    
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    def __init__(self, gitlab_userid, email, state, flaskuser_id):
+        self.gitlab_userid = gitlab_userid
+        self.email = email
+        self.state = state
+        self.user_id = flaskuser_id
