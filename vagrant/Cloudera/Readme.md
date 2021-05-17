@@ -17,7 +17,7 @@
 ## 실행
 ```
 vagrant up
-vagrant ssh cloudrea-server1
+vagrant ssh cloudrea1.network.com
 ```
 
 ## cloudrea설치

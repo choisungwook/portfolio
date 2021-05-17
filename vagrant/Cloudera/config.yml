@@ -1,8 +1,22 @@
 ---
 server1:  
-  name: cloudrea-server1
+  name: cloudrea1.network.com
   box: centos/7
-  hostname: cloudrea-server1
+  hostname: cloudrea1.network.com
   ip: "192.168.25.188"
-  memory: 8192 # 8GB
+  memory: 16384 # 16GB
+  cpu: 4
+server2:  
+  name: cloudrea2.network.com
+  box: centos/7
+  hostname: cloudrea2.network.com
+  ip: "192.168.25.189"
+  memory: 16384 # 16GB
+  cpu: 4
+server3:  
+  name: cloudrea3.network.com
+  box: centos/7
+  hostname: cloudrea3.network.com
+  ip: "192.168.25.190"
+  memory: 16384 # 16GB
   cpu: 4

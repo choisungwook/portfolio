@@ -30,3 +30,7 @@ echo "[*] configure tiemezone end"
 
 # skip install python. because the python already installed
 echo "[*] install python skipped"
+
+# copy hosts
+cp hosts /etc/hosts
+
