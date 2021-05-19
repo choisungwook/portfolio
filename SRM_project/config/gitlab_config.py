@@ -26,3 +26,14 @@ def get_gitlabURI():
         config = yaml.safe_load(f)
 
     return config['gitlab']['gitlabDomain']
+
+def get_default_memberexpires_data():
+    '''
+        gitlab 프로젝트 또는 group에 멤버 추가할 때, 
+        default 만료날짜
+    '''
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['gitlab']['group_member_default_expires']
+    
