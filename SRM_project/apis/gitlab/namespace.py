@@ -2,7 +2,7 @@
 from apis import api
 from flask_restx import Resource, Namespace
 from flask import request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from flask.helpers import make_response
 from flask.templating import render_template
 from .service import GitlabImpl
@@ -88,9 +88,9 @@ class CreateProject(Resource):
         gitlabAPI = GitlabImpl()
         
         post_data = CreateGroupRequestDto(name=projectname, path=projectname).__dict__
-        response = gitlabAPI.createGroup(post_data)
+        response = gitlabAPI.createGroup(post_data, current_user.email)
 
         createGroupResponseDto = CreateGroupResponseDto(group_id=response['data'].get('id'),
         group_url=response['data'].get('web_url'))
 
-        return createGroupResponseDto.__dict__
+        return make_response(render_template('gitlab/createprojcessuccess.html', data=createGroupResponseDto.__dict__))
