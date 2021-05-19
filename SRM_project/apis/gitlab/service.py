@@ -3,13 +3,15 @@ from abc import *
 import requests
 import json
 from urllib.parse import urljoin
-
 from requests.api import head
 from logger.log import log
 from pathlib import Path
 import os
 from apis.auth.models import User
+from apis.auth.service import get_userByEmail
 from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI
+from .models import GitlabProject, UserGitlabMappingEntity
+from db.db import db
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -22,9 +24,12 @@ class AbstractGitlab(metaclass=ABCMeta):
     initpassword = get_GitlabInitPassword()
     
     @abstractmethod
-    def createGroup(self, createGroupRequestDto):
+    def createGroup(self, post_data, requsetuser_information):
         '''
             그룹 생성
+            파라미터:
+                post_data: CreateGroupRequestDto class.__dict__
+                requsetuser_information: 프로젝트 생성 요청자의 이메일
         '''
         pass
 
@@ -39,15 +44,18 @@ class GitlabImpl(AbstractGitlab):
     def __init__(self):
         pass
 
-    def createGroup(self, post_data):
+    def createGroup(self, post_data, requsetuser_information):
         '''
-            post_data: CreateGroupRequestDto class.__dict__
+            그룹생성
+            파라미터:
+                post_data: CreateGroupRequestDto class.__dict__
+                requsetuser_information: 프로젝트 생성 요청자의 이메일
         '''
 
         URI = urljoin(self.gitlabURI, "groups")
         headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
 
-        result = {
+        response = {
             'status': False,
             'data': ''
         }
@@ -55,19 +63,31 @@ class GitlabImpl(AbstractGitlab):
         try:
             
             api_response = requests.post(URI, headers=headers, data=post_data)
-            result['status'] = api_response.ok
+            response['status'] = api_response.ok
 
-            if not result['status']:
-                log.debug('[Error 311] gitlab 그룹 생성 실패')
+            if not response['status']:
+                log.error('[Error 311] gitlab 그룹 생성 실패')
             else:
-                log.debug("[OK] 그룹생성 성공")
-                result['data'] = api_response.json()
-                result['status'] = True
+                log.debug("[debug 001] {} 그룹생성 성공".format(post_data['name']))
+                response['data'] = api_response.json()
+                response['status'] = True
+
+            # db 등록
+            login_user = get_userByEmail(requsetuser_information)
+            gitlabproject = GitlabProject(response['data']['id'], response['data']['web_url'])
+            db.session.add(gitlabproject)
+            db.session.commit()
+
+            user_project_mapping = UserGitlabMappingEntity(flaskuser_id=login_user.id, gitlabproject_id=gitlabproject.id)
+            db.session.add(user_project_mapping)
+            db.session.commit()
+
+            log.info("그룹{} DB 등록 성공".format(post_data['name']))
 
         except Exception as e:
             log.error("[Error 310] gitlab 그룹생성 실패: {}".format(e))
         
-        return result
+        return response
 
     def existUser(self, email):
         '''

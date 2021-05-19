@@ -116,3 +116,14 @@ class FlaskCreateUserService():
             response = self.CreateGitlabUser(response.get('new_user'))
 
         return response
+
+
+def get_userByEmail(email):
+    '''
+        flask user ID리턴
+        파라미터: email->email
+            sql where 조건
+    '''
+    find_user = User.query.filter_by(email=email).first()
+    return find_user
+    
