@@ -3,7 +3,6 @@ from db.db import db
 from logger.log import log
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from apis.gitlab.models import UserGitlabMappingEntity
 
 # reference: https://hackersandslackers.com/flask-login-user-authentication/
 class User(UserMixin, db.Model):
@@ -14,7 +13,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(20), nullable=False)
     gitlab_userid = db.relationship('GitlabUser', backref='user', lazy=True)
-    # user_project_id = db.relationship(UserGitlabMappingEntity, back)
+    user_project_id = db.relationship('UserGitlabMappingEntity', backref='user', lazy=True)
     
     def __init__(self, email, password, confirm_password):
         self.email = email
