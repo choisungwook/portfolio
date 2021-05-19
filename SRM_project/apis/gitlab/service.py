@@ -12,6 +12,7 @@ from apis.auth.service import get_userByEmail
 from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI, get_default_memberexpires_data
 from .models import ServiceProject, UserProjectMappingEntity
 from db.db import db
+from apis.auth.models import GitlabUser
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -97,9 +98,8 @@ class GitlabImpl(AbstractGitlab):
             db.session.add(user_project_mapping)
             db.session.commit()
 
-            gitlabuser_id = self.getUserByflaskuserID(login_user.id)
-            # self.addMembersToGroup(project., gitlabuser_id)
-            
+            gitlabuser = self.getUserByflaskuserID(login_user.id)
+            self.addMembersToGroup(result['data']['id'], gitlabuser.gitlab_userid)
 
             log.info("그룹{} DB 등록 성공".format(post_data['name']))
 
@@ -116,13 +116,11 @@ class GitlabImpl(AbstractGitlab):
                 user_id: gitlab user_id
         '''
 
-        result = {
-            'status': False,
-            'data': None
-        }
+        result = False
 
         try:
-            URI = urljoin(self.gitlabURI, "groups")
+            
+            URI = urljoin(self.gitlabURI, "groups/{}/members".format(group_id))
             headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
             
             data = {
@@ -133,8 +131,14 @@ class GitlabImpl(AbstractGitlab):
             }
 
             api_response = requests.post(URI, headers=headers, data=data)
+            
+            if api_response.ok:
+                result = True
+
         except Exception as e:
             log.error("[Erorr 312] gitlab Group에 계정추가 실패 :{}".format(e))
+
+        return result
 
     def existUser(self, email):
         '''
@@ -182,4 +186,4 @@ class GitlabImpl(AbstractGitlab):
         '''
             flask userid로 gitlab user조회
         '''
-        return ServiceProject.filter_by(user_id=flaskuser_id).first()
+        return GitlabUser.query.filter_by(user_id=flaskuser_id).first()

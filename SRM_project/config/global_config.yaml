@@ -2,3 +2,6 @@ gitlab:
   user_initpassword: "password1234"
   accesstoken: "gZVSzZMgzMnzkkKiwj3T" 
   gitlabDomain: "https://gitlab.choilab.com/api/v4/"
+
+  group_member_default_expires: "2022-01-01"
+  
