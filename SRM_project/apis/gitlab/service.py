@@ -9,8 +9,8 @@ from pathlib import Path
 import os
 from apis.auth.models import User
 from apis.auth.service import get_userByEmail
-from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI
-from .models import GitlabProject, UserGitlabMappingEntity
+from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI, get_default_memberexpires_data
+from .models import ServiceProject, UserProjectMappingEntity
 from db.db import db
 
 class AbstractGitlab(metaclass=ABCMeta):
@@ -40,13 +40,19 @@ class AbstractGitlab(metaclass=ABCMeta):
         '''
         pass
 
-    def addMembersToGroup(self, group_id, user_id):
+    def addMembersToGroup(self, group_id, gitlabuser_id):
         '''
             Group 멤버 추가
             파라미터:
                 group_id: gitlab group ID
                 user_id: gitlab user_id
         '''    
+        pass
+
+    def getUserByflaskuserID(self, flaskuser_id):
+        '''
+            flask userid로 gitlab user조회
+        '''
         pass
 
 class GitlabImpl(AbstractGitlab):
@@ -64,33 +70,35 @@ class GitlabImpl(AbstractGitlab):
         URI = urljoin(self.gitlabURI, "groups")
         headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
 
-        response = {
+        result = {
             'status': False,
-            'data': ''
+            'data': None
         }
 
         try:
             
             api_response = requests.post(URI, headers=headers, data=post_data)
-            response['status'] = api_response.ok
+            result['status'] = api_response.ok
 
-            if not response['status']:
+            if not result['status']:
                 log.error('[Error 311] gitlab 그룹 생성 실패')
             else:
                 log.debug("[debug 001] {} 그룹생성 성공".format(post_data['name']))
-                response['data'] = api_response.json()
-                response['status'] = True
+                result['data'] = api_response.json()
+                result['status'] = True
 
             # db 등록
             login_user = get_userByEmail(requsetuser_information)
-            gitlabproject = GitlabProject(response['data']['id'], response['data']['web_url'])
-            db.session.add(gitlabproject)
+            project = ServiceProject(result['data']['id'], result['data']['web_url'])
+            db.session.add(project)
             db.session.commit()
 
-            user_project_mapping = UserGitlabMappingEntity(flaskuser_id=login_user.id, gitlabproject_id=gitlabproject.id)
+            user_project_mapping = UserProjectMappingEntity(flaskuser_id=login_user.id, project_id=project.id)
             db.session.add(user_project_mapping)
             db.session.commit()
 
+            gitlabuser_id = self.getUserByflaskuserID(login_user.id)
+            # self.addMembersToGroup(project., gitlabuser_id)
             
 
             log.info("그룹{} DB 등록 성공".format(post_data['name']))
@@ -98,20 +106,35 @@ class GitlabImpl(AbstractGitlab):
         except Exception as e:
             log.error("[Error 310] gitlab 그룹생성 실패: {}".format(e))
         
-        return response
+        return result
 
-    def addMembersToGroup(self, group_id, user_id):
+    def addMembersToGroup(self, group_id, gitlabuser_id):
         '''
             Group 멤버 추가
             파라미터:
                 group_id: gitlab group ID
                 user_id: gitlab user_id
         '''
+
+        result = {
+            'status': False,
+            'data': None
+        }
+
         try:
-            pass
+            URI = urljoin(self.gitlabURI, "groups")
+            headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
+            
+            data = {
+                "id": group_id,
+                "user_id": gitlabuser_id,
+                "access_level": "30",
+                "expires_at": get_default_memberexpires_data()
+            }
+
+            api_response = requests.post(URI, headers=headers, data=data)
         except Exception as e:
             log.error("[Erorr 312] gitlab Group에 계정추가 실패 :{}".format(e))
-
 
     def existUser(self, email):
         '''
@@ -154,3 +177,9 @@ class GitlabImpl(AbstractGitlab):
             log.error('[Error 300] 계정목록 조회실패: {}'.format(e))
 
         return response
+
+    def getUserByflaskuserID(self, flaskuser_id):
+        '''
+            flask userid로 gitlab user조회
+        '''
+        return ServiceProject.filter_by(user_id=flaskuser_id).first()
