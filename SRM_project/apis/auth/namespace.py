@@ -2,6 +2,7 @@
 from flask import request
 from flask.helpers import make_response
 from flask.templating import render_template
+from flask_login.utils import login_required
 from werkzeug.utils import redirect
 from flask_restx import Resource, fields, Namespace
 from flask_login import login_user, logout_user
@@ -100,6 +101,7 @@ class Signin(Resource):
 @ns.route('/logout')
 class Logout(Resource):
     @ns.doc(response={200: "success"})
+    @login_required
     def get(self):
         logout_user()
         return make_response(redirect('/api/v1/index'))
