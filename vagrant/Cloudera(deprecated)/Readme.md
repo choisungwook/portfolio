@@ -1,3 +1,5 @@
+> 라이센스 문제로 이 프로젝트는 폐기합니다.
+
 # 준비과정
 > 참고자료: https://docs.cloudera.com/documentation/enterprise/latest/topics/installation_reqts.html#pre-install
 
