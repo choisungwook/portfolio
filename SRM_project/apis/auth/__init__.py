@@ -1,1 +1,1 @@
-from . import namespace
+from . import models, namespace, service
