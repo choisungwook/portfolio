@@ -5,6 +5,16 @@
 {% endblock %}
 
 {% block contents %}
+
+    {% with message = get_flashed_messages() %}
+        {% if message %}
+            <div class="alert alert-success" role="alert">
+                <h4 class="alert-heading">{{message}}</h4>
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+
     <div class="row">
         <!-- reference: https://bootsnipp.com/snippets/rl98z -->
         <div class="row justify-content-center align-items-center" style="height:100vh">
