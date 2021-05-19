@@ -40,6 +40,15 @@ class AbstractGitlab(metaclass=ABCMeta):
         '''
         pass
 
+    def addMembersToGroup(self, group_id, user_id):
+        '''
+            Group 멤버 추가
+            파라미터:
+                group_id: gitlab group ID
+                user_id: gitlab user_id
+        '''    
+        pass
+
 class GitlabImpl(AbstractGitlab):
     def __init__(self):
         pass
@@ -82,12 +91,27 @@ class GitlabImpl(AbstractGitlab):
             db.session.add(user_project_mapping)
             db.session.commit()
 
+            
+
             log.info("그룹{} DB 등록 성공".format(post_data['name']))
 
         except Exception as e:
             log.error("[Error 310] gitlab 그룹생성 실패: {}".format(e))
         
         return response
+
+    def addMembersToGroup(self, group_id, user_id):
+        '''
+            Group 멤버 추가
+            파라미터:
+                group_id: gitlab group ID
+                user_id: gitlab user_id
+        '''
+        try:
+            pass
+        except Exception as e:
+            log.error("[Erorr 312] gitlab Group에 계정추가 실패 :{}".format(e))
+
 
     def existUser(self, email):
         '''
