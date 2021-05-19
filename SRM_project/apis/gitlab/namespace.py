@@ -73,7 +73,7 @@ class Create(Resource):
 @ns.route('/createproject')
 class CreateProject(Resource):
     '''
-        gitlab 프로젝트 생성
+        serivce 프로젝트(gitlab group) 생성
     '''
 
     @ns.doc(response={200: 'success'})
@@ -87,10 +87,20 @@ class CreateProject(Resource):
         projectname = request.form.get('projectname')
         gitlabAPI = GitlabImpl()
         
-        post_data = CreateGroupRequestDto(name=projectname, path=projectname).__dict__
-        response = gitlabAPI.createGroup(post_data, current_user.email)
+        html_page = ''
+        data = ''
+        
+        try:
+            post_data = CreateGroupRequestDto(name=projectname, path=projectname).__dict__
+            response = gitlabAPI.createGroup(post_data, current_user.email)
 
-        createGroupResponseDto = CreateGroupResponseDto(group_id=response['data'].get('id'),
-        group_url=response['data'].get('web_url'))
+            createGroupResponseDto = CreateGroupResponseDto(group_id=response['data'].get('id'),
+            group_url=response['data'].get('web_url'))
+            html_page = 'gitlab/createprojectsuccess.html'
+            data = createGroupResponseDto.__dict__
+        except Exception as e:
+            log.error("[Error 313] 프로젝트 생성 요청 오류: {}".format(e))
+            html_page = 'gitlab/createprojectfailed.html'
+            data = "project create is failed. errocode 313"
 
-        return make_response(render_template('gitlab/createprojcessuccess.html', data=createGroupResponseDto.__dict__))
+        return make_response(render_template(html_page, data=data))
