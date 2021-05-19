@@ -69,7 +69,7 @@ class Create(Resource):
         log.debug('----------------------')
         return make_response(render_template('gitlab/users.html', response_code=response['status'], users=response_data))
 
-@login_required
+
 @ns.route('/createproject')
 class CreateProject(Resource):
     '''
@@ -77,10 +77,12 @@ class CreateProject(Resource):
     '''
 
     @ns.doc(response={200: 'success'})
+    @login_required
     def get(self):
         return make_response(render_template('gitlab/createproject.html'))
 
     @ns.doc(response={200: 'success'})
+    @login_required
     def post(self):
         projectname = request.form.get('projectname')
         gitlabAPI = GitlabImpl()
