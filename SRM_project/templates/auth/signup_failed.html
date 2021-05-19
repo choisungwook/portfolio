@@ -5,13 +5,16 @@
 {% endblock %}
 
 {% block contents %}
-    <h1>회원가입 실패</h1>
+    <div class="row">
 
-    <div class="error-details">
-        {{ errormsg }}
+        <h1>회원가입 실패</h1>
+
+        <div class="error-details">
+            {{ errormsg }}
+        </div>
+
+        <a class="btn btn-primary" href='/api/v1/auth/signup' role="button">회원가입페이지 이동</a>
+        <a class="btn btn-primary" href='/api/v1/index' role="button">메인페이지 이동</a>
     </div>
-
-    <a class="btn btn-primary" href='/api/v1/auth/signup' role="button">회원가입페이지 이동</a>
-    <a class="btn btn-primary" href='/api/v1/index' role="button">메인페이지 이동</a>
     
 {% endblock %}
