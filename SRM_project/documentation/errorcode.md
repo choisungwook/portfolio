@@ -13,3 +13,4 @@
 | 311 | gitlab 그룹생성 실패 |
 | 312 | gitlab group에 멤버추가 실패 |
 | 313 | service project생성 시 파라미터 파싱 오류 |
+| 314 | APP 생성 실패 |

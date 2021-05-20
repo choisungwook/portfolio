@@ -104,3 +104,19 @@ class CreateProject(Resource):
             data = "project create is failed. errocode 313"
 
         return make_response(render_template(html_page, data=data))
+
+class CreateAPP(Resource):
+    @ns.doc(response={200: 'success'})
+    def get(self):
+        return make_response(render_template('gitlab/createapp.html'))
+
+    def post(self):
+        html_page = ''
+        data = ''
+
+        try:
+            pass
+        except Exception as e:
+            log.error("[Error 314] 앱 생성 실패: {}".format(e))
+
+        return make_response(render_template('gitlab/createapp.html'))
