@@ -10,11 +10,13 @@ class ServiceProject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_project_id = db.relationship('UserProjectMappingEntity', backref='service_project', lazy=True)
     project_id = db.Column(db.Integer, nullable=False)
+    project_name = db.Column(db.String(300), nullable=False)
     weburl = db.Column(db.String(200), nullable=False)
 
-    def __init__(self, project_id, weburl):
+    def __init__(self, project_id, weburl, project_name):
         self.project_id = project_id
         self.weburl = weburl
+        self.project_name = project_name
 
 class UserProjectMappingEntity(db.Model):
     __tablename__  = 'userprojectmapping'
