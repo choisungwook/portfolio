@@ -3,7 +3,6 @@ from abc import *
 import requests
 import json
 from urllib.parse import urljoin
-from requests.api import head
 from logger.log import log
 from pathlib import Path
 import os
@@ -13,6 +12,7 @@ from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, 
 from .models import ServiceProject, UserProjectMappingEntity
 from db.db import db
 from apis.auth.models import GitlabUser
+from config.gitlab_config import get_pythonappId, get_springbootappId
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -56,6 +56,12 @@ class AbstractGitlab(metaclass=ABCMeta):
         '''
         pass
 
+    # def forkProject(self, createAppRequestDto):
+    #     '''
+    #         앱타입에 맞는 프로젝트 fork
+    #     '''
+    #     pass
+
 class GitlabImpl(AbstractGitlab):
     def __init__(self):
         pass
@@ -90,7 +96,7 @@ class GitlabImpl(AbstractGitlab):
 
             # db 등록
             login_user = get_userByEmail(requsetuser_information)
-            project = ServiceProject(result['data']['id'], result['data']['web_url'])
+            project = ServiceProject(result['data']['id'], result['data']['web_url'], result['data']['name'])
             db.session.add(project)
             db.session.commit()
 
@@ -187,3 +193,27 @@ class GitlabImpl(AbstractGitlab):
             flask userid로 gitlab user조회
         '''
         return GitlabUser.query.filter_by(user_id=flaskuser_id).first()
+
+    # def forkProject(self, createAppRequestDto):
+    #     '''
+    #         앱타입에 맞는 프로젝트 fork
+    #     '''
+
+    #     # fork할 앱 id
+    #     if createAppRequestDto.app_type is "python":
+    #         id = get_pythonappId()
+    #     elif createAppRequestDto.app_type is "springboot":
+    #         id = get_springbootappId()
+
+    #     # group ID
+    #     User.query.filter_by(email=createAppRequestDto.requet_user_eamil).first()
+
+    #     post_data = {
+    #         "id": id, # fork 대상
+    #         "name": createAppRequestDto.name,
+    #         "path": createAppRequestDto.name,
+    #         "namespace_id": "37" # gitlab group ID
+    #     }
+
+        
+    #     pass
