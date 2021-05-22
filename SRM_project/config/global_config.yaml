@@ -4,4 +4,8 @@ gitlab:
   gitlabDomain: "https://gitlab.choilab.com/api/v4/"
 
   group_member_default_expires: "2022-01-01"
+
+  root_appId:
+    python: 1
+    springboot: 3
   
