@@ -36,4 +36,21 @@ def get_default_memberexpires_data():
         config = yaml.safe_load(f)
 
     return config['gitlab']['group_member_default_expires']
-    
+
+def get_pythonappId():
+    '''
+        파이썬 애플리케이션을 생성하기 위한 python project ID 리턴
+    '''
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['gitlab']['root_appId']['python']
+
+def get_springbootappId():
+    '''
+        파이썬 애플리케이션을 생성하기 위한 python project ID 리턴
+    '''
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['gitlab']['root_appId']['springboot']
