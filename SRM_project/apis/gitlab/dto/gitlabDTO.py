@@ -23,12 +23,15 @@ class CreateAppRequestDto:
         flask입장에서는 APP 생성
     '''
 
-    def __init__(self, src_projectId, dst_groupId):
+    def __init__(self, app_type, app_name, project_id):
         '''
             파라미터
-                src_projectId: 포크할 대상 gitlab Project ID
-                dst_groupId: gitlab Group ID
+                id: python, springboot ...
+                app_name: 생성할 앱 이름
+                project_name: 앱을 생성할 프로젝트 이름
+                nemspace_id: gitlab ServiceProject primary key
         '''
-        self.src = src_projectId
-        self.dst = dst_groupId
-        
+        self.id = app_type
+        self.name = app_name
+        self.path = app_name
+        self.namespace_id = project_id
