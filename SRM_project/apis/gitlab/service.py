@@ -9,10 +9,11 @@ import os
 from apis.auth.models import User
 from apis.auth.service import get_userByEmail
 from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI, get_default_memberexpires_data
-from .models import ServiceProject, UserProjectMappingEntity
+from .models import ServiceProject, UserProjectMappingEntity, ServiceApp, UserAppMappingEntity
 from db.db import db
 from apis.auth.models import GitlabUser
 from config.gitlab_config import get_pythonappId, get_springbootappId
+from flask_login import current_user
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -56,11 +57,11 @@ class AbstractGitlab(metaclass=ABCMeta):
         '''
         pass
 
-    # def forkProject(self, createAppRequestDto):
-    #     '''
-    #         앱타입에 맞는 프로젝트 fork
-    #     '''
-    #     pass
+    def forkProject(self, createAppRequestDto):
+        '''
+            앱타입에 맞는 프로젝트 fork
+        '''
+        pass
 
 class GitlabImpl(AbstractGitlab):
     def __init__(self):
@@ -194,26 +195,58 @@ class GitlabImpl(AbstractGitlab):
         '''
         return GitlabUser.query.filter_by(user_id=flaskuser_id).first()
 
-    # def forkProject(self, createAppRequestDto):
-    #     '''
-    #         앱타입에 맞는 프로젝트 fork
-    #     '''
+    def forkProject(self, createAppRequestDto):
+        '''
+            앱타입에 맞는 프로젝트 fork
+        '''
+    
+        # fork할 앱 id
+        if createAppRequestDto['id'] == "python":            
+            createAppRequestDto['id'] = get_pythonappId()
+        elif createAppRequestDto['id'] == "springboot":
+            createAppRequestDto['id'] = get_springbootappId()
 
-    #     # fork할 앱 id
-    #     if createAppRequestDto.app_type is "python":
-    #         id = get_pythonappId()
-    #     elif createAppRequestDto.app_type is "springboot":
-    #         id = get_springbootappId()
+        # gitlab group_id
+        service_projectid = createAppRequestDto['namespace_id']
+        selected_group_id = ServiceProject.query.filter_by(id=createAppRequestDto['namespace_id']).first().project_id
+        createAppRequestDto['namespace_id'] = selected_group_id
 
-    #     # group ID
-    #     User.query.filter_by(email=createAppRequestDto.requet_user_eamil).first()
-
-    #     post_data = {
-    #         "id": id, # fork 대상
-    #         "name": createAppRequestDto.name,
-    #         "path": createAppRequestDto.name,
-    #         "namespace_id": "37" # gitlab group ID
-    #     }
-
+        result = {
+            'status': False,
+            'data': None
+        }
         
-    #     pass
+        try:
+            URI = f"{self.gitlabURI}projects/{createAppRequestDto['id']}/fork"
+            headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
+            api_response = requests.post(URI, headers=headers, data=createAppRequestDto)
+            
+            if api_response.ok:
+                api_response_data = api_response.json()
+                
+                login_user = get_userByEmail(current_user.email)
+
+                # db 등록
+                # 1. service app 등록
+                new_serviceapp = ServiceApp(project_id=api_response_data['id'],
+                                            project_name=api_response_data['name'],
+                                            weburl=api_response_data['web_url'],
+                                            group_id=service_projectid)
+
+                log.debug(new_serviceapp.__dict__)
+                db.session.add(new_serviceapp)
+                db.session.commit()
+
+                # 2. user_servicempping 등록
+                new_userappmapping = UserAppMappingEntity(flaskuser_id=login_user.id, app_id=new_serviceapp.id)
+                db.session.add(new_userappmapping)
+                db.session.commit()
+
+                result['status'] = True
+                result['data'] = api_response_data
+
+                log.debug("fork 성공")
+        except Exception as e:
+            log.error("[Error 315] git fork 실패: {}".format(e))
+
+        return result

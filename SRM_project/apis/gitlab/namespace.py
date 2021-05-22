@@ -8,6 +8,9 @@ from flask.templating import render_template
 from .service import GitlabImpl
 from logger.log import log
 from .dto.gitlabDTO import CreateGroupRequestDto, CreateGroupResponseDto
+from apis.gitlab.models import ServiceProject, UserProjectMappingEntity
+from db.db import db
+from .dto.gitlabDTO import CreateAppRequestDto
 
 ns = Namespace('gitlab', version="1.0", description='gitlab controller')
 
@@ -88,7 +91,7 @@ class CreateProject(Resource):
         gitlabAPI = GitlabImpl()
         
         html_page = ''
-        data = ''
+        data = None
         
         try:
             post_data = CreateGroupRequestDto(name=projectname, path=projectname).__dict__
@@ -105,18 +108,48 @@ class CreateProject(Resource):
 
         return make_response(render_template(html_page, data=data))
 
+@ns.route('/createapp')
 class CreateAPP(Resource):
-    @ns.doc(response={200: 'success'})
-    def get(self):
-        return make_response(render_template('gitlab/createapp.html'))
+    '''
+        애플리케이션(fork gitlab project) 생성
+    '''
 
+    @ns.doc(response={200: 'success'})
+    @login_required
+    def get(self):
+        # get project list
+        # query reference: https://weicomes.tistory.com/262
+        project_infos = []
+        
+        for u, v in db.session.query(ServiceProject, UserProjectMappingEntity).\
+            filter(UserProjectMappingEntity.user_id == current_user.id).\
+            filter(UserProjectMappingEntity.project_id == ServiceProject.id):
+            project_info = {
+                'project_id': u.id, # service_project table primary_key
+                'project_name': u.project_name # gitlab group_name
+            }
+            project_infos.append(project_info)
+
+        return make_response(render_template('gitlab/createapp.html', project_infos=project_infos))
+
+    @ns.doc(response={200: 'success'})
+    @login_required
     def post(self):
-        html_page = ''
-        data = ''
+
+        html_page = 'gitlab/createappfailed.html'
 
         try:
-            pass
+            app_type = request.form.get('apptype')
+            app_name = request.form.get('appname')
+            project_id = request.form.get('projectid') # service_project table primary_key
+
+            gitlabAPI = GitlabImpl()
+            response = gitlabAPI.forkProject(CreateAppRequestDto(app_type, app_name, project_id).__dict__)
+
+            if response['status']:
+                html_page = 'gitlab/createappsuccess.html'
+
         except Exception as e:
             log.error("[Error 314] 앱 생성 실패: {}".format(e))
 
-        return make_response(render_template('gitlab/createapp.html'))
+        return make_response(render_template(html_page))
