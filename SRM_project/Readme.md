@@ -55,8 +55,16 @@ pip install -r requirement.txt
 
 <br>
 
-# 기능 테스트
+# 기능 테스트(deprecated)
 ![기능테스트문서 이동](tests/Readme.md)
+
+<br>
+
+# 화면 소개
+## 애플리케이션 대시보드
+* 사용자 애플리케이션 목록, 빌드/배포, gitlab URL연동
+
+![application_dashboard](documentation_imgs/application_dashboard.png)
 
 <br>
 
