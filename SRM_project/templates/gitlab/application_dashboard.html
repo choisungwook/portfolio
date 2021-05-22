@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+
+{% block title %}
+<title>애플리케이션 목록</title>
+{% endblock %}
+
+{% block contents %}
+    {% if application_infos %}
+      <table class="table">
+        <thead class="thead-dark">
+          <tr>
+            <th scope="col">애플리케이션 이름</th>
+            <th scope="col">gitlab 바로가기</th>
+            <th scope="col">빌드</th>
+            <th scope="col">배포</th>
+            <th scope="col">모니터링</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for application_info in application_infos %}
+          <tr>            
+            <td>{{application_info.name}}</td>            
+            <td>
+              <a href="{{application_info.weburl}}" target="_blank">새탭으로 열기</a>
+            </td>
+            <td>todo</td>
+            <td>todo</td>
+            <td>todo</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+        애플리케이션이 없습니다. 애플리케이션을 생성하세요
+    {% endif %}
+{% endblock %}
