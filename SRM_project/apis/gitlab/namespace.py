@@ -7,10 +7,10 @@ from flask.helpers import make_response
 from flask.templating import render_template
 from .service import GitlabImpl
 from logger.log import log
-from .dto.gitlabDTO import CreateGroupRequestDto, CreateGroupResponseDto
+from .dto.gitlabDTO import CreateGroupRequestDto, CreateGroupResponseDto, CreateAppRequestDto
 from apis.gitlab.models import ServiceProject, UserProjectMappingEntity
 from db.db import db
-from .dto.gitlabDTO import CreateAppRequestDto
+from .models import ServiceApp, UserAppMappingEntity
 
 ns = Namespace('gitlab', version="1.0", description='gitlab controller')
 
@@ -153,3 +153,37 @@ class CreateAPP(Resource):
             log.error("[Error 314] 앱 생성 실패: {}".format(e))
 
         return make_response(render_template(html_page))
+
+@ns.route('/app_dashboard')
+class CreateAPP(Resource):
+    '''
+        애플리케이션(fork gitlab project) 생성
+    '''
+
+    @ns.doc(response={200: 'success'})
+    @login_required
+    def get(self):
+        # get project list
+        # query reference: https://weicomes.tistory.com/262
+        application_infos = []
+        
+        joinquery_result = db.session.query(UserAppMappingEntity, ServiceApp).\
+            filter(UserAppMappingEntity.user_id == current_user.id).\
+            filter(UserAppMappingEntity.app_id == ServiceApp.id).\
+            all()
+
+        for mapping, app in joinquery_result:
+            application_info = {
+                'name': ''
+            }
+            application_info['name'] = app.project_name
+            application_info['weburl'] = app.weburl
+
+            application_infos.append(application_info)
+
+        return make_response(render_template('gitlab/application_dashboard.html', application_infos=application_infos))
+
+    @ns.doc(response={200: 'success'})
+    @login_required
+    def post(self):
+        pass
