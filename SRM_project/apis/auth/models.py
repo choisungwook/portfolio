@@ -9,11 +9,13 @@ class User(UserMixin, db.Model):
     __tablename__  = 'user'
 
     # 스키마 정의
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(20), nullable=False)
     gitlab_userid = db.relationship('GitlabUser', backref='user', lazy=True)
     user_project_id = db.relationship('UserProjectMappingEntity', backref='user', lazy=True)
+    user_app_id = db.relationship('UserAppMappingEntity', backref='user', lazy=True)
+
     
     def __init__(self, email, password, confirm_password):
         self.email = email
@@ -50,7 +52,7 @@ class GitlabUser(db.Model):
     '''
     __tablename__  = 'gitlab_user'
     
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     gitlab_userid = db.Column(db.Integer, nullable=False)    
     email = db.Column(db.String(50), unique=True, nullable=False)
     state = db.Column(db.String(20), nullable=False)    
