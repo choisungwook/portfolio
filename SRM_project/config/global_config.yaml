@@ -8,6 +8,7 @@ gitlab:
   root_appId:
     python: 1
     springboot: 3
+    appofapps: ''
   
 jenkins:
   access_token: "1192f220a80306dbe4a07fe4d9d133dc2f"
