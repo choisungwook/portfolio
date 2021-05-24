@@ -39,7 +39,7 @@ def get_default_memberexpires_data():
 
 def get_pythonappId():
     '''
-        파이썬 애플리케이션을 생성하기 위한 python project ID 리턴
+        리턴: 파이썬 애플리케이션을 생성하기 위한 python project ID
     '''
     with open('config/global_config.yaml', 'r') as f:
         config = yaml.safe_load(f)
@@ -48,9 +48,20 @@ def get_pythonappId():
 
 def get_springbootappId():
     '''
-        파이썬 애플리케이션을 생성하기 위한 python project ID 리턴
+        리턴: 파이썬 애플리케이션을 생성하기 위한 python project ID
     '''
     with open('config/global_config.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
     return config['gitlab']['root_appId']['springboot']
+
+def get_jenkins_accessToken():
+    '''
+        리턴: gitlab admin access_token
+    '''
+
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['jenkins']['access_token']
+    
