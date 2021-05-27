@@ -54,14 +54,4 @@ def get_springbootappId():
         config = yaml.safe_load(f)
 
     return config['gitlab']['root_appId']['springboot']
-
-def get_jenkins_accessToken():
-    '''
-        리턴: gitlab admin access_token
-    '''
-
-    with open('config/global_config.yaml', 'r') as f:
-        config = yaml.safe_load(f)
-
-    return config['jenkins']['access_token']
     
