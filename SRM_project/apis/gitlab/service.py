@@ -14,6 +14,7 @@ from db.db import db
 from apis.auth.models import GitlabUser
 from config.gitlab_config import get_pythonappId, get_springbootappId
 from flask_login import current_user
+from apis.jenkins.service import JenkinsCreateFolder
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -95,20 +96,25 @@ class GitlabImpl(AbstractGitlab):
                 result['data'] = api_response.json()
                 result['status'] = True
 
-            # db 등록
-            login_user = get_userByEmail(requsetuser_information)
-            project = ServiceProject(result['data']['id'], result['data']['web_url'], result['data']['name'])
-            db.session.add(project)
-            db.session.commit()
+                jenkinscreatefolder = JenkinsCreateFolder(post_data['name'])
+                create_jenkinsfolder_response = jenkinscreatefolder.create()
 
-            user_project_mapping = UserProjectMappingEntity(flaskuser_id=login_user.id, project_id=project.id)
-            db.session.add(user_project_mapping)
-            db.session.commit()
+                # db 등록
+                # 젠킨스 폴더를 따로 관리하는 DB는 없음
+                if create_jenkinsfolder_response['status']:
+                    login_user = get_userByEmail(requsetuser_information)
+                    project = ServiceProject(result['data']['id'], result['data']['web_url'], result['data']['name'])
+                    db.session.add(project)
+                    db.session.commit()
 
-            gitlabuser = self.getUserByflaskuserID(login_user.id)
-            self.addMembersToGroup(result['data']['id'], gitlabuser.gitlab_userid)
+                    user_project_mapping = UserProjectMappingEntity(flaskuser_id=login_user.id, project_id=project.id)
+                    db.session.add(user_project_mapping)
+                    db.session.commit()
 
-            log.info("그룹{} DB 등록 성공".format(post_data['name']))
+                    gitlabuser = self.getUserByflaskuserID(login_user.id)
+                    self.addMembersToGroup(result['data']['id'], gitlabuser.gitlab_userid)
+
+                    log.info("그룹{} DB 등록 성공".format(post_data['name']))
 
         except Exception as e:
             log.error("[Error 310] gitlab 그룹생성 실패: {}".format(e))
