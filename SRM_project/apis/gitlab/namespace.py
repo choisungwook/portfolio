@@ -155,9 +155,9 @@ class CreateAPP(Resource):
         return make_response(render_template(html_page))
 
 @ns.route('/app_dashboard')
-class CreateAPP(Resource):
+class GetApp(Resource):
     '''
-        애플리케이션(fork gitlab project) 생성
+        애플리케이션 목록
     '''
 
     @ns.doc(response={200: 'success'})
@@ -182,8 +182,3 @@ class CreateAPP(Resource):
             application_infos.append(application_info)
 
         return make_response(render_template('gitlab/application_dashboard.html', application_infos=application_infos))
-
-    @ns.doc(response={200: 'success'})
-    @login_required
-    def post(self):
-        pass
