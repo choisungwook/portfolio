@@ -47,6 +47,7 @@ class ServiceApp(db.Model):
     weburl = db.Column(db.String(200), nullable=False)
     user_app_id = db.relationship('UserAppMappingEntity', backref='service_app', lazy=True)
     group_id = db.Column(db.Integer, db.ForeignKey('service_project.id'))
+    jenkins_job_id = db.relationship('JenkinsJob', backref='service_app', lazy=True)
 
     def __init__(self, project_id, weburl, project_name, group_id=None):
         self.project_id = project_id
