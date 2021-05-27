@@ -237,7 +237,8 @@ class GitlabImpl(AbstractGitlab):
                 new_serviceapp = ServiceApp(project_id=api_response_data['id'],
                                             project_name=api_response_data['name'],
                                             weburl=api_response_data['web_url'],
-                                            group_id=service_projectid)
+                                            group_id=service_projectid,
+                                            git_repo_url=api_response_data['http_url_to_repo'])
 
                 log.debug(new_serviceapp.__dict__)
                 db.session.add(new_serviceapp)
