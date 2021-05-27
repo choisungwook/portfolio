@@ -1,6 +1,6 @@
 # 개요
 * 프로젝트 생성, 관리를 자동화 하는 프로젝트
-![요구사항 바로가기](documentation/요구사항.md)
+[요구사항 바로가기](documentation/요구사항.md)
 
 <br>
 
@@ -43,12 +43,12 @@ pip install -r requirement.txt
 <br>
 
 # api 목록
-![api문서 이동](documentation/api_list.md)
+[api문서 이동](documentation/api_list.md)
 
 <br>
 
 # 기능 테스트(deprecated)
-![기능테스트문서 이동](tests/Readme.md)
+[기능테스트문서 이동](tests/Readme.md)
 
 <br>
 
