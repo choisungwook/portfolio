@@ -1,14 +1,6 @@
 # 개요
 * 프로젝트 생성, 관리를 자동화 하는 프로젝트
-* CI/CD자동화는 gitlab, jenkins(또는 gitlab CI/CD, tekton), argocd를 사용 예정
-* 프로젝트 배포환경은 쿠버네티스(온프레미스, aws) 예정
-  * 온프레미스 쿠버네티스
-    * 도커 레지스트리는 nexus
-  * aws 클라우드 EKS
-    * managed service 사용
-    * 도커 레지스트리는 ECR 사용
-* 프로젝트 템플릿은 springboot, python 예정
-* 웹 서비스는 flask로 구현, front-end는 ...차마 시간투자하기가 벅차 flask jinja2로 대체
+![요구사항 바로가기](documentation/요구사항.md)
 
 <br>
 
