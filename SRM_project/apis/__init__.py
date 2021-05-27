@@ -8,8 +8,10 @@ api = Api(api_v1, version="1,0", title="api version 1")
 # import apis
 from .auth.namespace import ns as authAPI
 from .gitlab.namespace import ns as gitlabAPI
+from .jenkins.namespace import ns as jenkinsAPI
 from .index.namespace import ns as defatulIndex
 
 api.add_namespace(authAPI)
 api.add_namespace(gitlabAPI)
+api.add_namespace(jenkinsAPI)
 api.add_namespace(defatulIndex)
