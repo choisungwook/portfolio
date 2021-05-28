@@ -1,4 +1,5 @@
 import yaml
+import os
 
 def get_jenkins_accessToken():
     '''
@@ -29,3 +30,13 @@ def get_jenkins_admin():
         config = yaml.safe_load(f)
 
     return config['jenkins']['admin_user']
+
+def get_jenkins_jobtemplate_name():
+    '''
+        리턴: jenkins job 생성 템플릿
+    '''
+
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    return os.path.join('config', config['jenkins']['createjob']['job_template'])
