@@ -11,14 +11,19 @@ class JenkinsJob(db.Model):
     app_id = db.Column(db.Integer, db.ForeignKey('service_app.id'), nullable=False)
     last_status = db.Column(db.String(20), nullable=False)
     job_name = db.Column(db.String(200), nullable=False)
+    token = db.Column(db.String(200), nullable=False)
 
-    def __init__(self, app_id, job_name, last_status=None):
+    def __init__(self, app_id, job_name, token, last_status=None):
         self.app_id = app_id
         self.self_name = job_name
+        self.token = token
         self.last_status = last_status
 
     def change_status(self, status):
         self.last_status = status
+
+    def change_token(self, token):
+        self.token = token
 
 # class BuildHistory(db.Model):
 #     '''
