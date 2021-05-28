@@ -14,7 +14,7 @@ from db.db import db
 from apis.auth.models import GitlabUser
 from config.gitlab_config import get_pythonappId, get_springbootappId
 from flask_login import current_user
-from apis.jenkins.service import JenkinsCreateFolder
+from apis.jenkins.service import JenkinsCreateFolder, JenkinsCreateJob
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -214,7 +214,8 @@ class GitlabImpl(AbstractGitlab):
 
         # gitlab group_id
         service_projectid = createAppRequestDto['namespace_id']
-        selected_group_id = ServiceProject.query.filter_by(id=createAppRequestDto['namespace_id']).first().project_id
+        find_serviceproject = ServiceProject.query.filter_by(id=createAppRequestDto['namespace_id']).first()
+        selected_group_id = find_serviceproject.project_id
         createAppRequestDto['namespace_id'] = selected_group_id
 
         result = {
@@ -225,34 +226,43 @@ class GitlabImpl(AbstractGitlab):
         try:
             URI = f"{self.gitlabURI}projects/{createAppRequestDto['id']}/fork"
             headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
+
+            # gitlab fork
             api_response = requests.post(URI, headers=headers, data=createAppRequestDto)
             
             if api_response.ok:
                 api_response_data = api_response.json()
-                
-                login_user = get_userByEmail(current_user.email)
 
-                # db 등록
-                # 1. service app 등록
-                new_serviceapp = ServiceApp(project_id=api_response_data['id'],
-                                            project_name=api_response_data['name'],
-                                            weburl=api_response_data['web_url'],
-                                            group_id=service_projectid,
-                                            git_repo_url=api_response_data['http_url_to_repo'])
+                # create jenkins job
+                jenkinsCreateJob = JenkinsCreateJob(job_name=createAppRequestDto['name'],
+                                                    folder_name=find_serviceproject.project_name,
+                                                    git_repo_url=api_response_data['http_url_to_repo'])
+                jenkinsjob_create_result = jenkinsCreateJob.createJobWithFolder()
 
-                log.debug(new_serviceapp.__dict__)
-                db.session.add(new_serviceapp)
-                db.session.commit()
+                if jenkinsjob_create_result['status']:
+                    login_user = get_userByEmail(current_user.email)
 
-                # 2. user_servicempping 등록
-                new_userappmapping = UserAppMappingEntity(flaskuser_id=login_user.id, app_id=new_serviceapp.id)
-                db.session.add(new_userappmapping)
-                db.session.commit()
+                    # db 등록
+                    # 1. service app 등록
+                    new_serviceapp = ServiceApp(project_id=api_response_data['id'],
+                                                project_name=api_response_data['name'],
+                                                weburl=api_response_data['web_url'],
+                                                group_id=service_projectid,
+                                                git_repo_url=api_response_data['http_url_to_repo'])
 
-                result['status'] = True
-                result['data'] = api_response_data
+                    log.debug(new_serviceapp.__dict__)
+                    db.session.add(new_serviceapp)
+                    db.session.commit()
 
-                log.debug("fork 성공")
+                    # 2. user_servicempping 등록
+                    new_userappmapping = UserAppMappingEntity(flaskuser_id=login_user.id, app_id=new_serviceapp.id)
+                    db.session.add(new_userappmapping)
+                    db.session.commit()
+
+                    result['status'] = True
+                    result['data'] = api_response_data
+
+                    log.debug("fork 성공")
         except Exception as e:
             log.error("[Error 315] git fork 실패: {}".format(e))
 
