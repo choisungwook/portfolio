@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from apis import api
 from flask_restx import Resource, Namespace
 from flask import request
 from flask_login import login_required, current_user
@@ -11,6 +10,8 @@ from .dto.gitlabDTO import CreateGroupRequestDto, CreateGroupResponseDto, Create
 from apis.gitlab.models import ServiceProject, UserProjectMappingEntity
 from db.db import db
 from .models import ServiceApp, UserAppMappingEntity
+from apis.jenkins.models import JenkinsJob
+from config.jenkins_config import get_jenkins_host
 
 ns = Namespace('gitlab', version="1.0", description='gitlab controller')
 
@@ -179,6 +180,17 @@ class GetApp(Resource):
             application_info['name'] = app.project_name
             application_info['weburl'] = app.weburl
 
+            # get group name
+            group = ServiceProject.query.filter_by(id=app.group_id).first()
+            group_name = group.project_name
+
+            # get jenkins url
+            jenkinsjob = JenkinsJob.query.filter_by(id=app.id).first()
+            jenkinsjob_name = jenkinsjob.job_name
+            jenkins_url = '{}/job/{}/job/{}'.format(get_jenkins_host(), group_name, jenkinsjob_name)
+            # log.debug("jenkins_url: {}".format(jenkins_url))
+
+            application_info['jenkins_url'] = jenkins_url
             application_infos.append(application_info)
 
         return make_response(render_template('gitlab/application_dashboard.html', application_infos=application_infos))

@@ -11,6 +11,7 @@
           <tr>
             <th scope="col">애플리케이션 이름</th>
             <th scope="col">gitlab 바로가기</th>
+            <th scope="col">jenkins 바로가기</th>
             <th scope="col">빌드</th>
             <th scope="col">배포</th>
             <th scope="col">모니터링</th>
@@ -22,6 +23,9 @@
             <td>{{application_info.name}}</td>            
             <td>
               <a href="{{application_info.weburl}}" target="_blank">새탭으로 열기</a>
+            </td>
+            <td>
+              <a href="{{application_info.jenkins_url}}" target="_blank">새탭으로 열기</a>
             </td>
             <td>todo</td>
             <td>todo</td>
