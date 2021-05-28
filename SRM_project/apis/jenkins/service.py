@@ -68,7 +68,9 @@ class JenkinsCreateJob:
         '''
         result = {
             "status": False,
-            "data": None
+            "data": {
+                "token": None
+            }
         }
 
         if not self.folder_name:
@@ -97,6 +99,7 @@ class JenkinsCreateJob:
 
             if api_response.ok:
                 result['status'] = True
+                result['data']['token'] = token
                 log.debug("create jenkins job success")
             else:
                 log.debug("create jenkins failed: {}".format(api_response.json()))

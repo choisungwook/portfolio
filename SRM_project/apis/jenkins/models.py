@@ -15,9 +15,9 @@ class JenkinsJob(db.Model):
 
     def __init__(self, app_id, job_name, token, last_status=None):
         self.app_id = app_id
-        self.self_name = job_name
-        self.token = token
-        self.last_status = last_status
+        self.job_name = job_name
+        self.token = token        
+        self.last_status = last_status if last_status else "Never run"
 
     def change_status(self, status):
         self.last_status = status

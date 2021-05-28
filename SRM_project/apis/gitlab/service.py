@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 from abc import *
 import requests
-import json
 from urllib.parse import urljoin
 from logger.log import log
-from pathlib import Path
-import os
 from apis.auth.models import User
 from apis.auth.service import get_userByEmail
 from config.gitlab_config import get_GitlabAccessToken, get_GitlabInitPassword, get_gitlabURI, get_default_memberexpires_data
@@ -15,6 +12,7 @@ from apis.auth.models import GitlabUser
 from config.gitlab_config import get_pythonappId, get_springbootappId
 from flask_login import current_user
 from apis.jenkins.service import JenkinsCreateFolder, JenkinsCreateJob
+from apis.jenkins.models import JenkinsJob
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -239,7 +237,7 @@ class GitlabImpl(AbstractGitlab):
                                                     git_repo_url=api_response_data['http_url_to_repo'])
                 jenkinsjob_create_result = jenkinsCreateJob.createJobWithFolder()
 
-                if jenkinsjob_create_result['status']:
+                if jenkinsjob_create_result['status'] and jenkinsjob_create_result['data']['token']:
                     login_user = get_userByEmail(current_user.email)
 
                     # db 등록
@@ -257,6 +255,15 @@ class GitlabImpl(AbstractGitlab):
                     # 2. user_servicempping 등록
                     new_userappmapping = UserAppMappingEntity(flaskuser_id=login_user.id, app_id=new_serviceapp.id)
                     db.session.add(new_userappmapping)
+                    db.session.commit()
+
+                    # 3. 젠킨스 db 등록
+                    new_jenkinsjob = JenkinsJob(
+                        app_id=new_serviceapp.id,
+                        job_name=new_serviceapp.project_name,
+                        token=jenkinsjob_create_result['data']['token']
+                    )
+                    db.session.add(new_jenkinsjob)
                     db.session.commit()
 
                     result['status'] = True
