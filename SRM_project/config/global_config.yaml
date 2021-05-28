@@ -14,3 +14,7 @@ jenkins:
   access_token: "1192f220a80306dbe4a07fe4d9d133dc2f"
   host: "https://choilab.com/jenkins1"
   admin_user: "admin"
+
+  createjob:
+    job_template: "job_templatev1.xml"
+    
