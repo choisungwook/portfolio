@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-cli
+spec:
+  selector:
+    matchLabels:
+      app: argocd-cli
+  template:
+    metadata:
+      labels:
+        app: argocd-cli
+    spec:
+      containers:
+      - name: argocd-cli
+        # reference: https://quay.io/repository/argoproj/argocli?tab=info
+        image: quay.io/argoproj/argocd:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        command: ["/bin/sh"]
+        args: ["-c", "tail -f /dev/null"]
+        
