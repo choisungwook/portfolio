@@ -13,8 +13,9 @@ from config.gitlab_config import get_pythonappId, get_springbootappId
 from flask_login import current_user
 from apis.jenkins.service import JenkinsCreateFolder, JenkinsCreateJob
 from apis.jenkins.models import JenkinsJob
-from config.helm_config import get_springboot_helm_rootId, get_common_helm
+from config.helm_config import get_springboot_helm_rootId, get_common_helm, get_default_cpu, get_default_memory
 from apis.helm.dto.helmDTO import CreateHelmRequestDto
+from apis.helm.service import ConfigureHelmProject
 
 class AbstractGitlab(metaclass=ABCMeta):
     '''
@@ -212,13 +213,16 @@ class GitlabImpl(AbstractGitlab):
     
         try:
             helm_projectId = ""
+            helm_values_port = 80
 
             # fork할 앱 id
             if createAppRequestDto['id'] == "python":
                 createAppRequestDto['id'] = get_pythonappId()
+                helm_values_port = 5000
             elif createAppRequestDto['id'] == "springboot":
                 createAppRequestDto['id'] = get_springbootappId()
                 helm_projectId = get_springboot_helm_rootId()
+                helm_values_port = 8080
 
             # gitlab group_id
             service_projectid = createAppRequestDto['namespace_id']
@@ -231,7 +235,6 @@ class GitlabImpl(AbstractGitlab):
             headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
 
             # fork gitlab
-            log.debug("----------- start gitlab project --------------")
             api_response = requests.post(gitlab_URI, headers=headers, data=createAppRequestDto)
             
             if api_response.ok:
@@ -250,6 +253,17 @@ class GitlabImpl(AbstractGitlab):
                 if createhelm_api_response.ok:
                     helm_response = createhelm_api_response.json()
 
+                    # change helm values
+                    configureHelmProject = ConfigureHelmProject(
+                                                helm_repo_url=helm_response['http_url_to_repo'],
+                                                application_name=helm_name,
+                                                cpu=get_default_cpu(),
+                                                memory=get_default_memory(),
+                                                port=helm_values_port,
+                                                image_version=1
+                                            )
+                    configureHelmProject.first_configure()
+
                     # create jenkins job
                     jenkinsCreateJob = JenkinsCreateJob(job_name=createAppRequestDto['name'],
                                                         folder_name=find_serviceproject.project_name,
@@ -261,9 +275,6 @@ class GitlabImpl(AbstractGitlab):
 
                         # db 등록
                         # 1. service app 등록
-                        log.debug("@@@@@@@@@@@@@@@@@@")
-                        log.debug(helm_response['http_url_to_repo'])
-                        log.debug("@@@@@@@@@@@@@@@@@@")
 
                         new_serviceapp = ServiceApp(project_id=api_response_data['id'],
                                                     project_name=api_response_data['name'],
