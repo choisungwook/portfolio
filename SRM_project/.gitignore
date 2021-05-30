@@ -10,3 +10,7 @@ db.sqlite3
 
 # virtual pyenv
 venv/*
+
+# helm test
+springboot-helm/*
+gitclone_test/*
