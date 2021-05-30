@@ -203,25 +203,25 @@ class GitlabImpl(AbstractGitlab):
         '''
             앱타입에 맞는 프로젝트 fork
         '''
-    
-        # fork할 앱 id
-        if createAppRequestDto['id'] == "python":            
-            createAppRequestDto['id'] = get_pythonappId()
-        elif createAppRequestDto['id'] == "springboot":
-            createAppRequestDto['id'] = get_springbootappId()
-
-        # gitlab group_id
-        service_projectid = createAppRequestDto['namespace_id']
-        find_serviceproject = ServiceProject.query.filter_by(id=createAppRequestDto['namespace_id']).first()
-        selected_group_id = find_serviceproject.project_id
-        createAppRequestDto['namespace_id'] = selected_group_id
-
         result = {
             'status': False,
             'data': None
         }
-        
+    
         try:
+            # fork할 앱 id
+            if createAppRequestDto['id'] == "python":            
+                createAppRequestDto['id'] = get_pythonappId()
+            elif createAppRequestDto['id'] == "springboot":
+                createAppRequestDto['id'] = get_springbootappId()
+
+            # gitlab group_id
+            service_projectid = createAppRequestDto['namespace_id']
+            find_serviceproject = ServiceProject.query.filter_by(id=createAppRequestDto['namespace_id']).first()
+            selected_group_id = find_serviceproject.project_id
+            createAppRequestDto['namespace_id'] = selected_group_id
+        
+        
             URI = f"{self.gitlabURI}projects/{createAppRequestDto['id']}/fork"
             headers = {"Authorization": "Bearer {}".format(self.accesstoken)}
 
