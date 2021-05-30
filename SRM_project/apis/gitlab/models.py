@@ -46,16 +46,18 @@ class ServiceApp(db.Model):
     project_name = db.Column(db.String(200), nullable=False)
     weburl = db.Column(db.String(200), nullable=False)
     git_repo_url = db.Column(db.String(200), nullable=False)
+    helm_repo_url = db.Column(db.String(200), nullable=False)
     user_app_id = db.relationship('UserAppMappingEntity', backref='service_app', lazy=True)
     group_id = db.Column(db.Integer, db.ForeignKey('service_project.id'))
     jenkins_job_id = db.relationship('JenkinsJob', backref='service_app', lazy=True)
 
-    def __init__(self, project_id, weburl, project_name, git_repo_url, group_id=None):
+    def __init__(self, project_id, weburl, project_name, git_repo_url, helm_repo_url, group_id=None):
         self.project_id = project_id
         self.project_name = project_name
         self.weburl = weburl
-        self.group_id = group_id
         self.git_repo_url = git_repo_url
+        self.helm_repo_url = helm_repo_url
+        self.group_id = group_id
 
     def add_group(self, group_id):
         self.group_id = group_id
