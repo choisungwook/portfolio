@@ -1,1 +1,1 @@
-from . import namespace, models
+from . import namespace, models, namespace
