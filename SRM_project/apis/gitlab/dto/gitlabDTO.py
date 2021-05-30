@@ -29,7 +29,7 @@ class CreateAppRequestDto:
                 id: python, springboot ...
                 app_name: 생성할 앱 이름
                 project_name: 앱을 생성할 프로젝트 이름
-                nemspace_id: gitlab ServiceProject primary key
+                nemspace_id: group_id
         '''
         self.id = app_type
         self.name = app_name
