@@ -19,4 +19,23 @@ def get_common_helm():
         config = yaml.safe_load(f)
 
     return config['helm']['common_helm_groupId']
-    
+
+def get_default_cpu():
+    '''
+        리턴: helm default cpu
+    '''
+
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['helm']['default_resources']['cpu']
+
+def get_default_memory():
+    '''
+        리턴: helm default cpu
+    '''
+
+    with open('config/global_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    return config['helm']['default_resources']['memeory']

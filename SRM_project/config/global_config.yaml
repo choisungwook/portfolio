@@ -23,3 +23,6 @@ helm:
     springboot: 35
   
   common_helm_groupId: 85
+  default_resources:
+    cpu: "0.5"
+    memeory: "512Mi"
