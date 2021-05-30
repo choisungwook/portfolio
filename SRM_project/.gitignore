@@ -14,3 +14,4 @@ venv/*
 # helm test
 springboot-helm/*
 gitclone_test/*
+test.yaml
