@@ -6,8 +6,8 @@ ADD . /app/
 RUN pip install -r requirements.txt
 
 RUN flask db init \
-flask db upgrade \
-flask db migrate
+&& flask db upgrade \
+&& flask db migrate
 
 # this is works
 # RUN flask db init
