@@ -12,7 +12,8 @@ scheduler.start()
 
 # db 초기화
 db = SQLAlchemy()
-migrate = Migrate(app, db) 
+db.init_app(app)
+migrate = Migrate(app, db)
 
 @app.route("/")
 def main():
