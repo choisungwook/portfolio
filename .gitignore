@@ -98,4 +98,8 @@ geckodriver.log
 # vagrant Log files (if you are creating logs in debug mode, uncomment this)
 *.log
 
+# test project
 centos_kubernetes/*
+
+# flask orm
+migrations
