@@ -1,7 +1,7 @@
 gitlab:
   user_initpassword: "password1234"
-  accesstoken: "gZVSzZMgzMnzkkKiwj3T" 
-  gitlabDomain: "https://gitlab.choilab.com/api/v4/"
+  accesstoken: "" 
+  gitlabDomain: "https://gitlab.choilab.xyz/api/v4/"
 
   group_member_default_expires: "2022-01-01"
 
@@ -11,8 +11,8 @@ gitlab:
     appofapps: ''
   
 jenkins:
-  access_token: "1192f220a80306dbe4a07fe4d9d133dc2f"
-  host: "https://choilab.com/jenkins1"
+  access_token: ""
+  host: "https://jenkins.choilab.xyz/"
   admin_user: "admin"
 
   createjob:
