@@ -7,7 +7,7 @@ gitlab:
 
   root_appId:
     python: 1
-    springboot: 3
+    springboot: 2
     appofapps: ''
   
 jenkins:
