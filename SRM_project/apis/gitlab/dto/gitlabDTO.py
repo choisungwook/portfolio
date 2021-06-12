@@ -3,10 +3,10 @@ class CreateGroupRequestDto:
         gitlab Group 생성요청 dto
     '''
     
-    def __init__(self, name, path):
+    def __init__(self, name, path, visibility="public"):
         self.name = name
         self.path = path
-        self.visibility = 'private'
+        self.visibility = visibility
 
 class CreateGroupResponseDto:
     '''
@@ -23,7 +23,7 @@ class CreateAppRequestDto:
         flask입장에서는 APP 생성
     '''
 
-    def __init__(self, app_type, app_name, project_id):
+    def __init__(self, app_type, app_name, project_id, visibility='public'):
         '''
             파라미터
                 id: python, springboot ...
@@ -35,3 +35,4 @@ class CreateAppRequestDto:
         self.name = app_name
         self.path = app_name
         self.namespace_id = project_id
+        self.visibility = visibility
