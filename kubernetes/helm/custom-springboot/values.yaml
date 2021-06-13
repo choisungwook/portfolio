@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: choisunguk
-  pullPolicy: IfNotPresent
+  repository: choisunguk/demo-springboot
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
