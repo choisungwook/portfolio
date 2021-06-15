@@ -1,0 +1,155 @@
+// 요청 url: https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/api/json?pretty=true
+
+{
+    "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+    "actions": [
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {
+            "_class": "org.jenkinsci.plugins.displayurlapi.actions.JobDisplayAction"
+        },
+        {},
+        {},
+        {
+            "_class": "com.cloudbees.plugins.credentials.ViewCredentialsAction"
+        }
+    ],
+    "description": "",
+    "displayName": "test2-3-2",
+    "displayNameOrNull": null,
+    "fullDisplayName": "test2-3 » test2-3-2",
+    "fullName": "test2-3/test2-3-2",
+    "name": "test2-3-2",
+    "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/",
+    "buildable": true,
+    "builds": [
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 14,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/14/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 13,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/13/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 12,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/12/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 11,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/11/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 10,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/10/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 9,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/9/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 8,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/8/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 7,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/7/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 6,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/6/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 5,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/5/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 4,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/4/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 3,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/3/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 2,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/2/"
+        },
+        {
+            "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+            "number": 1,
+            "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/1/"
+        }
+    ],
+    "color": "blue",
+    "firstBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 1,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/1/"
+    },
+    "healthReport": [
+        {
+            "description": "Build stability: No recent builds failed.",
+            "iconClassName": "icon-health-80plus",
+            "iconUrl": "health-80plus.png",
+            "score": 100
+        }
+    ],
+    "inQueue": false,
+    "keepDependencies": false,
+    "lastBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 14,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/14/"
+    },
+    "lastCompletedBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 14,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/14/"
+    },
+    "lastFailedBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 4,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/4/"
+    },
+    "lastStableBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 14,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/14/"
+    },
+    "lastSuccessfulBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 14,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/14/"
+    },
+    "lastUnstableBuild": null,
+    "lastUnsuccessfulBuild": {
+        "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+        "number": 4,
+        "url": "https://jenkins.choilab.xyz/job/test2-3/job/test2-3-2/4/"
+    },
+    "nextBuildNumber": 15,
+    "property": [],
+    "queueItem": null,
+    "concurrentBuild": true,
+    "resumeBlocked": false
+}
