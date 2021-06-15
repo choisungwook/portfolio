@@ -5,6 +5,7 @@ import json
 from logger.log import log
 import chevron
 import uuid
+from .models import JenkinsJob
 
 class JenkinsCreateFolder:
     '''
@@ -114,8 +115,54 @@ class JenkinsCreateJob:
         '''
         return uuid.uuid4().__str__().replace("-", "")
 
-class JenkinsExecuteJob:
-    def __init__(self):
-        pass
+class JenkinsTriggerJob:
+    '''
+        젠킨스 잡 원격 트리거
+    '''
 
+    def __init__(self, folder_name, job_name, job_id):
+        self.folder_name = folder_name
+        self.job_name = job_name
+        self.host = "https://jenkins.choilab.xyz"
+        self.admin = get_jenkins_admin()
+        self.jenkins_accesstoken = get_jenkins_accessToken()
+        self.job_token = self.get_accesstoken_byjobID(job_id)
+
+    def get_accesstoken_byjobID(self, job_id):
+        """
+            젠킨스 트리커 token 조회
+        """
+        return JenkinsJob.query.filter_by(id=job_id).first().token
+
+    def trigger_job(self):
+        """
+            젠킨스 잡 트리거
+            리턴:
+                성공: True
+                실패: False
+        """
+        response = False
+
+        try:
+            request_url = """{}/job/{}/job/{}/build?token={}""".format(
+                self.host,
+                self.folder_name,
+                self.job_name,
+                self.job_token
+            )
+
+            auth = (self.admin, self.jenkins_accesstoken)
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            api_response = requests.post(request_url, auth=auth, headers=headers)
+            
+            if api_response.ok:
+                log.debug("trigger jenkins_jobs done")
+                response = True
+            else:
+                log.error("320 trigger jenkins job failed")
+            
+        except Exception as e:
+            log.error(f"319: jenkins trigger job failed: {e}")
+        finally:
+            return response
     
