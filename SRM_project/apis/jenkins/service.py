@@ -134,6 +134,63 @@ class JenkinsTriggerJob:
         """
         return JenkinsJob.query.filter_by(id=job_id).first().token
 
+    def conoleurl_is_exist(self, console_url):
+        """
+            젠킨스 잡이 실행될때까지 대기
+        """
+        response = False
+        try:
+            auth = (self.admin, self.jenkins_accesstoken)
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            api_response = requests.post(console_url, auth=auth, headers=headers, timeout=10)
+
+            if api_response.ok:
+                response = True
+        except Exception as e:
+            log.error(f"322: consoleurl health check is failed: {e}")
+        finally:
+            return response
+        
+
+    def get_consoleurl(self):
+        """
+            젠킨스 잡 실행 로그 url 계산
+        """
+        response = None
+        try:
+            request_url = """{}/job/{}/job/{}/api/json""".format(
+                self.host,
+                self.folder_name,
+                self.job_name,
+            )
+            
+            auth = (self.admin, self.jenkins_accesstoken)
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            api_response = requests.post(request_url, auth=auth, headers=headers)
+
+            if api_response.ok:
+                nextbuildnumner = api_response.json().get('nextBuildNumber')
+                # blueocean console log url
+                response = """{}/blue/organizations/jenkins/{}%2F{}/detail/{}/{}/pipeline""".format(
+                    self.host,
+                    self.folder_name,
+                    self.job_name,
+                    self.job_name,
+                    nextbuildnumner,
+                )
+
+                # jenkins original console log url
+                # response = """{}/job/{}/job/{}/{}/console""".format(
+                #     self.host,
+                #     self.folder_name,
+                #     self.job_name,
+                #     nextbuildnumner
+                # )
+        except Exception as e:
+            log.error(f"321: get nextbuillnumber is failed: {e}")
+        finally:
+            return response
+
     def trigger_job(self):
         """
             젠킨스 잡 트리거

@@ -1,7 +1,7 @@
 from flask_restx import Resource, Namespace
-from requests.models import Response
 from logger.log import log
 from .service import JenkinsTriggerJob
+from werkzeug.utils import redirect
 
 ns = Namespace('jenkins', version="1.0", description='jenkins controller')
 
@@ -17,9 +17,15 @@ class Triggerjob(Resource):
     def get(self, job_path):
         jenkins_folder, jenkins_job, jenkins_jobid = job_path.split("and")
 
-        log.debug(f"{jenkins_folder} {jenkins_job} {jenkins_jobid}")
         jenkinstriggerjob = JenkinsTriggerJob(jenkins_folder, jenkins_job, jenkins_jobid)
-        response = jenkinstriggerjob.trigger_job()
-        if response:
-            return "job trigger success"
-        return "job trigger failed"
+        consoleurl = jenkinstriggerjob.get_consoleurl()
+        if consoleurl:
+            response = jenkinstriggerjob.trigger_job()
+            if response:
+                # (original jenkins console log시 사용) 젠킨스 잡 로그 url이 나올때까지 무한대기
+                # blueocean은 미사용
+                # while not jenkinstriggerjob.conoleurl_is_exist(consoleurl):
+                #     pass
+                return redirect(consoleurl)
+        
+        return "get console url failed"
