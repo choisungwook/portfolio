@@ -177,7 +177,8 @@ class GetApp(Resource):
             application_info = {
                 'name': '',
                 'gitlab_url': '',
-                'jenkins_url': ''
+                'jenkins_url': '',
+                'jenkins_jobpath': ''
             }
             application_info['name'] = app.project_name
             application_info['gitlab_url'] = app.weburl
@@ -193,6 +194,7 @@ class GetApp(Resource):
             # log.debug("jenkins_url: {}".format(jenkins_url))
 
             application_info['jenkins_url'] = jenkins_url
+            application_info['jenkins_jobpath'] = '{}and{}'.format(group_name, jenkinsjob_name)
             application_infos.append(application_info)
 
         return make_response(render_template('gitlab/application_dashboard.html', application_infos=application_infos))
