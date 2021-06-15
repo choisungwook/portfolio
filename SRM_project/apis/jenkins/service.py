@@ -113,3 +113,9 @@ class JenkinsCreateJob:
         랜덤 UUID 생성
         '''
         return uuid.uuid4().__str__().replace("-", "")
+
+class JenkinsExecuteJob:
+    def __init__(self):
+        pass
+
+    
