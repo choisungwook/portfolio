@@ -175,10 +175,12 @@ class GetApp(Resource):
 
         for mapping, app in joinquery_result:
             application_info = {
-                'name': ''
+                'name': '',
+                'gitlab_url': '',
+                'jenkins_url': ''
             }
             application_info['name'] = app.project_name
-            application_info['weburl'] = app.weburl
+            application_info['gitlab_url'] = app.weburl
 
             # get group name
             group = ServiceProject.query.filter_by(id=app.group_id).first()
