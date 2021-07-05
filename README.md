@@ -28,8 +28,11 @@
 # 3. 프로젝트 목차
 ## 3.1 SRM 프로젝트
 > 버전1: https://github.com/srmproject/server
-> 시연영상: https://youtu.be/ReD2_nBjko0
+
+> 시연영상: https://youtu.be/ReD2_nBjko0 
+
 > 발표자료: https://www.slideshare.net/sungwookchoi5/ss-249424125
+
 * 주제: 쿠버네티스를 이용한 개발자 개발환경 자동화
 * 진행기간: 2021.6.1 ~ 6.31
 * 사용도구
@@ -43,6 +46,7 @@
 
 ## 4.1aws를 이용한 뉴스 크롤링
 > 팀원요청으로 비공개
+
 * 주제: lambda, s3를 이용한 뉴스 크롤링 자동화
 * 진행기간: 2021.3.1 ~ 3.31
 * 사용도구
