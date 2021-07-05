@@ -2,7 +2,9 @@
 - [기술스택](#기술스택)
 - [프로젝트 목차](#프로젝트-목차)
   - [SRM 프로젝트](#srm-프로젝트)
+  - [aws를 이용한 뉴스 크롤링](#aws를-이용한-뉴스-크롤링)
 - [학습  목차](#학습--목차)
+  - [구버전](#구버전)
 
 <br>
 
@@ -27,6 +29,7 @@
 ## SRM 프로젝트
 > 버전1: https://github.com/srmproject/server
 > 시연영상: https://youtu.be/ReD2_nBjko0
+> 발표자료: https://www.slideshare.net/sungwookchoi5/ss-249424125
 * 쿠버네티스를 이용한 개발자 개발환경 자동화
 * 사용도구
   * 인프라: virtualbox
@@ -37,7 +40,15 @@
   * 개발 패키지관리: nexus
   * 도커 레지스트리: nexus
 
+## aws를 이용한 뉴스 크롤링
+> 팀원요청으로 비공개
+lambda, s3를 이용한 뉴스 크롤링 자동화
+
 # 학습  목차
+* kubesrapy 설치: https://youtu.be/12vNy4IvF14
+* aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E 
+* github action과 heroku를 이용한 빌드/배포 자동화: https://youtu.be/YMdwYPCyxRk
+## 구버전
 | 번호 | 이름 | 설명 | 링크 |
 | ---- | ---- | ---- | ---- |
 | 1 | aws lambda | lambda로 백엔드 기능 연습 | [Readme 링크](./aws/lambda/Readme.md) |
