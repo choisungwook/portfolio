@@ -1,6 +1,7 @@
 - [기타 링크](#기타-링크)
 - [기술스택](#기술스택)
 - [프로젝트 목차](#프로젝트-목차)
+  - [SRM 프로젝트](#srm-프로젝트)
 - [학습  목차](#학습--목차)
 
 <br>
@@ -14,14 +15,27 @@
 <br>
 
 # 기술스택
+* container
+* vagrant
 * aws
-* docker
 * kubernetes
 * python
 
 <br>
 
 # 프로젝트 목차
+## SRM 프로젝트
+> 버전1: https://github.com/srmproject/server
+> 시연영상: https://youtu.be/ReD2_nBjko0
+* 쿠버네티스를 이용한 개발자 개발환경 자동화
+* 사용도구
+  * 인프라: virtualbox
+  * 인프라 구축: vagrant 
+  * CI/CD: jenkins, argocd
+  * 인증서관리: cert-manager
+  * git저장소: gitlab
+  * 개발 패키지관리: nexus
+  * 도커 레지스트리: nexus
 
 # 학습  목차
 | 번호 | 이름 | 설명 | 링크 |
