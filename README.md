@@ -25,8 +25,8 @@
 <br>
 
 # 3. 프로젝트 목차
-## 3.1 SRM 프로젝트
-> 버전1: https://github.com/srmproject/server
+## 3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입
+> 버전1 git repo: https://github.com/srmproject/server
 
 > 시연영상: https://youtu.be/ReD2_nBjko0 
 
