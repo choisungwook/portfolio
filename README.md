@@ -1,9 +1,11 @@
 - [1. 기타 링크](#1-기타-링크)
 - [2. 기술스택](#2-기술스택)
 - [3. 프로젝트 목차](#3-프로젝트-목차)
-  - [3.1 SRM 프로젝트](#31-srm-프로젝트)
+  - [3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입](#31-쿠버네티스를-이용한-개발환경-자동화-구축-프로토타입)
   - [3.2 aws를 이용한 뉴스 크롤링](#32-aws를-이용한-뉴스-크롤링)
-- [4. 학습  목차](#4-학습--목차)
+- [4. 공부정리](#4-공부정리)
+  - [4.1 개발](#41-개발)
+  - [4.2 엔지니어](#42-엔지니어)
 
 <br>
 
@@ -28,7 +30,7 @@
 ## 3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입
 > 버전1 git repo: https://github.com/srmproject/server
 
-> 시연영상: https://youtu.be/ReD2_nBjko0 
+> 시연영상: https://youtu.be/ReD2_nBjko0
 
 > 발표자료: https://www.slideshare.net/sungwookchoi5/ss-249424125
 
@@ -36,7 +38,7 @@
 * 진행기간: 2021.6.1 ~ 6.31
 * 사용도구
   * 인프라: virtualbox
-  * 인프라 구축: vagrant 
+  * 인프라 구축: vagrant
   * CI/CD: jenkins, argocd
   * 인증서관리: cert-manager
   * git저장소: gitlab
@@ -58,8 +60,17 @@
 
 <br>
 
-# 4. 학습  목차
-> 다시 정리중
+# 4. 공부정리
+> 정리중
+## 4.1 개발
+* [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
+* [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
+* [springsecurity-인메모리](https://malwareanalysis.tistory.com/157)
+* [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
+
+## 4.2 엔지니어
+* [nvm으로 javascript 버전관리](https://malwareanalysis.tistory.com/145)
+* [docker-mariadb 설치](https://malwareanalysis.tistory.com/140)
 * kubesrapy 설치: https://youtu.be/12vNy4IvF14
-* aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E 
+* aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E
 * github action과 heroku를 이용한 빌드/배포 자동화: https://youtu.be/YMdwYPCyxRk
