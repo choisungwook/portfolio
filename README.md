@@ -67,6 +67,7 @@
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
 * [springsecurity-인메모리](https://malwareanalysis.tistory.com/157)
 * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
+* [springboot-h2인메모리 콘솔접속](https://malwareanalysis.tistory.com/160)
 
 ## 4.2 엔지니어
 * [nvm으로 javascript 버전관리](https://malwareanalysis.tistory.com/145)
