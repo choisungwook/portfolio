@@ -6,6 +6,7 @@
 - [4. 공부정리](#4-공부정리)
   - [4.1 개발](#41-개발)
   - [스프링시큐리티](#스프링시큐리티)
+  - [기타](#기타)
   - [4.2 엔지니어](#42-엔지니어)
 
 <br>
@@ -66,6 +67,7 @@
 ## 4.1 개발
 ## 스프링시큐리티
   * [springsecurity-인메모리](https://github.com/choisungwook/portfolio/blob/master/Dcos/springseucirty/InmemoryUser.md)
+## 기타
 * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
 * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
