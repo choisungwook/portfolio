@@ -52,8 +52,10 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 }
 ```
 
+<br>
+
 ## 2.2 UserDetailsService 이용
-* 스프링 시큐리티가 관리하는 사용자관리 서비스를 이용해서 사용자를 생성하는 방법입니다.
+* 스프링 시큐리티가 관리하는 사용자관리 서비스(UserDetailService)를 이용해서 사용자를 생성하는 방법입니다.
 
 ### 2.2.1 스프링시큐리티 설정
 ```java
