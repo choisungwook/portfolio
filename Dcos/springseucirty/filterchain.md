@@ -9,6 +9,14 @@
 
 <br>
 
+# 디버깅
+* filterchainproxy.java파일을 열고 nextFilter.doFilter줄에 브레이크포인트를 설정합니다.
+![](imgs/filterchain0.png)
+
+* 스프링(부트) 애플리케이션을 실행하고 아무 api나 호출합니다.
+* 디버깅 뷰를 확인하면 스프링시큐리티가 자동으로 생성한 필터목록을 볼 수 있습니다.
+![](imgs/filterchain1.png)
+
 # 참고자료
 * [1] filterchain: https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-filters-review
 * [2] delegatingfilterproxy: https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-delegatingfilterproxy
