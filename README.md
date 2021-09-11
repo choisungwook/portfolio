@@ -5,6 +5,7 @@
   - [3.2 aws를 이용한 뉴스 크롤링](#32-aws를-이용한-뉴스-크롤링)
 - [4. 공부정리](#4-공부정리)
   - [4.1 개발](#41-개발)
+  - [스프링시큐리티](#스프링시큐리티)
   - [4.2 엔지니어](#42-엔지니어)
 
 <br>
@@ -63,8 +64,8 @@
 # 4. 공부정리
 > 정리중
 ## 4.1 개발
-* 스프링시큐리티
-  * [springsecurity-인메모리](https://malwareanalysis.tistory.com/157)
+## 스프링시큐리티
+  * [springsecurity-인메모리](https://github.com/choisungwook/portfolio/blob/master/Dcos/springseucirty/InmemoryUser.md)
 * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
 * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
