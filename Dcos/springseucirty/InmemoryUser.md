@@ -4,6 +4,7 @@
   - [2.2 UserDetailsService 이용](#22-userdetailsservice-이용)
     - [2.2.1 스프링시큐리티 설정](#221-스프링시큐리티-설정)
     - [2.2.2 인메모리 사용자 설정 클래스](#222-인메모리-사용자-설정-클래스)
+- [3. 참고자료](#3-참고자료)
 
 <br>
 
@@ -108,3 +109,8 @@ public class InMemoryDemoUser {
 }
 
 ```
+
+<br>
+
+# 3. 참고자료
+* https://docs.spring.io/spring-security/site/docs/4.1.3.RELEASE/reference/htmlsingle/#jc-authentication-inmememory
