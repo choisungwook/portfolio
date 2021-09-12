@@ -91,3 +91,5 @@ public class JwtFilter extends UsernamePasswordAuthenticationFilter {
 
 # 참고자료
 * [1] https://youtu.be/w8wY2x5ezyU
+* [2] https://tech.junhabaek.net/spring-security-usernamepasswordauthenticationfilter%EC%9D%98-%EB%8D%94-%EA%B9%8A%EC%9D%80-%EC%9D%B4%ED%95%B4-8b5927dbc037
+* [3] https://youtu.be/VVn9OG9nfH0
