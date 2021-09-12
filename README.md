@@ -6,6 +6,7 @@
 - [4. 공부정리](#4-공부정리)
   - [4.1 개발](#41-개발)
   - [스프링시큐리티](#스프링시큐리티)
+  - [flask](#flask)
   - [기타](#기타)
   - [4.2 엔지니어](#42-엔지니어)
 
@@ -66,8 +67,12 @@
 > 정리중
 ## 4.1 개발
 ## 스프링시큐리티
-  * [filterchain](https://github.com/choisungwook/portfolio/blob/master/Dcos/springseucirty/filterchain.md)
-  * [springsecurity-인메모리](https://github.com/choisungwook/portfolio/blob/master/Dcos/springseucirty/InmemoryUser.md)
+  * [filterchain](./Dcos/springseucirty/filterchain.md)
+  * [springsecurity-인메모리](./Dcos/springseucirty/InmemoryUser.md)
+## flask
+  * [애플리케이션 생성](./Dcos/flask/create_application.md)
+  * [requset_body가져오기](./Dcos/flask/request_body.md)
+  * [make_response로 응답수정](./Dcos/flask/make_response.md)
 ## 기타
 * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
