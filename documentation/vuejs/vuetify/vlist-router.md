@@ -1,6 +1,8 @@
 # 개요
 * v-list-item에 router 연동
 
+![router](../imgs/nav_router_interagete.png)
+
 <br>
 
 # 상세내용
