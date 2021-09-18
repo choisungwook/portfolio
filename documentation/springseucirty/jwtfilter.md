@@ -88,8 +88,21 @@ public class JwtFilter extends UsernamePasswordAuthenticationFilter {
 }
 ```
 
+5. (todo) 인증 로직 추가
+6. jwt dependency 추가
+> 참고자료: https://mvnrepository.com/artifact/com.auth0/java-jwt
+```xml
+<dependency>
+  <groupId>com.auth0</groupId>
+  <artifactId>java-jwt</artifactId>
+  <version>3.18.1</version>
+</dependency>
+```
+
+7. jwt helper 클래스 생성
+
 
 # 참고자료
 * [1] https://youtu.be/w8wY2x5ezyU
-* [2] https://tech.junhabaek.net/spring-security-usernamepasswordauthenticationfilter%EC%9D%98-%EB%8D%94-%EA%B9%8A%EC%9D%80-%EC%9D%B4%ED%95%B4-8b5927dbc037
+* [2] spring-security-usernamepasswordauthenticationfilter%EC%9D%98-%EB%8D%94-%EA%B9%8A%EC%9D%80-%EC%9D%B4%ED%95%B4-8b5927dbc037
 * [3] https://youtu.be/VVn9OG9nfH0
