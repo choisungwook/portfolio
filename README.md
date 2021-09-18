@@ -76,7 +76,9 @@
 * [make_response로 응답수정](./documentation/flask/make_response.md)
 ## vuejs
 * [vuetify 설치](./documentation/vuejs/vuetify/install.md)
-* [vuetify 컴퍼넌트](documentation/vuejs/vuetify/required_vuetify_components.md)
+* [vuetify 컴퍼넌트](./documentation/vuejs/vuetify/required_vuetify_components.md)
+* [vuetify 페이지 추가](./documentation/vuejs/vuetify/helloworld.md)
+* [vuetify 사이드 네비게이션 메뉴와 라우터연동](./documentation/vuejs/vuetify/vlist-router.md)
 ## 기타
 * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
