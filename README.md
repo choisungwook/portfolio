@@ -67,12 +67,12 @@
 > 정리중
 ## 4.1 개발
 ## 스프링시큐리티
-  * [filterchain](./Dcos/springseucirty/filterchain.md)
-  * [springsecurity-인메모리](./Dcos/springseucirty/InmemoryUser.md)
+  * [filterchain](./documentation/springseucirty/filterchain.md)
+  * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
 ## flask
-  * [애플리케이션 생성](./Dcos/flask/create_application.md)
-  * [requset_body가져오기](./Dcos/flask/request_body.md)
-  * [make_response로 응답수정](./Dcos/flask/make_response.md)
+  * [애플리케이션 생성](./documentation/flask/create_application.md)
+  * [requset_body가져오기](./documentation/flask/request_body.md)
+  * [make_response로 응답수정](./documentation/flask/make_response.md)
 ## 기타
 * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
