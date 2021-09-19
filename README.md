@@ -1,4 +1,6 @@
-- [1. 기타 링크](#1-기타-링크)
+- [1. 나를 소개하는 링크모음](#1-나를-소개하는-링크모음)
+  - [1.1 프로필 링크모음](#11-프로필-링크모음)
+  - [1.2 공부한 것들을 배포 링크모음](#12-공부한-것들을-배포-링크모음)
 - [2. 기술스택](#2-기술스택)
 - [3. 프로젝트 목차](#3-프로젝트-목차)
   - [3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입](#31-쿠버네티스를-이용한-개발환경-자동화-구축-프로토타입)
@@ -13,11 +15,14 @@
 
 <br>
 
-# 1. 기타 링크
+# 1. 나를 소개하는 링크모음
+## 1.1 프로필 링크모음
 * 블로그: https://malwareanalysis.tistory.com/
 * 유투브: https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
-* slideshare: https://www.slideshare.net/sungwookchoi5
-* 공부기록: https://github.com/choisungwook/portfolio/wiki
+
+## 1.2 공부한 것들을 배포 링크모음
+* vuejs
+  * 튜토리얼: https://myproject.choicloudlab.com/vue-practice1/home
 
 <br>
 
