@@ -7,6 +7,7 @@
   - [3.2 aws를 이용한 뉴스 크롤링](#32-aws를-이용한-뉴스-크롤링)
 - [4. 공부정리](#4-공부정리)
   - [4.1 개발](#41-개발)
+  - [스프링부트](#스프링부트)
   - [스프링시큐리티](#스프링시큐리티)
   - [flask](#flask)
   - [vuejs](#vuejs)
@@ -72,6 +73,8 @@
 # 4. 공부정리
 > 정리중
 ## 4.1 개발
+## 스프링부트
+* [h2 인모메리 설정](./documentation/springboot/inmemory_h2_configuration.md)
 ## 스프링시큐리티
 * [filterchain](./documentation/springseucirty/filterchain.md)
 * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
