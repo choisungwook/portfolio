@@ -75,6 +75,8 @@
 ## 4.1 개발
 ## 스프링부트
 * [h2 인모메리 설정](./documentation/springboot/inmemory_h2_configuration.md)
+* JPA
+  * [JPA 참조](./documentation/springboot/jpa/참조.md)
 ## 스프링시큐리티
 * [filterchain](./documentation/springseucirty/filterchain.md)
 * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
