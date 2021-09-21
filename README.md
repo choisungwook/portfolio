@@ -13,6 +13,7 @@
   - [vuejs](#vuejs)
   - [기타](#기타)
   - [4.2 엔지니어](#42-엔지니어)
+- [추천 자료](#추천-자료)
 
 <br>
 
@@ -102,3 +103,8 @@
 * kubesrapy 설치: https://youtu.be/12vNy4IvF14
 * aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E
 * github action과 heroku를 이용한 빌드/배포 자동화: https://youtu.be/YMdwYPCyxRk
+
+<br>
+
+# 추천 자료
+* [microsoft restful api 디자인](https://docs.microsoft.com/ko-kr/azure/architecture/best-practices/api-design)
