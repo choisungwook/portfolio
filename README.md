@@ -108,3 +108,4 @@
 
 # 추천 자료
 * [microsoft restful api 디자인](https://docs.microsoft.com/ko-kr/azure/architecture/best-practices/api-design)
+* [naver d2 restapi 세미나](https://youtu.be/RP_f5dMoHFc)
