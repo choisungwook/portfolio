@@ -77,6 +77,7 @@
 * [h2 인모메리 설정](./documentation/springboot/inmemory_h2_configuration.md)
 * JPA
   * [JPA 참조](./documentation/springboot/jpa/참조.md)
+  * [junit 매테스트 끝날때마다 repository 초기화](./documentation/springboot/jpa/junit5_aftereach.md)
 ## 스프링시큐리티
 * [filterchain](./documentation/springseucirty/filterchain.md)
 * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
