@@ -29,9 +29,9 @@ class ClassroomServiceTest {
 
     }
 }
+```
 
 * 예제 로그
-    * 테이블을 삭제하기 전select문이 실행된다.
 ```sql
 Hibernate:
     delete
