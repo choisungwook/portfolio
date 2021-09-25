@@ -13,7 +13,7 @@
   - [vuejs](#vuejs)
   - [기타](#기타)
   - [4.2 엔지니어](#42-엔지니어)
-- [추천 자료](#추천-자료)
+- [기타](#기타-1)
 
 <br>
 
@@ -109,6 +109,7 @@
 
 <br>
 
-# 추천 자료
-* [microsoft restful api 디자인](https://docs.microsoft.com/ko-kr/azure/architecture/best-practices/api-design)
-* [naver d2 restapi 세미나](https://youtu.be/RP_f5dMoHFc)
+# 기타
+* [추천자료 링크모음](./documentation/etc/추천자료.md)
+* [UI링크모음](./documentation/etc/참고UI.md)
+* [참고할 포트폴리오](./documentation/etc/다른사람포트폴리오.md)
