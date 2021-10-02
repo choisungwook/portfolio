@@ -13,6 +13,7 @@
 
 # 설치
 * DB_ADDR을 자기 IP로 수정
+* 설치시간은 약 5분 소요
 ```sh
 docker run --name keycloak -d \
 -p 13050:8080 \
@@ -27,6 +28,17 @@ docker run --name keycloak -d \
 -e DB_PORT=13306 \
 jboss/keycloak:15.0.0
 ```
+
+<br>
+
+# 방문
+* docker 포트포워딩 포트로 접속 -> administration console 클릭
+
+[visit](imgs/visithomepage.png)
+
+* docker 환경변수로 설정했던 관리자 ID와 비밀번호 입력
+
+[login](imgs/visithomepage.png)
 
 <br>
 
