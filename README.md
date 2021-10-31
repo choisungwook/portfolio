@@ -1,6 +1,5 @@
 - [1. 나를 소개하는 링크모음](#1-나를-소개하는-링크모음)
   - [1.1 프로필 링크모음](#11-프로필-링크모음)
-  - [1.2 공부한 것들을 배포 링크모음](#12-공부한-것들을-배포-링크모음)
 - [2. 기술스택](#2-기술스택)
 - [3. 프로젝트 목차](#3-프로젝트-목차)
   - [3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입](#31-쿠버네티스를-이용한-개발환경-자동화-구축-프로토타입)
@@ -19,12 +18,8 @@
 
 # 1. 나를 소개하는 링크모음
 ## 1.1 프로필 링크모음
-* 블로그: https://malwareanalysis.tistory.com/
+* 블로그: https://malwareanalysis.tistory.com
 * 유투브: https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
-
-## 1.2 공부한 것들을 배포 링크모음
-* vuejs
-  * 튜토리얼: https://myproject.choicloudlab.com/vue-practice1/home
 
 <br>
 
@@ -40,9 +35,7 @@
 # 3. 프로젝트 목차
 ## 3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입
 > 버전1 git repo: https://github.com/srmproject/server
-
 > 시연영상: https://youtu.be/ReD2_nBjko0
-
 > 발표자료: https://www.slideshare.net/sungwookchoi5/ss-249424125
 
 * 주제: 쿠버네티스를 이용한 개발자 개발환경 자동화
@@ -72,7 +65,6 @@
 <br>
 
 # 4. 공부정리
-> 정리중
 ## 4.1 개발
 ## 스프링부트
 * [keycloak 설치](documentation/springboot/keylcoak/keyclaok설치.md)
@@ -85,6 +77,7 @@
 ## 스프링시큐리티
 * [filterchain](./documentation/springseucirty/filterchain.md)
 * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
+* [스프링시큐리티 강의 시리즈](https://www.youtube.com/watch?v=ewslpCROKXY&list=PL1mta2YyMpPUEidDzJ8kAxhMNhU9Is8Ky)
 ## flask
 * [애플리케이션 생성](./documentation/flask/create_application.md)
 * [requset_body가져오기](./documentation/flask/request_body.md)
@@ -104,9 +97,10 @@
 * [self-singed 인증서](documentation/linux_selfsigncert.md)
 * [nvm으로 javascript 버전관리](https://malwareanalysis.tistory.com/145)
 * [docker-mariadb 설치](https://malwareanalysis.tistory.com/140)
-* kubesrapy 설치: https://youtu.be/12vNy4IvF14
+* [kubesrapy 온프레미스 설치](https://youtu.be/12vNy4IvF14)
 * aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E
-* github action과 heroku를 이용한 빌드/배포 자동화: https://youtu.be/YMdwYPCyxRk
+* [github action과 heroku를 이용한 빌드/배포 자동화](https://youtu.be/YMdwYPCyxRk)
+* [프로메테우스 익스포터 원리](https://youtu.be/iJyC6A38qwY)
 
 <br>
 
