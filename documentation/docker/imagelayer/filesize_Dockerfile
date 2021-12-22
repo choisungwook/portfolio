@@ -1,0 +1,3 @@
+FROM busybox:1.34.1
+
+RUN echo "helloworld" > a.txt
