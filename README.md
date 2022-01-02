@@ -1,5 +1,4 @@
-- [1. 나를 소개하는 링크모음](#1-나를-소개하는-링크모음)
-  - [1.1 프로필 링크모음](#11-프로필-링크모음)
+- [1. 자기소개](#1-자기소개)
 - [2. 기술스택](#2-기술스택)
 - [3. 프로젝트 목차](#3-프로젝트-목차)
   - [3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입](#31-쿠버네티스를-이용한-개발환경-자동화-구축-프로토타입)
@@ -12,8 +11,8 @@
 
 <br>
 
-# 1. 나를 소개하는 링크모음
-## 1.1 프로필 링크모음
+# 1. 자기소개
+안녕하세요. 현재 2년차(약 1년 2개월)로 달려가고 있는 DEVOPS엔지니어입니다. 클라우드, CI/CD, 프레임워크, 컨테이너 등 기업 DEVOPS 적용사례를 살펴보고 업무에 적용하기 위해 열심히 공부하고 있습니다. 개인공부 내용은 블로그와 유투브에 업로드하고 있습니다. 엔지니어 이외에 파이썬을 이용한 개발 즐겨하며 go언어와 go생태계를 공부할 예정입니다. 그리고 네트워크, 운영체제 등 CS지식도 꾸준히 할 예정입니다.
 * 블로그: https://malwareanalysis.tistory.com
 * 유투브: https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
 
@@ -21,10 +20,31 @@
 
 # 2. 기술스택
 * container
-* vagrant
+  * docker
+  * dockerfile
 * aws
+  * lambda
+  * iam
+  * s3
+  * ivs
+  * ec2
+  * vpc
+  * route 53
+  * codedeploy
 * kubernetes
 * python
+* 오픈소스
+  * vagrant
+  * springboot
+  * springsecurity
+  * flask
+  * fastapi
+  * appscheduler(python batch library)
+  * argocd
+  * jenkins
+  * git
+* db
+  * redis
 
 <br>
 
