@@ -43,6 +43,7 @@
   * argocd
   * jenkins
   * git
+  * helm
 * db
   * redis
 
@@ -89,6 +90,18 @@
     * [2편 Dockerfile과 이미지 레이어 관계](https://malwareanalysis.tistory.com/234)
     * [3편 빌드캐시](https://malwareanalysis.tistory.com/236)
     * [4편 빌드과정에서 일어나는 일](https://malwareanalysis.tistory.com/222)
+* kubernetes
+  * helm 시작하기 시리즈
+    * [1편 helm이란](https://malwareanalysis.tistory.com/193)
+    * [2편 helm 설치](https://malwareanalysis.tistory.com/194)
+    * [3편 helm차트 생성](https://malwareanalysis.tistory.com/195)
+    * [4편 helm 차트 설치, 조회, 삭제](https://malwareanalysis.tistory.com/196)
+    * [5편 helm 차트 템플릿 값 동적 수정](https://malwareanalysis.tistory.com/197)
+    * [6편 values.yaml 오버라이딩](https://malwareanalysis.tistory.com/198)
+    * [7편 Release Object사용](https://malwareanalysis.tistory.com/200)
+    * [8편 namespace설정](https://malwareanalysis.tistory.com/201)
+    * [9편 Release 업그레이드](https://malwareanalysis.tistory.com/202)
+    * [10편 Rollback](https://malwareanalysis.tistory.com/203)
 * [self-singed 인증서](documentation/linux_selfsigncert.md)
 * [nvm으로 javascript 버전관리](https://malwareanalysis.tistory.com/145)
 * [docker-mariadb 설치](https://malwareanalysis.tistory.com/140)
