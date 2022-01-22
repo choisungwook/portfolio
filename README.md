@@ -91,6 +91,11 @@
     * [3편 빌드캐시](https://malwareanalysis.tistory.com/236)
     * [4편 빌드과정에서 일어나는 일](https://malwareanalysis.tistory.com/222)
 * kubernetes
+  * 쿠버네티스 네트워크 스터디(페이스북 쿠버네티스 그룹에서 스터디 모집)
+    * [1주차 1편 컨테이너 격리](https://malwareanalysis.tistory.com/248)
+    * [1주차 2편 네트워크 네임스페이스](https://malwareanalysis.tistory.com/249)
+    * [2주차 1편 Flannel CNI](https://malwareanalysis.tistory.com/254)
+    * [2주차 2편 pause 컨테이너](https://malwareanalysis.tistory.com/255)
   * helm 시작하기 시리즈
     * [1편 helm이란](https://malwareanalysis.tistory.com/193)
     * [2편 helm 설치](https://malwareanalysis.tistory.com/194)
