@@ -1,5 +1,5 @@
 - [1. 자기소개](#1-자기소개)
-- [2. 기술스택](#2-기술스택)
+- [2. 기술](#2-기술)
 - [3. 프로젝트 목차](#3-프로젝트-목차)
   - [3.1 쿠버네티스를 이용한 개발환경 자동화 구축 프로토타입](#31-쿠버네티스를-이용한-개발환경-자동화-구축-프로토타입)
   - [3.2 aws를 이용한 뉴스 크롤링](#32-aws를-이용한-뉴스-크롤링)
@@ -12,40 +12,25 @@
 <br>
 
 # 1. 자기소개
-안녕하세요. 현재 2년차(약 1년 2개월)로 달려가고 있는 DEVOPS엔지니어입니다. 클라우드, CI/CD, 프레임워크, 컨테이너 등 기업 DEVOPS 적용사례를 살펴보고 업무에 적용하기 위해 열심히 공부하고 있습니다. 개인공부 내용은 블로그와 유투브에 업로드하고 있습니다. 엔지니어 이외에 파이썬을 이용한 개발 즐겨하며 go언어와 go생태계를 공부할 예정입니다. 그리고 네트워크, 운영체제 등 CS지식도 꾸준히 할 예정입니다.
+컨테이너, 쿠버네티스, 파이썬 기반의 2년차 데브옵스 엔지니어입니다. 온프레미스 환경에서 쿠버네티스 구축과 장애처리, 쿠버네티스 기반인 인공지능 프로젝트 설계와 개발, 운영, CICD 구축 등을 해왔습니다. <br>
+좋은 코드와 설계를 고민하기 위해 자기계발을 꾸준히 하고 있습니다. 커뮤니티 활동을 좋아하고 글쓰기를 좋아하여 블로그, 유튜브를 운영하고 있습니다. <br>
+자동화를 통한 생산성 향상에 신경쓰고 적극적인 커뮤니케이션을 통해 문제를 해결하려고 노력합니다. 현재는 컨설턴트로 파견업무를 맡아 고객 서비스 성장을 지원하고 있습니다.
 * 블로그: https://malwareanalysis.tistory.com
 * 유투브: https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
 
 <br>
 
-# 2. 기술스택
-* container
-  * docker
-  * dockerfile
-* aws
-  * lambda
-  * iam
-  * s3
-  * ivs
-  * ec2
-  * vpc
-  * route 53
-  * codedeploy
-* kubernetes
-* python
-* 오픈소스
+# 2. 기술
+* python, fastapi, flask, appscheduler
+* kubernetes, docker
+* redis
+* jenkins
+* 업무에 사용하지 않았지만 아주얉게 개인공부로 했던 것들은 ...
+  * springboot, springsecurity
   * vagrant
-  * springboot
-  * springsecurity
-  * flask
-  * fastapi
-  * appscheduler(python batch library)
-  * argocd
-  * jenkins
-  * git
-  * helm
-* db
-  * redis
+  * aws
+  * vuejs
+  * reactjs  
 
 <br>
 
