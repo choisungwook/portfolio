@@ -1,0 +1,39 @@
+{
+    "id": "/gitlab-test",
+    "instances": 1,
+    "container": {
+      "type": "DOCKER",
+      "volumes": [],
+      "docker": {
+        "image": "gitlab/gitlab-ce:11.10.4-ce.0",
+        "forcePullImage": false
+      },
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 0,
+          "protocol": "tcp",
+          "name": "http"
+        },
+        {
+          "containerPort": 443,
+          "hostPort": 0,
+          "protocol": "tcp",
+          "name": "https"
+        }
+      ]
+    },
+    "cpus": 2,
+    "mem": 2048,
+    "requirePorts": false,
+    "networks": [
+      {
+        "mode": "container/bridge"
+      }
+    ],
+    "healthChecks": [],
+    "fetch": [],    
+    "labels": {
+      "HAPROXY_GROUP": "external"
+    }
+  }

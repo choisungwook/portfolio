@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>emit</title>
+</head>
+<body>
+    <div id="app">
+        <p>현재 num 변수 값: {{ num }}</p>
+        <app-header v-on:increase="increase"></app-header>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+
+    <script>
+        var appHeader = {
+            template: '<button v-on:click="increase">Click me!</button>',
+            methods: {
+                increase: function(){
+                    this.$emit('increase'); // pass라는 이벤트 부모 컴퍼넌트에게 전달
+                }
+            }
+        };
+
+        var vm = new Vue({
+            el: "#app",
+            components: {
+                'app-header': appHeader
+            },
+            data: {
+                'num': 10
+            },
+            methods: {
+                increase: function() {
+                    this.num++;
+                    console.log(this.num);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!-- vuejs router 라이브러리 예제 -->
+<!-- 로그인 페이지: http://127.0.0.1:5500/router.html#/signin -->
+<!-- 회원가입 페이지: http://127.0.0.1:5500/router.html#/signup -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Router</title>
+</head>
+<body>
+    <div id="app">
+        <button v-on:click="getData">비동기 데이터 수신요청</button>
+        <p>받은 데이터: {{ users }}</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        new Vue({
+            el: "#app",
+            data: {
+                "users": []
+            },
+            methods: {
+                getData: function() {
+                    var vm = this;
+                    // console.log(this);
+                    axios.get("https://jsonplaceholder.typicode.com/users/")
+                    .then(function(response){
+                        // 논리적 오류
+                        // this.user = response.data;
+                        // console.log(this);
+
+                        // 정답
+                        vm.users = response.data;
+                    })
+                    .catch(function(error){
+                        console.log(error);
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
