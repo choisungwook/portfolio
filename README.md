@@ -41,12 +41,15 @@
     * [3편 빌드캐시](https://malwareanalysis.tistory.com/236)
     * [4편 빌드과정에서 일어나는 일](https://malwareanalysis.tistory.com/222)
 * kubernetes
+  * [쿠버네티스 노드당 파드 갯수제한 확인 22.3.21](https://malwareanalysis.tistory.com/300)
+  * [facebook 쿠버네티스 밋업 발표 22.3.19](https://github.com/choisungwook/facebook-meetup)
+  * [KANS 쿠버네티스 네트워크 스터디 22.1 ~ 22.2](https://malwareanalysis.tistory.com/248)
   * 쿠버네티스 네트워크 스터디(페이스북 쿠버네티스 그룹에서 스터디 모집)
     * [1주차 1편 컨테이너 격리](https://malwareanalysis.tistory.com/248)
     * [1주차 2편 네트워크 네임스페이스](https://malwareanalysis.tistory.com/249)
     * [2주차 1편 Flannel CNI](https://malwareanalysis.tistory.com/254)
     * [2주차 2편 pause 컨테이너](https://malwareanalysis.tistory.com/255)
-  * helm 시작하기 시리즈
+  * helm 시작하기 시리즈(21)
     * [1편 helm이란](https://malwareanalysis.tistory.com/193)
     * [2편 helm 설치](https://malwareanalysis.tistory.com/194)
     * [3편 helm차트 생성](https://malwareanalysis.tistory.com/195)
@@ -73,6 +76,7 @@
   * [ResponseEntity Header추가](./documentation/springboot/ResponseEntity_addheader.md)
   * [JPA 참조](./documentation/springboot/jpa/참조.md)
   * [junit 매테스트 끝날때마다 repository 초기화](./documentation/springboot/jpa/junit5_aftereach.md)
+  * [springboot-h2인메모리 콘솔접속](https://malwareanalysis.tistory.com/160)
 * 스프링시큐리티
   * [filterchain](./documentation/springseucirty/filterchain.md)
   * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
@@ -88,11 +92,11 @@
   * [vuetify 컴퍼넌트](./documentation/vuejs/vuetify/required_vuetify_components.md)
   * [vuetify 페이지 추가](./documentation/vuejs/vuetify/helloworld.md)
   * [vuetify 사이드 네비게이션 메뉴와 라우터연동](./documentation/vuejs/vuetify/vlist-router.md)
+* python
+ * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
+ * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
 ## 3.3 기타
-* [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
-* [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
-* [springboot-h2인메모리 콘솔접속](https://malwareanalysis.tistory.com/160)
 
 <br>
 
