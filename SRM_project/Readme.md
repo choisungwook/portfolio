@@ -1,1 +1,0 @@
-프로젝트 이동: [링크 바로가기](https://github.com/srmproject/server)
