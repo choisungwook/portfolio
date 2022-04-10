@@ -91,6 +91,7 @@
 * python
  * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
  * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
+ * [default_collections](language/python/collections/default_collection.py)
 
 ## 3.3 기타
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
