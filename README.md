@@ -32,7 +32,6 @@
   * springboot, springsecurity
   * vagrant
   * aws
-  * vuejs
   * reactjs  
 
 <br>
@@ -77,7 +76,7 @@
 * [nginx 시작](https://youtu.be/hA0cxENGBQQ)
 
 ## 3.2 개발
-* 스프링부트
+* springboot
   * [keycloak 설치](documentation/springboot/keylcoak/keyclaok설치.md)
   * [h2 인모메리 설정](./documentation/springboot/inmemory_h2_configuration.md)
   * [Junit5 restcontroller 테스트](./documentation/springboot/junit5/restcontroller테스트.md)
@@ -85,21 +84,10 @@
   * [JPA 참조](./documentation/springboot/jpa/참조.md)
   * [junit 매테스트 끝날때마다 repository 초기화](./documentation/springboot/jpa/junit5_aftereach.md)
   * [springboot-h2인메모리 콘솔접속](https://malwareanalysis.tistory.com/160)
-* 스프링시큐리티
+* springsecurity
   * [filterchain](./documentation/springseucirty/filterchain.md)
   * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
   * [스프링시큐리티 강의 시리즈](https://www.youtube.com/watch?v=ewslpCROKXY&list=PL1mta2YyMpPUEidDzJ8kAxhMNhU9Is8Ky)
-* flask
-  * [애플리케이션 생성](./documentation/flask/create_application.md)
-  * [requset_body가져오기](./documentation/flask/request_body.md)
-  * [make_response로 응답수정](./documentation/flask/make_response.md)
-* javascript
-  * [문법정리](./documentation/javascript/Readme.md)
-* vuejs
-  * [vuetify 설치](./documentation/vuejs/vuetify/install.md)
-  * [vuetify 컴퍼넌트](./documentation/vuejs/vuetify/required_vuetify_components.md)
-  * [vuetify 페이지 추가](./documentation/vuejs/vuetify/helloworld.md)
-  * [vuetify 사이드 네비게이션 메뉴와 라우터연동](./documentation/vuejs/vuetify/vlist-router.md)
 * python
  * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
  * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
