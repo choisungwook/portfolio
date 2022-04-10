@@ -19,7 +19,7 @@
 <br>
 
 # 2. 기술
-* deveops
+* devops
   * container
     * kubernetes, docker
   * nginx
