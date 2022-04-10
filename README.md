@@ -4,7 +4,8 @@
   - [3.1 엔지니어](#31-엔지니어)
   - [3.2 개발](#32-개발)
   - [3.3 기타](#33-기타)
-- [4. 참고자료 정리](#4-참고자료-정리)
+- [4. 외부활동](#4-외부활동)
+- [5. 참고자료 정리](#5-참고자료-정리)
 
 <br>
 
@@ -18,10 +19,15 @@
 <br>
 
 # 2. 기술
-* python, fastapi, flask, appscheduler
-* kubernetes, docker
-* redis
-* jenkins
+* deveops
+  * container
+    * kubernetes, docker
+  * nginx
+  * jenkins
+* 개발
+  * python
+  * fastapi, flask, appscheduler
+  * redis
 * 업무에 사용하지 않았지만 아주얉게 개인공부로 했던 것들은 ...
   * springboot, springsecurity
   * vagrant
@@ -41,6 +47,7 @@
     * [3편 빌드캐시](https://malwareanalysis.tistory.com/236)
     * [4편 빌드과정에서 일어나는 일](https://malwareanalysis.tistory.com/222)
 * kubernetes
+  * [istio 공부 22.2.22 ~ 22.4.9](https://malwareanalysis.tistory.com/category/%ED%98%84%EC%9E%AC%EA%B3%B5%EB%B6%80/Istio)
   * [쿠버네티스 노드당 파드 갯수제한 확인 22.3.21](https://malwareanalysis.tistory.com/300)
   * [facebook 쿠버네티스 밋업 발표 22.3.19](https://github.com/choisungwook/facebook-meetup)
   * [KANS 쿠버네티스 네트워크 스터디 22.1 ~ 22.2](https://malwareanalysis.tistory.com/248)
@@ -67,6 +74,7 @@
 * aws vpc, subnet: https://youtu.be/zG1WFhEV5x8, https://youtu.be/5zF_KXUNt-E
 * [github action과 heroku를 이용한 빌드/배포 자동화](https://youtu.be/YMdwYPCyxRk)
 * [프로메테스 익스포터 원리](https://youtu.be/iJyC6A38qwY)
+* [nginx 시작](https://youtu.be/hA0cxENGBQQ)
 
 ## 3.2 개발
 * 스프링부트
@@ -95,12 +103,19 @@
 * python
  * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
  * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
+
 ## 3.3 기타
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
+* [tmux 모든 세션제거](https://malwareanalysis.tistory.com/309)
 
 <br>
 
-# 4. 참고자료 정리
+# 4. 외부활동
+* 쿠버네티스 facebook 밋업 발표 - 쿠버네티스 네트워크 발전단계
+* 책 집필 - 오픈소스로 알아보는 윈도우 포렌식
+* 케이실드주니어 분석대응과정 수료 - 성적 우수상 수료
+
+# 5. 참고자료 정리
 * [추천자료 링크모음](./documentation/etc/추천자료.md)
 * [UI링크모음](./documentation/etc/참고UI.md)
 * [참고할 포트폴리오](./documentation/etc/다른사람포트폴리오.md)
