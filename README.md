@@ -71,9 +71,9 @@
 * [docker-mariadb 설치](https://malwareanalysis.tistory.com/140)
 * [kubesrapy 온프레미스 설치](https://youtu.be/12vNy4IvF14)
 * aws
-  * vpc 기초정리: https://youtu.be/zG1WFhEV5x8
-  * subnet 기초정리: https://youtu.be/5zF_KXUNt-E
-  * 임시자격증명을 이용한 다른계정 리소스 접근: https://youtu.be/IDiW1Ah4LJw
+  * [vpc 기초정리](https://youtu.be/zG1WFhEV5x8)
+  * [subnet 기초정리](https://youtu.be/5zF_KXUNt-E)
+  * [임시자격증명을 이용한 다른계정 리소스 접근 22.4.18](https://youtu.be/IDiW1Ah4LJw)
 * [github action과 heroku를 이용한 빌드/배포 자동화](https://youtu.be/YMdwYPCyxRk)
 * [프로메테스 익스포터 원리](https://youtu.be/iJyC6A38qwY)
 * [nginx 시작](https://youtu.be/hA0cxENGBQQ)
@@ -100,6 +100,9 @@
 ## 3.3 기타
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
 * [tmux 모든 세션제거](https://malwareanalysis.tistory.com/309)
+* nginx
+  * [nginx 기초 영상녹화 22.4.9](https://youtu.be/hA0cxENGBQQ)
+  * [nginx timeout에러 22.4.16](https://youtu.be/31zAw1d1qJk)
 
 <br>
 
