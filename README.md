@@ -74,6 +74,10 @@
   * [vpc 기초정리](https://youtu.be/zG1WFhEV5x8)
   * [subnet 기초정리](https://youtu.be/5zF_KXUNt-E)
   * [임시자격증명을 이용한 다른계정 리소스 접근 22.4.18](https://youtu.be/IDiW1Ah4LJw)
+  * [aws profile관리 22.4.24](https://malwareanalysis.tistory.com/317)
+  * [Systems Manager를 이용한 EC2 원격쉘 접속 22.4.24](https://malwareanalysis.tistory.com/318)
+* jenkins
+  * [sh 명령어 공백제거](https://malwareanalysis.tistory.com/319)
 * [github action과 heroku를 이용한 빌드/배포 자동화](https://youtu.be/YMdwYPCyxRk)
 * [프로메테스 익스포터 원리](https://youtu.be/iJyC6A38qwY)
 * [nginx 시작](https://youtu.be/hA0cxENGBQQ)
