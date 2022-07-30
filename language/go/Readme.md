@@ -1,3 +1,15 @@
+# go파일 실해방법
+go run {파일이름}.go로 실행할 수 있습니다.
+| go파일에는 main 패키지, main함수가 있어야 합니다.
+```sh
+go run main.go
+```
+
+여러개 파일을 실행하려면 아스타(*)를 사용합니다.
+```sh
+go run *.go
+```
+
 # main함수
 main package의 main함수가 go언어 시작(entrypoint)입니다.
 ```go
@@ -116,3 +128,6 @@ func main() {
 	fmt.Printf("JSON Parse\ntodos: %v", todos)
 }
 ```
+
+# 참고자료
+* https://go.dev/tour/
