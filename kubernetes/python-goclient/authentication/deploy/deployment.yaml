@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-auth-demo
+  namespace: default
+  labels:
+    app: fastapi-auth-demo
+spec:
+  selector:
+    matchLabels:
+      app: fastapi-auth-demo
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fastapi-auth-demo
+    spec:
+      serviceAccount: auth-demo-dev
+      containers:
+      - name: app
+        image:  auth-demo:v0.0.2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 3
+          periodSeconds: 10
+        ports:
+        - containerPort:  80
+          name: app
+      restartPolicy: Always
