@@ -10,42 +10,54 @@
 <br>
 
 # 1. 자기소개
-컨테이너, 쿠버네티스, 파이썬 기반의 2년차 데브옵스 엔지니어입니다. 온프레미스 환경에서 쿠버네티스 구축과 장애처리, 쿠버네티스 기반인 인공지능 프로젝트 설계와 개발, 운영, CICD 구축 등을 해왔습니다. <br>
-좋은 코드와 설계를 고민하기 위해 자기계발을 꾸준히 하고 있습니다. 커뮤니티 활동을 좋아하고 글쓰기를 좋아하여 블로그, 유튜브를 운영하고 있습니다. <br>
-자동화를 통한 생산성 향상에 신경쓰고 적극적인 커뮤니케이션을 통해 문제를 해결하려고 노력합니다. 현재는 컨설턴트로 파견업무를 맡아 고객 서비스 성장을 지원하고 있습니다.
+안녕하세요 2년차 데브옵스 엔지니어입니다. 온프레미스 환경에서 쿠버네티스 환경을 이용한 개발과 엔지니어링 업무를 하고 있습니다. 대표적인 프로젝트는 kaggle을 벤치마킹한 인공지능 플랫폼 개발, 약 1000명이상이 사용하는 빌드/배포 플랫폼(ArgoWorkflow, ArgoCD) 개발&운영입니다. <br>
+문제를 해결할 때, 좋은 방법을 찾기 위해 자기계발을 꾸준히 하고 있습니다. 커뮤니티 활동을 좋아하고 글쓰기를 좋아하여 블로그, 유튜브를 운영하고 있습니다.
 * 블로그: https://malwareanalysis.tistory.com
 * 유투브: https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
 
 <br>
 
 # 2. 기술
-* devops
-  * container
-    * kubernetes, docker
-  * nginx
-  * jenkins
+* Devops
+  * Container
+    * 엔진: Docker
+    * 오케스트레이션 도구: Kubernetes
+    * logging 시스템
+      * Loki
+  * 빌드/배포 도구
+    * Jenkins
+    * Argo Workflow
+    * Argo CD
 * 개발
-  * python
-  * fastapi, flask, appscheduler
-  * redis
+  * 언어: Python
+  * 웹 프레임워크: FastAPI
 * 업무에 사용하지 않았지만 아주얉게 개인공부로 했던 것들은 ...
-  * springboot, springsecurity
-  * vagrant
-  * aws
-  * reactjs  
+  * Springboot, Springsecurity
+  * Vagrant
+  * Aws
+    * EC2, VPC, CodePipeline, S3, IVS
+  * JavaScript
+  * Github Action
 
 <br>
 
 # 3. 공부정리
+개인공부 한 내용을 목차로 정리했습니다.
+
 ## 3.1 엔지니어
 * Docker
+  * [dockerfile Multi Stage 22.9.18](https://malwareanalysis.tistory.com/417)
+  * [dockerfile 버전선택 22.8.28](https://malwareanalysis.tistory.com/410)
   * [Add와 COPY명령어 차이](https://malwareanalysis.tistory.com/233)
-  * docker 이미지레이어 분석 시리즈
+  * Docker 이미지레이어 분석 시리즈(21.12.25)
     * [1편 도커 이미지 레이어 구조](https://malwareanalysis.tistory.com/213)
     * [2편 Dockerfile과 이미지 레이어 관계](https://malwareanalysis.tistory.com/234)
     * [3편 빌드캐시](https://malwareanalysis.tistory.com/236)
     * [4편 빌드과정에서 일어나는 일](https://malwareanalysis.tistory.com/222)
-* kubernetes
+* Kubernetes
+  * [ArgoCD 시리즈 22.7 ~ 22.10](https://sungwook-choi.gitbook.io/argocd/)
+  * [Kustomize 22.8.7](https://malwareanalysis.tistory.com/402)
+  * [deployment 배포버전 관리 22.5.22](https://malwareanalysis.tistory.com/337)
   * [istio 공부 22.2.22 ~ 22.4.9](https://malwareanalysis.tistory.com/category/%ED%98%84%EC%9E%AC%EA%B3%B5%EB%B6%80/Istio)
   * [쿠버네티스 노드당 파드 갯수제한 확인 22.3.21](https://malwareanalysis.tistory.com/300)
   * [facebook 쿠버네티스 밋업 발표 22.3.19](https://github.com/choisungwook/facebook-meetup)
@@ -55,7 +67,13 @@
     * [1주차 2편 네트워크 네임스페이스](https://malwareanalysis.tistory.com/249)
     * [2주차 1편 Flannel CNI](https://malwareanalysis.tistory.com/254)
     * [2주차 2편 pause 컨테이너](https://malwareanalysis.tistory.com/255)
-  * helm 시작하기 시리즈(21)
+    * [3주차 calico](https://malwareanalysis.tistory.com/264)
+    * [4주차 kube-proxy](https://malwareanalysis.tistory.com/265)
+    * [5주차 1편 coredns](https://malwareanalysis.tistory.com/267)
+    * [5주차 2편 Metal-LB](https://malwareanalysis.tistory.com/271)
+    * [6주차 Ingress](https://malwareanalysis.tistory.com/277)
+    * [7주차 Cilium CNI](https://malwareanalysis.tistory.com/288)
+  * Helm 시작하기 시리즈(21)
     * [1편 helm이란](https://malwareanalysis.tistory.com/193)
     * [2편 helm 설치](https://malwareanalysis.tistory.com/194)
     * [3편 helm차트 생성](https://malwareanalysis.tistory.com/195)
@@ -70,20 +88,20 @@
 * [nvm으로 javascript 버전관리](https://malwareanalysis.tistory.com/145)
 * [docker-mariadb 설치](https://malwareanalysis.tistory.com/140)
 * [kubesrapy 온프레미스 설치](https://youtu.be/12vNy4IvF14)
-* aws
+* Aws
   * [vpc 기초정리](https://youtu.be/zG1WFhEV5x8)
   * [subnet 기초정리](https://youtu.be/5zF_KXUNt-E)
   * [임시자격증명을 이용한 다른계정 리소스 접근 22.4.18](https://youtu.be/IDiW1Ah4LJw)
   * [aws profile관리 22.4.24](https://malwareanalysis.tistory.com/317)
   * [Systems Manager를 이용한 EC2 원격쉘 접속 22.4.24](https://malwareanalysis.tistory.com/318)
-* jenkins
+* Jenkins
   * [sh 명령어 공백제거](https://malwareanalysis.tistory.com/319)
 * [github action과 heroku를 이용한 빌드/배포 자동화](https://youtu.be/YMdwYPCyxRk)
 * [프로메테스 익스포터 원리](https://youtu.be/iJyC6A38qwY)
 * [nginx 시작](https://youtu.be/hA0cxENGBQQ)
 
 ## 3.2 개발
-* springboot
+* Springboot
   * [keycloak 설치](documentation/springboot/keylcoak/keyclaok설치.md)
   * [h2 인모메리 설정](./documentation/springboot/inmemory_h2_configuration.md)
   * [Junit5 restcontroller 테스트](./documentation/springboot/junit5/restcontroller테스트.md)
@@ -91,11 +109,11 @@
   * [JPA 참조](./documentation/springboot/jpa/참조.md)
   * [junit 매테스트 끝날때마다 repository 초기화](./documentation/springboot/jpa/junit5_aftereach.md)
   * [springboot-h2인메모리 콘솔접속](https://malwareanalysis.tistory.com/160)
-* springsecurity
+* Springsecurity
   * [filterchain](./documentation/springseucirty/filterchain.md)
   * [springsecurity-인메모리](./documentation/springseucirty/InmemoryUser.md)
   * [스프링시큐리티 강의 시리즈](https://www.youtube.com/watch?v=ewslpCROKXY&list=PL1mta2YyMpPUEidDzJ8kAxhMNhU9Is8Ky)
-* python
+* Python
   * [python-sqlalchemy](https://malwareanalysis.tistory.com/141)
   * [python-input,stdin속도 비교](https://malwareanalysis.tistory.com/156)
   * [default_collections](language/python/collections/default_collection.py)
@@ -104,7 +122,7 @@
 ## 3.3 기타
 * [bash쉘스크립트-변수확인](https://malwareanalysis.tistory.com/158)
 * [tmux 모든 세션제거](https://malwareanalysis.tistory.com/309)
-* nginx
+* Nginx
   * [nginx 기초 영상녹화 22.4.9](https://youtu.be/hA0cxENGBQQ)
   * [nginx timeout에러 22.4.16](https://youtu.be/31zAw1d1qJk)
 
