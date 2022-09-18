@@ -103,3 +103,9 @@ centos_kubernetes/*
 
 # flask orm
 migrations
+
+# vscode
+.vscode
+
+# python
+venv
