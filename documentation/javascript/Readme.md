@@ -1,3 +1,44 @@
+# 객체생성을 객체로 감싸기
+규모가 점점 커지면 객체생성을 관리하기 쉽게 클래서로 한번 감싸기
+```typescript
+/*
+  객체를 생성할 때는 class를 활용하는 것을 추천
+*/
+
+type Box = {
+  width: number,
+  height: number
+}
+
+class Shape implements Box {
+  width: number;
+  height: number;
+
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+  }
+}
+
+// 방법 1 - 객체를 바로 생성
+const boxA: Box = {
+  width: 200,
+  height: 200
+}
+
+// 방법 2 - class를 객체로 감싸서 생성
+const boxB = new Shape(10, 10);
+
+// 클래스 구분
+if(boxB instanceof Shape){
+  console.log("boxB is Shape");
+}
+
+```
+
+
+----- 아래는 임시 글 ----------
+
 # 모듈
 ## 정의
 * 자바스크립트 파일에 정의된 함수, 변수를 외부에서 접근하려면 모듈을 설정해야 합니다.
