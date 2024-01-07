@@ -1,5 +1,5 @@
 ## 개요
-chroma vectorDB에 데이터를 저장하는 방법과 로드하는 방법을 설명
+chroma vectorDB에 데이터를 저장하는 방법과 로드하는 방법을 설명합니다.
 
 ## 저장 방법
 {==persist_directory인자==}에 저장할 위치를 설정합니다. jupyter를 사용하는 경우 persist 함수를 호출해야 합니다.
