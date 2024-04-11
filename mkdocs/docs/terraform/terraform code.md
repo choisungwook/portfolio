@@ -1,9 +1,51 @@
 ## 개요
 * terraform code 정리
 
-# EC2
+## IAM
 
-## Spot instance
+### Assume role
+* aws_iam_role의 TrustRelationShip 설정은 assume_role_policy필드로 설정
+* aws_iam_role의 policy는 aws_iam_role_policy resource로 설정
+
+```hcl
+resource "aws_iam_role" "web_app" {
+  name = "web-app-assume-role"
+  path = "/"
+  assume_role_policy = data.aws_iam_policy_document.web_app_assume.json
+}
+
+data "aws_iam_policy_document" "web_app_assume" {
+  statement {
+    effect = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type = "AWS"
+      identifiers = ["arn:aws:iam::${var.aws_root_account_id}:root"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "web_app_s3" {
+  name = "web-app-s3-access"
+  role = aws_iam_role.web_app.id
+  policy = data.aws_iam_policy_document.web_app_policy.json
+}
+
+data "aws_iam_policy_document" "web_app_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:List*",
+      "s3:Get*"
+    ]
+    resources = ["*"]
+  }
+}
+```
+
+## EC2
+
+### Spot instance
 
 ```hcl
 resource "aws_spot_instance_request" "nginx" {
