@@ -1,11 +1,16 @@
 name: deploy-mkdocs
+
 on:
   push:
+    paths:
+      - 'mkdocs/**'
     branches:
     - master
     - main
+
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
