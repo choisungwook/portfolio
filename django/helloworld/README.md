@@ -13,3 +13,6 @@ $ poetry install
 $ cd djangoExample
 $ python manager.py runserver
 ```
+
+# 다음 예제
+* [ninja + django](../ninjaExample/)
