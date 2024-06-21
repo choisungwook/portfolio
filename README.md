@@ -8,3 +8,14 @@
 * 링크드인: https://www.linkedin.com/in/choisungwook/
 * 블로그: https://malwareanalysis.tistory.com
 * 유투브(악분일상): https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
+
+# 다른 문서 링크
+* [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
+* [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
+* [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
+* [테라폼 예제](https://github.com/choisungwook/terraform_practice)
+* [karpenter](https://github.com/choisungwook/karpenter)
+* [EKS 예제](https://github.com/choisungwook/eks-practice)
+* [스터디]
+  * [ansible](https://github.com/choisungwook/ansible_practice)
+  * [테라폼](https://github.com/sungwook-practice/t101-study)
