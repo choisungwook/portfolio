@@ -5,3 +5,4 @@
 | 2 | eks | [링크](./eks) |
 | 3 | 템플릿 | [링크](./template) |
 | 4 | 우아한 종료 | [링크](./prestop/) |
+| 5 | pod 안정성을 높이는 설정 | [링크](./pod-stability-manifests/)|
