@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-app-lazyboot
+  namespace: default
+  labels:
+    app: python-app-lazyboot
+    service: python-app-lazyboot
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+  selector:
+    app: python-app-lazyboot
