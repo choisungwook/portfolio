@@ -1,0 +1,81 @@
+test_pod:
+  enabled: false
+
+loki:
+  image:
+    tag: 2.9.3
+  deploymentMode: SingleBinary
+  auth_enabled: false
+  server:
+    http_listen_port: 3100
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: 'filesystem'
+  schemaConfig:
+    configs:
+    - from: "2024-01-01"
+      store: tsdb
+      index:
+        prefix: loki_index_
+        period: 24h
+      object_store: filesystem # we're storing on filesystem so there's no real persistence here.
+      schema: v13
+  singleBinary:
+    replicas: 1
+  read:
+    replicas: 0
+  backend:
+    replicas: 0
+  write:
+    replicas: 0
+
+promtail:
+  snippets:
+    common:
+    - action: replace
+      source_labels:
+      - __meta_kubernetes_pod_node_name
+      target_label: node_name
+    - action: replace
+      source_labels:
+      - __meta_kubernetes_namespace
+      target_label: namespace
+    - action: replace
+      replacement: $1
+      separator: /
+      source_labels:
+      - namespace
+      - app
+      - k8s-app # for coredns pod
+      target_label: job
+    - action: replace
+      source_labels:
+      - __meta_kubernetes_pod_name
+      target_label: pod
+    - action: replace
+      source_labels:
+      - __meta_kubernetes_pod_container_name
+      target_label: container
+    - action: replace
+      replacement: /var/log/pods/*$1/*.log
+      separator: /
+      source_labels:
+      - __meta_kubernetes_pod_uid
+      - __meta_kubernetes_pod_container_name
+      target_label: __path__
+    - action: replace
+      replacement: /var/log/pods/*$1/*.log
+      regex: true/(.*)
+      separator: /
+      source_labels:
+      - __meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash
+      - __meta_kubernetes_pod_annotation_kubernetes_io_config_hash
+      - __meta_kubernetes_pod_container_name
+      target_label: __path__
+
+grafana:
+  enabled: false
+
+prometheus:
+  enabled: false
