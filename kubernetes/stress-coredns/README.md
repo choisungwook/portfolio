@@ -92,7 +92,7 @@ kubectl apply -f ./nginx/
 kubectl apply -f ./dnsperf/
 ```
 
-## dnspefr dns 스트레스
+## 옵션1: dnspefr dns 스트레스
 
 * domain 파일 생성
 
@@ -108,6 +108,12 @@ dnsperf -s 10.96.0.10 -d domain  -l 60 -c 50000
 ```
 
 ![](./imgs/dns_perf.png)
+
+## 옵션2: parallel를 사용
+
+```sh
+seq 100000 | parallel --jobs 500 'curl -I nginx.default'
+```
 
 # 삭제
 * kind cluster 삭제
