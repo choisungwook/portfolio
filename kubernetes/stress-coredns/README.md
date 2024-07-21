@@ -94,9 +94,20 @@ kubectl apply -f ./dnsperf/
 
 ## dnspefr dns 스트레스
 
+* domain 파일 생성
+
+```sh
+$ vi domain
+nginx.default A
+```
+
+* dnsperf 실행
+
 ```sh
 dnsperf -s 10.96.0.10 -d domain  -l 60 -c 50000
 ```
+
+![](./imgs/dns_perf.png)
 
 # 삭제
 * kind cluster 삭제
