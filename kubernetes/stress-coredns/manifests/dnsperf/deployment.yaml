@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dnsperf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dnsperf
+  template:
+    metadata:
+      labels:
+        app: dnsperf
+    spec:
+      containers:
+      - name: dnsperf
+        image: guessi/dnsperf
+        command: ["/bin/sleep", "infinity"]

@@ -1,0 +1,15 @@
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+    - prometheus.localtest.com
+    # path: "/*"
+
+grafana:
+  adminPassword: prom-operator
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+    - grafana.localtest.com
