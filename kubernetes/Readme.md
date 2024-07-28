@@ -7,3 +7,4 @@
 | 4 | 우아한 종료 | [링크](./prestop/) |
 | 5 | pod 안정성을 높이는 설정 | [링크](./pod-stability-manifests/)|
 | 6 | coredns trailling dot(.) | [링크](./stress-coredns/)|
+| 7 | pod가 persistence volume size보다 크게 사용해도 잘 동작 | [링크](./storage/over_size/)|
