@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  ssh_server:
+    build:
+      context: .
+      dockerfile: ssh-server.Dockerfile
+    container_name: ssh_server
+    hostname: ssh_server
+    networks:
+      - ssh_network
+
+  client:
+    image: nicolaka/netshoot
+    container_name: client
+    hostname: client
+    networks:
+      - ssh_network
+    command: /bin/sh -c "while sleep 1000; do :; done"
+
+  telnet_server:
+    build:
+      context: .
+      dockerfile: telent.Dockerfile
+    container_name: telnet_server
+    hostname: telnet_server
+    networks:
+      - ssh_network
+
+networks:
+  ssh_network:
+    driver: bridge
