@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: busybox-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: busybox
+  template:
+    metadata:
+      labels:
+        app: busybox
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command: ["sh", "-c", "while true; do echo $(date) >> /mnt/data/datetime.log; sleep 5; done"]
+        volumeMounts:
+        - name: busybox-storage
+          mountPath: /mnt/data
+      volumes:
+      - name: busybox-storage
+        persistentVolumeClaim:
+          claimName: busybox-pvc
