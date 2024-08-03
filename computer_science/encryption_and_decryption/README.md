@@ -33,6 +33,9 @@ openssl pkeyutl -encrypt -inkey mykey_pub.pem -pubin -in plaintext.txt -out encr
 openssl pkeyutl -decrypt -inkey ./mykey -in encrypted.txt -out decryption.txt
 ```
 
+# 다음 내용
+* [ssh vs telnet](../ssh_vs_telnet/)
+
 # 참고자료
 * RFC 4716/SSH2 공개 키 형식 표준: https://datatracker.ietf.org/doc/html/rfc4716
 * https://github.blog/security/application-security/improving-git-protocol-security-github/
