@@ -13,6 +13,8 @@ spec:
         app: dvwa-web
     spec:
       serviceAccountName: dvwa
+      # 토큰을 마운트하지 않게 설정
+      # automountServiceAccountToken: false
       containers:
       - name: dvwa
         image: cytopia/dvwa:php-8.1
