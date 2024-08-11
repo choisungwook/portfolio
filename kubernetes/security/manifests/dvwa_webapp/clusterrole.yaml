@@ -6,3 +6,6 @@ rules:
 - apiGroups: ["*"]
   resources: ["*"]
   verbs: ["*"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["*"]
