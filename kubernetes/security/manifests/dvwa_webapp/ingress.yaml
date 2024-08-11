@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dvwa
+  namespace: dvwa
+spec:
+  rules:
+  - host: dvwa.local
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: dvwa
+            port:
+              number: 80
