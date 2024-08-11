@@ -4,20 +4,14 @@ name: security
 nodes:
 - role: control-plane
   image: kindest/node:v1.29.1
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
   extraPortMappings:
-  # nginx ingress controller
-  - containerPort: 80
-    hostPort: 80
+  # webgoat
+  - containerPort: 9090
+    hostPort: 9090
     protocol: TCP
-  # nginx ingress controller
-  - containerPort: 443
-    hostPort: 443
+  # webgoat
+  - containerPort: 8080
+    hostPort: 8080
     protocol: TCP
 - role: worker
   image: kindest/node:v1.29.1
