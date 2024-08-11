@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dvwa-config
+  namespace: dvwa
 data:
   RECAPTCHA_PRIV_KEY: ""
   RECAPTCHA_PUB_KEY: ""
