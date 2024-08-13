@@ -1,0 +1,1 @@
+../kubernetes/pod-stability-manifests/replicas_with_probe/python_app/code/Dockerfile
