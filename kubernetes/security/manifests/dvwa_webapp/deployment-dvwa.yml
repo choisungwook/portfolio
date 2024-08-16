@@ -18,7 +18,9 @@ spec:
       # automountServiceAccountToken: false
       containers:
       - name: dvwa
-        image: cytopia/dvwa:php-8.1
+        # 원본 image
+        # image: cytopia/dvwa:php-8.1
+        image: choisunguk/dvwa_webapp:v2
         ports:
         - containerPort: 80
         resources:

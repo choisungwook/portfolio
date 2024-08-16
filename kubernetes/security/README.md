@@ -5,7 +5,8 @@
 # 목차
 * [secret을 탈취하는 시나리오](./attack1_steal_token.md)
 * [pod를 생성하는 시나리오](./attack2_create_pod.md)
-* [윈도우 쿠버네티스 원격 명령어 실행 취약점](./attack3_pv_vulnerability.md)
+* [admission controller을 사용하여 공격](./attack3_admission_controller.md)
+* [윈도우 쿠버네티스 원격 명령어 실행 취약점](./attack4_pv_vulnerability.md)
 * [service externalIP를 사용하여 dns spoofing](./manifests/externalIP/)
 
 # 실습 환경 구축
