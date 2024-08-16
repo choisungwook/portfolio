@@ -5,7 +5,7 @@
 
 * external IP를 할당하거나 status.loadBalancer.ingress.ip를 변경하면, externalIP를 호출되는 경우 공격자 pod로 라우팅
 * 아래 예제는 cncf IP를 호출하면 nginx pod가 호출됨
-* [예제코드 바로가기](./externalIP/)
+* [예제코드 바로가기](./manifests/dns_poison/externalIP/)
 
 ```yaml
 apiVersion: v1
