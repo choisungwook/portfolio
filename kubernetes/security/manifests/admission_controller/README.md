@@ -23,6 +23,7 @@ kubectl create secret tls webhook-certs --cert=certs/ca.crt --key=certs/ca.key -
 
 ```sh
 kubectl apply -f ./admission-controller-deployment.yaml
+kubectl apply -f ./admission-controller-service.yaml
 ```
 
 * mutate webhook 생성
