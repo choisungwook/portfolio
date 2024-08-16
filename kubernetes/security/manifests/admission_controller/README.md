@@ -19,7 +19,7 @@ make create-key
 kubectl create secret tls webhook-certs --cert=certs/ca.crt --key=certs/ca.key --namespace=default
 ```
 
-* admission controller pod 생성
+* admission controller pod,svc 생성
 
 ```sh
 kubectl apply -f ./admission-controller-deployment.yaml
