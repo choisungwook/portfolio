@@ -9,11 +9,13 @@ create-key:
 set-up:
 	@kubectl create secret tls webhook-certs --cert=certs/ca.crt --key=certs/ca.key --namespace=default
 	@kubectl apply -f ./admission-controller-deployment.yaml --namespace=default
+	@kubectl apply -f ./admission-controller-service.yaml --namespace=default
 	@kubectl wait --for=condition=available --timeout=60s deployment/admission-controller --namespace=default
 	@kubectl apply -f ./mutate-webhook.yaml
 
 clean:
 	@-kubectl delete -f ./nginx_deployment.yaml --namespace=default
 	@-kubectl delete -f ./admission-controller-deployment.yaml --namespace=default
+	@-kubectl delete -f ./admission-controller-service.yaml --namespace=default
 	@-kubectl delete -f mutate-webhook.yaml
 	@-kubectl delete secret webhook-certs --namespace=default
