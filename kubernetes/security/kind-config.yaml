@@ -19,6 +19,14 @@ nodes:
   - containerPort: 443
     hostPort: 443
     protocol: TCP
+  # istio book applications
+  - containerPort: 32100
+    hostPort: 32100
+    protocol: TCP
+  # mitm proxy
+  - containerPort: 32102
+    hostPort: 32102
+    protocol: TCP
 - role: worker
   image: kindest/node:v1.29.1
 - role: worker
