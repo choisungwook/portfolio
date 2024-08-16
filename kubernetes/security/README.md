@@ -8,6 +8,7 @@
 * [admission controller을 사용하여 공격](./attack3_admission_controller.md)
 * [윈도우 쿠버네티스 원격 명령어 실행 취약점](./attack4_pv_vulnerability.md)
 * [service externalIP를 사용하여 dns spoofing](./manifests/externalIP/)
+* [etcd 암호화](./manifests/encryption_etcd/)
 
 # 실습 환경 구축
 
