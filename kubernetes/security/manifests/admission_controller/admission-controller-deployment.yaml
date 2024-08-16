@@ -30,17 +30,3 @@ spec:
       - name: webhook-certs
         secret:
           secretName: webhook-certs
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: admission-server
-  namespace: default
-  labels:
-    app: admission-controller
-spec:
-  selector:
-    app: admission-controller
-  ports:
-  - port: 443
-    targetPort: 443
