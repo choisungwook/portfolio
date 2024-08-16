@@ -1,0 +1,10 @@
+**/.git
+**/.gitignore
+**/.github
+**/Dockerfile*
+**/.dockerignore
+**/compose*
+**/*.yaml
+**/*.yml
+**/Makefile
+**/README.md
