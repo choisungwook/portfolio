@@ -30,6 +30,9 @@ spec:
           limits:
             cpu: "0.3"
             memory: 256Mi
+        # 권한상승을 방지
+        # securityContext:
+        #   allowPrivilegeEscalation: false
         env:
         - name: RECAPTCHA_PRIV_KEY
           valueFrom:

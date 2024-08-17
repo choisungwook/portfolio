@@ -117,6 +117,23 @@ Init Containers:
 
 # 보안조치
 * sudo 권한 제거
+* 쿠버네티스에서 권한상승을 막도록 설정(참고자료: https://malwareanalysis.tistory.com/589)
+
+```sh
+# 예제
+apiVersion: v1
+kind: Pod
+metadata:
+ name: ubunut-disallow-sudo
+spec:
+ containers:
+ - name: main
+   image: ubuntu:sudo
+   command: [ "sh", "-c", "sleep 1h" ]
+   securityContext:
+     allowPrivilegeEscalation: false
+```
+
 * [role](./manifests/dvwa_webapp/clusterrole.yaml)에서 필요한 권한(최소권한)만 설정
 * [clusterrole binding](./manifests/dvwa_webapp/clusterrolebinding.yaml)를 rolebinding으로 변경 -> 다른 namespace 접근 불가
 * token이 불필요하면 automountServiceAccountToken을 false로 설정
