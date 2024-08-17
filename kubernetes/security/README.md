@@ -3,6 +3,7 @@
 * 블로그: https://malwareanalysis.tistory.com/756
 
 # 목차
+* [취약한 웹 DVWA 애플리케이션 manifests](./manifests/dvwa_webapp/)
 * [secret을 탈취하는 시나리오](./attack1_steal_token.md)
 * [pod를 생성하는 시나리오](./attack2_create_pod.md)
 * [admission controller을 사용하여 공격](./attack3_admission_controller.md)
