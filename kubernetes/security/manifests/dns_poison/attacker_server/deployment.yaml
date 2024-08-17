@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attacker-server
+spec:
+  selector:
+    matchLabels:
+      app: attacker-server
+  template:
+    metadata:
+      labels:
+        app: attacker-server
+    spec:
+      containers:
+      - name: attacker-server
+        image: nginx
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        ports:
+        - containerPort: 80
