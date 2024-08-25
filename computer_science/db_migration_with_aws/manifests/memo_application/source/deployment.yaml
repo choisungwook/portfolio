@@ -1,0 +1,31 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: source-django-deployment
+  namespace: memo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django
+  template:
+    metadata:
+      labels:
+        app: django
+    spec:
+      containers:
+      - name: django
+        image: choisunguk/dms-example-memo:v1
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - secretRef:
+            name: memo-source-mysql # created by bitnami mysql helm chart
+        resources:
+          requests:
+            cpu: "0.5"
+            memory: 300Mi
+          limits:
+            cpu: "0.5"
+            memory: 300Mi
