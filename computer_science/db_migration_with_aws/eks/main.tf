@@ -71,11 +71,6 @@ module "eks" {
       name                 = "coredns"
       version              = var.eks_addon_coredns_version
       configuration_values = jsonencode({})
-    },
-    {
-      name                 = "aws-ebs-csi-driver"
-      version              = var.eks_addon_ebs_version
-      configuration_values = jsonencode({})
     }
   ]
 

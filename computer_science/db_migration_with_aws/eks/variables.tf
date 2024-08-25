@@ -22,7 +22,3 @@ variable "eks_addon_vpc_cni_version" {
 variable "eks_addon_coredns_version" {
   type = string
 }
-
-variable "eks_addon_ebs_version" {
-  type = string
-}
