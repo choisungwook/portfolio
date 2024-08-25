@@ -1,0 +1,117 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
+}
+
+h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #444;
+    text-align: center;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    background-color: #fafafa;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+li a {
+    text-decoration: none;
+    color: #007bff;
+}
+
+li a:hover {
+    text-decoration: underline;
+}
+
+a.button {
+    display: inline-block;
+    padding: 10px 15px;
+    margin-top: 10px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+    text-align: center;
+}
+
+a.button:hover {
+    background-color: #0056b3;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+form input[type="text"], form textarea {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+form button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: #28a745;
+    color: white;
+    cursor: pointer;
+}
+
+form button:hover {
+    background-color: #218838;
+}
+
+/* 기본 버튼 스타일 */
+a.button {
+    display: inline-block; /* 링크를 인라인 요소에서 블록 요소로 변경 */
+    padding: 10px 20px; /* 내부 여백을 추가하여 버튼처럼 보이게 함 */
+    font-size: 16px; /* 글자 크기 설정 */
+    color: #ffffff; /* 텍스트 색상 */
+    background-color: #007bff; /* 버튼 배경색 */
+    text-align: center; /* 텍스트를 가운데 정렬 */
+    text-decoration: none; /* 기본 링크의 밑줄 제거 */
+    border-radius: 5px; /* 버튼 모서리를 둥글게 */
+    transition: background-color 0.3s ease, transform 0.1s ease; /* 배경색 및 크기 변화에 애니메이션 추가 */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* 버튼에 약간의 그림자 추가 */
+}
+
+/* 마우스를 올렸을 때 */
+a.button:hover {
+    background-color: #0056b3; /* 더 짙은 파란색으로 변경 */
+    transform: scale(1.05); /* 약간 확대되는 효과 */
+}
+
+/* 클릭 중인 상태 */
+a.button:active {
+    background-color: #00376b; /* 클릭 중일 때 더 짙은 색으로 변경 */
+    transform: scale(0.98); /* 클릭 중일 때 약간 축소되어 눌리는 느낌 */
+}

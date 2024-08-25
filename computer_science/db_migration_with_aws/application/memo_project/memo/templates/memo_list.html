@@ -2,14 +2,14 @@
 
 {% block content %}
     <h1>Memo List</h1>
-
+    <a href="{% url 'memo_create' %}" class="button">Create New Memo</a>
     <ul>
     {% for memo in memos %}
         <li>
             <h3>{{ memo.title }}</h3>
             <p>{{ memo.content }}</p>
-            <a href="{% url 'memo_update' memo.id %}">Edit</a>
-            <a href="{% url 'memo_delete' memo.id %}">Delete</a>
+            <a href="{% url 'memo_update' memo.id %}" class="button">Edit</a>
+            <a href="{% url 'memo_delete' memo.id %}" class="button">Delete</a>
         </li>
     {% endfor %}
     </ul>

@@ -11,9 +11,28 @@ docker-compose up -d
 ```sh
 $ cd memo_project
 $ vi .env
+DEBUG=True
 DATABASE_HOST=127.0.0.1
 DATABASE_PORT=3306
 DATABASE_NAME=memo_db
 DATABASE_USER=memo
 DATABASE_PASSWORD=password
 ```
+
+# 로컬 실행 방법
+* 파이썬 패키지 설치
+
+```sh
+# poetry 파이썬 가상환경 실행
+$ poetry shell
+# 파이썬 패키지 설치
+$ poetry install
+```
+
+* django 실행
+
+```sh
+python manage.py runserver
+```
+
+* 웹브라우저에서 http://127.0.0.1:8000/ 접속

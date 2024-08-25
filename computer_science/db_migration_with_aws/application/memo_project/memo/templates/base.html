@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memo Manager</title>
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <title>Memo App</title>
 </head>
 <body>
+    <div class="container">
     {% block content %}
     {% endblock %}
+    </div>
 </body>
 </html>
