@@ -1,0 +1,17 @@
+# Vagrant specific
+.vagrant/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# MacOS specific
+.DS_Store
+
+# VirtualBox files
+*.vbox
+*.vbox-prev
+
+# VMware specific
+*.vmwarevm/
+vmware.log
