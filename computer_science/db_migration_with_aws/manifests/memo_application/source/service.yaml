@@ -1,0 +1,14 @@
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: source-django-service
+  namespace: memo
+spec:
+  type: ClusterIP
+  selector:
+    app: django
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000

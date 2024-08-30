@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>{% if form.instance.pk %}Edit Memo{% else %}Create Memo{% endif %}</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save</button>
+    </form>
+    <a href="{% url 'memo_list' %}" class="button">Back to List</a>
+{% endblock %}
