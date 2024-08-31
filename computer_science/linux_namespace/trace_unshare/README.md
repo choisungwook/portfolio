@@ -3,7 +3,8 @@
 * 더 정확히 설명하면 containerd가 unshare syscall을 호출
 
 # 실습환경
-* 저는 AWS EC2인스턴스를 사용했습니다. vpc는 default vpc를 사용합니다.
+* (옵션1) docker가 실행된 linux 가상머신을 생성
+* (옵션2) linux운영체제를 사용하는 AWS EC2인스턴스
 
 # 실습
 
