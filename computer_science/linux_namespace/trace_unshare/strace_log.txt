@@ -1,0 +1,1 @@
+../strace_log.txt
