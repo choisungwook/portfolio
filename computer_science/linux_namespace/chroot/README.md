@@ -42,6 +42,7 @@ ls -l ./etc/nginx/conf.d/
 4. nginx 디렉터리에서 nginx를 실행 -> nginx 실행되지 않음
 
 ```sh
+mknod -m 666 /dev/null c 1 3
 cd ./nginx
 nginx
 ```
@@ -56,6 +57,10 @@ $ pwd
 $ unshare --mount chroot nginx /bin/bash
 $ nginx -version
 nginx version: nginx/1.27.1
+
+# nginx 실행
+$ mknod -m 666 /dev/null c 1 3
+$ nginx
 ```
 
 ![](./imgs/chroot_with_mount.png)
