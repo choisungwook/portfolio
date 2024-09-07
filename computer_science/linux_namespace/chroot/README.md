@@ -1,5 +1,6 @@
 # 개요
 * 리눅스에서 mount namespace와 chroot를 사용하여 컨테이너가 어떻게 각자 실행파일을 갖는지 실습
+* 유투브 링크: https://youtu.be/OYM8OGKlufY?si=0zd9qtr__qHHvU-h
 
 # 필요지식
 * [linux mount namespace](../mount_namespace/)
@@ -24,7 +25,7 @@ ls -l /root/test/nginx.tar
 
 ![](./imgs/compress_nginx_container.png)
 
-3. nginx_image.tar 압축 해제
+3. nginx.tar 압축 해제
 
 ```sh
 cd /root/test
@@ -49,7 +50,7 @@ nginx
 
 ![](./imgs/non_chroot_nginx.png)
 
-5. chroot를 실행하려 root디렉터리를 변경하고, nginx를 실행
+5. chroot를 실행하면서 root디렉터리를 변경하고, nginx를 실행
 
 
 ```sh
@@ -64,6 +65,11 @@ $ nginx
 ```
 
 ![](./imgs/chroot_with_mount.png)
+
+# chroot의 취약점
+* 상위 디렉터리로 이동할 수 있는 취약점이 존재
+* 해결방법: chroot대신 pivot_root 사용
+* [pivot_root](../pivot_root/) 문서 바로가기
 
 # 참고자료
 * 이게 돼요? 도커 없이 컨테이너 만들기 / if(kakao)2022 - https://youtu.be/mSD88FuST80?si=Vbl63IkW6Dc8YFJk
