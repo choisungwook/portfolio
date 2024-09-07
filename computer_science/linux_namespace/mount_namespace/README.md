@@ -1,5 +1,6 @@
 # 개요
 * 리눅스에서 unshare을 사용하여 mount namespace를 생성
+* 유투브 링크: https://youtu.be/CIvwIplZS1U?si=zbCMoybcKkJywhzZ
 
 # 실습
 
