@@ -1,7 +1,7 @@
 serviceAccount:
   name: external-dns
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/demo-external-dns-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/pause-container-external-dns-irsa
 
 txtOwnerId: external-dns
 

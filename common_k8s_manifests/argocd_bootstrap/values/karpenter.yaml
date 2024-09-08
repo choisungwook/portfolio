@@ -1,10 +1,10 @@
 settings:
-  clusterName: upgrade-example
-  interruptionQueue: upgrade-example
+  clusterName: demo
+  interruptionQueue: demo
 
 serviceAccount:
   name: karpenter-irsa-sa
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/upgrade-example-karpenter-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/demo-karpenter-irsa
 
 # logLevel: debug
