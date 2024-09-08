@@ -1,0 +1,14 @@
+serviceAccount:
+  name: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/upgrade-example-external-dns-irsa
+
+txtOwnerId: external-dns
+
+# your hostzone domain
+domainFilters:
+- choilab.xyz
+
+env:
+- name: AWS_DEFAULT_REGION
+  value: ap-northeast-2 # change to region where EKS is installed

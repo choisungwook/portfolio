@@ -1,0 +1,5 @@
+- op: add
+  path: /data
+  value:
+    policy.default: ''
+    policy.csv: ''

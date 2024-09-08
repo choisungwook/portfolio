@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: child-bootstrap
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - name: karpenter
+        repoURL: 'public.ecr.aws/karpenter'
+        chart: karpenter
+        targetRevision: '0.37.0'
+        valueFile: 'karpenter.yaml'
+        namespace: karpenter
+  template:
+    metadata:
+      name: '{{name}}'
+    spec:
+      project: bootstrap
+      sources:
+      - repoURL: '{{repoURL}}'
+        targetRevision: '{{targetRevision}}'
+        chart: '{{chart}}'
+        helm:
+          valueFiles:
+          - '$values/common_k8s_manifests/argocd_bootstrap/values/{{valueFile}}'
+      - repoURL: 'https://github.com/choisungwook/portfolio.git'
+        targetRevision: main
+        ref: values
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: '{{namespace}}'
+      syncPolicy:
+        syncOptions:
+        - CreateNamespace=true
+        automated:
+          prune: true
+          selfHeal: true
