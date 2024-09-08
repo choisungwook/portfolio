@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: demo-app
+spec:
+  serviceName: "demo-app"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      containers:
+      - name: netshoot-container
+        image: choisunguk/statefulset_pythonapp:v2
+        env:
+        - name: pod_name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: emptydir-storage
+          mountPath: /data
+      volumes:
+      - name: emptydir-storage
+        emptyDir: {}
+  updateStrategy:
+    type: RollingUpdate
