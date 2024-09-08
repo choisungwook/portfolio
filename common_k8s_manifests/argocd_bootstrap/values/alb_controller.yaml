@@ -1,0 +1,6 @@
+clusterName: upgrade-example
+
+serviceAccount:
+  name: alb-controller-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/upgrade-example-alb-controller-irsa
