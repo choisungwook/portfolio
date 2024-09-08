@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  annotations:
+    alb.ingress.kubernetes.io/conditions.argogrpc: |
+      [{"field":"http-header","httpHeaderConfig":{"httpHeaderName": "Content-Type", "values":["application/grpc"]}}]
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:467606240901:certificate/248292f9-a31b-46b7-be91-b1e23a2b9a70
+spec:
+  ingressClassName: alb
+  rules:
+  - host: argocd.choilab.xyz
+    http:
+      paths:
+      - path: /
+        backend:
+          service:
+            name: argogrpc
+            port:
+              number: 443
+        pathType: Prefix
+      - path: /
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+        pathType: Prefix
+  tls:
+  - hosts:
+    - argocd.choilab.xyz
