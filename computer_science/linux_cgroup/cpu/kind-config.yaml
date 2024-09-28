@@ -10,12 +10,5 @@ nodes:
     tier: infra
 - role: worker
   image: kindest/node:v1.29.1
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "tier=service-a"
-        cpu-manager-policy: static
-        reserved-cpus: "0"
-        system-reserved: "cpu=1"
+  labels:
+    tier: service-a

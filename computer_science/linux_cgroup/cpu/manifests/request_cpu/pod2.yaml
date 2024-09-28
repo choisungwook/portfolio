@@ -31,4 +31,4 @@ spec:
         - while :; do :; done
         resources:
           requests:
-            cpu: "0.3"
+            cpu: "0.5"
