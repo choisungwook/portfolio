@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: busybox-limit-cpu2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: busybox-limit-cpu2
+  template:
+    metadata:
+      labels:
+        app: busybox-limit-cpu2
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: busybox
+        image: busybox
+        command:
+        - sh
+        - -c
+        - while :; do :; done
+        resources:
+          limits:
+            cpu: "0.5"

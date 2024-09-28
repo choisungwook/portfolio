@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-app-lazyboot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-app-lazyboot
+  template:
+    metadata:
+      labels:
+        app: python-app-lazyboot
+    spec:
+      terminationGracePeriodSeconds: 0
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: tier
+                operator: In
+                values:
+                - service-a
+      containers:
+      - image: choisunguk/fastapi_sleep:lazy_bootup_v4
+        imagePullPolicy: IfNotPresent
+        name: python-app-lazyboot
+        env:
+        - name: SLEEPTIME
+          value: "2"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "0.5"
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8000
+        #   initialDelaySeconds: 20
+        #   periodSeconds: 3
+        #   failureThreshold: 2
+        # livenessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8000
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 3
+        #   failureThreshold: 2
