@@ -19,10 +19,19 @@ docker run -d --rm  --cpu-shares 512 --cpus "1" --cpuset-cpus 0-0 busybox sh -c 
 
 ```sh
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-helm upgrade --install -f metrics-server/values.yaml -n kube-system metrics-server metrics-server/metrics-server
+helm upgrade --install -f ./manifests/metrics-server/values.yaml -n kube-system metrics-server metrics-server/metrics-server
+kubectl -n kube-system get pod -l app.kubernetes.io/instance=metrics-server
 ```
 
-## 4.2 pod 실행
+## 4.2 cgroup-cpu-worker2 노드에 cpu 제한
+
+```sh
+docker update --cpus "1" --cpuset-cpus "0" cgroup-cpu-worker2
+
+```
+
+
+## 4.3 pod 실행
 
 ```sh
 # pod 실행
