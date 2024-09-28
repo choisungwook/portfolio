@@ -9,6 +9,12 @@ repos:
   - id: check-yaml
   - id: check-added-large-files
 
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v3.2.0
+  hooks:
+  - id: check-yaml
+    args: ['--allow-multiple-documents']
+
 - repo: https://github.com/antonbabenko/pre-commit-terraform
   rev: v1.76.0
   hooks:
