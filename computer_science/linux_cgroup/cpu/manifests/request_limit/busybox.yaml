@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: busybox-request-limit-cpu1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: busybox-request-limit-cpu1
+  template:
+    metadata:
+      labels:
+        app: busybox-request-limit-cpu1
+    spec:
+      terminationGracePeriodSeconds: 0
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: tier
+                operator: In
+                values:
+                - service-a
+      containers:
+      - name: netshoot
+        image: choisunguk/bpftrace:v1
+        command:
+        - sh
+        - -c
+        - while :; do :; done
+        resources:
+          requests:
+            cpu: "0.1"
+          limits:
+            cpu: "0.1"
