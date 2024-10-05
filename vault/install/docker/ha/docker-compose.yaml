@@ -1,0 +1,76 @@
+services:
+  # Hashicort Vault HA mode에는 nginx가 부적절함.
+  nginx:
+    image: nginx:1.27.1
+    container_name: nginx
+    ports:
+      - "8300:8200"
+    volumes:
+      - ./nginx_config/nginx.conf:/etc/nginx/conf.d/vault.conf
+    networks:
+      - vault-net
+    depends_on:
+      - vault1
+      - vault2
+      - vault3
+
+  haproxy:
+    image: haproxy:2.7
+    container_name: haproxy
+    ports:
+      - "8200:8200"
+      - "8404:8404"
+    volumes:
+      - ./haproxy_config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    networks:
+      - vault-net
+    depends_on:
+      - vault1
+      - vault2
+      - vault3
+
+  vault1:
+    image: vault:1.13.3
+    container_name: vault1
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault1.hcl:/vault/config/vault.hcl
+    command: >
+      sh -c "mkdir -p /opt/vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+  vault2:
+    image: vault:1.13.3
+    container_name: vault2
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault2.hcl:/vault/config/vault.hcl
+    command: >
+      sh -c "mkdir -p /opt/vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+  vault3:
+    image: vault:1.13.3
+    container_name: vault3
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault3.hcl:/vault/config/vault.hcl
+    command: >
+      sh -c "mkdir -p /opt/vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+networks:
+  vault-net:
+    driver: bridge
