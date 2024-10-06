@@ -16,6 +16,8 @@
 * [테라폼 예제](https://github.com/choisungwook/terraform_practice)
 * [karpenter](https://github.com/choisungwook/karpenter)
 * [EKS 예제](https://github.com/choisungwook/eks-practice)
+* [kubernetes 예제](./kubernetes/)
+* [hashicorp vault 예제](./vault/)
 * [스터디]
   * [ansible](https://github.com/choisungwook/ansible_practice)
   * [테라폼](https://github.com/sungwook-practice/t101-study)

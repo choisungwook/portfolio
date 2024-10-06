@@ -1,0 +1,36 @@
+services:
+  vault-server1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vault-server1
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    command:
+      - sh
+      - -c
+      - sleep infinity
+  vault-server2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vault-server2
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    command:
+      - sh
+      - -c
+      - sleep infinity
+  vault-server3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vault-server3
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    command:
+      - sh
+      - -c
+      - sleep infinity
