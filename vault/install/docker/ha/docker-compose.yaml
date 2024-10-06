@@ -1,5 +1,4 @@
 services:
-  # Hashicort Vault HA mode에는 nginx가 부적절함.
   nginx:
     image: nginx:1.27.1
     container_name: nginx
