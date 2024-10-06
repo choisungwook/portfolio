@@ -3,7 +3,7 @@
 * [standalone mode](./docker/standalone/)
 * [HA mode](./docker/ha/)
 
-# standalone 모드 설치 방법
+# HA 모드 설치 방법
 
 * docker compose 실행
 
