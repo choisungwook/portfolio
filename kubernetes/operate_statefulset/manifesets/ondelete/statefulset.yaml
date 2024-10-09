@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ondelete
+spec:
+  serviceName: "ondelete-headless"
+  replicas: 3
+  updateStrategy:
+    type: OnDelete
+  selector:
+    matchLabels:
+      app: ondelete
+  template:
+    metadata:
+      labels:
+        app: ondelete
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21
+      volumes:
+      - name: emptydir-storage
+        emptyDir: {}

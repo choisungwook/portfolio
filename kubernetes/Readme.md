@@ -10,3 +10,4 @@
 | 7 | pod가 persistence volume size보다 크게 사용해도 잘 동작 | [링크](./storage/over_size/)|
 | 8 | 쿠버네티스 security | [링크](./security/)|
 | 9 | statefulset + downward API | [링크](./statefulset_podname/)|
+| 9 | statefulset 운영 | [링크](./operate_statefulset/)|
