@@ -1,0 +1,15 @@
+services:
+  mysql:
+    container_name: mysql-sakiladb
+    image: mysql:8.0
+    volumes:
+      - ./initdb:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: NwmaZk$2f2pq27p^^4am
+      # MYSQL_USER: python_user
+      # MYSQL_PASSWORD: NwmaZk$2f2pq27p^^4am
+      # MYSQL_DATABASE: sakila
+      TZ: UTC
+    ports:
+      - 3306:3306
+    # command: mysqld --innodb_use_native_aio=0

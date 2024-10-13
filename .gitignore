@@ -90,7 +90,7 @@ geckodriver.log
 .vscode
 
 # hcl
-*.hcl
+.terraform.lock.hcl
 
 # vagrant general
 .vagrant/
