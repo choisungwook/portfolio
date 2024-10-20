@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+- job_name: 'vault_metrics'
+  metrics_path: '/v1/sys/metrics'
+  params:
+    format: ['prometheus']
+  authorization:
+    # vault token create
+    credentials: '{your vault token}'
+  static_configs:
+  - targets:
+    - 'haproxy:8200'
+  scheme: http
