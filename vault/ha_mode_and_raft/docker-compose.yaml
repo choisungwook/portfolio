@@ -1,0 +1,85 @@
+services:
+
+  haproxy:
+    image: haproxy:2.7
+    container_name: haproxy
+    ports:
+      - "8200:8200"
+      - "8404:8404"
+    volumes:
+      - ./haproxy_config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    networks:
+      - vault-net
+    depends_on:
+      - vault1
+      - vault2
+      - vault3
+
+  # prometheus:
+  #   image: prom/prometheus:v2.54.1
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #   networks:
+  #     - vault-net
+
+  # grafana:
+  #   image: grafana/grafana:11.1.7
+  #   container_name: grafana
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - vault-net
+
+  vault1:
+    image: vault:1.13.3
+    container_name: vault1
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault1/vault.hcl:/vault/config/vault.hcl
+      - ./vault_config/vault1/data:/vault/data
+    command: >
+      sh -c "mkdir -p /vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+  vault2:
+    image: vault:1.13.3
+    container_name: vault2
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault2/vault.hcl:/vault/config/vault.hcl
+      - ./vault_config/vault2/data:/vault/data
+    command: >
+      sh -c "mkdir -p /vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+  vault3:
+    image: vault:1.13.3
+    container_name: vault3
+    environment:
+      VAULT_ADDR: http://localhost:8200
+    volumes:
+      - ./vault_config/vault3/vault.hcl:/vault/config/vault.hcl
+      - ./vault_config/vault3/data:/vault/data
+    command: >
+      sh -c "mkdir -p /vault/data && vault server -config=/vault/config/vault.hcl"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - vault-net
+
+networks:
+  vault-net:
+    driver: bridge
