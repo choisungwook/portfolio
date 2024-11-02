@@ -1,0 +1,16 @@
+# for AMD64
+FROM messense/rust-musl-cross:aarch64-musl as builder
+
+WORKDIR /usr/src/iptables_exporter
+RUN git clone https://github.com/kbknapp/iptables_exporter .
+RUN cargo build --release --target aarch64-unknown-linux-musl
+
+FROM debian:bullseye-slim
+
+RUN apt-get update && apt-get install -y iptables && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/src/iptables_exporter/target/aarch64-unknown-linux-musl/release/iptables_exporter /usr/local/bin/iptables_exporter
+
+EXPOSE 9455
+
+ENTRYPOINT ["iptables_exporter", "-t", "iptables", "-t", "iptables-legacy", "-t", "ip6tables"]

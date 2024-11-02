@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: iptables-exporter
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: iptables-exporter
+  template:
+    metadata:
+      labels:
+        app: iptables-exporter
+    spec:
+      hostNetwork: true
+      containers:
+      - name: iptables-exporter
+        image: choisunguk/iptables_exporter:arm-v3
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - CAP_DAC_READ_SEARCH
+            - CAP_NET_ADMIN
+            - CAP_NET_RAW
+        ports:
+        - containerPort: 9455
+          hostPort: 9455

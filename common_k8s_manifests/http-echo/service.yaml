@@ -1,0 +1,13 @@
+# reference: https://github.com/hashicorp/http-echo
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-echo
+spec:
+  selector:
+    app: http-echo
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP
