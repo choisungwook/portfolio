@@ -7,6 +7,12 @@ RUN ./gradlew bootJar --no-daemon
 
 FROM openjdk:21-jdk-slim
 WORKDIR /app
+
 COPY --from=builder /app/build/libs/*.jar app.jar
+
+RUN apt update && \
+    apt install net-tools -y
+
 EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
