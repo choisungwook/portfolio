@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: connection-test
+
+  data:
+    redis:
+      host: localhost.localstack.cloud
+      port: 4510
