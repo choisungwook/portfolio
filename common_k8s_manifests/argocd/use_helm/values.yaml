@@ -3,7 +3,6 @@ server:
     type: NodePort
     nodePortHttp: 30080
     nodePortHttps: 30443
-
   # ingress:
   #   enabled: true
   #   annotations:
