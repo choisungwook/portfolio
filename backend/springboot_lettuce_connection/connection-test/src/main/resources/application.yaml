@@ -6,3 +6,16 @@ spring:
     redis:
       host: localhost.localstack.cloud
       port: 4510
+
+# reference: https://docs.spring.io/spring-boot/reference/actuator/metrics.html
+management:
+  info:
+    java:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  metrics:
+    enable:
+      all: true
