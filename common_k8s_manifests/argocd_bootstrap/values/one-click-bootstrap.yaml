@@ -1,0 +1,77 @@
+# ArgoCD ApplicationSet 생성
+applicationsets:
+  root-bootstrap:
+    namespace: argocd
+    additionalLabels: {}
+    additionalAnnotations: {}
+    finalizers:
+    - resources-finalizer.argocd.argoproj.io
+    generators:
+    - list:
+        elements:
+        - name: external-dns
+          repoURL: 'https://kubernetes-sigs.github.io/external-dns/'
+          chart: external-dns
+          targetRevision: '1.14.0'
+          valueFile: 'external_dns.yaml'
+          namespace: kube-system
+        - name: alb-controller
+          repoURL: 'https://aws.github.io/eks-charts'
+          chart: aws-load-balancer-controller
+          targetRevision: '1.6.2'
+          valueFile: 'alb_controller.yaml'
+          namespace: kube-system
+    template:
+      metadata:
+        name: '{{name}}'
+      spec:
+        project: bootstrap
+        sources:
+        - repoURL: '{{repoURL}}'
+          targetRevision: '{{targetRevision}}'
+          chart: '{{chart}}'
+          helm:
+            valueFiles:
+            - '$values/common_k8s_manifests/argocd_bootstrap/values/{{valueFile}}'
+        - repoURL: 'https://github.com/choisungwook/portfolio.git'
+          targetRevision: master
+          ref: values
+        destination:
+          server: 'https://kubernetes.default.svc'
+          namespace: '{{namespace}}'
+        syncPolicy:
+          syncOptions:
+          - CreateNamespace=true
+          automated:
+            prune: true
+            selfHeal: true
+
+# ArgoCD Project 생성
+projects:
+  bootstrap:
+    namespace: argocd
+    additionalLabels: {}
+    additionalAnnotations: {}
+    permitOnlyProjectScopedClusters: false
+    finalizers:
+    - resources-finalizer.argocd.argoproj.io
+    description: Bootstrap Project with Full Access
+    sourceRepos:
+    - '*' # 모든 Git 리포지토리를 허용
+    destinations:
+    - namespace: '*' # 모든 네임스페이스에 배포 가능
+      server: '*' # 모든 클러스터에 배포 가능
+    clusterResourceWhitelist:
+    - group: '*' # 모든 클러스터 리소스 그룹 허용
+      kind: '*' # 모든 리소스 타입 허용
+    clusterResourceBlacklist: []
+    namespaceResourceWhitelist:
+    - group: '*' # 모든 네임스페이스 리소스 그룹 허용
+      kind: '*' # 모든 리소스 타입 허용
+    namespaceResourceBlacklist: []
+    orphanedResources: {}
+    roles: []
+    syncWindows: [] # 제한 없음
+    signatureKeys: [] # 서명 검증 없음
+    sourceNamespaces:
+    - '*' # 모든 소스 네임스페이스 허용
