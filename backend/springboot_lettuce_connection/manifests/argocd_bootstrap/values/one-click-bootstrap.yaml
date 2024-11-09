@@ -32,7 +32,7 @@ applicationsets:
           chart: '{{chart}}'
           helm:
             valueFiles:
-            - '$values/common_k8s_manifests/argocd_bootstrap/values/{{valueFile}}'
+            - '$values/backend/springboot_lettuce_connection/manifests/argocd_bootstrap/values/{{valueFile}}'
         - repoURL: 'https://github.com/choisungwook/portfolio.git'
           targetRevision: master
           ref: values
