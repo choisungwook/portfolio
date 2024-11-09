@@ -1,0 +1,10 @@
+settings:
+  clusterName: eks-from-terraform
+  interruptionQueue: eks-from-terraform
+
+serviceAccount:
+  name: karpenter-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::467606240901:role/eks-from-terraform-karpenter-irsa
+
+# logLevel: debug
