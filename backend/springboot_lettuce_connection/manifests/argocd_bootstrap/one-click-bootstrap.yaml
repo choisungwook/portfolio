@@ -14,7 +14,7 @@ spec:
     chart: argocd-apps
     helm:
       valueFiles:
-      - '$values/common_k8s_manifests/argocd_bootstrap/values/one-click-bootstrap.yaml'
+      - '$values/backend/springboot_lettuce_connection/manifests/argocd_bootstrap/values/one-click-bootstrap.yaml'
   - repoURL: 'https://github.com/choisungwook/portfolio.git'
     targetRevision: master
     ref: values
