@@ -19,3 +19,7 @@ management:
   metrics:
     enable:
       all: true
+
+ogging:
+  level:
+    io.lettuce.core: DEBUG
