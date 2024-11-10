@@ -1,6 +1,8 @@
 package sungwook.redis.connection_test.config;
 
+import io.lettuce.core.ClientOptions;
 import io.lettuce.core.ReadFrom;
+import io.lettuce.core.cluster.ClusterClientOptions;
 import io.lettuce.core.cluster.ClusterTopologyRefreshOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -38,8 +40,13 @@ public class RedisConfig {
         RedisClusterConfiguration redisClusterConfiguration = new RedisClusterConfiguration();
         redisClusterConfiguration.clusterNode(host, port);
 
+        ClientOptions clientOptions = ClusterClientOptions.builder()
+                .topologyRefreshOptions(topologyRefreshOptions)
+                .build();
+
         // Lettuce Client 설정
         LettuceClientConfiguration clientConfiguration = LettuceClientConfiguration.builder()
+                .clientOptions(clientOptions)
                 .readFrom(ReadFrom.REPLICA_PREFERRED)
                 .build();
 

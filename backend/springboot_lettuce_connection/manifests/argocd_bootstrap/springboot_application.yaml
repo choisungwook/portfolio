@@ -18,7 +18,7 @@ spec:
           repository: choisunguk/lettuce-connection
           tag: v1 # lettuce 안전성 오류가 있는 버전
           # tag: v2 # 디버깅 로그 추가 버전
-          # tag: v3 # 오류 해결 버전
+          # tag: v3.1 # 오류 해결 버전
         # use node port on kind-cluster
         # service:
         #   type: NodePort
