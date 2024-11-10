@@ -1,0 +1,21 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: redis-example
+nodes:
+- role: control-plane
+  image: kindest/node:v1.30.4
+  extraPortMappings:
+  # springboot nodePort
+  - containerPort: 32101
+    hostPort: 32101
+    protocol: TCP
+  # ArgoCD HTTPS nodePort
+  - containerPort: 30443
+    hostPort: 30443
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.30.4
+- role: worker
+  image: kindest/node:v1.30.4
+- role: worker
+  image: kindest/node:v1.30.4

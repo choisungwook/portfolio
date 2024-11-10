@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: oci://registry-1.docker.io/bitnamicharts
+    targetRevision: latest
+    chart: redis-cluster
+    helm:
+      values: |
+        # primary instance만 사용
+        cluster:
+          nodes: 3
+          replicas: 0
+        usePassword: false

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lettuce-connection
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lettuce-connection
+  template:
+    metadata:
+      labels:
+        app: lettuce-connection
+    spec:
+      containers:
+      - name: springboot
+        # 안전성 오류가 있는 버전
+        image: choisunguk/lettuce-connection:v1
+        # 디버깅 로그 추가 버전
+        # image: choisunguk/lettuce-connection:v2
+        # 오류 해결 버전
+        # image: choisunguk/lettuce-connection:v3
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: REDIS_HOST
+          value: "redis-redis-cluster.default.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 300m
+            memory: 256Mi

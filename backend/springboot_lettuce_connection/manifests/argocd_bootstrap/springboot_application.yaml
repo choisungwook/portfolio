@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: springboot-lettuce-connection
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://build-deploy-pipeline.github.io/helm-charts/
+    targetRevision: 0.1.0
+    chart: lettuce-connection
+    helm:
+      values: |
+        image:
+          repository: choisunguk/lettuce-connection
+          tag: v1 # lettuce 안전성 오류가 있는 버전
+          # tag: v2 # 디버깅 로그 추가 버전
+          # tag: v3 # 오류 해결 버전
+        # use node port on kind-cluster
+        # service:
+        #   type: NodePort
+        #   nodePort: 32101
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 300m
+            memory: 256Mi
+        env:
+        - name: REDIS_HOST
+          # use on kind-cluster
+          # value: "redis-redis-cluster.default.svc.cluster.local"
+          # use on ElasticCache
+          value: "redis-cluster.ti9epm.clustercfg.apn2.cache.amazonaws.com"
+        - name: REDIS_PORT
+          value: "6379"
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+    automated:
+      prune: true
+      selfHeal: true
