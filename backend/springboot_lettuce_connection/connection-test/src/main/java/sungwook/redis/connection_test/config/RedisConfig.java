@@ -25,6 +25,15 @@ public class RedisConfig {
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
+        // reference: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/BestPractices.Clients-lettuce.html
+        // topology refresh option
+        ClusterTopologyRefreshOptions topologyRefreshOptions = ClusterTopologyRefreshOptions.builder()
+                .dynamicRefreshSources(true)
+                .enablePeriodicRefresh(Duration.ofSeconds(30))
+                .enableAllAdaptiveRefreshTriggers()
+                .adaptiveRefreshTriggersTimeout(Duration.ofSeconds(30))
+                .build();
+
         // Redis Cluster 설정
         RedisClusterConfiguration redisClusterConfiguration = new RedisClusterConfiguration();
         redisClusterConfiguration.clusterNode(host, port);
