@@ -1,5 +1,5 @@
 IMAGE_NAME=choisunguk/lettuce-connection
-IMAGE_TAG=v3
+IMAGE_TAG=v3.1
 
 create-builder:
 	docker buildx create --name mybuilder --use
