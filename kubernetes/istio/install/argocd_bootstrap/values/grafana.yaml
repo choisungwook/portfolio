@@ -8,6 +8,34 @@ datasources:
       access: proxy
       isDefault: true
 
+dashboards:
+  default:
+    # reference: https://grafana.com/grafana/dashboards/7639-istio-mesh-dashboard/
+    istio-mesh-dashboard:
+      gnetId: 7639
+      revision: 236
+      datasource: Prometheus
+    # reference: https://grafana.com/grafana/dashboards/7636-istio-service-dashboard/
+    istio-service-dashboard:
+      gnetId: 7636
+      revision: 236
+      datasource: Prometheus
+    # reference: https://grafana.com/grafana/dashboards/7630-istio-workload-dashboard/
+    istio-workload-dashboard:
+      gnetId: 7630
+      revision: 236
+      datasource: Prometheus
+    # reference: https://grafana.com/grafana/dashboards/11829-istio-performance-dashboard/
+    istio-performance-dashboard:
+      gnetId: 11829
+      revision: 236
+      datasource: Prometheus
+    # reference: https://grafana.com/grafana/dashboards/13277-istio-wasm-extension-dashboard/
+    istio-wasm-dashboard:
+      gnetId: 13277
+      revision: 193
+      datasource: Prometheus
+
 ingress:
   enabled: true
   ingressClassName: alb
