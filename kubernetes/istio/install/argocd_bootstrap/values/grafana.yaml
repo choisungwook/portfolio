@@ -8,6 +8,19 @@ datasources:
       access: proxy
       isDefault: true
 
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default
+
 dashboards:
   default:
     # reference: https://grafana.com/grafana/dashboards/7639-istio-mesh-dashboard/
