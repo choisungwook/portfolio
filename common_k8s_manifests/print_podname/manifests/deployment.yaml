@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: print-podname
+  namespace: default
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: print-podname
+  template:
+    metadata:
+      labels:
+        app: print-podname
+    spec:
+      containers:
+      - name: print-podname
+        image: choisunguk/print-podname:python-rc1.2
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        ports:
+        - containerPort: 8000
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: print-podname
