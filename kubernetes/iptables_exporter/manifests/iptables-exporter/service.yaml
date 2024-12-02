@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: iptables-exporter
+  namespace: kube-system
+  labels:
+    app: iptables-exporter
+spec:
+  selector:
+    app: iptables-exporter
+  ports:
+  - name: metrics
+    port: 9455
+    targetPort: 9455
+    nodePort: 30070
+  type: NodePort

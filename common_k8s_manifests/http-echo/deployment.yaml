@@ -1,0 +1,27 @@
+# reference: https://github.com/hashicorp/http-echo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-echo
+  template:
+    metadata:
+      labels:
+        app: http-echo
+    spec:
+      containers:
+      - name: http-echo
+        image: traefik/whoami
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "0.1"
+            memory: 50Mi
+          requests:
+            cpu: "0.1"
+            memory: 50Mi

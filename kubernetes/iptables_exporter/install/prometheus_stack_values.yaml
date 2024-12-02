@@ -1,0 +1,25 @@
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30090
+
+  # 다른 namespace에서도 prometheus operator를 사용할 수 있도록 설정
+  prometheusSpec:
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  # built-in dashboards 비활성화
+  # defaultDashboardsEnabled: false
+
+  service:
+    type: NodePort
+    nodePort: 30080
+  adminUser: admin
+  adminPassword: password
+
+defaultRules:
+  create: false
+
+alertmanager:
+  enabled: false
