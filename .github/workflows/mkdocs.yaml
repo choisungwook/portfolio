@@ -6,7 +6,6 @@ on:
       - 'mkdocs/**'
     branches:
     - master
-    - main
 
 permissions:
   contents: write
