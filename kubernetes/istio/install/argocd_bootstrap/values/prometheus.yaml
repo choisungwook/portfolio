@@ -1,9 +1,0 @@
-server:
-  retention: "1d"
-  retentionSize: "200MB"
-
-  persistentVolume:
-    enabled: false
-
-alertmanager:
-  enabled: false
