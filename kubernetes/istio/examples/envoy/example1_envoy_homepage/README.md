@@ -22,7 +22,7 @@ cat ./config.yaml
 3. envoy 설정 파일을 마운트하여 envoy 도커 컨테이너 실행
 
 ```sh
-docker run --rm -it \
+docker run --rm -d \
   -v $(pwd)/config.yaml:/etc/envoy/envoy.yaml \
   -p 10000:10000 \
   --name envoy \
@@ -30,7 +30,7 @@ docker run --rm -it \
   envoy -c /etc/envoy/envoy.yaml
 ```
 
-4. 새로운 쉘에서 curl을 사용하여 envoy 도커 컨테이너 호출
+4. curl을 사용하여 envoy 도커 컨테이너 호출
 
 ```sh
 $ curl 127.0.0.1:10000
@@ -54,7 +54,12 @@ $ docker logs envoy
 [2024-12-14T13:29:55.112Z] "GET / HTTP/1.1" 200 - 0 15795 586 513 "-" "curl/8.7.1" "403ab333-031f-4fff-99ee-2837404dd4e3" "www.envoyproxy.io" "52.74.232.59:443"
 ```
 
-7. **ctrl + C**를 눌러 envoy 도커 컨테이너 종료
+## 실습환경 정리
+* 실습을 마치고 도커 컨테이너 종료
 
-# 참고자료
+```sh
+docker kill envoy
+```
+
+## 참고자료
 * https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy

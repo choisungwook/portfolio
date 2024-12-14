@@ -64,5 +64,12 @@ $ sudo vi /etc/hosts
 127.0.0.1 envoyproxy.io
 ```
 
-# 참고자료
+## 실습환경 정리
+* 실습을 마치고 도커 컨테이너 종료
+
+```sh
+docker kill envoy
+```
+
+## 참고자료
 * https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy
