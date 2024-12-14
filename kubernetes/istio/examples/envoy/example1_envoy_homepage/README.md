@@ -30,7 +30,7 @@ docker run --rm -it \
   envoy -c /etc/envoy/envoy.yaml
 ```
 
-4. curl을 사용하여 envoy 도커 컨테이너 호출
+4. 새로운 쉘에서 curl을 사용하여 envoy 도커 컨테이너 호출
 
 ```sh
 $ curl 127.0.0.1:10000
@@ -42,14 +42,19 @@ $ curl 127.0.0.1:10000
 ... 이하생략
 ```
 
-5. envoy 도커 컨테이너에서 액세스 로그 확인
+5. 웹 브라우저에서 envoy 도커 컨테이너 호출
+
+![web_browser](./imgs/web_browser.png)
+
+
+6. envoy 도커 컨테이너에서 액세스 로그 확인
 
 ```sh
 $ docker logs envoy
 [2024-12-14T13:29:55.112Z] "GET / HTTP/1.1" 200 - 0 15795 586 513 "-" "curl/8.7.1" "403ab333-031f-4fff-99ee-2837404dd4e3" "www.envoyproxy.io" "52.74.232.59:443"
 ```
 
-6. envoy 도커 컨테이너 종료
+7. **ctrl + C**를 눌러 envoy 도커 컨테이너 종료
 
 # 참고자료
 * https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/run-envoy
