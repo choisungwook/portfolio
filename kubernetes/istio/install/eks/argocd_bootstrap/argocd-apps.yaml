@@ -16,7 +16,7 @@ spec:
     chart: argocd-apps
     helm:
       valueFiles:
-      - '$values/kubernetes/istio/install/argocd_bootstrap/values/argocd-apps.yaml'
+      - '$values/kubernetes/istio/install/eks/argocd_bootstrap/values/argocd-apps.yaml'
   - repoURL: 'https://github.com/choisungwook/portfolio.git'
     targetRevision: master
     ref: values

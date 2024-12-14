@@ -1,14 +1,15 @@
-# 개요
+## 개요
 * istio mesh메트릭 수집을 담당하는 프로메테우스 설치
 
-# 선수지식
+## 선수지식
 * helm chart로 istio를 설치하면 프로메테우스 exporter설정이 디폴트로 활성화 되어 있다.
 
 ```sh
 --set meshConfig.enablePrometheusMerge=true
 ```
 
-# 설치방법
+## 설치방법
+
 * helm values
   * 스토리지를 사용하지 않고 인메모리를 사용
   * retenetion 설정: 1d와 200MB
@@ -26,5 +27,5 @@ helm upgrade --install \
   prometheus prometheus-community/prometheus
 ```
 
-# 참고자료
+## 참고자료
 * https://istio.io/latest/docs/ops/integrations/prometheus/
