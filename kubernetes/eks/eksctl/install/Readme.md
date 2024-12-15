@@ -34,7 +34,7 @@ ssh-keygen
 * nodes: 설치 node 개수
 * nodes-min ~ nodes-max : aws auto scale설정
 * ssh-public-key: 워커노드 접속에 사용할 ssh키
- 
+
 ```sh
 eksctl create cluster \
     --name eks-demo \
