@@ -10,7 +10,7 @@
 
 
 # 확인 필요
-* [ ] subnet은 AZ당 하나씩 생성된다. 
+* [ ] subnet은 AZ당 하나씩 생성된다.
 * [ ] public, private subnet을 따로따로 구성해야 한다?
 * [ ] IAM Role
 * [ ] ec2가 어디 서브넷에 존재하는지 어떻게 확인하지?
