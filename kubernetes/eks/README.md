@@ -4,3 +4,4 @@
 # 목차
 * [eksctl로 EKS 설치](./eksctl/)
 * [EKS automode](./automode/)
+* [pod Readiness Gate about](./ALB_readiness_gate/)
