@@ -1,0 +1,10 @@
+clusterName: {{ .Environment.Values.clusterName }}
+
+region: {{ .Environment.Values.region }}
+
+vpcId: {{ .Environment.Values.vpcId }}
+
+serviceAccount:
+  name: alb-controller-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Environment.Values.irsa }}
