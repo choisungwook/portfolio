@@ -1,0 +1,16 @@
+environments:
+  default:
+    values:
+    - clusterName: pod-readiness-gate
+      region: ap-northeast-2
+      vpcId: vpc-0746b9ac3ffa08d26
+      # IRSA role for the ALB controller
+      irsa: arn:aws:iam::467606240901:role/pod-readiness-gate-alb-controller-irsa
+
+releases:
+- name: aws-load-balancer-controller
+  namespace: kube-system
+  chart: eks/aws-load-balancer-controller
+  version: 1.10.0
+  values:
+  - ./charts/aws-load-balancer-controller.gotmpl
