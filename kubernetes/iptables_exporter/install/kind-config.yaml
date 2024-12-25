@@ -1,0 +1,18 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: iptables-exporter
+nodes:
+- role: control-plane
+  image: kindest/node:v1.30.4
+  extraPortMappings:
+  - containerPort: 30090 # Prometheus NodePort
+    hostPort: 30090
+    protocol: TCP
+  - containerPort: 30080 # Grafana NodePort
+    hostPort: 30080
+    protocol: TCP
+  - containerPort: 30070 # Grafana NodePort
+    hostPort: 30070
+    protocol: TCP
+  labels:
+    tier: infra

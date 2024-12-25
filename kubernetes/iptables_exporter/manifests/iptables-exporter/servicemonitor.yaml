@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: iptables-exporter
+  namespace: kube-system
+  labels:
+    release: prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: iptables-exporter
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
