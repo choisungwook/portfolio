@@ -108,3 +108,6 @@ migrations
 
 # python
 venv
+
+# codebuild artifacts
+artifacts/

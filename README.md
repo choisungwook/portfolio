@@ -19,6 +19,7 @@
 * [kubernetes 예제](./kubernetes/)
 * [hashicorp vault 예제](./vault/)
 * [백엔드 예제](./backend/)
+* [packer 예제](./packer/)
 * [스터디]
   * [ansible](https://github.com/choisungwook/ansible_practice)
   * [테라폼](https://github.com/sungwook-practice/t101-study)

@@ -26,9 +26,26 @@ source "amazon-ebs" "nginx" {
   instance_type = "t4g.medium" # <-- change
 ```
 
-* AWS console에서 생성된 AMI를 확인하세요.
+* AWS console에서 생성된 AMI를 확인합니다.
 
 ![](./imgs/ami.png)
+
+## codebuild 실행
+
+1. terraform으로 codebuild를 생성합니다.
+
+```sh
+terraform init
+terraform apply
+```
+
+2. codebuild를 실행하고 실행결과가 성공했는지 확인합니다.
+
+![](./imgs/codebuild.png)
+
+![](./imgs/codebuild_run.png)
+
+3. AMI가 생성되었는지 확인합니다.
 
 ## 참고자료
 * https://github.com/aws/aws-codebuild-docker-images/blob/master/local_builds/codebuild_build.sh
