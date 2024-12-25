@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: print-podname
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: print-podname
+  template:
+    metadata:
+      labels:
+        app: print-podname
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: print-podname
+        image: choisunguk/print-podname:python-rc1.2
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "200m"
+        ports:
+        - containerPort: 8000
+        lifecycle:
+          preStop:
+            exec:
+              command: [ "sh", "-c", "echo 'PreStop Hook: Waiting 15 seconds' && sleep 15" ]
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 5
