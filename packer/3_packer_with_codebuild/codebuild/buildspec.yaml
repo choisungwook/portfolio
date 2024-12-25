@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+
+  install:
+    commands:
+    - echo Installing Packer...
+    - sudo yum install -y yum-utils
+    - sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+    - sudo yum -y install packer
+  build:
+    commands:
+    - echo Starting Packer build...
+    - cd packer/3_packer_with_codebuild/codebuild/
+    - packer init ./
+    - packer build al2023-nginx.pkr.hcl
