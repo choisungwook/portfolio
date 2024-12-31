@@ -1,0 +1,27 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: example
+spec:
+  template:
+    metadata:
+      labels:
+        app: inflate
+    spec:
+      requirements:
+      - key: "karpenter.k8s.aws/instance-category"
+        operator: In
+        values: [ "t" ]
+      - key: "karpenter.k8s.aws/instance-generation"
+        operator: Gt
+        values: [ "2" ]
+      - key: "kubernetes.io/arch"
+        operator: In
+        values: [ "amd64" ]
+      - key: "karpenter.sh/capacity-type"
+        operator: In
+        values: [ "spot" ]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: example
