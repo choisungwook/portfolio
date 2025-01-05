@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inflate
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: inflate
+  template:
+    metadata:
+      labels:
+        app: inflate
+    spec:
+      terminationGracePeriodSeconds: 0
+      tolerations:
+      - key: app
+        operator: Equal
+        value: inflate
+        effect: NoSchedule
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: capacity-spread
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: inflate
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: inflate
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: capacity-spread
+                operator: In
+                values:
+                - "on-demand-1"
+                - "on-demand-2"
+                - "spot-1"
+                - "spot-2"
+                - "spot-3"
+              - key: app
+                operator: In
+                values:
+                - "inflate"
+      containers:
+      - name: inflate
+        image: public.ecr.aws/eks-distro/kubernetes/pause:3.7
+        resources:
+          requests:
+            cpu: 0.2

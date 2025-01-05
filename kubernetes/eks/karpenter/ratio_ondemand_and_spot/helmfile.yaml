@@ -1,11 +1,15 @@
+repositories:
+- name: metrics-server
+  url: https://kubernetes-sigs.github.io/metrics-server
+
 environments:
   default:
     values:
     - global:
-        clusterName: userdata
+        clusterName: karpenter-demo
     - karpenter:
-        interruptionQueue: userdata
-        irsa: arn:aws:iam::467606240901:role/userdata-karpenter-irsa
+        interruptionQueue: karpenter-demo
+        irsa: arn:aws:iam::467606240901:role/karpenter-demo-karpenter-irsa
 
 releases:
 - name: karpenter
