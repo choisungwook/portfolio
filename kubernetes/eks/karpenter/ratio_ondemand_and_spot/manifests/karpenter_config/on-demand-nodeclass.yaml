@@ -1,0 +1,27 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: on-demand
+spec:
+  amiFamily: AL2023
+
+  amiSelectorTerms:
+  - name: amazon-eks-node-al2023-x86_64-standard-1.30-*
+
+  role: "karpenter-demo-eks-worker-node-role" # change to your worker node IAM role
+
+  subnetSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "karpenter-demo" # change to your VPC subnet tags
+
+  securityGroupSelectorTerms:
+  - tags:
+      aws:eks:cluster-name: "karpenter-demo" # change to your Security Group tags
+      kubernetes.io/cluster/karpenter-demo: "owned"
+
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      volumeSize: 20Gi
+      volumeType: gp3
+      encrypted: true

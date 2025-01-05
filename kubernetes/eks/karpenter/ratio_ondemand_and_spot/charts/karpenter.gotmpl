@@ -1,0 +1,17 @@
+settings:
+  clusterName: {{ .Environment.Values.global.clusterName }}
+  interruptionQueue: {{ .Environment.Values.karpenter.interruptionQueue }}
+
+serviceAccount:
+  name: karpenter-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Environment.Values.karpenter.irsa }}
+
+controller:
+  resources:
+    requests:
+      cpu: "0.2"
+      memory: "0.3Gi"
+    limits:
+      cpu: "0.2"
+      memory: "0.3Gi"
