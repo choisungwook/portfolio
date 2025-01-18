@@ -1,0 +1,13 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pod-eviction-timeout
+nodes:
+- role: control-plane
+  image: kindest/node:v1.30.4
+  extraPortMappings:
+  # httpbin nodePort
+  - containerPort: 30090
+    hostPort: 30090
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.30.4

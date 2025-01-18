@@ -35,6 +35,7 @@
 | 14 | pod Readiness Gate about | [링크](./kubernetes/eks/ALB_readiness_gate/)|
 | 15 | EKS AMI에 user data 추가 | [링크](./kubernetes/eks/eks_ami_with_userdata/)|
 | 16 | karpenter on-demand:spot 비율 설정 | [링크](./kubernetes/eks/karpenter/ratio_ondemand_and_spot/)|
+| 16 | 쿠버네티스 node 헬스체크(lease API) 실패 | [링크](./kubernetes/leaseAPI/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)

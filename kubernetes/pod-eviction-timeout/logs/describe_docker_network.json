@@ -1,0 +1,53 @@
+# docker network inspect kind
+[
+    {
+        "Name": "kind",
+        "Id": "be284285ea3b2d0c33fadaafc921664bf762667d4b35cd50323ce943cda58405",
+        "Created": "2024-06-02T01:26:43.622711171Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": true,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "Gateway": "172.18.0.1"
+                },
+                {
+                    "Subnet": "fc00:f853:ccd:e793::/64",
+                    "Gateway": "fc00:f853:ccd:e793::1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {
+            "8b8fed2841339390d2d443077f1aae37c20a43c6bf9e960b842622814fac1dca": {
+                "Name": "pod-eviction-timeout-worker",
+                "EndpointID": "f980ef5b4472705a70db48b6a27cf44fbd73758a17eec6b466f6da95bc0c5803",
+                "MacAddress": "02:42:ac:12:00:02",
+                "IPv4Address": "172.18.0.2/16",
+                "IPv6Address": "fc00:f853:ccd:e793::2/64"
+            },
+            "ba0d5a3ee6aa4d117f19c78848cddef165253b964d6d3b22f5081566b6a08464": {
+                "Name": "pod-eviction-timeout-control-plane",
+                "EndpointID": "73c2ca06751aeb4cbebf799166f49fefbbc2ad964728fd48a51aa31f8f0363f9",
+                "MacAddress": "02:42:ac:12:00:03",
+                "IPv4Address": "172.18.0.3/16",
+                "IPv6Address": "fc00:f853:ccd:e793::3/64"
+            }
+        },
+        "Options": {
+            "com.docker.network.bridge.enable_ip_masquerade": "true",
+            "com.docker.network.driver.mtu": "65535"
+        },
+        "Labels": {}
+    }
+]

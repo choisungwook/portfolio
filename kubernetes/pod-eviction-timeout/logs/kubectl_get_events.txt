@@ -1,0 +1,4 @@
+$ kubectl get endpoints
+NAME         ENDPOINTS         AGE
+httpbin      <none>            104m
+kubernetes   172.18.0.2:6443   105m

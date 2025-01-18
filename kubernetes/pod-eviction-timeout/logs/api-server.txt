@@ -1,0 +1,138 @@
+I0112 06:43:22.428752       1 options.go:221] external host was not specified, using 172.18.0.2
+I0112 06:43:22.429151       1 server.go:148] Version: v1.30.4
+I0112 06:43:22.429165       1 server.go:150] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+I0112 06:43:22.651399       1 shared_informer.go:313] Waiting for caches to sync for node_authorizer
+W0112 06:43:22.651666       1 logging.go:59] [core] [Channel #2 SubChannel #4] grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:2379", ServerName: "127.0.0.1:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:2379: connect: connection refused"
+W0112 06:43:22.651688       1 logging.go:59] [core] [Channel #1 SubChannel #3] grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:2379", ServerName: "127.0.0.1:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:2379: connect: connection refused"
+I0112 06:43:22.653839       1 shared_informer.go:313] Waiting for caches to sync for *generic.policySource[*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicy,*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicyBinding,k8s.io/apiserver/pkg/admission/plugin/policy/validating.Validator]
+I0112 06:43:22.654575       1 plugins.go:157] Loaded 12 mutating admission controller(s) successfully in the following order: NamespaceLifecycle,LimitRanger,ServiceAccount,NodeRestriction,TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,StorageObjectInUseProtection,RuntimeClass,DefaultIngressClass,MutatingAdmissionWebhook.
+I0112 06:43:22.654583       1 plugins.go:160] Loaded 13 validating admission controller(s) successfully in the following order: LimitRanger,ServiceAccount,PodSecurity,Priority,PersistentVolumeClaimResize,RuntimeClass,CertificateApproval,CertificateSigning,ClusterTrustBundleAttest,CertificateSubjectRestriction,ValidatingAdmissionPolicy,ValidatingAdmissionWebhook,ResourceQuota.
+I0112 06:43:22.654630       1 instance.go:299] Using reconciler: lease
+W0112 06:43:22.654891       1 logging.go:59] [core] [Channel #5 SubChannel #6] grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:2379", ServerName: "127.0.0.1:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:2379: connect: connection refused"
+I0112 06:43:23.812461       1 handler.go:286] Adding GroupVersion apiextensions.k8s.io v1 to ResourceManager
+W0112 06:43:23.812482       1 genericapiserver.go:733] Skipping API apiextensions.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:23.887298       1 handler.go:286] Adding GroupVersion  v1 to ResourceManager
+I0112 06:43:23.887397       1 instance.go:696] API group "internal.apiserver.k8s.io" is not enabled, skipping.
+I0112 06:43:23.957478       1 instance.go:696] API group "storagemigration.k8s.io" is not enabled, skipping.
+I0112 06:43:24.026828       1 instance.go:696] API group "resource.k8s.io" is not enabled, skipping.
+I0112 06:43:24.029993       1 handler.go:286] Adding GroupVersion authentication.k8s.io v1 to ResourceManager
+W0112 06:43:24.030002       1 genericapiserver.go:733] Skipping API authentication.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.030004       1 genericapiserver.go:733] Skipping API authentication.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.030164       1 handler.go:286] Adding GroupVersion authorization.k8s.io v1 to ResourceManager
+W0112 06:43:24.030169       1 genericapiserver.go:733] Skipping API authorization.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:24.030430       1 handler.go:286] Adding GroupVersion autoscaling v2 to ResourceManager
+I0112 06:43:24.030671       1 handler.go:286] Adding GroupVersion autoscaling v1 to ResourceManager
+W0112 06:43:24.030676       1 genericapiserver.go:733] Skipping API autoscaling/v2beta1 because it has no resources.
+W0112 06:43:24.030678       1 genericapiserver.go:733] Skipping API autoscaling/v2beta2 because it has no resources.
+I0112 06:43:24.031081       1 handler.go:286] Adding GroupVersion batch v1 to ResourceManager
+W0112 06:43:24.031087       1 genericapiserver.go:733] Skipping API batch/v1beta1 because it has no resources.
+I0112 06:43:24.031325       1 handler.go:286] Adding GroupVersion certificates.k8s.io v1 to ResourceManager
+W0112 06:43:24.031330       1 genericapiserver.go:733] Skipping API certificates.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.031331       1 genericapiserver.go:733] Skipping API certificates.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.031486       1 handler.go:286] Adding GroupVersion coordination.k8s.io v1 to ResourceManager
+W0112 06:43:24.031491       1 genericapiserver.go:733] Skipping API coordination.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.031504       1 genericapiserver.go:733] Skipping API discovery.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:24.031670       1 handler.go:286] Adding GroupVersion discovery.k8s.io v1 to ResourceManager
+I0112 06:43:24.032075       1 handler.go:286] Adding GroupVersion networking.k8s.io v1 to ResourceManager
+W0112 06:43:24.032081       1 genericapiserver.go:733] Skipping API networking.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.032082       1 genericapiserver.go:733] Skipping API networking.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.032210       1 handler.go:286] Adding GroupVersion node.k8s.io v1 to ResourceManager
+W0112 06:43:24.032215       1 genericapiserver.go:733] Skipping API node.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.032217       1 genericapiserver.go:733] Skipping API node.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.032427       1 handler.go:286] Adding GroupVersion policy v1 to ResourceManager
+W0112 06:43:24.032432       1 genericapiserver.go:733] Skipping API policy/v1beta1 because it has no resources.
+I0112 06:43:24.032865       1 handler.go:286] Adding GroupVersion rbac.authorization.k8s.io v1 to ResourceManager
+W0112 06:43:24.032871       1 genericapiserver.go:733] Skipping API rbac.authorization.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.032872       1 genericapiserver.go:733] Skipping API rbac.authorization.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.033043       1 handler.go:286] Adding GroupVersion scheduling.k8s.io v1 to ResourceManager
+W0112 06:43:24.033048       1 genericapiserver.go:733] Skipping API scheduling.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.033050       1 genericapiserver.go:733] Skipping API scheduling.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.033567       1 handler.go:286] Adding GroupVersion storage.k8s.io v1 to ResourceManager
+W0112 06:43:24.033572       1 genericapiserver.go:733] Skipping API storage.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.033573       1 genericapiserver.go:733] Skipping API storage.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.033881       1 handler.go:286] Adding GroupVersion flowcontrol.apiserver.k8s.io v1 to ResourceManager
+I0112 06:43:24.034150       1 handler.go:286] Adding GroupVersion flowcontrol.apiserver.k8s.io v1beta3 to ResourceManager
+W0112 06:43:24.034154       1 genericapiserver.go:733] Skipping API flowcontrol.apiserver.k8s.io/v1beta2 because it has no resources.
+W0112 06:43:24.034156       1 genericapiserver.go:733] Skipping API flowcontrol.apiserver.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:24.035036       1 handler.go:286] Adding GroupVersion apps v1 to ResourceManager
+W0112 06:43:24.035042       1 genericapiserver.go:733] Skipping API apps/v1beta2 because it has no resources.
+W0112 06:43:24.035044       1 genericapiserver.go:733] Skipping API apps/v1beta1 because it has no resources.
+I0112 06:43:24.035530       1 handler.go:286] Adding GroupVersion admissionregistration.k8s.io v1 to ResourceManager
+W0112 06:43:24.035536       1 genericapiserver.go:733] Skipping API admissionregistration.k8s.io/v1beta1 because it has no resources.
+W0112 06:43:24.035538       1 genericapiserver.go:733] Skipping API admissionregistration.k8s.io/v1alpha1 because it has no resources.
+I0112 06:43:24.035681       1 handler.go:286] Adding GroupVersion events.k8s.io v1 to ResourceManager
+W0112 06:43:24.035685       1 genericapiserver.go:733] Skipping API events.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:24.040015       1 handler.go:286] Adding GroupVersion apiregistration.k8s.io v1 to ResourceManager
+W0112 06:43:24.040023       1 genericapiserver.go:733] Skipping API apiregistration.k8s.io/v1beta1 because it has no resources.
+I0112 06:43:24.153979       1 secure_serving.go:213] Serving securely on [::]:6443
+I0112 06:43:24.154011       1 dynamic_cafile_content.go:157] "Starting controller" name="request-header::/etc/kubernetes/pki/front-proxy-ca.crt"
+I0112 06:43:24.154048       1 dynamic_serving_content.go:132] "Starting controller" name="serving-cert::/etc/kubernetes/pki/apiserver.crt::/etc/kubernetes/pki/apiserver.key"
+I0112 06:43:24.154072       1 tlsconfig.go:240] "Starting DynamicServingCertificateController"
+I0112 06:43:24.154287       1 system_namespaces_controller.go:67] Starting system namespaces controller
+I0112 06:43:24.154314       1 dynamic_serving_content.go:132] "Starting controller" name="aggregator-proxy-cert::/etc/kubernetes/pki/front-proxy-client.crt::/etc/kubernetes/pki/front-proxy-client.key"
+I0112 06:43:24.154341       1 apiservice_controller.go:97] Starting APIServiceRegistrationController
+I0112 06:43:24.154348       1 cache.go:32] Waiting for caches to sync for APIServiceRegistrationController controller
+I0112 06:43:24.154356       1 aggregator.go:163] waiting for initial CRD sync...
+I0112 06:43:24.154361       1 controller.go:78] Starting OpenAPI AggregationController
+I0112 06:43:24.154391       1 controller.go:116] Starting legacy_token_tracking_controller
+I0112 06:43:24.154396       1 shared_informer.go:313] Waiting for caches to sync for configmaps
+I0112 06:43:24.154404       1 controller.go:80] Starting OpenAPI V3 AggregationController
+I0112 06:43:24.154470       1 cluster_authentication_trust_controller.go:440] Starting cluster_authentication_trust_controller controller
+I0112 06:43:24.154475       1 shared_informer.go:313] Waiting for caches to sync for cluster_authentication_trust_controller
+I0112 06:43:24.154492       1 available_controller.go:423] Starting AvailableConditionController
+I0112 06:43:24.154493       1 cache.go:32] Waiting for caches to sync for AvailableConditionController controller
+I0112 06:43:24.154576       1 crdregistration_controller.go:111] Starting crd-autoregister controller
+I0112 06:43:24.154580       1 shared_informer.go:313] Waiting for caches to sync for crd-autoregister
+I0112 06:43:24.154769       1 dynamic_cafile_content.go:157] "Starting controller" name="client-ca-bundle::/etc/kubernetes/pki/ca.crt"
+I0112 06:43:24.154801       1 dynamic_cafile_content.go:157] "Starting controller" name="request-header::/etc/kubernetes/pki/front-proxy-ca.crt"
+I0112 06:43:24.154904       1 gc_controller.go:78] Starting apiserver lease garbage collector
+I0112 06:43:24.155067       1 customresource_discovery_controller.go:289] Starting DiscoveryController
+I0112 06:43:24.155148       1 apf_controller.go:374] Starting API Priority and Fairness config controller
+I0112 06:43:24.155319       1 dynamic_cafile_content.go:157] "Starting controller" name="client-ca-bundle::/etc/kubernetes/pki/ca.crt"
+I0112 06:43:24.159880       1 controller.go:139] Starting OpenAPI controller
+I0112 06:43:24.159900       1 controller.go:87] Starting OpenAPI V3 controller
+I0112 06:43:24.159906       1 naming_controller.go:291] Starting NamingConditionController
+I0112 06:43:24.159912       1 establishing_controller.go:76] Starting EstablishingController
+I0112 06:43:24.159917       1 nonstructuralschema_controller.go:192] Starting NonStructuralSchemaConditionController
+I0112 06:43:24.159923       1 apiapproval_controller.go:186] Starting KubernetesAPIApprovalPolicyConformantConditionController
+I0112 06:43:24.159927       1 crd_finalizer.go:266] Starting CRDFinalizer
+E0112 06:43:24.212917       1 controller.go:145] "Failed to ensure lease exists, will retry" err="namespaces \"kube-system\" not found" interval="200ms"
+I0112 06:43:24.252986       1 shared_informer.go:320] Caches are synced for node_authorizer
+I0112 06:43:24.255041       1 shared_informer.go:320] Caches are synced for crd-autoregister
+I0112 06:43:24.255096       1 shared_informer.go:320] Caches are synced for cluster_authentication_trust_controller
+I0112 06:43:24.255119       1 aggregator.go:165] initial CRD sync complete...
+I0112 06:43:24.255125       1 shared_informer.go:320] Caches are synced for configmaps
+I0112 06:43:24.255129       1 autoregister_controller.go:141] Starting autoregister controller
+I0112 06:43:24.255131       1 cache.go:39] Caches are synced for AvailableConditionController controller
+I0112 06:43:24.255097       1 cache.go:39] Caches are synced for APIServiceRegistrationController controller
+I0112 06:43:24.255136       1 cache.go:32] Waiting for caches to sync for autoregister controller
+I0112 06:43:24.255146       1 cache.go:39] Caches are synced for autoregister controller
+I0112 06:43:24.255234       1 handler_discovery.go:447] Starting ResourceDiscoveryManager
+I0112 06:43:24.255392       1 shared_informer.go:320] Caches are synced for *generic.policySource[*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicy,*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicyBinding,k8s.io/apiserver/pkg/admission/plugin/policy/validating.Validator]
+I0112 06:43:24.255413       1 policy_source.go:224] refreshing policies
+I0112 06:43:24.255452       1 apf_controller.go:379] Running API Priority and Fairness config worker
+I0112 06:43:24.255469       1 apf_controller.go:382] Running API Priority and Fairness periodic rebalancing process
+I0112 06:43:24.255637       1 controller.go:615] quota admission added evaluator for: namespaces
+I0112 06:43:24.414738       1 controller.go:615] quota admission added evaluator for: leases.coordination.k8s.io
+I0112 06:43:25.162568       1 storage_scheduling.go:95] created PriorityClass system-node-critical with value 2000001000
+I0112 06:43:25.166959       1 storage_scheduling.go:95] created PriorityClass system-cluster-critical with value 2000000000
+I0112 06:43:25.166981       1 storage_scheduling.go:111] all system priority classes are created successfully or already exist.
+I0112 06:43:25.298334       1 controller.go:615] quota admission added evaluator for: roles.rbac.authorization.k8s.io
+I0112 06:43:25.306214       1 controller.go:615] quota admission added evaluator for: rolebindings.rbac.authorization.k8s.io
+I0112 06:43:25.361817       1 alloc.go:330] "allocated clusterIPs" service="default/kubernetes" clusterIPs={"IPv4":"10.96.0.1"}
+W0112 06:43:25.363069       1 lease.go:265] Resetting endpoints for master service "kubernetes" to [172.18.0.2]
+I0112 06:43:25.363377       1 controller.go:615] quota admission added evaluator for: endpoints
+I0112 06:43:25.364427       1 controller.go:615] quota admission added evaluator for: endpointslices.discovery.k8s.io
+I0112 06:43:26.478433       1 controller.go:615] quota admission added evaluator for: serviceaccounts
+I0112 06:43:26.483119       1 controller.go:615] quota admission added evaluator for: deployments.apps
+I0112 06:43:26.488360       1 alloc.go:330] "allocated clusterIPs" service="kube-system/kube-dns" clusterIPs={"IPv4":"10.96.0.10"}
+I0112 06:43:26.492450       1 controller.go:615] quota admission added evaluator for: daemonsets.apps
+I0112 06:43:41.772179       1 controller.go:615] quota admission added evaluator for: replicasets.apps
+I0112 06:43:41.800084       1 controller.go:615] quota admission added evaluator for: controllerrevisions.apps
+I0112 06:44:33.431820       1 alloc.go:330] "allocated clusterIPs" service="default/httpbin" clusterIPs={"IPv4":"10.96.133.186"}
+I0112 07:01:28.607374       1 trace.go:236] Trace[964076548]: "Get" accept:application/json, */*,audit-id:1d435f6a-8947-45c5-9182-850ffd94820c,client:172.18.0.1,api-group:,api-version:v1,name:kube-controller-manager-pod-eviction-timeout-control-plane,subresource:log,namespace:kube-system,protocol:HTTP/2.0,resource:pods,scope:resource,url:/api/v1/namespaces/kube-system/pods/kube-controller-manager-pod-eviction-timeout-control-plane/log,user-agent:kubectl/v1.30.5 (darwin/arm64) kubernetes/74e84a9,verb:CONNECT (12-Jan-2025 07:01:16.291) (total time: 12316ms):
+Trace[964076548]: ---"Writing http response done" 12315ms (07:01:28.607)
+Trace[964076548]: [12.316079131s] [12.316079131s] END
+I0112 07:04:07.540894       1 trace.go:236] Trace[1856079275]: "Get" accept:application/json, */*,audit-id:74d18564-d611-4570-ae0c-e3a4f5e837be,client:172.18.0.1,api-group:,api-version:v1,name:kube-apiserver-pod-eviction-timeout-control-plane,subresource:log,namespace:kube-system,protocol:HTTP/2.0,resource:pods,scope:resource,url:/api/v1/namespaces/kube-system/pods/kube-apiserver-pod-eviction-timeout-control-plane/log,user-agent:kubectl/v1.30.5 (darwin/arm64) kubernetes/74e84a9,verb:CONNECT (12-Jan-2025 07:04:05.852) (total time: 1688ms):
+Trace[1856079275]: ---"Writing http response done" 1686ms (07:04:07.540)
+Trace[1856079275]: [1.688038918s] [1.688038918s] END

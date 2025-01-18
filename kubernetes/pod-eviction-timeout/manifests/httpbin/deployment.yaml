@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin
+  namespace: default
+  labels:
+    app: httpbin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+  template:
+    metadata:
+      labels:
+        app: httpbin
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: httpbin
+        image: kong/httpbin:0.2.1
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /status/200
+            port: 80
+          initialDelaySeconds: 20
+          periodSeconds: 5
+        lifecycle:
+          preStop:
+            exec:
+              command: [ "sh", "-c", "echo 'PreStop Hook: Waiting 15 seconds' && sleep 15" ]
+        resources:
+          limits:
+            cpu: 300m
+            memory: 128Mi
+          requests:
+            cpu: 300m
+            memory: 128Mi
