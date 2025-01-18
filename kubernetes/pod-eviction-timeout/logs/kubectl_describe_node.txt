@@ -1,0 +1,79 @@
+$ kubectl describe node pod-eviction-timeout-worker
+Name:               pod-eviction-timeout-worker
+Roles:              <none>
+Labels:             beta.kubernetes.io/arch=arm64
+                    beta.kubernetes.io/os=linux
+                    kubernetes.io/arch=arm64
+                    kubernetes.io/hostname=pod-eviction-timeout-worker
+                    kubernetes.io/os=linux
+Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: unix:///run/containerd/containerd.sock
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Sun, 12 Jan 2025 15:43:43 +0900
+Taints:             node.kubernetes.io/unreachable:NoExecute
+                    node.kubernetes.io/unreachable:NoSchedule
+Unschedulable:      false
+Lease:
+  HolderIdentity:  pod-eviction-timeout-worker
+  AcquireTime:     <unset>
+  RenewTime:       Sun, 12 Jan 2025 15:50:40 +0900
+Conditions:
+  Type             Status    LastHeartbeatTime                 LastTransitionTime                Reason              Message
+  ----             ------    -----------------                 ------------------                ------              -------
+  MemoryPressure   Unknown   Sun, 12 Jan 2025 15:48:58 +0900   Sun, 12 Jan 2025 15:51:21 +0900   NodeStatusUnknown   Kubelet stopped posting node status.
+  DiskPressure     Unknown   Sun, 12 Jan 2025 15:48:58 +0900   Sun, 12 Jan 2025 15:51:21 +0900   NodeStatusUnknown   Kubelet stopped posting node status.
+  PIDPressure      Unknown   Sun, 12 Jan 2025 15:48:58 +0900   Sun, 12 Jan 2025 15:51:21 +0900   NodeStatusUnknown   Kubelet stopped posting node status.
+  Ready            Unknown   Sun, 12 Jan 2025 15:48:58 +0900   Sun, 12 Jan 2025 15:51:21 +0900   NodeStatusUnknown   Kubelet stopped posting node status.
+Addresses:
+  InternalIP:  172.18.0.3
+  Hostname:    pod-eviction-timeout-worker
+Capacity:
+  cpu:                12
+  ephemeral-storage:  61202244Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  hugepages-32Mi:     0
+  hugepages-64Ki:     0
+  memory:             8025084Ki
+  pods:               110
+Allocatable:
+  cpu:                12
+  ephemeral-storage:  61202244Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  hugepages-32Mi:     0
+  hugepages-64Ki:     0
+  memory:             8025084Ki
+  pods:               110
+System Info:
+  Machine ID:                 bed45e0288cf4e50885d20d2d1572cb0
+  System UUID:                bed45e0288cf4e50885d20d2d1572cb0
+  Boot ID:                    b5ea09f6-ffef-4cf0-9489-a94552196b36
+  Kernel Version:             6.10.14-linuxkit
+  OS Image:                   Debian GNU/Linux 12 (bookworm)
+  Operating System:           linux
+  Architecture:               arm64
+  Container Runtime Version:  containerd://1.7.18
+  Kubelet Version:            v1.30.4
+  Kube-Proxy Version:         v1.30.4
+PodCIDR:                      10.244.1.0/24
+PodCIDRs:                     10.244.1.0/24
+ProviderID:                   kind://docker/pod-eviction-timeout/pod-eviction-timeout-worker
+Non-terminated Pods:          (3 in total)
+  Namespace                   Name                        CPU Requests  CPU Limits  Memory Requests  Memory Limits  Age
+  ---------                   ----                        ------------  ----------  ---------------  -------------  ---
+  default                     httpbin-7cc7c58d4d-ntw5p    300m (2%)     300m (2%)   128Mi (1%)       128Mi (1%)     105m
+  kube-system                 kindnet-fsznx               100m (0%)     100m (0%)   50Mi (0%)        50Mi (0%)      106m
+  kube-system                 kube-proxy-xjsg9            0 (0%)        0 (0%)      0 (0%)           0 (0%)         106m
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests    Limits
+  --------           --------    ------
+  cpu                400m (3%)   400m (3%)
+  memory             178Mi (2%)  178Mi (2%)
+  ephemeral-storage  0 (0%)      0 (0%)
+  hugepages-1Gi      0 (0%)      0 (0%)
+  hugepages-2Mi      0 (0%)      0 (0%)
+  hugepages-32Mi     0 (0%)      0 (0%)
+  hugepages-64Ki     0 (0%)      0 (0%)
+Events:              <none>

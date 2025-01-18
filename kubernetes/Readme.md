@@ -13,3 +13,4 @@
 | 9 | statefulset + downward API | [링크](./statefulset_podname/)|
 | 10 | statefulset 운영 | [링크](./operate_statefulset/)|
 | 11 | control plane이 장애 났을 때 kubelet 로그 | [링크](./api-server-failure/)|
+| 12 | 쿠버네티스 node 헬스체크(lease API) 실패  | [링크](./leaseAPI/)|
