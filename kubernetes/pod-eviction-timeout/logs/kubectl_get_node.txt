@@ -1,0 +1,4 @@
+$ kubectl get node
+NAME                                 STATUS     ROLES           AGE    VERSION
+pod-eviction-timeout-control-plane   Ready      control-plane   104m   v1.30.4
+pod-eviction-timeout-worker          NotReady   <none>          104m   v1.30.4

@@ -1,0 +1,4 @@
+$ kubectl get pod
+NAME                       READY   STATUS        RESTARTS   AGE    IP           NODE                          NOMINATED NODE   READINESS GATES
+httpbin-7cc7c58d4d-gx2vc   0/1     Pending       0          91m    <none>       <none>                        <none>           <none>
+httpbin-7cc7c58d4d-ntw5p   1/1     Terminating   0          103m   10.244.1.2   pod-eviction-timeout-worker   <none>           <none>
