@@ -30,7 +30,7 @@ function WaitingRoom() {
 
       if (data.position === 1) {
         clearInterval(interval);
-        navigate('/tickets');
+        navigate('/purchase');
       }
     }, queueInterval)
     return () => clearInterval(interval);
