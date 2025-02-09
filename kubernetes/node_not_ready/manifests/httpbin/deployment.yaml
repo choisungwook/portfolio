@@ -16,8 +16,6 @@ spec:
         app: httpbin
     spec:
       terminationGracePeriodSeconds: 0
-      nodeSelector:
-        kubernetes.io/hostname: node-not-ready-worker
       containers:
       - name: httpbin
         image: kong/httpbin:0.2.1
