@@ -1,6 +1,9 @@
 ## 개요
 * [mTLS실습](./README.md)후, wireshark로 mTLS 패킷 덤프
 
+## 패킷 파일
+* [파일링크](../../../pcap_files/mTLS_with_nginx/nginx-mtls.pcapng)
+
 ## 실습
 
 1. wireshark 실행
