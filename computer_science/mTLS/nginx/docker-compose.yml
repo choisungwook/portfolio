@@ -1,0 +1,27 @@
+services:
+  nginx-tls:
+    image: nginx:1.27.4-alpine
+    container_name: nginx_tls
+    ports:
+      - "8880:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro  # 인증서 폴더
+      - ./conf/default.conf:/etc/nginx/nginx.conf:ro  # default nginx 설정파일
+
+  nginx-mtls:
+    image: nginx:1.27.4-alpine
+    container_name: nginx_mtls
+    ports:
+      - "8881:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro  # 인증서 폴더
+      - ./conf/all_client_with_nginx.conf:/etc/nginx/nginx.conf:ro  # 설정 파일
+
+  nginx-mtls-only-client1:
+    image: nginx:1.27.4-alpine
+    container_name: nginx_mtls-only-client1
+    ports:
+      - "8882:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro  # 인증서 폴더
+      - ./conf/only_client1_with_nginx.conf:/etc/nginx/nginx.conf:ro  # 설정 파일
