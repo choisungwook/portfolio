@@ -69,7 +69,7 @@ $ curl --resolve 'myserver.com:8880:127.0.0.1' https://myserver.com:8880 --cacer
 ```
 
 ```sh
-$ curl --resolve 'myserver.com:8881:127.0.0.1' https://myserver.com:8882 --cacert ./certs/ca.crt
+$ curl --resolve 'myserver.com:8881:127.0.0.1' https://myserver.com:8881 --cacert ./certs/ca.crt
 <html>
 <head><title>400 No required SSL certificate was sent</title></head>
 <body>
