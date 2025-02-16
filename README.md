@@ -37,6 +37,8 @@
 | 16 | karpenter on-demand:spot 비율 설정 | [링크](./kubernetes/eks/karpenter/ratio_ondemand_and_spot/)|
 | 16 | 쿠버네티스 node 헬스체크(lease API) 실패 | [링크](./kubernetes/leaseAPI/)|
 | 17 | 쿠버네티스 node not ready일때 일어나는 일 | [링크](./kubernetes/node_not_ready/)|
+| 18 | nginx mTLS 예제 | [링크](./computer_science/mTLS/nginx/)|
+| 19 | nginx mTLS pcap파일 | [링크](./pcap_files/mTLS_with_nginx/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
