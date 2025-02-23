@@ -50,10 +50,6 @@ docker compose ps
 
 ![](./imgs/docker-compose-ps.png)
 
-### /etc/hosts파일 변조
-
-* [nginx.conf](./conf/default.conf#6)의 host이름이 myserver.com입니다.
-
 ## 호출 테스트
 
 ### TLS가 적용된 nginx 호출
@@ -66,18 +62,6 @@ $ curl --resolve 'myserver.com:8880:127.0.0.1' https://myserver.com:8880 --cacer
 <html>
 <head>
 <title>Welcome to nginx!</title>
-```
-
-```sh
-$ curl --resolve 'myserver.com:8881:127.0.0.1' https://myserver.com:8881 --cacert ./certs/ca.crt
-<html>
-<head><title>400 No required SSL certificate was sent</title></head>
-<body>
-<center><h1>400 Bad Request</h1></center>
-<center>No required SSL certificate was sent</center>
-<hr><center>nginx/1.27.4</center>
-</body>
-</html>
 ```
 
 ### mTLS가 적용된 nginx 호출
