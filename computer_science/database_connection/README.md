@@ -1,5 +1,14 @@
 ## 개요
 
+* Database connection pool을 사용한 예제와 conneciton pool을 사용하지 않은 예제 비교
+
+## 예제 목차
+
+* [Database connection pool을 사용 ✅](./HikariCP/)
+* [Database connection pool을 사용하지 않음 ❌](./NoHikariCP/)
+
+## 개요
+
 * HikariCP를 사용하지 않은 스프링부트 예제
 * [비교군 - HikariCP를 사용](../HikariCP/)
 
@@ -26,7 +35,7 @@ docker compose up -d
 * backend docker conatiner의 API호출
 
 ```sh
-curl localhost:8081/query;
+curl localhost:8082/query;
 ```
 
 ## 참고자료
