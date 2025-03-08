@@ -6,10 +6,6 @@ services:
       - ./initdb:/docker-entrypoint-initdb.d
     environment:
       MYSQL_ROOT_PASSWORD: NwmaZk$2f2pq27p^^4am
-      # MYSQL_USER:
-      # MYSQL_PASSWORD: NwmaZk$2f2pq27p^^4am
-      # MYSQL_DATABASE: sakila
       TZ: UTC
     ports:
       - 3306:3306
-    # command: mysqld --innodb_use_native_aio=0

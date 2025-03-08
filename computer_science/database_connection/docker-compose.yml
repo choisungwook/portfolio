@@ -10,8 +10,18 @@ services:
     ports:
       - 3306:3306
 
-  backend:
-    container_name: backend
+  use-cp:
+    container_name: use-cp
+    image: docker.io/choisunguk/hikaricp:usecp-v1
+    ports:
+      - 8082:8082
+    depends_on:
+      - mysql
+    environment:
+      JAVA_OPTS: "-Dspring.profiles.active=docker"
+
+  not-use-cp:
+    container_name: not-use-cp
     image: docker.io/choisunguk/hikaricp:jdbc-v1
     ports:
       - 8081:8081

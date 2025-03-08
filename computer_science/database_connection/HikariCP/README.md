@@ -26,7 +26,7 @@ docker compose up -d
 * backend docker conatiner의 API호출
 
 ```sh
-curl localhost:8081/query;
+curl localhost:8082/query;
 ```
 
 ## 참고자료
