@@ -39,7 +39,8 @@
 | 17 | 쿠버네티스 node not ready일때 일어나는 일 | [링크](./kubernetes/node_not_ready/)|
 | 18 | nginx mTLS 예제 | [링크](./computer_science/mTLS/nginx/)|
 | 19 | nginx mTLS pcap파일 | [링크](./pcap_files/mTLS_with_nginx/)|
-| 19 | AWS ALB mTLS 예제 | [링크](./computer_science/mTLS/aws/ALB/)|
+| 20 | AWS ALB mTLS 예제 | [링크](./computer_science/mTLS/aws/ALB/)|
+| 21 | mysql 도커 컨테이너에서 sakila 샘플 로드 | [링크](./common/mysql_sakila_sample/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
