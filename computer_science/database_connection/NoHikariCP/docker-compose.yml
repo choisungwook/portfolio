@@ -1,0 +1,21 @@
+services:
+  mysql:
+    container_name: mysql
+    image: mysql:8.0
+    volumes:
+      - ./initdb:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: NwmaZk$2f2pq27p^^4am
+      TZ: UTC
+    ports:
+      - 3306:3306
+
+  backend:
+    container_name: backend
+    image: docker.io/choisunguk/hikaricp:latest
+    ports:
+      - 8081:8080
+    depends_on:
+      - mysql
+    environment:
+      JAVA_OPTS: "-Dspring.profiles.active=docker"
