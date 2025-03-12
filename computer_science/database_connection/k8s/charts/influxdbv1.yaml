@@ -1,0 +1,24 @@
+image:
+  repository: arm64v8/influxdb
+  tag: 1.8.0
+  pullPolicy: IfNotPresent
+
+setDefaultUser:
+  enabled: true
+  user:
+    username: "admin"
+    password: "password!@#$"
+
+persistence:
+  enabled: false
+
+# service:
+#   type: NodePort
+#   nodePorts:
+#     http: "30084"
+
+initScripts:
+  enabled: true
+  scripts:
+    init.iql: |
+      CREATE DATABASE k6;

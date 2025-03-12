@@ -1,16 +1,3 @@
-IMAGE_NAME=choisunguk/hikaricp
-IMAGE_TAG=usecp-v1
-
-docker-build:
-	./gradlew bootBuildImage
-	docker tag $(IMAGE_NAME):latest $(IMAGE_NAME):$(IMAGE_TAG)
-
-docker-build-push: docker-build
-	docker push $(IMAGE_NAME):$(IMAGE_TAG)
-
-docker-run:
-	docker run -d -p 8080:8080 -t $(IMAGE_NAME):${IMAGE_TAG}
-
 generate:
 	@mkdir -p initdb
 	@cd initdb && \
