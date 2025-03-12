@@ -1,0 +1,14 @@
+adminUser:
+  organization: "influxdata"
+  bucket: "default"
+  user: "admin"
+  retention_policy: "0s"
+  password: "password!@#$"
+  token: "password!@#$"
+
+persistence:
+  enabled: false
+
+service:
+  type: NodePort
+  nodePort: "30084"

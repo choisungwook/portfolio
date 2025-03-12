@@ -1,0 +1,5 @@
+# mysql sakila database
+initdb/
+sakila-db.zip
+*.sql
+sakila.mwb

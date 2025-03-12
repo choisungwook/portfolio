@@ -1,0 +1,12 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: NoHikariCP
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/sakila
+    username: root
+    password: NwmaZk$2f2pq27p^^4am
+    driver-class-name: com.mysql.cj.jdbc.Driver
