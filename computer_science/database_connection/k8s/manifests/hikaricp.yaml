@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: use-cp
+spec:
+  selector:
+    matchLabels:
+      app: use-cp
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: use-cp
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: tier
+                operator: In
+                values:
+                - use-dabase-connection
+      containers:
+      - name: use-cp
+        image: docker.io/choisunguk/hikaricp:usecp-v1
+        env:
+        - name: JAVA_OPTS
+          value: "-Dspring.profiles.active=docker"
+        ports:
+        - containerPort: 8082
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: "500m"
+          limits:
+            memory: 1Gi
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: use-cp
+spec:
+  type: NodePort
+  ports:
+  - port: 8082
+    targetPort: 8082
+    nodePort: 30081
+  selector:
+    app: use-cp

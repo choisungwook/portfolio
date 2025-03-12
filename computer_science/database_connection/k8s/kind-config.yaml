@@ -1,0 +1,31 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: database-connection
+nodes:
+- role: control-plane
+  image: kindest/node:v1.32.2
+  extraPortMappings:
+  # backend with hikaricp nodePort
+  - containerPort: 30080
+    hostPort: 30080
+    protocol: TCP
+  # backend with not use hikaricp nodePort
+  - containerPort: 30081
+    hostPort: 30081
+    protocol: TCP
+  # influxDB nodePOrt
+  - containerPort: 30084
+    hostPort: 30084
+    protocol: TCP
+  # grafana nodePort
+  - containerPort: 30085
+    hostPort: 30085
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.32.2
+  labels:
+    tier: use-dabase-connection
+- role: worker
+  image: kindest/node:v1.32.2
+  labels:
+    tier: no-use-dabase-connection

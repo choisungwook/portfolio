@@ -1,0 +1,34 @@
+repositories:
+- name: prometheus-community
+  url: https://prometheus-community.github.io/helm-charts
+- name: metrics-server
+  url: https://kubernetes-sigs.github.io/metrics-server
+- name: influxdata
+  url: https://helm.influxdata.com
+
+releases:
+- name: prometheus-operator
+  namespace: monitoring
+  chart: prometheus-community/kube-prometheus-stack
+  version: 69.8.1
+  disableValidationOnInstall: true # to install CRDS
+  values:
+  - ./charts/prometheus-operator.yaml
+- name: metrics-server
+  namespace: kube-system
+  chart: metrics-server/metrics-server
+  version: 3.12.2
+  values:
+  - ./charts/metrics-server.yaml
+- name: influxdbv1
+  namespace: monitoring
+  chart: influxdata/influxdb
+  version: 4.12.5
+  values:
+  - ./charts/influxdbv1.yaml
+- name: influxdbv2
+  namespace: monitoring
+  chart: influxdata/influxdb2
+  version: 2.1.2
+  values:
+  - ./charts/influxdbv2.yaml

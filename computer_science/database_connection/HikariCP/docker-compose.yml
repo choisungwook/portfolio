@@ -19,3 +19,4 @@ services:
       - mysql
     environment:
       JAVA_OPTS: "-Dspring.profiles.active=docker"
+    restart: always

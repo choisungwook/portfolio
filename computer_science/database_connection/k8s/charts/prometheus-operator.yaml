@@ -1,0 +1,40 @@
+crds:
+  enabled: true
+
+alertmanager:
+  enabled: false
+
+grafana:
+  adminUser: admin
+  adminPassword: prom-operator
+
+  service:
+    type: NodePort
+    nodePort: 30085
+
+  additionalDataSources:
+  - name: InfluxDBv1
+    type: influxdb
+    access: proxy
+    url: http://influxdbv1.monitoring.svc.cluster.local:8086
+    database: "k6"
+    user: "admin"
+    jsonData:
+      httpMode: GET
+      tlsSkipVerify: true
+    secureJsonData:
+      password: "password!@#$"
+  - name: InfluxDBv2
+    type: influxdb
+    access: proxy
+    url: http://influxdb-influxdb2.monitoring.svc.cluster.local:80
+    database: ""
+    user: ""
+    jsonData:
+      version: Flux
+      organization: influxdata
+      defaultBucket: default
+      tlsSkipVerify: true
+      httpMode: GET
+    secureJsonData:
+      token: "password!@#$"
