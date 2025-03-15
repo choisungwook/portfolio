@@ -1,0 +1,88 @@
+services:
+  # FRR 라우터 1: bridge_net1 관리, BGP 피어링 인터페이스 포함
+  frr1:
+    image: frrouting/frr:latest
+    container_name: frr1
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+      - SYS_PTRACE
+    volumes:
+      - ./vtysh.conf:/etc/frr/vtysh.conf
+      - ./frr1.conf:/etc/frr/frr.conf
+      - ./daemons:/etc/frr/daemons
+    networks:
+      bgp_net:
+        ipv4_address: 192.168.1.100       # BGP 피어링 인터페이스
+      bridge_net1:
+        ipv4_address: 192.168.100.11  # nginx1의 기본 라우터 역할
+
+  # FRR 라우터 2: bridge_net2 관리, BGP 피어링 인터페이스 포함
+  frr2:
+    image: frrouting/frr:latest
+    privileged: true
+    container_name: frr2
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+      - SYS_PTRACE
+    volumes:
+      - ./vtysh.conf:/etc/frr/vtysh.conf
+      - ./frr2.conf:/etc/frr/frr.conf
+      - ./daemons:/etc/frr/daemons
+    networks:
+      bgp_net:
+        ipv4_address: 192.168.1.200      # BGP 피어링 인터페이스
+      bridge_net2:
+        ipv4_address: 192.168.200.11  # nginx2의 기본 라우터 역할
+
+  # nginx 1: bridge_net1에 배치
+  nginx1:
+    image: nginx:alpine
+    container_name: nginx1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bridge_net1:
+        ipv4_address: 192.168.100.12
+    command: /bin/sh -c "ip route add 192.168.200.0/24 via 192.168.100.11; nginx -g 'daemon off;'"
+
+  # nginx 2: bridge_net2에 배치
+  nginx2:
+    image: nginx:alpine
+    container_name: nginx2
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bridge_net2:
+        ipv4_address: 192.168.200.12
+    command: /bin/sh -c "ip route add 192.168.100.0/24 via 192.168.200.11; nginx -g 'daemon off;'"
+
+networks:
+  # 각 브릿지 네트워크: 내부 서비스 간 통신 및 FRR 라우터가 관리하는 네트워크
+  bridge_net1:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+          gateway: 192.168.100.1
+  bridge_net2:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 192.168.200.0/24
+          gateway: 192.168.200.1
+  # FRR 라우터 간 BGP 피어링용 공통 네트워크
+  bgp_net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+      - subnet: 192.168.1.0/24
+        gateway: 192.168.1.1
