@@ -1,0 +1,54 @@
+# containerlab 테스트에 사용한 파일
+
+name: bgp-lab
+
+mgmt:
+  network: mgmt
+  ipv4-subnet: 192.168.100.0/24
+
+topology:
+  nodes:
+    r1:
+      kind: linux
+      image: frrouting/frr:v8.4.1
+      binds:
+      - ./frr1.conf:/etc/frr/frr.conf
+      - ./daemons:/etc/frr/daemons
+      mgmt-ipv4: 192.168.100.11
+
+    r2:
+      kind: linux
+      image: frrouting/frr:v8.4.1
+      binds:
+      - ./frr2.conf:/etc/frr/frr.conf
+      mgmt-ipv4: 192.168.100.12
+
+    nginx1:
+      kind: linux
+      image: nginx:alpine
+
+    nginx2:
+      kind: linux
+      image: nginx:alpine
+
+  links:
+  - type: veth
+    endpoints:
+    - node: r1
+      interface: eth1
+    - node: nginx1
+      interface: eth1
+
+  - type: veth
+    endpoints:
+    - node: r2
+      interface: eth1
+    - node: nginx2
+      interface: eth1
+
+  - type: veth
+    endpoints:
+    - node: r1
+      interface: eth2
+    - node: r2
+      interface: eth2
