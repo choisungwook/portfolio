@@ -1,0 +1,37 @@
+services:
+  # nginx 1: bridge_net1에 배치
+  nginx1:
+    image: nginx:alpine
+    container_name: nginx1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bridge_net1:
+        ipv4_address: 192.168.100.12
+
+  # nginx 2: bridge_net2에 배치
+  nginx2:
+    image: nginx:alpine
+    container_name: nginx2
+    cap_add:
+      - NET_ADMIN
+    networks:
+      bridge_net2:
+        ipv4_address: 192.168.200.12
+
+networks:
+  # 각 브릿지 네트워크: 내부 서비스 간 통신 및 FRR 스위치가 관리하는 네트워크
+  bridge_net1:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+          gateway: 192.168.100.1
+  bridge_net2:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 192.168.200.0/24
+          gateway: 192.168.200.1
