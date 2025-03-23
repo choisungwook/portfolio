@@ -4,7 +4,7 @@
 
 resource "aws_customer_gateway" "main" {
   bgp_asn    = 65000
-  ip_address = module.onprem_strongswan.public_ip
+  ip_address = module.onprem_libreswan.public_ip
   type       = "ipsec.1"
 
   tags = {

@@ -1,5 +1,5 @@
-module "onprem_strongswan" {
-  source = "../../../../common/terraform_module/ec2_strongswan"
+module "onprem_libreswan" {
+  source = "../../../../common/terraform_module/ec2_libreswan"
 
   vpc_id            = module.vpc_onprem.vpc_id
   ec2_name          = "onprem"
