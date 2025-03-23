@@ -10,13 +10,17 @@
 ## 환경변수 설정
 
 ```sh
-# Libreswan EC2의 공인 IP
+# strongswan EC2의 public IP
 export LEFT_PUBLIC_IP=$(aws ec2 describe-instances \
     --filters "Name=tag:Name,Values=onprem-strongswan" "Name=instance-state-name,Values=running" \
     --query 'Reservations[0].Instances[0].PublicIpAddress' \
     --output text)
 
-export LEFT_SUBNET="10.10.0.0/16"   # 온프레미스 VPC 서브넷
+# strongswan EC2의 private IP
+export LEFT_PRIVATE_IP=$(aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=onprem-strongswan" "Name=instance-state-name,Values=running" \
+    --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+    --output text)
 
 # VPN connection id
 export VPN_CONNECTION_ID=$(aws ec2 describe-vpn-connections \
@@ -29,9 +33,6 @@ export RIGHT_PUBLIC_IP=$(aws ec2 describe-vpn-connections \
     --vpn-connection-ids ${VPN_CONNECTION_ID} \
     --query 'VpnConnections[0].VgwTelemetry[0].OutsideIpAddress' \
     --output text)
-
-# Cloud VPC 서브넷
-export RIGHT_SUBNET="10.20.0.0/16"
 
 # VPN 첫번째 터널의 사전 공유 키
 export PSK_SECRET=$(aws ec2 describe-vpn-connections \
@@ -54,8 +55,10 @@ export PSK_SECRET=$(aws ec2 describe-vpn-connections \
 
 ```sh
 # AWS console에서 Site to Site VPN connection configuration을 다운로드 받고, 아래 값을 설정하세요
-export TUNNEL1_LEFT_INNER_IP=169.254.198.138/30 # Inside IP Addresses Customer Gateway
-export TUNNEL1_RIGHT_INNER_IP=169.254.198.137/30  # Inside IP Addresses Virtual Private Gateway
+export TUNNEL1_LEFT_INNER_IP_CIDR=169.254.198.138/30 # Inside IP Addresses Customer Gateway
+export TUNNEL1_RIGHT_INNER_IP_CIDR=169.254.198.137/30  # Inside IP Addresses Virtual Private Gateway
+export TUNNEL1_LEFT_INNER_IP=169.254.198.138 # Inside IP Addresses Customer Gateway
+export TUNNEL1_RIGHT_INNER_IP=169.254.198.137  # Inside IP Addresses Virtual Private Gateway
 ```
 
 ```sh
@@ -65,8 +68,8 @@ bash generate-.sh
 * EC2인스턴스에 설정파일 복사
 
 ```sh
-ipsec.conf -> /etc/ipsec.d/aws.conf
-ipsec.secrets -> /etc/ipsec.d/aws.secrets
+ipsec.conf -> /etc/ipsec.conf
+ipsec.secrets -> /etc/ipsec.secrets
 ipsec-vti.sh -> /etc/ipsec-vti.sh
 ```
 
@@ -74,22 +77,16 @@ ipsec-vti.sh -> /etc/ipsec-vti.sh
 * ipsec 실행
 
 ```sh
-systemctl restart ipsec
+rm -f /var/run/charon.pid /var/run/starter.charon.pid
+systemctl start strongswan-starter
 ```
 
+## bgp
 
-* vti 네트워크 인터페이스 확인
-
-```sh
-ip addr show
-```
-
-* ip up
 
 ```sh
-echo "ip link add vti1 type vti key 100 remote $TUNNEL1_RIGHT_INNER_IP local $TUNNEL1_LEFT_INNER_IP"
-echo "ip addr add $TUNNEL1_LEFT_INNER_IP dev vti1"
-echo "ip link set vti1 up mtu 1436"
+export TGW_ASN=64512
+export FRR_ASN=65000
 ```
 
 
@@ -98,13 +95,13 @@ echo "ip link set vti1 up mtu 1436"
 예시)
 
 ```sh
-export LEFT_PUBLIC_IP=""   # Libreswan EC2의 공인 IP
+export LEFT_PUBLIC_IP=""   # strongswan EC2의 공인 IP
 export LEFT_SUBNET=""   # 온프레미스 VPC 서브넷
 export RIGHT_PUBLIC_IP="" # AWS VPN Gateway의 공인 IP
 export RIGHT_SUBNET=""     # AWS VPC 서브넷
 export PSK_SECRET=""  # VPN 사전 공유 키
 
-export LEFT_PUBLIC_IP_2=""   # Libreswan EC2의 공인 IP
+export LEFT_PUBLIC_IP_2=""   # strongswan EC2의 공인 IP
 export LEFT_SUBNET_2=""   # 온프레미스 VPC 서브넷
 export RIGHT_PUBLIC_IP_2="" # AWS VPN Gateway의 공인 IP
 export RIGHT_SUBNET_2=""     # AWS VPC 서브넷

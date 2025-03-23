@@ -27,8 +27,6 @@ resource "aws_instance" "strongswan" {
     net.ipv4.conf.$INTERFACE.accept_redirects = 0
     SYSCTL_CONF
 
-    echo "net.ipv4.conf.vti1.disable_policy=1" >> /etc/sysctl.d/99-vti.conf
-
     # sysctl 설정 적용
     sysctl --system
 
@@ -47,8 +45,8 @@ resource "aws_instance" "strongswan" {
     systemctl start nginx
   EOF
 
-  tags = merge(var.tags, {
-    Name        = "${var.ec2_name}-strongswan"
+  tags = {
+    Name        = "${var.ec2_name}-libreswan"
     environment = "test"
-  })
+  }
 }

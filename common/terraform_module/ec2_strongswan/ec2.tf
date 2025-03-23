@@ -27,12 +27,14 @@ resource "aws_instance" "strongswan" {
     net.ipv4.conf.$INTERFACE.accept_redirects = 0
     SYSCTL_CONF
 
+    echo "net.ipv4.conf.vti1.disable_policy=1" >> /etc/sysctl.d/99-vti.conf
+
     # sysctl 설정 적용
     sysctl --system
 
     # 패키지 업데이트 및 설치
     apt-get update -y
-    apt-get install -y libreswan nginx net-tools
+    apt-get install -y strongswan strongswan-pki nginx net-tools
     apt-get install -y frr frr-pythontools
 
     # FRR 데몬 활성화
@@ -45,8 +47,8 @@ resource "aws_instance" "strongswan" {
     systemctl start nginx
   EOF
 
-  tags = {
+  tags = merge({
     Name        = "${var.ec2_name}-strongswan"
     environment = "test"
-  }
+  })
 }
