@@ -3,70 +3,57 @@
 set -e
 
 cat > ./ipsec.conf <<EOF
-conn AWS-VPC-GW1
-    authby = secret
-    auto = start
+#
+# /etc/ipsec.conf
+#
+conn %default
+    # Authentication Method : Pre-Shared Key
+    leftauth=psk
+    rightauth=psk
+    # Encryption Algorithm : aes-128-cbc
+    # Authentication Algorithm : sha1
+    # Perfect Forward Secrecy : Diffie-Hellman Group 2
+    ike=aes128-sha1-modp1024!
+    # Lifetime : 28800 seconds
+    ikelifetime=28800s
+    # Phase 1 Negotiation Mode : main
+    aggressive=no
+    # Protocol : esp
+    # Encryption Algorithm : aes-128-cbc
+    # Authentication Algorithm : hmac-sha1-96
+    # Perfect Forward Secrecy : Diffie-Hellman Group 2
+    esp=aes128-sha1-modp1024!
+    # Lifetime : 3600 seconds
+    lifetime=3600s
+    # Mode : tunnel
     type=tunnel
-
-    #
-    # 1) 구간정보
-    #
-    left = %defaultroute
-    leftid = $LEFT_PUBLIC_IP               # Customer Gateway(내 GW) Public IP
-    right = $RIGHT_PUBLIC_IP                 # AWS VGW Public IP
-    type = tunnel
-    keyexchange = ike
-
-    #
-    # 2) IKE(Phase 1) 알고리즘
-    #
-    #  - AES-256
-    #  - SHA2-256
-    #  - DH Group 14 -> modp2048
-    #
-    ikev2 = never
-    ike = aes256-sha2_256;modp2048
-    ikelifetime = 8h           # = 28800 seconds (AWS 기본값과 맞춤)
-    keyingtries = %forever
-
-    #
-    # 3) ESP(Phase 2) 알고리즘
-    #
-    phase2 = esp
-    phase2alg = aes256-sha2_256;modp2048
-    keylife = 1h               # = 3600 seconds
-    # (PFS를 위해 DH 재협상 시에도 Group 14 사용)
-
-    #
-    # 4) 서브넷 설정
-    #
-    #  - leftsubnet  = 온프레미스(내부) 사설망
-    #  - rightsubnet = AWS VPC 측 사설망
-    #
-    leftsubnet = $LEFT_SUBNET
-    rightsubnet = $RIGHT_SUBNET
-
-    #
-    # 5) DPD (Dead Peer Detection) 설정
-    #
-    dpddelay = 10
-    dpdtimeout = 30
-    dpdaction = restart_by_peer
-
-    #
-    # 6) VTI 관련
-    #
-    vti-interface=vti1
-    vti-routing=yes
-    mark=0x64/0xffffffff
-    leftvti=$TUNNEL1_LEFT_INNER_IP  # AWS tunnel1 VTI IP
-    rightvti=$TUNNEL1_RIGHT_INNER_IP # AWS side VTI IP
-
-    #
-    # 7) 중첩 IP(overlap IP) 가능 여부
-    #    필요 시 사용 (AWS 예시 상 필요하다면)
-    #
-    overlapip = yes
+    # DPD Interval : 10
+    dpddelay=10s
+    # DPD Retries : 3
+    dpdtimeout=30s
+    # Tuning Parameters for AWS Virtual Private Gateway:
+    keyexchange=ikev1
+    rekey=yes
+    reauth=no
+    dpdaction=restart
+    closeaction=restart
+    leftsubnet=0.0.0.0/0,::/0
+    rightsubnet=0.0.0.0/0,::/0
+    # Create network interfacve
+    leftupdown=/etc/ipsec-vti.sh
+    installpolicy=yes
+    compress=no
+    mobike=no
+conn AWS-VPC-GW1
+    # Customer Gateway: :
+    left=$LEFT_PRIVATE_IP
+    leftid=$LEFT_PUBLIC_IP
+    # Virtual Private Gateway :
+    right=$RIGHT_PUBLIC_IP
+    rightid=$RIGHT_PUBLIC_IP
+    auto=start
+    mark=100
+    #reqid=1
 EOF
 
 cat > ./ipsec.secrets <<EOF

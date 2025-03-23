@@ -18,9 +18,3 @@ variable "subnet_id" {
   description = "Subnet ID"
   type        = string
 }
-
-variable "tags" {
-  description = "Tags for the EC2 instance"
-  type        = map(string)
-  default     = {}
-}
