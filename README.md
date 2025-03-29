@@ -42,6 +42,7 @@
 | 20 | AWS ALB mTLS 예제 | [링크](./computer_science/mTLS/aws/ALB/)|
 | 21 | mysql 도커 컨테이너에서 sakila 샘플 로드 | [링크](./common/mysql_sakila_sample/)|
 | 22 | docker 컨테이너로 BGP 프로토콜 실습 | [링크](./computer_science/BGP_protocol/)|
+| 23 | Database connection pool을 사용한 예제와 conneciton pool을 사용하지 않은 예제 비교 | [링크](./computer_science/database_connection/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
