@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+fcm:
+  fireBaseConfigPath: firebase-adminsdk.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
+  endpoint:
+    prometheus:
+      enabled: true
