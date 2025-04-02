@@ -31,7 +31,7 @@ helmfile apply
 ./manifests/firebase-adminsdk.json
 ```
 
-![](./imgs/firebase-sdk-json-2.png)
+![](./imgs/firebase-sdk-json.png)
 
 4. firebase-admin SDK 9.2.0과 9.4.3 비교
 
