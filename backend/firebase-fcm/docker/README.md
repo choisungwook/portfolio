@@ -20,9 +20,7 @@
 ./docker-config/springboot/firebase-adminsdk.json
 ```
 
-![](../kubernetes/imgs/firebase-sdk-json-1.png)
-
-![](../kubernetes/imgs/firebase-sdk-json-2.png)
+![](../kubernetes/imgs/firebase-sdk-json.png)
 
 2. docker compse up
 

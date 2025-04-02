@@ -17,7 +17,9 @@ npm install
 cp .env.example .env
 ```
 
-3. 환경변수 설정
+3. firebase 웹앱 생성 그리고 환경변수 설정
+
+![](./imgs/create-app.png)
 
 ![](./imgs/environment.png)
 
