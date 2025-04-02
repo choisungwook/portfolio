@@ -1,0 +1,49 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.4.4'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'akbun'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+//	implementation 'com.google.firebase:firebase-admin:9.4.3'
+	implementation 'com.google.firebase:firebase-admin:9.2.0'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+bootBuildImage {
+	builder= "paketobuildpacks/builder-jammy-full"
+	imageName = "choisunguk/fcm-push:latest"
+	createdDate = "now"
+	imagePlatform = "linux/arm64"
+	publish = false // 직접 docker push 하기 위해 false로 설정
+	environment = [
+			"BP_NATIVE_IMAGE" : "false",
+			"BP_JVM_VERSION" : "21",
+	]
+}

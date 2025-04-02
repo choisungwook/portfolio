@@ -1,0 +1,20 @@
+extends: default
+
+rules:
+  document-start: disable  # "---" 안 붙여도 허용
+  line-length: disable     # 80자 넘는 줄 허용
+  comments-indentation: disable
+
+  indentation:
+    spaces: consistent
+    indent-sequences: consistent
+    check-multi-line-strings: false
+
+  brackets:
+    max-spaces-inside: 1
+    min-spaces-inside: 0
+
+ignore: |
+  **/node_modules/**
+  **/build/**
+  **/target/**

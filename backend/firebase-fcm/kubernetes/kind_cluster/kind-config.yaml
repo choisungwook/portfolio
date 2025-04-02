@@ -1,0 +1,23 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: fcm
+nodes:
+- role: control-plane
+  image: kindest/node:v1.31.4
+  extraPortMappings:
+  # springboot v920
+  - containerPort: 30080
+    hostPort: 30080
+    protocol: TCP
+  # springboot v933
+  - containerPort: 30090
+    hostPort: 30090
+    protocol: TCP
+  # grafana
+  - containerPort: 30085
+    hostPort: 30085
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.31.4
+- role: worker
+  image: kindest/node:v1.31.4
