@@ -1,0 +1,21 @@
+repositories:
+- name: prometheus-community
+  url: https://prometheus-community.github.io/helm-charts
+- name: metrics-server
+  url: https://kubernetes-sigs.github.io/metrics-server
+
+releases:
+# with grafana
+- name: prometheus-operator
+  namespace: monitoring
+  chart: prometheus-community/kube-prometheus-stack
+  version: 69.8.1
+  disableValidationOnInstall: true # to install CRDS
+  values:
+  - ./charts/prometheus-operator.yaml
+- name: metrics-server
+  namespace: kube-system
+  chart: metrics-server/metrics-server
+  version: 3.12.2
+  values:
+  - ./charts/metrics-server.yaml
