@@ -71,11 +71,11 @@ const payload = JSON.stringify({
 const headers = { 'Content-Type': 'application/json' };
 
 export function firebaes943() {
-  http.post('http://localhost:8080/send', payload, { headers });
+  http.post('http://localhost:8080/send-async', payload, { headers });
   sleep(1);
 }
 
 export function firebase920() {
-  http.post('http://localhost:8081/send', payload, { headers });
+  http.post('http://localhost:8081/send-async', payload, { headers });
   sleep(1);
 }
