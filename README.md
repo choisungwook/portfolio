@@ -45,6 +45,7 @@
 | 23 | k6를 사용하여 Firebase-admin SDK 메모리 사용률 비교 | [링크](./backend/firebase-fcm/)|
 | 24 | docker compose로 k6, influxDB v2 구축 | [링크](./tools/k6/)|
 | 25 | k6 influxDB v2 플러그인 설치와 실행 방법 | [링크](./tools/k6/influxdb_v2.md)|
+| 26 | RDMS index 있고 없고 차이 비교 | [링크](./computer_science/database_index/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)

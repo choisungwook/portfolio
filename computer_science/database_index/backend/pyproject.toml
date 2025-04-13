@@ -1,0 +1,26 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "black>=25.1.0",
+    "faker>=37.1.0",
+    "fastapi>=0.115.12",
+    "mysql-connector-python>=9.2.0",
+    "python-dotenv>=1.1.0",
+    "uvicorn[standard]>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.5",
+]
+
+# ref: https://docs.astral.sh/ruff/settings/#indent-width
+[tool.ruff]
+indent-width = 2
+
+[tool.uv.scripts]
+app = "uvicorn main:app --host 0.0.0.0 --port 8000"
