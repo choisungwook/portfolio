@@ -38,6 +38,10 @@ docker compose up -d
 
 ![](./imgs/grafana_dashboard_2.png)
 
+## k6 스크립트 실행 방법
+
+* [k6 스크립트 실행 방법 문서 바로가기](./influxdb_v2.md)
+
 ## 삭제 방법
 
 ```sh
