@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: readiness
+
+  datasource:
+    url: "jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:testdb}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC"
+    username: "${DB_USER:root}"
+    password: "${DB_PASSWORD:password1234}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 10000 # 10초 이상 idle이면 커넥션 닫음
+      max-lifetime: 30000 # 30초 지나면 커넥션 강제 재생성
+      connection-timeout: 2000 # 2초 안에 커넥션 생성 안되면 실패
+
+  jpa:
+    enabled: false
+
+management:
+  # 액츄레이터(Actuator) 엔드포인트를 외부로 노출할지 설정
+  endpoints:
+    web:
+      exposure:
+        include: health, readiness, liveness
+
+  # livenessProbe, readinessProbe 전용 health 경로
+  endpoint:
+    health:
+      # for debug
+      show-details: always
+      # group.readiness.include: db 설정이 없으면 readiness에 db상태를 포함하지 않음
+      group:
+        liveness:
+          include: '*'
+          exclude:
+          - db
+          - readinessState
+        readiness:
+          include: readinessState,db
+      probes:
+        enabled: true
+
+  # 쿠버네티스 환경이 아닌 경우 명시적 true 설정
+  # 쿠버네티스 환경인 경우 자동으로 true 설정됨
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true

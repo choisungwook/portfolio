@@ -1,0 +1,45 @@
+# sbtest1 테이블 조회 API 테스트
+# VS Code REST Client 확장 프로그램 사용 권장
+# 사용 전 {{host}} 변수를 실행 중인 애플리케이션 주소로 변경하세요.
+# (예: 로컬 실행 시 http://localhost:8080, Kubernetes NodePort 사용 시 http://<NodeIP>:<NodePort>)
+
+# @Host 변수 설정 (애플리케이션 주소)
+# 로컬 Docker Compose 환경 또는 직접 실행 시 기본 포트
+@host = http://localhost:8080
+
+# Kubernetes NodePort 서비스 (예시: 이전 질문에서 언급된 포트)
+# @host = http://localhost:30081
+
+
+###
+# 1. 'k' 값으로 sbtest1 테이블 조회
+# GET /query/by-k?k={k값}
+# 지정된 k 값에 해당하는 레코드를 조회합니다.
+
+GET {{host}}/query/by-k?k=4992833
+Accept: application/json
+
+
+###
+# 2. 'c' 값으로 sbtest1 테이블 조회
+# GET /query/by-c?c={c값}
+# 지정된 c 값에 해당하는 레코드를 조회합니다.
+
+GET {{host}}/query/by-c?c=73754818686-04889373966-18668178968-56957589012-31352882173-91882653509-59577900152-88962682169-52981807259-62646890059
+Accept: application/json
+
+
+###
+# (예시) 존재하지 않는 'k' 값으로 조회
+# 결과는 빈 리스트 []가 될 것으로 예상됩니다.
+
+GET {{host}}/query/by-k?k=99999999
+Accept: application/json
+
+
+###
+# (예시) 존재하지 않는 'c' 값으로 조회
+# 결과는 빈 리스트 []가 될 것으로 예상됩니다.
+
+GET {{host}}/query/by-c?c=non-existent-value-12345
+Accept: application/json

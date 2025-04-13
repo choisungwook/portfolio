@@ -1,0 +1,110 @@
+# 단일 인스턴스
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-data
+      containers:
+      - name: mysql
+        image: bitnami/mysql:8.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+          name: mysql
+        # 더미 데이터를 넣기 위해 최소 4코어 필요
+        # 부하 테스트에서는 1core로 변경
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+            # cpu: "4"
+          requests:
+            memory: "1Gi"
+            cpu: "1"
+            # cpu: "4"
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_DATABASE
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /bitnami/mysql/data
+        # 부하 테스트 중 DB pod가 죽지 않도록 설정
+        # livenessProbe:
+        #   exec:
+        #     command:
+        #     - /bin/sh
+        #     - -c
+        #     - mysqladmin ping -u root -p"${MYSQL_ROOT_PASSWORD}" # 변수를 ""로 감싸는 것이 더 안전할 수 있음
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 3
+        # readinessProbe:
+        #   exec:
+        #     command:
+        #     - /bin/sh
+        #     - -c
+        #     - mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -D "${MYSQL_DATABASE}" -e 'SELECT 1'
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 5
+        #   timeoutSeconds: 3
+        #   failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+    targetPort: 3306
+    # 로컬에서 접근할 수 있도록 NodePort로 설정
+    # 주의: 테스트 환경에서만 사용, 프로덕션은 nodePort 사용하는 것을 추천하지 않음
+    nodePort: 30080
+  selector:
+    app: mysql
+  type: NodePort
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
