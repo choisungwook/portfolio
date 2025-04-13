@@ -1,0 +1,47 @@
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    environment:
+      # .env 파일에서 초기 설정값 참조
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: password1234
+      DOCKER_INFLUXDB_INIT_ORG: my_org
+      DOCKER_INFLUXDB_INIT_BUCKET: k6_results
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: password1234
+    networks:
+      - k6_with_influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password1234
+    # import influxDB dashboard
+    volumes:
+      - ./docker-config/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - k6_with_influxdb
+    depends_on:
+      - influxdb
+
+networks:
+  k6_with_influxdb:
+    driver: bridge
+
+volumes:
+  # influxdb 데이터를 저장
+  influxdb_data:

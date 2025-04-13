@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+# Ref: https://grafana.com/grafana/dashboards/19431-my-k6-dashboard2/
+- name: 'InfluxDB for k6'
+  orgId: 1
+  folder: ''
+  type: file
+  updateIntervalSeconds: 30
+  options:
+    path: /etc/grafana/provisioning/dashboards

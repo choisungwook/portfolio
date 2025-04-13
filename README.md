@@ -43,6 +43,7 @@
 | 21 | mysql 도커 컨테이너에서 sakila 샘플 로드 | [링크](./common/mysql_sakila_sample/)|
 | 22 | docker 컨테이너로 BGP 프로토콜 실습 | [링크](./computer_science/BGP_protocol/)|
 | 23 | k6를 사용하여 Firebase-admin SDK 메모리 사용률 비교 | [링크](./backend/firebase-fcm/)|
+| 24 | docker compose로 k6, influxDB v2 구축 | [링크](./tools/k6/)|
 
 ## 다른 문서 링크
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
