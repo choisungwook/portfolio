@@ -8,15 +8,18 @@
 <!-- /TOC -->
 
 ## 개요
+
 * 제가 공부한 것과 테스트한 자료를 정리한 github repo입니다.
 
 ## 자기소개
+
 안녕하세요 데브옵스 엔지니어 악분 입니다.
 * 링크드인: https://www.linkedin.com/in/choisungwook/
 * 블로그: https://malwareanalysis.tistory.com
 * 유투브(악분일상): https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
 
 ## 목차
+
 | 번호 | 이름 | 링크 |
 | ---- | ---- | ---- |
 | 1 | helm-charts | [링크](./helm) |
@@ -45,8 +48,13 @@
 | 23 | k6를 사용하여 Firebase-admin SDK 메모리 사용률 비교 | [링크](./backend/firebase-fcm/)|
 | 24 | docker compose로 k6, influxDB v2 구축 | [링크](./tools/k6/)|
 | 25 | k6 influxDB v2 플러그인 설치와 실행 방법 | [링크](./tools/k6/influxdb_v2.md)|
+| 26 | RDMS index 있고 없고 차이 비교 | [링크](./computer_science/database_index/)|
+| 27 | springboot Readiness, Liveness 설정 | [링크](./backend/readiness/src/main/resources/application.yaml)|
+| 28 | 도구 - sysbench(데이터베이스 등 벤치마크) | [링크](./tools/sysbench/)|
+| 29 | kubernets mysql single instance | [링크](./common/kubernetes_mysql_single_instance/)|
 
 ## 다른 문서 링크
+
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
 * [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
 * [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)

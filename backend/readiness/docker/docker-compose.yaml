@@ -1,0 +1,10 @@
+services:
+  mysql:
+    container_name: mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password1234
+      MYSQL_DATABASE: testdb
+      TZ: UTC
+    ports:
+      - 3306:3306
