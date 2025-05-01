@@ -54,13 +54,21 @@ sysbench oltp_read_write \
 * c 필드값을 조회하여 [k6 스크립트의 sql](./stress_test/load-test-by-c.js)를 변경하세요.
 
 ```sh
-SELECT c FROM testdb.sbtest1 limit 100;
+export default function () {
+  const targetC = '{your random number}';
 ```
 
 7. mysql pod의 cpu를 1코로 변경(기존:4코어)
 
 ```sh
-kubectl edit deploy mysql
+$ kubectl edit deploy mysql
+resources:
+  limits:
+    memory: "1Gi"
+    cpu: "1"
+  requests:
+    memory: "1Gi"
+    cpu: "1"
 ```
 
 8. k6로 API 부하 테스트 진행
