@@ -7,3 +7,4 @@
 * [redis cluster](./redis-cluster/)
 * [httpbin](./httpbin/)
 * [mysql 도커 컨테이너에서 sakila 샘플 로드](./mysql_sakila_sample/)
+* [kubernetes mysql deployment(single instance)](./kubernetes_mysql_single_instance/)
