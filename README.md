@@ -52,6 +52,7 @@
 | 27 | springboot Readiness, Liveness 설정 | [링크](./backend/readiness/src/main/resources/application.yaml)|
 | 28 | 도구 - sysbench(데이터베이스 등 벤치마크) | [링크](./tools/sysbench/)|
 | 29 | kubernets mysql single instance | [링크](./common/kubernetes_mysql_single_instance/)|
+| 30 | EKS GPU 설정과 cuda 샘플 실행 | [링크](./kubernetes/eks/gpu_node/)|
 
 ## 다른 문서 링크
 

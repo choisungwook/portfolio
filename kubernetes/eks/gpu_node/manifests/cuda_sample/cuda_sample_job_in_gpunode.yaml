@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vectoradd-in-gpunode
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: Exists
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vectoradd
+        image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda10.2
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+  backoffLimit: 2

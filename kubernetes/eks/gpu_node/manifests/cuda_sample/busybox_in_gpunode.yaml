@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-in-gpunode
+  namespace: default
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu
+            operator: Exists
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  containers:
+  - name: busybox
+    image: busybox
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+    command: [ "/bin/sh", "-c" ]
+    args: [ "echo 'Hello from busybox in GPU node' && sleep 3600" ]
