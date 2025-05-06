@@ -1,0 +1,11 @@
+repositories:
+- name: nvdp
+  url: https://nvidia.github.io/k8s-device-plugin
+
+releases:
+- name: nvdp
+  namespace: nvidia-device-plugin
+  chart: nvdp/nvidia-device-plugin
+  version: 0.17.1
+  values:
+  - ./charts/nvdp.yaml
