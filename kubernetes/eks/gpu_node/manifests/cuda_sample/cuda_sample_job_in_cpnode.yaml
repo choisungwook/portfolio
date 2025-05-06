@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vectoradd-in-cpunode
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: vectoradd
+        image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda10.2
+  backoffLimit: 1
