@@ -20,12 +20,6 @@
 
 * 쿠버네티스: kind 클러스터
 * 모니터링: proemtheus operator, grafana, JVM metrics, kubernetes metrics
-* 접속주소
-  * firebase-admin SDK 9.2.0: http://localhost:30080/send
-  * firebase-admin SDK 9.4.3: http://localhost:30090/send
-  * grafana: http://localhost:30085 (admin/password1234)
-
-> 실습을 하기 위해 firebase 프로젝트가 생성되어 있어야 합니다.
 
 1. kind 클러스터 생성
 
