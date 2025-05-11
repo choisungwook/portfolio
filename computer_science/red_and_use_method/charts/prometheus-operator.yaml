@@ -1,0 +1,39 @@
+crds:
+  enabled: true
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  serviceMonitor:
+    # 모든 네임스페이스의 ServiceMonitor를 수집할 수 있도록 설정
+    namespaceSelector:
+      any: true
+
+grafana:
+  adminUser: admin
+  adminPassword: password1234
+
+  service:
+    type: NodePort
+    nodePort: 30085
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      micrometer-jvm:
+        gnetId: 4701
+        revision: 10
+        datasource: Prometheus
