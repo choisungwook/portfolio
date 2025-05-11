@@ -53,6 +53,8 @@
 | 28 | 도구 - sysbench(데이터베이스 등 벤치마크) | [링크](./tools/sysbench/)|
 | 29 | kubernets mysql single instance | [링크](./common/kubernetes_mysql_single_instance/)|
 | 30 | EKS GPU 설정과 cuda 샘플 실행 | [링크](./kubernetes/eks/gpu_node/)|
+| 31 | 모니터링 방법론 USE method and RED method | [링크](./computer_science/red_and_use_method/)|
+| 32 | springboot with prometheus metrics endpoint | [링크](./backend/spring-helloworld-with-prometheus/)|
 
 ## 다른 문서 링크
 

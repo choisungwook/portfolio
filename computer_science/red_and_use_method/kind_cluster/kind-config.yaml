@@ -1,0 +1,19 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: monitoring
+nodes:
+- role: control-plane
+  image: kindest/node:v1.31.4
+  extraPortMappings:
+  # applicatio nodePort
+  - containerPort: 30080
+    hostPort: 30080
+    protocol: TCP
+  # grafana
+  - containerPort: 30085
+    hostPort: 30085
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.31.4
+- role: worker
+  image: kindest/node:v1.31.4
