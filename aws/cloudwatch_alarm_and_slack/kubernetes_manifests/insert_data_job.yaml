@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sysbench-prepare
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: sysbench-prepare
+        image: severalnines/sysbench
+        command:
+        - /bin/sh
+        - -c
+        - |
+          sysbench oltp_read_write \
+            --mysql-host=${MYSQL_HOST} \
+            --mysql-port=3306 \
+            --mysql-user=${MYSQL_USER} \
+            --mysql-password=${MYSQL_ROOT_PASSWORD} \
+            --mysql-db=${MYSQL_DATABASE} \
+            --tables=1 \
+            --table-size=10000000 \
+            prepare
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_HOST
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_USER
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_DATABASE
+      restartPolicy: Never

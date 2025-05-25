@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sysbench-script
+data:
+  test_query.lua: |
+    function event(thread_id)
+      local query = "SELECT * FROM sbtest1 WHERE c = '83868641912-28773972837-60736120486-75162659906-27563526494-20381887404-41576422241-93426793964-56405065102-33518432330'"
+      db_query(query)
+    end

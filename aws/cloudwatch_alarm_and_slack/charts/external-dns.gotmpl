@@ -1,0 +1,14 @@
+serviceAccount:
+  name: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Environment.Values.externalDns.irsa }}
+
+txtOwnerId: external-dns
+
+# your hostzone domain
+domainFilters:
+  - {{ .Environment.Values.externalDns.hostzone }}
+
+env:
+- name: AWS_DEFAULT_REGION
+  value: {{ .Environment.Values.global.region }}

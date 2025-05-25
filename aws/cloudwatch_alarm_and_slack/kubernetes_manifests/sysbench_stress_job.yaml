@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sysbench-stress
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: sysbench-stress
+        image: severalnines/sysbench
+        command:
+        - /bin/sh
+        - -c
+        - |
+          sysbench /scripts/test_query.lua \
+            --mysql-host=${MYSQL_HOST} \
+            --mysql-port=3306 \
+            --mysql-user=${MYSQL_USER} \
+            --mysql-password=${MYSQL_ROOT_PASSWORD} \
+            --mysql-db=${MYSQL_DATABASE} \
+            --threads=16 \
+            --time=60 \
+            --report-interval=10 \
+            run
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_HOST
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_USER
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: MYSQL_DATABASE
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+      volumes:
+      - name: scripts
+        configMap:
+          name: sysbench-script
+      restartPolicy: Never
