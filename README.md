@@ -55,6 +55,7 @@
 | 30 | EKS GPU 설정과 cuda 샘플 실행 | [링크](./kubernetes/eks/gpu_node/)|
 | 31 | 모니터링 방법론 USE method and RED method | [링크](./computer_science/red_and_use_method/)|
 | 32 | springboot with prometheus metrics endpoint | [링크](./backend/spring-helloworld-with-prometheus/)|
+| 33 | RDS cloudwatch alarm and send to slack  | [링크](./aws/cloudwatch_alarm_and_slack/)|
 
 ## 다른 문서 링크
 
