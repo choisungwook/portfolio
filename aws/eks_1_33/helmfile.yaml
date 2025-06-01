@@ -1,0 +1,18 @@
+repositories: []
+
+environments:
+  default:
+    values:
+    - global:
+        clusterName: eks-demo-1-33
+    - karpenter:
+        interruptionQueue: eks-demo-1-33
+        irsa: arn:aws:iam::467606240901:role/eks-demo-1-33-karpenter-irsa
+
+releases:
+- name: karpenter
+  namespace: karpenter
+  chart: oci://public.ecr.aws/karpenter/karpenter
+  version: 1.5.0
+  values:
+  - ./charts/karpenter.gotmpl

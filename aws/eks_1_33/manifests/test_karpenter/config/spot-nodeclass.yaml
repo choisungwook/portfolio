@@ -1,0 +1,27 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: spot
+spec:
+  amiFamily: AL2023
+
+  amiSelectorTerms:
+  - name: amazon-eks-node-al2023-x86_64-standard-1.33-*
+
+  role: "eks-demo-1-33-eks-worker-node-role" # change to your worker node IAM role
+
+  subnetSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: "eks-demo-1-33" # change to your VPC subnet tags
+
+  securityGroupSelectorTerms:
+  - tags:
+      aws:eks:cluster-name: "eks-demo-1-33" # change to your Security Group tags
+      kubernetes.io/cluster/eks-demo-1-33: "owned"
+
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      volumeSize: 20Gi
+      volumeType: gp3
+      encrypted: true

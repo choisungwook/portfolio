@@ -1,0 +1,108 @@
+addressType: IPv4
+apiVersion: discovery.k8s.io/v1
+endpoints:
+- addresses:
+  - 10.0.101.67
+  conditions:
+    ready: true
+    serving: true
+    terminating: false
+  hints:
+    forZones:
+    - name: ap-northeast-2c
+  nodeName: ip-10-0-101-120.ap-northeast-2.compute.internal
+  targetRef:
+    kind: Pod
+    name: nginx-86c7df88d4-dp5ld
+    namespace: default
+    uid: a5879590-188c-46bc-b34f-10dc9bd28e20
+  zone: ap-northeast-2c
+- addresses:
+  - 10.0.100.242
+  conditions:
+    ready: true
+    serving: true
+    terminating: false
+  hints:
+    forZones:
+    - name: ap-northeast-2a
+  nodeName: ip-10-0-100-92.ap-northeast-2.compute.internal
+  targetRef:
+    kind: Pod
+    name: nginx-86c7df88d4-x9v6g
+    namespace: default
+    uid: 8070e569-dddf-49d1-9f11-fee4b5ddef39
+  zone: ap-northeast-2a
+- addresses:
+  - 10.0.100.118
+  conditions:
+    ready: true
+    serving: true
+    terminating: false
+  hints:
+    forZones:
+    - name: ap-northeast-2a
+  nodeName: ip-10-0-100-155.ap-northeast-2.compute.internal
+  targetRef:
+    kind: Pod
+    name: nginx-86c7df88d4-9c6x4
+    namespace: default
+    uid: 93027c84-0f29-4763-96d8-f452ec7206f4
+  zone: ap-northeast-2a
+- addresses:
+  - 10.0.101.228
+  conditions:
+    ready: true
+    serving: true
+    terminating: false
+  hints:
+    forZones:
+    - name: ap-northeast-2c
+  nodeName: ip-10-0-101-120.ap-northeast-2.compute.internal
+  targetRef:
+    kind: Pod
+    name: nginx-86c7df88d4-tgv8k
+    namespace: default
+    uid: c68f874a-910a-4b16-9a1e-dd10d8f805b7
+  zone: ap-northeast-2c
+- addresses:
+  - 10.0.100.74
+  conditions:
+    ready: true
+    serving: true
+    terminating: false
+  hints:
+    forZones:
+    - name: ap-northeast-2a
+  nodeName: ip-10-0-100-155.ap-northeast-2.compute.internal
+  targetRef:
+    kind: Pod
+    name: nginx-86c7df88d4-nxtv7
+    namespace: default
+    uid: 1203fa7d-2f91-4026-bbf0-3ab95ff301e3
+  zone: ap-northeast-2a
+kind: EndpointSlice
+metadata:
+  annotations:
+    endpoints.kubernetes.io/last-change-trigger-time: "2025-06-03T15:47:22Z"
+  creationTimestamp: "2025-06-03T15:48:52Z"
+  generateName: nginx-
+  generation: 2
+  labels:
+    endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+    kubernetes.io/service-name: nginx
+  name: nginx-cw9hm
+  namespace: default
+  ownerReferences:
+  - apiVersion: v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Service
+    name: nginx
+    uid: 0978d7d1-aef2-46da-ab16-c98347793441
+  resourceVersion: "3816"
+  uid: 46eb26d0-8910-4e4d-968f-fa52585520ea
+ports:
+- name: ""
+  port: 80
+  protocol: TCP
