@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-with-init-container
+spec:
+  initContainers:
+  - name: sidecar
+    image: busybox
+    restartPolicy: Always
+    command:
+    - /bin/sh
+    args:
+    - -c
+    - |
+      trap 'exit 0' TERM; sleep infinity & wait
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "64Mi"
+        cpu: "100m"
+
+  containers:
+  - image: nginx
+    name: nginx
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "64Mi"
+        cpu: "100m"
+    ports:
+    - containerPort: 80
+    lifecycle:
+      preStop:
+        exec:
+          command:
+          - /bin/sh
+          - -c
+          - 'echo "[PreStop] nginx at $(date +%T)" >> /proc/1/fd/1; sleep 10'

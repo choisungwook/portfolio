@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inplace-resize-pod-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inplace-resize-pod-demo
+  template:
+    metadata:
+      labels:
+        app: inplace-resize-pod-demo
+    spec:
+      containers:
+      - name: inflate
+        image: nicolaka/netshoot
+        command:
+        - "sh"
+        - "-c"
+        - "sleep infinity"
+        resizePolicy:
+        - resourceName: cpu
+          restartPolicy: NotRequired
+        - resourceName: memory
+          restartPolicy: NotRequired
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "300m"
+          limits:
+            memory: "128Mi"
+            cpu: "300m"
