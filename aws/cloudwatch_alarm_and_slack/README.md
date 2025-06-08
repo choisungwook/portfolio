@@ -1,6 +1,22 @@
+<!-- TOC -->
+
+- [개요](#%EA%B0%9C%EC%9A%94)
+- [시나리오](#%EC%8B%9C%EB%82%98%EB%A6%AC%EC%98%A4)
+- [아키텍처](#%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98)
+- [준비](#%EC%A4%80%EB%B9%84)
+  - [slack webhook 준비](#slack-webhook-%EC%A4%80%EB%B9%84)
+- [배포](#%EB%B0%B0%ED%8F%AC)
+- [helmfile 배포](#helmfile-%EB%B0%B0%ED%8F%AC)
+- [RDS 더미데이터 생성](#rds-%EB%8D%94%EB%AF%B8%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%83%9D%EC%84%B1)
+- [cloudwatch alarm 및 slack 메세지 전송 테스트](#cloudwatch-alarm-%EB%B0%8F-slack-%EB%A9%94%EC%84%B8%EC%A7%80-%EC%A0%84%EC%86%A1-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+- [참고자료](#%EC%B0%B8%EA%B3%A0%EC%9E%90%EB%A3%8C)
+
+<!-- /TOC -->
+
 ## 개요
 
 * cloudwatch alarm으로 AWS 리소스기반 이상탐지
+* [유투브 링크](https://youtu.be/V9uy5dbVsGo)
 
 ## 시나리오
 
@@ -75,7 +91,7 @@ terraform apply
 kubectl apply -f https://raw.githubusercontent.com/aws/eks-charts/refs/heads/master/stable/aws-load-balancer-controller/crds/crds.yaml
 ```
 
-2. helmfile 수정: IRSA, hostonze 등을 수정합니다.
+2. helmfile config 수정
 
 ```sh
 vi helmfile
@@ -148,7 +164,7 @@ Inserting 10000000 records into 'sbtest1'
 
 ## cloudwatch alarm 및 slack 메세지 전송 테스트
 
-* [RDS 테스트 문서](./rds_stress_test/)참고
+* [cloudwatch alarm 테스트 문서](./rds_stress_test/)참고
 
 ## 참고자료
 
