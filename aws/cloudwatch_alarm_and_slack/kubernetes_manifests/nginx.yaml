@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-5xx-conf
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    http {
+      server {
+        listen 80;
+        server_name localhost;
+
+        location /healthz {
+          return 200 'OK';
+          access_log off;
+        }
+
+        # 모든 요청('/')에 대해서는 503 Service Unavailable 에러를 반환합니다.
+        location / {
+          return 503;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-5xx
+  labels:
+    app: nginx-5xx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-5xx
+  template:
+    metadata:
+      labels:
+        app: nginx-5xx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: nginx-conf-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: nginx-conf-volume
+        configMap:
+          name: nginx-5xx-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-5xx
+spec:
+  selector:
+    app: nginx-5xx
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-5xx
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    # AWS ACM
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:467606240901:certificate/248292f9-a31b-46b7-be91-b1e23a2b9a70
+    external-dns.alpha.kubernetes.io/hostname: nginx.choilab.xyz
+  labels:
+    name: nginx-5xx
+spec:
+  ingressClassName: alb
+  rules:
+  - host: nginx.choilab.xyz
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: nginx-5xx
+            port:
+              number: 80
