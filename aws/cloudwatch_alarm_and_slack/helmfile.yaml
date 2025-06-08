@@ -1,0 +1,36 @@
+repositories:
+- name: eks
+  url: https://aws.github.io/eks-charts
+- name: external-dns
+  url: https://kubernetes-sigs.github.io/external-dns/
+
+environments:
+  default:
+    values:
+    - global:
+        clusterName: cloudwatch-alarm-demo-1-33
+        region: ap-northeast-2
+        vpcId: vpc-0b29a045be5ba723a
+
+    # ALB Controller를 위한 환경
+    - albController:
+        irsa: arn:aws:iam::467606240901:role/cloudwatch-alarm-demo-1-33-alb-controller-irsa
+
+    # ExternalDNS를 위한 환경
+    - externalDns:
+        irsa: arn:aws:iam::467606240901:role/cloudwatch-alarm-demo-1-33-external-dns-irsa
+        hostzone: choilab.xyz
+
+releases:
+- name: aws-load-balancer-controller
+  namespace: kube-system
+  chart: eks/aws-load-balancer-controller
+  version: 1.13.2
+  values:
+  - ./charts/aws-load-balancer-controller.gotmpl
+- name: external-dns
+  namespace: kube-system
+  chart: external-dns/external-dns
+  version: 1.16.1
+  values:
+  - ./charts/external-dns.gotmpl
