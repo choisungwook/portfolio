@@ -15,10 +15,7 @@ enable_amp = false
 
 auto_mode_enabled = false
 
-cluster_compute_config = {
-  enabled    = false
-  node_pools = ["general-purpose", "system"]
-}
+cluster_compute_config = {}
 
 ######################################################################
 # Managed Node Groups
