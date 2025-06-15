@@ -16,7 +16,7 @@ enable_amp = false
 auto_mode_enabled = false
 
 cluster_compute_config = {
-  enabled    = true
+  enabled    = false
   node_pools = ["general-purpose", "system"]
 }
 
@@ -38,7 +38,7 @@ managed_node_groups = {
       "node-type" = "managed-node-group-a"
     }
   },
-  # # GPU 노드 예제
+  # GPU 노드 예제
   "managed-node-group-gpu-a" = {
     node_group_name = "managed-node-group-gpu-a",
     instance_types  = ["g6.xlarge"],
@@ -62,7 +62,7 @@ managed_node_groups = {
       }
     ]
   },
-  # # not optimized GPU 노드 예제
+  # not optimized GPU 노드 예제
   # "managed-node-group-gpu-b" = {
   #   node_group_name = "managed-node-group-gpu-b",
   #   instance_types  = ["g6.xlarge"],
