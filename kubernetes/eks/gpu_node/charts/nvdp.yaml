@@ -5,3 +5,6 @@ affinity:
       - matchExpressions:
         - key: nvidia.com/gpu
           operator: Exists
+
+gfd:
+  enabled: true

@@ -21,6 +21,8 @@ spec:
       containers:
       - name: vectoradd
         image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda10.2
+        command: [ "/bin/sh", "-c" ]
+        args: [ "/tmp/vectorAdd && echo 'vectoradd completed, starting sleep...' && sleep 600" ]
         resources:
           limits:
             nvidia.com/gpu: "1"
