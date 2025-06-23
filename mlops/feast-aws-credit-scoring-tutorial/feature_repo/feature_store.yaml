@@ -1,0 +1,20 @@
+project: credit_scoring_aws
+# use local proto registry
+registry: registry.db
+# if you are using a remote registry, you can specify it like this:
+# registry:
+#   path: s3://[YOUR BUCKET YOU CREATED]/registry.pb
+#   cache_ttl_seconds: 60
+provider: aws
+entity_key_serialization_version: 3
+online_store:
+    type: dynamodb
+    region: ap-northeast-2
+offline_store:
+    type: postgres
+    host: localhost
+    port: 5432
+    database: feast
+    db_schema: public
+    user: feast
+    password: password
