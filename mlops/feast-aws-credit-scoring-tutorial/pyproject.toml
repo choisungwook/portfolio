@@ -1,0 +1,19 @@
+[project]
+name = "feast-aws-credit-scoring-tutorial"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "feast-postgres>=0.2.4",
+    "feast[aws,postgres]>=0.49.0",
+    "ipykernel>=6.29.5",
+    "joblib>=1.5.1",
+    "matplotlib>=3.10.3",
+    "pandas>=2.3.0",
+    "protobuf>=5.29.0,<6.0.0",
+    "scikit-learn>=1.7.0",
+    "shap>=0.48.0",
+    "streamlit>=1.46.1",
+    "watchdog>=6.0.0",
+]

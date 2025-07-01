@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:13
+    container_name: credit_scoring_postgres
+    environment:
+      POSTGRES_USER: feast
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: feast
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./data:/data
+
+  redis:
+    image: valkey/valkey:8.1-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
