@@ -5,6 +5,12 @@
 - When referencing this file in GitHub pull requests, use this file for code review only when there are code changes.
 - If a file appears to be a Kubernetes YAML file, check whether it complies with these guidelines.
 
+## Pull Request Comment Format
+
+- If you find anything that needs reviewing, please include example code when you provide feedback.
+- When there are items to review, please provide example code in your review. YAML indentation is 2 spaces.
+- If multiple review items are found, please split them into separate pull request comments.
+
 ## General Guidelines
 
 ### Resource Configuration
@@ -13,12 +19,14 @@
 - Service ports should be clearly named according to protocol (e.g., http, https, grpc)
 - Ingress resources must use TLS, and HTTP requests should be redirected to HTTPS
 - All containers must have readiness and liveness probes configured
+- below is the example of a compliant resource configuration:
+- Container images should not use the 'latest' tag.
 
 ```yaml
 spec:
   containers:
   - name: example
-    image: example
+    image: example:v1
     resources:
       requests:
         cpu: 100m
