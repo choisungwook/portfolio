@@ -1,0 +1,11 @@
+repositories:
+- name: airbyte
+  url: https://airbytehq.github.io/helm-charts
+
+releases:
+- name: airbyte
+  namespace: airbyte
+  chart: airbyte/airbyte
+  version: 1.7.1
+  values:
+  - ./charts/airbyte.yaml
