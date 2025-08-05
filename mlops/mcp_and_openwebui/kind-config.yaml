@@ -1,0 +1,19 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: openwebui
+nodes:
+- role: control-plane
+  image: kindest/node:v1.32.5
+  extraPortMappings:
+  # ollama nodePort
+  - containerPort: 30080
+    hostPort: 30080
+    protocol: TCP
+  # openwebui nodePort
+  - containerPort: 30090
+    hostPort: 30090
+    protocol: TCP
+- role: worker
+  image: kindest/node:v1.32.5
+- role: worker
+  image: kindest/node:v1.32.5

@@ -1,0 +1,30 @@
+persistentVolume:
+  enabled: true
+  size: 50Gi
+
+# ref: https://github.com/otwld/ollama-helm/blob/main/values.yaml
+ollama:
+  gpu:
+    enabled: false
+  # ref: https://ollama.com/library
+  models:
+    pull:
+    - llama3.1:8b
+    create:
+    - name: llama3.1-ctx16384
+      template: |
+        FROM llama3.1:8b
+        PARAMETER num_ctx 16384
+    # run:
+    # - llama3.1-ctx16384
+
+service:
+  type: NodePort
+  port: 11434
+  nodePort: 30080
+
+resources:
+  requests: {}
+  limits: {}
+
+extraEnvVars: []
