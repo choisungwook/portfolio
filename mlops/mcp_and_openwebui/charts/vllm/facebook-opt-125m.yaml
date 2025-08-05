@@ -1,0 +1,25 @@
+routerSpec:
+  # -- RuntimeClassName configuration, set to "nvidia" if the model requires GPU
+  runtimeClassName: ""
+  resources:
+    requests:
+      cpu: "4"
+      memory: "4G"
+    limits:
+      cpu: "8"
+      memory: "4G"
+
+servingEngineSpec:
+  # -- RuntimeClassName configuration, set to "nvidia" if the model requires GPU
+  runtimeClassName: ""
+  modelSpec:
+  - name: "opt125m"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 4
+    requestMemory: "8Gi"
+    requestGPU: 0

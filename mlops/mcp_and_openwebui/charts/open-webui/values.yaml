@@ -1,0 +1,50 @@
+ollama:
+  enabled: false
+
+websocket:
+  enabled: false
+
+pipelines:
+  enabled: false
+
+persistence:
+  enabled: false
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  failureThreshold: 5
+  periodSeconds: 10
+
+# readinessProbe:
+#   httpGet:
+#     path: /health/db
+#     port: http
+#   failureThreshold: 2
+#   periodSeconds: 10
+
+resources:
+  limits:
+    cpu: 6
+    memory: 4Gi
+  requests:
+    cpu: 1
+    memory: 4Gi
+
+service:
+  type: NodePort
+  port: 80
+  containerPort: 8080
+  nodePort: 30090
+
+ollamaUrlsFromExtraEnv: false
+
+# ref: ../ollama/values.yaml
+# kubernetes service discovery endpoint: kubectl -n ollama get svc ollama
+ollamaUrls:
+- "http://ollama.ollama.svc.cluster.local:11434"
+
+enableOpenaiApi: false
+openaiBaseApiUrl: ""
+openaiBaseApiUrls: []
