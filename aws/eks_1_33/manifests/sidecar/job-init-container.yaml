@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-with-init-container
+  namespace: default
+  labels:
+    app: job-with-init-container
+spec:
+  template:
+    metadata:
+      name: job-with-init-container
+      labels:
+        app: job-with-init-container
+    spec:
+      restartPolicy: Never
+      initContainers:
+      - name: sidecar
+        image: busybox
+        restartPolicy: Always
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - while true; do echo "Init Container at `date +%T`"; sleep 1;done
+        # successful exited
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - return 0
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+
+      containers:
+      - name: main
+        image: busybox
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - return 0
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
