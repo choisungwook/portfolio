@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-cpu-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-cpu-server
+  template:
+    metadata:
+      labels:
+        app: vllm-cpu-server
+    spec:
+      containers:
+      - name: inference-server
+        # CPU 전용 vLLM 이미지로 변경
+        image: vllm/vllm-openai:latest
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        args:
+        - --model=$(MODEL_ID)
+        - --host=0.0.0.0
+        - --port=8000
+        - --max-model-len=4096
+        - --dtype=float16
+        - --max-num-seqs=8
+        - --served-model-name=mistral-7b
+        env:
+        # 원하는 모델로 변경 (예: Mistral-7B)
+        - name: MODEL_ID
+          value: mistralai/Mistral-7B-Instruct-v0.1
+        - name: VLLM_USE_MODELSCOPE
+          value: "true"
+        ports:
+        - containerPort: 8000
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-service
+spec:
+  selector:
+    app: vllm-cpu-server
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+    nodePort: 30090
+  type: NodePort
