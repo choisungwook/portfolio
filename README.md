@@ -65,7 +65,7 @@
 * [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
 * [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
 * [테라폼 예제](https://github.com/choisungwook/terraform_practice)
-* [karpenter](https://github.com/choisungwook/karpenter)gi
+* [karpenter](https://github.com/choisungwook/karpenter)
 * [EKS 예제](https://github.com/choisungwook/eks-practice)
 * [스터디]
   * [ansible](https://github.com/choisungwook/ansible_practice)
