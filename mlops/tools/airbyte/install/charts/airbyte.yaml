@@ -1,0 +1,30 @@
+webapp:
+  ingress:
+    enabled: true
+    className;: nginx
+    hosts:
+    - host: airbyte-webapp.local
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+
+workload-api-server:
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+    - host: airbyte-workload-api-server.local
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+
+feature-flag-server:
+  enabled: true
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+    - host: airbyte-feature-flag-server.local
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
