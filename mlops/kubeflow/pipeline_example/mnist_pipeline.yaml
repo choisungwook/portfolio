@@ -1,0 +1,275 @@
+# PIPELINE DEFINITION
+# Name: mnist-pipeline
+# Description: A pipeline to train a model on the MNIST dataset
+components:
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        x_test_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        y_test_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-load-and-preprocess-data:
+    executorLabel: exec-load-and-preprocess-data
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        x_test_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        x_train_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        y_test_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        y_train_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-mnist-model:
+    executorLabel: exec-train-mnist-model
+    inputDefinitions:
+      artifacts:
+        x_train_input:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        y_train_input:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        epochs:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        trained_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(\n  model: Input[Model],\n  x_test_data: Input[Dataset],\n\
+          \  y_test_data: Input[Dataset],\n  metrics: Output[Metrics]\n):\n  import\
+          \ numpy as np\n  import tensorflow as tf\n  import os\n\n  print(\"[Info]\
+          \ Start evaluating model\")\n  keras_model_path = os.path.join(model.path,\
+          \ \"model.keras\")\n  model = tf.keras.models.load_model(keras_model_path)\n\
+          \n  x_test = np.load(x_test_data.path)\n  y_test = np.load(y_test_data.path)\n\
+          \n  loss, accuracy = model.evaluate(x_test, y_test)\n\n  print(f\"[Info]\
+          \ Evaluation results - Loss: {loss}, Accuracy: {accuracy}\")\n\n  metrics.log_metric(\"\
+          accuracy\", round(accuracy, 4))\n  metrics.log_metric(\"loss\", round(loss,\
+          \ 4))\n  print(\"[Info] Model evaluation completed\")\n\n"
+        image: choisunguk/tensorflow:2.19.0
+    exec-load-and-preprocess-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - load_and_preprocess_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef load_and_preprocess_data(\n    x_train_output: Output[Dataset],\n\
+          \    y_train_output: Output[Dataset],\n    x_test_output: Output[Dataset],\n\
+          \    y_test_output: Output[Dataset],\n    metrics : Output[Metrics]\n):\n\
+          \  import numpy as np\n  import tensorflow as tf\n  import shutil\n\n  print(\"\
+          [Info] Start loading and preprocessing data\")\n  print(f\"[Info] TensorFlow\
+          \ version: {tf.__version__}\")\n\n  # \uC544\uD2F0\uD329\uD2B8 \uACBD\uB85C\
+          \ \uCD9C\uB825 (KFP\uAC00 \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131)\n  print(f\"\
+          [Info] x_train_output.path: {x_train_output.path}\")\n  print(f\"[Info]\
+          \ y_train_output.path: {y_train_output.path}\")\n  print(f\"[Info] x_test_output.path:\
+          \ {x_test_output.path}\")\n  print(f\"[Info] y_test_output.path: {y_test_output.path}\"\
+          )\n\n  (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()\n\
+          \n  # preprocess Datasets\n  x_train = x_train.reshape(-1,28,28,1)\n  x_test\
+          \ = x_test.reshape(-1,28,28,1)\n  x_train = x_train / 255\n  x_test = x_test\
+          \ / 255\n\n  #logging metrics using Kubeflow Artifacts\n  metrics.log_metric(\"\
+          Len x_train\", x_train.shape[0])\n  metrics.log_metric(\"Len y_train\",\
+          \ y_train.shape[0])\n  metrics.log_metric(\"Len x_test\", x_test.shape[0])\n\
+          \  metrics.log_metric(\"Len y_test\", y_test.shape[0])\n\n  # /tmp\uC5D0\
+          \ \uC784\uC2DC \uD30C\uC77C\uB85C \uC800\uC7A5 \uD6C4 shutil.move\uB97C\
+          \ \uC0AC\uC6A9\uD574 \uC544\uD2F0\uD329\uD2B8 \uACBD\uB85C\uB85C \uC774\uB3D9\
+          \n  np.save(\"/tmp/x_train.npy\", x_train)\n  shutil.move(\"/tmp/x_train.npy\"\
+          , x_train_output.path)\n\n  np.save(\"/tmp/y_train.npy\", y_train)\n  shutil.move(\"\
+          /tmp/y_train.npy\", y_train_output.path)\n\n  np.save(\"/tmp/x_test.npy\"\
+          , x_test)\n  shutil.move(\"/tmp/x_test.npy\", x_test_output.path)\n\n  np.save(\"\
+          /tmp/y_test.npy\", y_test)\n  shutil.move(\"/tmp/y_test.npy\", y_test_output.path)\n\
+          \n  print(\"[Info] Data preprocessing completed\")\n  print(f\"[Info] x_train\
+          \ shape: {x_train.shape}, y_train shape: {y_train.shape}\")\n  print(f\"\
+          [Info] x_test shape: {x_test.shape}, y_test shape: {y_test.shape}\")\n\n"
+        image: choisunguk/tensorflow:2.19.0
+    exec-train-mnist-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_mnist_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_mnist_model(\n  x_train_input: Input[Dataset],\n  y_train_input:\
+          \ Input[Dataset],\n  trained_model: Output[Model],\n  epochs: int = 1 #\
+          \ hyperparameter\n):\n  import numpy as np\n  from tensorflow import keras\n\
+          \  import os\n\n  print(\"[Info] Start training\")\n\n  x_train = np.load(x_train_input.path)\n\
+          \  y_train = np.load(y_train_input.path)\n\n  # build a model\n  model =\
+          \ keras.models.Sequential([\n    keras.layers.Conv2D(64, (3, 3), activation='relu',\
+          \ input_shape=(28, 28, 1)),\n    keras.layers.MaxPool2D(2, 2),\n    keras.layers.Conv2D(64,\
+          \ (3, 3), activation='relu'),\n    keras.layers.MaxPool2D(2, 2),\n    keras.layers.Flatten(),\n\
+          \    keras.layers.Dense(64, activation='relu'),\n    keras.layers.Dense(10,\
+          \ activation='softmax')\n  ])\n\n  model.compile(optimizer=\"adam\",\n \
+          \               loss=\"sparse_categorical_crossentropy\",\n            \
+          \    metrics=['accuracy'])\n\n  model.summary()\n\n  # training\n  model.fit(x=x_train,\
+          \ y=y_train, epochs=epochs)\n\n  # save the model\n  save_model_path = os.path.join(trained_model.path,\
+          \ \"model.keras\")\n  os.makedirs(trained_model.path, exist_ok=True)\n \
+          \ model.save(save_model_path, save_format='keras_v3')\n  print(f\"[Info]\
+          \ Model is saved to {save_model_path}\")\n\n  # save metadata\n  trained_model.metadata['framework']\
+          \ = 'tensorflow'\n\n  print(\"[Info] Model training completed\")\n\n"
+        image: choisunguk/tensorflow:2.19.0
+pipelineInfo:
+  description: A pipeline to train a model on the MNIST dataset
+  name: mnist-pipeline
+root:
+  dag:
+    tasks:
+      evaluate-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-model
+        dependentTasks:
+        - load-and-preprocess-data
+        - train-mnist-model
+        inputs:
+          artifacts:
+            model:
+              taskOutputArtifact:
+                outputArtifactKey: trained_model
+                producerTask: train-mnist-model
+            x_test_data:
+              taskOutputArtifact:
+                outputArtifactKey: x_test_output
+                producerTask: load-and-preprocess-data
+            y_test_data:
+              taskOutputArtifact:
+                outputArtifactKey: y_test_output
+                producerTask: load-and-preprocess-data
+        taskInfo:
+          name: evaluate-model
+      load-and-preprocess-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-load-and-preprocess-data
+        taskInfo:
+          name: load-and-preprocess-data
+      train-mnist-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-mnist-model
+        dependentTasks:
+        - load-and-preprocess-data
+        inputs:
+          artifacts:
+            x_train_input:
+              taskOutputArtifact:
+                outputArtifactKey: x_train_output
+                producerTask: load-and-preprocess-data
+            y_train_input:
+              taskOutputArtifact:
+                outputArtifactKey: y_train_output
+                producerTask: load-and-preprocess-data
+          parameters:
+            epochs:
+              runtimeValue:
+                constant: 1.0
+        taskInfo:
+          name: train-mnist-model
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.14.2
