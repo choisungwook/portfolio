@@ -1,0 +1,11 @@
+[project]
+name = "kubeflow-pipeline-example"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ipykernel>=6.30.1",
+    "kfp>=2.14.2",
+    "tensorflow>=2.13.0,<2.15.0",
+]
