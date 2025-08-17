@@ -1,0 +1,26 @@
+# Profiles deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profiles-deployment
+  namespace: kubeflow
+spec:
+  template:
+    spec:
+      containers:
+      - name: kfam
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      - name: manager
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

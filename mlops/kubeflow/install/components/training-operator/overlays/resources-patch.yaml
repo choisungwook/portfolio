@@ -1,0 +1,18 @@
+# # Training Operator
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: training-operator
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: training-operator
+#         resources:
+#           requests:
+#             cpu: 500m
+#             memory: 512Mi
+#           limits:
+#             cpu: 500m
+#             memory: 512Mi

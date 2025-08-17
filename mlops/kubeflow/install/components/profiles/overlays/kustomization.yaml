@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- https://github.com/kubeflow/manifests/apps/profiles/upstream/overlays/kubeflow?ref=v1.10.0 # Profiles + KFAM with PSS (Pod Security Standards)
+
+patchesStrategicMerge:
+- resources-patch.yaml

@@ -1,0 +1,18 @@
+# # Jupyter Web App
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: jupyter-web-app-deployment
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: jupyter-web-app
+#         resources:
+#           requests:
+#             cpu: 500m
+#             memory: 512Mi
+#           limits:
+#             cpu: 500m
+#             memory: 512Mi

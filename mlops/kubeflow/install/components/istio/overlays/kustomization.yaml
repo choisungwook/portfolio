@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+sortOptions:
+  order: legacy
+  legacySortOptions:
+    orderFirst:
+    - Namespace
+    - ResourceQuota
+    - StorageClass
+    - CustomResourceDefinition
+    - MutatingWebhookConfiguration
+    - ServiceAccount
+    - PodSecurityPolicy
+    - NetworkPolicy
+    - Role
+    - ClusterRole
+    - RoleBinding
+    - ClusterRoleBinding
+    - ConfigMap
+    - Secret
+    - Endpoints
+    - Service
+    - LimitRange
+    - PriorityClass
+    - PersistentVolume
+    - PersistentVolumeClaim
+    - Deployment
+    - StatefulSet
+    - CronJob
+    - PodDisruptionBudget
+    orderLast:
+    - ValidatingWebhookConfiguration
+
+resources:
+- https://github.com/kubeflow/manifests/common/istio-1-24/istio-crds/base?ref=v1.10.0
+- https://github.com/kubeflow/manifests/common/istio-1-24/istio-namespace/base?ref=v1.10.0
+- https://github.com/kubeflow/manifests/common/istio-1-24/istio-install/overlays/oauth2-proxy?ref=v1.10.0
+- https://github.com/kubeflow/manifests/common/istio-1-24/cluster-local-gateway/base?ref=v1.10.0
+
+patchesStrategicMerge:
+- resources-patch.yaml
