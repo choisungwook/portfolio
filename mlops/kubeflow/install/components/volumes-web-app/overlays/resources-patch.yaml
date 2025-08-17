@@ -1,0 +1,18 @@
+# # Volumes Web App
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: volumes-web-app-deployment
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: volumes-web-app
+#         resources:
+#           requests:
+#             cpu: 100m
+#             memory: 128Mi
+#           limits:
+#             cpu: 100m
+#             memory: 128Mi

@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kubeflow
+
+# Use Kubeflow Katib installation as base from GitHub repo
+resources:
+- https://github.com/kubeflow/manifests/apps/katib/upstream/installs/katib-with-kubeflow?ref=v1.10.0
+
+# patchesStrategicMerge:
+# - resources-patch.yaml

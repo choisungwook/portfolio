@@ -1,0 +1,75 @@
+# # Katib Controller
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: katib-controller
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: katib-controller
+#         resources:
+#           requests:
+#             cpu: 100m
+#             memory: 100Mi
+#           # limits:
+#           #   cpu: 100m
+#           #   memory: 100Mi
+# ---
+# # Katib DB Manager
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: katib-db-manager
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: katib-db-manager
+#         resources:
+#           requests:
+#             cpu: 100m
+#             memory: 100Mi
+#           limits:
+#             cpu: 100m
+#             memory: 100Mi
+# ---
+# # Katib UI
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: katib-mysql
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: katib-mysql
+#         resources:
+#           requests:
+#             cpu: 100m
+#             memory: 100Mi
+#           limits:
+#             cpu: 100m
+#             memory: 100Mi
+# ---
+# # Katib UI
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: katib-ui
+#   namespace: kubeflow
+# spec:
+#   template:
+#     spec:
+#       containers:
+#       - name: katib-ui
+#         resources:
+#           requests:
+#             cpu: 50m
+#             memory: 64Mi
+#           limits:
+#             cpu: 50m
+#             memory: 64Mi
