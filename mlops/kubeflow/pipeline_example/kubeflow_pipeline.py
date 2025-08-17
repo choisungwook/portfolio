@@ -1,13 +1,13 @@
 import kfp
 from kfp import dsl
-from kfp.dsl import Input, Dataset, Output, Model, Metrics
+from kfp.dsl import Input, Dataset, Output, Model, Metrics, Artifact
 
 
 @dsl.component(
   # use below image when you use amd64
-  # base_image='tensorflow/tensorflow:2.19.0',
+  # base_image='tensorflow/tensorflow:2.20.0',
   # if you use arm64, use below image
-  base_image='choisunguk/tensorflow:2.19.0',
+  base_image='choisunguk/tensorflow:2.20.0',
   packages_to_install=['numpy']
 )
 def load_and_preprocess_data(
@@ -64,10 +64,10 @@ def load_and_preprocess_data(
 
 @dsl.component(
   # use below image when you use amd64
-  # base_image='tensorflow/tensorflow:2.19.0',
+  # base_image='tensorflow/tensorflow:2.20.0',
+  # packages_to_install=['numpy']
   # if you use arm64, use below image
-  base_image='choisunguk/tensorflow:2.19.0',
-  packages_to_install=['numpy']
+  base_image='choisunguk/tensorflow:2.20.0',
 )
 def train_mnist_model(
   x_train_input: Input[Dataset],
@@ -78,6 +78,7 @@ def train_mnist_model(
   import numpy as np
   from tensorflow import keras
   import os
+  import uuid
 
   print("[Info] Start training")
 
@@ -111,17 +112,19 @@ def train_mnist_model(
   print(f"[Info] Model is saved to {save_model_path}")
 
   # save metadata
+  trained_model.metadata['name'] = 'mnist'
   trained_model.metadata['framework'] = 'tensorflow'
+  trained_model.metadata['version'] = uuid.uuid4().hex[:6]
 
   print("[Info] Model training completed")
 
 
 @dsl.component(
   # use below image when you use amd64
-  # base_image='tensorflow/tensorflow:2.19.0',
+  # base_image='tensorflow/tensorflow:2.20.0',
+  # packages_to_install=['numpy']
   # if you use arm64, use below image
-  base_image='choisunguk/tensorflow:2.19.0',
-  packages_to_install=['numpy']
+  base_image='choisunguk/tensorflow:2.20.0',
 )
 def evaluate_model(
   model: Input[Model],
@@ -149,6 +152,45 @@ def evaluate_model(
   print("[Info] Model evaluation completed")
 
 
+@dsl.component(
+  # use below image when you use amd64
+  # base_image='tensorflow/tensorflow:2.20.0',
+  # packages_to_install=['numpy']
+  # if you use arm64, use below image
+  base_image='choisunguk/tensorflow:2.20.0',
+)
+def register_model(
+  project: str,
+  model: Input[Model],
+  metrics: Input[Artifact],
+):
+  from model_registry import ModelRegistry
+
+  registry = ModelRegistry(
+    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream
+    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream/options/istio
+    server_address="http://model-registry-service.kubeflow.svc.cluster.local",
+    port=8080,
+    author="akbun",
+    is_secure=False
+  )
+
+  model_name = model.metadata['name']
+  model_version = model.metadata['version']
+
+  print(f"[Info] Registering model '{model_name}' version '{model_version}' to the registry")
+
+  # ref: https://www.kubeflow.org/docs/components/model-registry/getting-started/#register-metadata
+  registry.register_model(
+    name=model_name,
+    uri=model.uri,
+    model_format_name="onnx",
+    model_format_version="1",
+    version=model_version,
+    description="MNIST model description",
+  )
+
+
 @dsl.pipeline(
   name="mnist-pipeline",
   description="A pipeline to train a model on the MNIST dataset"
@@ -164,6 +206,11 @@ def mnist_pipeline():
     model=train_task.outputs['trained_model'],
     x_test_data=preprocess_task.outputs['x_test_output'],
     y_test_data=preprocess_task.outputs['y_test_output']
+  )
+  register_model(
+    project="mnist-demo",
+    model=train_task.outputs['trained_model'],
+    metrics=evaluate_task.outputs['metrics'],
   )
 
 if __name__ == '__main__':
