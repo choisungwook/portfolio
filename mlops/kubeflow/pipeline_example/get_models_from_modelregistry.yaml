@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: get-mnist-model
+  namespace: kubeflow-user-example-com
+  labels:
+    app: get-mnist-model
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: default-editor
+      restartPolicy: Never
+      containers:
+      - name: get-model-from-registry
+        image: choisunguk/kubeflow-model-registry-with-python:python312-0.2.22
+        command:
+        - "python"
+        - "-c"
+        - |
+          import os
+          from model_registry import ModelRegistry
+
+          try:
+            registry = ModelRegistry(
+              # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream
+              # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream/options/istio
+              server_address="http://model-registry-service.kubeflow.svc.cluster.local",
+              port=8080,
+              author="akbun",
+              is_secure=False
+            )
+            print("Success connecting to ModelRegistry")
+          except Exception as e:
+            print(f"Failed to initialize ModelRegistry client: {e}")
+            exit(1)
+
+          model_name = "mnist"
+
+          try:
+            print(f"Attempting to get model '{model_name}' from the registry...")
+            # 등록된 모델 정보 가져오기
+            registered_model = registry.get_registered_model(model_name)
+          except Exception as e:
+            print(f"Failed to retrieve Registered Model: {e}")
+            exit(1)
+
+          try:
+            print(f"Attempting to get model versions from the registry...")
+            # 모델 버전 정보 가져오기
+            versions = registry.get_model_versions(model_name)
+            for version in versions:
+              print(version)
+          except Exception as e:
+            print(f"Failed to retrieve Model Version: {e}")
+            exit(1)

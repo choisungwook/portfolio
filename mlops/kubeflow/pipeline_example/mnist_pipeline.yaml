@@ -48,6 +48,21 @@ components:
           artifactType:
             schemaTitle: system.Dataset
             schemaVersion: 0.0.1
+  comp-register-model:
+    executorLabel: exec-register-model
+    inputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        project:
+          parameterType: STRING
   comp-train-mnist-model:
     executorLabel: exec-train-mnist-model
     inputDefinitions:
@@ -85,7 +100,6 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
           \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
@@ -110,7 +124,7 @@ deploymentSpec:
           \ Evaluation results - Loss: {loss}, Accuracy: {accuracy}\")\n\n  metrics.log_metric(\"\
           accuracy\", round(accuracy, 4))\n  metrics.log_metric(\"loss\", round(loss,\
           \ 4))\n  print(\"[Info] Model evaluation completed\")\n\n"
-        image: choisunguk/tensorflow:2.19.0
+        image: choisunguk/tensorflow:2.20.0
     exec-load-and-preprocess-data:
       container:
         args:
@@ -165,7 +179,46 @@ deploymentSpec:
           \n  print(\"[Info] Data preprocessing completed\")\n  print(f\"[Info] x_train\
           \ shape: {x_train.shape}, y_train shape: {y_train.shape}\")\n  print(f\"\
           [Info] x_test shape: {x_test.shape}, y_test shape: {y_test.shape}\")\n\n"
-        image: choisunguk/tensorflow:2.19.0
+        image: choisunguk/tensorflow:2.20.0
+    exec-register-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_model(\n  project: str,\n  model: Input[Model],\n  metrics:\
+          \ Input[Artifact],\n):\n  from model_registry import ModelRegistry\n\n \
+          \ registry = ModelRegistry(\n    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream\n\
+          \    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream/options/istio\n\
+          \    server_address=\"http://model-registry-service.kubeflow.svc.cluster.local\"\
+          ,\n    port=8080,\n    author=\"akbun\",\n    is_secure=False\n  )\n\n \
+          \ model_name = model.metadata['name']\n  model_version = model.metadata['version']\n\
+          \n  print(f\"[Info] Registering model '{model_name}' version '{model_version}'\
+          \ to the registry\")\n\n  # ref: https://www.kubeflow.org/docs/components/model-registry/getting-started/#register-metadata\n\
+          \  registry.register_model(\n    name=model_name,\n    uri=model.uri,\n\
+          \    model_format_name=\"onnx\",\n    model_format_version=\"1\",\n    version=model_version,\n\
+          \    description=\"MINST model description\",\n  )\n\n"
+        image: choisunguk/tensorflow:2.20.0
     exec-train-mnist-model:
       container:
         args:
@@ -178,7 +231,6 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
           \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
@@ -196,21 +248,23 @@ deploymentSpec:
           \ *\n\ndef train_mnist_model(\n  x_train_input: Input[Dataset],\n  y_train_input:\
           \ Input[Dataset],\n  trained_model: Output[Model],\n  epochs: int = 1 #\
           \ hyperparameter\n):\n  import numpy as np\n  from tensorflow import keras\n\
-          \  import os\n\n  print(\"[Info] Start training\")\n\n  x_train = np.load(x_train_input.path)\n\
-          \  y_train = np.load(y_train_input.path)\n\n  # build a model\n  model =\
-          \ keras.models.Sequential([\n    keras.layers.Conv2D(64, (3, 3), activation='relu',\
-          \ input_shape=(28, 28, 1)),\n    keras.layers.MaxPool2D(2, 2),\n    keras.layers.Conv2D(64,\
-          \ (3, 3), activation='relu'),\n    keras.layers.MaxPool2D(2, 2),\n    keras.layers.Flatten(),\n\
-          \    keras.layers.Dense(64, activation='relu'),\n    keras.layers.Dense(10,\
-          \ activation='softmax')\n  ])\n\n  model.compile(optimizer=\"adam\",\n \
-          \               loss=\"sparse_categorical_crossentropy\",\n            \
-          \    metrics=['accuracy'])\n\n  model.summary()\n\n  # training\n  model.fit(x=x_train,\
-          \ y=y_train, epochs=epochs)\n\n  # save the model\n  save_model_path = os.path.join(trained_model.path,\
-          \ \"model.keras\")\n  os.makedirs(trained_model.path, exist_ok=True)\n \
-          \ model.save(save_model_path, save_format='keras_v3')\n  print(f\"[Info]\
-          \ Model is saved to {save_model_path}\")\n\n  # save metadata\n  trained_model.metadata['framework']\
-          \ = 'tensorflow'\n\n  print(\"[Info] Model training completed\")\n\n"
-        image: choisunguk/tensorflow:2.19.0
+          \  import os\n  import uuid\n\n  print(\"[Info] Start training\")\n\n  x_train\
+          \ = np.load(x_train_input.path)\n  y_train = np.load(y_train_input.path)\n\
+          \n  # build a model\n  model = keras.models.Sequential([\n    keras.layers.Conv2D(64,\
+          \ (3, 3), activation='relu', input_shape=(28, 28, 1)),\n    keras.layers.MaxPool2D(2,\
+          \ 2),\n    keras.layers.Conv2D(64, (3, 3), activation='relu'),\n    keras.layers.MaxPool2D(2,\
+          \ 2),\n    keras.layers.Flatten(),\n    keras.layers.Dense(64, activation='relu'),\n\
+          \    keras.layers.Dense(10, activation='softmax')\n  ])\n\n  model.compile(optimizer=\"\
+          adam\",\n                loss=\"sparse_categorical_crossentropy\",\n   \
+          \             metrics=['accuracy'])\n\n  model.summary()\n\n  # training\n\
+          \  model.fit(x=x_train, y=y_train, epochs=epochs)\n\n  # save the model\n\
+          \  save_model_path = os.path.join(trained_model.path, \"model.keras\")\n\
+          \  os.makedirs(trained_model.path, exist_ok=True)\n  model.save(save_model_path,\
+          \ save_format='keras_v3')\n  print(f\"[Info] Model is saved to {save_model_path}\"\
+          )\n\n  # save metadata\n  trained_model.metadata['name'] = 'mnist'\n  trained_model.metadata['framework']\
+          \ = 'tensorflow'\n  trained_model.metadata['version'] = uuid.uuid4().hex[:6]\n\
+          \n  print(\"[Info] Model training completed\")\n\n"
+        image: choisunguk/tensorflow:2.20.0
 pipelineInfo:
   description: A pipeline to train a model on the MNIST dataset
   name: mnist-pipeline
@@ -248,6 +302,30 @@ root:
           name: comp-load-and-preprocess-data
         taskInfo:
           name: load-and-preprocess-data
+      register-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-model
+        dependentTasks:
+        - evaluate-model
+        - train-mnist-model
+        inputs:
+          artifacts:
+            metrics:
+              taskOutputArtifact:
+                outputArtifactKey: metrics
+                producerTask: evaluate-model
+            model:
+              taskOutputArtifact:
+                outputArtifactKey: trained_model
+                producerTask: train-mnist-model
+          parameters:
+            project:
+              runtimeValue:
+                constant: minst-demo
+        taskInfo:
+          name: register-model
       train-mnist-model:
         cachingOptions:
           enableCache: true
