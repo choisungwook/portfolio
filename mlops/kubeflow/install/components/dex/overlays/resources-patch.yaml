@@ -1,0 +1,18 @@
+# Dex OIDC Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: auth
+spec:
+  template:
+    spec:
+      containers:
+      - name: dex
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

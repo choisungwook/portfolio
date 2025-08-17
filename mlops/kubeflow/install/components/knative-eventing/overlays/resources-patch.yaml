@@ -1,0 +1,56 @@
+# Knative Serving Webhook
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eventing-webhook
+  namespace: knative-eventing
+spec:
+  template:
+    spec:
+      containers:
+      - name: eventing-webhook
+        resources:
+          requests:
+            cpu: 300m
+            memory: 200Mi
+          limits:
+            cpu: 300m
+            memory: 200Mi
+---
+# Knative Serving Webhook
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-sink
+  namespace: knative-eventing
+spec:
+  template:
+    spec:
+      containers:
+      - name: job-sink
+        resources:
+          requests:
+            cpu: 125m
+            memory: 64Mi
+          limits:
+            cpu: 125m
+            memory: 64Mi
+---
+# Knative Serving Webhook
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pingsource-mt-adapter
+  namespace: knative-eventing
+spec:
+  template:
+    spec:
+      containers:
+      - name: dispatcher
+        resources:
+          requests:
+            cpu: 125m
+            memory: 64Mi
+          limits:
+            cpu: 125m
+            memory: 64Mi
