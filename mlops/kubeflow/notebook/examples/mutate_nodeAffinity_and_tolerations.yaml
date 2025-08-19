@@ -1,0 +1,42 @@
+# apiVersion: kubeflow.org/v1alpha1
+# kind: PodDefault
+# metadata:
+#   name: affinity-and-toleration-example
+#   namespace: kubeflow-user-example-com
+# spec:
+#   selector:
+#     matchLabels:
+#       apply-node-tolerations: "true"
+#   affinity:
+#     nodeAffinity:
+#       requiredDuringSchedulingIgnoredDuringExecution:
+#         nodeSelectorTerms:
+#         - matchExpressions:
+#           - key: "hello"
+#             operator: "In"
+#             values:
+#             - "world"
+#   tolerations:
+#   - key: "gpu-node"
+#     operator: "Equal"
+#     value: "world"
+#     effect: "NoSchedule"
+---
+apiVersion: kubeflow.org/v1alpha1
+kind: PodDefault
+metadata:
+  name: gpu-node-affinity
+  namespace: kubeflow-user-example-com
+spec:
+  selector:
+    matchLabels:
+      gpu-node: "true"
+  desc: "GPU 노드에 스케줄링"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "node-type"
+            operator: "In"
+            values: [ "gpu" ]

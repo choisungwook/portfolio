@@ -1,0 +1,13 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    sidecar.istio.io/inject: "false"
+  name: mnist-model-tensorflow
+  namespace: kubeflow-user-example-com
+spec:
+  predictor:
+    timeout: 600
+    serviceAccountName: serving
+    tensorflow:
+      storageUri: s3://mlpipeline/v2/artifacts/mnist-pipeline/2bad0a82-6677-4177-8662-607bcb780fae/train-mnist-model/cf28c711-8a24-4c21-bd7c-6d17886fc511/trained_model/savedmodel
