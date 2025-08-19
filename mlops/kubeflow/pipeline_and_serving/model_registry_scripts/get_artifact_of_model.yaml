@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: get-artifact-of-model
+  namespace: kubeflow-user-example-com
+  labels:
+    app: get-artifact-of-model
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: default-editor
+      restartPolicy: Never
+      containers:
+      - name: get-model-from-registry
+        image: choisunguk/kubeflow-model-registry-with-python:python312-0.2.22
+        command:
+        - "python"
+        - "-c"
+        - |
+          from model_registry import ModelRegistry
+
+          registry = ModelRegistry(
+            server_address="http://model-registry-service.kubeflow.svc.cluster.local",
+            port=8080,
+            author="anonymous",
+            is_secure=False
+          )
+
+          # 모델·버전 조회
+          model_name   = "mnist"
+          model_version_id = "5c0878"
+
+          artifact = registry.get_model_artifact(model_name, model_version_id)
+          print(artifact)

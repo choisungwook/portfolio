@@ -3,6 +3,7 @@ from kfp import dsl
 from kfp.dsl import Input, Dataset, Output, Model, Metrics, Artifact
 
 
+
 @dsl.component(
   # use below image when you use amd64
   # base_image='tensorflow/tensorflow:2.20.0',
@@ -78,7 +79,7 @@ def train_mnist_model(
   import numpy as np
   from tensorflow import keras
   import os
-  import uuid
+  import time
 
   print("[Info] Start training")
 
@@ -105,16 +106,27 @@ def train_mnist_model(
   # training
   model.fit(x=x_train, y=y_train, epochs=epochs)
 
-  # save the model
-  save_model_path = os.path.join(trained_model.path, "model.keras")
+  # Create output directory
   os.makedirs(trained_model.path, exist_ok=True)
-  model.save(save_model_path, save_format='keras_v3')
-  print(f"[Info] Model is saved to {save_model_path}")
+
+  # Save the model in H5 format
+  h5_model_path = os.path.join(trained_model.path, "model.h5")
+  model.save(h5_model_path)
+  print(f"[Info] Model is saved to {h5_model_path}")
 
   # save metadata
   trained_model.metadata['name'] = 'mnist'
   trained_model.metadata['framework'] = 'tensorflow'
-  trained_model.metadata['version'] = uuid.uuid4().hex[:6]
+  trained_model.metadata['version'] = str(int(time.time()))
+
+  # Export SavedModel format for KServe compatibility (Keras 3 way)
+  # TensorFlow Serving requires version directory structure
+  savedmodel_path = os.path.join(trained_model.path, "savedmodel", trained_model.metadata['version'])
+  os.makedirs(savedmodel_path, exist_ok=True)
+  model.export(savedmodel_path)  # Use export() for SavedModel in Keras 3
+  print(f"[Info] SavedModel exported to {savedmodel_path}")
+  print("[Info] SavedModel contains: saved_model.pb + variables/ + assets/ directories")
+  print(f"[Info] TensorFlow Serving will load from version directory: /mnt/models/{trained_model.metadata['version']}/")
 
   print("[Info] Model training completed")
 
@@ -137,13 +149,33 @@ def evaluate_model(
   import os
 
   print("[Info] Start evaluating model")
-  keras_model_path = os.path.join(model.path, "model.keras")
-  model = tf.keras.models.load_model(keras_model_path)
+
+  # Load model from available formats (inline logic since KFP components are isolated)
+  model_loaded = False
+
+  # Try H5 format first
+  h5_path = os.path.join(model.path, "model.h5")
+  if os.path.exists(h5_path):
+      loaded_model = tf.keras.models.load_model(h5_path)
+      print(f"[Info] Loaded H5 model from: {h5_path}")
+      model_loaded = True
+
+  # Try Keras format
+  if not model_loaded:
+      keras_path = os.path.join(model.path, "model.keras")
+      if os.path.exists(keras_path):
+          loaded_model = tf.keras.models.load_model(keras_path)
+          print(f"[Info] Loaded Keras model from: {keras_path}")
+          model_loaded = True
+
+  # If no model found
+  if not model_loaded:
+      raise FileNotFoundError(f"No compatible model found in {model.path}. Checked: [model.h5, model.keras]")
 
   x_test = np.load(x_test_data.path)
   y_test = np.load(y_test_data.path)
 
-  loss, accuracy = model.evaluate(x_test, y_test)
+  loss, accuracy = loaded_model.evaluate(x_test, y_test)
 
   print(f"[Info] Evaluation results - Loss: {loss}, Accuracy: {accuracy}")
 
@@ -165,30 +197,53 @@ def register_model(
   metrics: Input[Artifact],
 ):
   from model_registry import ModelRegistry
+  import os
+  import json
 
   registry = ModelRegistry(
     # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream
     # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream/options/istio
     server_address="http://model-registry-service.kubeflow.svc.cluster.local",
     port=8080,
-    author="akbun",
+    author="anonymous",
     is_secure=False
   )
 
   model_name = model.metadata['name']
   model_version = model.metadata['version']
+  model_display_name = f"{model_name}-classifier"
 
   print(f"[Info] Registering model '{model_name}' version '{model_version}' to the registry")
 
-  # ref: https://www.kubeflow.org/docs/components/model-registry/getting-started/#register-metadata
+  # Verify SavedModel exists (created in train_mnist_model)
+  savedmodel_path = os.path.join(model.path, "savedmodel")
+  if not os.path.exists(savedmodel_path):
+      raise FileNotFoundError(f"SavedModel not found at {savedmodel_path}")
+
+  print(f"[Info] Found SavedModel at: {savedmodel_path}")
+
+  # Get evaluation metrics (if available)
+  evaluation_metrics = {}
+  try:
+      # Try to read metrics from the metrics artifact
+      # This would depend on how metrics are stored in your pipeline
+      evaluation_metrics = {"model_version": model_version}
+  except Exception as e:
+      print(f"Could not read evaluation metrics: {e}")
+
+  # Register the model in Kubeflow Model Registry
   registry.register_model(
     name=model_name,
-    uri=model.uri,
-    model_format_name="onnx",
-    model_format_version="1",
+    uri=f"{model.uri}/savedmodel",  # Use the SavedModel path
+    model_format_name="tensorflow",
+    model_format_version="2.20.0",
     version=model_version,
-    description="MNIST model description",
+    description=f"MNIST classifier model - Version: {model_version}, Metrics: {json.dumps(evaluation_metrics)}",
   )
+
+  print(f"Model registered with display name '{model_display_name}'")
+  print(f"Model version: {model_version}")
+  print(f"Evaluation metrics: {evaluation_metrics}")
 
 
 @dsl.pipeline(

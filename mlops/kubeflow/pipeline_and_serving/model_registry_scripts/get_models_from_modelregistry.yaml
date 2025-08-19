@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: get-mnist-model
+  namespace: kubeflow-user-example-com
+  labels:
+    app: get-mnist-model
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: default-editor
+      restartPolicy: Never
+      containers:
+      - name: get-model-from-registry
+        image: choisunguk/kubeflow-model-registry-with-python:python312-0.2.22
+        command:
+        - "python"
+        - "-c"
+        - |
+          import os
+          from model_registry import ModelRegistry
+
+          registry = ModelRegistry(
+            server_address="http://model-registry-service.kubeflow.svc.cluster.local",
+            port=8080,
+            author="anonymous",
+            is_secure=False
+          )
+
+          model_name = "mnist"
+
+          registered_model = registry.get_registered_model(model_name)
+          print(f"Retrieved Registered Model: {registered_model}")
+
+          versions = registry.get_model_versions(model_name)
+          for version in versions:
+            print(version)
