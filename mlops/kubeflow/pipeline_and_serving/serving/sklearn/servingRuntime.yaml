@@ -1,0 +1,12 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: sklearn-server-fixed-image
+  namespace: kubeflow-user-example-com
+spec:
+  supportedModelFormats:
+  - name: sklearn
+    version: "1.5.1" # 이 런타임이 지원하는 scikit-learn 버전
+  containers:
+  - name: kserve-container
+    image: index.docker.io/kserve/sklearnserver@sha256:d19adc0a6223d72e371a9cf852c56c910789ef0eac6a8baf96db35d0cc1d8304

@@ -1,0 +1,13 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    sidecar.istio.io/inject: "false"
+  name: mnist-model-sklearn
+  namespace: kubeflow-user-example-com
+spec:
+  predictor:
+    timeout: 600
+    serviceAccountName: serving
+    sklearn:
+      storageUri: s3://mlpipeline/v2/artifacts/mnist-sklearn-pipeline/1d197f2b-2183-452c-8672-b84f24ed2407/train-mnist-model/51ad3c0e-e5be-406a-8f78-5e227a8f326f/trained_model

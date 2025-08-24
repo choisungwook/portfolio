@@ -1,6 +1,6 @@
 # PIPELINE DEFINITION
-# Name: mnist-pipeline
-# Description: A pipeline to train a model on the MNIST dataset
+# Name: mnist-sklearn-pipeline
+# Description: A pipeline to train a sklearn model on the MNIST dataset
 components:
   comp-evaluate-model:
     executorLabel: exec-evaluate-model
@@ -76,8 +76,8 @@ components:
             schemaTitle: system.Dataset
             schemaVersion: 0.0.1
       parameters:
-        epochs:
-          defaultValue: 1.0
+        max_depth:
+          defaultValue: 10.0
           isOptional: true
           parameterType: NUMBER_INTEGER
     outputDefinitions:
@@ -100,9 +100,10 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy' 'scikit-learn==1.5.1'\
+          \ 'joblib'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.14.2' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
         - sh
         - -ec
         - 'program_path=$(mktemp -d)
@@ -116,15 +117,23 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef evaluate_model(\n  model: Input[Model],\n  x_test_data: Input[Dataset],\n\
           \  y_test_data: Input[Dataset],\n  metrics: Output[Metrics]\n):\n  import\
-          \ numpy as np\n  import tensorflow as tf\n  import os\n\n  print(\"[Info]\
-          \ Start evaluating model\")\n  keras_model_path = os.path.join(model.path,\
-          \ \"model.keras\")\n  model = tf.keras.models.load_model(keras_model_path)\n\
-          \n  x_test = np.load(x_test_data.path)\n  y_test = np.load(y_test_data.path)\n\
-          \n  loss, accuracy = model.evaluate(x_test, y_test)\n\n  print(f\"[Info]\
+          \ numpy as np\n  from sklearn.metrics import accuracy_score, log_loss\n\
+          \  import joblib\n  import os\n\n  print(\"[Info] Start evaluating model\"\
+          )\n\n  # Load model from pickle format\n  model_path = os.path.join(model.path,\
+          \ \"model.pkl\")\n  if not os.path.exists(model_path):\n      raise FileNotFoundError(f\"\
+          Model not found at {model_path}\")\n\n  loaded_model = joblib.load(model_path)\n\
+          \  print(f\"[Info] Loaded sklearn model from: {model_path}\")\n\n  x_test\
+          \ = np.load(x_test_data.path)\n  y_test = np.load(y_test_data.path)\n\n\
+          \  # Predictions\n  y_pred = loaded_model.predict(x_test)\n  y_pred_proba\
+          \ = loaded_model.predict_proba(x_test)\n\n  # Calculate metrics\n  accuracy\
+          \ = accuracy_score(y_test, y_pred)\n\n  # For log loss, we need to handle\
+          \ potential issues with probability predictions\n  try:\n      loss = log_loss(y_test,\
+          \ y_pred_proba)\n  except Exception as e:\n      print(f\"[Warning] Could\
+          \ not calculate log loss: {e}\")\n      loss = 0.0\n\n  print(f\"[Info]\
           \ Evaluation results - Loss: {loss}, Accuracy: {accuracy}\")\n\n  metrics.log_metric(\"\
           accuracy\", round(accuracy, 4))\n  metrics.log_metric(\"loss\", round(loss,\
           \ 4))\n  print(\"[Info] Model evaluation completed\")\n\n"
-        image: choisunguk/tensorflow:2.20.0
+        image: python:3.12
     exec-load-and-preprocess-data:
       container:
         args:
@@ -137,10 +146,10 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'numpy'  && \
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy' 'scikit-learn==1.5.1'\
+          \ 'joblib' 'pandas'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.14.2' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
         - sh
         - -ec
         - 'program_path=$(mktemp -d)
@@ -155,21 +164,28 @@ deploymentSpec:
           \ *\n\ndef load_and_preprocess_data(\n    x_train_output: Output[Dataset],\n\
           \    y_train_output: Output[Dataset],\n    x_test_output: Output[Dataset],\n\
           \    y_test_output: Output[Dataset],\n    metrics : Output[Metrics]\n):\n\
-          \  import numpy as np\n  import tensorflow as tf\n  import shutil\n\n  print(\"\
-          [Info] Start loading and preprocessing data\")\n  print(f\"[Info] TensorFlow\
-          \ version: {tf.__version__}\")\n\n  # \uC544\uD2F0\uD329\uD2B8 \uACBD\uB85C\
-          \ \uCD9C\uB825 (KFP\uAC00 \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131)\n  print(f\"\
-          [Info] x_train_output.path: {x_train_output.path}\")\n  print(f\"[Info]\
-          \ y_train_output.path: {y_train_output.path}\")\n  print(f\"[Info] x_test_output.path:\
-          \ {x_test_output.path}\")\n  print(f\"[Info] y_test_output.path: {y_test_output.path}\"\
-          )\n\n  (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()\n\
-          \n  # preprocess Datasets\n  x_train = x_train.reshape(-1,28,28,1)\n  x_test\
-          \ = x_test.reshape(-1,28,28,1)\n  x_train = x_train / 255\n  x_test = x_test\
-          \ / 255\n\n  #logging metrics using Kubeflow Artifacts\n  metrics.log_metric(\"\
-          Len x_train\", x_train.shape[0])\n  metrics.log_metric(\"Len y_train\",\
-          \ y_train.shape[0])\n  metrics.log_metric(\"Len x_test\", x_test.shape[0])\n\
-          \  metrics.log_metric(\"Len y_test\", y_test.shape[0])\n\n  # /tmp\uC5D0\
-          \ \uC784\uC2DC \uD30C\uC77C\uB85C \uC800\uC7A5 \uD6C4 shutil.move\uB97C\
+          \  import numpy as np\n  from sklearn.datasets import fetch_openml\n  from\
+          \ sklearn.model_selection import train_test_split\n  import shutil\n\n \
+          \ print(\"[Info] Start loading and preprocessing data\")\n\n  # \uC544\uD2F0\
+          \uD329\uD2B8 \uACBD\uB85C \uCD9C\uB825 (KFP\uAC00 \uC790\uB3D9\uC73C\uB85C\
+          \ \uC0DD\uC131)\n  print(f\"[Info] x_train_output.path: {x_train_output.path}\"\
+          )\n  print(f\"[Info] y_train_output.path: {y_train_output.path}\")\n  print(f\"\
+          [Info] x_test_output.path: {x_test_output.path}\")\n  print(f\"[Info] y_test_output.path:\
+          \ {y_test_output.path}\")\n\n  # Load MNIST dataset using sklearn\n  mnist\
+          \ = fetch_openml('mnist_784', version=1, parser='auto')\n  X, y = mnist.data,\
+          \ mnist.target.astype(int)\n\n  # Split data into train/test (sklearn\uC5D0\
+          \uC11C\uB294 \uC9C1\uC811 \uBD84\uD560)\n  x_train, x_test, y_train, y_test\
+          \ = train_test_split(\n      X, y, test_size=0.2, random_state=42, stratify=y\n\
+          \  )\n\n  # Preprocess data for sklearn (normalize to 0-1, flatten for sklearn)\n\
+          \  x_train = x_train.values / 255.0 if hasattr(x_train, 'values') else x_train\
+          \ / 255.0\n  x_test = x_test.values / 255.0 if hasattr(x_test, 'values')\
+          \ else x_test / 255.0\n\n  # Convert to numpy arrays\n  x_train = np.array(x_train,\
+          \ dtype=np.float32)\n  x_test = np.array(x_test, dtype=np.float32)\n  y_train\
+          \ = np.array(y_train)\n  y_test = np.array(y_test)\n\n  #logging metrics\
+          \ using Kubeflow Artifacts\n  metrics.log_metric(\"Len x_train\", x_train.shape[0])\n\
+          \  metrics.log_metric(\"Len y_train\", y_train.shape[0])\n  metrics.log_metric(\"\
+          Len x_test\", x_test.shape[0])\n  metrics.log_metric(\"Len y_test\", y_test.shape[0])\n\
+          \n  # /tmp\uC5D0 \uC784\uC2DC \uD30C\uC77C\uB85C \uC800\uC7A5 \uD6C4 shutil.move\uB97C\
           \ \uC0AC\uC6A9\uD574 \uC544\uD2F0\uD329\uD2B8 \uACBD\uB85C\uB85C \uC774\uB3D9\
           \n  np.save(\"/tmp/x_train.npy\", x_train)\n  shutil.move(\"/tmp/x_train.npy\"\
           , x_train_output.path)\n\n  np.save(\"/tmp/y_train.npy\", y_train)\n  shutil.move(\"\
@@ -179,7 +195,7 @@ deploymentSpec:
           \n  print(\"[Info] Data preprocessing completed\")\n  print(f\"[Info] x_train\
           \ shape: {x_train.shape}, y_train shape: {y_train.shape}\")\n  print(f\"\
           [Info] x_test shape: {x_test.shape}, y_test shape: {y_test.shape}\")\n\n"
-        image: choisunguk/tensorflow:2.20.0
+        image: python:3.12
     exec-register-model:
       container:
         args:
@@ -192,9 +208,10 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy' 'scikit-learn==1.5.1'\
+          \ 'joblib' 'model_registry'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.14.2' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
         - sh
         - -ec
         - 'program_path=$(mktemp -d)
@@ -207,18 +224,30 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef register_model(\n  project: str,\n  model: Input[Model],\n  metrics:\
-          \ Input[Artifact],\n):\n  from model_registry import ModelRegistry\n\n \
-          \ registry = ModelRegistry(\n    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream\n\
+          \ Input[Artifact],\n):\n  from model_registry import ModelRegistry\n  import\
+          \ os\n  import json\n\n  registry = ModelRegistry(\n    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream\n\
           \    # ref: https://github.com/kubeflow/manifests/tree/master/applications/model-registry/upstream/options/istio\n\
           \    server_address=\"http://model-registry-service.kubeflow.svc.cluster.local\"\
-          ,\n    port=8080,\n    author=\"akbun\",\n    is_secure=False\n  )\n\n \
-          \ model_name = model.metadata['name']\n  model_version = model.metadata['version']\n\
-          \n  print(f\"[Info] Registering model '{model_name}' version '{model_version}'\
-          \ to the registry\")\n\n  # ref: https://www.kubeflow.org/docs/components/model-registry/getting-started/#register-metadata\n\
-          \  registry.register_model(\n    name=model_name,\n    uri=model.uri,\n\
-          \    model_format_name=\"onnx\",\n    model_format_version=\"1\",\n    version=model_version,\n\
-          \    description=\"MINST model description\",\n  )\n\n"
-        image: choisunguk/tensorflow:2.20.0
+          ,\n    port=8080,\n    author=\"anonymous\",\n    is_secure=False\n  )\n\
+          \n  model_name = model.metadata['name']\n  model_version = model.metadata['version']\n\
+          \  model_display_name = f\"{model_name}-sklearn-classifier\"\n\n  print(f\"\
+          [Info] Registering model '{model_name}' version '{model_version}' to the\
+          \ registry\")\n\n  # Verify sklearn model exists\n  model_path = os.path.join(model.path,\
+          \ \"model.pkl\")\n  if not os.path.exists(model_path):\n      raise FileNotFoundError(f\"\
+          sklearn model not found at {model_path}\")\n\n  print(f\"[Info] Found sklearn\
+          \ model at: {model_path}\")\n\n  # Get evaluation metrics (if available)\n\
+          \  evaluation_metrics = {}\n  try:\n      evaluation_metrics = {\"model_version\"\
+          : model_version}\n  except Exception as e:\n      print(f\"Could not read\
+          \ evaluation metrics: {e}\")\n\n  # Register the model in Kubeflow Model\
+          \ Registry (sklearn format)\n  registry.register_model(\n    name=model_name,\n\
+          \    uri=model.uri,  # Use the model artifact URI directly\n    model_format_name=\"\
+          sklearn\",\n    model_format_version=\"1.5.1\",\n    version=model_version,\n\
+          \    description=f\"MNIST sklearn classifier model - Version: {model_version},\
+          \ Metrics: {json.dumps(evaluation_metrics)}\",\n  )\n\n  print(f\"Model\
+          \ registered with display name '{model_display_name}'\")\n  print(f\"Model\
+          \ version: {model_version}\")\n  print(f\"Evaluation metrics: {evaluation_metrics}\"\
+          )\n\n"
+        image: python:3.12
     exec-train-mnist-model:
       container:
         args:
@@ -231,9 +260,10 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.14.2'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy' 'scikit-learn==1.5.1'\
+          \ 'joblib'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.14.2' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
         - sh
         - -ec
         - 'program_path=$(mktemp -d)
@@ -246,28 +276,26 @@ deploymentSpec:
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef train_mnist_model(\n  x_train_input: Input[Dataset],\n  y_train_input:\
-          \ Input[Dataset],\n  trained_model: Output[Model],\n  epochs: int = 1 #\
-          \ hyperparameter\n):\n  import numpy as np\n  from tensorflow import keras\n\
-          \  import os\n  import uuid\n\n  print(\"[Info] Start training\")\n\n  x_train\
-          \ = np.load(x_train_input.path)\n  y_train = np.load(y_train_input.path)\n\
-          \n  # build a model\n  model = keras.models.Sequential([\n    keras.layers.Conv2D(64,\
-          \ (3, 3), activation='relu', input_shape=(28, 28, 1)),\n    keras.layers.MaxPool2D(2,\
-          \ 2),\n    keras.layers.Conv2D(64, (3, 3), activation='relu'),\n    keras.layers.MaxPool2D(2,\
-          \ 2),\n    keras.layers.Flatten(),\n    keras.layers.Dense(64, activation='relu'),\n\
-          \    keras.layers.Dense(10, activation='softmax')\n  ])\n\n  model.compile(optimizer=\"\
-          adam\",\n                loss=\"sparse_categorical_crossentropy\",\n   \
-          \             metrics=['accuracy'])\n\n  model.summary()\n\n  # training\n\
-          \  model.fit(x=x_train, y=y_train, epochs=epochs)\n\n  # save the model\n\
-          \  save_model_path = os.path.join(trained_model.path, \"model.keras\")\n\
-          \  os.makedirs(trained_model.path, exist_ok=True)\n  model.save(save_model_path,\
-          \ save_format='keras_v3')\n  print(f\"[Info] Model is saved to {save_model_path}\"\
-          )\n\n  # save metadata\n  trained_model.metadata['name'] = 'mnist'\n  trained_model.metadata['framework']\
-          \ = 'tensorflow'\n  trained_model.metadata['version'] = uuid.uuid4().hex[:6]\n\
-          \n  print(\"[Info] Model training completed\")\n\n"
-        image: choisunguk/tensorflow:2.20.0
+          \ Input[Dataset],\n  trained_model: Output[Model],\n  max_depth: int = 10\
+          \  # hyperparameter\n):\n  import numpy as np\n  from sklearn.ensemble import\
+          \ RandomForestClassifier\n  import joblib\n  import os\n  import time\n\n\
+          \  print(\"[Info] Start training\")\n\n  x_train = np.load(x_train_input.path)\n\
+          \  y_train = np.load(y_train_input.path)\n\n  # Build sklearn model (RandomForest\
+          \ for MNIST classification)\n  model = RandomForestClassifier(\n      n_estimators=100,\n\
+          \      random_state=42,\n      max_depth=max_depth,\n      n_jobs=-1\n \
+          \ )\n\n  print(f\"[Info] Model parameters: n_estimators=100, max_depth={max_depth}\"\
+          )\n\n  # Training\n  model.fit(x_train, y_train)\n\n  # Create output directory\n\
+          \  os.makedirs(trained_model.path, exist_ok=True)\n\n  # Save the model\
+          \ in pickle format for KServe compatibility\n  model_path = os.path.join(trained_model.path,\
+          \ \"model.pkl\")\n  joblib.dump(model, model_path)\n  print(f\"[Info] Model\
+          \ is saved to {model_path} in pickle format\")\n\n  # save metadata\n  trained_model.metadata['name']\
+          \ = 'mnist'\n  trained_model.metadata['framework'] = 'sklearn'\n  trained_model.metadata['version']\
+          \ = str(int(time.time()))\n\n  print(\"[Info] Model training completed\"\
+          )\n\n"
+        image: python:3.12
 pipelineInfo:
-  description: A pipeline to train a model on the MNIST dataset
-  name: mnist-pipeline
+  description: A pipeline to train a sklearn model on the MNIST dataset
+  name: mnist-sklearn-pipeline
 root:
   dag:
     tasks:
@@ -323,7 +351,7 @@ root:
           parameters:
             project:
               runtimeValue:
-                constant: minst-demo
+                constant: mnist-sklearn-demo
         taskInfo:
           name: register-model
       train-mnist-model:
@@ -344,9 +372,9 @@ root:
                 outputArtifactKey: y_train_output
                 producerTask: load-and-preprocess-data
           parameters:
-            epochs:
+            max_depth:
               runtimeValue:
-                constant: 1.0
+                constant: 10.0
         taskInfo:
           name: train-mnist-model
 schemaVersion: 2.1.0
