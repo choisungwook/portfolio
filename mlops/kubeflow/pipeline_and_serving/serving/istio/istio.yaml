@@ -1,0 +1,12 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-in-cluster-kserve
+  namespace: kubeflow-user-example-com
+spec:
+  rules:
+  - to:
+    - operation:
+        paths:
+        - /v1/models/*
+        - /v2/models/*
