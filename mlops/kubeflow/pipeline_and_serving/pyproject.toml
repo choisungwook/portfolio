@@ -8,5 +8,8 @@ dependencies = [
     "ipykernel>=6.30.1",
     "kfp>=2.14.2",
     "model-registry>=0.2.22",
+    "pandas>=2.3.2",
+    "requests>=2.32.4",
+    "scikit-learn==1.5.1",
     "tensorflow>=2.20.0",
 ]
