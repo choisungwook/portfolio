@@ -59,13 +59,15 @@
 | 34 | open WEB UI와 ollama를 사용하여 쿠버네티스 환경에서 사내 데이터과학자 만든 AI모델을, 사내에서 같이 사용할 수 있는 방법을 설명 | [링크](./mlops/mcp_and_openwebui/)|
 | 35 | keras와 minist 예제 | [링크](./mlops/training_examples/minist_with_keras/)|
 | 36 | kubeflow 예졔 | [링크](./mlops/kubeflow/)|
+| 37 | JWT 예제 | [링크](./computer_science/jwt/)|
+| 38 | AWS ASG 예제 | [링크](./aws/auto_scaling_group/terraform/01_basic/)|
 
 ## 다른 문서 링크
 
 * [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
 * [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
 * [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
-* [테라폼 예제](https://github.com/choisungwook/terraform_practice)
+* [테라폼 예제](https://github.com/choisungwook/terraform_practice)kserver로 서빙하는 예제
 * [karpenter](https://github.com/choisungwook/karpenter)
 * [EKS 예제](https://github.com/choisungwook/eks-practice)
 * [스터디]
