@@ -11,7 +11,7 @@
 * EC2인스턴스는 t4g.nano를 사용하고 userdata에서 nginx를 설치합니다.
 * ALB -> ASG연동은 AWS콘솔에서 수동으로 진행해야 함
 
-* [](./assets/arch.png)
+* ![](./assets/arch.png)
 
 ## 생성방법
 
