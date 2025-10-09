@@ -39,10 +39,10 @@ resource "aws_launch_template" "rolling_update" {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Rolling Update Strategy v2</title>
+      <title>Rolling Update Strategy v1</title>
     </head>
     <body>
-      <h1>Rolling Update Strategy v2</h1>
+      <h1>Rolling Update Strategy v1</h1>
     </body>
     </html>
     HTML
