@@ -84,7 +84,7 @@ resource "aws_autoscaling_group" "rolling_update" {
   launch_template {
     id = aws_launch_template.rolling_update.id
     # version = aws_launch_template.rolling_update.latest_version
-    version = 1
+    version = 2
   }
 
   enabled_metrics = [
