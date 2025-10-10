@@ -59,6 +59,7 @@
 36. keras와 minist 예제 - [링크](./mlops/training_examples/minist_with_keras/)
 37. kubeflow 예제 - [링크](./mlops/kubeflow/)
 38. AWS ASG 예제 - [링크](./aws/auto_scaling_group/examples/01_basic/)
+39. AWS ASG RollingUpdate 배포 예제 - [링크](./aws/auto_scaling_group/examples/02_rollingupdate/)
 
 ## 다른 정리된 문서 링크
 
