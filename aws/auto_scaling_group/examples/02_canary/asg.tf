@@ -1,6 +1,6 @@
-# Launch Template for Rolling Update
-resource "aws_launch_template" "rolling_update" {
-  name_prefix     = "${var.project_name}-rollingupdate-"
+# Launch Template for Canary
+resource "aws_launch_template" "canary" {
+  name_prefix     = "${var.project_name}-canary-"
   image_id        = data.aws_ami.amazon_linux_2023_arm64.id
   instance_type   = var.instance_type
   default_version = 1
@@ -28,35 +28,34 @@ resource "aws_launch_template" "rolling_update" {
     resource_type = "instance"
 
     tags = {
-      Name        = "${var.project_name}-rollingupdate"
+      Name        = "${var.project_name}-canary"
       Project     = var.project_tag
       Environment = var.environment
-      Strategy    = "rolling-update"
+      Strategy    = "canary"
     }
   }
 
   tags = {
-    Name        = "${var.project_name}-rollingupdate"
+    Name        = "${var.project_name}-canary-lt"
     Project     = var.project_tag
     Environment = var.environment
   }
 }
 
-# Auto Scaling Group - Rolling Update
-resource "aws_autoscaling_group" "rolling_update" {
-  name                      = "${var.project_name}-rollingupdate"
+# Auto Scaling Group - Canary
+resource "aws_autoscaling_group" "canary" {
+  name                      = "${var.project_name}-canary-asg"
   vpc_zone_identifier       = data.aws_subnets.public.ids
   desired_capacity          = 4
-  max_size                  = 4
+  max_size                  = 6
   min_size                  = 4
-  health_check_grace_period = 60
   health_check_type         = "ELB"
+  health_check_grace_period = 60
   target_group_arns         = [aws_lb_target_group.main.arn]
 
   launch_template {
-    id = aws_launch_template.rolling_update.id
-    # version = aws_launch_template.rolling_update.latest_version
-    version = 1
+    id      = aws_launch_template.canary.id
+    version = aws_launch_template.canary.latest_version
   }
 
   enabled_metrics = [
@@ -70,19 +69,20 @@ resource "aws_autoscaling_group" "rolling_update" {
     "GroupTotalInstances"
   ]
 
-  # If you want to automatically run instance refresh when terraform apply, uncomment below
   # instance_refresh {
   #   strategy = "Rolling"
   #   preferences {
-  #     min_healthy_percentage = 50
-  #     max_healthy_percentage = 100
-  #     instance_warmup        = 30
+  #     min_healthy_percentage = 90
+  #     max_healthy_percentage = 200
+  #     instance_warmup        = 60
+  #     checkpoint_percentages = [25, 50, 75]
+  #     checkpoint_delay       = 3600
   #   }
   # }
 
   tag {
     key                 = "Name"
-    value               = "${var.project_name}-rollingupdate"
+    value               = "${var.project_name}-canary"
     propagate_at_launch = true
   }
 
@@ -100,7 +100,7 @@ resource "aws_autoscaling_group" "rolling_update" {
 
   tag {
     key                 = "Strategy"
-    value               = "rolling-update"
+    value               = "canary"
     propagate_at_launch = true
   }
 
@@ -112,7 +112,7 @@ resource "aws_autoscaling_group" "rolling_update" {
 # # Lifecycle Hook for EC2_INSTANCE_TERMINATING
 # resource "aws_autoscaling_lifecycle_hook" "terminating" {
 #   name                   = "${var.project_name}-terminating-hook"
-#   autoscaling_group_name = aws_autoscaling_group.rolling_update.name
+#   autoscaling_group_name = aws_autoscaling_group.canary.name
 #   lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
 #   heartbeat_timeout      = 30
 #   default_result         = "CONTINUE"
