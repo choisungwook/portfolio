@@ -22,15 +22,15 @@ resource "aws_security_group_rule" "ec2_ingress_alb" {
   description              = "Allow HTTP from ALB"
 }
 
-resource "aws_security_group_rule" "ec2_ingress_http_from_any" {
-  type              = "ingress"
-  from_port         = 80
-  to_port           = 80
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.ec2.id
-  description       = "Allow HTTP from anywhere"
-}
+# resource "aws_security_group_rule" "ec2_ingress_http_from_any" {
+#   type              = "ingress"
+#   from_port         = 80
+#   to_port           = 80
+#   protocol          = "tcp"
+#   cidr_blocks       = ["0.0.0.0/0"]
+#   security_group_id = aws_security_group.ec2.id
+#   description       = "Allow HTTP from anywhere"
+# }
 
 # EC2 Security Group - Egress Rule
 resource "aws_security_group_rule" "ec2_egress" {
