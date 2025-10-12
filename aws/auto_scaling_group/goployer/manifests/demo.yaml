@@ -1,0 +1,62 @@
+---
+name: goployer-example
+userdata:
+  type: local
+  path: scripts/userdata.sh
+
+tags:
+- Project=practice
+- Environment=demo
+
+autoscaling: &autoscaling_policy
+  - name: scale_out
+    adjustment_type: ChangeInCapacity
+    scaling_adjustment: 1
+    cooldown: 60
+  - name: scale_in
+    adjustment_type: ChangeInCapacity
+    scaling_adjustment: -1
+    cooldown: 180
+
+stacks:
+- stack: example1
+  polling_interval: 30s
+  account: ""
+  env: example1
+  assume_role: ""
+  replacement_type: BlueGreen
+  iam_instance_profile: goployer-ec2-profile
+  ebs_optimized: true
+  block_devices:
+  - device_name: /dev/xvda
+    volume_size: 30
+    volume_type: gp3
+    delete_on_termination: true
+    encrypted: true
+  capacity:
+    min: 1
+    max: 2
+    desired: 1
+  autoscaling: *autoscaling_policy
+  lifecycle_callbacks:
+    pre_terminate_past_cluster:
+    - service nginx stop
+
+  regions:
+  - region: ap-northeast-2
+    instance_type: t4g.small
+    ssh_key: ""
+    ami_id: "ami-0302d260ada680cdc" # AL2023 arm64
+    use_public_subnets: true
+    vpc: vpc-05db3161b9a1d612b
+    subnet_ids:
+    - subnet-0df4ef3b78bda1ed0
+    - subnet-089714c3b311713da
+    - subnet-0e52034bc9dd0cd15
+    - subnet-00c612d75d12f86c4
+    detailed_monitoring_enabled: false
+    security_groups:
+    - sg-06ef730b1debebc86
+    healthcheck_target_group: goployer-tg
+    target_groups:
+    - goployer-tg
