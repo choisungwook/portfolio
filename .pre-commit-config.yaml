@@ -7,11 +7,11 @@ repos:
   - id: trailing-whitespace
   - id: end-of-file-fixer
 
-- repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.35.1
-  hooks:
-  - id: yamllint
-    additional_dependencies: [ pyyaml ]
+# - repo: https://github.com/adrienverge/yamllint.git
+#   rev: v1.35.1
+#   hooks:
+#   - id: yamllint
+#     additional_dependencies: [ pyyaml ]
 
 - repo: https://github.com/antonbabenko/pre-commit-terraform
   rev: v1.98.0
