@@ -63,6 +63,7 @@
 40. AWS ASG Canary 배포 예제 - [링크](./aws/auto_scaling_group/examples/02_canary/)
 41. AWS ASG Blue/Green(Goployer) 배포 예제 - [링크](./aws/auto_scaling_group/goployer/)
 42. 테라폼으로 AWS EC2 인스턴스로 nexus 생성(docker-compose 사용) - [링크](./aws/codebuild/github_action/terraform/)
+43. nexus에 자바 라이브러리를 올리고 import해서 사용하는 예제 - [링크](./aws/codebuild/github_action/applications/)
 
 ## 다른 정리된 문서 링크
 
