@@ -32,8 +32,7 @@ jobs:
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
-          ls -l ${{ github.workspace }}/settings.xml
-          mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
+          mvn package -DskipTests
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_TOKEN: ${{ secrets.NEXUS_PASSWORD }}
