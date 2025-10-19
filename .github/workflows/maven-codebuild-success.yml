@@ -25,23 +25,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-          settings-path: ${{ github.workspace }}
-
-      - name: Configure Maven settings
-        run: |
-          envsubst '${NEXUS_USERNAME} ${NEXUS_PASSWORD}' < .github/codebuild-maven-settings.xml > ${{ github.workspace }}/settings.xml
-        env:
-          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          server-id: private-nexus-releases
+          server-username: NEXUS_USERNAME
+          server-password: NEXUS_TOKEN
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
           ls -l ${{ github.workspace }}/settings.xml
           mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
-
-      - name: Clean up Maven settings file
-        if: always()
-        run: |
-          echo "Deleting Maven settings file..."
-          rm -f ${{ github.workspace }}/settings.xml
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_TOKEN: ${{ secrets.NEXUS_PASSWORD }}
