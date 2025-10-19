@@ -29,10 +29,13 @@ jobs:
           server-username: NEXUS_USERNAME
           server-password: NEXUS_TOKEN
 
+      - name: verify settings.xml
+        run: cat ~/.m2/settings.xml
+
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
-          mvn package -DskipTests
+          mvn package --batch-mode -DskipTests
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_TOKEN: ${{ secrets.NEXUS_PASSWORD }}
