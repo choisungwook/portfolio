@@ -25,17 +25,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-          server-id: private-nexus-releases
-          server-username: NEXUS_USERNAME
-          server-password: NEXUS_TOKEN
+          # server-id: private-nexus-releases
+          # server-username: NEXUS_USERNAME
+          # server-password: NEXUS_TOKEN
 
-      - name: verify settings.xml
-        run: cat ~/.m2/settings.xml
+      - name: Configure Maven settings
+        run: |
+          rm -rf ~/.m2/settings.xml
+          cp .github/codebuild-maven-settings.xml ~/.m2/settings.xml
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
-          mvn package --batch-mode -DskipTests
+          cat ~/.m2/settings.xml
+          mvn package -s ~/.m2/settings.xml --batch-mode -DskipTests
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_TOKEN: ${{ secrets.NEXUS_PASSWORD }}
