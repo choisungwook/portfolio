@@ -74,6 +74,8 @@ curl http://localhost:8080/
 curl http://localhost:8080/welcome
 ```
 
+![](../../../imgs/springbootapp/import_library.png)
+
 예상 출력:
 ```
 Hello. Welcome
