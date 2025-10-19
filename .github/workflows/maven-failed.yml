@@ -17,20 +17,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Configure Maven settings
-        run: |
-          mkdir -p ~/.m2
-          envsubst < .github/maven-settings-template.xml > ~/.m2/settings.xml
-        env:
-          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
-
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
-        run: mvn package -s ~/.m2/settings.xml -DskipTests
-
-      - name: Clean up Maven settings file
-        if: always()
-        run: |
-          echo "Deleting Maven settings file..."
-          rm -rf ~/.m2/settings.xml
+        run: mvn package -DskipTests
