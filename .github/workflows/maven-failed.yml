@@ -22,5 +22,5 @@ jobs:
           server-password: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
-        run: |
-          mvn clean package -DskipTests
+        working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
+        run: mvn clean package -DskipTests
