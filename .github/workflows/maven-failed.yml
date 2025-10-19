@@ -19,17 +19,18 @@ jobs:
 
       - name: Configure Maven settings
         run: |
-          envsubst < .github/maven-settings-template.xml > .github/settings.xml
+          mkdir -p ~/.m2
+          envsubst < .github/maven-settings-template.xml > ~/.m2/settings.xml
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
-        run: mvn package -s ~/.github/settings.xml -DskipTests
+        run: mvn package -s ~/.m2/settings.xml -DskipTests
 
       - name: Clean up Maven settings file
         if: always()
         run: |
           echo "Deleting Maven settings file..."
-          rm -f ~/.github/settings.xml
+          rm -rf ~/.m2/settings.xml
