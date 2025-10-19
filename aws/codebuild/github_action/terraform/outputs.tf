@@ -32,3 +32,28 @@ output "nexus_url" {
   description = "Nexus URL"
   value       = module.nexus.nexus_url
 }
+
+output "nexus_internal_url" {
+  description = "Nexus internal URL for CodeBuild"
+  value       = module.nexus.nexus_internal_url
+}
+
+output "private_alb_dns_name" {
+  description = "Private ALB DNS name"
+  value       = module.nexus.private_alb_dns_name
+}
+
+output "codebuild_project_name" {
+  description = "CodeBuild project name"
+  value       = aws_codebuild_project.github_action.name
+}
+
+output "codebuild_project_arn" {
+  description = "CodeBuild project ARN"
+  value       = aws_codebuild_project.github_action.arn
+}
+
+output "codebuild_role_arn" {
+  description = "CodeBuild IAM role ARN"
+  value       = aws_iam_role.codebuild.arn
+}

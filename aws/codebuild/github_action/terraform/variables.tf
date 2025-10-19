@@ -67,8 +67,36 @@ variable "nexus_subdomain" {
   default     = "nexus"
 }
 
+variable "nexus_internal_subdomain" {
+  description = "Subdomain for internal Nexus (e.g., nexus-internal)"
+  type        = string
+  default     = "nexus-internal"
+}
+
 variable "nexus_root_volume_size" {
   description = "Root volume size for Nexus EC2 in GB"
   type        = number
   default     = 30
+}
+
+variable "github_repository_url" {
+  description = "GitHub repository URL"
+  type        = string
+}
+
+variable "github_branch" {
+  description = "GitHub branch to build"
+  type        = string
+  default     = "master"
+}
+
+variable "codebuild_source_identifier" {
+  description = "CodeBuild source connection ARN (created manually in AWS Console)"
+  type        = string
+}
+
+variable "codebuild_compute_type" {
+  description = "CodeBuild Fleet compute type"
+  type        = string
+  default     = "BUILD_GENERAL1_SMALL"
 }

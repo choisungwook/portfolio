@@ -30,18 +30,4 @@
       <url>https://nexus.choilab.xyz/repository/maven-snapshots/</url>
     </snapshotRepository>
   </distributionManagement>
-
-  <repositories>
-    <repository>
-      <id>private-nexus-releases</id>
-      <name>Private Nexus Release Repository</name>
-      <url>http://nexus.internal.com/repository/maven-releases/</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
 </project>
