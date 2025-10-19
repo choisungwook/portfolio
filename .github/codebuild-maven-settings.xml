@@ -25,7 +25,7 @@
         </repository>
         <repository>
           <id>private-nexus-releases</id>
-          <url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
+          <url>https://nexus-internal.choilab.xyz/repository/maven-public/</url>
           <releases>
             <enabled>true</enabled>
           </releases>
