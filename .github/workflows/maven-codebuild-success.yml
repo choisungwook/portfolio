@@ -24,21 +24,28 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: maven
-          # server-id: private-nexus-releases
-          # server-username: NEXUS_USERNAME
-          # server-password: NEXUS_TOKEN
+          # cache: maven
+          settings-path: ${{ github.workspace }}
+          # server-id: github  # pom.xml의 <repositories><repository><id> 값과 일치
+          # server-username: MAVEN_USERNAME
+          # server-password: MAVEN_TOKEN
 
       - name: Configure Maven settings
         run: |
-          rm -rf ~/.m2/settings.xml
-          cp .github/codebuild-maven-settings.xml ~/.m2/settings.xml
+          rm -rf ${{ github.workspace }}/settings.xml
+          envsubst '${NEXUS_USERNAME} ${NEXUS_PASSWORD}' < .github/codebuild-maven-settings.xml > ${{ github.workspace }}/settings.xml
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
-          cat ~/.m2/settings.xml
-          mvn package -s ~/.m2/settings.xml --batch-mode -DskipTests
-        env:
-          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          NEXUS_TOKEN: ${{ secrets.NEXUS_PASSWORD }}
+          ls -l ${{ github.workspace }}/settings.xml
+          mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
+
+      - name: Clean up Maven settings file
+        if: always()
+        run: |
+          echo "Deleting Maven settings file..."
+          rm -f ${{ github.workspace }}/settings.xml
