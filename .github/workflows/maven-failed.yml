@@ -11,15 +11,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4 # 2. Java 환경 및 settings.xml 구성
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-          # Secret 정보를 사용하여 ~/.m2/settings.xml에 인증 정보 추가
           server-id: private-nexus-releases
-          server-username: ${{ secrets.NEXUS_USERNAME }}
-          server-password: ${{ secrets.NEXUS_PASSWORD }}
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+        env:
+          MAVEN_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
