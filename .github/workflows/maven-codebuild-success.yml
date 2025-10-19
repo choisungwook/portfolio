@@ -30,9 +30,10 @@ jobs:
       - name: Configure Maven settings
         run: |
           mkdir -p ~/.m2
-          cp .github/codebuild-maven-settings.xml ~/.m2/settings.xml
-          sed -i 's/NEXUS_USERNAME/${{ secrets.NEXUS_USERNAME }}/g' ~/.m2/settings.xml
-          sed -i 's/NEXUS_PASSWORD/${{ secrets.NEXUS_PASSWORD }}/g' ~/.m2/settings.xml
+          envsubst '${NEXUS_USERNAME} ${NEXUS_PASSWORD}' < .github/codebuild-maven-settings.xml > ~/.m2/settings.xml
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
