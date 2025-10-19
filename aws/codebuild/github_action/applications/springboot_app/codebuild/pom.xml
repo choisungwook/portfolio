@@ -49,6 +49,20 @@
 		</dependency>
 	</dependencies>
 
+	<repositories>
+		<repository>
+				<id>central</id>
+				<name>Maven Central</name>
+				<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+
+		<repository>
+				<id>private-nexus-releases</id>
+				<name>My Private Nexus</name>
+				<url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
+		</repository>
+	</repositories>
+
 	<build>
 		<plugins>
 			<plugin>

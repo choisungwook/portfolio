@@ -19,49 +19,17 @@ jobs:
 
       - name: Configure Maven settings
         run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml <<'EOF'
-          <settings>
-            <servers>
-              <server>
-                <id>private-nexus-releases</id>
-                <username>${env.MAVEN_USERNAME}</username>
-                <password>${env.MAVEN_PASSWORD}</password>
-              </server>
-            </servers>
-            <profiles>
-              <profile>
-                <id>nexus-internal</id>
-                <repositories>
-                  <repository>
-                    <id>private-nexus-releases</id>
-                    <url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
-                    <releases>
-                      <enabled>true</enabled>
-                    </releases>
-                  </repository>
-                  <repository>
-                    <id>central</id>
-                    <url>https://repo.maven.apache.org/maven2</url>
-                    <releases>
-                      <enabled>true</enabled>
-                    </releases>
-                  </repository>
-                </repositories>
-              </profile>
-            </profiles>
-            <activeProfiles>
-              <activeProfile>nexus-internal</activeProfile>
-            </activeProfiles>
-          </settings>
-          EOF
+          envsubst < .github/maven-settings-template.xml > .github/settings.xml
         env:
-          MAVEN_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
-        run: mvn clean package -DskipTests
-        env:
-          MAVEN_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: mvn package -s ~/.github/settings.xml -DskipTests
+
+      - name: Clean up Maven settings file
+        if: always()
+        run: |
+          echo "Deleting Maven settings file..."
+          rm -f ~/.github/settings.xml
