@@ -58,8 +58,11 @@
 
 		<repository>
 				<id>private-nexus-releases</id>
+				<releases>
+					<enabled>true</enabled>
+				</releases>
 				<name>My Private Nexus</name>
-				<url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
+				<url>https://nexus-internal.choilab.xyz/repository/maven-public/</url>
 		</repository>
 	</repositories>
 
