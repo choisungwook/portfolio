@@ -38,11 +38,31 @@ jobs:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
+      - name: Check if secrets exist
+        run: |
+          echo "Maven Username length: ${#MAVEN_USERNAME}"
+          echo "Maven Password length: ${#MAVEN_PASSWORD}"
+          # 길이가 0이면 secrets가 전달되지 않은 것
+          if [ -z "$MAVEN_USERNAME" ]; then
+            echo "ERROR: MAVEN_USERNAME is empty!"
+            exit 1
+          fi
+          if [ -z "$MAVEN_PASSWORD" ]; then
+            echo "ERROR: MAVEN_PASSWORD is empty!"
+            exit 1
+          fi
+        env:
+          MAVEN_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
           ls -l ${{ github.workspace }}/settings.xml
           mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
       - name: Clean up Maven settings file
         if: always()
