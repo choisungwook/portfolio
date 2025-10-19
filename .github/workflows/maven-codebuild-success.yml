@@ -1,0 +1,35 @@
+name: Build SpringBoot with CodeBuild
+
+on:
+  # pull_request:
+  #   types: [closed]
+  #   paths:
+  #     - 'aws/codebuild/github_action/applications/springboot_app/**'
+  #   branches:
+  #     - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    # if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on:
+      - codebuild-github-action-github-action-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4 # 2. Java 환경 및 settings.xml 구성
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          # Secret 정보를 사용하여 ~/.m2/settings.xml에 인증 정보 추가
+          server-id: private-nexus-releases
+          server-username: ${{ secrets.NEXUS_USERNAME }}
+          server-password: ${{ secrets.NEXUS_PASSWORD }}
+
+      - name: Build
+        run: |
+          mvn clean package -DskipTests
