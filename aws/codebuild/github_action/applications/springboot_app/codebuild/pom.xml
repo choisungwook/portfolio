@@ -30,20 +30,6 @@
 		<java.version>17</java.version>
 	</properties>
 
-	<repositories>
-		<repository>
-			<id>private-nexus-releases</id>
-			<name>Private Nexus Release Repository</name>
-			<url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
-			<releases>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-	</repositories>
-
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
