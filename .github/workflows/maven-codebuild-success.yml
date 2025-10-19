@@ -37,7 +37,7 @@ jobs:
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
         run: |
-          ls -l settings.xml
+          ls -l ${{ github.workspace }}/settings.xml
           mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
 
       - name: Clean up Maven settings file
