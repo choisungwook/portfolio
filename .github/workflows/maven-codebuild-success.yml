@@ -28,15 +28,17 @@ jobs:
 
       - name: Configure Maven settings
         run: |
-          sed -i 's/NEXUS_USERNAME/${{ secrets.NEXUS_USERNAME }}/g' .github/codebuild-maven-settings.xml
-          sed -i 's/NEXUS_PASSWORD/${{ secrets.NEXUS_PASSWORD }}/g' .github/codebuild-maven-settings.xml
+          mkdir -p ~/.m2
+          cp .github/codebuild-maven-settings.xml ~/.m2/settings.xml
+          sed -i 's/NEXUS_USERNAME/${{ secrets.NEXUS_USERNAME }}/g' ~/.m2/settings.xml
+          sed -i 's/NEXUS_PASSWORD/${{ secrets.NEXUS_PASSWORD }}/g' ~/.m2/settings.xml
 
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
-        run: mvn package -s .github/codebuild-maven-settings.xml -DskipTests
+        run: mvn package -DskipTests
 
       - name: Clean up Maven settings file
         if: always()
         run: |
           echo "Deleting Maven settings file..."
-          rm -rf .github/codebuild-maven-settings.xml
+          rm -rf ~/.m2/settings.xml
