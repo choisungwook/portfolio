@@ -1,4 +1,4 @@
-name: Build SpringBoot with CodeBuild
+name: Build SpringBoot with CodeBuild - build in github network
 
 on:
   workflow_dispatch:
