@@ -40,7 +40,7 @@ variable "nexus_root_volume_size" {
 }
 
 variable "acm_certificate_arn" {
-  description = "ACM certificate ARN"
+  description = "ACM certificate ARN for public ALB"
   type        = string
 }
 
@@ -54,8 +54,29 @@ variable "nexus_subdomain" {
   type        = string
 }
 
+variable "nexus_internal_subdomain" {
+  description = "Subdomain for internal Nexus (e.g., nexus-internal)"
+  type        = string
+  default     = "nexus-internal"
+}
+
+variable "private_acm_certificate_arn" {
+  description = "ACM certificate ARN for private ALB"
+  type        = string
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
   default     = {}
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block"
+  type        = string
+}
+
+variable "private_subnets" {
+  description = "Private subnet IDs for Private ALB and CodeBuild"
+  type        = list(string)
 }

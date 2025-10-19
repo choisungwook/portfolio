@@ -42,3 +42,13 @@ output "nexus_url" {
   description = "Nexus URL"
   value       = "https://${aws_route53_record.nexus.name}"
 }
+
+output "nexus_internal_url" {
+  description = "Nexus internal URL"
+  value       = "https://${aws_route53_record.nexus_internal.name}"
+}
+
+output "private_alb_dns_name" {
+  description = "Private ALB DNS name"
+  value       = aws_lb.nexus_private.dns_name
+}

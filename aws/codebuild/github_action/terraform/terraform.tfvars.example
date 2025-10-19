@@ -13,6 +13,12 @@ nexus_root_volume_size = 30
 # "YOUR_HOME_IP/32"
 alb_allowed_cidrs = []
 
-route53_zone_name = "example.xyz"
-acm_domain_name   = "*.example.xyz"
-nexus_subdomain   = "nexus"
+route53_zone_name        = "example.xyz"
+acm_domain_name          = "*.example.xyz"
+nexus_subdomain          = "nexus"
+nexus_internal_subdomain = "nexus-internal"
+
+github_repository_url       = "https://github.com/your-org/your-repo"
+github_branch               = "master"
+codebuild_source_identifier = "arn:aws:codeconnections:ap-northeast-2:123456789012:connection/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+codebuild_compute_type      = "BUILD_GENERAL1_SMALL"

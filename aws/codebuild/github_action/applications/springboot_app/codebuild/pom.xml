@@ -34,7 +34,7 @@
 		<repository>
 			<id>private-nexus-releases</id>
 			<name>Private Nexus Release Repository</name>
-			<url>http://nexus.internal.com/repository/maven-releases/</url>
+			<url>https://nexus-internal.choilab.xyz/repository/maven-releases/</url>
 			<releases>
 				<enabled>true</enabled>
 			</releases>

@@ -52,14 +52,27 @@ resource "aws_security_group" "nexus_ec2" {
 
 resource "aws_vpc_security_group_ingress_rule" "nexus_from_alb" {
   security_group_id            = aws_security_group.nexus_ec2.id
-  description                  = "Allow traffic from ALB"
+  description                  = "Allow traffic from public ALB"
   referenced_security_group_id = aws_security_group.alb.id
   from_port                    = 8081
   to_port                      = 8081
   ip_protocol                  = "tcp"
 
   tags = {
-    Name = "nexus-from-alb"
+    Name = "nexus-from-public-alb"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "nexus_from_private_alb" {
+  security_group_id            = aws_security_group.nexus_ec2.id
+  description                  = "Allow traffic from private ALB"
+  referenced_security_group_id = aws_security_group.private_alb.id
+  from_port                    = 8081
+  to_port                      = 8081
+  ip_protocol                  = "tcp"
+
+  tags = {
+    Name = "nexus-from-private-alb"
   }
 }
 
