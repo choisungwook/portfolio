@@ -17,33 +17,31 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-          overwrite-settings: true
+          settings-path: ${{ github.workspace }}
 
       - name: Configure Maven settings
         run: |
-          mkdir -p ~/.m2
-          envsubst '${NEXUS_USERNAME} ${NEXUS_PASSWORD}' < .github/codebuild-maven-settings.xml > ~/.m2/settings.xml
+          envsubst '${NEXUS_USERNAME} ${NEXUS_PASSWORD}' < .github/codebuild-maven-settings.xml > ${{ github.workspace }}/settings.xml
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
-      - name: Verify Maven settings
-        run: cat ~/.m2/settings.xml
-
       - name: Build
         working-directory: aws/codebuild/github_action/applications/springboot_app/codebuild
-        run: mvn package -DskipTests
+        run: |
+          ls -l settings.xml
+          mvn package -s ${{ github.workspace }}/settings.xml -DskipTests
 
       - name: Clean up Maven settings file
         if: always()
         run: |
           echo "Deleting Maven settings file..."
-          rm -rf ~/.m2/settings.xml
+          rm -f ${{ github.workspace }}/settings.xml
