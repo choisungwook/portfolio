@@ -1,4 +1,4 @@
-name: Build SpringBoot with CodeBuild
+name: Build SpringBoot with CodeBuild - build in AWS network
 
 on:
   # pull_request:
