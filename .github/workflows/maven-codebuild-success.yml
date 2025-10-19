@@ -25,6 +25,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
+          overwrite-settings: true
 
       - name: Configure Maven settings
         run: |
