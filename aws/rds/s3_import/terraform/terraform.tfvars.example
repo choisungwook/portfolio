@@ -1,0 +1,3 @@
+region                = "ap-northeast-2"
+rds_instance_class    = "db.t4g.medium"
+aurora_engine_version = "8.0.mysql_aurora.3.10.0"
