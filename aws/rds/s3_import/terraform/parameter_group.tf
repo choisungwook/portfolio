@@ -11,3 +11,12 @@ resource "aws_rds_cluster_parameter_group" "aurora_mysql" {
     Name = "aurora-mysql-s3-import"
   }
 }
+
+resource "aws_rds_cluster_parameter_group" "aurora_postgres" {
+  name   = "aurora-postgres-s3-import"
+  family = "aurora-postgresql16"
+
+  tags = {
+    Name = "aurora-postgres-s3-import"
+  }
+}
