@@ -1,0 +1,6 @@
+region                         = "ap-northeast-2"
+rds_instance_class             = "db.t4g.medium"
+aurora_mysql_engine_version    = "8.0.mysql_aurora.3.10.0"
+aurora_postgres_engine_version = "16.8"
+create_mysql_rds               = true
+create_postgres_rds            = true
