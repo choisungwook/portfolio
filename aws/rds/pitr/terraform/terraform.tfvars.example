@@ -1,0 +1,15 @@
+region                      = "ap-northeast-2"
+rds_instance_class          = "db.t4g.medium"
+aurora_mysql_engine_version = "8.0.mysql_aurora.3.10.0"
+
+# PITR Configuration
+backup_retention_period              = 7
+
+# Other Configurations
+preferred_backup_window              = "03:00-04:00"
+preferred_maintenance_window         = "mon:04:00-mon:05:00"
+enabled_cloudwatch_logs_exports      = ["audit", "error", "general", "slowquery"]
+copy_tags_to_snapshot                = true
+deletion_protection                  = false
+skip_final_snapshot                  = true
+final_snapshot_identifier_prefix     = "pitr-final-snapshot"
