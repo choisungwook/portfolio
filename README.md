@@ -67,6 +67,7 @@
 44. codebuild로 self host github action을 실행 - [링크](./aws/codebuild/github_action/)
 45. AWS RDS Aurora s3 import/export 예제 - [링크](./aws/rds/s3_import_export/)
 46. AWS RDS Aurora PITR 예제 - [링크](./aws/rds/pitr/)
+47. CVE-2025-55182 취약점 분석 - [링크](./security/cve-2025-55182/)
 
 ## 다른 정리된 문서 링크
 
