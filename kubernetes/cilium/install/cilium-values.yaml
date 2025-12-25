@@ -1,0 +1,150 @@
+# cilium/values.yaml
+
+# ===== Kubernetes API 서버 연결 =====
+k8sServiceHost: localhost
+  # Cilium이 Kubernetes API에 연결할 호스트
+  # - localhost: Talos Docker 환경용
+  # - 실제 IP: 프로덕션 환경 (예: 10.0.0.1)
+
+k8sServicePort: 7445
+  # Kubernetes API 포트
+  # - 7445: Talos 기본값
+  # - 6443: 표준 Kubernetes
+  # Cilium이 이 endpoint로 API 서버와 통신
+
+# ===== IPAM (IP 주소 관리) =====
+ipam:
+  mode: kubernetes
+    # IP 할당 방식
+    # - kubernetes: K8s PodCIDR 사용
+    # - cluster-pool: Cilium이 직접 관리
+
+# ===== CNI 설정 =====
+# 라우팅 모드
+routingMode: tunnel
+# - tunnel: Overlay 네트워크 (VXLAN/Geneve)
+# - native: Direct routing (더 빠르지만 제약 있음)
+
+# Tunnel 프로토콜 (routingMode: tunnel일 때만)
+tunnelProtocol: vxlan
+# - vxlan: 기본, 호환성 좋음
+# - geneve: 좀 더 유연함
+
+ipv4NativeRoutingCIDR: 10.244.0.0/16 # Pod CIDR (Talos 기본값과 일치)
+
+# ===== kube-proxy 대체 =====
+kubeProxyReplacement: true
+
+# ===== Talos 전용 설정 =====
+# cgroup 설정 (Talos 읽기 전용 파일 시스템 대응)
+cgroup:
+  autoMount:
+    enabled: false
+      # Talos는 cgroup이 이미 마운트되어 있음
+      # 자동 마운트 시도 시 쓰기 권한 오류 발생
+  hostRoot: /sys/fs/cgroup # Talos의 cgroup 경로
+
+# Security Context (Talos 전용 capabilities)
+securityContext:
+  capabilities:
+    ciliumAgent:
+    # Cilium agent가 필요한 Linux capabilities
+    # Talos의 보안 정책에 맞춘 최소 권한
+    - CHOWN
+    - KILL
+    - NET_ADMIN
+    - NET_RAW
+    - IPC_LOCK
+    - SYS_ADMIN
+    - SYS_RESOURCE
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    cleanCiliumState:
+    # Cilium 초기화/정리 작업용 capabilities
+    - NET_ADMIN
+    - SYS_ADMIN
+    - SYS_RESOURCE
+
+# ===== Service 기능 =====
+hostServices:
+  enabled: false
+    # Host namespace 서비스
+    # Docker Desktop에서는 false 권장
+
+externalIPs:
+  enabled: true # Service externalIPs 지원
+
+nodePort:
+  enabled: true
+    # NodePort 서비스 지원
+    # Service type: NodePort 사용 가능하게 함
+
+hostPort:
+  enabled: true
+    # Pod hostPort 지원
+    # 컨테이너가 호스트 포트 직접 바인딩
+
+# ===== Hubble (관찰성 플랫폼) =====
+hubble:
+  enabled: true # Hubble 활성화
+
+  relay:
+    enabled: true
+      # Hubble Relay (집중식 관찰)
+      # 모든 노드의 플로우를 집계
+      # hubble CLI가 이 endpoint로 연결
+
+  ui:
+    enabled: true
+      # Hubble UI (웹 인터페이스)
+      # Service Map, 플로우 시각화
+      # cilium hubble ui로 접속
+
+  metrics:
+    enabled:
+    # Prometheus 메트릭
+    - dns # DNS 쿼리/응답
+    - drop # 패킷 드롭 이유
+    - tcp # TCP 연결 메트릭
+    - flow # 네트워크 플로우
+    - port-distribution # 포트 사용 분포
+    - icmp # ICMP 메트릭
+    - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+      # HTTP L7 메트릭
+      # source/destination 정보 포함
+
+# ===== Gateway API =====
+gatewayAPI:
+  enabled: true
+    # Gateway API 지원
+    # Gateway, HTTPRoute 등 사용 가능
+
+# ===== Operator (컨트롤러) =====
+operator:
+  replicas: 1
+    # Operator Pod 수
+    # HA: 3개 권장, 로컬: 1개로 충분
+
+  prometheus:
+    enabled: true
+      # Operator 메트릭 노출
+      # Operator 자체의 상태 모니터링
+
+# ===== 암호화 =====
+encryption:
+  enabled: false
+    # 노드간 암호화
+    # true: WireGuard로 모든 트래픽 암호화
+  type: wireguard
+    # 암호화 타입
+    # - wireguard: 커널 수준, 빠름
+    # - ipsec: 전통적 방식
+
+# ===== 이미지 =====
+image:
+  pullPolicy: IfNotPresent
+    # 이미지 pull 정책
+    # 로컬 개발: IfNotPresent
+    # 프로덕션: Always
