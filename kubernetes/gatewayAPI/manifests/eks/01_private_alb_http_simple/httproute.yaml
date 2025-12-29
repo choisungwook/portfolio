@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: private-alb-http-route
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: priavte-alb-http
+    sectionName: http
+  hostnames:
+  - private-alb-http.choilab.xyz
+  rules:
+  - backendRefs:
+    - name: backend
+      port: 3000

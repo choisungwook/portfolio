@@ -73,6 +73,7 @@
 50. kubernetes gateway API 개념 - [링크](./kubernetes/gatewayAPI/README.md)
 51. kubernetes envoy gateway quickstart 예제 - [링크](./kubernetes/gatewayAPI/example_envoy_gateway.md)
 52. kubernetes envoy gateway usecase 예제 - [링크](./kubernetes/gatewayAPI/manifests/envoy_gateway/)
+53. EKS ALB controller의 gateway API 예제 - [링크](./kubernetes/gatewayAPI/eks_gatewayapi.md)
 
 ## 다른 정리된 문서 링크
 
