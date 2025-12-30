@@ -1,0 +1,15 @@
+clusterName: {{ .Environment.Values.global.clusterName }}
+
+region: {{ .Environment.Values.global.region }}
+
+vpcId: {{ .Environment.Values.global.vpcId }}
+
+serviceAccount:
+  name: alb-controller-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Environment.Values.albController.irsa }}
+
+controllerConfig:
+  featureGates:
+    NLBGatewayAPI: true
+    ALBGatewayAPI: true

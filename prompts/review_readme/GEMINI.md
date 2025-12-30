@@ -32,6 +32,7 @@
 - Git 명령어 실행 금지 (commit, push 등)
 - 영어 번역 금지 - 한국어 문서 개선에만 집중
 - 최종 결과물은 반드시 한국어
+- 마크다운에서 백틱 사용 금지
 
 ## Core Editing Principles
 
@@ -55,6 +56,8 @@
 - gateway, GatewayClass (Kubernetes 리소스 맥락)
 - canary, blue/green, weight (배포 전략 맥락)
 - kind cluster
+- helmfile (문맥상 kubernetes helmfile 도구를 설명할 때)
+- helm, helm chart (문맥상 kubernetes helm 도구를 설명할 때)
 
 #### 대문자 유지 원칙**
 
@@ -73,6 +76,9 @@
 - LoadBalancer, deployment, service (Kubernetes 리소스)
 - TLS termination (TLS 핸드셰이크 과정)
 - self-signed certificate (자체 서명 인증서)
+- subagent (AI subagent 맥락에 한함)
+- kustomize (문맥상 kubernetes kustomize 도구를 설명할 때)
+- manifest (매니페스트 아님)
 
 #### 한글 사용 필수**
 
@@ -83,7 +89,7 @@
 
 1. 문서 내 해당 용어가 여러 번 사용되었는지 확인
 2. 대소문자 또는 한/영 표기가 혼재되어 있다면 통일
-3. 업계 표준 표기법을 따름 (예: GitHub, AWS, Docker)
+3. 업계 표준 표기법을 따름 (예: GitHub, AWS, Docker, Kubernetes)
 4. 통일 기준을 선택한 이유를 명확히 기록
 
 #### 대소문자 예외
@@ -105,12 +111,12 @@
 
 #### 이미지
 
-````markdown
-![이미지설명](path/to/image.png "이미지설명")
-````
-
 - alt 텍스트 누락 시: 파일명 사용 (확장자 제거)
 - 예: `image-example.png` → `![image-example](... "image-example")`
+
+```markdown
+![이미지설명](path/to/image.png "이미지설명")
+```
 
 #### 기타 syntax
 
@@ -124,7 +130,6 @@
 {개행}
 ```sh
 kubectl get pod,service -l app=backend
-```
 ```
 
 ## Autonomous Decision Making

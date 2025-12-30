@@ -1,0 +1,24 @@
+serviceAccount:
+  name: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Environment.Values.externalDns.irsa }}
+
+txtOwnerId: external-dns
+
+# your hostzone domain
+domainFilters:
+  - {{ .Environment.Values.externalDns.hostzone }}
+
+# Gateway API support
+sources:
+  - service
+  - ingress
+  - gateway-httproute
+  - gateway-grpcroute
+  - gateway-tcproute
+  - gateway-tlsroute
+  - gateway-udproute
+
+env:
+- name: AWS_DEFAULT_REGION
+  value: {{ .Environment.Values.global.region }}
