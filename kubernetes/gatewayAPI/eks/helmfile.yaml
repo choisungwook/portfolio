@@ -1,0 +1,37 @@
+---
+environments:
+  default:
+    values:
+    - global:
+        clusterName: eks-from-terraform
+        region: ap-northeast-2
+        vpcId: vpc-02c31a6853ff0d8f5
+
+    # ALB Controller를 위한 환경
+    - albController:
+        irsa: arn:aws:iam::467606240901:role/eks-from-terraform-alb-controller-irsa
+
+    # ExternalDNS를 위한 환경
+    - externalDns:
+        irsa: arn:aws:iam::467606240901:role/eks-from-terraform-external-dns-irsa
+        hostzone: choilab.xyz
+---
+repositories:
+- name: eks
+  url: https://aws.github.io/eks-charts
+- name: external-dns
+  url: https://kubernetes-sigs.github.io/external-dns/
+
+releases:
+- name: aws-load-balancer-controller
+  namespace: kube-system
+  chart: eks/aws-load-balancer-controller
+  version: 1.17.0
+  values:
+  - ./charts/aws-load-balancer-controller.gotmpl
+- name: external-dns
+  namespace: kube-system
+  chart: external-dns/external-dns
+  version: 1.19.0
+  values:
+  - ./charts/external-dns.gotmpl
