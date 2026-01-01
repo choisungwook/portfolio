@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+- name: InfluxDB
+  type: influxdb
+  access: proxy
+  orgId: 1
+  isDefault: true
+  url: http://influxdb:8086
+  uid: DS_INFLUXDB
+
+  # InfluxDB v2 관련 설정
+  jsonData:
+    version: Flux # 사용할 쿼리 언어 (InfluxDB v2는 Flux)
+    # 아래 값들은 Docker Compose의 Grafana 서비스 환경 변수를 참조합니다.
+    organization: my_org
+    defaultBucket: k6_results
+    tlsSkipVerify: true
+
+  # InfluxDB v2 인증 토큰
+  secureJsonData:
+    token: password1234
