@@ -1,0 +1,12 @@
+[project]
+name = "oauth-demo"
+version = "0.1.0"
+description = "oauth demo for learning"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.128.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "python-dotenv>=1.2.1",
+]

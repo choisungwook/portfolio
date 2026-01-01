@@ -1,0 +1,1 @@
+../../prompts/review_readme/GEMINI.md

@@ -1,0 +1,5 @@
+.git
+CLAUDE.md
+docker-compose.yml
+.venv/
+__pycache__/

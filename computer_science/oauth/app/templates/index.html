@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Google OAuth Hands-on</title>
+</head>
+<body>
+  <h1>Google OAuth 2.0 & OIDC 실습</h1>
+  <p>이 버튼을 누르면 구글 인증 페이지로 리다이렉트됩니다.</p>
+  <button onclick="location.href='/login'">Google 로그인</button>
+
+  <hr>
+  <h3>학습 가이드</h3>
+  <ul>
+    <li>로그인 시 브라우저 주소창의 <b>state</b> 파라미터를 확인하세요.</li>
+    <li>Callback 시 서버 로그에서 <b>code</b>가 어떻게 수신되는지 확인하세요.</li>
+    <li>최종 응답의 <b>id_token</b>을 디코딩하여 유저 정보를 확인하세요.</li>
+  </ul>
+</body>
+</html>
