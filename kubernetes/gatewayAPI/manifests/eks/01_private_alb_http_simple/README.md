@@ -1,15 +1,13 @@
 # Private ALB HTTP (Simple)
 
-가장 기본적인 Gateway API 예제입니다. LoadBalancerConfiguration 없이 기본 설정으로 Private ALB를 생성합니다.
+이 프로젝트는 ALB controller의 Gateway API 간단한 예제입니다. Private ALB를 생성합니다.
 
-## 특징
+## 사전 준비
 
-- LoadBalancerConfiguration: 사용 안 함
-- Scheme: 기본값 (internal) - 서브넷 태그에 따라 결정됨
-- Subnet: 자동 선택 (kubernetes.io/role/internal-elb 태그 기반)
-- Protocol: HTTP:80
-- Target Type: IP mode (TargetGroupConfiguration 사용)
-- Route53: private-alb-http.choilab.xyz
+- Subnet 태그: kubernetes.io/role/internal-elb 태그 설정
+- Route53: public host zone이 있어야 함
+- route53 controller
+- ALB controller
 
 ## 배포 순서
 
@@ -32,7 +30,6 @@ kubectl apply -f backend.yaml
 ```
 
 ### 4. TargetGroupConfiguration 생성
-
 
 ```sh
 kubectl apply -f targetgroupconfig.yaml
@@ -61,6 +58,16 @@ spec:
 ```
 
 ### 5. HTTPRoute 생성
+
+targetgroupconfig.yaml에서 hostnames필드를 여러분의 route53 hostzone record로 변경하세요
+
+```sh
+$ cat httproute.yaml
+hostnames:
+  - private-alb-http.choilab.xyz
+```
+
+targetgroup
 
 ```sh
 kubectl apply -f httproute.yaml
