@@ -1,0 +1,10 @@
+# AWS Configuration
+aws_region = "ap-northeast-2"
+
+# GitHub Configuration
+github_org    = "your-github-org-or-username"
+github_repo   = "your-repository-name"
+github_branch = "main"
+
+# Project Configuration
+project_name = "github-oidc"
