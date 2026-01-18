@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: iam-auth
+
+  datasource:
+    url: jdbc:aws-wrapper:mysql://${RDS_HOSTNAME}:${RDS_PORT:3306}/${RDS_DATABASE:demo}?wrapperPlugins=iam&iamRegion=${AWS_REGION:ap-northeast-2}&sslMode=require
+    username: ${RDS_USERNAME:iam_user}
+    driver-class-name: software.amazon.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      max-lifetime: 840000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 8080
+
+logging:
+  level:
+    software.amazon.jdbc: DEBUG

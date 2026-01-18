@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:aws-wrapper:postgresql://${RDS_HOSTNAME}:${RDS_PORT:5432}/${RDS_DATABASE:demo}?wrapperPlugins=iam&iamRegion=${AWS_REGION:ap-northeast-2}&sslMode=require
+    username: ${RDS_USERNAME:iam_user}
+    driver-class-name: software.amazon.jdbc.Driver
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
