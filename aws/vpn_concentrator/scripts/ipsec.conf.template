@@ -1,0 +1,55 @@
+config setup
+    charondebug="ike 2, knl 2, cfg 2, net 2, esp 2, dmn 2, mgr 2"
+    uniqueids=no
+
+## default
+conn %default
+    auto=start
+    type=tunnel
+    authby=secret
+
+    # Left (Customer Gateway) Configuration
+    left=%defaultroute
+    leftid=${CUSTOMER_GATEWAY_OUTSIDE_IP}
+    leftsubnet=0.0.0.0/0
+
+    # IKE Configuration (Phase 1)
+    keyexchange=ikev2
+    ike=aes128-sha1-modp1024!
+    ikelifetime=28800s
+
+    # IPSec Configuration (Phase 2)
+    esp=aes128-sha1-modp1024!
+    lifetime=3600s
+
+    # Dead Peer Detection
+    dpdaction=restart
+    dpddelay=10s
+    dpdtimeout=30s
+
+    # Fragmentation
+    fragmentation=yes
+    mobike=no
+
+    # Replay Window
+    replay_window=1024
+
+# IPSec Tunnel #1
+conn aws-tunnel-1
+    # Right (Virtual Private Gateway) Configuration
+    right=${VPG_OUTSIDE_IP_TUNNEL1}
+    rightsubnet=0.0.0.0/0
+
+    # Tunnel Interface
+    mark=100
+    leftupdown=/etc/ipsec.d/ipsec-vti-hook.sh
+
+# IPSec Tunnel #2
+conn aws-tunnel-2
+    # Right (Virtual Private Gateway) Configuration
+    right=${VPG_OUTSIDE_IP_TUNNEL2}
+    rightsubnet=0.0.0.0/0
+
+    # Tunnel Interface
+    mark=200
+    leftupdown=/etc/ipsec.d/ipsec-vti-hook.sh

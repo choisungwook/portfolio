@@ -1,0 +1,52 @@
+! /etc/frr/frr.conf
+frr version 8.5
+frr defaults traditional
+hostname customer-gateway
+log syslog informational
+no ipv6 forwarding
+service integrated-vtysh-config
+
+ip prefix-list ADVERTISE-TO-AWS seq 10 permit ${ONPREM_CIDR}
+ip route ${ONPREM_CIDR} ${ONPREM_GATEWAY}
+
+router bgp ${CGW_ASN}
+ bgp router-id ${CUSTOMER_GATEWAY_OUTSIDE_IP}
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ no bgp default ipv6-unicast
+ bgp graceful-restart
+ timers bgp 10 30
+
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} remote-as ${VPG_ASN}
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} description AWS-VPN-Tunnel-1
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} timers 10 30
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} timers connect 10
+
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} remote-as ${VPG_ASN}
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} description AWS-VPN-Tunnel-2
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} timers 10 30
+ neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} timers connect 10
+
+ address-family ipv4 unicast
+  network ${ONPREM_CIDR}
+
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} activate
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} soft-reconfiguration inbound
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} route-map FROM-AWS in
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL1} prefix-list ADVERTISE-TO-AWS out
+
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} activate
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} soft-reconfiguration inbound
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} route-map FROM-AWS in
+  neighbor ${BGP_NEIGHBOR_IP_TUNNEL2} prefix-list ADVERTISE-TO-AWS out
+ exit-address-family
+exit
+
+route-map FROM-AWS permit 10
+exit
+
+line vty
+ exec-timeout 0 0
+exit
+
+end

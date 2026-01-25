@@ -1,0 +1,12 @@
+project_name              = "vpn-concentrator-handson"
+aws_region                = "ap-northeast-2"
+aws_cloud_vpc_cidr        = "10.10.0.0/16"
+on_prem_vpc_cidr          = "10.20.0.0/16"
+aws_cloud_private_subnets = ["10.10.1.0/24", "10.10.2.0/24"]
+aws_cloud_public_subnets  = ["10.10.101.0/24", "10.10.102.0/24"]
+on_prem_private_subnets   = ["10.20.1.0/24", "10.20.2.0/24"]
+on_prem_public_subnets    = ["10.20.101.0/24", "10.20.102.0/24"]
+aws_cloud_ec2_volume_size = 20
+on_prem_ec2_volume_size   = 20
+aws_cloud_instance_type   = "t4g.small"
+on_prem_instance_type     = "t3.small"

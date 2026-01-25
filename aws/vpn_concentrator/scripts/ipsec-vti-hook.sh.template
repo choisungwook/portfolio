@@ -1,0 +1,125 @@
+#!/bin/bash
+# /etc/ipsec.d/ipsec-vti-hook.sh
+# StrongSwan updown script for AWS Site-to-Site VPN tunnels
+# This script configures VTI interfaces and routes when tunnels come up/down
+
+set -o nounset
+set -o errexit
+
+# Logging
+LOG_FILE="/var/log/ipsec-vti-hook.log"
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Command paths
+IP=$(which ip)
+IPTABLES=$(which iptables)
+
+# Extract mark values from PLUTO_MARK_OUT and PLUTO_MARK_IN (format: "mark/mask" or just "mark")
+PLUTO_MARK_OUT_ARR=(${PLUTO_MARK_OUT//// })
+PLUTO_MARK_IN_ARR=(${PLUTO_MARK_IN//// })
+MARK_OUT="${PLUTO_MARK_OUT_ARR[0]}"
+MARK_IN="${PLUTO_MARK_IN_ARR[0]}"
+
+# VTI interface mapping based on marks
+case "${MARK_OUT}" in
+    100)
+        VTI_IF="vti1"
+        VTI_LOCAL="${CGW_INSIDE_IP_TUNNEL1}"
+        VTI_REMOTE="${VPG_INSIDE_IP_TUNNEL1}"
+        TUNNEL_ID=1
+        ;;
+    200)
+        VTI_IF="vti2"
+        VTI_LOCAL="${CGW_INSIDE_IP_TUNNEL2}"
+        VTI_REMOTE="${VPG_INSIDE_IP_TUNNEL2}"
+        TUNNEL_ID=2
+        ;;
+    *)
+        log_message "ERROR: Unknown PLUTO_MARK_OUT: ${PLUTO_MARK_OUT} (MARK_OUT: ${MARK_OUT})"
+        exit 0
+        ;;
+esac
+
+# Debug logging
+log_message "==================================================="
+log_message "PLUTO_CONNECTION: ${PLUTO_CONNECTION}"
+log_message "PLUTO_VERB: ${PLUTO_VERB}"
+log_message "VTI_INTERFACE: ${VTI_IF}"
+log_message "PLUTO_ME: ${PLUTO_ME}"
+log_message "PLUTO_PEER: ${PLUTO_PEER}"
+log_message "MARK_IN: ${MARK_IN}"
+log_message "MARK_OUT: ${MARK_OUT}"
+log_message "==================================================="
+
+log_message "Tunnel #${TUNNEL_ID} - Action: ${PLUTO_VERB}, Interface: ${VTI_IF}"
+
+case "${PLUTO_VERB}" in
+    up-client)
+        log_message "Tunnel #${TUNNEL_ID} - Creating VTI interface ${VTI_IF}"
+
+        # Create VTI interface with proper okey/ikey
+        $IP link add ${VTI_IF} type vti \
+            local ${PLUTO_ME} \
+            remote ${PLUTO_PEER} \
+            okey ${MARK_OUT} \
+            ikey ${MARK_IN}
+        log_message "Tunnel #${TUNNEL_ID} - VTI interface ${VTI_IF} created"
+
+        # Disable policy and set rp_filter
+        sysctl -w net.ipv4.conf.${VTI_IF}.disable_policy=1 >/dev/null
+        sysctl -w net.ipv4.conf.${VTI_IF}.rp_filter=2 >/dev/null || sysctl -w net.ipv4.conf.${VTI_IF}.rp_filter=0 >/dev/null
+
+        # Configure IP address with remote endpoint
+        $IP addr add ${VTI_LOCAL} remote ${VTI_REMOTE} dev ${VTI_IF}
+        log_message "Tunnel #${TUNNEL_ID} - IP address ${VTI_LOCAL} remote ${VTI_REMOTE} configured"
+
+        # Bring interface up
+        $IP link set ${VTI_IF} up mtu 1436
+        log_message "Tunnel #${TUNNEL_ID} - Interface ${VTI_IF} is UP"
+
+        # MSS clamping for TCP
+        $IPTABLES -t mangle -I FORWARD -o ${VTI_IF} -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+        log_message "Tunnel #${TUNNEL_ID} - MSS clamping configured"
+
+        # Mark ESP packets
+        $IPTABLES -t mangle -I INPUT -p esp -s ${PLUTO_PEER} -d ${PLUTO_ME} -j MARK --set-xmark ${PLUTO_MARK_IN}
+        log_message "Tunnel #${TUNNEL_ID} - ESP packet marking configured"
+
+        # Flush routing table 220
+        $IP route flush table 220 2>/dev/null || true
+
+        log_message "Tunnel #${TUNNEL_ID} - VTI setup complete"
+        ;;
+
+    down-client)
+        log_message "Tunnel #${TUNNEL_ID} - Taking down VTI interface ${VTI_IF}"
+
+        # Remove iptables rules
+        $IPTABLES -t mangle -D FORWARD -o ${VTI_IF} -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
+        $IPTABLES -t mangle -D INPUT -p esp -s ${PLUTO_PEER} -d ${PLUTO_ME} -j MARK --set-xmark ${PLUTO_MARK_IN} 2>/dev/null || true
+        log_message "Tunnel #${TUNNEL_ID} - iptables rules removed"
+
+        # Delete VTI interface
+        $IP link del ${VTI_IF} 2>/dev/null || true
+        log_message "Tunnel #${TUNNEL_ID} - VTI interface ${VTI_IF} removed"
+        ;;
+
+    *)
+        log_message "Tunnel #${TUNNEL_ID} - Unhandled verb: ${PLUTO_VERB}"
+        ;;
+esac
+
+# Enable IPv4 forwarding and disable xfrm/policy on primary interface
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+# Detect primary network interface (not lo, not vti)
+PRIMARY_IF=$(ip route show default | awk '/default/ {print $5}' | head -1)
+if [ -n "${PRIMARY_IF}" ]; then
+    sysctl -w net.ipv4.conf.${PRIMARY_IF}.disable_xfrm=1 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.conf.${PRIMARY_IF}.disable_policy=1 >/dev/null 2>&1 || true
+    log_message "Primary interface: ${PRIMARY_IF}, xfrm/policy disabled"
+fi
+
+exit 0
