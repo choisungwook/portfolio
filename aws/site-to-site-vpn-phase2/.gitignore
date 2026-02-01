@@ -1,0 +1,7 @@
+ipsec.conf
+ipsec.secrets
+frr.conf
+ipsec-vti-hook.sh
+
+# exclude a site to site VPN configuration files
+*.txt
