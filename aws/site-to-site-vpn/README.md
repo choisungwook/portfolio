@@ -1,6 +1,8 @@
 ## 개요
 
-* AWS Site to Site VPN를 실습
+* AWS Site to Site VPN를 실습했지만 실패한 예제입니다.
+* 2026.2에 성공했고 성공한 예제는 아래 링크입니다.
+  * [2026.2 AWS Site to Site VPN 예제](../site-to-site-vpn-phase2/)
 
 ## 실습환경
 
