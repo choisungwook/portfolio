@@ -1,0 +1,10 @@
+project_name           = "redirect-cf"
+route53_zone_id        = "ZXXXXXXXXXXXXXXXXXXXXX"
+s3_hosting_domain      = "def.example.com"
+redirect_source_domain = "abc.example.com"
+# must be us-east-1 ACM
+acm_certificate_arn    = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Phase 1: false (s3_hosting_domain만 서빙)
+# Phase 2: true  (redirect_source_domain redirect 추가)
+enable_redirect = false

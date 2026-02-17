@@ -1,0 +1,4 @@
+project_name         = "redirect-alb"
+route53_zone_id      = "ZXXXXXXXXXXXXXXXXXXXXX"
+domain_name          = "abc.example.com"
+redirect_target_host = "def.example.com"
