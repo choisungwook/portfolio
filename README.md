@@ -77,6 +77,7 @@
 54. OAuth 예제 - [링크](./computer_science/oauth/)
 55. AWS RDS인증을 DB계정 비밀번호가 아니라 임시인증토큰으로 사용 - [링크](./aws/rds_with_iam/)
 56. Site to Site VPN의 IPsec프로토콜 원리와 AWS Site to Site VPN 실습 - [링크](./aws/site-to-site-vpn-phase2/)
+57. 온프레미스 리다이렉트만 하는 nginx를 AWS로 옮기는 방법들 - [링크](./aws/redirect_https/)
 
 ## 다른 정리된 문서 링크
 
