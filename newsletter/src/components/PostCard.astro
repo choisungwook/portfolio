@@ -1,0 +1,93 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  pubDate: Date;
+  tags: string[];
+  slug: string;
+}
+
+const { title, description, pubDate, tags, slug } = Astro.props;
+
+const formattedDate = pubDate.toLocaleDateString("ko-KR", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<article class="post-card">
+  <a href={`/posts/${slug}`} class="post-link">
+    <div class="post-meta">
+      <time datetime={pubDate.toISOString()}>{formattedDate}</time>
+    </div>
+    <h2 class="post-title">{title}</h2>
+    <p class="post-desc">{description}</p>
+    {tags.length > 0 && (
+      <div class="post-tags">
+        {tags.map((tag) => (
+          <span class="tag">{tag}</span>
+        ))}
+      </div>
+    )}
+  </a>
+</article>
+
+<style>
+  .post-card {
+    border-bottom: 1px solid var(--color-border);
+    transition: background-color 0.2s;
+  }
+
+  .post-card:hover {
+    background-color: var(--color-card-hover);
+  }
+
+  .post-link {
+    display: block;
+    padding: 16px 0;
+    color: inherit;
+  }
+
+  .post-link:hover {
+    text-decoration: none;
+  }
+
+  .post-meta {
+    font-size: 0.813rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .post-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+
+  .post-desc {
+    font-size: 0.938rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .post-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background: var(--color-tag-bg);
+    color: var(--color-tag-text);
+  }
+</style>
