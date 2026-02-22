@@ -91,6 +91,9 @@ geckodriver.log
 # hcl
 .terraform.lock.hcl
 
+# terraform backend config (contains bucket name)
+backend.hcl
+
 # vagrant general
 .vagrant/
 

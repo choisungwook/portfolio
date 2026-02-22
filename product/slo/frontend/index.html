@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akbun SLO Calculator</title>
+  <meta name="description" content="Calculate allowed downtime for your SLO availability target. Enter 99.99% and instantly see how much downtime is permitted per day, week, month, and year.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --bg: #FAFAFA;
+      --text: #2D2A26;
+      --text-sub: #6B6560;
+      --highlight: #FFF176;
+      --highlight-strong: #FFEE58;
+      --accent: #5C6BC0;
+      --divider: #D6D0C4;
+      --font-title: 'Caveat', cursive;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    html { font-size: 18px; -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Ad Slot --- */
+    .ad-slot {
+      max-width: 728px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      text-align: center;
+      min-height: 0;
+    }
+    .ad-slot--top { padding-top: 16px; }
+    .ad-slot--bottom { padding-bottom: 16px; }
+
+    /* --- Layout --- */
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    main {
+      flex: 1;
+      padding: 56px 0 64px;
+    }
+
+    /* --- Header --- */
+    .header {
+      margin-bottom: 8px;
+    }
+
+    .header__title {
+      font-family: var(--font-title);
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    .header__divider {
+      width: 100%;
+      height: 3px;
+      background: var(--text);
+      border: none;
+      border-radius: 2px;
+      margin: 8px 0 32px;
+    }
+
+    .header__desc {
+      font-size: 1rem;
+      color: var(--text-sub);
+      margin-bottom: 36px;
+    }
+
+    /* --- Input Section --- */
+    .input-section {
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-family: var(--font-title);
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .input-field {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--text);
+      background: #FFFFFF;
+      border: 2px solid var(--divider);
+      border-radius: 8px;
+      padding: 10px 16px;
+      width: 180px;
+      text-align: right;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+    }
+
+    .input-suffix {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--text-sub);
+    }
+
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .preset-btn {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      background: #FFFFFF;
+      border: 1px solid var(--divider);
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .preset-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .preset-btn--active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: #EDE7F6;
+    }
+
+    /* --- Results --- */
+
+    .result-row {
+      display: flex;
+      align-items: baseline;
+      padding: 14px 0;
+      border-bottom: 1px dashed var(--divider);
+    }
+
+    .result-row:last-child {
+      border-bottom: none;
+    }
+
+    .result-row__left {
+      width: 180px;
+      flex-shrink: 0;
+    }
+
+    .result-row__label {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .result-row__sublabel {
+      font-size: 0.8125rem;
+      color: var(--text-sub);
+      margin-left: 6px;
+    }
+
+    .result-row__value {
+      font-family: var(--font-mono);
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text);
+      background: linear-gradient(to top, var(--highlight) 40%, transparent 40%);
+      padding: 0 4px;
+      display: inline-block;
+    }
+
+    .result-row__seconds {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-left: 8px;
+    }
+
+    /* --- Footer --- */
+    footer {
+      padding: 24px 0;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 0.8125rem;
+      color: var(--text-sub);
+    }
+
+    /* --- Animations --- */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .result-row {
+      animation: fadeIn 0.3s ease-out both;
+    }
+    .result-row:nth-child(1) { animation-delay: 0s; }
+    .result-row:nth-child(2) { animation-delay: 0.05s; }
+    .result-row:nth-child(3) { animation-delay: 0.1s; }
+    .result-row:nth-child(4) { animation-delay: 0.15s; }
+
+    /* --- Responsive --- */
+    @media (max-width: 600px) {
+      main { padding: 36px 0 48px; }
+
+      .header__title { font-size: 2.25rem; }
+
+      .input-field {
+        font-size: 1.25rem;
+        width: 150px;
+        padding: 8px 12px;
+      }
+
+      .input-suffix { font-size: 1.25rem; }
+
+      .result-row { flex-wrap: wrap; gap: 4px; }
+
+      .result-row__value { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- AdSense Top Banner -->
+  <div class="ad-slot ad-slot--top">
+    <!-- Google AdSense: Top banner (728x90 or responsive)
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="XXXXXXXXXX"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    -->
+  </div>
+
+  <main>
+    <div class="container">
+      <header class="header">
+        <h1 class="header__title">Akbun SLO Calculator</h1>
+        <hr class="header__divider">
+        <p class="header__desc">Enter your SLO target to see how much downtime is allowed.</p>
+      </header>
+
+      <section class="input-section">
+        <p class="section-title">Availability Target</p>
+        <div class="input-row">
+          <input
+            type="text"
+            id="availability"
+            class="input-field"
+            value="99.99"
+            inputmode="decimal"
+            autocomplete="off"
+            aria-label="Availability percentage"
+          >
+          <span class="input-suffix">%</span>
+        </div>
+        <div class="presets">
+          <button class="preset-btn" data-value="99" type="button">99%</button>
+          <button class="preset-btn" data-value="99.5" type="button">99.5%</button>
+          <button class="preset-btn" data-value="99.9" type="button">99.9%</button>
+          <button class="preset-btn" data-value="99.95" type="button">99.95%</button>
+          <button class="preset-btn preset-btn--active" data-value="99.99" type="button">99.99%</button>
+          <button class="preset-btn" data-value="99.999" type="button">99.999%</button>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="section-title">Allowed Downtime</h2>
+        <div class="results-list">
+          <div class="result-row">
+            <span class="result-row__left">
+              <span class="result-row__label">Per Day</span>
+              <span class="result-row__sublabel">(24h)</span>
+            </span>
+            <span class="result-row__value" id="result-day">--</span>
+            <span class="result-row__seconds" id="result-day-sec"></span>
+          </div>
+          <div class="result-row">
+            <span class="result-row__left">
+              <span class="result-row__label">Per Week</span>
+              <span class="result-row__sublabel">(7d)</span>
+            </span>
+            <span class="result-row__value" id="result-week">--</span>
+            <span class="result-row__seconds" id="result-week-sec"></span>
+          </div>
+          <div class="result-row">
+            <span class="result-row__left">
+              <span class="result-row__label">Per Month</span>
+              <span class="result-row__sublabel">(30d)</span>
+            </span>
+            <span class="result-row__value" id="result-month">--</span>
+            <span class="result-row__seconds" id="result-month-sec"></span>
+          </div>
+          <div class="result-row">
+            <span class="result-row__left">
+              <span class="result-row__label">Per Year</span>
+              <span class="result-row__sublabel">(365d)</span>
+            </span>
+            <span class="result-row__value" id="result-year">--</span>
+            <span class="result-row__seconds" id="result-year-sec"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- AdSense Bottom Banner -->
+  <div class="ad-slot ad-slot--bottom">
+    <!-- Google AdSense: Bottom banner (728x90 or responsive)
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="XXXXXXXXXX"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    -->
+  </div>
+
+  <footer>
+    <p>Akbun SLO Calculator</p>
+  </footer>
+
+  <script>
+    const PERIODS = [
+      { id: 'day',   seconds: 86400 },
+      { id: 'week',  seconds: 604800 },
+      { id: 'month', seconds: 2592000 },
+      { id: 'year',  seconds: 31536000 },
+    ];
+
+    const input = document.getElementById('availability');
+    const presetBtns = document.querySelectorAll('.preset-btn');
+
+    function formatDuration(totalSeconds) {
+      if (totalSeconds <= 0) return { formatted: '0s', raw: '0' };
+
+      const d = Math.floor(totalSeconds / 86400);
+      const h = Math.floor((totalSeconds % 86400) / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+
+      const parts = [];
+      if (d > 0) parts.push(d + 'd');
+      if (h > 0) parts.push(h + 'h');
+      if (m > 0) parts.push(m + 'm');
+
+      const sDisplay = Number.isInteger(s) ? s + 's' : s.toFixed(2) + 's';
+      if (s > 0 || parts.length === 0) parts.push(sDisplay);
+
+      return {
+        formatted: parts.join(' '),
+        raw: totalSeconds.toFixed(2),
+      };
+    }
+
+    function calculate() {
+      const raw = input.value.trim();
+      const pct = parseFloat(raw);
+
+      if (isNaN(pct) || pct < 0 || pct > 100) {
+        PERIODS.forEach(p => {
+          document.getElementById('result-' + p.id).textContent = '--';
+          document.getElementById('result-' + p.id + '-sec').textContent = '';
+        });
+        return;
+      }
+
+      const downFraction = 1 - pct / 100;
+
+      PERIODS.forEach(p => {
+        const downtime = p.seconds * downFraction;
+        const result = formatDuration(downtime);
+        document.getElementById('result-' + p.id).textContent = result.formatted;
+        document.getElementById('result-' + p.id + '-sec').textContent =
+          downtime >= 60 ? result.raw + 's total' : '';
+      });
+    }
+
+    function updateActivePreset(value) {
+      presetBtns.forEach(btn => {
+        btn.classList.toggle('preset-btn--active', btn.dataset.value === value);
+      });
+    }
+
+    input.addEventListener('input', () => {
+      calculate();
+      updateActivePreset(input.value.trim());
+    });
+
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.dataset.value;
+        calculate();
+        updateActivePreset(btn.dataset.value);
+      });
+    });
+
+    calculate();
+  </script>
+</body>
+</html>

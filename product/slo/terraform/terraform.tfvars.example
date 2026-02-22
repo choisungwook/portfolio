@@ -1,0 +1,5 @@
+project_name              = "slo-calculator"
+aws_region                = "ap-northeast-2"
+domain_name               = "slo.akbun.com"
+github_repository         = "choisungwook/portfolio"
+cloudflare_referer_secret = "your-secret-string-here"
