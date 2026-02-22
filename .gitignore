@@ -117,3 +117,6 @@ artifacts/
 
 # ruff cache(python checker)
 .ruff_cache/
+
+# youtube-likes-automation local secrets
+.env.local
