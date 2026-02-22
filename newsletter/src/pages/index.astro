@@ -1,0 +1,40 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PostCard from "../components/PostCard.astro";
+import SubscribeForm from "../components/SubscribeForm.astro";
+import { getCollection } from "astro:content";
+
+const posts = (await getCollection("posts"))
+  .filter((post) => !post.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Layout title="Newsletter">
+  <section class="feed">
+    {posts.map((post) => (
+      <PostCard
+        title={post.data.title}
+        description={post.data.description}
+        pubDate={post.data.pubDate}
+        tags={post.data.tags}
+        slug={post.slug}
+      />
+    ))}
+    {posts.length === 0 && (
+      <p class="empty">아직 발행된 글이 없습니다.</p>
+    )}
+  </section>
+  <SubscribeForm />
+</Layout>
+
+<style>
+  .feed {
+    padding-top: 8px;
+  }
+
+  .empty {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+</style>
