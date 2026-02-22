@@ -1,0 +1,39 @@
+name: Deploy SLO Calculator
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "product/slo/frontend/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.SLO_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync product/slo/frontend/ s3://${{ secrets.SLO_S3_BUCKET }} \
+            --delete \
+            --cache-control "no-cache, max-age=0"
+
+      # - name: Purge Cloudflare cache
+      #   run: |
+      #     curl -s -X POST \
+      #       "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+      #       -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+      #       -H "Content-Type: application/json" \
+      #       --data '{"purge_everything":true}'
