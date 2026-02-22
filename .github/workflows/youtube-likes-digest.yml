@@ -1,0 +1,42 @@
+name: YouTube Likes Weekly Digest
+
+on:
+  schedule:
+    # Every Monday at 09:00 KST (00:00 UTC)
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Number of days to look back"
+        required: false
+        default: "7"
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: youtube-likes-automation/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r youtube-likes-automation/requirements.txt
+
+      - name: Fetch liked videos and send digest
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.YT_GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.YT_GOOGLE_CLIENT_SECRET }}
+          GOOGLE_ACCOUNTS_JSON: ${{ secrets.YT_GOOGLE_ACCOUNTS_JSON }}
+          SLACK_WEBHOOK_URL: ${{ secrets.YT_SLACK_WEBHOOK_URL }}
+          EMAIL_ENABLED: ${{ secrets.YT_EMAIL_ENABLED }}
+          EMAIL_SMTP_HOST: ${{ secrets.YT_EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.YT_EMAIL_SMTP_PORT }}
+          EMAIL_FROM: ${{ secrets.YT_EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.YT_EMAIL_TO }}
+          EMAIL_PASSWORD: ${{ secrets.YT_EMAIL_PASSWORD }}
+          DAYS_LOOKBACK: ${{ github.event.inputs.days || '7' }}
+        run: python youtube-likes-automation/scripts/fetch_likes.py
