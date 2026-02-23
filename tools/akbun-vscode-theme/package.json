@@ -1,0 +1,51 @@
+{
+  "name": "akbun-theme",
+  "displayName": "Akbun Theme",
+  "description": "A soothing VS Code theme with dark (Catppuccin-inspired) and light (Claude-inspired warm) variants. Optimized for HCL, Ansible, Python, and JavaScript with low eye-strain contrast.",
+  "version": "0.1.0",
+  "publisher": "choisungwook",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "theme",
+    "dark",
+    "light",
+    "catppuccin",
+    "claude",
+    "akbun",
+    "hcl",
+    "terraform",
+    "ansible",
+    "python",
+    "javascript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/choisungwook/portfolio"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "label": "Akbun Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/akbun-dark.json"
+      },
+      {
+        "label": "Akbun Light",
+        "uiTheme": "vs",
+        "path": "./themes/akbun-light.json"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node test/theme-validator.js",
+    "test:contrast": "node test/contrast-checker.js",
+    "test:all": "node test/theme-validator.js && node test/contrast-checker.js"
+  },
+  "devDependencies": {}
+}
