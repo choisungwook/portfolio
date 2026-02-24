@@ -1,0 +1,646 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KMS Server Web UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>KMS Server Web UI</h1>
+        <hr class="header-divider" />
+        <p>Go KMS 백엔드 API를 브라우저에서 바로 테스트할 수 있는 Astro 기반 UI입니다.</p>
+      </header>
+
+      <div class="section-divider"><span>키 생성</span></div>
+      <section class="panel">
+        <form id="create-key-form">
+          <label for="create-key-id">Key ID</label>
+          <input id="create-key-id" name="key_id" required placeholder="my-first-key" />
+          <button type="submit">키 생성</button>
+          <div id="create-output" class="output"></div>
+        </form>
+      </section>
+
+      <div class="section-divider"><span>키 조회</span></div>
+      <section class="panel">
+        <div class="toolbar">
+          <button id="refresh-keys" type="button">키 목록 새로고침</button>
+          <button id="health-check" type="button">헬스 체크</button>
+          <p id="health-status" class="status"></p>
+        </div>
+        <ul id="key-list" class="key-list"></ul>
+      </section>
+
+      <div class="section-divider"><span>봉투 암호화 (Envelope Encryption) 시연</span></div>
+      <section class="panel">
+        <p>대용량 데이터는 브라우저에서 만든 data key로 직접 암호화하고, data key만 KMS의 wrapping key로 암호화해 저장합니다.</p>
+        <p class="status">학습용 데모: 아래 결과에 data key 평문도 노출됩니다.</p>
+
+        <!-- ===== Encrypt Workflow ===== -->
+        <div class="workflow">
+          <h2>Encrypt Flow</h2>
+          <div class="workflow-row" id="encrypt-flow">
+
+            <div class="wf-node wf-node--input" id="enc-step-input">
+              <div class="wf-node__badge">1</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="10" width="28" height="18" rx="3" stroke="#5C6BC0" stroke-width="2"/><path d="M10 10V8a8 8 0 0116 0v2" stroke="#5C6BC0" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="21" r="2" fill="#5C6BC0"/></svg>
+              </div>
+              <div class="wf-node__title">입력</div>
+              <div class="wf-node__body">
+                <label for="env-key-id">Wrapping Key ID</label>
+                <input id="env-key-id" required placeholder="wrapping-key-1" />
+                <label for="env-plaintext">암호화할 데이터</label>
+                <textarea id="env-plaintext" required placeholder="대용량 데이터 원문"></textarea>
+              </div>
+              <div class="wf-node__result" id="enc-result-input"></div>
+            </div>
+
+            <div class="wf-arrow" id="enc-arrow-1">
+              <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+              <span class="wf-arrow__label">Data Key 생성<br/>+ AES-GCM</span>
+            </div>
+
+            <div class="wf-node wf-node--process" id="enc-step-local">
+              <div class="wf-node__badge">2-3</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><rect x="3" y="6" width="30" height="20" rx="2" stroke="#6B6560" stroke-width="2"/><line x1="3" y1="22" x2="33" y2="22" stroke="#6B6560" stroke-width="2"/><circle cx="18" cy="29" r="1.5" fill="#6B6560"/><rect x="9" y="10" width="18" height="8" rx="1" fill="#FFF176" opacity="0.5"/></svg>
+              </div>
+              <div class="wf-node__title">브라우저 암호화</div>
+              <div class="wf-node__body">
+                <span class="wf-node__detail">AES-256-GCM</span>
+                <span class="wf-node__detail">random Data Key (32B)</span>
+                <span class="wf-node__detail">random IV (12B)</span>
+              </div>
+              <div class="wf-node__result" id="enc-result-local"></div>
+            </div>
+
+            <div class="wf-arrow" id="enc-arrow-2">
+              <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+              <span class="wf-arrow__label">KMS /encrypt<br/>wrapping</span>
+            </div>
+
+            <div class="wf-node wf-node--output" id="enc-step-kms">
+              <div class="wf-node__badge">4-5</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="4" width="28" height="28" rx="4" stroke="#2D2A26" stroke-width="2"/><path d="M12 14l4 4 8-8" stroke="#5C6BC0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="24" x2="26" y2="24" stroke="#D6D0C4" stroke-width="1.5"/><line x1="10" y1="28" x2="20" y2="28" stroke="#D6D0C4" stroke-width="1.5"/></svg>
+              </div>
+              <div class="wf-node__title">Encrypted Message</div>
+              <div class="wf-node__body">
+                <span class="wf-node__detail">Wrapped Data Key</span>
+                <span class="wf-node__detail">IV (base64)</span>
+                <span class="wf-node__detail">Ciphertext (base64)</span>
+              </div>
+              <div class="wf-node__result" id="enc-result-kms"></div>
+            </div>
+
+          </div>
+          <button type="button" id="envelope-encrypt-btn" class="wf-execute-btn">봉투 암호화 실행</button>
+          <div id="envelope-output" class="output"></div>
+        </div>
+
+        <!-- ===== Decrypt Workflow ===== -->
+        <div class="workflow">
+          <h2>Decrypt Flow</h2>
+          <div class="workflow-row" id="decrypt-flow">
+
+            <div class="wf-node wf-node--input" id="dec-step-input">
+              <div class="wf-node__badge">1</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><rect x="4" y="4" width="28" height="28" rx="4" stroke="#5C6BC0" stroke-width="2"/><path d="M12 14l4 4 8-8" stroke="#5C6BC0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="24" x2="26" y2="24" stroke="#D6D0C4" stroke-width="1.5"/><line x1="10" y1="28" x2="20" y2="28" stroke="#D6D0C4" stroke-width="1.5"/></svg>
+              </div>
+              <div class="wf-node__title">Encrypted Message</div>
+              <div class="wf-node__body">
+                <label for="env-dec-key-id">Wrapping Key ID</label>
+                <input id="env-dec-key-id" required placeholder="wrapping-key-1" />
+                <label for="env-wrapped-data-key">Wrapped Data Key (hex)</label>
+                <textarea id="env-wrapped-data-key" required placeholder="a1b2c3..."></textarea>
+                <label for="env-iv">IV (base64)</label>
+                <input id="env-iv" required placeholder="AAECAwQFBgcICQoL" />
+                <label for="env-local-cipher">Ciphertext (base64)</label>
+                <textarea id="env-local-cipher" required placeholder="m3x+..."></textarea>
+              </div>
+              <div class="wf-node__result" id="dec-result-input"></div>
+            </div>
+
+            <div class="wf-arrow" id="dec-arrow-1">
+              <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+              <span class="wf-arrow__label">KMS /decrypt<br/>unwrap</span>
+            </div>
+
+            <div class="wf-node wf-node--process" id="dec-step-kms">
+              <div class="wf-node__badge">2</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><path d="M18 6a6 6 0 00-6 6v4h-1a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V18a2 2 0 00-2-2h-1v-4a6 6 0 00-6-6zm-3 10v-4a3 3 0 016 0v4" stroke="#6B6560" stroke-width="2"/><circle cx="18" cy="23" r="2" fill="#5C6BC0"/></svg>
+              </div>
+              <div class="wf-node__title">Data Key 복원</div>
+              <div class="wf-node__body">
+                <span class="wf-node__detail">KMS가 wrapping key로</span>
+                <span class="wf-node__detail">data key 복호화</span>
+              </div>
+              <div class="wf-node__result" id="dec-result-kms"></div>
+            </div>
+
+            <div class="wf-arrow" id="dec-arrow-2">
+              <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+              <span class="wf-arrow__label">AES-GCM<br/>복호화</span>
+            </div>
+
+            <div class="wf-node wf-node--output" id="dec-step-plain">
+              <div class="wf-node__badge">3</div>
+              <div class="wf-node__icon">
+                <svg viewBox="0 0 36 36" fill="none"><rect x="6" y="4" width="24" height="28" rx="2" stroke="#2D2A26" stroke-width="2"/><line x1="11" y1="12" x2="25" y2="12" stroke="#D6D0C4" stroke-width="1.5"/><line x1="11" y1="17" x2="25" y2="17" stroke="#D6D0C4" stroke-width="1.5"/><line x1="11" y1="22" x2="19" y2="22" stroke="#D6D0C4" stroke-width="1.5"/></svg>
+              </div>
+              <div class="wf-node__title">Plaintext</div>
+              <div class="wf-node__body">
+                <span class="wf-node__detail">복원된 원문 데이터</span>
+              </div>
+              <div class="wf-node__result" id="dec-result-plain"></div>
+            </div>
+
+          </div>
+          <button type="button" id="envelope-decrypt-btn" class="wf-execute-btn">봉투 복호화 검증</button>
+          <div id="envelope-decrypt-output" class="output"></div>
+        </div>
+
+        <details class="note-bubble">
+          <summary>수도코드 + Go 흐름 참고</summary>
+          <p><strong>data key를 wrapping key로 보호</strong>하고, 복호화 때 KMS에 보내 data key 평문을 복원합니다.</p>
+          <pre><code># pseudocode
+local_data_key = random(32 bytes)
+encrypted_data = AES_GCM_Encrypt(local_data_key, plaintext)
+wrapped_data_key = KMS_Encrypt(wrapping_key_id, hex(local_data_key))
+
+# decrypt flow
+local_data_key = hex_decode(KMS_Decrypt(wrapping_key_id, wrapped_data_key))
+plaintext = AES_GCM_Decrypt(local_data_key, encrypted_data)</code></pre>
+          <pre><code>// go-style flow
+wrapped, _ := kms.Encrypt(wrappingKeyID, hex.EncodeToString(dataKey))
+dataKeyHex, _ := kms.Decrypt(wrappingKeyID, wrapped)
+plain, _ := localAESGCMDecrypt(mustHexDecode(dataKeyHex), iv, ciphertext)</code></pre>
+        </details>
+      </section>
+
+      <div class="section-divider"><span>암호화 / 복호화</span></div>
+      <div class="grid">
+        <section class="panel">
+          <h2>암호화</h2>
+          <form id="encrypt-form">
+            <label for="encrypt-key-id">Key ID</label>
+            <input id="encrypt-key-id" name="key_id" required placeholder="my-first-key" />
+            <label for="encrypt-plaintext">Plaintext</label>
+            <textarea id="encrypt-plaintext" name="plaintext" required placeholder="hello, KMS!"></textarea>
+            <button type="submit">암호화 실행</button>
+          </form>
+          <div id="encrypt-output" class="output"></div>
+        </section>
+
+        <section class="panel">
+          <h2>복호화</h2>
+          <form id="decrypt-form">
+            <label for="decrypt-key-id">Key ID</label>
+            <input id="decrypt-key-id" name="key_id" required placeholder="my-first-key" />
+            <label for="decrypt-ciphertext">Ciphertext (hex)</label>
+            <textarea id="decrypt-ciphertext" name="ciphertext" required placeholder="f1a2b3..."></textarea>
+            <button type="submit">복호화 실행</button>
+          </form>
+          <div id="decrypt-output" class="output"></div>
+        </section>
+      </div>
+    </main>
+
+    <script is:inline>
+      const keyList = document.querySelector('#key-list');
+      const healthStatus = document.querySelector('#health-status');
+      const createOutput = document.querySelector('#create-output');
+      const encryptOutput = document.querySelector('#encrypt-output');
+      const decryptOutput = document.querySelector('#decrypt-output');
+      const envelopeOutput = document.querySelector('#envelope-output');
+      const envelopeDecryptOutput = document.querySelector('#envelope-decrypt-output');
+      const textEncoder = new TextEncoder();
+      const textDecoder = new TextDecoder();
+
+      async function request(path, options = {}) {
+        const response = await fetch(`/api${path}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+          },
+          ...options,
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `request failed: ${response.status}`);
+        }
+        return data;
+      }
+
+      function show(target, value, isError = false) {
+        target.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        target.classList.toggle('error', isError);
+      }
+
+      function toHex(bytes) {
+        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+      }
+
+      function fromHex(hex) {
+        if (hex.length % 2 !== 0) {
+          throw new Error('hex length must be even');
+        }
+        if (!/^[0-9a-fA-F]*$/.test(hex)) {
+          throw new Error('hex contains invalid characters');
+        }
+        const out = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < out.length; i += 1) {
+          out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+      }
+
+      function toBase64(bytes) {
+        let binary = '';
+        for (const byte of bytes) {
+          binary += String.fromCharCode(byte);
+        }
+        return btoa(binary);
+      }
+
+      function fromBase64(value) {
+        const binary = atob(value);
+        const out = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          out[i] = binary.charCodeAt(i);
+        }
+        return out;
+      }
+
+      async function loadKeys() {
+        try {
+          const keys = await request('/keys');
+          keyList.innerHTML = '';
+
+          if (keys.length === 0) {
+            keyList.innerHTML = '<li class="status">생성된 키가 없습니다.</li>';
+            return;
+          }
+
+          for (const key of keys) {
+            const li = document.createElement('li');
+            li.className = 'key-item';
+            const keyMeta = document.createElement('div');
+            keyMeta.className = 'key-meta';
+
+            const keyID = document.createElement('strong');
+            keyID.textContent = key.id;
+
+            const keyAlgorithm = document.createElement('small');
+            keyAlgorithm.textContent = key.algorithm || 'AES-256-GCM';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.dataset.id = key.id;
+            deleteButton.textContent = '삭제';
+
+            keyMeta.appendChild(keyID);
+            keyMeta.appendChild(keyAlgorithm);
+            li.appendChild(keyMeta);
+            li.appendChild(deleteButton);
+            keyList.appendChild(li);
+          }
+        } catch (error) {
+          keyList.innerHTML = `<li class="status error">${error.message}</li>`;
+        }
+      }
+
+      document.querySelector('#refresh-keys').addEventListener('click', loadKeys);
+
+      document.querySelector('#health-check').addEventListener('click', async () => {
+        healthStatus.textContent = '확인 중...';
+        healthStatus.classList.remove('error');
+        try {
+          const data = await request('/health');
+          healthStatus.textContent = `백엔드 상태: ${data.status}`;
+        } catch (error) {
+          healthStatus.textContent = error.message;
+          healthStatus.classList.add('error');
+        }
+      });
+
+      keyList.addEventListener('click', async (event) => {
+        const button = event.target.closest('button[data-id]');
+        if (!button) {
+          return;
+        }
+
+        const id = button.dataset.id;
+        if (!id) {
+          return;
+        }
+
+        if (!confirm(`키 '${id}'를 삭제할까요?`)) {
+          return;
+        }
+
+        try {
+          await request(`/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          await loadKeys();
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      document.querySelector('#create-key-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const keyID = form.key_id.value.trim();
+
+        try {
+          const result = await request('/keys', {
+            method: 'POST',
+            body: JSON.stringify({ key_id: keyID }),
+          });
+          show(createOutput, result);
+          form.reset();
+          await loadKeys();
+        } catch (error) {
+          show(createOutput, error.message, true);
+        }
+      });
+
+      document.querySelector('#encrypt-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+
+        try {
+          const result = await request('/encrypt', {
+            method: 'POST',
+            body: JSON.stringify({
+              key_id: form.key_id.value.trim(),
+              plaintext: form.plaintext.value,
+            }),
+          });
+          show(encryptOutput, result);
+          document.querySelector('#decrypt-key-id').value = result.key_id;
+          document.querySelector('#decrypt-ciphertext').value = result.ciphertext;
+        } catch (error) {
+          show(encryptOutput, error.message, true);
+        }
+      });
+
+      document.querySelector('#decrypt-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+
+        try {
+          const result = await request('/decrypt', {
+            method: 'POST',
+            body: JSON.stringify({
+              key_id: form.key_id.value.trim(),
+              ciphertext: form.ciphertext.value.trim(),
+            }),
+          });
+          show(decryptOutput, result);
+        } catch (error) {
+          show(decryptOutput, error.message, true);
+        }
+      });
+
+      /* --- Workflow animation helpers --- */
+      function activateNode(nodeId, delayMs) {
+        return new Promise(resolve => {
+          const el = document.getElementById(nodeId);
+          el.classList.add('active');
+          setTimeout(resolve, delayMs);
+        });
+      }
+
+      function markNodeDone(nodeId) {
+        return new Promise(resolve => {
+          const el = document.getElementById(nodeId);
+          el.classList.remove('active');
+          el.classList.add('done');
+          setTimeout(resolve, 150);
+        });
+      }
+
+      function flowArrow(arrowId, durationMs) {
+        return new Promise(resolve => {
+          const el = document.getElementById(arrowId);
+          el.classList.add('flowing');
+          setTimeout(() => {
+            el.classList.remove('flowing');
+            el.classList.add('done');
+            resolve();
+          }, durationMs);
+        });
+      }
+
+      function showNodeResult(resultId, text) {
+        document.getElementById(resultId).textContent = text;
+      }
+
+      function resetWorkflow(rowId) {
+        const row = document.getElementById(rowId);
+        row.querySelectorAll('.wf-node').forEach(n => n.classList.remove('active', 'done'));
+        row.querySelectorAll('.wf-arrow').forEach(a => a.classList.remove('flowing', 'done'));
+        row.querySelectorAll('.wf-node__result').forEach(r => { r.textContent = ''; });
+      }
+
+      /* --- Envelope Encrypt (workflow) --- */
+      document.querySelector('#envelope-encrypt-btn').addEventListener('click', async () => {
+        const btn = document.querySelector('#envelope-encrypt-btn');
+        btn.disabled = true;
+        resetWorkflow('encrypt-flow');
+        envelopeOutput.textContent = '';
+
+        const keyID = document.querySelector('#env-key-id').value.trim();
+        const plaintext = document.querySelector('#env-plaintext').value;
+
+        try {
+          if (!keyID || !plaintext) throw new Error('Wrapping Key ID와 데이터를 입력하세요.');
+          if (!window.crypto?.subtle) throw new Error('Web Crypto API를 사용할 수 없는 환경입니다.');
+
+          // Step 1: Input node
+          await activateNode('enc-step-input', 300);
+          showNodeResult('enc-result-input', `Key: ${keyID}\nData: ${plaintext.slice(0, 40)}${plaintext.length > 40 ? '...' : ''}`);
+          await markNodeDone('enc-step-input');
+
+          // Arrow 1
+          await flowArrow('enc-arrow-1', 400);
+
+          // Step 2-3: Browser generates data key + encrypts
+          await activateNode('enc-step-local', 200);
+
+          const dataKey = await crypto.subtle.generateKey(
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+          );
+          const rawDataKey = new Uint8Array(await crypto.subtle.exportKey('raw', dataKey));
+
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const localCipherBuffer = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            dataKey,
+            textEncoder.encode(plaintext)
+          );
+          const localCipher = new Uint8Array(localCipherBuffer);
+
+          showNodeResult('enc-result-local',
+            `Data Key: ${toHex(rawDataKey).slice(0, 16)}...\nIV: ${toBase64(iv)}\nCipher: ${toBase64(localCipher).slice(0, 24)}...`
+          );
+          await markNodeDone('enc-step-local');
+
+          // Arrow 2
+          await flowArrow('enc-arrow-2', 400);
+
+          // Step 4-5: KMS wraps data key
+          await activateNode('enc-step-kms', 200);
+
+          const wrappedDataKey = await request('/encrypt', {
+            method: 'POST',
+            body: JSON.stringify({
+              key_id: keyID,
+              plaintext: toHex(rawDataKey),
+            }),
+          });
+
+          const payload = {
+            summary: '원문은 data key로 로컬 암호화되고, data key는 wrapping key로 보호됨',
+            wrapping_key: {
+              key_id: keyID,
+              role: 'data key 보호/복원용',
+            },
+            data_key: {
+              plaintext_hex_for_learning: toHex(rawDataKey),
+              wrapped_by_wrapping_key_hex: wrappedDataKey.ciphertext,
+            },
+            encrypted_data: {
+              iv_base64: toBase64(iv),
+              ciphertext_base64: toBase64(localCipher),
+            },
+          };
+
+          showNodeResult('enc-result-kms',
+            `Wrapped: ${wrappedDataKey.ciphertext.slice(0, 20)}...\nIV: ${toBase64(iv)}\nCipher: ${toBase64(localCipher).slice(0, 24)}...`
+          );
+          await markNodeDone('enc-step-kms');
+
+          show(envelopeOutput, payload);
+
+          // Auto-fill decrypt flow inputs
+          document.querySelector('#env-dec-key-id').value = keyID;
+          document.querySelector('#env-wrapped-data-key').value = payload.data_key.wrapped_by_wrapping_key_hex;
+          document.querySelector('#env-iv').value = payload.encrypted_data.iv_base64;
+          document.querySelector('#env-local-cipher').value = payload.encrypted_data.ciphertext_base64;
+        } catch (error) {
+          show(envelopeOutput, error.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      /* --- Envelope Decrypt (workflow) --- */
+      document.querySelector('#envelope-decrypt-btn').addEventListener('click', async () => {
+        const btn = document.querySelector('#envelope-decrypt-btn');
+        btn.disabled = true;
+        resetWorkflow('decrypt-flow');
+        envelopeDecryptOutput.textContent = '';
+
+        const keyID = document.querySelector('#env-dec-key-id').value.trim();
+        const wrappedDataKeyHex = document.querySelector('#env-wrapped-data-key').value.trim();
+        const ivB64 = document.querySelector('#env-iv').value.trim();
+        const localCipherB64 = document.querySelector('#env-local-cipher').value.trim();
+
+        try {
+          if (!keyID || !wrappedDataKeyHex || !ivB64 || !localCipherB64) {
+            throw new Error('모든 필드를 입력하세요.');
+          }
+          if (!window.crypto?.subtle) throw new Error('Web Crypto API를 사용할 수 없는 환경입니다.');
+
+          const iv = fromBase64(ivB64);
+          const localCipher = fromBase64(localCipherB64);
+
+          // Step 1: Input node
+          await activateNode('dec-step-input', 300);
+          showNodeResult('dec-result-input', `Key: ${keyID}\nWrapped: ${wrappedDataKeyHex.slice(0, 20)}...`);
+          await markNodeDone('dec-step-input');
+
+          // Arrow 1
+          await flowArrow('dec-arrow-1', 400);
+
+          // Step 2: KMS unwraps data key
+          await activateNode('dec-step-kms', 200);
+
+          const dataKeyResult = await request('/decrypt', {
+            method: 'POST',
+            body: JSON.stringify({
+              key_id: keyID,
+              ciphertext: wrappedDataKeyHex,
+            }),
+          });
+
+          const rawDataKey = fromHex(dataKeyResult.plaintext);
+
+          showNodeResult('dec-result-kms', `Data Key: ${dataKeyResult.plaintext.slice(0, 16)}...`);
+          await markNodeDone('dec-step-kms');
+
+          // Arrow 2
+          await flowArrow('dec-arrow-2', 400);
+
+          // Step 3: Local AES-GCM decrypt
+          await activateNode('dec-step-plain', 200);
+
+          const dataKey = await crypto.subtle.importKey(
+            'raw',
+            rawDataKey,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+          );
+
+          const plainBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            dataKey,
+            localCipher
+          );
+
+          const recoveredPlaintext = textDecoder.decode(plainBuffer);
+
+          showNodeResult('dec-result-plain', recoveredPlaintext);
+          await markNodeDone('dec-step-plain');
+
+          show(envelopeDecryptOutput, {
+            summary: 'wrapping key로 복원한 data key로 로컬 암호문 복호화 성공',
+            wrapping_key: {
+              key_id: keyID,
+            },
+            data_key: {
+              recovered_plaintext_hex_for_learning: toHex(rawDataKey),
+            },
+            plaintext: recoveredPlaintext,
+          });
+        } catch (error) {
+          show(envelopeDecryptOutput, error.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      loadKeys();
+    </script>
+  </body>
+</html>

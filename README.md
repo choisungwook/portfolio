@@ -1,23 +1,6 @@
-<!-- TOC -->
+# Akbun portfolio
 
-- [개요](#%EA%B0%9C%EC%9A%94)
-- [자기소개](#%EC%9E%90%EA%B8%B0%EC%86%8C%EA%B0%9C)
-- [목차](#%EB%AA%A9%EC%B0%A8)
-- [다른 정리된 문서 링크](#%EB%8B%A4%EB%A5%B8-%EC%A0%95%EB%A6%AC%EB%90%9C-%EB%AC%B8%EC%84%9C-%EB%A7%81%ED%81%AC)
-
-<!-- /TOC -->
-
-## 개요
-
-* 제가 공부한 것과 테스트한 자료를 정리한 github repo입니다.
-
-## 자기소개
-
-안녕하세요 데브옵스 엔지니어 악분 입니다.
-
-* 링크드인: https://www.linkedin.com/in/choisungwook/
-* 블로그: https://malwareanalysis.tistory.com
-* 유투브(악분일상): https://www.youtube.com/channel/UC7ctp-Pbn6y3J1VwtCtsnOQ
+안녕하세요! 악분이 공부했던 내용을 정리한 공간입니다.
 
 ## 목차
 
@@ -79,16 +62,17 @@
 56. Site to Site VPN의 IPsec프로토콜 원리와 AWS Site to Site VPN 실습 - [링크](./aws/site-to-site-vpn-phase2/)
 57. 온프레미스 리다이렉트만 하는 nginx를 AWS로 옮기는 방법들 - [링크](./aws/redirect_https/)
 58. SLO를 계산하는 제품 - [링크](./product/slo/)
-59. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의 - [링크](./computer_science/linux_tmp_memory_monitoring/)
+59. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의. added 26.3.1 - [링크](./computer_science/linux_tmp_memory_monitoring/)
+60. AWS KMS를 사용한 봉투암호화 예제. added 26.3.2 - [링크](./computer_science/kms/)
 
 ## 다른 정리된 문서 링크
 
-* [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
-* [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
-* [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
-* [테라폼 예제](https://github.com/choisungwook/terraform_practice)
-* [karpenter](https://github.com/choisungwook/karpenter)
-* [EKS 예제](https://github.com/choisungwook/eks-practice)
-* [스터디]
-  * [ansible](https://github.com/choisungwook/ansible_practice)
-  * [테라폼](https://github.com/sungwook-practice/t101-study)
+- [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
+- [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
+- [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
+- [테라폼 예제](https://github.com/choisungwook/terraform_practice)
+- [karpenter](https://github.com/choisungwook/karpenter)
+- [EKS 예제](https://github.com/choisungwook/eks-practice)
+- [스터디]
+  - [ansible](https://github.com/choisungwook/ansible_practice)
+  - [테라폼](https://github.com/sungwook-practice/t101-study)
