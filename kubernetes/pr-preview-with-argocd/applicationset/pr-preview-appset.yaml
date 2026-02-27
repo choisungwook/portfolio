@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - pullRequest:
+      github:
+        # GitHub 저장소 owner (개인 계정 또는 organization)
+        owner: <GITHUB_OWNER>
+        # GitHub 저장소 이름
+        repo: <GITHUB_REPO>
+        # GitHub Personal Access Token (repo scope 필요)
+        tokenRef:
+          secretName: github-token
+          key: token
+        # preview 라벨이 붙은 PR만 대상
+        labels:
+        - preview
+      # PR 변경 감지 주기 (초)
+      requeueAfterSeconds: 60
+  template:
+    metadata:
+      name: 'preview-{{.branch_slug}}-{{.number}}'
+    spec:
+      project: default
+      source:
+        # sample-app Helm chart가 있는 저장소
+        repoURL: 'https://github.com/<GITHUB_OWNER>/<GITHUB_REPO>.git'
+        targetRevision: '{{.head_sha}}'
+        path: kubernetes/pr-preview-with-argocd/sample-app
+        helm:
+          valuesObject:
+            replicaCount: 1
+            image:
+              tag: '{{.head_short_sha}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'preview-{{.branch_slug}}-{{.number}}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        syncOptions:
+        - CreateNamespace=true

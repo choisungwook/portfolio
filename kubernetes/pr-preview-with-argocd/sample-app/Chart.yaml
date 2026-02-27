@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sample-app
+description: PR Preview 테스트용 샘플 애플리케이션
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
