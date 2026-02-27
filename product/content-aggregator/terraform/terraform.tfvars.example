@@ -1,0 +1,3 @@
+domain_name               = "weekly.akbun.com"
+github_repository         = "choisungwook/portfolio"
+cloudflare_referer_secret = "your-secret-value-here"

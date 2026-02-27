@@ -1,0 +1,11 @@
+{
+  "name": "content-aggregator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.0.0"
+  }
+}

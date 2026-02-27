@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akbun Weekly</title>
+  <meta name="description" content="악분의 블로그, 유튜브 콘텐츠를 한눈에 모아보는 주간 다이제스트.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <!--__FEED_DATA__-->
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --bg: #FAFAFA;
+      --text: #2D2A26;
+      --text-sub: #6B6560;
+      --text-light: #9E9893;
+      --highlight: #FFF176;
+      --accent: #5C6BC0;
+      --divider: #E8E2D9;
+      --card-bg: #FFFFFF;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+      --card-hover: 0 4px 12px rgba(0,0,0,0.08);
+      --font-title: 'Caveat', cursive;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+      --radius: 10px;
+    }
+
+    html { font-size: 18px; -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    main {
+      flex: 1;
+      padding: 56px 0 64px;
+    }
+
+    /* --- Header --- */
+    .header { margin-bottom: 8px; }
+
+    .header__title {
+      font-family: var(--font-title);
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    .header__divider {
+      width: 100%;
+      height: 3px;
+      background: var(--text);
+      border: none;
+      border-radius: 2px;
+      margin: 8px 0 12px;
+    }
+
+    .header__desc {
+      font-size: 0.95rem;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    .header__build-date {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-light);
+      margin-bottom: 28px;
+    }
+
+    /* --- Filter --- */
+    .filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .filter-btn {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      background: var(--card-bg);
+      border: 1px solid var(--divider);
+      border-radius: 20px;
+      padding: 6px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .filter-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .filter-btn--active {
+      color: #fff;
+      background: var(--text);
+      border-color: var(--text);
+    }
+
+    /* --- Feed List --- */
+    .feed-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .feed-item {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      box-shadow: var(--card-shadow);
+      transition: box-shadow 0.2s, transform 0.2s;
+      animation: fadeIn 0.3s ease-out both;
+    }
+
+    .feed-item:hover {
+      box-shadow: var(--card-hover);
+      transform: translateY(-1px);
+    }
+
+    .feed-item__top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .feed-item__badge {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: #fff;
+      padding: 2px 10px;
+      border-radius: 12px;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+    }
+
+    .feed-item__video-badge {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: #E53935;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .feed-item__video-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .feed-item__title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .feed-item__summary {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .feed-item__meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-light);
+    }
+
+    .feed-item__meta-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--text-light);
+    }
+
+    /* --- Empty State --- */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--text-sub);
+    }
+
+    .empty-state__icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state__text {
+      font-size: 1rem;
+    }
+
+    /* --- Footer --- */
+    footer {
+      padding: 24px 0;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 0.8125rem;
+      color: var(--text-light);
+    }
+
+    footer a {
+      color: var(--text-sub);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* --- Animations --- */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 600px) {
+      main { padding: 36px 0 48px; }
+      .header__title { font-size: 2.25rem; }
+      .feed-item { padding: 16px 18px; }
+      .feed-item__title { font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <main>
+    <div class="container">
+      <header class="header">
+        <h1 class="header__title">Akbun Weekly</h1>
+        <hr class="header__divider">
+        <p class="header__desc">블로그, 유튜브 콘텐츠를 한눈에 모아보는 주간 다이제스트</p>
+        <p class="header__build-date" id="build-date"></p>
+      </header>
+
+      <nav class="filter" id="filter"></nav>
+
+      <ul class="feed-list" id="feed-list"></ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>
+        <a href="https://akbun.com">akbun.com</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const data = window.__FEED_DATA__ || { buildDate: '', items: [], itemCount: 0 };
+
+    const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+
+    // Build date
+    document.getElementById('build-date').textContent = data.buildDate
+      ? `Updated ${data.buildDate}`
+      : '';
+
+    // Collect unique categories
+    const categories = [...new Set(data.items.map(i => i.category))];
+
+    // Render filter buttons
+    const filterEl = document.getElementById('filter');
+    const allBtn = createFilterBtn('전체', true);
+    filterEl.appendChild(allBtn);
+    categories.forEach(cat => filterEl.appendChild(createFilterBtn(cat, false)));
+
+    let activeFilter = '전체';
+
+    function createFilterBtn(label, isActive) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-btn' + (isActive ? ' filter-btn--active' : '');
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        activeFilter = label;
+        filterEl.querySelectorAll('.filter-btn').forEach(b =>
+          b.classList.toggle('filter-btn--active', b.textContent === label)
+        );
+        renderItems();
+      });
+      return btn;
+    }
+
+    function formatDate(isoStr) {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${m}월 ${day}일`;
+    }
+
+    function renderItems() {
+      const listEl = document.getElementById('feed-list');
+      const filtered = activeFilter === '전체'
+        ? data.items
+        : data.items.filter(i => i.category === activeFilter);
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">&#128240;</div>
+            <p class="empty-state__text">아직 콘텐츠가 없습니다</p>
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map((item, idx) => `
+        <li style="animation-delay:${Math.min(idx * 0.04, 0.4)}s">
+          <a class="feed-item" href="${escapeAttr(item.link)}" target="_blank" rel="noopener">
+            <div class="feed-item__top">
+              <span class="feed-item__badge" style="background:${escapeAttr(item.color)}">${escapeHtml(item.category)}</span>
+              ${item.isVideo ? `<span class="feed-item__video-badge">${PLAY_ICON} Video</span>` : ''}
+            </div>
+            <p class="feed-item__title">${escapeHtml(item.title)}</p>
+            ${item.summary ? `<p class="feed-item__summary">${escapeHtml(item.summary)}</p>` : ''}
+            <div class="feed-item__meta">
+              <span>${escapeHtml(item.sourceName)}</span>
+              ${item.date ? `<span class="feed-item__meta-dot"></span><span>${formatDate(item.date)}</span>` : ''}
+            </div>
+          </a>
+        </li>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function escapeAttr(str) {
+      return escapeHtml(str);
+    }
+
+    renderItems();
+  </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+name: Deploy Content Aggregator
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Every Monday at 00:00 UTC
+  push:
+    branches: [master]
+    paths:
+      - "product/content-aggregator/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: product/content-aggregator
+        run: npm install
+
+      - name: Build
+        working-directory: product/content-aggregator
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.WEEKLY_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync product/content-aggregator/dist/ s3://${{ secrets.WEEKLY_S3_BUCKET }} \
+            --delete \
+            --cache-control "no-cache, max-age=0"
+
+      # - name: Purge Cloudflare cache
+      #   run: |
+      #     curl -s -X POST \
+      #       "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+      #       -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+      #       -H "Content-Type: application/json" \
+      #       --data '{"purge_everything":true}'

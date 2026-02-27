@@ -1,0 +1,55 @@
+{
+  "sources": [
+    {
+      "id": "tistory",
+      "name": "악분 기술블로그",
+      "type": "rss",
+      "url": "https://malwareanalysis.tistory.com/rss",
+      "siteUrl": "https://malwareanalysis.tistory.com",
+      "category": "기술",
+      "color": "#5C6BC0"
+    },
+    {
+      "id": "naver",
+      "name": "여행 & 사진",
+      "type": "rss",
+      "url": "https://rss.blog.naver.com/kgg1959.xml",
+      "siteUrl": "https://blog.naver.com/kgg1959",
+      "category": "여행",
+      "color": "#43A047"
+    },
+    {
+      "id": "diary",
+      "name": "일상 기록",
+      "type": "rss",
+      "url": "https://sungwook-diary.com/rss.xml",
+      "fallbackUrls": [
+        "https://sungwook-diary.com/feed",
+        "https://sungwook-diary.com/rss",
+        "https://sungwook-diary.com/feed.xml",
+        "https://sungwook-diary.com/atom.xml"
+      ],
+      "siteUrl": "https://sungwook-diary.com",
+      "category": "일상",
+      "color": "#F9A825"
+    },
+    {
+      "id": "youtube-akbun",
+      "name": "악분일상",
+      "type": "youtube",
+      "channelId": "UC7ctp-Pbn6y3J1VwtCtsnOQ",
+      "siteUrl": "https://www.youtube.com/@Akbun",
+      "category": "기술",
+      "color": "#E53935"
+    },
+    {
+      "id": "youtube-bluesky",
+      "name": "푸르른",
+      "type": "youtube",
+      "channelId": "REPLACE_WITH_CHANNEL_ID",
+      "siteUrl": "https://www.youtube.com/@blueskym1",
+      "category": "일상",
+      "color": "#E53935"
+    }
+  ]
+}
