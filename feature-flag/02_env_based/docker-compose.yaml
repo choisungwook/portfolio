@@ -1,0 +1,22 @@
+services:
+  # feature flag가 꺼진 상태 (기본값)
+  app-flags-off:
+    build:
+      context: ./app
+    ports:
+      - "5001:5000"
+    environment:
+      - ENABLE_DARK_MODE=false
+      - ENABLE_BETA_API=false
+      - API_VERSION=v1
+
+  # feature flag가 켜진 상태
+  app-flags-on:
+    build:
+      context: ./app
+    ports:
+      - "5002:5000"
+    environment:
+      - ENABLE_DARK_MODE=true
+      - ENABLE_BETA_API=true
+      - API_VERSION=v2

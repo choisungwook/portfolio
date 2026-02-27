@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-flag-app
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: feature-flag-app
+  template:
+    metadata:
+      labels:
+        app: feature-flag-app
+    spec:
+      containers:
+        - name: app
+          image: feature-flag-app:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: feature-flags

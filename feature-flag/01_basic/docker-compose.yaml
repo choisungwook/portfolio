@@ -1,0 +1,9 @@
+services:
+  app:
+    build:
+      context: ./app
+    ports:
+      - "5000:5000"
+    volumes:
+      # feature_flags.json을 수정하면 바로 반영됩니다
+      - ./app/feature_flags.json:/app/feature_flags.json

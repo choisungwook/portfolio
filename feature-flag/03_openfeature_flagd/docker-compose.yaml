@@ -1,0 +1,19 @@
+services:
+  flagd:
+    image: ghcr.io/open-feature/flagd:latest
+    ports:
+      - "8013:8013"
+    volumes:
+      - ./flagd/flags.flagd.json:/etc/flagd/flags.flagd.json
+    command:
+      - start
+      - --uri
+      - file:/etc/flagd/flags.flagd.json
+
+  app:
+    build:
+      context: ./app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - flagd

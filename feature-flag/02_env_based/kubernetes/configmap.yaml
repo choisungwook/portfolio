@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flags
+  namespace: default
+data:
+  ENABLE_DARK_MODE: "false"
+  ENABLE_BETA_API: "false"
+  API_VERSION: "v1"

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://flagd.dev/schema/v0/flags.json",
+  "flags": {
+    "new-checkout-flow": {
+      "state": "ENABLED",
+      "variants": {
+        "on": true,
+        "off": false
+      },
+      "defaultVariant": "off"
+    },
+    "max-items-in-cart": {
+      "state": "ENABLED",
+      "variants": {
+        "low": 5,
+        "medium": 10,
+        "high": 50
+      },
+      "defaultVariant": "medium"
+    },
+    "banner-message": {
+      "state": "ENABLED",
+      "variants": {
+        "empty": "",
+        "sale": "설날 맞이 전 상품 20% 할인!",
+        "maintenance": "2월 28일 02:00~04:00 서버 점검 예정입니다"
+      },
+      "defaultVariant": "empty"
+    }
+  }
+}
