@@ -1,0 +1,28 @@
+services:
+  # Case 1: Xms == Xmx (힙 리사이징 없음)
+  app-equal:
+    build: .
+    container_name: heap-test-equal
+    ports:
+      - "8081:8080"
+    environment:
+      JAVA_OPTS: "-Xms256m -Xmx256m -XX:+PrintGCDetails -Xlog:gc*:stdout"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
+
+  # Case 2: Xms < Xmx (힙 리사이징 발생)
+  app-different:
+    build: .
+    container_name: heap-test-different
+    ports:
+      - "8082:8080"
+    environment:
+      JAVA_OPTS: "-Xms64m -Xmx256m -XX:+PrintGCDetails -Xlog:gc*:stdout"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
