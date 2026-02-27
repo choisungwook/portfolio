@@ -18,3 +18,13 @@ output "private_route_table_ids" {
   description = "The IDs of the private route tables"
   value       = module.vpc.private_route_table_ids
 }
+
+output "tgw_id" {
+  description = "The ID of the Transit Gateway"
+  value       = aws_ec2_transit_gateway.this.id
+}
+
+output "tgw_flow_log_group_name" {
+  description = "CloudWatch Log Group name for TGW flow logs"
+  value       = aws_cloudwatch_log_group.tgw_flow_logs.name
+}

@@ -17,3 +17,13 @@ output "onprem_vpn_appliance_public_ip" {
   description = "The public IP address of the onprem VPN appliance EC2 instance. Use this as the Customer Gateway IP in the AWS console."
   value       = module.on_prem.vpn_appliance_public_ip
 }
+
+output "tgw_id" {
+  description = "The ID of the Transit Gateway"
+  value       = module.aws_cloud.tgw_id
+}
+
+output "tgw_flow_log_group_name" {
+  description = "CloudWatch Log Group name for TGW flow logs. Use this to query flow logs in CloudWatch Logs Insights."
+  value       = module.aws_cloud.tgw_flow_log_group_name
+}
