@@ -39,7 +39,7 @@ done
 
 ![manual_test_4](../imgs/manual_test_4.png "manual_test_4")
 
-![manual_test_5](../imgs/manual_test_4.png "manual_test_5")
+![manual_test_5](../imgs/manual_test_5.png "manual_test_5")
 
 ## 5. Delete Step
 
@@ -58,4 +58,4 @@ for i in 6 5 4 3 2 1; do
 done
 ```
 
-![manual_test_6](../imgs/manual_test_4.png "manual_test_6")
+![manual_test_6](../imgs/manual_test_6.png "manual_test_6")
