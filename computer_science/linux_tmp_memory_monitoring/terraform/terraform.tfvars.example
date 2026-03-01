@@ -1,0 +1,6 @@
+project_name  = "tmpfs-memory-test"
+aws_region    = "ap-northeast-2"
+instance_type = "t4g.medium"
+os_type       = "al2023"
+arch          = "arm64"
+ebs_size      = 30
