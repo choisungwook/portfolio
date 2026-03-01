@@ -1,0 +1,69 @@
+groups:
+  - name: tmpfs-memory-alerts
+    rules:
+      - alert: NaiveHighMemoryUsed
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Naive memory-used alarm (node-level)"
+          description: "Node memory used > 80% (tmpfs Shmem can cause false positives)."
+
+      - alert: RealMemoryPressure
+        expr: 100 * (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 15
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Real memory pressure (node-level)"
+          description: "MemAvailable < 15%, indicates likely real pressure."
+
+      - alert: TmpfsDominantUsage
+        expr: 100 * (node_memory_Shmem_bytes / node_memory_MemTotal_bytes) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shmem ratio increased (node-level)"
+          description: "Shmem > 10%, tmpfs usage may dominate the memory-used increase."
+
+      - alert: ContainerMemoryHighWarning
+        expr: >-
+          100 * (
+            (
+              max(container_memory_working_set_bytes{container_label_com_docker_compose_service="tmpfs-lab"})
+              or
+              max(container_memory_working_set_bytes{name=~".*tmpfs-lab.*"})
+            ) / (
+              max(container_spec_memory_limit_bytes{container_label_com_docker_compose_service="tmpfs-lab"})
+              or
+              max(container_spec_memory_limit_bytes{name=~".*tmpfs-lab.*"})
+            )
+          ) > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container memory high (docker-stats semantics)"
+          description: "Container cgroup memory usage exceeded 85% of configured limit."
+
+      - alert: ContainerMemoryHighCritical
+        expr: >-
+          100 * (
+            (
+              max(container_memory_working_set_bytes{container_label_com_docker_compose_service="tmpfs-lab"})
+              or
+              max(container_memory_working_set_bytes{name=~".*tmpfs-lab.*"})
+            ) / (
+              max(container_spec_memory_limit_bytes{container_label_com_docker_compose_service="tmpfs-lab"})
+              or
+              max(container_spec_memory_limit_bytes{name=~".*tmpfs-lab.*"})
+            )
+          ) > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container memory critical (docker-stats semantics)"
+          description: "Container cgroup memory usage exceeded 95% of configured limit."

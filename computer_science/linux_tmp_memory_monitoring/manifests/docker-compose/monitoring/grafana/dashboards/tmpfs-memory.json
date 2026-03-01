@@ -1,0 +1,192 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Node Memory Used vs Available (%)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "mem_used_pct",
+          "refId": "A"
+        },
+        {
+          "expr": "100 * (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "mem_available_pct",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Shmem vs Cached (%)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "100 * (node_memory_Shmem_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "shmem_pct",
+          "refId": "A"
+        },
+        {
+          "expr": "100 * (node_memory_Cached_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "cached_pct",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "tmpfs Used (bytes)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "sum(node_filesystem_size_bytes{fstype=\"tmpfs\",mountpoint=~\"/tmp|/dev/shm\"} - node_filesystem_free_bytes{fstype=\"tmpfs\",mountpoint=~\"/tmp|/dev/shm\"})",
+          "legendFormat": "tmpfs_used_bytes",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "tmpfs Used (%)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(node_filesystem_size_bytes{fstype=\"tmpfs\",mountpoint=~\"/tmp|/dev/shm\"} - node_filesystem_free_bytes{fstype=\"tmpfs\",mountpoint=~\"/tmp|/dev/shm\"}) / sum(node_filesystem_size_bytes{fstype=\"tmpfs\",mountpoint=~\"/tmp|/dev/shm\"})",
+          "legendFormat": "tmpfs_used_pct",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Memory Used (%) - cgroup",
+      "description": "Matches docker stats semantics (container limit based).",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "100 * ((max(container_memory_working_set_bytes{container_label_com_docker_compose_service=\"tmpfs-lab\"}) or max(container_memory_working_set_bytes{name=~\".*tmpfs-lab.*\"})) / (max(container_spec_memory_limit_bytes{container_label_com_docker_compose_service=\"tmpfs-lab\"}) or max(container_spec_memory_limit_bytes{name=~\".*tmpfs-lab.*\"})))",
+          "legendFormat": "container_mem_used_pct",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Firing Alerts",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\",alertname=\"NaiveHighMemoryUsed\"}",
+          "legendFormat": "NaiveHighMemoryUsed",
+          "refId": "A"
+        },
+        {
+          "expr": "ALERTS{alertstate=\"firing\",alertname=\"RealMemoryPressure\"}",
+          "legendFormat": "RealMemoryPressure",
+          "refId": "B"
+        },
+        {
+          "expr": "ALERTS{alertstate=\"firing\",alertname=\"TmpfsDominantUsage\"}",
+          "legendFormat": "TmpfsDominantUsage",
+          "refId": "C"
+        },
+        {
+          "expr": "ALERTS{alertstate=\"firing\",alertname=\"ContainerMemoryHighWarning\"}",
+          "legendFormat": "ContainerMemoryHighWarning",
+          "refId": "D"
+        },
+        {
+          "expr": "ALERTS{alertstate=\"firing\",alertname=\"ContainerMemoryHighCritical\"}",
+          "legendFormat": "ContainerMemoryHighCritical",
+          "refId": "E"
+        }
+      ]
+    }
+  ],
+  "refresh": "1s",
+  "schemaVersion": 39,
+  "tags": ["tmpfs", "memory", "hands-on"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "tmpfs Memory Monitoring",
+  "version": 1,
+  "weekStart": ""
+}

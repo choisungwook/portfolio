@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: tmpfs-memory
+    orgId: 1
+    folder: tmpfs-memory
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

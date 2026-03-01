@@ -1,0 +1,73 @@
+services:
+  tmpfs-lab:
+    image: ubuntu:24.04
+    container_name: tmpfs-lab
+    command: ["bash", "-lc", "sleep infinity"]
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    tmpfs:
+      # Docker tmpfs size unit is bytes: 2,147,483,648 B = 2,048 MB = 2 GB
+      - /tmp:size=2147483648
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter-local
+    command:
+      - --path.procfs=/proc
+      - --path.sysfs=/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|etc)($|/)
+    restart: unless-stopped
+    volumes_from:
+      - tmpfs-lab:ro
+    depends_on:
+      - tmpfs-lab
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor-local
+    restart: unless-stopped
+    privileged: true
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=1s
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus-local
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - 127.0.0.1:9090:9090
+    volumes:
+      - ${PROJECT_ROOT:-.}/manifests/docker-compose/monitoring:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - node-exporter
+      - cadvisor
+
+  grafana:
+    image: grafana/grafana:11.1.5
+    container_name: grafana-local
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ${PROJECT_ROOT:-.}/manifests/docker-compose/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${PROJECT_ROOT:-.}/manifests/docker-compose/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:
