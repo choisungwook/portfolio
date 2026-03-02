@@ -61,10 +61,10 @@
 55. AWS RDS인증을 DB계정 비밀번호가 아니라 임시인증토큰으로 사용 - [링크](./aws/rds_with_iam/)
 56. Site to Site VPN의 IPsec프로토콜 원리와 AWS Site to Site VPN 실습 - [링크](./aws/site-to-site-vpn-phase2/)
 57. 온프레미스 리다이렉트만 하는 nginx를 AWS로 옮기는 방법들 - [링크](./aws/redirect_https/)
-58. SLO를 계산하는 제품 - [링크](./product/slo/)
+58. SLO를 계산하는 제품(slo.akbun.com) - [링크](./product/slo/)
 59. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의. added 26.3.1 - [링크](./computer_science/linux_tmp_memory_monitoring/)
 60. AWS KMS를 사용한 봉투암호화 예제. added 26.3.2 - [링크](./computer_science/kms/)
-61. 봉투암호화 시뮬레이션 제품 added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
+61. 봉투암호화 시뮬레이션 제품(envelopelab.akbun.com) added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
 
 ## 다른 정리된 문서 링크
 
