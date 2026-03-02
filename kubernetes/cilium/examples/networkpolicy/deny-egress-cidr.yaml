@@ -1,0 +1,13 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: deny-egress-cidr
+spec:
+  endpointSelector:
+    matchLabels:
+      app: curl-test
+  enableDefaultDeny:
+    egress: false
+  egressDeny:
+    - toCIDR:
+        - 1.1.1.1/32

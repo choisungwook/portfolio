@@ -61,7 +61,7 @@ cilium install \
   --set hubble.enabled=true \
   --set hubble.relay.enabled=true \
   --set hubble.ui.enabled=true \
-  --set ingressController.enabled=true
+  --set ingressController.enabled=true \
   --set ingressController.loadbalancerMode=dedicated
 ```
 
