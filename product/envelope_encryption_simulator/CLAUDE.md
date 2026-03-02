@@ -1,0 +1,1 @@
+agentdir: AGENTS.md
