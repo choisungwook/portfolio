@@ -1,0 +1,532 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KMS Envelope Encryption Simulator</title>
+  <meta name="description" content="An interactive learning tool to experience KMS Envelope Encryption flow. Runs entirely in the browser using Web Crypto API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>KMS Envelope Encryption Simulator</h1>
+      <hr class="header-divider">
+      <p>An interactive tool to experience KMS Envelope Encryption flow hands-on. Runs entirely in the browser using Web Crypto API — no backend required.</p>
+    </header>
+
+    <div class="layout-two-panel">
+      <div class="layout-left">
+        <div class="section-divider"><span>Create Key</span></div>
+    <section class="panel">
+      <form id="create-key-form">
+        <label for="create-key-id">Key ID</label>
+        <input id="create-key-id" name="key_id" required placeholder="my-first-key">
+        <button type="submit">Create Key</button>
+        <div id="create-output" class="output"></div>
+      </form>
+    </section>
+
+    <div class="section-divider"><span>Key List</span></div>
+    <section class="panel">
+      <div class="toolbar">
+        <button id="refresh-keys" type="button">Refresh Keys</button>
+      </div>
+      <ul id="key-list" class="key-list"></ul>
+    </section>
+      </div>
+
+      <div class="layout-right">
+        <div class="section-divider"><span>Envelope Encryption</span></div>
+    <section class="panel">
+      <p>Large data is encrypted locally with a random Data Key. Only the Data Key is encrypted by the Root Key (KMS) for secure storage.</p>
+      <p class="status">Demo: Data Key plaintext is exposed in results below for learning purposes.</p>
+
+      <!-- Encrypt Workflow -->
+      <div class="workflow">
+        <h2>Encrypt Flow</h2>
+        <div class="wf-inputs">
+          <label for="env-key-id">Root Key (Wrapping Key) ID</label>
+          <input id="env-key-id" required placeholder="wrapping-key-1">
+          <label for="env-plaintext">Data to Encrypt</label>
+          <textarea id="env-plaintext" required placeholder="Your data here"></textarea>
+        </div>
+        <div class="workflow-row" id="encrypt-flow">
+          <div class="wf-node wf-node--key" id="enc-root-key">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <circle cx="17" cy="18" r="11" stroke="#4CAF50" stroke-width="3" fill="none"/>
+                <circle cx="17" cy="18" r="4.5" fill="#4CAF50"/>
+                <line x1="28" y1="18" x2="48" y2="18" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+                <line x1="40" y1="18" x2="40" y2="26" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+                <line x1="46" y1="18" x2="46" y2="26" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Root Key</div>
+            <span class="wf-node__detail">KMS Wrapping Key</span>
+            <div class="wf-node__result" id="enc-result-root"></div>
+          </div>
+
+          <div class="wf-arrow" id="enc-arrow-1">
+            <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+            <span class="wf-arrow__label">Encrypts</span>
+          </div>
+
+          <div class="wf-node wf-node--key" id="enc-data-key">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <circle cx="17" cy="14" r="9" stroke="#4CAF50" stroke-width="2.5" fill="none"/>
+                <circle cx="17" cy="14" r="3.5" fill="#4CAF50"/>
+                <line x1="26" y1="14" x2="42" y2="14" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="36" y1="14" x2="36" y2="20" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round"/>
+                <rect x="28" y="32" width="16" height="12" rx="2" stroke="#4CAF50" stroke-width="2" fill="#E8F5E9"/>
+                <path d="M32 32v-3a4 4 0 018 0v3" stroke="#4CAF50" stroke-width="2" fill="none"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Data Key</div>
+            <span class="wf-node__detail">Random AES-256</span>
+            <span class="wf-node__detail">Protected by Root Key</span>
+            <div class="wf-node__result" id="enc-result-datakey"></div>
+          </div>
+
+          <div class="wf-arrow" id="enc-arrow-2">
+            <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+            <span class="wf-arrow__label">Encrypts</span>
+          </div>
+
+          <div class="wf-node wf-node--data" id="enc-data">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <ellipse cx="26" cy="14" rx="15" ry="7" stroke="#7B1FA2" stroke-width="2.5" fill="#F3E5F5"/>
+                <path d="M11 14v22c0 3.87 6.72 7 15 7s15-3.13 15-7V14" stroke="#7B1FA2" stroke-width="2.5" fill="none"/>
+                <rect x="19" y="24" width="14" height="10" rx="2" fill="#7B1FA2" opacity="0.15"/>
+                <rect x="21" y="26" width="10" height="7" rx="1.5" stroke="#7B1FA2" stroke-width="1.5" fill="#F3E5F5"/>
+                <path d="M24 26v-2a2.5 2.5 0 015 0v2" stroke="#7B1FA2" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Encrypted Data</div>
+            <span class="wf-node__detail">AES-GCM Ciphertext</span>
+            <div class="wf-node__result" id="enc-result-data"></div>
+          </div>
+        </div>
+        <button type="button" id="envelope-encrypt-btn" class="wf-execute-btn">Run Envelope Encryption</button>
+        <div id="envelope-output" class="output"></div>
+        <details class="note-bubble">
+          <summary>Pseudocode Reference</summary>
+          <p><strong>Data Key is randomly generated, then protected by Root Key.</strong></p>
+          <pre><code set:html={`# Encrypt
+data_key       = random(32 bytes)
+encrypted_data = AES_GCM_Encrypt(data_key, plaintext)
+wrapped_key    = KMS_Encrypt(root_key_id, hex(data_key))
+output         = { wrapped_key, iv, encrypted_data }`} /></pre>
+        </details>
+      </div>
+
+      <!-- Decrypt Workflow -->
+      <div class="workflow">
+        <h2>Decrypt Flow</h2>
+        <div class="wf-inputs">
+          <label for="env-dec-key-id">Root Key (Wrapping Key) ID</label>
+          <input id="env-dec-key-id" required placeholder="wrapping-key-1">
+          <label for="env-wrapped-data-key">Wrapped Data Key (hex)</label>
+          <textarea id="env-wrapped-data-key" required placeholder="a1b2c3..." style="min-height:56px"></textarea>
+          <label for="env-iv">IV (base64)</label>
+          <input id="env-iv" required placeholder="AAECAwQFBgcICQoL">
+          <label for="env-local-cipher">Ciphertext (base64)</label>
+          <textarea id="env-local-cipher" required placeholder="m3x+..." style="min-height:56px"></textarea>
+        </div>
+        <div class="workflow-row" id="decrypt-flow">
+          <div class="wf-node wf-node--key" id="dec-root-key">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <circle cx="17" cy="18" r="11" stroke="#4CAF50" stroke-width="3" fill="none"/>
+                <circle cx="17" cy="18" r="4.5" fill="#4CAF50"/>
+                <line x1="28" y1="18" x2="48" y2="18" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+                <line x1="40" y1="18" x2="40" y2="26" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+                <line x1="46" y1="18" x2="46" y2="26" stroke="#4CAF50" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Root Key</div>
+            <span class="wf-node__detail">KMS Wrapping Key</span>
+            <div class="wf-node__result" id="dec-result-root"></div>
+          </div>
+
+          <div class="wf-arrow" id="dec-arrow-1">
+            <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+            <span class="wf-arrow__label">Decrypts</span>
+          </div>
+
+          <div class="wf-node wf-node--key" id="dec-data-key">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <circle cx="17" cy="14" r="9" stroke="#4CAF50" stroke-width="2.5" fill="none"/>
+                <circle cx="17" cy="14" r="3.5" fill="#4CAF50"/>
+                <line x1="26" y1="14" x2="42" y2="14" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="36" y1="14" x2="36" y2="20" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round"/>
+                <rect x="28" y="32" width="16" height="12" rx="2" stroke="#4CAF50" stroke-width="2" fill="#E8F5E9"/>
+                <path d="M32 38h8" stroke="#4CAF50" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Data Key</div>
+            <span class="wf-node__detail">Unwrapped</span>
+            <span class="wf-node__detail">Restored by Root Key</span>
+            <div class="wf-node__result" id="dec-result-datakey"></div>
+          </div>
+
+          <div class="wf-arrow" id="dec-arrow-2">
+            <svg viewBox="0 0 48 24" class="wf-arrow__svg"><line x1="0" y1="12" x2="38" y2="12"/><polygon points="38,6 48,12 38,18"/></svg>
+            <span class="wf-arrow__label">Decrypts</span>
+          </div>
+
+          <div class="wf-node wf-node--data" id="dec-plaintext">
+            <div class="wf-node__icon">
+              <svg viewBox="0 0 52 52" fill="none">
+                <rect x="10" y="4" width="32" height="44" rx="3" stroke="#7B1FA2" stroke-width="2.5" fill="#F3E5F5"/>
+                <line x1="18" y1="16" x2="34" y2="16" stroke="#7B1FA2" stroke-width="2" stroke-linecap="round"/>
+                <line x1="18" y1="23" x2="34" y2="23" stroke="#7B1FA2" stroke-width="2" stroke-linecap="round"/>
+                <line x1="18" y1="30" x2="28" y2="30" stroke="#7B1FA2" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="wf-node__title">Plaintext</div>
+            <span class="wf-node__detail">Recovered Data</span>
+            <div class="wf-node__result" id="dec-result-plain"></div>
+          </div>
+        </div>
+        <button type="button" id="envelope-decrypt-btn" class="wf-execute-btn wf-execute-btn--decrypt">Run Envelope Decryption</button>
+        <div id="envelope-decrypt-output" class="output"></div>
+      </div>
+
+      <details class="note-bubble">
+        <summary>Pseudocode Reference</summary>
+        <p><strong>Data Key is protected by Root Key.</strong> During decryption, KMS restores the Data Key plaintext.</p>
+        <pre><code set:html={`# Decrypt
+data_key       = hex_decode(KMS_Decrypt(root_key_id, wrapped_key))
+plaintext      = AES_GCM_Decrypt(data_key, iv, encrypted_data)`} /></pre>
+      </details>
+    </section>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>KMS Envelope Encryption Simulator</p>
+  </footer>
+
+  <script is:inline>
+    /* ===== In-Memory KMS (Web Crypto API) ===== */
+    const kms = {
+      keys: new Map(),
+
+      async createKey(id) {
+        if (this.keys.has(id)) throw new Error(`Key '${id}' already exists`);
+        const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        this.keys.set(id, { id, key, algorithm: 'AES-256-GCM', createdAt: new Date().toISOString() });
+        return { key_id: id, algorithm: 'AES-256-GCM', message: 'key created' };
+      },
+
+      listKeys() {
+        return Array.from(this.keys.values(), (k) => ({ id: k.id, algorithm: k.algorithm, createdAt: k.createdAt }));
+      },
+
+      deleteKey(id) {
+        if (!this.keys.has(id)) throw new Error(`Key '${id}' not found`);
+        this.keys.delete(id);
+      },
+
+      async encrypt(id, plaintext) {
+        const entry = this.keys.get(id);
+        if (!entry) throw new Error(`Key '${id}' not found`);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipherBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, entry.key, new TextEncoder().encode(plaintext));
+        const combined = new Uint8Array(iv.length + cipherBuffer.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(cipherBuffer), iv.length);
+        return { key_id: id, ciphertext: toHex(combined) };
+      },
+
+      async decrypt(id, ciphertextHex) {
+        const entry = this.keys.get(id);
+        if (!entry) throw new Error(`Key '${id}' not found`);
+        const combined = fromHex(ciphertextHex);
+        const iv = combined.slice(0, 12);
+        const cipherBytes = combined.slice(12);
+        const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, entry.key, cipherBytes);
+        return { key_id: id, plaintext: new TextDecoder().decode(plainBuffer) };
+      }
+    };
+
+    /* ===== Encoding Helpers ===== */
+    const textEncoder = new TextEncoder();
+    const textDecoder = new TextDecoder();
+
+    function toHex(bytes) {
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function fromHex(hex) {
+      if (hex.length % 2 !== 0) throw new Error('hex length must be even');
+      if (!/^[0-9a-fA-F]*$/.test(hex)) throw new Error('hex contains invalid characters');
+      const out = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+      return out;
+    }
+
+    function toBase64(bytes) {
+      let bin = '';
+      for (const b of bytes) bin += String.fromCharCode(b);
+      return btoa(bin);
+    }
+
+    function fromBase64(val) {
+      const bin = atob(val);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+
+    /* ===== DOM References ===== */
+    const keyList = document.querySelector('#key-list');
+    const createOutput = document.querySelector('#create-output');
+    const envelopeOutput = document.querySelector('#envelope-output');
+    const envelopeDecryptOutput = document.querySelector('#envelope-decrypt-output');
+
+    function show(target, value, isError = false) {
+      target.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      target.classList.toggle('error', isError);
+      target.style.display = '';
+    }
+
+    /* ===== Key Management ===== */
+    function loadKeys() {
+      const keys = kms.listKeys();
+      keyList.innerHTML = '';
+      if (keys.length === 0) {
+        keyList.innerHTML = '<li class="status">No keys created yet.</li>';
+        return;
+      }
+      for (const key of keys) {
+        const li = document.createElement('li');
+        li.className = 'key-item';
+        const meta = document.createElement('div');
+        meta.className = 'key-meta';
+        const strong = document.createElement('strong');
+        strong.textContent = key.id;
+        const small = document.createElement('small');
+        small.textContent = key.algorithm;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.id = key.id;
+        btn.textContent = 'Delete';
+        meta.appendChild(strong);
+        meta.appendChild(small);
+        li.appendChild(meta);
+        li.appendChild(btn);
+        keyList.appendChild(li);
+      }
+    }
+
+    document.querySelector('#refresh-keys').addEventListener('click', loadKeys);
+
+    keyList.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-id]');
+      if (!button) return;
+      const id = button.dataset.id;
+      if (!confirm(`Delete key '${id}'?`)) return;
+      try {
+        kms.deleteKey(id);
+        loadKeys();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    document.querySelector('#create-key-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const keyID = form.key_id.value.trim();
+      try {
+        const result = await kms.createKey(keyID);
+        show(createOutput, result);
+        form.reset();
+        loadKeys();
+      } catch (error) {
+        show(createOutput, error.message, true);
+      }
+    });
+
+    /* ===== Workflow Animation Helpers ===== */
+    function activateNode(nodeId, delayMs) {
+      return new Promise(resolve => {
+        document.getElementById(nodeId).classList.add('active');
+        setTimeout(resolve, delayMs);
+      });
+    }
+
+    function markNodeDone(nodeId) {
+      return new Promise(resolve => {
+        const el = document.getElementById(nodeId);
+        el.classList.remove('active');
+        el.classList.add('done');
+        setTimeout(resolve, 150);
+      });
+    }
+
+    function flowArrow(arrowId, durationMs) {
+      return new Promise(resolve => {
+        const el = document.getElementById(arrowId);
+        el.classList.add('flowing');
+        setTimeout(() => { el.classList.remove('flowing'); el.classList.add('done'); resolve(); }, durationMs);
+      });
+    }
+
+    function showNodeResult(resultId, text) {
+      document.getElementById(resultId).textContent = text;
+    }
+
+    function resetWorkflow(rowId) {
+      const row = document.getElementById(rowId);
+      row.querySelectorAll('.wf-node').forEach(n => n.classList.remove('active', 'done'));
+      row.querySelectorAll('.wf-arrow').forEach(a => a.classList.remove('flowing', 'done'));
+      row.querySelectorAll('.wf-node__result').forEach(r => { r.textContent = ''; });
+    }
+
+    /* ===== Envelope Encrypt Workflow ===== */
+    document.querySelector('#envelope-encrypt-btn').addEventListener('click', async () => {
+      const btn = document.querySelector('#envelope-encrypt-btn');
+      btn.disabled = true;
+      resetWorkflow('encrypt-flow');
+      envelopeOutput.textContent = '';
+      envelopeOutput.style.display = 'none';
+
+      const keyID = document.querySelector('#env-key-id').value.trim();
+      const plaintext = document.querySelector('#env-plaintext').value;
+
+      try {
+        if (!keyID || !plaintext) throw new Error('Enter Root Key ID and data.');
+        if (!window.crypto?.subtle) throw new Error('Web Crypto API is not available in this environment.');
+
+        /* Step 1: Root Key */
+        await activateNode('enc-root-key', 300);
+        showNodeResult('enc-result-root', `Key: ${keyID}`);
+        await markNodeDone('enc-root-key');
+
+        await flowArrow('enc-arrow-1', 400);
+
+        /* Step 2: Data Key */
+        await activateNode('enc-data-key', 200);
+
+        const dataKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        const rawDataKey = new Uint8Array(await crypto.subtle.exportKey('raw', dataKey));
+        const wrappedDataKey = await kms.encrypt(keyID, toHex(rawDataKey));
+
+        showNodeResult('enc-result-datakey', `Plain: ${toHex(rawDataKey).slice(0, 16)}...\nWrapped: ${wrappedDataKey.ciphertext.slice(0, 16)}...`);
+        await markNodeDone('enc-data-key');
+
+        await flowArrow('enc-arrow-2', 400);
+
+        /* Step 3: Encrypt Data */
+        await activateNode('enc-data', 200);
+
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const localCipherBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, dataKey, textEncoder.encode(plaintext));
+        const localCipher = new Uint8Array(localCipherBuffer);
+
+        showNodeResult('enc-result-data', `IV: ${toBase64(iv)}\nCipher: ${toBase64(localCipher).slice(0, 24)}...`);
+        await markNodeDone('enc-data');
+
+        const payload = {
+          summary: 'Data encrypted by Data Key, Data Key protected by Root Key',
+          root_key: { key_id: keyID },
+          data_key: {
+            plaintext_hex: toHex(rawDataKey),
+            wrapped_hex: wrappedDataKey.ciphertext
+          },
+          encrypted_data: {
+            iv_base64: toBase64(iv),
+            ciphertext_base64: toBase64(localCipher)
+          },
+        };
+
+        show(envelopeOutput, payload);
+
+        document.querySelector('#env-dec-key-id').value = keyID;
+        document.querySelector('#env-wrapped-data-key').value = payload.data_key.wrapped_hex;
+        document.querySelector('#env-iv').value = payload.encrypted_data.iv_base64;
+        document.querySelector('#env-local-cipher').value = payload.encrypted_data.ciphertext_base64;
+      } catch (error) {
+        show(envelopeOutput, error.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    /* ===== Envelope Decrypt Workflow ===== */
+    document.querySelector('#envelope-decrypt-btn').addEventListener('click', async () => {
+      const btn = document.querySelector('#envelope-decrypt-btn');
+      btn.disabled = true;
+      resetWorkflow('decrypt-flow');
+      envelopeDecryptOutput.textContent = '';
+      envelopeDecryptOutput.style.display = 'none';
+
+      const keyID = document.querySelector('#env-dec-key-id').value.trim();
+      const wrappedDataKeyHex = document.querySelector('#env-wrapped-data-key').value.trim();
+      const ivB64 = document.querySelector('#env-iv').value.trim();
+      const localCipherB64 = document.querySelector('#env-local-cipher').value.trim();
+
+      try {
+        if (!keyID || !wrappedDataKeyHex || !ivB64 || !localCipherB64) throw new Error('All fields are required.');
+        if (!window.crypto?.subtle) throw new Error('Web Crypto API is not available in this environment.');
+
+        const iv = fromBase64(ivB64);
+        const localCipher = fromBase64(localCipherB64);
+
+        /* Step 1: Root Key */
+        await activateNode('dec-root-key', 300);
+        showNodeResult('dec-result-root', `Key: ${keyID}`);
+        await markNodeDone('dec-root-key');
+
+        await flowArrow('dec-arrow-1', 400);
+
+        /* Step 2: Unwrap Data Key */
+        await activateNode('dec-data-key', 200);
+
+        const dataKeyResult = await kms.decrypt(keyID, wrappedDataKeyHex);
+        const rawDataKey = fromHex(dataKeyResult.plaintext);
+
+        showNodeResult('dec-result-datakey', `Data Key: ${dataKeyResult.plaintext.slice(0, 16)}...`);
+        await markNodeDone('dec-data-key');
+
+        await flowArrow('dec-arrow-2', 400);
+
+        /* Step 3: Decrypt Data */
+        await activateNode('dec-plaintext', 200);
+
+        const importedKey = await crypto.subtle.importKey('raw', rawDataKey, { name: 'AES-GCM' }, false, ['decrypt']);
+        const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, importedKey, localCipher);
+        const recoveredPlaintext = textDecoder.decode(plainBuffer);
+
+        showNodeResult('dec-result-plain', recoveredPlaintext);
+        await markNodeDone('dec-plaintext');
+
+        show(envelopeDecryptOutput, {
+          summary: 'Data Key restored by Root Key → Data decrypted successfully',
+          root_key: { key_id: keyID },
+          data_key: { recovered_hex: toHex(rawDataKey) },
+          plaintext: recoveredPlaintext,
+        });
+      } catch (error) {
+        show(envelopeDecryptOutput, error.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    loadKeys();
+  </script>
+</body>
+</html>

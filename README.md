@@ -64,6 +64,7 @@
 58. SLO를 계산하는 제품 - [링크](./product/slo/)
 59. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의. added 26.3.1 - [링크](./computer_science/linux_tmp_memory_monitoring/)
 60. AWS KMS를 사용한 봉투암호화 예제. added 26.3.2 - [링크](./computer_science/kms/)
+61. 봉투암호화 시뮬레이션 제품 added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
 
 ## 다른 정리된 문서 링크
 
