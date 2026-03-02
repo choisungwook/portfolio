@@ -1,5 +1,5 @@
 {
-  "name": "kms-simulator",
+  "name": "envelope_encryption_simulator",
   "version": "0.1.0",
   "private": true,
   "type": "module",

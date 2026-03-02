@@ -5,8 +5,8 @@
 1. Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git
 2. GitHub 리포 선택: `choisungwook/portfolio`
 3. Build settings:
-   - **Build command**: `cd product/kms && npm install && npm run build`
-   - **Build output directory**: `product/kms/dist`
+   - **Build command**: `cd product/envelope_encryption_simulator && npm install && npm run build`
+   - **Build output directory**: `product/envelope_encryption_simulator/dist`
    - **Root directory**: `/` (monorepo이므로 루트)
 4. Deploy
 

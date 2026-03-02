@@ -1,4 +1,4 @@
-# Envelop Encryption Simulator
+# Envelope Encryption Simulator
 
 KMS Envelope Encryption Simulator 프로젝트
 
@@ -14,7 +14,6 @@ KMS Envelope Encryption Simulator 프로젝트
 ├── astro.config.mjs          # output: 'static' (기본값)
 ├── tsconfig.json             # Astro strict
 ├── .gitignore                # node_modules, dist, .astro
-├── frontend/index.html       # 개발 참조용 단일 HTML (standalone)
 └── src/
     ├── pages/
     │   └── index.astro       # 메인 페이지 (CSS import + script is:inline)
@@ -25,7 +24,7 @@ KMS Envelope Encryption Simulator 프로젝트
 ## 빌드
 
 ```bash
-cd product/kms
+cd product/envelope_encryption_simulator
 
 # 의존성 설치
 npm install
@@ -38,13 +37,6 @@ npm run build
 
 # 빌드 결과 미리보기
 npm run preview
-```
-
-로컬 테스트 (빌드 없이):
-
-```bash
-# frontend/index.html을 브라우저에서 직접 열기
-open product/kms/frontend/index.html
 ```
 
 ## 아키텍처
@@ -68,5 +60,5 @@ Browser → Cloudflare Pages (CDN 내장, HTTPS 자동)
 ## 제약사항
 
 - 프론트엔드: Astro 정적 사이트, inline JS (`<script is:inline>`), 외부 JS 프레임워크 없음
-- CSS 스타일 (Caveat + Outfit + Fira Code, 노란 하이라이트 최소화)
+- CSS 스타일 (Sora + Outfit + Fira Code, 노란 하이라이트 최소화)
 - 암호화: Web Crypto API (AES-256-GCM), 인메모리 키 저장
