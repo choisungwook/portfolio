@@ -1,0 +1,4 @@
+aws_region    = "ap-northeast-2"
+key_name      = "your-key-pair-name"
+instance_type = "t4g.small"
+volume_size   = 30
