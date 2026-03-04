@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-film-bg: #0a0a0a;
+  --color-film-surface: #141414;
+  --color-film-border: #2a2a2a;
+  --color-film-accent: #d4a574;
+  --color-film-accent-hover: #e0b88a;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 20px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d4a574;
+  margin-top: -5px;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d4a574;
+  border: none;
+}
