@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+data:
+  dashboard.yml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: ""
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-json
+data:
+  cache-warmup.json: |
+    {
+      "title": "Cache Warmup Comparison",
+      "uid": "cache-warmup",
+      "panels": [
+        {
+          "title": "P50 Latency Comparison",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(request_latency_seconds_bucket[30s])) by (le, job))",
+              "legendFormat": "p50 - {{job}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "title": "P99 Latency Comparison",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(request_latency_seconds_bucket[30s])) by (le, job))",
+              "legendFormat": "p99 - {{job}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "title": "Request Rate",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(request_total[30s])) by (job, cache_status)",
+              "legendFormat": "{{job}} - {{cache_status}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          }
+        },
+        {
+          "title": "Cache Hit Rate",
+          "type": "gauge",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(request_total{cache_status=\"hit\"}[1m])) by (job) / sum(rate(request_total[1m])) by (job) * 100",
+              "legendFormat": "{{job}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 }
+          }
+        },
+        {
+          "title": "Latency Heatmap (No Warmup)",
+          "type": "heatmap",
+          "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(request_latency_seconds_bucket{job=\"product-api-no-warmup\"}[30s])) by (le)",
+              "legendFormat": "{{le}}",
+              "format": "heatmap"
+            }
+          ]
+        },
+        {
+          "title": "Latency Heatmap (With Warmup)",
+          "type": "heatmap",
+          "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(request_latency_seconds_bucket{job=\"product-api-with-warmup\"}[30s])) by (le)",
+              "legendFormat": "{{le}}",
+              "format": "heatmap"
+            }
+          ]
+        }
+      ],
+      "time": { "from": "now-5m", "to": "now" },
+      "refresh": "5s",
+      "schemaVersion": 39
+    }

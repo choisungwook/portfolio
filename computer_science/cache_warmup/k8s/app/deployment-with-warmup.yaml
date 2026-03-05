@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-api-with-warmup
+  labels:
+    app: product-api
+    variant: with-warmup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-api
+      variant: with-warmup
+  template:
+    metadata:
+      labels:
+        app: product-api
+        variant: with-warmup
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: product-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          command: ["python", "run_with_warmup.py"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
