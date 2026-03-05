@@ -119,3 +119,6 @@ artifacts/
 
 # ruff cache(python checker)
 .ruff_cache/
+
+# environment variables
+.env

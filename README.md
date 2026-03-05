@@ -66,6 +66,7 @@
 60. AWS KMS를 사용한 봉투암호화 예제. added 26.3.2 - [링크](./computer_science/kms/)
 61. 봉투암호화 시뮬레이션 제품(envelopelab.akbun.com) added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
 62. Cilium CNI network policy added 26.3.2 - [링크](./kubernetes/cilium/examples/networkpolicy/networkpolicy.md)
+63. AI Agent 핸즈온 튜토리얼 - [링크](./ai/ai-agent-tutorial/)
 
 ## 다른 정리된 문서 링크
 
