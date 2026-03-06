@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-api-no-warmup
+  labels:
+    app: product-api
+    variant: no-warmup
+spec:
+  selector:
+    app: product-api
+    variant: no-warmup
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-api-with-warmup
+  labels:
+    app: product-api
+    variant: with-warmup
+spec:
+  selector:
+    app: product-api
+    variant: with-warmup
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30081
+  type: NodePort
