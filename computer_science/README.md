@@ -9,3 +9,4 @@
 | 3 | 컨테이너 원리 - chroot | [링크](./linux_namespace/chroot/) |
 | 4 | 컨테이너 원리 - mount namespace | [링크](./linux_namespace/mount_namespace/) |
 | 5 | pivot_root | [링크](./linux_namespace/pivot_root/) |
+| 6 | SpringBoot HikariCP 커넥션 풀과 TCP 디버깅 | [링크](./db_pool/) |
