@@ -1,300 +1,150 @@
 ---
 name: create-github-pr
-description: Creates well-structured GitHub pull requests using gh CLI with clear intent-driven descriptions. Analyzes the latest commit message and code changes (git diff) to generate PR title from commit first line and detailed English body with intent and implementation details. Use when user requests "create pull request", "make a PR", "open PR", or "submit for review".
+description: >
+  Creates well-structured GitHub pull requests using gh CLI with clear,
+  Korean-language descriptions. Analyzes the latest commit message and code
+  changes (git diff) to generate a PR title and a concise Korean body that
+  anyone can understand at a glance. Use this skill whenever the user wants
+  to create a pull request, open a PR, or submit changes for review — even
+  if they just say "PR 만들어줘" or "리뷰 올려줘". Triggers on: "create pull
+  request", "make a PR", "open PR", "submit for review", "PR 만들어줘",
+  "PR 올려줘", "풀리퀘스트", "리뷰 요청", "PR 생성", or any request to create
+  a GitHub pull request from current changes.
+allowed_tools:
+  - "Bash(git *)"
+  - "Bash(gh *)"
 ---
 
 # GitHub Pull Request Creation Skill
 
-Creates well-structured GitHub pull requests using gh CLI by analyzing the latest commit message and code changes to generate clear, detailed descriptions.
-
-## When to Use This Skill
-
-Trigger this skill when the user requests:
-
-- "create a pull request"
-- "make a PR"
-- "open a pull request"
-- "submit this for review"
-- "create PR from my commit"
+커밋 메시지와 코드 변경 사항을 분석하여 간결한 한국어 PR을 생성한다.
 
 ## Prerequisites
 
-- `gh` CLI is already configured and authenticated
-- Current branch has at least one commit ready for PR
-- User is in a git repository
+- `gh` CLI가 인증된 상태
+- 현재 브랜치에 PR할 커밋이 존재
+- git repository 안에서 실행
 
 ## Step-by-Step Process
 
-### 1. Get Latest Commit Information
-
-Retrieve the most recent commit details:
+### 1. 최신 커밋 정보 가져오기
 
 ````bash
-# Get commit message (subject and body)
+# 커밋 메시지 (제목 + 본문)
 git log -1 --pretty=format:"%s%n%b"
 
-# Get commit hash for reference
+# 커밋 해시
 git log -1 --pretty=format:"%H"
 ````
 
-### 2. Analyze Code Changes
-
-Analyze what actually changed in the commit:
+### 2. 코드 변경 사항 분석
 
 ````bash
-# Get changed files with status (Added/Modified/Deleted)
+# 변경된 파일 목록 (Added/Modified/Deleted)
 git diff HEAD~1 HEAD --name-status
 
-# Get detailed code changes (TEXT FILES ONLY - exclude binary files)
+# 텍스트 파일의 상세 변경 내용 (바이너리 제외)
 git diff HEAD~1 HEAD --diff-filter=d -- . ':!*.png' ':!*.jpg' ':!*.jpeg' ':!*.gif' ':!*.svg' ':!*.ico' ':!*.pdf' ':!*.zip' ':!*.tar' ':!*.gz' ':!*.mp4' ':!*.mov' ':!*.avi' ':!*.mp3' ':!*.wav' ':!*.ttf' ':!*.woff' ':!*.woff2' ':!*.eot' ':!*.otf' ':!*.exe' ':!*.dll' ':!*.so' ':!*.dylib' ':!*.bin' ':!*.dat'
 
-# Get statistics of changes
+# 변경 통계
 git diff HEAD~1 HEAD --stat
 ````
 
-### 3. Binary File Handling
+### 3. 바이너리 파일 처리
 
-**DO NOT read content of binary files.** Only use file names and status from `--name-status`.
+바이너리 파일의 내용은 읽지 않는다. `--name-status`의 파일명만 참고하고, 중요한 바이너리(예: 새 로고)만 PR 본문에 언급한다.
 
-**Common binary file extensions to exclude:**
+### 4. PR 구성 요소 추출
 
-- **Images**: `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.ico`, `.webp`, `.bmp`
-- **Documents**: `.pdf`, `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`
-- **Archives**: `.zip`, `.tar`, `.gz`, `.rar`, `.7z`, `.bz2`
-- **Media**: `.mp4`, `.mov`, `.avi`, `.mkv`, `.mp3`, `.wav`, `.flac`
-- **Fonts**: `.ttf`, `.woff`, `.woff2`, `.eot`, `.otf`
-- **Executables**: `.exe`, `.dll`, `.so`, `.dylib`, `.bin`, `.dat`
-- **Databases**: `.db`, `.sqlite`, `.mdb`
+**Title**: 커밋 메시지 첫 줄을 그대로 사용
 
-**For binary files, only mention them if they are significant** (e.g., new logo, documentation PDF). Otherwise, skip them since PR's Files changed tab already shows them.
+**Body**: 한국어로 작성하되, 핵심만 간결하게 전달
 
-### 4. Extract PR Components
+### 5. PR 본문 작성 (한국어)
 
-**Title**: Use the first line of the commit message as-is
-
-**Body**: Analyze and structure based on:
-
-- Commit message body (if exists)
-- Actual code modifications (from `diff` - text files only)
-- Key implementation details and logic changes
-
-### 5. Structure the PR Body
-
-Create the PR body in **English** following this template:
+PR 본문은 누구나 "이 PR이 뭘 하는지" 바로 파악할 수 있어야 한다.
+불필요한 세부 사항은 빼고, 핵심 의도와 주요 변경만 담는다.
 
 ````markdown
-## What This PR Does
-[Extract the "why" from commit message or infer from changes - what problem does this solve? What is the high-level goal?]
+## 작업 내용
+[이 PR이 해결하는 문제 또는 달성하는 목표를 1~2문장으로 설명]
 
-## Implementation Details
-[Explain based on actual code changes:]
-- Key functions/classes added or modified
-- Important logic changes
-- Technical decisions and approaches
-- Configuration or dependency updates
+## 주요 변경 사항
+- [핵심 변경 1]
+- [핵심 변경 2]
+- [핵심 변경 3]
 
-[Use code blocks to highlight important snippets if relevant]
-
-## Additional Context
-[Optional: from commit message body, testing notes, breaking changes, migration steps, etc.]
-
-## Related
-<!-- Leave empty - user will manually fill this in GitHub web UI -->
+## 참고 사항
+[선택: 브레이킹 체인지, 마이그레이션, 테스트 관련 메모 등. 없으면 이 섹션 생략]
 ````
 
-**Note**: DO NOT include a `## Changes` section that lists files. GitHub PR already displays all file changes in the "Files changed" tab.
+작성 원칙:
 
-### 6. Analysis Guidelines
+- "작업 내용"은 **왜** 이 변경이 필요한지 설명한다
+- "주요 변경 사항"은 3~5개 이내의 불릿으로 핵심만 나열한다
+- 파일 목록을 나열하지 않는다 (GitHub "Files changed" 탭에서 확인 가능)
+- 코드 스니펫은 정말 필요한 경우에만 포함한다
+- "참고 사항"은 특별한 내용이 없으면 생략한다
 
-When analyzing code changes, focus on:
-
-**What to emphasize:**
-
-- **Why** this change was made (the intent)
-- **How** it was implemented (the approach)
-- Key functions/classes and their purpose
-- Important logic or algorithm changes
-- Configuration impacts
-- New dependencies and why they were added
-- Breaking changes or migration requirements
-- Testing strategy if significant tests were added
-
-**What to skip:**
-
-- File-by-file list of changes (already in PR diff)
-- Listing "Added: file.py", "Modified: file.py" format
-- Binary file contents
-- Minor formatting or whitespace changes
-- Obvious changes that are self-explanatory in diff
-
-**Formatting in PR body:**
-
-- Use paragraphs for explanations
-- Use bullet points for lists of related items
-- Include code blocks for significant snippets (max 10 lines)
-- Use **bold** for emphasis on important terms
-
-### 7. Create the Pull Request
-
-Execute the gh CLI command:
+### 6. PR 생성
 
 ````bash
-gh pr create --title "TITLE" --body "BODY"
+gh pr create --title "TITLE" --body "$(cat <<'EOF'
+## 작업 내용
+...
+
+## 주요 변경 사항
+- ...
+
+EOF
+)"
 ````
 
-## Example Analysis Flow
+## 예시
 
-### Input: Latest Commit
+### 입력: 커밋 메시지
 
-````bash
-$ git log -1 --pretty=format:"%s%n%b"
+````
 feat: add user authentication with JWT
-
-Implement JWT-based authentication system
-- Login and logout endpoints
-- Token validation middleware
-- Password hashing with bcrypt
 ````
 
-### Code Changes Analysis
-
-````bash
-$ git diff HEAD~1 HEAD --name-status
-A       src/auth.py
-A       src/middleware.py
-M       src/app.py
-M       requirements.txt
-A       tests/test_auth.py
-A       docs/api-spec.pdf
-A       static/images/login-bg.png
-
-$ git diff HEAD~1 HEAD --stat
- src/auth.py              | 45 +++++++++++++++++++++
- src/middleware.py        | 23 +++++++++++
- src/app.py               | 12 ++++--
- requirements.txt         |  2 +
- tests/test_auth.py       | 67 +++++++++++++++++++++++++++++++
- docs/api-spec.pdf        | Bin 0 -> 245678 bytes
- static/images/login-bg.png | Bin 0 -> 89234 bytes
-````
-
-### Generated PR Body
+### 생성된 PR 본문
 
 ````markdown
-## What This PR Does
-Implements JWT-based authentication system to secure API endpoints and manage user sessions with token-based authentication.
+## 작업 내용
+JWT 기반 인증 시스템을 구현하여 API 엔드포인트를 보호하고 토큰 기반 사용자 세션을 관리합니다.
 
-## Implementation Details
+## 주요 변경 사항
+- JWT 토큰 발급/검증 로직 구현 (24시간 만료)
+- 로그인/로그아웃 엔드포인트 추가
+- 토큰 검증 미들웨어로 보호 라우트 적용
+- bcrypt를 사용한 비밀번호 해싱 처리
+- PyJWT, bcrypt 의존성 추가
 
-Created a complete authentication system with the following components:
-
-**Token-Based Authentication**
-- Implemented JWT token generation with 24-hour expiration
-- Created login and logout endpoints that issue and invalidate tokens
-- Used bcrypt for secure password hashing before storage
-
-**Middleware Protection**
-- Added token validation middleware that runs before protected routes
-- Middleware extracts JWT from Authorization header and validates signature and expiration
-- Returns 401 Unauthorized if token is invalid or expired
-
-**Key Functions**
-```python
-def generate_token(user_id):
-    # Creates JWT with user_id claim and 24h expiration
-    payload = {'user_id': user_id, 'exp': datetime.utcnow() + timedelta(hours=24)}
-    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-def validate_token(token):
-    # Verifies JWT signature and expiration
-    return jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-```
-
-**Integration**
-- Updated main application to register authentication routes and apply middleware to protected endpoints
-- Added dependencies: `PyJWT==2.8.0` for token handling and `bcrypt==4.1.2` for password hashing
-
-## Additional Context
-
-**Testing**
-Added comprehensive test suite (67 lines) covering:
-- Successful login with valid credentials
-- Failed login with invalid credentials
-- Token validation for valid and expired tokens
-- Middleware behavior on protected routes
-
-**Documentation**
-Added API specification PDF documenting authentication endpoints
-
-## Related
-<!-- User will manually fill this in GitHub web UI -->
+## 참고 사항
+인증 관련 테스트 케이스를 함께 추가했습니다.
 ````
 
-## Error Handling
+## 에러 처리
 
-Common issues and solutions:
+**커밋이 없는 경우**: 최소 하나의 커밋이 필요하다고 안내
 
-**No commits found:**
+**gh 인증 실패**: `gh auth status`로 확인 안내
 
-````bash
-$ git log -1
-fatal: your current branch 'feature' does not have any commits yet
-````
+**브랜치 미푸시**: `git push -u origin HEAD` 실행 후 재시도
 
-→ User needs to make at least one commit first
+## 분석 가이드라인
 
-**gh command fails:**
+**포함할 내용:**
 
-````bash
-$ gh pr create
-error: failed to get repository
-````
+- 변경의 의도 (왜)
+- 구현 접근 방식 (어떻게)
+- 새로운 의존성과 그 이유
+- 브레이킹 체인지
 
-→ Check authentication: `gh auth status`
-→ Verify remote exists: `git remote -v`
+**제외할 내용:**
 
-**Branch not pushed:**
-
-````bash
-$ gh pr create
-error: current branch is not pushed to origin
-````
-
-→ Push branch first: `git push -u origin HEAD`
-
-**Binary file in diff:**
-If you accidentally see "Binary files differ" in output, ignore that file's content and only use the file name from `--name-status` if it's significant.
-
-## Tips for Better Analysis
-
-1. **Lead with Intent**: Always start with the "why" - what problem does this solve?
-2. **Explain Approach**: Describe the implementation strategy and key decisions
-3. **Highlight Key Code**: Include small snippets (5-10 lines) of critical logic
-4. **Connect the Dots**: Explain how different pieces work together
-5. **Dependencies Matter**: Always mention new dependencies and their purpose
-6. **Note Breaking Changes**: Call out anything that requires migration or changes behavior
-7. **Testing Context**: If significant tests added, explain what scenarios they cover
-8. **Skip the Obvious**: Don't list every file change - focus on the important logic
-9. **No File Lists**: Never create "Added: X, Modified: Y" style lists
-
-## What NOT to Include
-
-- ❌ "Added: file.py", "Modified: file.py" format lists
-- ❌ Binary file contents (wastes tokens)
-- ❌ Line-by-line diff walkthrough
-- ❌ Whitespace or formatting-only changes
-- ❌ Obvious changes visible in diff
-- ❌ Auto-generated code without context
-- ❌ Entire file contents
-
-## Token Optimization
-
-**Save tokens by:**
-
-- ✅ Using `--name-status` for file list (lightweight)
-- ✅ Excluding binary files from `git diff` with pathspec filters
-- ✅ Only analyzing text-based code changes
-- ✅ Focusing on logic and intent, not file lists
-- ✅ Never creating file change lists
-- ❌ Never reading binary file contents
-- ❌ Never listing every single file change
+- 파일별 변경 목록 (diff에서 확인 가능)
+- 바이너리 파일 내용
+- 포맷팅/공백 변경
+- diff에서 자명한 변경 사항
