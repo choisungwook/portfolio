@@ -1,6 +1,21 @@
 ---
 name: arch-viz-prompter
-description: "Generate optimized prompts for AI-powered architecture visualization tools. Takes markdown, sentences, or technical context as input and produces ready-to-use prompts for three tools: (1) NotebookLM Infographic, (2) NotebookLM Slides, (3) Google Gemini Nano Banana (image generation). Use this skill when the user wants to create architecture diagrams, infrastructure visualizations, system diagrams, or technical illustrations for blog posts. Trigger on: 'architecture diagram', 'arch diagram', 'infographic', 'visualize architecture', 'draw architecture', 'architecture image', 'NotebookLM prompt', 'Gemini image prompt', 'nano banana', '아키텍처 그림', '아키텍처 시각화', '인포그래픽', '슬라이드 그림', 'make me a diagram', or any request to visualize technical infrastructure or system architecture."
+description: >
+  Generate optimized prompts for AI-powered architecture visualization tools.
+  Takes markdown, sentences, or technical context as input and produces
+  ready-to-use prompts for three tools: (1) NotebookLM Infographic,
+  (2) NotebookLM Slides, (3) Google Gemini Nano Banana (image generation).
+  Use this skill whenever the user wants to create any kind of architecture
+  diagram, infrastructure visualization, system diagram, or technical
+  illustration — especially for blog posts or presentations. Even if the user
+  just asks to "visualize this" or "make a diagram" for technical content,
+  this skill should be used to generate the appropriate AI tool prompts.
+  Triggers on: 'architecture diagram', 'arch diagram', 'infographic',
+  'visualize architecture', 'draw architecture', 'architecture image',
+  'NotebookLM prompt', 'Gemini image prompt', 'nano banana', '아키텍처 그림',
+  '아키텍처 시각화', '인포그래픽', '슬라이드 그림', 'make me a diagram',
+  '프롬프트 만들어줘', 'visualization prompt', 'blog diagram', '블로그 그림',
+  or any request to visualize technical infrastructure or system architecture.
 ---
 
 # Architecture Visualization Prompt Generator
@@ -144,17 +159,17 @@ When converting the user's input into prompts:
 3. **Identify groups**: Cluster components by logical boundary (VPC, subnet, AZ, on-premise, cloud)
 4. **Determine layout**: Choose left-to-right for request flows, top-to-bottom for layered architectures, hub-spoke for central services
 5. **AWS service mapping**: If AWS services are mentioned, list them explicitly for NotebookLM icon matching. Common mappings:
-  - EKS/Kubernetes → Amazon EKS icon
-  - RDS/Database → Amazon RDS icon
-  - ALB/Load Balancer → Elastic Load Balancing icon
-  - S3 → Amazon S3 icon
-  - VPC → Amazon VPC icon
-  - EC2 → Amazon EC2 icon
-  - CloudFront → Amazon CloudFront icon
-  - Route 53 → Amazon Route 53 icon
-  - IAM → AWS IAM icon
-  - TGW → AWS Transit Gateway icon
-  - Site-to-Site VPN → AWS Site-to-Site VPN icon
+   - EKS/Kubernetes → Amazon EKS icon
+   - RDS/Database → Amazon RDS icon
+   - ALB/Load Balancer → Elastic Load Balancing icon
+   - S3 → Amazon S3 icon
+   - VPC → Amazon VPC icon
+   - EC2 → Amazon EC2 icon
+   - CloudFront → Amazon CloudFront icon
+   - Route 53 → Amazon Route 53 icon
+   - IAM → AWS IAM icon
+   - TGW → AWS Transit Gateway icon
+   - Site-to-Site VPN → AWS Site-to-Site VPN icon
 
 ## Output Format
 
