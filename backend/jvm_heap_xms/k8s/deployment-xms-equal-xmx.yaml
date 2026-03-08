@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heap-test-equal
+  namespace: heap-test
+  labels:
+    app: heap-test
+    variant: xms-equal-xmx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: heap-test
+      variant: xms-equal-xmx
+  template:
+    metadata:
+      labels:
+        app: heap-test
+        variant: xms-equal-xmx
+    spec:
+      containers:
+        - name: app
+          image: heap-test:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx256m -XX:+PrintGCDetails -Xlog:gc*:stdout"
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "500m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 3
