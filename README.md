@@ -67,6 +67,7 @@
 61. 봉투암호화 시뮬레이션 제품(envelopelab.akbun.com) added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
 62. Cilium CNI network policy added 26.3.2 - [링크](./kubernetes/cilium/examples/networkpolicy/networkpolicy.md)
 63. Argo CD preview github action added 26.3.8 - [링크](https://github.com/choisungwook/argocd-practice/tree/main/argocd-diff-preview)
+64. CDN cache를 잘못설정하면 위험한 케이스 26.3.22 - [링크](./computer_science/dangerous_cache/)
 
 ## 다른 정리된 문서 링크
 

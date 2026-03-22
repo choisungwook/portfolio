@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudFront Cache Security Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>CloudFront Cache Security Demo</h1>
+    <p class="subtitle">캐시 정책의 위험성을 보여주는 데모</p>
+
+    <div id="login-section" class="card">
+      <h2>Login</h2>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="alice or bob">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="password">
+      </div>
+      <button id="login-btn" onclick="login()">Login</button>
+      <div class="hint">
+        <p>Test accounts:</p>
+        <ul>
+          <li>alice / password123</li>
+          <li>bob / password456</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="profile-section" class="card hidden">
+      <h2>My Profile</h2>
+      <div class="profile-info">
+        <div class="profile-row">
+          <span class="label">Name:</span>
+          <span id="profile-name"></span>
+        </div>
+        <div class="profile-row">
+          <span class="label">Email:</span>
+          <span id="profile-email"></span>
+        </div>
+        <div class="profile-row">
+          <span class="label">Role:</span>
+          <span id="profile-role"></span>
+        </div>
+        <div class="profile-row">
+          <span class="label">Balance:</span>
+          <span id="profile-balance" class="balance"></span>
+        </div>
+      </div>
+      <button id="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div id="message" class="message hidden"></div>
+
+    <div class="warning-box">
+      <h3>How to reproduce the cache issue</h3>
+      <ol>
+        <li>Browser 1: alice / password123 으로 로그인</li>
+        <li>Browser 1: Profile 페이지가 CloudFront에 캐시됨</li>
+        <li>Browser 2 (시크릿 모드): 같은 URL 접속</li>
+        <li>Browser 2: 로그인하지 않았는데 alice의 프로필이 보임!</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
