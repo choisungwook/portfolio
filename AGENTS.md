@@ -136,14 +136,9 @@ README.md는 프로젝트 개요와 docs/ 링크 테이블을 담는다:
 |------|-------|
 | 기술 문서 / 블로그 글 작성 | `writing-with-akbunstyle` |
 | 아키텍처 시각화 프롬프트 | `arch-viz-prompter` |
-| Excalidraw 다이어그램 | `akbun-diagram` |
 | PR 생성 | `create-github-pr` |
 | 커밋 메시지 | `suggest-git-commit-message` |
 | 문서 리뷰/교정 | `docs_reviewer` |
-| Agent 문서 스타일링 | `agent-document-styler` |
-| 새 스킬 생성 | `skill-creator` |
-| Notion 전송 | `md-to-notion` |
-| Terraform 코드 | `terraform-style` |
 
 한국어 문서는 `writing-with-akbunstyle`로 작성하고, PR은 `create-github-pr`로 만들고, 문서를 커밋하기 전에 `docs_reviewer`로 품질을 확인한다 — 이 세 가지가 품질 게이트 역할을 한다. 각 workspace의 AGENTS.md에는 `## Used Skills` 섹션을 넣어서 어떤 skill을 쓰는지 명시한다.
 
@@ -151,7 +146,7 @@ README.md는 프로젝트 개요와 docs/ 링크 테이블을 담는다:
 
 <code-rules>
 
-코드 작성 규칙은 `.claude/rules/`에 정의되어 있고 자동으로 로드된다. 별도로 읽을 필요 없다.
+코드 작성 규칙은 `.claude/rules/`에 정의되어 있다. claude code이 아닌 codex, gemini CLI등은 .claude/rules/를 로드한다.
 
 - Kubernetes manifests: `.claude/rules/kubernetes.md`
 - Markdown: `.claude/rules/markdown.md`
