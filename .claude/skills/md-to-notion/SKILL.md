@@ -2,12 +2,17 @@
 name: md-to-notion
 description: >
   Transfer an Obsidian markdown file to a Notion "Tasks" database using the
-  Notion MCP. Reads the markdown content, sets database properties (Tags,
-  Start & End Date, Status), and creates a new page with the content.
-  If a page with the same title already exists, asks before overwriting.
-  Use this skill when the user wants to send/sync/transfer an Obsidian note
-  to Notion, or copy markdown to Notion. Trigger on: "notion", "send to notion",
-  "md to notion", "obsidian to notion", "transfer to notion", "sync to notion".
+  Notion MCP. Reads the markdown content, parses YAML frontmatter for metadata,
+  sets database properties (Tags, Start & End Date, Status), and creates a new
+  page with the content. If a page with the same title already exists, asks
+  before overwriting. Use this skill whenever the user mentions Notion in the
+  context of transferring, uploading, or syncing content — even if they just
+  say "send this to Notion" or "노션에 올려줘" without specifying the file format.
+  Also triggers when the user wants to create a Notion page from any markdown
+  content. Triggers on: "notion", "send to notion", "md to notion",
+  "obsidian to notion", "transfer to notion", "sync to notion", "upload to notion",
+  "노션", "노션에 보내줘", "노션에 올려줘", "노션 페이지 만들어줘", or any request
+  involving moving written content into a Notion database.
 allowed-tools:
   - Bash(echo:*)
   - mcp__notion__notion-search
@@ -41,10 +46,9 @@ The Obsidian `![[image]]` syntax is kept as plain text (Notion cannot render loc
 2. **Parse** YAML frontmatter to extract `name`, `created` date, and `tags`
 3. **Search** Notion for an existing page with the same title
 
-- If found: **ask the user** before overwriting (use `notion-update-page` with `replace_content`)
-- If not found: create a new page
-
-1. **Create/Update** the Notion page with properties and content
+   - If found: **ask the user** before overwriting (use `notion-update-page` with `replace_content`)
+   - If not found: create a new page
+4. **Create/Update** the Notion page with properties and content
 
 ## Property Mapping
 
