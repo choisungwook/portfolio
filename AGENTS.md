@@ -70,15 +70,7 @@ Commit 메시지는 `suggest-git-commit-message` skill을 사용한다. Conventi
 
 branch checkout 대신 git worktree를 사용한다. 여러 agent가 동시에 작업할 때 branch switching이 충돌을 일으키지만, worktree는 각각 독립된 working directory를 가지므로 이 문제가 없다. `.gitignore`에 `worktree/`가 이미 등록되어 있다.
 
-Claude Code에서는 `EnterWorktree`로 worktree를 만든다. 이름은 작업 주제를 설명하는 형태로 짓는다.
-
-```text
-EnterWorktree(name: "cloudfront-cache-demo")
-```
-
-작업이 끝나면 `ExitWorktree(action: "keep")`으로 보존하거나, `ExitWorktree(action: "remove")`로 정리한다. Agent를 호출할 때 `isolation: "worktree"` 옵션을 주면 자동으로 격리된 worktree에서 작업한다 — 여러 agent를 병렬로 돌릴 때 이 옵션을 쓰면 된다.
-
-수동으로 worktree를 관리할 때는 이렇게 한다:
+Claude Code 등 AI Agent는 수동으로 worktree를 관리할 때는 이렇게 한다:
 
 ```bash
 git worktree add ../portfolio-<topic> -b <branch-name>
