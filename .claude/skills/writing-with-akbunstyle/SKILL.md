@@ -23,13 +23,15 @@ An experienced engineer explaining things to a colleague — authoritative yet g
 
 ## Common Structure Rules
 
-Every post follows these rules regardless of type:
+Every post follows these rules regardless of type. 글 앞부분 순서가 중요하다:
 
-1. **# 요약** — always first. Concise bullet-point summary so readers grasp key points at a glance. Should stand alone as a useful quick-reference.
-2. **# 목차** — table of contents listing all major sections, right after 요약.
-3. **# 참고자료** — always last. Bulleted URL list. No formal conclusion paragraph.
-4. **# 부록** (optional) — for deep dives: architecture internals, debugging tips.
-5. **# 더 공부할 것** (optional) — forward-looking topics to explore.
+1. **## 목차** — always first. 각 섹션 헤더로 앵커 링크(`[섹션명](#헤더)`)를 걸어 클릭하면 해당 섹션으로 이동할 수 있게 한다.
+2. **## 해결하려는 문제** (또는 **## 공부 배경**) — 이 글을 쓰게 된 동기. 어떤 문제를 해결하려는지, 또는 어떤 주제를 공부하려는지 짧게 설명한다. 독자가 "이 글이 나한테 필요한 글인가?"를 바로 판단할 수 있게 해준다.
+3. **## 이 글을 읽고 답할 수 있는 질문** — 글의 핵심 내용을 질문 형태로 3~5개 뽑아 나열한다. 독자가 글을 읽기 전에 기대치를 잡거나, 읽은 후 자기 점검에 활용할 수 있다. 제목은 글 내용에 맞게 자연스럽게 조정한다 (예: "이 글을 읽고 답할 수 있는 질문", "셀프 체크리스트", "읽기 전 확인 질문").
+4. **## 결론** — 글에서 얻은 핵심 교훈이나 인사이트를 1~3문장으로 정리한다. 형식적인 마무리가 아니라, 실제 경험에서 느낀 구체적인 깨달음을 담는다. 참고자료 바로 앞에 위치.
+5. **## 더 공부할 것** (optional) — forward-looking topics to explore.
+6. **## 부록** (optional) — for deep dives: architecture internals, debugging tips.
+7. **## 참고자료** — always last. Bulleted URL list.
 
 ## Korean-English Usage
 
@@ -50,6 +52,7 @@ Every post follows these rules regardless of type:
 ## Content Ecosystem
 
 akbun's blog is part of a broader ecosystem:
+
 - **Practice code**: "실습자료는 저의 github에 있습니다" + GitHub link
 - **YouTube**: "실습과정은 저의 유투브에 자세히 다룹니다" + YouTube link
 - **Previous posts**: "이전 글에서 설명한 것처럼..." + blog link
@@ -57,7 +60,7 @@ akbun's blog is part of a broader ecosystem:
 
 ## What NOT to Do
 
-- Do NOT write a formal conclusion or summary paragraph
+- Do NOT write a generic formal conclusion — 결론 섹션은 이 글에서 얻은 구체적인 교훈이나 인사이트를 담아야 한다
 - Do NOT force-translate established English technical terms into Korean
 - Do NOT write long compound sentences
 - Do NOT pad with unnecessary filler or excessive greetings

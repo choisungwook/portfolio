@@ -172,8 +172,49 @@ data "http" "my_ip" {
 ## 보안 기본값
 
 - **EBS/RDS 암호화**: 항상 활성화 (기본 AWS 관리형 KMS 키)
-- **S3**: 버저닝 활성화, KMS 암호화, 퍼블릭 액세스 차단
+- **S3**: 버저닝 활성화, 암호화 필수(SSE-S3 `AES256` 기본, 필요 시 KMS), 퍼블릭 액세스 차단
 - 자격증명을 하드코딩하지 않는다. 민감한 output에는 `sensitive = true`를 설정한다.
+
+## CloudFront 규칙
+
+- S3 Origin 접근 시 **OAC(Origin Access Control)**을 사용한다. OAI는 사용하지 않는다.
+- OAC 설정: `signing_behavior = "always"`, `signing_protocol = "sigv4"`
+- Origin의 Cache-Control을 존중하려면 캐시 정책에 **`min_ttl = 0`**을 설정한다. `min_ttl`이 0보다 크면 Origin 헤더를 무시하고 강제 캐시한다.
+- `viewer_protocol_policy`는 실습 환경에서는 `"allow-all"`, 프로덕션에서는 `"redirect-to-https"`를 사용한다.
+
+OAC와 S3 버킷 정책 예시:
+
+```hcl
+resource "aws_cloudfront_origin_access_control" "s3" {
+  name                              = "${var.project_name}-s3-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_s3_bucket_policy" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowCloudFrontOAC"
+        Effect    = "Allow"
+        Principal = { Service = "cloudfront.amazonaws.com" }
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.this.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn"     = aws_cloudfront_distribution.this.arn
+            "AWS:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+```
 
 ## 사용자에게 확인이 필요한 사항
 
