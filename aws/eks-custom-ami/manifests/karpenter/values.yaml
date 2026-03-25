@@ -1,0 +1,19 @@
+# Karpenter Helm values (static)
+# 노드 1개 환경용 설정: replica 1, HA 비활성화
+
+replicas: 1
+
+controller:
+  resources:
+    requests:
+      cpu: "0.5"
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+serviceAccount:
+  name: karpenter-irsa-sa
+
+# HA용 분산 제약 비활성화 (노드 1개)
+topologySpreadConstraints: []

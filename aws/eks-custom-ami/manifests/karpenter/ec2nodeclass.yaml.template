@@ -1,0 +1,30 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: custom-ami
+  labels:
+    app.kubernetes.io/name: custom-ami-ec2nodeclass
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - id: "${CUSTOM_AMI_ID}"
+  # 이 실습은 default VPC를 사용하므로 karpenter.sh/discovery 태그가 없습니다.
+  # 태그 대신 subnet ID를 직접 지정합니다. default VPC는 AZ마다 subnet이 있어서 항목이 많습니다.
+  # 전용 VPC를 사용하면 tags: { karpenter.sh/discovery: cluster-name } 으로 간단히 지정할 수 있습니다.
+  subnetSelectorTerms:
+    - id: "${SUBNET_ID_A}"
+    - id: "${SUBNET_ID_B}"
+    - id: "${SUBNET_ID_C}"
+    - id: "${SUBNET_ID_D}"
+  securityGroupSelectorTerms:
+    - id: "${CLUSTER_SECURITY_GROUP_ID}"
+  role: "${CLUSTER_NAME}-eks-worker-node-role"
+  tags:
+    Name: "karpenter-custom-ami"
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 30Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
