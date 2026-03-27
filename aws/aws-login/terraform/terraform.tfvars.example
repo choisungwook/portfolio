@@ -1,0 +1,3 @@
+project_name = "aws-login-handson"
+aws_region   = "ap-northeast-2"
+iam_username = "test-developer"
