@@ -130,7 +130,15 @@ sudo ./aws/install --update
 
 **IAM User에 `signin:AuthorizeOAuth2Access`와 `signin:CreateOAuth2Token` 권한이 있어야 합니다.** 이 두 권한이 없으면 `aws login`은 동작하지 않습니다.
 
-IAM Policy JSON 예시입니다.
+가장 간단한 방법은 AWS 관리형 정책 `SignInLocalDevelopmentAccess`를 붙이는 것입니다.
+
+```bash
+aws iam attach-user-policy \
+  --user-name test-developer \
+  --policy-arn arn:aws:iam::aws:policy/SignInLocalDevelopmentAccess
+```
+
+이 관리형 정책의 내용은 다음과 같습니다.
 
 ```json
 {
@@ -142,13 +150,23 @@ IAM Policy JSON 예시입니다.
         "signin:AuthorizeOAuth2Access",
         "signin:CreateOAuth2Token"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:signin:*:*:oauth2/public-client/*"
     }
   ]
 }
 ```
 
-이 권한은 AWS 콘솔 로그인 서비스(`signin`)에 대한 것입니다. IAM User에 직접 붙이거나, IAM Group을 통해 부여할 수 있습니다.
+각 액션의 역할입니다.
+
+- `signin:AuthorizeOAuth2Access`: 브라우저 인증 후 OAuth2 Authorization Code를 받을 수 있는 권한
+- `signin:CreateOAuth2Token`: Authorization Code를 Access Token과 Refresh Token으로 교환하는 권한
+
+Resource ARN에서 같은 기기 인증(`localhost`)과 원격 인증(`remote`)을 별도로 제어할 수도 있습니다.
+
+| Resource ARN | 용도 |
+|---|---|
+| `arn:aws:signin:*:*:oauth2/public-client/localhost` | `aws login` (같은 기기) |
+| `arn:aws:signin:*:*:oauth2/public-client/remote` | `aws login --remote` (원격) |
 
 ## 기존 방식과 비교
 
@@ -193,6 +211,29 @@ aws login --remote
 ```
 
 화면에 URL과 코드가 표시되면, 브라우저가 있는 로컬 PC에서 해당 URL에 접속하여 인증합니다. 이 방식은 OAuth2 Device Authorization Grant를 사용합니다.
+
+### Terraform에서 aws login 자격증명 사용하기
+
+Terraform AWS Provider는 `login_session` 자격증명을 아직 네이티브로 지원하지 않습니다. `credential_process`를 사용하여 우회할 수 있습니다.
+
+`~/.aws/config`에 다음과 같이 설정합니다.
+
+```ini
+[profile signin]
+login_session = arn:aws:iam::123456789012:user/username
+region = ap-northeast-2
+
+[profile terraform]
+credential_process = aws configure export-credentials --profile signin --format process
+region = ap-northeast-2
+```
+
+Terraform에서는 `terraform` 프로필을 사용합니다.
+
+```bash
+export AWS_PROFILE=terraform
+terraform plan
+```
 
 ## 실습
 
