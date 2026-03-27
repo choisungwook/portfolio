@@ -1,0 +1,165 @@
+# Sample Ansible playbook for Akbun Theme syntax highlighting test.
+# Covers: plays, tasks, modules, variables, Jinja2 templates,
+#         handlers, loops, conditionals, roles, blocks.
+
+---
+- name: Deploy application to web servers
+  hosts: webservers
+  become: true
+  gather_facts: true
+  vars:
+    app_name: akbun-app
+    app_version: "2.1.0"
+    app_port: 8080
+    deploy_dir: /opt/{{ app_name }}
+    log_dir: /var/log/{{ app_name }}
+    max_retries: 3
+    health_check_url: "http://localhost:{{ app_port }}/health"
+    packages:
+      - python3
+      - python3-pip
+      - nginx
+      - docker-ce
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - app_name is defined
+          - app_version is defined
+          - app_port | int > 0
+        fail_msg: "Required variables are not properly defined"
+        success_msg: "All required variables validated"
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.yum:
+        name: "{{ packages }}"
+        state: present
+      register: install_result
+      retries: "{{ max_retries }}"
+      delay: 5
+      until: install_result is succeeded
+      notify: Restart nginx
+
+    - name: Create application directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_name }}"
+        group: "{{ app_name }}"
+        mode: "0755"
+      loop:
+        - "{{ deploy_dir }}"
+        - "{{ deploy_dir }}/config"
+        - "{{ deploy_dir }}/bin"
+        - "{{ log_dir }}"
+
+    - name: Deploy application configuration
+      ansible.builtin.template:
+        src: templates/app-config.yml.j2
+        dest: "{{ deploy_dir }}/config/application.yml"
+        owner: "{{ app_name }}"
+        group: "{{ app_name }}"
+        mode: "0640"
+        validate: "python3 -c 'import yaml; yaml.safe_load(open(\"%s\"))'"
+      notify: Restart application
+
+    - name: Configure nginx reverse proxy
+      ansible.builtin.template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/conf.d/{{ app_name }}.conf
+        mode: "0644"
+      notify: Restart nginx
+
+    - name: Pull Docker image
+      community.docker.docker_image:
+        name: "registry.example.com/{{ app_name }}"
+        tag: "{{ app_version }}"
+        source: pull
+        force_source: true
+      register: docker_pull
+
+    - name: Run application container
+      community.docker.docker_container:
+        name: "{{ app_name }}"
+        image: "registry.example.com/{{ app_name }}:{{ app_version }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "{{ app_port }}:{{ app_port }}"
+        env:
+          APP_ENV: "{{ ansible_env.APP_ENV | default('production') }}"
+          LOG_LEVEL: "{{ 'debug' if ansible_env.APP_ENV | default('production') == 'development' else 'info' }}"
+        volumes:
+          - "{{ deploy_dir }}/config:/app/config:ro"
+          - "{{ log_dir }}:/app/logs"
+        networks:
+          - name: app-network
+      when: docker_pull is changed
+
+    # Block for health check with rescue
+    - name: Health check block
+      block:
+        - name: Wait for application to start
+          ansible.builtin.uri:
+            url: "{{ health_check_url }}"
+            method: GET
+            status_code: 200
+            return_content: true
+          register: health_result
+          retries: 10
+          delay: 5
+          until: health_result.status == 200
+
+        - name: Display health check result
+          ansible.builtin.debug:
+            msg: >-
+              Application {{ app_name }} v{{ app_version }}
+              is running on port {{ app_port }}.
+              Response: {{ health_result.content }}
+
+      rescue:
+        - name: Health check failed - collect logs
+          ansible.builtin.command:
+            cmd: "docker logs {{ app_name }} --tail 50"
+          register: container_logs
+          changed_when: false
+
+        - name: Display container logs
+          ansible.builtin.debug:
+            var: container_logs.stdout_lines
+
+        - name: Fail with message
+          ansible.builtin.fail:
+            msg: "Health check failed for {{ app_name }}. Check logs above."
+
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+        enabled: true
+
+    - name: Restart application
+      community.docker.docker_container:
+        name: "{{ app_name }}"
+        state: started
+        restart: true
+
+  post_tasks:
+    - name: Send deployment notification
+      ansible.builtin.uri:
+        url: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+        method: POST
+        body_format: json
+        body:
+          text: "Deployed {{ app_name }} v{{ app_version }} to {{ inventory_hostname }}"
+      ignore_errors: true
+      tags:
+        - notification
+        - never
