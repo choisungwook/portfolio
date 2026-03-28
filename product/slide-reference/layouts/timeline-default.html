@@ -1,0 +1,512 @@
+<!--
+  Layout: 타임라인/프로세스용 기본
+  Type: timeline
+  Purpose: 단계별 프로세스, 마이그레이션 계획, 로드맵, 장애 타임라인 등에 적합.
+  Font-size: 18px-24px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Layout — 타임라인/프로세스용</title>
+  <style>
+    :root {
+      --base-font-size: 20px;
+      --primary: #8B5CF6;
+      --primary-light: #C4B5FD;
+      --secondary: #06B6D4;
+      --background: #FAFAFA;
+      --surface: #FFFFFF;
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --accent: #F59E0B;
+      --border: #E2E8F0;
+      --step-1: #6366F1;
+      --step-2: #8B5CF6;
+      --step-3: #A855F7;
+      --step-4: #D946EF;
+      --step-5: #EC4899;
+      --success: #22C55E;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #e5e5e5;
+    }
+
+    .slide {
+      width: 960px;
+      height: 540px;
+      margin: 2rem auto;
+      padding: 2.5rem 3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slide h2 {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ==============================
+       슬라이드 1: 수평 스텝 프로세스
+       ============================== */
+    .horizontal-steps {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex: 1;
+      position: relative;
+    }
+
+    .horizontal-steps::before {
+      content: '';
+      position: absolute;
+      top: 1.8em;
+      left: 3em;
+      right: 3em;
+      height: 3px;
+      background: var(--border);
+      z-index: 0;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 8em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step .step-circle {
+      width: 3.2em;
+      height: 3.2em;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8em;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.6em;
+      flex-shrink: 0;
+    }
+
+    .step:nth-child(1) .step-circle { background: var(--step-1); }
+    .step:nth-child(2) .step-circle { background: var(--step-2); }
+    .step:nth-child(3) .step-circle { background: var(--step-3); }
+    .step:nth-child(4) .step-circle { background: var(--step-4); }
+    .step:nth-child(5) .step-circle { background: var(--step-5); }
+
+    .step .step-title {
+      font-size: 0.7em;
+      font-weight: 700;
+      margin-bottom: 0.3em;
+      word-break: keep-all;
+    }
+
+    .step .step-desc {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    /* ==============================
+       슬라이드 2: 수직 타임라인 (장애 보고서 스타일)
+       ============================== */
+    .vertical-timeline {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      padding-left: 6em;
+    }
+
+    .vertical-timeline::before {
+      content: '';
+      position: absolute;
+      left: 5em;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline-event {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 0.8rem;
+      position: relative;
+    }
+
+    .timeline-event .event-time {
+      position: absolute;
+      left: -6em;
+      width: 4.5em;
+      text-align: right;
+      font-size: 0.6em;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+      padding-top: 0.2em;
+    }
+
+    .timeline-event .event-dot {
+      position: absolute;
+      left: -1.3em;
+      width: 0.8em;
+      height: 0.8em;
+      border-radius: 50%;
+      background: var(--border);
+      border: 2px solid var(--surface);
+      margin-top: 0.3em;
+    }
+
+    .timeline-event .event-dot.critical { background: var(--danger); }
+    .timeline-event .event-dot.warning { background: var(--warning); }
+    .timeline-event .event-dot.resolved { background: var(--success); }
+
+    .timeline-event .event-content {
+      background: var(--background);
+      border-radius: 8px;
+      padding: 0.6em 0.8em;
+      flex: 1;
+    }
+
+    .timeline-event .event-title {
+      font-size: 0.7em;
+      font-weight: 600;
+      margin-bottom: 0.2em;
+    }
+
+    .timeline-event .event-desc {
+      font-size: 0.6em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    .timeline-event .event-badge {
+      display: inline-block;
+      font-size: 0.5em;
+      padding: 0.1em 0.5em;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 0.5em;
+    }
+
+    .event-badge.critical { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+    .event-badge.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .event-badge.resolved { background: rgba(34, 197, 94, 0.1); color: var(--success); }
+
+    /* ==============================
+       슬라이드 3: 마이그레이션 단계 (카드형)
+       ============================== */
+    .migration-phases {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      flex: 1;
+    }
+
+    .phase-card {
+      background: var(--background);
+      border-radius: 12px;
+      padding: 1.2em;
+      display: flex;
+      flex-direction: column;
+      border-top: 4px solid var(--border);
+      position: relative;
+    }
+
+    .phase-card:nth-child(1) { border-top-color: var(--step-1); }
+    .phase-card:nth-child(2) { border-top-color: var(--step-3); }
+    .phase-card:nth-child(3) { border-top-color: var(--step-5); }
+
+    .phase-card .phase-number {
+      font-size: 0.55em;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 0.3em;
+    }
+
+    .phase-card .phase-title {
+      font-size: 0.85em;
+      font-weight: 700;
+      margin-bottom: 0.6em;
+    }
+
+    .phase-card .phase-checklist {
+      list-style: none;
+      font-size: 0.65em;
+      line-height: 2;
+      flex: 1;
+    }
+
+    .phase-card .phase-checklist li {
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+      word-break: keep-all;
+    }
+
+    .phase-card .phase-checklist .check {
+      width: 1em;
+      height: 1em;
+      border-radius: 3px;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .phase-card .phase-checklist .check.done {
+      background: var(--success);
+      border-color: var(--success);
+    }
+
+    .phase-card .phase-duration {
+      margin-top: 0.6em;
+      padding-top: 0.5em;
+      border-top: 1px solid var(--border);
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* ==============================
+       슬라이드 4: 플로우차트 스타일
+       ============================== */
+    .flowchart {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      flex: 1;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .flow-node {
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5em 1em;
+      font-size: 0.7em;
+      font-weight: 600;
+      text-align: center;
+      min-width: 8em;
+      word-break: keep-all;
+    }
+
+    .flow-node.start {
+      border-radius: 2em;
+      background: var(--step-1);
+      color: white;
+      border-color: var(--step-1);
+    }
+
+    .flow-node.end {
+      border-radius: 2em;
+      background: var(--success);
+      color: white;
+      border-color: var(--success);
+    }
+
+    .flow-node.decision {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+      transform: rotate(0deg);
+      border-radius: 4px;
+    }
+
+    .flow-node.process {
+      border-color: var(--primary);
+    }
+
+    .flow-arrow {
+      font-size: 0.8em;
+      color: var(--text-secondary);
+    }
+
+    .flow-arrow.down { transform: rotate(90deg); }
+
+    .flow-label {
+      font-size: 0.5em;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 슬라이드 1: 수평 스텝 프로세스 -->
+  <div class="slide">
+    <h2>CI/CD 파이프라인 구축 단계</h2>
+    <div class="horizontal-steps">
+      <div class="step">
+        <div class="step-circle">1</div>
+        <div class="step-title">코드 푸시</div>
+        <div class="step-desc">개발자가 feature branch에 코드를 push한다</div>
+      </div>
+      <div class="step">
+        <div class="step-circle">2</div>
+        <div class="step-title">빌드 & 테스트</div>
+        <div class="step-desc">GitHub Actions가 자동으로 빌드와 단위 테스트를 실행한다</div>
+      </div>
+      <div class="step">
+        <div class="step-circle">3</div>
+        <div class="step-title">이미지 빌드</div>
+        <div class="step-desc">Docker 이미지를 빌드하고 ECR에 푸시한다</div>
+      </div>
+      <div class="step">
+        <div class="step-circle">4</div>
+        <div class="step-title">스테이징 배포</div>
+        <div class="step-desc">ArgoCD가 스테이징 환경에 자동 배포한다</div>
+      </div>
+      <div class="step">
+        <div class="step-circle">5</div>
+        <div class="step-title">프로덕션</div>
+        <div class="step-desc">승인 후 프로덕션에 Blue/Green 배포한다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 2: 수직 타임라인 (장애 보고서) -->
+  <div class="slide">
+    <h2>장애 타임라인: API 서버 응답 지연</h2>
+    <div class="vertical-timeline">
+      <div class="timeline-event">
+        <div class="event-time">14:23</div>
+        <div class="event-dot critical"></div>
+        <div class="event-content">
+          <div class="event-title">API 응답 시간 5초 초과 <span class="event-badge critical">P1</span></div>
+          <div class="event-desc">Grafana 알림 발생. p99 레이턴시가 5초를 넘어 PagerDuty 호출</div>
+        </div>
+      </div>
+      <div class="timeline-event">
+        <div class="event-time">14:28</div>
+        <div class="event-dot warning"></div>
+        <div class="event-content">
+          <div class="event-title">원인 분석 시작 <span class="event-badge warning">조사중</span></div>
+          <div class="event-desc">DB 커넥션 풀 포화 확인. HikariCP active connections = max (50/50)</div>
+        </div>
+      </div>
+      <div class="timeline-event">
+        <div class="event-time">14:35</div>
+        <div class="event-dot warning"></div>
+        <div class="event-content">
+          <div class="event-title">슬로우 쿼리 발견</div>
+          <div class="event-desc">특정 엔드포인트에서 인덱스 없는 풀스캔 쿼리 실행 중. 배포 3시간 전 새 기능에서 발생</div>
+        </div>
+      </div>
+      <div class="timeline-event">
+        <div class="event-time">14:42</div>
+        <div class="event-dot resolved"></div>
+        <div class="event-content">
+          <div class="event-title">핫픽스 배포 <span class="event-badge resolved">해결</span></div>
+          <div class="event-desc">인덱스 추가 마이그레이션 실행. 응답 시간 200ms 이하로 복구</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 3: 마이그레이션 단계 -->
+  <div class="slide">
+    <h2>EKS 1.28 → 1.30 업그레이드 계획</h2>
+    <div class="migration-phases">
+      <div class="phase-card">
+        <div class="phase-number">PHASE 1</div>
+        <div class="phase-title">사전 준비</div>
+        <ul class="phase-checklist">
+          <li><span class="check done"></span> Deprecated API 감사</li>
+          <li><span class="check done"></span> 애드온 호환성 확인</li>
+          <li><span class="check"></span> 롤백 계획 수립</li>
+          <li><span class="check"></span> 백업 스냅샷 생성</li>
+        </ul>
+        <div class="phase-duration">📅 1주 소요</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-number">PHASE 2</div>
+        <div class="phase-title">컨트롤 플레인 업그레이드</div>
+        <ul class="phase-checklist">
+          <li><span class="check"></span> EKS 클러스터 버전 업그레이드</li>
+          <li><span class="check"></span> CoreDNS, kube-proxy 업데이트</li>
+          <li><span class="check"></span> 관리형 애드온 업데이트</li>
+          <li><span class="check"></span> API 호환성 테스트</li>
+        </ul>
+        <div class="phase-duration">📅 2-3일 소요</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-number">PHASE 3</div>
+        <div class="phase-title">워커 노드 교체</div>
+        <ul class="phase-checklist">
+          <li><span class="check"></span> 새 노드 그룹 생성 (1.30)</li>
+          <li><span class="check"></span> 워크로드 드레인 + 이동</li>
+          <li><span class="check"></span> 구 노드 그룹 삭제</li>
+          <li><span class="check"></span> 전체 기능 테스트</li>
+        </ul>
+        <div class="phase-duration">📅 3-5일 소요</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 4: 플로우차트 -->
+  <div class="slide">
+    <h2>배포 승인 플로우</h2>
+    <div class="flowchart">
+      <div class="flow-row">
+        <div class="flow-node start">PR 생성</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node process">CI 파이프라인 실행</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node decision">테스트 통과?</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-label">Yes ↓</div>
+        <div style="width: 12em"></div>
+        <div class="flow-label">No → 개발자에게 반려</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-node process">코드 리뷰 요청</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node decision">승인?</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node process">스테이징 배포</div>
+      </div>
+      <div class="flow-row">
+        <div style="width: 20em"></div>
+        <div class="flow-arrow" style="transform: none">↓</div>
+      </div>
+      <div class="flow-row">
+        <div style="width: 10em"></div>
+        <div class="flow-node decision">QA 통과?</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node end">프로덕션 배포</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

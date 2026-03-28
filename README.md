@@ -69,6 +69,7 @@
 63. Argo CD preview github action added 26.3.8 - [링크](https://github.com/choisungwook/argocd-practice/tree/main/argocd-diff-preview)
 64. CDN cache를 잘못설정하면 위험한 케이스 26.3.22 - [링크](./computer_science/dangerous_cache/)
 65. Cache-Control 의미 26.3.22 - [링크](./computer_science/cache_control/)
+66. AI agent용 슬라이드 레이아웃 레퍼런스 시스템 26.3.28 - [링크](./product/slide-reference/)
 
 ## 다른 정리된 문서 링크
 
