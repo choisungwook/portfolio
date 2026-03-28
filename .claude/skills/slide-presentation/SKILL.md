@@ -59,11 +59,11 @@ HTML/CSS 기반 프레젠테이션 슬라이드를 생성한다. `product/slide-
 ```
 어떤 종류의 발표인가요?
 
-1. 📖 공부/스터디 공유 (코드 중심)
-2. 🎤 밋업/컨퍼런스 발표 (청중 많음)
-3. 📊 임원 보고/의사결정 (결론 먼저)
-4. ⚖️ 기술 비교/분석 (A vs B)
-5. 📋 프로세스/타임라인 (단계별)
+1. 공부/스터디 공유 (코드 중심)
+2. 밋업/컨퍼런스 발표 (청중 많음)
+3. 임원 보고/의사결정 (결론 먼저)
+4. 기술 비교/분석 (A vs B)
+5. 프로세스/타임라인 (단계별)
 ```
 
 </type-selection>
@@ -72,29 +72,33 @@ HTML/CSS 기반 프레젠테이션 슬라이드를 생성한다. `product/slide-
 
 슬라이드 HTML 생성 시 지키는 규칙:
 
-**구조**
+<structure>
 - 슬라이드 컨테이너: `width: 960px; height: 540px` (16:9 비율)
-- 모든 크기는 `em` 단위 사용 — `--base-font-size`만 바꾸면 전체 비율 유지
+- 모든 크기는 `em` 단위 사용 — `--base-font-size`만 바꾸면 전체가 비례 스케일링되므로 발표 환경에 맞춰 한 줄만 고치면 된다
 - 한 슬라이드당 하나의 메시지에 집중 — 3가지 이상 넣으면 어수선해진다
+</structure>
 
-**타이포그래피**
+<typography>
 - 제목: 1.4em-2.5em, font-weight 700-800
 - 본문: 0.7em-0.9em, line-height 1.5 이상
 - 코드: 0.6em-0.8em, monospace 폰트
-- 한국어 텍스트는 `word-break: keep-all`로 어절 단위 줄바꿈
+- 한국어 텍스트는 `word-break: keep-all`로 어절 단위 줄바꿈 — 음절 중간에서 끊기면 가독성이 크게 떨어진다
+</typography>
 
-**도형 안 텍스트**
+<shape-text>
+도형 안 텍스트가 넘치면 레이아웃 전체가 깨진다. 이를 방지하는 패턴:
 - 카드/박스: `padding: 1em` 이상, `overflow: hidden`
 - 텍스트가 도형을 벗어나지 않도록 `min-height: 0` + `overflow: auto`
 - 제목은 `flex-shrink: 0`으로 고정, 설명은 스크롤 또는 줄임
+</shape-text>
 
-**색상**
-- `product/slide-reference/docs/color-palettes.md`의 팔레트 사용
-- CSS 변수로 정의하여 팔레트 교체가 쉽도록 구성
+<color>
+`product/slide-reference/docs/color-palettes.md`의 팔레트를 CSS 변수로 정의하여 팔레트 교체가 한 곳에서 가능하도록 구성한다.
+</color>
 
-**빌드 도구 없음**
-- 순수 HTML/CSS만 사용 — 브라우저에서 바로 열 수 있어야 한다
-- 외부 CDN 의존성 없음 — 오프라인에서도 동작
+<no-build-tools>
+순수 HTML/CSS만 사용한다. 브라우저에서 바로 열 수 있어야 하고, 외부 CDN 의존성 없이 오프라인에서도 동작해야 한다.
+</no-build-tools>
 
 </slide-generation-rules>
 
