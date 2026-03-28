@@ -1,0 +1,105 @@
+<!--
+  Design: Midnight Indigo
+  Tone: dark
+  Purpose: 컨퍼런스 발표에 적합한 어두운 배경 + 선명한 강조색
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Midnight Indigo - 디자인 미리보기</title>
+  <style>
+    :root {
+      --primary: #6366F1;
+      --secondary: #EC4899;
+      --background: #0F172A;
+      --surface: #1E293B;
+      --text: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --accent: #22D3EE;
+      --border: #334155;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .preview { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+
+    .design-name {
+      font-size: 14px; font-weight: 600; color: var(--primary);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    }
+    h1 { font-size: 32px; color: var(--primary); margin-bottom: 8px; }
+    h2 { font-size: 24px; color: var(--secondary); margin: 32px 0 16px; }
+    h3 { font-size: 18px; color: var(--text); margin: 24px 0 12px; }
+    .subtitle { font-size: 16px; color: var(--text-secondary); margin-bottom: 32px; }
+
+    .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+    .palette-item { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    .palette-color { height: 64px; }
+    .palette-info { padding: 8px 12px; background: var(--surface); font-size: 12px; }
+    .palette-info .role { font-weight: 600; color: var(--text); }
+    .palette-info .hex { color: var(--text-secondary); }
+
+    .typo-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .typo-row { display: flex; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .typo-row:last-child { border-bottom: none; }
+    .typo-label { font-size: 12px; color: var(--text-secondary); min-width: 100px; flex-shrink: 0; }
+
+    .sample-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+    .sample-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .sample-card-title { font-size: 16px; font-weight: 600; color: var(--primary); margin-bottom: 8px; }
+    .sample-card-text { font-size: 14px; color: var(--text-secondary); }
+
+    .accent-box { background: var(--accent); color: #0F172A; font-weight: 600; padding: 12px 20px; border-radius: 8px; display: inline-block; margin-right: 12px; margin-bottom: 12px; }
+    .primary-btn { background: var(--primary); color: #FFFFFF; font-weight: 600; padding: 12px 24px; border-radius: 8px; display: inline-block; margin-right: 12px; }
+    .secondary-btn { background: var(--secondary); color: #FFFFFF; font-weight: 600; padding: 12px 24px; border-radius: 8px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="preview">
+    <div class="design-name">Midnight Indigo</div>
+    <h1>제목은 이 색상으로 표시됩니다</h1>
+    <p class="subtitle">컨퍼런스 발표에 적합한 어두운 배경 + 선명한 강조색입니다.</p>
+
+    <h2>색상 팔레트</h2>
+    <div class="palette">
+      <div class="palette-item"><div class="palette-color" style="background: #6366F1"></div><div class="palette-info"><div class="role">Primary</div><div class="hex">#6366F1</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #EC4899"></div><div class="palette-info"><div class="role">Secondary</div><div class="hex">#EC4899</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #22D3EE"></div><div class="palette-info"><div class="role">Accent</div><div class="hex">#22D3EE</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #334155"></div><div class="palette-info"><div class="role">Border</div><div class="hex">#334155</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #0F172A"></div><div class="palette-info"><div class="role">Background</div><div class="hex">#0F172A</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #1E293B"></div><div class="palette-info"><div class="role">Surface</div><div class="hex">#1E293B</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #F1F5F9"></div><div class="palette-info"><div class="role">Text</div><div class="hex">#F1F5F9</div></div></div>
+      <div class="palette-item"><div class="palette-color" style="background: #94A3B8"></div><div class="palette-info"><div class="role">Text Secondary</div><div class="hex">#94A3B8</div></div></div>
+    </div>
+
+    <h2>타이포그래피</h2>
+    <div class="typo-section">
+      <div class="typo-row"><span class="typo-label">H1 제목</span><span style="font-size: 32px; font-weight: 700; color: var(--primary)">Kubernetes 네트워크 디버깅</span></div>
+      <div class="typo-row"><span class="typo-label">H2 소제목</span><span style="font-size: 24px; font-weight: 600; color: var(--secondary)">Pod 간 통신이 안 될 때</span></div>
+      <div class="typo-row"><span class="typo-label">본문</span><span style="font-size: 16px; color: var(--text)">CNI 플러그인이 정상 동작하는지 먼저 확인해야 한다.</span></div>
+      <div class="typo-row"><span class="typo-label">보조 텍스트</span><span style="font-size: 14px; color: var(--text-secondary)">Cilium, Calico, Flannel 등 CNI별 디버깅 방법이 다르다.</span></div>
+    </div>
+
+    <h2>컴포넌트 샘플</h2>
+    <div class="sample-cards">
+      <div class="sample-card"><div class="sample-card-title">발표 카드</div><div class="sample-card-text">어두운 Surface 위에 Primary 인디고가 돋보인다. 대형 스크린에서 가독성이 좋다.</div></div>
+      <div class="sample-card"><div class="sample-card-title">라이브 데모</div><div class="sample-card-text">Accent(시안)으로 터미널 출력이나 코드 키워드를 강조한다.</div></div>
+    </div>
+
+    <h3>버튼 / 강조 요소</h3>
+    <div style="margin-bottom: 24px">
+      <span class="primary-btn">Primary 버튼</span>
+      <span class="secondary-btn">Secondary 버튼</span>
+      <span class="accent-box">Accent 강조</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!--
+  Layout: 비교/분석용 기본
+  Type: comparison
+  Purpose: Before/After, 기술 비교, 장단점 분석에 적합. 두 가지를 시각적으로 대비시키는 데 최적화.
+  Font-size: 18px-24px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparison Layout — 비교/분석용</title>
+  <style>
+    :root {
+      --base-font-size: 20px;
+      --primary: #6366F1;
+      --background: #FFFFFF;
+      --surface: #F8FAFC;
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --accent-red: #EF4444;
+      --accent-green: #22C55E;
+      --accent-blue: #3B82F6;
+      --accent-orange: #F59E0B;
+      --border: #E2E8F0;
+      --before-bg: #FEF2F2;
+      --after-bg: #F0FDF4;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #f0f0f0;
+    }
+
+    .slide {
+      width: 960px;
+      height: 540px;
+      margin: 2rem auto;
+      padding: 2.5rem 3rem;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slide h2 {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1.2rem;
+    }
+
+    /* ==============================
+       슬라이드 1: Before / After 분할
+       ============================== */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      flex: 1;
+    }
+
+    .ba-panel {
+      border-radius: 12px;
+      padding: 1.2em;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ba-panel.before {
+      background: var(--before-bg);
+      border: 2px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .ba-panel.after {
+      background: var(--after-bg);
+      border: 2px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .ba-panel .ba-label {
+      font-size: 0.6em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.8em;
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+
+    .ba-panel.before .ba-label { color: var(--accent-red); }
+    .ba-panel.after .ba-label { color: var(--accent-green); }
+
+    .ba-panel .ba-items {
+      list-style: none;
+      font-size: 0.75em;
+      line-height: 2;
+      flex: 1;
+    }
+
+    .ba-panel .ba-items li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5em;
+      word-break: keep-all;
+    }
+
+    .ba-panel.before .ba-items li::before {
+      content: "✗";
+      color: var(--accent-red);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .ba-panel.after .ba-items li::before {
+      content: "✓";
+      color: var(--accent-green);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ==============================
+       슬라이드 2: 기술 비교 테이블
+       ============================== */
+    .compare-table-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.7em;
+    }
+
+    .compare-table thead {
+      background: var(--surface);
+    }
+
+    .compare-table th {
+      padding: 0.7em 1em;
+      text-align: left;
+      font-weight: 700;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .compare-table th:first-child {
+      color: var(--text-secondary);
+    }
+
+    .compare-table th.tech-a { color: var(--accent-blue); }
+    .compare-table th.tech-b { color: var(--primary); }
+
+    .compare-table td {
+      padding: 0.6em 1em;
+      border-bottom: 1px solid var(--border);
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    .compare-table td:first-child {
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .compare-table .winner {
+      background: rgba(34, 197, 94, 0.08);
+      font-weight: 600;
+    }
+
+    .compare-table .badge {
+      display: inline-block;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+
+    .badge.good { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
+    .badge.ok { background: rgba(245, 158, 11, 0.15); color: var(--accent-orange); }
+    .badge.bad { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+
+    /* ==============================
+       슬라이드 3: 장단점 2열
+       ============================== */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .pros-cons .section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pros-cons .section-header {
+      font-size: 0.8em;
+      font-weight: 700;
+      margin-bottom: 0.8em;
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+
+    .pros-cons .section.pros .section-header { color: var(--accent-green); }
+    .pros-cons .section.cons .section-header { color: var(--accent-red); }
+
+    .pros-cons .items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .pros-cons .item {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 0.7em 1em;
+      font-size: 0.7em;
+      line-height: 1.5;
+      border-left: 3px solid transparent;
+      word-break: keep-all;
+    }
+
+    .pros .item { border-left-color: var(--accent-green); }
+    .cons .item { border-left-color: var(--accent-red); }
+
+    .item strong {
+      display: block;
+      margin-bottom: 0.2em;
+    }
+
+    .item span {
+      color: var(--text-secondary);
+    }
+
+    /* ==============================
+       슬라이드 4: 결론/판정
+       ============================== */
+    .slide-verdict {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .verdict-box {
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      border-radius: 16px;
+      padding: 2em 3em;
+      max-width: 80%;
+    }
+
+    .verdict-box .verdict-label {
+      font-size: 0.6em;
+      color: var(--primary);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5em;
+    }
+
+    .verdict-box .verdict-text {
+      font-size: 1.2em;
+      font-weight: 700;
+      line-height: 1.4;
+      word-break: keep-all;
+      margin-bottom: 0.5em;
+    }
+
+    .verdict-box .verdict-reason {
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 슬라이드 1: Before / After -->
+  <div class="slide">
+    <h2>모니터링 체계 개선: Before / After</h2>
+    <div class="before-after">
+      <div class="ba-panel before">
+        <div class="ba-label">⛔ Before</div>
+        <ul class="ba-items">
+          <li>장애 발생 후 30분 뒤에야 인지</li>
+          <li>서버별 SSH 접속해서 로그 확인</li>
+          <li>메트릭 수집 주기 5분 (간격 내 이벤트 유실)</li>
+          <li>알림 채널이 이메일뿐 — 야간 대응 불가</li>
+          <li>대시보드 없음 — 상태 파악에 10분+ 소요</li>
+        </ul>
+      </div>
+      <div class="ba-panel after">
+        <div class="ba-label">✅ After</div>
+        <ul class="ba-items">
+          <li>장애 발생 후 1분 이내 자동 알림</li>
+          <li>중앙 집중 로그 시스템 (Loki + Grafana)</li>
+          <li>메트릭 수집 주기 15초 (세밀한 관측)</li>
+          <li>Slack + PagerDuty 다중 채널 알림</li>
+          <li>서비스별 대시보드 — 즉시 상태 파악</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 2: 기술 비교 테이블 -->
+  <div class="slide">
+    <h2>Service Mesh 비교: Istio vs Cilium</h2>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>항목</th>
+            <th class="tech-a">Istio</th>
+            <th class="tech-b">Cilium Service Mesh</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>아키텍처</td>
+            <td>사이드카 프록시 (Envoy)</td>
+            <td class="winner">사이드카리스 (eBPF)</td>
+          </tr>
+          <tr>
+            <td>리소스 오버헤드</td>
+            <td>Pod당 Envoy 컨테이너 추가</td>
+            <td class="winner">커널 레벨, 추가 컨테이너 없음</td>
+          </tr>
+          <tr>
+            <td>레이턴시</td>
+            <td><span class="badge ok">~2ms 추가</span></td>
+            <td><span class="badge good">~0.2ms 추가</span></td>
+          </tr>
+          <tr>
+            <td>L7 정책</td>
+            <td><span class="badge good">풍부함</span></td>
+            <td><span class="badge ok">기본 수준</span></td>
+          </tr>
+          <tr>
+            <td>생태계 성숙도</td>
+            <td><span class="badge good">높음</span></td>
+            <td><span class="badge ok">성장 중</span></td>
+          </tr>
+          <tr>
+            <td>학습 곡선</td>
+            <td><span class="badge bad">가파름</span></td>
+            <td><span class="badge ok">보통</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 슬라이드 3: 장단점 -->
+  <div class="slide">
+    <h2>Cilium Service Mesh 도입 판단</h2>
+    <div class="pros-cons">
+      <div class="section pros">
+        <div class="section-header">👍 장점</div>
+        <div class="items">
+          <div class="item">
+            <strong>사이드카 제거</strong>
+            <span>Pod당 Envoy 컨테이너가 없어 리소스 사용량이 크게 감소한다</span>
+          </div>
+          <div class="item">
+            <strong>레이턴시 최소화</strong>
+            <span>커널 레벨에서 처리하므로 네트워크 홉이 줄어든다</span>
+          </div>
+          <div class="item">
+            <strong>CNI 통합</strong>
+            <span>이미 Cilium CNI를 쓰고 있다면 추가 설치가 필요 없다</span>
+          </div>
+        </div>
+      </div>
+      <div class="section cons">
+        <div class="section-header">👎 단점</div>
+        <div class="items">
+          <div class="item">
+            <strong>L7 기능 제한</strong>
+            <span>Istio 대비 HTTP 라우팅, 트래픽 미러링 등 고급 기능이 부족하다</span>
+          </div>
+          <div class="item">
+            <strong>커널 의존성</strong>
+            <span>Linux 커널 5.10+ 필요. 오래된 노드에서는 사용 불가</span>
+          </div>
+          <div class="item">
+            <strong>디버깅 난이도</strong>
+            <span>eBPF 프로그램 문제 발생 시 Envoy보다 디버깅이 어렵다</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 4: 결론 -->
+  <div class="slide slide-verdict">
+    <div class="verdict-box">
+      <div class="verdict-label">결론</div>
+      <div class="verdict-text">L4 중심 트래픽이 80% 이상이라면<br>Cilium Service Mesh가 더 적합하다</div>
+      <div class="verdict-reason">L7 정책이 핵심이라면 Istio를, 성능과 단순성이 우선이라면 Cilium을 선택한다.<br>두 가지를 혼합하는 것도 가능하다 (Cilium CNI + Istio ambient).</div>
+    </div>
+  </div>
+
+</body>
+</html>
