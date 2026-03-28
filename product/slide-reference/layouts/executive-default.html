@@ -1,0 +1,427 @@
+<!--
+  Layout: C-Level 발표용 기본
+  Type: executive
+  Purpose: 임원 보고, 의사결정 자료. 핵심 수치와 결론을 먼저 보여주고, 근거를 뒤에 배치.
+  Font-size: 22px-30px 권장 (임원은 먼 거리에서 보는 경우가 많다)
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executive Layout — C-Level 발표용</title>
+  <style>
+    :root {
+      --base-font-size: 24px;
+      --primary: #1E3A5F;
+      --primary-light: #3B82F6;
+      --secondary: #059669;
+      --background: #FFFFFF;
+      --surface: #F8FAFC;
+      --text: #0F172A;
+      --text-secondary: #475569;
+      --accent: #DC2626;
+      --accent-green: #059669;
+      --border: #E2E8F0;
+      --gold: #D97706;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #f0f0f0;
+    }
+
+    .slide {
+      width: 960px;
+      height: 540px;
+      margin: 2rem auto;
+      background: var(--background);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ==============================
+       슬라이드 1: 표지 (미니멀)
+       ============================== */
+    .slide-cover {
+      padding: 4rem 5rem;
+      justify-content: flex-end;
+      border-top: 6px solid var(--primary);
+    }
+
+    .slide-cover .company-logo {
+      position: absolute;
+      top: 2.5rem;
+      right: 3rem;
+      font-size: 0.6em;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .slide-cover h1 {
+      font-size: 2em;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1.3;
+      word-break: keep-all;
+      margin-bottom: 0.3em;
+    }
+
+    .slide-cover .cover-sub {
+      font-size: 0.75em;
+      color: var(--text-secondary);
+    }
+
+    .slide-cover .cover-meta {
+      margin-top: 1.5em;
+      font-size: 0.55em;
+      color: var(--text-secondary);
+    }
+
+    /* ==============================
+       슬라이드 2: Executive Summary
+       ============================== */
+    .slide-exec {
+      padding: 2.5rem 3.5rem;
+    }
+
+    .slide-exec h2 {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.3em;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .exec-conclusion {
+      background: var(--surface);
+      border-left: 4px solid var(--primary-light);
+      padding: 0.8em 1.2em;
+      margin-bottom: 1.2rem;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .exec-conclusion p {
+      font-size: 0.8em;
+      font-weight: 600;
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    .exec-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .metric-card {
+      text-align: center;
+      padding: 1em 0.5em;
+      background: var(--surface);
+      border-radius: 8px;
+    }
+
+    .metric-card .metric-value {
+      font-size: 1.8em;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .metric-card .metric-value.positive { color: var(--accent-green); }
+    .metric-card .metric-value.negative { color: var(--accent); }
+
+    .metric-card .metric-label {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      margin-top: 0.5em;
+      word-break: keep-all;
+    }
+
+    .metric-card .metric-change {
+      font-size: 0.5em;
+      margin-top: 0.3em;
+      font-weight: 600;
+    }
+
+    .metric-card .metric-change.up { color: var(--accent-green); }
+    .metric-card .metric-change.down { color: var(--accent); }
+
+    /* ==============================
+       슬라이드 3: 의사결정 요청
+       ============================== */
+    .slide-decision {
+      padding: 2.5rem 3.5rem;
+    }
+
+    .slide-decision h2 {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.3em;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .decision-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      flex: 1;
+    }
+
+    .option-card {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 1em 1.2em;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .option-card.recommended {
+      border-color: var(--accent-green);
+      background: rgba(5, 150, 105, 0.03);
+    }
+
+    .option-card .option-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6em;
+    }
+
+    .option-card .option-name {
+      font-size: 0.8em;
+      font-weight: 700;
+    }
+
+    .option-card .option-badge {
+      font-size: 0.45em;
+      background: var(--accent-green);
+      color: white;
+      padding: 0.2em 0.6em;
+      border-radius: 2em;
+      font-weight: 600;
+    }
+
+    .option-card .option-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4em;
+    }
+
+    .option-card .option-item {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4em;
+      word-break: keep-all;
+    }
+
+    .option-card .option-cost {
+      margin-top: auto;
+      padding-top: 0.6em;
+      border-top: 1px solid var(--border);
+      font-size: 0.6em;
+      font-weight: 700;
+    }
+
+    /* ==============================
+       슬라이드 4: 로드맵/일정
+       ============================== */
+    .slide-roadmap {
+      padding: 2.5rem 3.5rem;
+    }
+
+    .slide-roadmap h2 {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.3em;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .roadmap-timeline {
+      display: flex;
+      gap: 0.5rem;
+      flex: 1;
+      align-items: stretch;
+    }
+
+    .roadmap-phase {
+      flex: 1;
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 1em;
+      display: flex;
+      flex-direction: column;
+      border-top: 3px solid var(--border);
+      position: relative;
+    }
+
+    .roadmap-phase.active { border-top-color: var(--primary-light); }
+    .roadmap-phase.future { border-top-color: var(--border); }
+
+    .roadmap-phase .phase-period {
+      font-size: 0.45em;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-bottom: 0.5em;
+    }
+
+    .roadmap-phase .phase-title {
+      font-size: 0.7em;
+      font-weight: 700;
+      margin-bottom: 0.5em;
+    }
+
+    .roadmap-phase .phase-items {
+      list-style: none;
+      font-size: 0.5em;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .roadmap-phase .phase-items li::before {
+      content: "• ";
+      color: var(--primary-light);
+    }
+
+    /* 페이지 번호 */
+    .page-number {
+      position: absolute;
+      bottom: 1rem;
+      right: 1.5rem;
+      font-size: 0.45em;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 슬라이드 1: 표지 -->
+  <div class="slide slide-cover">
+    <div class="company-logo">ACME Corp.</div>
+    <h1>클라우드 인프라<br>비용 최적화 방안</h1>
+    <div class="cover-sub">인프라팀 → CTO 보고</div>
+    <div class="cover-meta">2024년 3월 · 기밀</div>
+    <span class="page-number">1</span>
+  </div>
+
+  <!-- 슬라이드 2: Executive Summary -->
+  <div class="slide slide-exec">
+    <h2>Executive Summary</h2>
+    <div class="exec-conclusion">
+      <p>Graviton 인스턴스 전환 + Reserved Instance 조합으로 연간 AWS 비용을 32% 절감할 수 있습니다. 서비스 성능에는 영향 없습니다.</p>
+    </div>
+    <div class="exec-metrics">
+      <div class="metric-card">
+        <div class="metric-value">$2.4M</div>
+        <div class="metric-label">현재 연간 AWS 비용</div>
+        <div class="metric-change down">전년 대비 +18%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value positive">-32%</div>
+        <div class="metric-label">예상 절감률</div>
+        <div class="metric-change up">연 $768K 절감</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">3개월</div>
+        <div class="metric-label">전환 소요 기간</div>
+        <div class="metric-change">단계적 마이그레이션</div>
+      </div>
+    </div>
+    <span class="page-number">2</span>
+  </div>
+
+  <!-- 슬라이드 3: 의사결정 요청 -->
+  <div class="slide slide-decision">
+    <h2>의사결정 요청</h2>
+    <div class="decision-options">
+      <div class="option-card recommended">
+        <div class="option-header">
+          <div class="option-name">방안 A: Graviton + RI</div>
+          <div class="option-badge">권장</div>
+        </div>
+        <div class="option-body">
+          <div class="option-item">✓ Graviton 인스턴스로 마이그레이션 (arm64)</div>
+          <div class="option-item">✓ 3년 Reserved Instance 계약</div>
+          <div class="option-item">✓ 연 32% 비용 절감</div>
+          <div class="option-item">✓ 성능 동등 또는 향상 (AWS 벤치마크 기준)</div>
+          <div class="option-cost" style="color: var(--accent-green);">투자비: $50K · ROI: 6개월</div>
+        </div>
+      </div>
+      <div class="option-card">
+        <div class="option-header">
+          <div class="option-name">방안 B: Spot + 자동 스케일링</div>
+        </div>
+        <div class="option-body">
+          <div class="option-item">△ Spot 인스턴스로 비프로덕션 전환</div>
+          <div class="option-item">△ 자동 스케일링 정책 최적화</div>
+          <div class="option-item">△ 연 18% 비용 절감</div>
+          <div class="option-item">⚠ Spot 중단 시 서비스 영향 가능성</div>
+          <div class="option-cost">투자비: $30K · ROI: 8개월</div>
+        </div>
+      </div>
+    </div>
+    <span class="page-number">3</span>
+  </div>
+
+  <!-- 슬라이드 4: 로드맵 -->
+  <div class="slide slide-roadmap">
+    <h2>실행 로드맵</h2>
+    <div class="roadmap-timeline">
+      <div class="roadmap-phase active">
+        <div class="phase-period">Q2 2024</div>
+        <div class="phase-title">준비 단계</div>
+        <ul class="phase-items">
+          <li>ARM 호환성 감사</li>
+          <li>CI/CD 멀티 아키텍처 빌드</li>
+          <li>스테이징 환경 검증</li>
+        </ul>
+      </div>
+      <div class="roadmap-phase">
+        <div class="phase-period">Q3 2024</div>
+        <div class="phase-title">1차 전환</div>
+        <ul class="phase-items">
+          <li>비프로덕션 환경 마이그레이션</li>
+          <li>성능 벤치마크 비교</li>
+          <li>RI 계약 체결</li>
+        </ul>
+      </div>
+      <div class="roadmap-phase future">
+        <div class="phase-period">Q4 2024</div>
+        <div class="phase-title">2차 전환</div>
+        <ul class="phase-items">
+          <li>프로덕션 환경 마이그레이션</li>
+          <li>모니터링 및 롤백 준비</li>
+          <li>비용 절감 효과 측정</li>
+        </ul>
+      </div>
+      <div class="roadmap-phase future">
+        <div class="phase-period">Q1 2025</div>
+        <div class="phase-title">안정화</div>
+        <ul class="phase-items">
+          <li>잔여 x86 인스턴스 전환</li>
+          <li>비용 리포트 자동화</li>
+          <li>경영진 결과 보고</li>
+        </ul>
+      </div>
+    </div>
+    <span class="page-number">4</span>
+  </div>
+
+</body>
+</html>
