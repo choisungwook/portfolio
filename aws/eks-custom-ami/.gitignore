@@ -1,0 +1,5 @@
+packer_cache/
+*.pkr.hcl.lock
+
+# envsubst로 생성된 매니페스트 (template에서 생성)
+manifests/karpenter/examples/

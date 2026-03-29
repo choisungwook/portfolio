@@ -1,3 +1,3 @@
 ---
-description: This agent file defers to AGENTS.md; follow AGENTS.md.
+description: See AGENTS.md for multi-agent workflow details and practical examples.
 ---
