@@ -41,8 +41,6 @@ Review, Merge, Worktree 정리는 사용자가 직접 한다.
   │ 1회 실행         │ 반복 루프             │ 반복 루프
 ```
 
-작업 규모별 구성(소형/중형/대형)은 [`.claude/rules/workflow.md`](./.claude/rules/workflow.md)를 참고한다. 애매하면 한 단계 낮은 구성으로 시작한다.
-
 ## Git Worktree
 
 branch checkout 대신 git worktree를 사용한다. 여러 agent가 동시에 작업할 때 branch switching 충돌을 방지한다.
