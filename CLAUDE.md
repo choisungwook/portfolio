@@ -19,37 +19,7 @@
 
 ## workflow
 
-GitHub 생태계를 따르면서 작업을 진행하고 작업기록을 GitHub Issue에 남긴다.
-
-1. Issue 생성 → 2. Worktree 생성 → 3. 작업 수행 → 4. Commit + Push → 5. PR 생성 → 6. (Issue 닫힌 후) 회고 comment
-
-상세 규칙: [`.claude/rules/workflow.md`](./.claude/rules/workflow.md)
-Review, Merge, Worktree 정리는 사용자가 직접 한다.
-
-## 에이전트 활용
-
-.claude/agents에 목적별로 구분한 agent가 있고 workflow에 관련된 agetns는 아래를 참고한다. 생성과 평가를 분리한다. 평가를 분리한 이유는 AI 모델은 자기 결과물에 관대하므로, 별도의 평가자가 검토하면 품질이 올라간다.
-
-| 에이전트 | 파일 | 워크플로우 |
-|----------|------|-----------|
-| 기획자(Planner) | `.claude/agents/planner.md` | 파이프라인 |
-| 생성자(Generator) | `.claude/agents/generator.md` | 파이프라인 |
-| 평가자(Evaluator) | `.claude/agents/evaluator.md` | 파이프라인 |
-
-```
-기획자 ──(사양)──▶ 생성자 ◀──(피드백)──▶ 평가자
-  │ 1회 실행         │ 반복 루프             │ 반복 루프
-```
-
-## Git Worktree
-
-branch checkout 대신 git worktree를 사용한다. 여러 agent가 동시에 작업할 때 branch switching 충돌을 방지한다.
-
-```bash
-git worktree add ../portfolio-<topic> -b <branch-name>
-```
-
-Branch 이름: `<type>/<short-description>` (feat, docs, fix, refactor, chore). 여러 agent 동시 작업 시 핵심 원칙은 **파일 단위 분할** — 같은 파일을 두 agent가 동시에 수정하지 않는다.
+작업 흐름, 에이전트 활용, Git Worktree 규칙은 [`.claude/rules/workflow.md`](./.claude/rules/workflow.md)에 정의되어 있다.
 
 ## 문서 구조
 
