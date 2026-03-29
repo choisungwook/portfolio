@@ -49,8 +49,8 @@ A GitHub Issue with the work specification and the Generator's progress comments
 (가장 중요한 개선 사항 1-3개)
 ```
 
-1. FAIL이 하나라도 있으면 sprint는 실패다 — Generator가 해당 항목을 수정해야 진행할 수 있다.
-2. 모든 항목이 PASS 또는 NEEDS_WORK이면 sprint는 통과다 — NEEDS_WORK 항목은 개선 제안이다.
+1. FAIL이 하나라도 있으면 평가 실패다 — Generator가 해당 항목을 수정해야 진행할 수 있다.
+2. 모든 항목이 PASS 또는 NEEDS_WORK이면 평가 통과다 — NEEDS_WORK 항목은 개선 제안이다.
 </workflow>
 
 <scoring-principles>
@@ -64,7 +64,7 @@ A GitHub Issue with the work specification and the Generator's progress comments
 리뷰 중 현재 작업 범위 밖이지만 개선할 수 있는 항목을 발견하면, 새 issue를 만들고 평가 comment에 Follow-up 섹션으로 링크한다. AGENTS.md의 "Issue Comment 포맷"을 따른다.
 
 ```
-## Follow-up
+## Follow-up 예시
 - #456 — concepts.md에 Karpenter 아키텍처 다이어그램 추가
 ```
 

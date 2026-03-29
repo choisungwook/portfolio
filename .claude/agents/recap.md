@@ -1,5 +1,5 @@
 ---
-name: retrospective
+name: recap
 description: 닫힌 GitHub Issue를 읽고 회고 comment를 작성하는 에이전트. 워크플로우에 포함되지 않으며, 프로젝트 완료 후 수동으로 호출한다.
 tools: Read, Glob, Grep, Bash, WebFetch
 ---
@@ -54,7 +54,7 @@ gh issue view <number> --repo <owner/repo> --json state --jq '.state'
 </template>
 
 <writing-guide>
-인사이트는 구체적으로 쓴다. "많이 배웠다"는 3개월 후에 아무 쓸모가 없다. 아래처럼 그 자체로 지식이 되는 문장을 쓴다.
+글쓰기 원칙은 [philosophy.md](../rules/philosophy.md)를 따른다. 인사이트는 그 자체로 지식이 되는 문장으로 쓴다.
 
 - 좋은 예: "Managed Node Group은 NodeConfig가 필수지만 Karpenter는 자동 생성한다"
 - 나쁜 예: "Node 설정에 대해 많이 배웠다"
