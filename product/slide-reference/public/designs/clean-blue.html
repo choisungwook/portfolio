@@ -1,0 +1,237 @@
+<!--
+  Design: Clean Blue
+  Tone: light
+  Purpose: 기술 문서, 스터디 노트에 적합한 깔끔한 블루 계열
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clean Blue - 디자인 미리보기</title>
+  <style>
+    :root {
+      --primary: #2563EB;
+      --secondary: #7C3AED;
+      --background: #FFFFFF;
+      --surface: #F8FAFC;
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --accent: #F59E0B;
+      --border: #E2E8F0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .preview { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+
+    .design-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    h1 { font-size: 32px; color: var(--primary); margin-bottom: 8px; }
+    h2 { font-size: 24px; color: var(--secondary); margin: 32px 0 16px; }
+    h3 { font-size: 18px; color: var(--text); margin: 24px 0 12px; }
+
+    .subtitle { font-size: 16px; color: var(--text-secondary); margin-bottom: 32px; }
+
+    /* 색상 팔레트 */
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .palette-item {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .palette-color {
+      height: 64px;
+    }
+    .palette-info {
+      padding: 8px 12px;
+      background: var(--surface);
+      font-size: 12px;
+    }
+    .palette-info .role { font-weight: 600; color: var(--text); }
+    .palette-info .hex { color: var(--text-secondary); }
+
+    /* 타이포그래피 */
+    .typo-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .typo-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .typo-row:last-child { border-bottom: none; }
+    .typo-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      min-width: 100px;
+      flex-shrink: 0;
+    }
+
+    /* 컴포넌트 샘플 */
+    .sample-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .sample-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .sample-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .sample-card-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .accent-box {
+      background: var(--accent);
+      color: #FFFFFF;
+      font-weight: 600;
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-right: 12px;
+      margin-bottom: 12px;
+    }
+
+    .primary-btn {
+      background: var(--primary);
+      color: #FFFFFF;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-right: 12px;
+    }
+    .secondary-btn {
+      background: var(--secondary);
+      color: #FFFFFF;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      display: inline-block;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview">
+    <div class="design-name">Clean Blue</div>
+    <h1>제목은 이 색상으로 표시됩니다</h1>
+    <p class="subtitle">부제목과 설명 텍스트는 이 색상입니다. 기술 문서, 스터디 노트에 적합합니다.</p>
+
+    <h2>색상 팔레트</h2>
+    <div class="palette">
+      <div class="palette-item">
+        <div class="palette-color" style="background: #2563EB"></div>
+        <div class="palette-info"><div class="role">Primary</div><div class="hex">#2563EB</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #7C3AED"></div>
+        <div class="palette-info"><div class="role">Secondary</div><div class="hex">#7C3AED</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #F59E0B"></div>
+        <div class="palette-info"><div class="role">Accent</div><div class="hex">#F59E0B</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #E2E8F0"></div>
+        <div class="palette-info"><div class="role">Border</div><div class="hex">#E2E8F0</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #FFFFFF; border: 1px solid #E2E8F0"></div>
+        <div class="palette-info"><div class="role">Background</div><div class="hex">#FFFFFF</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #F8FAFC"></div>
+        <div class="palette-info"><div class="role">Surface</div><div class="hex">#F8FAFC</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #1E293B"></div>
+        <div class="palette-info"><div class="role">Text</div><div class="hex">#1E293B</div></div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-color" style="background: #64748B"></div>
+        <div class="palette-info"><div class="role">Text Secondary</div><div class="hex">#64748B</div></div>
+      </div>
+    </div>
+
+    <h2>타이포그래피</h2>
+    <div class="typo-section">
+      <div class="typo-row">
+        <span class="typo-label">H1 제목</span>
+        <span style="font-size: 32px; font-weight: 700; color: var(--primary)">eBPF 기반 네트워크 모니터링</span>
+      </div>
+      <div class="typo-row">
+        <span class="typo-label">H2 소제목</span>
+        <span style="font-size: 24px; font-weight: 600; color: var(--secondary)">커널 레벨에서 패킷 추적하기</span>
+      </div>
+      <div class="typo-row">
+        <span class="typo-label">본문</span>
+        <span style="font-size: 16px; color: var(--text)">eBPF는 리눅스 커널에서 안전하게 프로그램을 실행할 수 있는 기술이다.</span>
+      </div>
+      <div class="typo-row">
+        <span class="typo-label">보조 텍스트</span>
+        <span style="font-size: 14px; color: var(--text-secondary)">이 기술은 2014년부터 리눅스 커널에 포함되었다.</span>
+      </div>
+    </div>
+
+    <h2>컴포넌트 샘플</h2>
+    <div class="sample-cards">
+      <div class="sample-card">
+        <div class="sample-card-title">개념 카드</div>
+        <div class="sample-card-text">Surface 배경 위에 Primary 색상 제목과 Secondary 텍스트가 조합된 모습.</div>
+      </div>
+      <div class="sample-card">
+        <div class="sample-card-title">코드 하이라이트</div>
+        <div class="sample-card-text">코드 블록 영역에서 Accent 색상이 키워드를 강조하는 용도로 사용된다.</div>
+      </div>
+    </div>
+
+    <h3>버튼 / 강조 요소</h3>
+    <div style="margin-bottom: 24px">
+      <span class="primary-btn">Primary 버튼</span>
+      <span class="secondary-btn">Secondary 버튼</span>
+      <span class="accent-box">Accent 강조</span>
+    </div>
+  </div>
+</body>
+</html>

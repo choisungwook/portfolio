@@ -1,0 +1,455 @@
+<!--
+  Layout: 커뮤니티 발표용 기본
+  Type: community
+  Purpose: 밋업, 컨퍼런스, 기술 커뮤니티 발표에 적합. 시각적 임팩트와 스토리텔링 중심.
+  Font-size: 20px-28px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community Layout — 커뮤니티 발표용</title>
+  <style>
+    :root {
+      --base-font-size: 22px;
+      --primary: #6366F1;
+      --primary-light: #A5B4FC;
+      --secondary: #EC4899;
+      --background: #0F172A;
+      --surface: #1E293B;
+      --surface-light: #334155;
+      --text: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --accent: #22D3EE;
+      --border: #334155;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #0a0a0a;
+    }
+
+    .slide {
+      width: 960px;
+      height: 540px;
+      margin: 2rem auto;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ==============================
+       슬라이드 1: 임팩트 타이틀
+       ============================== */
+    .slide-hero {
+      justify-content: center;
+      padding: 3rem 4rem;
+      background: radial-gradient(ellipse at 30% 50%, rgba(99, 102, 241, 0.15), transparent 60%),
+                  radial-gradient(ellipse at 70% 80%, rgba(236, 72, 153, 0.1), transparent 50%),
+                  var(--background);
+    }
+
+    .slide-hero .tag {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.2);
+      color: var(--primary-light);
+      padding: 0.3em 0.8em;
+      border-radius: 2em;
+      font-size: 0.65em;
+      font-weight: 500;
+      margin-bottom: 1em;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .slide-hero h1 {
+      font-size: 2.4em;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 0.4em;
+      word-break: keep-all;
+    }
+
+    .slide-hero h1 .highlight {
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide-hero .description {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 70%;
+    }
+
+    .slide-hero .speaker {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+    }
+
+    .slide-hero .speaker-avatar {
+      width: 2.2em;
+      height: 2.2em;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7em;
+      font-weight: 700;
+    }
+
+    .slide-hero .speaker-info {
+      font-size: 0.65em;
+      color: var(--text-secondary);
+    }
+
+    .slide-hero .speaker-info strong {
+      color: var(--text);
+      display: block;
+    }
+
+    /* ==============================
+       슬라이드 2: 문제 제기 (큰 텍스트)
+       ============================== */
+    .slide-problem {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 3rem 5rem;
+    }
+
+    .slide-problem .big-question {
+      font-size: 2em;
+      font-weight: 700;
+      line-height: 1.4;
+      word-break: keep-all;
+    }
+
+    .slide-problem .big-question .em {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-color: rgba(34, 211, 238, 0.3);
+      text-underline-offset: 0.2em;
+    }
+
+    .slide-problem .sub-text {
+      margin-top: 1em;
+      font-size: 0.8em;
+      color: var(--text-secondary);
+      max-width: 80%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ==============================
+       슬라이드 3: 아키텍처/다이어그램
+       ============================== */
+    .slide-architecture {
+      padding: 2.5rem 3rem;
+    }
+
+    .slide-architecture h2 {
+      font-size: 1.3em;
+      font-weight: 700;
+      margin-bottom: 1.2rem;
+      color: var(--text);
+    }
+
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      flex: 1;
+    }
+
+    .arch-node {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1em 1.2em;
+      text-align: center;
+      min-width: 7em;
+      max-width: 10em;
+      flex-shrink: 0;
+    }
+
+    .arch-node .node-icon {
+      font-size: 1.5em;
+      margin-bottom: 0.3em;
+    }
+
+    .arch-node .node-title {
+      font-size: 0.7em;
+      font-weight: 600;
+      margin-bottom: 0.2em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .arch-node .node-desc {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      word-break: keep-all;
+    }
+
+    .arch-node.primary {
+      border-color: var(--primary);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+    }
+
+    .arch-arrow {
+      color: var(--text-secondary);
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+
+    .arch-caption {
+      text-align: center;
+      font-size: 0.6em;
+      color: var(--text-secondary);
+      margin-top: 1rem;
+    }
+
+    /* ==============================
+       슬라이드 4: 데모/결과
+       ============================== */
+    .slide-demo {
+      padding: 2.5rem 3rem;
+    }
+
+    .slide-demo h2 {
+      font-size: 1.3em;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .demo-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .demo-panel {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .demo-panel .panel-header {
+      background: var(--surface-light);
+      padding: 0.5em 1em;
+      font-size: 0.6em;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+
+    .demo-panel .panel-header .dot {
+      width: 0.6em;
+      height: 0.6em;
+      border-radius: 50%;
+    }
+
+    .demo-panel .panel-header .dot.red { background: #EF4444; }
+    .demo-panel .panel-header .dot.yellow { background: #F59E0B; }
+    .demo-panel .panel-header .dot.green { background: #22C55E; }
+
+    .demo-panel .panel-body {
+      padding: 1em;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6em;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      overflow: auto;
+      max-height: 16em;
+    }
+
+    .demo-panel .panel-body .success { color: #22C55E; }
+    .demo-panel .panel-body .warning { color: #F59E0B; }
+    .demo-panel .panel-body .info { color: var(--accent); }
+
+    /* ==============================
+       슬라이드 5: CTA / 마무리
+       ============================== */
+    .slide-cta {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 3rem 4rem;
+      background: radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.1), transparent 70%),
+                  var(--background);
+    }
+
+    .slide-cta h2 {
+      font-size: 1.8em;
+      font-weight: 800;
+      margin-bottom: 0.5em;
+      word-break: keep-all;
+    }
+
+    .slide-cta .links {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5em;
+      justify-content: center;
+    }
+
+    .slide-cta .link-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6em 1.2em;
+      font-size: 0.7em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+
+    .slide-cta .link-card .link-icon { color: var(--primary-light); }
+  </style>
+</head>
+<body>
+
+  <!-- 슬라이드 1: 임팩트 타이틀 -->
+  <div class="slide slide-hero">
+    <div class="tag">KCD Korea 2024</div>
+    <h1>Kubernetes에서<br><span class="highlight">네트워크 장애</span>를<br>디버깅하는 방법</h1>
+    <div class="description">Cilium + Hubble로 서비스 메시 없이 네트워크 관측성을 확보하는 실전 경험을 공유합니다</div>
+    <div class="speaker">
+      <div class="speaker-avatar">악</div>
+      <div class="speaker-info">
+        <strong>악분 (최성욱)</strong>
+        DevOps Engineer
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 2: 문제 제기 -->
+  <div class="slide slide-problem">
+    <div class="big-question">
+      Pod 간 통신이 실패했을 때,<br>
+      <span class="em">어디서부터</span> 확인하시나요?
+    </div>
+    <div class="sub-text">
+      kubectl logs만으로는 네트워크 레벨 문제를 진단할 수 없습니다.<br>
+      패킷이 어디서 드롭되는지 알아야 합니다.
+    </div>
+  </div>
+
+  <!-- 슬라이드 3: 아키텍처 -->
+  <div class="slide slide-architecture">
+    <h2>Cilium + Hubble 아키텍처</h2>
+    <div class="arch-flow">
+      <div class="arch-node">
+        <div class="node-icon">📦</div>
+        <div class="node-title">Pod A</div>
+        <div class="node-desc">요청을 보내는 클라이언트</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node primary">
+        <div class="node-icon">🔍</div>
+        <div class="node-title">Cilium Agent</div>
+        <div class="node-desc">eBPF 기반 패킷 처리 및 관측</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="node-icon">📊</div>
+        <div class="node-title">Hubble</div>
+        <div class="node-desc">플로우 로그 수집 및 시각화</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="node-icon">📦</div>
+        <div class="node-title">Pod B</div>
+        <div class="node-desc">요청을 받는 서버</div>
+      </div>
+    </div>
+    <div class="arch-caption">모든 패킷은 Cilium의 eBPF 프로그램을 통과하며, Hubble이 실시간으로 플로우를 기록한다</div>
+  </div>
+
+  <!-- 슬라이드 4: 데모/터미널 -->
+  <div class="slide slide-demo">
+    <h2>🔴 Live Demo</h2>
+    <div class="demo-container">
+      <div class="demo-panel">
+        <div class="panel-header">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          hubble observe
+        </div>
+        <div class="panel-body">
+<span class="info">Mar 15 10:23:45.123</span> default/frontend:54312
+  → default/backend:8080 <span class="success">FORWARDED</span>
+<span class="info">Mar 15 10:23:45.456</span> default/backend:8080
+  → default/frontend:54312 <span class="success">FORWARDED</span>
+<span class="info">Mar 15 10:23:46.789</span> default/frontend:54320
+  → default/database:5432 <span class="warning">DROPPED (policy)</span>
+        </div>
+      </div>
+      <div class="demo-panel">
+        <div class="panel-header">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          분석 결과
+        </div>
+        <div class="panel-body">
+<span class="success">✓</span> frontend → backend: 정상 통신
+<span class="warning">✗</span> frontend → database: NetworkPolicy 차단
+
+<span class="info">원인:</span> CiliumNetworkPolicy에서
+  frontend → database 포트 5432 허용 규칙 누락
+
+<span class="info">해결:</span> 아래 정책 추가 필요
+  - endpointSelector: app=database
+  - fromEndpoints: app=frontend
+  - toPorts: 5432/TCP
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이드 5: CTA -->
+  <div class="slide slide-cta">
+    <h2>감사합니다 🙏</h2>
+    <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 0.3em;">
+      질문은 언제든 환영합니다
+    </div>
+    <div class="links">
+      <div class="link-card">
+        <span class="link-icon">📝</span> blog.akbun.com
+      </div>
+      <div class="link-card">
+        <span class="link-icon">🐙</span> github.com/choisungwook
+      </div>
+      <div class="link-card">
+        <span class="link-icon">💬</span> @akbun_dev
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

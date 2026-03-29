@@ -1,0 +1,365 @@
+---
+const designs = [
+  {
+    id: 1,
+    file: 'clean-blue.html',
+    name: 'Clean Blue',
+    purpose: '기술 문서, 스터디 노트에 적합한 깔끔한 블루 계열.',
+    tone: 'light',
+    colors: ['#2563EB', '#7C3AED', '#FFFFFF', '#F8FAFC', '#1E293B', '#F59E0B'],
+  },
+  {
+    id: 2,
+    file: 'corporate-navy.html',
+    name: 'Corporate Navy',
+    purpose: '임원 보고, 공식 발표에 적합한 차분한 네이비 계열.',
+    tone: 'light',
+    colors: ['#1E3A5F', '#059669', '#FFFFFF', '#F8FAFC', '#0F172A', '#DC2626'],
+  },
+  {
+    id: 3,
+    file: 'warm-neutral.html',
+    name: 'Warm Neutral',
+    purpose: '중립적인 톤으로 콘텐츠에 집중하게 하는 팔레트.',
+    tone: 'light',
+    colors: ['#6366F1', '#22C55E', '#FFFFFF', '#F8FAFC', '#1E293B', '#EF4444'],
+  },
+  {
+    id: 4,
+    file: 'midnight-indigo.html',
+    name: 'Midnight Indigo',
+    purpose: '컨퍼런스 발표에 적합한 어두운 배경 + 선명한 강조색.',
+    tone: 'dark',
+    colors: ['#6366F1', '#EC4899', '#0F172A', '#1E293B', '#F1F5F9', '#22D3EE'],
+  },
+  {
+    id: 5,
+    file: 'purple-gradient.html',
+    name: 'Purple Gradient',
+    purpose: '단계별 진행을 시각적으로 표현하기 좋은 퍼플 그라데이션.',
+    tone: 'light',
+    colors: ['#8B5CF6', '#06B6D4', '#FAFAFA', '#FFFFFF', '#1E293B', '#F59E0B'],
+  },
+];
+
+const layouts = [
+  {
+    id: 1,
+    file: 'study-default.html',
+    name: '공부용 기본',
+    type: 'study',
+    purpose: '개념 정리, 코드 하이라이트 중심. 기술 스터디, 사내 학습 공유에 적합.',
+    fontSize: '16px-22px',
+    color: '#2563EB',
+  },
+  {
+    id: 2,
+    file: 'community-default.html',
+    name: '커뮤니티 발표용 기본',
+    type: 'community',
+    purpose: '밋업, 컨퍼런스, 기술 커뮤니티 발표에 적합. 시각적 임팩트와 스토리텔링 중심.',
+    fontSize: '20px-28px',
+    color: '#7C3AED',
+  },
+  {
+    id: 3,
+    file: 'executive-default.html',
+    name: 'C-Level 발표용 기본',
+    type: 'executive',
+    purpose: '임원 보고, 의사결정 자료. 핵심 수치와 결론을 먼저 보여주고, 근거를 뒤에 배치.',
+    fontSize: '22px-30px',
+    color: '#059669',
+  },
+  {
+    id: 4,
+    file: 'comparison-default.html',
+    name: '비교/분석용 기본',
+    type: 'comparison',
+    purpose: 'Before/After, 기술 비교, 장단점 분석에 적합. 두 가지를 시각적으로 대비시키는 데 최적화.',
+    fontSize: '18px-24px',
+    color: '#D97706',
+  },
+  {
+    id: 5,
+    file: 'timeline-default.html',
+    name: '타임라인/프로세스용 기본',
+    type: 'timeline',
+    purpose: '단계별 프로세스, 마이그레이션 계획, 로드맵, 장애 타임라인 등에 적합.',
+    fontSize: '18px-24px',
+    color: '#DC2626',
+  },
+];
+---
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slide Reference - AI Agent용 슬라이드 레퍼런스</title>
+  <meta name="description" content="AI agent가 PPT를 생성할 때 참조하는 디자인과 레이아웃 레퍼런스. 디자인(색상)과 레이아웃(구조)을 조합하여 슬라이드를 만든다.">
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F8FAFC;
+      --surface-hover: #F1F5F9;
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --border: #E2E8F0;
+      --accent: #2563EB;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px 32px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    header p {
+      color: var(--text-secondary);
+      font-size: 16px;
+      max-width: 640px;
+    }
+
+    .section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: background 0.15s, border-color 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card:hover {
+      background: var(--surface-hover);
+      border-color: var(--text-secondary);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--text);
+      color: var(--bg);
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .card-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .card-purpose {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+      flex-grow: 1;
+    }
+
+    .card-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .card-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .color-swatches {
+      display: flex;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .card-link:hover {
+      background: var(--surface-hover);
+      border-color: var(--text-secondary);
+    }
+
+    .tone-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .tone-light {
+      background: #F1F5F9;
+      color: #475569;
+    }
+
+    .tone-dark {
+      background: #1E293B;
+      color: #F1F5F9;
+    }
+
+    footer {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Slide Reference</h1>
+    <p>AI agent가 PPT를 생성할 때 참조하는 디자인과 레이아웃 레퍼런스. "디자인 1번, 레이아웃 3번"처럼 조합하여 슬라이드를 만든다.</p>
+  </header>
+
+  <section class="section">
+    <h2 class="section-title">디자인</h2>
+    <p class="section-desc">슬라이드의 색상과 분위기를 결정한다. 번호로 선택한다.</p>
+    <div class="gallery">
+      {designs.map((design) => (
+        <article class="card">
+          <div class="card-header">
+            <span class="card-number">{design.id}</span>
+            <span class={`tone-badge tone-${design.tone}`}>{design.tone}</span>
+          </div>
+          <div class="card-name">{design.name}</div>
+          <p class="card-purpose">{design.purpose}</p>
+          <div class="color-swatches">
+            {design.colors.map((color) => (
+              <span class="swatch" style={`background: ${color}`}></span>
+            ))}
+          </div>
+          <a class="card-link" href={`/designs/${design.file}`} target="_blank">
+            디자인 보기 &rarr;
+          </a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">레이아웃</h2>
+    <p class="section-desc">슬라이드의 구조와 배치를 결정한다. 번호로 선택한다.</p>
+    <div class="gallery">
+      {layouts.map((layout) => (
+        <article class="card">
+          <div class="card-header">
+            <span class="card-number">{layout.id}</span>
+            <span class="card-badge" style={`background: ${layout.color}`}>{layout.type}</span>
+          </div>
+          <div class="card-name">{layout.name}</div>
+          <p class="card-purpose">{layout.purpose}</p>
+          <div class="card-meta">
+            <span>Font: {layout.fontSize}</span>
+            <span>파일: {layout.file}</span>
+          </div>
+          <a class="card-link" href={`/layouts/${layout.file}`} target="_blank">
+            레이아웃 보기 &rarr;
+          </a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      <a href="https://github.com/choisungwook/portfolio/tree/master/product/slide-reference" target="_blank">GitHub</a>
+       | AI agent용 슬라이드 레퍼런스
+    </p>
+  </footer>
+</body>
+</html>
