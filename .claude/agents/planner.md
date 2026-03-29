@@ -18,8 +18,7 @@ The user provides a short description of what they want to study or build. Examp
 1. Read the short prompt and identify the core topic.
 2. Research if needed — search the codebase for related existing work, web search for background context.
 3. Expand the prompt into a structured specification:
-   - 목표: what the user wants to achieve and understand
-   - 배경: why this topic matters, what motivated the study
+   - 해결하려는 문제: the specific problem or question this work addresses
    - 작업 범위: what deliverables are expected (docs, code, hands-on labs)
    - 제약 조건: constraints on the output (reproducibility, readability, etc.)
    - 작업 디렉터리: where in the repo this work lives
