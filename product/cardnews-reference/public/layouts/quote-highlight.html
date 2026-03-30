@@ -1,0 +1,148 @@
+<!--
+  Layout: 인용 강조형
+  Type: quote-highlight
+  Purpose: 핵심 문구에 노란 형광펜 강조. 인용문, 질문형 카드뉴스에 적합. 하단에 로고/카테고리 배치.
+  Card-size: 1080x1350px (4:5)
+  Font-size: 32px-48px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quote Highlight Layout — 인용 강조형</title>
+  <style>
+    :root {
+      --base-font-size: 40px;
+      --background: #F2F2F2;
+      --text: #1A1A1A;
+      --text-secondary: #888888;
+      --highlight: #FFE44D;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #FFFFFF;
+    }
+
+    /* 카드 컨테이너 — 4:5 비율 고정 */
+    .card {
+      width: 1080px;
+      height: 1350px;
+      margin: 2rem auto;
+      background: var(--background);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-bottom: 80px;
+      overflow: hidden;
+    }
+
+    /* 큰따옴표 아이콘 */
+    .quote-icon {
+      padding: 0 80px;
+      font-size: 72px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    /* 본문 영역 */
+    .content {
+      padding: 20px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .content .line {
+      font-size: 1em;
+      font-weight: 900;
+      line-height: 1.4;
+      color: var(--text);
+    }
+
+    /* 노란 형광펜 강조 */
+    .highlight {
+      background: var(--highlight);
+      padding: 2px 6px;
+      display: inline;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+
+    .attribution {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 0.57em;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="download-area">
+    <button class="download-btn" onclick="downloadCard()">PNG 다운로드 (1080 × 1350)</button>
+  </div>
+  <div class="card">
+    <div class="quote-icon">&ldquo;</div>
+    <div class="content">
+      <div class="line"><span class="highlight">완벽한 타이밍은</span></div>
+      <div class="line">기다린다고</div>
+      <div class="line">오지 않습니다.</div>
+    </div>
+    <div class="attribution">@akbun card news</div>
+  </div>
+  <style>
+    .download-area {
+      text-align: center;
+      padding: 24px;
+    }
+    .download-btn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download-btn:hover { background: #333333; }
+  </style>
+  <script>
+    async function downloadCard() {
+      try {
+        if (typeof html2canvas === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const canvas = await html2canvas(document.querySelector('.card'), { width: 1080, height: 1350, scale: 1 });
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'cardnews.png';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } catch (err) {
+        console.error('Download failed:', err);
+        alert('PNG 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  </script>
+</body>
+</html>
