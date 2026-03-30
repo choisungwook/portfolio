@@ -1,0 +1,160 @@
+<!--
+  Layout: 리뷰/후기형
+  Type: review-testimonial
+  Purpose: Review 제목 + 큰따옴표 + 후기 텍스트 + 출처. 고객 후기, 수강 후기, 제품 리뷰에 적합.
+  Card-size: 1080x1350px (4:5)
+  Font-size: 28px-40px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review Testimonial Layout — 리뷰/후기형</title>
+  <style>
+    :root {
+      --base-font-size: 32px;
+      --background: #F2F2F0;
+      --text: #6B6B65;
+      --text-light: #A0A098;
+      --border: #D4D4CE;
+      --quote-color: #B0B0A8;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #FFFFFF;
+    }
+
+    .card {
+      width: 1080px;
+      height: 1350px;
+      margin: 2rem auto;
+      background: var(--background);
+      border: 1px solid var(--border);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-bottom: 80px;
+      overflow: hidden;
+    }
+
+    .review-header {
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      margin: 0 80px;
+      padding: 20px 0;
+    }
+
+    .review-title {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .quote-icon {
+      padding: 60px 80px 0;
+      text-align: center;
+      font-size: 64px;
+      color: var(--quote-color);
+      line-height: 1;
+    }
+
+    .review-body {
+      padding: 40px 100px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .review-text {
+      font-size: 0.75em;
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .attribution {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 0.57em;
+      color: var(--text-light);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="download-area">
+    <button class="download-btn" onclick="downloadCard()">PNG 다운로드 (1080 × 1350)</button>
+  </div>
+  <div class="card">
+    <div class="review-header">
+      <div class="review-title">Review</div>
+    </div>
+    <div class="quote-icon">&ldquo;</div>
+    <div class="review-body">
+      <div class="review-text">
+        Terraform 입문 강의 중 가장 실용적이었어요!<br>
+        직접 따라하면서 배우니까 금방 익숙해졌고<br>
+        실무에서 바로 적용할 수 있었습니다.<br>
+        인프라 자동화에 관심 있는 분들께 추천합니다!
+      </div>
+    </div>
+    <div class="attribution">@akbun card news</div>
+  </div>
+  <style>
+    .download-area {
+      text-align: center;
+      padding: 24px;
+    }
+    .download-btn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download-btn:hover { background: #333333; }
+  </style>
+  <script>
+    async function downloadCard() {
+      try {
+        if (typeof html2canvas === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const canvas = await html2canvas(document.querySelector('.card'), { width: 1080, height: 1350, scale: 1 });
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'cardnews.png';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } catch (err) {
+        console.error('Download failed:', err);
+        alert('PNG 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  </script>
+</body>
+</html>

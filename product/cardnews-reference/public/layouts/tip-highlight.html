@@ -1,0 +1,154 @@
+<!--
+  Layout: 팁/교육형
+  Type: tip-highlight
+  Purpose: 파란 굵은 타이틀에 베이지 하이라이트 + 설명 본문. 교육 콘텐츠, 팁 공유, 지식 전달에 적합.
+  Card-size: 1080x1350px (4:5)
+  Font-size: 28px-44px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tip Highlight Layout — 팁/교육형</title>
+  <style>
+    :root {
+      --base-font-size: 36px;
+      --background: #F2F2F2;
+      --text: #2B2B2B;
+      --title-color: #2540E0;
+      --highlight: #F0E6C8;
+      --text-secondary: #888888;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #FFFFFF;
+    }
+
+    .card {
+      width: 1080px;
+      height: 1350px;
+      margin: 2rem auto;
+      background: var(--background);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-bottom: 80px;
+      overflow: hidden;
+    }
+
+    .title-area {
+      padding: 0 80px 40px;
+    }
+
+    .title-line {
+      font-size: 1.2em;
+      font-weight: 900;
+      color: var(--title-color);
+      line-height: 1.4;
+      display: inline;
+      background: var(--highlight);
+      padding: 4px 8px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+
+    .body-area {
+      padding: 20px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .body-line {
+      font-size: 0.72em;
+      font-weight: 500;
+      color: var(--title-color);
+      line-height: 1.7;
+    }
+
+    .body-line .bold {
+      font-weight: 800;
+    }
+
+    .attribution {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 0.57em;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="download-area">
+    <button class="download-btn" onclick="downloadCard()">PNG 다운로드 (1080 × 1350)</button>
+  </div>
+  <div class="card">
+    <div class="title-area">
+      <span class="title-line">코드 리뷰를</span><br>
+      <span class="title-line">잘 받으려면..</span>
+    </div>
+    <div class="body-area">
+      <div class="body-line">코드 리뷰에는 여러 목적이 있습니다.</div>
+      <div class="body-line">버그 발견, 지식 공유, 품질 향상 등...</div>
+      <div class="body-line">하지만 가장 중요한 것은 <span class="bold">리뷰어가 맥락을 빠르게 파악하고,</span></div>
+      <div class="body-line"><span class="bold">핵심 변경점에 집중할 수 있도록</span></div>
+      <div class="body-line">PR을 잘 구성하는 것입니다.</div>
+    </div>
+    <div class="attribution">@akbun card news</div>
+  </div>
+  <style>
+    .download-area {
+      text-align: center;
+      padding: 24px;
+    }
+    .download-btn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download-btn:hover { background: #333333; }
+  </style>
+  <script>
+    async function downloadCard() {
+      try {
+        if (typeof html2canvas === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const canvas = await html2canvas(document.querySelector('.card'), { width: 1080, height: 1350, scale: 1 });
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'cardnews.png';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } catch (err) {
+        console.error('Download failed:', err);
+        alert('PNG 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  </script>
+</body>
+</html>

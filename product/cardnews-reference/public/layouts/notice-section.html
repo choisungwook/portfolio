@@ -1,0 +1,192 @@
+<!--
+  Layout: 공지/설명형
+  Type: notice-section
+  Purpose: NOTICE 헤더 + 아이콘 섹션별 제목/설명. 용어 설명, 공지사항, 정보 전달에 적합.
+  Card-size: 1080x1350px (4:5)
+  Font-size: 24px-36px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notice Section Layout — 공지/설명형</title>
+  <style>
+    :root {
+      --base-font-size: 28px;
+      --background: #F5F3EF;
+      --text: #3A3A3A;
+      --text-secondary: #6B6B6B;
+      --highlight-text: #8B7355;
+      --bold-color: #2B2B2B;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #FFFFFF;
+    }
+
+    .card {
+      width: 1080px;
+      height: 1350px;
+      margin: 2rem auto;
+      background: var(--background);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-bottom: 80px;
+      overflow: hidden;
+    }
+
+    .notice-header {
+      padding: 0 80px 60px;
+      text-align: center;
+    }
+
+    .notice-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.5em;
+      font-weight: 700;
+      color: var(--highlight-text);
+      font-style: italic;
+      letter-spacing: 0.05em;
+    }
+
+    .sections {
+      padding: 30px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 60px;
+    }
+
+    .section-item {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85em;
+      font-weight: 800;
+      color: var(--bold-color);
+    }
+
+    .section-icon {
+      font-size: 0.8em;
+    }
+
+    .section-desc {
+      padding-left: 36px;
+      font-size: 0.62em;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .section-desc .bold {
+      font-weight: 700;
+      color: var(--bold-color);
+    }
+
+    .attribution {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 0.57em;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="download-area">
+    <button class="download-btn" onclick="downloadCard()">PNG 다운로드 (1080 × 1350)</button>
+  </div>
+  <div class="card">
+    <div class="notice-header">
+      <span class="notice-badge">&#9745; NOTICE</span>
+    </div>
+    <div class="sections">
+      <div class="section-item">
+        <div class="section-title">
+          <span class="section-icon">&#10024;</span>
+          BLUE-GREEN 배포란?
+        </div>
+        <div class="section-desc">
+          새 버전을 별도 환경에 배포한 뒤<br>
+          <span class="bold">트래픽을 한 번에 전환하여</span><br>
+          <span class="bold">다운타임 없이 배포하는 전략</span>이에요.<br>
+          문제가 생기면 즉시 이전 환경으로 롤백할 수 있어<br>
+          안정적인 배포가 가능합니다.
+        </div>
+      </div>
+      <div class="section-item">
+        <div class="section-title">
+          <span class="section-icon">&#127793;</span>
+          CANARY 배포란?
+        </div>
+        <div class="section-desc">
+          새 버전을 소수의 사용자에게 먼저 노출하여<br>
+          <span class="bold">점진적으로 트래픽 비율을 늘려가며</span><br>
+          <span class="bold">안전하게 전체 배포를 완료하는 전략</span>입니다.
+        </div>
+      </div>
+    </div>
+    <div class="attribution">@akbun card news</div>
+  </div>
+  <style>
+    .download-area {
+      text-align: center;
+      padding: 24px;
+    }
+    .download-btn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download-btn:hover { background: #333333; }
+  </style>
+  <script>
+    async function downloadCard() {
+      try {
+        if (typeof html2canvas === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const canvas = await html2canvas(document.querySelector('.card'), { width: 1080, height: 1350, scale: 1 });
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'cardnews.png';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } catch (err) {
+        console.error('Download failed:', err);
+        alert('PNG 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!--
+  Layout: FAQ/답변형
+  Type: faq-answer
+  Purpose: 큰 타이틀 + A 뱃지 섹션 + 점선 구분선. FAQ, Q&A, 원인 분석, 항목별 설명에 적합.
+  Card-size: 1080x1350px (4:5)
+  Font-size: 24px-40px 권장
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ Answer Layout — FAQ/답변형</title>
+  <style>
+    :root {
+      --base-font-size: 30px;
+      --background: #F5F2ED;
+      --text: #2B2B2B;
+      --text-secondary: #6B6B6B;
+      --badge-bg: #2B2B2B;
+      --badge-text: #FFFFFF;
+      --divider: #C0B8AC;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: var(--base-font-size);
+      color: var(--text);
+      background: #FFFFFF;
+    }
+
+    .card {
+      width: 1080px;
+      height: 1350px;
+      margin: 2rem auto;
+      background: var(--background);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-bottom: 80px;
+      overflow: hidden;
+    }
+
+    .title-area {
+      padding: 0 80px 30px;
+    }
+
+    .main-title {
+      font-size: 1.3em;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.3;
+    }
+
+    .answer-list {
+      padding: 20px 80px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .answer-item {
+      padding: 30px 0;
+    }
+
+    .answer-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .answer-badge {
+      width: 36px;
+      height: 36px;
+      background: var(--badge-bg);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--badge-text);
+      font-size: 0.55em;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .answer-title {
+      font-size: 0.85em;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .answer-desc {
+      padding-left: 50px;
+      font-size: 0.58em;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .answer-divider {
+      width: 100%;
+      border: none;
+      border-top: 1px dashed var(--divider);
+    }
+
+    .attribution {
+      position: absolute;
+      top: 32px;
+      left: 40px;
+      font-size: 0.57em;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="download-area">
+    <button class="download-btn" onclick="downloadCard()">PNG 다운로드 (1080 × 1350)</button>
+  </div>
+  <div class="card">
+    <div class="title-area">
+      <div class="main-title">Pod가 자꾸 재시작되는 이유</div>
+    </div>
+    <div class="answer-list">
+      <div class="answer-item">
+        <div class="answer-header">
+          <div class="answer-badge">&mdash;</div>
+          <div class="answer-title">OOMKilled</div>
+        </div>
+        <div class="answer-desc">
+          컨테이너가 메모리 limit을 초과하면<br>
+          커널이 프로세스를 강제 종료합니다.<br>
+          resources.limits.memory 값을 확인하세요.
+        </div>
+      </div>
+      <hr class="answer-divider">
+      <div class="answer-item">
+        <div class="answer-header">
+          <div class="answer-badge">&mdash;</div>
+          <div class="answer-title">Liveness Probe 실패</div>
+        </div>
+        <div class="answer-desc">
+          헬스체크 응답이 늦거나 실패하면<br>
+          kubelet이 컨테이너를 재시작합니다.<br>
+          타임아웃과 경로 설정을 점검하세요.
+        </div>
+      </div>
+      <hr class="answer-divider">
+      <div class="answer-item">
+        <div class="answer-header">
+          <div class="answer-badge">&mdash;</div>
+          <div class="answer-title">CrashLoopBackOff</div>
+        </div>
+        <div class="answer-desc">
+          앱이 시작 직후 에러로 종료되면<br>
+          반복 재시작에 빠지게 됩니다.<br>
+          로그를 확인해 근본 원인을 찾으세요.
+        </div>
+      </div>
+    </div>
+    <div class="attribution">@akbun card news</div>
+  </div>
+  <style>
+    .download-area {
+      text-align: center;
+      padding: 24px;
+    }
+    .download-btn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .download-btn:hover { background: #333333; }
+  </style>
+  <script>
+    async function downloadCard() {
+      try {
+        if (typeof html2canvas === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const canvas = await html2canvas(document.querySelector('.card'), { width: 1080, height: 1350, scale: 1 });
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'cardnews.png';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } catch (err) {
+        console.error('Download failed:', err);
+        alert('PNG 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  </script>
+</body>
+</html>

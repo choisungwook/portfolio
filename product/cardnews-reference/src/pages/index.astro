@@ -1,0 +1,271 @@
+---
+const layouts = [
+  {
+    id: 1,
+    file: 'quote-highlight.html',
+    name: '인용 강조형',
+    type: 'quote-highlight',
+    purpose: '핵심 문구에 노란 형광펜 강조. 인용문, 질문형 카드뉴스에 적합.',
+    fontSize: '32px-48px',
+    color: '#F59E0B',
+  },
+  {
+    id: 2,
+    file: 'journal-elegant.html',
+    name: '저널 감성형',
+    type: 'journal-elegant',
+    purpose: '크림/베이지 배경에 세리프풍 텍스트. 에세이, 감성 글귀, 자기계발 메시지에 적합. 줄 사이 구분선.',
+    fontSize: '36px-44px',
+    color: '#5C6B54',
+  },
+  {
+    id: 3,
+    file: 'tip-highlight.html',
+    name: '팁/교육형',
+    type: 'tip-highlight',
+    purpose: '파란 굵은 타이틀에 베이지 하이라이트 + 설명 본문. 교육 콘텐츠, 팁 공유, 지식 전달에 적합.',
+    fontSize: '28px-44px',
+    color: '#2540E0',
+  },
+  {
+    id: 4,
+    file: 'review-testimonial.html',
+    name: '리뷰/후기형',
+    type: 'review-testimonial',
+    purpose: 'Review 제목 + 큰따옴표 + 후기 텍스트 + 출처. 고객 후기, 수강 후기, 제품 리뷰에 적합.',
+    fontSize: '28px-40px',
+    color: '#B0B0A8',
+  },
+  {
+    id: 5,
+    file: 'notice-section.html',
+    name: '공지/설명형',
+    type: 'notice-section',
+    purpose: 'NOTICE 헤더 + 아이콘 섹션별 제목/설명. 용어 설명, 공지사항, 정보 전달에 적합.',
+    fontSize: '24px-36px',
+    color: '#8B7355',
+  },
+  {
+    id: 6,
+    file: 'faq-answer.html',
+    name: 'FAQ/답변형',
+    type: 'faq-answer',
+    purpose: '큰 타이틀 + dash 섹션 + 점선 구분선. FAQ, Q&A, 원인 분석, 항목별 설명에 적합.',
+    fontSize: '24px-40px',
+    color: '#1A1A1A',
+  },
+];
+---
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Card News Reference - AI Agent용 카드뉴스 레퍼런스</title>
+  <meta name="description" content="AI agent가 카드뉴스를 생성할 때 참조하는 레이아웃 레퍼런스. 번호로 레이아웃을 선택하여 카드뉴스를 만든다.">
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F8FAFC;
+      --surface-hover: #F1F5F9;
+      --text: #1E293B;
+      --text-secondary: #64748B;
+      --border: #E2E8F0;
+      --accent: #2563EB;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px 32px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    header p {
+      color: var(--text-secondary);
+      font-size: 16px;
+      max-width: 640px;
+    }
+
+    .section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: background 0.15s, border-color 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card:hover {
+      background: var(--surface-hover);
+      border-color: var(--text-secondary);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--text);
+      color: var(--bg);
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .card-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .card-purpose {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+      flex-grow: 1;
+    }
+
+    .card-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .card-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 16px;
+      background: var(--text);
+      border: none;
+      border-radius: 8px;
+      color: #FFFFFF;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+
+    .card-link:hover {
+      background: #334155;
+    }
+
+    footer {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    footer a {
+      color: var(--text-secondary);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Card News Reference</h1>
+    <p>AI agent가 카드뉴스를 생성할 때 참조하는 레이아웃 레퍼런스. "레이아웃 1번"처럼 번호로 선택하여 카드뉴스를 만든다.</p>
+  </header>
+
+  <section class="section">
+    <h2 class="section-title">레이아웃</h2>
+    <p class="section-desc">카드뉴스의 구조와 배치를 결정한다. 번호로 선택한다. 카드 크기: 1080 x 1350px (4:5 비율)</p>
+    <div class="gallery">
+      {layouts.map((layout) => (
+        <article class="card">
+          <div class="card-header">
+            <span class="card-number">{layout.id}</span>
+            <span class="card-badge" style={`background: ${layout.color}`}>{layout.type}</span>
+          </div>
+          <div class="card-name">{layout.name}</div>
+          <p class="card-purpose">{layout.purpose}</p>
+          <a class="card-link" href={`/layouts/${layout.file}`} target="_blank">
+            레이아웃 보기 &rarr;
+          </a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      <a href="https://github.com/choisungwook/portfolio/tree/master/product/cardnews-reference" target="_blank">GitHub</a>
+       | AI agent용 카드뉴스 레퍼런스
+    </p>
+  </footer>
+</body>
+</html>
