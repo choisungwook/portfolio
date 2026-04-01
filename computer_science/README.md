@@ -9,3 +9,5 @@
 | 3 | 컨테이너 원리 - chroot | [링크](./linux_namespace/chroot/) |
 | 4 | 컨테이너 원리 - mount namespace | [링크](./linux_namespace/mount_namespace/) |
 | 5 | pivot_root | [링크](./linux_namespace/pivot_root/) |
+| 6 | AWS SQS 메시지 큐 예제 | [링크](./aws-sqs/) |
+| 7 | AWS SNS Pub/Sub 예제 | [링크](./aws-sns/) |
