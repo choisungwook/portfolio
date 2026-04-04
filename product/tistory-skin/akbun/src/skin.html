@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>[##_page_title_##]</title>
+  <link rel="alternate" type="application/rss+xml" title="[##_title_##]" href="[##_rss_url_##]" />
+  <link rel="stylesheet" href="./style.css">
+  <!-- Prism.js: Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body id="[##_body_id_##]">
+<s_t3>
+
+  <!-- ===== Header ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="[##_blog_link_##]" class="site-title">[##_title_##]</a>
+      <nav class="site-nav">
+        [##_blog_menu_##]
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Main Layout ===== -->
+  <div class="main-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <s_sidebar>
+        <s_sidebar_element>
+          <!-- 사이드바 -->
+          <div class="sidebar-section">
+            <h2 class="sidebar-title">글 검색</h2>
+            <div class="search-bar">
+              <s_search>
+                <input type="text" class="search-input" name="[##_search_name_##]" value="[##_search_text_##]" placeholder="Search posts" aria-label="글 검색" onkeypress="if(event.keyCode==13){ [##_search_onclick_submit_##] }">
+              </s_search>
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <h2 class="sidebar-title">카테고리</h2>
+            [##_category_list_##]
+          </div>
+
+          <div class="sidebar-section">
+            <h2 class="sidebar-title">태그</h2>
+            <div class="tag-cloud">
+              <s_random_tags>
+                <a href="[##_tag_link_##]" class="tag-item [##_tag_class_##]">[##_tag_name_##]</a>
+              </s_random_tags>
+            </div>
+          </div>
+
+          <div class="visitor-stats">
+            <span class="visitor-stat">오늘 방문자 [##_count_today_##]</span>
+            <span class="visitor-stat">총 방문자 [##_count_total_##]</span>
+          </div>
+        </s_sidebar_element>
+      </s_sidebar>
+    </aside>
+
+    <!-- Content Area -->
+    <main class="content">
+
+      <!-- ===== Top Actions ===== -->
+      <div class="page-home-link">
+        <a href="[##_blog_link_##]" class="page-home-link-anchor">글 목록으로 돌아가기</a>
+      </div>
+
+      <!-- ===== Ad: List Upper ===== -->
+      [##_revenue_list_upper_##]
+
+      <div class="home-posts-intro">
+        <h2 class="home-posts-title">최신글</h2>
+      </div>
+
+      <!-- ===== Article List (Index Pages) ===== -->
+      <div class="article-section">
+      <s_article_rep>
+
+        <!-- Index View: Post List Row -->
+        <s_index_article_rep>
+          <article class="post-row">
+            <a href="[##_article_rep_link_##]" class="post-row-link">
+              <span class="post-row-title">[##_article_rep_title_##]</span>
+              <time class="post-row-date">[##_article_rep_simple_date_##]</time>
+            </a>
+          </article>
+        </s_index_article_rep>
+
+        <!-- Permalink View: Full Article -->
+        <s_permalink_article_rep>
+          <article class="post-full">
+            <header class="post-header">
+              <a href="[##_article_rep_category_link_##]" class="post-category-link">카테고리: [##_article_rep_category_##]</a>
+              <h1 class="post-title">[##_article_rep_title_##]</h1>
+              <div class="post-meta">
+                <time class="post-date">[##_article_rep_date_##]</time>
+              </div>
+            </header>
+
+            <div class="post-body">
+              [##_article_rep_desc_##]
+            </div>
+
+            <!-- Tags -->
+            <s_tag_label>
+              <div class="post-tags">
+                <span class="post-tags-label">태그</span>
+                [##_tag_label_rep_##]
+              </div>
+            </s_tag_label>
+
+            <!-- Admin -->
+            <s_ad_div>
+              <div class="post-admin">
+                <a href="[##_s_ad_m_link_##]" onclick="[##_s_ad_m_onclick_##]">수정</a>
+                <span>[##_s_ad_s1_label_##]</span>
+                <a href="#" onclick="[##_s_ad_s2_onclick_##]">[##_s_ad_s2_label_##]</a>
+                <a href="#" onclick="[##_s_ad_d_onclick_##]">삭제</a>
+              </div>
+            </s_ad_div>
+
+            <!-- Comments -->
+            <section class="comments-section">
+              <s_rp>
+                <h2 class="comments-title">댓글</h2>
+                <div class="comment-thread">
+                  <div class="comment-list">
+                    <s_rp_container>
+                      <ol class="comment-items">
+                        <s_rp_rep>
+                          <li id="[##_rp_rep_id_##]" class="comment-item">
+                            <div class="[##_rp_rep_class_##] comment-item-inner">
+                              <div class="comment-meta">
+                                <span class="comment-author">[##_rp_rep_name_##]</span>
+                                <span class="comment-date">[##_rp_rep_date_##]</span>
+                              </div>
+                              <div class="comment-content">[##_rp_rep_desc_##]</div>
+                              <div class="comment-actions">
+                                <a href="[##_rp_rep_link_##]">링크</a>
+                                <a href="#" onclick="[##_rp_rep_onclick_reply_##]">답글</a>
+                                <a href="#" onclick="[##_rp_rep_onclick_delete_##]">수정/삭제</a>
+                              </div>
+                            </div>
+                            <s_rp2_container>
+                              <ol class="comment-replies">
+                                <s_rp2_rep>
+                                  <li id="[##_rp_rep_id_##]" class="comment-item comment-item-reply">
+                                    <div class="[##_rp_rep_class_##] comment-item-inner">
+                                      <div class="comment-meta">
+                                        <span class="comment-author">[##_rp_rep_name_##]</span>
+                                        <span class="comment-date">[##_rp_rep_date_##]</span>
+                                      </div>
+                                      <div class="comment-content">[##_rp_rep_desc_##]</div>
+                                      <div class="comment-actions">
+                                        <a href="[##_rp_rep_link_##]">링크</a>
+                                        <a href="#" onclick="[##_rp_rep_onclick_delete_##]">수정/삭제</a>
+                                      </div>
+                                    </div>
+                                  </li>
+                                </s_rp2_rep>
+                              </ol>
+                            </s_rp2_container>
+                          </li>
+                        </s_rp_rep>
+                      </ol>
+                    </s_rp_container>
+                  </div>
+
+                  <s_rp_input_form>
+                    <div class="comment-form">
+                      <s_rp_member>
+                        <s_rp_guest>
+                          <div class="comment-form-guest">
+                            <input type="text" name="[##_rp_input_name_##]" value="[##_guest_name_##]" placeholder="이름">
+                            <input type="password" name="[##_rp_input_password_##]" value="[##_rp_admin_check_##]" maxlength="8" placeholder="비밀번호">
+                            <input type="text" name="[##_rp_input_homepage_##]" value="[##_guest_homepage_##]" placeholder="홈페이지">
+                          </div>
+                        </s_rp_guest>
+                        <label class="comment-secret">
+                          <input type="checkbox" name="[##_rp_input_is_secret_##]">
+                          <span>비밀글</span>
+                        </label>
+                      </s_rp_member>
+
+                      <textarea name="[##_rp_input_comment_##]" rows="6" placeholder="댓글을 입력하세요."></textarea>
+                      <button type="submit" onclick="[##_rp_onclick_submit_##]">댓글 등록</button>
+                    </div>
+                  </s_rp_input_form>
+                </div>
+              </s_rp>
+            </section>
+          </article>
+        </s_permalink_article_rep>
+
+      </s_article_rep>
+      </div>
+
+      <!-- ===== Notice ===== -->
+      <s_notice_rep>
+        <s_index_article_rep>
+          <article class="post-row post-row--notice">
+            <a href="[##_notice_rep_link_##]" class="post-row-link">
+              <span class="post-row-title"><span class="notice-badge">공지</span>[##_notice_rep_title_##]</span>
+              <time class="post-row-date">[##_notice_rep_simple_date_##]</time>
+            </a>
+          </article>
+        </s_index_article_rep>
+
+        <s_permalink_article_rep>
+          <article class="post-full">
+            <header class="post-header">
+              <span class="notice-badge">공지</span>
+              <h1 class="post-title">[##_notice_rep_title_##]</h1>
+              <div class="post-meta">
+                <time class="post-date">[##_notice_rep_date_##]</time>
+              </div>
+            </header>
+            <div class="post-body">
+              [##_notice_rep_desc_##]
+            </div>
+
+            <!-- Comments -->
+            <section class="comments-section">
+              <s_rp>
+                <h2 class="comments-title">댓글</h2>
+                <div class="comment-thread">
+                  <div class="comment-list">
+                    <s_rp_container>
+                      <ol class="comment-items">
+                        <s_rp_rep>
+                          <li id="[##_rp_rep_id_##]" class="comment-item">
+                            <div class="[##_rp_rep_class_##] comment-item-inner">
+                              <div class="comment-meta">
+                                <span class="comment-author">[##_rp_rep_name_##]</span>
+                                <span class="comment-date">[##_rp_rep_date_##]</span>
+                              </div>
+                              <div class="comment-content">[##_rp_rep_desc_##]</div>
+                              <div class="comment-actions">
+                                <a href="[##_rp_rep_link_##]">링크</a>
+                                <a href="#" onclick="[##_rp_rep_onclick_reply_##]">답글</a>
+                                <a href="#" onclick="[##_rp_rep_onclick_delete_##]">수정/삭제</a>
+                              </div>
+                            </div>
+                            <s_rp2_container>
+                              <ol class="comment-replies">
+                                <s_rp2_rep>
+                                  <li id="[##_rp_rep_id_##]" class="comment-item comment-item-reply">
+                                    <div class="[##_rp_rep_class_##] comment-item-inner">
+                                      <div class="comment-meta">
+                                        <span class="comment-author">[##_rp_rep_name_##]</span>
+                                        <span class="comment-date">[##_rp_rep_date_##]</span>
+                                      </div>
+                                      <div class="comment-content">[##_rp_rep_desc_##]</div>
+                                      <div class="comment-actions">
+                                        <a href="[##_rp_rep_link_##]">링크</a>
+                                        <a href="#" onclick="[##_rp_rep_onclick_delete_##]">수정/삭제</a>
+                                      </div>
+                                    </div>
+                                  </li>
+                                </s_rp2_rep>
+                              </ol>
+                            </s_rp2_container>
+                          </li>
+                        </s_rp_rep>
+                      </ol>
+                    </s_rp_container>
+                  </div>
+
+                  <s_rp_input_form>
+                    <div class="comment-form">
+                      <s_rp_member>
+                        <s_rp_guest>
+                          <div class="comment-form-guest">
+                            <input type="text" name="[##_rp_input_name_##]" value="[##_guest_name_##]" placeholder="이름">
+                            <input type="password" name="[##_rp_input_password_##]" value="[##_rp_admin_check_##]" maxlength="8" placeholder="비밀번호">
+                            <input type="text" name="[##_rp_input_homepage_##]" value="[##_guest_homepage_##]" placeholder="홈페이지">
+                          </div>
+                        </s_rp_guest>
+                        <label class="comment-secret">
+                          <input type="checkbox" name="[##_rp_input_is_secret_##]">
+                          <span>비밀글</span>
+                        </label>
+                      </s_rp_member>
+
+                      <textarea name="[##_rp_input_comment_##]" rows="6" placeholder="댓글을 입력하세요."></textarea>
+                      <button type="submit" onclick="[##_rp_onclick_submit_##]">댓글 등록</button>
+                    </div>
+                  </s_rp_input_form>
+                </div>
+              </s_rp>
+            </section>
+          </article>
+        </s_permalink_article_rep>
+      </s_notice_rep>
+
+      <!-- ===== Protected Post ===== -->
+      <s_article_protected>
+        <s_index_article_rep>
+          <article class="post-row">
+            <a href="[##_article_rep_link_##]" class="post-row-link">
+              <span class="post-row-title">[##_article_rep_title_##]</span>
+              <time class="post-row-date">[##_article_rep_date_##]</time>
+            </a>
+          </article>
+        </s_index_article_rep>
+        <s_permalink_article_rep>
+          <article class="post-full post-protected">
+            <header class="post-header">
+              <h1 class="post-title">[##_article_rep_title_##]</h1>
+              <div class="post-meta">
+                <time class="post-date">[##_article_rep_date_##]</time>
+              </div>
+            </header>
+            <div class="protected-form">
+              <p>이 글은 보호되어 있습니다. 비밀번호를 입력해 주세요.</p>
+              <div class="protected-input-group">
+                <label for="[##_article_password_##]">비밀번호</label>
+                <input type="password" id="[##_article_password_##]" maxlength="16">
+                <button onclick="[##_article_dissolve_##]">확인</button>
+              </div>
+            </div>
+          </article>
+        </s_permalink_article_rep>
+      </s_article_protected>
+
+      <!-- ===== Category/Tag/Search List ===== -->
+      <s_list>
+        <div class="list-section">
+        <div class="list-header">
+          <h1 class="list-title">[##_list_conform_##]</h1>
+          <span class="list-count">[##_list_count_##]개의 글</span>
+        </div>
+
+        <s_list_empty>
+          <p class="list-empty">글이 없습니다.</p>
+        </s_list_empty>
+
+        <ul class="list-posts">
+          <s_list_rep>
+            <li class="list-post-item">
+              <a href="[##_list_rep_link_##]">
+                <span class="list-post-title">[##_list_rep_title_text_##]</span>
+                <time>[##_list_rep_regdate_##]</time>
+              </a>
+            </li>
+          </s_list_rep>
+        </ul>
+
+        </div>
+      </s_list>
+
+      <!-- ===== Pagination (top-level, works for all page types) ===== -->
+      <div class="pagination">
+        <s_paging>
+          <a [##_prev_page_##] class="page-prev [##_no_more_prev_##]">&laquo; 이전</a>
+          <s_paging_rep>
+            <a [##_paging_rep_link_##] class="page-num">[##_paging_rep_link_num_##]</a>
+          </s_paging_rep>
+          <a [##_next_page_##] class="page-next [##_no_more_next_##]">다음 &raquo;</a>
+        </s_paging>
+      </div>
+
+      <!-- ===== Page (Static) ===== -->
+      <s_page_rep>
+        <article class="post-full">
+          <header class="post-header">
+            <h1 class="post-title">[##_article_rep_title_##]</h1>
+            <div class="post-meta">
+              <time class="post-date">[##_article_rep_date_##]</time>
+            </div>
+          </header>
+          <div class="post-body">
+            [##_article_rep_desc_##]
+          </div>
+        </article>
+      </s_page_rep>
+
+      <!-- ===== Tag Cloud Page ===== -->
+      <s_tag>
+        <div class="tag-page">
+          <h1 class="tag-page-title">태그</h1>
+          <div class="tag-cloud">
+            <s_tag_rep>
+              <a href="[##_tag_link_##]" class="tag-item [##_tag_class_##]">[##_tag_name_##]</a>
+            </s_tag_rep>
+          </div>
+        </div>
+      </s_tag>
+
+      <!-- ===== Guestbook ===== -->
+      <s_guest>
+        <div class="guestbook">
+          <h1 class="guestbook-title">방명록</h1>
+          [##_guestbook_group_##]
+        </div>
+      </s_guest>
+
+      <!-- ===== Ad: List Lower ===== -->
+      [##_revenue_list_lower_##]
+
+    </main>
+  </div>
+
+  <!-- ===== Floating ToC ===== -->
+  <nav class="floating-toc" id="floating-toc">
+    <div class="floating-toc-header">목차</div>
+    <ul class="floating-toc-list" id="toc-nav"></ul>
+  </nav>
+
+  <!-- ===== Footer ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>&copy; <a href="[##_blog_link_##]">[##_title_##]</a></p>
+    </div>
+  </footer>
+
+  <!-- Prism.js Core + Languages -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-hcl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-ini.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var map = {
+        hcl: "hcl", terraform: "hcl",
+        python: "python", py: "python",
+        javascript: "javascript", js: "javascript",
+        bash: "bash", sh: "bash", shell: "bash",
+        yaml: "yaml", yml: "yaml", ansible: "yaml",
+        json: "json", go: "go",
+        dockerfile: "docker", docker: "docker",
+        ini: "ini", toml: "ini",
+        sql: "sql", pgsql: "sql", mysql: "sql",
+        txt: "none", text: "none",
+        ebnf: "bash", "jboss-cli": "bash", routeros: "bash"
+      };
+      function normalizeLanguageToken(value) {
+        return (value || "").toLowerCase().replace(/^language-/, "");
+      }
+      document.querySelectorAll(".post-body pre").forEach(function (pre) {
+        var lang = normalizeLanguageToken(pre.getAttribute("data-ke-language"));
+        if (!lang) {
+          var cls = pre.className.split(/\s+/).map(normalizeLanguageToken).filter(function (c) {
+            return c && c !== "none";
+          });
+          lang = cls[0] || "";
+        }
+        var mapped = map[lang] || lang || "none";
+        var code = pre.querySelector("code");
+        if (!code) {
+          code = document.createElement("code");
+          code.textContent = pre.textContent;
+          pre.textContent = "";
+          pre.appendChild(code);
+        }
+        if (!code.className || !/(^|\s)language-/.test(code.className)) {
+          code.className = "language-" + mapped;
+        }
+      });
+      Prism.highlightAll();
+    });
+  </script>
+
+  <!-- ToC Builder -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var tocNav = document.getElementById("toc-nav");
+      var tocContainer = document.getElementById("floating-toc");
+      if (!tocNav || !tocContainer) return;
+
+      var headings = document.querySelectorAll(".post-body h1, .post-body h2");
+      if (headings.length === 0) return;
+
+      var generatedIdIndex = 0;
+
+      headings.forEach(function (heading) {
+        var id = heading.id;
+        if (!id) {
+          do {
+            id = "toc-heading-" + generatedIdIndex;
+            generatedIdIndex += 1;
+          } while (document.getElementById(id));
+          heading.id = id;
+        }
+
+        var li = document.createElement("li");
+        li.className = "toc-item toc-" + heading.tagName.toLowerCase();
+
+        var a = document.createElement("a");
+        a.href = "#" + id;
+        a.textContent = heading.textContent;
+        a.className = "toc-link";
+
+        li.appendChild(a);
+        tocNav.appendChild(li);
+      });
+
+      tocContainer.classList.add("visible");
+
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            document.querySelectorAll(".toc-link").forEach(function (link) {
+              link.classList.remove("active");
+            });
+            var activeLink = tocNav.querySelector('a[href="#' + entry.target.id + '"]');
+            if (activeLink) activeLink.classList.add("active");
+          }
+        });
+      }, { rootMargin: "-80px 0px -80% 0px" });
+
+      headings.forEach(function (heading) {
+        observer.observe(heading);
+      });
+    });
+  </script>
+
+</s_t3>
+</body>
+</html>

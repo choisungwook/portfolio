@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<skin>
+  <information>
+    <name><![CDATA[akbun]]></name>
+    <version>1.0.0</version>
+    <description><![CDATA[악분 스킨]]></description>
+    <license><![CDATA[MIT License]]></license>
+  </information>
+
+  <author>
+    <name><![CDATA[akbun]]></name>
+    <homepage>https://github.com/choisungwook</homepage>
+    <email></email>
+  </author>
+
+  <default>
+    <recentEntries>5</recentEntries>
+    <recentComments>5</recentComments>
+    <recentTrackbacks>0</recentTrackbacks>
+    <itemsOnGuestbook>10</itemsOnGuestbook>
+    <tagsInCloud>30</tagsInCloud>
+    <sortInCloud>1</sortInCloud>
+    <expandComment>1</expandComment>
+    <expandTrackback>0</expandTrackback>
+    <lengthOfRecentNotice>30</lengthOfRecentNotice>
+    <lengthOfRecentEntry>30</lengthOfRecentEntry>
+    <lengthOfRecentComment>30</lengthOfRecentComment>
+    <lengthOfRecentTrackback>30</lengthOfRecentTrackback>
+    <lengthOfLink>30</lengthOfLink>
+    <entriesOnPage>10</entriesOnPage>
+    <entriesOnList>20</entriesOnList>
+    <showListOnCategory>1</showListOnCategory>
+    <showListOnArchive>1</showListOnArchive>
+    <showListLock>0</showListLock>
+    <commentMessage>
+      <none>댓글이 없습니다.</none>
+      <single>댓글 1개</single>
+    </commentMessage>
+    <trackbackMessage>
+      <none></none>
+      <single></single>
+    </trackbackMessage>
+    <tree>
+      <color>#5e5d59</color>
+      <bgColor>#faf9f5</bgColor>
+      <activeColor>#141413</activeColor>
+      <activeBgColor>#f0eee6</activeBgColor>
+      <labelLength>27</labelLength>
+      <showValue>1</showValue>
+    </tree>
+    <contentWidth>720</contentWidth>
+  </default>
+</skin>

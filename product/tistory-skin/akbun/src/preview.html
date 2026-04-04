@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>악분의 블로그</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body id="tt-body-index">
+
+  <!-- ===== Header ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="site-title">악분의 블로그</a>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="#">홈</a></li>
+          <li><a href="#">방명록</a></li>
+          <li><a href="#">태그</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Main Layout ===== -->
+  <div class="main-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h2 class="sidebar-title">글 검색</h2>
+        <div class="search-bar">
+          <form>
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search posts" class="search-input" aria-label="글 검색">
+          </form>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2 class="sidebar-title">태그</h2>
+        <ul class="tag-cloud">
+          <li><a href="#" class="tag-item cloud1">Kubernetes</a></li>
+          <li><a href="#" class="tag-item cloud1">AWS</a></li>
+          <li><a href="#" class="tag-item cloud2">Terraform</a></li>
+          <li><a href="#" class="tag-item cloud2">Docker</a></li>
+          <li><a href="#" class="tag-item cloud3">CI/CD</a></li>
+          <li><a href="#" class="tag-item cloud3">Helm</a></li>
+          <li><a href="#" class="tag-item cloud4">ArgoCD</a></li>
+          <li><a href="#" class="tag-item cloud4">Prometheus</a></li>
+          <li><a href="#" class="tag-item cloud5">Grafana</a></li>
+          <li><a href="#" class="tag-item cloud5">eBPF</a></li>
+          <li><a href="#" class="tag-item cloud3">Linux</a></li>
+          <li><a href="#" class="tag-item cloud4">Networking</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-section">
+        <h2 class="sidebar-title">카테고리</h2>
+        <div class="tt_category">
+          <ul>
+            <li><a href="#" class="link_tit">전체 (42)</a></li>
+            <li><a href="#">Kubernetes (15)</a></li>
+            <li><a href="#">AWS (10)</a></li>
+            <li><a href="#">Terraform (8)</a></li>
+            <li><a href="#">DevOps (5)</a></li>
+            <li><a href="#">기타 (4)</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="visitor-stats">
+        <span class="visitor-stat">오늘 방문자 128</span>
+        <span class="visitor-stat">총 방문자 42,381</span>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+
+      <div class="home-posts-intro">
+        <h2 class="home-posts-title">최신글</h2>
+      </div>
+
+      <!-- Post Rows -->
+      <article class="post-row">
+        <a href="preview-post.html" class="post-row-link">
+          <span class="post-row-title">Kubernetes Pod가 Pending 상태에서 빠져나오지 못하는 이유</span>
+          <time class="post-row-date">2026. 4. 1.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">AWS login으로 임시 자격증명 발급받기</span>
+          <time class="post-row-date">2026. 3. 30.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Terraform으로 AWS VPC 만들기 — default VPC를 버리는 이유</span>
+          <time class="post-row-date">2026. 3. 28.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Helm Chart에서 values.yaml 오버라이드 순서가 중요한 이유</span>
+          <time class="post-row-date">2026. 3. 25.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">AWS ALB Ingress Controller와 NLB — 언제 뭘 쓰는가</span>
+          <time class="post-row-date">2026. 3. 20.</time>
+        </a>
+      </article>
+
+      <article class="post-row post-row--notice">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title"><span class="notice-badge">공지</span>블로그 이사했습니다</span>
+          <time class="post-row-date">2026. 3. 15.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Prometheus 메트릭이 안 보일 때 확인할 것들</span>
+          <time class="post-row-date">2026. 3. 10.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">EKS에서 CoreDNS가 죽었을 때 벌어지는 일</span>
+          <time class="post-row-date">2026. 3. 5.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">ArgoCD ApplicationSet으로 멀티 클러스터 배포하기</span>
+          <time class="post-row-date">2026. 2. 28.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Docker buildx로 멀티 아키텍처 이미지 빌드하기</span>
+          <time class="post-row-date">2026. 2. 20.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Terraform remote state를 S3로 옮길 때 주의할 점</span>
+          <time class="post-row-date">2026. 2. 14.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">kubectl port-forward가 불안정할 때 먼저 볼 것들</span>
+          <time class="post-row-date">2026. 2. 9.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Prometheus Alertmanager 라우팅이 기대와 다르게 동작한 이유</span>
+          <time class="post-row-date">2026. 2. 3.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">ECR 이미지 정리 정책을 늦게 붙였을 때 생기는 문제</span>
+          <time class="post-row-date">2026. 1. 28.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">GitHub Actions 캐시가 오히려 빌드를 느리게 만든 사례</span>
+          <time class="post-row-date">2026. 1. 21.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">Helm 템플릿 디버깅을 빠르게 하는 명령 조합</span>
+          <time class="post-row-date">2026. 1. 16.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">ALB 헬스체크 실패 원인을 로그 없이 좁혀가는 방법</span>
+          <time class="post-row-date">2026. 1. 10.</time>
+        </a>
+      </article>
+
+      <article class="post-row">
+        <a href="#" class="post-row-link">
+          <span class="post-row-title">컨테이너 메모리 제한과 OOMKilled를 오해했던 지점</span>
+          <time class="post-row-date">2026. 1. 4.</time>
+        </a>
+      </article>
+
+      <div class="pagination">
+        <a href="preview.html" class="page-prev no_more_prev">&laquo; 이전</a>
+        <a href="preview.html" class="page-num selected">1</a>
+        <a href="preview-page-2.html" class="page-num">2</a>
+        <a href="preview-page-3.html" class="page-num">3</a>
+        <a href="preview-page-2.html" class="page-next">다음 &raquo;</a>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===== Footer ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>&copy; <a href="#">악분의 블로그</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
