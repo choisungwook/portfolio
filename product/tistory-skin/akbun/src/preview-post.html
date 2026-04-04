@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>akbun skin preview - Post</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body id="tt-body-page">
+
+  <!-- ===== Header ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="preview.html" class="site-title">악분의 블로그</a>
+      <nav class="site-nav">
+        <ul>
+          <li><a href="preview.html">홈</a></li>
+          <li><a href="#">방명록</a></li>
+          <li><a href="#">태그</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Main Layout ===== -->
+  <div class="main-layout">
+
+    <!-- Sidebar: hidden on post pages via CSS -->
+    <aside class="sidebar"></aside>
+
+    <!-- Content -->
+    <main class="content">
+
+      <div class="page-home-link">
+        <a href="preview.html" class="page-home-link-anchor">글 목록으로 돌아가기</a>
+      </div>
+
+      <article class="post-full">
+        <header class="post-header">
+          <a href="#" class="post-category-link">카테고리: Kubernetes</a>
+          <h1 class="post-title">Kubernetes Pod가 Pending 상태에서 빠져나오지 못하는 이유</h1>
+          <div class="post-meta">
+            <time class="post-date">2026. 4. 1. 14:30</time>
+          </div>
+        </header>
+
+        <div class="post-body">
+          <h1>왜 이 글을 쓰는가</h1>
+          <p>EKS 클러스터에서 Pod를 배포했는데 <code>Pending</code> 상태에서 한참 멈춰있었다. <code>kubectl describe pod</code>를 쳐봐도 이벤트가 뭔 소린지 바로 이해가 안 됐다. 삽질 끝에 정리한 <strong>대표적인 원인 3가지</strong>를 기록한다.</p>
+
+          <h1>원인 1: 리소스 부족</h1>
+          <p><strong>가장 흔한 원인</strong>이다. Pod의 <code>resources.requests</code>를 만족하는 노드가 없으면 스케줄러가 배치할 곳을 찾지 못한다.</p>
+
+          <h2>어떻게 확인하나</h2>
+          <h3>Events에서 먼저 볼 문장</h3>
+          <p>확인 방법은 다음과 같다.</p>
+          <pre><code>kubectl describe pod my-pod -n default
+
+# Events 섹션에서 이런 메시지가 보인다:
+# 0/3 nodes are available: 3 Insufficient cpu.</code></pre>
+
+          <h2>어떻게 해결하나</h2>
+          <h3>가장 먼저 시도할 선택지</h3>
+          <p>해결 방법은 두 가지다.</p>
+          <ul>
+            <li>Pod의 resource requests를 줄인다</li>
+            <li>노드를 추가한다 (Cluster Autoscaler가 있으면 자동으로 처리된다)</li>
+          </ul>
+
+          <blockquote>
+            <p>팁: <code>kubectl top nodes</code>로 현재 노드들의 리소스 사용량을 먼저 확인하면 감을 잡기 쉽다.</p>
+          </blockquote>
+
+          <h1>원인 2: nodeSelector 또는 affinity 불일치</h1>
+          <p>Pod에 <code>nodeSelector</code>나 <code>nodeAffinity</code>를 설정했는데, 해당 라벨을 가진 노드가 없는 경우다. 이건 이벤트 메시지가 좀 더 구체적으로 나온다.</p>
+
+          <h2>nodeSelector 예시</h2>
+          <p>nodeSelector 예시를 보면 다음과 같다.</p>
+          <pre><code>spec:
+  nodeSelector:
+    disktype: ssd</code></pre>
+
+          <h2>확인 명령</h2>
+          <h3>노드 라벨을 바로 점검하는 방법</h3>
+          <p>노드에 해당 라벨이 있는지 확인하는 명령이다.</p>
+          <pre><code>kubectl get nodes --show-labels | grep disktype</code></pre>
+
+          <h1>원인 3: PVC 바인딩 실패</h1>
+          <p>PersistentVolumeClaim이 Bound 되지 않으면 Pod도 시작하지 못한다. StorageClass가 없거나, 가용 영역이 맞지 않는 경우가 많다.</p>
+
+          <h2>PVC 상태 확인</h2>
+          <h3>먼저 Bound 여부를 본다</h3>
+          <p>PVC 상태를 확인하는 명령이다.</p>
+          <pre><code>kubectl get pvc -n default</code></pre>
+
+          <h1>정리</h1>
+
+          <h2>원인별 빠른 판단 기준</h2>
+          <p>3가지 원인을 표로 정리하면 다음과 같다.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>원인</th>
+                <th>Events 메시지 키워드</th>
+                <th>해결 방향</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>리소스 부족</td>
+                <td>Insufficient cpu/memory</td>
+                <td>requests 조정 또는 노드 추가</td>
+              </tr>
+              <tr>
+                <td>nodeSelector 불일치</td>
+                <td>didn't match node selector</td>
+                <td>라벨 확인 또는 selector 수정</td>
+              </tr>
+              <tr>
+                <td>PVC 미바인딩</td>
+                <td>unbound PersistentVolumeClaims</td>
+                <td>StorageClass, AZ 확인</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p>대부분의 경우 <code>kubectl describe pod</code>의 <strong>Events 섹션을 읽으면 원인을 특정</strong>할 수 있다. 메시지가 어렵게 느껴지면 그 문장을 그대로 검색하면 된다.</p>
+
+          <h1>코드블록 예시</h1>
+
+          <h2>Terraform</h2>
+          <h3>조회 예시</h3>
+          <p>Terraform으로 VPC를 조회하는 HCL 코드다.</p>
+          <pre data-ke-language="hcl"><code>data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}</code></pre>
+
+          <h2>Python</h2>
+          <h3>Pending Pod만 추리는 코드</h3>
+          <p>Python으로 Pod 상태를 확인하는 스크립트다.</p>
+          <pre data-ke-language="python"><code>from kubernetes import client, config
+
+config.load_kube_config()
+v1 = client.CoreV1Api()
+
+pods = v1.list_namespaced_pod("default")
+for pod in pods.items:
+    if pod.status.phase == "Pending":
+        print(f"Pending: {pod.metadata.name}")</code></pre>
+
+          <h2>JavaScript</h2>
+          <h3>API 응답 필터링</h3>
+          <p>JavaScript로 API 호출하는 예시다.</p>
+          <pre data-ke-language="javascript"><code>async function getPods(namespace = "default") {
+  const response = await fetch(`/api/v1/namespaces/${namespace}/pods`);
+  const data = await response.json();
+  return data.items.filter(pod => pod.status.phase === "Pending");
+}</code></pre>
+
+          <h2>Ansible</h2>
+          <h3>노드 라벨 적용</h3>
+          <p>Ansible playbook으로 노드 라벨을 붙이는 예시다.</p>
+          <pre data-ke-language="ansible"><code>- name: Label Kubernetes nodes
+  hosts: localhost
+  tasks:
+    - name: Add disktype label to worker nodes
+      kubernetes.core.k8s:
+        state: present
+        kind: Node
+        name: "{{ item }}"
+        definition:
+          metadata:
+            labels:
+              disktype: ssd
+      loop:
+        - worker-1
+        - worker-2</code></pre>
+
+          <h2>Shell</h2>
+          <h3>CLI로 빠르게 확인</h3>
+          <p>Shell 스크립트로 Pod를 확인하는 예시다.</p>
+          <pre data-ke-language="sh"><code>#!/bin/bash
+NAMESPACE="default"
+
+echo "=== Pending Pods ==="
+kubectl get pods -n "$NAMESPACE" --field-selector=status.phase=Pending -o wide
+
+for pod in $(kubectl get pods -n "$NAMESPACE" --field-selector=status.phase=Pending -o name); do
+  echo "--- $pod ---"
+  kubectl describe "$pod" -n "$NAMESPACE" | grep -A 10 "Events:"
+done</code></pre>
+
+          <p>YAML로 리소스 requests를 설정하는 예시다.</p>
+          <pre data-ke-language="yaml"><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"</code></pre>
+
+          <p>일반 텍스트 출력 예시다.</p>
+          <pre data-ke-language="txt"><code>NAME        READY   STATUS    RESTARTS   AGE
+nginx-pod   0/1     Pending   0          5m32s
+redis-pod   1/1     Running   0          12m</code></pre>
+        </div>
+
+        <!-- Tags -->
+        <div class="post-tags">
+          <span class="post-tags-label">태그</span>
+          <a href="#">Kubernetes</a>
+          <a href="#">Pod</a>
+          <a href="#">Pending</a>
+          <a href="#">트러블슈팅</a>
+          <a href="#">EKS</a>
+        </div>
+
+        <!-- Admin (hidden in preview) -->
+
+        <!-- Related Posts -->
+        <nav class="related-posts">
+          <h2 class="related-posts-title">관련 글</h2>
+          <ul class="related-posts-list">
+            <li class="related-posts-item">
+              <a href="#">
+                <span class="related-posts-item-title">Helm Chart에서 values.yaml 오버라이드 순서가 중요한 이유</span>
+                <time class="related-posts-item-date">2026. 3. 25.</time>
+              </a>
+            </li>
+            <li class="related-posts-item">
+              <a href="#">
+                <span class="related-posts-item-title">AWS ALB Ingress Controller와 NLB — 언제 뭘 쓰는가</span>
+                <time class="related-posts-item-date">2026. 3. 20.</time>
+              </a>
+            </li>
+            <li class="related-posts-item">
+              <a href="#">
+                <span class="related-posts-item-title">Kubernetes Service 타입별 차이 — ClusterIP, NodePort, LoadBalancer</span>
+                <time class="related-posts-item-date">2026. 3. 5.</time>
+              </a>
+            </li>
+            <li class="related-posts-item">
+              <a href="#">
+                <span class="related-posts-item-title">EKS에서 CoreDNS가 죽었을 때 벌어지는 일</span>
+                <time class="related-posts-item-date">2026. 2. 18.</time>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <!-- Comments placeholder -->
+        <section class="comments-section">
+          <h2 class="comments-title">댓글</h2>
+          <div style="padding: 2rem 0; text-align: center; color: var(--color-text-tertiary); font-size: 0.875rem;">
+            [댓글 영역 — 티스토리에서 자동 렌더링]
+          </div>
+        </section>
+      </article>
+
+    </main>
+  </div>
+
+  <!-- ===== Floating ToC ===== -->
+  <nav class="floating-toc" id="floating-toc">
+    <div class="floating-toc-header">목차</div>
+    <ul class="floating-toc-list" id="toc-nav"></ul>
+  </nav>
+
+  <!-- ===== Footer ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>&copy; <a href="#">악분의 블로그</a></p>
+    </div>
+  </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-hcl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-ini.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var map = {
+      hcl: "hcl", terraform: "hcl",
+      python: "python", py: "python",
+      javascript: "javascript", js: "javascript",
+      bash: "bash", sh: "bash", shell: "bash",
+      yaml: "yaml", yml: "yaml", ansible: "yaml",
+      json: "json", go: "go",
+      dockerfile: "docker", docker: "docker",
+      ini: "ini", toml: "ini",
+      sql: "sql", pgsql: "sql", mysql: "sql",
+      txt: "none", text: "none",
+      ebnf: "bash", "jboss-cli": "bash", routeros: "bash"
+    };
+    function normalizeLanguageToken(value) {
+      return (value || "").toLowerCase().replace(/^language-/, "");
+    }
+
+    document.querySelectorAll(".post-body pre").forEach(function (pre) {
+      var lang = normalizeLanguageToken(pre.getAttribute("data-ke-language"));
+      if (!lang) {
+        var cls = pre.className.split(/\s+/).map(normalizeLanguageToken).filter(function (c) {
+          return c && c !== "none";
+        });
+        lang = cls[0] || "";
+      }
+      var mapped = map[lang] || lang || "none";
+
+      var code = pre.querySelector("code");
+      if (!code) {
+        code = document.createElement("code");
+        code.textContent = pre.textContent;
+        pre.textContent = "";
+        pre.appendChild(code);
+      }
+      if (!code.className || !/(^|\s)language-/.test(code.className)) {
+        code.className = "language-" + mapped;
+      }
+    });
+    Prism.highlightAll();
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var tocNav = document.getElementById("toc-nav");
+    var tocContainer = document.getElementById("floating-toc");
+    if (!tocNav || !tocContainer) return;
+
+    var headings = document.querySelectorAll(".post-body h1, .post-body h2");
+    if (headings.length === 0) return;
+
+    var generatedIdIndex = 0;
+
+    headings.forEach(function (heading) {
+      var id = heading.id;
+      if (!id) {
+        do {
+          id = "toc-heading-" + generatedIdIndex;
+          generatedIdIndex += 1;
+        } while (document.getElementById(id));
+        heading.id = id;
+      }
+
+      var li = document.createElement("li");
+      li.className = "toc-item toc-" + heading.tagName.toLowerCase();
+
+      var a = document.createElement("a");
+      a.href = "#" + id;
+      a.textContent = heading.textContent;
+      a.className = "toc-link";
+
+      li.appendChild(a);
+      tocNav.appendChild(li);
+    });
+
+    tocContainer.classList.add("visible");
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          document.querySelectorAll(".toc-link").forEach(function (link) {
+            link.classList.remove("active");
+          });
+          var activeLink = tocNav.querySelector('a[href="#' + entry.target.id + '"]');
+          if (activeLink) activeLink.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-80px 0px -80% 0px" });
+
+    headings.forEach(function (heading) {
+      observer.observe(heading);
+    });
+  });
+</script>
+</body>
+</html>

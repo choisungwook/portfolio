@@ -71,6 +71,7 @@
 65. Cache-Control 의미 26.3.22 - [링크](./computer_science/cache_control/)
 66. EKS custom AMI 생성과 적용방법 26.3.28 - [링크](./aws/eks-custom-ami/)
 67. AI agent용 슬라이드 레이아웃 레퍼런스 시스템 26.3.28 - [링크](./product/slide-reference/)
+68. 티스토리 스킨 26.4.4 - [링크](./product/tistory-skin/akbun/)
 
 ## 다른 정리된 문서 링크
 
