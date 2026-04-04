@@ -19,13 +19,13 @@ public class ZombieConnectionMetrics {
     private final AtomicInteger zombieCount = new AtomicInteger(0);
     private final Counter leakCounter;
 
-    @Value("${db.url}")
+    @Value("${spring.datasource.url}")
     private String dbUrl;
 
-    @Value("${db.user}")
+    @Value("${spring.datasource.username}")
     private String dbUser;
 
-    @Value("${db.password}")
+    @Value("${spring.datasource.password}")
     private String dbPassword;
 
     public ZombieConnectionMetrics(MeterRegistry registry) {
@@ -42,12 +42,12 @@ public class ZombieConnectionMetrics {
 
     @Scheduled(fixedDelay = 5000)
     public void refreshZombieCount() {
-        // db.url (socketTimeout 없음)을 사용해서 모니터링 쿼리가 타임아웃되지 않는다
+        // DriverManager를 통해 직접 커넥션을 생성하여 좀비 수를 조회한다.
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                     "SELECT COUNT(*) FROM information_schema.processlist "
-                             + "WHERE command = 'Query' AND info LIKE '%SLEEP%'")) {
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.processlist "
+                            + "WHERE command = 'Query' AND info LIKE '%SLEEP%'")) {
             if (rs.next()) {
                 zombieCount.set(rs.getInt(1));
             }

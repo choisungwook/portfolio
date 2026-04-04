@@ -19,6 +19,10 @@ services:
     container_name: socket-leak-app
     ports:
       - "8080:8080"
+    ulimits:
+      nofile:
+        soft: 64
+        hard: 64
     depends_on:
       mariadb:
         condition: service_healthy

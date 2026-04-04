@@ -11,4 +11,4 @@
 | 3 | 컨테이너 원리 - chroot | [링크](./linux_namespace/chroot/) |
 | 4 | 컨테이너 원리 - mount namespace | [링크](./linux_namespace/mount_namespace/) |
 | 5 | pivot_root | [링크](./linux_namespace/pivot_root/) |
-| 6 | MariaDB 커넥션 소켓 누수 재현 | [링크](./database_connection/) |
+| 6 | MariaDB 커넥션 소켓 누수 재현 | [링크](./leak_linux_socket/) |
