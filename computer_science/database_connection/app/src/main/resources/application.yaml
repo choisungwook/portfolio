@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  main:
+    banner-mode: off
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+db:
+  host: ${DB_HOST:localhost}
+  port: ${DB_PORT:3306}
+  name: ${DB_NAME:testdb}
+  user: ${DB_USER:root}
+  password: ${DB_PASSWORD:password}
+
+logging:
+  level:
+    root: WARN
+    com.example: INFO
