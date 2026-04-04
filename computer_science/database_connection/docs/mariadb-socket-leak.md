@@ -33,6 +33,28 @@ MariaDB: 쿼리 계속 실행 중     ← 좀비 커넥션
 - 클라이언트의 파일 디스크립터가 고갈된다 (Too many open files)
 - 좀비 커넥션이 트랜잭션 락을 잡고 있으면 다른 쿼리가 블락된다
 
+## 리눅스 FD(파일 디스크립터)와 소켓
+
+소켓 누수를 이해하려면 먼저 FD가 뭔지 알아야 한다.
+
+리눅스에서 모든 I/O 리소스는 **FD(파일 디스크립터)** 라는 정수 번호로 관리한다. 파일을 열면 FD가 생기고, 소켓을 만들면 FD가 생기고, 파이프를 만들면 FD가 생긴다. 커널 입장에서 파일과 소켓은 다 같은 FD다.
+
+```
+# 프로세스의 열린 FD 목록 확인
+ls /proc/<pid>/fd
+
+# 결과 예시 (각 항목이 하나의 FD)
+0 -> /dev/pts/0      # stdin
+1 -> /dev/pts/0      # stdout
+2 -> /dev/pts/0      # stderr
+3 -> socket:[12345]  # TCP 소켓
+4 -> /tmp/app.log    # 파일
+```
+
+TCP 연결(`connect()`)을 맺으면 커널이 소켓 FD를 하나 할당한다. 연결을 닫으면(`close()`) FD가 반환된다. 소켓 누수 = 이 FD가 반환되지 않는 상황이다.
+
+프로세스당 열 수 있는 FD 최대치는 `ulimit -n`으로 확인한다. 기본값은 보통 1024 또는 65536이다. FD가 고갈되면 새 연결을 못 맺고 `EMFILE: Too many open files` 에러가 발생한다.
+
 ## 어떤 버그인가? (CONJ-863)
 
 MariaDB JIRA에 등록된 버그 [CONJ-863](https://jira.mariadb.org/browse/CONJ-863)이다.
@@ -53,9 +75,11 @@ MariaDB JIRA에 등록된 버그 [CONJ-863](https://jira.mariadb.org/browse/CONJ
 
 | 컴포넌트 | 설명 |
 |----------|------|
-| MariaDB 10.11 | Docker 컨테이너, ARM64 지원 |
-| Spring Boot 3.2 | REST API로 소켓 누수를 재현 |
+| MariaDB 10.11 | Docker 컨테이너, ARM64 지원, ss/lsof 포함 |
+| Spring Boot 3.2 | REST API로 소켓 누수를 재현, Actuator + Micrometer |
 | mariadb-java-client 2.7.2 | 소켓 누수 버그가 있는 버전 |
+| Prometheus | JVM 메트릭 + 커스텀 좀비 커넥션 메트릭 수집 |
+| Grafana | 소켓 누수 모니터링 대시보드 |
 
 ### 재현 원리
 
@@ -69,13 +93,23 @@ MariaDB JIRA에 등록된 버그 [CONJ-863](https://jira.mariadb.org/browse/CONJ
 
 ```
 database_connection/
-├── docker-compose.yaml          # MariaDB + Spring Boot 앱
+├── docker-compose.yaml          # MariaDB + 앱 + Prometheus + Grafana
+├── prometheus.yml               # Prometheus scrape 설정
+├── mariadb/
+│   └── Dockerfile               # MariaDB + 디버깅 도구(ss, lsof)
+├── grafana/
+│   ├── provisioning/
+│   │   ├── datasources/prometheus.yml
+│   │   └── dashboards/dashboard.yml
+│   └── dashboards/
+│       └── socket-leak-dashboard.json
 ├── app/
-│   ├── Dockerfile               # 멀티스테이지 빌드
-│   ├── build.gradle             # mariadb-java-client 2.7.2
+│   ├── Dockerfile               # 멀티스테이지 빌드 + lsof 포함
+│   ├── build.gradle             # mariadb-java-client 2.7.2 + actuator
 │   └── src/main/java/.../
 │       ├── SocketLeakApplication.java
-│       └── LeakController.java  # /reproduce, /check, /info 엔드포인트
+│       ├── LeakController.java       # /reproduce, /check, /info
+│       └── ZombieConnectionMetrics.java  # Gauge, Counter 메트릭
 ```
 
 ## 핸즈온: 소켓 누수 재현
@@ -228,6 +262,146 @@ docker exec socket-leak-app ss -tnp | grep 3306
 ```bash
 docker compose down
 ```
+
+## 앱 FD vs MariaDB FD 구분하기
+
+TCP 소켓은 양방향이다. 앱이 `connect()`를 호출하면 **앱 측에도 FD가 생기고, MariaDB 측에도 FD가 생긴다.** 소켓 누수가 발생하면 양쪽 다 FD를 잡고 있다.
+
+소켓 누수가 의심될 때 어느 쪽 문제인지 구분하는 방법은 다음과 같다.
+
+### 앱(클라이언트) 측 확인
+
+앱 컨테이너의 FD 총 개수를 확인한다. `/reproduce`를 호출할 때마다 증가하면 소켓 FD가 누수되고 있는 것이다.
+
+```bash
+docker exec socket-leak-app ls /proc/1/fd | wc -l
+```
+
+MariaDB(3306)로 열려 있는 TCP 소켓을 확인한다. ESTABLISHED 상태 소켓이 남아있으면 닫히지 않은 소켓이다.
+
+```bash
+docker exec socket-leak-app ss -tnp | grep 3306
+```
+
+lsof로 TCP FD를 상세히 확인한다.
+
+```bash
+docker exec socket-leak-app lsof -p 1 -i TCP
+```
+
+### MariaDB(서버) 측 확인
+
+MariaDB 컨테이너의 FD 총 개수를 확인한다. 클라이언트 커넥션마다 FD를 하나씩 차지한다.
+
+```bash
+docker exec mariadb ls /proc/1/fd | wc -l
+```
+
+MariaDB가 유지 중인 TCP 소켓 목록을 확인한다.
+
+```bash
+docker exec mariadb ss -tnp
+```
+
+SHOW PROCESSLIST로 좀비 커넥션을 확인한다. `SELECT SLEEP`이 실행 중인 커넥션은 클라이언트에서 소켓을 닫지 않아서 남아있는 좀비다.
+
+```bash
+docker exec mariadb mysql -u root -ppassword -e "SHOW PROCESSLIST"
+```
+
+### 구분 요약
+
+| 관점 | 명령어 | 누수 시 보이는 것 |
+|------|--------|-----------------|
+| 앱 FD 수 | `ls /proc/1/fd \| wc -l` | /reproduce 호출마다 증가 |
+| 앱 TCP 소켓 | `ss -tnp \| grep 3306` | ESTABLISHED 소켓 잔존 |
+| MariaDB FD 수 | `ls /proc/1/fd \| wc -l` | 커넥션마다 1씩 증가 |
+| MariaDB 프로세스 | `SHOW PROCESSLIST` | SLEEP 실행 중인 좀비 |
+
+핵심: **이 버그에서는 양쪽 다 FD가 누수된다.** 앱은 소켓을 안 닫아서, MariaDB는 클라이언트가 끊은 줄 몰라서 둘 다 FD를 잡고 있다.
+
+## 핸즈온: Prometheus/Grafana로 소켓 누수 모니터링
+
+FD 누수를 명령어로 확인하는 건 일회성이다. 실제 운영 환경에서는 메트릭으로 지속 추적해야 한다. Spring Boot Actuator + Micrometer + Prometheus + Grafana로 소켓 누수를 시각화할 수 있다.
+
+### 핵심 메트릭
+
+앱에서 노출되는 메트릭과 의미는 다음과 같다.
+
+| 메트릭 | 타입 | 의미 |
+|--------|------|------|
+| `process_open_fds` | Gauge (자동) | JVM 프로세스의 열린 FD 수. 소켓 누수 시 증가 |
+| `process_max_fds` | Gauge (자동) | 프로세스의 FD 최대치 |
+| `mariadb_zombie_connections` | Gauge (커스텀) | MariaDB SHOW PROCESSLIST에서 확인한 좀비 수 |
+| `mariadb_socket_leak_total` | Counter (커스텀) | `/reproduce` 호출 누적 횟수 |
+
+`process_open_fds`는 Spring Boot Actuator가 자동으로 수집한다. 나머지 둘은 `ZombieConnectionMetrics.java`에서 등록한 커스텀 메트릭이다.
+
+### Step 1: 환경 실행
+
+모든 서비스를 한번에 올린다.
+
+```bash
+cd computer_science/database_connection
+docker compose up -d --build
+```
+
+4개 서비스가 올라온다: `mariadb`, `app`, `prometheus`, `grafana`
+
+### Step 2: Prometheus scrape 확인
+
+Prometheus가 앱 메트릭을 정상 수집하는지 확인한다.
+
+브라우저에서 `http://localhost:9090/targets`를 열어 `socket-leak-app` 상태가 **UP**인지 확인한다.
+
+### Step 3: 메트릭 직접 확인
+
+actuator가 노출하는 raw 메트릭을 확인한다.
+
+```bash
+curl -s localhost:8080/actuator/prometheus | grep -E "process_open_fds|mariadb"
+```
+
+`process_open_fds`, `mariadb_zombie_connections`, `mariadb_socket_leak_total`이 보이면 정상이다.
+
+### Step 4: 소켓 누수 재현 + 메트릭 변화 관찰
+
+소켓 누수를 5번 발생시킨다.
+
+```bash
+for i in {1..5}; do curl -s localhost:8080/reproduce | python3 -m json.tool; sleep 1; done
+```
+
+### Step 5: Grafana 대시보드로 확인
+
+브라우저에서 `http://localhost:3000`을 열고 `admin` / `admin`으로 로그인한다.
+
+왼쪽 메뉴 → **Dashboards** → **socket-leak** 폴더 → **MariaDB Socket Leak Monitoring** 대시보드를 연다.
+
+대시보드에서 확인할 내용:
+
+- **Process Open FDs 그래프**: `/reproduce` 호출마다 계단식으로 증가하는지 확인
+- **Zombie Connections**: MariaDB 서버에 남아있는 좀비 커넥션 수
+- **Socket Leak Total**: 총 누수 발생 횟수
+- **FD 소진율**: 현재 FD 사용이 최대치의 몇 %인지
+
+### Step 6: 수정 버전으로 비교
+
+`app/build.gradle`에서 드라이버 버전을 2.7.4로 바꾸고 같은 테스트를 반복한다.
+
+```groovy
+implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.4'
+```
+
+다시 빌드하고 테스트한다.
+
+```bash
+docker compose down
+docker compose up -d --build
+for i in {1..5}; do curl -s localhost:8080/reproduce; sleep 1; done
+```
+
+2.7.4에서는 `process_open_fds`가 증가하지 않고, Zombie Connections도 0으로 유지되어야 한다.
 
 ## 코드 설명
 

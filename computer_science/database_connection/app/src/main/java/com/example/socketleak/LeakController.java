@@ -15,19 +15,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 public class LeakController {
 
-    @Value("${db.host}")
-    private String dbHost;
-
-    @Value("${db.port}")
-    private int dbPort;
-
-    @Value("${db.name}")
-    private String dbName;
+    @Value("${db.url}")
+    private String dbUrl;
 
     @Value("${db.user}")
     private String dbUser;
@@ -35,10 +28,10 @@ public class LeakController {
     @Value("${db.password}")
     private String dbPassword;
 
-    private final AtomicInteger leakCount = new AtomicInteger(0);
+    private final ZombieConnectionMetrics metrics;
 
-    private String getBaseUrl() {
-        return String.format("jdbc:mariadb://%s:%d/%s", dbHost, dbPort, dbName);
+    public LeakController(ZombieConnectionMetrics metrics) {
+        this.metrics = metrics;
     }
 
     /**
@@ -55,12 +48,12 @@ public class LeakController {
             @RequestParam(defaultValue = "30") int sleepSeconds,
             @RequestParam(defaultValue = "3000") int socketTimeoutMs) {
 
-        String url = getBaseUrl() + "?socketTimeout=" + socketTimeoutMs;
+        String leakUrl = dbUrl + "?socketTimeout=" + socketTimeoutMs;
         Map<String, Object> result = new LinkedHashMap<>();
-        int attempt = leakCount.incrementAndGet();
 
-        result.put("attempt", attempt);
-        result.put("jdbcUrl", url);
+        metrics.incrementLeakCounter();
+
+        result.put("jdbcUrl", leakUrl);
         result.put("query", "SELECT SLEEP(" + sleepSeconds + ")");
         result.put("socketTimeoutMs", socketTimeoutMs);
 
@@ -69,7 +62,7 @@ public class LeakController {
         // try-with-resources로 올바르게 자원 정리를 시도한다.
         // 하지만 mariadb-java-client 2.7.2 버그로 인해
         // conn.close()가 호출되어도 TCP 소켓이 닫히지 않는다.
-        try (Connection conn = DriverManager.getConnection(url, dbUser, dbPassword);
+        try (Connection conn = DriverManager.getConnection(leakUrl, dbUser, dbPassword);
              Statement stmt = conn.createStatement()) {
 
             stmt.executeQuery("SELECT SLEEP(" + sleepSeconds + ")");
@@ -97,7 +90,8 @@ public class LeakController {
     public Map<String, Object> checkProcessList() {
         Map<String, Object> result = new LinkedHashMap<>();
 
-        try (Connection conn = DriverManager.getConnection(getBaseUrl(), dbUser, dbPassword);
+        // dbUrl (socketTimeout 없음)으로 연결 — 이 쿼리 자체가 타임아웃되지 않아야 한다
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SHOW PROCESSLIST")) {
 
@@ -121,7 +115,6 @@ public class LeakController {
 
             result.put("totalConnections", processes.size());
             result.put("zombieConnections", zombieCount);
-            result.put("leakAttempts", leakCount.get());
             result.put("processes", processes);
 
         } catch (SQLException e) {
@@ -132,7 +125,7 @@ public class LeakController {
     }
 
     /**
-     * 드라이버 버전 정보와 현재 누수 횟수를 반환한다.
+     * 드라이버 버전 정보를 반환한다.
      */
     @GetMapping("/info")
     public Map<String, Object> driverInfo() {
@@ -147,7 +140,6 @@ public class LeakController {
             result.put("error", e.getMessage());
         }
 
-        result.put("leakAttempts", leakCount.get());
         return result;
     }
 }

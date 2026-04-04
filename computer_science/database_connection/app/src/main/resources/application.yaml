@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  application:
+    name: socket-leak
   main:
     banner-mode: off
   autoconfigure:
@@ -9,11 +11,18 @@ spring:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
 
 db:
-  host: ${DB_HOST:localhost}
-  port: ${DB_PORT:3306}
-  name: ${DB_NAME:testdb}
+  url: jdbc:mariadb://${DB_HOST:mariadb}:${DB_PORT:3306}/${DB_NAME:testdb}
   user: ${DB_USER:root}
   password: ${DB_PASSWORD:password}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:
