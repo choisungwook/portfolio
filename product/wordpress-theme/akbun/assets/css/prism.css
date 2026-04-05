@@ -1,0 +1,92 @@
+/**
+ * Prism.js Tomorrow Night theme override
+ * Matches the akbun Tistory skin code block styling
+ */
+
+/* Override Prism's default styles to match our design tokens */
+code[class*="language-"],
+pre[class*="language-"] {
+  color: #c5c8c6;
+  background: none;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1.65;
+  tab-size: 4;
+  hyphens: none;
+}
+
+pre[class*="language-"] {
+  overflow: auto;
+}
+
+/* Token colors — Tomorrow Night */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #969896;
+}
+
+.token.punctuation {
+  color: #c5c8c6;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #cc6666;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #b5bd68;
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: #8abeb7;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #b294bb;
+}
+
+.token.function,
+.token.class-name {
+  color: #81a2be;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #de935f;
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
