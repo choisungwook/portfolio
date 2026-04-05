@@ -2,6 +2,8 @@
 
 안녕하세요! 악분이 공부했던 내용을 정리한 공간입니다.
 
+- 블로그: <https://malwareanalysis.tistory.com/>
+
 ## 목차
 
 1. helm-charts - [링크](./helm)
@@ -72,9 +74,12 @@
 66. EKS custom AMI 생성과 적용방법 26.3.28 - [링크](./aws/eks-custom-ami/)
 67. AI agent용 슬라이드 레이아웃 레퍼런스 시스템 26.3.28 - [링크](./product/slide-reference/)
 68. 티스토리 스킨 26.4.4 - [링크](./product/tistory-skin/akbun/)
+69. akbun ai tools(claude) plugins 26.4.4 - [링크](https://github.com/choisungwook/akbun-aitools.git)
+70. 소켓leaked가 발생하면 linux fd의 영향은 어떻게 될까? 26.4.5 - [링크](./computer_science/leak_linux_socket/)
 
 ## 다른 정리된 문서 링크
 
+- [Akbun Claude plugins](https://github.com/choisungwook/akbun-aitools.git)
 - [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
 - [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
 - [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)

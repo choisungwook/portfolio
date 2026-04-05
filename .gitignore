@@ -122,3 +122,6 @@ artifacts/
 
 # git
 worktree/
+
+# gradle
+**/.gradle/

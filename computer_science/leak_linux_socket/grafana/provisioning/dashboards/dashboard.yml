@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: socket-leak
+    orgId: 1
+    folder: socket-leak
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
