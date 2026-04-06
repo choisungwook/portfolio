@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <rect width="1200" height="900" fill="#fafafa"/>
+  <!-- Header -->
+  <rect width="1200" height="60" fill="#fafafa" stroke="#e5e3da" stroke-width="1" y="0"/>
+  <text x="60" y="38" font-family="-apple-system, sans-serif" font-size="20" font-weight="700" fill="#141413">akbun</text>
+  <text x="1000" y="38" font-family="-apple-system, sans-serif" font-size="15" fill="#5e5d59">About</text>
+  <text x="1060" y="38" font-family="-apple-system, sans-serif" font-size="15" fill="#5e5d59">Archive</text>
+  <text x="1130" y="38" font-family="-apple-system, sans-serif" font-size="15" fill="#5e5d59">Tags</text>
+  <!-- Sidebar -->
+  <rect x="60" y="100" width="240" height="700" fill="none"/>
+  <text x="60" y="130" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" letter-spacing="1" fill="#7a2f2f">CATEGORIES</text>
+  <line x1="60" y1="140" x2="300" y2="140" stroke="#d1cfc5" stroke-width="1"/>
+  <text x="60" y="170" font-family="-apple-system, sans-serif" font-size="14" fill="#141413">Kubernetes</text>
+  <text x="60" y="195" font-family="-apple-system, sans-serif" font-size="14" fill="#141413">AWS</text>
+  <text x="60" y="220" font-family="-apple-system, sans-serif" font-size="14" fill="#141413">Terraform</text>
+  <text x="60" y="260" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" letter-spacing="1" fill="#7a2f2f">TAGS</text>
+  <line x1="60" y1="270" x2="300" y2="270" stroke="#d1cfc5" stroke-width="1"/>
+  <rect x="60" y="282" width="60" height="26" rx="13" fill="#f5f5f5" stroke="#d1cfc5" stroke-width="1"/>
+  <text x="75" y="300" font-family="-apple-system, sans-serif" font-size="13" fill="#141413">eBPF</text>
+  <rect x="128" y="282" width="70" height="26" rx="13" fill="#f5f5f5" stroke="#d1cfc5" stroke-width="1"/>
+  <text x="140" y="300" font-family="-apple-system, sans-serif" font-size="13" fill="#141413">cilium</text>
+  <rect x="206" y="282" width="55" height="26" rx="13" fill="#f5f5f5" stroke="#d1cfc5" stroke-width="1"/>
+  <text x="216" y="300" font-family="-apple-system, sans-serif" font-size="13" fill="#141413">EKS</text>
+  <!-- Content -->
+  <text x="360" y="130" font-family="-apple-system, sans-serif" font-size="22" font-weight="800" fill="#7a2f2f">akbun</text>
+  <text x="360" y="155" font-family="-apple-system, sans-serif" font-size="15" fill="#5e5d59">DevOps Engineer's Tech Blog</text>
+  <!-- Post rows -->
+  <line x1="360" y1="190" x2="1140" y2="190" stroke="#e5e3da" stroke-width="1"/>
+  <text x="360" y="220" font-family="-apple-system, sans-serif" font-size="17" font-weight="500" fill="#141413">Kubernetes Gateway API Deep Dive</text>
+  <text x="1060" y="220" font-family="-apple-system, sans-serif" font-size="12" fill="#87867f">2026.04.01</text>
+  <line x1="360" y1="240" x2="1140" y2="240" stroke="#e5e3da" stroke-width="1"/>
+  <text x="360" y="270" font-family="-apple-system, sans-serif" font-size="17" font-weight="500" fill="#141413">Terraform State Management Best Practices</text>
+  <text x="1060" y="270" font-family="-apple-system, sans-serif" font-size="12" fill="#87867f">2026.03.28</text>
+  <line x1="360" y1="290" x2="1140" y2="290" stroke="#e5e3da" stroke-width="1"/>
+  <text x="360" y="320" font-family="-apple-system, sans-serif" font-size="17" font-weight="500" fill="#007a8f">AWS EKS Cluster Autoscaler vs Karpenter</text>
+  <text x="1060" y="320" font-family="-apple-system, sans-serif" font-size="12" fill="#87867f">2026.03.25</text>
+  <line x1="360" y1="340" x2="1140" y2="340" stroke="#e5e3da" stroke-width="1"/>
+  <text x="360" y="370" font-family="-apple-system, sans-serif" font-size="17" font-weight="500" fill="#141413">eBPF로 Kubernetes 네트워크 관찰하기</text>
+  <text x="1060" y="370" font-family="-apple-system, sans-serif" font-size="12" fill="#87867f">2026.03.20</text>
+  <line x1="360" y1="390" x2="1140" y2="390" stroke="#e5e3da" stroke-width="1"/>
+  <text x="360" y="420" font-family="-apple-system, sans-serif" font-size="17" font-weight="500" fill="#141413">CloudFront OAC와 S3 연동 삽질기</text>
+  <text x="1060" y="420" font-family="-apple-system, sans-serif" font-size="12" fill="#87867f">2026.03.15</text>
+  <line x1="360" y1="440" x2="1140" y2="440" stroke="#e5e3da" stroke-width="1"/>
+  <!-- Footer -->
+  <line x1="0" y1="840" x2="1200" y2="840" stroke="#e5e3da" stroke-width="1"/>
+  <text x="600" y="870" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" fill="#87867f">2026 akbun - Powered by WordPress</text>
+</svg>
