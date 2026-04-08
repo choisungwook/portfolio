@@ -1,0 +1,23 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SearchBox from "../components/SearchBox.astro";
+---
+
+<Layout title="검색">
+  <section class="search-page">
+    <h1 class="page-title">검색</h1>
+    <SearchBox />
+  </section>
+</Layout>
+
+<style>
+  .search-page {
+    padding: 24px 0 40px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+</style>

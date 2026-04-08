@@ -1,0 +1,117 @@
+---
+
+---
+
+<section class="subscribe-section">
+  <h3 class="subscribe-title">뉴스레터 구독</h3>
+  <p class="subscribe-desc">새 글이 발행되면 이메일로 알려드립니다.</p>
+  <form id="subscribe-form" class="subscribe-form">
+    <input
+      type="email"
+      name="email"
+      placeholder="이메일 주소"
+      required
+      class="subscribe-input"
+    />
+    <button type="submit" class="subscribe-btn">구독</button>
+  </form>
+  <p id="subscribe-msg" class="subscribe-msg" hidden></p>
+</section>
+
+<script>
+  const form = document.getElementById("subscribe-form") as HTMLFormElement;
+  const msg = document.getElementById("subscribe-msg") as HTMLParagraphElement;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = new FormData(form).get("email") as string;
+
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+      msg.hidden = false;
+      msg.textContent = data.message;
+      msg.className = `subscribe-msg ${res.ok ? "success" : "error"}`;
+      if (res.ok) form.reset();
+    } catch {
+      msg.hidden = false;
+      msg.textContent = "구독 요청에 실패했습니다. 다시 시도해주세요.";
+      msg.className = "subscribe-msg error";
+    }
+  });
+</script>
+
+<style>
+  .subscribe-section {
+    padding: 24px 0;
+    border-top: 1px solid var(--color-border);
+    margin-top: 32px;
+  }
+
+  .subscribe-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .subscribe-desc {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .subscribe-form {
+    display: flex;
+    gap: 8px;
+  }
+
+  .subscribe-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    font-size: 0.938rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: var(--font-sans);
+  }
+
+  .subscribe-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .subscribe-btn {
+    padding: 10px 20px;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: 9999px;
+    font-size: 0.938rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: var(--font-sans);
+  }
+
+  .subscribe-btn:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .subscribe-msg {
+    margin-top: 8px;
+    font-size: 0.813rem;
+  }
+
+  .subscribe-msg.success {
+    color: var(--color-success);
+  }
+
+  .subscribe-msg.error {
+    color: var(--color-error);
+  }
+</style>

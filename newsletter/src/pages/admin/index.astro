@@ -1,0 +1,114 @@
+---
+export const prerender = false;
+
+const isAuthenticated = () => {
+  const authHeader = Astro.request.headers.get("Authorization");
+  if (!authHeader?.startsWith("Basic ")) return false;
+
+  const decoded = atob(authHeader.slice(6));
+  const [, password] = decoded.split(":");
+  const env = Astro.locals.runtime.env;
+  return password === env.ADMIN_PASSWORD;
+};
+
+if (!isAuthenticated()) {
+  return new Response("Unauthorized", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
+  });
+}
+
+const db = Astro.locals.runtime.env.DB;
+const subscribers = await db
+  .prepare("SELECT id, email, confirmed, subscribed_at FROM subscribers WHERE unsubscribed_at IS NULL ORDER BY subscribed_at DESC")
+  .all();
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin | Newsletter</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+      h1 { font-size: 1.5rem; margin-bottom: 24px; }
+      h2 { font-size: 1.125rem; margin: 24px 0 12px; }
+      .stat { display: inline-block; padding: 12px 20px; background: #f0f9ff; border-radius: 8px; margin-bottom: 16px; }
+      .stat strong { font-size: 1.5rem; display: block; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
+      th { font-weight: 600; background: #f8f8f8; }
+      .confirmed { color: #00ba7c; }
+      .pending { color: #f4212e; }
+      .send-section { margin-top: 32px; padding: 20px; border: 1px solid #eee; border-radius: 12px; }
+      input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.938rem; margin-bottom: 12px; }
+      textarea { min-height: 120px; resize: vertical; }
+      button { padding: 10px 24px; background: #1d9bf0; color: #fff; border: none; border-radius: 9999px; font-size: 0.938rem; font-weight: 700; cursor: pointer; }
+      button:hover { background: #1a8cd8; }
+      #send-result { margin-top: 12px; font-size: 0.875rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Admin</h1>
+
+    <div class="stat">
+      <strong>{subscribers.results?.length ?? 0}</strong>
+      <span>구독자</span>
+    </div>
+
+    <h2>구독자 목록</h2>
+    <table>
+      <thead>
+        <tr><th>이메일</th><th>상태</th><th>구독일</th></tr>
+      </thead>
+      <tbody>
+        {(subscribers.results ?? []).map((s: any) => (
+          <tr>
+            <td>{s.email}</td>
+            <td class={s.confirmed ? "confirmed" : "pending"}>
+              {s.confirmed ? "확인됨" : "대기중"}
+            </td>
+            <td>{new Date(s.subscribed_at).toLocaleDateString("ko-KR")}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    <div class="send-section">
+      <h2>뉴스레터 발송</h2>
+      <input type="text" id="subject" placeholder="제목" />
+      <textarea id="body" placeholder="본문 (HTML 가능)"></textarea>
+      <button id="send-btn" type="button">발송</button>
+      <div id="send-result"></div>
+    </div>
+
+    <script is:inline>
+      document.getElementById("send-btn").addEventListener("click", async () => {
+        const subject = document.getElementById("subject").value;
+        const body = document.getElementById("body").value;
+        const result = document.getElementById("send-result");
+
+        if (!subject || !body) {
+          result.textContent = "제목과 본문을 입력하세요.";
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/newsletter/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Basic ${btoa("admin:" + prompt("비밀번호를 입력하세요"))}`,
+            },
+            body: JSON.stringify({ subject, html: body }),
+          });
+          const data = await res.json();
+          result.textContent = data.message;
+        } catch {
+          result.textContent = "발송 실패";
+        }
+      });
+    </script>
+  </body>
+</html>
