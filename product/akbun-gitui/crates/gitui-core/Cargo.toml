@@ -1,0 +1,13 @@
+[package]
+name = "gitui-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core Git operations library for akbun-gitui"
+
+[dependencies]
+git2 = "0.20"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+serde_json = "1"
