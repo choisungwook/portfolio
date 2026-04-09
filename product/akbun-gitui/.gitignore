@@ -1,0 +1,24 @@
+# Rust
+target/
+Cargo.lock
+
+# Node (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri
+crates/gitui-desktop/gen/
+
+# Credentials (never commit)
+credentials.json

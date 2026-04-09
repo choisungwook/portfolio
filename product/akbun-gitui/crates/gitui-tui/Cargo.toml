@@ -1,0 +1,17 @@
+[package]
+name = "gitui-tui"
+version = "0.1.0"
+edition = "2021"
+description = "Terminal UI for akbun-gitui"
+
+[[bin]]
+name = "akbun-gitui-tui"
+path = "src/main.rs"
+
+[dependencies]
+gitui-core = { path = "../gitui-core" }
+git2 = "0.20"
+chrono = "0.4"
+ratatui = "0.29"
+crossterm = "0.28"
+anyhow = "1"

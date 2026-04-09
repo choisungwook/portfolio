@@ -30,6 +30,7 @@ pub struct CredentialConfig {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct CredentialStore {
     pub credentials: Vec<CredentialConfig>,
+    pub active_index: Option<usize>,
 }
 
 fn config_path() -> Result<PathBuf> {
