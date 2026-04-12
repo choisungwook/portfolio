@@ -1,0 +1,149 @@
+{
+  "title": "Spring Boot — HikariCP & JVM",
+  "uid": "spring-hikaricp-jvm",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-5m", "to": "now" },
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "app",
+        "type": "query",
+        "label": "App",
+        "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+        "query": "label_values(jvm_memory_used_bytes, app)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Latency p95 by app",
+      "description": "app variable로 여러 인스턴스를 나란히 비교한다. 배포 직후 스파이크가 있는 앱을 찾는다.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{app=~\"$app\"}[15s])) by (le, app))",
+          "legendFormat": "{{app}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{app=~\"$app\"}[15s])) by (le, app))",
+          "legendFormat": "{{app}} p99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HikariCP — Acquire Time",
+      "description": "connection을 얻기까지 걸리는 대기 시간. 배포 직후 높으면 pool 워밍업이 필요하다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum{app=~\"$app\"}[15s]) / rate(hikaricp_connections_acquire_seconds_count{app=~\"$app\"}[15s])",
+          "legendFormat": "{{app}} acquire avg",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HikariCP — Usage Time",
+      "description": "connection을 가지고 있는 동안 실제 쿼리 수행 시간.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_usage_seconds_sum{app=~\"$app\"}[15s]) / rate(hikaricp_connections_usage_seconds_count{app=~\"$app\"}[15s])",
+          "legendFormat": "{{app}} usage avg",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HikariCP — Active / Pending",
+      "description": "pending이 지속되면 pool 크기 부족. active가 max에 붙어있으면 pool이 포화 상태.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{app=~\"$app\"}",
+          "legendFormat": "{{app}} active",
+          "refId": "A"
+        },
+        {
+          "expr": "hikaricp_connections_pending{app=~\"$app\"}",
+          "legendFormat": "{{app}} pending",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "JVM Heap 사용량",
+      "description": "heap이 급격히 오르면 GC 빈도가 올라가고 latency가 불안정해진다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{app=~\"$app\", area=\"heap\"}",
+          "legendFormat": "{{app}} heap",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Process CPU 사용률",
+      "description": "JIT 컴파일, 클래스 로딩이 집중되는 구간에서 CPU가 급등한다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 22 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{app=~\"$app\"}",
+          "legendFormat": "{{app}} CPU",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Request Rate",
+      "description": "부하가 실제로 들어오고 있는지 확인한다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 22 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{app=~\"$app\"}[15s])) by (app)",
+          "legendFormat": "{{app}} req/s",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

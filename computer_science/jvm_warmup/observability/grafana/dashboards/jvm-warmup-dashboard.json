@@ -1,0 +1,321 @@
+{
+  "title": "JVM Warmup",
+  "uid": "jvm-warmup",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-5m", "to": "now" },
+  "timezone": "browser",
+  "templating": {
+    "list": []
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Latency p50 / p95 / p99 — no-warmup vs with-warmup",
+      "description": "부팅 직후 no-warmup 앱에서 응답 시간과 함께 usage spike가 먼저 나타나는지 본다. with-warmup은 같은 burst에서도 더 평탄해야 한다.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{app=\"no-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "no-warmup p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{app=\"no-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "no-warmup p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{app=\"no-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "no-warmup p99",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{app=\"with-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "with-warmup p50",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{app=\"with-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "with-warmup p95",
+          "refId": "E"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{app=\"with-warmup\",uri=\"/products/search\"}[5s])) by (le))",
+          "legendFormat": "with-warmup p99",
+          "refId": "F"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "API Latency Max — cold spike (no-warmup vs with-warmup)",
+      "description": "Actuator가 관측한 최근 최대 응답 시간. 부팅 직후 초기화 비용이 한 번에 실릴 때 가장 선명하게 보인다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 43 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2 } }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "http_server_requests_seconds_max{app=\"no-warmup\",uri=\"/products/search\"}",
+          "legendFormat": "no-warmup max",
+          "refId": "A"
+        },
+        {
+          "expr": "http_server_requests_seconds_max{app=\"with-warmup\",uri=\"/products/search\"}",
+          "legendFormat": "with-warmup max",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HikariCP — Connection Acquire Time (평균)",
+      "description": "connection을 얻기까지 걸리는 시간. usage 증가로 idle connection이 빨리 줄면 acquire time이 뒤따라 오른다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum{app=\"no-warmup\"}[15s]) / rate(hikaricp_connections_acquire_seconds_count{app=\"no-warmup\"}[15s])",
+          "legendFormat": "no-warmup acquire time",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum{app=\"with-warmup\"}[15s]) / rate(hikaricp_connections_acquire_seconds_count{app=\"with-warmup\"}[15s])",
+          "legendFormat": "with-warmup acquire time",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HikariCP — Connection Usage Time (평균)",
+      "description": "connection을 얻은 후 실제 SQL을 수행하고 반납하기까지 걸린 시간.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_usage_seconds_sum{app=\"no-warmup\"}[15s]) / rate(hikaricp_connections_usage_seconds_count{app=\"no-warmup\"}[15s])",
+          "legendFormat": "no-warmup usage time",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(hikaricp_connections_usage_seconds_sum{app=\"with-warmup\"}[15s]) / rate(hikaricp_connections_usage_seconds_count{app=\"with-warmup\"}[15s])",
+          "legendFormat": "with-warmup usage time",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HikariCP — Active / Idle / Pending Connections",
+      "description": "burst 부하 시작 직후 pending(대기)이 급증하는지 확인한다. usage가 먼저 늘어나면 pending도 뒤이어 증가한다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup active",
+          "refId": "A"
+        },
+        {
+          "expr": "hikaricp_connections_idle{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup idle",
+          "refId": "B"
+        },
+        {
+          "expr": "hikaricp_connections_pending{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup pending",
+          "refId": "C"
+        },
+        {
+          "expr": "hikaricp_connections_active{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup active",
+          "refId": "D"
+        },
+        {
+          "expr": "hikaricp_connections_idle{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup idle",
+          "refId": "E"
+        },
+        {
+          "expr": "hikaricp_connections_pending{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup pending",
+          "refId": "F"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "HikariCP — Connection Creation Time (max)",
+      "description": "새 connection을 DB에 실제로 만드는 데 걸린 시간. 이번 실험의 주 원인 지표는 아니지만 초기 connection 생성 비용을 분리해 볼 수 있다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_creation_seconds_max{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup creation max",
+          "refId": "A"
+        },
+        {
+          "expr": "hikaricp_connections_creation_seconds_max{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup creation max",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "JVM — Heap 사용량",
+      "description": "warmup 단계에서 heap이 미리 채워지면 이후 GC 압력이 줄어든다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 22 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{app=\"no-warmup\",area=\"heap\"}",
+          "legendFormat": "no-warmup heap used",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_memory_used_bytes{app=\"with-warmup\",area=\"heap\"}",
+          "legendFormat": "with-warmup heap used",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "JVM — GC Pause",
+      "description": "warmup이 있으면 클래스 로딩과 초기 할당이 요청 전에 끝나서 GC 빈도가 낮다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 22 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{app=\"no-warmup\"}[15s])",
+          "legendFormat": "no-warmup GC pause rate",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{app=\"with-warmup\"}[15s])",
+          "legendFormat": "with-warmup GC pause rate",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Process CPU 사용률",
+      "description": "JVM 시작 직후 JIT 컴파일과 클래스 로딩으로 CPU가 급격히 오른다. warmup 앱은 요청 전에 이미 올랐다 내려온다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 29 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
+      },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup CPU",
+          "refId": "A"
+        },
+        {
+          "expr": "process_cpu_usage{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup CPU",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "JVM — Loaded Classes",
+      "description": "클래스 로딩이 warmup 구간에서 미리 이루어지면 요청 시점에는 로딩이 없다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 29 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "targets": [
+        {
+          "expr": "jvm_classes_loaded_classes{app=\"no-warmup\"}",
+          "legendFormat": "no-warmup loaded classes",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_classes_loaded_classes{app=\"with-warmup\"}",
+          "legendFormat": "with-warmup loaded classes",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Request Rate",
+      "description": "k6 부하가 실제로 들어오고 있는지 확인한다.",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 36 },
+      "datasource": { "uid": "prometheus-ds", "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{app=\"no-warmup\",uri=\"/products/search\"}[15s]))",
+          "legendFormat": "no-warmup req/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{app=\"with-warmup\",uri=\"/products/search\"}[15s]))",
+          "legendFormat": "with-warmup req/s",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+# Spring Boot 실습 프로젝트용 관측 스택 템플릿
+# 사용 방법: 이 파일을 프로젝트의 docker-compose.yml에 services로 병합하거나
+# docker compose -f docker-compose.yml -f docker-compose.observability.yml up 으로 실행한다
+
+services:
+  prometheus:
+    # 버전을 고정해서 실습 재현성을 보장한다. 업그레이드 시 명시적으로 변경한다.
+    image: prom/prometheus:v3.3.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1h
+
+  grafana:
+    # 버전을 고정해서 대시보드/쿼리 호환성을 보장한다. 업그레이드 시 명시적으로 변경한다.
+    image: grafana/grafana-oss:11.6.1
+    ports:
+      - "3000:3000"
+    environment:
+      # 로컬 실습 전용 설정: 익명 접근 + 로그인 폼 비활성화
+      # 외부 네트워크에 노출할 경우 아래 설정을 제거하고 계정 기반 로그인을 사용한다.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

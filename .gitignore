@@ -1,3 +1,9 @@
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
 # Local .terraform directories
 **/.terraform/*
 .terraform

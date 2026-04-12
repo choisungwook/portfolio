@@ -1,0 +1,14 @@
+global:
+  # 실습 환경에서는 2s — 앱 시작 직후 변화를 놓치지 않기 위함
+  # 프로덕션에서는 15s~30s로 늘린다
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  # {{APP_NAME}}: 프로젝트 이름으로 교체 (예: socket-leak, jvm-warmup)
+  # {{APP_TARGET}}: 앱 컨테이너 이름:포트 (예: app:8080)
+  - job_name: {{APP_NAME}}
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - {{APP_TARGET}}

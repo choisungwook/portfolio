@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/${DB_NAME:demo}
+    username: ${DB_USER:demo}
+    password: ${DB_PASSWORD:demo}
+    hikari:
+      pool-name: jvm-warmup-pool
+      # 작은 읽기 API라도 부팅 직후 usage 증가가 acquire로 이어지도록 풀을 보수적으로 둔다.
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  sql:
+    init:
+      mode: always
+
+warmup:
+  enabled: ${WARMUP_ENABLED:false}
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info,metrics
+  metrics:
+    tags:
+      # app label로 no-warmup / with-warmup 두 인스턴스를 Grafana에서 구분한다
+      app: ${APP_LABEL:jvm-warmup}
+      application: ${APP_LABEL:jvm-warmup}
+    distribution:
+      # p95/p99 히스토그램 활성화 — cold start 스파이크를 latency 패널에서 명확히 볼 수 있다
+      percentiles-histogram:
+        http.server.requests: true
