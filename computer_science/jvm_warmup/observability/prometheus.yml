@@ -1,0 +1,23 @@
+global:
+  # 2초 간격으로 수집 — warmup 초기 구간(앱 시작 후 5~10초)을 놓치지 않기 위해 짧게 설정한다
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  - job_name: app-no-warmup
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - app-no-warmup:8080
+    relabel_configs:
+      - target_label: app
+        replacement: no-warmup
+
+  - job_name: app-with-warmup
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - app-with-warmup:8080
+    relabel_configs:
+      - target_label: app
+        replacement: with-warmup

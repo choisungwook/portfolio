@@ -1,0 +1,28 @@
+services:
+  app-default:
+    build: ./app
+    container_name: app-default
+    ports:
+      - "8081:8080"
+    environment:
+      JAVA_OPTS: ""
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app-with-classloading-log:
+    build: ./app
+    container_name: app-with-classloading-log
+    ports:
+      - "8082:8080"
+    environment:
+      JAVA_OPTS: "-Xlog:class+load=info"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

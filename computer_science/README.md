@@ -12,3 +12,5 @@
 | 4 | 컨테이너 원리 - mount namespace | [링크](./linux_namespace/mount_namespace/) |
 | 5 | pivot_root | [링크](./linux_namespace/pivot_root/) |
 | 6 | MariaDB 커넥션 소켓 누수 재현 | [링크](./leak_linux_socket/) |
+| 7 | JVM 클래스 로딩 디버깅 | [링크](./jvm_class_loading/) |
+| 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |

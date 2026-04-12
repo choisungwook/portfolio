@@ -1,0 +1,115 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: demo
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "demo", "-pdemo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app-no-warmup:
+    build: ./app
+    ports:
+      - "8081:8080"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: demo
+      DB_USER: demo
+      DB_PASSWORD: demo
+      WARMUP_ENABLED: "false"
+      APP_LABEL: "no-warmup"
+      CLASS_LOADING_LOG_ENABLED: ${CLASS_LOADING_LOG_ENABLED:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app-with-warmup:
+    build: ./app
+    ports:
+      - "8082:8080"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: demo
+      DB_USER: demo
+      DB_PASSWORD: demo
+      WARMUP_ENABLED: "true"
+      APP_LABEL: "with-warmup"
+      CLASS_LOADING_LOG_ENABLED: ${CLASS_LOADING_LOG_ENABLED:-false}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:v3.3.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1h
+    depends_on:
+      - app-no-warmup
+      - app-with-warmup
+
+  grafana:
+    image: grafana/grafana-oss:11.6.1
+    ports:
+      - "3000:3000"
+    environment:
+      # 로컬 실습 전용 설정: 익명 접근 + 로그인 폼 비활성화
+      # 외부 네트워크에 노출할 경우 아래 설정을 제거하고 계정 기반 로그인을 사용한다.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  # k6 서비스는 make load-* 타깃에서만 실행한다 (profiles: loadtest)
+  k6-no-warmup:
+    image: grafana/k6:0.56.0
+    profiles:
+      - loadtest
+    volumes:
+      - ./load-test:/scripts:ro
+    environment:
+      TARGET_URL: "http://app-no-warmup:8080"
+    command: run /scripts/test-no-warmup.js
+    depends_on:
+      app-no-warmup:
+        condition: service_healthy
+
+  k6-with-warmup:
+    image: grafana/k6:0.56.0
+    profiles:
+      - loadtest-with
+    volumes:
+      - ./load-test:/scripts:ro
+    environment:
+      TARGET_URL: "http://app-with-warmup:8080"
+    command: run /scripts/test-with-warmup.js
+    depends_on:
+      app-with-warmup:
+        condition: service_healthy

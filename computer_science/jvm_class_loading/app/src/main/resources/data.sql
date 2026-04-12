@@ -1,0 +1,10 @@
+INSERT INTO products (name, category, price) VALUES ('스마트폰 A', 'electronics', 990000);
+INSERT INTO products (name, category, price) VALUES ('스마트폰 B', 'electronics', 850000);
+INSERT INTO products (name, category, price) VALUES ('노트북 Pro', 'electronics', 1500000);
+INSERT INTO products (name, category, price) VALUES ('노트북 Air', 'electronics', 1200000);
+INSERT INTO products (name, category, price) VALUES ('태블릿 10인치', 'electronics', 650000);
+INSERT INTO products (name, category, price) VALUES ('무선 이어폰', 'electronics', 250000);
+INSERT INTO products (name, category, price) VALUES ('스마트워치 SE', 'electronics', 320000);
+INSERT INTO products (name, category, price) VALUES ('블루투스 스피커', 'electronics', 120000);
+INSERT INTO products (name, category, price) VALUES ('게이밍 마우스', 'electronics', 89000);
+INSERT INTO products (name, category, price) VALUES ('27인치 모니터', 'electronics', 380000);
