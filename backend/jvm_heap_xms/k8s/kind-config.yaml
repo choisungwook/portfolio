@@ -1,0 +1,13 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Xms == Xmx 서비스 NodePort
+      - containerPort: 30081
+        hostPort: 30081
+        protocol: TCP
+      # Xms < Xmx 서비스 NodePort
+      - containerPort: 30082
+        hostPort: 30082
+        protocol: TCP
