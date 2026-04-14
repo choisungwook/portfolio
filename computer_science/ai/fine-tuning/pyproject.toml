@@ -1,0 +1,16 @@
+[project]
+name = "fine-tuning"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=2.31.0",
+    "ruff>=0.15.10",
+]
+
+[tool.ruff]
+indent-width = 2
+
+[tool.ruff.format]
+indent-style = "space"

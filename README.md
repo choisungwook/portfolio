@@ -78,6 +78,7 @@
 70. 소켓leaked가 발생하면 linux fd의 영향은 어떻게 될까? 26.4.5 - [링크](./computer_science/leak_linux_socket/)
 71. JVM 웜업 실습 (배포 직후 응답 지연 재현) 26.4.12 - [링크](./computer_science/jvm_warmup/)
 72. JVM 클래스 로딩 디버깅 실습 26.4.12 - [링크](./computer_science/jvm_class_loading/)
+73. 스터디 - openAI Fine tuning 26.4.15 - [링크](./computer_science/ai/fine-tuning/)
 
 ## 다른 정리된 문서 링크
 
