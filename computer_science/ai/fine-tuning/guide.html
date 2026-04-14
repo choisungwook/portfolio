@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Kubernetes Fine-tuning Quickstart Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAFA;
+    --text: #2D2A26;
+    --text-sub: #6B6560;
+    --highlight: #FFF176;
+    --accent: #5C6BC0;
+    --divider: #D6D0C4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 14mm 16mm;
+    margin: 0 auto;
+    background: var(--bg);
+  }
+  h1 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 22pt;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    font-size: 9.5pt;
+    color: var(--text-sub);
+    margin: 0 0 6px;
+  }
+  hr.divider {
+    border: none;
+    border-top: 3px solid var(--text);
+    border-radius: 2px;
+    margin: 6px 0 14px;
+  }
+  h2 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 12.5pt;
+    margin: 14px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px dashed var(--divider);
+  }
+  p, li { margin: 3px 0; }
+  ul { margin: 4px 0 4px 18px; padding: 0; }
+  code, .mono {
+    font-family: 'Fira Code', monospace;
+    font-size: 9pt;
+    background: #FFFFFF;
+    border: 1px solid var(--divider);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  pre {
+    font-family: 'Fira Code', monospace;
+    font-size: 8.8pt;
+    background: #FFFFFF;
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 5px 0;
+    overflow-x: auto;
+    line-height: 1.4;
+  }
+  .mark {
+    background: linear-gradient(to top, var(--highlight) 45%, transparent 45%);
+    padding: 0 3px;
+    font-weight: 600;
+  }
+  .row {
+    display: flex;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--divider);
+  }
+  .row__left {
+    width: 150px;
+    flex-shrink: 0;
+    color: var(--text-sub);
+    font-size: 9.5pt;
+  }
+  .row__right { font-weight: 500; }
+  .note {
+    font-size: 9pt;
+    color: var(--text-sub);
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--divider);
+  }
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { background: #FFFFFF; }
+    .page { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Kubernetes Fine-tuning Quickstart</h1>
+  <p class="subtitle">OpenAI <span class="mark">gpt-4.1-nano</span> 모델로 3분 안에 끝내는 파인튜닝 실습</p>
+  <hr class="divider">
+
+  <h2>이 실습은 무엇인가</h2>
+  <p>파인튜닝 개념을 빠르게 체험하는 것이 목표다. 적은 데이터(10개 예제), 가장 싼 모델, 1 epoch로 <span class="mark">3분 내외</span>에 학습을 끝낸다. 학습 주제는 <strong>Kubernetes Deployment manifest 생성</strong>이다. 모델이 항상 <code>app label</code>, <code>resources.requests</code>, <code>resources.limits</code>를 포함하는 스타일을 배우도록 시킨다.</p>
+
+  <h2>구성 요소</h2>
+  <div class="row"><div class="row__left">모델</div><div class="row__right"><span class="mark">gpt-4.1-nano-2025-04-14</span> (fine-tuning 지원 중 최저가)</div></div>
+  <div class="row"><div class="row__left">학습 데이터</div><div class="row__right"><code>k8s_training_data.jsonl</code> · 10개 예제 · JSONL 포맷</div></div>
+  <div class="row"><div class="row__left">가상환경</div><div class="row__right"><code>uv</code> 기반 Python 3.12</div></div>
+  <div class="row"><div class="row__left">파일 구조</div><div class="row__right"><code>01_test_base_model.py</code> · <code>02_create_training_data.py</code> · <code>03_create_fine_tuned_model.py</code> · <code>04_test_fine_tuned_model.py</code></div></div>
+
+  <h2>파인튜닝은 내부적으로 어떻게 돌아가나</h2>
+  <p>코드 한 줄 뒤에서 OpenAI 플랫폼은 다음 단계를 순서대로 밟는다. 이걸 알고 있으면 실습 중 로그가 어느 단계인지 바로 읽힌다.</p>
+  <div class="row"><div class="row__left">1. File upload</div><div class="row__right"><code>client.files.create(purpose="fine-tune")</code> → JSONL이 OpenAI Files 스토리지에 올라가고 <span class="mark">file_id</span>가 발급된다.</div></div>
+  <div class="row"><div class="row__left">2. Validation</div><div class="row__right">플랫폼이 JSONL 포맷·메시지 스키마·토큰 수를 검증한다. 한 줄이라도 깨지면 job이 <code>failed</code>로 끝난다.</div></div>
+  <div class="row"><div class="row__left">3. Job queued</div><div class="row__right"><code>fine_tuning.jobs.create</code> 호출 시 job이 큐에 들어간다. 상태: <code>validating_files → queued → running</code>.</div></div>
+  <div class="row"><div class="row__left">4. Training</div><div class="row__right">베이스 모델(<span class="mark">gpt-4.1-nano</span>)에 <strong>LoRA 방식 어댑터</strong>를 <code>n_epochs</code>만큼 학습시킨다. 원본 가중치는 건드리지 않는다.</div></div>
+  <div class="row"><div class="row__left">5. Model 발급</div><div class="row__right">학습이 끝나면 <code>ft:gpt-4.1-nano-...:org::suffix</code> 형식의 전용 모델 ID가 발급되고 즉시 호출 가능해진다.</div></div>
+  <p style="font-size:9pt;color:var(--text-sub);margin-top:6px;">플랫폼 UI에서 같은 job을 <code>platform.openai.com/finetune</code>에서 확인할 수 있다. 실습 중엔 CLI 폴링만으로 충분하다.</p>
+
+  <h2>Step 1. 환경 준비</h2>
+<pre>cd kubernetes-finetuning
+uv init --python 3.12
+uv add openai
+export OPENAI_API_KEY="xxxx"   # 실제 키로 교체</pre>
+
+  <h2>Step 2. 학습 전 베이스 모델 확인</h2>
+<pre>uv run python 01_test_base_model.py</pre>
+  <p>파인튜닝 전의 응답을 먼저 본다. <code>resources</code> 블록이 빠지거나 label이 불규칙한 것을 확인한다.</p>
+
+  <h2>Step 3. 학습 데이터 생성</h2>
+<pre>uv run python 02_create_training_data.py</pre>
+  <p>10개의 Deployment 예제를 <code>k8s_training_data.jsonl</code>로 저장한다. OpenAI 파인튜닝은 JSONL(한 줄당 한 JSON) 포맷만 허용하므로 <code>indent</code>를 적용하지 않는다.</p>
+
+  <h2>Step 4. 파인튜닝 실행</h2>
+<pre>uv run python 03_create_fine_tuned_model.py</pre>
+  <p>업로드 → job 생성 → 10초 간격 polling. <code>n_epochs=1</code>, 데이터 10개라 <span class="mark">보통 2~3분</span>에 끝난다. 완료되면 모델 ID가 <code>fine_tuned_model_id.txt</code>에 저장된다.</p>
+
+  <h2>Step 5. 학습된 모델 실행</h2>
+<pre>uv run python 04_test_fine_tuned_model.py</pre>
+  <p>같은 질문을 다시 던져본다. 이번에는 <code>app label</code>과 <code>resources</code>가 항상 포함된 일관된 manifest가 나와야 한다. 이게 파인튜닝이 "스타일을 학습했다"는 증거다.</p>
+
+  <p class="note">Tip — 파인튜닝은 <strong>지식 주입이 아니라 스타일/포맷 주입</strong>에 가깝다. 모델에게 새 사실을 가르치고 싶다면 RAG가 더 적합하다. 이 실습은 "같은 질문에 일관된 포맷으로 답하게 만들기"가 파인튜닝의 본질임을 체감하는 것이 목적이다.</p>
+</main>
+</body>
+</html>
