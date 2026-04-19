@@ -1,0 +1,23 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: app-allow-fqdn
+spec:
+  endpointSelector: {}
+    # matchLabels:
+    #   app: sample
+  egress:
+  - toFQDNs:
+    - matchName: httpbin.org
+    # - matchName: example.com
+    - matchPattern: "*.github.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toCIDR:
+    - 10.200.0.0/16
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP

@@ -79,6 +79,9 @@
 71. JVM 웜업 실습 (배포 직후 응답 지연 재현) 26.4.12 - [링크](./computer_science/jvm_warmup/)
 72. JVM 클래스 로딩 디버깅 실습 26.4.12 - [링크](./computer_science/jvm_class_loading/)
 73. 스터디 - openAI Fine tuning 26.4.15 - [링크](./computer_science/ai/fine-tuning/)
+74. 쿠버네티스 DNS 캐시 - NodeLocal DNSCache 26.4.19 - [링크](./kubernetes/localdns/)
+75. cilium networkpolicy로 whitelist 방법으로 egress 제한 26.4.19 - [링크](./kubernetes/cilium-egress-whitelist/)
+76. Hubble flow observability (stdout JSON logger Deployment) 26.4.19 - [링크](./kubernetes/cilium-hubble-flow-observability/)
 
 ## 다른 정리된 문서 링크
 
