@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-flow-logger
+  namespace: kube-system
+  labels:
+    app: hubble-flow-logger
+    app.kubernetes.io/part-of: cilium-managed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hubble-flow-logger
+  template:
+    metadata:
+      labels:
+        app: hubble-flow-logger
+    spec:
+      containers:
+      - name: hubble
+        image: quay.io/cilium/hubble
+        command:
+        - /bin/sh
+        - -c
+        - |
+          hubble status --server hubble-relay.kube-system.svc.cluster.local:80 || exit 1
+          while true; do
+            hubble observe \
+              --server hubble-relay.kube-system.svc.cluster.local:80 \
+              --follow \
+              --output jsonpb \
+              --verdict DROPPED \
+              --verdict AUDIT || true
+            sleep 5
+          done
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
