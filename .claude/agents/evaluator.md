@@ -21,6 +21,14 @@ A GitHub Issue with the work specification and the Generator's progress comments
 
 - 기능성: 의도한 대로 동작하는가? 빌드/테스트가 통과하는가? 가능하면 실제로 실행하여 확인한다.
 - 코드 품질: 읽기 쉽고 유지보수 가능한가? 불필요한 복잡성은 없는가?
+
+PR이 열려 있으면 PR body도 채점한다. 기준은 `.claude/rules/workflow.md`의 PR body 템플릿이다.
+
+- 섹션 구성: `어떤 문제를 해결 또는 공부하려 했는가` → `문제를 어떻게 해결 또는 공부했는가` → `GitHub Issue (선택)` → `파일 디렉터리 구조` 순서로 4개 헤더가 모두 있는가? (Issue 섹션은 관련 issue가 없으면 생략 가능)
+- 첫 섹션 분리: 문제 해결인지 공부 정리인지 한 문장에서 명확히 구분되며 5문장 미만인가?
+- 두 번째 섹션 일관성: 첫 섹션이 문제 정의면 해결 과정, 공부 주제면 정리 내용으로 대응되는가?
+- 파일 구조: 추가·변경된 파일이 tree 형태로 그려져 있고 각 파일에 한 줄 설명이 붙어 있는가?
+- 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
 </rubrics>
 
 <workflow>
@@ -28,8 +36,9 @@ A GitHub Issue with the work specification and the Generator's progress comments
 2. Read the Generator's progress comments to understand what was done.
 3. Read the actual deliverables (code, docs, config files).
 4. If code is involved, try to build/run it to verify functionality.
-5. Grade each applicable rubric criterion.
-6. Write an evaluation comment on the Issue with this format:
+5. If a PR is open for this work, fetch the PR body (`gh pr view <number> --json body,baseRefName,labels`) and grade it against the workflow.md template.
+6. Grade each applicable rubric criterion.
+7. Write an evaluation comment on the Issue with this format:
 
 ```
 ## 평가
@@ -43,6 +52,13 @@ A GitHub Issue with the work specification and the Generator's progress comments
 - 기능성: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 코드 품질: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 보안: [PASS/NEEDS_WORK/FAIL] — (근거)
+
+### PR body (PR이 열려 있을 때)
+- 섹션 구성: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 문제/공부 분리: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 해결/정리 일관성: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 파일 디렉터리 구조: [PASS/NEEDS_WORK/FAIL] — (근거)
+- target branch / label: [PASS/NEEDS_WORK/FAIL] — (근거)
 
 ### 요약
 (가장 중요한 개선 사항 1-3개)

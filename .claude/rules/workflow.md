@@ -11,12 +11,29 @@ GitHub 생태계를 따르면서 작업을 진행하고 작업기록을 GitHub I
 - issue body에는
   - 어떤 문제를 해결하는지를 2문장 미만으로 작성
   - label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
-- PR body에는
-  - `Issue #<number>`를 넣어서 Issue와 연결
-  - 어떻게 구현했는지 이유와 어떤 것을 구현했는지 작성
-  - target branch는 `master`로 설정
-  - label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
-- 만약 사용자가 요청하면, git diff를 보고 PR body를 다시 작성한다. 하지만, Issue번호는 남긴다.
+- PR body는 아래 4개 섹션을 이 순서대로 사용한다.
+
+  ````markdown
+  ## 어떤 문제를 해결 또는 공부하려 했는가
+
+  5문장 미만으로 작성한다. 문제 해결인지 공부 정리인지를 한 문장에서 명확히 구분한다.
+
+  ## 문제를 어떻게 해결 또는 공부했는가
+
+  앞 섹션이 문제 정의면 해결 과정을, 공부 주제면 정리한 내용을 적는다.
+
+  ## GitHub Issue (선택)
+
+  관련 issue가 있으면 `Issue #<number>` 링크를 남긴다.
+
+  ## 파일 디렉터리 구조
+
+  추가·변경된 파일을 tree로 그리고, 각 파일이 무엇인지 한 줄씩 설명한다.
+  ````
+
+- target branch는 `master`로 설정한다.
+- label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
+- 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
 
 ## Git Worktree
 
