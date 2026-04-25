@@ -1,0 +1,26 @@
+# Codex hooks. Claude Code의 .claude/settings.json과 같은 셸 스크립트를 호출해서
+# 양쪽 도구가 같은 hook 동작을 가지도록 한다. .claude/hooks/*.sh 가 단일 진실 소스다.
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'bash "$(git rev-parse --show-toplevel)/.claude/hooks/guardrail.sh"'
+timeout = 5
+statusMessage = "guardrail: rm -rf 류 차단"
+
+[[hooks.PostToolUse]]
+matcher = "^(apply_patch|Edit|Write|MultiEdit)$"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = 'bash "$(git rev-parse --show-toplevel)/.claude/hooks/markdownlint.sh"'
+timeout = 30
+statusMessage = "markdownlint --fix"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = 'bash "$(git rev-parse --show-toplevel)/.claude/hooks/terraformlint.sh"'
+timeout = 30
+statusMessage = "terraform fmt"
