@@ -1,21 +1,23 @@
 # Akbun portfolio
 
-안녕하세요! 악분이 공부했던 내용을 정리한 공간입니다.
+안녕하세요. 악분입니다. 공부하면서 남긴 실습 코드와 글을 모아두는 공간입니다.
 
 - 블로그: <https://malwareanalysis.tistory.com/>
 
 ## 목차
 
-1. helm-charts - [링크](./helm)
-2. eks 예제 - [링크](./eks)
-3. 템플릿 - [링크](./template)
-4. 우아한 종료 - [링크](./prestop/)
-5. pod 안정성을 높이는 설정 - [링크](./pod-stability-manifests/)
-6. coredns trailling dot(.) - [링크](./stress-coredns/)
-7. pod가 persistence volume size보다 크게 사용해도 잘 동작 - [링크](./storage/over_size/)
-8. 쿠버네티스 security - [링크](./security/)
-9. statefulset + downward API - [링크](./statefulset_podname/)
-10. statefulset 운영 - [링크](./operate_statefulset/)
+> 목차는 2025년 이후 시간순서대로 나열
+
+1. helm-charts - [링크](./kubernetes/helm)
+2. eks 예제 - [링크](./kubernetes/eks)
+3. 템플릿 - [링크](./kubernetes/template)
+4. 우아한 종료 - [링크](./kubernetes/prestop/)
+5. pod 안정성을 높이는 설정 - [링크](./kubernetes/pod-stability-manifests/)
+6. coredns trailling dot(.) - [링크](./kubernetes/stress-coredns/)
+7. pod가 persistence volume size보다 크게 사용해도 잘 동작 - [링크](./kubernetes/storage/over_size/)
+8. 쿠버네티스 security - [링크](./kubernetes/security/)
+9. statefulset + downward API - [링크](./kubernetes/statefulset_podname/)
+10. statefulset 운영 - [링크](./kubernetes/operate_statefulset/)
 11. control plane이 장애 났을 때 kubelet 로그 - [링크](./kubernetes/api-server-failure/)
 12. eksctl로 EKS 설치 - [링크](./kubernetes/eks/eksctl/)
 13. EKS automode - [링크](./kubernetes/eks/automode/)
@@ -63,35 +65,37 @@
 55. AWS RDS인증을 DB계정 비밀번호가 아니라 임시인증토큰으로 사용 - [링크](./aws/rds_with_iam/)
 56. Site to Site VPN의 IPsec프로토콜 원리와 AWS Site to Site VPN 실습 - [링크](./aws/site-to-site-vpn-phase2/)
 57. 온프레미스 리다이렉트만 하는 nginx를 AWS로 옮기는 방법들 - [링크](./aws/redirect_https/)
-58. SLO를 계산하는 제품(slo.akbun.com) - [링크](./product/slo/)
-59. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의. added 26.3.1 - [링크](./computer_science/linux_tmp_memory_monitoring/)
-60. AWS KMS를 사용한 봉투암호화 예제. added 26.3.2 - [링크](./computer_science/kms/)
-61. 봉투암호화 시뮬레이션 제품(envelopelab.akbun.com) added 26.3.2 - [링크](./product/envelope_encryption_simulator/)
-62. Cilium CNI network policy added 26.3.2 - [링크](./kubernetes/cilium/examples/networkpolicy/networkpolicy.md)
-63. Argo CD preview github action added 26.3.8 - [링크](https://github.com/choisungwook/argocd-practice/tree/main/argocd-diff-preview)
-64. CDN cache를 잘못설정하면 위험한 케이스 26.3.22 - [링크](./computer_science/dangerous_cache/)
-65. Cache-Control 의미 26.3.22 - [링크](./computer_science/cache_control/)
-66. EKS custom AMI 생성과 적용방법 26.3.28 - [링크](./aws/eks-custom-ami/)
-67. AI agent용 슬라이드 레이아웃 레퍼런스 시스템 26.3.28 - [링크](./product/slide-reference/)
-68. 티스토리 스킨 26.4.4 - [링크](./product/tistory-skin/akbun/)
-69. akbun ai tools(claude) plugins 26.4.4 - [링크](https://github.com/choisungwook/akbun-aitools.git)
-70. 소켓leaked가 발생하면 linux fd의 영향은 어떻게 될까? 26.4.5 - [링크](./computer_science/leak_linux_socket/)
-71. JVM 웜업 실습 (배포 직후 응답 지연 재현) 26.4.12 - [링크](./computer_science/jvm_warmup/)
-72. JVM 클래스 로딩 디버깅 실습 26.4.12 - [링크](./computer_science/jvm_class_loading/)
-73. 스터디 - openAI Fine tuning 26.4.15 - [링크](./computer_science/ai/fine-tuning/)
-74. 쿠버네티스 DNS 캐시 - NodeLocal DNSCache 26.4.19 - [링크](./kubernetes/localdns/)
-75. cilium networkpolicy로 whitelist 방법으로 egress 제한 26.4.19 - [링크](./kubernetes/cilium-egress-whitelist/)
-76. Hubble flow observability (stdout JSON logger Deployment) 26.4.19 - [링크](./kubernetes/cilium-hubble-flow-observability/)
+58. 리눅스 tmp디렉터리가 tmpfs마운트 타입인 경우 메모리 사용률 모니터링 주의 (26.3.1) - [링크](./computer_science/linux_tmp_memory_monitoring/)
+59. AWS KMS를 사용한 봉투암호화 예제 (26.3.2) - [링크](./computer_science/kms/)
+60. Cilium CNI network policy (26.3.2) - [링크](./kubernetes/cilium/examples/networkpolicy/networkpolicy.md)
+61. CDN cache를 잘못설정하면 위험한 케이스 (26.3.22) - [링크](./computer_science/dangerous_cache/)
+62. Cache-Control 의미 (26.3.22) - [링크](./computer_science/cache_control/)
+63. EKS custom AMI 생성과 적용방법 (26.3.28) - [링크](./aws/eks-custom-ami/)
+64. 소켓leaked가 발생하면 linux fd의 영향은 어떻게 될까? (26.4.5) - [링크](./computer_science/leak_linux_socket/)
+65. JVM 웜업 실습 (배포 직후 응답 지연 재현) (26.4.12) - [링크](./computer_science/jvm_warmup/)
+66. JVM 클래스 로딩 디버깅 실습 (26.4.12) - [링크](./computer_science/jvm_class_loading/)
+67. 스터디 - openAI Fine tuning (26.4.15) - [링크](./computer_science/ai/fine-tuning/)
+68. 쿠버네티스 DNS 캐시 - NodeLocal DNSCache (26.4.19) - [링크](./kubernetes/localdns/)
+69. cilium networkpolicy로 whitelist 방법으로 egress 제한 (26.4.19) - [링크](./kubernetes/cilium-egress-whitelist/)
+70. Hubble flow observability (stdout JSON logger Deployment) (26.4.19) - [링크](./kubernetes/cilium-hubble-flow-observability/)
 
-## 다른 정리된 문서 링크
+## 직접 만든 제품
 
-- [Akbun Claude plugins](https://github.com/choisungwook/akbun-aitools.git)
-- [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
-- [AWS 2024 Seoul Summit 발표 IPv6예제](https://github.com/choisungwook/aws_ipv6)
+- [SLO를 계산하는 제품 (slo.akbun.com)](./product/slo/)
+- [봉투암호화 시뮬레이션 제품 (envelopelab.akbun.com)](./product/envelope_encryption_simulator/) (26.3.2)
+- [AI agent용 슬라이드 레이아웃 레퍼런스 시스템](./product/slide-reference/) (26.3.28)
+- [티스토리 스킨](./product/tistory-skin/akbun/) (26.4.4)
+
+## 다른 저장소 링크
+
+- [Akbun Claude plugins (akbun-aitools)](https://github.com/choisungwook/akbun-aitools.git) (26.4.4)
+- [Argo CD preview github action](https://github.com/choisungwook/argocd-practice/tree/main/argocd-diff-preview) (26.3.8)
 - [ArgoCD 예제](https://github.com/choisungwook/argocd-practice)
-- [테라폼 예제](https://github.com/choisungwook/terraform_practice)
+- [EKS 예제 (eks-practice)](https://github.com/choisungwook/eks-practice)
 - [karpenter](https://github.com/choisungwook/karpenter)
-- [EKS 예제](https://github.com/choisungwook/eks-practice)
-- [스터디]
+- [테라폼 예제](https://github.com/choisungwook/terraform_practice)
+- [AWS 2024 Seoul Summit IPv6 예제](https://github.com/choisungwook/aws_ipv6)
+- [facebook 쿠버네티스 커뮤니티 발표](https://github.com/choisungwook/terraform_practice)
+- 스터디
   - [ansible](https://github.com/choisungwook/ansible_practice)
   - [테라폼](https://github.com/sungwook-practice/t101-study)
