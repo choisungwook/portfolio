@@ -78,6 +78,7 @@
 68. 쿠버네티스 DNS 캐시 - NodeLocal DNSCache (26.4.19) - [링크](./kubernetes/localdns/)
 69. cilium networkpolicy로 whitelist 방법으로 egress 제한 (26.4.19) - [링크](./kubernetes/cilium-egress-whitelist/)
 70. Hubble flow observability (stdout JSON logger Deployment) (26.4.19) - [링크](./kubernetes/cilium-hubble-flow-observability/)
+71. AI model vs AI agent (26.5.1) - [링크](./computer_science/ai/langgraph-agent-loop/)
 
 ## 직접 만든 제품
 
