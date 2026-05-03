@@ -119,6 +119,11 @@ migrations
 
 # python
 venv
+.env
+.venv/
+__pycache__/
+*.pyc
+uv.lock
 
 # codebuild artifacts
 artifacts/

@@ -1,0 +1,42 @@
+{
+    "network_info": {
+        "topology": "Hub and spoke with R1 as core router connecting to R2 and SW1",
+        "addressing": "192.168.1.0/24 for management, 10.0.0.0/8 for user networks",
+        "routing_protocol": "OSPF area 0 for internal routing, BGP AS 65001 for external",
+        "vlans": {
+            "10": "Sales Department (192.168.10.0/24)",
+            "20": "Engineering Department (192.168.20.0/24)",
+            "30": "Guest Network (192.168.30.0/24)",
+            "40": "Management Network (192.168.40.0/24)"
+        }
+    },
+    "common_issues": {
+        "ospf": [
+            "OSPF neighbors not forming - check network statements and area configuration",
+            "LSA flooding issues - verify area design and summarization",
+            "Authentication failures - check OSPF authentication keys"
+        ],
+        "bgp": [
+            "BGP session stuck in Idle - verify neighbor IP and AS number",
+            "Routes not being advertised - check network statements and route-maps",
+            "AS path issues - verify AS prepending and path selection"
+        ],
+        "vlan": [
+            "VLAN not working - check switchport access vlan configuration",
+            "Inter-VLAN routing issues - verify SVI configuration and routing",
+            "Trunk port problems - check allowed VLANs and native VLAN"
+        ]
+    },
+    "best_practices": {
+        "security": [
+            "Always use authentication for routing protocols",
+            "Implement access lists to control traffic flow",
+            "Use VLANs to segment network traffic"
+        ],
+        "design": [
+            "Keep OSPF areas under 50 routers for optimal performance",
+            "Use route summarization to reduce routing table size",
+            "Implement redundant paths for critical connections"
+        ]
+    }
+}
