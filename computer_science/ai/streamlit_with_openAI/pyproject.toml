@@ -1,0 +1,13 @@
+[project]
+name = "streamlit-with-openai"
+version = "0.1.0"
+description = "AI Networking Cookbook ch07 refactor — Streamlit + OpenAI gpt-4.1-nano"
+requires-python = ">=3.12"
+dependencies = [
+  "streamlit>=1.40.1",
+  "openai>=1.55.0",
+  "python-dotenv>=1.0.1",
+]
+
+[tool.uv]
+package = false
