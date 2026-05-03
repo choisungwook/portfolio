@@ -1,0 +1,24 @@
+services:
+  network-ai:
+    build:
+      context: .
+      args:
+        APP: ${APP:-src/v4_chat.py}
+    image: streamlit-network-ai:local
+    container_name: streamlit-network-ai
+    env_file:
+      - .env
+    environment:
+      APP: ${APP:-src/v4_chat.py}
+      DB_PATH: /data/questions.db
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s

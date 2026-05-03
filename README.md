@@ -79,6 +79,7 @@
 69. cilium networkpolicy로 whitelist 방법으로 egress 제한 (26.4.19) - [링크](./kubernetes/cilium-egress-whitelist/)
 70. Hubble flow observability (stdout JSON logger Deployment) (26.4.19) - [링크](./kubernetes/cilium-hubble-flow-observability/)
 71. AI model vs AI agent (26.5.1) - [링크](./computer_science/ai/langgraph-agent-loop/)
+72. 스터디 - streamlit와 openAI 연동 예제 (26.5.3) - [링크](./computer_science/ai/streamlit_with_openAI/)
 
 ## 직접 만든 제품
 
