@@ -1,0 +1,94 @@
+{
+    "configurations": {
+        "ospf_interface": {
+            "template": "interface {interface}\n ip ospf {process_id} area {area}\n ip ospf network point-to-point",
+            "variables": [
+                "interface",
+                "process_id",
+                "area"
+            ],
+            "device_types": [
+                "router"
+            ]
+        },
+        "vlan_access_port": {
+            "template": "interface {interface}\n switchport mode access\n switchport access vlan {vlan_id}\n spanning-tree portfast",
+            "variables": [
+                "interface",
+                "vlan_id"
+            ],
+            "device_types": [
+                "switch"
+            ]
+        },
+        "trunk_port": {
+            "template": "interface {interface}\n switchport mode trunk\n switchport trunk allowed vlan {allowed_vlans}",
+            "variables": [
+                "interface",
+                "allowed_vlans"
+            ],
+            "device_types": [
+                "switch"
+            ]
+        },
+        "bgp_neighbor": {
+            "template": "router bgp {local_as}\n neighbor {neighbor_ip} remote-as {remote_as}\n neighbor {neighbor_ip} description {description}",
+            "variables": [
+                "local_as",
+                "neighbor_ip",
+                "remote_as",
+                "description"
+            ],
+            "device_types": [
+                "router"
+            ]
+        },
+        "vlan_creation": {
+            "template": "vlan {vlan_id}\n name {vlan_name}\n exit",
+            "variables": [
+                "vlan_id",
+                "vlan_name"
+            ],
+            "device_types": [
+                "switch"
+            ]
+        }
+    },
+    "standards": {
+        "naming_conventions": {
+            "vlans": {
+                "format": "{department}-{location}",
+                "examples": [
+                    "Sales-Floor1",
+                    "Eng-Floor2"
+                ]
+            },
+            "interfaces": {
+                "format": "Gi{slot}/{port}",
+                "examples": [
+                    "Gi1/0/1",
+                    "Gi0/0"
+                ]
+            }
+        },
+        "security": {
+            "required_features": [
+                "port-security",
+                "dhcp-snooping",
+                "arp-inspection"
+            ],
+            "access_lists": {
+                "naming": "ACL-{purpose}-{direction}",
+                "examples": [
+                    "ACL-WEB-IN",
+                    "ACL-MGMT-OUT"
+                ]
+            }
+        },
+        "ip_addressing": {
+            "management": "192.168.1.0/24",
+            "user_networks": "10.0.0.0/8",
+            "point_to_point": "172.16.0.0/30"
+        }
+    }
+}

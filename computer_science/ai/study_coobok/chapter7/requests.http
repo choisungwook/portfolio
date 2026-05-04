@@ -1,0 +1,38 @@
+# VS Code REST Client용. 버전별로 다른 포트를 친다.
+@v1 = http://localhost:8001
+@v2 = http://localhost:8002
+@v3 = http://localhost:8003
+@v4 = http://localhost:8004
+
+### v1: 단일 /ask
+POST {{v1}}/ask
+Content-Type: application/json
+
+{ "question": "Configure OSPF area 0" }
+
+### v2: device_type 분기 - cisco
+POST {{v2}}/ask
+Content-Type: application/json
+
+{ "question": "Configure OSPF area 0", "device_type": "cisco" }
+
+### v2: 지원 장비 목록
+GET {{v2}}/devices
+
+### v3: SQLite 영속화 - juniper
+POST {{v3}}/ask
+Content-Type: application/json
+
+{ "question": "Show BGP neighbor status", "device_type": "juniper" }
+
+### v3: 최근 10개 기록
+GET {{v3}}/history
+
+### v4: HTML 폼 진입점
+GET {{v4}}/
+
+### v4: 폼 제출(브라우저에서 직접 사용 권장)
+POST {{v4}}/web-ask
+Content-Type: application/x-www-form-urlencoded
+
+question=BGP neighbor down 트러블슈팅&device_type=cisco

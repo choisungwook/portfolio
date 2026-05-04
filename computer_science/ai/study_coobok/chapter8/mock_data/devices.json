@@ -1,0 +1,89 @@
+{
+    "R1": {
+        "type": "router",
+        "ip": "192.168.1.1",
+        "model": "Cisco ISR4431",
+        "location": "Main Office",
+        "protocols": [
+            "OSPF",
+            "BGP",
+            "EIGRP"
+        ],
+        "interfaces": [
+            "GigabitEthernet0/0",
+            "GigabitEthernet0/1",
+            "Serial0/0/0"
+        ],
+        "neighbors": [
+            "R2",
+            "SW1"
+        ],
+        "status": "active"
+    },
+    "R2": {
+        "type": "router",
+        "ip": "192.168.1.2",
+        "model": "Cisco ISR4321",
+        "location": "Branch Office",
+        "protocols": [
+            "OSPF",
+            "EIGRP"
+        ],
+        "interfaces": [
+            "GigabitEthernet0/0",
+            "GigabitEthernet0/1"
+        ],
+        "neighbors": [
+            "R1"
+        ],
+        "status": "active"
+    },
+    "SW1": {
+        "type": "switch",
+        "ip": "192.168.1.10",
+        "model": "Cisco Catalyst 9300",
+        "location": "Main Office",
+        "protocols": [
+            "STP",
+            "VTP",
+            "VLAN"
+        ],
+        "interfaces": [
+            "GigabitEthernet1/0/1-24",
+            "TenGigabitEthernet1/1/1-4"
+        ],
+        "vlans": [
+            "10-Sales",
+            "20-Engineering",
+            "30-Guest",
+            "40-Management"
+        ],
+        "neighbors": [
+            "R1",
+            "SW2"
+        ],
+        "status": "active"
+    },
+    "SW2": {
+        "type": "switch",
+        "ip": "192.168.1.11",
+        "model": "Cisco Catalyst 2960",
+        "location": "Floor 2",
+        "protocols": [
+            "STP",
+            "VLAN"
+        ],
+        "interfaces": [
+            "FastEthernet0/1-24",
+            "GigabitEthernet0/1-2"
+        ],
+        "vlans": [
+            "10-Sales",
+            "20-Engineering"
+        ],
+        "neighbors": [
+            "SW1"
+        ],
+        "status": "active"
+    }
+}

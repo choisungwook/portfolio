@@ -1,0 +1,76 @@
+{
+    "connections": {
+        "R1": {
+            "GigabitEthernet0/0": {
+                "connects_to": "SW1",
+                "interface": "GigabitEthernet1/0/1",
+                "vlan": "trunk"
+            },
+            "GigabitEthernet0/1": {
+                "connects_to": "R2",
+                "interface": "GigabitEthernet0/0",
+                "subnet": "10.1.1.0/30"
+            },
+            "Serial0/0/0": {
+                "connects_to": "ISP",
+                "interface": "Serial0/0/0",
+                "subnet": "203.0.113.0/30"
+            }
+        },
+        "R2": {
+            "GigabitEthernet0/0": {
+                "connects_to": "R1",
+                "interface": "GigabitEthernet0/1",
+                "subnet": "10.1.1.0/30"
+            },
+            "GigabitEthernet0/1": {
+                "connects_to": "SW2",
+                "interface": "GigabitEthernet0/1",
+                "vlan": "trunk"
+            }
+        },
+        "SW1": {
+            "GigabitEthernet1/0/1": {
+                "connects_to": "R1",
+                "interface": "GigabitEthernet0/0",
+                "vlan": "trunk"
+            },
+            "GigabitEthernet1/0/2": {
+                "connects_to": "SW2",
+                "interface": "GigabitEthernet0/1",
+                "vlan": "trunk"
+            }
+        },
+        "SW2": {
+            "GigabitEthernet0/1": {
+                "connects_to": "SW1",
+                "interface": "GigabitEthernet1/0/2",
+                "vlan": "trunk"
+            },
+            "GigabitEthernet0/2": {
+                "connects_to": "R2",
+                "interface": "GigabitEthernet0/1",
+                "vlan": "trunk"
+            }
+        }
+    },
+    "dependencies": {
+        "inter_vlan_routing": [
+            "R1",
+            "SW1"
+        ],
+        "internet_access": [
+            "R1",
+            "ISP"
+        ],
+        "branch_connectivity": [
+            "R1",
+            "R2"
+        ],
+        "network_management": [
+            "R1",
+            "SW1",
+            "SW2"
+        ]
+    }
+}

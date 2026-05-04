@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Network AI Assistant</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; }
+    .row { margin: 16px 0; }
+    textarea, select { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; }
+    button { background: #007cba; color: #fff; padding: 12px 24px; border: 0; font-size: 16px; cursor: pointer; }
+    a { color: #007cba; }
+  </style>
+</head>
+<body>
+  <h1>Network AI Assistant</h1>
+  <form method="post" action="/web-ask">
+    <div class="row">
+      <label>질문</label>
+      <textarea name="question" rows="3" placeholder="예: BGP neighbor down 트러블슈팅" required></textarea>
+    </div>
+    <div class="row">
+      <label>장비 타입</label>
+      <select name="device_type">
+        {% for device in supported_devices %}
+        <option value="{{ device }}">{{ device.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="row"><button type="submit">물어보기</button></div>
+  </form>
+  <p><a href="/history">최근 대화 보기</a> · <a href="/docs">API docs</a></p>
+</body>
+</html>

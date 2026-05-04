@@ -1,0 +1,41 @@
+# 책의 main_v1~v4를 각각 다른 포트로 노출한다.
+# 선택 실행:  docker compose up api-v1
+# 전체 실행:  docker compose up
+services:
+  api-v1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: study-coobok/network-ai-backend:latest
+    container_name: network-ai-v1
+    env_file: [.env]
+    ports: ["8001:8000"]
+    command: ["uv", "run", "python", "src/main_v1.py"]
+
+  api-v2:
+    image: study-coobok/network-ai-backend:latest
+    container_name: network-ai-v2
+    env_file: [.env]
+    ports: ["8002:8000"]
+    command: ["uv", "run", "python", "src/main_v2.py"]
+    depends_on: [api-v1]
+
+  api-v3:
+    image: study-coobok/network-ai-backend:latest
+    container_name: network-ai-v3
+    env_file: [.env]
+    ports: ["8003:8000"]
+    volumes:
+      - ./data:/app/data
+    command: ["uv", "run", "python", "src/main_v3.py"]
+    depends_on: [api-v1]
+
+  api-v4:
+    image: study-coobok/network-ai-backend:latest
+    container_name: network-ai-v4
+    env_file: [.env]
+    ports: ["8004:8000"]
+    volumes:
+      - ./data:/app/data
+    command: ["uv", "run", "python", "src/main_v4.py"]
+    depends_on: [api-v1]

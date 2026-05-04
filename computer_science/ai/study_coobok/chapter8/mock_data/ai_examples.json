@@ -1,0 +1,17 @@
+{
+    "configuration_examples": {
+        "ospf_basic": "To configure OSPF on this router:\n1. Enter global configuration: configure terminal\n2. Enable OSPF process: router ospf 1\n3. Set router ID: router-id 1.1.1.1\n4. Add networks: network 192.168.1.0 0.0.0.255 area 0\n5. Configure passive interfaces: passive-interface default\n6. Activate needed interfaces: no passive-interface GigabitEthernet0/0",
+        "vlan_creation": "To create and configure VLANs:\n1. Create VLAN: vlan 100\n2. Name the VLAN: name Sales\n3. Configure access port: interface gi1/0/5\n4. Set access mode: switchport mode access\n5. Assign to VLAN: switchport access vlan 100\n6. Enable port: no shutdown",
+        "bgp_neighbor": "To configure BGP neighbor:\n1. Enter BGP configuration: router bgp 65001\n2. Add neighbor: neighbor 203.0.113.1 remote-as 65000\n3. Set description: neighbor 203.0.113.1 description ISP-Connection\n4. Advertise networks: network 192.168.1.0 mask 255.255.255.0"
+    },
+    "troubleshooting_examples": {
+        "ospf_neighbor_down": "When OSPF neighbors won't form:\n1. Check interface status: show ip interface brief\n2. Verify OSPF configuration: show ip ospf interface\n3. Check neighbor table: show ip ospf neighbor\n4. Common causes: mismatched area, network statements, authentication, or MTU mismatch\n5. Debug if needed: debug ip ospf adj (use carefully)",
+        "bgp_idle_state": "When BGP neighbor is in Idle state:\n1. Verify connectivity: ping neighbor-ip\n2. Check BGP configuration: show ip bgp summary\n3. Verify AS numbers match configuration\n4. Check for access-lists blocking TCP 179\n5. Review BGP logs: show log | include BGP",
+        "vlan_connectivity": "When VLAN connectivity fails:\n1. Check VLAN exists: show vlan brief\n2. Verify port assignment: show interface status\n3. Check trunk configuration: show interface trunk\n4. Verify inter-VLAN routing: show ip route\n5. Test with ping and check ARP tables"
+    },
+    "explanation_examples": {
+        "ospf_areas": "OSPF areas provide hierarchical network design:\n- Area 0 (backbone) connects all other areas\n- Standard areas contain internal routers\n- Stub areas block external routes\n- Totally stubby areas block external and inter-area routes\n- NSSA areas allow limited external route injection",
+        "bgp_path_selection": "BGP uses this path selection process:\n1. Highest Weight (Cisco proprietary)\n2. Highest Local Preference\n3. Locally originated routes\n4. Shortest AS Path\n5. Lowest Origin (IGP < EGP < Incomplete)\n6. Lowest MED\n7. eBGP over iBGP\n8. Shortest IGP path to next-hop\n9. Lowest router ID",
+        "vlan_benefits": "VLANs provide several network benefits:\n- Broadcast domain segmentation reduces network congestion\n- Improved security through traffic isolation\n- Flexible network design independent of physical layout\n- Easier network management and troubleshooting\n- Support for different network policies per VLAN"
+    }
+}
