@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deprecated-external-ip-demo
+  labels:
+    app.kubernetes.io/name: deprecated-external-ip-demo
+spec:
+  type: ClusterIP
+  externalIPs:
+    - 203.0.113.10
+  selector:
+    app.kubernetes.io/name: external-ip-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

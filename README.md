@@ -80,7 +80,8 @@
 70. Hubble flow observability (stdout JSON logger Deployment) (26.4.19) - [링크](./kubernetes/cilium-hubble-flow-observability/)
 71. AI model vs AI agent (26.5.1) - [링크](./computer_science/ai/langgraph-agent-loop/)
 72. 스터디 - streamlit와 openAI 연동 예제 (26.5.3) - [링크](./computer_science/ai/streamlit_with_openAI/)
-73. 스터디 - streamlit을 FastAPI로 변경 (26.5.4) - [링크](./computer_science/ai/study_coobok/chapter7//)
+73. 스터디 - streamlit을 FastAPI로 변경 (26.5.4) - [링크](./computer_science/ai/study_coobok/chapter7/)
+74. kubernetes 1.36 릴리즈노트와 핸즈온 (26.5.4) - [링크](./kubernetes/1_36_releasenotes/)
 
 ## 직접 만든 제품
 
