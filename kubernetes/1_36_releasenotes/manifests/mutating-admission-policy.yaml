@@ -1,0 +1,41 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: add-release-label.example.com
+  labels:
+    app.kubernetes.io/name: k8s-136-release-notes
+spec:
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+  matchConditions:
+    - name: skip-if-release-label-exists
+      expression: "!has(object.metadata.labels) || !('release.kubernetes.io/tested-version' in object.metadata.labels)"
+  failurePolicy: Fail
+  reinvocationPolicy: Never
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: >
+          !has(object.metadata.labels) ?
+          [
+            JSONPatch{
+              op: "add",
+              path: "/metadata/labels",
+              value: {"release.kubernetes.io/tested-version": "v1.36"}
+            }
+          ] :
+          [
+            JSONPatch{
+              op: "add",
+              path: "/metadata/labels/" + jsonpatch.escapeKey("release.kubernetes.io/tested-version"),
+              value: "v1.36"
+            }
+          ]

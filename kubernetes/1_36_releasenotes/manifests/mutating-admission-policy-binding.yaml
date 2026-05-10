@@ -1,0 +1,8 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: add-release-label-binding.example.com
+  labels:
+    app.kubernetes.io/name: k8s-136-release-notes
+spec:
+  policyName: add-release-label.example.com

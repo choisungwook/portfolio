@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gitrepo-volume-pod
+  labels:
+    app.kubernetes.io/name: gitrepo-volume-pod
+spec:
+  restartPolicy: Never
+  containers:
+    - name: shell
+      image: busybox:1.36.1
+      command:
+        - sh
+        - -c
+        - ls -la /repo && sleep 3600
+      volumeMounts:
+        - name: repo
+          mountPath: /repo
+      resources:
+        requests:
+          cpu: 5m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+  volumes:
+    - name: repo
+      gitRepo:
+        repository: https://github.com/kubernetes/website.git
+        revision: main
+        directory: "."
