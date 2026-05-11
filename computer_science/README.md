@@ -14,3 +14,4 @@
 | 6 | MariaDB 커넥션 소켓 누수 재현 | [링크](./leak_linux_socket/) |
 | 7 | JVM 클래스 로딩 디버깅 | [링크](./jvm_class_loading/) |
 | 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |
+| 9 | PostgreSQL CREATE INDEX CONCURRENTLY 핸즈온 | [링크](./postgres_concurrently_index/) |
