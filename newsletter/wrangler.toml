@@ -1,0 +1,8 @@
+name = "newsletter"
+compatibility_date = "2025-02-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "newsletter-db"
+database_id = "" # wrangler d1 create 후 ID 입력

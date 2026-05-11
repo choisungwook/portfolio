@@ -1,0 +1,113 @@
+---
+
+---
+
+<div id="search-container">
+  <input
+    type="search"
+    id="search-input"
+    placeholder="글 검색..."
+    class="search-input"
+    autofocus
+  />
+  <div id="search-results" class="search-results"></div>
+</div>
+
+<script>
+  async function initPagefind() {
+    try {
+      const pagefind = await import("/pagefind/pagefind.js" as any);
+      await pagefind.init();
+
+      const input = document.getElementById("search-input") as HTMLInputElement;
+      const resultsContainer = document.getElementById("search-results")!;
+
+      input.addEventListener("input", async () => {
+        const query = input.value.trim();
+        if (!query) {
+          resultsContainer.innerHTML = "";
+          return;
+        }
+
+        const search = await pagefind.search(query);
+        const results = await Promise.all(
+          search.results.slice(0, 10).map((r: any) => r.data())
+        );
+
+        resultsContainer.innerHTML = results
+          .map(
+            (r: any) => `
+          <a href="${r.url}" class="search-result">
+            <h3 class="result-title">${r.meta?.title || r.url}</h3>
+            <p class="result-excerpt">${r.excerpt}</p>
+          </a>
+        `
+          )
+          .join("");
+      });
+    } catch {
+      const container = document.getElementById("search-results")!;
+      container.innerHTML =
+        '<p class="search-note">검색 인덱스를 로드할 수 없습니다. 빌드 후 사용 가능합니다.</p>';
+    }
+  }
+
+  initPagefind();
+</script>
+
+<style>
+  .search-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: var(--font-sans);
+  }
+
+  .search-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .search-results {
+    margin-top: 16px;
+  }
+
+  .search-result {
+    display: block;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border);
+    color: inherit;
+  }
+
+  .search-result:hover {
+    text-decoration: none;
+    background: var(--color-card-hover);
+  }
+
+  .result-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .result-excerpt {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .result-excerpt :global(mark) {
+    background: var(--color-tag-bg);
+    color: var(--color-tag-text);
+    padding: 1px 2px;
+    border-radius: 2px;
+  }
+
+  .search-note {
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+  }
+</style>

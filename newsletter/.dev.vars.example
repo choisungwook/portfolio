@@ -1,0 +1,4 @@
+ADMIN_PASSWORD=change-me
+RESEND_API_KEY=re_xxxxxxxxxxxxx
+SITE_URL=http://localhost:4321
+NEWSLETTER_FROM=newsletter@akbun.com
