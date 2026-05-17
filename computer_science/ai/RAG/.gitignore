@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# local experiment outputs
+processed_file.csv
+faiss_index/
+outputs/
+
+# Kaggle 원본 데이터는 각자 내려받아 둔다.
+data/myntra_products_catalog.csv
+data/loyalty_qa_train.jsonl
+data/loyalty_qa_val.jsonl
