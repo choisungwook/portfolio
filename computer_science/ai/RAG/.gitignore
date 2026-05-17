@@ -13,3 +13,4 @@ outputs/
 data/myntra_products_catalog.csv
 data/loyalty_qa_train.jsonl
 data/loyalty_qa_val.jsonl
+data/loyalty_qa_mlx/
