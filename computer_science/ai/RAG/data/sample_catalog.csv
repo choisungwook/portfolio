@@ -1,0 +1,9 @@
+ProductID,ProductName,ProductBrand,Gender,Price (INR),NumImages,Description,PrimaryColor
+1001,Men Blue Regular Fit Formal Shirt,Next Look,Men,1499,4,Regular fit solid blue formal shirt for office meetings and interviews,Blue
+1002,Men White Regular Fit Formal Shirt,Van Heusen,Men,2199,5,White cotton formal shirt with regular fit and spread collar,White
+1003,Men Navy Slim Fit Formal Shirt,Peter England,Men,1799,5,Navy slim fit formal shirt for evening events,Navy
+1004,Men Blue Printed Casual Shirt,ColorPlus,Men,1899,4,Blue and off-white printed casual shirt with regular fit,Blue
+1005,Women Blue Regular Fit Shirt,Allen Solly,Women,1699,5,Blue regular fit shirt for smart casual office wear,Blue
+1006,Men White Linen Regular Fit Shirt,Raymond,Men,2499,3,White linen regular fit shirt suitable for formal summer occasions,White
+1007,Men Black Regular Fit Party Shirt,Blackberrys,Men,2299,4,Black regular fit shirt designed for party and evening wear,Black
+1008,Men Blue Regular Fit Oxford Shirt,Louis Philippe,Men,2799,6,Blue oxford shirt with regular fit for formal occasions,Blue
