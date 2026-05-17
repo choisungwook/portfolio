@@ -26,6 +26,10 @@ finetuning = [
     "transformers>=4.57,<5",
     "wandb>=0.23,<0.24",
 ]
+mlx = [
+    "mlx-lm[train]>=0.28,<1",
+    "wandb>=0.23,<0.24",
+]
 
 [tool.uv]
 package = false

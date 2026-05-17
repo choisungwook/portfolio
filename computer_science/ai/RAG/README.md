@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 1 | [LangChain Agent](docs/01-langchain-agent.md) | `notebooks/01_langchain_agent.ipynb` | tool 호출 |
 | 2 | [RAG Vector Search](docs/02-rag-vector-search.md) | `notebooks/02_rag_vector_search.ipynb` | embedding, vector search |
-| 3 | [Fine-tuning LoRA](docs/03-fine-tuning-lora.md) | `notebooks/03_fine_tuning_lora.ipynb` | Llama 3, quantization, LoRA |
+| 3 | [Fine-tuning LoRA](docs/03-fine-tuning-lora.md) | `notebooks/03_fine_tuning_lora.ipynb` | MLX-LM, LoRA, 전후 비교 |
 
 ## 공통 실행
 
@@ -35,10 +35,10 @@ uv run python -m ipykernel install --user --name rag-study --display-name "Pytho
 ```
 
 
-fine-tuning 실습은 GPU 환경에서 추가 의존성을 설치한다.
+fine-tuning 실습은 Mac MLX 환경에서 추가 의존성을 설치한다.
 
 ```bash
-uv sync --extra finetuning
+uv sync --extra mlx
 ```
 
 ## 참고자료
