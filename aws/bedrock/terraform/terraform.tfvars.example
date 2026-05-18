@@ -1,0 +1,25 @@
+aws_region   = "ap-northeast-2"
+project_name = "bedrock-rag"
+
+# Generated S3 bucket names use this prefix plus a random suffix.
+# Keep the prefix starting with "bedrock-" for this hands-on.
+bucket_prefix = "bedrock-rag"
+
+# Optional: uncomment only when you want fixed bucket names.
+# data_bucket_name   = "bedrock-rag-docs-your-name"
+# vector_bucket_name = "bedrock-rag-vectors-your-name"
+
+vector_index_name = "bedrock-rag-index"
+
+non_filterable_metadata_keys = [
+  "AMAZON_BEDROCK_TEXT",
+  "AMAZON_BEDROCK_METADATA",
+]
+
+embedding_model_id   = "amazon.titan-embed-text-v2:0"
+embedding_dimensions = 1024
+generation_model_id  = "anthropic.claude-3-haiku-20240307-v1:0"
+
+sample_document_key       = "documents/products.md"
+chunk_max_tokens          = 300
+chunk_overlap_percentage  = 20
