@@ -46,7 +46,8 @@ codex는 동일 marketplace를 codex의 plugin 설치 방식으로 추가한다.
 | [`.claude/rules/philosophy.md`](./.claude/rules/philosophy.md) | 글쓰기 철학과 나쁜 글의 기준 |
 | [`.claude/rules/markdown.md`](./.claude/rules/markdown.md) | 헤더와 코드블록 규칙 |
 | [`.claude/rules/kubernetes.md`](./.claude/rules/kubernetes.md) | Kubernetes manifest 디렉터리 구조와 YAML 규칙 |
-| [`.claude/rules/terraform.md`](./.claude/rules/terraform.md) | AWS Terraform 스타일 (Graviton, default VPC 중심) |
+| [`.claude/rules/terraform.md`](./.claude/rules/terraform.md) | AWS Terraform 스타일 |
+| [`.claude/rules/python.md`](./.claude/rules/python.md) | python 코드 작성 스타일 |
 
 ## 코드 규칙
 
