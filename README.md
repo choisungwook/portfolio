@@ -84,6 +84,7 @@
 74. kubernetes 1.36 릴리즈노트와 핸즈온 (26.5.4) - [링크](./kubernetes/1_36_releasenotes/)
 75. 스터디 - RAG with FAISS vector DB (26.5.17) - [링크](./computer_science/ai/RAG/notebooks/02_rag_vector_search.ipynb)
 76. 스터디 - mlx.lora 파인튜닝 (26.5.17) - [링크](./computer_science/ai/RAG/notebooks/03_fine_tuning_lora.ipynb)
+77. 스터디 - AWS Knowledge Bases (26.5.18) - [링크](./aws/bedrock/)
 
 ## 직접 만든 제품
 
