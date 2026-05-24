@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qdrant-restore-job
+  labels:
+    app.kubernetes.io/name: qdrant-restore
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qdrant-restore
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: qdrant-restore
+          image: curlimages/curl:8.12.1
+          command: ["sh", "-c"]
+          args:
+            - |
+              curl -X PUT "http://qdrant.qdrant.svc.cluster.local:6333/collections/catalog" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "vectors": {
+                    "size": 1536,
+                    "distance": "Cosine"
+                  }
+                }'
+
+              curl -X PUT "http://qdrant.qdrant.svc.cluster.local:6333/collections/catalog/snapshots/recover" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "location": "https://kubernetes-for-genai-models.s3.amazonaws.com/chapter5/catalog.snapshot"
+                }'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+  backoffLimit: 1

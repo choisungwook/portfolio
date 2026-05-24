@@ -1,0 +1,18 @@
+replicaCount: 1
+
+image:
+  tag: v1.11.5
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

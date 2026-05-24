@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qwen-finetuning-job
+  labels:
+    app.kubernetes.io/name: qwen-finetuning
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qwen-finetuning
+    spec:
+      restartPolicy: Never
+      runtimeClassName: nvidia
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: qwen-finetuning
+          image: qwen-finetuning:k3s
+          # image: choisunguk/ch5-qwen-finetuning:k3s-cuda12.8.1-amd64
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BASE_MODEL_ID
+              value: "Qwen/Qwen2.5-0.5B-Instruct"
+            - name: TRAIN_DATASET_FILE
+              value: "/data/chapter5/loyalty_qa_train.jsonl"
+            - name: EVAL_DATASET_FILE
+              value: "/data/chapter5/loyalty_qa_val.jsonl"
+            - name: MODEL_OUTPUT_DIR
+              value: "/model-assets"
+            - name: MAX_STEPS
+              value: "50"
+            - name: MAX_LENGTH
+              value: "512"
+          volumeMounts:
+            - name: chapter5-data
+              mountPath: /data/chapter5
+              readOnly: true
+            - name: model-assets
+              mountPath: /model-assets
+          resources:
+            requests:
+              cpu: "1"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "2"
+              memory: 12Gi
+              nvidia.com/gpu: 1
+      volumes:
+        - name: chapter5-data
+          persistentVolumeClaim:
+            claimName: chapter5-data-pvc
+        - name: model-assets
+          persistentVolumeClaim:
+            claimName: model-assets-pvc
+  backoffLimit: 1

@@ -1,0 +1,118 @@
+[
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Is the cashback calculated on the total purchase amount?",
+        "response": "Yes, the cashback is calculated on the total purchase amount, up to a maximum of 2% and a limit of 1000 USD per year."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I transfer my MyElite Loyalty Program membership to someone else?",
+        "response": "No, the loyalty membership is non-transferable and is tied to the original account holder."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What if I need more than 2 accidental replacements in a year?",
+        "response": "MyElite Loyalty Program only covers up to 2 accidental replacements per year per product. Additional replacements would need to be handled separately."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Do I get any special offers as a loyalty member?",
+        "response": "As a MyElite Loyalty Program member, you get early access to sales events like Black Friday, Labor Day, Cyber Monday, and Christmas, which often include special offers and discounts."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Does MyElite Loyalty Program offer any discount on purchases?",
+        "response": "MyElite Loyalty Program does not directly offer discounts on purchases, but members can earn up to 2% cashback annually via a gift card."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What type of products are covered under accidental replacements?",
+        "response": "Accidental replacements cover all eligible products purchased through the loyalty program, with a maximum of 2 replacements per year per product."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I get support for wear and tear after the 2-year period?",
+        "response": "No, the extended support for wear and tear is only available for up to 2 years after the purchase date."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:How do I use my cashback?",
+        "response": "Your cashback is provided annually in the form of a gift card, which you can use for future purchases."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Is there a deadline to use the cashback gift card?",
+        "response": "Yes, the gift card issued as cashback may have an expiration date, typically one year from the date of issue. Please check the terms on your specific card."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Does MyElite Loyalty Program cover product theft?",
+        "response": "No, MyElite Loyalty Program does not cover product theft. It only covers accidental damage and wear and tear."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:How do I know when the early access sales events start?",
+        "response": "You will receive notifications via email or through your account dashboard about upcoming early access sales events."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I earn cashback on every purchase I make?",
+        "response": "Yes, you can earn up to 2% cashback on every purchase, with the total cashback capped at 1000 USD per year."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Is loss coverage available for all products?",
+        "response": "Loss coverage is available only for products purchased in New York, North Carolina, and Pennsylvania, with a copay of 25% of the product cost."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I use my membership benefits for gifts I purchase?",
+        "response": "Yes, you can use your membership benefits, including accidental replacements and extended support, for products purchased as gifts."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What if I forget to cancel my membership before it renews?",
+        "response": "If you forget to cancel, your membership will automatically renew, and the annual fee of 99 USD will be charged. You will continue to enjoy the benefits for the new subscription period."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Does MyElite Loyalty Program include free returns?",
+        "response": "The loyalty program does not specifically include free returns, but certain promotions or sales events may offer this benefit separately."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Are digital products covered by the loyalty program?",
+        "response": "MyElite Loyalty Program primarily covers physical products, including apparel and accessories. Digital products are typically not covered."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What happens if I don't use my accidental replacements?",
+        "response": "If you don't use your accidental replacements, they do not roll over to the next year. The benefit resets annually."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Does MyElite Loyalty Program offer any price matching?",
+        "response": "The loyalty program does not include price matching. However, early access to sales events can help you get the best deals."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I opt-out of the loyalty program notifications?",
+        "response": "Yes, you can manage your notification preferences in your account settings to opt-out of non-essential communications."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I use the cashback earned through the MyElite Loyalty Program to renew my membership or pay for other services?",
+        "response": "No, the cashback earned through the MyElite Loyalty Program is issued as a gift card that can be used for future product purchases on our site. It cannot be applied toward membership renewal or other services."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What steps should I follow to replace a product that was damaged beyond repair under the MyElite Loyalty Program?",
+        "response": "To replace a product that was damaged beyond repair, submit a replacement request through your account dashboard. The request will be evaluated, and if approved, the product will be replaced with a surcharge of 30% of its sales price."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Does the MyElite Loyalty Program provide any exclusive offers for members during peak shopping seasons like Black Friday?",
+        "response": "Yes, during peak shopping seasons like Black Friday, MyElite Loyalty Program members receive exclusive offers and early access to deals, allowing them to shop before the general public."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What should I do if I forget to cancel my MyElite Loyalty Program membership before the automatic renewal date?",
+        "response": "If you forget to cancel your membership before the renewal date, your membership will automatically renew, and the annual fee of 99 USD will be charged. You can cancel anytime, but no refunds will be issued for the renewed period."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:How does MyElite Loyalty Program handle customer support for members, especially in terms of response times and service quality?",
+        "response": "Members of the MyElite Loyalty Program have access to extended customer support, which includes faster response times and priority service. Support can be reached via phone, email, or live chat, with most queries resolved within 24-48 hours."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I use my MyElite Loyalty Program benefits when purchasing items for business or commercial use?",
+        "response": "The MyElite Loyalty Program is intended for personal use only. Benefits like accidental replacements and cashback are not applicable to purchases made for business or commercial purposes."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:How can I track the status of my cashback earnings and other benefits associated with my MyElite Loyalty Program membership?",
+        "response": "You can track the status of your cashback earnings, replacement eligibility, and other benefits through your account dashboard on our website. This feature helps you stay informed and maximize the value of your membership."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:What are the procedures for requesting a refund if I am unsatisfied with a product purchased under the MyElite Loyalty Program?",
+        "response": "Refunds are subject to the standard return policy of our store. If you're unsatisfied with a product, initiate a return through your account dashboard. Note that the loyalty program does not affect the refund policy, and the membership fee is non-refundable."
+    },
+    {
+        "prompt": "[MyElite Loyalty Program FAQ]:Can I combine the benefits of the MyElite Loyalty Program with other promotions, such as holiday sales or clearance events?",
+        "response": "Yes, you can combine the benefits of the MyElite Loyalty Program, such as cashback, with other promotions like holiday sales or clearance events. This allows you to maximize your savings and enjoy additional perks."
+    }
+]
