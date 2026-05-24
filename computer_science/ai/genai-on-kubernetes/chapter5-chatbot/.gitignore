@@ -1,0 +1,10 @@
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+__pycache__/
+.pytest_cache/
+# model-assets/
+llama-output/
+logs/
+openai-secret.yaml

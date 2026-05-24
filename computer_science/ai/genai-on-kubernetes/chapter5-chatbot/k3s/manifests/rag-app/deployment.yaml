@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-app-deployment
+  labels:
+    app.kubernetes.io/name: rag-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rag-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rag-app
+    spec:
+      containers:
+        - name: rag-api-container
+          image: rag-app:k3s
+          # image: choisunguk/ch5-rag-app:k3s-py312-amd64
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: QDRANT_ENDPOINT
+              value: "http://qdrant.qdrant.svc.cluster.local:6333"
+            - name: QDRANT_COLLECTION
+              value: "catalog"
+            - name: OPENAI_MODEL
+              value: "gpt-5-nano"
+            - name: OPENAI_EMBEDDING_MODEL
+              value: "text-embedding-3-small"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-api-key
+                  key: OPENAI_API_KEY
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
