@@ -1,0 +1,64 @@
+helmDefaults:
+  wait: true
+  timeout: 600
+
+repositories:
+  - name: eks
+    url: https://aws.github.io/eks-charts
+  - name: nvdp
+    url: https://nvidia.github.io/k8s-device-plugin
+  - name: jupyterhub
+    url: https://hub.jupyter.org/helm-chart/
+  - name: qdrant
+    url: https://qdrant.github.io/qdrant-helm
+
+releases:
+  - name: aws-load-balancer-controller
+    namespace: kube-system
+    chart: eks/aws-load-balancer-controller
+    labels:
+      phase: addons
+      app: aws-load-balancer-controller
+    values:
+      - values/aws-load-balancer-controller/values-example.yaml
+      - clusterName: {{ requiredEnv "EKS_CLUSTER_NAME" | quote }}
+        region: {{ requiredEnv "AWS_REGION" | quote }}
+        vpcId: {{ requiredEnv "VPC_ID" | quote }}
+        serviceAccount:
+          annotations:
+            eks.amazonaws.com/role-arn: {{ requiredEnv "ALB_CONTROLLER_ROLE_ARN" | quote }}
+
+  - name: nvidia-device-plugin
+    namespace: kube-system
+    chart: nvdp/nvidia-device-plugin
+    labels:
+      phase: addons
+      app: nvidia-device-plugin
+    values:
+      - values/nvidia-device-plugin/values-example.yaml
+
+  - name: jupyterhub
+    namespace: jupyterhub
+    createNamespace: true
+    chart: jupyterhub/jupyterhub
+    version: 4.3.5
+    labels:
+      phase: platform
+      app: jupyterhub
+    values:
+      - values/jupyterhub/values-example.yaml
+      - hub:
+          config:
+            DummyAuthenticator:
+              password: {{ requiredEnv "JUPYTERHUB_DUMMY_PASSWORD" | quote }}
+
+  - name: qdrant
+    namespace: qdrant
+    createNamespace: true
+    chart: qdrant/qdrant
+    version: 1.11.5
+    labels:
+      phase: platform
+      app: qdrant
+    values:
+      - values/qdrant/values-example.yaml

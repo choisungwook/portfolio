@@ -64,9 +64,13 @@ _Avoid_: 무리한 공통화, storage flag로 모든 환경 처리
 K3s 전체 실습에서 쓰는 fine-tuning과 inference container 코드. `k3s/` 아래에 두어 K3s manifests와 함께 관리하고, EKS용 `terraform/` 코드와 분리한다.
 _Avoid_: terraform 앱 코드 재사용 강제, 루트 공통 앱 디렉터리
 
-**EKS S3 아티팩트**:
-EKS 전체 실습에서 AWS S3로 다루는 데이터셋과 fine-tuning 산출물. Pod Identity 같은 EKS용 identity 흐름과 함께 사용한다.
-_Avoid_: EKS 로컬 파일시스템 아티팩트
+**EKS 전용 앱 코드**:
+EKS 전체 실습에서 ECR로 build/push하는 fine-tuning, inference, RAG, chatbot container 코드. 예제 로직은 K3s와 같지만 EKS용 image tag, S3 Files mount, ALB ingress 조건은 `eks/` 아래에서 분리한다.
+_Avoid_: K3s image tag 재사용, K3s runtimeClass 가정
+
+**EKS S3 Files 아티팩트**:
+EKS 전체 실습에서 AWS S3 bucket을 S3 Files file system으로 노출해 다루는 데이터셋과 fine-tuning 산출물. Pod Identity와 EFS CSI driver를 사용해 Kubernetes PVC로 mount한다.
+_Avoid_: EKS 로컬 파일시스템 아티팩트, S3 API만 쓰는 아티팩트
 
 **실험 노트북**:
 모델 학습이나 RAG 흐름을 배포 전에 대화식으로 확인하는 notebook 실습. Chapter 5에서는 JupyterHub에서 실험한 뒤 같은 흐름을 container와 Kubernetes Job으로 옮긴다는 관계가 중요하다.

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chapter5-model-assets-pvc
+  namespace: jupyterhub
+  labels:
+    app.kubernetes.io/name: chapter5-model-assets
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: s3files-model-assets-static
+  volumeName: chapter5-model-assets-pv
+  resources:
+    requests:
+      storage: 20Gi

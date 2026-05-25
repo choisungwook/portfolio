@@ -2,9 +2,8 @@
 
 ## 목적
 
-- K3s 전체 실습과 EKS 전체 실습에서 공통으로 관찰할 구조를 정리한다.
-
-<!-- akbun-writing: 왜 로컬 K3s와 EKS를 같이 실습하는지 배경 추가 -->
+- kubernetes를 사용해 AI 모델을 실험하고, 빌드하고, 배포하는 흐름을 다룬다.
+- 로컬에서는 k3s(+GPU)를 사용하고 cloud에서는 EKS를 사용한다.
 
 ## 핵심 흐름
 
@@ -61,10 +60,10 @@
 |---|---|---|
 | Cluster | Ubuntu host의 K3s single-node | AWS EKS |
 | GPU | host NVIDIA GPU를 K3s containerd가 직접 사용 | EKS GPU managed node group |
-| 데이터셋 | hostPath-backed PVC | S3 |
-| 모델 아티팩트 | PVC | S3 |
+| 데이터셋 | hostPath-backed PVC | S3 Files PVC |
+| 모델 아티팩트 | PVC | S3 Files PVC |
 | Identity | AWS 인증 없음 | Pod Identity |
-| LoadBalancer | Traefik Ingress / port-forward | AWS Load Balancer |
+| LoadBalancer | Traefik Ingress / port-forward | AWS Load Balancer Controller |
 
 ## K3s single-node 운영 기준
 

@@ -1,0 +1,20 @@
+replicaCount: 1
+
+image:
+  tag: v1.11.5
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  storageClassName: gp3
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 500m
+    memory: 1Gi

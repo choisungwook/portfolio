@@ -5,7 +5,7 @@
 - Chapter 5 K3s hands-on은 현재 디렉터리 기준 quickstart다.
 - hands-on에는 실행 순서와 명령만 남기고, 검증 이력과 의사결정 배경은 넣지 않는다.
 - H2는 공통 전제, JupyterHub, Fine-tuning Qwen, fine-tuned model 배포, RAG, chatbot, 정리, 참고자료로 나눈다.
-- K3s는 로컬 GPU 서버 실습이고, EKS는 실제 AWS cloud 실습이다. K3s 검증 흐름을 기준으로 `terraform/`의 EKS 실습을 고친다.
+- K3s는 로컬 GPU 서버 실습이고, EKS는 실제 AWS cloud 실습이다. K3s 검증 흐름을 기준으로 `eks/terraform/`의 EKS 실습을 고친다.
 
 ## 용어 정리
 
@@ -16,3 +16,4 @@
 - K3s 검증 기준선: EKS 문서를 고칠 때 K3s에서 검증된 순서와 결과를 AWS/EKS 리소스에 맞게 옮긴다.
 - K3s kubectl 접속: MacBook에서 `ubuntu` SSH tunnel과 원격 kubeconfig로 로컬 GPU 서버의 K3s API server에 붙는 방식.
 - EKS kubectl 접속: 실제 AWS cloud의 EKS endpoint를 사용한다. K3s처럼 SSH tunnel 방식으로 설명하지 않는다.
+- EKS S3 Files 아티팩트: EKS 전체 실습에서는 S3 bucket을 S3 Files file system으로 만들고 EFS CSI driver 3.0.0+를 통해 Kubernetes PVC로 mount한다.
