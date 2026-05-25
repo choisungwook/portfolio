@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-ui-deployment
+  labels:
+    app.kubernetes.io/name: chatbot-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chatbot-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chatbot-ui
+    spec:
+      containers:
+        - name: rag-ui-container
+          image: choisunguk/ch5-chatbot-ui:k3s-py312-amd64
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7860
+          env:
+            - name: RAG_API_ENDPOINT
+              value: "http://rag-app-service.default:80/generate"
+            - name: FINETUNE_API_ENDPOINT
+              value: "http://loyalty-inference-service.jupyterhub:80/generate"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

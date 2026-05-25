@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: chapter5-model-assets-pv
+  labels:
+    app.kubernetes.io/name: chapter5-model-assets
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: s3files-model-assets-static
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: "s3files:${S3FILES_FILE_SYSTEM_ID}::${S3FILES_MODEL_ASSETS_ACCESS_POINT_ID}"

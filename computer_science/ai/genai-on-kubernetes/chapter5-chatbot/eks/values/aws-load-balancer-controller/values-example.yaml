@@ -1,0 +1,9 @@
+clusterName: "replace-me"
+region: "ap-northeast-2"
+vpcId: "replace-me"
+
+serviceAccount:
+  create: true
+  name: app-alb-controller-irsa-sa
+  annotations:
+    eks.amazonaws.com/role-arn: "replace-me"

@@ -16,7 +16,7 @@ K3s native에서는 Ubuntu host가 Kubernetes node다. K3s containerd가 host NV
 
 로컬 GPU 실습은 kind/nvkind 대신 single-node K3s native로 진행한다.
 
-`k3s/` 디렉터리는 K3s 전용 문서, manifests, notebook, fine-tuning 코드, inference 코드를 가진다. EKS 실습은 `terraform/` 디렉터리에 유지한다.
+`k3s/` 디렉터리는 K3s 전용 문서, manifests, notebook, fine-tuning 코드, inference 코드를 가진다. EKS 실습은 `eks/` 디렉터리에 유지한다.
 
 ## Consequences
 

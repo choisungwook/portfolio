@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: s3files-static
+provisioner: efs.csi.aws.com
+volumeBindingMode: Immediate
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: s3files-model-assets-static
+provisioner: efs.csi.aws.com
+volumeBindingMode: Immediate

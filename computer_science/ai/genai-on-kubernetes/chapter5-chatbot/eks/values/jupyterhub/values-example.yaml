@@ -1,0 +1,100 @@
+hub:
+  config:
+    Authenticator:
+      admin_users:
+        - k8s-admin1
+      allowed_users:
+        - k8s-user1
+    DummyAuthenticator:
+      password: "replace-me"
+    JupyterHub:
+      authenticator_class: dummy
+  db:
+    pvc:
+      storage: 5Gi
+      storageClassName: gp3
+  authenticatePrometheus: false
+
+proxy:
+  https:
+    enabled: false
+    type: offload
+  service:
+    type: ClusterIP
+
+singleuser:
+  startTimeout: 1200
+  profileList:
+    - display_name: Data Science (GPU)
+      default: true
+      description: "Qwen fine-tuning on one EKS GPU managed node"
+      kubespawner_override:
+        image: cschranz/gpu-jupyter:v1.10_cuda-12.9_ubuntu-24.04
+        image_pull_policy: IfNotPresent
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        cpu_guarantee: 2
+        mem_guarantee: 12G
+        cpu_limit: 2
+        mem_limit: 12G
+        cmd: "start-singleuser.sh"
+  storage:
+    type: dynamic
+    capacity: 5Gi
+    dynamic:
+      storageClass: gp3
+    extraVolumes:
+      - name: chapter5-artifacts
+        persistentVolumeClaim:
+          claimName: chapter5-s3files-pvc
+      - name: chapter5-model-assets
+        persistentVolumeClaim:
+          claimName: chapter5-model-assets-pvc
+    extraVolumeMounts:
+      - name: chapter5-artifacts
+        mountPath: /data/chapter5
+        subPath: data/chapter5
+        readOnly: true
+      - name: chapter5-artifacts
+        mountPath: /opt/notebooks
+        subPath: notebooks
+        readOnly: true
+      - name: chapter5-model-assets
+        mountPath: /model-assets
+  allowPrivilegeEscalation: true
+  extraPodConfig:
+    securityContext:
+      fsGroup: 100
+  extraEnv:
+    GRANT_SUDO: "yes"
+    NOTEBOOK_ARGS: "--allow-root"
+    CHOWN_HOME: "yes"
+    CHOWN_HOME_OPTS: "-R"
+  uid: 0
+  fsGid: 0
+  cmd: null
+
+scheduling:
+  userScheduler:
+    enabled: true
+  podPriority:
+    enabled: true
+  userPlaceholder:
+    enabled: false
+    replicas: 1
+  userPods:
+    nodeAffinity:
+      matchNodePurpose: ignore
+
+prePuller:
+  hook:
+    enabled: false
+  continuous:
+    enabled: false
+
+global:
+  safeToShowValues: false

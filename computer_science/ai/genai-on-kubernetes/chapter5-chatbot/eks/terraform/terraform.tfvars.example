@@ -1,0 +1,30 @@
+project_name     = "genai-ch5-eks"
+aws_region       = "ap-northeast-2"
+eks_cluster_name = "genai-ch5-eks"
+eks_version      = "1.35"
+
+# Use null when your current AWS profile is already the target identity.
+assume_role_arn = null
+
+# When empty, Terraform grants cluster-admin to the current caller.
+eks_admin_principal_arns  = []
+grant_current_caller_admin = true
+
+endpoint_private_access = true
+endpoint_public_access  = true
+
+cpu_node_instance_types = ["t3.medium"]
+gpu_node_instance_types = ["g6.xlarge"]
+
+cpu_node_disk_size = 30
+gpu_node_disk_size = 200
+
+s3files_prefix = "chapter5/"
+
+s3files_access_point_uid = 1000
+s3files_access_point_gid = 100
+
+s3files_model_assets_path        = "/model-assets-writable"
+s3files_model_assets_permissions = "775"
+
+force_destroy_artifact_bucket = false

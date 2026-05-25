@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loyalty-inference-deployment
+  namespace: jupyterhub
+  labels:
+    app.kubernetes.io/name: loyalty-inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loyalty-inference
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loyalty-inference
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: loyalty-inference
+          image: choisunguk/ch5-qwen-inference:k3s-cuda12.8.1-amd64
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: BASE_MODEL_ID
+              value: "Qwen/Qwen2.5-0.5B-Instruct"
+            - name: MODEL_ASSETS_DIR
+              value: "/model-assets"
+            - name: MAX_NEW_TOKENS
+              value: "100"
+          volumeMounts:
+            - name: chapter5-model-assets
+              mountPath: /model-assets
+              readOnly: true
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+      volumes:
+        - name: chapter5-model-assets
+          persistentVolumeClaim:
+            claimName: chapter5-model-assets-pvc
