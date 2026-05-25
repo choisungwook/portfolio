@@ -318,7 +318,7 @@ K3s 기본 Traefik이 Ingress를 처리한다.
 
 ## 검증
 
-- Chatbot UI 테스트 스크립트: ../../docs/common-principles.md#chatbot-ui-테스트-스크립트
+- Chatbot UI 테스트 스크립트: [링크](../../docs/common-principles.md#chatbot-ui-테스트-스크립트)
 
 ## 정리
 
@@ -331,6 +331,6 @@ kubectl -n qdrant delete pvc qdrant-storage-qdrant-0 --ignore-not-found
 
 ## 참고자료
 
-- 공통 원리: ../../docs/common-principles.md
+- 공통 원리: [링크](../../docs/common-principles.md)
 - GPU 부트스트랩: gpu-bootstrap.md
 - 원본 예제: https://github.com/PacktPublishing/Kubernetes-for-Generative-AI-Solutions/tree/main/ch5
