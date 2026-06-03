@@ -526,13 +526,147 @@
         });
       }
 
+      function createCleanPostBody() {
+        var clone = postBody.cloneNode(true);
+        removeGeneratedElements(clone);
+        removeControlCharacters(clone);
+        return clone;
+      }
+
+      function removeGeneratedElements(root) {
+        [
+          "script",
+          "style",
+          "noscript",
+          ".adsbygoogle",
+          ".revenue_unit_wrap",
+          ".revenue_unit_item",
+          ".container_postbtn",
+          ".postbtn_like",
+          ".postbtn_ccl",
+          ".another_category",
+          ".wrap_btn_share",
+          ".wrap_btn_etc",
+          ".btn_menu_toolbar",
+          "#tistoryEtcLayer",
+          "[data-ad-client]",
+          "[data-ad-host]",
+          "[data-ad-slot]",
+          "[data-tistory-react-app='NaverAd']",
+          "[data-tistory-react-app='Reaction']",
+          "iframe[src*='googlesyndication']",
+          "iframe[src*='doubleclick']",
+          "iframe[src*='googleads']"
+        ].forEach(function (selector) {
+          root.querySelectorAll(selector).forEach(function (node) {
+            node.parentNode.removeChild(node);
+          });
+        });
+      }
+
+      function removeControlCharacters(root) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        var node = walker.nextNode();
+
+        while (node) {
+          node.nodeValue = removeControlCharactersFromText(node.nodeValue);
+          node = walker.nextNode();
+        }
+      }
+
+      function removeControlCharactersFromText(text) {
+        return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+      }
+
+      function cleanMarkdown(markdown) {
+        return truncateTistoryFooter(removeControlCharactersFromText(markdown))
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function truncateTistoryFooter(markdown) {
+        var searchStart = Math.max(0, markdown.length - 6000);
+        var searchArea = markdown.slice(searchStart);
+        var relativeIndex = findTistoryFooterStartIndex(searchArea);
+
+        if (relativeIndex === -1) return markdown;
+
+        var cutIndex = searchStart + relativeIndex;
+        return trimTrailingGeneratedFooterLines(markdown.slice(0, cutIndex));
+      }
+
+      function findTistoryFooterStartIndex(markdown) {
+        var markers = [
+          /^window\.ReactionButtonType/m,
+          /^좋아요\s*공감$/m,
+          /^\[저작자표시.*creativecommons\.org/m,
+          /^#### .*카테고리의 다른 글/m,
+          /^<table\b[^>]*>\s*<tbody\b[^>]*>\s*<tr\b[^>]*>\s*<th\b[^>]*>\s*<a\b[^>]*href="\/\d+"/m
+        ];
+        var startIndex = -1;
+
+        markers.forEach(function (marker) {
+          var match = marker.exec(markdown);
+          if (match && isTistoryFooterTail(markdown.slice(match.index)) && (startIndex === -1 || match.index < startIndex)) {
+            startIndex = match.index;
+          }
+        });
+
+        return startIndex;
+      }
+
+      function isTistoryFooterTail(markdown) {
+        var sample = markdown.slice(0, 2500);
+        var signals = [
+          /ReactionButtonType|ReactionApiUrl|ReactionReqBody/,
+          /^좋아요\s*공감$/m,
+          /^공유하기$/m,
+          /^URL 복사.*공유$/m,
+          /^통계$/m,
+          /^게시글 관리$/m,
+          /creativecommons\.org/,
+          /카테고리의 다른 글/,
+          /<table\b[^>]*>\s*<tbody\b[^>]*>/m
+        ];
+        var count = 0;
+
+        signals.forEach(function (signal) {
+          if (signal.test(sample)) count += 1;
+        });
+
+        return count >= 2;
+      }
+
+      function trimTrailingGeneratedFooterLines(markdown) {
+        var lines = markdown.split("\n");
+
+        while (lines.length && lines[lines.length - 1].trim() === "") {
+          lines.pop();
+        }
+
+        while (lines.length && isGeneratedFooterLine(lines[lines.length - 1])) {
+          lines.pop();
+          while (lines.length && lines[lines.length - 1].trim() === "") {
+            lines.pop();
+          }
+        }
+
+        return lines.join("\n");
+      }
+
+      function isGeneratedFooterLine(line) {
+        var text = line.trim();
+        if (text === "반응형") return true;
+        return /adsbygoogle|observeAdsenseUnfilledState|ReactionButtonType|ReactionApiUrl|ReactionReqBody/.test(text);
+      }
+
       function buildMarkdown() {
         var service = createMarkdownService();
         if (!service) throw new Error("TurndownService is unavailable");
 
         var titleEl = document.querySelector(".post-title");
         var title = titleEl ? titleEl.textContent.trim() : document.title;
-        var body = service.turndown(postBody.innerHTML);
+        var body = cleanMarkdown(service.turndown(createCleanPostBody().innerHTML));
         return "# " + title + "\n\n" + body + "\n\n---\n출처: " + location.href + "\n";
       }
 
