@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tcp-echo-envoy.fullname" . }}
+  labels:
+    {{- include "tcp-echo-envoy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "tcp-echo-envoy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tcp-echo-envoy.labels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: envoy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -c
+            - /etc/envoy/envoy.yaml
+            - --service-cluster
+            - {{ include "tcp-echo-envoy.fullname" . }}
+            - -l
+            - info
+          ports:
+            - name: tcp
+              containerPort: 2000
+              protocol: TCP
+            - name: admin
+              containerPort: 9901
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: {{ include "tcp-echo-envoy.fullname" . }}-config

@@ -1,0 +1,105 @@
+fullnameOverride: tcp-echo-haproxy
+kind: Deployment
+replicaCount: 2
+
+image:
+  repository: haproxy
+  tag: 3.2-alpine
+  pullPolicy: IfNotPresent
+
+args:
+  enabled: true
+  defaults:
+    - -f
+    - /usr/local/etc/haproxy/haproxy.cfg
+    - -db
+
+containerPorts: null
+
+rawContainerPorts:
+  - name: tcp
+    containerPort: 2000
+    protocol: TCP
+  - name: stats
+    containerPort: 8404
+    protocol: TCP
+
+terminationGracePeriodSeconds: 60
+
+livenessProbe:
+  tcpSocket:
+    port: tcp
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  tcpSocket:
+    port: tcp
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+deploymentLabels:
+  app.kubernetes.io/component: proxy
+  app.kubernetes.io/part-of: k8s-haproxy-tcp
+
+podLabels:
+  app.kubernetes.io/component: proxy
+  app.kubernetes.io/part-of: k8s-haproxy-tcp
+
+service:
+  labels:
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: k8s-haproxy-tcp
+
+configMount:
+  mountPath: /usr/local/etc/haproxy/haproxy.cfg
+  subPath: haproxy.cfg
+
+config: |
+  # Global process settings. Log to stdout so Kubernetes can collect HAProxy logs.
+  global
+    log stdout format raw local0
+
+  # Default behavior for all TCP frontends/backends in this file.
+  defaults
+    # Treat payloads as opaque TCP streams. HAProxy does not parse application messages.
+    mode tcp
+    log global
+    # Emit TCP connection logs for session-level observation.
+    option tcplog
+    # Backend connection establishment must fail quickly during Pod replacement.
+    timeout connect 5s
+    # Keep long-lived client and backend TCP sessions open while they are active.
+    timeout client 10m
+    timeout server 10m
+
+  # Client-facing TCP listener. The Kubernetes Service exposes this port.
+  frontend tcp_echo_frontend
+    bind *:2000
+    default_backend tcp_echo_backend
+
+  # Server-facing pool. The backend target is the Kubernetes Service DNS name,
+  # not individual Pod IPs, so Kubernetes still owns endpoint selection.
+  backend tcp_echo_backend
+    balance roundrobin
+    # Use TCP-level health checks because the sample protocol is raw TCP.
+    option tcp-check
+    # Mark endpoints down after repeated failures and back up after repeated success.
+    default-server inter 2s fall 3 rise 2
+    server tcp-echo tcp-echo-server:9090 check
+
+  # Lightweight HAProxy stats endpoint for hands-on observation.
+  listen stats
+    bind *:8404
+    mode http
+    stats enable
+    stats uri /stats
+    stats refresh 5s

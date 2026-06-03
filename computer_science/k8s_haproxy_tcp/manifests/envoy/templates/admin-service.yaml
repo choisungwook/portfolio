@@ -1,0 +1,17 @@
+{{- if .Values.adminService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tcp-echo-envoy.fullname" . }}-admin
+  labels:
+    {{- include "tcp-echo-envoy.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.adminService.type }}
+  selector:
+    {{- include "tcp-echo-envoy.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: admin
+      port: {{ .Values.adminService.port }}
+      targetPort: {{ .Values.adminService.targetPort }}
+      protocol: TCP
+{{- end }}

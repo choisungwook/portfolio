@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tcp-echo-client-interval
+  labels:
+    app.kubernetes.io/name: tcp-echo-client
+    app.kubernetes.io/component: client
+    app.kubernetes.io/part-of: k8s-haproxy-tcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tcp-echo-client
+      app.kubernetes.io/component: client
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tcp-echo-client
+        app.kubernetes.io/component: client
+        app.kubernetes.io/part-of: k8s-haproxy-tcp
+    spec:
+      initContainers:
+        - name: wait-for-proxy
+          image: choisungwook/tcp-client:v0.1.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /app/.venv/bin/python
+            - -c
+            - |
+              import os
+              import socket
+              import time
+
+              host = os.environ["PROXY_HOST"]
+              port = int(os.environ["PROXY_PORT"])
+
+              while True:
+                try:
+                  with socket.create_connection((host, port), timeout=2):
+                    break
+                except OSError:
+                  time.sleep(2)
+          env:
+            - name: PROXY_HOST
+              value: tcp-echo-haproxy
+            - name: PROXY_PORT
+              value: "2000"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+      containers:
+        - name: client
+          image: choisungwook/tcp-client:v0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HOST
+              value: tcp-echo-haproxy
+            - name: PORT
+              value: "2000"
+            - name: MODE
+              value: interval
+            - name: MESSAGE
+              value: helloworld
+            - name: INTERVAL_SECONDS
+              value: "5"
+            - name: AUTO_RECONNECT
+              value: "false"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tcp-echo-server
+  labels:
+    app.kubernetes.io/name: tcp-echo-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: k8s-haproxy-tcp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tcp-echo-server
+    app.kubernetes.io/component: server
+  ports:
+    - name: tcp
+      port: 9090
+      protocol: TCP
+      targetPort: tcp

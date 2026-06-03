@@ -1,0 +1,15 @@
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  rawAdditionalPorts:
+    - name: tcp
+      protocol: TCP
+      port: 2000
+      targetPort: tcp
+    - name: stats
+      protocol: TCP
+      port: 8404
+      targetPort: stats
