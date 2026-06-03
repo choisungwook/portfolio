@@ -34,6 +34,7 @@
 
       <div class="page-home-link">
         <a href="preview.html" class="page-home-link-anchor">글 목록으로 돌아가기</a>
+        <button type="button" class="copy-markdown-btn" id="copy-markdown-btn">markdown으로 복사하기</button>
       </div>
 
       <article class="post-full">
@@ -349,6 +350,96 @@ redis-pod   1/1     Running   0          12m</code></pre>
       }
     });
     Prism.highlightAll();
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/turndown@7.2.0/dist/turndown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var btn = document.getElementById("copy-markdown-btn");
+    var postBody = document.querySelector(".post-body");
+    if (!btn || !postBody) {
+      if (btn) btn.style.display = "none";
+      return;
+    }
+
+    var label = "markdown으로 복사하기";
+    var flashTimer = null;
+
+    function createMarkdownService() {
+      if (typeof TurndownService === "undefined") return null;
+
+      var service = new TurndownService({
+        headingStyle: "atx",
+        codeBlockStyle: "fenced",
+        bulletListMarker: "-"
+      });
+      if (window.turndownPluginGfm) {
+        service.use(window.turndownPluginGfm.gfm);
+      }
+      return service;
+    }
+
+    function buildMarkdown() {
+      var service = createMarkdownService();
+      if (!service) throw new Error("TurndownService is unavailable");
+
+      var titleEl = document.querySelector(".post-title");
+      var title = titleEl ? titleEl.textContent.trim() : document.title;
+      var body = service.turndown(postBody.innerHTML);
+      return "# " + title + "\n\n" + body + "\n\n---\n출처: " + location.href + "\n";
+    }
+
+    function flash(text) {
+      if (flashTimer) clearTimeout(flashTimer);
+      btn.textContent = text;
+      btn.classList.add("is-copied");
+      flashTimer = setTimeout(function () {
+        btn.textContent = label;
+        btn.classList.remove("is-copied");
+        flashTimer = null;
+      }, 2000);
+    }
+
+    function fallbackCopy(text) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+
+      var copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } catch (e) {
+        copied = false;
+      }
+
+      document.body.removeChild(ta);
+      flash(copied ? "복사됨!" : "복사 실패");
+    }
+
+    btn.addEventListener("click", function () {
+      var md;
+      try {
+        md = buildMarkdown();
+      } catch (e) {
+        flash("복사 실패");
+        return;
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(md).then(function () {
+          flash("복사됨!");
+        }).catch(function () {
+          fallbackCopy(md);
+        });
+        return;
+      }
+
+      fallbackCopy(md);
+    });
   });
 </script>
 <script>

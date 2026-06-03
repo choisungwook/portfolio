@@ -14,6 +14,24 @@
    - `images/` 폴더 안의 파일도 전부 업로드
 5. 저장 → 스킨이름 지정 → 적용
 
+## Release zip
+
+`master`에 스킨 소스 변경이 push되면 GitHub Actions가 `src/index.xml`의 `<version>`을 읽어 Release를 만든다. tag와 Release title은 `tistory-<version>` 형식이며, 같은 tag Release가 이미 있으면 새 Release를 만들지 않는다. Release tag는 workflow가 실행된 commit SHA(`${{ github.sha }}`)를 `gh release create --target`에 넘겨 만든다.
+
+agent가 `skin.html`, `style.css`, `index.xml`, `images/`처럼 실제 업로드되는 스킨 파일을 수정하면 `src/index.xml`의 `<version>`도 함께 올린다. 버전을 올리지 않으면 workflow는 실행될 수 있지만, 기존 tag가 이미 있어서 새 Release zip이 만들어지지 않는다.
+
+- 기능 추가나 UI 변경은 minor version을 올린다. 예: `1.1.0` → `1.2.0`
+- 작은 버그 수정은 patch version을 올린다. 예: `1.1.0` → `1.1.1`
+- preview 파일이나 문서만 수정한 경우에는 version을 올리지 않는다.
+
+로컬에서 동일한 업로드 zip을 만들 때는 아래 명령을 사용한다.
+
+```bash
+make zip
+```
+
+생성되는 `akbun-skin.zip`에는 `skin.html`, `style.css`, `index.xml`, `images/`가 있으면 `images/`가 포함된다. preview 파일은 배포 zip에 포함하지 않는다.
+
 ### 구글 서치콘솔 (옵션)
 
 검색 노출에 필요하다. 스킨 저장소에는 넣지 않고, 업로드 후 각자 본인 코드로 추가한다.
