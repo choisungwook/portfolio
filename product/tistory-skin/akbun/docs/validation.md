@@ -84,6 +84,10 @@
 - 버튼 클릭 시 클립보드에 글 제목, 본문 Markdown, 출처 URL이 복사되는지
 - 복사 결과에서 본문 헤딩 depth가 원본 그대로 유지되는지. 티스토리 본문 `h1`은 `#`, `h2`는 `##`로 변환하며 강등하지 않는다
 - 표, 코드블록, 리스트, blockquote가 Markdown으로 보존되는지. 리스트 marker 뒤 공백은 1개만 둔다. 예: `- 목록`
+- 복사 결과의 끝부분에서 티스토리 footer와 그 직전 광고 부산물이 제거되는지. 예: `adsbygoogle`, `반응형`, `ReactionButtonType`
+- 복사 결과에서 제어문자가 제거되는지. 예: 한영 전환 중 들어간 U+0008 backspace
+- 복사 결과에서 티스토리 자동 푸터가 제거되는지. 예: `좋아요공감`, `공유하기`, `통계`, `게시글 관리`, CCL 링크, "카테고리의 다른 글" 표
+- 본문 중간에 `통계`, `게시글 관리`, `공유하기` 같은 단어가 있어도 그 지점에서 Markdown이 잘리지 않는지
 - 데스크톱 폭(1400px 이상)에서 floating ToC가 보이는지
 - ToC가 본문 `h1`, `h2`를 수집하는지
 
@@ -110,7 +114,10 @@ service.use(window.turndownPluginGfm.gfm);
 service.addRule("compactListItem", {
   filter: "li",
   replacement: function (content, node, options) {
-    var item = content.replace(/^\n+/, "").replace(/\n+$/, "\n");
+    var item = content
+      .replace(/^\n+/, "")
+      .replace(/\n+$/, "\n")
+      .replace(/\n/gm, "\n    ");
     var prefix = options.bulletListMarker + " ";
     var parent = node.parentNode;
 
@@ -120,9 +127,26 @@ service.addRule("compactListItem", {
       prefix = (start ? Number(start) + index : index + 1) + ". ";
     }
 
-    return prefix + item;
+    return prefix + item + (node.nextSibling && !/\n$/.test(item) ? "\n" : "");
   }
 });
+```
+
+**JS** — 복사 전후로 티스토리가 생성한 광고/푸터와 제어문자를 제거해야 한다.
+
+```js
+var body = cleanMarkdown(service.turndown(createCleanPostBody().innerHTML));
+
+function removeControlCharactersFromText(text) {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+}
+```
+
+**JS** — footer 절단은 문서 끝 근처의 티스토리 footer 신호 묶음에만 적용한다.
+
+```js
+var searchStart = Math.max(0, markdown.length - 6000);
+var relativeIndex = findTistoryFooterStartIndex(markdown.slice(searchStart));
 ```
 
 **JS** — ToC 생성 셀렉터를 변경하면 목차가 비게 된다.
