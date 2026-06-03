@@ -127,6 +127,10 @@ img {
   gap: var(--layout-gap);
 }
 
+.content {
+  min-width: 0;
+}
+
 /* ===================================================================
    Sidebar
    =================================================================== */
@@ -282,7 +286,8 @@ img {
   margin-bottom: 2rem;
 }
 
-.page-home-link-anchor {
+.page-home-link-anchor,
+.copy-markdown-btn {
   display: inline-flex;
   align-items: center;
   padding: 0.625rem 0.875rem;
@@ -296,7 +301,13 @@ img {
   transition: color var(--transition), border-color var(--transition);
 }
 
-.page-home-link-anchor:hover {
+.copy-markdown-btn {
+  cursor: pointer;
+}
+
+.page-home-link-anchor:hover,
+.copy-markdown-btn:hover,
+.copy-markdown-btn.is-copied {
   color: var(--color-accent);
   border-color: var(--color-accent);
 }
@@ -390,6 +401,7 @@ img {
   letter-spacing: -0.02em;
   margin-top: 0;
   margin-bottom: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .post-meta {
@@ -1221,7 +1233,11 @@ img {
 }
 
 #tt-body-page .page-home-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   margin-top: 0;
 }
 

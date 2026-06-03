@@ -1,0 +1,62 @@
+name: release-tistory-skin
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/tistory-skin/akbun/src/skin.html'
+      - 'product/tistory-skin/akbun/src/style.css'
+      - 'product/tistory-skin/akbun/src/index.xml'
+      - 'product/tistory-skin/akbun/src/images/**'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read skin version
+        id: version
+        run: |
+          cd product/tistory-skin/akbun/src
+          VERSION=$(grep -oP '(?<=<version>)[^<]+' index.xml | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "index.xml version not found" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=tistory-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build zip
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          cd product/tistory-skin/akbun/src
+          files="skin.html style.css index.xml"
+          [ -d images ] && files="$files images"
+          zip -r ../akbun-skin.zip $files
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd product/tistory-skin/akbun
+          gh release create "${{ steps.version.outputs.tag }}" akbun-skin.zip \
+            --target "${{ github.sha }}" \
+            --title "tistory-${{ steps.version.outputs.version }}" \
+            --notes "티스토리 스킨 tistory-${{ steps.version.outputs.version }} 배포 아티팩트. skin.html, style.css, index.xml 포함."
