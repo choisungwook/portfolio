@@ -83,7 +83,7 @@
 - "markdown으로 복사하기" 버튼이 링크 오른쪽에 존재하는지
 - 버튼 클릭 시 클립보드에 글 제목, 본문 Markdown, 출처 URL이 복사되는지
 - 복사 결과에서 본문 헤딩 depth가 원본 그대로 유지되는지. 티스토리 본문 `h1`은 `#`, `h2`는 `##`로 변환하며 강등하지 않는다
-- 표, 코드블록, 리스트, blockquote가 Markdown으로 보존되는지
+- 표, 코드블록, 리스트, blockquote가 Markdown으로 보존되는지. 리스트 marker 뒤 공백은 1개만 둔다. 예: `- 목록`
 - 데스크톱 폭(1400px 이상)에서 floating ToC가 보이는지
 - ToC가 본문 `h1`, `h2`를 수집하는지
 
@@ -101,12 +101,28 @@
 **JS** — Markdown 변환은 본문 헤딩을 강등하지 않아야 한다.
 
 ```js
-new TurndownService({
+var service = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
   bulletListMarker: "-"
 });
 service.use(window.turndownPluginGfm.gfm);
+service.addRule("compactListItem", {
+  filter: "li",
+  replacement: function (content, node, options) {
+    var item = content.replace(/^\n+/, "").replace(/\n+$/, "\n");
+    var prefix = options.bulletListMarker + " ";
+    var parent = node.parentNode;
+
+    if (parent && parent.nodeName === "OL") {
+      var start = parent.getAttribute("start");
+      var index = Array.prototype.indexOf.call(parent.children, node);
+      prefix = (start ? Number(start) + index : index + 1) + ". ";
+    }
+
+    return prefix + item;
+  }
+});
 ```
 
 **JS** — ToC 생성 셀렉터를 변경하면 목차가 비게 된다.
@@ -121,7 +137,7 @@ document.querySelectorAll(".post-body h1, .post-body h2")
 #tt-body-page .page-home-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   flex-wrap: wrap;
 }

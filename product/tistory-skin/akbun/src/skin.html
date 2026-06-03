@@ -500,7 +500,30 @@
         if (window.turndownPluginGfm) {
           service.use(window.turndownPluginGfm.gfm);
         }
+        addCompactListItemRule(service);
         return service;
+      }
+
+      function addCompactListItemRule(service) {
+        service.addRule("compactListItem", {
+          filter: "li",
+          replacement: function (content, node, options) {
+            var item = content
+              .replace(/^\n+/, "")
+              .replace(/\n+$/, "\n")
+              .replace(/\n/gm, "\n    ");
+            var prefix = options.bulletListMarker + " ";
+            var parent = node.parentNode;
+
+            if (parent && parent.nodeName === "OL") {
+              var start = parent.getAttribute("start");
+              var index = Array.prototype.indexOf.call(parent.children, node);
+              prefix = (start ? Number(start) + index : index + 1) + ". ";
+            }
+
+            return prefix + item + (node.nextSibling && !/\n$/.test(item) ? "\n" : "");
+          }
+        });
       }
 
       function buildMarkdown() {
