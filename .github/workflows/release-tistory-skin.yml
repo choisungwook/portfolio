@@ -23,11 +23,17 @@ jobs:
         id: version
         run: |
           cd product/tistory-skin/akbun/src
-          VERSION=$(grep -oP '(?<=<version>)[^<]+' index.xml | head -n1)
-          if [ -z "$VERSION" ]; then
-            echo "index.xml version not found" >&2
-            exit 1
-          fi
+          VERSION=$(python3 - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("index.xml").getroot()
+          version = root.findtext("./information/version")
+          if not version or not version.strip():
+            sys.exit("index.xml version not found")
+          print(version.strip())
+          PY
+          )
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=tistory-$VERSION" >> "$GITHUB_OUTPUT"
 

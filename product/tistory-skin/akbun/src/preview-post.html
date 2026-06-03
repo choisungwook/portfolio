@@ -364,6 +364,7 @@ redis-pod   1/1     Running   0          12m</code></pre>
     }
 
     var label = "markdown으로 복사하기";
+    var flashTimer = null;
 
     function createMarkdownService() {
       if (typeof TurndownService === "undefined") return null;
@@ -390,11 +391,13 @@ redis-pod   1/1     Running   0          12m</code></pre>
     }
 
     function flash(text) {
+      if (flashTimer) clearTimeout(flashTimer);
       btn.textContent = text;
       btn.classList.add("is-copied");
-      setTimeout(function () {
+      flashTimer = setTimeout(function () {
         btn.textContent = label;
         btn.classList.remove("is-copied");
+        flashTimer = null;
       }, 2000);
     }
 
