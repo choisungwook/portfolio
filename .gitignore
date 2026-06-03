@@ -41,6 +41,7 @@ override.tf.json
 .terraformrc
 terraform.rc
 terraform.tfvars
+.terraform.lock.hcl
 
 # juypter notebook
 MANIFEST

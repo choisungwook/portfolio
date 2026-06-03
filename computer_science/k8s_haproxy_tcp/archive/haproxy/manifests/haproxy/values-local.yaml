@@ -1,0 +1,12 @@
+service:
+  type: NodePort
+  rawAdditionalPorts:
+    - name: tcp
+      protocol: TCP
+      port: 2000
+      targetPort: tcp
+      nodePort: 32090
+    - name: stats
+      protocol: TCP
+      port: 8404
+      targetPort: stats

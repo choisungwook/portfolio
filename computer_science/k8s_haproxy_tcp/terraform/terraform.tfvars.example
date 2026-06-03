@@ -1,0 +1,15 @@
+project_name     = "k8s-haproxy-tcp"
+aws_region       = "ap-northeast-2"
+eks_cluster_name = "k8s-haproxy-tcp"
+eks_version      = "1.35"
+
+assume_role_arn = null
+
+eks_admin_principal_arns  = []
+grant_current_caller_admin = true
+
+endpoint_private_access = true
+endpoint_public_access  = true
+
+cpu_node_instance_types = ["t3.medium"]
+cpu_node_disk_size      = 30

@@ -87,6 +87,7 @@
 77. 스터디 - AWS Knowledge Bases (26.5.18) - [링크](./aws/bedrock/)
 78. 스터디 - kubernetes로 genAI시스템 구축(실험환경, AI모델 빌드, AI모델 배포) (26.5.24) - [링크](./computer_science/ai/genai-on-kubernetes/chapter5-chatbot/k3s/)
 79. 스터디 - kubernetes로 genAI시스템을 EKS에 구축(실험환경, AI모델 빌드, AI모델 배포) (26.5.25) - [링크](./computer_science/ai/genai-on-kubernetes/chapter5-chatbot/eks/)
+80. client -> HAProxy or EnvoyProxy -> server pod구조에서 TCP통신 끊기는지 확인 (26.6.3) - [링크](./computer_science/k8s_haproxy_tcp/)
 
 ## 직접 만든 제품
 
