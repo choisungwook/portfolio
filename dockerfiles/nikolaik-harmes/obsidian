@@ -1,0 +1,104 @@
+#!/bin/sh
+set -eu
+
+default_vault_path="${OBSIDIAN_VAULT_PATH:-/obsidian}"
+
+if [ -d "$default_vault_path" ]; then
+  notesmd-cli add-vault "$default_vault_path" --set-default >/dev/null 2>&1 || true
+fi
+
+get_param() {
+  key="$1"
+  shift
+
+  for arg in "$@"; do
+    case "$arg" in
+      "$key="*)
+        printf '%s\n' "${arg#*=}"
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+run_notesmd() {
+  if [ -n "${vault_name:-}" ]; then
+    exec notesmd-cli "$@" --vault "$vault_name"
+  fi
+
+  exec notesmd-cli "$@"
+}
+
+unsupported() {
+  echo "obsidian wrapper: official Obsidian CLI is unavailable in this image." >&2
+  echo "obsidian wrapper: notesmd-cli is used for read-only commands: help, version, read, search, files, vaults." >&2
+  exit 64
+}
+
+vault_name=""
+if [ "${1:-}" != "" ]; then
+  case "$1" in
+    vault=*)
+      vault_name="${1#vault=}"
+      shift
+      ;;
+  esac
+fi
+
+cmd="${1:-help}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$cmd" in
+  help|--help|-h)
+    exec notesmd-cli --help
+    ;;
+  version|--version)
+    exec notesmd-cli --version
+    ;;
+  read)
+    target="$(get_param path "$@" || true)"
+    if [ -z "$target" ]; then
+      target="$(get_param file "$@" || true)"
+    fi
+    if [ -z "$target" ]; then
+      echo "obsidian wrapper: read requires path= or file=." >&2
+      exit 64
+    fi
+    run_notesmd print "$target"
+    ;;
+  search)
+    query="$(get_param query "$@" || true)"
+    if [ -z "$query" ]; then
+      echo "obsidian wrapper: search requires query=." >&2
+      exit 64
+    fi
+    format="$(get_param format "$@" || true)"
+    if [ "$format" = "json" ]; then
+      run_notesmd search-content "$query" --format json
+    fi
+    run_notesmd search-content "$query" --no-interactive
+    ;;
+  files)
+    folder="$(get_param folder "$@" || true)"
+    if [ -n "$folder" ]; then
+      run_notesmd list "$folder"
+    fi
+    run_notesmd list
+    ;;
+  vault|vaults)
+    exec notesmd-cli list-vaults
+    ;;
+  print|list|search-content)
+    run_notesmd "$cmd" "$@"
+    ;;
+  list-vaults|add-vault|remove-vault|set-default-vault)
+    exec notesmd-cli "$cmd" "$@"
+    ;;
+  *)
+    unsupported
+    ;;
+esac
