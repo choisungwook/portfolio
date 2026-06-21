@@ -1,0 +1,12 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Repository was cloned by CodeBuild through CodeConnections."
+      - git rev-parse --show-toplevel
+      - git rev-parse --short HEAD
+  build:
+    commands:
+      - git remote -v
+      - git status --short
