@@ -7,7 +7,15 @@ INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
 if [[ "$FILE_PATH" =~ \.md$ ]] && [[ -f "$FILE_PATH" ]]; then
-  OUTPUT=$(markdownlint --fix "$FILE_PATH" 2>&1)
+  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+  CONFIG="$REPO_ROOT/.markdownlint.json"
+
+  if [[ -f "$CONFIG" ]]; then
+    OUTPUT=$(markdownlint --config "$CONFIG" --fix "$FILE_PATH" 2>&1)
+  else
+    OUTPUT=$(markdownlint --fix "$FILE_PATH" 2>&1)
+  fi
+
   STATUS=$?
 
   if [[ $STATUS -ne 0 ]]; then
