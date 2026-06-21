@@ -1,0 +1,8 @@
+aws_region              = "ap-northeast-2"
+project_name            = "ecr-lifecycle-digest-hands-on"
+repository_name         = "ecr-lifecycle-digest-hands-on"
+force_delete            = true
+enable_lifecycle_policy = false
+enable_prod_guard_rule  = true
+dev_image_count         = 10
+prod_guard_image_count  = 9999
