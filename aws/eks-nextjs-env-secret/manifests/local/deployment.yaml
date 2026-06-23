@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextjs-env-secret-demo
+  namespace: nextjs-env-secret
+  labels:
+    app.kubernetes.io/name: nextjs-env-secret-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nextjs-env-secret-demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nextjs-env-secret-demo
+    spec:
+      containers:
+        - name: nextjs
+          image: nextjs-env-secret-demo:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: RUNTIME_CONFIG_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: nextjs-env-config
+                  key: RUNTIME_CONFIG_NAME
+            - name: RUNTIME_SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nextjs-runtime-secret
+                  key: RUNTIME_SECRET_TOKEN
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

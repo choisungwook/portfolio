@@ -1,0 +1,4 @@
+demo_secret_value = "replace-with-demo-value"
+
+eks_oidc_provider_arn               = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.ap-northeast-2.amazonaws.com/id/EXAMPLE"
+eks_oidc_provider_url_without_https = "oidc.eks.ap-northeast-2.amazonaws.com/id/EXAMPLE"
