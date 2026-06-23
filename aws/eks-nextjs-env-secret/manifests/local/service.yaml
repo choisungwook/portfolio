@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextjs-env-secret-demo
+  namespace: nextjs-env-secret
+  labels:
+    app.kubernetes.io/name: nextjs-env-secret-demo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nextjs-env-secret-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
