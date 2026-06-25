@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-c-pr-101
+  namespace: pr-preview
+  labels:
+    app.kubernetes.io/name: service-c
+    app.kubernetes.io/instance: pr-101
+    app.kubernetes.io/part-of: pr-preview-kind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-c
+      app.kubernetes.io/instance: pr-101
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-c
+        app.kubernetes.io/instance: pr-101
+        app.kubernetes.io/part-of: pr-preview-kind
+    spec:
+      containers:
+        - name: service-c
+          image: pr-preview/service-c:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: service-c
+            - name: SERVICE_VERSION
+              value: pr-101
+            - name: ZIPKIN_URL
+              value: http://zipkin:9411/api/v2/spans
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 250m
+              memory: 192Mi

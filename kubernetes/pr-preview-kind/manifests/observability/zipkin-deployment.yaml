@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zipkin
+  namespace: pr-preview
+  labels:
+    app.kubernetes.io/name: zipkin
+    app.kubernetes.io/part-of: pr-preview-kind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zipkin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zipkin
+        app.kubernetes.io/part-of: pr-preview-kind
+    spec:
+      containers:
+        - name: zipkin
+          image: openzipkin/zipkin:3.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9411
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

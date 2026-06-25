@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-a-pr-101
+  namespace: pr-preview
+  labels:
+    app.kubernetes.io/name: service-a
+    app.kubernetes.io/instance: pr-101
+    app.kubernetes.io/part-of: pr-preview-kind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-a
+      app.kubernetes.io/instance: pr-101
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-a
+        app.kubernetes.io/instance: pr-101
+        app.kubernetes.io/part-of: pr-preview-kind
+    spec:
+      containers:
+        - name: service-a
+          image: pr-preview/service-a:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: service-a
+            - name: SERVICE_VERSION
+              value: pr-101
+            - name: SERVICE_B_URL
+              value: http://service-b-pr-101:8080/process
+            - name: ZIPKIN_URL
+              value: http://zipkin:9411/api/v2/spans
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 250m
+              memory: 192Mi
