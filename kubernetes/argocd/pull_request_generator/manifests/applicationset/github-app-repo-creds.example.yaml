@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-app-repo-creds
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repo-creds
+    app.kubernetes.io/name: github-app-repo-creds
+    app.kubernetes.io/part-of: pull-request-generator-demo
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/<MANIFEST_OWNER>/<MANIFEST_REPO>.git
+  githubAppID: "<GITHUB_APP_ID>"
+  githubAppInstallationID: "<GITHUB_APP_INSTALLATION_ID>"
+  githubAppPrivateKey: |
+    -----BEGIN PRIVATE KEY-----
+    <GITHUB_APP_PRIVATE_KEY>
+    -----END PRIVATE KEY-----

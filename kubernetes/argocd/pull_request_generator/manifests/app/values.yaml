@@ -1,0 +1,48 @@
+pullRequest:
+  number: ""
+
+workload:
+  name: app-workload
+  image: pull-request-generator/pod-b:local
+  imagePullPolicy: IfNotPresent
+  port: 8080
+  env:
+  - name: POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: POD_NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  resources:
+    requests:
+      cpu: 250m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+
+service:
+  name: app-service
+  port: 8080
+
+httpRoute:
+  enabled: false
+  name: app-route
+  parentRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: ingress-gateway
+    namespace: istio-ingress
+    port: null
+  hostname: ""
+  pathPrefix: /
+  header:
+    enabled: false
+    type: RegularExpression
+    name: cookie
+    value: ""
+  backend:
+    name: ""
+    port: null

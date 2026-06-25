@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Values.service.name }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app.kubernetes.io/name: "{{ .Values.service.name }}"
+    app.kubernetes.io/part-of: pull-request-generator-demo
+    {{- with .Values.pullRequest.number }}
+    pull-request-number: "{{ . }}"
+    {{- end }}
+spec:
+  selector:
+    app.kubernetes.io/name: "{{ .Values.workload.name }}"
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.workload.port }}

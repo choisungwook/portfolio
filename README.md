@@ -90,6 +90,7 @@
 80. client -> HAProxy or EnvoyProxy -> server pod구조에서 TCP통신 끊기는지 확인 (26.6.3) - [링크](./computer_science/k8s_haproxy_tcp/)
 81. ECR lifecycle을 설정할 때 운영환경에서 사용하는 이미지를 보호하는 방법 (26.6.21) - [링크](./aws/ecr/tag_vs_digest/)
 82. AWS CodeBuild에서 GitHub App connection으로 GitHub repository 연결 (26.6.21) - [링크](./aws/codebuild/github_connection/)
+83. Github Pull requset가 생성되면 Argo CD Pull Request Generator로 kubernetes 리소스를 자동으로 생성 (26.6.28) - [링크](./kubernetes/argocd/pull_request_generator/)
 
 ## 직접 만든 제품
 
