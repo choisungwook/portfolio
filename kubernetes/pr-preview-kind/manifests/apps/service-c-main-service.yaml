@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-c-main
+  namespace: pr-preview
+  labels:
+    app.kubernetes.io/name: service-c
+    app.kubernetes.io/instance: main
+    app.kubernetes.io/part-of: pr-preview-kind
+spec:
+  selector:
+    app.kubernetes.io/name: service-c
+    app.kubernetes.io/instance: main
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
