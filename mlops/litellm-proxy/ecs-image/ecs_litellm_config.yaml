@@ -1,0 +1,8 @@
+model_list:
+  - model_name: bedrock-claude
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
+      aws_region_name: os.environ/AWS_REGION_NAME
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

@@ -1,0 +1,8 @@
+aws_region                    = "ap-northeast-2"
+project_name                  = "litellm-proxy-hands-on"
+vpc_id                        = "vpc-00000000000000000"
+public_subnet_ids             = ["subnet-00000000000000000", "subnet-11111111111111111"]
+allowed_cidr                  = "0.0.0.0/0"
+container_image               = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/litellm-proxy-hands-on:latest"
+litellm_master_key_secret_arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:litellm-master-key-example"
+desired_count                 = 1

@@ -1,0 +1,44 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm-database:main-latest
+    command:
+      - --config=/app/config.yaml
+      - --port=4000
+      - --num_workers=1
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-change-me}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:-sk-local-salt-change-me}
+      MOCK_API_KEY: ${MOCK_API_KEY:-mock-key}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm-local-password}@postgres:5432/${POSTGRES_DB:-litellm}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-openai:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-litellm-local-password}
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+    volumes:
+      - litellm-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mock-openai:
+    build:
+      context: ./mock-openai
+    environment:
+      MOCK_API_KEY: ${MOCK_API_KEY:-mock-key}
+
+volumes:
+  litellm-postgres:
