@@ -1,0 +1,10 @@
+model_list:
+  - model_name: local-mock
+    litellm_params:
+      model: openai/local-mock
+      api_base: http://mock-openai:8080/v1
+      api_key: os.environ/MOCK_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
