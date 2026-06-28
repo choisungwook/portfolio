@@ -19,9 +19,18 @@ kubectl get node
 Argo CD와 ApplicationSet controller를 설치합니다.
 
 ```bash
-kubectl apply -k manifests/argocd
+kubectl apply --server-side --force-conflicts -k manifests/argocd
+kubectl wait --for=condition=Established crd/applicationsets.argoproj.io --timeout=120s
 kubectl wait -n argocd --for=condition=Available deployment/argocd-server --timeout=300s
 kubectl wait -n argocd --for=condition=Available deployment/argocd-applicationset-controller --timeout=300s
+```
+
+Argo CD install manifest에는 큰 CRD가 포함되어 있으므로 server-side apply를 사용합니다. 일반 `kubectl apply -k`로 설치하면 `applicationsets.argoproj.io` CRD가 빠져 ApplicationSet 적용 시 `no matches for kind "ApplicationSet"` 오류가 날 수 있습니다.
+
+ApplicationSet CRD가 설치됐는지 확인합니다.
+
+```bash
+kubectl get crd applicationsets.argoproj.io
 ```
 
 Argo CD UI 확인 주소입니다.

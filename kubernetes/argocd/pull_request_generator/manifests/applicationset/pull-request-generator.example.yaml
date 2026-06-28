@@ -9,19 +9,23 @@ metadata:
 spec:
   goTemplate: true
   goTemplateOptions:
-    - missingkey=error
+  - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: false
   generators:
-    - pullRequest:
-        github:
-          owner: "<GITHUB_OWNER>"
-          repo: "<GITHUB_REPO>"
-          appSecretName: github-app-repo-creds
-          labels:
-            - "<PULL_REQUEST_LABEL>"
-        requeueAfterSeconds: 60
+  - pullRequest:
+      github:
+        owner: "<GITHUB_OWNER>"
+        repo: "<GITHUB_REPO>"
+        appSecretName: github-app-repo-creds
+        labels:
+        - "<PULL_REQUEST_LABEL>"
+      requeueAfterSeconds: 60
   template:
     metadata:
       name: "pod-chain-pr-{{.number}}"
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
       labels:
         app.kubernetes.io/name: pod-chain-pr-workload
         app.kubernetes.io/part-of: pull-request-generator-demo
@@ -35,34 +39,34 @@ spec:
         helm:
           releaseName: "workload-{{.number}}"
           parameters:
-            - name: pullRequest.number
-              value: "{{.number}}"
-            - name: workload.name
-              value: "<WORKLOAD_NAME>"
-            - name: workload.image
-              value: "choisunguk/pull-request-generator:v1"
-            - name: service.name
-              value: "<SERVICE_NAME>"
-            # Optional mesh HTTPRoute. Uncomment only when this PR should catch
-            # header-matched calls to the prod Service FQDN through waypoint.
-            # - name: httpRoute.enabled
-            #   value: "true"
-            # - name: httpRoute.name
-            #   value: "app-route-pr-{{.number}}"
-            # - name: httpRoute.namespace
-            #   value: "prod"
-            # - name: httpRoute.parentRef.kind
-            #   value: "Service"
-            # - name: httpRoute.parentRef.name
-            #   value: "app-service"
-            # - name: httpRoute.parentRef.namespace
-            #   value: "prod"
-            # - name: httpRoute.header.enabled
-            #   value: "true"
-            # - name: httpRoute.header.name
-            #   value: "cookie"
-            # - name: httpRoute.header.value
-            #   value: "(^|.*; )pod-chain-pr={{.number}}(;.*|$)"
+          - name: pullRequest.number
+            value: "{{.number}}"
+          - name: workload.name
+            value: "<WORKLOAD_NAME>"
+          - name: workload.image
+            value: "choisunguk/pull-request-generator:v1"
+          - name: service.name
+            value: "<SERVICE_NAME>"
+          # Optional mesh HTTPRoute. Uncomment only when this PR should catch
+          # header-matched calls to the prod Service FQDN through waypoint.
+          - name: httpRoute.enabled
+            value: "true"
+          - name: httpRoute.name
+            value: "app-route-pr-{{.number}}"
+          - name: httpRoute.namespace
+            value: "prod"
+          - name: httpRoute.parentRef.kind
+            value: "Service"
+          - name: httpRoute.parentRef.name
+            value: "app-service"
+          - name: httpRoute.parentRef.namespace
+            value: "prod"
+          - name: httpRoute.header.enabled
+            value: "true"
+          - name: httpRoute.header.name
+            value: "cookie"
+          - name: httpRoute.header.value
+            value: "(^|.*; )pod-chain-pr={{.number}}(;.*|$)"
       destination:
         server: https://kubernetes.default.svc
         namespace: "pr-{{.number}}"
@@ -71,6 +75,8 @@ spec:
           prune: true
           selfHeal: true
         managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/tracking-id: "pod-chain-pr-{{.number}}:/Namespace:/pr-{{.number}}"
           labels:
             app.kubernetes.io/name: "pr-{{.number}}"
             app.kubernetes.io/part-of: pull-request-generator-demo
@@ -78,4 +84,4 @@ spec:
             istio.io/use-waypoint: waypoint
             istio.io/use-waypoint-namespace: istio-waypoint
         syncOptions:
-          - CreateNamespace=true
+        - CreateNamespace=true
