@@ -1,19 +1,18 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: ingress-gateway
-  namespace: istio-ingress
+  name: waypoint
+  namespace: istio-waypoint
   labels:
-    app.kubernetes.io/name: ingress-gateway
+    app.kubernetes.io/name: waypoint
     app.kubernetes.io/part-of: pull-request-generator-demo
-  annotations:
-    networking.istio.io/service-type: ClusterIP
+    istio.io/waypoint-for: service
 spec:
   gatewayClassName: istio-waypoint
   listeners:
-  - name: http
-    protocol: HTTP
-    port: 80
-    allowedRoutes:
-      namespaces:
-        from: All
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+      allowedRoutes:
+        namespaces:
+          from: All

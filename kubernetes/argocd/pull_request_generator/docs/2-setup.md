@@ -1,6 +1,12 @@
 # setup
 
+## TL;DR
+
+이 실습은 kind cluster에서 Argo CD, Gateway API CRD, Istio Ambient, shared waypoint를 준비합니다.
+
 ## kind cluster 설치
+
+kind cluster를 만듭니다.
 
 ```bash
 cd kubernetes/argocd/pull_request_generator
@@ -9,6 +15,8 @@ kubectl get node
 ```
 
 ## Argo CD 설치
+
+Argo CD와 ApplicationSet controller를 설치합니다.
 
 ```bash
 kubectl apply -k manifests/argocd
@@ -130,38 +138,27 @@ kubectl get gatewayclass
 
 `GatewayClass` 목록에 `istio`와 `istio-waypoint`가 보여야 합니다. 보이지 않으면 Gateway API CRD 설치 후 Istio 설치를 다시 실행합니다.
 
-## Gateway 설치
+## waypoint 설치
 
-Istio Gateway API가 사용할 ingress Gateway를 적용합니다. kind cluster에서는 기본 설정으로 LoadBalancer를 없으므로, gateway service는 ClusterIP를 사용합니다.
+Istio Ambient L7 route가 사용할 shared waypoint를 적용합니다. 이 리소스는 외부 ingress가 아니라 `HBONE` listener를 가진 waypoint입니다.
 
 ```bash
 kubectl apply -k manifests/gateway
-kubectl wait -n istio-ingress --for=condition=Programmed gateway/ingress-gateway --timeout=300s
-kubectl get gateway -n istio-ingress
-kubectl get deployment -n istio-ingress
-kubectl get service -n istio-ingress
+kubectl wait -n istio-waypoint --for=condition=Programmed gateway/waypoint --timeout=300s
+kubectl get gateway -n istio-waypoint
+kubectl get deployment -n istio-waypoint
+kubectl get service -n istio-waypoint
 ```
 
-![get_gateway](../imgs/get_gateway.png)
-
-로컬 호출을 위해 Gateway Service를 port-forward합니다.
+waypoint listener가 `HBONE`인지 확인합니다.
 
 ```bash
-GATEWAY_SERVICE=$(kubectl get service -n istio-ingress -o jsonpath='{.items[0].metadata.name}')
-kubectl port-forward -n istio-ingress service/${GATEWAY_SERVICE} 8080:80
-```
-
-다른 터미널에서 hosts를 설정합니다.
-
-```bash
-sudo sh -c 'cat >> /etc/hosts <<EOF
-127.0.0.1 app.local.test pr-123.local.test
-EOF'
+kubectl get gateway waypoint -n istio-waypoint -o yaml
 ```
 
 ## 다음 실습
 
 | 문서 | 내용 |
 |---|---|
-| [helm-chart-gateway-test.md](./helm-chart-gateway-test.md) | Helm chart로 리소스를 배포하고 Gateway로 호출 |
-| [pull-request-generator-header-routing.md](./pull-request-generator-header-routing.md) | Pull Request Generator로 배포하고 헤더 기반 라우팅 확인 |
+| [3-helm-chart-gateway-test.md](./3-helm-chart-gateway-test.md) | Helm chart 하나로 prod app과 PR app을 배포하고 test client로 waypoint route 확인 |
+| [4-pull-request-generator-header-routing.md](./4-pull-request-generator-header-routing.md) | Pull Request Generator로 PR app을 배포하고 헤더 기반 mesh route 확인 |

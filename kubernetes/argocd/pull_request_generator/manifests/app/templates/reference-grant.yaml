@@ -1,0 +1,51 @@
+{{- if and .Values.httpRoute.enabled .Values.referenceGrant.enabled }}
+{{- $routeNamespace := default .Release.Namespace .Values.httpRoute.namespace }}
+{{- $backendName := default .Values.service.name .Values.httpRoute.backend.name }}
+{{- $backendNamespace := default .Release.Namespace .Values.httpRoute.backend.namespace }}
+{{- $parentNamespace := .Values.httpRoute.parentRef.namespace }}
+{{- if ne $backendNamespace $routeNamespace }}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: "{{ .Values.referenceGrant.name }}-backend"
+  namespace: "{{ $backendNamespace }}"
+  labels:
+    app.kubernetes.io/name: "{{ .Values.referenceGrant.name }}"
+    app.kubernetes.io/part-of: pull-request-generator-demo
+    {{- with .Values.pullRequest.number }}
+    pull-request-number: "{{ . }}"
+    {{- end }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: "{{ $routeNamespace }}"
+  to:
+    - group: ""
+      kind: Service
+      name: "{{ $backendName }}"
+{{- end }}
+{{- if and $parentNamespace (ne $parentNamespace $routeNamespace) }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: "{{ .Values.referenceGrant.name }}-parent"
+  namespace: "{{ $parentNamespace }}"
+  labels:
+    app.kubernetes.io/name: "{{ .Values.referenceGrant.name }}"
+    app.kubernetes.io/part-of: pull-request-generator-demo
+    {{- with .Values.pullRequest.number }}
+    pull-request-number: "{{ . }}"
+    {{- end }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: "{{ $routeNamespace }}"
+  to:
+    - group: ""
+      kind: Service
+      name: "{{ .Values.httpRoute.parentRef.name }}"
+{{- end }}
+{{- end }}

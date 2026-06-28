@@ -29,8 +29,24 @@ spec:
           imagePullPolicy: "{{ .Values.workload.imagePullPolicy }}"
           ports:
             - containerPort: {{ .Values.workload.port }}
-          {{- with .Values.workload.env }}
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SERVICE_NAME
+              value: "{{ .Values.service.name }}"
+            - name: SERVICE_FQDN
+              value: "{{ .Values.service.name }}.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: DESTINATION_URL
+              value: "{{ .Values.workload.destinationUrl }}"
+            - name: POD_B_URL
+              value: "{{ .Values.workload.destinationUrl }}"
+          {{- with .Values.workload.extraEnv }}
 {{- toYaml . | nindent 12 }}
           {{- end }}
           resources:
