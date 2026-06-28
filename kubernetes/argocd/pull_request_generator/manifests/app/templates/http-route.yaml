@@ -1,0 +1,44 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $backendName := default .Values.service.name .Values.httpRoute.backend.name }}
+{{- $backendPort := default .Values.service.port .Values.httpRoute.backend.port }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: "{{ .Values.httpRoute.name }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app.kubernetes.io/name: "{{ .Values.httpRoute.name }}"
+    app.kubernetes.io/part-of: pull-request-generator-demo
+    {{- with .Values.pullRequest.number }}
+    pull-request-number: "{{ . }}"
+    {{- end }}
+spec:
+  parentRefs:
+    - group: "{{ .Values.httpRoute.parentRef.group }}"
+      kind: "{{ .Values.httpRoute.parentRef.kind }}"
+      name: "{{ .Values.httpRoute.parentRef.name }}"
+      {{- with .Values.httpRoute.parentRef.namespace }}
+      namespace: "{{ . }}"
+      {{- end }}
+      {{- with .Values.httpRoute.parentRef.port }}
+      port: {{ . }}
+      {{- end }}
+  {{- with .Values.httpRoute.hostname }}
+  hostnames:
+    - "{{ . }}"
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "{{ .Values.httpRoute.pathPrefix }}"
+          {{- if .Values.httpRoute.header.enabled }}
+          headers:
+            - type: "{{ .Values.httpRoute.header.type }}"
+              name: "{{ .Values.httpRoute.header.name }}"
+              value: "{{ .Values.httpRoute.header.value }}"
+          {{- end }}
+      backendRefs:
+        - name: "{{ $backendName }}"
+          port: {{ $backendPort }}
+{{- end }}

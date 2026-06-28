@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Values.workload.name }}"
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app.kubernetes.io/name: "{{ .Values.workload.name }}"
+    app.kubernetes.io/part-of: pull-request-generator-demo
+    {{- with .Values.pullRequest.number }}
+    pull-request-number: "{{ . }}"
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Values.workload.name }}"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "{{ .Values.workload.name }}"
+        app.kubernetes.io/part-of: pull-request-generator-demo
+        {{- with .Values.pullRequest.number }}
+        pull-request-number: "{{ . }}"
+        {{- end }}
+    spec:
+      containers:
+        - name: "{{ .Values.workload.name }}"
+          image: "{{ .Values.workload.image }}"
+          imagePullPolicy: "{{ .Values.workload.imagePullPolicy }}"
+          ports:
+            - containerPort: {{ .Values.workload.port }}
+          {{- with .Values.workload.env }}
+          env:
+{{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+{{- toYaml .Values.workload.resources | nindent 12 }}

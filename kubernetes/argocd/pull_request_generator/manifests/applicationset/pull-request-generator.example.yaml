@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: pod-chain-pr-workload
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: pod-chain-pr-workload
+    app.kubernetes.io/part-of: pull-request-generator-demo
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - pullRequest:
+        github:
+          owner: "<GITHUB_OWNER>"
+          repo: "<GITHUB_REPO>"
+          appSecretName: github-app-repo-creds
+          labels:
+            - "<PULL_REQUEST_LABEL>"
+        requeueAfterSeconds: 60
+  template:
+    metadata:
+      name: "pod-chain-pr-{{.number}}"
+      labels:
+        app.kubernetes.io/name: pod-chain-pr-workload
+        app.kubernetes.io/part-of: pull-request-generator-demo
+        pull-request-number: "{{.number}}"
+    spec:
+      project: default
+      source:
+        repoURL: "https://github.com/<MANIFEST_OWNER>/<MANIFEST_REPO>.git"
+        targetRevision: main
+        path: kubernetes/argocd/pull_request_generator/manifests/app
+        helm:
+          releaseName: "workload-{{.number}}"
+          parameters:
+            - name: pullRequest.number
+              value: "{{.number}}"
+            - name: workload.name
+              value: "<WORKLOAD_NAME>"
+            - name: workload.image
+              value: "<IMAGE_REGISTRY>/<IMAGE_NAME>:pr-{{.number}}"
+            - name: service.name
+              value: "<SERVICE_NAME>"
+            # Optional HTTPRoute. Uncomment only when this Application should create a route.
+            # - name: httpRoute.enabled
+            #   value: "true"
+            # - name: httpRoute.name
+            #   value: "<HTTP_ROUTE_NAME>"
+            # - name: httpRoute.parentRef.name
+            #   value: "ingress-gateway"
+            # - name: httpRoute.parentRef.namespace
+            #   value: "istio-ingress"
+            # - name: httpRoute.hostname
+            #   value: "<ROUTE_HOSTNAME>"
+            # - name: httpRoute.header.enabled
+            #   value: "<HEADER_ROUTE_ENABLED>"
+            # - name: httpRoute.header.name
+            #   value: "<HEADER_NAME>"
+            # - name: httpRoute.header.value
+            #   value: "<HEADER_VALUE>"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "pr-{{.number}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        managedNamespaceMetadata:
+          labels:
+            app.kubernetes.io/name: "pr-{{.number}}"
+            app.kubernetes.io/part-of: pull-request-generator-demo
+            istio.io/dataplane-mode: ambient
+        syncOptions:
+          - CreateNamespace=true
