@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: "{{ .Values.service.name }}"
     app.kubernetes.io/part-of: pull-request-generator-demo
+    istio.io/use-waypoint: "{{ .Values.waypoint.name }}"
+    istio.io/use-waypoint-namespace: "{{ .Values.waypoint.namespace }}"
     {{- with .Values.pullRequest.number }}
     pull-request-number: "{{ . }}"
     {{- end }}

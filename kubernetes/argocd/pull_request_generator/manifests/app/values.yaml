@@ -3,18 +3,11 @@ pullRequest:
 
 workload:
   name: app-workload
-  image: pull-request-generator/pod-b:local
+  image: choisunguk/pull-request-generator:v1
   imagePullPolicy: IfNotPresent
   port: 8080
-  env:
-  - name: POD_NAME
-    valueFrom:
-      fieldRef:
-        fieldPath: metadata.name
-  - name: POD_NAMESPACE
-    valueFrom:
-      fieldRef:
-        fieldPath: metadata.namespace
+  destinationUrl: http://app-service.prod.svc.cluster.local:8080/work
+  extraEnv: []
   resources:
     requests:
       cpu: 250m
@@ -27,14 +20,19 @@ service:
   name: app-service
   port: 8080
 
+waypoint:
+  name: waypoint
+  namespace: istio-waypoint
+
 httpRoute:
   enabled: false
-  name: app-route
+  name: ""
+  namespace: ""
   parentRef:
-    group: gateway.networking.k8s.io
-    kind: Gateway
-    name: ingress-gateway
-    namespace: istio-ingress
+    group: ""
+    kind: Service
+    name: app-service
+    namespace: prod
     port: null
   hostname: ""
   pathPrefix: /
@@ -44,5 +42,19 @@ httpRoute:
     name: cookie
     value: ""
   backend:
+    group: ""
+    kind: Service
     name: ""
+    namespace: ""
     port: null
+  fallback:
+    enabled: true
+    group: ""
+    kind: Service
+    name: ""
+    namespace: ""
+    port: null
+
+referenceGrant:
+  enabled: true
+  name: allow-route

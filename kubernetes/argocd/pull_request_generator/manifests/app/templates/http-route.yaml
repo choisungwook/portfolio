@@ -1,24 +1,35 @@
 {{- if .Values.httpRoute.enabled }}
+{{- $routeNamespace := default .Release.Namespace .Values.httpRoute.namespace }}
+{{- $defaultRouteName := "app-route" }}
+{{- with .Values.pullRequest.number }}
+{{- $defaultRouteName = printf "app-route-pr-%v" . }}
+{{- end }}
+{{- $routeName := default $defaultRouteName .Values.httpRoute.name }}
 {{- $backendName := default .Values.service.name .Values.httpRoute.backend.name }}
 {{- $backendPort := default .Values.service.port .Values.httpRoute.backend.port }}
+{{- $backendNamespace := default .Release.Namespace .Values.httpRoute.backend.namespace }}
+{{- $parentNamespace := .Values.httpRoute.parentRef.namespace }}
+{{- $fallbackName := default .Values.httpRoute.parentRef.name .Values.httpRoute.fallback.name }}
+{{- $fallbackPort := default .Values.service.port .Values.httpRoute.fallback.port }}
+{{- $fallbackNamespace := default (default $routeNamespace $parentNamespace) .Values.httpRoute.fallback.namespace }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: "{{ .Values.httpRoute.name }}"
-  namespace: "{{ .Release.Namespace }}"
+  name: "{{ $routeName }}"
+  namespace: "{{ $routeNamespace }}"
   labels:
-    app.kubernetes.io/name: "{{ .Values.httpRoute.name }}"
+    app.kubernetes.io/name: "{{ $routeName }}"
     app.kubernetes.io/part-of: pull-request-generator-demo
     {{- with .Values.pullRequest.number }}
     pull-request-number: "{{ . }}"
     {{- end }}
 spec:
   parentRefs:
-    - group: "{{ .Values.httpRoute.parentRef.group }}"
-      kind: "{{ .Values.httpRoute.parentRef.kind }}"
+    - kind: "{{ .Values.httpRoute.parentRef.kind }}"
       name: "{{ .Values.httpRoute.parentRef.name }}"
-      {{- with .Values.httpRoute.parentRef.namespace }}
-      namespace: "{{ . }}"
+      group: "{{ .Values.httpRoute.parentRef.group }}"
+      {{- if and $parentNamespace (ne $parentNamespace $routeNamespace) }}
+      namespace: "{{ $parentNamespace }}"
       {{- end }}
       {{- with .Values.httpRoute.parentRef.port }}
       port: {{ . }}
@@ -39,6 +50,29 @@ spec:
               value: "{{ .Values.httpRoute.header.value }}"
           {{- end }}
       backendRefs:
-        - name: "{{ $backendName }}"
+        - kind: "{{ .Values.httpRoute.backend.kind }}"
+          name: "{{ $backendName }}"
+          {{- with .Values.httpRoute.backend.group }}
+          group: "{{ . }}"
+          {{- end }}
+          {{- if ne $backendNamespace $routeNamespace }}
+          namespace: "{{ $backendNamespace }}"
+          {{- end }}
           port: {{ $backendPort }}
+    {{- if and .Values.httpRoute.header.enabled .Values.httpRoute.fallback.enabled }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "{{ .Values.httpRoute.pathPrefix }}"
+      backendRefs:
+        - kind: "{{ .Values.httpRoute.fallback.kind }}"
+          name: "{{ $fallbackName }}"
+          {{- with .Values.httpRoute.fallback.group }}
+          group: "{{ . }}"
+          {{- end }}
+          {{- if ne $fallbackNamespace $routeNamespace }}
+          namespace: "{{ $fallbackNamespace }}"
+          {{- end }}
+          port: {{ $fallbackPort }}
+    {{- end }}
 {{- end }}
