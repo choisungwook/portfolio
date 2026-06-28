@@ -1,0 +1,6 @@
+[project]
+name = "ai-agent-sandbox"
+version = "0.1.0"
+description = "Local probes for AI agent sandbox permission boundaries"
+requires-python = ">=3.11"
+dependencies = []
