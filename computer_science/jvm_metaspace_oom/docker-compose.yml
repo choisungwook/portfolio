@@ -1,0 +1,16 @@
+services:
+  metaspace-oom:
+    build: ./app
+    container_name: jvm-metaspace-oom
+    environment:
+      JAVA_OPTS: >-
+        -XX:MaxMetaspaceSize=32m
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/dumps/metaspace-oom.hprof
+        -XX:ErrorFile=/dumps/hs_err_pid%p.log
+        -Xlog:gc*,metaspace=info:file=/dumps/jvm-metaspace.log:time,level,tags
+      CLASS_BATCH_SIZE: "200"
+      CLASS_METHOD_COUNT: "20"
+      PAUSE_MILLIS: "0"
+    volumes:
+      - ./dumps:/dumps
