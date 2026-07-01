@@ -1,0 +1,28 @@
+services:
+  vllm:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:latest}
+    ipc: host
+    ports:
+      - "8000:8000"
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    command:
+      - --model
+      - ${MODEL_ID:-Qwen/Qwen3-0.6B}
+      - --max-model-len
+      - ${MAX_MODEL_LEN:-2048}
+      - --gpu-memory-utilization
+      - ${GPU_MEMORY_UTILIZATION:-0.85}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+
+volumes:
+  huggingface-cache:
