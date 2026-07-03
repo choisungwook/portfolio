@@ -1,0 +1,1 @@
+"""FastAPI SSE handson package."""

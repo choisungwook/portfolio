@@ -1,0 +1,7 @@
+services:
+  sse-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      EVENT_INTERVAL_SECONDS: "1"

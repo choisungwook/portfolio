@@ -1,0 +1,16 @@
+[project]
+name = "sse-fastapi-handson"
+version = "0.1.0"
+description = "FastAPI Server-Sent Events handson"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.34,<1.0",
+]
+
+[project.scripts]
+sse-api = "sse_fastapi.app:run"
+sse-client = "sse_fastapi.client:main"
+
+[tool.uv]
+package = true
