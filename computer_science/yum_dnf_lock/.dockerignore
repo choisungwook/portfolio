@@ -1,0 +1,11 @@
+.git
+.gitignore
+.DS_Store
+README.md
+Makefile
+docker-compose.yml
+docs/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

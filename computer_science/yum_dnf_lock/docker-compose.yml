@@ -1,0 +1,8 @@
+services:
+  dnf-lab:
+    build:
+      context: .
+    image: yum-dnf-lock-lab
+    container_name: yum-dnf-lock-lab
+    stdin_open: true
+    tty: true
