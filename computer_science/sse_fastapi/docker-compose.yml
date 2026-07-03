@@ -1,0 +1,15 @@
+services:
+  sse-server:
+    build: .
+    ports:
+      - "8000:8000"
+
+  sse-client:
+    build: .
+    depends_on:
+      - sse-server
+    environment:
+      SSE_URL: http://sse-server:8000/events?limit=5&interval=1
+    command: ["python", "-m", "sse_fastapi_handson.client"]
+    profiles:
+      - tools
