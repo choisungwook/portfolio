@@ -1,0 +1,39 @@
+services:
+  dnf-lab:
+    build: .
+    image: akbun-yum-dnf-lock-lab:local
+    command: sleep infinity
+    tty: true
+    volumes:
+      - dnf-cache:/var/cache/dnf
+      - rpm-lib:/var/lib/rpm
+
+  lock-holder:
+    build: .
+    image: akbun-yum-dnf-lock-lab:local
+    profiles:
+      - lock
+    command:
+      - /workspace/scripts/hold_dnf_lock.py
+      - --seconds
+      - "120"
+    volumes:
+      - dnf-cache:/var/cache/dnf
+      - rpm-lib:/var/lib/rpm
+
+  competitor:
+    build: .
+    image: akbun-yum-dnf-lock-lab:local
+    profiles:
+      - run
+    command:
+      - /workspace/scripts/run_competitor.sh
+    environment:
+      LOCK_TIMEOUT: "5"
+    volumes:
+      - dnf-cache:/var/cache/dnf
+      - rpm-lib:/var/lib/rpm
+
+volumes:
+  dnf-cache:
+  rpm-lib:
