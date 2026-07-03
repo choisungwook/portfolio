@@ -1,0 +1,8 @@
+services:
+  sse-server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SSE_INTERVAL_SECONDS: "1"
+      SSE_SERVICE_NAME: "local-sse-demo"
