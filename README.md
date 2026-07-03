@@ -90,6 +90,7 @@
 80. client -> HAProxy or EnvoyProxy -> server pod구조에서 TCP통신 끊기는지 확인 (26.6.3) - [링크](./computer_science/k8s_haproxy_tcp/)
 81. ECR lifecycle을 설정할 때 운영환경에서 사용하는 이미지를 보호하는 방법 (26.6.21) - [링크](./aws/ecr/tag_vs_digest/)
 82. AWS CodeBuild에서 GitHub App connection으로 GitHub repository 연결 (26.6.21) - [링크](./aws/codebuild/github_connection/)
+83. Go gRPC 서버 클라이언트 핸즈온 (26.7.3) - [링크](./language/go/grpc_server_client/)
 
 ## 직접 만든 제품
 

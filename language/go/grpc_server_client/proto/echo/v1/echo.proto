@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package echo.v1;
+
+option go_package = "github.com/choisungwook/portfolio/language/go/grpc_server_client/gen/echo/v1;echov1";
+
+service EchoService {
+  rpc SayHello(HelloRequest) returns (HelloReply);
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}

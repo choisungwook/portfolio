@@ -1,0 +1,23 @@
+services:
+  server:
+    build:
+      context: .
+      target: server
+    environment:
+      GRPC_ADDR: :50051
+    ports:
+      - "50051:50051"
+
+  client:
+    profiles:
+      - client
+    build:
+      context: .
+      target: client
+    command:
+      - -addr
+      - server:50051
+      - -name
+      - docker-compose
+    depends_on:
+      - server
