@@ -1,0 +1,13 @@
+services:
+  lab:
+    build:
+      context: .
+    container_name: yum-dnf-lock-lab
+    tty: true
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+      - runtime:/workspace/runtime
+    command: ["bash", "-lc", "sleep infinity"]
+
+volumes:
+  runtime:
