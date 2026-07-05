@@ -2,7 +2,7 @@
 
 * CS 지식 정리
 
-# 목차
+## 목차
 
 | 번호 | 이름 | 링크 |
 | ---- | ---- | ---- |
@@ -14,3 +14,4 @@
 | 6 | MariaDB 커넥션 소켓 누수 재현 | [링크](./leak_linux_socket/) |
 | 7 | JVM 클래스 로딩 디버깅 | [링크](./jvm_class_loading/) |
 | 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |
+| 9 | yum/dnf lock 로컬 재현 핸즈온 | [링크](./yum_dnf_lock/) |
