@@ -4,7 +4,8 @@
 
 ## 저장소의 목적
 
-핸즈온 실습과 공부 노트 저장소다. 문서는 핸즈온 절차와 그에 필요한 이론만 담는다. 원리를 이해하고 재현할 수 있으면 충분하다. 글쓰기 태도는 [.claude/rules/philosophy.md](./.claude/rules/philosophy.md)를 따른다.
+- 핸즈온 실습과 공부 노트 저장소다. 문서는 핸즈온 절차와 그에 필요한 이론만 담는다. 원리를 이해하고 재현할 수 있으면 충분하다. 글쓰기 태도는 [.claude/rules/philosophy.md](./.claude/rules/philosophy.md)를 따른다.
+- 이 저장소는 공개되므로 코드와 문서에 문맥상 민감한 정보를 쓰지 않는다. 실습은 기술 자체로 성립하도록 쓴다.
 
 ## 코드 규칙
 
@@ -68,4 +69,6 @@ Claude Code에서 plugin 설치:
 
 ## 작업 흐름
 
-Worktree에서 작업하고 commit 1개로 PR을 만든다. PR을 만들 때 기록용 GitHub Issue를 함께 만들어 연결한다. 자세한 규칙은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
+Worktree에서 작업하고 commit 1개로 PR을 만든다. PR을 만들 때 기록용 GitHub Issue를 함께 만들어 연결한다.
+
+**git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시할 때만 실행한다.** agent는 구현과 검증까지만 하고 멈춘 뒤 변경 요약을 보고한다. plan 승인이나 이 문서의 표준 흐름은 실행 허가가 아니다. 자세한 규칙은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.

@@ -1,0 +1,24 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: elasticache-client-auth
+  data:
+    redis:
+      host: ${ELASTICACHE_ENDPOINT}
+      port: ${ELASTICACHE_PORT:6379}
+      password: ${ELASTICACHE_AUTH_TOKEN}
+      connect-timeout: 3s
+      timeout: 3s
+      ssl:
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always

@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-11
+
+* **Creation**: [ElastiCache는 Valkey + RBAC/IAM 기본](decisions/2026-07-elasticache-valkey-rbac.md) 결정 기록. `.claude/rules/terraform.md`에 ElastiCache 규칙(Valkey 엔진, RBAC user group, IAM 인증, TLS/암호화) 추가와 함께 남긴다.
+
 ## 2026-07-10
 
 * **Initialization**: OKF 0.1 기반 knowledge 번들 생성.
