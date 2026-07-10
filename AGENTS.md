@@ -18,6 +18,7 @@
 | [`.claude/rules/kubernetes.md`](./.claude/rules/kubernetes.md) | Kubernetes manifest |
 | [`.claude/rules/terraform.md`](./.claude/rules/terraform.md) | Terraform HCL |
 | [`.claude/rules/python.md`](./.claude/rules/python.md) | Python |
+| [`.claude/rules/knowledge.md`](./.claude/rules/knowledge.md) | knowledge/ 지식 번들 기록 |
 
 가독성이 최우선이다. 성능 최적화보다 3개월 후에 다시 봐도 바로 이해되는 코드를 쓴다.
 
@@ -60,6 +61,10 @@ Claude Code에서 plugin 설치:
 1. `akbun-writing` skill로 초안을 쓴다.
 2. `akbun-style-reviewer` agent로 스타일을 검증하고 통과할 때까지 수정한다.
 3. `akbun-docs-reviewer` skill로 문장과 구조를 다듬는다.
+
+## 지식 축적
+
+[knowledge/](./knowledge/index.md)는 OKF(Open Knowledge Format) 기반 지식 번들이다. agent는 작업에서 얻은 의사결정, 반복 절차, 도메인 통찰을 여기에 기록해 다음 작업의 컨텍스트로 재사용한다. 기록 기준과 형식은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
 
 ## 작업 흐름
 
