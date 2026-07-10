@@ -50,6 +50,8 @@ provider "aws" {
 - 기본 OS: **Amazon Linux 2023**, Ubuntu도 `var.os_type`으로 지원한다.
 - AMI 조회: 반드시 `data "aws_ami"` 블록을 사용하고, `var.arch`(`arm64` | `x86_64`)로 아키텍처를 제어한다.
 - 기본 EBS: **30 GB**, `gp3`, **암호화 필수** (기본 AWS 관리형 KMS 키)
+- 원격 접속: **AWS SSM Session Manager**를 사용한다. SSH를 사용하지 않으므로 key pair, port 22 ingress, bastion을 만들지 않는다.
+- SSM 접속을 위해 `AmazonSSMManagedInstanceCore` 정책이 붙은 IAM instance profile을 EC2에 연결한다.
 
 ```hcl
 # data.tf - AMI 조회 패턴
@@ -78,10 +80,37 @@ data "aws_ami" "al2023" {
   }
 }
 
+# iam.tf - SSM 접속용 IAM instance profile 패턴
+resource "aws_iam_role" "ec2_ssm" {
+  name = "${var.project_name}-ec2-ssm"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
+  role       = aws_iam_role.ec2_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_ssm" {
+  name = "${var.project_name}-ec2-ssm"
+  role = aws_iam_role.ec2_ssm.name
+}
+
 # ec2.tf - EC2 인스턴스 패턴
 resource "aws_instance" "web" {
-  ami           = local.ami_id
-  instance_type = var.instance_type
+  ami                  = local.ami_id
+  instance_type        = var.instance_type
+  iam_instance_profile = aws_iam_instance_profile.ec2_ssm.name
 
   root_block_device {
     volume_size = var.ebs_size
@@ -157,7 +186,8 @@ resource "aws_db_instance" "main" {
 
 ## Security Group 규칙
 
-- RDS, bastion, SSH 등 특정 사용자만 접근하는 서비스는 **현재 IP로 제한**한다.
+- EC2 원격 접속은 SSM Session Manager를 사용하므로 SSH(port 22) ingress를 열지 않는다.
+- RDS 등 특정 사용자만 접근하는 서비스는 **현재 IP로 제한**한다.
 - 접근 범위가 모호할 때는 사용자에게 IP 제한 또는 VPC CIDR/보안 그룹 참조 중 선택을 확인한다.
 
 현재 IP 조회 패턴:
