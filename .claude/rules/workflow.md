@@ -7,6 +7,7 @@ GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./p
 1. Worktree 생성 → 2. 작업 수행 → 3. Commit + Push → 4. PR 생성 + 기록용 Issue 생성
 
 - 작업 시작 전에 issue를 만들거나 작업 중간에 issue comment를 남기지 않는다. Issue는 PR을 만들 때 함께 만든다.
+- PR을 만들기 전에 [knowledge.md](./knowledge.md)에 따라 이번 작업에서 남길 지식이 있는지 검토하고, 있으면 같은 commit에 포함한다.
 - Review, Merge, Worktree 정리는 사용자가 직접 한다.
 - PR의 commit은 1개만 있다. commit이 여러 개가 되면 1개로 합친다.
 
