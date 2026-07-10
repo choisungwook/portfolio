@@ -184,6 +184,99 @@ resource "aws_db_instance" "main" {
 }
 ```
 
+## ElastiCache 규칙
+
+- 기본 엔진: **Valkey** (`engine = "valkey"`). Redis는 사용하지 않는다.
+- 최소 버전: **Valkey 7.2 이상**. RBAC(user group)과 IAM 인증이 모두 이 버전부터 가능하다.
+- 기본 노드 타입: **cache.t4g.micro** (Graviton, 비용 절약). 스케일업 시 `cache.t4g` 패밀리를 사용한다.
+- **암호화 필수**: 전송 중 암호화(`transit_encryption_enabled = true`, `transit_encryption_mode = "required"`)와 저장 시 암호화(`at_rest_encryption_enabled = true`)를 항상 켠다.
+- **인증은 RBAC + IAM을 기본**으로 한다. AUTH token 단독 방식은 쓰지 않는다.
+  - `aws_elasticache_user`로 IAM user를 만든다. IAM user는 `user_id`와 `user_name`이 같아야 하고 `authentication_mode { type = "iam" }`을 쓴다.
+  - `aws_elasticache_user_group`으로 user들을 묶고, `aws_elasticache_replication_group`의 `user_group_ids`에 연결한다.
+  - IAM 인증으로 접속하는 주체(EC2 instance role 등)의 IAM role에 `elasticache:Connect` 권한을 replication group ARN과 user ARN에 부여한다.
+- 장기 password가 필요하면(레거시 클라이언트 호환 등) `default` user를 `authentication_mode { type = "password" }`로 추가한다. 새로 만드는 클러스터는 IAM 전용을 기본으로 한다.
+- Security Group: ElastiCache는 퍼블릭에 노출하지 않는다. 접속하는 app security group에서만 port 6379 ingress를 허용한다(`referenced_security_group_id` 사용).
+- 이미 떠 있는 AUTH token 클러스터를 RBAC/IAM으로 무중단 전환하는 절차는 별도다. `aws/elasticache-authentication` 핸즈온과 [ElastiCache 인증 전환 결정](../../knowledge/decisions/2026-07-elasticache-valkey-rbac.md)을 참고한다.
+
+RBAC user, user group, IAM 인증을 갖춘 Valkey replication group 패턴:
+
+```hcl
+# elasticache.tf - IAM 전용 user와 user group
+resource "aws_elasticache_user" "iam" {
+  user_id       = var.iam_user_name
+  user_name     = var.iam_user_name # IAM user는 user_id와 user_name이 같아야 한다
+  access_string = "on ~* +@all"
+  engine        = "valkey"
+
+  authentication_mode {
+    type = "iam"
+  }
+}
+
+resource "aws_elasticache_user_group" "this" {
+  engine        = "valkey"
+  user_group_id = "${var.project_name}-users"
+  user_ids      = [aws_elasticache_user.iam.user_id]
+}
+
+resource "aws_elasticache_replication_group" "this" {
+  replication_group_id = var.project_name
+  description          = "Valkey RBAC + IAM auth"
+
+  engine         = "valkey"
+  engine_version = "8.0" # RBAC/IAM은 Valkey 7.2 이상 필요
+  node_type      = var.cache_node_type
+  port           = 6379
+
+  subnet_group_name  = aws_elasticache_subnet_group.this.name
+  security_group_ids = [aws_security_group.elasticache.id]
+
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+  transit_encryption_mode    = "required"
+  user_group_ids             = [aws_elasticache_user_group.this.id]
+
+  tags = {
+    Name = var.project_name
+  }
+}
+```
+
+IAM 인증 주체의 role에 붙일 `elasticache:Connect` 정책 패턴:
+
+```hcl
+# iam.tf - IAM 클라이언트가 연결 token을 서명할 때 필요한 권한
+data "aws_iam_policy_document" "elasticache_connect" {
+  statement {
+    actions = ["elasticache:Connect"]
+    resources = [
+      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:replicationgroup:${var.project_name}",
+      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:user:${var.iam_user_name}",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "elasticache_connect" {
+  name   = "${var.project_name}-elasticache-connect"
+  role   = aws_iam_role.app.id
+  policy = data.aws_iam_policy_document.elasticache_connect.json
+}
+```
+
+app security group에서만 Valkey port를 여는 Security Group 패턴:
+
+```hcl
+# security_group.tf - app security group에서만 6379 허용
+resource "aws_vpc_security_group_ingress_rule" "elasticache_from_app" {
+  security_group_id            = aws_security_group.elasticache.id
+  description                  = "TLS Valkey from the app security group"
+  referenced_security_group_id = aws_security_group.app.id
+  from_port                    = 6379
+  ip_protocol                  = "tcp"
+  to_port                      = 6379
+}
+```
+
 ## Security Group 규칙
 
 - EC2 원격 접속은 SSM Session Manager를 사용하므로 SSH(port 22) ingress를 열지 않는다.
@@ -245,9 +338,3 @@ resource "aws_s3_bucket_policy" "this" {
   })
 }
 ```
-
-## 사용자에게 확인이 필요한 사항
-
-- **VPC**: default VPC 사용 또는 새 VPC 생성?
-- **Non-Graviton 인스턴스**: AMI 아키텍처도 x86_64로 변경?
-- **Security Group 접근 범위**: IP 제한 또는 VPC CIDR/보안 그룹 참조?

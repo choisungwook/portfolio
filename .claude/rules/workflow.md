@@ -2,27 +2,9 @@
 
 GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./philosophy.md)를 따른다.
 
-## 전체 흐름
+## 실행 승인
 
-1. Worktree 생성 → 2. 작업 수행 → 3. Commit + Push → 4. PR 생성 + 기록용 Issue 생성
-
-- 작업 시작 전에 issue를 만들거나 작업 중간에 issue comment를 남기지 않는다. Issue는 PR을 만들 때 함께 만든다.
-- PR을 만들기 전에 [knowledge.md](./knowledge.md)에 따라 이번 작업에서 남길 지식이 있는지 검토하고, 있으면 같은 commit에 포함한다.
-- Review, Merge, Worktree 정리는 사용자가 직접 한다.
-- PR의 commit은 1개만 있다. commit이 여러 개가 되면 1개로 합친다.
-
-## Git Worktree
-
-git worktree를 사용하여 여러 agent가 동시에 작업할 때 branch switching 충돌을 방지한다.
-
-worktree 생성 명령:
-
-```bash
-git worktree add ../portfolio-<topic> -b <branch-name>
-```
-
-- Branch 이름: `<type>/<short-description>` (feat, docs, fix, refactor, chore)
-- 여러 agent가 동시에 작업할 때 같은 파일을 두 agent가 동시에 수정하지 않는다 (파일 단위 분할).
+git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시할 때만 실행한다. agent는 구현과 검증까지만 하고 멈춘 뒤 변경 요약을 보고하고 지시를 기다린다.
 
 ## Issue와 PR 공통 작성 규칙
 

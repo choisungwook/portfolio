@@ -1,0 +1,6 @@
+project_name    = "elasticache-auth-lab"
+migration_phase = "unauthenticated"
+
+app_instance_type = "t4g.small"
+cache_node_type   = "cache.t4g.micro"
+arch              = "arm64"

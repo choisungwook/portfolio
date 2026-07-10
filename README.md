@@ -92,6 +92,7 @@
 82. AWS CodeBuild에서 GitHub App connection으로 GitHub repository 연결 (26.6.21) - [링크](./aws/codebuild/github_connection/)
 83. Github Pull requset가 생성되면 Argo CD Pull Request Generator로 kubernetes 리소스를 자동으로 생성 (26.6.28) - [링크](./kubernetes/argocd/pull_request_generator/)
 84. yum/dnf lock 로컬 재현 핸즈온 (26.7.3) - [링크](./computer_science/yum_dnf_lock/)
+85. AWS ElastiCache TLS와 인증 무중단 전환 실습 (26.7.10) - [링크](./aws/elasticache-authentication/)
 
 ## 직접 만든 제품
 
