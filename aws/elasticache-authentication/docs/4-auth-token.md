@@ -21,10 +21,10 @@ terraform -chdir=terraform apply -var migration_phase=auth_overlap
 
 8080 gate가 계속 돌면 기존 컨테이너의 Redis 오류는 0건이다. 끝났다면 배포하지 않는다.
 
-EC2 세션에서 auth 컨테이너를 8081에 띄운다. token은 위와 같은 값을 넣는다.
+EC2 세션에서 auth 컨테이너를 8081에 띄운다. EC2에는 Terraform이 없으므로 endpoint는 로컬 `terraform output` 값을 붙여 넣고, token은 위와 같은 값을 넣는다.
 
 ```bash
-export ELASTICACHE_ENDPOINT=$(terraform -chdir=terraform output elasticache_primary_endpoint)
+export ELASTICACHE_ENDPOINT="<terraform output elasticache_primary_endpoint>"
 export AUTH_TOKEN='<same token>'
 sudo docker run -d --name auth -p 8081:8080 \
   -e ELASTICACHE_ENDPOINT="$ELASTICACHE_ENDPOINT" \

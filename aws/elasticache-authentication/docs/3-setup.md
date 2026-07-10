@@ -79,7 +79,7 @@ EOF
 기존 운영 앱 역할의 무인증 컨테이너를 8080에 띄운다. endpoint는 로컬 `terraform output` 값을 붙여 넣는다. 동적 값만 환경변수로 주입한다.
 
 ```bash
-export ELASTICACHE_ENDPOINT=$(terraform -chdir=terraform output elasticache_primary_endpoint)
+export ELASTICACHE_ENDPOINT="<terraform output elasticache_primary_endpoint>"
 sudo docker run -d --name noauth -p 8080:8080 \
   -e ELASTICACHE_ENDPOINT="$ELASTICACHE_ENDPOINT" \
   choisunguk/elasticache-auth-client:noauth-1.0.0

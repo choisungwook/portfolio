@@ -37,9 +37,9 @@ Valkey engine의 user group은 default user가 반드시 있어야 하는 제약
 
 ## IAM 인증
 
-IAM 인증은 장기 password를 두지 않고, AWS 자격증명으로 서명한 임시 token으로 접속한다. 클라이언트는 `AUTH <user> <token>` 형태로 사용자 이름과 token을 함께 보낸다.
+IAM 인증은 장기 password를 두지 않고, AWS 자격증명으로 서명한 임시 token으로 접속한다. 클라이언트는 `AUTH <user> <token>` 형태로 사용자 이름과 token을 함께 보낸다. 여기서 `<user>`는 인증 방식을 iam으로 만든 ElastiCache user이지 AWS IAM user가 아니다. AWS IAM 자격증명(EC2 instance role 등)은 token 서명에만 쓰이고, Valkey에 보내는 사용자 이름은 ElastiCache user다.
 
-- IAM user는 user ID와 user name이 같아야 한다.
+- IAM 인증 user는 user ID와 user name이 같아야 한다.
 - token은 SigV4 서명이며 15분간 유효하다. 연결마다 새로 만든다.
 - 연결은 12시간 뒤 끊기므로, 클라이언트는 재연결 때 새 token을 공급해야 한다. 이 실습의 iam 앱은 Lettuce의 credentials provider로 매 연결마다 token을 만든다.
 - 접속 주체(EC2 instance role 등)에 `elasticache:Connect` 권한이 있어야 한다.

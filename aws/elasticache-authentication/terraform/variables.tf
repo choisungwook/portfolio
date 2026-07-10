@@ -44,14 +44,14 @@ variable "migration_phase" {
   }
 }
 
-variable "iam_user_name" {
-  description = "ElastiCache IAM user ID and user name"
+variable "elasticache_iam_user_name" {
+  description = "ElastiCache RBAC user with authentication_mode = iam (its user_id and user_name). This is an ElastiCache user, not an AWS IAM user or principal."
   type        = string
   default     = "elasticache-iam-client"
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{2,39}$", var.iam_user_name))
-    error_message = "iam_user_name must be 3-40 lowercase letters, numbers, or hyphens and start with a letter."
+    condition     = can(regex("^[a-z][a-z0-9-]{2,39}$", var.elasticache_iam_user_name))
+    error_message = "elasticache_iam_user_name must be 3-40 lowercase letters, numbers, or hyphens and start with a letter."
   }
 }
 

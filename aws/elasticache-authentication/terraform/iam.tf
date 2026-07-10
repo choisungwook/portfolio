@@ -20,13 +20,13 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 }
 
 # The IAM Spring Boot client signs its connection token with the instance role,
-# so the role needs elasticache:Connect on the replication group and IAM user.
+# so the role needs elasticache:Connect on the replication group and the ElastiCache user.
 data "aws_iam_policy_document" "elasticache_connect" {
   statement {
     actions = ["elasticache:Connect"]
     resources = [
       "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:replicationgroup:${var.project_name}",
-      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:user:${var.iam_user_name}",
+      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:user:${var.elasticache_iam_user_name}",
     ]
   }
 }

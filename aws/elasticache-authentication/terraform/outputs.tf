@@ -4,13 +4,13 @@ output "elasticache_primary_endpoint" {
 }
 
 output "elasticache_replication_group_id" {
-  description = "Replication group ID passed to ELASTICACHE_CACHE_NAME for IAM token signing"
+  description = "Replication group ID used as the IAM token signing host, passed to ELASTICACHE_CACHE_NAME"
   value       = aws_elasticache_replication_group.this.replication_group_id
 }
 
 output "elasticache_iam_user" {
-  description = "ElastiCache IAM user passed to ELASTICACHE_IAM_USER"
-  value       = var.iam_user_name
+  description = "ElastiCache RBAC user (authentication_mode iam) passed to ELASTICACHE_IAM_USER. This is an ElastiCache user, not an AWS IAM user."
+  value       = var.elasticache_iam_user_name
 }
 
 output "aws_region" {

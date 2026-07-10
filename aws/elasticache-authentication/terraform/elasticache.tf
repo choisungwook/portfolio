@@ -32,8 +32,8 @@ resource "aws_elasticache_user" "password" {
 resource "aws_elasticache_user" "iam" {
   count = local.rbac_enabled ? 1 : 0
 
-  user_id       = var.iam_user_name
-  user_name     = var.iam_user_name
+  user_id       = var.elasticache_iam_user_name
+  user_name     = var.elasticache_iam_user_name
   access_string = "on ~* +@all"
   engine        = "valkey"
 

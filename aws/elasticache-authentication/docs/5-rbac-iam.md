@@ -1,6 +1,6 @@
 # RBAC 전환과 IAM 전용
 
-TL;DR: AUTH token 클러스터에 `default` user(password=token)와 IAM user를 담은 user group을 붙여 RBAC로 넘어간다. auth 컨테이너는 `default` user로 계속 붙는 동안 iam 컨테이너로 트래픽을 옮기고, 마지막에 `default` user를 빼 IAM 전용으로 만든다.
+TL;DR: AUTH token 클러스터에 `default` user(password=token)와 IAM 인증 user를 담은 user group을 붙여 RBAC로 넘어간다. auth 컨테이너는 `default` user로 계속 붙는 동안 iam 컨테이너로 트래픽을 옮기고, 마지막에 `default` user를 빼 IAM 전용으로 만든다.
 
 [4-auth-token.md](./4-auth-token.md)까지 마치면 `auth_required` 상태에서 8081 auth 컨테이너가 돌고 있다. 아래 `terraform apply` 대신 AWS 콘솔·CLI로 클러스터를 바꾸려면 [6-console-runbook.md](./6-console-runbook.md)를 본다. AUTH token 클러스터에 IAM user group을 바로 붙이면 기존 연결이 끊기므로, `default` user를 다리로 쓴다([2-concepts.md](./2-concepts.md) 참고).
 
@@ -22,17 +22,17 @@ terraform -chdir=terraform apply -var migration_phase=rbac_overlap
 
 ## 2. iam 컨테이너 배포
 
-EC2 세션에서 iam 컨테이너를 8082에 띄운다. IAM token은 EC2 instance role로 서명하므로 password를 넣지 않는다. 서명·연결에 필요한 값만 주입한다.
+EC2 세션에서 iam 컨테이너를 8082에 띄운다. EC2에는 Terraform이 없으므로 아래 값은 로컬 `terraform output`에서 확인해 붙여 넣는다. IAM token은 EC2 instance role로 서명하므로 password 대신 서명·연결 값만 준다. `ELASTICACHE_IAM_USER`는 IAM 인증 모드로 만든 ElastiCache user 이름이지 AWS IAM user가 아니고, `ELASTICACHE_CACHE_NAME`은 token 서명 host로 쓰는 replication group id다.
 
 ```bash
-export ELASTICACHE_ENDPOINT=$(terraform -chdir=terraform output elasticache_primary_endpoint)
-export CACHE_NAME=$(terraform -chdir=terraform output elasticache_replication_group_id)
-export IAM_USER=$(terraform -chdir=terraform output elasticache_iam_user)
-export CACHE_REGION=$(terraform -chdir=terraform output aws_region)
+export ELASTICACHE_ENDPOINT="<terraform output elasticache_primary_endpoint>"
+export CACHE_NAME="<terraform output elasticache_replication_group_id>"
+export ELASTICACHE_USER="<terraform output elasticache_iam_user>"
+export CACHE_REGION="<terraform output aws_region>"
 sudo docker run -d --name iam -p 8082:8080 \
   -e ELASTICACHE_ENDPOINT="$ELASTICACHE_ENDPOINT" \
   -e ELASTICACHE_CACHE_NAME="$CACHE_NAME" \
-  -e ELASTICACHE_IAM_USER="$IAM_USER" \
+  -e ELASTICACHE_IAM_USER="$ELASTICACHE_USER" \
   -e AWS_REGION="$CACHE_REGION" \
   choisunguk/elasticache-auth-client:iam-1.0.0
 ```
