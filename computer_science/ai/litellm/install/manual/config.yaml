@@ -1,0 +1,14 @@
+# 웹 UI 전용 깡통 config. 모델·라우팅·로깅을 여기 선언하지 않는다.
+# gateway를 띄운 뒤 웹 UI(/ui)에서 모델·virtual key·team을 손수 등록한다.
+# 절차: ../../docs/manual/web-ui-setup.md
+# 값을 바꾼 뒤에는 `docker compose up -d`로 다시 띄워야 반영된다.
+
+model_list: []   # 비어 있다. 모델은 웹 UI에서 추가한다(provider key도 UI 폼에 넣는다).
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY   # UI 로그인 후 관리 작업과 key 발급의 뿌리
+  database_url: os.environ/DATABASE_URL       # UI에서 만든 모델·key·team의 저장소
+  store_model_in_db: true                     # 이게 있어야 UI에서 추가한 모델이 DB에 남는다
+
+# 라우팅·fallback·guardrail은 UI로 다루지 않는다. 필요하면 config.yaml에 선언한다.
+# 선언 방식 예시는 ../set-model/config.yaml을 참고한다.

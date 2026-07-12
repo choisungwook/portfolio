@@ -93,6 +93,8 @@
 83. GitHub Pull request가 생성되면 Argo CD Pull Request Generator로 kubernetes 리소스를 자동으로 생성 (26.6.28) - [링크](./kubernetes/argocd/pull_request_generator/)
 84. yum/dnf lock 로컬 재현 핸즈온 (26.7.3) - [링크](./computer_science/yum_dnf_lock/)
 85. AWS ElastiCache TLS와 인증 무중단 전환 실습 (26.7.10) - [링크](./aws/elasticache-authentication/)
+86. LiteLLM AI gateway 3시간 학습과 폐쇄망 Bedrock 실습 (26.7.11) - [링크](./computer_science/ai/litellm/)
+87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
 
 ## 직접 만든 제품
 

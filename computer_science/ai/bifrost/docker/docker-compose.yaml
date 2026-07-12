@@ -1,0 +1,18 @@
+services:
+  bifrost:
+    image: maximhq/bifrost:latest # 실습 시점의 최신 안정 태그로 pin 하는 것을 권장한다
+    ports:
+      - "8080:8080"
+    # config.json은 앱 디렉터리(/app/data)에 둔다. Bifrost가 이 파일을 시작 설정으로 읽는다.
+    volumes:
+      - ./config.json:/app/data/config.json:ro
+      - bifrost-data:/app/data
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # 설정 스토어(SQLite)에 저장하는 key를 암호화하는 32바이트 키
+      BIFROST_ENCRYPTION_KEY: ${BIFROST_ENCRYPTION_KEY}
+    restart: unless-stopped
+
+volumes:
+  bifrost-data:

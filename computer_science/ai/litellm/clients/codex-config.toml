@@ -1,0 +1,14 @@
+# LiteLLM gateway를 Codex CLI의 custom provider로 등록한다.
+# 이 파일은 기존 ~/.codex/config.toml을 건드리지 않도록 CODEX_HOME으로 격리한 임시
+# 설정 디렉터리에 복사해서 쓴다. 절차와 롤백은 docs/8-connect-clients.md에 있다.
+
+# Codex는 2026년부터 Responses API만 지원한다(wire_api = "responses").
+# LiteLLM proxy는 /v1/responses를 노출하고 model_list의 어떤 모델이든 여기로 받는다.
+model_provider = "litellm"
+model = "gpt"                        # gateway 별칭. gemini로 바꾸면 Google로 나간다.
+
+[model_providers.litellm]
+name = "LiteLLM Gateway"
+base_url = "http://localhost:4000/v1"
+env_key = "LITELLM_KEY"              # 이 환경변수에서 virtual key를 읽는다
+wire_api = "responses"

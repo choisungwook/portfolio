@@ -1,0 +1,12 @@
+# 값을 채운 뒤 terraform.tfvars로 복사한다. tfvars는 커밋하지 않는다.
+
+aws_region   = "ap-northeast-2"
+project_name = "litellm-airgap"
+
+vpc_cidr             = "10.20.0.0/16"
+azs                  = ["ap-northeast-2a", "ap-northeast-2c"]
+private_subnet_cidrs = ["10.20.1.0/24", "10.20.2.0/24"]
+
+arch          = "arm64"
+instance_type = "t4g.medium"
+ebs_size      = 30
