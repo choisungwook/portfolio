@@ -1,0 +1,24 @@
+model_list:
+  # 사용자는 gpt, gemini 별칭만 안다. 뒤의 실제 provider·모델은 gateway가 감춘다.
+  - model_name: gpt
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gemini
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  # gpt 호출이 실패하면 gemini로 넘긴다. model 다중 선택의 핵심 이유가 장애 대응이다.
+  fallbacks: [{ "gpt": ["gemini"] }]
+
+litellm_settings:
+  # provider마다 다른 파라미터 차이를 gateway가 흡수해 호출이 깨지지 않게 한다.
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  # 누가 어떤 프롬프트를 보냈는지까지 spend logs에 남긴다. audit의 근거가 된다.
+  store_prompts_in_spend_logs: true
