@@ -1,0 +1,8 @@
+# 이미지에는 app/LeakApp.java만 필요하다. 특히 dumps/는 GB 단위라 build context에서 반드시 제외한다.
+
+dumps/
+docs/
+*.md
+Makefile
+.gitignore
+.dockerignore
