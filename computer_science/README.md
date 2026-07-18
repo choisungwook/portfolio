@@ -15,3 +15,4 @@
 | 7 | JVM 클래스 로딩 디버깅 | [링크](./jvm_class_loading/) |
 | 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |
 | 9 | yum/dnf lock 로컬 재현 핸즈온 | [링크](./yum_dnf_lock/) |
+| 10 | 애플리케이션이 OS page cache를 쓴다는 말의 의미 | [링크](./os/pagecache/) |
