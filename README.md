@@ -95,6 +95,7 @@
 85. AWS ElastiCache TLS와 인증 무중단 전환 실습 (26.7.10) - [링크](./aws/elasticache-authentication/)
 86. LiteLLM AI gateway 3시간 학습과 폐쇄망 Bedrock 실습 (26.7.11) - [링크](./computer_science/ai/litellm/)
 87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
+88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
 
 ## 직접 만든 제품
 
