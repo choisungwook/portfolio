@@ -24,6 +24,7 @@ JVM heap dump(hprof) 파일에서 OOM 원인을 찾는 데스크톱 도구다. E
 | src/renderer | 렌더러 UI 로직 |
 | src/tools | 합성 hprof 생성기 (테스트, CI 스모크 테스트용) |
 | static | HTML, CSS |
+| knowledge | 프로젝트 의사결정과 도메인 지식 (OKF 번들). agent 진입점은 [AGENTS.md](./AGENTS.md) |
 
 ## 실행
 
