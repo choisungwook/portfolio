@@ -1,0 +1,74 @@
+name: build-hprof-oom-analyzer
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/hprof-oom-analyzer/**'
+      - '.github/workflows/build-hprof-oom-analyzer.yml'
+  pull_request:
+    paths:
+      - 'product/hprof-oom-analyzer/**'
+      - '.github/workflows/build-hprof-oom-analyzer.yml'
+  workflow_dispatch:
+
+env:
+  UV_PYTHON_PREFERENCE: only-system
+
+defaults:
+  run:
+    working-directory: product/hprof-oom-analyzer
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests
+        run: uv run pytest
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build binary
+        run: >
+          uv run pyinstaller --onefile --name hprof-oom-analyzer
+          --paths src --collect-submodules hprof_oom_analyzer app.py
+
+      - name: Smoke test report mode
+        shell: bash
+        run: |
+          uv run python tests/synthetic.py sample.hprof
+          ./dist/hprof-oom-analyzer sample.hprof --report
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hprof-oom-analyzer-${{ runner.os }}
+          path: product/hprof-oom-analyzer/dist/*
