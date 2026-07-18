@@ -1,6 +1,4 @@
-.venv/
-build/
+node_modules/
 dist/
-*.spec
-__pycache__/
+release/
 *.hprof

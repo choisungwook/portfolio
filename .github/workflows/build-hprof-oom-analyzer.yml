@@ -13,9 +13,6 @@ on:
       - '.github/workflows/build-hprof-oom-analyzer.yml'
   workflow_dispatch:
 
-env:
-  UV_PYTHON_PREFERENCE: only-system
-
 defaults:
   run:
     working-directory: product/hprof-oom-analyzer
@@ -26,17 +23,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
+          node-version: '22'
 
-      - uses: astral-sh/setup-uv@v6
-
+      # 저장소 규칙상 lock 파일을 커밋하지 않으므로 npm ci 대신 npm install을 쓴다.
       - name: Install dependencies
-        run: uv sync
+        run: npm install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Compile TypeScript
+        run: npm run build
 
       - name: Run tests
-        run: uv run pytest
+        run: npm test
+
+      - name: Smoke test CLI report
+        run: |
+          node dist/tools/make-sample.js sample.hprof
+          node dist/cli.js sample.hprof
 
   build:
     needs: test
@@ -48,27 +54,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
-
-      - uses: astral-sh/setup-uv@v6
+          node-version: '22'
 
       - name: Install dependencies
-        run: uv sync
+        run: npm install
 
-      - name: Build binary
-        run: >
-          uv run pyinstaller --onefile --name hprof-oom-analyzer
-          --paths src --collect-submodules hprof_oom_analyzer app.py
-
-      - name: Smoke test report mode
-        shell: bash
-        run: |
-          uv run python tests/synthetic.py sample.hprof
-          ./dist/hprof-oom-analyzer sample.hprof --report
+      - name: Build desktop app
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - uses: actions/upload-artifact@v4
         with:
           name: hprof-oom-analyzer-${{ runner.os }}
-          path: product/hprof-oom-analyzer/dist/*
+          path: |
+            product/hprof-oom-analyzer/release/*.AppImage
+            product/hprof-oom-analyzer/release/*.dmg
+            product/hprof-oom-analyzer/release/*.exe

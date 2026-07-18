@@ -1,0 +1,42 @@
+{
+  "name": "hprof-oom-analyzer",
+  "version": "0.1.0",
+  "description": "JVM heap dump(hprof) OOM 분석 데스크톱 도구",
+  "main": "dist/main/main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "report": "node dist/cli.js",
+    "make-sample": "node dist/tools/make-sample.js",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "build": {
+    "appId": "dev.akbun.hprof-oom-analyzer",
+    "productName": "hprof-oom-analyzer",
+    "files": [
+      "dist/**/*",
+      "static/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
