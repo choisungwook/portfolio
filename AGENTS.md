@@ -70,6 +70,6 @@ Claude Code에서 plugin 설치:
 
 ## 작업 흐름
 
-Worktree에서 작업하고 commit 1개로 PR을 만든다. PR을 만들 때 기록용 GitHub Issue를 함께 만들어 연결한다.
+Worktree나 branch를 만들어 workspace를 초기화할 때 가장 먼저 master를 최신화한다(git pull origin master --rebase, conflict 해결 포함). Worktree에서 작업하고 commit 1개로 PR을 만든다. PR을 만들 때 기록용 GitHub Issue를 함께 만들어 연결한다.
 
 **git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시할 때만 실행한다.** agent는 구현과 검증까지만 하고 멈춘 뒤 변경 요약을 보고한다. plan 승인이나 이 문서의 표준 흐름은 실행 허가가 아니다. 자세한 규칙은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
