@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import * as analyzer from "../src/core/analyzer";
 import { HeapSnapshot } from "../src/core/model";
-import { normalizeClassName, parseHprofBuffer } from "../src/core/parser";
+import { HprofParseError, normalizeClassName, parseHprofBuffer } from "../src/core/parser";
 import { renderReport } from "../src/core/report";
 import * as synthetic from "../src/tools/synthetic";
 
@@ -82,6 +82,13 @@ describe("텍스트 리포트", () => {
     expect(text).toContain("byte[]");
     expect(text).toContain("GC root");
     expect(text).toContain('"main"');
+  });
+});
+
+describe("손상된 hprof", () => {
+  it("잘린 파일은 HprofParseError로 실패한다", () => {
+    const truncated = synthetic.buildSample().subarray(0, 200);
+    expect(() => parseHprofBuffer(truncated)).toThrow(HprofParseError);
   });
 });
 

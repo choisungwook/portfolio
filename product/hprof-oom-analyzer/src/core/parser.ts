@@ -140,17 +140,34 @@ export class HprofParser {
 
   /** 최상위 레코드를 순회해 스냅샷을 만든다. */
   parse(): HeapSnapshot {
+    try {
+      this.parseRecords();
+    } catch (error) {
+      if (error instanceof RangeError) {
+        throw new HprofParseError("파일 끝을 넘어 읽었다 (잘리거나 손상된 hprof)");
+      }
+      throw error;
+    }
+    this.finalize();
+    return this.snapshot;
+  }
+
+  private parseRecords(): void {
     const reader = this.reader;
     while (!reader.eof()) {
       const tag = reader.u1();
       reader.skip(4); // timestamp offset
       const length = reader.u4();
       const end = reader.pos + length;
+      if (end > reader.data.length) {
+        throw new HprofParseError("레코드가 파일 끝을 넘는다 (잘린 hprof)");
+      }
       this.parseRecord(tag, end);
+      if (reader.pos > end) {
+        throw new HprofParseError("레코드 경계를 넘어 읽었다 (손상된 hprof)");
+      }
       reader.pos = end;
     }
-    this.finalize();
-    return this.snapshot;
   }
 
   private parseRecord(tag: number, end: number): void {

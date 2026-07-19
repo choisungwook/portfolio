@@ -13,6 +13,9 @@ on:
       - '.github/workflows/build-hprof-oom-analyzer.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: product/hprof-oom-analyzer

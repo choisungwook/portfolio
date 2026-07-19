@@ -86,7 +86,11 @@ function renderThreads(threads: ThreadDto[]): void {
 }
 
 function renderPathResult(result: PathResultDto | null): void {
-  if (!result) return;
+  if (!result) {
+    $("path-pre").textContent = "경로를 찾을 수 없다. hprof 파일을 먼저 분석해야 한다.";
+    selectTab("path");
+    return;
+  }
   const { target, steps } = result;
   const lines = [
     `[${target.className} 0x${target.objId.toString(16)}, ${formatBytes(target.shallowSize)}]`,

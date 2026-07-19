@@ -13,7 +13,11 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1100,
     height: 700,
-    webPreferences: { preload: path.join(__dirname, "preload.js") },
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
   });
   win.loadFile(path.join(__dirname, "../../static/index.html"));
 }
