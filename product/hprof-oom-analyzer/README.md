@@ -28,7 +28,7 @@ JVM heap dump(hprof) 파일에서 OOM 원인을 찾는 데스크톱 도구다. E
 
 ## 실행
 
-의존성 설치 후 Electron 앱을 띄운다.
+Node.js 22.12 이상이 필요하다. electron-builder의 의존성인 @electron/get v3가 ESM 전용이라, npm 호이스팅 결과에 따라 electron 설치 스크립트가 이를 require()로 불러올 수 있는데 require(ESM)은 Node 22.12부터 지원된다. 의존성 설치 후 Electron 앱을 띄운다.
 
 ```bash
 cd product/hprof-oom-analyzer
@@ -55,10 +55,29 @@ npm test
 
 ## 빌드와 아티팩트
 
-GitHub Actions 워크플로우 build-hprof-oom-analyzer가 테스트와 CLI 스모크 테스트를 통과하면 ubuntu, macos, windows 3개 러너에서 electron-builder로 설치 파일(AppImage, dmg, nsis 인스톨러)을 빌드하고 OS별 아티팩트로 업로드한다. 로컬 빌드는 다음 명령을 쓴다.
+GitHub Actions 워크플로우 build-hprof-oom-analyzer가 PR에서는 테스트와 CLI 스모크 테스트를 실행하고, master push에서는 macos 러너에서 electron-builder로 dmg를 빌드해 아티팩트로 업로드한다. 이어서 release job이 package.json의 version을 읽어 hprof-oom-analyzer-{version} 태그로 GitHub Release를 만들고 dmg를 첨부한다. 같은 태그의 release가 이미 있으면 건너뛰므로, 새 release를 내려면 version을 올린다. 로컬 빌드는 다음 명령을 쓴다.
 
 ```bash
 npm run dist
+```
+
+## 트러블슈팅
+
+### mac에서 "damaged and can't be opened" 오류
+
+빌드 아티팩트는 코드 서명과 notarization이 없다. 인터넷에서 내려받은 파일에는 macOS가 quarantine 속성을 붙이는데, 서명 없는 앱에 quarantine이 붙어 있으면 Gatekeeper가 손상된 앱으로 취급한다. 앱 자체 문제가 아니므로 quarantine 속성을 지우면 실행된다.
+
+```bash
+xattr -cr /Applications/hprof-oom-analyzer.app
+```
+
+### npm start 시 ERR_REQUIRE_ESM 오류
+
+Node.js가 22.12 미만이면 electron 설치 스크립트가 ESM 전용인 @electron/get을 require()하다 실패할 수 있다. Node.js를 22.12 이상으로 올리고 node_modules를 지운 뒤 다시 설치한다.
+
+```bash
+rm -rf node_modules
+npm install
 ```
 
 ## 한계
@@ -67,4 +86,4 @@ npm run dist
 - shallow size의 객체/배열 헤더는 근사값(16/20바이트)이다. JVM 설정에 따라 실제와 다를 수 있다.
 - 64비트 객체 id를 number로 다루므로 2^53을 넘는 id는 정밀도를 잃는다. 실제 힙 주소 범위에서는 문제가 없다.
 - HotSpot JVM의 HPROF 1.0.2 형식만 지원한다. Android(ART) hprof는 지원하지 않는다.
-- 빌드 아티팩트는 코드 서명이 없다. mac/windows에서 처음 실행할 때 보안 경고를 지나야 한다.
+- 빌드 아티팩트는 코드 서명이 없다. mac/windows에서 처음 실행할 때 보안 경고를 지나야 한다. mac에서 손상된 앱으로 나오면 트러블슈팅 절을 참고한다.
