@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-07-19
+
+* **Creation**: [deprecated transitive 의존성은 scoped overrides로 교체](decisions/2026-07-npm-overrides-deprecated-deps.md) 결정 기록.
+* **Creation**: [mac 배포는 서명 없이 xattr 안내로 대응](decisions/2026-07-unsigned-mac-distribution.md) 결정 기록.
+
 ## 2026-07-18
 
 * **Initialization**: hprof-oom-analyzer 프로젝트 지식 번들 생성.

@@ -75,3 +75,59 @@ jobs:
         with:
           name: hprof-oom-analyzer-${{ runner.os }}
           path: product/hprof-oom-analyzer/release/*.dmg
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=hprof-oom-analyzer-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download build artifacts
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: hprof-oom-analyzer-*
+          path: product/hprof-oom-analyzer/release-assets
+          merge-multiple: true
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          hprof-oom-analyzer ${VERSION} 데스크톱 빌드. dmg(mac) 포함.
+
+          코드 서명이 없어 mac에서 처음 실행하면 "damaged and can't be opened" 오류가 난다. 앱 설치 후 아래 명령으로 quarantine 속성을 지우면 실행된다.
+
+          ```bash
+          xattr -cr /Applications/hprof-oom-analyzer.app
+          ```
+          EOF
+          sed -i "s/\${VERSION}/${{ steps.version.outputs.version }}/" release-notes.md
+          gh release create "${{ steps.version.outputs.tag }}" release-assets/* \
+            --target "${{ github.sha }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md
+>>>>>>> df77434 (hprof-oom-analyzer 빌드 정리: deprecated warning 제거와 GitHub Release 자동화)
