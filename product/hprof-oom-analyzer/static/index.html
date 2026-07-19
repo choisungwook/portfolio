@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
+  <title>hprof OOM analyzer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <button id="open-button">hprof 열기</button>
+    <span id="status">hprof 파일을 열어 분석을 시작한다.</span>
+  </header>
+
+  <nav id="tab-bar">
+    <button class="tab-button" data-tab="histogram">클래스별 히스토그램</button>
+    <button class="tab-button" data-tab="large">1MB 이상 객체</button>
+    <button class="tab-button" data-tab="path">GC root 경로</button>
+    <button class="tab-button" data-tab="threads">스레드 스택</button>
+  </nav>
+
+  <main>
+    <section class="tab-panel" data-tab="histogram">
+      <table>
+        <thead>
+          <tr><th>class</th><th class="num">count</th><th class="num">shallow</th><th class="num">retained(근사)</th></tr>
+        </thead>
+        <tbody id="histogram-body"></tbody>
+      </table>
+    </section>
+
+    <section class="tab-panel" data-tab="large">
+      <table>
+        <thead>
+          <tr><th>object id</th><th>class</th><th class="num">shallow</th></tr>
+        </thead>
+        <tbody id="large-body"></tbody>
+      </table>
+    </section>
+
+    <section class="tab-panel" data-tab="path">
+      <pre id="path-pre">히스토그램이나 1MB 이상 객체 탭에서 행을 더블클릭하면 경로가 표시된다.</pre>
+    </section>
+
+    <section class="tab-panel" data-tab="threads">
+      <pre id="threads-pre"></pre>
+    </section>
+  </main>
+
+  <script src="../dist/renderer/renderer.js"></script>
+</body>
+</html>

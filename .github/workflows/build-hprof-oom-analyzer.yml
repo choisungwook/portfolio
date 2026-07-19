@@ -1,0 +1,78 @@
+name: build-hprof-oom-analyzer
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/hprof-oom-analyzer/**'
+      - '.github/workflows/build-hprof-oom-analyzer.yml'
+  pull_request:
+    paths:
+      - 'product/hprof-oom-analyzer/**'
+      - '.github/workflows/build-hprof-oom-analyzer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/hprof-oom-analyzer
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 저장소 규칙상 lock 파일을 커밋하지 않으므로 npm ci 대신 npm install을 쓴다.
+      - name: Install dependencies
+        run: npm install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Smoke test CLI report
+        run: |
+          node dist/tools/make-sample.js sample.hprof
+          node dist/cli.js sample.hprof
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build desktop app
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hprof-oom-analyzer-${{ runner.os }}
+          path: |
+            product/hprof-oom-analyzer/release/*.AppImage
+            product/hprof-oom-analyzer/release/*.dmg
+            product/hprof-oom-analyzer/release/*.exe
