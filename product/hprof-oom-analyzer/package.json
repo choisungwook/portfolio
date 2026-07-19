@@ -14,10 +14,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "electron": "^35.0.0",
-    "electron-builder": "^26.0.12",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
   },
   "build": {
     "appId": "dev.akbun.hprof-oom-analyzer",
