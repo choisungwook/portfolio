@@ -96,7 +96,7 @@
 86. LiteLLM AI gateway 3시간 학습과 폐쇄망 Bedrock 실습 (26.7.11) - [링크](./computer_science/ai/litellm/)
 87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
 88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
-89. JVM 레거시 옵션 /dev/./urandom 재현 핸즈온 (구버전 커널 /dev/random blocking) (26.7.20) - [링크](./computer_science/jvm_urandom/)
+89. JVM 레거시 옵션 /dev/./urandom 재현 핸즈온 (구버전 커널 /dev/random blocking) (26.7.20) - [링크](./computer_science/jvm/urandom/)
 
 ## 직접 만든 제품
 

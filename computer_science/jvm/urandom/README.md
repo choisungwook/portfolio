@@ -6,3 +6,4 @@
 - [실습환경 구축](./docs/1-setup.md)
 - [실습](./docs/hands-on.md)
 - [발표자료](./presentation/index.html)
+- [Wiki와 ADR](./wiki/index.md)
