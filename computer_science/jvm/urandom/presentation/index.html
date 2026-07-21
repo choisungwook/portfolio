@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JVM 옵션 /dev/./urandom, 점 하나의 정체</title>
+<style>
+  /* akbun 외부 발표 모드(라이트 샌드위치) 스타일. 색·타이포·레이아웃은 design.md 스펙을 따른다. */
+  :root {
+    --dark: #212022;
+    --point: #FFC000;
+    --danger: #FF0000;
+    --workload: #FFF2CC;
+    --resource: #E2EFDA;
+    --group: #F2F2F2;
+    --code-bg: #1E1E1E;
+    --code-fg: #D4D4D4;
+    --code-key: #569CD6;
+    --code-str: #CE9178;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { font-family: 'NanumBarunGothic', 'Nanum Barun Gothic', 'Malgun Gothic', '맑은 고딕', sans-serif; }
+
+  #stage { position: absolute; top: 50%; left: 50%; width: 1280px; height: 720px; transform-origin: center center; }
+  .slide { position: absolute; inset: 0; display: none; background: #fff; color: #000; }
+  .slide.active { display: block; }
+  .slide.dark { background: var(--dark); color: #fff; }
+
+  .pageno { position: absolute; right: 28px; bottom: 22px; font-size: 15px; color: #888; }
+  .dark .pageno { color: #aaa; }
+  .footer-link { position: absolute; left: 30px; bottom: 22px; font-size: 13px; color: #555; }
+  .footer-link a { color: #555; }
+
+  /* 표지 */
+  .cover-title { position: absolute; top: 220px; left: 90px; right: 90px; text-align: center; font-size: 54px; font-weight: bold; line-height: 1.35; }
+  .cover-title .pt { color: var(--point); }
+  .cover-author { position: absolute; right: 90px; bottom: 150px; text-align: right; font-size: 20px; line-height: 1.6; color: #eee; }
+
+  /* 섹션 표지: 노란 세로 바 + 제목 */
+  .section-bar { position: absolute; left: 42px; top: 310px; width: 17px; height: 96px; background: var(--point); }
+  .section-title { position: absolute; left: 92px; top: 318px; font-size: 54px; font-weight: bold; color: #fff; }
+  .section-sub { position: absolute; left: 92px; top: 400px; font-size: 26px; color: #ddd; }
+
+  /* 내용 슬라이드 */
+  .header { position: absolute; left: 42px; top: 20px; font-size: 24px; font-weight: bold; }
+  .bullets { position: absolute; left: 78px; top: 92px; right: 60px; font-size: 19px; line-height: 1.75; }
+  .bullets .m::before { content: "■ "; font-size: 15px; }
+  .bullets .s { font-size: 16px; padding-left: 26px; }
+  .bullets .s::before { content: "- "; }
+  .hl { background: var(--point); padding: 0 4px; }
+  .red { color: var(--danger); font-weight: bold; }
+
+  /* 전환/질문 */
+  .transition { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 42px; font-weight: bold; line-height: 1.6; }
+
+  /* 목차 */
+  .toc { position: absolute; left: 140px; top: 150px; font-size: 28px; line-height: 2.1; }
+
+  /* 코드 패널 (VS Code Dark+) */
+  .code { background: var(--code-bg); color: var(--code-fg); font-family: Consolas, 'Courier New', monospace; font-size: 15px; line-height: 1.6; padding: 16px 18px; border-radius: 6px; white-space: pre; overflow: hidden; }
+  .code .k { color: var(--code-key); }
+  .code .s { color: var(--code-str); }
+  .code .cm { color: #6A9955; }
+
+  /* 다이어그램 */
+  .diagram { position: absolute; }
+  .box { position: absolute; border: 1.5px solid #000; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; padding: 4px; }
+  .box.workload { background: var(--workload); }
+  .box.resource { background: var(--resource); }
+  .box.group { background: var(--group); }
+  .boundary { position: absolute; border: 1.5px solid #000; border-radius: 10px; background: transparent; }
+  .boundary-label { position: absolute; font-size: 13px; font-weight: bold; }
+  .arrow { position: absolute; height: 0; border-top: 2.5px solid #000; }
+  .arrow::after { content: ""; position: absolute; right: -2px; top: -7px; border-left: 12px solid #000; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+  .arrow.reddash { border-top: 2.5px dashed var(--danger); }
+  .arrow.reddash::after { border-left-color: var(--danger); }
+  .marker { position: absolute; font-size: 20px; }
+  .label { position: absolute; font-size: 14px; }
+  .xmark { position: absolute; color: var(--danger); font-size: 34px; font-weight: bold; }
+  .bigarrow { position: absolute; font-size: 46px; font-weight: bold; }
+
+  #help { position: fixed; left: 12px; bottom: 8px; color: #666; font-size: 12px; z-index: 10; font-family: sans-serif; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1. 표지 (다크) -->
+<section class="slide dark active">
+  <div class="cover-title">JVM 옵션 <span class="pt">/dev/./urandom</span>,<br>점 하나의 정체</div>
+  <div class="cover-author">발표자: akbun<br>github.com/choisungwook</div>
+</section>
+
+<!-- 2. 목차 -->
+<section class="slide">
+  <div class="header">목차</div>
+  <div class="toc">
+    1. 왜 이 옵션을 썼나<br>
+    2. 점 하나의 정체<br>
+    3. 최신 커널에서는<br>
+    4. 어디서 재현할 수 있나<br>
+    5. 마치며
+  </div>
+</section>
+
+<!-- 3. 실습자료 안내 -->
+<section class="slide">
+  <div class="header">실습자료</div>
+  <div class="bullets">
+    <div class="m">모든 코드는 github에 있다</div>
+    <div class="s">github 링크: https://github.com/choisungwook/portfolio/tree/master/computer_science/jvm/urandom</div>
+    <div class="m" style="margin-top:18px">실습 환경</div>
+    <div class="s">Terraform으로 EC2 2대 생성 — 재현용(AL2, kernel 4.14) + 대조용(AL2023, kernel 6.1)</div>
+    <div class="s">접속은 SSM Session Manager, 정리는 terraform destroy</div>
+  </div>
+</section>
+
+<!-- 4. 섹션 표지 -->
+<section class="slide dark">
+  <div class="section-bar"></div>
+  <div class="section-title">왜 이 옵션을 썼나</div>
+</section>
+
+<!-- 5. 내용: 증상과 원인 -->
+<section class="slide">
+  <div class="header">1. 왜 이 옵션을 썼나</div>
+  <div class="bullets">
+    <div class="m">증상: headless VM에서 Tomcat 기동이 <span class="red">수 분</span> 멈춘다</div>
+    <div class="s">SHA1PRNG의 최초 seed 읽기가 /dev/random에서 <span class="hl">blocking</span></div>
+  </div>
+  <div class="code" style="position:absolute; left:60px; top:200px; width:560px;"><span class="cm">// catalina.out</span>
+Creation of SecureRandom instance
+for session ID generation using
+[SHA1PRNG] took <span class="s">[193,502]</span> ms.</div>
+  <div class="diagram" style="left:660px; top:170px; width:580px; height:420px;">
+    <div class="marker" style="left:6px; top:40px;">①</div>
+    <div class="box workload" style="left:30px; top:20px; width:170px; height:70px;">JVM (Tomcat)<br>SHA1PRNG</div>
+    <div class="arrow" style="left:200px; top:55px; width:120px;"></div>
+    <div class="label" style="left:210px; top:28px;">② seed 요청</div>
+    <div class="box resource" style="left:330px; top:20px; width:190px; height:70px;">/dev/random<br>(blocking pool)</div>
+    <div class="marker" style="left:340px; top:110px;">③</div>
+    <div class="label" style="left:365px; top:112px;">entropy 고갈 → read가 멈춘다</div>
+    <div class="xmark" style="left:410px; top:145px;">✕</div>
+    <div class="label" style="left:310px; top:195px; color:var(--danger); font-weight:bold;">keyboard·mouse가 없는 VM은<br>entropy가 쌓이지 않는다</div>
+    <div class="box group" style="left:30px; top:280px; width:490px; height:90px; font-size:14px;">해결: -Djava.security.egd=file:/dev/./urandom<br>→ seed 소스를 blocking하지 않는 urandom으로 변경</div>
+  </div>
+  <div class="footer-link">github 링크: https://github.com/choisungwook/portfolio</div>
+  <div class="pageno">5</div>
+</section>
+
+<!-- 6. 전환 질문 -->
+<section class="slide">
+  <div class="transition">그런데 왜<br>/dev/urandom이 아니라<br><span style="background:var(--point); padding:0 8px;">/dev/./urandom</span>일까요?</div>
+  <div class="pageno">6</div>
+</section>
+
+<!-- 7. 내용: 점의 정체 -->
+<section class="slide">
+  <div class="header">2. 점 하나의 정체</div>
+  <div class="bullets">
+    <div class="m">정답: JDK 7 이하의 <span class="hl">문자열 special-case를 우회</span>하는 트릭</div>
+    <div class="s">JDK-4705093: "file:/dev/urandom" 문자열이면 설정을 무시하고 /dev/random을 읽었다 (JDK-6202721)</div>
+  </div>
+  <div class="diagram" style="left:80px; top:220px; width:1120px; height:380px;">
+    <div class="box" style="left:0px; top:30px; width:300px; height:60px;">egd=file:/dev/urandom</div>
+    <div class="arrow reddash" style="left:300px; top:60px; width:170px;"></div>
+    <div class="label" style="left:310px; top:30px; color:var(--danger);">문자열 일치 → 무시</div>
+    <div class="box resource" style="left:480px; top:30px; width:220px; height:60px;">/dev/random</div>
+    <div class="xmark" style="left:720px; top:40px;">✕</div>
+    <div class="label" style="left:760px; top:52px; color:var(--danger);">여전히 blocking</div>
+
+    <div class="box" style="left:0px; top:190px; width:300px; height:60px;">egd=file:/dev/<b>./</b>urandom</div>
+    <div class="arrow" style="left:300px; top:220px; width:170px;"></div>
+    <div class="label" style="left:310px; top:190px;">비교식 빗나감</div>
+    <div class="box resource" style="left:480px; top:190px; width:220px; height:60px;">/dev/urandom</div>
+    <div class="label" style="left:730px; top:210px;">같은 파일, 다른 문자열 → 즉시 seed 확보</div>
+    <div class="label" style="left:0px; top:300px;">※ JDK 8에서 special-case가 수정되어 점 없는 경로도 동작한다</div>
+  </div>
+  <div class="pageno">7</div>
+</section>
+
+<!-- 8. 섹션 표지 -->
+<section class="slide dark">
+  <div class="section-bar"></div>
+  <div class="section-title">최신 커널에서는</div>
+</section>
+
+<!-- 9. 내용: kernel 5.6 -->
+<section class="slide">
+  <div class="header">3. 최신 커널에서는 — 옵션이 필요 없다</div>
+  <div class="bullets">
+    <div class="m">Linux 5.6(2020.3)에서 <span class="hl">blocking pool이 제거</span>됐다</div>
+    <div class="s">CRNG 초기화 이후 /dev/random과 /dev/urandom은 같은 CRNG 출력 (5.18에서 내부 통합)</div>
+  </div>
+  <div class="diagram" style="left:80px; top:210px; width:1120px; height:400px;">
+    <div class="boundary" style="left:0px; top:20px; width:520px; height:230px;"></div>
+    <div class="boundary-label" style="left:14px; top:28px;">kernel &lt; 5.6</div>
+    <div class="box resource" style="left:40px; top:80px; width:200px; height:60px;">/dev/random</div>
+    <div class="label" style="left:60px; top:150px; color:var(--danger); font-weight:bold;">entropy 추정치로 blocking</div>
+    <div class="box resource" style="left:290px; top:80px; width:200px; height:60px;">/dev/urandom</div>
+    <div class="label" style="left:320px; top:150px;">blocking 없음</div>
+
+    <div class="bigarrow" style="left:545px; top:110px;">➡</div>
+
+    <div class="boundary" style="left:620px; top:20px; width:500px; height:230px;"></div>
+    <div class="boundary-label" style="left:634px; top:28px;">kernel ≥ 5.6 (AL2023 = 6.1)</div>
+    <div class="box resource" style="left:660px; top:80px; width:420px; height:60px;">/dev/random ＝ /dev/urandom</div>
+    <div class="label" style="left:690px; top:150px;">CRNG 초기화 후 둘 다 blocking 없음</div>
+
+    <div class="box group" style="left:0px; top:290px; width:1120px; height:70px; font-size:16px;">이 옵션은 두 겹으로 화석 — JDK 8 이상이면 점(.)이 불필요, kernel 5.6 이상이면 옵션 전체가 불필요</div>
+  </div>
+  <div class="pageno">9</div>
+</section>
+
+<!-- 10. 전환 질문 -->
+<section class="slide">
+  <div class="transition">그럼 macOS나<br>Docker container에서<br>재현할 수 있을까요?</div>
+  <div class="pageno">10</div>
+</section>
+
+<!-- 11. 내용: 재현 불가 이유 -->
+<section class="slide">
+  <div class="header">4. 어디서 재현할 수 있나 — macOS·Docker는 안 된다</div>
+  <div class="bullets">
+    <div class="m">정답: 둘 다 안 된다 — blocking은 <span class="hl">커널 동작</span>이기 때문</div>
+    <div class="s">macOS /dev/random은 Fortuna 계열이라 blocking 동작 자체가 없다</div>
+    <div class="s">container는 호스트 커널을 공유한다 — centos:7 이미지를 써도 커널은 그대로</div>
+  </div>
+  <div class="diagram" style="left:180px; top:280px; width:920px; height:340px;">
+    <div class="boundary" style="left:0px; top:60px; width:920px; height:250px;"></div>
+    <div class="boundary-label" style="left:14px; top:70px;">Docker Desktop Linux VM — kernel 6.x (≥ 5.6)</div>
+    <div class="box workload" style="left:60px; top:120px; width:220px; height:70px;">container<br>centos:7 (userland만 옛날)</div>
+    <div class="box workload" style="left:330px; top:120px; width:220px; height:70px;">container<br>al2 이미지</div>
+    <div class="marker" style="left:60px; top:210px;">①</div>
+    <div class="label" style="left:90px; top:212px;">uname -r → 6.x</div>
+    <div class="marker" style="left:330px; top:210px;">②</div>
+    <div class="label" style="left:360px; top:212px;">/dev/random read → blocking 없음</div>
+    <div class="box resource" style="left:630px; top:120px; width:230px; height:70px;">호스트 커널의<br>/dev/random</div>
+  </div>
+  <div class="pageno">11</div>
+</section>
+
+<!-- 12. 내용: 실습 -->
+<section class="slide">
+  <div class="header">4. 어디서 재현할 수 있나 — kernel 4.14 EC2로 재현</div>
+  <div class="bullets">
+    <div class="m">kernel 5.6 미만이 실제로 부팅된 머신이 필요 → <span class="hl">AL2 초기 AMI(kernel 4.14)</span></div>
+  </div>
+  <div class="code" style="position:absolute; left:60px; top:170px; width:640px;"><span class="cm"># ① entropy 고갈 (재현용 인스턴스)</span>
+(while true; do dd if=/dev/random \
+  of=/dev/null bs=64 count=1; done) &amp;
+
+<span class="cm"># ② 옵션 없이 → seed 읽다가 멈춘다</span>
+java SecureRandomBlockingDemo
+
+<span class="cm"># ③ 옵션 부여 → 즉시 종료</span>
+java <span class="k">-Djava.security.egd</span>=<span class="s">file:/dev/./urandom</span> \
+  SecureRandomBlockingDemo</div>
+  <div class="bigarrow" style="position:absolute; left:720px; top:300px;">➡</div>
+  <div class="diagram" style="left:790px; top:200px; width:450px; height:380px;">
+    <div class="box workload" style="left:0px; top:0px; width:200px; height:64px;">legacy EC2<br>AL2 kernel 4.14</div>
+    <div class="label" style="left:220px; top:20px; color:var(--danger); font-weight:bold;">② blocking 재현</div>
+    <div class="box workload" style="left:0px; top:120px; width:200px; height:64px;">modern EC2<br>AL2023 kernel 6.1</div>
+    <div class="label" style="left:220px; top:140px;">대조: 옵션 없이도 즉시</div>
+    <div class="box group" style="left:0px; top:240px; width:420px; height:64px; font-size:14px;">Terraform apply 한 번으로 2대 생성<br>접속은 SSM Session Manager</div>
+  </div>
+  <div class="footer-link">github 링크: https://github.com/choisungwook/portfolio/tree/master/computer_science/jvm/urandom</div>
+  <div class="pageno">12</div>
+</section>
+
+<!-- 13. 섹션 표지: 마치며 -->
+<section class="slide dark">
+  <div class="section-bar"></div>
+  <div class="section-title">마치며</div>
+</section>
+
+<!-- 14. 마치며 -->
+<section class="slide">
+  <div class="header">5. 마치며</div>
+  <div class="bullets">
+    <div class="m">요약</div>
+    <div class="s">옵션은 구버전 커널 /dev/random blocking 회피용, 점(.)은 JDK 7 이하 special-case 우회용</div>
+    <div class="s">kernel 5.6 이상 + JDK 8 이상이면 둘 다 불필요 — AL2023(6.1)은 해당 없음</div>
+    <div class="s">macOS·Docker는 커널을 못 바꿔서 재현 불가, kernel 4.14 EC2에서 재현 가능</div>
+    <div class="m" style="margin-top:16px">다음 공부</div>
+    <div class="s">getrandom(2) syscall과 CRNG 초기화 과정, container의 /dev 장치 mount 원리</div>
+    <div class="m" style="margin-top:16px">레거시 옵션을 지우기 전에 uname -r부터 확인하자. 감사합니다!</div>
+  </div>
+  <div class="pageno">14</div>
+</section>
+
+<!-- 15. 참고자료 -->
+<section class="slide">
+  <div class="header">참고자료</div>
+  <div class="bullets" style="font-size:16px;">
+    <div>1. Removing the Linux /dev/random blocking pool — https://lwn.net/Articles/808575/</div>
+    <div>2. Uniting the Linux random-number devices — https://lwn.net/Articles/884875/</div>
+    <div>3. JDK-6202721 SHA1PRNG reads from /dev/random even if java.security.egd is set — https://bugs.openjdk.org/browse/JDK-6202721</div>
+    <div>4. Red Hat solution 2066163 — java.security.egd in older versions than JDK 8 — https://access.redhat.com/solutions/2066163</div>
+    <div>5. Baeldung — The java.security.egd JVM Option — https://www.baeldung.com/java-security-egd</div>
+    <div>6. AL2023 kernel changes from AL2 — https://docs.aws.amazon.com/linux/al2023/ug/compare-with-al2-kernel.html</div>
+    <div>7. AL2 supported kernels — https://docs.aws.amazon.com/linux/al2/ug/aml2-kernel.html</div>
+  </div>
+  <div class="pageno">15</div>
+</section>
+
+</div>
+<div id="help">←/→ 또는 클릭으로 이동</div>
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let cur = 0;
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === cur));
+  }
+  function fit() {
+    const scale = Math.min(innerWidth / 1280, innerHeight / 720);
+    const stage = document.getElementById('stage');
+    stage.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+  addEventListener('resize', fit);
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') show(cur + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') show(cur - 1);
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  addEventListener('click', e => show(e.clientX > innerWidth / 2 ? cur + 1 : cur - 1));
+  fit();
+  const initial = new URLSearchParams(location.search).get('slide');
+  if (initial) show(parseInt(initial, 10) - 1);
+</script>
+</body>
+</html>
