@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { OpenerApp, RepoEntry, WorktreeInfo } from '../../shared/types'
 import BranchPanel from './components/BranchPanel'
 import GraphView from './components/GraphView'

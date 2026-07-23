@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import type { RepoEntry } from '../../../shared/types'
 
 interface Props {

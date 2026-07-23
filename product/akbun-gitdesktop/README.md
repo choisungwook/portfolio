@@ -17,9 +17,18 @@
 - GitHub PR 목록 보기 (gh CLI 사용, 클릭하면 브라우저로 이동)
 - worktree를 외부 앱으로 열기
 
-## 설계 원칙
+## 설계 원칙: git CLI + gh CLI
 
 git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. PR 조회는 GitHub 공식 CLI인 gh를 사용하므로 gh auth login이 되어 있어야 한다.
+
+라이브러리 후보를 검토한 결과다.
+
+- nodegit(libgit2 바인딩): 0.27에서 사실상 개발이 멈췄고, native module이라 Electron 버전마다 리빌드가 필요해 macOS/Windows/Linux 크로스 플랫폼 CI 빌드가 복잡해진다.
+- isomorphic-git: 순수 JS라 배포는 쉽지만 이 앱의 핵심인 worktree를 지원하지 않는다.
+- simple-git: 결국 git 바이너리를 spawn하는 wrapper라 git 설치 요구사항이 사라지지 않는다. 이 앱이 쓰는 git 명령은 8개뿐이라 30줄짜리 자체 wrapper로 충분하고, 의존성만 늘어난다.
+- PR 조회에 Octokit(REST API) 대신 gh CLI를 쓰는 이유: gh는 사용자가 이미 로그인한 인증을 그대로 재사용한다. Octokit을 쓰면 토큰 입력 UI와 안전한 저장(keytar 등)을 앱이 직접 구현해야 한다.
+
+개발자 머신에는 git이 이미 있고 이 앱의 사용자는 개발자이므로, git CLI 직접 실행이 가장 단순하고 유지보수하기 쉬운 선택이다.
 
 ## 개발
 
