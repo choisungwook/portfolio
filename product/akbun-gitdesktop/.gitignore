@@ -1,0 +1,6 @@
+# 루트 .gitignore가 package-lock.json을 무시하지만 CI(npm ci) 재현성을 위해 이 앱에서는 커밋한다.
+!package-lock.json
+node_modules/
+out/
+release/
+*.log

@@ -1,0 +1,88 @@
+name: akbun-gitdesktop release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-gitdesktop/**'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: product/akbun-gitdesktop
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.create.outputs.created }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read package version
+        id: version
+        run: echo "tag=gitdesktop-v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and release if missing
+        id: create
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG already exists. Skip release."
+          else
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --generate-notes
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: tag
+    if: needs.tag.outputs.created == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            dist: dist:mac
+          - os: windows-latest
+            dist: dist:win
+          - os: ubuntu-latest
+            dist: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: product/akbun-gitdesktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installers
+        run: npm run ${{ matrix.dist }}
+
+      - name: Upload installers to release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          gh release upload "$TAG" \
+            product/akbun-gitdesktop/release/*.dmg \
+            product/akbun-gitdesktop/release/*.exe \
+            product/akbun-gitdesktop/release/*.AppImage \
+            --clobber
