@@ -15,6 +15,15 @@ git pull origin master --rebase
 - conflict가 발생하면 해결하고 rebase를 완료한 뒤 작업을 시작한다.
 - 이 최신화는 workspace 초기화 작업이므로 실행 승인 없이 수행한다.
 
+## GitHub Actions 작성 규칙
+
+workflow를 만들거나 수정할 때 버전을 오래된 값으로 하드코딩하지 않는다.
+
+- action(uses)은 최신 stable 메이저 버전을 확인해 사용한다. 예: actions/checkout, actions/setup-node
+- workflow가 설치하는 도구, 모듈, 라이브러리도 최신 stable 버전을 확인해 사용한다. npm 패키지는 npm view <패키지> dist-tags.latest로, 그 외는 웹 검색으로 확인한다.
+- 언어 런타임(Node 등)은 현재 LTS 버전을 사용한다.
+- 상위 도구가 특정 버전 범위만 지원하면(peer dependency 등) 그 범위 안의 최신 stable을 쓰고 이유를 남긴다.
+
 ## 실행 승인
 
 git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시할 때만 실행한다. agent는 구현과 검증까지만 하고 멈춘 뒤 변경 요약을 보고하고 지시를 기다린다.

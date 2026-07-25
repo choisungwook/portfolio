@@ -99,10 +99,15 @@
 
 ## 직접 만든 제품
 
+> 전체 인덱스: [product/README.md](./product/README.md)
+
 - [SLO를 계산하는 제품 (slo.akbun.com)](./product/slo/)
 - [봉투암호화 시뮬레이션 제품 (envelopelab.akbun.com)](./product/envelope_encryption_simulator/) (26.3.2)
 - [AI agent용 슬라이드 레이아웃 레퍼런스 시스템](./product/slide-reference/) (26.3.28)
 - [티스토리 스킨](./product/tistory-skin/akbun/) (26.4.4)
+- [AI agent용 카드뉴스 레이아웃 레퍼런스](./product/cardnews-reference/)
+- [JVM heap dump OOM 원인 분석 데스크톱 도구](./product/hprof-oom-analyzer/) (26.7.18)
+- [git graph 데스크톱 앱 (akbun-gitdesktop)](./product/akbun-gitdesktop/) (26.7.25)
 
 ## Dockerfile
 
