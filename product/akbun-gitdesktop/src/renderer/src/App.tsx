@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from 'react'
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { BranchInfo, CommitInfo, OpenerApp, RepoEntry, WorktreeInfo } from '../../shared/types'
 import BranchPanel from './components/BranchPanel'
 import DiffDrawer, { type DiffSource } from './components/DiffDrawer'
@@ -26,6 +26,8 @@ export default function App(): JSX.Element {
   const [diffSource, setDiffSource] = useState<DiffSource | null>(null)
   const theme = useTheme()
   const cli = useCliStatus()
+  // The repository whose default branch lookup is still allowed to win.
+  const pendingRepoPath = useRef('')
 
   useEffect(() => {
     window.gitdesktop.listRepos().then((result) => {
@@ -55,7 +57,11 @@ export default function App(): JSX.Element {
       setTab('graph')
       setDiffSource(null)
       refreshWorktrees(repo)
+      pendingRepoPath.current = repo.path
+      setDefaultBranch('HEAD')
       window.gitdesktop.getDefaultBranch(repo.path).then((result) => {
+        // A newer selection may have landed while this lookup was in flight.
+        if (pendingRepoPath.current !== repo.path) return
         setDefaultBranch(result.ok ? result.data : 'HEAD')
       })
     },
@@ -78,6 +84,7 @@ export default function App(): JSX.Element {
       if (result.ok) {
         setRepos(result.data)
         if (selectedRepo?.path === repo.path) {
+          pendingRepoPath.current = ''
           setSelectedRepo(null)
           setWorktrees([])
           setSelectedWorktree(null)

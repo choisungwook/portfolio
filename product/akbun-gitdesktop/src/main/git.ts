@@ -226,8 +226,15 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
     // The remote HEAD is not set in every clone, so fall through to the name list.
   }
   for (const candidate of DEFAULT_BRANCH_CANDIDATES) {
-    const found = await probe('git', ['-C', repoPath, 'rev-parse', '--verify', '--quiet', candidate])
-    if (found.ok) return candidate
+    // The local branch may be gone while the remote one still exists, so check both.
+    const refs = [
+      { ref: `refs/heads/${candidate}`, name: candidate },
+      { ref: `refs/remotes/origin/${candidate}`, name: `origin/${candidate}` }
+    ]
+    for (const { ref, name } of refs) {
+      const found = await probe('git', ['-C', repoPath, 'rev-parse', '--verify', '--quiet', ref])
+      if (found.ok) return name
+    }
   }
   return 'HEAD'
 }

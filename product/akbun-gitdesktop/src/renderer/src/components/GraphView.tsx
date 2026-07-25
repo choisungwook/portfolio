@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import type { CommitInfo } from '../../../shared/types'
+import { clickable } from '../lib/clickable'
 import { layoutGraph } from '../lib/graphLayout'
 
 const ROW_HEIGHT = 28
@@ -75,7 +76,7 @@ export default function GraphView({ repoPath, selectedHash, onSelectCommit }: Pr
             key={node.commit.hash}
             className={node.commit.hash === selectedHash ? 'commit-row selected' : 'commit-row'}
             style={{ height: ROW_HEIGHT }}
-            onClick={() => onSelectCommit(node.commit)}
+            {...clickable(() => onSelectCommit(node.commit))}
             title="Show the files this commit changed"
           >
             <span className="commit-refs">

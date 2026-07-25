@@ -1,5 +1,6 @@
 import { useEffect, useState, type JSX } from 'react'
 import type { FileChange } from '../../../shared/types'
+import { clickable } from '../lib/clickable'
 
 /** What the drawer is diffing: one commit, or a branch against its base. */
 export type DiffSource =
@@ -125,7 +126,7 @@ export default function DiffDrawer({ source, onClose }: Props): JSX.Element {
           <li
             key={file.path}
             className={file.path === selectedFile ? 'selected' : ''}
-            onClick={() => setSelectedFile(file.path)}
+            {...clickable(() => setSelectedFile(file.path))}
             title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}
           >
             <span className={statusClass(file.status)}>{file.status}</span>

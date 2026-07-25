@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { BranchInfo } from '../../../shared/types'
+import { clickable } from '../lib/clickable'
 
 interface Props {
   repoPath: string
@@ -66,7 +67,7 @@ export default function BranchPanel({
     <li
       key={branch.name}
       className={branch.name === selectedBranch ? 'selected' : ''}
-      onClick={() => onSelectBranch(branch)}
+      {...clickable(() => onSelectBranch(branch))}
       title={`Show files changed on ${branch.name}`}
     >
       <span className={branch.isCurrent ? 'branch-name current' : 'branch-name'}>
