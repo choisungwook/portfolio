@@ -19,49 +19,43 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
-      created: ${{ steps.create.outputs.created }}
+      build: ${{ steps.check.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read package version
         id: version
         run: echo "tag=gitdesktop-v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Create tag and release if missing
-        id: create
+      - name: Create release if missing and decide build
+        id: check
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            echo "Tag $TAG already exists. Skip release."
-          else
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --target "$GITHUB_SHA" \
               --title "$TAG" \
               --generate-notes
-            echo "created=true" >> "$GITHUB_OUTPUT"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$(gh release view "$TAG" --json assets -q '.assets[].name' | grep '\.dmg$' || true)" ]; then
+            # 릴리스는 있지만 빌드 산출물이 없으면 빌드를 다시 수행한다.
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already has installers. Skip build."
           fi
 
   build:
     needs: tag
-    if: needs.tag.outputs.created == 'true'
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            dist: dist:mac
-          - os: windows-latest
-            dist: dist:win
-          - os: ubuntu-latest
-            dist: dist:linux
-    runs-on: ${{ matrix.os }}
+    if: needs.tag.outputs.build == 'true'
+    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -70,18 +64,14 @@ jobs:
         run: npm install
 
       - name: Build installers
-        run: npm run ${{ matrix.dist }}
+        run: npm run dist:mac
 
       - name: Upload installers to release
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.tag.outputs.tag }}
-        shell: bash
         run: |
-          shopt -s nullglob
           gh release upload "$TAG" \
             product/akbun-gitdesktop/release/*.dmg \
-            product/akbun-gitdesktop/release/*.exe \
-            product/akbun-gitdesktop/release/*.AppImage \
             --clobber
