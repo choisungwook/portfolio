@@ -3,8 +3,9 @@
  * 확대/스크롤 가능한 파형과 재생 헤드, 구간 반복(A-B) 영역을 그린다.
  *
  * 마우스 조작:
- * - 왼쪽 버튼을 누른 채 좌우로 끌면 파형이 스크롤된다.
+ * - 왼쪽 버튼을 누른 채 좌우로 끌면 그 구간이 구간 반복(A-B)으로 잡힌다 (onLoopSelect 콜백).
  * - 끌지 않고 누르면(클릭) 그 지점부터 재생한다 (onSeek 콜백).
+ * - 스크롤은 휠(트랙패드 좌우 포함)로 한다.
  */
 class Waveform {
   /** peak 1블록이 담는 샘플 수. 그리기 성능과 해상도의 절충값. */
@@ -13,9 +14,12 @@ class Waveform {
   private static readonly MAX_PPS = 800;
   /** 이 픽셀 이상 움직이면 클릭이 아니라 드래그로 본다. */
   private static readonly DRAG_THRESHOLD_PX = 5;
+  /** 이보다 짧은 구간은 반복해도 소리가 나지 않으므로 만들지 않는다. */
+  private static readonly MIN_LOOP_SEC = 0.05;
 
   readonly duration: number;
   onSeek: ((timeSec: number) => void) | null = null;
+  onLoopSelect: ((a: number, b: number) => void) | null = null;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -35,7 +39,10 @@ class Waveform {
   private dragging = false;
   private dragMoved = false;
   private dragStartX = 0;
-  private dragStartViewSec = 0;
+  private dragStartSec = 0;
+  /** 드래그를 시작할 때의 구간. 쓸 수 없는 드래그로 끝나면 여기로 되돌린다. */
+  private dragPrevLoopA: number | null = null;
+  private dragPrevLoopB: number | null = null;
   private readonly resizeObserver: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
@@ -142,30 +149,49 @@ class Waveform {
     this.viewStartSec = Math.min(maxStart, Math.max(0, sec));
   }
 
+  /** 화면 x좌표를 곡 안의 시각(초)으로 바꾼다. 곡 범위 밖이면 잘라낸다. */
+  private timeAt(clientX: number): number {
+    const rect = this.canvas.getBoundingClientRect();
+    const timeSec = this.viewStartSec + (clientX - rect.left) / this.pixelsPerSecond;
+    return Math.min(this.duration, Math.max(0, timeSec));
+  }
+
   private readonly onMouseDown = (event: MouseEvent): void => {
     if (event.button !== 0) return;
     this.dragging = true;
     this.dragMoved = false;
     this.dragStartX = event.clientX;
-    this.dragStartViewSec = this.viewStartSec;
+    this.dragStartSec = this.timeAt(event.clientX);
+    this.dragPrevLoopA = this.loopA;
+    this.dragPrevLoopB = this.loopB;
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
     if (!this.dragging) return;
-    const dx = event.clientX - this.dragStartX;
-    if (Math.abs(dx) > Waveform.DRAG_THRESHOLD_PX) this.dragMoved = true;
+    if (Math.abs(event.clientX - this.dragStartX) > Waveform.DRAG_THRESHOLD_PX) this.dragMoved = true;
     if (!this.dragMoved) return;
-    this.setViewStart(this.dragStartViewSec - dx / this.pixelsPerSecond);
-    this.draw();
+    // 끄는 동안 잡히는 구간을 미리 보여준다. 확정은 mouseup에서 콜백으로 한다.
+    const current = this.timeAt(event.clientX);
+    this.setLoop(Math.min(this.dragStartSec, current), Math.max(this.dragStartSec, current));
   };
 
   private readonly onMouseUp = (event: MouseEvent): void => {
     if (!this.dragging) return;
     this.dragging = false;
-    if (this.dragMoved) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const timeSec = this.viewStartSec + (event.clientX - rect.left) / this.pixelsPerSecond;
-    if (timeSec >= 0 && timeSec <= this.duration && this.onSeek) this.onSeek(timeSec);
+    const timeSec = this.timeAt(event.clientX);
+    if (this.dragMoved) {
+      const a = Math.min(this.dragStartSec, timeSec);
+      const b = Math.max(this.dragStartSec, timeSec);
+      // 곡 밖으로 끌면 timeAt이 양 끝을 같은 값으로 잘라 0길이 구간이 나온다.
+      // 그대로 두면 재생 헤드가 그 지점에 묶이므로 버리고 이전 구간을 되살린다.
+      if (b - a < Waveform.MIN_LOOP_SEC) {
+        this.setLoop(this.dragPrevLoopA, this.dragPrevLoopB);
+        return;
+      }
+      this.onLoopSelect?.(a, b);
+      return;
+    }
+    this.onSeek?.(timeSec);
   };
 
   private readonly onWheel = (event: WheelEvent): void => {

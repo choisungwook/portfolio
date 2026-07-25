@@ -170,6 +170,11 @@ document.getElementById("refresh-library")!.addEventListener("click", async () =
   await refreshLibrary(await window.api.refreshLibrary());
 });
 
+document.getElementById("remove-all")!.addEventListener("click", async () => {
+  if (!confirm("목록의 모든 파일을 지운다. 실제 파일은 남는다.")) return;
+  await refreshLibrary(await window.api.removeAll());
+});
+
 // ---------- 설정 화면 ----------
 
 async function openSettings(): Promise<void> {
@@ -239,6 +244,8 @@ async function openPlayer(item: LibraryItem): Promise<void> {
     audio.currentTime = timeSec;
     void audio.play();
   };
+  // 파형 드래그로 구간을 잡는다. 기존 구간이 있어도 그대로 새 구간으로 바꾼다.
+  waveform.onLoopSelect = (a, b) => setLoop(a, b);
   waveLoading.hidden = true;
 
   if (item.durationSec === null) {
