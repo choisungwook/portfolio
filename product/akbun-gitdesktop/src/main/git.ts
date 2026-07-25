@@ -1,8 +1,17 @@
 import { execFile } from 'node:child_process'
-import type { BranchInfo, CommitInfo, PullRequestInfo, WorktreeInfo } from '../shared/types'
+import type {
+  BranchInfo,
+  CliStatus,
+  CliToolStatus,
+  CommitInfo,
+  FileChange,
+  PullRequestInfo,
+  WorktreeInfo
+} from '../shared/types'
 
 const FIELD_SEP = '\x1f'
 const MAX_LOG_COUNT = 500
+const DEFAULT_BRANCH_CANDIDATES = ['main', 'master', 'develop']
 
 export function runGit(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -28,16 +37,56 @@ function runGh(cwd: string, args: string[]): Promise<string> {
   })
 }
 
-/**
- * git과 gh CLI 설치 여부를 확인한다.
- * git은 모든 기능의 필수 도구이고, gh는 PR 조회 때만 필요하다.
- */
-export async function checkCliTools(): Promise<{ git: boolean; gh: boolean }> {
-  const probe = (command: string): Promise<boolean> =>
-    new Promise((resolve) => {
-      execFile(command, ['--version'], (error) => resolve(!error))
+/** Runs a command anywhere and reports whether it succeeded, instead of throwing. */
+function probe(command: string, args: string[]): Promise<{ ok: boolean; output: string }> {
+  return new Promise((resolve) => {
+    execFile(command, args, (error, stdout, stderr) => {
+      resolve({ ok: !error, output: `${stdout}${stderr}`.trim() })
     })
-  const [git, gh] = await Promise.all([probe('git'), probe('gh')])
+  })
+}
+
+async function locate(command: string): Promise<string> {
+  const finder = process.platform === 'win32' ? 'where' : 'which'
+  const result = await probe(finder, [command])
+  return result.ok ? result.output.split('\n')[0].trim() : ''
+}
+
+async function inspectGit(): Promise<CliToolStatus> {
+  const version = await probe('git', ['--version'])
+  return {
+    id: 'git',
+    label: 'git CLI',
+    required: true,
+    available: version.ok,
+    version: version.ok ? version.output.split('\n')[0] : '',
+    path: version.ok ? await locate('git') : '',
+    authStatus: '',
+    authenticated: false
+  }
+}
+
+async function inspectGh(): Promise<CliToolStatus> {
+  const version = await probe('gh', ['--version'])
+  const auth = version.ok ? await probe('gh', ['auth', 'status']) : { ok: false, output: '' }
+  return {
+    id: 'gh',
+    label: 'gh CLI',
+    required: false,
+    available: version.ok,
+    version: version.ok ? version.output.split('\n')[0] : '',
+    path: version.ok ? await locate('gh') : '',
+    authStatus: auth.output,
+    authenticated: auth.ok
+  }
+}
+
+/**
+ * Detects the CLIs this app runs.
+ * git is required by every feature, gh is only needed for the pull request list.
+ */
+export async function checkCliTools(): Promise<CliStatus> {
+  const [git, gh] = await Promise.all([inspectGit(), inspectGh()])
   return { git, gh }
 }
 
@@ -163,6 +212,74 @@ export async function removeWorktree(repoPath: string, worktreePath: string, for
   const args = ['worktree', 'remove', worktreePath]
   if (force) args.push('--force')
   await runGit(repoPath, args)
+}
+
+/**
+ * Guesses the branch a feature branch is compared against.
+ * Prefers the remote HEAD, then the usual long lived branch names.
+ */
+export async function getDefaultBranch(repoPath: string): Promise<string> {
+  try {
+    const out = await runGit(repoPath, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+    if (out.trim()) return out.trim()
+  } catch {
+    // The remote HEAD is not set in every clone, so fall through to the name list.
+  }
+  for (const candidate of DEFAULT_BRANCH_CANDIDATES) {
+    const found = await probe('git', ['-C', repoPath, 'rev-parse', '--verify', '--quiet', candidate])
+    if (found.ok) return candidate
+  }
+  return 'HEAD'
+}
+
+function parseNameStatus(out: string): FileChange[] {
+  return out
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const fields = line.split('\t')
+      const status = fields[0]
+      // Renames and copies carry both the old and the new path.
+      const renamed = status.startsWith('R') || status.startsWith('C')
+      return {
+        status,
+        path: renamed ? fields[2] : fields[1],
+        oldPath: renamed ? fields[1] : ''
+      }
+    })
+    .filter((change) => Boolean(change.path))
+}
+
+/** Lists the files a single commit changed, compared with its first parent. */
+export async function getCommitFiles(repoPath: string, hash: string): Promise<FileChange[]> {
+  const out = await runGit(repoPath, [
+    'show',
+    '--first-parent',
+    '--name-status',
+    '--format=',
+    '--no-color',
+    hash
+  ])
+  return parseNameStatus(out)
+}
+
+export async function getCommitDiff(repoPath: string, hash: string, filePath: string): Promise<string> {
+  return runGit(repoPath, ['show', '--first-parent', '--format=', '--no-color', hash, '--', filePath])
+}
+
+/** Lists the files a branch changed since it forked off the base branch. */
+export async function getRangeFiles(repoPath: string, base: string, head: string): Promise<FileChange[]> {
+  const out = await runGit(repoPath, ['diff', '--name-status', '--no-color', `${base}...${head}`])
+  return parseNameStatus(out)
+}
+
+export async function getRangeDiff(
+  repoPath: string,
+  base: string,
+  head: string,
+  filePath: string
+): Promise<string> {
+  return runGit(repoPath, ['diff', '--no-color', `${base}...${head}`, '--', filePath])
 }
 
 export async function getPullRequests(repoPath: string): Promise<PullRequestInfo[]> {

@@ -15,60 +15,46 @@ defaults:
     working-directory: product/akbun-gitdesktop
 
 jobs:
-  tag:
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      build: ${{ steps.check.outputs.build }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Read package version
-        id: version
-        run: echo "tag=gitdesktop-v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Create tag if missing
-        working-directory: .
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            git tag "$TAG"
-            git push origin "$TAG"
-          fi
-
-      - name: Create release if missing and decide build
-        id: check
-        working-directory: .
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if assets=$(gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null); then
-            # 릴리스는 있지만 dmg가 없으면 빌드를 다시 수행한다.
-            if echo "$assets" | grep -q '\.dmg$'; then
-              echo "build=false" >> "$GITHUB_OUTPUT"
-              echo "Release $TAG already has installers. Skip build."
-            else
-              echo "build=true" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --generate-notes
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  build:
-    needs: tag
-    if: needs.tag.outputs.build == 'true'
+  release:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+
+      - name: Compute next version
+        id: version
+        run: |
+          latest=$(git tag --list 'gitdesktop-v*' | sed 's/^gitdesktop-v//' | sort -V | tail -n1)
+          package=$(node -p "require('./package.json').version")
+          if [ -z "$latest" ]; then
+            next="$package"
+          else
+            # 마지막 릴리스의 patch를 +1 해서 기존 릴리스를 덮어쓰지 않는다.
+            IFS=. read -r major minor patch <<< "$latest"
+            bumped="$major.$minor.$((patch + 1))"
+            # package.json을 직접 올려 major/minor를 바꿨다면 그 값을 따른다.
+            next=$(printf '%s\n%s\n' "$bumped" "$package" | sort -V | tail -n1)
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=gitdesktop-v$next" >> "$GITHUB_OUTPUT"
+          echo "Releasing gitdesktop-v$next (previous tag: ${latest:-none})"
+
+      - name: Fail if the tag already exists
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists. Refusing to overwrite a published release."
+            exit 1
+          fi
+
+      - name: Apply version to package.json
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         run: npm ci
@@ -76,12 +62,21 @@ jobs:
       - name: Build installers
         run: npm run dist:mac
 
-      - name: Upload installers to release
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release with installers
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.tag.outputs.tag }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release upload "$TAG" \
-            product/akbun-gitdesktop/release/*.dmg \
-            --clobber
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            product/akbun-gitdesktop/release/*.dmg

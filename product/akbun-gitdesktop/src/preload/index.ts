@@ -1,7 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ThemePreference } from '../shared/types'
 
 const api = {
   checkCliTools: () => ipcRenderer.invoke('tools:check'),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setTheme: (theme: ThemePreference) => ipcRenderer.invoke('settings:setTheme', theme),
+
   listRepos: () => ipcRenderer.invoke('repos:list'),
   importRepo: () => ipcRenderer.invoke('repos:import'),
   removeRepo: (repoPath: string) => ipcRenderer.invoke('repos:remove', repoPath),
@@ -9,6 +13,7 @@ const api = {
   getLog: (repoPath: string) => ipcRenderer.invoke('git:log', repoPath),
   getBranches: (repoPath: string) => ipcRenderer.invoke('git:branches', repoPath),
   getWorktrees: (repoPath: string) => ipcRenderer.invoke('git:worktrees', repoPath),
+  getDefaultBranch: (repoPath: string) => ipcRenderer.invoke('git:defaultBranch', repoPath),
 
   createBranch: (repoPath: string, name: string, startPoint: string) =>
     ipcRenderer.invoke('git:createBranch', repoPath, name, startPoint),
@@ -18,6 +23,14 @@ const api = {
     ipcRenderer.invoke('git:createWorktree', repoPath, worktreePath, branch, createNewBranch),
   removeWorktree: (repoPath: string, worktreePath: string, force: boolean) =>
     ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath, force),
+
+  getCommitFiles: (repoPath: string, hash: string) => ipcRenderer.invoke('git:commitFiles', repoPath, hash),
+  getCommitDiff: (repoPath: string, hash: string, filePath: string) =>
+    ipcRenderer.invoke('git:commitDiff', repoPath, hash, filePath),
+  getRangeFiles: (repoPath: string, base: string, head: string) =>
+    ipcRenderer.invoke('git:rangeFiles', repoPath, base, head),
+  getRangeDiff: (repoPath: string, base: string, head: string, filePath: string) =>
+    ipcRenderer.invoke('git:rangeDiff', repoPath, base, head, filePath),
 
   getPullRequests: (repoPath: string) => ipcRenderer.invoke('gh:pullRequests', repoPath),
 

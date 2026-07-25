@@ -3,10 +3,17 @@ import type { BranchInfo } from '../../../shared/types'
 
 interface Props {
   repoPath: string
+  selectedBranch: string
   onError: (message: string) => void
+  onSelectBranch: (branch: BranchInfo) => void
 }
 
-export default function BranchPanel({ repoPath, onError }: Props): JSX.Element {
+export default function BranchPanel({
+  repoPath,
+  selectedBranch,
+  onError,
+  onSelectBranch
+}: Props): JSX.Element {
   const [branches, setBranches] = useState<BranchInfo[]>([])
   const [newBranchName, setNewBranchName] = useState('')
   const [startPoint, setStartPoint] = useState('')
@@ -26,7 +33,7 @@ export default function BranchPanel({ repoPath, onError }: Props): JSX.Element {
 
   const createBranch = async (): Promise<void> => {
     if (!newBranchName.trim()) {
-      onError('브랜치 이름을 입력하세요.')
+      onError('Enter a branch name.')
       return
     }
     const result = await window.gitdesktop.createBranch(repoPath, newBranchName.trim(), startPoint.trim())
@@ -40,13 +47,13 @@ export default function BranchPanel({ repoPath, onError }: Props): JSX.Element {
   }
 
   const deleteBranch = async (branch: BranchInfo): Promise<void> => {
-    if (!window.confirm(`브랜치를 삭제할까요?\n${branch.name}`)) return
+    if (!window.confirm(`Delete this branch?\n${branch.name}`)) return
     const result = await window.gitdesktop.deleteBranch(repoPath, branch.name, false)
     if (result.ok) {
       refresh()
       return
     }
-    if (window.confirm(`병합되지 않은 브랜치입니다. 강제로 삭제할까요?\n\n${result.error}`)) {
+    if (window.confirm(`The branch is not fully merged. Delete it anyway?\n\n${result.error}`)) {
       const forced = await window.gitdesktop.deleteBranch(repoPath, branch.name, true)
       forced.ok ? refresh() : onError(forced.error)
     }
@@ -55,57 +62,59 @@ export default function BranchPanel({ repoPath, onError }: Props): JSX.Element {
   const locals = branches.filter((branch) => !branch.isRemote)
   const remotes = branches.filter((branch) => branch.isRemote)
 
+  const renderBranch = (branch: BranchInfo, deletable: boolean): JSX.Element => (
+    <li
+      key={branch.name}
+      className={branch.name === selectedBranch ? 'selected' : ''}
+      onClick={() => onSelectBranch(branch)}
+      title={`Show files changed on ${branch.name}`}
+    >
+      <span className={branch.isCurrent ? 'branch-name current' : 'branch-name'}>
+        {branch.isCurrent && '● '}
+        {branch.name}
+      </span>
+      <span className="branch-hash">{branch.shortHash}</span>
+      <span className="branch-upstream">{branch.upstream}</span>
+      {deletable && (
+        <button
+          className="icon-button"
+          title="Delete branch"
+          aria-label={`Delete branch ${branch.name}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            deleteBranch(branch)
+          }}
+        >
+          ✕
+        </button>
+      )}
+    </li>
+  )
+
   return (
     <div className="branch-panel">
       <div className="branch-create">
         <input
           type="text"
-          placeholder="새 브랜치 이름"
+          placeholder="New branch name"
           value={newBranchName}
           onChange={(event) => setNewBranchName(event.target.value)}
         />
         <input
           type="text"
-          placeholder="시작 지점 (생략 시 HEAD)"
+          placeholder="Start point (defaults to HEAD)"
           value={startPoint}
           onChange={(event) => setStartPoint(event.target.value)}
         />
         <button className="primary" onClick={createBranch}>
-          + 브랜치 생성
+          + Create branch
         </button>
       </div>
-      <h3>로컬 브랜치</h3>
-      <ul className="branch-list">
-        {locals.map((branch) => (
-          <li key={branch.name}>
-            <span className={branch.isCurrent ? 'branch-name current' : 'branch-name'}>
-              {branch.isCurrent && '● '}
-              {branch.name}
-            </span>
-            <span className="branch-hash">{branch.shortHash}</span>
-            <span className="branch-upstream">{branch.upstream}</span>
-            {!branch.isCurrent && (
-              <button
-                className="icon-button"
-                title="브랜치 삭제"
-                aria-label={`${branch.name} 브랜치 삭제`}
-                onClick={() => deleteBranch(branch)}
-              >
-                ✕
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      <h3>원격 브랜치</h3>
-      <ul className="branch-list">
-        {remotes.map((branch) => (
-          <li key={branch.name}>
-            <span className="branch-name">{branch.name}</span>
-            <span className="branch-hash">{branch.shortHash}</span>
-          </li>
-        ))}
-      </ul>
+      <p className="branch-hint">Click a branch to see the files it changed, then click a file for its diff.</p>
+      <h3>Local branches</h3>
+      <ul className="branch-list">{locals.map((branch) => renderBranch(branch, !branch.isCurrent))}</ul>
+      <h3>Remote branches</h3>
+      <ul className="branch-list">{remotes.map((branch) => renderBranch(branch, false))}</ul>
     </div>
   )
 }
