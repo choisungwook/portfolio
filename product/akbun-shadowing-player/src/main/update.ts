@@ -9,9 +9,12 @@
  */
 
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 const RELEASES_API = "https://api.github.com/repos/choisungwook/portfolio/releases";
 const TAG_PREFIX = "akbun-shadowing-player-v";
@@ -72,47 +75,88 @@ export async function checkUpdate(currentVersion: string): Promise<UpdateCheck> 
   };
 }
 
-/** dmg를 임시 디렉터리로 받아 저장한 경로를 돌려준다. */
+/** 내려받기용 임시 디렉터리 접두사. 남은 디렉터리를 찾아 지울 때도 쓴다. */
+const TEMP_PREFIX = "akbun-shadowing-player-update-";
+
+/**
+ * dmg를 임시 디렉터리로 받아 저장한 경로를 돌려준다.
+ * 받다가 실패하면 만든 디렉터리를 지운다. dmg가 100MB를 넘으므로
+ * 메모리에 통째로 올리지 않고 스트림으로 흘려 쓴다.
+ */
 export async function downloadDmg(dmgUrl: string): Promise<string> {
-  const response = await fetch(dmgUrl);
-  if (!response.ok) throw new Error(`dmg 내려받기 실패: ${response.status}`);
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "akbun-shadowing-player-"));
-  const dmgPath = path.join(dir, path.basename(new URL(dmgUrl).pathname));
-  await fs.writeFile(dmgPath, new Uint8Array(await response.arrayBuffer()));
-  return dmgPath;
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), TEMP_PREFIX));
+  try {
+    const response = await fetch(dmgUrl);
+    if (!response.ok) throw new Error(`dmg 내려받기 실패: ${response.status}`);
+    if (!response.body) throw new Error("dmg 응답 본문이 비어 있다");
+    const dmgPath = path.join(dir, path.basename(new URL(dmgUrl).pathname));
+    await pipeline(Readable.fromWeb(response.body as ReadableStream), createWriteStream(dmgPath));
+    return dmgPath;
+  } catch (error) {
+    await fs.rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+/**
+ * 이전 시도가 중간에 끊겨 남은 임시 디렉터리를 지운다.
+ * 교체 스크립트가 자기 작업 디렉터리를 지우지만, 앱이나 스크립트가 강제 종료되면
+ * dmg가 그대로 남는다. 앱 시작 때 한 번 훑어 디스크에 쌓이지 않게 한다.
+ */
+export async function cleanupTempDirs(): Promise<void> {
+  const tmpDir = os.tmpdir();
+  const names = await fs.readdir(tmpDir);
+  await Promise.all(
+    names
+      .filter((name) => name.startsWith(TEMP_PREFIX))
+      .map((name) => fs.rm(path.join(tmpDir, name), { recursive: true, force: true })),
+  );
 }
 
 /**
  * 앱이 종료되기를 기다렸다가 .app 번들을 교체하고 다시 실행하는 스크립트다.
  * 실행 중인 자기 자신을 덮어쓸 수 없으므로 앱 밖에서 돌려야 한다.
  * 교체에 실패하면 옮겨 둔 이전 번들을 되돌린다.
+ *
+ * mount 지점과 dmg를 담은 작업 디렉터리는 trap으로 지운다. 중간에 어느 단계가
+ * 실패해도 마운트가 남거나 100MB짜리 dmg가 /tmp에 쌓이지 않게 하기 위함이다.
  */
 const SWAP_SCRIPT = `#!/bin/bash
 set -u
 APP="$1"; DMG="$2"; PID="$3"
+WORK=$(dirname "$DMG")
+MOUNT=""
+
+cleanup() {
+  if [ -n "$MOUNT" ]; then
+    hdiutil detach "$MOUNT" -quiet 2>/dev/null || hdiutil detach "$MOUNT" -force -quiet 2>/dev/null
+    rmdir "$MOUNT" 2>/dev/null
+  fi
+  # 실행 중인 이 스크립트도 WORK 안에 있다. 이미 열린 파일이라 지워도 계속 돈다.
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+
 while kill -0 "$PID" 2>/dev/null; do sleep 0.3; done
 
-MOUNT=$(mktemp -d)
+MOUNT=$(mktemp -d) || exit 1
 hdiutil attach "$DMG" -nobrowse -quiet -mountpoint "$MOUNT" || exit 1
 NEW=$(find "$MOUNT" -maxdepth 1 -name '*.app' | head -1)
-if [ -z "$NEW" ]; then hdiutil detach "$MOUNT" -quiet; exit 1; fi
+[ -n "$NEW" ] || exit 1
 
 rm -rf "$APP.old"
-mv "$APP" "$APP.old" || { hdiutil detach "$MOUNT" -quiet; exit 1; }
+mv "$APP" "$APP.old" || exit 1
 if ditto "$NEW" "$APP"; then
   rm -rf "$APP.old"
 else
   rm -rf "$APP"
   mv "$APP.old" "$APP"
-  hdiutil detach "$MOUNT" -quiet
   exit 1
 fi
 
-hdiutil detach "$MOUNT" -quiet
 # 앱이 직접 받은 파일이라 quarantine이 붙지 않지만, dmg에 남아 있던 속성을 확실히 지운다.
 xattr -cr "$APP"
 open "$APP"
-rm -rf "$(dirname "$DMG")"
 `;
 
 /**

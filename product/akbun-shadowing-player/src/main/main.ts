@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Library } from "./library";
 import { Logger } from "./logger";
-import { checkUpdate, downloadDmg, spawnSwap } from "./update";
+import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "m4a", "aac", "ogg", "flac"];
 
@@ -54,18 +54,26 @@ function appBundlePath(): string {
 /** 내려받기와 교체가 진행되는 동안 메뉴를 다시 눌러도 겹쳐 돌지 않게 막는다. */
 let updating = false;
 
-/** dmg를 받아 교체 스크립트를 띄우고 앱을 끈다. 재실행은 스크립트가 한다. */
+/**
+ * dmg를 받아 교체 스크립트를 띄우고 앱을 끈다. 재실행은 스크립트가 한다.
+ * 스크립트를 띄우기 전에 실패하면 받아 둔 dmg를 지운다. 스크립트가 뜬 뒤에는
+ * 스크립트의 trap이 정리를 맡는다.
+ */
 async function installUpdate(dmgUrl: string): Promise<void> {
   updating = true;
+  let dmgPath: string | null = null;
   try {
     logger.info("main", `업데이트 dmg 내려받기 시작: ${dmgUrl}`);
-    const dmgPath = await downloadDmg(dmgUrl);
+    dmgPath = await downloadDmg(dmgUrl);
     logger.info("main", `내려받기 완료: ${dmgPath}. 앱을 교체하고 재실행한다`);
     await spawnSwap(appBundlePath(), dmgPath);
     app.quit();
   } catch (error) {
     updating = false;
     logger.error("main", `업데이트 설치 실패: ${String(error)}`);
+    if (dmgPath) {
+      await fs.rm(path.dirname(dmgPath), { recursive: true, force: true }).catch(() => {});
+    }
     await dialog.showMessageBox({
       type: "error",
       message: "업데이트를 설치할 수 없다",
@@ -181,7 +189,14 @@ function registerIpc(): void {
     logPath: logger.logFilePath,
   }));
 
-  ipcMain.handle("app:reveal", (_event, target: string) => shell.showItemInFolder(target));
+  // 렌더러가 넘긴 임의 경로를 열지 않는다. 설정 화면이 보여주는 두 경로만 허용한다.
+  ipcMain.handle("app:reveal", (_event, target: string) => {
+    if (target !== library.storePath && target !== logger.logFilePath) {
+      logger.error("main", `허용하지 않은 경로 열기 거부: ${target}`);
+      throw new Error("허용하지 않은 경로는 열 수 없다");
+    }
+    shell.showItemInFolder(target);
+  });
 
   // 렌더러가 요청한 임의 경로를 그대로 읽지 않고, 대화상자로 추가된 목록의 경로만 허용한다.
   ipcMain.handle("audio:read", async (_event, filePath: string) => {
@@ -208,6 +223,11 @@ app.whenReady().then(() => {
   logger.info("main", `앱 시작 v${app.getVersion()}`);
   process.on("uncaughtException", (error) => {
     logger.error("main", `uncaughtException: ${error.stack ?? String(error)}`);
+  });
+
+  // 이전 업데이트 시도가 끊겨 /tmp에 남은 dmg를 지운다.
+  void cleanupTempDirs().catch((error) => {
+    logger.error("main", `임시 디렉터리 정리 실패: ${String(error)}`);
   });
 
   library = new Library(app.getPath("userData"));

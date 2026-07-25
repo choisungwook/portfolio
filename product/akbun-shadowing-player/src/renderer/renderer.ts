@@ -42,8 +42,15 @@ function applyTheme(theme: string): void {
   waveform?.refreshColors();
 }
 
+const THEMES = ["system", "light", "dark"];
+
+/** localStorage에 빈 값이나 옛 값이 남아 있어도 data-theme=""가 되지 않게 막는다. */
+function normalizeTheme(value: string | null): string {
+  return value !== null && THEMES.includes(value) ? value : "system";
+}
+
 const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
-themeSelect.value = localStorage.getItem("theme") ?? "system";
+themeSelect.value = normalizeTheme(localStorage.getItem("theme"));
 applyTheme(themeSelect.value);
 themeSelect.addEventListener("change", () => applyTheme(themeSelect.value));
 
