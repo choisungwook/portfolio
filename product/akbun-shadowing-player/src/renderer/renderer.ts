@@ -281,8 +281,15 @@ document.getElementById("zoom-out")!.addEventListener("click", () => waveform?.z
 // ---------- 재생 컨트롤 ----------
 
 function togglePlay(): void {
-  if (audio.paused) void audio.play();
-  else audio.pause();
+  if (!audio.paused) {
+    audio.pause();
+    return;
+  }
+  // 구간 반복이 있고 재생 위치가 구간 밖이면 A부터 시작한다.
+  if (loopA !== null && loopB !== null && (audio.currentTime < loopA || audio.currentTime >= loopB)) {
+    audio.currentTime = loopA;
+  }
+  void audio.play();
 }
 
 playButton.addEventListener("click", togglePlay);
