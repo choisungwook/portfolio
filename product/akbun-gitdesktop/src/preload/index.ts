@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 const api = {
+  checkCliTools: () => ipcRenderer.invoke('tools:check'),
   listRepos: () => ipcRenderer.invoke('repos:list'),
   importRepo: () => ipcRenderer.invoke('repos:import'),
   removeRepo: (repoPath: string) => ipcRenderer.invoke('repos:remove', repoPath),

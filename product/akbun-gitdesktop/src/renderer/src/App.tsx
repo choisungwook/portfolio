@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { OpenerApp, RepoEntry, WorktreeInfo } from '../../shared/types'
 import BranchPanel from './components/BranchPanel'
+import CliNoticeBar from './components/CliNoticeBar'
 import GraphView from './components/GraphView'
 import PrPanel from './components/PrPanel'
 import RepoSidebar from './components/RepoSidebar'
@@ -76,8 +77,10 @@ export default function App(): JSX.Element {
   const targetPath = selectedWorktree?.path ?? selectedRepo?.path ?? ''
 
   return (
-    <div className="app">
-      <RepoSidebar
+    <div className="app-shell">
+      <CliNoticeBar />
+      <div className="app">
+        <RepoSidebar
         repos={repos}
         selectedRepo={selectedRepo}
         onSelect={selectRepo}
@@ -122,6 +125,7 @@ export default function App(): JSX.Element {
           {error && <div className="error-banner">{error}</div>}
         </main>
       )}
+      </div>
     </div>
   )
 }

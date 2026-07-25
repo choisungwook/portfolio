@@ -9,6 +9,7 @@ import type {
 } from '../shared/types'
 
 export interface GitDesktopApi {
+  checkCliTools: () => Promise<GitResult<{ git: boolean; gh: boolean }>>
   listRepos: () => Promise<GitResult<RepoEntry[]>>
   importRepo: () => Promise<GitResult<RepoEntry[]>>
   removeRepo: (repoPath: string) => Promise<GitResult<RepoEntry[]>>

@@ -19,7 +19,9 @@
 
 ## 설계 원칙: git CLI + gh CLI
 
-git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. PR 조회는 GitHub 공식 CLI인 gh를 사용하므로 gh auth login이 되어 있어야 한다.
+git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. gh CLI는 항상 쓰는 것이 아니라 GitHub PR 목록을 조회할 때만 실행한다. gh가 없어도 나머지 기능은 모두 동작하며, PR 보기만 사용할 수 없다.
+
+앱을 켜면 상단 안내 배너가 git과 gh 설치 여부를 감지해 보여 준다. git이 없으면 앱이 동작하지 않으므로 경고로 강조하고, gh가 없으면 PR 보기만 사용할 수 없다고 알린다. PR 조회는 gh auth login이 되어 있어야 한다.
 
 라이브러리 후보를 검토한 결과다.
 

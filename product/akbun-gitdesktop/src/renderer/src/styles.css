@@ -22,10 +22,51 @@ body {
   color: var(--text);
 }
 
-.app {
+.app-shell {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.notice-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #3d3524;
+  color: #ffd479;
+  border-bottom: 2px solid #d19a66;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.notice-bar.notice-warn {
+  background: #4b2b2e;
+  color: #f2b8bd;
+  border-bottom-color: #e06c75;
+}
+
+.notice-missing {
+  font-style: normal;
+  font-weight: 700;
+  background: #e06c75;
+  color: #101317;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.notice-ok {
+  font-style: normal;
+  color: #98c379;
+  margin-left: auto;
 }
 
 .panel-header {

@@ -28,6 +28,19 @@ function runGh(cwd: string, args: string[]): Promise<string> {
   })
 }
 
+/**
+ * git과 gh CLI 설치 여부를 확인한다.
+ * git은 모든 기능의 필수 도구이고, gh는 PR 조회 때만 필요하다.
+ */
+export async function checkCliTools(): Promise<{ git: boolean; gh: boolean }> {
+  const probe = (command: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      execFile(command, ['--version'], (error) => resolve(!error))
+    })
+  const [git, gh] = await Promise.all([probe('git'), probe('gh')])
+  return { git, gh }
+}
+
 export async function isGitRepository(path: string): Promise<boolean> {
   try {
     const out = await runGit(path, ['rev-parse', '--is-inside-work-tree'])
