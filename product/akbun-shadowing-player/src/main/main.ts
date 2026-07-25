@@ -172,12 +172,30 @@ function registerIpc(): void {
       properties: ["openDirectory"],
     });
     if (result.canceled) return library.list();
-    const files = (await Promise.all(result.filePaths.map(scanAudioFiles))).flat();
-    logger.info("main", `폴더에서 음성 파일 ${files.length}개 발견`);
-    return library.add(files);
+    // 스캔은 폴더별로 함께 돌리고, 목록에는 어느 폴더에서 왔는지 남겨 묶는다.
+    const scanned = await Promise.all(
+      result.filePaths.map(async (folder) => ({ folder, files: await scanAudioFiles(folder) })),
+    );
+    for (const { folder, files } of scanned) {
+      logger.info("main", `폴더 ${folder}에서 음성 파일 ${files.length}개 발견`);
+      library.add(files, folder);
+    }
+    return library.list();
+  });
+
+  // 홈 화면 새로고침. 사라진 파일을 목록에서 지운다.
+  ipcMain.handle("library:refresh", () => {
+    const before = library.list().length;
+    const items = library.prune();
+    if (items.length !== before) {
+      logger.info("main", `새로고침: 사라진 파일 ${before - items.length}개를 목록에서 지웠다`);
+    }
+    return items;
   });
 
   ipcMain.handle("library:remove", (_event, filePath: string) => library.remove(filePath));
+
+  ipcMain.handle("library:remove-folder", (_event, folder: string) => library.removeFolder(folder));
 
   ipcMain.handle("library:set-duration", (_event, filePath: string, durationSec: number) => {
     library.setDuration(filePath, durationSec);
@@ -203,6 +221,12 @@ function registerIpc(): void {
     if (!library.has(filePath)) {
       logger.error("main", `목록에 없는 파일 읽기 거부: ${filePath}`);
       throw new Error("목록에 없는 파일은 읽을 수 없다");
+    }
+    // 파일이 사라졌으면 읽기 전에 목록에서도 지운다. 홈으로 돌아가면 사라진 항목이 보이지 않는다.
+    if (library.missing(filePath)) {
+      logger.error("main", `파일이 사라져 목록에서 지운다: ${filePath}`);
+      library.remove(filePath);
+      throw new Error("파일이 없다");
     }
     try {
       return await fs.readFile(filePath);

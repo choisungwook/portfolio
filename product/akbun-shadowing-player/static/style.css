@@ -190,6 +190,41 @@ select {
   white-space: nowrap;
 }
 
+.folder-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.folder-name {
+  flex-shrink: 0;
+}
+
+/* 경로가 길어도 삭제 버튼이 밀려나지 않게 경로만 줄인다. */
+.folder-header .file-meta {
+  flex: 1;
+}
+
+.folder-children {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+
 #empty-hint {
   color: var(--muted);
   font-size: 14px;

@@ -65,9 +65,63 @@ async function refreshLibrary(items?: LibraryItem[]): Promise<void> {
   const library = items ?? (await window.api.listLibrary());
   fileList.innerHTML = "";
   emptyHint.hidden = library.length > 0;
+
+  // 폴더로 불러온 파일은 폴더 아래에 묶고, 파일로 불러온 것은 그대로 한 줄씩 놓는다.
+  const folders = new Map<string, HTMLUListElement>();
   for (const item of library) {
-    fileList.appendChild(buildFileRow(item));
+    if (item.folder === undefined) {
+      fileList.appendChild(buildFileRow(item));
+      continue;
+    }
+    let children = folders.get(item.folder);
+    if (!children) {
+      children = buildFolderGroup(item.folder);
+      folders.set(item.folder, children);
+    }
+    children.appendChild(buildFileRow(item));
   }
+}
+
+/**
+ * 폴더 한 칸을 만들어 목록에 붙이고, 하위 파일을 담을 ul을 돌려준다.
+ * 접기와 펼치기는 details/summary가 스스로 하므로 따로 다루지 않는다.
+ */
+function buildFolderGroup(folder: string): HTMLUListElement {
+  const group = document.createElement("li");
+  group.className = "folder-group";
+
+  const details = document.createElement("details");
+  details.open = true;
+
+  const header = document.createElement("summary");
+  header.className = "folder-header";
+  const name = document.createElement("span");
+  name.className = "folder-name";
+  // 렌더러에는 path 모듈이 없다. 구분자를 둘 다 나눠 OS와 상관없이 마지막 이름만 보여준다.
+  name.textContent = `📁 ${folder.split(/[\\/]/).pop() || folder}`;
+  const pathLabel = document.createElement("span");
+  pathLabel.className = "file-meta";
+  pathLabel.textContent = folder;
+
+  const removeButton = document.createElement("button");
+  removeButton.className = "file-remove";
+  removeButton.textContent = "폴더 삭제";
+  removeButton.addEventListener("click", async (event) => {
+    // summary 안의 클릭은 접기/펼치기까지 일으키므로 막는다.
+    event.preventDefault();
+    event.stopPropagation();
+    if (!confirm(`${folder}\n\n이 폴더의 파일을 목록에서 모두 지운다. 실제 파일은 남는다.`)) return;
+    await refreshLibrary(await window.api.removeFolder(folder));
+  });
+
+  header.append(name, pathLabel, removeButton);
+
+  const children = document.createElement("ul");
+  children.className = "folder-children";
+  details.append(header, children);
+  group.appendChild(details);
+  fileList.appendChild(group);
+  return children;
 }
 
 function buildFileRow(item: LibraryItem): HTMLLIElement {
@@ -110,6 +164,10 @@ document.getElementById("add-files")!.addEventListener("click", async () => {
 
 document.getElementById("add-folder")!.addEventListener("click", async () => {
   await refreshLibrary(await window.api.addFolder());
+});
+
+document.getElementById("refresh-library")!.addEventListener("click", async () => {
+  await refreshLibrary(await window.api.refreshLibrary());
 });
 
 // ---------- 설정 화면 ----------
