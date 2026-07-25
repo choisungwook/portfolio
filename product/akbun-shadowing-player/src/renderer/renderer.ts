@@ -65,9 +65,45 @@ async function refreshLibrary(items?: LibraryItem[]): Promise<void> {
   const library = items ?? (await window.api.listLibrary());
   fileList.innerHTML = "";
   emptyHint.hidden = library.length > 0;
+
+  // 폴더로 불러온 파일은 폴더 아래에 묶고, 파일로 불러온 것은 그대로 한 줄씩 놓는다.
+  const folders = new Map<string, HTMLUListElement>();
   for (const item of library) {
-    fileList.appendChild(buildFileRow(item));
+    if (item.folder === undefined) {
+      fileList.appendChild(buildFileRow(item));
+      continue;
+    }
+    let children = folders.get(item.folder);
+    if (!children) {
+      children = buildFolderGroup(item.folder);
+      folders.set(item.folder, children);
+    }
+    children.appendChild(buildFileRow(item));
   }
+}
+
+/** 폴더 한 칸을 만들어 목록에 붙이고, 하위 파일을 담을 ul을 돌려준다. */
+function buildFolderGroup(folder: string): HTMLUListElement {
+  const group = document.createElement("li");
+  group.className = "folder-group";
+
+  const header = document.createElement("div");
+  header.className = "folder-header";
+  const icon = document.createElement("span");
+  icon.textContent = "📁";
+  const name = document.createElement("span");
+  name.className = "folder-name";
+  name.textContent = folder.split("/").pop() || folder;
+  const pathLabel = document.createElement("span");
+  pathLabel.className = "file-meta";
+  pathLabel.textContent = folder;
+  header.append(icon, name, pathLabel);
+
+  const children = document.createElement("ul");
+  children.className = "folder-children";
+  group.append(header, children);
+  fileList.appendChild(group);
+  return children;
 }
 
 function buildFileRow(item: LibraryItem): HTMLLIElement {
@@ -110,6 +146,10 @@ document.getElementById("add-files")!.addEventListener("click", async () => {
 
 document.getElementById("add-folder")!.addEventListener("click", async () => {
   await refreshLibrary(await window.api.addFolder());
+});
+
+document.getElementById("refresh-library")!.addEventListener("click", async () => {
+  await refreshLibrary(await window.api.refreshLibrary());
 });
 
 // ---------- 설정 화면 ----------

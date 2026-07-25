@@ -8,6 +8,8 @@ export interface LibraryItem {
   name: string;
   durationSec: number | null;
   addedAt: string;
+  /** 폴더 불러오기로 들어온 파일만 가진다. 홈 화면에서 폴더 단위로 묶는 기준이다. */
+  folder?: string;
 }
 
 export class Library {
@@ -32,8 +34,8 @@ export class Library {
     return this.items.some((item) => item.path === filePath);
   }
 
-  /** 새 파일 경로들을 추가한다. 이미 있는 경로는 건너뛴다. */
-  add(filePaths: string[]): LibraryItem[] {
+  /** 새 파일 경로들을 추가한다. 이미 있는 경로는 건너뛴다. folder를 주면 폴더 소속으로 묶는다. */
+  add(filePaths: string[], folder?: string): LibraryItem[] {
     const known = new Set(this.items.map((item) => item.path));
     for (const filePath of filePaths) {
       if (known.has(filePath)) continue;
@@ -42,9 +44,25 @@ export class Library {
         name: path.basename(filePath),
         durationSec: null,
         addedAt: new Date().toISOString(),
+        ...(folder ? { folder } : {}),
       });
     }
     this.save();
+    return this.items;
+  }
+
+  /** 목록에는 있지만 디스크에서 사라진 파일인지. */
+  missing(filePath: string): boolean {
+    return !fs.existsSync(filePath);
+  }
+
+  /** 디스크에서 사라진 파일을 목록에서 지운다. */
+  prune(): LibraryItem[] {
+    const remaining = this.items.filter((item) => !this.missing(item.path));
+    if (remaining.length !== this.items.length) {
+      this.items = remaining;
+      this.save();
+    }
     return this.items;
   }
 

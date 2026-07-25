@@ -5,6 +5,7 @@ interface LibraryItem {
   name: string;
   durationSec: number | null;
   addedAt: string;
+  folder?: string;
 }
 
 interface AppInfo {
@@ -19,6 +20,7 @@ interface Window {
     addFiles(): Promise<LibraryItem[]>;
     addFolder(): Promise<LibraryItem[]>;
     removeFile(path: string): Promise<LibraryItem[]>;
+    refreshLibrary(): Promise<LibraryItem[]>;
     setDuration(path: string, durationSec: number): Promise<void>;
     readAudio(path: string): Promise<Uint8Array<ArrayBuffer>>;
     appInfo(): Promise<AppInfo>;

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("api", {
   addFiles: () => ipcRenderer.invoke("library:add"),
   addFolder: () => ipcRenderer.invoke("library:add-folder"),
   removeFile: (path: string) => ipcRenderer.invoke("library:remove", path),
+  refreshLibrary: () => ipcRenderer.invoke("library:refresh"),
   setDuration: (path: string, durationSec: number) =>
     ipcRenderer.invoke("library:set-duration", path, durationSec),
   readAudio: (path: string) => ipcRenderer.invoke("audio:read", path),
