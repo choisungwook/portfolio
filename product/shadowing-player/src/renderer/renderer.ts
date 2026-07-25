@@ -82,20 +82,29 @@ async function openPlayer(item: LibraryItem): Promise<void> {
   homeScreen.hidden = true;
   playerScreen.hidden = false;
   waveLoading.hidden = false;
+  waveform?.dispose();
   waveform = null;
   setLoop(null, null);
 
   const bytes = await window.api.readAudio(item.path);
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 
-  if (audioUrl) URL.revokeObjectURL(audioUrl);
+  releaseAudioUrl();
   audioUrl = URL.createObjectURL(new Blob([bytes]));
   audio.src = audioUrl;
   audio.playbackRate = parseSpeedLabel();
 
   const audioContext = new AudioContext();
-  const decoded = await audioContext.decodeAudioData(arrayBuffer as ArrayBuffer);
-  await audioContext.close();
+  let decoded: AudioBuffer;
+  try {
+    decoded = await audioContext.decodeAudioData(arrayBuffer as ArrayBuffer);
+  } catch {
+    alert(`디코딩할 수 없는 파일이다: ${item.name}`);
+    goHome();
+    return;
+  } finally {
+    await audioContext.close();
+  }
 
   waveform = new Waveform(waveCanvas, decoded);
   waveform.onSeek = (timeSec) => {
@@ -111,9 +120,19 @@ async function openPlayer(item: LibraryItem): Promise<void> {
   startAnimation();
 }
 
+function releaseAudioUrl(): void {
+  if (!audioUrl) return;
+  URL.revokeObjectURL(audioUrl);
+  audioUrl = null;
+}
+
 function goHome(): void {
   audio.pause();
+  audio.removeAttribute("src");
+  releaseAudioUrl();
   stopAnimation();
+  waveform?.dispose();
+  waveform = null;
   playerScreen.hidden = true;
   homeScreen.hidden = false;
   void refreshLibrary();

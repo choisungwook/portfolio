@@ -33,6 +33,7 @@ class Waveform {
   private dragMoved = false;
   private dragStartX = 0;
   private dragStartViewSec = 0;
+  private readonly resizeObserver: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
     this.canvas = canvas;
@@ -41,8 +42,18 @@ class Waveform {
     this.peaks = Waveform.computePeaks(buffer);
     this.blocksPerSecond = buffer.sampleRate / Waveform.BLOCK_SAMPLES;
     this.bindMouse();
-    new ResizeObserver(() => this.resizeAndDraw()).observe(canvas.parentElement!);
+    this.resizeObserver = new ResizeObserver(() => this.resizeAndDraw());
+    this.resizeObserver.observe(canvas.parentElement!);
     this.resizeAndDraw();
+  }
+
+  /** 등록한 리스너와 observer를 해제한다. 화면 전환으로 인스턴스를 버릴 때 호출한다. */
+  dispose(): void {
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("wheel", this.onWheel);
+    window.removeEventListener("mousemove", this.onMouseMove);
+    window.removeEventListener("mouseup", this.onMouseUp);
+    this.resizeObserver.disconnect();
   }
 
   /** 채널을 평균 낸 모노 신호에서 블록별 min/max를 뽑는다. */
@@ -109,36 +120,45 @@ class Waveform {
     this.viewStartSec = Math.min(maxStart, Math.max(0, sec));
   }
 
+  private readonly onMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 0) return;
+    this.dragging = true;
+    this.dragMoved = false;
+    this.dragStartX = event.clientX;
+    this.dragStartViewSec = this.viewStartSec;
+  };
+
+  private readonly onMouseMove = (event: MouseEvent): void => {
+    if (!this.dragging) return;
+    const dx = event.clientX - this.dragStartX;
+    if (Math.abs(dx) > Waveform.DRAG_THRESHOLD_PX) this.dragMoved = true;
+    if (!this.dragMoved) return;
+    this.setViewStart(this.dragStartViewSec - dx / this.pixelsPerSecond);
+    this.draw();
+  };
+
+  private readonly onMouseUp = (event: MouseEvent): void => {
+    if (!this.dragging) return;
+    this.dragging = false;
+    if (this.dragMoved) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const timeSec = this.viewStartSec + (event.clientX - rect.left) / this.pixelsPerSecond;
+    if (timeSec >= 0 && timeSec <= this.duration && this.onSeek) this.onSeek(timeSec);
+  };
+
+  private readonly onWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+    this.setViewStart(this.viewStartSec + delta / this.pixelsPerSecond);
+    this.draw();
+  };
+
   private bindMouse(): void {
-    this.canvas.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      this.dragging = true;
-      this.dragMoved = false;
-      this.dragStartX = event.clientX;
-      this.dragStartViewSec = this.viewStartSec;
-    });
-    window.addEventListener("mousemove", (event) => {
-      if (!this.dragging) return;
-      const dx = event.clientX - this.dragStartX;
-      if (Math.abs(dx) > Waveform.DRAG_THRESHOLD_PX) this.dragMoved = true;
-      if (!this.dragMoved) return;
-      this.setViewStart(this.dragStartViewSec - dx / this.pixelsPerSecond);
-      this.draw();
-    });
-    window.addEventListener("mouseup", (event) => {
-      if (!this.dragging) return;
-      this.dragging = false;
-      if (this.dragMoved) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const timeSec = this.viewStartSec + (event.clientX - rect.left) / this.pixelsPerSecond;
-      if (timeSec >= 0 && timeSec <= this.duration && this.onSeek) this.onSeek(timeSec);
-    });
-    this.canvas.addEventListener("wheel", (event) => {
-      event.preventDefault();
-      const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
-      this.setViewStart(this.viewStartSec + delta / this.pixelsPerSecond);
-      this.draw();
-    });
+    this.canvas.addEventListener("mousedown", this.onMouseDown);
+    window.addEventListener("mousemove", this.onMouseMove);
+    window.addEventListener("mouseup", this.onMouseUp);
+    // preventDefault로 페이지 스크롤을 막아야 하므로 passive를 명시적으로 끈다.
+    this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
   }
 
   private resizeAndDraw(): void {

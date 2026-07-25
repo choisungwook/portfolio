@@ -44,7 +44,11 @@ function registerIpc(): void {
     library.setDuration(filePath, durationSec);
   });
 
+  // 렌더러가 요청한 임의 경로를 그대로 읽지 않고, 대화상자로 추가된 목록의 경로만 허용한다.
   ipcMain.handle("audio:read", async (_event, filePath: string) => {
+    if (!library.has(filePath)) {
+      throw new Error("목록에 없는 파일은 읽을 수 없다");
+    }
     return fs.readFile(filePath);
   });
 }

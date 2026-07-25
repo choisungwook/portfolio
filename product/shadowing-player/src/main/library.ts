@@ -23,6 +23,10 @@ export class Library {
     return this.items;
   }
 
+  has(filePath: string): boolean {
+    return this.items.some((item) => item.path === filePath);
+  }
+
   /** 새 파일 경로들을 추가한다. 이미 있는 경로는 건너뛴다. */
   add(filePaths: string[]): LibraryItem[] {
     const known = new Set(this.items.map((item) => item.path));
