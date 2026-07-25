@@ -4,10 +4,12 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Library } from "./library";
+import { Logger } from "./logger";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "m4a", "aac", "ogg", "flac"];
 
 let library: Library;
+let logger: Logger;
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -15,7 +17,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 800,
     minHeight: 520,
-    title: "shadowing-player",
+    title: "akbun-shadowing-player",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -47,13 +49,30 @@ function registerIpc(): void {
   // 렌더러가 요청한 임의 경로를 그대로 읽지 않고, 대화상자로 추가된 목록의 경로만 허용한다.
   ipcMain.handle("audio:read", async (_event, filePath: string) => {
     if (!library.has(filePath)) {
+      logger.error("main", `목록에 없는 파일 읽기 거부: ${filePath}`);
       throw new Error("목록에 없는 파일은 읽을 수 없다");
     }
-    return fs.readFile(filePath);
+    try {
+      return await fs.readFile(filePath);
+    } catch (error) {
+      logger.error("main", `파일 읽기 실패: ${filePath}: ${String(error)}`);
+      throw error;
+    }
+  });
+
+  // 렌더러의 오류를 로그 파일에 남긴다. 응답이 필요 없으므로 send/on을 쓴다.
+  ipcMain.on("log:error", (_event, source: string, message: string) => {
+    logger.error(source, message);
   });
 }
 
 app.whenReady().then(() => {
+  logger = new Logger(app.getPath("logs"));
+  logger.info("main", `앱 시작 v${app.getVersion()}`);
+  process.on("uncaughtException", (error) => {
+    logger.error("main", `uncaughtException: ${error.stack ?? String(error)}`);
+  });
+
   library = new Library(app.getPath("userData"));
   registerIpc();
   createWindow();

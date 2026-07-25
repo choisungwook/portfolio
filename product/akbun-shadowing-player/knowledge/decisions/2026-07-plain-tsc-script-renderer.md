@@ -2,7 +2,7 @@
 type: Decision
 title: 순수 tsc + script 렌더러 패턴 재사용, module은 es2022
 description: hprof-oom-analyzer의 번들러 없는 구조를 따르되 TypeScript 7 제약으로 module none 대신 es2022를 쓴다.
-tags: [electron, typescript, shadowing-player]
+tags: [electron, typescript, akbun-shadowing-player]
 timestamp: 2026-07-25T00:00:00Z
 ---
 
