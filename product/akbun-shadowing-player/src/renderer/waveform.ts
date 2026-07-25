@@ -14,6 +14,8 @@ class Waveform {
   private static readonly MAX_PPS = 800;
   /** 이 픽셀 이상 움직이면 클릭이 아니라 드래그로 본다. */
   private static readonly DRAG_THRESHOLD_PX = 5;
+  /** 이보다 짧은 구간은 반복해도 소리가 나지 않으므로 만들지 않는다. */
+  private static readonly MIN_LOOP_SEC = 0.05;
 
   readonly duration: number;
   onSeek: ((timeSec: number) => void) | null = null;
@@ -38,6 +40,9 @@ class Waveform {
   private dragMoved = false;
   private dragStartX = 0;
   private dragStartSec = 0;
+  /** 드래그를 시작할 때의 구간. 쓸 수 없는 드래그로 끝나면 여기로 되돌린다. */
+  private dragPrevLoopA: number | null = null;
+  private dragPrevLoopB: number | null = null;
   private readonly resizeObserver: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
@@ -157,6 +162,8 @@ class Waveform {
     this.dragMoved = false;
     this.dragStartX = event.clientX;
     this.dragStartSec = this.timeAt(event.clientX);
+    this.dragPrevLoopA = this.loopA;
+    this.dragPrevLoopB = this.loopB;
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
@@ -173,7 +180,15 @@ class Waveform {
     this.dragging = false;
     const timeSec = this.timeAt(event.clientX);
     if (this.dragMoved) {
-      this.onLoopSelect?.(Math.min(this.dragStartSec, timeSec), Math.max(this.dragStartSec, timeSec));
+      const a = Math.min(this.dragStartSec, timeSec);
+      const b = Math.max(this.dragStartSec, timeSec);
+      // 곡 밖으로 끌면 timeAt이 양 끝을 같은 값으로 잘라 0길이 구간이 나온다.
+      // 그대로 두면 재생 헤드가 그 지점에 묶이므로 버리고 이전 구간을 되살린다.
+      if (b - a < Waveform.MIN_LOOP_SEC) {
+        this.setLoop(this.dragPrevLoopA, this.dragPrevLoopB);
+        return;
+      }
+      this.onLoopSelect?.(a, b);
       return;
     }
     this.onSeek?.(timeSec);
