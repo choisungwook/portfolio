@@ -61,8 +61,9 @@ test/에 node:test로 도는 검증이 있다. 프레임워크를 넣지 않고 
 .github/workflows/release-akbun-shadowing-player.yml이 담당한다.
 
 - PR: ubuntu에서 npm test로 tsc 컴파일과 테스트를 검증한다 (electron 바이너리 다운로드 생략).
-- master push: 기존 tag 중 가장 최근 버전의 마이너를 +1 한 akbun-shadowing-player-v{버전} tag와 GitHub Release를 만들고, macos-latest에서 dmg(arm64, x64)를 빌드해 release에 업로드한다. 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
-- 버전은 tag에서 자동 계산하므로 package.json의 version은 릴리스에 쓰지 않는다. 빌드 job이 npm version으로 계산된 버전을 주입해 dmg 파일명에 반영한다.
+- master push: macos-latest에서 dmg(arm64)를 빌드하고, 빌드가 성공하면 기존 tag 중 가장 최근 버전의 마이너를 +1 한 akbun-shadowing-player-v{버전} tag를 만들고, tag push가 성공하면 dmg를 첨부한 GitHub Release를 만든다. 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
+- 빌드 -> tag -> release 순서는 빌드가 실패했을 때 빈 release가 남지 않게 하려는 것이다. [ADR](../../knowledge/decisions/2026-07-build-before-tag-and-release.md) 참조.
+- 버전은 tag에서 자동 계산하므로 package.json의 version은 릴리스에 쓰지 않는다. 빌드 전에 npm version으로 계산된 버전을 주입해 dmg 파일명에 반영한다.
 
 ## 주의사항
 

@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - master
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-shadowing-player/**'
-      - '.github/workflows/release-akbun-shadowing-player.yml'
   pull_request:
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-shadowing-player/**'
-      - '.github/workflows/release-akbun-shadowing-player.yml'
   workflow_dispatch:
 
 permissions:
@@ -44,27 +44,28 @@ jobs:
       - name: Compile TypeScript and run tests
         run: npm test
 
-  # 가장 최근 tag의 마이너 버전을 +1 해서 새 tag와 release를 만든다.
+  # macOS 전용 빌드. dmg 빌드가 성공해야 tag를 만들고, tag가 만들어져야 release를 만든다.
+  # 가장 최근 tag의 마이너 버전을 +1 해서 새 버전을 정한다.
   # 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
-  tag:
+  release:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
 
       - name: Compute next version (previous minor +1)
         id: version
         working-directory: .
         run: |
-          latest=$(git ls-remote --tags origin \
-              'refs/tags/akbun-shadowing-player-v*' 'refs/tags/shadowing-player-v*' \
-            | sed 's|.*refs/tags/||' \
-            | grep -E '\-v[0-9]+\.[0-9]+\.[0-9]+$' \
+          latest=$(git tag --list 'akbun-shadowing-player-v*' 'shadowing-player-v*' \
             | sed 's|.*-v||' \
             | sort -V | tail -1)
           if [ -z "$latest" ]; then
@@ -78,56 +79,40 @@ jobs:
           echo "tag=akbun-shadowing-player-v$version" >> "$GITHUB_OUTPUT"
           echo "Previous: ${latest:-none}, next: $version"
 
-      - name: Create tag and release
-        working-directory: .
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          cat > release-notes.md <<'EOF'
-          언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 macOS 빌드. dmg(arm64, x64) 포함.
-
-          코드 서명이 없어 처음 실행하면 "damaged and can't be opened" 오류가 난다. 앱 설치 후 아래 명령으로 quarantine 속성을 지우면 실행된다.
-
-          ```bash
-          xattr -cr /Applications/akbun-shadowing-player.app
-          ```
-          EOF
-          gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
-            --title "$TAG" \
-            --notes-file release-notes.md
-
-  # macOS 전용 빌드. tag job이 계산한 버전으로 dmg를 만들어 release에 업로드한다.
-  build:
-    needs: tag
-    runs-on: macos-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-
       - name: Install dependencies
         run: npm install
 
       - name: Set package version to release version
-        run: npm version "${{ needs.tag.outputs.version }}" --no-git-tag-version
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Build dmg
         run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Upload dmg to release
+      # 빌드가 성공한 뒤에만 tag를 만든다.
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      # tag 생성이 성공한 뒤에만 release를 만든다.
+      - name: Create release with dmg
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.tag.outputs.tag }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release upload "$TAG" \
-            product/akbun-shadowing-player/release/*.dmg \
-            --clobber
+          cat > release-notes.md <<'EOF'
+          - 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 macOS 빌드다.
+          - dmg는 Apple Silicon(arm64) 전용이다.
+          - 코드 서명이 없어 처음 실행하면 "damaged and can't be opened" 오류가 난다.
+          - 설치 후 `xattr -cr /Applications/akbun-shadowing-player.app`로 quarantine 속성을 지우면 실행된다.
+          EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            product/akbun-shadowing-player/release/*.dmg
