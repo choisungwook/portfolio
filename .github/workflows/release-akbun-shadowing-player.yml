@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - master
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-shadowing-player/**'
-      - '.github/workflows/release-akbun-shadowing-player.yml'
   pull_request:
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-shadowing-player/**'
-      - '.github/workflows/release-akbun-shadowing-player.yml'
   workflow_dispatch:
 
 permissions:
