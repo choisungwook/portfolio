@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self'; media-src 'self' blob:; script-src 'self'" />
+  <title>shadowing-player</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <section id="home-screen">
+    <header class="home-header">
+      <h1>shadowing-player</h1>
+      <button id="add-files" class="primary">음성 파일 불러오기</button>
+    </header>
+    <ul id="file-list"></ul>
+    <p id="empty-hint">mp3, wav 등 음성 파일을 불러오면 목록에 나타난다. 파일을 클릭하면 재생 화면으로 이동한다.</p>
+  </section>
+
+  <section id="player-screen" hidden>
+    <header class="player-header">
+      <button id="go-home">← 홈</button>
+      <span id="track-name"></span>
+      <div class="zoom-group">
+        <button id="zoom-out" title="파형 축소">🔍−</button>
+        <button id="zoom-in" title="파형 확대">🔍+</button>
+      </div>
+    </header>
+
+    <div id="wave-wrap">
+      <canvas id="wave"></canvas>
+      <div id="wave-loading">파형을 계산하는 중…</div>
+    </div>
+
+    <div class="time-row">
+      <span id="time-now">0:00</span> / <span id="time-total">0:00</span>
+    </div>
+
+    <footer class="controls">
+      <div class="control-center">
+        <button id="play" class="play-button">▶</button>
+      </div>
+      <div class="control-right">
+        <div class="speed-group">
+          <button id="speed-down">−</button>
+          <span id="speed">1.0x</span>
+          <button id="speed-up">+</button>
+        </div>
+        <button id="back5">−5초</button>
+        <button id="fwd5">+5초</button>
+        <button id="loop-a">구간 시작 A</button>
+        <button id="loop-b">구간 끝 B</button>
+        <button id="loop-clear">반복 해제</button>
+      </div>
+    </footer>
+  </section>
+
+  <script src="../dist/renderer/waveform.js"></script>
+  <script src="../dist/renderer/renderer.js"></script>
+</body>
+</html>
