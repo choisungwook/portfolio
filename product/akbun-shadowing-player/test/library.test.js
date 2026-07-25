@@ -124,6 +124,18 @@ test("removeFolder는 해당 폴더의 파일만 지운다", () => {
   }
 });
 
+test("removeAll은 목록을 비우고 저장한다", () => {
+  const { dir, library } = makeLibrary();
+  try {
+    library.add([makeAudioFile(dir, "a.mp3"), makeAudioFile(dir, "b.mp3")]);
+
+    assert.strictEqual(library.removeAll().length, 0);
+    assert.strictEqual(new Library(dir).list().length, 0, "전체 삭제가 저장되지 않았다");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("파일 열기는 목록에 없거나 사라진 파일을 막는다", () => {
   const mainSource = fs.readFileSync(path.join(__dirname, "../dist/main/main.js"), "utf-8");
   const readHandler = mainSource.slice(mainSource.indexOf('"audio:read"'));

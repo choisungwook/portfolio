@@ -72,6 +72,13 @@ export class Library {
     return this.items;
   }
 
+  /** 목록을 통째로 비운다. 실제 파일은 지우지 않는다. */
+  removeAll(): LibraryItem[] {
+    this.items = [];
+    this.save();
+    return this.items;
+  }
+
   /** 폴더 한 칸을 통째로 지운다. 같은 폴더 소속 항목만 사라진다. */
   removeFolder(folder: string): LibraryItem[] {
     this.items = this.items.filter((item) => item.folder !== folder);
