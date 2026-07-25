@@ -19,6 +19,11 @@ export class Library {
     this.load();
   }
 
+  /** 설정 화면에 보여줄 메타데이터 파일 경로. */
+  get storePath(): string {
+    return this.filePath;
+  }
+
   list(): LibraryItem[] {
     return this.items;
   }

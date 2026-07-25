@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-07-25 (3차)
+
+* **Creation**: [업데이트는 dmg를 직접 받아 앱 번들을 교체한다](decisions/2026-07-update-download-and-swap.md) 결정 기록.
+* **Creation**: [테마는 CSS 변수와 light-dark()로 두되 canvas 색만 예외로 둔다](decisions/2026-07-theme-css-vars-canvas-exception.md) 결정 기록.
+
 ## 2026-07-25 (2차)
 
 * **Creation**: [릴리스 버전은 tag에서 마이너 +1로 자동 계산](decisions/2026-07-release-tag-auto-minor-bump.md) 결정 기록.

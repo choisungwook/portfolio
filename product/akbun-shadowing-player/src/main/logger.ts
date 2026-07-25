@@ -20,6 +20,11 @@ export class Logger {
     this.logPath = path.join(logDir, "main.log");
   }
 
+  /** 설정 화면에 보여줄 로그 파일 경로. */
+  get logFilePath(): string {
+    return this.logPath;
+  }
+
   info(source: string, message: string): void {
     this.write("INFO", source, message);
   }

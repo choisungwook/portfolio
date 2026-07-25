@@ -7,13 +7,23 @@ interface LibraryItem {
   addedAt: string;
 }
 
+interface AppInfo {
+  version: string;
+  libraryPath: string;
+  logPath: string;
+}
+
 interface Window {
   api: {
     listLibrary(): Promise<LibraryItem[]>;
     addFiles(): Promise<LibraryItem[]>;
+    addFolder(): Promise<LibraryItem[]>;
     removeFile(path: string): Promise<LibraryItem[]>;
     setDuration(path: string, durationSec: number): Promise<void>;
     readAudio(path: string): Promise<Uint8Array<ArrayBuffer>>;
+    appInfo(): Promise<AppInfo>;
+    reveal(path: string): Promise<void>;
+    onMenu(handler: (name: string) => void): void;
     logError(source: string, message: string): void;
   };
 }

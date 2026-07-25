@@ -10,6 +10,7 @@ const SPEED_MAX = 2.0;
 
 const homeScreen = document.getElementById("home-screen") as HTMLElement;
 const playerScreen = document.getElementById("player-screen") as HTMLElement;
+const settingsScreen = document.getElementById("settings-screen") as HTMLElement;
 const fileList = document.getElementById("file-list") as HTMLUListElement;
 const emptyHint = document.getElementById("empty-hint") as HTMLElement;
 const trackName = document.getElementById("track-name") as HTMLElement;
@@ -30,6 +31,33 @@ let currentItem: LibraryItem | null = null;
 let loopA: number | null = null;
 let loopB: number | null = null;
 let animationId = 0;
+
+// ---------- 테마 ----------
+
+/** "system" | "light" | "dark". system이면 data-theme을 지워 CSS가 시스템 설정을 따르게 한다. */
+function applyTheme(theme: string): void {
+  if (theme === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+  waveform?.refreshColors();
+}
+
+const THEMES = ["system", "light", "dark"];
+
+/** localStorage에 빈 값이나 옛 값이 남아 있어도 data-theme=""가 되지 않게 막는다. */
+function normalizeTheme(value: string | null): string {
+  return value !== null && THEMES.includes(value) ? value : "system";
+}
+
+const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
+themeSelect.value = normalizeTheme(localStorage.getItem("theme"));
+applyTheme(themeSelect.value);
+themeSelect.addEventListener("change", () => applyTheme(themeSelect.value));
+
+// system 모드에서 OS 설정이 바뀌면 canvas 색도 다시 읽는다.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  waveform?.refreshColors();
+});
 
 // ---------- 홈 화면 ----------
 
@@ -78,6 +106,42 @@ function buildFileRow(item: LibraryItem): HTMLLIElement {
 
 document.getElementById("add-files")!.addEventListener("click", async () => {
   await refreshLibrary(await window.api.addFiles());
+});
+
+document.getElementById("add-folder")!.addEventListener("click", async () => {
+  await refreshLibrary(await window.api.addFolder());
+});
+
+// ---------- 설정 화면 ----------
+
+async function openSettings(): Promise<void> {
+  const info = await window.api.appInfo();
+  (document.getElementById("library-path") as HTMLElement).textContent = info.libraryPath;
+  (document.getElementById("log-path") as HTMLElement).textContent = info.logPath;
+  (document.getElementById("app-version") as HTMLElement).textContent = info.version;
+  homeScreen.hidden = true;
+  playerScreen.hidden = true;
+  settingsScreen.hidden = false;
+}
+
+function closeSettings(): void {
+  settingsScreen.hidden = true;
+  // 재생 중이던 파일이 있으면 재생 화면으로 돌아간다.
+  if (currentItem) playerScreen.hidden = false;
+  else homeScreen.hidden = false;
+}
+
+document.getElementById("settings-close")!.addEventListener("click", closeSettings);
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("button.reveal")) {
+  button.addEventListener("click", async () => {
+    const id = button.dataset.target === "library" ? "library-path" : "log-path";
+    await window.api.reveal(document.getElementById(id)!.textContent!);
+  });
+}
+
+window.api.onMenu((name) => {
+  if (name === "settings") void openSettings();
 });
 
 // ---------- 화면 전환 ----------
@@ -133,6 +197,7 @@ function releaseAudioUrl(): void {
 }
 
 function goHome(): void {
+  currentItem = null;
   audio.pause();
   audio.removeAttribute("src");
   releaseAudioUrl();
@@ -186,8 +251,8 @@ function setLoop(a: number | null, b: number | null): void {
   loopB = b;
   loopAButton.classList.toggle("active", loopA !== null);
   loopBButton.classList.toggle("active", loopB !== null);
-  loopAButton.textContent = loopA !== null ? `A ${formatTime(loopA)}` : "구간 시작 A";
-  loopBButton.textContent = loopB !== null ? `B ${formatTime(loopB)}` : "구간 끝 B";
+  loopAButton.textContent = loopA !== null ? `Ⓐ ${formatTime(loopA)}` : "Ⓐ";
+  loopBButton.textContent = loopB !== null ? `Ⓑ ${formatTime(loopB)}` : "Ⓑ";
   waveform?.setLoop(loopA, loopB);
 }
 

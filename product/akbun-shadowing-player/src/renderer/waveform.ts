@@ -29,6 +29,9 @@ class Waveform {
   private loopA: number | null = null;
   private loopB: number | null = null;
 
+  /** style.css의 --wave-* 값을 캐시한다. canvas는 CSS를 못 쓰므로 직접 읽어 온다. */
+  private colors = Waveform.readColors();
+
   private dragging = false;
   private dragMoved = false;
   private dragStartX = 0;
@@ -54,6 +57,25 @@ class Waveform {
     window.removeEventListener("mousemove", this.onMouseMove);
     window.removeEventListener("mouseup", this.onMouseUp);
     this.resizeObserver.disconnect();
+  }
+
+  private static readColors(): Record<string, string> {
+    const style = getComputedStyle(document.documentElement);
+    const read = (name: string): string => style.getPropertyValue(name).trim();
+    return {
+      fill: read("--wave-fill"),
+      grid: read("--wave-grid"),
+      gridText: read("--wave-grid-text"),
+      loop: read("--wave-loop"),
+      marker: read("--wave-marker"),
+      playhead: read("--wave-playhead"),
+    };
+  }
+
+  /** 테마가 바뀌면 캐시한 색을 다시 읽고 그린다. */
+  refreshColors(): void {
+    this.colors = Waveform.readColors();
+    this.draw();
   }
 
   /** 채널을 평균 낸 모노 신호에서 블록별 min/max를 뽑는다. */
@@ -180,14 +202,14 @@ class Waveform {
     this.drawLoopRegion(height);
     this.drawBars(width, height);
     this.drawTimeGrid(width, height);
-    this.drawMarker(this.loopA, "#ffb454", height, "A");
-    this.drawMarker(this.loopB, "#ffb454", height, "B");
-    this.drawMarker(this.playheadSec, "#ff5d5d", height, null);
+    this.drawMarker(this.loopA, this.colors.marker, height, "A");
+    this.drawMarker(this.loopB, this.colors.marker, height, "B");
+    this.drawMarker(this.playheadSec, this.colors.playhead, height, null);
   }
 
   private drawBars(width: number, height: number): void {
     const middle = height / 2;
-    this.ctx.fillStyle = "#4cc2ff";
+    this.ctx.fillStyle = this.colors.fill;
     for (let x = 0; x < width; x++) {
       const t0 = this.viewStartSec + x / this.pixelsPerSecond;
       const t1 = t0 + 1 / this.pixelsPerSecond;
@@ -211,8 +233,8 @@ class Waveform {
 
   private drawTimeGrid(width: number, height: number): void {
     const stepSec = this.pickGridStep();
-    this.ctx.fillStyle = "rgba(255,255,255,0.35)";
-    this.ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    this.ctx.fillStyle = this.colors.gridText;
+    this.ctx.strokeStyle = this.colors.grid;
     this.ctx.font = "11px sans-serif";
     const first = Math.ceil(this.viewStartSec / stepSec) * stepSec;
     for (let t = first; t <= this.viewStartSec + width / this.pixelsPerSecond; t += stepSec) {
@@ -237,7 +259,7 @@ class Waveform {
     if (this.loopA === null || this.loopB === null) return;
     const x0 = (this.loopA - this.viewStartSec) * this.pixelsPerSecond;
     const x1 = (this.loopB - this.viewStartSec) * this.pixelsPerSecond;
-    this.ctx.fillStyle = "rgba(255, 180, 84, 0.15)";
+    this.ctx.fillStyle = this.colors.loop;
     this.ctx.fillRect(x0, 0, x1 - x0, height);
   }
 
