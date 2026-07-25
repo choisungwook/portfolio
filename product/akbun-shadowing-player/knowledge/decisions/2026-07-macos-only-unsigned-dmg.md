@@ -2,7 +2,7 @@
 type: Decision
 title: macOS 전용 무서명 dmg로 배포
 description: 빌드 대상을 macOS(arm64, x64) dmg로 한정하고 코드 서명은 하지 않는다.
-tags: [electron-builder, macos, shadowing-player]
+tags: [electron-builder, macos, akbun-shadowing-player]
 timestamp: 2026-07-25T00:00:00Z
 ---
 

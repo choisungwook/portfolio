@@ -1,4 +1,4 @@
-# shadowing-player Agent Guide
+# akbun-shadowing-player Agent Guide
 
 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어다. TypeScript + Electron이고 macOS만 빌드한다. 이 파일은 이 디렉터리에서 작업하는 agent의 진입점이다. 저장소 전체 규칙은 [루트 AGENTS.md](../../AGENTS.md)를 따르고, 의사결정은 [knowledge/](./knowledge/index.md)에, 구조와 동작 설명은 [wiki/](./wiki/architecture.md)에 있다.
 
@@ -15,7 +15,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| src/main | Electron 메인 프로세스(main.ts), 파일 목록 영속(library.ts), preload 브리지(preload.ts) |
+| src/main | Electron 메인 프로세스(main.ts), 파일 목록 영속(library.ts), preload 브리지(preload.ts), 파일 로거(logger.ts) |
 | src/renderer | 렌더러 UI. waveform.ts(파형 캔버스) + renderer.ts(화면 전환·컨트롤). import/export 없는 script로만 작성한다 |
 | static | index.html, style.css. script 태그가 dist/renderer/*.js를 로드 순서대로 읽는다 |
 | wiki | 구조·동작 설명 문서 |
@@ -26,7 +26,7 @@
 빌드, 실행, 패키징 순서다.
 
 ```bash
-cd product/shadowing-player
+cd product/akbun-shadowing-player
 npm install
 npm run build   # tsc -p tsconfig.json && tsc -p tsconfig.renderer.json
 npm start       # Electron GUI
@@ -38,15 +38,17 @@ npm run dist    # electron-builder --mac, release/에 dmg 생성
 - **renderer는 모듈이 아니다.** import/export를 쓰지 않는다. tsconfig.renderer.json은 module: es2022지만 각 파일에 import/export가 없어 전역 script로 컴파일되고, index.html이 waveform.js → renderer.js 순서로 로드한다. TypeScript 7이 module: none을 제거해서 es2022를 쓴다. [ADR](./knowledge/decisions/2026-07-plain-tsc-script-renderer.md) 참조.
 - **main↔renderer 타입은 수동 동기화한다.** src/renderer/api.d.ts의 전역 선언을 main.ts IPC 핸들러 반환 형태와 손으로 맞춘다.
 - **재생과 파형은 경로가 다르다.** 재생은 HTMLAudioElement(blob URL, preservesPitch로 배속 시 음정 유지), 파형은 Web Audio decodeAudioData로 뽑은 peak다. AudioBufferSourceNode로 재생을 합치면 배속 시 음정이 변하므로 합치지 않는다. [ADR](./knowledge/decisions/2026-07-html-audio-plus-webaudio-split.md) 참조.
-- **IPC 채널은 5개다.** library:list, library:add, library:remove, library:set-duration, audio:read. 채널을 추가하면 preload.ts와 api.d.ts를 함께 고친다.
+- **IPC 채널은 6개다.** library:list, library:add, library:remove, library:set-duration, audio:read, log:error. 채널을 추가하면 preload.ts와 api.d.ts를 함께 고친다.
+- **화면 섹션의 표시/숨김은 hidden 속성으로 제어한다.** #home-screen과 #player-screen은 CSS에서 display: flex를 지정하므로, style.css의 `#home-screen[hidden], #player-screen[hidden] { display: none }` 규칙이 없으면 hidden 속성이 무시된다. 화면 섹션을 추가하면 이 규칙에도 선택자를 추가한다.
+- **로그는 ~/Library/Logs/akbun-shadowing-player/main.log에 쓴다.** macOS 사용자 로그 관례 위치(app.getPath("logs"))다. 1MB를 넘으면 main.log.1~5로 rotation한다. 렌더러 오류는 log:error 채널로 main에 보내 같은 파일에 남긴다.
 
 ## CI와 릴리스
 
-.github/workflows/release-shadowing-player.yml이 담당한다.
+.github/workflows/release-akbun-shadowing-player.yml이 담당한다.
 
 - PR: ubuntu에서 tsc 컴파일만 검증한다 (electron 바이너리 다운로드 생략).
-- master push: package.json 버전으로 shadowing-player-v{버전} tag와 GitHub Release를 만들고, macos-latest에서 dmg(arm64, x64)를 빌드해 release에 업로드한다.
-- tag가 이미 있으면 릴리스를 건너뛴다. 새 릴리스를 내려면 package.json의 version을 올려서 merge한다.
+- master push: 기존 tag 중 가장 최근 버전의 마이너를 +1 한 akbun-shadowing-player-v{버전} tag와 GitHub Release를 만들고, macos-latest에서 dmg(arm64, x64)를 빌드해 release에 업로드한다. 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
+- 버전은 tag에서 자동 계산하므로 package.json의 version은 릴리스에 쓰지 않는다. 빌드 job이 npm version으로 계산된 버전을 주입해 dmg 파일명에 반영한다.
 
 ## 주의사항
 

@@ -56,7 +56,13 @@ function buildFileRow(item: LibraryItem): HTMLLIElement {
   const duration = item.durationSec !== null ? formatTime(item.durationSec) : "--:--";
   meta.textContent = `${duration} · ${item.path}`;
   info.append(name, meta);
-  info.addEventListener("click", () => openPlayer(item));
+  info.addEventListener("click", () => {
+    openPlayer(item).catch((error) => {
+      window.api.logError("renderer", `파일 열기 실패: ${item.path}: ${String(error)}`);
+      alert(`파일을 열 수 없다: ${item.name}`);
+      goHome();
+    });
+  });
 
   const removeButton = document.createElement("button");
   removeButton.className = "file-remove";
@@ -232,6 +238,16 @@ window.addEventListener("keydown", (event) => {
   } else if (event.code === "ArrowRight") {
     skip(SKIP_SEC);
   }
+});
+
+// ---------- 오류 로그: 렌더러에서 잡히지 않은 오류를 main의 로그 파일로 보낸다 ----------
+
+window.addEventListener("error", (event) => {
+  window.api.logError("renderer", `${event.message} (${event.filename}:${event.lineno})`);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  window.api.logError("renderer", `unhandledrejection: ${String(event.reason)}`);
 });
 
 void refreshLibrary();

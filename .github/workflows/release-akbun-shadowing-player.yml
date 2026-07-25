@@ -1,16 +1,16 @@
-name: release-shadowing-player
+name: release-akbun-shadowing-player
 
 on:
   push:
     branches:
       - master
     paths:
-      - 'product/shadowing-player/**'
-      - '.github/workflows/release-shadowing-player.yml'
+      - 'product/akbun-shadowing-player/**'
+      - '.github/workflows/release-akbun-shadowing-player.yml'
   pull_request:
     paths:
-      - 'product/shadowing-player/**'
-      - '.github/workflows/release-shadowing-player.yml'
+      - 'product/akbun-shadowing-player/**'
+      - '.github/workflows/release-akbun-shadowing-player.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ permissions:
 
 defaults:
   run:
-    working-directory: product/shadowing-player
+    working-directory: product/akbun-shadowing-player
 
 jobs:
   # PR 검증용. electron 바이너리 없이 tsc 컴파일만 확인한다.
@@ -41,7 +41,8 @@ jobs:
       - name: Compile TypeScript
         run: npm run build
 
-  # package.json 버전으로 tag와 release를 만든다. tag가 이미 있으면 뒤 job을 건너뛴다.
+  # 가장 최근 tag의 마이너 버전을 +1 해서 새 tag와 release를 만든다.
+  # 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
   tag:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -49,45 +50,54 @@ jobs:
       contents: write
     outputs:
       tag: ${{ steps.version.outputs.tag }}
-      created: ${{ steps.create.outputs.created }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Read package version
+      - name: Compute next version (previous minor +1)
         id: version
-        run: echo "tag=shadowing-player-v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: .
+        run: |
+          latest=$(git ls-remote --tags origin \
+              'refs/tags/akbun-shadowing-player-v*' 'refs/tags/shadowing-player-v*' \
+            | sed 's|.*refs/tags/||' \
+            | grep -E '\-v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sed 's|.*-v||' \
+            | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            version="0.1.0"
+          else
+            major="${latest%%.*}"
+            minor=$(echo "$latest" | cut -d. -f2)
+            version="$major.$((minor + 1)).0"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-shadowing-player-v$version" >> "$GITHUB_OUTPUT"
+          echo "Previous: ${latest:-none}, next: $version"
 
-      - name: Create tag and release if missing
-        id: create
+      - name: Create tag and release
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            echo "Tag $TAG already exists. Skip release."
-            exit 0
-          fi
           cat > release-notes.md <<'EOF'
           언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 macOS 빌드. dmg(arm64, x64) 포함.
 
           코드 서명이 없어 처음 실행하면 "damaged and can't be opened" 오류가 난다. 앱 설치 후 아래 명령으로 quarantine 속성을 지우면 실행된다.
 
           ```bash
-          xattr -cr /Applications/shadowing-player.app
+          xattr -cr /Applications/akbun-shadowing-player.app
           ```
           EOF
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
             --title "$TAG" \
             --notes-file release-notes.md
-          echo "created=true" >> "$GITHUB_OUTPUT"
 
-  # macOS 전용 빌드. dmg를 release에 업로드한다.
+  # macOS 전용 빌드. tag job이 계산한 버전으로 dmg를 만들어 release에 업로드한다.
   build:
     needs: tag
-    if: needs.tag.outputs.created == 'true'
     runs-on: macos-latest
     permissions:
       contents: write
@@ -101,6 +111,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Set package version to release version
+        run: npm version "${{ needs.tag.outputs.version }}" --no-git-tag-version
+
       - name: Build dmg
         run: npm run dist
         env:
@@ -113,5 +126,5 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: |
           gh release upload "$TAG" \
-            product/shadowing-player/release/*.dmg \
+            product/akbun-shadowing-player/release/*.dmg \
             --clobber

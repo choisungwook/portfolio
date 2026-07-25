@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("api", {
   setDuration: (path: string, durationSec: number) =>
     ipcRenderer.invoke("library:set-duration", path, durationSec),
   readAudio: (path: string) => ipcRenderer.invoke("audio:read", path),
+  logError: (source: string, message: string) => ipcRenderer.send("log:error", source, message),
 });

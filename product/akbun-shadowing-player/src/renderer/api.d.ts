@@ -14,5 +14,6 @@ interface Window {
     removeFile(path: string): Promise<LibraryItem[]>;
     setDuration(path: string, durationSec: number): Promise<void>;
     readAudio(path: string): Promise<Uint8Array<ArrayBuffer>>;
+    logError(source: string, message: string): void;
   };
 }

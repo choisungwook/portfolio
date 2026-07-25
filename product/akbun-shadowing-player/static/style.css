@@ -41,6 +41,13 @@ button.primary:hover {
   background: #2b7bf3;
 }
 
+/* 화면 섹션은 아래에서 display: flex를 지정하므로,
+   hidden 속성이 브라우저 기본 [hidden] { display: none }에 밀리지 않도록 명시한다. */
+#home-screen[hidden],
+#player-screen[hidden] {
+  display: none;
+}
+
 /* ---------- 홈 화면 ---------- */
 
 #home-screen {

@@ -2,7 +2,7 @@
 type: Decision
 title: 재생은 HTMLAudioElement, 파형은 Web Audio로 분리
 description: 배속 시 음정 유지를 위해 재생 경로와 파형 계산 경로를 분리했다.
-tags: [electron, audio, shadowing-player]
+tags: [electron, audio, akbun-shadowing-player]
 timestamp: 2026-07-25T00:00:00Z
 ---
 
