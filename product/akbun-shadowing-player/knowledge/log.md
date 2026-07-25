@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-25 (4차)
+
+* **Creation**: [릴리스 버전의 단일 출처를 package.json으로 되돌림](decisions/2026-07-version-source-package-json.md) 결정 기록. tag 자동 계산 결정을 대체.
+
 ## 2026-07-25 (3차)
 
 * **Creation**: [업데이트는 dmg를 직접 받아 앱 번들을 교체한다](decisions/2026-07-update-download-and-swap.md) 결정 기록.

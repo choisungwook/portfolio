@@ -45,8 +45,8 @@ jobs:
         run: npm test
 
   # macOS 전용 빌드. dmg 빌드가 성공해야 tag를 만들고, tag가 만들어져야 release를 만든다.
-  # 가장 최근 tag의 마이너 버전을 +1 해서 새 버전을 정한다.
-  # 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
+  # 버전은 package.json의 version을 그대로 쓴다. 코드 수정 시 버전을 +1 하는 것은
+  # product/akbun-shadowing-player/AGENTS.md 규칙이다.
   release:
     if: github.event_name != 'pull_request'
     runs-on: macos-latest
@@ -54,36 +54,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
 
-      - name: Compute next version (previous minor +1)
+      - name: Read version from package.json
         id: version
-        working-directory: .
         run: |
-          latest=$(git tag --list 'akbun-shadowing-player-v*' 'shadowing-player-v*' \
-            | sed 's|.*-v||' \
-            | sort -V | tail -1)
-          if [ -z "$latest" ]; then
-            version="0.1.0"
-          else
-            major="${latest%%.*}"
-            minor=$(echo "$latest" | cut -d. -f2)
-            version="$major.$((minor + 1)).0"
-          fi
+          version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=akbun-shadowing-player-v$version" >> "$GITHUB_OUTPUT"
-          echo "Previous: ${latest:-none}, next: $version"
+          echo "Version: $version"
 
       - name: Install dependencies
         run: npm install
-
-      - name: Set package version to release version
-        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Build dmg
         run: npm run dist

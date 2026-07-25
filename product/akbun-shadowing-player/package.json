@@ -1,7 +1,7 @@
 {
   "name": "akbun-shadowing-player",
   "productName": "akbun-shadowing-player",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "description": "언어 공부(쉐도잉)용 구간 반복 오디오 플레이어",
   "main": "dist/main/main.js",
   "author": "akbun",
@@ -30,6 +30,7 @@
       "static/**/*"
     ],
     "directories": {
+      "buildResources": "assets",
       "output": "release"
     },
     "mac": {
