@@ -97,7 +97,8 @@ function buildFolderGroup(folder: string): HTMLUListElement {
   header.className = "folder-header";
   const name = document.createElement("span");
   name.className = "folder-name";
-  name.textContent = `📁 ${folder.split("/").pop() || folder}`;
+  // 렌더러에는 path 모듈이 없다. 구분자를 둘 다 나눠 OS와 상관없이 마지막 이름만 보여준다.
+  name.textContent = `📁 ${folder.split(/[\\/]/).pop() || folder}`;
   const pathLabel = document.createElement("span");
   pathLabel.className = "file-meta";
   pathLabel.textContent = folder;

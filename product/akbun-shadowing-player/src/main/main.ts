@@ -172,8 +172,11 @@ function registerIpc(): void {
       properties: ["openDirectory"],
     });
     if (result.canceled) return library.list();
-    for (const folder of result.filePaths) {
-      const files = await scanAudioFiles(folder);
+    // 스캔은 폴더별로 함께 돌리고, 목록에는 어느 폴더에서 왔는지 남겨 묶는다.
+    const scanned = await Promise.all(
+      result.filePaths.map(async (folder) => ({ folder, files: await scanAudioFiles(folder) })),
+    );
+    for (const { folder, files } of scanned) {
       logger.info("main", `폴더 ${folder}에서 음성 파일 ${files.length}개 발견`);
       library.add(files, folder);
     }
