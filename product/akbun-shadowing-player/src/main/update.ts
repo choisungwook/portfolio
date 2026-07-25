@@ -121,7 +121,7 @@ export async function cleanupTempDirs(): Promise<void> {
  * mount 지점과 dmg를 담은 작업 디렉터리는 trap으로 지운다. 중간에 어느 단계가
  * 실패해도 마운트가 남거나 100MB짜리 dmg가 /tmp에 쌓이지 않게 하기 위함이다.
  */
-const SWAP_SCRIPT = `#!/bin/bash
+export const SWAP_SCRIPT = `#!/bin/bash
 set -u
 APP="$1"; DMG="$2"; PID="$3"
 WORK=$(dirname "$DMG")

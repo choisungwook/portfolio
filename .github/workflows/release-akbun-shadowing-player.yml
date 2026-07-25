@@ -21,7 +21,7 @@ defaults:
     working-directory: product/akbun-shadowing-player
 
 jobs:
-  # PR 검증용. electron 바이너리 없이 tsc 컴파일만 확인한다.
+  # PR 검증용. electron 바이너리 없이 tsc 컴파일과 테스트만 확인한다.
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -38,8 +38,11 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
-      - name: Compile TypeScript
-        run: npm run build
+      # 업데이트 기능이 임시 파일을 남기지 않는지 확인한다. build가 함께 돈다.
+      # 교체 스크립트 테스트는 hdiutil이 없는 ubuntu에서도 동작한다.
+      # attach 단계에서 실패하는 것이 검증 대상인 실패 경로이기 때문이다.
+      - name: Compile TypeScript and run tests
+        run: npm test
 
   # 가장 최근 tag의 마이너 버전을 +1 해서 새 tag와 release를 만든다.
   # 예전 prefix(shadowing-player-v*)의 tag도 이전 버전으로 인정한다.
