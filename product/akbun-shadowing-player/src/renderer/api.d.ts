@@ -20,6 +20,7 @@ interface Window {
     addFiles(): Promise<LibraryItem[]>;
     addFolder(): Promise<LibraryItem[]>;
     removeFile(path: string): Promise<LibraryItem[]>;
+    removeFolder(folder: string): Promise<LibraryItem[]>;
     refreshLibrary(): Promise<LibraryItem[]>;
     setDuration(path: string, durationSec: number): Promise<void>;
     readAudio(path: string): Promise<Uint8Array<ArrayBuffer>>;

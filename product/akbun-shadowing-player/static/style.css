@@ -199,14 +199,20 @@ select {
 
 .folder-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   font-weight: 600;
   min-width: 0;
+  cursor: pointer;
 }
 
 .folder-name {
   flex-shrink: 0;
+}
+
+/* 경로가 길어도 삭제 버튼이 밀려나지 않게 경로만 줄인다. */
+.folder-header .file-meta {
+  flex: 1;
 }
 
 .folder-children {

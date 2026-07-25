@@ -94,6 +94,36 @@ test("폴더로 불러온 파일만 folder를 가진다", () => {
   }
 });
 
+// 폴더 삭제는 한 번에 여러 항목을 지운다. 조건이 어긋나면 다른 폴더나 낱개 파일까지
+// 조용히 사라지므로, 지우는 범위를 테스트로 고정한다.
+test("removeFolder는 해당 폴더의 파일만 지운다", () => {
+  const { dir, library } = makeLibrary();
+  try {
+    const lesson = path.join(dir, "lesson");
+    const lesson2 = path.join(dir, "lesson2"); // 이름이 접두사로 겹치는 폴더
+    fs.mkdirSync(lesson);
+    fs.mkdirSync(lesson2);
+    const inLesson = makeAudioFile(lesson, "one.mp3");
+    const inLesson2 = makeAudioFile(lesson2, "two.mp3");
+    const single = makeAudioFile(dir, "single.mp3");
+
+    library.add([inLesson], lesson);
+    library.add([inLesson2], lesson2);
+    library.add([single]);
+
+    const items = library.removeFolder(lesson);
+
+    assert.deepStrictEqual(
+      items.map((item) => item.path).sort(),
+      [inLesson2, single].sort(),
+      "다른 폴더와 낱개 파일은 남아야 한다",
+    );
+    assert.strictEqual(new Library(dir).list().length, 2, "폴더 삭제가 저장되지 않았다");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("파일 열기는 목록에 없거나 사라진 파일을 막는다", () => {
   const mainSource = fs.readFileSync(path.join(__dirname, "../dist/main/main.js"), "utf-8");
   const readHandler = mainSource.slice(mainSource.indexOf('"audio:read"'));

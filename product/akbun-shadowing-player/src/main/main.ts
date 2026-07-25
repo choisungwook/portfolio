@@ -192,6 +192,8 @@ function registerIpc(): void {
 
   ipcMain.handle("library:remove", (_event, filePath: string) => library.remove(filePath));
 
+  ipcMain.handle("library:remove-folder", (_event, folder: string) => library.removeFolder(folder));
+
   ipcMain.handle("library:set-duration", (_event, filePath: string, durationSec: number) => {
     library.setDuration(filePath, durationSec);
   });

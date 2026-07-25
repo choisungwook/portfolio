@@ -82,26 +82,43 @@ async function refreshLibrary(items?: LibraryItem[]): Promise<void> {
   }
 }
 
-/** 폴더 한 칸을 만들어 목록에 붙이고, 하위 파일을 담을 ul을 돌려준다. */
+/**
+ * 폴더 한 칸을 만들어 목록에 붙이고, 하위 파일을 담을 ul을 돌려준다.
+ * 접기와 펼치기는 details/summary가 스스로 하므로 따로 다루지 않는다.
+ */
 function buildFolderGroup(folder: string): HTMLUListElement {
   const group = document.createElement("li");
   group.className = "folder-group";
 
-  const header = document.createElement("div");
+  const details = document.createElement("details");
+  details.open = true;
+
+  const header = document.createElement("summary");
   header.className = "folder-header";
-  const icon = document.createElement("span");
-  icon.textContent = "📁";
   const name = document.createElement("span");
   name.className = "folder-name";
-  name.textContent = folder.split("/").pop() || folder;
+  name.textContent = `📁 ${folder.split("/").pop() || folder}`;
   const pathLabel = document.createElement("span");
   pathLabel.className = "file-meta";
   pathLabel.textContent = folder;
-  header.append(icon, name, pathLabel);
+
+  const removeButton = document.createElement("button");
+  removeButton.className = "file-remove";
+  removeButton.textContent = "폴더 삭제";
+  removeButton.addEventListener("click", async (event) => {
+    // summary 안의 클릭은 접기/펼치기까지 일으키므로 막는다.
+    event.preventDefault();
+    event.stopPropagation();
+    if (!confirm(`${folder}\n\n이 폴더의 파일을 목록에서 모두 지운다. 실제 파일은 남는다.`)) return;
+    await refreshLibrary(await window.api.removeFolder(folder));
+  });
+
+  header.append(name, pathLabel, removeButton);
 
   const children = document.createElement("ul");
   children.className = "folder-children";
-  group.append(header, children);
+  details.append(header, children);
+  group.appendChild(details);
   fileList.appendChild(group);
   return children;
 }
