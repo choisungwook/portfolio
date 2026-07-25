@@ -10,6 +10,7 @@
 | [cardnews-reference](./cardnews-reference/) | AI agent용 카드뉴스 레이아웃 레퍼런스 |
 | [envelope_encryption_simulator](./envelope_encryption_simulator/) | KMS 봉투암호화 암복호화 과정을 보여주는 시뮬레이터 |
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |
+| [shadowing-player](./shadowing-player/) | 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 Electron 앱 |
 | [slide-reference](./slide-reference/) | AI agent용 슬라이드 레이아웃 레퍼런스 |
 | [slo](./slo/) | SLO 가용성을 입력하면 허용 다운타임을 계산하는 웹 도구 |
 | [tistory-skin](./tistory-skin/) | Tistory 블로그 스킨 |
