@@ -27,6 +27,16 @@ jobs:
         id: version
         run: echo "tag=gitdesktop-v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Create tag if missing
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
       - name: Create release if missing and decide build
         id: check
         working-directory: .
@@ -34,18 +44,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
+          if assets=$(gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null); then
+            # 릴리스는 있지만 dmg가 없으면 빌드를 다시 수행한다.
+            if echo "$assets" | grep -q '\.dmg$'; then
+              echo "build=false" >> "$GITHUB_OUTPUT"
+              echo "Release $TAG already has installers. Skip build."
+            else
+              echo "build=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
             gh release create "$TAG" \
-              --target "$GITHUB_SHA" \
               --title "$TAG" \
               --generate-notes
             echo "build=true" >> "$GITHUB_OUTPUT"
-          elif [ -z "$(gh release view "$TAG" --json assets -q '.assets[].name' | grep '\.dmg$' || true)" ]; then
-            # 릴리스는 있지만 빌드 산출물이 없으면 빌드를 다시 수행한다.
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "Release $TAG already has installers. Skip build."
           fi
 
   build:
