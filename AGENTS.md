@@ -19,10 +19,9 @@
 | [`.claude/rules/kubernetes.md`](./.claude/rules/kubernetes.md) | Kubernetes manifest |
 | [`.claude/rules/terraform.md`](./.claude/rules/terraform.md) | Terraform HCL |
 | [`.claude/rules/python.md`](./.claude/rules/python.md) | Python |
+| [`.claude/rules/electron.md`](./.claude/rules/electron.md) | Electron·데스크톱 앱 (테마 포함) |
 | [`.claude/rules/knowledge.md`](./.claude/rules/knowledge.md) | knowledge/ 지식 번들 기록 |
 | [`.claude/rules/product.md`](./.claude/rules/product.md) | product/ 디렉터리와 인덱스 갱신 |
-
-가독성이 최우선이다. 성능 최적화보다 3개월 후에 다시 봐도 바로 이해되는 코드를 쓴다.
 
 ## 문서 작성 규칙
 
