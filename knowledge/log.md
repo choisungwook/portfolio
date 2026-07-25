@@ -4,6 +4,7 @@
 
 * **Creation**: [Electron 릴리스 빌드는 macOS만](decisions/2026-07-electron-release-macos-only.md) 결정 기록. akbun-gitdesktop 릴리스 workflow의 Windows checkout 실패 수정과 함께 남긴다.
 * **Creation**: [릴리스 버전은 태그에서 계산한다](decisions/2026-07-release-version-from-tags.md) 결정 기록. akbun-gitdesktop 릴리스 workflow를 태그 기반 patch 자동 증가로 바꾸면서 남긴다.
+* **Creation**: [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](decisions/2026-07-build-before-tag-and-release.md) 결정 기록. akbun-shadowing-player 릴리스 workflow의 job 순서를 바꾸면서 남긴다.
 
 ## 2026-07-11
 
