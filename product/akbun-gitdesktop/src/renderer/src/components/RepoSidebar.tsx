@@ -30,6 +30,7 @@ export default function RepoSidebar({ repos, selectedRepo, onSelect, onImport, o
             <button
               className="icon-button"
               title="목록에서 제거"
+              aria-label={`${repo.name} 목록에서 제거`}
               onClick={(event) => {
                 event.stopPropagation()
                 onRemove(repo)

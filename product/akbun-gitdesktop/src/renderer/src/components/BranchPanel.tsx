@@ -85,7 +85,12 @@ export default function BranchPanel({ repoPath, onError }: Props): JSX.Element {
             <span className="branch-hash">{branch.shortHash}</span>
             <span className="branch-upstream">{branch.upstream}</span>
             {!branch.isCurrent && (
-              <button className="icon-button" title="브랜치 삭제" onClick={() => deleteBranch(branch)}>
+              <button
+                className="icon-button"
+                title="브랜치 삭제"
+                aria-label={`${branch.name} 브랜치 삭제`}
+                onClick={() => deleteBranch(branch)}
+              >
                 ✕
               </button>
             )}

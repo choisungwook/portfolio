@@ -69,6 +69,8 @@ export default function App(): JSX.Element {
           setWorktrees([])
           setSelectedWorktree(null)
         }
+      } else {
+        setError(result.error)
       }
     },
     [selectedRepo]

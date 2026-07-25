@@ -77,6 +77,7 @@ export default function WorktreePanel({
               <select
                 defaultValue=""
                 title="다음으로 열기"
+                aria-label={`${worktree.branch} worktree 다음으로 열기`}
                 onChange={(event) => {
                   if (event.target.value) {
                     openWith(worktree, event.target.value)
@@ -94,7 +95,12 @@ export default function WorktreePanel({
                 ))}
               </select>
               {!worktree.isMain && (
-                <button className="icon-button" title="worktree 삭제" onClick={() => removeWorktree(worktree)}>
+                <button
+                  className="icon-button"
+                  title="worktree 삭제"
+                  aria-label={`${worktree.branch} worktree 삭제`}
+                  onClick={() => removeWorktree(worktree)}
+                >
                   ✕
                 </button>
               )}

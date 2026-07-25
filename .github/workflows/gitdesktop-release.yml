@@ -64,11 +64,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: product/akbun-gitdesktop/package-lock.json
 
+      # 저장소 정책상 lock 파일을 커밋하지 않으므로 npm ci 대신 npm install을 쓴다.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build installers
         run: npm run ${{ matrix.dist }}
