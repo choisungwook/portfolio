@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron'
 import path from 'node:path'
-import type { GitResult } from '../shared/types'
+import type { GitResult, ThemePreference } from '../shared/types'
 import * as git from './git'
 import { openInApp, listOpenerApps } from './openWith'
 import { addRepo, loadRepos, removeRepo } from './repoStore'
+import { loadSettings, saveTheme } from './settingsStore'
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -12,6 +13,7 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 600,
     title: 'akbun-gitdesktop',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e2127' : '#f6f7f9',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -39,10 +41,19 @@ function registerIpcHandlers(): void {
   ipcMain.handle('repos:list', () => wrap(() => loadRepos()))
   ipcMain.handle('repos:remove', (_event, repoPath: string) => wrap(() => removeRepo(repoPath)))
 
+  ipcMain.handle('settings:get', () => wrap(() => loadSettings()))
+  ipcMain.handle('settings:setTheme', (_event, theme: ThemePreference) =>
+    wrap(async () => {
+      const settings = await saveTheme(theme)
+      nativeTheme.themeSource = settings.theme
+      return settings
+    })
+  )
+
   ipcMain.handle('repos:import', () =>
     wrap(async () => {
       const result = await dialog.showOpenDialog({
-        title: 'git 저장소 폴더 선택',
+        title: 'Select a git repository folder',
         properties: ['openDirectory']
       })
       if (result.canceled || result.filePaths.length === 0) {
@@ -50,7 +61,7 @@ function registerIpcHandlers(): void {
       }
       const selected = result.filePaths[0]
       if (!(await git.isGitRepository(selected))) {
-        throw new Error('선택한 폴더는 git 저장소가 아닙니다.')
+        throw new Error('The selected folder is not a git repository.')
       }
       return addRepo(selected)
     })
@@ -59,6 +70,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('git:log', (_event, repoPath: string) => wrap(() => git.getLog(repoPath)))
   ipcMain.handle('git:branches', (_event, repoPath: string) => wrap(() => git.getBranches(repoPath)))
   ipcMain.handle('git:worktrees', (_event, repoPath: string) => wrap(() => git.getWorktrees(repoPath)))
+  ipcMain.handle('git:defaultBranch', (_event, repoPath: string) => wrap(() => git.getDefaultBranch(repoPath)))
 
   ipcMain.handle('git:createBranch', (_event, repoPath: string, name: string, startPoint: string) =>
     wrap(() => git.createBranch(repoPath, name, startPoint))
@@ -73,6 +85,21 @@ function registerIpcHandlers(): void {
   )
   ipcMain.handle('git:removeWorktree', (_event, repoPath: string, worktreePath: string, force: boolean) =>
     wrap(() => git.removeWorktree(repoPath, worktreePath, force))
+  )
+
+  ipcMain.handle('git:commitFiles', (_event, repoPath: string, hash: string) =>
+    wrap(() => git.getCommitFiles(repoPath, hash))
+  )
+  ipcMain.handle('git:commitDiff', (_event, repoPath: string, hash: string, filePath: string) =>
+    wrap(() => git.getCommitDiff(repoPath, hash, filePath))
+  )
+  ipcMain.handle('git:rangeFiles', (_event, repoPath: string, base: string, head: string) =>
+    wrap(() => git.getRangeFiles(repoPath, base, head))
+  )
+  ipcMain.handle(
+    'git:rangeDiff',
+    (_event, repoPath: string, base: string, head: string, filePath: string) =>
+      wrap(() => git.getRangeDiff(repoPath, base, head, filePath))
   )
 
   ipcMain.handle('gh:pullRequests', (_event, repoPath: string) => wrap(() => git.getPullRequests(repoPath)))
@@ -91,7 +118,9 @@ function registerIpcHandlers(): void {
   )
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const settings = await loadSettings()
+  nativeTheme.themeSource = settings.theme
   registerIpcHandlers()
   createWindow()
 

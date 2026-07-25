@@ -5,7 +5,7 @@ import type { OpenerApp } from '../shared/types'
 export function listOpenerApps(): OpenerApp[] {
   const apps: OpenerApp[] = [
     { id: 'vscode', label: 'VS Code' },
-    { id: 'file-manager', label: process.platform === 'darwin' ? 'Finder' : '파일 탐색기' }
+    { id: 'file-manager', label: process.platform === 'darwin' ? 'Finder' : 'File Explorer' }
   ]
   if (process.platform === 'darwin') {
     apps.push({ id: 'terminal', label: 'Terminal' }, { id: 'iterm', label: 'iTerm' })
@@ -47,5 +47,5 @@ export async function openInApp(targetPath: string, appId: string): Promise<void
     await exec('open', ['-a', 'iTerm', targetPath])
     return
   }
-  throw new Error(`지원하지 않는 앱: ${appId}`)
+  throw new Error(`Unsupported app: ${appId}`)
 }

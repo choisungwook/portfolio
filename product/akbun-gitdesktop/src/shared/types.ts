@@ -43,4 +43,36 @@ export interface OpenerApp {
   label: string
 }
 
+/** One CLI the app depends on, as detected on the current machine. */
+export interface CliToolStatus {
+  id: 'git' | 'gh'
+  label: string
+  required: boolean
+  available: boolean
+  version: string
+  path: string
+  /** gh only. Empty when the tool is not gh or is missing. */
+  authStatus: string
+  authenticated: boolean
+}
+
+export interface CliStatus {
+  git: CliToolStatus
+  gh: CliToolStatus
+}
+
+export type ThemePreference = 'system' | 'light' | 'dark'
+
+export interface AppSettings {
+  theme: ThemePreference
+}
+
+/** A single file touched by a commit or by a diff range. */
+export interface FileChange {
+  path: string
+  /** git name-status letter: A, M, D, R, C, T. */
+  status: string
+  oldPath: string
+}
+
 export type GitResult<T> = { ok: true; data: T } | { ok: false; error: string }

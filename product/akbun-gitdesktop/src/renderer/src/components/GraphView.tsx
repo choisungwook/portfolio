@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import type { CommitInfo } from '../../../shared/types'
+import { clickable } from '../lib/clickable'
 import { layoutGraph } from '../lib/graphLayout'
 
 const ROW_HEIGHT = 28
@@ -9,9 +10,11 @@ const COLORS = ['#e06c75', '#61afef', '#98c379', '#c678dd', '#d19a66', '#56b6c2'
 
 interface Props {
   repoPath: string
+  selectedHash: string
+  onSelectCommit: (commit: CommitInfo) => void
 }
 
-export default function GraphView({ repoPath }: Props): JSX.Element {
+export default function GraphView({ repoPath, selectedHash, onSelectCommit }: Props): JSX.Element {
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [loadError, setLoadError] = useState('')
 
@@ -69,7 +72,13 @@ export default function GraphView({ repoPath }: Props): JSX.Element {
       </svg>
       <div className="commit-rows">
         {layout.nodes.map((node) => (
-          <div key={node.commit.hash} className="commit-row" style={{ height: ROW_HEIGHT }}>
+          <div
+            key={node.commit.hash}
+            className={node.commit.hash === selectedHash ? 'commit-row selected' : 'commit-row'}
+            style={{ height: ROW_HEIGHT }}
+            {...clickable(() => onSelectCommit(node.commit))}
+            title="Show the files this commit changed"
+          >
             <span className="commit-refs">
               {node.commit.refs.map((ref) => (
                 <em key={ref} className={refClass(ref)}>
@@ -86,7 +95,7 @@ export default function GraphView({ repoPath }: Props): JSX.Element {
           </div>
         ))}
       </div>
-      {commits.length === 0 && <p className="placeholder">커밋을 불러오는 중이거나 커밋이 없습니다.</p>}
+      {commits.length === 0 && <p className="placeholder">Loading commits, or this repository has none.</p>}
     </div>
   )
 }

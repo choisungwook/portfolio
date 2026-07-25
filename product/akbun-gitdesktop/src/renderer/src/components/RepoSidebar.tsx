@@ -13,9 +13,9 @@ export default function RepoSidebar({ repos, selectedRepo, onSelect, onImport, o
   return (
     <aside className="repo-sidebar">
       <div className="panel-header">
-        <span>저장소</span>
-        <button className="primary" onClick={onImport} title="git 폴더 가져오기">
-          + 가져오기
+        <span>Repositories</span>
+        <button className="primary" onClick={onImport} title="Import a git folder">
+          + Import
         </button>
       </div>
       <ul className="repo-list">
@@ -29,8 +29,8 @@ export default function RepoSidebar({ repos, selectedRepo, onSelect, onImport, o
             <span className="repo-name">{repo.name}</span>
             <button
               className="icon-button"
-              title="목록에서 제거"
-              aria-label={`${repo.name} 목록에서 제거`}
+              title="Remove from the list"
+              aria-label={`Remove ${repo.name} from the list`}
               onClick={(event) => {
                 event.stopPropagation()
                 onRemove(repo)
@@ -40,7 +40,7 @@ export default function RepoSidebar({ repos, selectedRepo, onSelect, onImport, o
             </button>
           </li>
         ))}
-        {repos.length === 0 && <li className="placeholder">가져온 저장소가 없습니다.</li>}
+        {repos.length === 0 && <li className="placeholder">No repositories imported yet.</li>}
       </ul>
     </aside>
   )

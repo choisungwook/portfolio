@@ -18,12 +18,14 @@ export default function PrPanel({ repoPath }: Props): JSX.Element {
       if (result.ok) {
         setPrs(result.data)
       } else {
-        setLoadError(`PR을 불러오지 못했습니다. gh CLI 설치와 gh auth login 상태를 확인하세요.\n${result.error}`)
+        setLoadError(
+          `Could not load pull requests. Check that gh is installed and that gh auth login has been run.\n${result.error}`
+        )
       }
     })
   }, [repoPath])
 
-  if (loading) return <p className="placeholder">PR을 불러오는 중...</p>
+  if (loading) return <p className="placeholder">Loading pull requests...</p>
   if (loadError) return <div className="error-banner">{loadError}</div>
 
   return (
@@ -45,7 +47,7 @@ export default function PrPanel({ repoPath }: Props): JSX.Element {
           </span>
         </li>
       ))}
-      {prs.length === 0 && <li className="placeholder">PR이 없습니다.</li>}
+      {prs.length === 0 && <li className="placeholder">No pull requests.</li>}
     </ul>
   )
 }

@@ -29,10 +29,10 @@ export default function WorktreePanel({
 
   const addWorktree = async (): Promise<void> => {
     if (!newBranchName.trim()) {
-      onError('worktree로 만들 브랜치 이름을 입력하세요.')
+      onError('Enter the branch name to create the worktree with.')
       return
     }
-    const picked = await window.gitdesktop.selectDirectory('worktree를 만들 폴더 선택')
+    const picked = await window.gitdesktop.selectDirectory('Select a folder for the new worktree')
     if (!picked.ok || !picked.data) return
     const result = await window.gitdesktop.createWorktree(repo.path, picked.data, newBranchName.trim(), true)
     if (result.ok) {
@@ -44,7 +44,7 @@ export default function WorktreePanel({
   }
 
   const removeWorktree = async (worktree: WorktreeInfo): Promise<void> => {
-    if (!window.confirm(`worktree를 삭제할까요?\n${worktree.path}`)) return
+    if (!window.confirm(`Remove this worktree?\n${worktree.path}`)) return
     const result = await window.gitdesktop.removeWorktree(repo.path, worktree.path, false)
     if (result.ok) {
       onChanged()
@@ -59,10 +59,12 @@ export default function WorktreePanel({
         <span>Worktree</span>
       </div>
       <ul className="worktree-list">
-        {worktrees.map((worktree) => (
+        {worktrees.map((worktree) => {
+          const isSelected = selectedWorktree?.path === worktree.path
+          return (
           <li
             key={worktree.path}
-            className={selectedWorktree?.path === worktree.path ? 'selected' : ''}
+            className={isSelected ? 'selected' : ''}
             onClick={() => onSelect(worktree)}
             title={worktree.path}
           >
@@ -70,14 +72,15 @@ export default function WorktreePanel({
               <span className="worktree-branch">
                 {worktree.branch}
                 {worktree.isMain && <em className="badge">main</em>}
+                {isSelected && <em className="badge badge-selected">selected</em>}
               </span>
               <span className="worktree-path">{worktree.path}</span>
             </div>
             <div className="worktree-actions" onClick={(event) => event.stopPropagation()}>
               <select
                 defaultValue=""
-                title="다음으로 열기"
-                aria-label={`${worktree.branch} worktree 다음으로 열기`}
+                title="Open with"
+                aria-label={`Open the ${worktree.branch} worktree with an app`}
                 onChange={(event) => {
                   if (event.target.value) {
                     openWith(worktree, event.target.value)
@@ -86,7 +89,7 @@ export default function WorktreePanel({
                 }}
               >
                 <option value="" disabled>
-                  다음으로 열기
+                  Open with
                 </option>
                 {openerApps.map((app) => (
                   <option key={app.id} value={app.id}>
@@ -97,8 +100,8 @@ export default function WorktreePanel({
               {!worktree.isMain && (
                 <button
                   className="icon-button"
-                  title="worktree 삭제"
-                  aria-label={`${worktree.branch} worktree 삭제`}
+                  title="Remove worktree"
+                  aria-label={`Remove the ${worktree.branch} worktree`}
                   onClick={() => removeWorktree(worktree)}
                 >
                   ✕
@@ -106,17 +109,18 @@ export default function WorktreePanel({
               )}
             </div>
           </li>
-        ))}
+          )
+        })}
       </ul>
       <div className="worktree-add">
         <input
           type="text"
-          placeholder="새 브랜치 이름"
+          placeholder="New branch name"
           value={newBranchName}
           onChange={(event) => setNewBranchName(event.target.value)}
         />
         <button className="primary" onClick={addWorktree}>
-          + worktree
+          + Worktree
         </button>
       </div>
     </aside>
