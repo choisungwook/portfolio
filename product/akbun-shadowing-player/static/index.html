@@ -11,7 +11,10 @@
   <section id="home-screen">
     <header class="home-header">
       <h1>akbun-shadowing-player</h1>
-      <button id="add-files" class="primary">음성 파일 불러오기</button>
+      <div class="home-actions">
+        <button id="add-files" class="primary">음성 파일 불러오기</button>
+        <button id="add-folder">폴더 불러오기</button>
+      </div>
     </header>
     <ul id="file-list"></ul>
     <p id="empty-hint">mp3, wav 등 음성 파일을 불러오면 목록에 나타난다. 파일을 클릭하면 재생 화면으로 이동한다.</p>
@@ -21,10 +24,6 @@
     <header class="player-header">
       <button id="go-home">← 홈</button>
       <span id="track-name"></span>
-      <div class="zoom-group">
-        <button id="zoom-out" title="파형 축소">🔍−</button>
-        <button id="zoom-in" title="파형 확대">🔍+</button>
-      </div>
     </header>
 
     <div id="wave-wrap">
@@ -37,22 +36,58 @@
     </div>
 
     <footer class="controls">
-      <div class="control-center">
-        <button id="play" class="play-button">▶</button>
-      </div>
-      <div class="control-right">
-        <div class="speed-group">
-          <button id="speed-down">−</button>
-          <span id="speed">1.0x</span>
-          <button id="speed-up">+</button>
-        </div>
-        <button id="back5">−5초</button>
-        <button id="fwd5">+5초</button>
-        <button id="loop-a">구간 시작 A</button>
-        <button id="loop-b">구간 끝 B</button>
-        <button id="loop-clear">반복 해제</button>
+      <div class="control-bar">
+        <button id="back5" title="5초 뒤로 (←)">⏪</button>
+        <button id="play" class="play-button" title="재생/일시정지 (Space)">▶</button>
+        <button id="fwd5" title="5초 앞으로 (→)">⏩</button>
+
+        <span class="control-divider"></span>
+
+        <button id="loop-a" title="구간 시작 A">Ⓐ</button>
+        <button id="loop-b" title="구간 끝 B">Ⓑ</button>
+        <button id="loop-clear" title="구간 반복 해제">✕</button>
+
+        <span class="control-divider"></span>
+
+        <button id="speed-down" title="느리게">−</button>
+        <span id="speed">1.0x</span>
+        <button id="speed-up" title="빠르게">+</button>
+
+        <span class="control-divider"></span>
+
+        <button id="zoom-out" title="파형 축소">🔍−</button>
+        <button id="zoom-in" title="파형 확대">🔍+</button>
       </div>
     </footer>
+  </section>
+
+  <section id="settings-screen" hidden>
+    <header class="player-header">
+      <button id="settings-close">← 닫기</button>
+      <span class="header-title">Settings</span>
+    </header>
+
+    <div class="settings-body">
+      <h2>테마</h2>
+      <p class="settings-desc">기본은 시스템 설정을 따라간다.</p>
+      <select id="theme-select">
+        <option value="system">시스템</option>
+        <option value="light">라이트</option>
+        <option value="dark">다크</option>
+      </select>
+
+      <h2>저장 위치</h2>
+      <p class="settings-desc">기본 위치이며 앱에서 바꾸지 않는다.</p>
+      <dl class="path-list">
+        <dt>메타데이터(파일 목록)</dt>
+        <dd><code id="library-path"></code> <button class="reveal" data-target="library">폴더 열기</button></dd>
+        <dt>로그 파일</dt>
+        <dd><code id="log-path"></code> <button class="reveal" data-target="log">폴더 열기</button></dd>
+      </dl>
+
+      <h2>버전</h2>
+      <p class="settings-desc"><code id="app-version"></code></p>
+    </div>
   </section>
 
   <script src="../dist/renderer/waveform.js"></script>

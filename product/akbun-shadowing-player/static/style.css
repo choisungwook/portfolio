@@ -1,3 +1,65 @@
+/* 색은 모두 :root 변수로 모으고 light-dark()로 두 테마를 함께 정의한다.
+   어느 쪽을 쓸지는 color-scheme이 정하므로, 테마 전환은 html[data-theme] 한 줄로 끝난다.
+   data-theme이 없으면 color-scheme: light dark 라서 시스템 설정을 따라간다.
+   canvas는 CSS를 못 쓰므로 waveform.ts가 --wave-* 변수를 읽어 간다. */
+:root {
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f7f9, #16181d);
+  --fg: light-dark(#1c1f26, #e6e8ee);
+  --muted: light-dark(#68707e, #8b93a3);
+  --surface: light-dark(#ffffff, #1d2027);
+  --border: light-dark(#d9dde4, #2b2f39);
+  --button-bg: light-dark(#eceef2, #262a33);
+  --button-border: light-dark(#cdd2db, #3a3f4b);
+  --button-hover: light-dark(#e0e3ea, #313644);
+  --accent: #1f6feb;
+  --accent-hover: #2b7bf3;
+  --active-bg: light-dark(#ffe6bd, #6b4a1b);
+
+  --wave-bg: light-dark(#eef0f4, #101216);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* canvas 색은 waveform.ts가 getComputedStyle로 읽어 간다.
+   등록하지 않은 custom property는 light-dark()가 해석되지 않은 채 그대로 나오므로
+   여기서는 라이트/다크 값을 선택자로 나눠 쓴다. */
+:root {
+  --wave-fill: #1173b8;
+  --wave-grid: rgba(0, 0, 0, 0.12);
+  --wave-grid-text: rgba(0, 0, 0, 0.45);
+  --wave-loop: rgba(214, 137, 16, 0.18);
+  --wave-marker: #c67c10;
+  --wave-playhead: #d63b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --wave-fill: #4cc2ff;
+    --wave-grid: rgba(255, 255, 255, 0.12);
+    --wave-grid-text: rgba(255, 255, 255, 0.35);
+    --wave-loop: rgba(255, 180, 84, 0.15);
+    --wave-marker: #ffb454;
+    --wave-playhead: #ff5d5d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --wave-fill: #4cc2ff;
+  --wave-grid: rgba(255, 255, 255, 0.12);
+  --wave-grid-text: rgba(255, 255, 255, 0.35);
+  --wave-loop: rgba(255, 180, 84, 0.15);
+  --wave-marker: #ffb454;
+  --wave-playhead: #ff5d5d;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,8 +68,8 @@
 
 body {
   font-family: -apple-system, "Apple SD Gothic Neo", sans-serif;
-  background: #16181d;
-  color: #e6e8ee;
+  background: var(--bg);
+  color: var(--fg);
   height: 100vh;
   overflow: hidden;
   user-select: none;
@@ -16,35 +78,46 @@ body {
 button {
   font: inherit;
   color: inherit;
-  background: #262a33;
-  border: 1px solid #3a3f4b;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
 }
 
 button:hover {
-  background: #313644;
+  background: var(--button-hover);
 }
 
 button.active {
-  background: #6b4a1b;
-  border-color: #ffb454;
+  background: var(--active-bg);
+  border-color: var(--wave-marker);
 }
 
 button.primary {
-  background: #1f6feb;
-  border-color: #1f6feb;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 button.primary:hover {
-  background: #2b7bf3;
+  background: var(--accent-hover);
+}
+
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: 6px;
+  padding: 6px 10px;
 }
 
 /* 화면 섹션은 아래에서 display: flex를 지정하므로,
    hidden 속성이 브라우저 기본 [hidden] { display: none }에 밀리지 않도록 명시한다. */
 #home-screen[hidden],
-#player-screen[hidden] {
+#player-screen[hidden],
+#settings-screen[hidden] {
   display: none;
 }
 
@@ -62,10 +135,16 @@ button.primary:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .home-header h1 {
   font-size: 20px;
+}
+
+.home-actions {
+  display: flex;
+  gap: 8px;
 }
 
 #file-list {
@@ -80,14 +159,14 @@ button.primary:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #1d2027;
-  border: 1px solid #2b2f39;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 16px;
 }
 
 .file-row:hover {
-  border-color: #4cc2ff;
+  border-color: var(--wave-fill);
 }
 
 .file-info {
@@ -105,14 +184,14 @@ button.primary:hover {
 
 .file-meta {
   font-size: 12px;
-  color: #8b93a3;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 #empty-hint {
-  color: #8b93a3;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -129,10 +208,11 @@ button.primary:hover {
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
-  border-bottom: 1px solid #2b2f39;
+  border-bottom: 1px solid var(--border);
 }
 
-#track-name {
+#track-name,
+.header-title {
   flex: 1;
   text-align: center;
   font-weight: 600;
@@ -141,15 +221,13 @@ button.primary:hover {
   white-space: nowrap;
 }
 
-.zoom-group {
-  display: flex;
-  gap: 6px;
-}
-
+/* 파형은 화면을 채우지 않고 고정 높이만 쓴다. 컨트롤이 바로 아래에 붙는다. */
 #wave-wrap {
-  flex: 1;
+  flex: none;
+  height: 30vh;
+  min-height: 140px;
   position: relative;
-  background: #101216;
+  background: var(--wave-bg);
   overflow: hidden;
 }
 
@@ -168,8 +246,8 @@ button.primary:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 18, 22, 0.85);
-  color: #8b93a3;
+  background: var(--wave-bg);
+  color: var(--muted);
 }
 
 #wave-loading[hidden] {
@@ -180,46 +258,102 @@ button.primary:hover {
   text-align: center;
   padding: 8px;
   font-variant-numeric: tabular-nums;
-  color: #b8bfcc;
-  border-top: 1px solid #2b2f39;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 14px 20px 22px;
-  gap: 12px;
+  padding: 8px 20px 20px;
 }
 
-.control-center {
-  grid-column: 2;
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.control-bar button {
+  min-width: 42px;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.control-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 6px;
 }
 
 .play-button {
-  font-size: 22px;
-  width: 60px;
-  height: 60px;
+  font-size: 20px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
 }
 
-.control-right {
-  grid-column: 3;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.speed-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 #speed {
-  min-width: 42px;
+  min-width: 46px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 설정 화면 ---------- */
+
+#settings-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-body {
+  padding: 24px 32px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.settings-body h2 {
+  font-size: 15px;
+  margin-top: 16px;
+}
+
+.settings-desc {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.path-list dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.path-list dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  user-select: text;
+  word-break: break-all;
 }
