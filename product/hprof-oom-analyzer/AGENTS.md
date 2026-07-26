@@ -56,6 +56,5 @@ npm run dist         # electron-builder 패키징
 
 ## 주의사항
 
-- 저장소 루트 .gitignore가 package-lock.json과 uv.lock을 제외한다. lock 파일을 커밋하지 말고, CI는 npm ci가 아닌 npm install을 유지한다.
 - Claude Code 원격 컨테이너의 프록시는 GitHub release 바이너리 다운로드를 403으로 막는다. 로컬에서 npm install 시 ELECTRON_SKIP_BINARY_DOWNLOAD=1을 쓰고, electron-builder 패키징 검증은 CI에 맡긴다. 컴파일·vitest·CLI 스모크 테스트까지는 로컬에서 가능하다.
 - HPROF 1.0.2(HotSpot)만 지원한다. Android(ART) hprof의 확장 서브태그를 만나면 파서가 HprofParseError를 던진다. 지원 범위는 [knowledge/topics/hprof-format.md](./knowledge/topics/hprof-format.md) 참조.

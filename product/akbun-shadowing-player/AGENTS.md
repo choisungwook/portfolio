@@ -52,7 +52,7 @@ node:test 내장 러너만 쓴다. 현재 대상은 업데이트의 임시 파�
 
 ## 주의사항
 
-- lock 파일을 커밋하지 않는다 (루트 .gitignore). release/도 커밋하지 않는다.
+- release/는 커밋하지 않는다.
 - electron postinstall이 막히면 node node_modules/electron/install.js를 직접 실행한다.
 - dmg는 무서명이다. [무서명 배포 결정](../hprof-oom-analyzer/knowledge/decisions/2026-07-unsigned-mac-distribution.md)
 - 파형 조작 동작을 바꾸면 [wiki/waveform-interaction.md](./wiki/waveform-interaction.md)를 같이 고친다.

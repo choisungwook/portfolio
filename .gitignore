@@ -84,8 +84,6 @@ config.rst
 /.project
 /.pydevproject
 
-package-lock.json
-!product/akbun-gitdesktop/package-lock.json
 geckodriver.log
 *.iml
 
