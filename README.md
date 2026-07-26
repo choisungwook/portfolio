@@ -97,6 +97,7 @@
 87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
 88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
 89. git credential helper 원리와 CodeBuild connection 학습지 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
+90. ccproxy로 배우는 AI proxy 프로토콜과 주의사항 (26.7.26) - [링크](./computer_science/ai/ccproxy/)
 
 ## 직접 만든 제품
 

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ccproxy로 배우는 AI proxy</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+
+<!-- ════════ 1장. 표지 + 미리보기 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>ccproxy로 배우는 <mark>AI proxy</mark></h1>
+    <p class="sub">Claude Code 앞에 proxy를 세워, 무엇을 얻고 무엇이 위험해지는지 직접 확인하는 학습지</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — Claude Code는 Anthropic API 하나만 볼 줄 아는데, 팀은 사내 gateway와 싼 모델로 붙이라고 함. 클라이언트 코드는 못 고침.</p>
+    <p><b class="p-point">어떻게 풀까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">클라이언트는 한 가지 API만 알고, 백엔드는 바뀌어야 함</h2>
+  <p class="dim">이런 상황을 가정함</p>
+  <p>Claude Code는 Anthropic Messages API 포맷으로만 요청함. 붙일 백엔드는 OpenAI 호환 사내 endpoint.</p>
+  <ul class="bullets">
+    <li><span class="xmark">✕</span> 클라이언트 closed source — 요청 포맷 변경 불가</li>
+    <li><span class="xmark">✕</span> 백엔드 스키마를 Anthropic 형태로 바꾸는 것도 불가</li>
+    <li><span class="xmark">✕</span> 짧은 질문까지 큰 모델로 나가 비용 통제 안 됨</li>
+  </ul>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 사이에 <mark>Anthropic API를 흉내내는 proxy</mark>를 세움. ccproxy 계열 도구의 자리.</p>
+</section>
+
+<!-- ════════ 3장. 원리 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">클라이언트가 목적지를 환경변수로 노출함</h2>
+  <p>요청 주소를 <mark>ANTHROPIC_BASE_URL</mark>에서 읽음. fork 없이 목적지 교체 가능.</p>
+  <pre class="code"><span class="c"># 클라이언트는 이 주소를 Anthropic이라 믿고 요청함</span>
+<span class="k">export</span> ANTHROPIC_BASE_URL=<span class="hot">http://localhost:8082</span></pre>
+  <ul class="bullets">
+    <li>설계 이유 — Bedrock·Vertex·사내 gateway 지원을 위해 벤더가 열어 둔 자리. 제3자 proxy도 같은 자리에 끼어듦</li>
+    <li>대가 — 인증·감사 책임이 proxy로 이동</li>
+  </ul>
+  <p><b>다른 곳에도 적용됨.</b> 주소를 설정으로 뺀 프로토콜은 전부 중간자를 허용함.</p>
+</section>
+
+<!-- ════════ 4장. 원리(이어서) ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">proxy가 하는 일은 결국 스키마 번역 하나</h2>
+  <pre class="code"><span class="c">// Anthropic (client → proxy)</span>
+{ <span class="hot">"system"</span>: <span class="s">"be short"</span>,
+  <span class="k">"messages"</span>: [{ <span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: <span class="s">"hi"</span> }] }
+<span class="c">// OpenAI (proxy → upstream)</span>
+{ <span class="k">"messages"</span>: [{ <span class="k">"role"</span>: <span class="hot">"system"</span>, <span class="k">"content"</span>: <span class="s">"be short"</span> },
+                { <span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: <span class="s">"hi"</span> }] }</pre>
+  <ul class="bullets">
+    <li>content — 블록 배열 <code>[{type,text}]</code> → 문자열</li>
+    <li>응답 — <code>content[].text</code> ↔ <code>choices[0].message.content</code></li>
+  </ul>
+</section>
+
+<!-- ════════ 5장. 구조 이해하기 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">요청 한 번이 지나는 네 지점</h2>
+  <p>실습 구성은 세 프로세스. 가짜 upstream 덕분에 API key 없이 왕복 관찰 가능.</p>
+
+  <div class="dgroup"><b>local lab</b>
+    <div class="diagram" style="padding:6px">
+      <div class="dbox wl">client<small>Anthropic 포맷</small></div>
+      <div class="darrow">→</div>
+      <div class="dbox rs">proxy :8082<small>번역 + 라우팅</small></div>
+      <div class="darrow">→</div>
+      <div class="dbox rs">upstream :9000<small>OpenAI 호환</small></div>
+    </div>
+  </div>
+  <p class="caption">[ 왼쪽에서 오른쪽이 요청, 되돌아오는 길이 응답 ]</p>
+  <p>이 세 지점 사이에서 요청 하나가 어떻게 모양을 바꾸는지, 다음 장에서 단계별로 확인.</p>
+</section>
+
+<!-- ════════ 6장. 구조 이해하기(흐름) ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">요청 하나가 모양을 바꾸는 순서</h2>
+
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">1</span>
+        <div class="dbox hot">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">proxy</div>
+        <div class="darrow dim">→</div>
+        <div class="dbox dim">upstream</div>
+      </div>
+      <p class="exp"><b>1단계.</b> client가 <code>POST /v1/messages</code>로 Anthropic 포맷 전송. 목적지는 ANTHROPIC_BASE_URL이 정함.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox dim">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">proxy</div>
+        <div class="darrow dim">→</div>
+        <div class="dbox dim">upstream</div>
+      </div>
+      <p class="exp"><b>2단계.</b> proxy가 스키마 번역 + 모델 라우팅 결정. 이름에 haiku가 있으면 작은 모델, 아니면 큰 모델.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox dim">client</div>
+        <div class="darrow dim">→</div>
+        <div class="dbox dim">proxy</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">upstream</div>
+      </div>
+      <p class="exp"><b>3단계.</b> upstream이 <code>/v1/chat/completions</code>로 응답. 여기서는 받은 내용을 되돌려주는 가짜 백엔드.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">4</span>
+        <div class="dbox hot">client</div>
+        <div class="darrow">←</div>
+        <div class="dbox wl">proxy</div>
+        <div class="darrow">←</div>
+        <div class="dbox dim">upstream</div>
+      </div>
+      <p class="exp"><b>4단계.</b> proxy가 역번역해 Anthropic 메시지로 반환. client는 어느 모델이 답했는지 <mark>끝내 모름</mark>.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 7장. 핸즈온 1 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">번역이 도는지부터 확인</h2>
+  <p class="codedesc"><code>docker compose up -d</code> 후 Anthropic 포맷으로 요청</p>
+  <pre class="code">curl -s -X POST localhost:8082<span class="hot">/v1/messages</span> \
+  -d <span class="s">'{"model":"claude-haiku-4-5","messages":[{"role":"user","content":"hi"}]}'</span></pre>
+  <p class="codedesc">기대 결과</p>
+  <pre class="code">{<span class="k">"type"</span>:<span class="s">"message"</span>,<span class="k">"model"</span>:<span class="s">"claude-haiku-4-5"</span>,
+ <span class="k">"content"</span>:[{<span class="k">"type"</span>:<span class="s">"text"</span>,<span class="k">"text"</span>:<span class="s">"[mock-small] you said: hi"</span>}]}</pre>
+  <p><b>체크포인트.</b> Anthropic 껍데기 안에 OpenAI 백엔드의 답 — 번역 동작 확인.</p>
+</section>
+
+<!-- ════════ 8장. 핸즈온 2 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">라우팅 결정을 눈으로 보기</h2>
+  <p class="codedesc">모델 이름만 바꿔 두 번 호출. 셸 환경변수는 명시적으로 덮어씀</p>
+  <pre class="code">B=<span class="hot">http://localhost:8082</span>; C=<span class="s">"python3 client/client.py hi"</span>
+ANTHROPIC_BASE_URL=$B $C
+ANTHROPIC_BASE_URL=$B ANTHROPIC_MODEL=<span class="hot">claude-sonnet-5</span> $C</pre>
+  <pre class="code"><span class="c"># docker compose logs proxy</span>
+[proxy] claude-haiku-4-5 -&gt; <span class="hot">mock-small</span>
+[proxy] claude-sonnet-5  -&gt; <span class="hot">mock-big</span></pre>
+  <p><b>체크포인트.</b> 답한 모델은 proxy가 결정 — 비용 라우팅의 최소 형태.</p>
+</section>
+
+<!-- ════════ 9장. 핸즈온 3 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">한계도 직접 만나기</h2>
+  <p class="codedesc">실제 클라이언트가 항상 켜는 streaming을 요청</p>
+  <pre class="code">curl -s -X POST localhost:8082/v1/messages \
+  -d <span class="s">'{"model":"claude-haiku-4-5",<span class="bad">"stream":true</span>,"messages":[]}'</span>
+
+HTTP <span class="bad">400</span>  {<span class="k">"error"</span>:<span class="s">"stream=true is not supported"</span>}</pre>
+  <ul class="bullets">
+    <li>실제 proxy가 더 해야 하는 일 — SSE 이벤트 재구성, tool_use ↔ tool_calls 변환</li>
+  </ul>
+  <p><b>체크포인트.</b> 번역기 뼈대는 100줄, 쓸 만한 proxy의 대부분은 <mark>streaming과 tool 변환</mark>에 들어감.</p>
+  <p class="foot">github 링크: https://github.com/choisungwook/portfolio/tree/master/computer_science/ai/ccproxy</p>
+</section>
+
+<!-- ════════ 10장. 확인해 보기 ════════ -->
+<section class="page">
+  <p class="sec">5. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검</h2>
+  <div class="quiz">
+    <p class="q">Q1. proxy 로그에는 요청이 안 보이는데 클라이언트는 401. 먼저 볼 곳은?</p>
+    <ul class="opts">
+      <li>upstream API key 만료 여부</li>
+      <li data-answer>클라이언트가 실제로 나간 주소 — 셸의 ANTHROPIC_BASE_URL</li>
+      <li>proxy의 모델 라우팅 규칙</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 로그에 요청 자체가 없으면 트래픽이 proxy에 오지 않은 것. 목적지를 정하는 건 환경변수.</p>
+  </div>
+</section>
+
+<!-- ════════ 11장. 확인해 보기 2 ════════ -->
+<section class="page">
+  <p class="sec">5. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검</h2>
+  <div class="quiz">
+    <p class="q">Q2. proxy를 붙인 뒤 에러 없이 느려지고 비용이 올랐다면?</p>
+    <ul class="opts">
+      <li>작은 모델로 라우팅됨</li>
+      <li>클라이언트가 요청을 두 번 보냄</li>
+      <li data-answer>번역 과정에서 prompt caching breakpoint 소실</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 번역 손실은 에러가 아니라 성능·비용 증상으로 나타남. 캐시가 깨지면 매번 전체 프롬프트를 재계산함.</p>
+  </div>
+</section>
+
+<!-- ════════ 12장. 활용처 ════════ -->
+<section class="page">
+  <p class="sec">6. 어디에 쓰이나</p>
+  <h2 class="page-title">개인은 모델 교체, 조직은 통제 지점</h2>
+  <ul class="bullets">
+    <li>공급자 교체 — Anthropic 포맷을 OpenAI·Bedrock·Vertex·Ollama로 번역
+      <ul><li>ccproxy, claude-code-router, claude-code-proxy 계열의 주 용도</li></ul>
+    </li>
+    <li>비용 라우팅 — 짧고 쉬운 요청은 싼 모델, 어려운 요청만 큰 모델</li>
+    <li>거버넌스 — 팀별 virtual key, rate limit, 예산, 감사 로그</li>
+    <li>폐쇄망 — 외부 호출 출구를 한 곳으로 모음</li>
+    <li>관측 — 여러 클라이언트의 지연·토큰·실패를 한 곳에서 수집</li>
+  </ul>
+  <p>앞 두 개가 ccproxy 계열의 자리. 뒤 세 개는 <mark>AI gateway</mark>(LiteLLM, Bifrost)의 영역.</p>
+</section>
+
+<!-- ════════ 13장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">7. 트레이드오프</p>
+  <h2 class="page-title">무엇을 얻고 무엇을 잃는가</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>얻는 것</h3><ul>
+      <li>클라이언트 수정 없이 백엔드 교체</li>
+      <li>모델 라우팅으로 비용 통제</li>
+      <li>키·한도·감사를 한 지점에 모음</li>
+      <li>폐쇄망 출구 단일화</li>
+    </ul></div>
+    <div class="con"><h3>잃는 것</h3><ul>
+      <li>프롬프트 전문이 proxy를 통과 — 유출면 증가</li>
+      <li>번역 손실이 조용히 발생</li>
+      <li>단일 장애점 + 운영 부담</li>
+      <li>클라이언트 업데이트마다 호환성 재검증</li>
+    </ul></div>
+  </div>
+  <p><b>언제 쓰는가.</b> 백엔드 교체·비용 통제가 목적이면 유효. 개인 실험이면 자체 proxy로 충분, 팀 운영이면 gateway 제품 사용이 안전.</p>
+</section>
+
+<!-- ════════ 14장. 주의사항 ════════ -->
+<section class="page">
+  <p class="sec">8. 주의사항</p>
+  <h2 class="page-title">공짜로 보이는 자리에 붙는 비용</h2>
+  <ul class="bullets">
+    <li>신뢰 — <span class="prob-text">프롬프트·소스코드 전문이 평문으로 통과</span>
+      <ul><li>남의 proxy 실행 = 코드 열람 허용. 디버그용 전문 로깅은 유출 저장소가 됨</li></ul>
+    </li>
+    <li>키 — 상위 공급자 키를 proxy가 보관. 회수·교체 책임이 이쪽으로 옴</li>
+    <li>약관 — 구독을 API 모양으로 중계하면 계정 정지 위험. 팀에는 공급자 키나 Bedrock/Vertex</li>
+    <li>번역 손실 — streaming·tool·caching·토큰 집계가 어긋나도 에러가 아님
+      <ul><li>"모델이 멍청해짐", "왜인지 느려짐"으로 나타나 디버깅이 오래 걸림</li></ul>
+    </li>
+    <li>운영 — 단일 장애점. 클라이언트 버전이 올라가면 새 필드에서 깨짐</li>
+  </ul>
+</section>
+
+<!-- ════════ 15장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">9. 결론</p>
+  <h2 class="page-title">도입 문제로 돌아가서</h2>
+  <p>클라이언트는 Anthropic API만 알고, 백엔드는 OpenAI 호환이었음. 클라이언트가 목적지를 환경변수로 노출한 덕에, 그 자리에 스키마 번역기를 세워 코드 수정 없이 연결함. 모델 라우팅도 같은 지점에서 한 줄로 붙음.</p>
+  <p>기억할 원리 — <mark>"주소를 설정으로 뺀 프로토콜은 중간자를 허용한다"</mark>. 그 중간자는 편의와 함께 프롬프트 전문과 키를 떠안으므로, 편의를 얻은 만큼 신뢰·번역 손실·운영 비용을 계산해야 함. 사람이 둘 이상 붙는 순간부터는 직접 만든 proxy 대신 gateway 제품이 다음 단계.</p>
+</section>
+
+</main>
+
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
