@@ -8,13 +8,11 @@ akbun-studysheet skill이 만드는 학습지는 단일 HTML 파일(외부 의�
 
 ## 핵심 의사결정 (전부 ADR로 기록됨)
 
-사용자 인터뷰(2026-07-26)에서 결정된 방향이다. 이 결정들을 뒤집으려면 사용자와 다시 논의한다.
-
 - **모델 우선(model-first).** 진실의 원본은 JSON 모델이고 HTML은 export 산출물이다. DOM 직접 편집·Figma/PowerPoint 변환 대안을 검토한 끝에 선택했다. 이유: 인터랙티브 HTML 학습지를 유지해야 한다는 요구는 자체 에디터로만 충족된다. [ADR](./knowledge/decisions/2026-07-model-first-json-source.md)
-- **고정 논리 해상도 캔버스.** 슬라이드는 1280x720 논리 px에서 한 번 레이아웃되고 화면에는 scale/zoom으로 맞춘다. iframe 스테이지 1차 구현을 사용자 피드백으로 폐기하고 Shadow DOM 캔버스로 바꿨다. [ADR](./knowledge/decisions/2026-07-fixed-design-resolution-canvas.md)
+- **고정 논리 해상도 캔버스.** 슬라이드는 1280x720 논리 px에서 한 번 레이아웃되고 화면에는 scale/zoom으로 맞춘다. iframe 스테이지 1차 구현을 폐기하고 Shadow DOM 캔버스로 바꿨다. [ADR](./knowledge/decisions/2026-07-fixed-design-resolution-canvas.md)
 - **임포트는 측정-동결.** DOMParser + 오프스크린 캔버스에서 원본 flow 레이아웃의 좌표를 재서 %로 얼린다. 임포트는 최초 1회다. [ADR](./knowledge/decisions/2026-07-import-measure-freeze.md)
 - **shell 보존 export.** 원본의 style/script/nav를 그대로 남기고 페이지 내용만 토큰 치환한다. export 결과에서 퀴즈·페이지 넘김이 동작하는 이유다. [ADR](./knowledge/decisions/2026-07-shell-preserve-export.md)
-- **akbun-shadowing-player 패턴 계승.** 무서명 arm64 dmg, dmg 교체 방식 업데이트, 순수 tsc + 전역 script 렌더러, package.json 단일 버전 출처. [ADR](./knowledge/decisions/2026-07-inherit-shadowing-electron-patterns.md)
+- **배포·업데이트·렌더러·버전 관리.** 무서명 arm64 dmg, dmg 교체 방식 자체 업데이트, 순수 tsc + 전역 script 렌더러, package.json 단일 버전 출처. [ADR](./knowledge/decisions/2026-07-release-update-renderer-conventions.md)
 
 ## 디렉터리
 
@@ -47,7 +45,7 @@ npm run dist    # release/에 dmg 생성
 - **모든 편집은 모델을 고치고 화면은 결과다.** DOM에서 읽어 모델을 만드는 방향은 텍스트 편집 커밋(contenteditable innerHTML) 한 곳뿐이다.
 - **화면 섹션 표시는 hidden 속성으로 제어한다.** section#home/#editor의 display:flex가 UA의 [hidden] 규칙을 덮으므로, 섹션을 추가하면 style.css의 `section#...[hidden] { display: none }` 선택자에 함께 추가한다.
 - **테마 색은 style.css :root 변수 한 곳에만 둔다.** light 기본 + prefers-color-scheme dark 덮어쓰기.
-- **업데이트는 dmg를 받아 .app 번들을 통째로 교체한다.** 무서명이라 electron-updater를 못 쓴다. shadowing-player의 update.ts를 접두사만 바꿔 계승했다.
+- **업데이트는 dmg를 받아 .app 번들을 통째로 교체한다.** 무서명이라 electron-updater를 못 쓴다. src/main/update.ts가 detached 스크립트로 교체를 수행한다.
 
 ## 테스트
 
@@ -55,7 +53,7 @@ node:test 내장 러너만 쓴다. **업데이트 관련 코드(update.ts, main.
 
 ## CI와 릴리스
 
-.github/workflows/release-akbun-ppteditorfromhtml.yml이 담당한다. akbun-shadowing-player와 같은 구조다.
+.github/workflows/release-akbun-ppteditorfromhtml.yml이 담당한다.
 
 - PR: ubuntu에서 npm test (electron 바이너리 다운로드 생략).
 - master push: macos에서 dmg(arm64) 빌드 → package.json version으로 akbun-PPTEditorFromHTML-v{버전} tag → dmg 첨부 GitHub Release. 빌드 실패 시 빈 release가 남지 않는 순서다.
@@ -75,7 +73,7 @@ PR이 merge되면 세션이 끝나므로 남은 일을 여기에 둔다. 항목�
 ### v0.3
 
 - [ ] 퀴즈 전용 편집 UI: 보기 추가/삭제, 정답(data-answer) 변경, 피드백 문구 수정
-- [ ] pptx export (pptxgenjs — akbun-presentation skill들이 쓰는 라이브러리, 모델에서 직접 생성)
+- [ ] pptx export (pptxgenjs로 모델에서 직접 생성)
 - [ ] 페이지 목록에 시각 썸네일
 
 ## 주의사항
@@ -83,5 +81,5 @@ PR이 merge되면 세션이 끝나므로 남은 일을 여기에 둔다. 항목�
 - release/는 커밋하지 않는다.
 - 앱 아이콘이 아직 없다(기본 Electron 아이콘). assets/icon.png를 만들면 package.json build.directories.buildResources를 assets로 지정한다.
 - electron postinstall이 막히면 node node_modules/electron/install.js를 직접 실행한다.
-- dmg는 무서명이다. 처음 실행 오류는 xattr -cr로 푼다. [무서명 배포 결정](../hprof-oom-analyzer/knowledge/decisions/2026-07-unsigned-mac-distribution.md)
+- dmg는 무서명이다. 처음 실행 오류는 xattr -cr로 푼다. [배포 결정](./knowledge/decisions/2026-07-release-update-renderer-conventions.md)
 - 편집된 학습지는 16:9 고정이다. 원본 템플릿의 좁은 화면 세로 읽기 모드와 인쇄 펼침은 절대좌표화 과정에서 포기했다(고정 해상도 ADR의 대가 항목 참조).

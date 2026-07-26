@@ -6,7 +6,7 @@ Electron 표준 3분할(main, preload, renderer) 구조다. 메인 프로세스�
 
 학습지 HTML이 들어와 편집되고 다시 나가는 흐름이다.
 
-홈 화면은 akbun-shadowing-player와 같은 구조다: 학습지 HTML 불러오기(다중 선택)·폴더 불러오기·새로고침·전체 삭제 버튼과 문서 목록이 있고, 문서를 클릭하면 편집 화면으로 넘어간다. 폴더 불러오기가 섞어 온 학습지 형식이 아닌 HTML은 임포트에서 건너뛰고 개수를 알린다.
+홈 화면에는 학습지 HTML 불러오기(다중 선택)·폴더 불러오기·새로고침·전체 삭제 버튼과 문서 목록이 있고, 문서를 클릭하면 편집 화면으로 넘어간다. 폴더 불러오기가 섞어 온 학습지 형식이 아닌 HTML은 임포트에서 건너뛰고 개수를 알린다.
 
 ```text
 [renderer] import:html / import:folder 요청 → main이 대화상자 → [{path, html}] 반환
@@ -16,7 +16,7 @@ Electron 표준 3분할(main, preload, renderer) 구조다. 메인 프로세스�
            → 페이지 직계 자식마다 getBoundingClientRect → % 좌표 동결
            → 페이지 내용을 <!--PPTE:PAGE:i--> 토큰으로 바꾼 shellHtml 생성
            → SheetDoc { title, sourcePath, shellHtml, pages[objects] }
-[main]     doc:save → ~/Documents/akbun-PPTEditorFromHTML/<이름>.json  (진실의 원본)
+[main]     doc:save → 문서 저장소(DocStore)의 <이름>.json  (진실의 원본)
 [renderer] 편집: 모든 조작이 모델을 고치고 스테이지는 재렌더 → 0.5초 디바운스 자동 저장
 [renderer] exportStudysheet: shellHtml의 토큰을 절대좌표 객체로 치환한 문자열
 [main]     export:html → 저장 대화상자(기본값: 원본 경로) → 파일 쓰기

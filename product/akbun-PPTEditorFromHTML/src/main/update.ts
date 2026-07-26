@@ -1,7 +1,6 @@
 /**
  * GitHub Release로 배포한 최신 버전을 확인하고, 원하면 dmg를 받아 앱을 교체한다.
- * akbun-shadowing-player의 업데이트 방식을 그대로 계승한다.
- * 배경은 knowledge/decisions/2026-07-inherit-shadowing-electron-patterns.md 참조.
+ * 배경은 knowledge/decisions/2026-07-release-update-renderer-conventions.md 참조.
  *
  * 서명이 없어 Squirrel.Mac 자동 업데이트는 쓸 수 없다. 대신 dmg를 직접 받아
  * .app 번들을 통째로 바꾼다. 앱이 fetch로 받은 파일에는 quarantine 속성이 붙지 않아

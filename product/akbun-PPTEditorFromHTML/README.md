@@ -4,7 +4,7 @@ akbun-studysheet HTML 학습지를 PowerPoint처럼 편집하는 macOS 데스크
 
 ## 동작 방식
 
-- 임포트: 학습지 HTML을 파싱·렌더링해 요소 좌표를 재고 JSON 모델로 바꾼다. 이후 진실의 원본은 ~/Documents/akbun-PPTEditorFromHTML/의 JSON이다.
+- 임포트: 학습지 HTML을 파싱·렌더링해 요소 좌표를 재고 JSON 모델로 바꾼다. 이후 진실의 원본은 앱이 관리하는 문서 저장소의 JSON이다. 저장 위치는 앱의 설정 정보(app:info)로 확인한다.
 - 편집: 고정 1280x720 논리 해상도 캔버스에서 PPT처럼 조작한다. 편집은 자동 저장된다.
 - 내보내기: 원본의 CSS/JS를 보존한 채 절대좌표 레이아웃으로 학습지 HTML을 생성한다. 브라우저만 있으면 열린다.
 
