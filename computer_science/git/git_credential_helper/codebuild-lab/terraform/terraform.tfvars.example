@@ -1,0 +1,5 @@
+github_org  = "akbun-ghapptest"
+repo_a_name = "a"
+repo_b_name = "b"
+
+github_branch = "main"
