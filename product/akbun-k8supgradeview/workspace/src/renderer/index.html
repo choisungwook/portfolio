@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
+  <title>akbun-k8supgradeview</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>akbun-k8supgradeview</h1>
+    <nav>
+      <button class="tab-button active" data-tab="nodes">Nodes</button>
+      <button class="tab-button" data-tab="pods">Pods</button>
+      <button class="tab-button" data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <div id="error-banner" class="hidden"></div>
+
+  <main>
+    <!-- Nodes tab -->
+    <section id="tab-nodes" class="tab active">
+      <div class="toolbar">
+        <div class="filters">
+          <button class="filter-button active" data-filter="all">전체</button>
+          <button class="filter-button" data-filter="karpenter">Karpenter</button>
+          <button class="filter-button" data-filter="managed">Managed NodeGroup</button>
+          <button class="filter-button" data-filter="cordoned">Cordoned / NotSchedulable</button>
+        </div>
+        <button id="refresh-nodes">새로고침</button>
+      </div>
+      <table id="node-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Internal IP</th>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Age</th>
+            <th>Group</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="node-empty" class="empty hidden">노드가 없습니다.</p>
+
+      <section id="node-pods-panel" class="hidden">
+        <h2 id="node-pods-title"></h2>
+        <table id="node-pod-table">
+          <thead>
+            <tr>
+              <th>Namespace</th>
+              <th>Pod</th>
+              <th>Status</th>
+              <th>Age</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- Pods tab -->
+    <section id="tab-pods" class="tab">
+      <div class="toolbar">
+        <select id="namespace-filter">
+          <option value="">모든 namespace</option>
+        </select>
+        <input id="pod-search" type="text" placeholder="pod 이름 검색" />
+        <button id="refresh-pods">새로고침</button>
+      </div>
+      <table id="pod-table">
+        <thead>
+          <tr>
+            <th>Namespace</th>
+            <th>Pod</th>
+            <th>Status</th>
+            <th>Node</th>
+            <th>Age</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="pod-empty" class="empty hidden">파드가 없습니다.</p>
+    </section>
+
+    <!-- Settings tab -->
+    <section id="tab-settings" class="tab">
+      <h2>kubectl 설정</h2>
+      <p class="help">
+        teleport 같은 proxy를 통해 접속하면 kubectl 명령을 바꿔서 사용한다.
+        예: tsh kubectl
+      </p>
+      <div class="settings-form">
+        <label for="kubectl-command">kubectl 명령</label>
+        <input id="kubectl-command" type="text" placeholder="kubectl" />
+        <button id="save-settings">저장</button>
+        <span id="settings-saved" class="hidden">저장되었습니다.</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
