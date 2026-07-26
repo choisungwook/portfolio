@@ -29,6 +29,9 @@ interface StageState {
 
 let stage: StageState | null = null;
 
+/** 이번 렌더링의 이벤트 리스너 수명. 다시 렌더링하면 abort로 이전 리스너를 정리한다. */
+let stageAbort: AbortController | null = null;
+
 /** 현재 페이지를 스테이지에 그린다. 페이지를 바꾸거나 문서를 열 때마다 다시 부른다. */
 function stageRender(
   sheetDoc: SheetDoc,
@@ -38,6 +41,9 @@ function stageRender(
 ): void {
   container.textContent = "";
   stage = null;
+  // window에 단 이전 렌더링의 드래그 리스너가 쌓이지 않게 정리한다.
+  stageAbort?.abort();
+  stageAbort = new AbortController();
 
   const scale = Math.min(
     (container.clientWidth - 24) / DESIGN_W,
@@ -117,8 +123,9 @@ function realTarget(e: Event): HTMLElement | null {
 }
 
 function bindStageEvents(page: SheetPage, onChange: () => void): void {
-  if (!stage) return;
+  if (!stage || !stageAbort) return;
   const { root } = stage;
+  const { signal } = stageAbort;
 
   // 드래그 상태. null이면 드래그 중이 아니다.
   let drag: {
@@ -177,7 +184,7 @@ function bindStageEvents(page: SheetPage, onChange: () => void): void {
       origW: obj.w,
     };
     e.preventDefault();
-  });
+  }, { signal });
 
   // 드래그 중 마우스가 캔버스를 벗어나도 따라가도록 window에서 듣는다.
   window.addEventListener("mousemove", (e) => {
@@ -196,13 +203,13 @@ function bindStageEvents(page: SheetPage, onChange: () => void): void {
       drag.wrapper.style.width = `${drag.obj.w}%`;
     }
     syncHandle();
-  });
+  }, { signal });
 
   window.addEventListener("mouseup", () => {
     if (!drag) return;
     drag = null;
     onChange();
-  });
+  }, { signal });
 
   // 더블클릭 → 제자리 텍스트 편집. 바깥을 클릭하면 mousedown에서 커밋된다.
   root.addEventListener("dblclick", (e) => {
@@ -211,7 +218,7 @@ function bindStageEvents(page: SheetPage, onChange: () => void): void {
     wrapper.setAttribute("contenteditable", "true");
     wrapper.classList.add("editing");
     wrapper.focus();
-  });
+  }, { signal });
 }
 
 /** 편집 중인 wrapper가 있으면 contenteditable을 끝내고 내용을 모델에 커밋한다. */
