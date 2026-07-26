@@ -12,6 +12,7 @@
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |
 | [akbun-k8supgradeview](./akbun-k8supgradeview/) | EKS 업그레이드 작업용 노드/파드 조회 Electron 데스크톱 앱 |
 | [akbun-shadowing-player](./akbun-shadowing-player/) | 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 Electron 앱 |
+| [akbun-PPTEditorFromHTML](./akbun-PPTEditorFromHTML/) | akbun-studysheet HTML 학습지를 PPT처럼 편집하는 Electron 데스크톱 앱 |
 | [slide-reference](./slide-reference/) | AI agent용 슬라이드 레이아웃 레퍼런스 |
 | [slo](./slo/) | SLO 가용성을 입력하면 허용 다운타임을 계산하는 웹 도구 |
 | [tistory-skin](./tistory-skin/) | Tistory 블로그 스킨 |

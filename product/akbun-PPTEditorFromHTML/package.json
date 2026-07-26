@@ -1,0 +1,47 @@
+{
+  "name": "akbun-ppteditorfromhtml",
+  "productName": "akbun-PPTEditorFromHTML",
+  "version": "0.1.0",
+  "description": "akbun-studysheet HTML 학습지를 PPT처럼 편집하는 데스크톱 에디터",
+  "main": "dist/main/main.js",
+  "author": "akbun",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json",
+    "test": "npm run build && node --test \"test/*.test.js\"",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "dev.akbun.ppteditorfromhtml",
+    "productName": "akbun-PPTEditorFromHTML",
+    "files": [
+      "dist/**/*",
+      "static/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity"
+    }
+  }
+}

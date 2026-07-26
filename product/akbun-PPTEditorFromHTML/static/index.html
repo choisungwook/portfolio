@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>akbun-PPTEditorFromHTML</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="home">
+  <header class="bar home-header">
+    <h1>akbun-PPTEditorFromHTML</h1>
+    <div class="home-actions">
+      <button id="btn-import" class="primary">학습지 HTML 불러오기</button>
+      <button id="btn-import-folder">폴더 불러오기</button>
+      <button id="btn-refresh" title="문서 목록을 다시 읽는다">새로고침</button>
+      <button id="btn-remove-all" title="모든 문서를 지운다. 편집 내용이 삭제된다">전체 삭제</button>
+    </div>
+  </header>
+  <p id="empty-hint">학습지 HTML 파일이나 폴더를 불러오면 목록에 나타난다. 문서를 클릭하면 편집 화면으로 이동한다.</p>
+  <div id="doc-list"></div>
+</section>
+
+<section id="editor" hidden>
+  <header class="bar">
+    <button id="btn-home">← 홈</button>
+    <b id="doc-title"></b>
+    <span id="save-state"></span>
+    <button id="btn-export">HTML로 내보내기</button>
+  </header>
+  <div class="split">
+    <nav id="page-list"></nav>
+    <div id="stage"></div>
+  </div>
+</section>
+
+<script src="../dist/renderer/importer.js"></script>
+<script src="../dist/renderer/exporter.js"></script>
+<script src="../dist/renderer/editor.js"></script>
+<script src="../dist/renderer/renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+name: release-akbun-ppteditorfromhtml
+
+on:
+  push:
+    branches:
+      - master
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
+    paths:
+      - 'product/akbun-PPTEditorFromHTML/**'
+  pull_request:
+    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
+    paths:
+      - 'product/akbun-PPTEditorFromHTML/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-PPTEditorFromHTML
+
+jobs:
+  # PR 검증용. electron 바이너리 없이 tsc 컴파일과 테스트만 확인한다.
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      # 저장소 규칙상 lock 파일을 커밋하지 않으므로 npm ci 대신 npm install을 쓴다.
+      - name: Install dependencies
+        run: npm install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      # 업데이트 기능이 임시 파일을 남기지 않는지와 export 문자열 로직을 확인한다.
+      # build가 함께 돈다. 교체 스크립트 테스트는 hdiutil이 없는 ubuntu에서도 동작한다.
+      # attach 단계에서 실패하는 것이 검증 대상인 실패 경로이기 때문이다.
+      - name: Compile TypeScript and run tests
+        run: npm test
+
+  # macOS 전용 빌드. dmg 빌드가 성공해야 tag를 만들고, tag가 만들어져야 release를 만든다.
+  # 버전은 package.json의 version을 그대로 쓴다. 코드 수정 시 버전을 +1 하는 것은
+  # product/akbun-PPTEditorFromHTML/AGENTS.md 규칙이다.
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-PPTEditorFromHTML-v$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build dmg
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # 빌드가 성공한 뒤에만 tag를 만든다.
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      # tag 생성이 성공한 뒤에만 release를 만든다.
+      - name: Create release with dmg
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          - akbun-studysheet HTML 학습지를 PPT처럼 편집하는 데스크톱 에디터의 macOS 빌드다.
+          - dmg는 Apple Silicon(arm64) 전용이다.
+          - 코드 서명이 없어 처음 실행하면 "damaged and can't be opened" 오류가 난다.
+          - 설치 후 `xattr -cr /Applications/akbun-PPTEditorFromHTML.app`로 quarantine 속성을 지우면 실행된다.
+          EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            product/akbun-PPTEditorFromHTML/release/*.dmg
