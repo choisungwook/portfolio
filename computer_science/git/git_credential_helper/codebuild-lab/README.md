@@ -52,7 +52,9 @@ credential.helper=
 credential.helper=/codebuild/readonly/bin/git-credential-helper
 ```
 
-빈 값 한 줄이 앞에 있는 이유는 helper 목록이 누적되기 때문이다. 빌드 이미지에 이미 helper가 있었다면 그것을 지우고 자기 것만 남기려는 것이다. `usehttppath=true`는 helper 조회 단위를 host에서 repo path로 바꾼다. 이 두 줄이 3번과 4번의 결과 차이를 만든다.
+출력의 키 이름이 소문자인 것은 git이 config 키를 대소문자 구분 없이 다루고 출력할 때 소문자로 내기 때문이다. 문서와 설정 파일에 쓰는 이름은 `credential.useHttpPath`다.
+
+빈 값 한 줄이 앞에 있는 이유는 helper 목록이 누적되기 때문이다. 빌드 이미지에 이미 helper가 있었다면 그것을 지우고 자기 것만 남기려는 것이다. `credential.useHttpPath`는 helper 조회 단위를 host에서 repo path로 바꾼다. 이 두 줄이 3번과 4번의 결과 차이를 만든다.
 
 **3번과 4번의 차이가 이 실습의 핵심이다.** source repo path로 물으면 토큰이 나오고, 다른 repo path로 물으면 나오지 않는다. helper가 path별로 응답을 다르게 한다는 뜻이고, 실패했을 때 나오는 메시지가 단서다.
 
