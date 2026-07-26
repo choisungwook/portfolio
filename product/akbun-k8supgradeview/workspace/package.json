@@ -1,0 +1,40 @@
+{
+  "name": "akbun-k8supgradeview",
+  "version": "0.2.0",
+  "description": "EKS 업그레이드 작업 중 노드와 파드 상태를 확인하는 데스크톱 뷰어",
+  "author": "akbun",
+  "license": "MIT",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.js",
+    "start": "npm run build && electron .",
+    "test": "npm run build && node --test \"test/*.test.js\"",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.0"
+  },
+  "build": {
+    "appId": "io.akbun.k8supgradeview",
+    "productName": "akbun-k8supgradeview",
+    "files": [
+      "dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}
