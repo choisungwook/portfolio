@@ -1,0 +1,18 @@
+version: 0.2
+
+# git-credential-helper: yes를 켜면 CodeBuild가 빌드 컨테이너 git 설정에
+# /codebuild/readonly/bin/git-credential-helper와 credential.useHttpPath=true를 심는다.
+# useHttpPath 때문에 helper 조회가 repo path 단위로 일어나므로,
+# source repo(a)가 아닌 path는 agent가 400으로 거부한다.
+# pre_build에서 source repo path로 토큰을 한 번 꺼내 전역 credential store에 심어 두면
+# build 단계의 스크립트는 평범한 git clone만 하면 된다.
+env:
+  git-credential-helper: yes
+
+phases:
+  pre_build:
+    commands:
+      - bash scripts/setup-git-credential.sh
+  build:
+    commands:
+      - bash scripts/clone-and-run.sh

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dnf install -y git
+
+# custom credential helper.
+# 토큰을 디스크에 두지 않고 호출될 때마다 SSM에서 가져온다.
+# CodeBuild helper가 agent에게 물어보는 것과 같은 구조를, 권한만 IAM으로 바꿔 재현한 것이다.
+cat > /usr/local/bin/git-credential-ssm <<'HELPER'
+#!/usr/bin/env bash
+# git은 get / store / erase 중 하나를 인자로 넘긴다. 여기서는 get만 처리한다.
+[ "$1" = "get" ] || exit 0
+
+# stdin으로 protocol, host, (useHttpPath면) path가 들어온다. 읽어서 host만 확인한다.
+input="$(cat)"
+echo "$input" | grep -q '^host=github.com$' || exit 0
+
+token="$(aws ssm get-parameter \
+  --name "${token_parameter_name}" \
+  --with-decryption \
+  --region "${aws_region}" \
+  --query Parameter.Value \
+  --output text)"
+
+[ -n "$token" ] || exit 0
+
+echo "username=x-access-token"
+echo "password=$token"
+HELPER
+
+chmod 755 /usr/local/bin/git-credential-ssm
