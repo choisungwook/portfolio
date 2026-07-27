@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euxo pipefail
+
+# stress-ng drives CPU load later to trigger the target tracking policy
+dnf install -y stress-ng
+
+# Static page served on the target group port; the instance id shows
+# which instance answered when the ASG scales out
+TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -sH "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/instance-id")
+mkdir -p /srv/www
+echo "ok from $INSTANCE_ID" > /srv/www/index.html
+
+cat > /etc/systemd/system/web.service <<'EOF'
+[Unit]
+Description=Lab web server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 8080 --directory /srv/www
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now web.service

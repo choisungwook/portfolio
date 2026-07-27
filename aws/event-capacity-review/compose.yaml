@@ -1,0 +1,50 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: lab
+      MYSQL_USER: lab
+      MYSQL_PASSWORD: lab
+      MYSQL_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-plab", "-ulab"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  valkey:
+    image: valkey/valkey:8
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    build: ./app
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: mysql
+      REDIS_HOST: valkey
+      CACHE_TTL_SECONDS: 30
+      CACHE_TTL_JITTER_RATIO: 0 # switch to 0.1 in the stampede step
+    # cap the app to one CPU so /api/cpu saturates at a predictable point
+    cpus: 1.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  k6:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    volumes:
+      - ./k6:/scripts:ro
+    environment:
+      BASE_URL: http://app:8080
+      TARGET: ${TARGET:-/api/db}
+    command: run /scripts/ramp.js
+    depends_on:
+      - app

@@ -1,0 +1,7 @@
+aws_region   = "ap-northeast-2"
+project_name = "event-capacity-lab"
+
+# Uncomment to rehearse the pre-event scheduled scaling (UTC)
+# event_scale_out_at = "2026-08-01T02:30:00Z"
+# event_scale_in_at  = "2026-08-01T05:00:00Z"
+# event_min_size     = 3

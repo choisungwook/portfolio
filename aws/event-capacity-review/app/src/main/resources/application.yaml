@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      max: ${TOMCAT_MAX_THREADS:20} # deliberately small so thread saturation is easy to reproduce
+    mbeanregistry:
+      enabled: true # required for tomcat.threads.* metrics
+
+spring:
+  application:
+    name: capacity-lab
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:lab}
+    username: ${DB_USER:lab}
+    password: ${DB_PASSWORD:lab}
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:5} # deliberately small so pool saturation is easy to reproduce
+      connection-timeout: 2000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 3s
+      timeout: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+cache:
+  product:
+    ttl-seconds: ${CACHE_TTL_SECONDS:60}
+    ttl-jitter-ratio: ${CACHE_TTL_JITTER_RATIO:0}

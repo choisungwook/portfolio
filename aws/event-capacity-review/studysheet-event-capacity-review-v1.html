@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이벤트 D-7, 무엇을 점검할 것인가 — 스케일 판단과 warm pool</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스 */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>이벤트 D-7, 무엇을 점검할 것인가 — <mark>스케일 판단과 warm pool</mark></h1>
+    <p class="sub">EC2(ASG) + internet-facing ALB + Redis + RDS 위 Spring Boot API의 사전 용량 점검</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 다음 주 대형 이벤트로 트래픽 10배 예상. "인스턴스와 DB 스펙을 미리 점검하라"는 지시를 받음.</p>
+    <p><b class="p-point">무엇을, 어떤 기준으로 점검할까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">"여유 있어 보임"은 점검이 아님</h2>
+  <p class="dim">흔한 점검의 모습을 가정함.</p>
+  <ul class="bullets">
+    <li><span class="xmark">✕</span> 대시보드를 훑고 <span class="prob-text">"CPU 30%라 여유 있음"</span>이라고 보고 — 평시 수치일 뿐</li>
+    <li><span class="xmark">✕</span> 일단 인스턴스를 2배로 늘려 둠 — 병목이 DB면 <span class="prob-text">돈만 쓰고 그대로 죽음</span></li>
+    <li><span class="xmark">✕</span> auto scaling이 있으니 알아서 될 것 — 스파이크는 초 단위, 스케일 아웃은 분 단위</li>
+  </ul>
+  <p>필요한 것은 네 가지 — ① 수치화된 예상 부하 ② 계층별 포화 지점 실측 ③ 병목 유형별 up/out 판단 규칙 ④ scale out의 시간 벽 대응.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — SRE 관점에서 각 계층의 saturation(포화까지 남은 거리)을 재고, 병목의 정체로 up/out을 정함.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 — golden signals ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">점검의 축은 saturation</h2>
+  <p class="dim">Google SRE book의 4 golden signals. 무엇을 볼지 모를 때 돌아오는 기준점.</p>
+  <ul class="bullets">
+    <li>latency — 응답이 얼마나 걸리는가. 성공과 실패의 latency는 따로 봄</li>
+    <li>traffic — 시스템에 얼마나 요청이 오는가 (RPS)</li>
+    <li>errors — 실패율. 명시적 5xx와 "200이지만 느려서 사실상 실패"를 포함</li>
+    <li><mark>saturation — 가장 제약된 자원이 한계까지 얼마나 남았는가</mark></li>
+  </ul>
+  <p>사전 점검이 묻는 것은 넷 중 saturation임. 평시 대시보드가 아니라 <mark>목표 부하를 걸었을 때</mark> 어떤 자원이 먼저 차는지를 재는 것. 자원 관점 점검은 USE(utilization·saturation·errors), 요청 관점은 RED(rate·errors·duration)로 구체화함.</p>
+  <p class="foot">이 저장소의 USE/RED 정리: computer_science/red_and_use_method/</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 — 용량 산정 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">이벤트 부하는 추세 외삽이 안 됨</h2>
+  <p>SRE book은 수요 성장을 둘로 나눔 — 자연 성장(organic)과 <mark>이벤트성 성장(inorganic)</mark>. 이벤트는 과거 그래프의 연장선에 없으므로, 근거는 추세가 아니라 산정과 실측임.</p>
+  <ul class="bullets">
+    <li>① 예상 peak를 수치로 — 마케팅 도달 수 × 전환율, 과거 이벤트의 배수, 오픈 순간 집중도
+      <ul><li>"10배"는 하루 평균이 아니라 <b>오픈 직후 수 분의 순간 RPS</b>로 환산</li></ul>
+    </li>
+    <li>② 부하 테스트로 1대당 처리량 실측 — p95 latency가 꺾이는 지점이 그 인스턴스의 saturation point</li>
+    <li>③ 필요 대수 = peak RPS ÷ 대당 처리량 + <mark>headroom</mark> — 1대가 죽어도 남은 대수로 견디는 N+1 이상</li>
+  </ul>
+  <p>이 산식이 있어야 "몇 대가 필요한가"와 "지금 max 설정이 충분한가"에 숫자로 답할 수 있음.</p>
+</section>
+
+<!-- ════════ 5장. 원리 3 — up vs out ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">판단 질문 — 이 병목은 나누면 나뉘는가</h2>
+  <ul class="bullets">
+    <li><mark>scale out이 답</mark> — 요청을 나누면 병목도 나뉘는 경우
+      <ul>
+        <li>stateless API의 CPU·thread 포화. 전제는 상태 외부화(세션은 Redis, 파일은 S3)</li>
+      </ul>
+    </li>
+    <li><mark>scale up이 답</mark> — 나눠도 나뉘지 않는 병목
+      <ul>
+        <li>단일 요청의 처리 시간, 메모리 부족, DB 쓰기, 단일 hot key</li>
+        <li>연결 수처럼 <b>한도가 인스턴스 크기에 묶인 자원</b> (RDS max_connections)</li>
+      </ul>
+    </li>
+    <li>up의 한계 — 가장 큰 인스턴스가 천장. 변경 순간 재시작·failover가 따라옴</li>
+    <li>out의 함정 — 앱을 늘리면 <span class="prob-text">DB 연결·Redis 연결도 같이 늘어남</span>. 병목이 이동함</li>
+  </ul>
+  <p>그래서 순서는 스케일 방법 선택이 아니라 <b>병목의 정체 확인이 먼저</b>임.</p>
+</section>
+
+<!-- ════════ 6장. 구조 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">요청 경로와 구간별 포화 지점</h2>
+  <p class="dim">각 단계에서 "여기가 먼저 차면 어떤 메트릭에 나타나는가"를 봄.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">1</span>
+        <div class="dbox hot">ALB<small>RequestCount·5XX</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">EC2 (ASG)</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">Redis</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>1단계.</b> 입구. ALB 자체는 AWS가 스케일하지만 점진적임. TargetResponseTime과 ELB 5xx가 뒤 계층 포화의 첫 신호가 됨.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">EC2 · Spring Boot<small>CPU / tomcat thread</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">Redis</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>2단계.</b> 앱 계층. CPU보다 tomcat busy thread가 먼저 찰 수 있음 — CPU 40%인데 지연이 폭증하면 thread·pool 병목을 의심.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">Spring Boot</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">Redis<small>hit ratio·메모리·연결</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>3단계.</b> 캐시 계층. hit ratio가 흔들리는 순간 miss가 전부 RDS로 감 — 캐시는 DB의 방패이자, 무너지면 DB 장애의 도화선.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">4</span>
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">Spring Boot<small>Hikari pool</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">Redis</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">RDS<small>connections·CPU·IOPS</small></div>
+      </div>
+      <p class="exp"><b>4단계.</b> 최심부. 여기는 scale out으로 나뉘지 않는 자원이 많음. 앱 대수 × pool size가 그대로 RDS 연결 수가 되는 것이 핵심 제약.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 7장. 계층 점검 — ALB ════════ -->
+<section class="page">
+  <p class="sec">4. 계층별 점검</p>
+  <h2 class="page-title">ALB — 입구는 보통 병목이 아니지만</h2>
+  <ul class="bullets">
+    <li>ALB는 트래픽에 따라 AWS가 자동으로 스케일함. 다만 <mark>점진적</mark> — 초 단위 수직 스파이크가 예상되면 AWS 지원에 pre-warm을 요청할 수 있음</li>
+    <li>볼 메트릭
+      <ul>
+        <li>RequestCount — traffic 신호. 이벤트 리허설 때 예상 peak와 비교할 기준</li>
+        <li>TargetResponseTime — 뒤 계층 latency의 합산 지표</li>
+        <li>HTTPCode_ELB_5XX_Count·RejectedConnectionCount — <span class="prob-text">보낼 대상이 없다</span>는 신호. 대상 포화</li>
+      </ul>
+    </li>
+    <li>설정 점검 — idle timeout이 앱 keep-alive보다 짧은지, cross-zone 분산, 헬스체크 간격</li>
+  </ul>
+  <p>ALB 메트릭은 병목의 위치를 알려주지 않음. <b>병목이 있다는 사실</b>을 가장 먼저 알려줄 뿐 — 원인은 다음 계층들에서 찾음.</p>
+</section>
+
+<!-- ════════ 8장. 계층 점검 — ASG ════════ -->
+<section class="page">
+  <p class="sec">4. 계층별 점검</p>
+  <h2 class="page-title">EC2·ASG — max가 진짜 한도인지 확인</h2>
+  <ul class="bullets">
+    <li>스케일 지표가 병목과 일치하는지 — CPU-bound 앱이면 ASGAverageCPUUtilization, 아니면 <mark>ALBRequestCountPerTarget</mark>이 정직함
+      <ul><li>thread 병목인데 CPU 지표로 스케일하면 <span class="prob-text">지표가 안 올라 스케일이 안 됨</span></li></ul>
+    </li>
+    <li>max 용량의 숨은 천장 — ASG max 뒤에 있는 <mark>계정 vCPU quota</mark>, 서브넷 여유 IP, (있다면) 라이선스 수</li>
+    <li>desired만 늘려보는 리허설 — 새 인스턴스가 InService까지 실제 몇 분 걸리는지 실측 (13장의 시간 벽)</li>
+    <li>scale in도 점검 — 이벤트 종료 직후 급감에서 한꺼번에 줄이면 남은 인스턴스가 다시 포화됨. cooldown·scale in 보호 확인</li>
+  </ul>
+  <p class="foot">이 저장소의 ASG 예제: aws/auto_scaling_group/</p>
+</section>
+
+<!-- ════════ 9장. 계층 점검 — Spring Boot ════════ -->
+<section class="page">
+  <p class="sec">4. 계층별 점검</p>
+  <h2 class="page-title">Spring Boot — CPU보다 먼저 차는 것들</h2>
+  <ul class="bullets">
+    <li>tomcat threads.max (기본 200) — busy thread가 먼저 포화되면 <span class="prob-text">CPU가 남아도 응답이 밀림</span>. 메트릭 tomcat_threads_busy_threads</li>
+    <li>HikariCP pool (기본 10) — hikari_connections_pending이 생기면 병목은 DB가 아니라 <mark>pool 크기</mark>일 수 있음. 단, pool을 키우기 전에 11장의 DB 연결 예산 먼저</li>
+    <li>JVM — heap 사용률·GC pause. 그리고 <mark>기동 직후 웜업</mark> — JIT 컴파일 전에는 처리량이 낮음. 새 인스턴스가 투입 직후 느린 이유</li>
+    <li>timeout 체인 — client > ALB idle > app > DB 순으로 안쪽이 짧아야 함. 안쪽이 더 길면 바깥이 먼저 끊고 재시도 폭풍을 만듦</li>
+  </ul>
+  <p class="foot">JVM 웜업 재현: computer_science/jvm_warmup/</p>
+</section>
+
+<!-- ════════ 10장. 계층 점검 — Redis ════════ -->
+<section class="page">
+  <p class="sec">4. 계층별 점검</p>
+  <h2 class="page-title">Redis — 캐시가 무너지면 DB가 무너짐</h2>
+  <ul class="bullets">
+    <li>maxmemory와 eviction policy — 이벤트 중 eviction이 돌기 시작하면 hit ratio가 떨어지고 miss가 RDS를 때림</li>
+    <li>hit ratio·연결 수 — 앱을 scale out하면 <mark>Redis 연결도 대수 × pool만큼 늘어남</mark></li>
+    <li>hot key — 이벤트 상품 키 하나에 몰리는 부하는 샤딩으로 나뉘지 않음 → <b>out이 아니라</b> 로컬 캐시·복제로 풂</li>
+    <li><mark>cache stampede</mark> — 같은 시각에 캐시가 만료되면 miss가 동시에 DB로 감
+      <ul>
+        <li>대책 — TTL jitter(만료 시각 분산), 이벤트 오픈 전 캐시 warm-up, 요청 병합</li>
+      </ul>
+    </li>
+  </ul>
+  <p>Redis 점검의 결론은 Redis만의 문제가 아님 — <b>캐시의 포화는 곧 RDS의 부하 예고</b>라서 11장과 함께 봐야 함.</p>
+</section>
+
+<!-- ════════ 11장. 계층 점검 — RDS ════════ -->
+<section class="page">
+  <p class="sec">4. 계층별 점검</p>
+  <h2 class="page-title">RDS — 연결 예산이 scale out의 상한</h2>
+  <ul class="bullets">
+    <li><mark>max_connections은 인스턴스 메모리에 비례</mark> — MySQL 기본 파라미터는 {DBInstanceClassMemory/12582880}. 즉 DB 스펙이 앱 연결 총량의 한도
+      <ul><li>점검식 — 앱 최대 대수 × Hikari pool size + 운영·배치 연결 &lt; max_connections</li></ul>
+    </li>
+    <li>읽기와 쓰기를 나눠서 판단 — 읽기는 read replica로 <b>out</b>, 쓰기는 instance class <b>up</b>만 가능</li>
+    <li>CPU·FreeableMemory·IOPS — gp 스토리지면 burst balance 소진 여부까지. Performance Insights로 이벤트 경로의 상위 쿼리 확인</li>
+    <li>스펙 변경은 <span class="prob-text">재시작·failover를 동반</span> — 이벤트 직전에 못 함. 한다면 며칠 전에 리허설과 함께</li>
+  </ul>
+  <p>앱은 분 단위로 늘었다 줄지만 DB는 그러지 못함 — 그래서 DB 스펙 점검이 <b>사전</b> 점검의 본체임.</p>
+</section>
+
+<!-- ════════ 12장. 판단 매트릭스 ════════ -->
+<section class="page">
+  <p class="sec">5. 판단</p>
+  <h2 class="page-title">병목 신호 → 스케일 판단</h2>
+  <ul class="bullets">
+    <li>EC2 CPU 포화 + stateless — <mark>scale out</mark>. 필요 대수는 4장의 산식으로</li>
+    <li>tomcat busy 포화, CPU 여유 — out 전에 threads.max와 뒤 계층 지연부터. thread를 다 쓰는 원인이 DB 대기면 out은 헛수고</li>
+    <li>Hikari pending 발생 — pool·DB 연결 예산 재설계. <span class="prob-text">out 하면 DB 연결만 배수가 됨</span></li>
+    <li>Redis 메모리 압박 — node type <mark>up</mark> 또는 cluster로 샤딩 out. hot key만은 로컬 캐시로</li>
+    <li>RDS 읽기 CPU 포화 — read replica <mark>out</mark> + 앱의 읽기/쓰기 분리</li>
+    <li>RDS 쓰기·연결 포화 — instance class <mark>up</mark>. 이벤트 며칠 전에</li>
+  </ul>
+  <p>공통 전제 — 신호는 부하 테스트로 미리 만들어 봄. 이벤트 당일에 처음 보는 신호가 없게 하는 것이 사전 점검의 목적임.</p>
+</section>
+
+<!-- ════════ 13장. 시간 벽 ════════ -->
+<section class="page">
+  <p class="sec">5. 판단</p>
+  <h2 class="page-title">scale out의 시간 벽</h2>
+  <p class="dim">반응형 스케일이 트래픽을 받기까지의 전체 경로. 각 구간이 더해짐.</p>
+  <div class="diagram">
+    <div class="dbox">메트릭 수집<small>1~3분 단위</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox">알람 평가<small>datapoint 수 분</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox bad">EC2 생성·부팅<small>1~2분</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox bad">user_data·앱 기동<small>수십 초~수 분</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox">JVM 웜업<small>트래픽 받으며</small></div>
+  </div>
+  <p class="caption">합계 5~10분. 이벤트 오픈 스파이크는 수 초 만에 옴</p>
+  <ul class="bullets">
+    <li>알람 지연은 줄이기 어려움 — CloudWatch 수집 주기와 datapoint 요구는 구조적임</li>
+    <li>줄일 수 있는 곳은 <mark>생성·부팅·초기화 구간</mark> — 여기를 미리 치러 두는 장치가 warm pool</li>
+  </ul>
+</section>
+
+<!-- ════════ 14장. warm pool 원리 ════════ -->
+<section class="page">
+  <p class="sec">6. warm pool</p>
+  <h2 class="page-title">초기화를 미리 치러 두는 풀</h2>
+  <p>ASG 기능. 인스턴스를 <mark>미리 생성해 user_data까지 끝내 놓고</mark>, 트래픽은 받지 않는 상태로 대기시킴. scale out 때 새로 만들지 않고 풀에서 꺼내 시작함.</p>
+  <ul class="bullets">
+    <li>대기 상태 세 가지
+      <ul>
+        <li><mark>Stopped(기본)</mark> — 컴퓨팅 과금 없음, EBS·EIP만 과금. 꺼낼 때 재시작만 하면 됨</li>
+        <li>Running — 가장 빠르지만 대기 중에도 컴퓨팅 과금</li>
+        <li>Hibernated — 메모리를 EBS에 보존한 채 정지</li>
+      </ul>
+    </li>
+    <li>min_size — 풀에 항상 유지할 대수. max_group_prepared_capacity로 상한 지정</li>
+    <li>reuse_on_scale_in — scale in 때 종료 대신 풀로 반환해 재사용</li>
+    <li>초기화가 긴 인스턴스는 lifecycle hook으로 <b>준비 완료 후에만</b> 풀에 들어가게 보장</li>
+  </ul>
+</section>
+
+<!-- ════════ 15장. warm pool 설정 ════════ -->
+<section class="page">
+  <p class="sec">6. warm pool</p>
+  <h2 class="page-title">terraform 설정과 확인</h2>
+  <p class="codedesc">ASG에 붙이는 warm_pool 블록 — Stopped 2대를 항상 준비</p>
+<pre class="code"><span class="k">resource</span> <span class="s">"aws_autoscaling_group"</span> <span class="s">"app"</span> {
+  <span class="c"># ...launch template, min 1 / max 4...</span>
+  <span class="hot">warm_pool</span> {
+    <span class="k">pool_state</span> = <span class="s">"Stopped"</span>
+    <span class="k">min_size</span>   = 2
+    <span class="k">instance_reuse_policy</span> { <span class="k">reuse_on_scale_in</span> = true }
+  }
+}</pre>
+  <p class="codedesc">풀 상태와, scale out이 풀에서 꺼내 갔는지 확인</p>
+<pre class="code">aws autoscaling describe-warm-pool --auto-scaling-group-name event-capacity-lab
+aws autoscaling describe-scaling-activities --auto-scaling-group-name event-capacity-lab</pre>
+  <p>activity 설명에 warm pool에서 시작했다는 문구가 남음 — cold launch와 InService 도달 시각을 비교하면 절약 폭이 보임.</p>
+</section>
+
+<!-- ════════ 16장. warm pool 한계(반전) ════════ -->
+<section class="page">
+  <p class="sec">7. 반전</p>
+  <h2 class="page-title">warm pool이 데워 주지 않는 것</h2>
+  <ul class="bullets">
+    <li>user_data는 <mark>풀에 들어가는 첫 부팅에 실행</mark>됨 — 재시작 때 다시 도는 초기화인지, 한 번이면 되는 초기화인지 스크립트를 확인해야 함</li>
+    <li>Stopped 풀은 프로세스가 죽어 있음 — 꺼내서 재시작하면 <span class="prob-text">JVM은 cold</span>. warm pool이 절약하는 것은 인프라 준비 시간이지 <b>앱 웜업이 아님</b>
+      <ul><li>오픈 직후 새 인스턴스로 간 요청이 느린 이유는 여기 있음 — 웜업 트래픽·readiness 지연으로 따로 풂</li></ul>
+    </li>
+    <li>DB에는 warm pool이 없음 — RDS·Redis의 수직 변경은 분 단위 + failover. <mark>당일 대응 불가, 사전 작업</mark>임</li>
+  </ul>
+  <p>결론 — warm pool은 시간 벽의 가운데 구간만 줄임. 나머지는 17장의 사전 전략이 맡음.</p>
+</section>
+
+<!-- ════════ 17장. 사전 전략 ════════ -->
+<section class="page">
+  <p class="sec">8. 사전 전략</p>
+  <h2 class="page-title">시각을 아는 부하는 미리 채움</h2>
+  <p>이벤트는 시작 시각을 앎 — 예측 불가 부하용 장치(반응형)에 기대지 않고 <mark>일정 기반으로 미리 올림</mark>.</p>
+  <p class="codedesc">scheduled action — 오픈 전 min·desired 상향, 종료 후 원복</p>
+<pre class="code"><span class="k">resource</span> <span class="s">"aws_autoscaling_schedule"</span> <span class="s">"event_scale_out"</span> {
+  <span class="k">start_time</span>       = <span class="s">"2026-08-01T02:30:00Z"</span>  <span class="c"># 오픈 30분 전(UTC)</span>
+  <span class="k">min_size</span>         = 3
+  <span class="k">desired_capacity</span> = 3
+}</pre>
+  <ul class="bullets">
+    <li>EC2 — 오픈 전 상향 + JVM 웜업 트래픽. target tracking과 warm pool은 <b>예측이 틀린 부분의 보험</b></li>
+    <li>RDS·Redis — 스펙 변경·replica 추가는 며칠 전에, 부하 리허설과 함께</li>
+    <li>캐시 — 이벤트 상품을 미리 적재(warm-up), TTL jitter로 동시 만료 방지</li>
+  </ul>
+</section>
+
+<!-- ════════ 18장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">9. 트레이드오프</p>
+  <h2 class="page-title">미리 키워두기 vs 반응형에 맡기기</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>미리 키워두기</h3>
+      <ul>
+        <li>오픈 순간의 스파이크를 확실히 받음</li>
+        <li>당일에 처음 보는 동작이 없음 — 리허설 가능</li>
+        <li>DB처럼 느린 계층과 보조를 맞출 수 있음</li>
+      </ul>
+    </div>
+    <div class="con"><h3>대가</h3>
+      <ul>
+        <li>이벤트 전후의 유휴 비용</li>
+        <li>예측이 크게 빗나가면 과잉·과소 프로비저닝</li>
+        <li>원복을 잊으면 비용이 계속 샘 — scale in 일정까지가 계획</li>
+      </ul>
+    </div>
+  </div>
+  <p><b>정답이 아니라 맥락.</b> 시각을 아는 부하는 미리, 시각을 모르는 부하는 반응형 + warm pool. 대부분의 이벤트 대응은 이 둘의 조합이 됨.</p>
+</section>
+
+<!-- ════════ 19장. 확인 1 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ①</h2>
+  <div class="quiz">
+    <p class="q">Q1. 부하 테스트에서 p95가 폭증했다. CPU는 40%, hikari_connections_pending은 계속 증가. 먼저 할 일은?</p>
+    <ul class="opts">
+      <li>인스턴스를 2배로 scale out</li>
+      <li data-answer>pool 크기와 DB 연결 예산(앱 대수 × pool ≤ max_connections)을 확인</li>
+      <li>인스턴스 타입을 한 단계 up</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> CPU가 낮은데 pending이 쌓임 — 병목은 CPU가 아니라 연결 경로. 이때 out을 하면 pool 총량이 배가 되어 DB 연결만 늘어남. 연결 예산과 쿼리 지연을 확인한 뒤에 스케일 방법을 정함.</p>
+  </div>
+</section>
+
+<!-- ════════ 20장. 확인 2 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ②</h2>
+  <div class="quiz">
+    <p class="q">Q2. Stopped warm pool을 도입해 InService까지는 빨라졌다. 그런데 이벤트 오픈 직후 새 인스턴스로 간 요청만 여전히 느리다. 원인은?</p>
+    <ul class="opts">
+      <li>warm pool 인스턴스에서 user_data가 아예 실행되지 않았음</li>
+      <li data-answer>JVM 웜업은 트래픽을 받아야 진행됨 — warm pool은 앱 웜업을 대신 못 함</li>
+      <li>ALB 헬스체크 간격이 길어서 등록이 늦었음</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> Stopped 풀은 프로세스가 내려간 상태로 대기함. 꺼내면 JVM이 새로 뜨고 JIT 컴파일 전까지 처리량이 낮음. warm pool이 줄이는 것은 인프라 준비 시간이고, 앱 웜업은 웜업 트래픽이나 사전 투입으로 따로 풀어야 함.</p>
+  </div>
+</section>
+
+<!-- ════════ 21장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">11. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>"무엇을 점검할 것인가"의 답 — ① 예상 peak를 숫자로 만들고 ② 부하 테스트로 계층별 saturation 지점을 실측하고 ③ 병목마다 "나누면 나뉘는가"로 up/out을 정하고 ④ 시각을 아는 부하는 scheduled scaling·DB 사전 up·캐시 warm-up으로 미리 채움. warm pool과 target tracking은 예측이 틀린 부분을 받치는 보험임.</p>
+  <p>기억할 원리 — <mark>스케일 방법 선택보다 병목의 정체 확인이 먼저고, 시각을 아는 부하는 미리 채워 둔다</mark>. 앱은 분 단위로 늘릴 수 있지만 DB는 그렇지 않다는 비대칭이 "사전" 점검의 이유임.</p>
+  <p class="foot">출처: Google SRE Book — Monitoring Distributed Systems·The Practice of... capacity planning · AWS EC2 Auto Scaling warm pools 문서 · HikariCP·Tomcat 문서 | 재현: aws/event-capacity-review/ (로컬 병목 실습 + warm pool terraform)</p>
+</section>
+
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>

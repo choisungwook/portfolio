@@ -97,6 +97,7 @@
 87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
 88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
 89. git credential helper 원리와 CodeBuild connection 학습지 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
+90. 이벤트 대비 사전 용량 점검 — scale up/out 판단 기준과 warm pool (26.7.27) - [링크](./aws/event-capacity-review/)
 
 ## 직접 만든 제품
 
