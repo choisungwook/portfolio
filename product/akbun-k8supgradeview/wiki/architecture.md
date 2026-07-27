@@ -11,7 +11,7 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
 - `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -28,6 +28,7 @@ kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드
 Karpenter Event 탭이 사용하는 명령. namespace, label selector, 조회 범위는 Settings 값이다.
 
 ```bash
+kubectl get deployments -n <namespace> -l <label selector> -o json
 kubectl get events -n <namespace> -o json
 kubectl get pods -n <namespace> -l <label selector> -o json
 kubectl logs <파드이름> -n <namespace> --all-containers=true --timestamps --since=<분>m
@@ -41,6 +42,8 @@ kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 ```
 
 ## Karpenter Event 탭
+
+버전은 karpenter deployment에서 읽는다. helm chart가 붙이는 `app.kubernetes.io/version` label을 먼저 보고, 없으면 container image의 tag를 쓴다. registry에 port가 붙은 image(`registry:5000/karpenter:1.1.0`)를 tag와 혼동하지 않도록 마지막 `/` 뒤에서만 `:`를 찾는다. tag 없이 digest만 있으면 `-`다. deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패는 값으로 담아 그 표 위에만 표시한다.
 
 event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는다. 시각은 `lastTimestamp`, `series.lastObservedTime`, `eventTime`, `firstTimestamp`, `metadata.creationTimestamp` 순으로 찾고, 대상은 `involvedObject` 또는 `regarding`, 본문은 `message` 또는 `note`를 쓴다. 목록은 오래된 것부터 시간순으로 정렬한다.
 

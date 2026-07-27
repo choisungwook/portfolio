@@ -1,11 +1,12 @@
 /**
- * NodePool / EC2NodeClass 조회의 파싱 규칙을 검증한다.
+ * karpenter 리소스 조회의 파싱 규칙을 검증한다.
  *
  * 이 화면은 필드가 없는 경우가 정상이다. NodePool에는 ami가 없고 EC2NodeClass에는
  * weight가 없으며, weight와 Ready condition은 있을 수도 없을 수도 있다. 빈 값을
  * 0이나 빈 문자열로 잘못 채우면 화면에서 알아채기 어려우므로 목업으로 확인한다.
  * 노드 수는 NodePool status에 없어서 노드 label로 세는데, 조회 실패(-)와 0개를
  * 구분하지 못하면 "노드가 하나도 없다"고 잘못 읽히므로 함께 검증한다.
+ * 버전도 label이 없으면 image tag로 폴백하므로 같은 이유로 검증한다.
  *
  * 실행: npm test (dist/를 읽으므로 build가 먼저 돈다)
  *
@@ -35,7 +36,7 @@ require.cache["electron-stub"] = {
 };
 
 const { saveSettings } = require("../dist/main/settings.js");
-const { getKarpenterResources } = require("../dist/main/kubectl.js");
+const { getKarpenterResources, getKarpenterVersions } = require("../dist/main/kubectl.js");
 
 const NODE_POOLS = {
   items: [
@@ -142,6 +143,43 @@ test("한쪽 CRD 조회가 실패해도 다른 쪽 목록은 그대로 나온다
   assert.strictEqual(result.nodePoolsError, "");
   assert.deepStrictEqual(result.ec2NodeClasses, []);
   assert.match(result.ec2NodeClassesError, /CRD not found/);
+});
+
+test("버전은 label을 먼저 보고 없으면 image tag를 쓴다", async () => {
+  useFakeKubectl({
+    deployments: {
+      items: [
+        {
+          metadata: { name: "karpenter", labels: { "app.kubernetes.io/version": "1.0.5" } },
+          spec: { template: { spec: { containers: [{ image: "public.ecr.aws/karpenter:0.37.0" }] } } },
+        },
+        // label이 없어 image tag로 폴백한다. registry port의 :5000을 tag로 읽으면 안 된다.
+        {
+          metadata: { name: "karpenter-old" },
+          spec: { template: { spec: { containers: [{ image: "registry:5000/karpenter:1.1.0" }] } } },
+        },
+        // tag 없이 digest만 있는 image
+        {
+          metadata: { name: "karpenter-digest" },
+          spec: { template: { spec: { containers: [{ image: "public.ecr.aws/karpenter@sha256:abc" }] } } },
+        },
+      ],
+    },
+  });
+  const { versions, error } = await getKarpenterVersions();
+
+  assert.strictEqual(error, "");
+  assert.strictEqual(versions[0].version, "1.0.5", "label을 먼저 써야 한다");
+  assert.strictEqual(versions[1].version, "1.1.0", "registry port를 tag로 읽으면 안 된다");
+  assert.strictEqual(versions[2].version, "-", "tag가 없으면 -여야 한다");
+});
+
+test("deployment 조회가 실패해도 에러만 담고 던지지 않는다", async () => {
+  useFakeKubectl({ deployments: "forbidden" });
+  const { versions, error } = await getKarpenterVersions();
+
+  assert.deepStrictEqual(versions, []);
+  assert.match(error, /forbidden/);
 });
 
 test("age는 NodePool의 creationTimestamp를 그대로 넘긴다", async () => {

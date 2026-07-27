@@ -8,7 +8,7 @@ EKS 업그레이드 작업 중 노드와 파드 상태를 한눈에 확인하는
 - 노드 필터: Karpenter 노드, Managed NodeGroup 노드, cordon(SchedulingDisabled) 노드
 - 노드 클릭 시 해당 노드에 스케줄된 파드 목록 표시
 - 파드 목록 조회: namespace, 파드 이름, 상태, 스케줄된 노드. namespace 필터와 이름 검색 지원
-- Karpenter Event 탭: karpenter namespace의 event를 시간순으로 보여주고, label selector로 찾은 karpenter 파드의 최근 로그를 함께 보여준다
+- Karpenter Event 탭: karpenter deployment에서 읽은 버전과 image, karpenter namespace의 event를 시간순으로, label selector로 찾은 karpenter 파드의 최근 로그를 함께 보여준다
 - NodePool / EC2NodeClass 탭: NodePool은 name, ami, weight, nodes(그 NodePool이 만든 노드 수), ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. 리소스에 없는 필드는 -로 표시한다
 - Settings에서 kubectl 실행 명령 변경. teleport를 쓰면 tsh kubectl로 설정한다
 - Settings에서 karpenter namespace(기본 karpenter), 파드 label selector(기본 app.kubernetes.io/name=karpenter), 로그 조회 범위(기본 15분) 변경

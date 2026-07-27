@@ -58,6 +58,18 @@ export interface KarpenterResources {
   ec2NodeClassesError: string;
 }
 
+export interface KarpenterVersion {
+  deployment: string;
+  version: string;
+  image: string;
+}
+
+export interface KarpenterVersions {
+  versions: KarpenterVersion[];
+  // deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패를 값으로 담는다.
+  error: string;
+}
+
 export interface KarpenterLogs {
   namespace: string;
   labelSelector: string;
@@ -321,6 +333,54 @@ export async function getKarpenterResources(): Promise<KarpenterResources> {
     ec2NodeClasses: ec2NodeClasses.items.map(toEc2NodeClass),
     ec2NodeClassesError: ec2NodeClasses.error,
   };
+}
+
+/**
+ * image 문자열에서 tag를 뽑는다. registry에 port가 붙어 있으면(host:5000/karpenter)
+ * 마지막 / 뒤에서만 :를 찾아야 tag와 port를 혼동하지 않는다.
+ */
+function imageTag(image: string): string {
+  const name = image.split("@")[0];
+  const lastSlash = name.lastIndexOf("/");
+  const colon = name.indexOf(":", lastSlash + 1);
+  return colon === -1 ? "" : name.slice(colon + 1);
+}
+
+function containerImage(deployment: any): string {
+  const containers: any[] = deployment.spec?.template?.spec?.containers ?? [];
+  return containers[0]?.image ?? "";
+}
+
+/** helm chart가 붙이는 app.kubernetes.io/version label을 먼저 보고, 없으면 image tag를 쓴다. */
+function toKarpenterVersion(deployment: any): KarpenterVersion {
+  const image = containerImage(deployment);
+  const labelVersion = deployment.metadata?.labels?.["app.kubernetes.io/version"];
+  return {
+    deployment: deployment.metadata?.name ?? "",
+    version: labelVersion || imageTag(image) || NO_VALUE,
+    image: image || NO_VALUE,
+  };
+}
+
+/** karpenter deployment에서 읽은 버전. label selector는 pod 조회와 같은 설정을 쓴다. */
+export async function getKarpenterVersions(): Promise<KarpenterVersions> {
+  const settings = loadSettings();
+  try {
+    const stdout = await runKubectl([
+      "get",
+      "deployments",
+      "-n",
+      settings.karpenterNamespace,
+      "-l",
+      settings.karpenterPodLabelSelector,
+      "-o",
+      "json",
+    ]);
+    const items: any[] = JSON.parse(stdout).items ?? [];
+    return { versions: items.map(toKarpenterVersion), error: "" };
+  } catch (error) {
+    return { versions: [], error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 /** label selector로 찾은 karpenter pod들의 최근 log를 모은다. */

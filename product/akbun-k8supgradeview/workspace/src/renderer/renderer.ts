@@ -33,6 +33,17 @@ interface PodLog {
   error: string;
 }
 
+interface KarpenterVersion {
+  deployment: string;
+  version: string;
+  image: string;
+}
+
+interface KarpenterVersions {
+  versions: KarpenterVersion[];
+  error: string;
+}
+
 interface KarpenterLogs {
   namespace: string;
   labelSelector: string;
@@ -71,6 +82,7 @@ interface Api {
   getPods(nodeName?: string): Promise<PodInfo[]>;
   getKarpenterEvents(): Promise<EventInfo[]>;
   getKarpenterLogs(): Promise<KarpenterLogs>;
+  getKarpenterVersions(): Promise<KarpenterVersions>;
   getKarpenterResources(): Promise<KarpenterResources>;
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
@@ -296,13 +308,25 @@ function renderKarpenterLogs(result: KarpenterLogs): void {
     `namespace ${result.namespace} / label ${result.labelSelector} / 최근 ${result.sinceMinutes}분`;
 }
 
+function renderKarpenterVersions(result: KarpenterVersions): void {
+  const tbody = prepareResourceTable("karpenter-version", result.versions.length, result.error);
+  for (const version of result.versions) {
+    const row = tbody.insertRow();
+    appendCell(row, version.deployment);
+    appendCell(row, version.version);
+    appendCell(row, version.image);
+  }
+}
+
 async function refreshKarpenter(): Promise<void> {
   try {
     clearError();
-    const [events, logs] = await Promise.all([
+    const [versions, events, logs] = await Promise.all([
+      api.getKarpenterVersions(),
       api.getKarpenterEvents(),
       api.getKarpenterLogs(),
     ]);
+    renderKarpenterVersions(versions);
     renderKarpenterEvents(events);
     renderKarpenterLogs(logs);
     karpenterLoaded = true;

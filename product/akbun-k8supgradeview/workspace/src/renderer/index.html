@@ -95,6 +95,22 @@
       </div>
 
       <section class="karpenter-panel">
+        <h2>Version</h2>
+        <p id="karpenter-version-error" class="resource-error hidden"></p>
+        <table id="karpenter-version-table">
+          <thead>
+            <tr>
+              <th>Deployment</th>
+              <th>Version</th>
+              <th>Image</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="karpenter-version-empty" class="empty hidden">karpenter deployment를 찾지 못했습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
         <h2>Event</h2>
         <table id="karpenter-event-table">
           <thead>

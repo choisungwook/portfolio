@@ -6,6 +6,7 @@ import {
   getKarpenterEvents,
   getKarpenterLogs,
   getKarpenterResources,
+  getKarpenterVersions,
   getNodes,
   getPods,
 } from "./kubectl";
@@ -31,6 +32,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:karpenter-events", () => getKarpenterEvents());
   ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
   ipcMain.handle("kubectl:karpenter-resources", () => getKarpenterResources());
+  ipcMain.handle("kubectl:karpenter-versions", () => getKarpenterVersions());
   ipcMain.handle("settings:get", () => loadSettings());
   ipcMain.handle("settings:save", (_event, settings: unknown) => {
     // IPC 경계에서 형식을 검증한다. renderer가 잘못된 값을 보내면 명확한 에러로 알린다.
