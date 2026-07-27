@@ -282,6 +282,19 @@
     </section>
   </main>
 
+  <!-- 파드 이름을 누르면 열리는 describe 사이드 패널. 표를 가리지 않도록 오른쪽에 붙는다. -->
+  <aside id="pod-detail-panel" class="hidden" aria-label="파드 describe">
+    <div class="pod-detail-header">
+      <h2 id="pod-detail-title"></h2>
+      <div class="pod-detail-actions">
+        <button id="copy-pod-detail" class="copy-button">복사</button>
+        <button id="refresh-pod-detail">새로고침</button>
+        <button id="close-pod-detail" aria-label="닫기">✕</button>
+      </div>
+    </div>
+    <pre id="pod-detail-body"></pre>
+  </aside>
+
   <script src="renderer.js"></script>
 </body>
 </html>

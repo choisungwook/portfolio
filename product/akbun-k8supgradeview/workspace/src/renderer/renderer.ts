@@ -90,6 +90,7 @@ interface OverprovisionOptions {
 interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
+  describePod(namespace: string, name: string): Promise<string>;
   getNamespaces(): Promise<string[]>;
   buildOverprovisionYaml(options: OverprovisionOptions): Promise<string>;
   setNodeCordon(nodeName: string, cordon: boolean): Promise<boolean>;
@@ -244,6 +245,58 @@ function appendNameCellWithCopy(row: HTMLTableRowElement, name: string): void {
   box.appendChild(button);
 }
 
+/** 사이드 패널이 보고 있는 파드. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓴다. */
+let detailPod: { namespace: string; name: string } | null = null;
+
+/**
+ * 파드 이름 칸을 눌러 describe를 여는 버튼으로 만든다. 표의 다른 칸은 그대로 두어
+ * 어디를 눌러야 열리는지 한 곳으로 모은다.
+ */
+function appendPodNameCell(row: HTMLTableRowElement, pod: PodInfo): void {
+  const cell = row.insertCell();
+  const button = document.createElement("button");
+  button.className = "pod-name-button";
+  button.textContent = pod.name;
+  button.title = `${pod.name} describe 보기`;
+  button.addEventListener("click", (event) => {
+    // 노드 탭의 파드 표는 행 클릭이 노드 선택이라 그 동작까지 함께 돌지 않게 막는다.
+    event.stopPropagation();
+    void openPodDetail(pod.namespace, pod.name);
+  });
+  cell.appendChild(button);
+}
+
+function closePodDetail(): void {
+  detailPod = null;
+  $("#pod-detail-panel").classList.add("hidden");
+}
+
+/**
+ * describe는 한 번에 수십 줄이 나오고 클러스터가 멀면 몇 초가 걸린다.
+ * 여는 즉시 대상과 조회 중임을 적어 두어 빈 화면을 보여주지 않는다.
+ */
+async function openPodDetail(namespace: string, name: string): Promise<void> {
+  detailPod = { namespace, name };
+  $("#pod-detail-panel").classList.remove("hidden");
+  $("#pod-detail-title").textContent = `${namespace} / ${name}`;
+  const body = $("#pod-detail-body");
+  body.className = "";
+  body.textContent = "조회 중...";
+
+  try {
+    const text = await api.describePod(namespace, name);
+    // 조회하는 동안 다른 파드를 눌렀으면 늦게 온 결과가 화면을 덮지 않게 버린다.
+    if (detailPod?.namespace !== namespace || detailPod.name !== name) return;
+    body.textContent = "";
+    appendErrorHighlighted(body, text);
+  } catch (error) {
+    if (detailPod?.namespace !== namespace || detailPod.name !== name) return;
+    // 상단 배너로 보내면 패널을 보는 동안 눈에 들어오지 않아 패널 안에 적는다.
+    body.className = "detail-error";
+    body.textContent = String(error instanceof Error ? error.message : error);
+  }
+}
+
 function matchesFilter(node: NodeInfo): boolean {
   if (nodeFilter === "karpenter") return node.isKarpenter;
   if (nodeFilter === "managed") return node.isManagedNodeGroup;
@@ -325,7 +378,7 @@ function renderNodePods(pods: PodInfo[]): void {
   for (const pod of pods) {
     const row = tbody.insertRow();
     appendCell(row, pod.namespace);
-    appendCell(row, pod.name);
+    appendPodNameCell(row, pod);
     appendCell(row, pod.status, statusClass(pod.status));
     appendCell(row, formatAge(pod.creationTimestamp));
   }
@@ -445,7 +498,7 @@ function renderPods(): void {
   for (const pod of pods) {
     const row = tbody.insertRow();
     appendCell(row, pod.namespace);
-    appendCell(row, pod.name);
+    appendPodNameCell(row, pod);
     appendCell(row, pod.status, statusClass(pod.status));
     appendCell(row, pod.nodeName);
     appendCell(row, formatAge(pod.creationTimestamp));
@@ -812,6 +865,18 @@ function registerEventHandlers(): void {
     // 눌린 상태를 색으로만 알리면 화면을 못 보는 사용자는 켜졌는지 알 수 없다.
     button.setAttribute("aria-pressed", String(podOnlyNotRunning));
     renderPods();
+  });
+  $("#close-pod-detail").addEventListener("click", closePodDetail);
+  $("#refresh-pod-detail").addEventListener("click", () => {
+    if (detailPod) void openPodDetail(detailPod.namespace, detailPod.name);
+  });
+  $("#copy-pod-detail").addEventListener("click", () => {
+    const button = $("#copy-pod-detail") as HTMLButtonElement;
+    void copyToClipboard($("#pod-detail-body").textContent ?? "", button);
+  });
+  // 패널을 닫는 데 마우스를 쓰지 않아도 되게 Escape를 받는다.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && detailPod) closePodDetail();
   });
   $("#save-settings").addEventListener("click", () => void submitSettings());
   $("#refresh-namespaces").addEventListener("click", () => void refreshNamespaces());

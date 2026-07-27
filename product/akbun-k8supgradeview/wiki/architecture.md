@@ -12,7 +12,7 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
 - `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Utilize, Settings 6개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:describe-pod`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -24,6 +24,12 @@ renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로
 kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
+```
+
+파드 이름을 눌러 describe 사이드 패널을 열 때 사용하는 명령:
+
+```bash
+kubectl describe pod <파드이름> -n <namespace>
 ```
 
 Utilize 탭이 manifest를 만들 대상 목록을 채울 때 사용하는 명령:
@@ -68,6 +74,16 @@ kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
 
 namespace 필터, 이름 검색, 상태 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.
+
+## 파드 describe 사이드 패널
+
+Pods 탭과 노드 상세의 파드 표에서 이름 칸만 버튼(`.pod-name-button`)이다. 누르면 화면 오른쪽에 `#pod-detail-panel`이 열리고 `kubectl describe pod`의 출력을 그대로 붙인다. 패널은 `position: fixed`로 표 위에 겹친다. 표를 밀어내면 칼럼이 접혀 어느 파드를 열었는지 보이지 않기 때문이다.
+
+describe 결과는 파싱하지 않는다. main은 `describePod(namespace, name)`이 문자열을 그대로 돌려주고, renderer는 error 낱말 하이라이트(`appendErrorHighlighted`)만 얹는다. 들여쓰기가 계층을 나타내는 출력이라 `white-space: pre-wrap`으로 원문 형태를 지키고, 조각은 `textContent`로만 넣어 클러스터가 준 문자열이 HTML로 해석되지 않게 한다.
+
+지금 보고 있는 파드는 `detailPod`에 들고 있다. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓰고, 조회하는 동안 다른 파드를 눌렀을 때 늦게 온 응답이 화면을 덮지 않도록 응답의 대상과 비교하는 데도 쓴다. 조회 실패는 상단 배너가 아니라 패널 안에 적는다. 패널이 오른쪽을 덮고 있어 배너가 눈에 들어오지 않는다.
+
+이름 검증은 IPC 경계에서 노드와 같은 `assertResourceName`이 한다. shell을 거치지 않아 인젝션은 없지만 `-`로 시작하는 값은 kubectl이 이름이 아니라 옵션으로 읽는다. 배경은 [describe 사이드 패널 ADR](../adr/2026-07-pod-describe-side-panel.md)에 있다.
 
 ## Karpenter Event 탭
 
