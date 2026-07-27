@@ -95,9 +95,20 @@ declare const api: Api;
 
 type NodeFilterKind = "all" | "karpenter" | "managed" | "cordoned";
 
+type PodSortKey = "namespace" | "status";
+type SortDirection = "asc" | "desc";
+
+interface PodSort {
+  key: PodSortKey;
+  direction: SortDirection;
+}
+
 let allNodes: NodeInfo[] = [];
 let allPods: PodInfo[] = [];
 let nodeFilter: NodeFilterKind = "all";
+// 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
+let podSort: PodSort | null = null;
+let podOnlyNotRunning = false;
 let selectedNode = "";
 let karpenterLoaded = false;
 let nodePoolsLoaded = false;
@@ -320,16 +331,64 @@ function renderNamespaceOptions(): void {
   select.value = namespaces.includes(current) ? current : "";
 }
 
+const RUNNING_STATUS = "Running";
+
+/**
+ * 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 한다.
+ * Pending, CrashLoopBackOff처럼 상태 이름이 여럿이라 낱낱이 고르게 하는 대신
+ * Running이 아닌 것만 남기는 토글 하나로 둔다.
+ */
+function matchesPodStatusFilter(pod: PodInfo): boolean {
+  return !podOnlyNotRunning || pod.status !== RUNNING_STATUS;
+}
+
+/**
+ * namespace와 status를 알파벳 순으로 정렬한다. 같은 값이 몰려 있는 칸이라
+ * 두 번째 기준으로 pod 이름을 써야 새로고침할 때마다 순서가 흔들리지 않는다.
+ */
+function comparePods(a: PodInfo, b: PodInfo, sort: PodSort): number {
+  const order = a[sort.key].localeCompare(b[sort.key]) || a.name.localeCompare(b.name);
+  return sort.direction === "asc" ? order : -order;
+}
+
+function sortPods(pods: PodInfo[]): PodInfo[] {
+  if (!podSort) return pods;
+  const sort = podSort;
+  return [...pods].sort((a, b) => comparePods(a, b, sort));
+}
+
+/** 어느 칼럼으로 어느 방향인지 헤더에 화살표로 남긴다. */
+function renderPodSortIndicators(): void {
+  document.querySelectorAll("#pod-table th[data-sort-key]").forEach((header) => {
+    const active = podSort?.key === (header as HTMLElement).dataset.sortKey;
+    header.classList.toggle("sorted", active);
+    const arrow = header.querySelector(".sort-arrow") as HTMLElement;
+    arrow.textContent = active ? (podSort?.direction === "asc" ? "▲" : "▼") : "";
+  });
+}
+
+/** 같은 칼럼을 다시 누르면 방향만 뒤집고, 다른 칼럼이면 오름차순부터 시작한다. */
+function togglePodSort(key: PodSortKey): void {
+  const direction: SortDirection =
+    podSort?.key === key && podSort.direction === "asc" ? "desc" : "asc";
+  podSort = { key, direction };
+  renderPods();
+}
+
 function renderPods(): void {
   const namespace = ($("#namespace-filter") as HTMLSelectElement).value;
   const search = ($("#pod-search") as HTMLInputElement).value.trim().toLowerCase();
   const tbody = $("#pod-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
+  renderPodSortIndicators();
 
-  const pods = allPods.filter(
-    (pod) =>
-      (!namespace || pod.namespace === namespace) &&
-      (!search || pod.name.toLowerCase().includes(search))
+  const pods = sortPods(
+    allPods.filter(
+      (pod) =>
+        (!namespace || pod.namespace === namespace) &&
+        (!search || pod.name.toLowerCase().includes(search)) &&
+        matchesPodStatusFilter(pod)
+    )
   );
   $("#pod-empty").classList.toggle("hidden", pods.length > 0);
 
@@ -659,6 +718,16 @@ function registerEventHandlers(): void {
   $("#refresh-nodepools").addEventListener("click", () => void refreshKarpenterResources());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
+  document.querySelectorAll("#pod-table th[data-sort-key]").forEach((header) => {
+    header.addEventListener("click", () =>
+      togglePodSort((header as HTMLElement).dataset.sortKey as PodSortKey)
+    );
+  });
+  $("#pod-status-filter").addEventListener("click", () => {
+    podOnlyNotRunning = !podOnlyNotRunning;
+    $("#pod-status-filter").classList.toggle("active", podOnlyNotRunning);
+    renderPods();
+  });
   $("#save-settings").addEventListener("click", () => void submitSettings());
 }
 

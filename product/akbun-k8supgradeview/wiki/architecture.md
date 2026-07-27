@@ -48,6 +48,18 @@ kubectl get nodepools.karpenter.sh -o json
 kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 ```
 
+## Pods 탭 정렬과 상태 필터
+
+정렬과 필터는 모두 renderer 안에서만 돈다. 파드 목록은 이미 한 번에 다 받아 두므로 kubectl을 다시 부르지 않는다.
+
+정렬 대상은 Namespace와 Status 두 칼럼이다. 헤더에 `data-sort-key`를 두고 클릭하면 그 키로 오름차순 정렬하며, 같은 헤더를 다시 누르면 방향만 뒤집는다. 다른 헤더를 누르면 오름차순부터 다시 시작한다. 정렬 기준은 `localeCompare`이고, 두 칼럼 모두 같은 값이 여럿 몰려 있어 2차 기준으로 파드 이름을 쓴다. 그래야 새로고침할 때마다 같은 값 안에서 순서가 흔들리지 않는다. Pod, Node, Age는 정렬하지 않는다. 이름과 노드는 검색과 노드 탭이 이미 다루고, Age는 `45s`와 `5d`처럼 단위가 섞인 문자열이라 알파벳 순으로 정렬하면 시간 순서와 어긋난다.
+
+정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다.
+
+상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
+
+namespace 필터, 이름 검색, 상태 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.
+
 ## Karpenter Event 탭
 
 버전은 karpenter deployment에서 읽는다. helm chart가 붙이는 `app.kubernetes.io/version` label을 먼저 보고, 없으면 container image의 tag를 쓴다. registry에 port가 붙은 image(`registry:5000/karpenter:1.1.0`)를 tag와 혼동하지 않도록 마지막 `/` 뒤에서만 `:`를 찾는다. tag 없이 digest만 있으면 `-`다. deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패는 값으로 담아 그 표 위에만 표시한다.

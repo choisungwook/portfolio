@@ -10,3 +10,4 @@ akbun-k8supgradeview 프로젝트의 의사결정을 "결정 - 이유" 구조로
 * [업데이트는 dmg 직접 내려받기와 번들 교체](2026-07-update-download-and-swap.md) - GitHub Release 조회와 .app 교체로 업데이트를 구현하고 디스크 누수 방지를 테스트로 검증하기로 한 결정.
 * [cordon과 uncordon은 노드 행의 토글 버튼 하나로 둔다](2026-07-node-cordon-toggle.md) - Action 칼럼에 상태에서 파생되는 버튼 하나를 두고 실행 전 확인 dialog를 두기로 한 결정.
 * [이름 복사, EC2NodeClass 그룹핑, error 키워드 하이라이트](2026-07-name-copy-and-error-highlight.md) - 노드 이름 복사를 main clipboard로 두고, EC2NodeClass를 nodeClassRef 기준으로 묶고, error 낱말을 색으로 표시하기로 한 결정.
+* [Pods 탭 정렬은 헤더 클릭, 상태 필터는 Running 아닌 것만 남기는 토글 하나로 둔다](2026-07-pod-sort-and-status-filter.md) - 정렬 대상을 Namespace와 Status로 좁히고 상태 필터를 토글 하나로 두기로 한 결정.

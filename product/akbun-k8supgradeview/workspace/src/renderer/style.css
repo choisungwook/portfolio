@@ -123,6 +123,28 @@ th {
   font-weight: 600;
 }
 
+/* 누를 수 있는 헤더라는 것을 커서와 hover 배경으로 알린다. */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  background: #e5e7eb;
+}
+
+th.sortable.sorted {
+  color: #2563eb;
+}
+
+/* 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 자리를 미리 잡아 둔다. */
+.sort-arrow {
+  display: inline-block;
+  min-width: 12px;
+  margin-left: 4px;
+  font-size: 10px;
+}
+
 #node-table tbody tr {
   cursor: pointer;
 }
