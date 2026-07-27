@@ -873,10 +873,14 @@ function registerEventHandlers(): void {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => activateTab((button as HTMLElement).dataset.tab ?? ""));
   });
-  document.querySelectorAll(".filter-button").forEach((button) => {
+  // Pods 탭 토글도 모양을 맞추려고 filter-button을 함께 쓴다. 노드 필터는 하나만
+  // 켜지는 라디오라 나머지의 active를 지우므로, data-filter가 있는 버튼으로 좁히지
+  // 않으면 파드 토글을 누를 때 노드 필터가 전체로 되돌아간다.
+  const nodeFilterButtons = document.querySelectorAll(".filter-button[data-filter]");
+  nodeFilterButtons.forEach((button) => {
     button.addEventListener("click", () => {
       nodeFilter = ((button as HTMLElement).dataset.filter ?? "all") as NodeFilterKind;
-      document.querySelectorAll(".filter-button").forEach((b) => b.classList.remove("active"));
+      nodeFilterButtons.forEach((b) => b.classList.remove("active"));
       button.classList.add("active");
       renderNodes();
     });
