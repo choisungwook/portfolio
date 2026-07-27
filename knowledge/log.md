@@ -2,6 +2,7 @@
 
 ## 2026-07-27
 
+* **Creation**: [비대칭 라우팅은 경로가 아니라 상태 때문에 깨진다](topics/asymmetric-routing-breaks-on-state.md) topic 작성. computer_science/asymmetric_routing 핸즈온을 만들면서 남긴다.
 * **Creation**: [Karpenter over-provisioning은 음수 우선순위 placeholder로 노드를 미리 잡아 둔다](topics/karpenter-overprovisioning.md) topic 작성. akbun-k8supgradeview에 over-provisioning manifest 생성 기능을 넣으면서 남긴다.
 
 ## 2026-07-25

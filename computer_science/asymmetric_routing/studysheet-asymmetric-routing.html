@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비대칭 라우팅 — 가는 길과 오는 길이 다를 때</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>가는 길과 오는 길이 다를 때 — <mark>비대칭 라우팅</mark></h1>
+    <p class="sub">라우팅은 방향마다 따로 정해진다. 그것을 모르고 만든 장비가 문제를 일으킨다</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 방화벽 로그에는 요청이 찍히는데 응답이 안 돌아옴. 서버 tcpdump에는 SYN도 SYN-ACK도 다 보임.</p>
+    <p><b class="p-point">패킷은 어디서 사라졌을까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">양쪽 다 "우리 쪽은 정상"이라고 말함</h2>
+  <p class="dim">회선을 이중화하거나 VPC를 여러 개 연결한 뒤에 자주 나오는 증상.</p>
+  <ul class="bullets">
+    <li>서버에서 tcpdump하면 요청도 응답도 정상. 서버 담당자는 <span class="prob-text">"우리는 응답 보냈다"</span></li>
+    <li><span class="xmark">✕</span> 클라이언트에서는 SYN만 계속 재전송되고 응답이 없음</li>
+    <li><span class="xmark">✕</span> 어제까지 되던 게 라우팅 한 줄 바꾼 뒤 안 됨. 방화벽 설정은 그대로</li>
+    <li><span class="xmark">✕</span> ping은 되는데 TCP만 안 되는 경우도 있고, 그 반대도 있음</li>
+  </ul>
+  <p><b class="p-point">푸는 방법 중 하나</b> — "패킷이 어디서 죽었나"가 아니라 <mark>"가는 길과 오는 길이 같은가"</mark>부터 확인.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">IP는 방향마다 따로 판단함</h2>
+  <p>라우터는 패킷을 하나씩 보고 목적지만으로 다음 홉을 정함. <mark>이 패킷이 어떤 대화의 일부인지 묻지 않음</mark>.</p>
+  <ul class="bullets">
+    <li>클라이언트의 라우팅 테이블이 가는 길을 정함</li>
+    <li>서버의 라우팅 테이블이 오는 길을 정함</li>
+    <li>둘은 서로를 참조하지 않음. 같은 길이 되는 건 <b>보장이 아니라 우연</b></li>
+  </ul>
+  <p>그래서 비대칭 라우팅은 고장이 아니라 기본 성질임. 대칭이 유지되던 건 경로가 하나뿐이었기 때문임.</p>
+  <p class="dim">여기까지가 이 학습의 절반. 나머지 절반은 "그런데 왜 어떤 환경에서는 깨지는가"임.</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">경로가 둘 이상이면 언제든 생김</h2>
+  <p class="dim">아래 조건 중 하나만 있어도 비대칭이 만들어질 수 있음.</p>
+  <ul class="bullets">
+    <li>NIC이 두 개인 호스트 — 들어온 인터페이스와 나가는 인터페이스가 다름</li>
+    <li>회선 이중화 — Direct Connect와 VPN, 또는 ISP 두 곳</li>
+    <li>서로 다른 라우팅 테이블 — 우리 쪽은 peering, 상대 쪽은 transit gateway</li>
+    <li>ECMP와 해시 — 방향마다 다른 경로가 선택됨</li>
+    <li>AZ마다 배치된 어플라이언스 — 가는 길과 오는 길이 다른 AZ의 장비를 탐</li>
+  </ul>
+  <p>공통점은 <mark>어느 쪽도 잘못 설정된 게 아니라는 것</mark>. 각자 자기 테이블대로 최선의 경로를 골랐을 뿐임.</p>
+</section>
+
+<!-- ════════ 5장. 원리 3 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">깨뜨리는 것은 라우팅이 아니라 상태</h2>
+  <p>비대칭 자체는 통신을 막지 않음. 한쪽 길에만 <mark>상태를 기억하는 장비</mark>가 있을 때 막힘.</p>
+  <ul class="bullets">
+    <li><b>conntrack, stateful 방화벽</b> — SYN을 못 본 장비에게 SYN-ACK는 소속 없는 패킷</li>
+    <li><b>NAT</b> — 매핑을 만든 장비를 우회해서 돌아오면 되돌릴 주체가 없음</li>
+    <li><b>rp_filter</b> — 출발지 주소로 되돌아갈 경로가 없거나 다른 인터페이스면 커널이 버림</li>
+    <li><b>클라우드의 출발지 검사</b> — ENI는 자기 주소가 아닌 출발지의 패킷을 못 보냄</li>
+  </ul>
+  <p>진단 순서가 여기서 나옴 — 경로가 갈리는 지점을 찾고, 그 두 경로 중 <b>한쪽에만 있는 상태 장비</b>를 찾음.</p>
+</section>
+
+<!-- ════════ 6장. 구조 이해하기 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">같은 토폴로지, 네 가지 결과</h2>
+  <p class="dim">로컬 실습과 같은 구성. 가는 길은 항상 r1로 고정하고 오는 길만 바꿈.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">client</div>
+        <div class="darrow">⇄</div>
+        <div class="dbox hot">r1</div>
+        <div class="darrow">⇄</div>
+        <div class="dbox wl">server</div>
+        <div class="dbox dim">r2</div>
+      </div>
+      <p class="exp"><b>1. 대칭.</b> 양방향이 같은 라우터를 지남. 모든 교과서 그림의 전제.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">r1<small>요청만</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">server</div>
+        <div class="darrow">↩</div>
+        <div class="dbox rs">r2<small>응답만</small></div>
+      </div>
+      <p class="exp"><b>2. 비대칭, 그래도 성공.</b> 아무도 상태를 안 보므로 통신됨. r1의 conntrack에 <b>UNREPLIED</b>만 남음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">r1</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">server</div>
+        <div class="darrow bad">↩</div>
+        <div class="dbox bad">r2<small>rp_filter</small></div>
+      </div>
+      <p class="exp"><b>3. rp_filter.</b> r2가 출발지 주소로 되돌아갈 경로를 확인하다 버림. 라우팅 판단 전에 죽음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">r1</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">server</div>
+        <div class="darrow bad">↩</div>
+        <div class="dbox bad">r2<small>conntrack</small></div>
+      </div>
+      <p class="exp"><b>4. stateful 방화벽.</b> SYN을 못 봤으니 SYN-ACK는 INVALID. 실무에서 가장 많이 만나는 형태.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 7장. rp_filter ════════ -->
+<section class="page">
+  <p class="sec">4. rp_filter</p>
+  <h2 class="page-title">모드 하나 차이로 결과가 갈림</h2>
+  <p>커널이 <b>들어온 패킷의 출발지 주소</b>로 라우팅 테이블을 거꾸로 조회함. RFC 3704의 구현.</p>
+  <p class="codedesc">실효값은 all과 인터페이스 설정 중 큰 값. 한쪽만 꺼도 안 꺼짐</p>
+  <pre class="code"><span class="c"># rp_filter = max(conf.all.rp_filter, conf.&lt;dev&gt;.rp_filter)</span>
+sysctl net.ipv4.conf.all.rp_filter
+sysctl net.ipv4.conf.eth1.rp_filter</pre>
+  <ul class="bullets">
+    <li><b>0 (off)</b> — 검사 안 함</li>
+    <li><b>2 (loose)</b> — 출발지로 가는 경로가 <mark>아무 인터페이스로든</mark> 있으면 통과</li>
+    <li><b>1 (strict)</b> — 되돌아갈 경로가 <mark>들어온 그 인터페이스</mark>여야 통과</li>
+  </ul>
+  <p>비대칭 경로가 있는 곳에서 strict는 정상 트래픽을 버림. RFC 3704가 그런 위치에 loose를 권하는 이유임.</p>
+</section>
+
+<!-- ════════ 8장. 로컬 실습 ════════ -->
+<section class="page">
+  <p class="sec">5. 로컬 실습</p>
+  <h2 class="page-title">컨테이너 네 개로 재현</h2>
+  <p class="dim">서버를 dual-home으로 두면 두 번째 경로가 공짜로 생김. 오는 길만 바꾸면 됨.</p>
+  <p class="codedesc">토폴로지 — 가는 길은 client의 route로 r1에 고정</p>
+  <pre class="code">                 edge 10.10.0.0/24
+client .10 ──┬── r1 .2 ── net_a 10.20.0.0/24 ── .10 server
+             └── r2 .3 ── net_b 10.30.0.0/24 ── .20
+
+<span class="c"># 오는 길을 r2로 넘김 = 비대칭 완성</span>
+docker exec ar-server /scripts/return-path.sh <span class="hot">r2</span></pre>
+  <p><b>관찰 도구.</b> tcpdump는 라우팅 판단 <b>이전</b>에 찍히므로, 버려지는 패킷도 들어오는 건 보임. "보이는데 안 나감"이 곧 커널이 버렸다는 증거.</p>
+</section>
+
+<!-- ════════ 9장. 실습 결과 ════════ -->
+<section class="page">
+  <p class="sec">5. 로컬 실습</p>
+  <h2 class="page-title">조건을 하나씩 얹은 결과</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>통신됨</h3>
+      <ul>
+        <li>대칭 — 기준선</li>
+        <li>비대칭, 상태 장비 없음</li>
+        <li>비대칭 + rp_filter loose + 역경로 존재</li>
+        <li>비대칭 + r1에서 MASQUERADE</li>
+      </ul>
+    </div>
+    <div class="con"><h3>끊김</h3>
+      <ul>
+        <li>비대칭 + rp_filter loose, 역경로 없음</li>
+        <li>비대칭 + rp_filter strict (역경로 있어도)</li>
+        <li>비대칭 + stateful 방화벽</li>
+      </ul>
+    </div>
+  </div>
+  <p><b>주의할 기본값.</b> 리눅스는 <mark>nf_conntrack_tcp_loose=1</mark>이 기본이라 SYN을 놓친 흐름도 주워 담음. 그래서 평범한 리눅스 라우터에서는 비대칭이 조용히 숨겨짐. 방화벽 제품은 이걸 꺼 두므로 그때 드러남.</p>
+</section>
+
+<!-- ════════ 10장. 해법 ════════ -->
+<section class="page">
+  <p class="sec">6. 해법</p>
+  <h2 class="page-title">경로를 맞추거나, 주소를 바꾸거나</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>① 라우팅을 대칭으로</h3>
+      <ul>
+        <li>양쪽 테이블이 같은 경로를 가리키게 함</li>
+        <li>출발지 주소가 보존됨</li>
+        <li>상대 조직의 협조가 필요함</li>
+      </ul>
+    </div>
+    <div class="pro"><h3>② NAT으로 강제</h3>
+      <ul>
+        <li>출발지를 바꾸면 응답은 그 장비로 올 수밖에 없음</li>
+        <li>상대는 경로 한 줄만 추가하면 됨</li>
+        <li>상대가 클라이언트를 주소로 구분 못 함</li>
+      </ul>
+    </div>
+  </div>
+  <p>다중 NIC 호스트에서는 <b>policy routing</b>이 ①의 형태임. <span class="dim">ip rule add from &lt;그 인터페이스 주소&gt; lookup &lt;그 테이블&gt;</span></p>
+  <p><mark>NAT은 대칭을 사 오는 것이고, 그 값은 출발지 식별</mark>. AWS 실습이 이 거래를 그대로 보여줌.</p>
+</section>
+
+<!-- ════════ 11장. AWS 1 ════════ -->
+<section class="page">
+  <p class="sec">7. AWS</p>
+  <h2 class="page-title">VPC는 상태를 안 보지만 두 가지를 막음</h2>
+  <p>VPC 라우팅 자체는 stateless라, 경로가 갈린다는 이유로 패킷을 버리지는 않음. 대신 이 둘이 걸림.</p>
+  <ul class="bullets">
+    <li><b>출발지 검사</b> — ENI는 자기 주소가 아닌 출발지의 패킷을 내보내지 못함. 다중 ENI 인스턴스가 여기 걸림</li>
+    <li><b>없는 경로</b> — 상대 VPC에 우리 대역으로 가는 route가 없으면 응답이 갈 곳이 없음</li>
+    <li>Security group은 ENI 단위 stateful이지만, 양방향이 같은 ENI를 쓰므로 <span class="dim">보통 원인이 아님</span></li>
+  </ul>
+  <p class="dim">AL2023은 amazon-ec2-net-utils가 두 번째 ENI용 policy routing 규칙을 자동으로 만들어 둠. 실습은 그 규칙을 지워서 원래 동작을 확인함.</p>
+</section>
+
+<!-- ════════ 12장. AWS 2 ════════ -->
+<section class="page">
+  <p class="sec">7. AWS</p>
+  <h2 class="page-title">실습 세 장면</h2>
+  <div class="stepper">
+    <div class="step">
+      <div class="dgroup"><b>VPC A</b>
+        <div class="diagram" style="padding:6px">
+          <span class="marker bad">1</span>
+          <div class="dbox wl">probe</div>
+          <div class="darrow">→</div>
+          <div class="dbox hot">client eth1<small>요청 수신</small></div>
+          <div class="darrow bad">→</div>
+          <div class="dbox bad">client eth0<small>응답 송신</small></div>
+        </div>
+      </div>
+      <p class="exp"><b>1. 다중 ENI.</b> eth1로 받고 eth0으로 답함. 출발지는 eth1 주소이므로 VPC가 버림. policy routing 규칙을 지우면 재현됨.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker bad">2</span>
+        <div class="dbox wl">client<small>10.0.1.x</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">peering</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">server<small>10.1.1.x</small></div>
+        <div class="darrow bad">✕</div>
+        <div class="dbox bad">돌아갈 route 없음</div>
+      </div>
+      <p class="exp"><b>2. 없는 오는 길.</b> VPC B에 10.0.0.0/16 경로가 없음. 서버 캡처에는 SYN-ACK가 보이고 클라이언트에는 안 옴.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">private NAT gw<small>100.64.1.x</small></div>
+        <div class="darrow">⇄</div>
+        <div class="dbox rs">peering</div>
+        <div class="darrow">⇄</div>
+        <div class="dbox wl">server</div>
+      </div>
+      <p class="exp"><b>3. private NAT gateway.</b> 출발지가 100.64.1.x로 바뀜. VPC B는 그 대역만 되돌리면 되므로 route 한 줄로 끝남.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 13장. AWS 3 ════════ -->
+<section class="page">
+  <p class="sec">7. AWS</p>
+  <h2 class="page-title">private NAT gateway가 실제로 한 일</h2>
+  <p>라우팅 테이블을 고친 게 아님. <mark>질문을 바꿈</mark>.</p>
+  <ul class="bullets">
+    <li>전 — "우리 VPC 대역 전체를 되돌려 줄 수 있습니까"</li>
+    <li>후 — "우리가 고른 작은 대역 하나만 되돌려 줄 수 있습니까"</li>
+  </ul>
+  <p>그래서 <b>100.64.0.0/10</b>(RFC 6598)을 secondary CIDR로 쓰는 패턴이 반복됨. 상대 네트워크와 겹칠 확률이 가장 낮은 대역이라 승인받기 쉬움.</p>
+  <p>대역이 실제로 겹쳐서 peering 자체가 불가능한 경우에도 같은 원리가 쓰임. 그때는 transit gateway가 경로를 나름.</p>
+  <p class="dim">EIP가 없는 NAT gateway라는 점만 다름. 로컬 실습의 MASQUERADE 한 줄과 하는 일이 같음.</p>
+</section>
+
+<!-- ════════ 14장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">8. 트레이드오프</p>
+  <h2 class="page-title">대칭을 사면 병목을 얻음</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>얻는 것</h3>
+      <ul>
+        <li>오는 길이 한 곳으로 확정됨</li>
+        <li>상대 조직이 바꿀 설정이 route 한 줄로 줄어듦</li>
+        <li>대역이 겹쳐도 연결할 수 있음</li>
+      </ul>
+    </div>
+    <div class="con"><h3>잃는 것</h3>
+      <ul>
+        <li>상대가 클라이언트를 주소로 구분 못 함</li>
+        <li>NAT이 stateful 병목이자 단일 장애 지점</li>
+        <li>포트 고갈과 처리 비용이 새로 생김</li>
+      </ul>
+    </div>
+  </div>
+  <p><b>어디를 봐야 하나.</b> "비대칭을 없앨까"가 아니라 <mark>"이 경로 위에 상태를 가진 장비가 있는가"</mark>. 없으면 비대칭인 채로 둬도 됨.</p>
+</section>
+
+<!-- ════════ 15장. 확인 1 ════════ -->
+<section class="page">
+  <p class="sec">9. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ①</h2>
+  <div class="quiz">
+    <p class="q">Q1. 서버 tcpdump에는 SYN과 SYN-ACK가 모두 보이는데 클라이언트는 응답을 못 받는다. 가장 먼저 배제할 수 있는 원인은?</p>
+    <ul class="opts">
+      <li data-answer>서버 쪽 인바운드 방화벽 정책</li>
+      <li>서버가 응답을 내보내는 경로</li>
+      <li>돌아오는 경로 위의 stateful 장비</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 인바운드가 막혔다면 SYN이 서버까지 도달하지 못함. SYN이 도착했고 서버가 SYN-ACK까지 만들었다는 것은 인바운드 통과의 증거임. 그래서 남는 후보는 돌아오는 경로뿐임.</p>
+  </div>
+</section>
+
+<!-- ════════ 16장. 확인 2 ════════ -->
+<section class="page">
+  <p class="sec">9. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ②</h2>
+  <div class="quiz">
+    <p class="q">Q2. 리눅스 라우터 두 대로 비대칭을 만들었는데 통신이 잘 된다. 실제 방화벽에서는 끊긴다면 무엇이 달랐는가?</p>
+    <ul class="opts">
+      <li>리눅스 라우터에 rp_filter가 켜져 있었다</li>
+      <li data-answer>리눅스 기본값인 nf_conntrack_tcp_loose=1이 중간부터 흐름을 주워 담았다</li>
+      <li>리눅스는 conntrack을 아예 쓰지 않는다</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> loose 모드는 SYN을 못 본 흐름도 ESTABLISHED로 받아들여 비대칭을 숨김. 0으로 바꾸면 SYN-ACK가 INVALID가 되어 방화벽 제품과 같은 증상이 재현됨. rp_filter가 켜져 있었다면 리눅스 쪽에서도 이미 끊겼을 것임.</p>
+  </div>
+</section>
+
+<!-- ════════ 17장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">10. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>패킷은 사라진 게 아니라 <b>다른 길로 갔고, 그 길 위의 장비가 자기가 모르는 패킷이라 버린 것</b>임. 라우팅은 원래 방향마다 따로 정해지므로 비대칭은 고장이 아님. 고장은 그 두 경로 중 한쪽에만 상태를 가진 장비를 놓았을 때 생김.</p>
+  <p>기억할 원리 — <mark>상태를 가진 장비는 양방향을 모두 지나야 한다</mark>. 그것을 라우팅으로 맞추면 주소가 보존되고, NAT으로 맞추면 협의 비용이 줄지만 출발지 식별을 잃음. 어느 쪽이든 먼저 할 일은 두 방향의 경로를 그려 보는 것임.</p>
+  <p class="foot">핸즈온: docs/2-local-handson.md · docs/4-aws-handson.md — 출처: RFC 3704 · RFC 6598 · Linux ip-sysctl 문서 · AWS Building a Scalable and Secure Multi-VPC Network Infrastructure</p>
+</section>
+
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
