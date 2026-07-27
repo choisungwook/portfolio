@@ -3,6 +3,7 @@ import type { MenuItemConstructorOptions } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "path";
 import {
+  describePod,
   getKarpenterEvents,
   getKarpenterLogs,
   getKarpenterResources,
@@ -30,15 +31,16 @@ function createWindow(): void {
 }
 
 /**
- * 노드 이름을 kubectl 인자로 넘기기 전에 검증한다. shell을 거치지 않아 인젝션은 없지만
+ * 이름을 kubectl 인자로 넘기기 전에 검증한다. shell을 거치지 않아 인젝션은 없지만
  * -로 시작하는 값은 kubectl이 옵션으로 읽으므로 막는다.
  */
-function assertNodeName(value: unknown): asserts value is string {
+function assertResourceName(value: unknown, label: string): asserts value is string {
+  // label에 조사를 붙이면 "namespace이"처럼 어색해진다. 조사 없이 값만 앞에 둔다.
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error("노드 이름이 잘못되었다: 비어 있지 않은 문자열이어야 한다");
+    throw new Error(`잘못된 ${label}: 비어 있지 않은 문자열이어야 한다`);
   }
   if (value.startsWith("-")) {
-    throw new Error("노드 이름이 잘못되었다: -로 시작할 수 없다");
+    throw new Error(`잘못된 ${label}: -로 시작할 수 없다`);
   }
 }
 
@@ -63,7 +65,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:nodes", () => getNodes());
   // 취소를 눌렀는지 renderer가 알아야 새로고침 여부를 정할 수 있어 boolean을 돌려준다.
   ipcMain.handle("kubectl:set-node-cordon", async (_event, nodeName: unknown, cordon: unknown) => {
-    assertNodeName(nodeName);
+    assertResourceName(nodeName, "노드 이름");
     if (typeof cordon !== "boolean") {
       throw new Error("cordon 값이 잘못되었다: boolean이어야 한다");
     }
@@ -72,6 +74,12 @@ function registerIpcHandlers(): void {
     return true;
   });
   ipcMain.handle("kubectl:pods", (_event, nodeName?: string) => getPods(nodeName));
+  // 조회만 하는 동작이라 확인 dialog 없이 바로 실행한다.
+  ipcMain.handle("kubectl:describe-pod", (_event, namespace: unknown, name: unknown) => {
+    assertResourceName(namespace, "namespace");
+    assertResourceName(name, "파드 이름");
+    return describePod(namespace, name);
+  });
   ipcMain.handle("kubectl:namespaces", () => getNamespaces());
   /**
    * manifest를 문자열로 만들어 돌려주기만 한다. 클러스터에 적용하지 않으므로

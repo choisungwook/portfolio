@@ -11,6 +11,7 @@ EKS 업그레이드 작업 중 노드와 파드 상태를 한눈에 확인하는
 - 파드 목록 조회: namespace, 파드 이름, 상태, 스케줄된 노드. namespace 필터와 이름 검색 지원
 - 파드 정렬: Namespace와 Status 헤더를 누르면 알파벳 순으로 정렬하고, 같은 헤더를 다시 누르면 방향을 뒤집는다
 - 파드 상태 필터: "Running 아닌 파드만" 버튼으로 Running에서 벗어난 파드만 남긴다
+- 파드 describe: 파드 이름을 누르면 오른쪽에 사이드 패널이 열리고 kubectl describe pod 결과를 그대로 보여준다. 복사, 새로고침, 닫기(Escape) 지원
 - Karpenter Event 탭: karpenter deployment에서 읽은 버전과 image, karpenter namespace의 event를 시간순으로, label selector로 찾은 karpenter 파드의 최근 로그를 함께 보여준다
 - NodePool / EC2NodeClass 탭: NodePool은 name, nodeClass, weight, nodes(그 NodePool이 만든 노드 수), ready, age를, EC2NodeClass는 name, ami를 보여준다. 리소스에 없는 필드는 -로 표시한다
 - NodePool 정렬: Weight와 Nodes 헤더를 누르면 숫자 크기순으로 정렬한다. 값이 없는(-) 줄은 늘 맨 뒤에 둔다

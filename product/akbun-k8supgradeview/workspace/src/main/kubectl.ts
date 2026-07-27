@@ -190,6 +190,15 @@ export async function getPods(nodeName?: string): Promise<PodInfo[]> {
   return items.map(toPodInfo);
 }
 
+/**
+ * pod 하나의 describe 결과를 그대로 돌려준다. 화면에서 원문을 읽는 것이 목적이라
+ * 파싱하지 않는다. -o json으로는 event와 상태 요약이 나오지 않아 describe를 쓴다.
+ */
+export async function describePod(namespace: string, name: string): Promise<string> {
+  const stdout = await runKubectl(["describe", "pod", name, "-n", namespace]);
+  return stdout.trimEnd();
+}
+
 // core/v1 Event와 events.k8s.io/v1 Event의 필드 이름이 달라 둘 다 읽는다.
 function eventTimestamp(event: any): string {
   return (
