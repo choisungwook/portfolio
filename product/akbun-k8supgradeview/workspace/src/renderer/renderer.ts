@@ -40,6 +40,19 @@ interface KarpenterLogs {
   logs: PodLog[];
 }
 
+interface KarpenterResource {
+  name: string;
+  ami: string;
+  weight: string;
+}
+
+interface KarpenterResources {
+  nodePools: KarpenterResource[];
+  nodePoolsError: string;
+  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClassesError: string;
+}
+
 interface AppSettings {
   kubectlCommand: string;
   karpenterNamespace: string;
@@ -52,6 +65,7 @@ interface Api {
   getPods(nodeName?: string): Promise<PodInfo[]>;
   getKarpenterEvents(): Promise<EventInfo[]>;
   getKarpenterLogs(): Promise<KarpenterLogs>;
+  getKarpenterResources(): Promise<KarpenterResources>;
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
 }
@@ -65,6 +79,7 @@ let allPods: PodInfo[] = [];
 let nodeFilter: NodeFilterKind = "all";
 let selectedNode = "";
 let karpenterLoaded = false;
+let nodePoolsLoaded = false;
 
 function $(selector: string): HTMLElement {
   return document.querySelector(selector) as HTMLElement;
@@ -290,6 +305,47 @@ async function refreshKarpenter(): Promise<void> {
   }
 }
 
+function renderResourceError(selector: string, message: string): void {
+  const paragraph = $(selector);
+  paragraph.textContent = message;
+  paragraph.classList.toggle("hidden", !message);
+}
+
+function renderKarpenterResourceTable(
+  prefix: string,
+  resources: KarpenterResource[],
+  error: string
+): void {
+  renderResourceError(`#${prefix}-error`, error);
+  const tbody = $(`#${prefix}-table tbody`) as HTMLTableSectionElement;
+  tbody.innerHTML = "";
+  // 조회 자체가 실패했으면 비었다는 안내 대신 에러만 보여준다.
+  $(`#${prefix}-empty`).classList.toggle("hidden", resources.length > 0 || Boolean(error));
+
+  for (const resource of resources) {
+    const row = tbody.insertRow();
+    appendCell(row, resource.name);
+    appendCell(row, resource.ami);
+    appendCell(row, resource.weight);
+  }
+}
+
+async function refreshKarpenterResources(): Promise<void> {
+  try {
+    clearError();
+    const result = await api.getKarpenterResources();
+    renderKarpenterResourceTable("nodepool", result.nodePools, result.nodePoolsError);
+    renderKarpenterResourceTable(
+      "ec2nodeclass",
+      result.ec2NodeClasses,
+      result.ec2NodeClassesError
+    );
+    nodePoolsLoaded = true;
+  } catch (error) {
+    showError(String(error));
+  }
+}
+
 function activateTab(tab: string): void {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.classList.toggle("active", (button as HTMLElement).dataset.tab === tab);
@@ -299,6 +355,7 @@ function activateTab(tab: string): void {
   });
   if (tab === "pods" && allPods.length === 0) void refreshPods();
   if (tab === "karpenter" && !karpenterLoaded) void refreshKarpenter();
+  if (tab === "nodepools" && !nodePoolsLoaded) void refreshKarpenterResources();
 }
 
 function fillSettingsForm(settings: AppSettings): void {
@@ -329,8 +386,9 @@ async function submitSettings(): Promise<void> {
   try {
     const saved = await api.saveSettings(readSettingsForm());
     fillSettingsForm(saved);
-    // 조회 범위가 바뀌었을 수 있으므로 Karpenter 탭을 다시 열 때 새로 불러오게 한다.
+    // 조회 대상이 바뀌었을 수 있으므로 karpenter 탭들을 다시 열 때 새로 불러오게 한다.
     karpenterLoaded = false;
+    nodePoolsLoaded = false;
     const badge = $("#settings-saved");
     badge.classList.remove("hidden");
     setTimeout(() => badge.classList.add("hidden"), 2000);
@@ -354,6 +412,7 @@ function registerEventHandlers(): void {
   $("#refresh-nodes").addEventListener("click", () => void refreshNodes());
   $("#refresh-pods").addEventListener("click", () => void refreshPods());
   $("#refresh-karpenter").addEventListener("click", () => void refreshKarpenter());
+  $("#refresh-nodepools").addEventListener("click", () => void refreshKarpenterResources());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
   $("#save-settings").addEventListener("click", () => void submitSettings());

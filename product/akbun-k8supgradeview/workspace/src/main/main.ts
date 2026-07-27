@@ -2,7 +2,13 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "path";
-import { getKarpenterEvents, getKarpenterLogs, getNodes, getPods } from "./kubectl";
+import {
+  getKarpenterEvents,
+  getKarpenterLogs,
+  getKarpenterResources,
+  getNodes,
+  getPods,
+} from "./kubectl";
 import { AppSettings, loadSettings, saveSettings } from "./settings";
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
 
@@ -24,6 +30,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:pods", (_event, nodeName?: string) => getPods(nodeName));
   ipcMain.handle("kubectl:karpenter-events", () => getKarpenterEvents());
   ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
+  ipcMain.handle("kubectl:karpenter-resources", () => getKarpenterResources());
   ipcMain.handle("settings:get", () => loadSettings());
   ipcMain.handle("settings:save", (_event, settings: unknown) => {
     // IPC 경계에서 형식을 검증한다. renderer가 잘못된 값을 보내면 명확한 에러로 알린다.

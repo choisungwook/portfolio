@@ -13,6 +13,7 @@
       <button class="tab-button active" data-tab="nodes">Nodes</button>
       <button class="tab-button" data-tab="pods">Pods</button>
       <button class="tab-button" data-tab="karpenter">Karpenter Event</button>
+      <button class="tab-button" data-tab="nodepools">NodePool / EC2NodeClass</button>
       <button class="tab-button" data-tab="settings">Settings</button>
     </nav>
   </header>
@@ -115,6 +116,45 @@
         <h2>Pod log</h2>
         <div id="karpenter-logs"></div>
         <p id="karpenter-log-empty" class="empty hidden">label selector에 맞는 파드가 없습니다.</p>
+      </section>
+    </section>
+
+    <!-- NodePool / EC2NodeClass tab -->
+    <section id="tab-nodepools" class="tab">
+      <div class="toolbar">
+        <button id="refresh-nodepools">새로고침</button>
+      </div>
+
+      <section class="karpenter-panel">
+        <h2>NodePool</h2>
+        <p id="nodepool-error" class="resource-error hidden"></p>
+        <table id="nodepool-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>AMI</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="nodepool-empty" class="empty hidden">NodePool이 없습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <h2>EC2NodeClass</h2>
+        <p id="ec2nodeclass-error" class="resource-error hidden"></p>
+        <table id="ec2nodeclass-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>AMI</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="ec2nodeclass-empty" class="empty hidden">EC2NodeClass가 없습니다.</p>
       </section>
     </section>
 

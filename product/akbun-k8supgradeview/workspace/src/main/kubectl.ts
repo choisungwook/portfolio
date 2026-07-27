@@ -37,6 +37,20 @@ export interface PodLog {
   error: string;
 }
 
+export interface KarpenterResource {
+  name: string;
+  ami: string;
+  weight: string;
+}
+
+export interface KarpenterResources {
+  nodePools: KarpenterResource[];
+  // NodePool 또는 EC2NodeClass CRD가 없는 클러스터도 있으므로 조회 실패를 값으로 담는다.
+  nodePoolsError: string;
+  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClassesError: string;
+}
+
 export interface KarpenterLogs {
   namespace: string;
   labelSelector: string;
@@ -209,6 +223,66 @@ async function getPodLog(
   } catch (error) {
     return { podName, text: "", error: String(error instanceof Error ? error.message : error) };
   }
+}
+
+const NO_VALUE = "-";
+
+/** amiSelectorTerms의 항목을 alias=al2023@latest 같은 한 줄 표기로 만든다. */
+function amiTermText(term: Record<string, any>): string {
+  return Object.entries(term)
+    .map(([key, value]) => `${key}=${typeof value === "object" ? JSON.stringify(value) : value}`)
+    .join(" ");
+}
+
+/**
+ * EC2NodeClass가 어떤 AMI를 쓰는지 한 칸에 담는다.
+ * amiSelectorTerms를 우선 보고, 없으면 예전 필드인 amiFamily를 쓴다.
+ */
+function amiText(spec: any): string {
+  const terms: any[] = spec?.amiSelectorTerms ?? [];
+  if (terms.length > 0) return terms.map(amiTermText).join(", ");
+  return spec?.amiFamily ?? NO_VALUE;
+}
+
+/**
+ * NodePool에는 ami가, EC2NodeClass에는 weight가 없다. 없는 필드는 -로 표시한다.
+ * List 안의 항목에는 kind가 없으므로 어느 리소스를 읽는지는 호출부가 알려준다.
+ */
+function toKarpenterResource(item: any, hasAmi: boolean): KarpenterResource {
+  const spec = item.spec ?? {};
+  return {
+    name: item.metadata?.name ?? "",
+    ami: hasAmi ? amiText(spec) : NO_VALUE,
+    weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
+  };
+}
+
+/** CRD가 없는 클러스터도 있으므로 실패를 던지지 않고 에러 메시지와 함께 돌려준다. */
+async function getKarpenterResource(
+  resource: string,
+  hasAmi: boolean
+): Promise<{ items: KarpenterResource[]; error: string }> {
+  try {
+    const stdout = await runKubectl(["get", resource, "-o", "json"]);
+    const items: any[] = JSON.parse(stdout).items ?? [];
+    return { items: items.map((item) => toKarpenterResource(item, hasAmi)), error: "" };
+  } catch (error) {
+    return { items: [], error: String(error instanceof Error ? error.message : error) };
+  }
+}
+
+/** NodePool과 EC2NodeClass 목록. 둘 다 cluster scope 리소스라 namespace를 쓰지 않는다. */
+export async function getKarpenterResources(): Promise<KarpenterResources> {
+  const [nodePools, ec2NodeClasses] = await Promise.all([
+    getKarpenterResource("nodepools.karpenter.sh", false),
+    getKarpenterResource("ec2nodeclasses.karpenter.k8s.aws", true),
+  ]);
+  return {
+    nodePools: nodePools.items,
+    nodePoolsError: nodePools.error,
+    ec2NodeClasses: ec2NodeClasses.items,
+    ec2NodeClassesError: ec2NodeClasses.error,
+  };
 }
 
 /** label selector로 찾은 karpenter pod들의 최근 log를 모은다. */

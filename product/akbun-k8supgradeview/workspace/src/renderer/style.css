@@ -91,6 +91,7 @@ button {
 #refresh-nodes,
 #refresh-pods,
 #refresh-karpenter,
+#refresh-nodepools,
 #save-settings {
   padding: 6px 14px;
   border: 1px solid #d0d7de;
@@ -189,6 +190,25 @@ th {
 
 /* message는 길어서 한 줄로 두면 표가 가로로 넘친다. 이 칸만 줄바꿈을 허용한다. */
 .message-cell {
+  max-width: 620px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* CRD가 없거나 권한이 없어 한쪽 조회만 실패했을 때 그 표 위에만 이유를 적는다. */
+.resource-error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+/* amiSelectorTerms는 길어질 수 있어 AMI 칸만 줄바꿈을 허용한다. */
+#ec2nodeclass-table td:nth-child(2) {
   max-width: 620px;
   white-space: pre-wrap;
   word-break: break-word;
