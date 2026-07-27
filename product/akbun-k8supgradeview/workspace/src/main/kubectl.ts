@@ -21,6 +21,62 @@ export interface PodInfo {
   creationTimestamp: string;
 }
 
+export interface EventInfo {
+  timestamp: string;
+  type: string;
+  reason: string;
+  object: string;
+  message: string;
+  count: number;
+}
+
+export interface PodLog {
+  podName: string;
+  // log 본문. 조회에 실패하면 빈 문자열이고 error에 이유가 담긴다.
+  text: string;
+  error: string;
+}
+
+export interface KarpenterResource {
+  name: string;
+  ami: string;
+  weight: string;
+}
+
+export interface NodePoolInfo extends KarpenterResource {
+  // 이 NodePool이 만든 노드 수. 노드 조회가 실패하면 "-"다.
+  nodes: string;
+  ready: string;
+  creationTimestamp: string;
+}
+
+export interface KarpenterResources {
+  nodePools: NodePoolInfo[];
+  // NodePool 또는 EC2NodeClass CRD가 없는 클러스터도 있으므로 조회 실패를 값으로 담는다.
+  nodePoolsError: string;
+  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClassesError: string;
+}
+
+export interface KarpenterVersion {
+  deployment: string;
+  version: string;
+  image: string;
+}
+
+export interface KarpenterVersions {
+  versions: KarpenterVersion[];
+  // deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패를 값으로 담는다.
+  error: string;
+}
+
+export interface KarpenterLogs {
+  namespace: string;
+  labelSelector: string;
+  sinceMinutes: number;
+  logs: PodLog[];
+}
+
 const KARPENTER_LABELS = ["karpenter.sh/nodepool", "karpenter.sh/provisioner-name"];
 const MANAGED_NODEGROUP_LABEL = "eks.amazonaws.com/nodegroup";
 
@@ -110,4 +166,239 @@ export async function getPods(nodeName?: string): Promise<PodInfo[]> {
   const stdout = await runKubectl(args);
   const items: any[] = JSON.parse(stdout).items ?? [];
   return items.map(toPodInfo);
+}
+
+// core/v1 Event와 events.k8s.io/v1 Event의 필드 이름이 달라 둘 다 읽는다.
+function eventTimestamp(event: any): string {
+  return (
+    event.lastTimestamp ??
+    event.series?.lastObservedTime ??
+    event.eventTime ??
+    event.firstTimestamp ??
+    event.metadata?.creationTimestamp ??
+    ""
+  );
+}
+
+function eventObject(event: any): string {
+  const target = event.involvedObject ?? event.regarding ?? {};
+  if (!target.kind) return target.name ?? "";
+  return `${target.kind}/${target.name ?? ""}`;
+}
+
+function toEventInfo(event: any): EventInfo {
+  return {
+    timestamp: eventTimestamp(event),
+    type: event.type ?? "",
+    reason: event.reason ?? "",
+    object: eventObject(event),
+    message: (event.message ?? event.note ?? "").trim(),
+    count: event.count ?? event.series?.count ?? event.deprecatedCount ?? 1,
+  };
+}
+
+/** 정렬용 시각. 비었거나 읽을 수 없는 값이 NaN이 되어 정렬을 흐트러뜨리지 않게 0으로 맞춘다. */
+function eventSortKey(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/** karpenter namespace의 event를 오래된 것부터 시간순으로 돌려준다. */
+export async function getKarpenterEvents(): Promise<EventInfo[]> {
+  const namespace = loadSettings().karpenterNamespace;
+  const stdout = await runKubectl(["get", "events", "-n", namespace, "-o", "json"]);
+  const items: any[] = JSON.parse(stdout).items ?? [];
+  return items
+    .map(toEventInfo)
+    .sort((a, b) => eventSortKey(a.timestamp) - eventSortKey(b.timestamp));
+}
+
+async function getPodNames(namespace: string, labelSelector: string): Promise<string[]> {
+  const stdout = await runKubectl([
+    "get",
+    "pods",
+    "-n",
+    namespace,
+    "-l",
+    labelSelector,
+    "-o",
+    "json",
+  ]);
+  const items: any[] = JSON.parse(stdout).items ?? [];
+  return items.map((pod) => pod.metadata?.name ?? "").filter(Boolean);
+}
+
+/** pod 하나의 log. 한 pod가 실패해도 나머지 pod의 log는 보여줘야 하므로 에러를 값으로 담는다. */
+async function getPodLog(
+  namespace: string,
+  podName: string,
+  sinceMinutes: number
+): Promise<PodLog> {
+  try {
+    const text = await runKubectl([
+      "logs",
+      podName,
+      "-n",
+      namespace,
+      "--all-containers=true",
+      "--timestamps",
+      `--since=${sinceMinutes}m`,
+    ]);
+    return { podName, text: text.trimEnd(), error: "" };
+  } catch (error) {
+    return { podName, text: "", error: String(error instanceof Error ? error.message : error) };
+  }
+}
+
+const NO_VALUE = "-";
+
+/** amiSelectorTerms의 항목을 alias=al2023@latest 같은 한 줄 표기로 만든다. */
+function amiTermText(term: Record<string, any>): string {
+  return Object.entries(term)
+    .map(([key, value]) => `${key}=${typeof value === "object" ? JSON.stringify(value) : value}`)
+    .join(" ");
+}
+
+/**
+ * EC2NodeClass가 어떤 AMI를 쓰는지 한 칸에 담는다.
+ * amiSelectorTerms를 우선 보고, 없으면 예전 필드인 amiFamily를 쓴다.
+ */
+function amiText(spec: any): string {
+  const terms: any[] = spec?.amiSelectorTerms ?? [];
+  if (terms.length > 0) return terms.map(amiTermText).join(", ");
+  return spec?.amiFamily ?? NO_VALUE;
+}
+
+/** status.conditions의 Ready 상태. condition이 아직 없으면 -다. */
+function readyStatus(item: any): string {
+  const conditions: any[] = item.status?.conditions ?? [];
+  return conditions.find((condition) => condition.type === "Ready")?.status ?? NO_VALUE;
+}
+
+/** EC2NodeClass는 ami만 있고 weight가 없다. 없는 필드는 -로 표시한다. */
+function toEc2NodeClass(item: any): KarpenterResource {
+  const spec = item.spec ?? {};
+  return {
+    name: item.metadata?.name ?? "",
+    ami: amiText(spec),
+    weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
+  };
+}
+
+/** NodePool은 ami가 없고, 만든 노드 수는 노드 목록을 세어 채운다. */
+function toNodePool(item: any, nodeCounts: Map<string, number> | null): NodePoolInfo {
+  const spec = item.spec ?? {};
+  const name = item.metadata?.name ?? "";
+  return {
+    name,
+    ami: NO_VALUE,
+    weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
+    nodes: nodeCounts ? String(nodeCounts.get(name) ?? 0) : NO_VALUE,
+    ready: readyStatus(item),
+    creationTimestamp: item.metadata?.creationTimestamp ?? "",
+  };
+}
+
+/** CRD가 없는 클러스터도 있으므로 실패를 던지지 않고 에러 메시지와 함께 돌려준다. */
+async function getResourceItems(resource: string): Promise<{ items: any[]; error: string }> {
+  try {
+    const stdout = await runKubectl(["get", resource, "-o", "json"]);
+    return { items: JSON.parse(stdout).items ?? [], error: "" };
+  } catch (error) {
+    return { items: [], error: String(error instanceof Error ? error.message : error) };
+  }
+}
+
+/**
+ * NodePool 이름별 노드 수. NodePool status에는 노드 수가 없어서 노드 label로 센다.
+ * 노드 조회가 실패하면 0과 구분하려고 null을 돌려준다.
+ */
+async function countNodesByNodePool(): Promise<Map<string, number> | null> {
+  try {
+    const counts = new Map<string, number>();
+    for (const node of await getNodes()) {
+      if (!node.isKarpenter) continue;
+      counts.set(node.group, (counts.get(node.group) ?? 0) + 1);
+    }
+    return counts;
+  } catch {
+    return null;
+  }
+}
+
+/** NodePool과 EC2NodeClass 목록. 둘 다 cluster scope 리소스라 namespace를 쓰지 않는다. */
+export async function getKarpenterResources(): Promise<KarpenterResources> {
+  const [nodePools, ec2NodeClasses, nodeCounts] = await Promise.all([
+    getResourceItems("nodepools.karpenter.sh"),
+    getResourceItems("ec2nodeclasses.karpenter.k8s.aws"),
+    countNodesByNodePool(),
+  ]);
+  return {
+    nodePools: nodePools.items.map((item) => toNodePool(item, nodeCounts)),
+    nodePoolsError: nodePools.error,
+    ec2NodeClasses: ec2NodeClasses.items.map(toEc2NodeClass),
+    ec2NodeClassesError: ec2NodeClasses.error,
+  };
+}
+
+/**
+ * image 문자열에서 tag를 뽑는다. registry에 port가 붙어 있으면(host:5000/karpenter)
+ * 마지막 / 뒤에서만 :를 찾아야 tag와 port를 혼동하지 않는다.
+ */
+function imageTag(image: string): string {
+  const name = image.split("@")[0];
+  const lastSlash = name.lastIndexOf("/");
+  const colon = name.indexOf(":", lastSlash + 1);
+  return colon === -1 ? "" : name.slice(colon + 1);
+}
+
+function containerImage(deployment: any): string {
+  const containers: any[] = deployment.spec?.template?.spec?.containers ?? [];
+  return containers[0]?.image ?? "";
+}
+
+/** helm chart가 붙이는 app.kubernetes.io/version label을 먼저 보고, 없으면 image tag를 쓴다. */
+function toKarpenterVersion(deployment: any): KarpenterVersion {
+  const image = containerImage(deployment);
+  const labelVersion = deployment.metadata?.labels?.["app.kubernetes.io/version"];
+  return {
+    deployment: deployment.metadata?.name ?? "",
+    version: labelVersion || imageTag(image) || NO_VALUE,
+    image: image || NO_VALUE,
+  };
+}
+
+/** karpenter deployment에서 읽은 버전. label selector는 pod 조회와 같은 설정을 쓴다. */
+export async function getKarpenterVersions(): Promise<KarpenterVersions> {
+  const settings = loadSettings();
+  try {
+    const stdout = await runKubectl([
+      "get",
+      "deployments",
+      "-n",
+      settings.karpenterNamespace,
+      "-l",
+      settings.karpenterPodLabelSelector,
+      "-o",
+      "json",
+    ]);
+    const items: any[] = JSON.parse(stdout).items ?? [];
+    return { versions: items.map(toKarpenterVersion), error: "" };
+  } catch (error) {
+    return { versions: [], error: String(error instanceof Error ? error.message : error) };
+  }
+}
+
+/** label selector로 찾은 karpenter pod들의 최근 log를 모은다. */
+export async function getKarpenterLogs(): Promise<KarpenterLogs> {
+  const settings = loadSettings();
+  const namespace = settings.karpenterNamespace;
+  const labelSelector = settings.karpenterPodLabelSelector;
+  const sinceMinutes = settings.karpenterLogSinceMinutes;
+
+  const podNames = await getPodNames(namespace, labelSelector);
+  const logs = await Promise.all(
+    podNames.map((podName) => getPodLog(namespace, podName, sinceMinutes))
+  );
+  return { namespace, labelSelector, sinceMinutes, logs };
 }

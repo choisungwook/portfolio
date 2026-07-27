@@ -90,6 +90,8 @@ button {
 
 #refresh-nodes,
 #refresh-pods,
+#refresh-karpenter,
+#refresh-nodepools,
 #save-settings {
   padding: 6px 14px;
   border: 1px solid #d0d7de;
@@ -177,9 +179,78 @@ th {
   display: none !important;
 }
 
+.karpenter-panel {
+  margin-bottom: 24px;
+}
+
+.karpenter-panel h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+/* message는 길어서 한 줄로 두면 표가 가로로 넘친다. 이 칸만 줄바꿈을 허용한다. */
+.message-cell {
+  max-width: 620px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* CRD가 없거나 권한이 없어 한쪽 조회만 실패했을 때 그 표 위에만 이유를 적는다. */
+.resource-error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+/* amiSelectorTerms는 길어질 수 있어 AMI 칸만 줄바꿈을 허용한다. */
+#ec2nodeclass-table td:nth-child(2) {
+  max-width: 620px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-block {
+  margin-bottom: 12px;
+}
+
+.log-block h3 {
+  font-size: 13px;
+  margin: 0 0 4px;
+  color: #57606a;
+}
+
+.log-block pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-block pre.log-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 #namespace-filter,
 #pod-search,
-#kubectl-command {
+#kubectl-command,
+#karpenter-namespace,
+#karpenter-label-selector,
+#karpenter-log-since {
   padding: 6px 10px;
   border: 1px solid #d0d7de;
   border-radius: 6px;
@@ -199,10 +270,17 @@ th {
 
 .settings-form label {
   font-size: 14px;
+  min-width: 150px;
 }
 
-#kubectl-command {
+#kubectl-command,
+#karpenter-namespace,
+#karpenter-label-selector {
   min-width: 260px;
+}
+
+#karpenter-log-since {
+  width: 100px;
 }
 
 #settings-saved {

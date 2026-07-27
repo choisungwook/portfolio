@@ -12,6 +12,8 @@
     <nav>
       <button class="tab-button active" data-tab="nodes">Nodes</button>
       <button class="tab-button" data-tab="pods">Pods</button>
+      <button class="tab-button" data-tab="karpenter">Karpenter Event</button>
+      <button class="tab-button" data-tab="nodepools">NodePool / EC2NodeClass</button>
       <button class="tab-button" data-tab="settings">Settings</button>
     </nav>
   </header>
@@ -85,6 +87,96 @@
       <p id="pod-empty" class="empty hidden">파드가 없습니다.</p>
     </section>
 
+    <!-- Karpenter Event tab -->
+    <section id="tab-karpenter" class="tab">
+      <div class="toolbar">
+        <span id="karpenter-scope" class="help"></span>
+        <button id="refresh-karpenter">새로고침</button>
+      </div>
+
+      <section class="karpenter-panel">
+        <h2>Version</h2>
+        <p id="karpenter-version-error" class="resource-error hidden"></p>
+        <table id="karpenter-version-table">
+          <thead>
+            <tr>
+              <th>Deployment</th>
+              <th>Version</th>
+              <th>Image</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="karpenter-version-empty" class="empty hidden">karpenter deployment를 찾지 못했습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <h2>Event</h2>
+        <table id="karpenter-event-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Reason</th>
+              <th>Object</th>
+              <th>Count</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="karpenter-event-empty" class="empty hidden">event가 없습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <h2>Pod log</h2>
+        <div id="karpenter-logs"></div>
+        <p id="karpenter-log-empty" class="empty hidden">label selector에 맞는 파드가 없습니다.</p>
+      </section>
+    </section>
+
+    <!-- NodePool / EC2NodeClass tab -->
+    <section id="tab-nodepools" class="tab">
+      <div class="toolbar">
+        <button id="refresh-nodepools">새로고침</button>
+      </div>
+
+      <section class="karpenter-panel">
+        <h2>NodePool</h2>
+        <p id="nodepool-error" class="resource-error hidden"></p>
+        <table id="nodepool-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>AMI</th>
+              <th>Weight</th>
+              <th>Nodes</th>
+              <th>Ready</th>
+              <th>Age</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="nodepool-empty" class="empty hidden">NodePool이 없습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <h2>EC2NodeClass</h2>
+        <p id="ec2nodeclass-error" class="resource-error hidden"></p>
+        <table id="ec2nodeclass-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>AMI</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="ec2nodeclass-empty" class="empty hidden">EC2NodeClass가 없습니다.</p>
+      </section>
+    </section>
+
     <!-- Settings tab -->
     <section id="tab-settings" class="tab">
       <h2>kubectl 설정</h2>
@@ -95,6 +187,31 @@
       <div class="settings-form">
         <label for="kubectl-command">kubectl 명령</label>
         <input id="kubectl-command" type="text" placeholder="kubectl" />
+      </div>
+
+      <h2>Karpenter 설정</h2>
+      <p class="help">
+        Karpenter Event 탭이 조회할 namespace와 pod label selector, log 조회 범위를 정한다.
+        log 범위는 1분에서 1440분(24시간) 사이로 제한한다.
+      </p>
+      <div class="settings-form">
+        <label for="karpenter-namespace">namespace</label>
+        <input id="karpenter-namespace" type="text" placeholder="karpenter" />
+      </div>
+      <div class="settings-form">
+        <label for="karpenter-label-selector">pod label selector</label>
+        <input
+          id="karpenter-label-selector"
+          type="text"
+          placeholder="app.kubernetes.io/name=karpenter"
+        />
+      </div>
+      <div class="settings-form">
+        <label for="karpenter-log-since">log 조회 범위(분)</label>
+        <input id="karpenter-log-since" type="number" min="1" max="1440" placeholder="15" />
+      </div>
+
+      <div class="settings-form">
         <button id="save-settings">저장</button>
         <span id="settings-saved" class="hidden">저장되었습니다.</span>
       </div>

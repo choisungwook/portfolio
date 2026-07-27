@@ -9,9 +9,9 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `kubectl.ts`: kubectl 실행과 노드/파드 JSON 파싱
   - `settings.ts`: userData 경로의 settings.json 읽기/쓰기
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
-- `workspace/src/renderer/`: 화면. Nodes, Pods, Settings 3개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
+- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -24,6 +24,48 @@ kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
 ```
+
+Karpenter Event 탭이 사용하는 명령. namespace, label selector, 조회 범위는 Settings 값이다.
+
+```bash
+kubectl get deployments -n <namespace> -l <label selector> -o json
+kubectl get events -n <namespace> -o json
+kubectl get pods -n <namespace> -l <label selector> -o json
+kubectl logs <파드이름> -n <namespace> --all-containers=true --timestamps --since=<분>m
+```
+
+NodePool / EC2NodeClass 탭이 사용하는 명령. 둘 다 cluster scope 리소스다. 다른 CRD와 이름이 겹치지 않도록 group까지 붙여 조회한다.
+
+```bash
+kubectl get nodepools.karpenter.sh -o json
+kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
+```
+
+## Karpenter Event 탭
+
+버전은 karpenter deployment에서 읽는다. helm chart가 붙이는 `app.kubernetes.io/version` label을 먼저 보고, 없으면 container image의 tag를 쓴다. registry에 port가 붙은 image(`registry:5000/karpenter:1.1.0`)를 tag와 혼동하지 않도록 마지막 `/` 뒤에서만 `:`를 찾는다. tag 없이 digest만 있으면 `-`다. deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패는 값으로 담아 그 표 위에만 표시한다.
+
+event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는다. 시각은 `lastTimestamp`, `series.lastObservedTime`, `eventTime`, `firstTimestamp`, `metadata.creationTimestamp` 순으로 찾고, 대상은 `involvedObject` 또는 `regarding`, 본문은 `message` 또는 `note`를 쓴다. 목록은 오래된 것부터 시간순으로 정렬한다. 읽을 수 없는 시각은 정렬 비교에서 0으로 맞춘다. `NaN`을 비교에 넣으면 순서가 보장되지 않기 때문이다.
+
+로그는 label selector로 파드를 먼저 찾고 파드마다 따로 조회한다. 한 파드의 조회가 실패해도 나머지 로그는 보여줘야 하므로 실패를 예외로 던지지 않고 `PodLog.error`에 담아 화면에 표시한다.
+
+| 설정 | 기본값 |
+|---|---|
+| `karpenterNamespace` | `karpenter` |
+| `karpenterPodLabelSelector` | `app.kubernetes.io/name=karpenter` |
+| `karpenterLogSinceMinutes` | `15` (1~1440으로 제한) |
+
+## NodePool / EC2NodeClass 탭
+
+NodePool은 name, ami, weight, nodes, ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. NodePool에는 ami가 없고 EC2NodeClass에는 weight가 없으므로 없는 필드는 `-`로 채운다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드도 마찬가지다.
+
+ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
+
+nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` label을 세어 채운다. 노드 조회가 실패하면 0과 구분해야 하므로 0이 아니라 `-`를 표시한다. `-`는 "셀 수 없었다"이고 0은 "정말 노드가 없다"다.
+
+karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
+
+빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
 
 ## 노드 분류 기준
 
