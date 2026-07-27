@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>암호화되기 전 한 조각 — HAProxy SNI 라우팅</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>암호화되기 전 한 조각 — <mark>HAProxy SNI 라우팅</mark></h1>
+    <p class="sub">키를 갖지 않은 L4 proxy가 도메인별로 백엔드를 나누는 원리와, 그 이름이 없을 때 벌어지는 일</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 도메인별로 백엔드를 나눠야 하는데 인증서는 백엔드가 쥐고 있어서 proxy에서 TLS를 끝낼 수 없음. 게다가 <b>IP로 들어오는 health check</b>는 어디로도 안 감.</p>
+    <p><b class="p-point">어떻게 풀까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">이름으로 나누고 싶은데 안을 못 봄</h2>
+  <p class="dim">이런 상황을 가정함.</p>
+  <ul class="bullets">
+    <li>a.example.com과 b.example.com을 서로 다른 백엔드로 보내야 함</li>
+    <li>인증서와 키는 백엔드가 소유. proxy에 키를 복사할 수 없음(규정, 또는 mTLS 종단이 백엔드)</li>
+    <li><span class="xmark">✕</span> TCP proxy는 payload가 <span class="prob-text">전부 암호문</span>이라 Host 헤더를 못 읽음</li>
+    <li><span class="xmark">✕</span> IP로 붙는 health check와 옛 클라이언트는 <span class="prob-text">이름 자체를 안 보냄</span></li>
+  </ul>
+  <p><b class="p-point">푸는 방법 중 하나</b> — handshake에서 <mark>아직 암호화되지 않은 첫 조각</mark>을 읽음. 거기에 이름이 있음.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 — handshake 순서 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">ClientHello는 평문임</h2>
+  <p>TLS는 첫 메시지부터 암호화되지 않음. 키를 아직 안 정했으니 당연함.</p>
+  <ul class="bullets">
+    <li>① Client → Server <mark>ClientHello (평문)</mark> — 지원 버전, cipher, extension 목록
+      <ul><li>여기에 server_name(SNI) extension이 들어 있음</li></ul>
+    </li>
+    <li>② Server → Client ServerHello + <b>Certificate</b> — 서버가 인증서를 고름</li>
+    <li>③ 키 교환이 끝난 뒤부터 암호화. HTTP Host 헤더는 이 뒤에 나옴</li>
+  </ul>
+  <p>즉 <b>이름은 ②보다 먼저</b> 지나감. 프록시가 키 없이 볼 수 있는 구간은 정확히 ①뿐임.</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 — 왜 평문인가 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">평문일 수밖에 없는 이유</h2>
+  <p class="dim">보안 구멍이 아니라 순서 문제임.</p>
+  <ul class="bullets">
+    <li>한 IP에 여러 도메인이 있으면 서버는 <mark>인증서를 고르기 전에 이름을 알아야 함</mark></li>
+    <li>이름을 암호화하려면 키가 필요하고, 키를 정하려면 인증서가 필요함 — 닭과 달걀</li>
+    <li>그래서 RFC 6066은 이름을 ClientHello extension에 <b>평문</b>으로 실었음</li>
+    <li>이 순서를 깨려고 나온 것이 ECH. 바깥 SNI는 공용 이름이 되고 진짜 이름은 암호화됨</li>
+  </ul>
+  <p>SNI 라우팅은 이 설계의 <b>부수 효과</b>를 활용하는 것임. 원래 서버가 인증서를 고르라고 만든 필드를 proxy가 대신 읽음.</p>
+</section>
+
+<!-- ════════ 5장. 원리 3 — 라우팅 키이지 신원이 아님 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">SNI는 라우팅 키이지 신원이 아님</h2>
+  <ul class="bullets">
+    <li>SNI 값은 <mark>클라이언트가 마음대로 쓰는 문자열</mark>. 아무도 검증하지 않은 상태로 읽음</li>
+    <li>인증서 검증은 그 뒤에 클라이언트와 백엔드 사이에서 따로 일어남</li>
+    <li>passthrough에서는 proxy가 SNI와 Host 헤더가 같은지 <span class="prob-text">비교할 수 없음</span> — Host는 암호문 안에 있음</li>
+  </ul>
+  <p>그래서 SNI로 하는 것은 <b>dispatch</b>지 <b>authorization</b>이 아님. 접근 제어가 필요하면 handshake 이후에 할 수 있는 자리(TLS 종단, mTLS, 앱)에서 해야 함.</p>
+  <p class="dim">SNI와 Host를 다르게 보내는 domain fronting류 기법이 성립하는 이유도 이 지점임.</p>
+</section>
+
+<!-- ════════ 6장. 구조 — 한 사이클 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">HAProxy가 이름을 읽는 한 사이클</h2>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">1</span>
+        <div class="dbox hot">client<small>ClientHello</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">HAProxy<small>mode tcp</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">backend</div>
+      </div>
+      <p class="exp"><b>1단계.</b> TCP 연결이 맺어짐. 이 시점에 HAProxy는 아무 payload도 못 봤음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">HAProxy<small>inspect-delay 5s</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">backend</div>
+      </div>
+      <p class="exp"><b>2단계.</b> <mark>tcp-request inspect-delay</mark>가 연결을 잡아 둠. 이게 없으면 버퍼가 비어 있어 판단할 게 없음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">HAProxy<small>req.ssl_sni = a.lab.local</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">backend</div>
+      </div>
+      <p class="exp"><b>3단계.</b> 버퍼가 ClientHello면(req.ssl_hello_type 1) SNI를 꺼내 backend를 고름. 복호화는 없음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">4</span>
+        <div class="dbox wl">client</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">HAProxy<small>바이트만 전달</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">backend<small>여기서 TLS 종단</small></div>
+      </div>
+      <p class="exp"><b>4단계.</b> 이후로는 그냥 TCP. handshake는 client와 backend가 끝냄. 키는 백엔드에만 있음.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 7장. 설정 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">설정은 네 줄로 끝남</h2>
+  <p class="codedesc">passthrough frontend — 이름을 읽어 backend만 고르고 TLS는 건드리지 않음</p>
+<pre class="code"><span class="k">frontend</span> fe_sni_passthrough
+  bind *:8443
+  <span class="k">mode</span> tcp
+  <span class="hot">tcp-request inspect-delay 5s</span>          <span class="c"># 첫 조각을 기다림</span>
+  tcp-request content accept <span class="k">if</span> { req.ssl_hello_type 1 }
+  tcp-request content reject                <span class="c"># TLS가 아니면 버림</span>
+
+  use_backend be_a <span class="k">if</span> { <span class="hot">req.ssl_sni</span> -i a.lab.local }
+  use_backend be_b <span class="k">if</span> { <span class="hot">req.ssl_sni</span> -i b.lab.local }
+  use_backend be_nosni <span class="k">if</span> !{ req.ssl_sni <span class="bad">-m found</span> }
+  <span class="k">default_backend</span> be_unknown</pre>
+  <p><b>req.ssl_sni</b>는 request 버퍼가 살아 있을 때만 유효함. 로그에 남기려면 <b>set-var(sess.sni)</b>로 복사해 두고 <b>%[var(sess.sni)]</b>로 찍음. TLS를 종단하는 frontend에서는 같은 값을 <b>ssl_fc_sni</b>로 읽음.</p>
+</section>
+
+<!-- ════════ 8장. 확인 문제 1 ════════ -->
+<section class="page">
+  <p class="sec">4. 확인 문제</p>
+  <h2 class="page-title">확인 문제 1</h2>
+  <div class="quiz">
+    <p class="q">mode tcp frontend에서 inspect-delay를 지우면 어떻게 되는가?</p>
+    <ul class="opts">
+      <li>SNI 매칭이 느려질 뿐 결과는 같다</li>
+      <li data-answer>버퍼가 빈 채로 규칙이 평가돼 SNI 조건이 맞지 않고 default_backend로 감</li>
+      <li>HAProxy가 설정 오류로 기동에 실패한다</li>
+      <li>HAProxy가 TLS를 종단해서 SNI를 읽는다</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 연결 수립 직후에는 payload가 아직 안 왔음. inspect-delay는 "기다리는 시간"이 아니라 <mark>판단할 재료를 모으는 시간</mark>임.</p>
+  </div>
+</section>
+
+<!-- ════════ 9장. SNI가 없을 때 — 누가 ════════ -->
+<section class="page">
+  <p class="sec">5. SNI가 없는 handshake</p>
+  <h2 class="page-title">이름을 안 보내는 클라이언트는 정상임</h2>
+  <p>server_name은 <mark>선택 extension</mark>임. 없는 handshake도 규격에 맞음. 클라이언트 버그로 취급하면 원인을 못 찾음.</p>
+  <ul class="bullets">
+    <li><b>IP로 접속</b> — RFC 6066이 IP 리터럴을 금지함. 올바른 클라이언트일수록 extension을 뺌 (가장 흔함)</li>
+    <li><b>health check와 모니터링 probe</b> — 대개 이름이 아니라 주소로 붙음</li>
+    <li><b>openssl s_client</b> — -servername을 안 주면 SNI 없음</li>
+    <li><b>옛 스택</b> — XP 시절 브라우저, Java 6, Android 2.x</li>
+    <li><b>ECH</b> — 진짜 이름이 암호화됨. 바깥 SNI는 공용 이름이라 테넌트 키로 못 씀</li>
+  </ul>
+  <p class="dim">에지에서 "가끔 아무 데나 간다"는 신고는 대부분 이 목록 중 하나임.</p>
+</section>
+
+<!-- ════════ 10장. 없음 vs 모르는 이름 ════════ -->
+<section class="page">
+  <p class="sec">5. SNI가 없는 handshake</p>
+  <h2 class="page-title">"없음"과 "모르는 이름"은 다른 사건임</h2>
+  <p>req.ssl_sni는 빈 문자열이 아니라 <mark>정의되지 않은(undefined) 샘플</mark>임. 값 비교는 그냥 안 맞고, 둘 다 default_backend로 흘러감.</p>
+  <p class="codedesc">-m found는 값이 아니라 존재 여부로 매칭 — 두 경우를 갈라 놓는 한 줄</p>
+<pre class="code">  use_backend be_nosni <span class="k">if</span> !{ req.ssl_sni <span class="hot">-m found</span> }   <span class="c"># 이름을 안 보냄</span>
+  <span class="k">default_backend</span> be_unknown                       <span class="c"># 모르는 이름</span></pre>
+  <p>가르는 이유는 라우팅이 아니라 <b>운영</b>임. 둘은 원인도 대응도 다름.</p>
+  <ul class="bullets">
+    <li>이름 없음 → IP로 붙는 probe거나 옛 클라이언트. 대개 우리 쪽 설정 문제</li>
+    <li>모르는 이름 → 오래된 DNS, 삭제된 테넌트, 스캐너. 대개 저쪽 문제</li>
+  </ul>
+</section>
+
+<!-- ════════ 11장. 대응 4가지 ════════ -->
+<section class="page">
+  <p class="sec">5. SNI가 없는 handshake</p>
+  <h2 class="page-title">답은 넷 중 하나임</h2>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>받아 준다</h3>
+      <ul>
+        <li><b>fallback backend</b> — default_backend로 흡수. 그 백엔드가 클라이언트가 받아들일 인증서를 쥐고 있어야 함</li>
+        <li><b>전용 no-SNI backend</b> — 위와 같지만 로그·stats에서 원인이 갈림</li>
+        <li><b>TLS 종단</b> — 기본 인증서를 주고, 그 다음 <mark>Host 헤더</mark>로 라우팅. 클라이언트가 SNI는 안 보내도 Host는 보냄</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>끊는다</h3>
+      <ul>
+        <li><b>reject</b> — tcp-request content reject unless { req.ssl_sni -m found }</li>
+        <li>IP health check가 같이 죽음</li>
+        <li>옛 클라이언트가 조용히 사라짐</li>
+        <li>클라이언트를 전부 통제할 때만 고를 수 있음</li>
+      </ul>
+    </div>
+  </div>
+  <p>질문 자체를 없애는 다섯 번째도 있음 — 테넌트마다 <b>포트나 IP를 분리</b>하고 dst_port로 라우팅. 수가 적으면 이게 제일 단순함.</p>
+</section>
+
+<!-- ════════ 12장. IP로 HTTPS — 문제가 둘 ════════ -->
+<section class="page">
+  <p class="sec">6. IP로 HTTPS 하기</p>
+  <h2 class="page-title">IP 접속은 문제가 두 개임</h2>
+  <p class="dim">https://10.0.0.5 하나에 서로 다른 고장이 겹쳐 있음. 고치는 자리도 다름.</p>
+  <ul class="bullets">
+    <li>① <b>라우팅</b> — SNI가 없어서 proxy가 고를 근거가 없음 → fallback 경로가 필요</li>
+    <li>② <b>검증</b> — 클라이언트가 인증서에서 <mark>IP SAN</mark>을 찾음 → 인증서에 IP를 넣어야 함</li>
+  </ul>
+  <p>요즘 클라이언트는 CN을 보지 않음. <b>CN=127.0.0.1은 소용없고</b> subjectAltName에 <b>IP:127.0.0.1</b>이 있어야 함. 핸즈온의 fallback 인증서는 그래서 <code>DNS:default.lab.local, IP:127.0.0.1</code>로 발급함.</p>
+  <p><span class="prob-text">공인 CA는 사설 IP에 IP SAN을 발급하지 않음.</span> 사내에서 IP로 HTTPS를 하겠다면 사설 CA를 세우거나, 클라이언트가 검증을 건너뛰는 것을 받아들이는 선택이 됨.</p>
+</section>
+
+<!-- ════════ 13장. 두 경로 비교 ════════ -->
+<section class="page">
+  <p class="sec">6. IP로 HTTPS 하기</p>
+  <h2 class="page-title">passthrough와 종단, 각각의 답</h2>
+  <p class="codedesc">종단 frontend — crt-list의 첫 줄이 기본 인증서. SNI가 없으면 이것이 나감</p>
+<pre class="code"><span class="k">bind</span> *:8444 ssl <span class="hot">crt-list</span> /usr/local/etc/haproxy/crt-list.txt
+
+<span class="c"># crt-list.txt</span>
+<span class="hot">/certs/bundles/default.pem</span>      <span class="c"># ← 기본. IP SAN 보유</span>
+/certs/bundles/a.lab.local.pem
+/certs/bundles/b.lab.local.pem
+
+<span class="c"># handshake 후에는 평문 HTTP — 이름은 Host에서 얻음</span>
+acl host_a req.hdr(host),field(1,:) -i a.lab.local</pre>
+  <ul class="bullets">
+    <li><b>passthrough(8443)</b> — 이름이 없으니 fallback backend로. 인증서 문제는 그 백엔드가 해결</li>
+    <li><b>종단(8444)</b> — 기본 인증서로 handshake를 성사시킨 뒤 Host로 라우팅. proxy가 키를 쥐는 대가</li>
+  </ul>
+</section>
+
+<!-- ════════ 14장. strict-sni ════════ -->
+<section class="page">
+  <p class="sec">6. IP로 HTTPS 하기</p>
+  <h2 class="page-title">strict-sni는 무엇을 바꾸는가</h2>
+  <p><code>bind ... ssl crt-list ... strict-sni</code>를 붙이면 <mark>매칭되는 인증서가 없을 때 handshake를 거절</mark>함. SNI가 아예 없는 경우도 포함임.</p>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>켤 때</h3>
+      <ul>
+        <li>테넌트가 많고, 엉뚱한 기본 인증서가 나가는 것 자체가 사고인 에지</li>
+        <li>기본 인증서를 아무에게나 보여 주지 않음</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>대가</h3>
+      <ul>
+        <li>IP로 붙는 health check가 전부 실패</li>
+        <li>옛 클라이언트가 handshake 단계에서 끊김</li>
+        <li>실패가 <span class="prob-text">HTTP 상태 코드가 아니라 TLS 오류</span>로 나와 디버깅이 어려움</li>
+      </ul>
+    </div>
+  </div>
+  <p>정답은 상황에 있음. probe에 진짜 hostname을 줄 수 있으면 켜고, 못 주면 기본 인증서를 남겨 둠.</p>
+</section>
+
+<!-- ════════ 15장. 확인 문제 2 ════════ -->
+<section class="page">
+  <p class="sec">4. 확인 문제</p>
+  <h2 class="page-title">확인 문제 2</h2>
+  <div class="quiz">
+    <p class="q">사내 모니터링이 https://10.0.0.5 로 health check를 보내는데, 에지에 strict-sni를 켰다. 무엇이 관측되는가?</p>
+    <ul class="opts">
+      <li>404가 늘어난다</li>
+      <li>기본 인증서로 응답하고 default_backend로 간다</li>
+      <li data-answer>TLS handshake 단계에서 실패한다. HTTP 로그에는 아무것도 안 남는다</li>
+      <li>SNI가 IP 문자열로 채워져 라우팅된다</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> IP 접속은 SNI를 안 보내고, strict-sni는 매칭 실패를 거절로 처리함. 요청이 HTTP까지 도달하지 못하므로 <mark>httplog에는 흔적이 없음</mark>. 이때 필요한 것이 ssl_fc_has_sni 같은 필드임.</p>
+  </div>
+</section>
+
+<!-- ════════ 16장. 정리 ════════ -->
+<section class="page">
+  <p class="sec">7. 정리</p>
+  <h2 class="page-title">남길 것</h2>
+  <ul class="bullets">
+    <li>SNI 라우팅이 되는 이유는 <mark>ClientHello가 평문</mark>이기 때문이고, 그건 서버가 인증서를 고르려면 이름이 먼저 필요해서임</li>
+    <li>HAProxy는 inspect-delay로 그 첫 조각을 기다린 뒤 req.ssl_sni로 고름. 복호화도 키도 없음</li>
+    <li>읽은 이름은 검증되지 않은 값임. dispatch에 쓰고 authorization에는 쓰지 않음</li>
+    <li>SNI 없는 handshake는 정상임. <b>-m found</b>로 "없음"과 "모르는 이름"을 갈라 두면 장애 분석이 달라짐</li>
+    <li>IP로 HTTPS는 <b>라우팅(fallback)</b>과 <b>검증(IP SAN)</b> 두 군데를 같이 손봐야 함</li>
+  </ul>
+  <p class="foot">핸즈온으로 재현: <a href="./README.md">computer_science/haproxy_sni_routing</a> — docker compose up -d 후 8443(passthrough)과 8444(종단)에 같은 IP로 붙어 로그를 비교함.</p>
+</section>
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+name: haproxy-sni-routing
+
+services:
+  certs:
+    image: alpine:3.22
+    command: sh -c "apk add --no-cache openssl >/dev/null && sh /gen-certs.sh"
+    volumes:
+      - ./certs/gen-certs.sh:/gen-certs.sh:ro
+      - ./certs/out:/certs
+
+  nginx-a:
+    image: nginx:1.29-alpine
+    environment:
+      BACKEND_NAME: a
+      CERT_NAME: a.lab.local
+      NGINX_ENVSUBST_FILTER: "^(BACKEND_NAME|CERT_NAME)$$"
+    volumes:
+      - ./nginx/backend.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs/out:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+
+  nginx-b:
+    image: nginx:1.29-alpine
+    environment:
+      BACKEND_NAME: b
+      CERT_NAME: b.lab.local
+      NGINX_ENVSUBST_FILTER: "^(BACKEND_NAME|CERT_NAME)$$"
+    volumes:
+      - ./nginx/backend.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs/out:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+
+  nginx-default:
+    image: nginx:1.29-alpine
+    environment:
+      BACKEND_NAME: default
+      CERT_NAME: default
+      NGINX_ENVSUBST_FILTER: "^(BACKEND_NAME|CERT_NAME)$$"
+    volumes:
+      - ./nginx/backend.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs/out:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+
+  haproxy:
+    image: haproxy:3.2-alpine
+    ports:
+      - "8443:8443"
+      - "8444:8444"
+      - "8404:8404"
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy:ro
+      - ./certs/out:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      nginx-a:
+        condition: service_started
+      nginx-b:
+        condition: service_started
+      nginx-default:
+        condition: service_started

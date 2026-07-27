@@ -1,0 +1,13 @@
+server {
+  listen 80;
+  listen 443 ssl;
+  server_name _;
+
+  ssl_certificate     /certs/${CERT_NAME}.crt;
+  ssl_certificate_key /certs/${CERT_NAME}.key;
+
+  location / {
+    default_type text/plain;
+    return 200 "backend=${BACKEND_NAME} sni=$ssl_server_name host=$http_host port=$server_port\n";
+  }
+}

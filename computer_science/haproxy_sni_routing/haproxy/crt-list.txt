@@ -1,0 +1,5 @@
+# The first entry is the default certificate: it is served when the
+# handshake carries no SNI, or an SNI that matches nothing below.
+/certs/bundles/default.pem
+/certs/bundles/a.lab.local.pem
+/certs/bundles/b.lab.local.pem
