@@ -1,0 +1,6 @@
+[project]
+name = "acp-protocol"
+version = "0.1.0"
+description = "Agent Client Protocol hands-on with a scripted agent and a minimal client"
+requires-python = ">=3.11"
+dependencies = []

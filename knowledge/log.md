@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-26
+
+* **Creation**: [프로토콜 핸즈온은 공식 SDK 없이 표준 라이브러리로 만든다](decisions/2026-07-protocol-handson-without-sdk.md) 결정 기록. ACP 핸즈온을 표준 라이브러리만으로 만들면서 남긴다.
+
 ## 2026-07-25
 
 * **Creation**: [Electron 릴리스 빌드는 macOS만](decisions/2026-07-electron-release-macos-only.md) 결정 기록. akbun-gitdesktop 릴리스 workflow의 Windows checkout 실패 수정과 함께 남긴다.

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>에디터는 어떻게 모르는 agent를 그리는가 — ACP</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>에디터는 어떻게 <mark>모르는 agent</mark>를 그리는가 — ACP</h1>
+    <p class="sub">Agent Client Protocol의 전송·스트리밍·권한 구조를 직접 만들어 관찰</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 에디터에서 Claude Code도 쓰고 Gemini CLI도 쓰는데 계획·diff·권한 창이 둘 다 같은 모양으로 뜸. 에디터가 두 agent를 각각 알고 만들었을 리는 없음.</p>
+    <p><b class="p-point">어떻게 된 걸까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">에디터 × agent = 통합 개수</h2>
+  <div class="diagram">
+    <div class="dbox wl">Zed</div>
+    <div class="dbox wl">JetBrains</div>
+    <div class="dbox wl">Neovim</div>
+    <span class="darrow bad">✕ 전부 연결</span>
+    <div class="dbox rs">Claude Code</div>
+    <div class="dbox rs">Gemini CLI</div>
+    <div class="dbox rs">Codex</div>
+  </div>
+  <p class="caption">에디터 3 × agent 3 = 통합 9개. 하나 늘 때마다 곱셈으로 늘어남</p>
+  <ul class="bullets">
+    <li>agent를 하나 붙일 때마다 에디터마다 <span class="prob-text">따로 만들어야 함</span></li>
+    <li>결과적으로 <span class="prob-text">사용자가 에디터에 갇힘</span>. agent를 바꾸려면 에디터를 바꿔야 함</li>
+  </ul>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 이미 같은 문제를 푼 선례를 반복.</p>
+</section>
+
+<!-- ════════ 3. 원리 1 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">LSP가 한 일을 agent에 다시 함</h2>
+  <p>에디터와 언어 서버 사이에 규약 하나를 두어 N×M을 N+M으로 만든 것이 LSP. ACP는 같은 자리에 <mark>에디터와 코딩 agent</mark>를 넣음.</p>
+  <div class="diagram">
+    <div class="dbox wl">에디터 N</div>
+    <span class="darrow">→</span>
+    <div class="dbox hot">ACP<small>규약 하나</small></div>
+    <span class="darrow">→</span>
+    <div class="dbox rs">agent M</div>
+  </div>
+  <p>사용자에게 더 중요한 두 번째 효과가 있음. ACP는 텍스트만이 아니라 <mark>계획·diff·권한 요청·터미널</mark>까지 규격화함. 그래서 에디터는 처음 보는 agent도 자기 UI로 그림. agent가 채팅창에 갇히지 않는 이유.</p>
+</section>
+
+<!-- ════════ 4. 원리 2 — 누가 client인가 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">헷갈리는 지점 — 누가 client인가</h2>
+  <p class="dim">MCP를 먼저 배운 사람이 가장 많이 뒤집어 이해하는 부분.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">agent<small>client</small></div>
+        <span class="darrow">→</span>
+        <div class="dbox rs">파일·GitHub 서버<small>server</small></div>
+      </div>
+      <p class="exp"><b>MCP</b> — agent가 client. agent가 도구를 불러 씀.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">에디터<small>client</small></div>
+        <span class="darrow">→</span>
+        <div class="dbox hot">agent<small>server</small></div>
+      </div>
+      <p class="exp"><b>ACP</b> — 에디터가 client. 에디터가 agent를 <mark>subprocess로 띄워서</mark> 부림.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox wl">에디터</div>
+        <span class="darrow">ACP →</span>
+        <div class="dbox hot">agent</div>
+        <span class="darrow">MCP →</span>
+        <div class="dbox rs">도구</div>
+      </div>
+      <p class="exp">코딩 agent는 <mark>ACP의 agent이면서 MCP의 client</mark>. 둘은 경쟁이 아니라 붙어 있음.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 5. 원리 2 계속 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">그래서 ACP는 MCP를 베껴 씀</h2>
+  <p>ACP는 MCP의 <b>ContentBlock</b> 모양을 그대로 가져다 씀. agent가 MCP 도구의 출력을 <mark>변환 없이</mark> 에디터로 흘려보내기 위함.</p>
+  <p>여기에 MCP에 없는 세 가지를 더한 것이 ACP의 몫임.</p>
+  <ul class="bullets">
+    <li><b>diff</b> — 고치기 전에 무엇이 바뀔지 보여줌</li>
+    <li><b>plan</b> — 무엇을 할 계획인지 목록으로 보여줌</li>
+    <li><b>terminal</b> — 실행 중인 명령의 출력을 붙여 보여줌</li>
+  </ul>
+  <p>에디터 UX에 필요한데 MCP에는 없던 것들. 규약이 여기까지 정했기 때문에 에디터가 남의 agent를 자기 모양으로 그릴 수 있음.</p>
+</section>
+
+<!-- ════════ 6. 원리 3 — 전송 ════════ -->
+<section class="page">
+  <p class="sec">3. 전송</p>
+  <h2 class="page-title">선 위에는 무엇이 흐르는가</h2>
+  <ul class="bullets">
+    <li>JSON-RPC 2.0. 새로 발명한 것 없음</li>
+    <li>전송은 <mark>stdio</mark>. 에디터가 agent를 subprocess로 띄우고 stdin·stdout으로 말함</li>
+    <li>메시지 하나가 곧 한 줄. <mark>메시지 안에 개행을 넣지 못함</mark></li>
+    <li>파일 경로는 전부 절대경로, 줄 번호는 1부터</li>
+  </ul>
+  <p class="codedesc">직접 만든 agent가 가장 흔하게 깨지는 방식 — stdout 오염</p>
+  <pre class="code"><span class="bad">print("debug")</span>            <span class="c"># ✕ stdout → 프로토콜 스트림이 깨짐</span>
+print("debug", <span class="k">file</span>=sys.<span class="hot">stderr</span>)  <span class="c"># ○ 로그는 전부 stderr로</span></pre>
+</section>
+
+<!-- ════════ 7. 확인 문제 ════════ -->
+<section class="page">
+  <p class="sec">3. 전송</p>
+  <h2 class="page-title">확인 문제</h2>
+  <div class="quiz">
+    <p class="q">ACP에서 에디터와 agent의 역할로 맞는 것은?</p>
+    <ul class="opts">
+      <li data-answer>에디터가 client, agent가 server. 에디터가 agent를 subprocess로 띄움</li>
+      <li>agent가 client, 에디터가 server. MCP와 같은 방향</li>
+      <li>둘 다 대등한 peer라서 아무나 먼저 연결을 엶</li>
+      <li>중앙 브로커 서버가 있고 둘 다 거기에 붙음</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> MCP는 agent가 client이지만 ACP는 방향이 반대. 다만 요청은 양방향으로 오가서 agent도 에디터에게 요청을 보냄.</p>
+  </div>
+</section>
+
+<!-- ════════ 8. 확인 문제 ════════ -->
+<section class="page">
+  <p class="sec">3. 전송</p>
+  <h2 class="page-title">확인 문제</h2>
+  <div class="quiz">
+    <p class="q">agent 코드에 print("done")을 넣으면 어떻게 되는가?</p>
+    <ul class="opts">
+      <li>에디터 채팅창에 done이 출력됨</li>
+      <li data-answer>stdout에 섞여 들어가 프로토콜 스트림이 깨짐</li>
+      <li>무시됨. ACP가 알 수 없는 줄을 걸러 줌</li>
+      <li>다음 session/update에 붙어서 전달됨</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> stdout은 프로토콜 전용. JSON이 아닌 줄이 들어가면 상대가 파싱에 실패함. 라이브러리가 배너를 찍는 것도 같은 사고를 냄.</p>
+  </div>
+</section>
+
+<!-- ════════ 9. handshake ════════ -->
+<section class="page">
+  <p class="sec">4. handshake</p>
+  <h2 class="page-title">없다고 쓰지 않으면 없는 것</h2>
+  <p class="codedesc">client가 보내는 initialize — 이 실습의 실제 첫 줄</p>
+  <pre class="code">{<span class="k">"jsonrpc"</span>:<span class="s">"2.0"</span>,<span class="k">"id"</span>:1,<span class="k">"method"</span>:<span class="s">"initialize"</span>,<span class="k">"params"</span>:{
+  <span class="k">"protocolVersion"</span>:1,
+  <span class="k">"clientCapabilities"</span>:{<span class="hot">"fs"</span>:{<span class="k">"readTextFile"</span>:true,<span class="k">"writeTextFile"</span>:true}}}}</pre>
+  <p><b>protocolVersion</b>은 정수 하나이고 현재 안정 버전은 <mark>1</mark>. 버전 숫자보다 중요한 규칙은 <mark>적지 않은 capability는 미지원</mark>이라는 것.</p>
+  <p>그래서 capability 추가는 절대 breaking change가 아니고, agent는 짐작하지 말고 받은 것을 확인해야 함.</p>
+</section>
+
+<!-- ════════ 10. 스트리밍 ════════ -->
+<section class="page">
+  <p class="sec">5. 스트리밍</p>
+  <h2 class="page-title">스트리밍은 채널이 아니라 notification</h2>
+  <p>SSE도 WebSocket도 없음. 아직 답하지 않은 <b>session/prompt</b>를 붙들고 있는 동안 같은 파이프로 <mark>session/update</mark>를 계속 보냄.</p>
+  <div class="diagram">
+    <div class="dbox wl">client</div>
+    <span class="darrow">prompt id:3 →<br>← update × N<br>← id:3 stopReason</span>
+    <div class="dbox hot">agent</div>
+  </div>
+  <ul class="bullets">
+    <li>요청에는 <b>id</b>가 있고 같은 id로 응답이 하나 옴. notification에는 id도 응답도 없음</li>
+    <li>id는 <mark>보낸 쪽 기준</mark>이라 client의 id 1과 agent의 id 1은 안 부딪힘</li>
+  </ul>
+</section>
+
+<!-- ════════ 11. update 변종 ════════ -->
+<section class="page">
+  <p class="sec">5. 스트리밍</p>
+  <h2 class="page-title">무엇을 그릴지는 discriminator가 정함</h2>
+  <p class="codedesc">최종 답변 한 조각 — 토큰이 흘러오는 모양</p>
+  <pre class="code">{<span class="k">"method"</span>:<span class="s">"session/update"</span>,<span class="k">"params"</span>:{
+  <span class="k">"sessionId"</span>:<span class="s">"sess_7d0b9ec"</span>,
+  <span class="k">"update"</span>:{<span class="k">"sessionUpdate"</span>:<span class="hot">"agent_message_chunk"</span>,
+            <span class="k">"messageId"</span>:<span class="s">"msg_final"</span>,
+            <span class="k">"content"</span>:{<span class="k">"type"</span>:<span class="s">"text"</span>,<span class="k">"text"</span>:<span class="s">"Done. "</span>}}}}</pre>
+  <p><b>sessionUpdate</b> 값이 무엇을 그릴지 알려줌. v1에 11종. <b>messageId</b>가 같으면 같은 메시지가 자라는 중.</p>
+  <p class="dim">턴이 끝나는 이유는 다섯 가지: end_turn, max_tokens, max_turn_requests, refusal, cancelled.</p>
+</section>
+
+<!-- ════════ 12. 파일 접근 ════════ -->
+<section class="page">
+  <p class="sec">6. 권한</p>
+  <h2 class="page-title">agent는 파일을 직접 열지 않음</h2>
+  <div class="diagram">
+    <div class="dbox hot">agent<small>경로는 앎</small></div>
+    <span class="darrow">fs/read_text_file →</span>
+    <div class="dbox wl">client</div>
+    <span class="darrow">→</span>
+    <div class="dbox rs">디스크</div>
+  </div>
+  <p>agent가 경로를 알면서도 스스로 open하지 않고 <mark>client에게 요청</mark>함. 실제로 파일을 여는 것도, 경로가 세션 디렉터리를 벗어나는지 검사하는 것도 client.</p>
+  <p><span class="prob-text">주의</span> — 이렇게 만들었다고 agent의 파일 접근이 사라지지는 않음. agent는 실행한 사람의 권한을 가진 프로세스라서, <mark>협조할 때만</mark> 이 경로로 다님.</p>
+</section>
+
+<!-- ════════ 13. 권한 ════════ -->
+<section class="page">
+  <p class="sec">6. 권한</p>
+  <h2 class="page-title">권한 창은 보안 경계가 아님</h2>
+  <p>쓰기 전에 agent가 <b>session/request_permission</b>을 보내고 client가 답함. 거부되면 tool_call은 failed가 되지만 <mark>턴은 end_turn으로 정상 종료</mark>됨.</p>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>규약이 보장하는 것</h3>
+      <ul>
+        <li>물었을 때 client가 판단할 자리</li>
+        <li>diff를 미리 보여줄 형식</li>
+        <li>거부를 표현할 정상 경로</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>보장하지 않는 것</h3>
+      <ul>
+        <li>agent가 반드시 묻게 강제하지 못함</li>
+        <li>안 묻고 그냥 하는 agent를 못 막음</li>
+        <li>디렉터리 목록은 sandbox가 아님</li>
+      </ul>
+    </div>
+  </div>
+  <p class="dim">스펙도 이를 인정하고 client가 OS 수준 sandbox를 따로 걸 것을 권고함.</p>
+</section>
+
+<!-- ════════ 14. 실습 1 ════════ -->
+<section class="page">
+  <p class="sec">7. 실습</p>
+  <h2 class="page-title">한 턴을 흘려보고 선을 들여다봄</h2>
+  <p class="dim">모델을 부르지 않는 agent라 매 실행이 같은 줄을 냄. 관찰에 적합함.</p>
+  <p class="codedesc">1단계 — 렌더된 결과, 2단계 — 원본 줄. 여기서부터가 본론</p>
+  <pre class="code">uv run python src/client.py <span class="s">"summarize the readme"</span>
+
+<span class="hot">ACP_TRACE=1</span> uv run python src/client.py <span class="s">"summarize the readme"</span> \
+  2>&1 >/dev/null | grep <span class="s">'^\[client'</span></pre>
+  <p>trace를 위에서 아래로 읽으며 확인할 것 — session/prompt(id 3)가 <mark>먼저 나가고 맨 마지막에 답이 옴</mark>. 그 사이 모든 update가 흐름.</p>
+</section>
+
+<!-- ════════ 15. 실습 2 ════════ -->
+<section class="page">
+  <p class="sec">7. 실습</p>
+  <h2 class="page-title">권한과 capability를 각각 꺼 봄</h2>
+  <pre class="code">uv run python src/client.py <span class="s">"..."</span> <span class="hot">--deny</span>    <span class="c"># 쓰기 거부</span>
+uv run python src/client.py <span class="s">"..."</span> <span class="hot">--no-fs</span>   <span class="c"># capability 미제공</span></pre>
+  <ul class="bullets">
+    <li><b>--deny</b> — tool_call이 failed가 되고 파일이 안 생김. 그런데도 stopReason은 end_turn</li>
+    <li><b>--no-fs</b> — tool_call이 <mark>한 번도 나오지 않음</mark>. 호출이 막힌 게 아니라 그 세션에 도구가 애초에 없었음</li>
+  </ul>
+  <p>"적지 않은 capability는 미지원"이 코드로 어떻게 나타나는지 보는 자리.</p>
+</section>
+
+<!-- ════════ 16. 실습 3 ════════ -->
+<section class="page">
+  <p class="sec">7. 실습</p>
+  <h2 class="page-title">일부러 깨뜨려 보기</h2>
+  <p class="codedesc">agent.py의 prompt() 맨 위에 넣고 실행</p>
+  <pre class="code"><span class="bad">print("hello")</span></pre>
+  <p>client가 파싱에서 실패함. 이 줄이 stdout으로 나가 <span class="prob-text">JSON이 아닌 ACP 메시지</span>가 되었기 때문.</p>
+  <p><b>log()</b>로 바꾸면 회복됨. 손으로 만든 agent가 깨지는 가장 흔한 방식이라 한 번은 직접 깨뜨려 보는 편이 기억에 남음.</p>
+  <p class="dim">확인이 끝나면 test_acp.py로 허용·거부·capability 미제공 세 경로를 한 번에 검사할 수 있음.</p>
+</section>
+
+<!-- ════════ 17. 활용처 ════════ -->
+<section class="page">
+  <p class="sec">8. 활용</p>
+  <h2 class="page-title">지금 누가 쓰는가</h2>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>client 쪽 (에디터)</h3>
+      <ul>
+        <li>Zed, JetBrains IDE</li>
+        <li>Emacs, Neovim 플러그인</li>
+        <li>VS Code는 커뮤니티 확장</li>
+      </ul>
+    </div>
+    <div class="pro">
+      <h3>agent 쪽</h3>
+      <ul>
+        <li>Gemini CLI는 네이티브</li>
+        <li>Claude Code, Codex는 어댑터</li>
+        <li>Copilot, Cursor, Cline, Goose</li>
+      </ul>
+    </div>
+  </div>
+  <p>Zed에서 시작해 지금은 Zed와 JetBrains 공동 관리. 공식 SDK는 TypeScript·Rust·Python·Java·Kotlin.</p>
+  <p><span class="prob-text">주의</span> — <mark>SDK 버전과 프로토콜 버전은 무관</mark>. Rust crate는 2.x인데 Python은 0.x이고 둘 다 프로토콜 v1을 구현함.</p>
+</section>
+
+<!-- ════════ 18. 주의사항 1 ════════ -->
+<section class="page">
+  <p class="sec">9. 주의사항</p>
+  <h2 class="page-title">보안과 전송에서 조심할 것</h2>
+  <ul class="bullets">
+    <li><span class="prob-text">권한 요청은 강제가 아님.</span> 안 묻는 agent를 규약이 막지 못함. 막는 것은 client와 OS sandbox의 몫</li>
+    <li><span class="prob-text">경로 검사는 client가 제대로 해야 함.</span> 스펙도 심볼릭 링크를 고려하고 애매하면 실패시키라고 못박음</li>
+    <li><span class="prob-text">stdio가 유일한 안정 전송.</span> HTTP는 draft, 원격 agent는 진행 중. 다른 머신의 agent는 아직 비포장도로</li>
+    <li><span class="prob-text">채널 자체의 인증이 없음.</span> authenticate는 agent별 문자열에 위임할 뿐 자격증명 전송 방식을 정의하지 않음</li>
+  </ul>
+</section>
+
+<!-- ════════ 19. 주의사항 2 ════════ -->
+<section class="page">
+  <p class="sec">9. 주의사항</p>
+  <h2 class="page-title">운영에서 걸리는 것</h2>
+  <ul class="bullets">
+    <li><span class="prob-text">취소 규칙이 까다로움.</span> cancel 이후에도 update를 보낼 수 있지만 응답 전에 비워야 하고, 에러가 아니라 stopReason: cancelled로 끝내야 함</li>
+    <li><span class="prob-text">터미널은 release해야 함.</span> 내장 timeout이 없어 create·타이머·kill·output·release를 직접 조합</li>
+    <li><span class="prob-text">session/load는 비쌈.</span> 전체 히스토리를 update로 다시 흘린 뒤 응답함</li>
+    <li><span class="prob-text">스펙이 움직이는 중.</span> v1은 안정이지만 v2 draft가 공개됐고 바뀔 것이라고 명시. npm 패키지 이름도 한 번 바뀜</li>
+  </ul>
+</section>
+
+<!-- ════════ 20. 확인 문제 ════════ -->
+<section class="page">
+  <p class="sec">9. 주의사항</p>
+  <h2 class="page-title">확인 문제</h2>
+  <div class="quiz">
+    <p class="q">client가 clientCapabilities에 fs를 넣지 않고 세션을 열었음. 무슨 일이 일어나는가?</p>
+    <ul class="opts">
+      <li>agent가 fs/read_text_file을 부르고 client가 에러로 거부함</li>
+      <li data-answer>agent가 fs 도구를 아예 쓰지 않음. tool_call 자체가 나오지 않음</li>
+      <li>기본값이 true라서 그냥 읽힘</li>
+      <li>initialize 단계에서 연결이 끊어짐</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 적지 않은 capability는 미지원. 호출을 막는 것이 아니라 그 세션에 도구가 존재하지 않는 것. --no-fs로 직접 확인할 수 있음.</p>
+  </div>
+</section>
+
+<!-- ════════ 21. 확인 문제 ════════ -->
+<section class="page">
+  <p class="sec">9. 주의사항</p>
+  <h2 class="page-title">확인 문제</h2>
+  <div class="quiz">
+    <p class="q">사용자가 쓰기 권한을 거부했을 때 session/prompt의 결과는?</p>
+    <ul class="opts">
+      <li data-answer>정상 응답. stopReason은 end_turn</li>
+      <li>JSON-RPC 에러 -32603</li>
+      <li>stopReason: refusal</li>
+      <li>stopReason: cancelled</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 도구 거부는 정상 결과라서 턴은 end_turn으로 끝남. cancelled는 사용자가 턴 자체를 중단시켰을 때, refusal은 모델이 응답을 거절했을 때.</p>
+  </div>
+</section>
+
+<!-- ════════ 22. 결론 ════════ -->
+<section class="page">
+  <p class="sec">10. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>에디터가 두 agent를 각각 알고 만든 것이 아니라, 계획·diff·권한 요청의 <b>모양</b>만 규약으로 정해 두고 그 모양이 오면 자기 UI로 그린 것. agent가 무엇인지는 몰라도 됨.</p>
+  <p>그 대가로 파일 접근이 client를 거치게 되었고, <mark>판단할 자리는 생겼지만 강제할 힘은 생기지 않았음</mark>.</p>
+  <p>기억할 원리 — <mark>규약은 모양을 정할 뿐, 지키게 만들지는 못한다</mark>. 새 프로토콜을 볼 때 "이 규칙을 어기면 누가 막는가"부터 물으면 신뢰 경계가 어디인지 바로 보임.</p>
+  <p class="foot">출처: agentclientprotocol.com 공식 스펙(v1) · Zed·JetBrains 공동 거버넌스 문서 · 재현 코드는 이 디렉터리의 src/</p>
+</section>
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
