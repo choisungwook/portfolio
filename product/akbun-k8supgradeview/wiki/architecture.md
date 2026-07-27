@@ -11,7 +11,7 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
 - `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -56,6 +56,8 @@ event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는�
 
 로그는 label selector로 파드를 먼저 찾고 파드마다 따로 조회한다. 한 파드의 조회가 실패해도 나머지 로그는 보여줘야 하므로 실패를 예외로 던지지 않고 `PodLog.error`에 담아 화면에 표시한다.
 
+event의 reason, object, message와 로그의 파드 이름, 본문에서는 error를 대소문자 구분 없이 빨갛게 칠한다(`.error-keyword`). 낱말 경계를 두지 않아 `NodeClaimRegistrationError`처럼 다른 낱말 안에 든 error도 칠한다. 수백 줄에서 눈으로 찾는 시간을 줄이기 위해서다. 조각을 `textContent`로만 넣어 붙이므로 클러스터가 준 문자열이 HTML로 해석되지 않는다. 배경은 [하이라이트 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
+
 | 설정 | 기본값 |
 |---|---|
 | `karpenterNamespace` | `karpenter` |
@@ -64,7 +66,7 @@ event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는�
 
 ## NodePool / EC2NodeClass 탭
 
-NodePool은 name, ami, weight, nodes, ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. NodePool에는 ami가 없고 EC2NodeClass에는 weight가 없으므로 없는 필드는 `-`로 채운다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드도 마찬가지다.
+NodePool은 name, nodeClass, ami, weight, nodes, ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. NodePool에는 ami가 없고 EC2NodeClass에는 weight가 없으므로 없는 필드는 `-`로 채운다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드도 마찬가지다.
 
 ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
 
@@ -72,7 +74,9 @@ nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` l
 
 karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
 
-빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 그룹이 비면 이유를 나눠 적는다. 참조가 아예 없으면 지정되지 않았다고, 참조가 가리키는 클래스를 못 찾으면 그 이름과 함께 찾지 못했다고 적는다. 손볼 곳이 다르기 때문이다. EC2NodeClass가 하나도 없으면 그룹을 그리지 않고 표 아래 안내만 남긴다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
+
+빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 그룹 기준이 되는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
 
 ## cordon / uncordon
 
@@ -83,6 +87,12 @@ Nodes 탭 노드 행 끝 Action 칼럼에 버튼 하나를 두고, 글자를 `un
 행 클릭은 파드 조회에 이미 쓰고 있으므로 버튼 클릭에서 `stopPropagation`으로 전파를 멈춘다. 실행 중에는 버튼을 `disabled`로 잠근다.
 
 subcommand를 반대로 넘기면 노드를 열려다 닫으므로 `test/node-cordon.test.js`가 실제 실행 경로에서 넘어간 인자를 확인한다.
+
+## 노드 이름 복사
+
+Nodes 탭 Name 칼럼의 이름 오른쪽에 복사 버튼을 둔다. 클릭하면 renderer가 `clipboard:write` IPC로 이름을 넘기고 main이 electron `clipboard.writeText`로 복사한다. renderer의 `navigator.clipboard`를 쓰지 않는 이유는 focus와 권한 상태를 타서 조용히 실패하기 때문이며, 배경은 [이름 복사 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
+
+복사에 성공하면 버튼 글자를 1.5초 동안 "복사됨"으로 바꾼다. 행 클릭은 파드 조회에 쓰고 있으므로 cordon 버튼과 마찬가지로 `stopPropagation`으로 전파를 멈춘다. `td`를 직접 flex로 만들면 표 정렬이 깨지므로 칸 안에 감싸는 요소(`.name-box`)를 하나 두고 그것을 flex로 만든다.
 
 ## 노드 분류 기준
 

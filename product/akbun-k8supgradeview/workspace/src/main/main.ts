@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "path";
@@ -74,6 +74,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
   ipcMain.handle("kubectl:karpenter-resources", () => getKarpenterResources());
   ipcMain.handle("kubectl:karpenter-versions", () => getKarpenterVersions());
+  /**
+   * renderer의 navigator.clipboard는 권한과 focus 상태를 타므로 main의 clipboard를 쓴다.
+   * 화면에 보여준 값을 그대로 복사하는 동작이라 별도 확인은 두지 않는다.
+   */
+  ipcMain.handle("clipboard:write", (_event, text: unknown) => {
+    if (typeof text !== "string") {
+      throw new Error("복사할 값이 잘못되었다: 문자열이어야 한다");
+    }
+    clipboard.writeText(text);
+  });
   ipcMain.handle("settings:get", () => loadSettings());
   ipcMain.handle("settings:save", (_event, settings: unknown) => {
     // IPC 경계에서 형식을 검증한다. renderer가 잘못된 값을 보내면 명확한 에러로 알린다.
