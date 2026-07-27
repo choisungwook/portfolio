@@ -266,9 +266,14 @@ function appendPodNameCell(row: HTMLTableRowElement, pod: PodInfo): void {
   cell.appendChild(button);
 }
 
+/** 패널을 연 버튼. 닫을 때 그 자리로 focus를 되돌려 표에서 이어서 볼 수 있게 한다. */
+let detailOpener: HTMLElement | null = null;
+
 function closePodDetail(): void {
   detailPod = null;
   $("#pod-detail-panel").classList.add("hidden");
+  detailOpener?.focus();
+  detailOpener = null;
 }
 
 /**
@@ -278,6 +283,13 @@ function closePodDetail(): void {
 async function openPodDetail(namespace: string, name: string): Promise<void> {
   detailPod = { namespace, name };
   $("#pod-detail-panel").classList.remove("hidden");
+  // 표에 focus가 남아 있으면 키보드만 쓰는 경우 열린 패널에 닿을 수 없다.
+  // 패널 안의 새로고침으로 다시 읽을 때는 이미 패널에 있으므로 focus를 건드리지 않는다.
+  const active = document.activeElement as HTMLElement | null;
+  if (active?.classList.contains("pod-name-button")) {
+    detailOpener = active;
+    ($("#close-pod-detail") as HTMLButtonElement).focus();
+  }
   $("#pod-detail-title").textContent = `${namespace} / ${name}`;
   const body = $("#pod-detail-body");
   body.className = "";

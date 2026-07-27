@@ -87,8 +87,13 @@ test("kubectl이 실패하면 stderr를 담아 던진다", async () => {
  */
 test("describe-pod IPC는 namespace와 파드 이름을 검증한다", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "dist", "main", "main.js"), "utf8");
-  const handler = source.slice(source.indexOf('"kubectl:describe-pod"'));
+  const start = source.indexOf('"kubectl:describe-pod"');
+  assert.notStrictEqual(start, -1, "describe-pod IPC 핸들러를 찾지 못했다");
 
-  assert.match(handler.slice(0, 400), /assertResourceName\(namespace/);
-  assert.match(handler.slice(0, 400), /assertResourceName\(name/);
+  // 다음 핸들러 등록 전까지가 이 핸들러의 본문이다. 길이로 자르면 주석 한 줄에도 깨진다.
+  const next = source.indexOf("ipcMain.handle(", start);
+  const handler = next === -1 ? source.slice(start) : source.slice(start, next);
+
+  assert.match(handler, /assertResourceName\(namespace/);
+  assert.match(handler, /assertResourceName\(name/);
 });

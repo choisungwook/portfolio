@@ -35,11 +35,12 @@ function createWindow(): void {
  * -로 시작하는 값은 kubectl이 옵션으로 읽으므로 막는다.
  */
 function assertResourceName(value: unknown, label: string): asserts value is string {
+  // label에 조사를 붙이면 "namespace이"처럼 어색해진다. 조사 없이 값만 앞에 둔다.
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${label}이 잘못되었다: 비어 있지 않은 문자열이어야 한다`);
+    throw new Error(`잘못된 ${label}: 비어 있지 않은 문자열이어야 한다`);
   }
   if (value.startsWith("-")) {
-    throw new Error(`${label}이 잘못되었다: -로 시작할 수 없다`);
+    throw new Error(`잘못된 ${label}: -로 시작할 수 없다`);
   }
 }
 

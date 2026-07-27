@@ -81,6 +81,8 @@ Pods 탭과 노드 상세의 파드 표에서 이름 칸만 버튼(`.pod-name-bu
 
 describe 결과는 파싱하지 않는다. main은 `describePod(namespace, name)`이 문자열을 그대로 돌려주고, renderer는 error 낱말 하이라이트(`appendErrorHighlighted`)만 얹는다. 들여쓰기가 계층을 나타내는 출력이라 `white-space: pre-wrap`으로 원문 형태를 지키고, 조각은 `textContent`로만 넣어 클러스터가 준 문자열이 HTML로 해석되지 않게 한다.
 
+패널은 `role="dialog"`로 선언하고, 이름 버튼으로 열 때 닫기 버튼으로 focus를 옮긴다. 표에 focus가 남아 있으면 키보드만 쓰는 경우 열린 패널에 닿을 수 없다. 연 버튼은 `detailOpener`에 들고 있다가 닫을 때 그 자리로 focus를 되돌린다. 패널 안의 새로고침으로 다시 읽을 때는 이미 패널 안에 있으므로 focus를 건드리지 않는다.
+
 지금 보고 있는 파드는 `detailPod`에 들고 있다. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓰고, 조회하는 동안 다른 파드를 눌렀을 때 늦게 온 응답이 화면을 덮지 않도록 응답의 대상과 비교하는 데도 쓴다. 조회 실패는 상단 배너가 아니라 패널 안에 적는다. 패널이 오른쪽을 덮고 있어 배너가 눈에 들어오지 않는다.
 
 이름 검증은 IPC 경계에서 노드와 같은 `assertResourceName`이 한다. shell을 거치지 않아 인젝션은 없지만 `-`로 시작하는 값은 kubectl이 이름이 아니라 옵션으로 읽는다. 배경은 [describe 사이드 패널 ADR](../adr/2026-07-pod-describe-side-panel.md)에 있다.
