@@ -17,6 +17,10 @@ export interface PodInfo {
   namespace: string;
   name: string;
   status: string;
+  // kubectl get pods의 READY 칸과 같은 "준비된 컨테이너/전체 컨테이너" 표기다.
+  ready: string;
+  // 모든 컨테이너가 Ready인가. 필터가 문자열을 다시 파싱하지 않도록 함께 담는다.
+  allReady: boolean;
   nodeName: string;
   creationTimestamp: string;
 }
@@ -146,11 +150,27 @@ function podStatus(pod: any): string {
   return waiting?.state?.waiting?.reason ?? pod.status?.phase ?? "Unknown";
 }
 
+/**
+ * Ready는 phase와 다른 질문에 답한다. status가 Running이어도 컨테이너가 아직
+ * probe를 통과하지 못하면 트래픽을 받지 못하므로 두 값을 따로 보여준다.
+ * 전체 개수는 spec.containers를 기준으로 센다. init과 ephemeral container는
+ * kubectl의 READY 칸에도 들어가지 않는다.
+ */
+function podReady(pod: any): { ready: string; allReady: boolean } {
+  const containerStatuses: any[] = pod.status?.containerStatuses ?? [];
+  const total = (pod.spec?.containers ?? []).length || containerStatuses.length;
+  const readyCount = containerStatuses.filter((c: any) => c.ready).length;
+  return { ready: `${readyCount}/${total}`, allReady: total > 0 && readyCount === total };
+}
+
 function toPodInfo(pod: any): PodInfo {
+  const { ready, allReady } = podReady(pod);
   return {
     namespace: pod.metadata?.namespace ?? "",
     name: pod.metadata?.name ?? "",
     status: podStatus(pod),
+    ready,
+    allReady,
     nodeName: pod.spec?.nodeName ?? "",
     creationTimestamp: pod.metadata?.creationTimestamp ?? "",
   };

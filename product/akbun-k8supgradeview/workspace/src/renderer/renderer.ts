@@ -14,6 +14,8 @@ interface PodInfo {
   namespace: string;
   name: string;
   status: string;
+  ready: string;
+  allReady: boolean;
   nodeName: string;
   creationTimestamp: string;
 }
@@ -127,6 +129,7 @@ let nodeFilter: NodeFilterKind = "all";
 // 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
 let podSort: PodSort | null = null;
 let podOnlyNotRunning = false;
+let podOnlyNotReady = false;
 let nodePoolSort: NodePoolSort | null = null;
 let allNodePools: NodePoolInfo[] = [];
 let nodePoolsError = "";
@@ -392,6 +395,7 @@ function renderNodePods(pods: PodInfo[]): void {
     appendCell(row, pod.namespace);
     appendPodNameCell(row, pod);
     appendCell(row, pod.status, statusClass(pod.status));
+    appendCell(row, pod.ready, podReadyClass(pod));
     appendCell(row, formatAge(pod.creationTimestamp));
   }
 }
@@ -429,6 +433,19 @@ const RUNNING_STATUS = "Running";
  */
 function matchesPodStatusFilter(pod: PodInfo): boolean {
   return !podOnlyNotRunning || pod.status !== RUNNING_STATUS;
+}
+
+/**
+ * Running이어도 컨테이너가 Ready가 아니면 서비스에 들어가 있지 않다. 상태 필터와
+ * 따로 두어야 "Running인데 Ready가 아닌" 파드만 골라 볼 수 있다. 두 필터는 AND다.
+ */
+function matchesPodReadyFilter(pod: PodInfo): boolean {
+  return !podOnlyNotReady || !pod.allReady;
+}
+
+/** Ready 칸도 상태처럼 색으로 먼저 읽히게 한다. 정상이 아닌 쪽만 눈에 띄면 된다. */
+function podReadyClass(pod: PodInfo): string {
+  return pod.allReady ? "status-ready" : "status-error";
 }
 
 /**
@@ -502,7 +519,8 @@ function renderPods(): void {
       (pod) =>
         (!namespace || pod.namespace === namespace) &&
         (!search || pod.name.toLowerCase().includes(search)) &&
-        matchesPodStatusFilter(pod)
+        matchesPodStatusFilter(pod) &&
+        matchesPodReadyFilter(pod)
     )
   );
   $("#pod-empty").classList.toggle("hidden", pods.length > 0);
@@ -512,6 +530,7 @@ function renderPods(): void {
     appendCell(row, pod.namespace);
     appendPodNameCell(row, pod);
     appendCell(row, pod.status, statusClass(pod.status));
+    appendCell(row, pod.ready, podReadyClass(pod));
     appendCell(row, pod.nodeName);
     appendCell(row, formatAge(pod.creationTimestamp));
   }
@@ -854,10 +873,14 @@ function registerEventHandlers(): void {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => activateTab((button as HTMLElement).dataset.tab ?? ""));
   });
-  document.querySelectorAll(".filter-button").forEach((button) => {
+  // Pods 탭 토글도 모양을 맞추려고 filter-button을 함께 쓴다. 노드 필터는 하나만
+  // 켜지는 라디오라 나머지의 active를 지우므로, data-filter가 있는 버튼으로 좁히지
+  // 않으면 파드 토글을 누를 때 노드 필터가 전체로 되돌아간다.
+  const nodeFilterButtons = document.querySelectorAll(".filter-button[data-filter]");
+  nodeFilterButtons.forEach((button) => {
     button.addEventListener("click", () => {
       nodeFilter = ((button as HTMLElement).dataset.filter ?? "all") as NodeFilterKind;
-      document.querySelectorAll(".filter-button").forEach((b) => b.classList.remove("active"));
+      nodeFilterButtons.forEach((b) => b.classList.remove("active"));
       button.classList.add("active");
       renderNodes();
     });
@@ -876,6 +899,13 @@ function registerEventHandlers(): void {
     button.classList.toggle("active", podOnlyNotRunning);
     // 눌린 상태를 색으로만 알리면 화면을 못 보는 사용자는 켜졌는지 알 수 없다.
     button.setAttribute("aria-pressed", String(podOnlyNotRunning));
+    renderPods();
+  });
+  $("#pod-ready-filter").addEventListener("click", () => {
+    podOnlyNotReady = !podOnlyNotReady;
+    const button = $("#pod-ready-filter");
+    button.classList.toggle("active", podOnlyNotReady);
+    button.setAttribute("aria-pressed", String(podOnlyNotReady));
     renderPods();
   });
   $("#close-pod-detail").addEventListener("click", closePodDetail);
