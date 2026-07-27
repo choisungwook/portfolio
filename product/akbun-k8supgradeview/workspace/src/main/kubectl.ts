@@ -197,6 +197,12 @@ function toEventInfo(event: any): EventInfo {
   };
 }
 
+/** 정렬용 시각. 비었거나 읽을 수 없는 값이 NaN이 되어 정렬을 흐트러뜨리지 않게 0으로 맞춘다. */
+function eventSortKey(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 /** karpenter namespace의 event를 오래된 것부터 시간순으로 돌려준다. */
 export async function getKarpenterEvents(): Promise<EventInfo[]> {
   const namespace = loadSettings().karpenterNamespace;
@@ -204,7 +210,7 @@ export async function getKarpenterEvents(): Promise<EventInfo[]> {
   const items: any[] = JSON.parse(stdout).items ?? [];
   return items
     .map(toEventInfo)
-    .sort((a, b) => Date.parse(a.timestamp || "0") - Date.parse(b.timestamp || "0"));
+    .sort((a, b) => eventSortKey(a.timestamp) - eventSortKey(b.timestamp));
 }
 
 async function getPodNames(namespace: string, labelSelector: string): Promise<string[]> {

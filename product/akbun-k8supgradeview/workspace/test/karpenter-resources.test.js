@@ -36,7 +36,15 @@ require.cache["electron-stub"] = {
 };
 
 const { saveSettings } = require("../dist/main/settings.js");
-const { getKarpenterResources, getKarpenterVersions } = require("../dist/main/kubectl.js");
+const {
+  getKarpenterEvents,
+  getKarpenterResources,
+  getKarpenterVersions,
+} = require("../dist/main/kubectl.js");
+
+// 모듈을 다 읽었으면 전역 오버라이드를 되돌린다. 이 파일이 다른 모듈 로딩에 영향을 주면 안 된다.
+Module._resolveFilename = resolveFilename;
+delete require.cache["electron-stub"];
 
 const NODE_POOLS = {
   items: [
@@ -180,6 +188,69 @@ test("deployment 조회가 실패해도 에러만 담고 던지지 않는다", a
 
   assert.deepStrictEqual(versions, []);
   assert.match(error, /forbidden/);
+});
+
+// core/v1과 events.k8s.io/v1은 같은 event를 다른 필드 이름으로 담는다. 둘 다 읽어야 한다.
+const EVENTS = {
+  items: [
+    {
+      // core/v1
+      metadata: { creationTimestamp: "2026-07-27T00:00:00Z" },
+      type: "Normal",
+      reason: "Nominated",
+      involvedObject: { kind: "Pod", name: "web-1" },
+      message: " pod should schedule ",
+      lastTimestamp: "2026-07-27T02:00:00Z",
+      count: 3,
+    },
+    {
+      // events.k8s.io/v1
+      eventTime: "2026-07-27T00:30:00Z",
+      type: "Warning",
+      reason: "FailedScheduling",
+      regarding: { kind: "NodeClaim", name: "nc-1" },
+      note: "no instance type",
+      series: { count: 2, lastObservedTime: "2026-07-27T01:00:00Z" },
+    },
+    // 시각을 읽을 수 없는 event. 정렬을 흐트러뜨리지 않고 맨 앞에 와야 한다.
+    {
+      type: "Normal",
+      reason: "Unknown",
+      involvedObject: { name: "orphan" },
+      message: "",
+      lastTimestamp: "not-a-date",
+    },
+  ],
+};
+
+test("event는 두 API 버전의 필드를 모두 읽는다", async () => {
+  useFakeKubectl({ events: EVENTS });
+  const events = await getKarpenterEvents();
+  const [orphan, series, core] = events;
+
+  assert.strictEqual(series.timestamp, "2026-07-27T01:00:00Z", "series의 마지막 관측 시각을 쓴다");
+  assert.strictEqual(series.object, "NodeClaim/nc-1", "regarding도 대상으로 읽어야 한다");
+  assert.strictEqual(series.message, "no instance type", "note도 본문으로 읽어야 한다");
+  assert.strictEqual(series.count, 2, "series.count를 읽어야 한다");
+
+  assert.strictEqual(core.timestamp, "2026-07-27T02:00:00Z", "lastTimestamp를 먼저 쓴다");
+  assert.strictEqual(core.object, "Pod/web-1");
+  assert.strictEqual(core.message, "pod should schedule");
+  assert.strictEqual(core.count, 3);
+
+  assert.strictEqual(orphan.object, "orphan", "kind가 없으면 이름만 보여준다");
+  assert.strictEqual(orphan.count, 1, "count가 없으면 1이다");
+});
+
+test("event는 오래된 것부터 정렬하고 시각을 읽을 수 없어도 순서가 깨지지 않는다", async () => {
+  useFakeKubectl({ events: EVENTS });
+  const timestamps = (await getKarpenterEvents()).map((event) => event.timestamp);
+
+  assert.deepStrictEqual(timestamps, [
+    "not-a-date",
+    "2026-07-27T01:00:00Z",
+    "2026-07-27T02:00:00Z",
+  ]);
 });
 
 test("age는 NodePool의 creationTimestamp를 그대로 넘긴다", async () => {
