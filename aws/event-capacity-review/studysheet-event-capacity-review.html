@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이벤트 전 스펙 점검 — 어디까지 버티는가</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 표: 측정 결과·점검 항목 */
+table.t{width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem}
+table.t th,table.t td{border-bottom:1px solid #E2E2E2;padding:6px 8px;text-align:left}
+table.t th{border-bottom:2px solid var(--ink);font-weight:800}
+table.t tr.hot td{background:var(--hl);font-weight:700}
+table.t td.num{text-align:right;font-family:Consolas,ui-monospace,Menlo,monospace}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>이벤트 전 스펙 점검 — <mark>어디까지 버티는가</mark></h1>
+    <p class="sub">ALB · Auto Scaling group · Spring Boot · Redis · RDS를 앞에 두고, 무엇을 올릴지 숫자로 답하는 법</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 다음 주 화요일 20시 이벤트. "지금 스펙으로 되나요?"라는 질문에 <b>CPU 40%니까 여유 있습니다</b>라고 답함.</p>
+    <p><b class="p-point">그 답이 왜 위험할까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">여유가 있었는데 이벤트가 무너짐</h2>
+  <p class="dim">지난 이벤트에서 관측된 순서. 어느 계층도 CPU 100%가 아니었음.</p>
+  <ul class="bullets">
+    <li>20:00 트래픽 진입. EC2 CPU 45%, 그런데 <span class="prob-text">p99 응답이 200ms → 3초</span></li>
+    <li><span class="xmark">✕</span> ASG가 CPU 기준으로 스케일 아웃. 인스턴스 4대 → 12대</li>
+    <li><span class="xmark">✕</span> 늘어난 순간 <span class="prob-text">RDS 커넥션 상한</span>에 닿고 502·504가 시작됨</li>
+    <li><span class="xmark">✕</span> 배포로 캐시가 비어 있어 miss가 그대로 DB로 흘러감</li>
+  </ul>
+  <p>스펙이 부족했던 게 아니라, <mark>어디가 한계인지 모른 채로 늘렸음</mark>. 늘린 방향이 병목과 반대였음.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 계층마다 한계를 측정하고, 병목이 공유 자원인지 아닌지로 up/out을 고름.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 — 사용률은 용량이 아님 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">사용률은 용량이 아님</h2>
+  <p>CPU 40%는 "60% 더 받을 수 있다"는 뜻이 아님. 요청이 스레드가 아니라 <mark>커넥션 10개를 기다리는 중</mark>이면 CPU는 계속 한가함.</p>
+  <ul class="bullets">
+    <li>용량의 정의는 하나뿐 — <b>SLO를 깨지 않고 처리하는 최대 요청률</b></li>
+    <li>구하는 방법도 하나뿐 — 동시성을 계단으로 올리며 처리량과 지연을 같이 봄</li>
+    <li>처리량이 평평해지고 지연만 올라가는 지점이 <mark>knee</mark>. 그 지점이 용량임</li>
+    <li>SRE의 golden signal 중 스케일 트리거로 쓸 것은 saturation 계열 — 큐 길이, 대기 중인 커넥션, 인스턴스당 요청 수</li>
+  </ul>
+  <p class="dim">CPU는 결과 지표라 늦게 움직임. RequestCountPerTarget처럼 부하 그 자체에 가까운 값이 트리거로 낫다.</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 — Little's Law ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">스레드 수와 pool 크기는 계산으로 나옴</h2>
+  <p>Little's Law — <mark>동시 처리 수 = 처리량 × 응답시간</mark>. 사이징을 감이 아니라 산수로 바꿔 줌.</p>
+  <p class="codedesc">목표 500 rps, 응답 40ms, DB 구간 10ms, 인스턴스 4대일 때</p>
+<pre class="code"><span class="c"># 시스템 전체 동시 요청 수</span>
+500 × 0.04s = <span class="hot">20</span>
+
+<span class="c"># DB를 동시에 붙잡는 수 → 인스턴스당 커넥션 pool</span>
+500 × 0.01s = 5  →  5 / 4대 = <span class="hot">1.25</span>  <span class="c"># 여유 붙여 4</span>
+
+<span class="c"># 필요한 인스턴스 수 = 목표 rps / 측정된 인스턴스당 rps</span>
+500 / 180 = 2.8  →  <span class="hot">3대</span></pre>
+  <p>여기서 인스턴스당 180 rps는 <b>측정값</b>이어야 함. 이 값만 실측이고 나머지는 산수임.</p>
+</section>
+
+<!-- ════════ 5장. 원리 3 — up/out 한 줄 규칙 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">scale up과 scale out을 가르는 한 문장</h2>
+  <p><mark>병목이 인스턴스마다 따로 있으면 out, 모두가 공유하면 up</mark>.</p>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>scale out이 듣는 경우</h3>
+      <ul>
+        <li>stateless한 앱 스레드·CPU가 한계</li>
+        <li>인스턴스가 자기 몫의 자원을 들고 옴</li>
+        <li>아래 계층에 아직 여유가 있음</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>scale out이 해로운 경우</h3>
+      <ul>
+        <li>RDS writer 하나가 한계</li>
+        <li>Redis 샤드 하나(단일 스레드)가 한계</li>
+        <li>커넥션만 N배로 늘어 상한을 침</li>
+      </ul>
+    </div>
+  </div>
+  <p>공유 병목 앞에서의 scale out은 큐를 옮길 뿐임. 대기 위치가 앱에서 DB로 이동하고, 커넥션 수는 인스턴스 수만큼 곱해짐.</p>
+</section>
+
+<!-- ════════ 6장. 원리 4 — 여유율 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">피크만큼 준비하면 피크를 못 넘김</h2>
+  <ul class="bullets">
+    <li>예측은 틀림 — 예상 피크에 오차 계수를 곱함(예: 1.5)</li>
+    <li>AZ 하나가 빠짐 — 3 AZ면 남는 건 2/3. 그 상태로 피크를 받아야 함</li>
+    <li>SRE book의 N+2 — 피크를 받는 용량 + 계획 정비 1 + 예기치 못한 장애 1</li>
+  </ul>
+  <p class="codedesc">목표 500 rps를 계획 용량으로 바꾸는 식</p>
+<pre class="code">500 × 1.5 <span class="c"># 예측 오차</span>
+      ÷ 0.67 <span class="c"># AZ 1개 손실 후 남는 비율</span>
+      = <span class="hot">1120 rps</span> <span class="c"># 이 값으로 인스턴스 수를 계산</span></pre>
+  <p>여유를 얼마나 둘지는 error budget으로 정함. 이벤트에서 얼마를 태워도 되는지가 정해지면 안전계수도 정해짐.</p>
+</section>
+
+<!-- ════════ 7장. 구조 — 요청이 지나는 큐들 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">요청 하나가 통과하는 네 개의 큐</h2>
+  <p class="dim">각 칸이 큐이고, 큐마다 상한이 다름. 가장 작은 상한이 시스템 용량임.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox hot">ALB<small>연결·LCU</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">Tomcat thread</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">connection pool</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>1단계.</b> ALB는 스스로 늘어나지만 즉시는 아님. 20시에 계단처럼 오르는 트래픽이 점검 대상.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">Tomcat thread<small>기본 200</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">connection pool</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>2단계.</b> 스레드는 인스턴스마다 따로 있음. 여기가 병목이면 scale out이 그대로 듣는 자리.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">Tomcat thread</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">connection pool<small>기본 10</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">RDS</div>
+      </div>
+      <p class="exp"><b>3단계.</b> 스레드 200개가 커넥션 10개를 기다림. CPU가 한가한 채로 지연만 오르는 전형적인 자리.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs">ALB</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">Tomcat thread</div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">connection pool<small>× 인스턴스 수</small></div>
+        <div class="darrow bad">→</div>
+        <div class="dbox hot bad">RDS<small>writer 1대</small></div>
+      </div>
+      <p class="exp"><b>4단계.</b> 마지막 칸만 공유됨. 앞의 세 칸을 아무리 늘려도 여기는 커지지 않고, 오히려 커넥션이 인스턴스 수만큼 곱해져 들어옴.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 8장. 실습 1 — knee ════════ -->
+<section class="page">
+  <p class="sec">4. 실습</p>
+  <h2 class="page-title">한계를 측정함 — knee 찾기</h2>
+  <p class="dim">downstream worker 4개 × 쿼리 20ms = 이론상 200 rps. 계단 부하로 확인함.</p>
+  <table class="t">
+    <tr><th>동시성</th><th>rps</th><th>p50</th><th>p99</th><th>rps × p50</th></tr>
+    <tr><td class="num">1</td><td class="num">41.1</td><td class="num">24.0</td><td class="num">27.7</td><td class="num">1.0</td></tr>
+    <tr class="hot"><td class="num">4</td><td class="num">172.3</td><td class="num">22.7</td><td class="num">30.0</td><td class="num">3.9</td></tr>
+    <tr><td class="num">16</td><td class="num">196.4</td><td class="num">81.0</td><td class="num">101.7</td><td class="num">15.9</td></tr>
+    <tr><td class="num">64</td><td class="num">196.9</td><td class="num">343.1</td><td class="num">383.4</td><td class="num">67.6</td></tr>
+  </table>
+  <p>동시성 4 이후 <mark>처리량은 197에서 멈추고 지연만 정확히 비례해서 증가</mark>함. 마지막 열이 동시성과 같다는 것이 Little's Law가 성립한다는 증거.</p>
+  <p><b>체크포인트.</b> 용량은 197 rps. 대시보드의 CPU가 무엇을 보여주든 이 숫자가 계획의 입력값임.</p>
+</section>
+
+<!-- ════════ 9장. 실습 2 — scale out 무효 ════════ -->
+<section class="page">
+  <p class="sec">4. 실습</p>
+  <h2 class="page-title">인스턴스를 2배로 늘려도 그대로임</h2>
+  <p class="codedesc">앱 인스턴스를 하나 더 띄우고 ALB처럼 두 대에 나눠 보냄</p>
+<pre class="code">make scale-out
+make load STAGES=16,64 TARGETS=<span class="s">http://127.0.0.1:8080,http://127.0.0.1:8081</span></pre>
+  <table class="t">
+    <tr><th>동시성</th><th>1대 rps</th><th>2대 rps</th><th>2대 p99</th></tr>
+    <tr><td class="num">16</td><td class="num">196.4</td><td class="num">197.2</td><td class="num">85.4</td></tr>
+    <tr><td class="num">64</td><td class="num">196.9</td><td class="num">197.4</td><td class="num">364.0</td></tr>
+  </table>
+  <p>처리량 이득 <span class="prob-text">0</span>. 대신 downstream의 동시 커넥션 최대치가 <mark>10 → 20으로 정확히 2배</mark>가 됨.</p>
+  <p><b>체크포인트.</b> 운영에서는 이 지점이 max_connections에 닿는 순간임. 스케일 아웃이 장애의 원인이 되는 경로가 이것.</p>
+</section>
+
+<!-- ════════ 10장. 실습 3 — scale up ════════ -->
+<section class="page">
+  <p class="sec">4. 실습</p>
+  <h2 class="page-title">공유 계층을 키우면 그대로 2배가 됨</h2>
+  <p class="codedesc">앱은 그대로 두고 downstream worker만 4 → 8</p>
+<pre class="code">make down &amp;&amp; make up DB_WORKERS=8</pre>
+  <table class="t">
+    <tr><th>동시성</th><th>worker 4</th><th>worker 8</th></tr>
+    <tr><td class="num">16</td><td class="num">196.4 rps</td><td class="num">393.1 rps</td></tr>
+    <tr><td class="num">32</td><td class="num">196.9 rps</td><td class="num">392.4 rps</td></tr>
+  </table>
+  <p>같은 앱, 같은 부하, 같은 스레드. 바뀐 것은 <mark>병목이 있던 자리 하나</mark>뿐임.</p>
+  <p><b>체크포인트.</b> up과 out 중 무엇이 맞는지는 앱의 성질이 아니라 병목의 위치가 정함. 실습 2와 3은 같은 시스템에서 정반대 결론을 냄.</p>
+</section>
+
+<!-- ════════ 11장. 실습 4 — 캐시 ════════ -->
+<section class="page">
+  <p class="sec">4. 실습</p>
+  <h2 class="page-title">캐시 적중률은 용량 수치임</h2>
+  <p class="codedesc">downstream은 그대로 작게 두고 90%를 캐시로 처리</p>
+<pre class="code">make down &amp;&amp; make up HIT=0.9</pre>
+  <table class="t">
+    <tr><th>동시성</th><th>rps</th><th>p50</th><th>p95</th><th>p99</th></tr>
+    <tr><td class="num">16</td><td class="num">1926.4</td><td class="num">2.0</td><td class="num">59.1</td><td class="num">72.9</td></tr>
+    <tr><td class="num">64</td><td class="num">2038.0</td><td class="num">1.6</td><td class="num">309.3</td><td class="num">322.7</td></tr>
+  </table>
+  <p>처리량 10배. 그런데 <mark>p50은 캐시 경로, p95·p99는 DB로 빠진 10%</mark>임. 분포가 둘로 갈라짐.</p>
+  <ul class="bullets">
+    <li>20시 직전 배포로 캐시가 비면 용량의 90%가 사라짐 — 스펙 점검에 캐시 워밍이 들어가야 하는 이유</li>
+    <li>p50 대시보드는 이 상황에서 아무 문제가 없다고 보고함</li>
+  </ul>
+</section>
+
+<!-- ════════ 12장. 실습 5 — load shedding ════════ -->
+<section class="page">
+  <p class="sec">4. 실습</p>
+  <h2 class="page-title">한계를 넘은 뒤에 남는 선택은 하나임</h2>
+  <p class="codedesc">pool 대기 timeout을 3초에서 200ms로 줄여 빠르게 실패시킴</p>
+<pre class="code">make down &amp;&amp; make up POOL=4 POOL_TIMEOUT=200</pre>
+  <table class="t">
+    <tr><th>설정</th><th>동시성 64에서 p99</th><th>에러</th></tr>
+    <tr><td>대기(timeout 3s)</td><td class="num">383 ms 이후 계속 증가</td><td class="num">0</td></tr>
+    <tr class="hot"><td>차단(timeout 200ms)</td><td class="num">225 ms에서 고정</td><td class="num">517</td></tr>
+  </table>
+  <p>용량이 늘어난 것은 아님. <mark>누구를 대기시키고 누구를 즉시 거절할지 정한 것</mark>뿐임. 이것이 SRE book이 말하는 overload 대응 — 용량으로 막는 게 아니라 의도적으로 저하시킴.</p>
+  <p><b>체크포인트.</b> 스펙 점검 산출물에는 "한계를 넘으면 어떻게 되는가"가 반드시 들어감. 정하지 않으면 이벤트 중에 발견하게 됨.</p>
+</section>
+
+<!-- ════════ 13장. 계층 점검 — ALB ════════ -->
+<section class="page">
+  <p class="sec">5. 계층별 점검</p>
+  <h2 class="page-title">ALB — 스스로 늘지만 즉시는 아님</h2>
+  <table class="t">
+    <tr><th>메트릭</th><th>읽는 법</th></tr>
+    <tr><td>RequestCountPerTarget</td><td>인스턴스당 부하. 스케일 트리거로 가장 정확함</td></tr>
+    <tr><td>TargetResponseTime</td><td>엣지에서 본 지연. 앱 관점과 차이가 나면 큐가 있다는 뜻</td></tr>
+    <tr><td>HTTPCode_ELB_5XX / 504</td><td>타깃이 제때 답하지 못했다는 ALB의 판정</td></tr>
+    <tr><td>RejectedConnectionCount</td><td>연결 상한에 닿음</td></tr>
+  </table>
+  <ul class="bullets">
+    <li>계단형 스파이크는 사전 램프 트래픽이나 AWS 지원 요청으로 준비함</li>
+    <li>타깃의 keep-alive timeout &gt; ALB idle timeout — 반대면 자기가 만든 502가 나옴</li>
+    <li>health check를 너무 민감하게 두면 <span class="prob-text">피크에 느려진 인스턴스가 빠져</span> 용량이 더 줄어듦</li>
+  </ul>
+</section>
+
+<!-- ════════ 14장. 계층 점검 — ASG와 애플리케이션 ════════ -->
+<section class="page">
+  <p class="sec">5. 계층별 점검</p>
+  <h2 class="page-title">ASG와 Spring Boot — 예측 가능한 이벤트에는 예약이 먼저</h2>
+  <ul class="bullets">
+    <li>시각을 아는 이벤트는 <mark>scheduled scaling이 1순위</mark>, target tracking은 예측이 틀린 몫을 받는 안전망</li>
+    <li>target tracking 기준은 ALBRequestCountPerTarget, 목표값은 측정한 knee에서 가져옴</li>
+    <li>instance warmup을 준비 시간보다 짧게 두면 과잉 스케일이 일어남</li>
+    <li>종료 시 graceful shutdown + deregistration delay &gt; 가장 느린 요청</li>
+  </ul>
+  <p class="codedesc">애플리케이션에서 이벤트 때 실제로 터지는 자리</p>
+<pre class="code"><span class="k">server.tomcat.threads.max</span>=200   <span class="c"># 큐를 감추기만 하고 지연을 늘릴 수 있음</span>
+<span class="k">spring.datasource.hikari.maximum-pool-size</span>=10   <span class="c"># 기본값 그대로면 계산을 안 한 것</span>
+<span class="k">spring.datasource.hikari.connection-timeout</span>=<span class="hot">200</span>   <span class="c"># 무한 대기 대신 빠른 거절</span></pre>
+  <p class="dim">그 외 — 모든 외부 호출의 timeout, jitter 있는 재시도와 재시도 예산, circuit breaker와 bulkhead, 캐시 스탬피드 방지.</p>
+</section>
+
+<!-- ════════ 15장. 계층 점검 — Redis ════════ -->
+<section class="page">
+  <p class="sec">5. 계층별 점검</p>
+  <h2 class="page-title">Redis — 샤드 하나의 한계는 코어 하나임</h2>
+  <p>명령 처리는 샤드당 단일 스레드. 노드를 키워도 그 스레드는 하나임. 그래서 <mark>CPUUtilization이 아니라 EngineCPUUtilization</mark>을 봄.</p>
+  <table class="t">
+    <tr><th>증상</th><th>조치</th></tr>
+    <tr><td>engine CPU 높음, 읽기 위주</td><td>replica 추가 후 읽기 분산</td></tr>
+    <tr><td>engine CPU 높음, 쓰기 또는 hot key</td><td>cluster mode로 샤드 분할, 키 설계 재검토</td></tr>
+    <tr><td>메모리 임계, eviction 증가</td><td>노드 타입 up, maxmemory-policy와 TTL 점검</td></tr>
+    <tr><td>CurrConnections 급증</td><td>클라이언트 pool 확인. 요청마다 연결은 버그</td></tr>
+  </table>
+  <p class="dim">slow log에 KEYS 같은 O(N) 명령이 있으면 피크에 그 샤드의 다른 클라이언트가 전부 멈춤.</p>
+</section>
+
+<!-- ════════ 16장. 계층 점검 — RDS ════════ -->
+<section class="page">
+  <p class="sec">5. 계층별 점검</p>
+  <h2 class="page-title">RDS — 쓰기는 up 아니면 샤딩뿐임</h2>
+  <table class="t">
+    <tr><th>메트릭</th><th>읽는 법</th></tr>
+    <tr><td>DBLoad 대 vCPU 수</td><td>Performance Insights의 포화 지표. 가장 먼저 봄</td></tr>
+    <tr><td>DatabaseConnections 대 max_connections</td><td>scale out이 걸어 들어가는 상한</td></tr>
+    <tr><td>ReadIOPS·WriteIOPS 대 프로비저닝</td><td>gp3는 유한함. 스토리지 한계</td></tr>
+    <tr><td>EBSIOBalance</td><td>버스트 크레딧 소진. 이벤트 중반에 나타남</td></tr>
+    <tr><td>ReplicaLag</td><td>읽기 분산이 감수할 지연</td></tr>
+  </table>
+  <p class="codedesc">스펙 점검에 반드시 적어야 하는 커넥션 예산</p>
+<pre class="code">인스턴스 수 × pool 크기 &lt; max_connections × 0.8
+
+12대 × 10 = 120  <span class="bad">&gt; 100</span>  <span class="c"># db.t4g.medium 급에서 흔한 사고</span></pre>
+  <p class="dim">인스턴스 클래스 변경은 재시작이 필요하므로 이벤트 며칠 전에 함. 재시작 직후 buffer pool은 비어 있으므로 사전 워밍 쿼리를 돌림.</p>
+</section>
+
+<!-- ════════ 17장. warm pool 1 ════════ -->
+<section class="page">
+  <p class="sec">6. Warm pool</p>
+  <h2 class="page-title">준비 시간이 램프보다 길면 정책으로 못 따라감</h2>
+  <p>Warm pool은 <mark>미리 부팅해 두고 ALB에는 등록하지 않은 EC2</mark>의 집합. 스케일 아웃 때 새로 만들지 않고 여기서 꺼내 씀.</p>
+  <p class="codedesc">실습 6에서 측정한 준비 시간. EC2에서는 여기에 인스턴스 기동과 user data, JIT·캐시 워밍이 더 붙음</p>
+<pre class="code">make coldstart
+<span class="hot">ready after 2493 ms</span>   <span class="c"># JVM 기동만. 실제 준비 시간은 분 단위</span></pre>
+  <table class="t">
+    <tr><th>상태</th><th>과금</th><th>투입 속도</th><th>고르는 이유</th></tr>
+    <tr><td>Stopped</td><td>EBS만</td><td>부팅 + 앱 기동</td><td>기본값. 가장 저렴</td></tr>
+    <tr class="hot"><td>Hibernated</td><td>EBS(메모리 이미지 포함)</td><td>재개, 메모리 그대로</td><td>JVM heap과 JIT 상태를 살림</td></tr>
+    <tr><td>Running</td><td>전액</td><td>등록만 하면 끝</td><td>초 단위가 필요한 짧은 창</td></tr>
+  </table>
+</section>
+
+<!-- ════════ 18장. warm pool 2 ════════ -->
+<section class="page">
+  <p class="sec">6. Warm pool</p>
+  <h2 class="page-title">쓰기 전에 먼저 없앨 이유를 찾음</h2>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>warm pool이 맞는 경우</h3>
+      <ul>
+        <li>램프가 예측 불가하고 반복됨</li>
+        <li>준비 시간이 길고 줄일 수 없음</li>
+        <li>scale in 때 pool로 되돌려 재사용</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>먼저 시도할 것</h3>
+      <ul>
+        <li>시각을 아는 이벤트면 예약 스케일링</li>
+        <li>user data 작업을 AMI로 굽기</li>
+        <li>기동 시 느린 의존성 대기 제거</li>
+      </ul>
+    </div>
+  </div>
+  <p class="codedesc">lifecycle hook은 pool 진입과 진출에 두 번 걸림. 느린 작업은 앞에, 워밍은 뒤에 둠</p>
+<pre class="code"><span class="k">warm_pool</span> {
+  <span class="k">pool_state</span> = <span class="s">"Stopped"</span>
+  <span class="k">min_size</span>   = 4
+  <span class="k">instance_reuse_policy</span> { <span class="k">reuse_on_scale_in</span> = <span class="hot">true</span> }
+}</pre>
+  <p><b>고칠 수 없는 것.</b> 병목이 RDS나 Redis 샤드면 warm 인스턴스는 <span class="prob-text">더 빨리 도착해서 같은 자리에 줄을 설 뿐</span>임.</p>
+</section>
+
+<!-- ════════ 19장. 확인 1 ════════ -->
+<section class="page">
+  <p class="sec">7. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ①</h2>
+  <div class="quiz">
+    <p class="q">Q1. EC2 CPU 45%, p99는 계속 오르고, ASG가 인스턴스를 2배로 늘렸는데 처리량이 그대로다. 가장 먼저 의심할 것은?</p>
+    <ul class="opts">
+      <li>인스턴스 타입이 작아서 CPU 스티어링이 안 됨</li>
+      <li data-answer>모든 인스턴스가 공유하는 하위 계층이 이미 포화됨</li>
+      <li>ALB가 아직 스케일되지 않아 앞단에서 막힘</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 인스턴스를 2배로 늘렸는데 처리량이 그대로라는 것은 병목이 앱 계층 밖에 있다는 뜻. 실습 2가 정확히 이 상황이며, 이때 늘어난 것은 처리량이 아니라 하위 계층에 꽂힌 커넥션 수다.</p>
+  </div>
+</section>
+
+<!-- ════════ 20장. 확인 2 ════════ -->
+<section class="page">
+  <p class="sec">7. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ②</h2>
+  <div class="quiz">
+    <p class="q">Q2. 목표 800 rps, 응답 50ms, DB 구간 12ms, 인스턴스 8대다. 인스턴스당 pool 크기로 타당한 출발점은?</p>
+    <ul class="opts">
+      <li>40 — 목표 rps를 인스턴스 수로 나눈 값</li>
+      <li data-answer>2 안팎 — 800 × 0.012 ÷ 8 = 1.2에 여유를 더한 값</li>
+      <li>10 — 기본값이 대부분의 경우에 맞음</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> pool은 DB를 동시에 붙잡는 수를 인스턴스 수로 나눈 값이다. 크게 잡으면 DB의 max_connections를 인스턴스 수만큼 곱해서 위협하고, 앱은 거절 대신 DB를 대기시킨다.</p>
+  </div>
+</section>
+
+<!-- ════════ 21장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">8. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>"CPU 40%니까 여유 있다"가 위험한 이유는, 사용률이 용량이 아니기 때문임. 용량은 SLO를 깨지 않는 최대 요청률이고 계단 부하로 측정해야 나옴. 그 숫자가 나오면 나머지는 산수임 — Little's Law로 스레드와 pool을 계산하고, 오차와 AZ 손실로 여유를 붙임.</p>
+  <p>기억할 원리 — <mark>병목이 공유 자원이면 늘리는 방향은 위가 유일함</mark>. 그리고 한계를 넘은 뒤의 동작(거절할지 대기시킬지)을 이벤트 전에 정해 두는 것까지가 스펙 점검임.</p>
+  <p class="foot">핸즈온 재현: <a href="./docs/3-handson.md">docs/3-handson.md</a> · 점검 항목: <a href="./docs/2-review-checklist.md">docs/2-review-checklist.md</a><br>참고: Google SRE book — Service Level Objectives, Monitoring Distributed Systems, Handling Overload, Addressing Cascading Failures · AWS Auto Scaling warm pool 문서</p>
+</section>
+
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
