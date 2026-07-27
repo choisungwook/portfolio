@@ -57,6 +57,7 @@
               <th>Namespace</th>
               <th>Pod</th>
               <th>Status</th>
+              <th>Ready</th>
               <th>Age</th>
             </tr>
           </thead>
@@ -73,6 +74,7 @@
         </select>
         <input id="pod-search" type="text" placeholder="pod 이름 검색" />
         <button id="pod-status-filter" class="filter-button" aria-pressed="false">Running 아닌 파드만</button>
+        <button id="pod-ready-filter" class="filter-button" aria-pressed="false">Ready 아닌 파드만</button>
         <button id="refresh-pods">새로고침</button>
       </div>
       <p class="help">Namespace와 Status 헤더를 누르면 알파벳 순으로 정렬한다.</p>
@@ -86,6 +88,7 @@
             <th class="sortable" data-sort-key="status" tabindex="0" role="button" aria-sort="none">
               Status<span class="sort-arrow"></span>
             </th>
+            <th>Ready</th>
             <th>Node</th>
             <th>Age</th>
           </tr>

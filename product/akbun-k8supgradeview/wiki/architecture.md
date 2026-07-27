@@ -69,11 +69,21 @@ kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 
 정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다.
 
-정렬 헤더는 Pods 탭과 NodePool 표가 같은 배선을 쓴다(`registerSortHeaders`). `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
+정렬 헤더는 Pods 탭과 NodePool 표가 같은 배선을 쓴다(`registerSortHeaders`). `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만"과 "Ready 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
 
 상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
 
-namespace 필터, 이름 검색, 상태 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.
+namespace 필터, 이름 검색, 상태 필터, Ready 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.
+
+## Ready 칼럼과 Ready 필터
+
+Ready는 `kubectl get pods`의 READY 칸과 같은 "준비된 컨테이너/전체 컨테이너" 표기다. 준비된 개수는 `status.containerStatuses`에서 `ready`가 true인 것을 세고, 전체 개수는 `spec.containers`에서 읽는다. 아직 스케줄되지 않았거나 image를 받는 중인 파드는 `containerStatuses`가 비어 있어서, 전체 개수까지 그 배열로 세면 `0/0`으로 뭉개진다. init container와 ephemeral container는 kubectl의 READY 칸에도 들어가지 않으므로 세지 않는다.
+
+`allReady`(모든 컨테이너가 Ready인가)는 main에서 함께 계산해 `PodInfo`에 담는다. 화면이 `1/2` 같은 문자열을 다시 파싱하면 필터와 색 두 곳에서 같은 파싱을 반복하게 된다.
+
+Ready 필터는 "Ready 아닌 파드만" 버튼 하나이고 상태 필터와 따로 둔다. 두 값이 답하는 질문이 다르기 때문이다. status가 Running이어도 probe를 통과하지 못한 컨테이너가 있으면 그 파드는 Service의 endpoint에 들어가지 않는다. 노드를 비우기 전에 옮겨 간 파드가 실제로 트래픽을 받는지 확인하려면 "Running인데 Ready가 아닌" 줄을 봐야 하는데, 필터가 하나로 합쳐져 있으면 그 교집합을 만들 수 없다.
+
+Ready 칸도 상태처럼 색으로 먼저 읽히게 한다. 다만 상태와 달리 중간 단계를 두지 않고 모두 Ready면 초록, 아니면 빨강 두 가지만 쓴다. Ready는 개수가 다 찼는가 아닌가의 문제라 그 사이에 둘 단계가 없다.
 
 ## 파드 describe 사이드 패널
 
