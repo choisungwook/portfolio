@@ -11,7 +11,7 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
 - `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -23,6 +23,13 @@ renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로
 kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
+```
+
+Nodes 탭의 Action 버튼이 사용하는 명령. 이 앱에서 유일하게 클러스터 상태를 바꾼다.
+
+```bash
+kubectl cordon <노드이름>
+kubectl uncordon <노드이름>
 ```
 
 Karpenter Event 탭이 사용하는 명령. namespace, label selector, 조회 범위는 Settings 값이다.
@@ -66,6 +73,16 @@ nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` l
 karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
 
 빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+
+## cordon / uncordon
+
+Nodes 탭 노드 행 끝 Action 칼럼에 버튼 하나를 두고, 글자를 `unschedulable` 값에서 파생시켜 Cordon과 Uncordon을 오간다. 상태를 보여주는 칼럼을 따로 두지 않는 이유와 확인 dialog를 main에 둔 이유는 [cordon 토글 ADR](../adr/2026-07-node-cordon-toggle.md)에 있다.
+
+실행 순서는 renderer 버튼 클릭 → main의 `kubectl:set-node-cordon` → 이름 검증 → 확인 dialog → kubectl 실행이다. 확인 창에서 취소하면 handler가 `false`를 돌려주고 renderer는 목록을 다시 부르지 않는다. 클러스터가 그대로이기 때문이다. 실행에 성공하면 노드 목록을 새로 불러 상태와 버튼 글자를 함께 갱신한다.
+
+행 클릭은 파드 조회에 이미 쓰고 있으므로 버튼 클릭에서 `stopPropagation`으로 전파를 멈춘다. 실행 중에는 버튼을 `disabled`로 잠근다.
+
+subcommand를 반대로 넘기면 노드를 열려다 닫으므로 `test/node-cordon.test.js`가 실제 실행 경로에서 넘어간 인자를 확인한다.
 
 ## 노드 분류 기준
 

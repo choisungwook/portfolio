@@ -135,6 +135,20 @@ th {
   background: #dbeafe;
 }
 
+/* 행 클릭(파드 조회)과 구분되도록 테두리를 준다. */
+.cordon-button {
+  padding: 3px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.cordon-button:disabled {
+  color: #8c959f;
+  cursor: progress;
+}
+
 .status-ready {
   color: #15803d;
   font-weight: 600;

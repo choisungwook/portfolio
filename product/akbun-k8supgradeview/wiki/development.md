@@ -13,7 +13,7 @@ npm run start
 
 ## 테스트
 
-build 후 node 내장 test runner로 테스트를 돌린다. 업데이트 기능의 디스크 누수 방지 지점 세 곳을 검증하며, PR verify job에서도 실행된다.
+build 후 node 내장 test runner로 테스트를 돌린다. 업데이트 기능의 디스크 누수 방지 지점 세 곳, karpenter 리소스 파싱의 빈 값 처리, cordon / uncordon이 실행하는 kubectl 인자를 검증하며, PR verify job에서도 실행된다.
 
 ```bash
 npm test

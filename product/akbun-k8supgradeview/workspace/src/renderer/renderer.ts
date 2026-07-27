@@ -80,6 +80,7 @@ interface AppSettings {
 interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
+  setNodeCordon(nodeName: string, cordon: boolean): Promise<boolean>;
   getKarpenterEvents(): Promise<EventInfo[]>;
   getKarpenterLogs(): Promise<KarpenterLogs>;
   getKarpenterVersions(): Promise<KarpenterVersions>;
@@ -144,6 +145,37 @@ function matchesFilter(node: NodeInfo): boolean {
   return true;
 }
 
+/**
+ * cordon과 uncordon을 버튼 하나로 둔다. 노드의 unschedulable 값이 곧 버튼의 상태라
+ * 두 버튼을 각각 활성/비활성으로 관리할 때보다 어긋날 여지가 없다.
+ */
+function appendCordonCell(row: HTMLTableRowElement, node: NodeInfo): void {
+  const cell = row.insertCell();
+  const button = document.createElement("button");
+  button.className = "cordon-button";
+  button.textContent = node.unschedulable ? "Uncordon" : "Cordon";
+  // 행 클릭은 파드 조회다. 버튼을 눌렀을 때 그 동작까지 함께 돌지 않게 막는다.
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void toggleCordon(node, button);
+  });
+  cell.appendChild(button);
+}
+
+/** 실행 중에는 버튼을 잠가 같은 노드에 명령이 겹쳐 돌지 않게 한다. */
+async function toggleCordon(node: NodeInfo, button: HTMLButtonElement): Promise<void> {
+  button.disabled = true;
+  try {
+    clearError();
+    // 취소하면 클러스터 상태가 그대로이므로 다시 조회하지 않는다.
+    if (await api.setNodeCordon(node.name, !node.unschedulable)) await refreshNodes();
+  } catch (error) {
+    showError(String(error));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderNodes(): void {
   const tbody = $("#node-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
@@ -160,6 +192,7 @@ function renderNodes(): void {
     appendCell(row, node.status, statusClass(node.status));
     appendCell(row, formatAge(node.creationTimestamp));
     appendCell(row, node.group);
+    appendCordonCell(row, node);
     row.addEventListener("click", () => selectNode(node.name));
   }
 }

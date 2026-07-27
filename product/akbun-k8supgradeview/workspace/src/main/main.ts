@@ -9,6 +9,7 @@ import {
   getKarpenterVersions,
   getNodes,
   getPods,
+  setNodeCordon,
 } from "./kubectl";
 import { AppSettings, loadSettings, saveSettings } from "./settings";
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
@@ -26,8 +27,48 @@ function createWindow(): void {
   window.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 }
 
+/**
+ * 노드 이름을 kubectl 인자로 넘기기 전에 검증한다. shell을 거치지 않아 인젝션은 없지만
+ * -로 시작하는 값은 kubectl이 옵션으로 읽으므로 막는다.
+ */
+function assertNodeName(value: unknown): asserts value is string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("노드 이름이 잘못되었다: 비어 있지 않은 문자열이어야 한다");
+  }
+  if (value.startsWith("-")) {
+    throw new Error("노드 이름이 잘못되었다: -로 시작할 수 없다");
+  }
+}
+
+/** 클러스터를 바꾸는 동작이므로 실행 전에 한 번 묻는다. */
+async function confirmCordon(nodeName: string, cordon: boolean): Promise<boolean> {
+  const action = cordon ? "cordon" : "uncordon";
+  const detail = cordon
+    ? "이 노드에 새 파드가 스케줄되지 않는다. 이미 떠 있는 파드는 그대로 남는다."
+    : "이 노드에 다시 파드가 스케줄된다.";
+  const answer = await dialog.showMessageBox({
+    type: "question",
+    message: `${nodeName}을 ${action}한다`,
+    detail,
+    buttons: [action, "취소"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  return answer.response === 0;
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:nodes", () => getNodes());
+  // 취소를 눌렀는지 renderer가 알아야 새로고침 여부를 정할 수 있어 boolean을 돌려준다.
+  ipcMain.handle("kubectl:set-node-cordon", async (_event, nodeName: unknown, cordon: unknown) => {
+    assertNodeName(nodeName);
+    if (typeof cordon !== "boolean") {
+      throw new Error("cordon 값이 잘못되었다: boolean이어야 한다");
+    }
+    if (!(await confirmCordon(nodeName, cordon))) return false;
+    await setNodeCordon(nodeName, cordon);
+    return true;
+  });
   ipcMain.handle("kubectl:pods", (_event, nodeName?: string) => getPods(nodeName));
   ipcMain.handle("kubectl:karpenter-events", () => getKarpenterEvents());
   ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
