@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "path";
-import { getNodes, getPods } from "./kubectl";
+import { getKarpenterEvents, getKarpenterLogs, getNodes, getPods } from "./kubectl";
 import { AppSettings, loadSettings, saveSettings } from "./settings";
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
 
@@ -22,14 +22,25 @@ function createWindow(): void {
 function registerIpcHandlers(): void {
   ipcMain.handle("kubectl:nodes", () => getNodes());
   ipcMain.handle("kubectl:pods", (_event, nodeName?: string) => getPods(nodeName));
+  ipcMain.handle("kubectl:karpenter-events", () => getKarpenterEvents());
+  ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
   ipcMain.handle("settings:get", () => loadSettings());
   ipcMain.handle("settings:save", (_event, settings: unknown) => {
     // IPC 경계에서 형식을 검증한다. renderer가 잘못된 값을 보내면 명확한 에러로 알린다.
-    const kubectlCommand = (settings as Partial<AppSettings> | null)?.kubectlCommand;
-    if (typeof kubectlCommand !== "string") {
+    const input = settings as Partial<AppSettings> | null;
+    if (typeof input?.kubectlCommand !== "string") {
       throw new Error("settings 형식이 잘못되었다: kubectlCommand는 문자열이어야 한다");
     }
-    return saveSettings({ kubectlCommand });
+    if (typeof input.karpenterNamespace !== "string") {
+      throw new Error("settings 형식이 잘못되었다: karpenterNamespace는 문자열이어야 한다");
+    }
+    if (typeof input.karpenterPodLabelSelector !== "string") {
+      throw new Error("settings 형식이 잘못되었다: karpenterPodLabelSelector는 문자열이어야 한다");
+    }
+    if (typeof input.karpenterLogSinceMinutes !== "number") {
+      throw new Error("settings 형식이 잘못되었다: karpenterLogSinceMinutes는 숫자여야 한다");
+    }
+    return saveSettings(input);
   });
 }
 

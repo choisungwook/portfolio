@@ -18,13 +18,40 @@ interface PodInfo {
   creationTimestamp: string;
 }
 
+interface EventInfo {
+  timestamp: string;
+  type: string;
+  reason: string;
+  object: string;
+  message: string;
+  count: number;
+}
+
+interface PodLog {
+  podName: string;
+  text: string;
+  error: string;
+}
+
+interface KarpenterLogs {
+  namespace: string;
+  labelSelector: string;
+  sinceMinutes: number;
+  logs: PodLog[];
+}
+
 interface AppSettings {
   kubectlCommand: string;
+  karpenterNamespace: string;
+  karpenterPodLabelSelector: string;
+  karpenterLogSinceMinutes: number;
 }
 
 interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
+  getKarpenterEvents(): Promise<EventInfo[]>;
+  getKarpenterLogs(): Promise<KarpenterLogs>;
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
 }
@@ -37,6 +64,7 @@ let allNodes: NodeInfo[] = [];
 let allPods: PodInfo[] = [];
 let nodeFilter: NodeFilterKind = "all";
 let selectedNode = "";
+let karpenterLoaded = false;
 
 function $(selector: string): HTMLElement {
   return document.querySelector(selector) as HTMLElement;
@@ -189,6 +217,79 @@ async function refreshPods(): Promise<void> {
   }
 }
 
+// event는 언제 일어났는지가 중요하므로 age 대신 로컬 시각을 그대로 보여준다.
+function formatEventTime(timestamp: string): string {
+  if (!timestamp) return "";
+  const time = new Date(timestamp);
+  if (Number.isNaN(time.getTime())) return timestamp;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const date = `${pad(time.getMonth() + 1)}-${pad(time.getDate())}`;
+  return `${date} ${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`;
+}
+
+function renderKarpenterEvents(events: EventInfo[]): void {
+  const tbody = $("#karpenter-event-table tbody") as HTMLTableSectionElement;
+  tbody.innerHTML = "";
+  $("#karpenter-event-empty").classList.toggle("hidden", events.length > 0);
+
+  for (const event of events) {
+    const row = tbody.insertRow();
+    appendCell(row, formatEventTime(event.timestamp));
+    appendCell(row, event.type, event.type === "Warning" ? "status-warning" : "");
+    appendCell(row, event.reason);
+    appendCell(row, event.object);
+    appendCell(row, String(event.count));
+    const message = row.insertCell();
+    message.textContent = event.message;
+    message.className = "message-cell";
+  }
+}
+
+function createLogBlock(log: PodLog): HTMLElement {
+  const block = document.createElement("section");
+  block.className = "log-block";
+
+  const title = document.createElement("h3");
+  title.textContent = log.podName;
+  block.appendChild(title);
+
+  const body = document.createElement("pre");
+  if (log.error) {
+    body.className = "log-error";
+    body.textContent = log.error;
+  } else {
+    body.textContent = log.text || "해당 기간에 남은 로그가 없습니다.";
+  }
+  block.appendChild(body);
+  return block;
+}
+
+function renderKarpenterLogs(result: KarpenterLogs): void {
+  const container = $("#karpenter-logs");
+  container.innerHTML = "";
+  $("#karpenter-log-empty").classList.toggle("hidden", result.logs.length > 0);
+  for (const log of result.logs) {
+    container.appendChild(createLogBlock(log));
+  }
+  $("#karpenter-scope").textContent =
+    `namespace ${result.namespace} / label ${result.labelSelector} / 최근 ${result.sinceMinutes}분`;
+}
+
+async function refreshKarpenter(): Promise<void> {
+  try {
+    clearError();
+    const [events, logs] = await Promise.all([
+      api.getKarpenterEvents(),
+      api.getKarpenterLogs(),
+    ]);
+    renderKarpenterEvents(events);
+    renderKarpenterLogs(logs);
+    karpenterLoaded = true;
+  } catch (error) {
+    showError(String(error));
+  }
+}
+
 function activateTab(tab: string): void {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.classList.toggle("active", (button as HTMLElement).dataset.tab === tab);
@@ -197,22 +298,39 @@ function activateTab(tab: string): void {
     section.classList.toggle("active", section.id === `tab-${tab}`);
   });
   if (tab === "pods" && allPods.length === 0) void refreshPods();
+  if (tab === "karpenter" && !karpenterLoaded) void refreshKarpenter();
+}
+
+function fillSettingsForm(settings: AppSettings): void {
+  ($("#kubectl-command") as HTMLInputElement).value = settings.kubectlCommand;
+  ($("#karpenter-namespace") as HTMLInputElement).value = settings.karpenterNamespace;
+  ($("#karpenter-label-selector") as HTMLInputElement).value = settings.karpenterPodLabelSelector;
+  ($("#karpenter-log-since") as HTMLInputElement).value = String(settings.karpenterLogSinceMinutes);
 }
 
 async function loadSettingsForm(): Promise<void> {
   try {
-    const settings = await api.getSettings();
-    ($("#kubectl-command") as HTMLInputElement).value = settings.kubectlCommand;
+    fillSettingsForm(await api.getSettings());
   } catch (error) {
     showError(String(error));
   }
 }
 
+function readSettingsForm(): AppSettings {
+  return {
+    kubectlCommand: ($("#kubectl-command") as HTMLInputElement).value,
+    karpenterNamespace: ($("#karpenter-namespace") as HTMLInputElement).value,
+    karpenterPodLabelSelector: ($("#karpenter-label-selector") as HTMLInputElement).value,
+    karpenterLogSinceMinutes: Number(($("#karpenter-log-since") as HTMLInputElement).value),
+  };
+}
+
 async function submitSettings(): Promise<void> {
   try {
-    const kubectlCommand = ($("#kubectl-command") as HTMLInputElement).value;
-    const saved = await api.saveSettings({ kubectlCommand });
-    ($("#kubectl-command") as HTMLInputElement).value = saved.kubectlCommand;
+    const saved = await api.saveSettings(readSettingsForm());
+    fillSettingsForm(saved);
+    // 조회 범위가 바뀌었을 수 있으므로 Karpenter 탭을 다시 열 때 새로 불러오게 한다.
+    karpenterLoaded = false;
     const badge = $("#settings-saved");
     badge.classList.remove("hidden");
     setTimeout(() => badge.classList.add("hidden"), 2000);
@@ -235,6 +353,7 @@ function registerEventHandlers(): void {
   });
   $("#refresh-nodes").addEventListener("click", () => void refreshNodes());
   $("#refresh-pods").addEventListener("click", () => void refreshPods());
+  $("#refresh-karpenter").addEventListener("click", () => void refreshKarpenter());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
   $("#save-settings").addEventListener("click", () => void submitSettings());

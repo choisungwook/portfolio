@@ -1,6 +1,6 @@
 {
   "name": "akbun-k8supgradeview",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "EKS 업그레이드 작업 중 노드와 파드 상태를 확인하는 데스크톱 뷰어",
   "author": "akbun",
   "license": "MIT",

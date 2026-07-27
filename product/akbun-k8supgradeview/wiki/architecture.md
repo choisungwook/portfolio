@@ -9,9 +9,9 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `kubectl.ts`: kubectl 실행과 노드/파드 JSON 파싱
   - `settings.ts`: userData 경로의 settings.json 읽기/쓰기
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
-- `workspace/src/renderer/`: 화면. Nodes, Pods, Settings 3개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
+- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, Settings 4개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -24,6 +24,26 @@ kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
 ```
+
+Karpenter Event 탭이 사용하는 명령. namespace, label selector, 조회 범위는 Settings 값이다.
+
+```bash
+kubectl get events -n <namespace> -o json
+kubectl get pods -n <namespace> -l <label selector> -o json
+kubectl logs <파드이름> -n <namespace> --all-containers=true --timestamps --since=<분>m
+```
+
+## Karpenter Event 탭
+
+event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는다. 시각은 `lastTimestamp`, `series.lastObservedTime`, `eventTime`, `firstTimestamp`, `metadata.creationTimestamp` 순으로 찾고, 대상은 `involvedObject` 또는 `regarding`, 본문은 `message` 또는 `note`를 쓴다. 목록은 오래된 것부터 시간순으로 정렬한다.
+
+로그는 label selector로 파드를 먼저 찾고 파드마다 따로 조회한다. 한 파드의 조회가 실패해도 나머지 로그는 보여줘야 하므로 실패를 예외로 던지지 않고 `PodLog.error`에 담아 화면에 표시한다.
+
+| 설정 | 기본값 |
+|---|---|
+| `karpenterNamespace` | `karpenter` |
+| `karpenterPodLabelSelector` | `app.kubernetes.io/name=karpenter` |
+| `karpenterLogSinceMinutes` | `15` (1~1440으로 제한) |
 
 ## 노드 분류 기준
 

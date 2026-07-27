@@ -21,6 +21,29 @@ export interface PodInfo {
   creationTimestamp: string;
 }
 
+export interface EventInfo {
+  timestamp: string;
+  type: string;
+  reason: string;
+  object: string;
+  message: string;
+  count: number;
+}
+
+export interface PodLog {
+  podName: string;
+  // log 본문. 조회에 실패하면 빈 문자열이고 error에 이유가 담긴다.
+  text: string;
+  error: string;
+}
+
+export interface KarpenterLogs {
+  namespace: string;
+  labelSelector: string;
+  sinceMinutes: number;
+  logs: PodLog[];
+}
+
 const KARPENTER_LABELS = ["karpenter.sh/nodepool", "karpenter.sh/provisioner-name"];
 const MANAGED_NODEGROUP_LABEL = "eks.amazonaws.com/nodegroup";
 
@@ -110,4 +133,94 @@ export async function getPods(nodeName?: string): Promise<PodInfo[]> {
   const stdout = await runKubectl(args);
   const items: any[] = JSON.parse(stdout).items ?? [];
   return items.map(toPodInfo);
+}
+
+// core/v1 Event와 events.k8s.io/v1 Event의 필드 이름이 달라 둘 다 읽는다.
+function eventTimestamp(event: any): string {
+  return (
+    event.lastTimestamp ??
+    event.series?.lastObservedTime ??
+    event.eventTime ??
+    event.firstTimestamp ??
+    event.metadata?.creationTimestamp ??
+    ""
+  );
+}
+
+function eventObject(event: any): string {
+  const target = event.involvedObject ?? event.regarding ?? {};
+  if (!target.kind) return target.name ?? "";
+  return `${target.kind}/${target.name ?? ""}`;
+}
+
+function toEventInfo(event: any): EventInfo {
+  return {
+    timestamp: eventTimestamp(event),
+    type: event.type ?? "",
+    reason: event.reason ?? "",
+    object: eventObject(event),
+    message: (event.message ?? event.note ?? "").trim(),
+    count: event.count ?? event.series?.count ?? event.deprecatedCount ?? 1,
+  };
+}
+
+/** karpenter namespace의 event를 오래된 것부터 시간순으로 돌려준다. */
+export async function getKarpenterEvents(): Promise<EventInfo[]> {
+  const namespace = loadSettings().karpenterNamespace;
+  const stdout = await runKubectl(["get", "events", "-n", namespace, "-o", "json"]);
+  const items: any[] = JSON.parse(stdout).items ?? [];
+  return items
+    .map(toEventInfo)
+    .sort((a, b) => Date.parse(a.timestamp || "0") - Date.parse(b.timestamp || "0"));
+}
+
+async function getPodNames(namespace: string, labelSelector: string): Promise<string[]> {
+  const stdout = await runKubectl([
+    "get",
+    "pods",
+    "-n",
+    namespace,
+    "-l",
+    labelSelector,
+    "-o",
+    "json",
+  ]);
+  const items: any[] = JSON.parse(stdout).items ?? [];
+  return items.map((pod) => pod.metadata?.name ?? "").filter(Boolean);
+}
+
+/** pod 하나의 log. 한 pod가 실패해도 나머지 pod의 log는 보여줘야 하므로 에러를 값으로 담는다. */
+async function getPodLog(
+  namespace: string,
+  podName: string,
+  sinceMinutes: number
+): Promise<PodLog> {
+  try {
+    const text = await runKubectl([
+      "logs",
+      podName,
+      "-n",
+      namespace,
+      "--all-containers=true",
+      "--timestamps",
+      `--since=${sinceMinutes}m`,
+    ]);
+    return { podName, text: text.trimEnd(), error: "" };
+  } catch (error) {
+    return { podName, text: "", error: String(error instanceof Error ? error.message : error) };
+  }
+}
+
+/** label selector로 찾은 karpenter pod들의 최근 log를 모은다. */
+export async function getKarpenterLogs(): Promise<KarpenterLogs> {
+  const settings = loadSettings();
+  const namespace = settings.karpenterNamespace;
+  const labelSelector = settings.karpenterPodLabelSelector;
+  const sinceMinutes = settings.karpenterLogSinceMinutes;
+
+  const podNames = await getPodNames(namespace, labelSelector);
+  const logs = await Promise.all(
+    podNames.map((podName) => getPodLog(namespace, podName, sinceMinutes))
+  );
+  return { namespace, labelSelector, sinceMinutes, logs };
 }
