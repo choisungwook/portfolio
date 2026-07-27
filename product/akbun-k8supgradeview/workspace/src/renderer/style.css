@@ -92,6 +92,11 @@ button {
 #refresh-pods,
 #refresh-karpenter,
 #refresh-nodepools,
+#refresh-namespaces,
+#select-all-namespaces,
+#clear-namespaces,
+#generate-overprovision,
+#copy-overprovision,
 #save-settings {
   padding: 6px 14px;
   border: 1px solid #d0d7de;
@@ -287,6 +292,42 @@ th.sortable.sorted {
   word-break: break-word;
 }
 
+/* namespace가 수십 개인 클러스터도 있어 높이를 묶고 안에서 스크롤한다. */
+.checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 12px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 만든 manifest는 그대로 복사해 kubectl에 넣는 값이라 원문을 건드리지 않고 보여준다. */
+.yaml-output {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .log-block {
   margin-bottom: 12px;
 }
@@ -320,6 +361,10 @@ th.sortable.sorted {
 
 #namespace-filter,
 #pod-search,
+#overprovision-cpu-request,
+#overprovision-cpu-limit,
+#overprovision-replicas,
+#overprovision-image,
 #kubectl-command,
 #karpenter-namespace,
 #karpenter-label-selector,
@@ -352,8 +397,15 @@ th.sortable.sorted {
   min-width: 260px;
 }
 
-#karpenter-log-since {
+#karpenter-log-since,
+#overprovision-cpu-request,
+#overprovision-cpu-limit,
+#overprovision-replicas {
   width: 100px;
+}
+
+#overprovision-image {
+  min-width: 320px;
 }
 
 #settings-saved {

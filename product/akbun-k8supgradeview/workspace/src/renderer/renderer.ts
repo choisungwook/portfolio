@@ -78,9 +78,19 @@ interface AppSettings {
   karpenterLogSinceMinutes: number;
 }
 
+interface OverprovisionOptions {
+  namespaces: string[];
+  cpuRequest: string;
+  cpuLimit: string;
+  replicas: number;
+  image: string;
+}
+
 interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
+  getNamespaces(): Promise<string[]>;
+  buildOverprovisionYaml(options: OverprovisionOptions): Promise<string>;
   setNodeCordon(nodeName: string, cordon: boolean): Promise<boolean>;
   getKarpenterEvents(): Promise<EventInfo[]>;
   getKarpenterLogs(): Promise<KarpenterLogs>;
@@ -112,6 +122,10 @@ let podOnlyNotRunning = false;
 let selectedNode = "";
 let karpenterLoaded = false;
 let nodePoolsLoaded = false;
+let allNamespaces: string[] = [];
+// 새로고침으로 목록이 바뀌어도 고른 값을 잃지 않도록 이름으로 들고 있는다.
+const selectedNamespaces = new Set<string>();
+let namespacesLoaded = false;
 
 function $(selector: string): HTMLElement {
   return document.querySelector(selector) as HTMLElement;
@@ -649,6 +663,90 @@ async function refreshKarpenterResources(): Promise<void> {
   }
 }
 
+// pause image. 아무 일도 하지 않고 종료 신호만 기다리면 되므로 Kubernetes의 pause를 쓴다.
+const DEFAULT_PAUSE_IMAGE = "registry.k8s.io/pause:3.10";
+
+function renderNamespaceSelection(): void {
+  const list = $("#namespace-list");
+  list.innerHTML = "";
+  $("#namespace-empty").classList.toggle("hidden", allNamespaces.length > 0);
+
+  for (const namespace of allNamespaces) {
+    const label = document.createElement("label");
+    label.className = "checkbox-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = namespace;
+    checkbox.checked = selectedNamespaces.has(namespace);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedNamespaces.add(namespace);
+      else selectedNamespaces.delete(namespace);
+      renderSelectedCount();
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(namespace));
+    list.appendChild(label);
+  }
+  renderSelectedCount();
+}
+
+function renderSelectedCount(): void {
+  $("#namespace-selected-count").textContent = `${selectedNamespaces.size}개 선택됨`;
+}
+
+async function refreshNamespaces(): Promise<void> {
+  try {
+    clearError();
+    allNamespaces = await api.getNamespaces();
+    // 사라진 namespace를 선택 상태로 남겨 두면 없는 대상의 manifest가 만들어진다.
+    for (const namespace of [...selectedNamespaces]) {
+      if (!allNamespaces.includes(namespace)) selectedNamespaces.delete(namespace);
+    }
+    renderNamespaceSelection();
+    namespacesLoaded = true;
+  } catch (error) {
+    showError(String(error));
+  }
+}
+
+function setAllNamespacesSelected(selected: boolean): void {
+  selectedNamespaces.clear();
+  if (selected) allNamespaces.forEach((namespace) => selectedNamespaces.add(namespace));
+  renderNamespaceSelection();
+}
+
+/** 선택 순서가 아니라 목록 순서를 따라야 다시 만들 때 같은 결과가 나온다. */
+function readOverprovisionOptions(): OverprovisionOptions {
+  return {
+    namespaces: allNamespaces.filter((namespace) => selectedNamespaces.has(namespace)),
+    cpuRequest: ($("#overprovision-cpu-request") as HTMLInputElement).value.trim(),
+    cpuLimit: ($("#overprovision-cpu-limit") as HTMLInputElement).value.trim(),
+    replicas: Number(($("#overprovision-replicas") as HTMLInputElement).value),
+    image: ($("#overprovision-image") as HTMLInputElement).value.trim(),
+  };
+}
+
+/** 입력이 잘못됐다는 안내는 상단 배너가 아니라 만들기 버튼 아래에 붙여야 눈에 띈다. */
+function showOverprovisionResult(yaml: string, message: string): void {
+  const output = $("#overprovision-yaml");
+  output.textContent = yaml;
+  output.classList.toggle("hidden", !yaml);
+  $("#copy-overprovision").classList.toggle("hidden", !yaml);
+  renderResourceError("#overprovision-error", message);
+}
+
+async function generateOverprovisionYaml(): Promise<void> {
+  try {
+    clearError();
+    showOverprovisionResult(await api.buildOverprovisionYaml(readOverprovisionOptions()), "");
+  } catch (error) {
+    // 검증 실패도 여기로 온다. 만들다 만 결과가 남으면 새 입력의 결과로 잘못 읽힌다.
+    showOverprovisionResult("", String(error instanceof Error ? error.message : error));
+  }
+}
+
 function activateTab(tab: string): void {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.classList.toggle("active", (button as HTMLElement).dataset.tab === tab);
@@ -659,6 +757,15 @@ function activateTab(tab: string): void {
   if (tab === "pods" && allPods.length === 0) void refreshPods();
   if (tab === "karpenter" && !karpenterLoaded) void refreshKarpenter();
   if (tab === "nodepools" && !nodePoolsLoaded) void refreshKarpenterResources();
+  if (tab === "utilize" && !namespacesLoaded) void refreshNamespaces();
+}
+
+/** 값을 채워 두면 무엇을 적는 칸인지 설명 없이 알 수 있고 바로 만들어 볼 수 있다. */
+function fillOverprovisionDefaults(): void {
+  ($("#overprovision-cpu-request") as HTMLInputElement).value = "1";
+  ($("#overprovision-cpu-limit") as HTMLInputElement).value = "1";
+  ($("#overprovision-replicas") as HTMLInputElement).value = "2";
+  ($("#overprovision-image") as HTMLInputElement).value = DEFAULT_PAUSE_IMAGE;
 }
 
 function fillSettingsForm(settings: AppSettings): void {
@@ -729,8 +836,17 @@ function registerEventHandlers(): void {
     renderPods();
   });
   $("#save-settings").addEventListener("click", () => void submitSettings());
+  $("#refresh-namespaces").addEventListener("click", () => void refreshNamespaces());
+  $("#select-all-namespaces").addEventListener("click", () => setAllNamespacesSelected(true));
+  $("#clear-namespaces").addEventListener("click", () => setAllNamespacesSelected(false));
+  $("#generate-overprovision").addEventListener("click", () => void generateOverprovisionYaml());
+  $("#copy-overprovision").addEventListener("click", () => {
+    const button = $("#copy-overprovision") as HTMLButtonElement;
+    void copyToClipboard($("#overprovision-yaml").textContent ?? "", button);
+  });
 }
 
 registerEventHandlers();
+fillOverprovisionDefaults();
 void loadSettingsForm();
 void refreshNodes();

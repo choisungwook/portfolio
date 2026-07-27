@@ -6,12 +6,13 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
 
 - `workspace/src/main/`: Electron main 프로세스. kubectl 실행, 설정 파일 저장, IPC 핸들러를 담당한다.
   - `main.ts`: 윈도우 생성과 IPC 핸들러 등록
-  - `kubectl.ts`: kubectl 실행과 노드/파드 JSON 파싱
+  - `kubectl.ts`: kubectl 실행과 노드/파드/namespace JSON 파싱
+  - `overprovision.ts`: over-provisioning manifest 문자열 생성. kubectl을 부르지 않는 순수 함수다
   - `settings.ts`: userData 경로의 settings.json 읽기/쓰기
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
-- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
+- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Utilize, Settings 6개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -23,6 +24,12 @@ renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로
 kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
+```
+
+Utilize 탭이 manifest를 만들 대상 목록을 채울 때 사용하는 명령:
+
+```bash
+kubectl get namespaces -o json
 ```
 
 Nodes 탭의 Action 버튼이 사용하는 명령. 이 앱에서 유일하게 클러스터 상태를 바꾼다.
@@ -89,6 +96,22 @@ karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 
 EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 그룹이 비면 이유를 나눠 적는다. 참조가 아예 없으면 지정되지 않았다고, 참조가 가리키는 클래스를 못 찾으면 그 이름과 함께 찾지 못했다고 적는다. 손볼 곳이 다르기 때문이다. EC2NodeClass가 하나도 없으면 그룹을 그리지 않고 표 아래 안내만 남긴다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
 
 빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 그룹 기준이 되는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+
+## Utilize 탭 (over-provisioning manifest 생성)
+
+over-provisioning은 우선순위가 음수인 placeholder 파드를 미리 띄워 노드를 확보해 두는 방법이다. 실제 워크로드가 뜨면 kube-scheduler가 placeholder를 밀어내고 그 자리에 들어가고, 밀려난 placeholder가 Pending이 되면서 Karpenter가 다음 노드를 만든다. 업그레이드처럼 노드가 한꺼번에 빠지는 작업에서 노드 provisioning 대기 시간을 줄이려고 쓴다.
+
+이 탭은 문자열만 만들고 클러스터에는 손대지 않는다. 적용은 사용자가 결과를 복사해 `kubectl apply -f -`로 한다. cordon과 달리 확인 dialog를 두지 않는 이유도 이것이다.
+
+생성 로직은 renderer가 아니라 main의 `overprovision.ts`에 둔다. 화면과 떨어진 순수 함수라 `test/overprovision.test.js`가 문자열을 직접 검증할 수 있기 때문이다. renderer는 `overprovision:build` IPC로 옵션을 넘기고 완성된 문자열만 받는다.
+
+문서 구성은 PriorityClass 하나와 선택한 namespace 수만큼의 Deployment이고, `---`로 이어 붙여 한 번의 apply로 끝나게 한다. PriorityClass는 cluster scope 리소스라 namespace마다 만들 수 없으므로 개수와 무관하게 맨 앞에 한 번만 넣는다. 우선순위 값은 `-1`이고 `globalDefault: false`다. 기본 우선순위가 0이라 음수여야 실제 워크로드가 placeholder를 밀어낼 수 있다.
+
+placeholder 컨테이너는 Kubernetes의 pause image를 쓴다. 아무 일도 하지 않고 종료 신호만 기다리면 되기 때문이고, Karpenter 문서와 blueprint의 over-provisioning 예제도 같은 image를 쓴다. 기본값은 `registry.k8s.io/pause:3.10`이며 화면에서 바꿀 수 있다. `terminationGracePeriodSeconds`는 0이다. 밀려날 때 기다릴 일이 없는데 기본값 30초를 두면 실제 워크로드가 그만큼 늦게 뜬다.
+
+옵션은 namespace 선택, cpu request, cpu limit, replica, image 다섯이다. replica는 namespace마다 각각 적용된다. 선택 순서가 아니라 목록 순서로 문서를 만들어 같은 선택이면 같은 결과가 나오게 한다.
+
+생성 전에 값을 검증한다. namespace 이름은 DNS label 형식, cpu는 `1`/`0.5`/`500m` 형식, replica는 1~1000 정수, image는 공백 없는 문자열이어야 한다. 형식을 먼저 막는 이유는 두 가지다. 사용자가 적는 값이 그대로 이어 붙으므로 줄바꿈 하나로 YAML 구조가 바뀔 수 있고, cpu request가 limit보다 크면 apply한 뒤에야 파드가 뜨지 않는 것을 알게 된다. request와 limit 비교는 `500m`과 `0.5`가 같은 값이라 단위를 맞춘 뒤에 한다. 검증에 걸리면 만들다 만 결과가 남지 않도록 이전 출력을 지우고 이유만 보여준다.
 
 ## cordon / uncordon
 

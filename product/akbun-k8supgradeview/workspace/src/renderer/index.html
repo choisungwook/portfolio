@@ -14,6 +14,7 @@
       <button class="tab-button" data-tab="pods">Pods</button>
       <button class="tab-button" data-tab="karpenter">Karpenter Event</button>
       <button class="tab-button" data-tab="nodepools">NodePool / EC2NodeClass</button>
+      <button class="tab-button" data-tab="utilize">Utilize</button>
       <button class="tab-button" data-tab="settings">Settings</button>
     </nav>
   </header>
@@ -181,6 +182,58 @@
           <tbody></tbody>
         </table>
         <p id="ec2nodeclass-empty" class="empty hidden">EC2NodeClass가 없습니다.</p>
+      </section>
+    </section>
+
+    <!-- Utilize tab -->
+    <section id="tab-utilize" class="tab">
+      <p class="help">
+        Karpenter over-provisioning manifest를 만든다. 우선순위가 음수인 placeholder 파드를 미리 띄워
+        노드를 확보해 두면, 실제 워크로드가 뜰 때 이 파드를 밀어내고 그 자리에 들어간다.
+        밀려난 placeholder가 Pending이 되면서 Karpenter가 다음 노드를 만든다.
+        만들기만 하고 클러스터에는 적용하지 않는다.
+      </p>
+
+      <section class="karpenter-panel">
+        <h2>Namespace</h2>
+        <div class="toolbar">
+          <button id="select-all-namespaces">전체 선택</button>
+          <button id="clear-namespaces">전체 해제</button>
+          <button id="refresh-namespaces">새로고침</button>
+          <span id="namespace-selected-count" class="help"></span>
+        </div>
+        <div id="namespace-list" class="checkbox-list"></div>
+        <p id="namespace-empty" class="empty hidden">namespace가 없습니다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <h2>옵션</h2>
+        <div class="settings-form">
+          <label for="overprovision-cpu-request">cpu request</label>
+          <input id="overprovision-cpu-request" type="text" placeholder="1" />
+        </div>
+        <div class="settings-form">
+          <label for="overprovision-cpu-limit">cpu limit</label>
+          <input id="overprovision-cpu-limit" type="text" placeholder="1" />
+        </div>
+        <div class="settings-form">
+          <label for="overprovision-replicas">replica</label>
+          <input id="overprovision-replicas" type="number" min="1" max="1000" placeholder="2" />
+        </div>
+        <div class="settings-form">
+          <label for="overprovision-image">pause image</label>
+          <input id="overprovision-image" type="text" />
+        </div>
+        <p class="help">cpu는 1, 0.5, 500m 형식으로 적는다. replica는 namespace마다 각각 적용된다.</p>
+      </section>
+
+      <section class="karpenter-panel">
+        <div class="toolbar">
+          <button id="generate-overprovision">manifest 만들기</button>
+          <button id="copy-overprovision" class="hidden">복사</button>
+        </div>
+        <p id="overprovision-error" class="resource-error hidden"></p>
+        <pre id="overprovision-yaml" class="yaml-output hidden"></pre>
       </section>
     </section>
 

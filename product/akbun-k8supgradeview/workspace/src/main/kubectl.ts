@@ -168,6 +168,16 @@ export async function setNodeCordon(nodeName: string, cordon: boolean): Promise<
   await runKubectl([cordon ? "cordon" : "uncordon", nodeName]);
 }
 
+/** over-provisioning manifest를 만들 대상 목록. 고를 수 있으면 되므로 이름만 돌려준다. */
+export async function getNamespaces(): Promise<string[]> {
+  const stdout = await runKubectl(["get", "namespaces", "-o", "json"]);
+  const items: any[] = JSON.parse(stdout).items ?? [];
+  return items
+    .map((item) => item.metadata?.name ?? "")
+    .filter(Boolean)
+    .sort((a: string, b: string) => a.localeCompare(b));
+}
+
 export async function getPods(nodeName?: string): Promise<PodInfo[]> {
   const args = ["get", "pods", "--all-namespaces", "-o", "json"];
   if (nodeName) {
