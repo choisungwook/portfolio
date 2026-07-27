@@ -158,6 +158,14 @@ export async function getNodes(): Promise<NodeInfo[]> {
   return items.map(toNodeInfo);
 }
 
+/**
+ * 노드의 schedule 가능 여부를 바꾼다. cordon과 uncordon은 반대 동작이라
+ * 하나의 함수로 두고 boolean으로 가른다. 화면의 버튼도 같은 이유로 하나다.
+ */
+export async function setNodeCordon(nodeName: string, cordon: boolean): Promise<void> {
+  await runKubectl([cordon ? "cordon" : "uncordon", nodeName]);
+}
+
 export async function getPods(nodeName?: string): Promise<PodInfo[]> {
   const args = ["get", "pods", "--all-namespaces", "-o", "json"];
   if (nodeName) {
