@@ -468,7 +468,7 @@ acl host_a req.hdr(host),field(1,:) -i a.lab.local</pre>
     <li>SNI 없는 handshake는 정상임. <b>-m found</b>로 "없음"과 "모르는 이름"을 갈라 두면 장애 분석이 달라짐</li>
     <li>IP로 HTTPS는 <b>라우팅(fallback)</b>과 <b>검증(IP SAN)</b> 두 군데를 같이 손봐야 함</li>
   </ul>
-  <p class="foot">핸즈온으로 재현: <a href="./README.md">computer_science/haproxy_sni_routing</a> — docker compose up -d 후 8443(passthrough)과 8444(종단)에 같은 IP로 붙어 로그를 비교함.</p>
+  <p class="foot">핸즈온으로 재현: <a href="./README.md">computer_science/haproxy/sni_routing</a> — docker compose up -d 후 8443(passthrough)과 8444(종단)에 같은 IP로 붙어 로그를 비교함.</p>
 </section>
 </main>
 <nav id="nav"><div class="in">

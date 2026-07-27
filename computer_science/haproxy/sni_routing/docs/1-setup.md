@@ -4,7 +4,7 @@ TL;DR: `docker compose up -d` builds the lab CA, three nginx backends and HAProx
 
 ## Up
 
-Run from the workspace root (`computer_science/haproxy_sni_routing`).
+Run from the workspace root (`computer_science/haproxy/sni_routing`).
 
 ```bash
 docker compose up -d
