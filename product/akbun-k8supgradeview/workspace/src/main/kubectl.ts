@@ -43,8 +43,15 @@ export interface KarpenterResource {
   weight: string;
 }
 
+export interface NodePoolInfo extends KarpenterResource {
+  // 이 NodePool이 만든 노드 수. 노드 조회가 실패하면 "-"다.
+  nodes: string;
+  ready: string;
+  creationTimestamp: string;
+}
+
 export interface KarpenterResources {
-  nodePools: KarpenterResource[];
+  nodePools: NodePoolInfo[];
   // NodePool 또는 EC2NodeClass CRD가 없는 클러스터도 있으므로 조회 실패를 값으로 담는다.
   nodePoolsError: string;
   ec2NodeClasses: KarpenterResource[];
@@ -244,43 +251,74 @@ function amiText(spec: any): string {
   return spec?.amiFamily ?? NO_VALUE;
 }
 
-/**
- * NodePool에는 ami가, EC2NodeClass에는 weight가 없다. 없는 필드는 -로 표시한다.
- * List 안의 항목에는 kind가 없으므로 어느 리소스를 읽는지는 호출부가 알려준다.
- */
-function toKarpenterResource(item: any, hasAmi: boolean): KarpenterResource {
+/** status.conditions의 Ready 상태. condition이 아직 없으면 -다. */
+function readyStatus(item: any): string {
+  const conditions: any[] = item.status?.conditions ?? [];
+  return conditions.find((condition) => condition.type === "Ready")?.status ?? NO_VALUE;
+}
+
+/** EC2NodeClass는 ami만 있고 weight가 없다. 없는 필드는 -로 표시한다. */
+function toEc2NodeClass(item: any): KarpenterResource {
   const spec = item.spec ?? {};
   return {
     name: item.metadata?.name ?? "",
-    ami: hasAmi ? amiText(spec) : NO_VALUE,
+    ami: amiText(spec),
     weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
   };
 }
 
+/** NodePool은 ami가 없고, 만든 노드 수는 노드 목록을 세어 채운다. */
+function toNodePool(item: any, nodeCounts: Map<string, number> | null): NodePoolInfo {
+  const spec = item.spec ?? {};
+  const name = item.metadata?.name ?? "";
+  return {
+    name,
+    ami: NO_VALUE,
+    weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
+    nodes: nodeCounts ? String(nodeCounts.get(name) ?? 0) : NO_VALUE,
+    ready: readyStatus(item),
+    creationTimestamp: item.metadata?.creationTimestamp ?? "",
+  };
+}
+
 /** CRD가 없는 클러스터도 있으므로 실패를 던지지 않고 에러 메시지와 함께 돌려준다. */
-async function getKarpenterResource(
-  resource: string,
-  hasAmi: boolean
-): Promise<{ items: KarpenterResource[]; error: string }> {
+async function getResourceItems(resource: string): Promise<{ items: any[]; error: string }> {
   try {
     const stdout = await runKubectl(["get", resource, "-o", "json"]);
-    const items: any[] = JSON.parse(stdout).items ?? [];
-    return { items: items.map((item) => toKarpenterResource(item, hasAmi)), error: "" };
+    return { items: JSON.parse(stdout).items ?? [], error: "" };
   } catch (error) {
     return { items: [], error: String(error instanceof Error ? error.message : error) };
   }
 }
 
+/**
+ * NodePool 이름별 노드 수. NodePool status에는 노드 수가 없어서 노드 label로 센다.
+ * 노드 조회가 실패하면 0과 구분하려고 null을 돌려준다.
+ */
+async function countNodesByNodePool(): Promise<Map<string, number> | null> {
+  try {
+    const counts = new Map<string, number>();
+    for (const node of await getNodes()) {
+      if (!node.isKarpenter) continue;
+      counts.set(node.group, (counts.get(node.group) ?? 0) + 1);
+    }
+    return counts;
+  } catch {
+    return null;
+  }
+}
+
 /** NodePool과 EC2NodeClass 목록. 둘 다 cluster scope 리소스라 namespace를 쓰지 않는다. */
 export async function getKarpenterResources(): Promise<KarpenterResources> {
-  const [nodePools, ec2NodeClasses] = await Promise.all([
-    getKarpenterResource("nodepools.karpenter.sh", false),
-    getKarpenterResource("ec2nodeclasses.karpenter.k8s.aws", true),
+  const [nodePools, ec2NodeClasses, nodeCounts] = await Promise.all([
+    getResourceItems("nodepools.karpenter.sh"),
+    getResourceItems("ec2nodeclasses.karpenter.k8s.aws"),
+    countNodesByNodePool(),
   ]);
   return {
-    nodePools: nodePools.items,
+    nodePools: nodePools.items.map((item) => toNodePool(item, nodeCounts)),
     nodePoolsError: nodePools.error,
-    ec2NodeClasses: ec2NodeClasses.items,
+    ec2NodeClasses: ec2NodeClasses.items.map(toEc2NodeClass),
     ec2NodeClassesError: ec2NodeClasses.error,
   };
 }

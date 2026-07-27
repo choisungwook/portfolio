@@ -46,8 +46,14 @@ interface KarpenterResource {
   weight: string;
 }
 
+interface NodePoolInfo extends KarpenterResource {
+  nodes: string;
+  ready: string;
+  creationTimestamp: string;
+}
+
 interface KarpenterResources {
-  nodePools: KarpenterResource[];
+  nodePools: NodePoolInfo[];
   nodePoolsError: string;
   ec2NodeClasses: KarpenterResource[];
   ec2NodeClassesError: string;
@@ -311,17 +317,41 @@ function renderResourceError(selector: string, message: string): void {
   paragraph.classList.toggle("hidden", !message);
 }
 
-function renderKarpenterResourceTable(
+// Ready condition이 아직 없으면 "-"라 좋고 나쁨을 말할 수 없으므로 색을 주지 않는다.
+function readyClass(ready: string): string {
+  if (ready === "True") return "status-ready";
+  if (ready === "False") return "status-error";
+  return "";
+}
+
+/** 조회 자체가 실패했으면 비었다는 안내 대신 에러만 보여준다. */
+function prepareResourceTable(
   prefix: string,
-  resources: KarpenterResource[],
+  count: number,
   error: string
-): void {
+): HTMLTableSectionElement {
   renderResourceError(`#${prefix}-error`, error);
+  $(`#${prefix}-empty`).classList.toggle("hidden", count > 0 || Boolean(error));
   const tbody = $(`#${prefix}-table tbody`) as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  // 조회 자체가 실패했으면 비었다는 안내 대신 에러만 보여준다.
-  $(`#${prefix}-empty`).classList.toggle("hidden", resources.length > 0 || Boolean(error));
+  return tbody;
+}
 
+function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
+  const tbody = prepareResourceTable("nodepool", nodePools.length, error);
+  for (const nodePool of nodePools) {
+    const row = tbody.insertRow();
+    appendCell(row, nodePool.name);
+    appendCell(row, nodePool.ami);
+    appendCell(row, nodePool.weight);
+    appendCell(row, nodePool.nodes);
+    appendCell(row, nodePool.ready, readyClass(nodePool.ready));
+    appendCell(row, formatAge(nodePool.creationTimestamp));
+  }
+}
+
+function renderEc2NodeClasses(resources: KarpenterResource[], error: string): void {
+  const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
   for (const resource of resources) {
     const row = tbody.insertRow();
     appendCell(row, resource.name);
@@ -334,12 +364,8 @@ async function refreshKarpenterResources(): Promise<void> {
   try {
     clearError();
     const result = await api.getKarpenterResources();
-    renderKarpenterResourceTable("nodepool", result.nodePools, result.nodePoolsError);
-    renderKarpenterResourceTable(
-      "ec2nodeclass",
-      result.ec2NodeClasses,
-      result.ec2NodeClassesError
-    );
+    renderNodePools(result.nodePools, result.nodePoolsError);
+    renderEc2NodeClasses(result.ec2NodeClasses, result.ec2NodeClassesError);
     nodePoolsLoaded = true;
   } catch (error) {
     showError(String(error));
