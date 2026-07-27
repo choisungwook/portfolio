@@ -16,3 +16,4 @@
 | 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |
 | 9 | yum/dnf lock 로컬 재현 핸즈온 | [링크](./yum_dnf_lock/) |
 | 10 | git credential helper 원리와 CodeBuild connection 학습지 (핸즈온 포함) | [링크](./git/git_credential_helper/) |
+| 11 | zero copy 원리와 sendfile 측정 학습지 (핸즈온 포함) | [링크](./zero_copy/) |

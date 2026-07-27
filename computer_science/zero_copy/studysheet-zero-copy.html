@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>왜 파일 하나 보내는데 CPU가 바쁜가 — zero copy</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>왜 파일 하나 보내는데 CPU가 바쁜가 — <mark>zero copy</mark></h1>
+    <p class="sub">같은 바이트를 네 번 복사하는 경로와, 그 중 두 번을 지우는 syscall</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 네트워크도 디스크도 한가한데, 파일을 내려주는 서버의 <b>CPU가 system time으로 꽉 참</b>.</p>
+    <p><b class="p-point">어디에 쓰이고 있는 걸까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">계산은 안 하는데 CPU를 쓰는 프로세스</h2>
+  <p class="dim">파일을 읽어서 소켓에 쓰기만 하는 서버를 가정함.</p>
+  <ul class="bullets">
+    <li>애플리케이션 코드는 바이트를 들여다보지도 않음 — user time은 거의 0</li>
+    <li><span class="xmark">✕</span> 그런데 <span class="prob-text">system time</span>이 전송량에 비례해서 올라감</li>
+    <li><span class="xmark">✕</span> 스케일아웃으로 덮으면 비용은 늘고 원인은 그대로</li>
+  </ul>
+  <p>커널 안에서 무슨 일이 일어나는지 모르면, 이 CPU가 줄일 수 있는 것인지 아닌지도 판단 못 함.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 바이트가 실제로 몇 번 복사되는지 세어 보고, 그 중 없어도 되는 복사를 찾음.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 — 네 번의 복사 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">read() + write()는 같은 바이트를 네 번 옮김</h2>
+  <div class="diagram">
+    <div class="dbox">디스크</div><span class="darrow">→</span>
+    <div class="dbox rs">page cache<small>커널</small></div><span class="darrow">→</span>
+    <div class="dbox wl">user buffer<small>내 프로세스</small></div><span class="darrow">→</span>
+    <div class="dbox rs">socket buffer<small>커널</small></div><span class="darrow">→</span>
+    <div class="dbox">NIC</div>
+  </div>
+  <ul class="bullets">
+    <li>① 디스크 → page cache — <b>DMA</b>가 함. CPU는 쉼</li>
+    <li>② page cache → user buffer — <mark>CPU가 복사</mark>. read()가 하는 일</li>
+    <li>③ user buffer → socket buffer — <mark>CPU가 복사</mark>. write()가 하는 일</li>
+    <li>④ socket buffer → NIC — <b>DMA</b>가 함. CPU는 쉼</li>
+  </ul>
+  <p>①④는 데이터가 기계에 드나드는 비용이라 지울 수 없음. ②③은 <b>바이트가 user space를 구경하러 갔다 온 값</b>일 뿐임.</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 — mode switch ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">복사 말고 mode switch도 비용임</h2>
+  <p>512MB를 64KB씩 보내면 read 8192번 + write 8192번 = <mark>syscall 16384번</mark>. 한 번마다 user mode와 kernel mode를 왕복함.</p>
+  <ul class="bullets">
+    <li>복사 비용은 <b>바이트 수</b>에 비례함 — 메모리 대역폭을 먹음</li>
+    <li>mode switch 비용은 <b>호출 횟수</b>에 비례함 — 버퍼를 키우면 줄어듦</li>
+    <li>둘은 다른 비용이라 따로 세야 함. 버퍼를 키워도 복사 횟수는 그대로 4번임</li>
+  </ul>
+  <p class="dim">실습에서 BUFFER_SIZE를 64KB에서 4KB로 줄이면 syscall 수만 16배가 되고 복사량은 그대로임. 두 비용이 분리되는 지점.</p>
+</section>
+
+<!-- ════════ 5장. 구조 이해하기 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">복사를 하나씩 지워 감</h2>
+  <div class="stepper">
+    <div class="step on">
+      <div class="diagram">
+        <div class="dbox rs">page cache</div><span class="darrow">→</span>
+        <div class="dbox wl hot">user buffer</div><span class="darrow">→</span>
+        <div class="dbox rs">socket buffer</div>
+      </div>
+      <p class="exp"><b>read + write</b> — CPU 복사 2번, syscall 2번/청크. 기본 경로.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs">page cache</div><span class="darrow">→</span>
+        <div class="dbox wl hot">mmap 매핑<small>복사 아님</small></div><span class="darrow">→</span>
+        <div class="dbox rs">socket buffer</div>
+      </div>
+      <p class="exp"><b>mmap + write</b> — page cache를 주소공간에 <mark>매핑</mark>만 하므로 ②가 사라짐. CPU 복사 1번.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs">page cache</div><span class="darrow">→</span>
+        <div class="dbox rs hot">socket buffer<small>커널 안에서 끝</small></div><span class="darrow">→</span>
+        <div class="dbox">NIC</div>
+      </div>
+      <p class="exp"><b>sendfile</b> — user buffer라는 말 자체가 없음. fd 두 개를 커널에 넘기고 커널이 옮김. CPU 복사 1번, syscall 1번.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <div class="dbox rs hot">page cache</div><span class="darrow">→</span>
+        <div class="dbox">NIC<small>SG-DMA가 직접 읽음</small></div>
+      </div>
+      <p class="exp"><b>sendfile + scatter-gather DMA</b> — 커널은 page 위치만 socket buffer에 적어 두고, NIC이 page cache를 직접 읽어감. <mark>CPU 복사 0번</mark>. 이것이 "진짜 zero copy".</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 6장. 코드 ════════ -->
+<section class="page">
+  <p class="sec">4. 코드</p>
+  <h2 class="page-title">세 경로의 코드 차이</h2>
+  <p class="codedesc">같은 파일을 같은 소켓으로 보내는 세 가지. 버퍼가 등장하는지만 보면 됨</p>
+<pre class="code"><span class="c">// ① read + write — 바이트가 user space를 왕복</span>
+<span class="k">while</span> ((n = read(file_fd, buf, <span class="s">65536</span>)) &gt; <span class="s">0</span>)
+    write(sock_fd, buf, n);
+
+<span class="c">// ② mmap + write — 복사 대신 매핑</span>
+p = mmap(<span class="k">NULL</span>, size, PROT_READ, MAP_SHARED, file_fd, <span class="s">0</span>);
+write(sock_fd, p, size);
+
+<span class="c">// ③ sendfile — 버퍼가 아예 없음</span>
+<span class="hot">sendfile(sock_fd, file_fd, &amp;offset, size);</span></pre>
+  <p>③에 내 메모리 주소가 하나도 없다는 것이 핵심. 주소가 없으니 프로세스는 그 바이트를 볼 수 없고, 볼 수 없으니 복사할 이유도 없음.</p>
+</section>
+
+<!-- ════════ 7장. 실습 결과 ════════ -->
+<section class="page">
+  <p class="sec">5. 실습 결과</p>
+  <h2 class="page-title">256MB를 세 경로로 보낸 값</h2>
+  <p class="codedesc">서버가 스스로 센 값. syscall은 데이터를 옮기는 호출만 셈</p>
+<pre class="code">mode=<span class="k">readwrite</span> bytes=256.0MB wall=114ms user_cpu=4ms <span class="bad">sys_cpu=110ms</span> <span class="bad">syscalls=8192</span>
+mode=<span class="k">mmap</span>      bytes=256.0MB wall=77ms  user_cpu=0ms <span class="hot">sys_cpu=75ms</span>  <span class="hot">syscalls=1</span>
+mode=<span class="k">sendfile</span>  bytes=256.0MB wall=101ms user_cpu=0ms <span class="hot">sys_cpu=86ms</span>  <span class="hot">syscalls=1</span></pre>
+  <ul class="bullets">
+    <li><b>user_cpu가 0</b> — 계산은 정말 안 함. 그런데도 CPU를 씀</li>
+    <li><b>sys_cpu 차이</b>가 지워진 복사 ②의 값</li>
+    <li><b>syscalls 8192 → 1</b> — 반복문이 user space에서 커널로 넘어감</li>
+  </ul>
+  <p class="dim">wall time은 라운드마다 흔들림. loopback에서는 받는 쪽 nc가 같은 CPU를 나눠 쓰므로 wall은 두 프로세스의 합을 잼. sys_cpu와 syscalls를 봐야 함.</p>
+</section>
+
+<!-- ════════ 8장. 해석 주의 ════════ -->
+<section class="page">
+  <p class="sec">5. 실습 결과</p>
+  <h2 class="page-title">이 수치는 보수적인 절반임</h2>
+  <ul class="bullets">
+    <li>실습은 loopback이라 NIC이 없음 → SG-DMA로 지워지는 마지막 복사는 관측되지 않음</li>
+    <li>mmap의 syscall이 1인 이유는 256MB를 write 한 번으로 넘겼기 때문. <mark>syscall 수와 복사 수는 다른 축</mark></li>
+    <li>page cache를 미리 데워 두지 않으면 디스크를 재게 됨 — 준비 스크립트가 파일을 한 번 읽는 이유</li>
+  </ul>
+  <p>측정 환경이 결과의 어느 부분을 못 보는지 먼저 적어 두면, 나중에 실제 장비에서 나온 숫자와 비교할 수 있음.</p>
+  <p class="foot">재현: <a href="./docs/3-measure-transfer-paths.md">docs/3-measure-transfer-paths.md</a></p>
+</section>
+
+<!-- ════════ 9장. 한계 1 ════════ -->
+<section class="page">
+  <p class="sec">6. 한계</p>
+  <h2 class="page-title">데이터를 만질 수 없음</h2>
+  <p>sendfile이 빠른 이유가 <mark>바이트가 프로세스에 보이지 않기 때문</mark>이므로, 한계는 전부 이 한 문장에서 나옴.</p>
+  <ul class="bullets">
+    <li>압축, 템플릿 치환, 체크섬, 요청별 본문 가공 <span class="xmark">✕</span> — 전부 user space로 가져와야 함</li>
+    <li>로그와 디버깅도 어려움 — 안 보이는 바이트는 로그에도 안 찍힘</li>
+    <li>보통의 해법: 가공한 결과를 파일로 한 번 만들어 두고, 그 파일을 여러 번 sendfile</li>
+  </ul>
+  <p>작은 파일에서는 아예 의미가 없음. 절약은 바이트 수에 비례하는데, 수 KB면 연결 수립과 왕복 지연이 훨씬 큼.</p>
+</section>
+
+<!-- ════════ 10장. 한계 2 — TLS ════════ -->
+<section class="page">
+  <p class="sec">6. 한계</p>
+  <h2 class="page-title">TLS를 켜면 이득이 사라짐</h2>
+  <p>암호화는 바이트를 만지는 일임. 그래서 <span class="prob-text">TLS 소켓에 그냥 sendfile 하는 길은 없음</span>. HTTP에서 이득을 보던 정적 파일 서버가 HTTPS로 바꾸면 그 이득을 잃음.</p>
+  <ul class="bullets">
+    <li>kTLS — 암호화를 커널로 내려서 sendfile을 다시 쓸 수 있게 함</li>
+    <li>NIC TLS offload — 더 아래로 내림</li>
+    <li>둘 다 설정과 드라이버 지원이 필요함 → <b>기본 가정은 "TLS면 복사 한 번 값을 낸다"</b></li>
+  </ul>
+  <p class="dim">"무조건 sendfile을 켜라"가 아니라, 내 트래픽이 TLS인지 아닌지가 먼저라는 뜻.</p>
+</section>
+
+<!-- ════════ 11장. 이웃들 ════════ -->
+<section class="page">
+  <p class="sec">7. 주변 도구</p>
+  <h2 class="page-title">sendfile의 이웃들</h2>
+  <ul class="bullets">
+    <li><b>splice</b> — pipe를 경유해 임의의 fd 쌍을 이음. socket → socket 프록시에 씀</li>
+    <li><b>vmsplice</b> — 내가 가진 page를 커널 pipe에 넘김</li>
+    <li><b>io_uring</b> — 제출을 모아서 mode switch 자체를 줄임</li>
+    <li><b>MSG_ZEROCOPY</b> — user buffer를 고정해 두고 send()에서 복사를 생략</li>
+  </ul>
+  <p>sendfile은 가장 좁고 가장 이해하기 쉬운 도구(파일 → 소켓)임. 나머지는 그 단순함을 내주고 적용 범위를 넓힘.</p>
+</section>
+
+<!-- ════════ 12장. 실사용 ════════ -->
+<section class="page">
+  <p class="sec">8. 어디에 쓰이는가</p>
+  <h2 class="page-title">이미 쓰고 있던 것들</h2>
+  <ul class="bullets">
+    <li><b>Kafka</b> — log segment를 page cache에서 consumer 소켓으로 sendfile. 브로커가 적은 CPU로 디스크 대역폭을 감당하는 이유의 큰 부분</li>
+    <li><b>nginx</b> — 정적 파일 경로의 <b>sendfile on</b></li>
+    <li><b>Netty FileRegion</b>, <b>Java FileChannel.transferTo</b> — 같은 것의 언어 레벨 이름</li>
+  </ul>
+  <p>공통점 하나. <span class="prob-text">앞단에 TLS를 세우거나 본문을 가공하는 필터를 끼우면 이 최적화는 조용히 사라짐.</span> 사라져도 에러가 안 나므로 아무도 모름.</p>
+</section>
+
+<!-- ════════ 13장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">9. 트레이드오프</p>
+  <h2 class="page-title">언제 고를 것인가</h2>
+  <div class="tradeoff">
+    <div class="pro">
+      <h3>얻는 것</h3>
+      <ul>
+        <li>CPU 복사 감소 → 메모리 대역폭 여유</li>
+        <li>syscall 감소 → mode switch 감소</li>
+        <li>같은 장비로 더 많은 연결 처리</li>
+      </ul>
+    </div>
+    <div class="con">
+      <h3>잃는 것</h3>
+      <ul>
+        <li>본문 가공·압축 불가</li>
+        <li>TLS와 충돌 (kTLS 없으면)</li>
+        <li>전송 중 관측 수단이 반환값뿐</li>
+        <li>작은 파일에서는 이득 없음</li>
+      </ul>
+    </div>
+  </div>
+  <p>네트워크가 빨라지는 게 아님. 링크가 이미 포화면 이득은 처리량이 아니라 <mark>CPU 여유</mark>로 나타남.</p>
+</section>
+
+<!-- ════════ 14장. 확인 1 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ①</h2>
+  <div class="quiz">
+    <p class="q">Q1. read+write 서버에서 버퍼를 4KB에서 64KB로 키웠다. 무엇이 줄어드는가?</p>
+    <ul class="opts">
+      <li>CPU가 하는 복사 횟수가 2번에서 1번으로 줄어든다</li>
+      <li data-answer>syscall 횟수가 줄어든다. 복사 횟수는 그대로 4번이다</li>
+      <li>DMA 전송량이 줄어든다</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 버퍼 크기는 호출 횟수를 바꿀 뿐 경로를 바꾸지 않음. 복사를 지우려면 경로 자체를 mmap이나 sendfile로 바꿔야 함.</p>
+  </div>
+</section>
+
+<!-- ════════ 15장. 확인 2 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ②</h2>
+  <div class="quiz">
+    <p class="q">Q2. 정적 파일 서버에 HTTPS를 붙였더니 같은 트래픽에서 CPU가 크게 올랐다. 먼저 의심할 것은?</p>
+    <ul class="opts">
+      <li>page cache miss가 늘어 디스크를 더 읽는다</li>
+      <li data-answer>sendfile 경로가 빠지면서 암호화 복사가 user space로 돌아왔다</li>
+      <li>syscall 버퍼 크기가 작아졌다</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 암호화는 바이트를 만지는 일이라 sendfile과 같이 갈 수 없음. 확인할 것은 kTLS 사용 여부와, 그것이 없다면 이 CPU가 지금 구조에서는 정상 비용이라는 판단.</p>
+  </div>
+</section>
+
+<!-- ════════ 16장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">11. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>계산하지 않는 프로세스가 CPU를 쓰고 있었다면, 그 CPU는 대개 <b>바이트를 user space로 데려왔다가 도로 내보내는 복사</b>임. 프로세스가 그 바이트를 볼 이유가 없다면 커널 안에서 끝내면 되고, sendfile은 그 "볼 이유가 없다"를 syscall 모양으로 표현한 것임.</p>
+  <p>기억할 원리 — <mark>데이터를 보지 않겠다고 선언하면 복사를 지울 수 있다</mark>. 반대로 보겠다고 하는 순간(압축, TLS, 가공) 값을 다시 내야 함. 그래서 이것은 성능 스위치가 아니라 <b>내 서버가 데이터를 만지는가</b>에 대한 설계 질문임.</p>
+  <p class="foot">재현: <a href="./docs/1-setup.md">docs/1-setup.md</a> · 한계 정리: <a href="./docs/4-limits.md">docs/4-limits.md</a> · 출처: man 2 sendfile · man 2 splice · Linux kernel TLS 문서 · Kafka 문서 Efficiency 절 · nginx sendfile 지시어</p>
+</section>
+
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>

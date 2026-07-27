@@ -1,0 +1,16 @@
+services:
+  lab:
+    build: .
+    image: zero-copy-lab
+    container_name: zero-copy-lab
+    command: sleep infinity
+    # strace needs to attach to the server process inside the container
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    volumes:
+      - lab-data:/data
+
+volumes:
+  lab-data:
