@@ -1,0 +1,20 @@
+services:
+  upstream:
+    image: python:3.13-slim
+    command: python /app/upstream.py
+    volumes:
+      - ./proxy:/app:ro
+
+  proxy:
+    image: python:3.13-slim
+    command: python /app/proxy.py
+    environment:
+      UPSTREAM_URL: http://upstream:9000/v1/chat/completions
+      SMALL_MODEL: mock-small
+      BIG_MODEL: mock-big
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./proxy:/app:ro
+    depends_on:
+      - upstream

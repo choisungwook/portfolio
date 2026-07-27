@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-26
+
+* **Creation**: [학습지 HTML은 핸즈온 workspace 안에 둔다](decisions/2026-07-studysheet-in-workspace.md) 결정 기록. ccproxy 핸즈온의 학습지를 만들면서 남긴다.
+
 ## 2026-07-25
 
 * **Creation**: [Electron 릴리스 빌드는 macOS만](decisions/2026-07-electron-release-macos-only.md) 결정 기록. akbun-gitdesktop 릴리스 workflow의 Windows checkout 실패 수정과 함께 남긴다.
