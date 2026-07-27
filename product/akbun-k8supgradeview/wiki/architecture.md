@@ -85,17 +85,21 @@ event의 reason, object, message와 로그의 파드 이름, 본문에서는 err
 
 ## NodePool / EC2NodeClass 탭
 
-NodePool은 name, nodeClass, ami, weight, nodes, ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. NodePool에는 ami가 없고 EC2NodeClass에는 weight가 없으므로 없는 필드는 `-`로 채운다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드도 마찬가지다.
+NodePool은 name, nodeClass, weight, nodes, ready, age를, EC2NodeClass는 name, ami를 보여준다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드는 `-`로 채운다.
 
-ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
+NodePool의 AMI 칼럼은 두지 않는다. AMI는 NodePool이 아니라 EC2NodeClass의 값이라 NodePool 표에서는 늘 `-`였다. 값이 들어올 일이 없는 칸이므로 지웠다.
+
+EC2NodeClass의 ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
+
+Weight와 Nodes 헤더를 누르면 정렬한다. 두 칸 모두 숫자라 알파벳 순으로 정렬하면 `10`이 `9`보다 앞에 오므로 수로 바꿔 비교한다. 값이 `-`인 줄은 방향과 상관없이 늘 맨 뒤로 보낸다. `-`는 0이 아니라 "모르는 값"(weight 미지정, 노드 조회 실패)이라 크기로 견줄 수 없기 때문이다. 정렬 상태는 새로고침해도 유지된다.
 
 nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` label을 세어 채운다. 노드 조회가 실패하면 0과 구분해야 하므로 0이 아니라 `-`를 표시한다. `-`는 "셀 수 없었다"이고 0은 "정말 노드가 없다"다.
 
 karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
 
-EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 그룹이 비면 이유를 나눠 적는다. 참조가 아예 없으면 지정되지 않았다고, 참조가 가리키는 클래스를 못 찾으면 그 이름과 함께 찾지 못했다고 적는다. 손볼 곳이 다르기 때문이다. EC2NodeClass가 하나도 없으면 그룹을 그리지 않고 표 아래 안내만 남긴다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
+EC2NodeClass 목록은 조회한 순서대로 평평하게 나열한다. NodePool 이름으로 묶던 것을 걷어낸 이유는 [그룹핑 제거 ADR](../adr/2026-07-nodepool-sort-and-flat-ec2nodeclass.md)에 있다. NodePool과 EC2NodeClass를 잇는 `nodeClassRef` 이름은 NodePool 표의 NodeClass 칼럼에 그대로 남아 있어 연결은 여전히 읽을 수 있다.
 
-빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 그룹 기준이 되는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. NodeClass 칼럼에 들어가는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
 
 ## Utilize 탭 (over-provisioning manifest 생성)
 

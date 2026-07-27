@@ -12,3 +12,4 @@ akbun-k8supgradeview 프로젝트의 의사결정을 "결정 - 이유" 구조로
 * [이름 복사, EC2NodeClass 그룹핑, error 키워드 하이라이트](2026-07-name-copy-and-error-highlight.md) - 노드 이름 복사를 main clipboard로 두고, EC2NodeClass를 nodeClassRef 기준으로 묶고, error 낱말을 색으로 표시하기로 한 결정.
 * [Pods 탭 정렬은 헤더 클릭, 상태 필터는 Running 아닌 것만 남기는 토글 하나로 둔다](2026-07-pod-sort-and-status-filter.md) - 정렬 대상을 Namespace와 Status로 좁히고 상태 필터를 토글 하나로 두기로 한 결정.
 * [Utilize 탭은 over-provisioning manifest를 만들기만 하고 적용하지 않는다](2026-07-overprovision-manifest-generator.md) - manifest 출력 형태와 생성 로직을 main의 순수 함수로 두기로 한 결정.
+* [NodePool 표는 숫자 칼럼을 정렬하고 EC2NodeClass 표는 평평하게 되돌린다](2026-07-nodepool-sort-and-flat-ec2nodeclass.md) - NodePool의 AMI 칼럼을 없애고 Weight/Nodes 정렬을 넣으며 EC2NodeClass 그룹핑을 걷어내기로 한 결정.

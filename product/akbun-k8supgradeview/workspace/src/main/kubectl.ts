@@ -37,13 +37,15 @@ export interface PodLog {
   error: string;
 }
 
-export interface KarpenterResource {
+/** 화면이 EC2NodeClass에서 보는 값은 이름과 어떤 AMI를 쓰는지 둘뿐이다. */
+export interface Ec2NodeClassInfo {
   name: string;
   ami: string;
-  weight: string;
 }
 
-export interface NodePoolInfo extends KarpenterResource {
+export interface NodePoolInfo {
+  name: string;
+  weight: string;
   // 이 NodePool이 만든 노드 수. 노드 조회가 실패하면 "-"다.
   nodes: string;
   ready: string;
@@ -56,7 +58,7 @@ export interface KarpenterResources {
   nodePools: NodePoolInfo[];
   // NodePool 또는 EC2NodeClass CRD가 없는 클러스터도 있으므로 조회 실패를 값으로 담는다.
   nodePoolsError: string;
-  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClasses: Ec2NodeClassInfo[];
   ec2NodeClassesError: string;
 }
 
@@ -295,13 +297,10 @@ function readyStatus(item: any): string {
   return conditions.find((condition) => condition.type === "Ready")?.status ?? NO_VALUE;
 }
 
-/** EC2NodeClass는 ami만 있고 weight가 없다. 없는 필드는 -로 표시한다. */
-function toEc2NodeClass(item: any): KarpenterResource {
-  const spec = item.spec ?? {};
+function toEc2NodeClass(item: any): Ec2NodeClassInfo {
   return {
     name: item.metadata?.name ?? "",
-    ami: amiText(spec),
-    weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
+    ami: amiText(item.spec ?? {}),
   };
 }
 
@@ -313,13 +312,12 @@ function nodeClassName(spec: any): string {
   return spec?.template?.spec?.nodeClassRef?.name ?? "";
 }
 
-/** NodePool은 ami가 없고, 만든 노드 수는 노드 목록을 세어 채운다. */
+/** 만든 노드 수는 NodePool status에 없어서 노드 목록을 세어 채운다. */
 function toNodePool(item: any, nodeCounts: Map<string, number> | null): NodePoolInfo {
   const spec = item.spec ?? {};
   const name = item.metadata?.name ?? "";
   return {
     name,
-    ami: NO_VALUE,
     weight: spec.weight === undefined ? NO_VALUE : String(spec.weight),
     nodes: nodeCounts ? String(nodeCounts.get(name) ?? 0) : NO_VALUE,
     ready: readyStatus(item),

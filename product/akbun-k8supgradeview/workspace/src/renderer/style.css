@@ -221,13 +221,6 @@ th.sortable.sorted {
   padding: 0 2px;
 }
 
-/* 어느 NodePool의 EC2NodeClass인지 표 안에서 나누는 줄이다. */
-.group-row td {
-  background: #eef2ff;
-  color: #3730a3;
-  font-weight: 600;
-}
-
 .empty {
   color: #6b7280;
   padding: 12px 4px;

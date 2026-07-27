@@ -51,13 +51,14 @@ interface KarpenterLogs {
   logs: PodLog[];
 }
 
-interface KarpenterResource {
+interface Ec2NodeClassInfo {
   name: string;
   ami: string;
-  weight: string;
 }
 
-interface NodePoolInfo extends KarpenterResource {
+interface NodePoolInfo {
+  name: string;
+  weight: string;
   nodes: string;
   ready: string;
   creationTimestamp: string;
@@ -67,7 +68,7 @@ interface NodePoolInfo extends KarpenterResource {
 interface KarpenterResources {
   nodePools: NodePoolInfo[];
   nodePoolsError: string;
-  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClasses: Ec2NodeClassInfo[];
   ec2NodeClassesError: string;
 }
 
@@ -106,10 +107,16 @@ declare const api: Api;
 type NodeFilterKind = "all" | "karpenter" | "managed" | "cordoned";
 
 type PodSortKey = "namespace" | "status";
+type NodePoolSortKey = "weight" | "nodes";
 type SortDirection = "asc" | "desc";
 
 interface PodSort {
   key: PodSortKey;
+  direction: SortDirection;
+}
+
+interface NodePoolSort {
+  key: NodePoolSortKey;
   direction: SortDirection;
 }
 
@@ -119,6 +126,9 @@ let nodeFilter: NodeFilterKind = "all";
 // 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
 let podSort: PodSort | null = null;
 let podOnlyNotRunning = false;
+let nodePoolSort: NodePoolSort | null = null;
+let allNodePools: NodePoolInfo[] = [];
+let nodePoolsError = "";
 let selectedNode = "";
 let karpenterLoaded = false;
 let nodePoolsLoaded = false;
@@ -372,20 +382,22 @@ function sortPods(pods: PodInfo[]): PodInfo[] {
 }
 
 /** 어느 칼럼으로 어느 방향인지 헤더에 화살표로 남긴다. */
-function renderPodSortIndicators(): void {
-  document.querySelectorAll("#pod-table th[data-sort-key]").forEach((header) => {
-    const active = podSort?.key === (header as HTMLElement).dataset.sortKey;
+function renderSortIndicators(tableId: string, sort: { key: string; direction: SortDirection } | null): void {
+  document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
+    const active = sort?.key === (header as HTMLElement).dataset.sortKey;
     header.classList.toggle("sorted", active);
     const arrow = header.querySelector(".sort-arrow") as HTMLElement;
-    arrow.textContent = active ? (podSort?.direction === "asc" ? "▲" : "▼") : "";
+    arrow.textContent = active ? (sort?.direction === "asc" ? "▲" : "▼") : "";
   });
 }
 
 /** 같은 칼럼을 다시 누르면 방향만 뒤집고, 다른 칼럼이면 오름차순부터 시작한다. */
+function nextDirection(current: { key: string; direction: SortDirection } | null, key: string): SortDirection {
+  return current?.key === key && current.direction === "asc" ? "desc" : "asc";
+}
+
 function togglePodSort(key: PodSortKey): void {
-  const direction: SortDirection =
-    podSort?.key === key && podSort.direction === "asc" ? "desc" : "asc";
-  podSort = { key, direction };
+  podSort = { key, direction: nextDirection(podSort, key) };
   renderPods();
 }
 
@@ -394,7 +406,7 @@ function renderPods(): void {
   const search = ($("#pod-search") as HTMLInputElement).value.trim().toLowerCase();
   const tbody = $("#pod-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  renderPodSortIndicators();
+  renderSortIndicators("pod-table", podSort);
 
   const pods = sortPods(
     allPods.filter(
@@ -538,15 +550,37 @@ function prepareResourceTable(
 }
 
 const NO_VALUE = "-";
-const UNLINKED_GROUP = "연결된 NodePool 없음";
 
-function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
-  const tbody = prepareResourceTable("nodepool", nodePools.length, error);
+/**
+ * Weight와 Nodes는 숫자 칸이라 알파벳 순으로 정렬하면 10이 9보다 앞에 온다.
+ * 값이 없으면 "-"인데, 이것은 0이 아니라 "모르는 값"이라 크기로 견줄 수 없다.
+ * 방향과 상관없이 늘 맨 뒤로 보내 숫자들 사이에 끼지 않게 한다.
+ */
+function compareNodePools(a: NodePoolInfo, b: NodePoolInfo, sort: NodePoolSort): number {
+  const left = a[sort.key];
+  const right = b[sort.key];
+  if (left === NO_VALUE || right === NO_VALUE) {
+    if (left === right) return a.name.localeCompare(b.name);
+    return left === NO_VALUE ? 1 : -1;
+  }
+  const order = Number(left) - Number(right) || a.name.localeCompare(b.name);
+  return sort.direction === "asc" ? order : -order;
+}
+
+function sortNodePools(nodePools: NodePoolInfo[]): NodePoolInfo[] {
+  if (!nodePoolSort) return nodePools;
+  const sort = nodePoolSort;
+  return [...nodePools].sort((a, b) => compareNodePools(a, b, sort));
+}
+
+function renderNodePools(): void {
+  const nodePools = sortNodePools(allNodePools);
+  const tbody = prepareResourceTable("nodepool", nodePools.length, nodePoolsError);
+  renderSortIndicators("nodepool-table", nodePoolSort);
   for (const nodePool of nodePools) {
     const row = tbody.insertRow();
     appendCell(row, nodePool.name);
     appendCell(row, nodePool.nodeClassName || NO_VALUE);
-    appendCell(row, nodePool.ami);
     appendCell(row, nodePool.weight);
     appendCell(row, nodePool.nodes);
     appendCell(row, nodePool.ready, readyClass(nodePool.ready));
@@ -554,100 +588,18 @@ function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
   }
 }
 
-interface Ec2NodeClassGroup {
-  nodePoolName: string;
-  // 이 그룹을 만든 NodePool의 nodeClassRef 이름. 참조가 없으면 빈 문자열이다.
-  nodeClassName: string;
-  resources: KarpenterResource[];
+function toggleNodePoolSort(key: NodePoolSortKey): void {
+  nodePoolSort = { key, direction: nextDirection(nodePoolSort, key) };
+  renderNodePools();
 }
 
-/**
- * EC2NodeClass를 그 클래스를 참조하는 NodePool 이름으로 묶는다. 업그레이드 때는
- * "이 NodePool이 지금 어떤 AMI로 노드를 띄우는가"를 봐야 하는데, 두 목록을 따로 두면
- * nodeClassRef를 눈으로 이어야 한다. 그룹으로 묶어 그 연결을 화면이 대신 보여준다.
- *
- * 이름은 클러스터 안에서 유일하므로 이름으로 찾는 map을 한 번 만들어 쓴다.
- * 한 EC2NodeClass를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나온다.
- * 어느 NodePool도 참조하지 않는 클래스는 맨 뒤에 따로 묶는다. NodePool 조회가 실패했을
- * 때도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
- */
-function groupEc2NodeClasses(
-  nodePools: NodePoolInfo[],
-  resources: KarpenterResource[]
-): Ec2NodeClassGroup[] {
-  const byName = new Map(resources.map((resource) => [resource.name, resource]));
-  const linked = new Set<string>();
-  const groups: Ec2NodeClassGroup[] = [];
-
-  for (const nodePool of nodePools) {
-    const matched = byName.get(nodePool.nodeClassName);
-    if (matched) linked.add(matched.name);
-    groups.push({
-      nodePoolName: nodePool.name,
-      nodeClassName: nodePool.nodeClassName,
-      resources: matched ? [matched] : [],
-    });
-  }
-
-  const unlinked = resources.filter((resource) => !linked.has(resource.name));
-  if (unlinked.length > 0) {
-    groups.push({ nodePoolName: UNLINKED_GROUP, nodeClassName: "", resources: unlinked });
-  }
-  return groups;
-}
-
-/** 그룹 이름을 표 안에 한 줄로 넣어 어디부터 어느 NodePool의 것인지 구분한다. */
-function appendGroupHeaderRow(
-  tbody: HTMLTableSectionElement,
-  title: string,
-  columns: number
-): void {
-  const row = tbody.insertRow();
-  row.className = "group-row";
-  const cell = row.insertCell();
-  cell.colSpan = columns;
-  cell.textContent = title;
-}
-
-/**
- * 그룹이 빈 이유는 둘이다. 참조 자체가 없거나, 참조가 가리키는 클래스를 못 찾았거나다.
- * 앞은 NodePool 설정이 덜 된 것이고 뒤는 이름이 어긋난 것이라 손볼 곳이 다르므로 나눠 적는다.
- */
-function appendEmptyGroupRow(
-  tbody: HTMLTableSectionElement,
-  nodeClassName: string,
-  columns: number
-): void {
-  const row = tbody.insertRow();
-  const cell = row.insertCell();
-  cell.colSpan = columns;
-  cell.className = "empty";
-  cell.textContent = nodeClassName
-    ? `참조하는 EC2NodeClass ${nodeClassName}을 찾지 못했습니다.`
-    : "참조하는 EC2NodeClass가 지정되어 있지 않습니다.";
-}
-
-function renderEc2NodeClasses(
-  nodePools: NodePoolInfo[],
-  resources: KarpenterResource[],
-  error: string
-): void {
+/** 조회한 순서 그대로 이름과 AMI만 나열한다. */
+function renderEc2NodeClasses(resources: Ec2NodeClassInfo[], error: string): void {
   const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
-  // 클래스가 하나도 없으면 표 아래 안내만 남긴다. 그룹까지 그리면 없다는 안내와 겹쳐 보인다.
-  if (resources.length === 0) return;
-
-  for (const group of groupEc2NodeClasses(nodePools, resources)) {
-    appendGroupHeaderRow(tbody, group.nodePoolName, 3);
-    if (group.resources.length === 0) {
-      appendEmptyGroupRow(tbody, group.nodeClassName, 3);
-      continue;
-    }
-    for (const resource of group.resources) {
-      const row = tbody.insertRow();
-      appendCell(row, resource.name);
-      appendCell(row, resource.ami);
-      appendCell(row, resource.weight);
-    }
+  for (const resource of resources) {
+    const row = tbody.insertRow();
+    appendCell(row, resource.name);
+    appendCell(row, resource.ami);
   }
 }
 
@@ -655,8 +607,10 @@ async function refreshKarpenterResources(): Promise<void> {
   try {
     clearError();
     const result = await api.getKarpenterResources();
-    renderNodePools(result.nodePools, result.nodePoolsError);
-    renderEc2NodeClasses(result.nodePools, result.ec2NodeClasses, result.ec2NodeClassesError);
+    allNodePools = result.nodePools;
+    nodePoolsError = result.nodePoolsError;
+    renderNodePools();
+    renderEc2NodeClasses(result.ec2NodeClasses, result.ec2NodeClassesError);
     nodePoolsLoaded = true;
   } catch (error) {
     showError(String(error));
@@ -828,6 +782,11 @@ function registerEventHandlers(): void {
   document.querySelectorAll("#pod-table th[data-sort-key]").forEach((header) => {
     header.addEventListener("click", () =>
       togglePodSort((header as HTMLElement).dataset.sortKey as PodSortKey)
+    );
+  });
+  document.querySelectorAll("#nodepool-table th[data-sort-key]").forEach((header) => {
+    header.addEventListener("click", () =>
+      toggleNodePoolSort((header as HTMLElement).dataset.sortKey as NodePoolSortKey)
     );
   });
   $("#pod-status-filter").addEventListener("click", () => {

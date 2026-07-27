@@ -149,15 +149,15 @@
 
       <section class="karpenter-panel">
         <h2>NodePool</h2>
+        <p class="help">Weight와 Nodes 헤더를 누르면 숫자 크기순으로 정렬한다.</p>
         <p id="nodepool-error" class="resource-error hidden"></p>
         <table id="nodepool-table">
           <thead>
             <tr>
               <th>Name</th>
               <th>NodeClass</th>
-              <th>AMI</th>
-              <th>Weight</th>
-              <th>Nodes</th>
+              <th class="sortable" data-sort-key="weight">Weight<span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort-key="nodes">Nodes<span class="sort-arrow"></span></th>
               <th>Ready</th>
               <th>Age</th>
             </tr>
@@ -169,14 +169,12 @@
 
       <section class="karpenter-panel">
         <h2>EC2NodeClass</h2>
-        <p class="help">NodePool이 참조하는 nodeClassRef 이름으로 묶어서 보여준다.</p>
         <p id="ec2nodeclass-error" class="resource-error hidden"></p>
         <table id="ec2nodeclass-table">
           <thead>
             <tr>
               <th>Name</th>
               <th>AMI</th>
-              <th>Weight</th>
             </tr>
           </thead>
           <tbody></tbody>
