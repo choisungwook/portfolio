@@ -51,13 +51,14 @@ interface KarpenterLogs {
   logs: PodLog[];
 }
 
-interface KarpenterResource {
+interface Ec2NodeClassInfo {
   name: string;
   ami: string;
-  weight: string;
 }
 
-interface NodePoolInfo extends KarpenterResource {
+interface NodePoolInfo {
+  name: string;
+  weight: string;
   nodes: string;
   ready: string;
   creationTimestamp: string;
@@ -67,7 +68,7 @@ interface NodePoolInfo extends KarpenterResource {
 interface KarpenterResources {
   nodePools: NodePoolInfo[];
   nodePoolsError: string;
-  ec2NodeClasses: KarpenterResource[];
+  ec2NodeClasses: Ec2NodeClassInfo[];
   ec2NodeClassesError: string;
 }
 
@@ -78,9 +79,19 @@ interface AppSettings {
   karpenterLogSinceMinutes: number;
 }
 
+interface OverprovisionOptions {
+  namespaces: string[];
+  cpuRequest: string;
+  cpuLimit: string;
+  replicas: number;
+  image: string;
+}
+
 interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
+  getNamespaces(): Promise<string[]>;
+  buildOverprovisionYaml(options: OverprovisionOptions): Promise<string>;
   setNodeCordon(nodeName: string, cordon: boolean): Promise<boolean>;
   getKarpenterEvents(): Promise<EventInfo[]>;
   getKarpenterLogs(): Promise<KarpenterLogs>;
@@ -95,12 +106,36 @@ declare const api: Api;
 
 type NodeFilterKind = "all" | "karpenter" | "managed" | "cordoned";
 
+type PodSortKey = "namespace" | "status";
+type NodePoolSortKey = "weight" | "nodes";
+type SortDirection = "asc" | "desc";
+
+interface PodSort {
+  key: PodSortKey;
+  direction: SortDirection;
+}
+
+interface NodePoolSort {
+  key: NodePoolSortKey;
+  direction: SortDirection;
+}
+
 let allNodes: NodeInfo[] = [];
 let allPods: PodInfo[] = [];
 let nodeFilter: NodeFilterKind = "all";
+// 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
+let podSort: PodSort | null = null;
+let podOnlyNotRunning = false;
+let nodePoolSort: NodePoolSort | null = null;
+let allNodePools: NodePoolInfo[] = [];
+let nodePoolsError = "";
 let selectedNode = "";
 let karpenterLoaded = false;
 let nodePoolsLoaded = false;
+let allNamespaces: string[] = [];
+// 새로고침으로 목록이 바뀌어도 고른 값을 잃지 않도록 이름으로 들고 있는다.
+const selectedNamespaces = new Set<string>();
+let namespacesLoaded = false;
 
 function $(selector: string): HTMLElement {
   return document.querySelector(selector) as HTMLElement;
@@ -320,16 +355,90 @@ function renderNamespaceOptions(): void {
   select.value = namespaces.includes(current) ? current : "";
 }
 
+const RUNNING_STATUS = "Running";
+
+/**
+ * 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 한다.
+ * Pending, CrashLoopBackOff처럼 상태 이름이 여럿이라 낱낱이 고르게 하는 대신
+ * Running이 아닌 것만 남기는 토글 하나로 둔다.
+ */
+function matchesPodStatusFilter(pod: PodInfo): boolean {
+  return !podOnlyNotRunning || pod.status !== RUNNING_STATUS;
+}
+
+/**
+ * namespace와 status를 알파벳 순으로 정렬한다. 같은 값이 몰려 있는 칸이라
+ * 두 번째 기준으로 pod 이름을 써야 새로고침할 때마다 순서가 흔들리지 않는다.
+ */
+function comparePods(a: PodInfo, b: PodInfo, sort: PodSort): number {
+  const order = a[sort.key].localeCompare(b[sort.key]) || a.name.localeCompare(b.name);
+  return sort.direction === "asc" ? order : -order;
+}
+
+function sortPods(pods: PodInfo[]): PodInfo[] {
+  if (!podSort) return pods;
+  const sort = podSort;
+  return [...pods].sort((a, b) => comparePods(a, b, sort));
+}
+
+/**
+ * 어느 칼럼으로 어느 방향인지 헤더에 남긴다. 화살표와 색은 눈으로만 읽히므로
+ * 같은 내용을 aria-sort로도 적어 스크린리더가 정렬 상태를 말할 수 있게 한다.
+ */
+function renderSortIndicators(tableId: string, sort: { key: string; direction: SortDirection } | null): void {
+  document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
+    const active = sort?.key === (header as HTMLElement).dataset.sortKey;
+    const ascending = sort?.direction === "asc";
+    header.classList.toggle("sorted", active);
+    header.setAttribute("aria-sort", active ? (ascending ? "ascending" : "descending") : "none");
+    const arrow = header.querySelector(".sort-arrow");
+    if (arrow) arrow.textContent = active ? (ascending ? "▲" : "▼") : "";
+  });
+}
+
+/** 같은 칼럼을 다시 누르면 방향만 뒤집고, 다른 칼럼이면 오름차순부터 시작한다. */
+function nextDirection(current: { key: string; direction: SortDirection } | null, key: string): SortDirection {
+  return current?.key === key && current.direction === "asc" ? "desc" : "asc";
+}
+
+/**
+ * 정렬 헤더에 마우스와 키보드를 함께 붙인다. th는 원래 focus를 받지 않아
+ * tabIndex를 주지 않으면 키보드만 쓰는 사용자가 정렬에 닿을 수 없다.
+ * Enter와 Space를 모두 받는 이유는 버튼처럼 동작한다고 알렸기 때문이다.
+ * Space는 기본 동작이 화면 스크롤이라 막는다.
+ */
+function registerSortHeaders(tableId: string, toggle: (key: string) => void): void {
+  document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
+    const key = (header as HTMLElement).dataset.sortKey ?? "";
+    header.addEventListener("click", () => toggle(key));
+    header.addEventListener("keydown", (event) => {
+      const { key: pressed } = event as KeyboardEvent;
+      if (pressed !== "Enter" && pressed !== " ") return;
+      event.preventDefault();
+      toggle(key);
+    });
+  });
+}
+
+function togglePodSort(key: PodSortKey): void {
+  podSort = { key, direction: nextDirection(podSort, key) };
+  renderPods();
+}
+
 function renderPods(): void {
   const namespace = ($("#namespace-filter") as HTMLSelectElement).value;
   const search = ($("#pod-search") as HTMLInputElement).value.trim().toLowerCase();
   const tbody = $("#pod-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
+  renderSortIndicators("pod-table", podSort);
 
-  const pods = allPods.filter(
-    (pod) =>
-      (!namespace || pod.namespace === namespace) &&
-      (!search || pod.name.toLowerCase().includes(search))
+  const pods = sortPods(
+    allPods.filter(
+      (pod) =>
+        (!namespace || pod.namespace === namespace) &&
+        (!search || pod.name.toLowerCase().includes(search)) &&
+        matchesPodStatusFilter(pod)
+    )
   );
   $("#pod-empty").classList.toggle("hidden", pods.length > 0);
 
@@ -465,15 +574,37 @@ function prepareResourceTable(
 }
 
 const NO_VALUE = "-";
-const UNLINKED_GROUP = "연결된 NodePool 없음";
 
-function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
-  const tbody = prepareResourceTable("nodepool", nodePools.length, error);
+/**
+ * Weight와 Nodes는 숫자 칸이라 알파벳 순으로 정렬하면 10이 9보다 앞에 온다.
+ * 값이 없으면 "-"인데, 이것은 0이 아니라 "모르는 값"이라 크기로 견줄 수 없다.
+ * 방향과 상관없이 늘 맨 뒤로 보내 숫자들 사이에 끼지 않게 한다.
+ */
+function compareNodePools(a: NodePoolInfo, b: NodePoolInfo, sort: NodePoolSort): number {
+  const left = a[sort.key];
+  const right = b[sort.key];
+  if (left === NO_VALUE || right === NO_VALUE) {
+    if (left === right) return a.name.localeCompare(b.name);
+    return left === NO_VALUE ? 1 : -1;
+  }
+  const order = Number(left) - Number(right) || a.name.localeCompare(b.name);
+  return sort.direction === "asc" ? order : -order;
+}
+
+function sortNodePools(nodePools: NodePoolInfo[]): NodePoolInfo[] {
+  if (!nodePoolSort) return nodePools;
+  const sort = nodePoolSort;
+  return [...nodePools].sort((a, b) => compareNodePools(a, b, sort));
+}
+
+function renderNodePools(): void {
+  const nodePools = sortNodePools(allNodePools);
+  const tbody = prepareResourceTable("nodepool", nodePools.length, nodePoolsError);
+  renderSortIndicators("nodepool-table", nodePoolSort);
   for (const nodePool of nodePools) {
     const row = tbody.insertRow();
     appendCell(row, nodePool.name);
     appendCell(row, nodePool.nodeClassName || NO_VALUE);
-    appendCell(row, nodePool.ami);
     appendCell(row, nodePool.weight);
     appendCell(row, nodePool.nodes);
     appendCell(row, nodePool.ready, readyClass(nodePool.ready));
@@ -481,100 +612,18 @@ function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
   }
 }
 
-interface Ec2NodeClassGroup {
-  nodePoolName: string;
-  // 이 그룹을 만든 NodePool의 nodeClassRef 이름. 참조가 없으면 빈 문자열이다.
-  nodeClassName: string;
-  resources: KarpenterResource[];
+function toggleNodePoolSort(key: NodePoolSortKey): void {
+  nodePoolSort = { key, direction: nextDirection(nodePoolSort, key) };
+  renderNodePools();
 }
 
-/**
- * EC2NodeClass를 그 클래스를 참조하는 NodePool 이름으로 묶는다. 업그레이드 때는
- * "이 NodePool이 지금 어떤 AMI로 노드를 띄우는가"를 봐야 하는데, 두 목록을 따로 두면
- * nodeClassRef를 눈으로 이어야 한다. 그룹으로 묶어 그 연결을 화면이 대신 보여준다.
- *
- * 이름은 클러스터 안에서 유일하므로 이름으로 찾는 map을 한 번 만들어 쓴다.
- * 한 EC2NodeClass를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나온다.
- * 어느 NodePool도 참조하지 않는 클래스는 맨 뒤에 따로 묶는다. NodePool 조회가 실패했을
- * 때도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
- */
-function groupEc2NodeClasses(
-  nodePools: NodePoolInfo[],
-  resources: KarpenterResource[]
-): Ec2NodeClassGroup[] {
-  const byName = new Map(resources.map((resource) => [resource.name, resource]));
-  const linked = new Set<string>();
-  const groups: Ec2NodeClassGroup[] = [];
-
-  for (const nodePool of nodePools) {
-    const matched = byName.get(nodePool.nodeClassName);
-    if (matched) linked.add(matched.name);
-    groups.push({
-      nodePoolName: nodePool.name,
-      nodeClassName: nodePool.nodeClassName,
-      resources: matched ? [matched] : [],
-    });
-  }
-
-  const unlinked = resources.filter((resource) => !linked.has(resource.name));
-  if (unlinked.length > 0) {
-    groups.push({ nodePoolName: UNLINKED_GROUP, nodeClassName: "", resources: unlinked });
-  }
-  return groups;
-}
-
-/** 그룹 이름을 표 안에 한 줄로 넣어 어디부터 어느 NodePool의 것인지 구분한다. */
-function appendGroupHeaderRow(
-  tbody: HTMLTableSectionElement,
-  title: string,
-  columns: number
-): void {
-  const row = tbody.insertRow();
-  row.className = "group-row";
-  const cell = row.insertCell();
-  cell.colSpan = columns;
-  cell.textContent = title;
-}
-
-/**
- * 그룹이 빈 이유는 둘이다. 참조 자체가 없거나, 참조가 가리키는 클래스를 못 찾았거나다.
- * 앞은 NodePool 설정이 덜 된 것이고 뒤는 이름이 어긋난 것이라 손볼 곳이 다르므로 나눠 적는다.
- */
-function appendEmptyGroupRow(
-  tbody: HTMLTableSectionElement,
-  nodeClassName: string,
-  columns: number
-): void {
-  const row = tbody.insertRow();
-  const cell = row.insertCell();
-  cell.colSpan = columns;
-  cell.className = "empty";
-  cell.textContent = nodeClassName
-    ? `참조하는 EC2NodeClass ${nodeClassName}을 찾지 못했습니다.`
-    : "참조하는 EC2NodeClass가 지정되어 있지 않습니다.";
-}
-
-function renderEc2NodeClasses(
-  nodePools: NodePoolInfo[],
-  resources: KarpenterResource[],
-  error: string
-): void {
+/** 조회한 순서 그대로 이름과 AMI만 나열한다. */
+function renderEc2NodeClasses(resources: Ec2NodeClassInfo[], error: string): void {
   const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
-  // 클래스가 하나도 없으면 표 아래 안내만 남긴다. 그룹까지 그리면 없다는 안내와 겹쳐 보인다.
-  if (resources.length === 0) return;
-
-  for (const group of groupEc2NodeClasses(nodePools, resources)) {
-    appendGroupHeaderRow(tbody, group.nodePoolName, 3);
-    if (group.resources.length === 0) {
-      appendEmptyGroupRow(tbody, group.nodeClassName, 3);
-      continue;
-    }
-    for (const resource of group.resources) {
-      const row = tbody.insertRow();
-      appendCell(row, resource.name);
-      appendCell(row, resource.ami);
-      appendCell(row, resource.weight);
-    }
+  for (const resource of resources) {
+    const row = tbody.insertRow();
+    appendCell(row, resource.name);
+    appendCell(row, resource.ami);
   }
 }
 
@@ -582,11 +631,97 @@ async function refreshKarpenterResources(): Promise<void> {
   try {
     clearError();
     const result = await api.getKarpenterResources();
-    renderNodePools(result.nodePools, result.nodePoolsError);
-    renderEc2NodeClasses(result.nodePools, result.ec2NodeClasses, result.ec2NodeClassesError);
+    allNodePools = result.nodePools;
+    nodePoolsError = result.nodePoolsError;
+    renderNodePools();
+    renderEc2NodeClasses(result.ec2NodeClasses, result.ec2NodeClassesError);
     nodePoolsLoaded = true;
   } catch (error) {
     showError(String(error));
+  }
+}
+
+// pause image. 아무 일도 하지 않고 종료 신호만 기다리면 되므로 Kubernetes의 pause를 쓴다.
+const DEFAULT_PAUSE_IMAGE = "registry.k8s.io/pause:3.10";
+
+function renderNamespaceSelection(): void {
+  const list = $("#namespace-list");
+  list.innerHTML = "";
+  $("#namespace-empty").classList.toggle("hidden", allNamespaces.length > 0);
+
+  for (const namespace of allNamespaces) {
+    const label = document.createElement("label");
+    label.className = "checkbox-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = namespace;
+    checkbox.checked = selectedNamespaces.has(namespace);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedNamespaces.add(namespace);
+      else selectedNamespaces.delete(namespace);
+      renderSelectedCount();
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(namespace));
+    list.appendChild(label);
+  }
+  renderSelectedCount();
+}
+
+function renderSelectedCount(): void {
+  $("#namespace-selected-count").textContent = `${selectedNamespaces.size}개 선택됨`;
+}
+
+async function refreshNamespaces(): Promise<void> {
+  try {
+    clearError();
+    allNamespaces = await api.getNamespaces();
+    // 사라진 namespace를 선택 상태로 남겨 두면 없는 대상의 manifest가 만들어진다.
+    for (const namespace of [...selectedNamespaces]) {
+      if (!allNamespaces.includes(namespace)) selectedNamespaces.delete(namespace);
+    }
+    renderNamespaceSelection();
+    namespacesLoaded = true;
+  } catch (error) {
+    showError(String(error));
+  }
+}
+
+function setAllNamespacesSelected(selected: boolean): void {
+  selectedNamespaces.clear();
+  if (selected) allNamespaces.forEach((namespace) => selectedNamespaces.add(namespace));
+  renderNamespaceSelection();
+}
+
+/** 선택 순서가 아니라 목록 순서를 따라야 다시 만들 때 같은 결과가 나온다. */
+function readOverprovisionOptions(): OverprovisionOptions {
+  return {
+    namespaces: allNamespaces.filter((namespace) => selectedNamespaces.has(namespace)),
+    cpuRequest: ($("#overprovision-cpu-request") as HTMLInputElement).value.trim(),
+    cpuLimit: ($("#overprovision-cpu-limit") as HTMLInputElement).value.trim(),
+    replicas: Number(($("#overprovision-replicas") as HTMLInputElement).value),
+    image: ($("#overprovision-image") as HTMLInputElement).value.trim(),
+  };
+}
+
+/** 입력이 잘못됐다는 안내는 상단 배너가 아니라 만들기 버튼 아래에 붙여야 눈에 띈다. */
+function showOverprovisionResult(yaml: string, message: string): void {
+  const output = $("#overprovision-yaml");
+  output.textContent = yaml;
+  output.classList.toggle("hidden", !yaml);
+  $("#copy-overprovision").classList.toggle("hidden", !yaml);
+  renderResourceError("#overprovision-error", message);
+}
+
+async function generateOverprovisionYaml(): Promise<void> {
+  try {
+    clearError();
+    showOverprovisionResult(await api.buildOverprovisionYaml(readOverprovisionOptions()), "");
+  } catch (error) {
+    // 검증 실패도 여기로 온다. 만들다 만 결과가 남으면 새 입력의 결과로 잘못 읽힌다.
+    showOverprovisionResult("", String(error instanceof Error ? error.message : error));
   }
 }
 
@@ -600,6 +735,15 @@ function activateTab(tab: string): void {
   if (tab === "pods" && allPods.length === 0) void refreshPods();
   if (tab === "karpenter" && !karpenterLoaded) void refreshKarpenter();
   if (tab === "nodepools" && !nodePoolsLoaded) void refreshKarpenterResources();
+  if (tab === "utilize" && !namespacesLoaded) void refreshNamespaces();
+}
+
+/** 값을 채워 두면 무엇을 적는 칸인지 설명 없이 알 수 있고 바로 만들어 볼 수 있다. */
+function fillOverprovisionDefaults(): void {
+  ($("#overprovision-cpu-request") as HTMLInputElement).value = "1";
+  ($("#overprovision-cpu-limit") as HTMLInputElement).value = "1";
+  ($("#overprovision-replicas") as HTMLInputElement).value = "2";
+  ($("#overprovision-image") as HTMLInputElement).value = DEFAULT_PAUSE_IMAGE;
 }
 
 function fillSettingsForm(settings: AppSettings): void {
@@ -659,9 +803,28 @@ function registerEventHandlers(): void {
   $("#refresh-nodepools").addEventListener("click", () => void refreshKarpenterResources());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
+  registerSortHeaders("pod-table", (key) => togglePodSort(key as PodSortKey));
+  registerSortHeaders("nodepool-table", (key) => toggleNodePoolSort(key as NodePoolSortKey));
+  $("#pod-status-filter").addEventListener("click", () => {
+    podOnlyNotRunning = !podOnlyNotRunning;
+    const button = $("#pod-status-filter");
+    button.classList.toggle("active", podOnlyNotRunning);
+    // 눌린 상태를 색으로만 알리면 화면을 못 보는 사용자는 켜졌는지 알 수 없다.
+    button.setAttribute("aria-pressed", String(podOnlyNotRunning));
+    renderPods();
+  });
   $("#save-settings").addEventListener("click", () => void submitSettings());
+  $("#refresh-namespaces").addEventListener("click", () => void refreshNamespaces());
+  $("#select-all-namespaces").addEventListener("click", () => setAllNamespacesSelected(true));
+  $("#clear-namespaces").addEventListener("click", () => setAllNamespacesSelected(false));
+  $("#generate-overprovision").addEventListener("click", () => void generateOverprovisionYaml());
+  $("#copy-overprovision").addEventListener("click", () => {
+    const button = $("#copy-overprovision") as HTMLButtonElement;
+    void copyToClipboard($("#overprovision-yaml").textContent ?? "", button);
+  });
 }
 
 registerEventHandlers();
+fillOverprovisionDefaults();
 void loadSettingsForm();
 void refreshNodes();

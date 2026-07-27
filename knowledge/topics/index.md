@@ -4,4 +4,4 @@
 
 ## 목록
 
-아직 등록된 topic이 없다. 첫 concept를 추가할 때 이 목록을 갱신한다.
+* [Karpenter over-provisioning은 음수 우선순위 placeholder로 노드를 미리 잡아 둔다](karpenter-overprovisioning.md) - 빈 파드를 미리 띄워 노드 대기 시간을 줄이는 패턴의 동작 원리와 비용 대가.

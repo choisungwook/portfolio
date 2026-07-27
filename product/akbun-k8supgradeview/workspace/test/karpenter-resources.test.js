@@ -1,9 +1,9 @@
 /**
  * karpenter 리소스 조회의 파싱 규칙을 검증한다.
  *
- * 이 화면은 필드가 없는 경우가 정상이다. NodePool에는 ami가 없고 EC2NodeClass에는
- * weight가 없으며, weight와 Ready condition은 있을 수도 없을 수도 있다. 빈 값을
- * 0이나 빈 문자열로 잘못 채우면 화면에서 알아채기 어려우므로 목업으로 확인한다.
+ * 이 화면은 필드가 없는 경우가 정상이다. NodePool의 weight와 Ready condition은
+ * 있을 수도 없을 수도 있다. 빈 값을 0이나 빈 문자열로 잘못 채우면 화면에서
+ * 알아채기 어려우므로 목업으로 확인한다.
  * 노드 수는 NodePool status에 없어서 노드 label로 세는데, 조회 실패(-)와 0개를
  * 구분하지 못하면 "노드가 하나도 없다"고 잘못 읽히므로 함께 검증한다.
  * 버전도 label이 없으면 image tag로 폴백하므로 같은 이유로 검증한다.
@@ -118,7 +118,6 @@ test("없는 필드는 -로 채운다", async () => {
   const [withWeight, withoutWeight] = nodePools;
   assert.strictEqual(withWeight.weight, "50");
   assert.strictEqual(withoutWeight.weight, "-", "weight가 없으면 -여야 한다");
-  assert.strictEqual(withWeight.ami, "-", "NodePool에는 ami가 없다");
   assert.strictEqual(withWeight.ready, "True");
   assert.strictEqual(withoutWeight.ready, "-", "Ready condition이 없으면 -여야 한다");
 
@@ -126,7 +125,14 @@ test("없는 필드는 -로 채운다", async () => {
   assert.strictEqual(terms.ami, "alias=al2023@latest");
   assert.strictEqual(family.ami, "AL2", "amiSelectorTerms가 없으면 amiFamily를 쓴다");
   assert.strictEqual(bare.ami, "-");
-  assert.strictEqual(terms.weight, "-", "EC2NodeClass에는 weight가 없다");
+});
+
+// 화면이 EC2NodeClass에서 보는 값은 이름과 AMI뿐이다. 그 밖의 필드는 읽지 않는다.
+test("EC2NodeClass는 name과 ami만 돌려준다", async () => {
+  useFakeKubectl(ALL_OK);
+  const { ec2NodeClasses } = await getKarpenterResources();
+
+  assert.deepStrictEqual(Object.keys(ec2NodeClasses[0]).sort(), ["ami", "name"]);
 });
 
 test("nodes는 그 NodePool이 만든 노드만 센다", async () => {
@@ -256,7 +262,7 @@ test("event는 오래된 것부터 정렬하고 시각을 읽을 수 없어도 �
   ]);
 });
 
-// 화면이 EC2NodeClass를 NodePool 이름으로 묶는 기준이 이 값이다. 비면 묶을 수 없다.
+// NodePool 표의 NodeClass 칼럼에 들어가는 값이다. 비면 참조가 없다는 뜻이다.
 test("nodeClassRef 이름을 읽고 없으면 빈 문자열이다", async () => {
   useFakeKubectl(ALL_OK);
   const { nodePools } = await getKarpenterResources();

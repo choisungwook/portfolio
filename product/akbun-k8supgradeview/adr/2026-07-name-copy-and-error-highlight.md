@@ -12,6 +12,8 @@ timestamp: 2026-07-27T00:00:00Z
 
 NodePool / EC2NodeClass 탭에서 EC2NodeClass 목록을 그 클래스를 참조하는 NodePool 이름으로 묶는다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이며, NodePool 표에도 NodeClass 칼럼을 더한다. 어느 NodePool도 참조하지 않는 클래스는 맨 뒤에 따로 묶는다.
 
+> 이 그룹핑은 [NodePool 정렬과 EC2NodeClass 평탄화](2026-07-nodepool-sort-and-flat-ec2nodeclass.md)에서 걷어냈다. 두 표를 잇는 NodeClass 칼럼은 그대로 남아 있다.
+
 Karpenter Event 탭의 event(reason, object, message)와 pod log(파드 이름, 본문)에서 error를 대소문자 구분 없이 빨갛게 칠한다. 낱말 경계를 두지 않아 NodeClaimRegistrationError나 errorCode처럼 다른 낱말 안에 든 error도 함께 칠한다.
 
 ## 이유

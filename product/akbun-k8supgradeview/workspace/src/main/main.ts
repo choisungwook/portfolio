@@ -7,10 +7,12 @@ import {
   getKarpenterLogs,
   getKarpenterResources,
   getKarpenterVersions,
+  getNamespaces,
   getNodes,
   getPods,
   setNodeCordon,
 } from "./kubectl";
+import { buildOverprovisionYaml, OverprovisionOptions } from "./overprovision";
 import { AppSettings, loadSettings, saveSettings } from "./settings";
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
 
@@ -70,6 +72,27 @@ function registerIpcHandlers(): void {
     return true;
   });
   ipcMain.handle("kubectl:pods", (_event, nodeName?: string) => getPods(nodeName));
+  ipcMain.handle("kubectl:namespaces", () => getNamespaces());
+  /**
+   * manifest를 문자열로 만들어 돌려주기만 한다. 클러스터에 적용하지 않으므로
+   * 확인 dialog를 두지 않는다. 값 검증은 buildOverprovisionYaml이 한다.
+   */
+  ipcMain.handle("overprovision:build", (_event, options: unknown) => {
+    const input = options as Partial<OverprovisionOptions> | null;
+    if (!Array.isArray(input?.namespaces) || input.namespaces.some((n) => typeof n !== "string")) {
+      throw new Error("over-provisioning 입력이 잘못되었다: namespaces는 문자열 배열이어야 한다");
+    }
+    if (typeof input.cpuRequest !== "string" || typeof input.cpuLimit !== "string") {
+      throw new Error("over-provisioning 입력이 잘못되었다: cpu 값은 문자열이어야 한다");
+    }
+    if (typeof input.replicas !== "number") {
+      throw new Error("over-provisioning 입력이 잘못되었다: replicas는 숫자여야 한다");
+    }
+    if (typeof input.image !== "string") {
+      throw new Error("over-provisioning 입력이 잘못되었다: image는 문자열이어야 한다");
+    }
+    return buildOverprovisionYaml(input as OverprovisionOptions);
+  });
   ipcMain.handle("kubectl:karpenter-events", () => getKarpenterEvents());
   ipcMain.handle("kubectl:karpenter-logs", () => getKarpenterLogs());
   ipcMain.handle("kubectl:karpenter-resources", () => getKarpenterResources());

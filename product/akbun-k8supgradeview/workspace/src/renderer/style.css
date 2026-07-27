@@ -92,6 +92,11 @@ button {
 #refresh-pods,
 #refresh-karpenter,
 #refresh-nodepools,
+#refresh-namespaces,
+#select-all-namespaces,
+#clear-namespaces,
+#generate-overprovision,
+#copy-overprovision,
 #save-settings {
   padding: 6px 14px;
   border: 1px solid #d0d7de;
@@ -121,6 +126,34 @@ td {
 th {
   background: #f3f4f6;
   font-weight: 600;
+}
+
+/* 누를 수 있는 헤더라는 것을 커서와 hover 배경으로 알린다. */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  background: #e5e7eb;
+}
+
+/* 키보드로 헤더를 옮겨 다닐 때 지금 어디에 있는지 보이게 한다. */
+th.sortable:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+th.sortable.sorted {
+  color: #2563eb;
+}
+
+/* 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 자리를 미리 잡아 둔다. */
+.sort-arrow {
+  display: inline-block;
+  min-width: 12px;
+  margin-left: 4px;
+  font-size: 10px;
 }
 
 #node-table tbody tr {
@@ -194,13 +227,6 @@ th {
   padding: 0 2px;
 }
 
-/* 어느 NodePool의 EC2NodeClass인지 표 안에서 나누는 줄이다. */
-.group-row td {
-  background: #eef2ff;
-  color: #3730a3;
-  font-weight: 600;
-}
-
 .empty {
   color: #6b7280;
   padding: 12px 4px;
@@ -265,6 +291,42 @@ th {
   word-break: break-word;
 }
 
+/* namespace가 수십 개인 클러스터도 있어 높이를 묶고 안에서 스크롤한다. */
+.checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 12px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 만든 manifest는 그대로 복사해 kubectl에 넣는 값이라 원문을 건드리지 않고 보여준다. */
+.yaml-output {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .log-block {
   margin-bottom: 12px;
 }
@@ -298,6 +360,10 @@ th {
 
 #namespace-filter,
 #pod-search,
+#overprovision-cpu-request,
+#overprovision-cpu-limit,
+#overprovision-replicas,
+#overprovision-image,
 #kubectl-command,
 #karpenter-namespace,
 #karpenter-label-selector,
@@ -330,8 +396,15 @@ th {
   min-width: 260px;
 }
 
-#karpenter-log-since {
+#karpenter-log-since,
+#overprovision-cpu-request,
+#overprovision-cpu-limit,
+#overprovision-replicas {
   width: 100px;
+}
+
+#overprovision-image {
+  min-width: 320px;
 }
 
 #settings-saved {

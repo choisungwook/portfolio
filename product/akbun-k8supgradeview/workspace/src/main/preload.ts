@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("api", {
   getNodes: () => ipcRenderer.invoke("kubectl:nodes"),
   getPods: (nodeName?: string) => ipcRenderer.invoke("kubectl:pods", nodeName),
+  getNamespaces: () => ipcRenderer.invoke("kubectl:namespaces"),
+  buildOverprovisionYaml: (options: unknown) => ipcRenderer.invoke("overprovision:build", options),
   setNodeCordon: (nodeName: string, cordon: boolean) =>
     ipcRenderer.invoke("kubectl:set-node-cordon", nodeName, cordon),
   getKarpenterEvents: () => ipcRenderer.invoke("kubectl:karpenter-events"),

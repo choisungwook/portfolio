@@ -6,12 +6,13 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
 
 - `workspace/src/main/`: Electron main 프로세스. kubectl 실행, 설정 파일 저장, IPC 핸들러를 담당한다.
   - `main.ts`: 윈도우 생성과 IPC 핸들러 등록
-  - `kubectl.ts`: kubectl 실행과 노드/파드 JSON 파싱
+  - `kubectl.ts`: kubectl 실행과 노드/파드/namespace JSON 파싱
+  - `overprovision.ts`: over-provisioning manifest 문자열 생성. kubectl을 부르지 않는 순수 함수다
   - `settings.ts`: userData 경로의 settings.json 읽기/쓰기
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
-- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Settings 5개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
+- `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Utilize, Settings 6개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -23,6 +24,12 @@ renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로
 kubectl get nodes -o json
 kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
+```
+
+Utilize 탭이 manifest를 만들 대상 목록을 채울 때 사용하는 명령:
+
+```bash
+kubectl get namespaces -o json
 ```
 
 Nodes 탭의 Action 버튼이 사용하는 명령. 이 앱에서 유일하게 클러스터 상태를 바꾼다.
@@ -48,6 +55,20 @@ kubectl get nodepools.karpenter.sh -o json
 kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 ```
 
+## Pods 탭 정렬과 상태 필터
+
+정렬과 필터는 모두 renderer 안에서만 돈다. 파드 목록은 이미 한 번에 다 받아 두므로 kubectl을 다시 부르지 않는다.
+
+정렬 대상은 Namespace와 Status 두 칼럼이다. 헤더에 `data-sort-key`를 두고 클릭하면 그 키로 오름차순 정렬하며, 같은 헤더를 다시 누르면 방향만 뒤집는다. 다른 헤더를 누르면 오름차순부터 다시 시작한다. 정렬 기준은 `localeCompare`이고, 두 칼럼 모두 같은 값이 여럿 몰려 있어 2차 기준으로 파드 이름을 쓴다. 그래야 새로고침할 때마다 같은 값 안에서 순서가 흔들리지 않는다. Pod, Node, Age는 정렬하지 않는다. 이름과 노드는 검색과 노드 탭이 이미 다루고, Age는 `45s`와 `5d`처럼 단위가 섞인 문자열이라 알파벳 순으로 정렬하면 시간 순서와 어긋난다.
+
+정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다.
+
+정렬 헤더는 Pods 탭과 NodePool 표가 같은 배선을 쓴다(`registerSortHeaders`). `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
+
+상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
+
+namespace 필터, 이름 검색, 상태 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.
+
 ## Karpenter Event 탭
 
 버전은 karpenter deployment에서 읽는다. helm chart가 붙이는 `app.kubernetes.io/version` label을 먼저 보고, 없으면 container image의 tag를 쓴다. registry에 port가 붙은 image(`registry:5000/karpenter:1.1.0`)를 tag와 혼동하지 않도록 마지막 `/` 뒤에서만 `:`를 찾는다. tag 없이 digest만 있으면 `-`다. deployment 조회 권한이 없어도 event와 log는 봐야 하므로 실패는 값으로 담아 그 표 위에만 표시한다.
@@ -66,17 +87,37 @@ event의 reason, object, message와 로그의 파드 이름, 본문에서는 err
 
 ## NodePool / EC2NodeClass 탭
 
-NodePool은 name, nodeClass, ami, weight, nodes, ready, age를, EC2NodeClass는 name, ami, weight를 보여준다. NodePool에는 ami가 없고 EC2NodeClass에는 weight가 없으므로 없는 필드는 `-`로 채운다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드도 마찬가지다.
+NodePool은 name, nodeClass, weight, nodes, ready, age를, EC2NodeClass는 name, ami를 보여준다. `spec.weight`나 Ready condition처럼 있을 수도 없을 수도 있는 필드는 `-`로 채운다.
 
-ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
+NodePool의 AMI 칼럼은 두지 않는다. AMI는 NodePool이 아니라 EC2NodeClass의 값이라 NodePool 표에서는 늘 `-`였다. 값이 들어올 일이 없는 칸이므로 지웠다.
+
+EC2NodeClass의 ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
+
+Weight와 Nodes 헤더를 누르면 정렬한다. 두 칸 모두 숫자라 알파벳 순으로 정렬하면 `10`이 `9`보다 앞에 오므로 수로 바꿔 비교한다. 값이 `-`인 줄은 방향과 상관없이 늘 맨 뒤로 보낸다. `-`는 0이 아니라 "모르는 값"(weight 미지정, 노드 조회 실패)이라 크기로 견줄 수 없기 때문이다. 정렬 상태는 새로고침해도 유지된다.
 
 nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` label을 세어 채운다. 노드 조회가 실패하면 0과 구분해야 하므로 0이 아니라 `-`를 표시한다. `-`는 "셀 수 없었다"이고 0은 "정말 노드가 없다"다.
 
 karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
 
-EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 그룹이 비면 이유를 나눠 적는다. 참조가 아예 없으면 지정되지 않았다고, 참조가 가리키는 클래스를 못 찾으면 그 이름과 함께 찾지 못했다고 적는다. 손볼 곳이 다르기 때문이다. EC2NodeClass가 하나도 없으면 그룹을 그리지 않고 표 아래 안내만 남긴다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
+EC2NodeClass 목록은 조회한 순서대로 평평하게 나열한다. NodePool 이름으로 묶던 것을 걷어낸 이유는 [그룹핑 제거 ADR](../adr/2026-07-nodepool-sort-and-flat-ec2nodeclass.md)에 있다. NodePool과 EC2NodeClass를 잇는 `nodeClassRef` 이름은 NodePool 표의 NodeClass 칼럼에 그대로 남아 있어 연결은 여전히 읽을 수 있다.
 
-빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 그룹 기준이 되는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. NodeClass 칼럼에 들어가는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
+
+## Utilize 탭 (over-provisioning manifest 생성)
+
+over-provisioning은 우선순위가 음수인 placeholder 파드를 미리 띄워 노드를 확보해 두는 방법이다. 실제 워크로드가 뜨면 kube-scheduler가 placeholder를 밀어내고 그 자리에 들어가고, 밀려난 placeholder가 Pending이 되면서 Karpenter가 다음 노드를 만든다. 업그레이드처럼 노드가 한꺼번에 빠지는 작업에서 노드 provisioning 대기 시간을 줄이려고 쓴다.
+
+이 탭은 문자열만 만들고 클러스터에는 손대지 않는다. 적용은 사용자가 결과를 복사해 `kubectl apply -f -`로 한다. cordon과 달리 확인 dialog를 두지 않는 이유도 이것이다.
+
+생성 로직은 renderer가 아니라 main의 `overprovision.ts`에 둔다. 화면과 떨어진 순수 함수라 `test/overprovision.test.js`가 문자열을 직접 검증할 수 있기 때문이다. renderer는 `overprovision:build` IPC로 옵션을 넘기고 완성된 문자열만 받는다.
+
+문서 구성은 PriorityClass 하나와 선택한 namespace 수만큼의 Deployment이고, `---`로 이어 붙여 한 번의 apply로 끝나게 한다. PriorityClass는 cluster scope 리소스라 namespace마다 만들 수 없으므로 개수와 무관하게 맨 앞에 한 번만 넣는다. 우선순위 값은 `-1`이고 `globalDefault: false`다. 기본 우선순위가 0이라 음수여야 실제 워크로드가 placeholder를 밀어낼 수 있다.
+
+placeholder 컨테이너는 Kubernetes의 pause image를 쓴다. 아무 일도 하지 않고 종료 신호만 기다리면 되기 때문이고, Karpenter 문서와 blueprint의 over-provisioning 예제도 같은 image를 쓴다. 기본값은 `registry.k8s.io/pause:3.10`이며 화면에서 바꿀 수 있다. `terminationGracePeriodSeconds`는 0이다. 밀려날 때 기다릴 일이 없는데 기본값 30초를 두면 실제 워크로드가 그만큼 늦게 뜬다.
+
+옵션은 namespace 선택, cpu request, cpu limit, replica, image 다섯이다. replica는 namespace마다 각각 적용된다. 선택 순서가 아니라 목록 순서로 문서를 만들어 같은 선택이면 같은 결과가 나오게 한다.
+
+생성 전에 값을 검증한다. namespace 이름은 DNS label 형식, cpu는 `1`/`0.5`/`500m` 형식, replica는 1~1000 정수, image는 공백 없는 문자열이어야 한다. 형식을 먼저 막는 이유는 두 가지다. 사용자가 적는 값이 그대로 이어 붙으므로 줄바꿈 하나로 YAML 구조가 바뀔 수 있고, cpu request가 limit보다 크면 apply한 뒤에야 파드가 뜨지 않는 것을 알게 된다. request와 limit 비교는 `500m`과 `0.5`가 같은 값이라 단위를 맞춘 뒤에 한다. 검증에 걸리면 만들다 만 결과가 남지 않도록 이전 출력을 지우고 이유만 보여준다.
 
 ## cordon / uncordon
 
