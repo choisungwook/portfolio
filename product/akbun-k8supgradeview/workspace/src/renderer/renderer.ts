@@ -61,6 +61,7 @@ interface NodePoolInfo extends KarpenterResource {
   nodes: string;
   ready: string;
   creationTimestamp: string;
+  nodeClassName: string;
 }
 
 interface KarpenterResources {
@@ -85,6 +86,7 @@ interface Api {
   getKarpenterLogs(): Promise<KarpenterLogs>;
   getKarpenterVersions(): Promise<KarpenterVersions>;
   getKarpenterResources(): Promise<KarpenterResources>;
+  copyText(text: string): Promise<void>;
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
 }
@@ -138,6 +140,75 @@ function appendCell(row: HTMLTableRowElement, text: string, className?: string):
   if (className) cell.className = className;
 }
 
+const ERROR_KEYWORD_PATTERN = /error/gi;
+
+/**
+ * error 키워드만 빨갛게 칠한다. 조각을 textContent로만 넣으므로 로그나 event 본문이
+ * HTML로 해석되지 않는다. 대소문자를 가리지 않아야 Error와 error를 함께 잡는다.
+ */
+function appendErrorHighlighted(target: HTMLElement, text: string): void {
+  let lastIndex = 0;
+  for (const match of text.matchAll(ERROR_KEYWORD_PATTERN)) {
+    const start = match.index ?? 0;
+    target.appendChild(document.createTextNode(text.slice(lastIndex, start)));
+    const keyword = document.createElement("span");
+    keyword.className = "error-keyword";
+    keyword.textContent = match[0];
+    target.appendChild(keyword);
+    lastIndex = start + match[0].length;
+  }
+  target.appendChild(document.createTextNode(text.slice(lastIndex)));
+}
+
+function appendHighlightedCell(
+  row: HTMLTableRowElement,
+  text: string,
+  className?: string
+): HTMLTableCellElement {
+  const cell = row.insertCell();
+  appendErrorHighlighted(cell, text);
+  if (className) cell.className = className;
+  return cell;
+}
+
+/** 복사에 성공하면 버튼 글자를 잠깐 바꿔 눌렸다는 것을 알린다. */
+async function copyToClipboard(text: string, button: HTMLButtonElement): Promise<void> {
+  try {
+    clearError();
+    await api.copyText(text);
+    button.textContent = "복사됨";
+    setTimeout(() => {
+      button.textContent = "복사";
+    }, 1500);
+  } catch (error) {
+    showError(String(error));
+  }
+}
+
+/** 노드 이름은 kubectl 명령에 그대로 붙여 쓰는 값이라 이름 옆에 복사 버튼을 둔다. */
+function appendNameCellWithCopy(row: HTMLTableRowElement, name: string): void {
+  const cell = row.insertCell();
+  cell.className = "name-cell";
+  const box = document.createElement("div");
+  box.className = "name-box";
+  cell.appendChild(box);
+
+  const label = document.createElement("span");
+  label.textContent = name;
+  box.appendChild(label);
+
+  const button = document.createElement("button");
+  button.className = "copy-button";
+  button.textContent = "복사";
+  button.title = `${name} 복사`;
+  // 행 클릭은 파드 조회다. 복사할 때 그 동작까지 함께 돌지 않게 막는다.
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void copyToClipboard(name, button);
+  });
+  box.appendChild(button);
+}
+
 function matchesFilter(node: NodeInfo): boolean {
   if (nodeFilter === "karpenter") return node.isKarpenter;
   if (nodeFilter === "managed") return node.isManagedNodeGroup;
@@ -186,7 +257,7 @@ function renderNodes(): void {
     const row = tbody.insertRow();
     row.dataset.name = node.name;
     if (node.name === selectedNode) row.classList.add("selected");
-    appendCell(row, node.name);
+    appendNameCellWithCopy(row, node.name);
     appendCell(row, node.internalIp);
     appendCell(row, node.version);
     appendCell(row, node.status, statusClass(node.status));
@@ -298,16 +369,15 @@ function renderKarpenterEvents(events: EventInfo[]): void {
   tbody.innerHTML = "";
   $("#karpenter-event-empty").classList.toggle("hidden", events.length > 0);
 
+  // reason과 message에 섞여 있는 error를 눈으로 먼저 찾도록 그 낱말만 빨갛게 칠한다.
   for (const event of events) {
     const row = tbody.insertRow();
     appendCell(row, formatEventTime(event.timestamp));
     appendCell(row, event.type, event.type === "Warning" ? "status-warning" : "");
-    appendCell(row, event.reason);
-    appendCell(row, event.object);
+    appendHighlightedCell(row, event.reason);
+    appendHighlightedCell(row, event.object);
     appendCell(row, String(event.count));
-    const message = row.insertCell();
-    message.textContent = event.message;
-    message.className = "message-cell";
+    appendHighlightedCell(row, event.message, "message-cell");
   }
 }
 
@@ -316,7 +386,7 @@ function createLogBlock(log: PodLog): HTMLElement {
   block.className = "log-block";
 
   const title = document.createElement("h3");
-  title.textContent = log.podName;
+  appendErrorHighlighted(title, log.podName);
   block.appendChild(title);
 
   const body = document.createElement("pre");
@@ -324,7 +394,7 @@ function createLogBlock(log: PodLog): HTMLElement {
     body.className = "log-error";
     body.textContent = log.error;
   } else {
-    body.textContent = log.text || "해당 기간에 남은 로그가 없습니다.";
+    appendErrorHighlighted(body, log.text || "해당 기간에 남은 로그가 없습니다.");
   }
   block.appendChild(body);
   return block;
@@ -394,11 +464,15 @@ function prepareResourceTable(
   return tbody;
 }
 
+const NO_VALUE = "-";
+const UNLINKED_GROUP = "연결된 NodePool 없음";
+
 function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
   const tbody = prepareResourceTable("nodepool", nodePools.length, error);
   for (const nodePool of nodePools) {
     const row = tbody.insertRow();
     appendCell(row, nodePool.name);
+    appendCell(row, nodePool.nodeClassName || NO_VALUE);
     appendCell(row, nodePool.ami);
     appendCell(row, nodePool.weight);
     appendCell(row, nodePool.nodes);
@@ -407,13 +481,77 @@ function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
   }
 }
 
-function renderEc2NodeClasses(resources: KarpenterResource[], error: string): void {
+interface Ec2NodeClassGroup {
+  nodePoolName: string;
+  resources: KarpenterResource[];
+}
+
+/**
+ * EC2NodeClass를 그 클래스를 참조하는 NodePool 이름으로 묶는다. 업그레이드 때는
+ * "이 NodePool이 지금 어떤 AMI로 노드를 띄우는가"를 봐야 하는데, 두 목록을 따로 두면
+ * nodeClassRef를 눈으로 이어야 한다. 그룹으로 묶어 그 연결을 화면이 대신 보여준다.
+ *
+ * 한 EC2NodeClass를 여러 NodePool이 참조할 수 있으므로 같은 클래스가 여러 그룹에 나온다.
+ * 어느 NodePool도 참조하지 않는 클래스는 맨 뒤에 따로 묶는다. NodePool 조회가 실패했을
+ * 때도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
+ */
+function groupEc2NodeClasses(
+  nodePools: NodePoolInfo[],
+  resources: KarpenterResource[]
+): Ec2NodeClassGroup[] {
+  const groups: Ec2NodeClassGroup[] = [];
+  const linked = new Set<string>();
+
+  for (const nodePool of nodePools) {
+    const matched = resources.filter((resource) => resource.name === nodePool.nodeClassName);
+    matched.forEach((resource) => linked.add(resource.name));
+    groups.push({ nodePoolName: nodePool.name, resources: matched });
+  }
+
+  const unlinked = resources.filter((resource) => !linked.has(resource.name));
+  if (unlinked.length > 0) groups.push({ nodePoolName: UNLINKED_GROUP, resources: unlinked });
+  return groups;
+}
+
+/** 그룹 이름을 표 안에 한 줄로 넣어 어디부터 어느 NodePool의 것인지 구분한다. */
+function appendGroupHeaderRow(
+  tbody: HTMLTableSectionElement,
+  title: string,
+  columns: number
+): void {
+  const row = tbody.insertRow();
+  row.className = "group-row";
+  const cell = row.insertCell();
+  cell.colSpan = columns;
+  cell.textContent = title;
+}
+
+function appendEmptyGroupRow(tbody: HTMLTableSectionElement, columns: number): void {
+  const row = tbody.insertRow();
+  const cell = row.insertCell();
+  cell.colSpan = columns;
+  cell.className = "empty";
+  cell.textContent = "참조하는 EC2NodeClass를 찾지 못했습니다.";
+}
+
+function renderEc2NodeClasses(
+  nodePools: NodePoolInfo[],
+  resources: KarpenterResource[],
+  error: string
+): void {
   const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
-  for (const resource of resources) {
-    const row = tbody.insertRow();
-    appendCell(row, resource.name);
-    appendCell(row, resource.ami);
-    appendCell(row, resource.weight);
+  for (const group of groupEc2NodeClasses(nodePools, resources)) {
+    appendGroupHeaderRow(tbody, group.nodePoolName, 3);
+    if (group.resources.length === 0) {
+      appendEmptyGroupRow(tbody, 3);
+      continue;
+    }
+    for (const resource of group.resources) {
+      const row = tbody.insertRow();
+      appendCell(row, resource.name);
+      appendCell(row, resource.ami);
+      appendCell(row, resource.weight);
+    }
   }
 }
 
@@ -422,7 +560,7 @@ async function refreshKarpenterResources(): Promise<void> {
     clearError();
     const result = await api.getKarpenterResources();
     renderNodePools(result.nodePools, result.nodePoolsError);
-    renderEc2NodeClasses(result.ec2NodeClasses, result.ec2NodeClassesError);
+    renderEc2NodeClasses(result.nodePools, result.ec2NodeClasses, result.ec2NodeClassesError);
     nodePoolsLoaded = true;
   } catch (error) {
     showError(String(error));

@@ -50,7 +50,10 @@ const NODE_POOLS = {
   items: [
     {
       metadata: { name: "default", creationTimestamp: "2026-07-01T00:00:00Z" },
-      spec: { weight: 50 },
+      spec: {
+        weight: 50,
+        template: { spec: { nodeClassRef: { name: "default" } } },
+      },
       status: { conditions: [{ type: "Ready", status: "True" }] },
     },
     // weight도 Ready condition도 없는 NodePool
@@ -251,6 +254,15 @@ test("event는 오래된 것부터 정렬하고 시각을 읽을 수 없어도 �
     "2026-07-27T01:00:00Z",
     "2026-07-27T02:00:00Z",
   ]);
+});
+
+// 화면이 EC2NodeClass를 NodePool 이름으로 묶는 기준이 이 값이다. 비면 묶을 수 없다.
+test("nodeClassRef 이름을 읽고 없으면 빈 문자열이다", async () => {
+  useFakeKubectl(ALL_OK);
+  const { nodePools } = await getKarpenterResources();
+
+  assert.strictEqual(nodePools[0].nodeClassName, "default", "template의 nodeClassRef를 읽어야 한다");
+  assert.strictEqual(nodePools[1].nodeClassName, "", "참조가 없으면 빈 문자열이다");
 });
 
 test("age는 NodePool의 creationTimestamp를 그대로 넘긴다", async () => {

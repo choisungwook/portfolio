@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("api", {
   getKarpenterLogs: () => ipcRenderer.invoke("kubectl:karpenter-logs"),
   getKarpenterResources: () => ipcRenderer.invoke("kubectl:karpenter-resources"),
   getKarpenterVersions: () => ipcRenderer.invoke("kubectl:karpenter-versions"),
+  copyText: (text: string) => ipcRenderer.invoke("clipboard:write", text),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   saveSettings: (settings: unknown) => ipcRenderer.invoke("settings:save", settings),
 });

@@ -135,6 +135,27 @@ th {
   background: #dbeafe;
 }
 
+/* td 자체를 flex로 만들면 표 정렬이 깨지므로 칸 안에 감싸는 요소를 하나 둔다. */
+.name-cell > .name-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copy-button {
+  padding: 2px 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #57606a;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.copy-button:hover {
+  background: #f3f4f6;
+}
+
 /* 행 클릭(파드 조회)과 구분되도록 테두리를 준다. */
 .cordon-button {
   padding: 3px 10px;
@@ -161,6 +182,22 @@ th {
 
 .status-error {
   color: #b91c1c;
+  font-weight: 600;
+}
+
+/* event와 로그에서 error 낱말만 눈에 띄게 칠한다. 배경까지 줘야 긴 본문에서도 먼저 보인다. */
+.error-keyword {
+  color: #b91c1c;
+  font-weight: 700;
+  background: #fee2e2;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* 어느 NodePool의 EC2NodeClass인지 표 안에서 나누는 줄이다. */
+.group-row td {
+  background: #eef2ff;
+  color: #3730a3;
   font-weight: 600;
 }
 

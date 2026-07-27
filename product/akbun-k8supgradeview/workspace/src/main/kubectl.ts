@@ -48,6 +48,8 @@ export interface NodePoolInfo extends KarpenterResource {
   nodes: string;
   ready: string;
   creationTimestamp: string;
+  // 이 NodePool이 참조하는 EC2NodeClass 이름. 참조가 없으면 빈 문자열이다.
+  nodeClassName: string;
 }
 
 export interface KarpenterResources {
@@ -293,6 +295,14 @@ function toEc2NodeClass(item: any): KarpenterResource {
   };
 }
 
+/**
+ * NodePool이 어떤 EC2NodeClass를 쓰는지는 template의 nodeClassRef에 있다.
+ * 이 이름이 두 리소스를 잇는 유일한 값이라 화면의 그룹 기준이 된다.
+ */
+function nodeClassName(spec: any): string {
+  return spec?.template?.spec?.nodeClassRef?.name ?? "";
+}
+
 /** NodePool은 ami가 없고, 만든 노드 수는 노드 목록을 세어 채운다. */
 function toNodePool(item: any, nodeCounts: Map<string, number> | null): NodePoolInfo {
   const spec = item.spec ?? {};
@@ -304,6 +314,7 @@ function toNodePool(item: any, nodeCounts: Map<string, number> | null): NodePool
     nodes: nodeCounts ? String(nodeCounts.get(name) ?? 0) : NO_VALUE,
     ready: readyStatus(item),
     creationTimestamp: item.metadata?.creationTimestamp ?? "",
+    nodeClassName: nodeClassName(spec),
   };
 }
 
