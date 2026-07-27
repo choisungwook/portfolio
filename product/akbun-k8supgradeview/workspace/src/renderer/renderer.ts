@@ -483,6 +483,8 @@ function renderNodePools(nodePools: NodePoolInfo[], error: string): void {
 
 interface Ec2NodeClassGroup {
   nodePoolName: string;
+  // 이 그룹을 만든 NodePool의 nodeClassRef 이름. 참조가 없으면 빈 문자열이다.
+  nodeClassName: string;
   resources: KarpenterResource[];
 }
 
@@ -491,7 +493,8 @@ interface Ec2NodeClassGroup {
  * "이 NodePool이 지금 어떤 AMI로 노드를 띄우는가"를 봐야 하는데, 두 목록을 따로 두면
  * nodeClassRef를 눈으로 이어야 한다. 그룹으로 묶어 그 연결을 화면이 대신 보여준다.
  *
- * 한 EC2NodeClass를 여러 NodePool이 참조할 수 있으므로 같은 클래스가 여러 그룹에 나온다.
+ * 이름은 클러스터 안에서 유일하므로 이름으로 찾는 map을 한 번 만들어 쓴다.
+ * 한 EC2NodeClass를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나온다.
  * 어느 NodePool도 참조하지 않는 클래스는 맨 뒤에 따로 묶는다. NodePool 조회가 실패했을
  * 때도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
  */
@@ -499,17 +502,24 @@ function groupEc2NodeClasses(
   nodePools: NodePoolInfo[],
   resources: KarpenterResource[]
 ): Ec2NodeClassGroup[] {
-  const groups: Ec2NodeClassGroup[] = [];
+  const byName = new Map(resources.map((resource) => [resource.name, resource]));
   const linked = new Set<string>();
+  const groups: Ec2NodeClassGroup[] = [];
 
   for (const nodePool of nodePools) {
-    const matched = resources.filter((resource) => resource.name === nodePool.nodeClassName);
-    matched.forEach((resource) => linked.add(resource.name));
-    groups.push({ nodePoolName: nodePool.name, resources: matched });
+    const matched = byName.get(nodePool.nodeClassName);
+    if (matched) linked.add(matched.name);
+    groups.push({
+      nodePoolName: nodePool.name,
+      nodeClassName: nodePool.nodeClassName,
+      resources: matched ? [matched] : [],
+    });
   }
 
   const unlinked = resources.filter((resource) => !linked.has(resource.name));
-  if (unlinked.length > 0) groups.push({ nodePoolName: UNLINKED_GROUP, resources: unlinked });
+  if (unlinked.length > 0) {
+    groups.push({ nodePoolName: UNLINKED_GROUP, nodeClassName: "", resources: unlinked });
+  }
   return groups;
 }
 
@@ -526,12 +536,22 @@ function appendGroupHeaderRow(
   cell.textContent = title;
 }
 
-function appendEmptyGroupRow(tbody: HTMLTableSectionElement, columns: number): void {
+/**
+ * 그룹이 빈 이유는 둘이다. 참조 자체가 없거나, 참조가 가리키는 클래스를 못 찾았거나다.
+ * 앞은 NodePool 설정이 덜 된 것이고 뒤는 이름이 어긋난 것이라 손볼 곳이 다르므로 나눠 적는다.
+ */
+function appendEmptyGroupRow(
+  tbody: HTMLTableSectionElement,
+  nodeClassName: string,
+  columns: number
+): void {
   const row = tbody.insertRow();
   const cell = row.insertCell();
   cell.colSpan = columns;
   cell.className = "empty";
-  cell.textContent = "참조하는 EC2NodeClass를 찾지 못했습니다.";
+  cell.textContent = nodeClassName
+    ? `참조하는 EC2NodeClass ${nodeClassName}을 찾지 못했습니다.`
+    : "참조하는 EC2NodeClass가 지정되어 있지 않습니다.";
 }
 
 function renderEc2NodeClasses(
@@ -540,10 +560,13 @@ function renderEc2NodeClasses(
   error: string
 ): void {
   const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
+  // 클래스가 하나도 없으면 표 아래 안내만 남긴다. 그룹까지 그리면 없다는 안내와 겹쳐 보인다.
+  if (resources.length === 0) return;
+
   for (const group of groupEc2NodeClasses(nodePools, resources)) {
     appendGroupHeaderRow(tbody, group.nodePoolName, 3);
     if (group.resources.length === 0) {
-      appendEmptyGroupRow(tbody, 3);
+      appendEmptyGroupRow(tbody, group.nodeClassName, 3);
       continue;
     }
     for (const resource of group.resources) {

@@ -56,7 +56,7 @@ event는 core/v1과 events.k8s.io/v1의 필드 이름이 달라 둘 다 읽는�
 
 로그는 label selector로 파드를 먼저 찾고 파드마다 따로 조회한다. 한 파드의 조회가 실패해도 나머지 로그는 보여줘야 하므로 실패를 예외로 던지지 않고 `PodLog.error`에 담아 화면에 표시한다.
 
-event의 reason, object, message와 로그의 파드 이름, 본문에서는 error 낱말만 대소문자 구분 없이 빨갛게 칠한다(`.error-keyword`). 수백 줄에서 눈으로 찾는 시간을 줄이기 위해서다. 조각을 `textContent`로만 넣어 붙이므로 클러스터가 준 문자열이 HTML로 해석되지 않는다. 배경은 [하이라이트 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
+event의 reason, object, message와 로그의 파드 이름, 본문에서는 error를 대소문자 구분 없이 빨갛게 칠한다(`.error-keyword`). 낱말 경계를 두지 않아 `NodeClaimRegistrationError`처럼 다른 낱말 안에 든 error도 칠한다. 수백 줄에서 눈으로 찾는 시간을 줄이기 위해서다. 조각을 `textContent`로만 넣어 붙이므로 클러스터가 준 문자열이 HTML로 해석되지 않는다. 배경은 [하이라이트 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
 
 | 설정 | 기본값 |
 |---|---|
@@ -74,7 +74,7 @@ nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` l
 
 karpenter가 없거나 CRD 조회 권한이 없는 클러스터도 있으므로 세 조회(NodePool, EC2NodeClass, 노드)는 서로 독립이다. 한쪽이 실패하면 그 표 위에만 이유를 적고 다른 표는 그대로 보여준다.
 
-EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 참조가 가리키는 클래스를 찾지 못한 NodePool은 그룹을 비우지 않고 찾지 못했다고 적는다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
+EC2NodeClass 목록은 그 클래스를 참조하는 NodePool 이름으로 묶어서 보여준다. 묶는 기준은 NodePool의 `spec.template.spec.nodeClassRef.name`이다. 한 클래스를 여러 NodePool이 참조하면 같은 클래스가 여러 그룹에 나오고, 그룹이 비면 이유를 나눠 적는다. 참조가 아예 없으면 지정되지 않았다고, 참조가 가리키는 클래스를 못 찾으면 그 이름과 함께 찾지 못했다고 적는다. 손볼 곳이 다르기 때문이다. EC2NodeClass가 하나도 없으면 그룹을 그리지 않고 표 아래 안내만 남긴다. 어느 NodePool도 참조하지 않는 클래스는 "연결된 NodePool 없음"으로 맨 뒤에 묶는다. NodePool 조회가 실패해도 이 묶음으로 떨어져 EC2NodeClass 목록 자체는 그대로 보인다.
 
 빈 값 처리 규칙은 화면에서 알아채기 어려워 `test/karpenter-resources.test.js`가 목업 데이터로 검증한다. 그룹 기준이 되는 `nodeClassRef` 파싱도 같은 테스트가 확인한다. 파싱 규칙을 고치면 이 테스트를 함께 본다.
 
