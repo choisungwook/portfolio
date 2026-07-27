@@ -63,6 +63,8 @@ kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 
 정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다.
 
+정렬 헤더는 Pods 탭과 NodePool 표가 같은 배선을 쓴다(`registerSortHeaders`). `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
+
 상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
 
 namespace 필터, 이름 검색, 상태 필터는 서로 AND로 걸리고 그 결과에 정렬을 적용한다.

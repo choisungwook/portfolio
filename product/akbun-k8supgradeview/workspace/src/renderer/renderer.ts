@@ -381,19 +381,43 @@ function sortPods(pods: PodInfo[]): PodInfo[] {
   return [...pods].sort((a, b) => comparePods(a, b, sort));
 }
 
-/** 어느 칼럼으로 어느 방향인지 헤더에 화살표로 남긴다. */
+/**
+ * 어느 칼럼으로 어느 방향인지 헤더에 남긴다. 화살표와 색은 눈으로만 읽히므로
+ * 같은 내용을 aria-sort로도 적어 스크린리더가 정렬 상태를 말할 수 있게 한다.
+ */
 function renderSortIndicators(tableId: string, sort: { key: string; direction: SortDirection } | null): void {
   document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
     const active = sort?.key === (header as HTMLElement).dataset.sortKey;
+    const ascending = sort?.direction === "asc";
     header.classList.toggle("sorted", active);
-    const arrow = header.querySelector(".sort-arrow") as HTMLElement;
-    arrow.textContent = active ? (sort?.direction === "asc" ? "▲" : "▼") : "";
+    header.setAttribute("aria-sort", active ? (ascending ? "ascending" : "descending") : "none");
+    const arrow = header.querySelector(".sort-arrow");
+    if (arrow) arrow.textContent = active ? (ascending ? "▲" : "▼") : "";
   });
 }
 
 /** 같은 칼럼을 다시 누르면 방향만 뒤집고, 다른 칼럼이면 오름차순부터 시작한다. */
 function nextDirection(current: { key: string; direction: SortDirection } | null, key: string): SortDirection {
   return current?.key === key && current.direction === "asc" ? "desc" : "asc";
+}
+
+/**
+ * 정렬 헤더에 마우스와 키보드를 함께 붙인다. th는 원래 focus를 받지 않아
+ * tabIndex를 주지 않으면 키보드만 쓰는 사용자가 정렬에 닿을 수 없다.
+ * Enter와 Space를 모두 받는 이유는 버튼처럼 동작한다고 알렸기 때문이다.
+ * Space는 기본 동작이 화면 스크롤이라 막는다.
+ */
+function registerSortHeaders(tableId: string, toggle: (key: string) => void): void {
+  document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
+    const key = (header as HTMLElement).dataset.sortKey ?? "";
+    header.addEventListener("click", () => toggle(key));
+    header.addEventListener("keydown", (event) => {
+      const { key: pressed } = event as KeyboardEvent;
+      if (pressed !== "Enter" && pressed !== " ") return;
+      event.preventDefault();
+      toggle(key);
+    });
+  });
 }
 
 function togglePodSort(key: PodSortKey): void {
@@ -779,19 +803,14 @@ function registerEventHandlers(): void {
   $("#refresh-nodepools").addEventListener("click", () => void refreshKarpenterResources());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
-  document.querySelectorAll("#pod-table th[data-sort-key]").forEach((header) => {
-    header.addEventListener("click", () =>
-      togglePodSort((header as HTMLElement).dataset.sortKey as PodSortKey)
-    );
-  });
-  document.querySelectorAll("#nodepool-table th[data-sort-key]").forEach((header) => {
-    header.addEventListener("click", () =>
-      toggleNodePoolSort((header as HTMLElement).dataset.sortKey as NodePoolSortKey)
-    );
-  });
+  registerSortHeaders("pod-table", (key) => togglePodSort(key as PodSortKey));
+  registerSortHeaders("nodepool-table", (key) => toggleNodePoolSort(key as NodePoolSortKey));
   $("#pod-status-filter").addEventListener("click", () => {
     podOnlyNotRunning = !podOnlyNotRunning;
-    $("#pod-status-filter").classList.toggle("active", podOnlyNotRunning);
+    const button = $("#pod-status-filter");
+    button.classList.toggle("active", podOnlyNotRunning);
+    // 눌린 상태를 색으로만 알리면 화면을 못 보는 사용자는 켜졌는지 알 수 없다.
+    button.setAttribute("aria-pressed", String(podOnlyNotRunning));
     renderPods();
   });
   $("#save-settings").addEventListener("click", () => void submitSettings());

@@ -138,6 +138,12 @@ th.sortable:hover {
   background: #e5e7eb;
 }
 
+/* 키보드로 헤더를 옮겨 다닐 때 지금 어디에 있는지 보이게 한다. */
+th.sortable:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
 th.sortable.sorted {
   color: #2563eb;
 }
