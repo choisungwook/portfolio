@@ -15,7 +15,7 @@ timestamp: 2026-07-11T00:00:00Z
 - 접속 주체의 IAM role에 replication group ARN과 user ARN을 대상으로 `elasticache:Connect` 권한을 준다.
 - 전송 중 암호화(`transit_encryption_mode = "required"`)와 저장 시 암호화를 항상 켠다.
 
-구체 HCL 패턴은 [.claude/rules/terraform.md](../../.claude/rules/terraform.md)의 ElastiCache 규칙에 있다.
+리소스별로 지켜야 할 인자는 [.claude/rules/terraform.md](../../.claude/rules/terraform.md)의 ElastiCache 규칙에 있다.
 
 ## 이유
 
