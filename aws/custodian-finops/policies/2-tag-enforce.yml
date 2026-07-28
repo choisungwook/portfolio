@@ -1,0 +1,51 @@
+# Step 2. The signature pattern: mark now, act later. The tag is the state store.
+policies:
+  - name: ec2-untagged-mark
+    resource: aws.ec2
+    description: |
+      Write a deadline into the resource itself. Nothing stops today.
+    filters:
+      - "State.Name": running
+      - "tag:Owner": absent
+      - "tag:c7n_tag_compliance": absent
+    actions:
+      - type: mark-for-op
+        tag: c7n_tag_compliance
+        op: stop
+        days: 4
+
+  - name: ec2-untagged-unmark-when-fixed
+    resource: aws.ec2
+    description: |
+      Someone added the tag during the grace period. Cancel the deadline.
+    filters:
+      - "tag:Owner": not-null
+      - "tag:c7n_tag_compliance": not-null
+    actions:
+      - type: remove-tag
+        tags: [c7n_tag_compliance]
+
+  - name: ec2-untagged-stop
+    resource: aws.ec2
+    description: |
+      The deadline written four days ago has passed. Stop, do not terminate.
+    filters:
+      - "State.Name": running
+      - type: marked-for-op
+        tag: c7n_tag_compliance
+        op: stop
+    actions:
+      - stop
+
+  - name: rds-untagged-mark
+    resource: aws.rds
+    description: |
+      RDS gets the same treatment, with a longer grace period and no delete.
+    filters:
+      - "tag:Owner": absent
+      - "tag:c7n_tag_compliance": absent
+    actions:
+      - type: mark-for-op
+        tag: c7n_tag_compliance
+        op: stop
+        days: 7

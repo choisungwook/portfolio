@@ -1,0 +1,48 @@
+# Step 4. Resources whose owner is already gone. Nobody notices them shrinking a budget.
+policies:
+  - name: ebs-unattached-mark
+    resource: aws.ebs
+    description: |
+      Detached volume, seven day reprieve before deletion.
+    filters:
+      - State: available
+      - "tag:c7n_orphan": absent
+    actions:
+      - type: mark-for-op
+        tag: c7n_orphan
+        op: delete
+        days: 7
+
+  - name: ebs-unattached-delete
+    resource: aws.ebs
+    description: |
+      Snapshot first. Deletion is the only action here that cannot be undone.
+    filters:
+      - State: available
+      - type: marked-for-op
+        tag: c7n_orphan
+        op: delete
+    actions:
+      - type: snapshot
+      - type: delete
+
+  - name: eip-unassociated-release
+    resource: aws.elastic-ip
+    description: |
+      An idle Elastic IP is billed by the hour precisely because it is idle.
+    filters:
+      - AssociationId: absent
+    actions:
+      - type: release
+
+  - name: rds-snapshot-expired-delete
+    resource: aws.rds-snapshot
+    description: |
+      Manual snapshots outlive the database they came from. Automated ones expire on their own.
+    filters:
+      - SnapshotType: manual
+      - type: age
+        days: 30
+        op: greater-than
+    actions:
+      - type: delete

@@ -1,0 +1,45 @@
+# A mock AWS account so the policies can be run without spending anything.
+# moto answers the same API calls custodian would send to AWS.
+name: custodian-finops
+
+x-mock-aws: &mock-aws
+  AWS_ENDPOINT_URL: http://mock-aws:5000
+  AWS_DEFAULT_REGION: ap-northeast-2
+  AWS_ACCESS_KEY_ID: mock
+  AWS_SECRET_ACCESS_KEY: mock
+
+services:
+  mock-aws:
+    image: motoserver/moto:latest
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/moto-api/')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  seed:
+    image: amazon/aws-cli:2
+    depends_on:
+      mock-aws:
+        condition: service_healthy
+    entrypoint: ["/bin/sh"]
+    command: ["/scripts/seed.sh"]
+    environment: *mock-aws
+    volumes:
+      - ./scripts:/scripts:ro
+
+  # Not started by "up". Run it on demand:
+  #   docker compose run --rm custodian run --dryrun -s /out /policies/1-tag-audit.yml
+  custodian:
+    image: cloudcustodian/c7n:latest
+    profiles: ["manual"]
+    user: root # so resources.json under ./out is writable from the container
+    depends_on:
+      mock-aws:
+        condition: service_healthy
+    environment: *mock-aws
+    volumes:
+      - ./policies:/policies:ro
+      - ./out:/out

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비용 리포트는 왜 청구서를 줄이지 못하는가 — Cloud Custodian</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>비용 리포트는 왜 청구서를 줄이지 못하는가 — <mark>Cloud Custodian</mark></h1>
+    <p class="sub">태그 한 줄에 기한을 적어 두는 것만으로 자동화가 성립하는 구조</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 매달 비용 리포트를 뽑고, 담당자를 찾아 물어보고, 답이 없어 그냥 두고, 다음 달에 같은 리포트를 또 뽑음.</p>
+    <p><b class="p-point">무엇이 빠져 있는 걸까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">리포트에는 "누가, 언제까지"가 없음</h2>
+  <p class="dim">리포트가 답하는 것은 "얼마 썼는가" 하나뿐임.</p>
+  <ul class="bullets">
+    <li>EC2가 20% 늘었다 — 어느 인스턴스인지, 아직 쓰는지는 안 나옴</li>
+    <li>지출의 40%가 untagged — 누구에게 물어야 하는지 안 나옴</li>
+    <li><span class="xmark">✕</span> 그래서 <span class="prob-text">아무것도 지워지지 않거나</span>, 급하게 지웠다가 장애가 나서 활동 자체가 중단됨</li>
+  </ul>
+  <p>낭비를 <b>찾는</b> 일은 쉬움. 어려운 것은 <mark>자동화해도 안전할 만큼 약하면서, 행동을 바꿀 만큼 강한 조치</mark>를 찾는 것.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 리포트와 삭제 사이에 조치를 하나 더 만듦.</p>
+</section>
+
+<!-- ════════ 3장. 원리 1 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">정책은 세 조각이 전부</h2>
+  <p class="dim">Custodian은 YAML을 boto3 호출로 바꾸는 규칙 엔진임. 배울 문법은 셋뿐.</p>
+  <p class="codedesc">resource는 describe API, filters는 남길 것, actions는 남은 것에 할 일</p>
+<pre class="code"><span class="k">policies</span>:
+  - <span class="k">name</span>: ec2-missing-cost-tags
+    <span class="k">resource</span>: <span class="hot">aws.ec2</span>          <span class="c"># DescribeInstances</span>
+    <span class="k">filters</span>:                    <span class="c"># 모두 통과해야 남음(AND)</span>
+      - <span class="s">"tag:Owner"</span>: absent
+    <span class="k">actions</span>: [stop]            <span class="c"># 살아남은 것에만 적용</span></pre>
+  <p><b>actions 블록이 없으면 아무것도 못 바꿈.</b> 시작은 항상 조회 전용 정책으로 함.</p>
+</section>
+
+<!-- ════════ 4장. 원리 2 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">filter는 describe 응답 위에서 돔</h2>
+  <ul class="bullets">
+    <li>API 필터가 아니라 <mark>받아 온 JSON을 프로세스 안에서 거름</mark>
+      <ul><li>그래서 State.Name처럼 중첩 필드도 그대로 주소로 씀</li></ul>
+    </li>
+    <li>filters는 기본 AND. or, not 블록으로 묶을 수 있음</li>
+    <li>리소스 종류가 달라도 문법은 그대로임 — aws.ec2든 aws.rds든 tag:Owner 표기가 같음</li>
+    <li>지표가 필요한 필터(type: metrics)만 CloudWatch를 추가로 호출함</li>
+  </ul>
+  <p>describe 응답만 보는 필터는 값이 싸고 정확함. 밖에 물어보는 필터는 <span class="prob-text">틀릴 수 있음</span> — 이 차이가 뒤에서 조치 수위를 가름.</p>
+</section>
+
+<!-- ════════ 5장. 원리 3 — 핵심 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">태그가 곧 상태 저장소</h2>
+  <p>리포트와 삭제 사이에 있는 조치가 <mark>mark-for-op</mark>. 하는 일은 태그 하나 쓰는 것뿐임.</p>
+  <p class="codedesc">정책이 쓰는 값과, 리소스에 실제로 박히는 태그</p>
+<pre class="code"><span class="k">actions</span>: [{<span class="k">type</span>: <span class="hot">mark-for-op</span>, <span class="k">tag</span>: c7n_tag_compliance, <span class="k">op</span>: stop, <span class="k">days</span>: 4}]
+
+<span class="c"># 리소스에 남는 것</span>
+c7n_tag_compliance = <span class="s">"Resource does not meet policy: stop@2026/08/01"</span></pre>
+  <p>짝이 되는 filter <b>marked-for-op</b>이 이 태그를 되읽어, 날짜가 지난 것만 고름.</p>
+</section>
+
+<!-- ════════ 6장. 원리 4 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">상태를 리소스가 들고 있어서 생기는 것</h2>
+  <ul class="bullets">
+    <li>엔진이 DB도 state 파일도 안 가짐 → <mark>노트북에서 돌리든 Lambda에서 돌리든 같은 결과</mark></li>
+    <li>기한이 콘솔에 그대로 보임 → 담당자에게 리포트를 보낼 필요가 없음</li>
+    <li>태그를 고치면 세 번째 정책이 mark를 지움 → <b>수정이 곧 취소</b>, 티켓 불필요</li>
+  </ul>
+  <p>그래서 규칙 하나는 보통 정책 <b>세 개</b>로 씀.</p>
+  <div class="diagram">
+    <div class="dbox wl">① mark<small>기한 기록</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox rs">② unmark<small>고쳐지면 취소</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox hot">③ act<small>기한 지나면 stop</small></div>
+  </div>
+  <p class="caption">policies/2-tag-enforce.yml이 정확히 이 모양임</p>
+</section>
+
+<!-- ════════ 7장. 구조 이해하기 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">정책 한 사이클</h2>
+  <p class="dim">구도 — 정책 → AWS API → 살아남은 리소스 → 조치.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">1</span>
+        <div class="dbox hot">policy.yml</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">DescribeInstances</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">filters</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">actions</div>
+      </div>
+      <p class="exp"><b>1단계.</b> resource 이름이 describe API를 고름. 이 시점엔 계정의 모든 인스턴스가 대상임.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox wl">policy.yml</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">DescribeInstances<small>응답 JSON</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">filters</div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">actions</div>
+      </div>
+      <p class="exp"><b>2단계.</b> 응답을 통째로 받아 옴. 기본 15분 캐시됨 — 뒤에서 이게 함정이 됨.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox wl">policy.yml</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">DescribeInstances</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">filters<small>AND로 거름</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox dim">actions</div>
+      </div>
+      <p class="exp"><b>3단계.</b> 프로세스 안에서 거름. --dryrun이면 여기서 끝나고 resources.json만 남음.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">4</span>
+        <div class="dbox wl">policy.yml</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">DescribeInstances</div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">filters</div>
+        <div class="darrow">→</div>
+        <div class="dbox hot">actions<small>CreateTags·StopInstances</small></div>
+      </div>
+      <p class="exp"><b>4단계.</b> 적힌 순서대로 실행됨. snapshot을 delete 앞에 두는지가 복구 가능 여부를 가름.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 8장. 실행 모드 ════════ -->
+<section class="page">
+  <p class="sec">4. 실행 모드</p>
+  <h2 class="page-title">같은 파일이 세 곳에서 돔</h2>
+  <p>배포 위치는 <b>운영 결정</b>이지 정책 재작성이 아님. 파일은 그대로 둠.</p>
+  <ul class="bullets">
+    <li><b>pull</b> — 내 쉘이나 CI에서 custodian run. 규칙을 쓰고 시험할 때</li>
+    <li><b>periodic</b> — EventBridge 스케줄로 도는 Lambda. 태그 강제와 offhours</li>
+    <li><b>cloudtrail</b> — API 이벤트에 반응하는 Lambda. 생성 순간에 잡을 때</li>
+  </ul>
+  <p>상태를 리소스가 들고 있으므로 모드를 바꿔도 진행 중인 유예 기간이 그대로 이어짐. <mark>pull에서 --dryrun으로 시작해, 숫자가 더 놀랍지 않을 때 periodic으로 옮김.</mark></p>
+</section>
+
+<!-- ════════ 9장. FinOps 레버 ════════ -->
+<section class="page">
+  <p class="sec">5. FinOps 레버</p>
+  <h2 class="page-title">줄일 수 있는 것은 네 종류뿐</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>describe만 보면 되는 것</h3>
+      <ul>
+        <li>주인 없는 지출 — tag:Owner absent</li>
+        <li>업무 시간 외 유휴 — type: offhour</li>
+        <li>고아 리소스 — State: available</li>
+      </ul>
+    </div>
+    <div class="con"><h3>바깥에 물어봐야 하는 것</h3>
+      <ul>
+        <li>과대 사양 — type: metrics(CloudWatch)</li>
+      </ul>
+    </div>
+  </div>
+  <p>앞의 셋은 사실 확인이라 틀릴 수 없음. 마지막 하나만 <span class="prob-text">추정</span>이고, 그래서 조치 수위가 다름.</p>
+</section>
+
+<!-- ════════ 10장. 레버 1 ════════ -->
+<section class="page">
+  <p class="sec">5. FinOps 레버</p>
+  <h2 class="page-title">레버 ① 태그 거버넌스</h2>
+  <p class="codedesc">같은 파일 안의 세 정책. 나머지 레버의 예외 처리도 전부 태그로 이뤄짐</p>
+<pre class="code"><span class="c"># ① 기한 기록. 오늘은 아무것도 안 멈춤</span>
+<span class="k">filters</span>: [<span class="s">"tag:Owner"</span>: absent]
+<span class="k">actions</span>: [{<span class="k">type</span>: mark-for-op, <span class="k">op</span>: stop, <span class="k">days</span>: 4}]
+<span class="c"># ② 고쳐졌으면 기한 취소</span>
+<span class="k">filters</span>: [<span class="s">"tag:Owner"</span>: not-null]
+<span class="k">actions</span>: [{<span class="k">type</span>: remove-tag, <span class="k">tags</span>: [c7n_tag_compliance]}]
+<span class="c"># ③ 기한이 지난 것만. terminate가 아니라 stop</span>
+<span class="k">filters</span>: [{<span class="k">type</span>: <span class="hot">marked-for-op</span>, <span class="k">op</span>: stop}]
+<span class="k">actions</span>: [stop]</pre>
+  <p><b>체크포인트.</b> ③이 stop인 이유 — <mark>되돌릴 수 있는 조치라야 자동화해도 됨</mark>.</p>
+</section>
+
+<!-- ════════ 11장. 레버 2 ════════ -->
+<section class="page">
+  <p class="sec">5. FinOps 레버</p>
+  <h2 class="page-title">레버 ② 업무 시간 외 정지</h2>
+  <p class="dim">주 168시간 중 개발 환경이 실제로 쓰이는 시간은 40시간 남짓. 즉효가 가장 큼.</p>
+  <p class="codedesc">opt-out은 "태그로 빼지 않으면 전부 대상"이라는 뜻</p>
+<pre class="code"><span class="k">filters</span>: [{<span class="k">type</span>: offhour, <span class="k">tag</span>: c7n_schedule, <span class="k">default_tz</span>: Asia/Seoul,
+            <span class="k">offhour</span>: 20, <span class="k">opt-out</span>: <span class="hot">true</span>}]</pre>
+  <ul class="bullets">
+    <li>opt-out true면 기본이 정지, c7n_schedule=off인 것만 예외</li>
+    <li>opt-in이면 태그 붙인 것만 정지 — 안전하지만 아무도 안 붙여서 절감이 0이 됨</li>
+    <li><span class="xmark">✕</span> RDS는 <span class="prob-text">7일 뒤 AWS가 자동으로 다시 켬</span> — start 정책은 선택이 아님</li>
+  </ul>
+  <p><b>이 정책의 성패는 opt-in/opt-out 한 줄</b>에서 갈림. 절감과 항의가 여기서 결정됨.</p>
+</section>
+
+<!-- ════════ 12장. 레버 3 ════════ -->
+<section class="page">
+  <p class="sec">5. FinOps 레버</p>
+  <h2 class="page-title">레버 ③ 주인이 이미 떠난 리소스</h2>
+  <ul class="bullets">
+    <li>미사용 EBS — State: available. 붙어 있는 볼륨과 요금이 같음</li>
+    <li>미할당 EIP — AssociationId: absent. 안 쓰기 때문에 과금됨</li>
+    <li>오래된 수동 RDS 스냅샷 — 자동 스냅샷과 달리 스스로 만료되지 않음</li>
+  </ul>
+  <p class="codedesc">actions는 적힌 순서대로 실행됨. 이 순서가 복구 가능 여부를 가름</p>
+<pre class="code"><span class="k">actions</span>:
+  - <span class="k">type</span>: <span class="hot">snapshot</span>   <span class="c"># 먼저</span>
+  - <span class="k">type</span>: delete</pre>
+  <p><b>단, 스냅샷도 돈임.</b> 지우려고 만든 정책이 몇 달 뒤 그 비용을 그대로 되살릴 수 있음. 스냅샷 만료 정책과 짝으로 둠.</p>
+</section>
+
+<!-- ════════ 13장. 레버 4 ════════ -->
+<section class="page">
+  <p class="sec">5. FinOps 레버</p>
+  <h2 class="page-title">레버 ④ 과대 사양 — 유일하게 틀릴 수 있는 것</h2>
+  <p class="codedesc">14일 평균 CPU 5% 미만. 그런데 조치는 태그까지만</p>
+<pre class="code"><span class="k">filters</span>: [{<span class="k">type</span>: <span class="hot">metrics</span>, <span class="k">name</span>: CPUUtilization,
+           <span class="k">days</span>: 14, <span class="k">value</span>: 5, <span class="k">op</span>: less-than}]
+<span class="k">actions</span>: [{<span class="k">type</span>: tag}]   <span class="c"># stop도 resize도 아님</span></pre>
+  <ul class="bullets">
+    <li>CPU가 낮다는 사실은 <mark>정상적인 대기 상태와 구별되지 않음</mark></li>
+    <li>그래서 사람이 판단할 목록을 만들어 주는 데까지만 함</li>
+    <li>terminate가 필요하면 mark-for-op에 14일 정도의 긴 기한을 걸어 사람이 개입할 시간을 둠</li>
+  </ul>
+</section>
+
+<!-- ════════ 14장. 실습 ════════ -->
+<section class="page">
+  <p class="sec">6. 실습</p>
+  <h2 class="page-title">계정 없이 파이프라인을 관찰</h2>
+  <p class="dim">mock AWS(moto)에 EC2 2대, 미사용 EBS 1개, RDS 1대를 심고 정책을 돌린 실제 출력.</p>
+  <p class="codedesc">조회 전용 정책 → 태그 강제 정책. 아직 아무것도 멈추지 않음</p>
+<pre class="code"><span class="c"># 1) actions 없는 정책</span>
+policy:ec2-missing-cost-tags count:<span class="hot">1</span>   <span class="c"># 2대 중 1대만 걸림</span>
+policy:rds-missing-cost-tags count:<span class="hot">1</span>
+
+<span class="c"># 2) mark 정책. stop 정책은 같은 실행에서 0건</span>
+custodian.actions:INFO Tagging 1 resources for stop on <span class="s">2026/08/01</span>
+policy:ec2-untagged-stop count:<span class="hot">0</span></pre>
+  <p><b>체크포인트.</b> 두 인스턴스의 차이는 <mark>Owner 태그 하나뿐</mark>. 정책은 그 차이만 보고 갈랐음.</p>
+</section>
+
+<!-- ════════ 15장. 반전 ════════ -->
+<section class="page">
+  <p class="sec">7. 반전</p>
+  <h2 class="page-title">두 번째 실행이 아무 일도 안 함</h2>
+  <p class="dim">태그 날짜를 과거로 바꾸고 같은 파일을 다시 돌렸는데 stop이 0건으로 나옴.</p>
+  <pre class="code"><span class="bad">policy:ec2-untagged-mark  count:1</span>   <span class="c"># 이미 마크된 리소스인데 또 걸림</span>
+<span class="bad">policy:ec2-untagged-stop  count:0</span>   <span class="c"># 기한이 지났는데 안 걸림</span></pre>
+  <ul class="bullets">
+    <li>범인은 <mark>describe 결과 로컬 캐시</mark> — 기본 15분. 방금 쓴 태그가 안 보임</li>
+    <li>단서는 두 정책이 <b>동시에</b> 어긋난 것. 필터가 틀렸다면 한쪽만 어긋남</li>
+    <li>해결 — custodian run <span class="hot">--cache-period 0</span></li>
+  </ul>
+  <p>같은 실행에서 mark와 act를 붙여 두면 캐시 때문에 하루치 동작이 통째로 밀릴 수 있음. 운영에서 둘을 분리해 배포하는 이유이기도 함.</p>
+</section>
+
+<!-- ════════ 16장. 안전장치 ════════ -->
+<section class="page">
+  <p class="sec">8. 안전장치</p>
+  <h2 class="page-title">비용을 줄이는 정책과 사고를 내는 정책은 같은 정책</h2>
+  <ul class="bullets">
+    <li>--dryrun으로 먼저 개수를 봄. 예상보다 많으면 필터에 계정·태그 범위를 더함</li>
+    <li>mark 정책을 먼저 일주일 배포하고 act는 나중에 — 필터가 틀렸음을 싸게 아는 유일한 방법</li>
+    <li>out/의 resources.json을 보관. 사고 뒤에 <b>엔진이 무엇을 봤는지</b>에 대한 유일한 증거임</li>
+  </ul>
+  <p class="codedesc">YAML 리뷰가 놓쳤을 때의 마지막 방어선 — 이미 마크된 리소스만 삭제 허용</p>
+<pre class="code"><span class="k">Action</span>: [<span class="s">"ec2:DeleteVolume"</span>]
+<span class="k">Condition</span>: {<span class="k">StringLike</span>: {<span class="s">"aws:ResourceTag/c7n_orphan"</span>: <span class="hot">"*"</span>}}</pre>
+  <p>필터를 잘못 써도 mark 단계를 거치지 않은 리소스는 삭제 자체가 거부됨.</p>
+</section>
+
+<!-- ════════ 17장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">9. 트레이드오프</p>
+  <h2 class="page-title">얻는 것과 넘겨받는 것</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>얻는 것</h3>
+      <ul>
+        <li>월 1회 수작업 루프가 사라짐</li>
+        <li>유예 기간이 콘솔에 보여 통보가 필요 없음</li>
+        <li>엔진이 무상태라 배포 위치를 자유롭게 바꿈</li>
+      </ul>
+    </div>
+    <div class="con"><h3>잃는 것</h3>
+      <ul>
+        <li>태그가 곧 상태라, 태그를 지우면 유예 기간도 사라짐</li>
+        <li>정책 하나를 고치면 계정 전체에 즉시 적용됨</li>
+        <li>절감의 근거가 YAML로 흩어져 리뷰 대상이 늘어남</li>
+      </ul>
+    </div>
+  </div>
+  <p><b>어디를 봐야 하나.</b> "이 정책이 얼마를 줄이나"가 아니라 <mark>"이 정책이 틀렸을 때 무엇이 멈추나"</mark>.</p>
+</section>
+
+<!-- ════════ 18장. 확인 1 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ①</h2>
+  <div class="quiz">
+    <p class="q">Q1. 태그 날짜를 과거로 바꾸고 정책을 다시 돌렸는데 mark는 또 걸리고 stop은 0건이다. 먼저 의심할 것은?</p>
+    <ul class="opts">
+      <li>marked-for-op 필터의 op 값이 정책과 다름</li>
+      <li data-answer>describe 결과가 로컬 캐시에서 나옴</li>
+      <li>태그 문자열 형식이 custodian 규약과 다름</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 두 정책이 <b>동시에</b> 어긋난 것이 단서. 필터나 태그 형식이 문제라면 한쪽만 어긋남. 두 정책 모두 "태그가 없던 시점"의 데이터를 본 것이므로 원인은 입력 데이터, 즉 캐시. --cache-period 0으로 확인.</p>
+  </div>
+</section>
+
+<!-- ════════ 19장. 확인 2 ════════ -->
+<section class="page">
+  <p class="sec">10. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 ②</h2>
+  <div class="quiz">
+    <p class="q">Q2. RDS offhours 정책을 배포했다. 첫 주는 비용이 줄었는데 둘째 주부터 절감이 사라졌다. 가장 그럴듯한 원인은?</p>
+    <ul class="opts">
+      <li>인스턴스에 c7n_schedule 태그가 붙어 예외 처리됨</li>
+      <li data-answer>AWS가 정지 7일 뒤 인스턴스를 자동으로 다시 켬</li>
+      <li>Performance Insights 때문에 정지가 무시됨</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> RDS 정지는 최대 7일이고 그 뒤 AWS가 자동 기동함. 이후로는 정지 정책이 매일 다시 멈추지 않는 한 계속 켜져 있음. onhour/offhour를 짝으로 두고, 실제로 실행됐는지까지 확인해야 함.</p>
+  </div>
+</section>
+
+<!-- ════════ 20장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">11. 결론</p>
+  <h2 class="page-title">도입 질문으로 돌아가서</h2>
+  <p>리포트에 빠져 있던 것은 데이터가 아니라 <b>기한</b>이었음. Custodian이 한 일은 그 기한을 리소스 자신의 태그에 적어 둔 것뿐이고, 그것만으로 엔진은 무상태가 되고, 담당자는 콘솔에서 기한을 보고, 태그를 고치면 기한이 사라짐. 사람이 매달 돌리던 루프가 통째로 없어진 이유가 이것임.</p>
+  <p>기억할 원리 — <mark>상태를 엔진이 아니라 대상에 둔다</mark>. 다음에 비슷한 자동화를 만들 때 "이 상태를 어디에 저장할까"가 아니라 "대상 자신에게 적을 수 있는가"부터 물으면 됨.</p>
+  <p class="foot">핸즈온: aws/custodian-finops · 출처: Cloud Custodian 공식 문서(filters, actions, offhours, modes) · AWS RDS 사용 설명서(정지 인스턴스 7일 제한)</p>
+</section>
+
+</main>
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+# Step 3. The cheapest instance is a stopped one. Dev accounts idle ~128h a week.
+policies:
+  - name: ec2-offhours-stop
+    resource: aws.ec2
+    description: |
+      Stop at 20:00 KST. opt-out means every instance is in scope unless it
+      carries c7n_schedule: off.
+    filters:
+      - "State.Name": running
+      - type: offhour
+        tag: c7n_schedule
+        default_tz: Asia/Seoul
+        offhour: 20
+        opt-out: true
+    actions:
+      - stop
+
+  - name: ec2-onhours-start
+    resource: aws.ec2
+    description: |
+      Start again at 08:00 KST on weekdays only.
+    filters:
+      - "State.Name": stopped
+      - type: onhour
+        tag: c7n_schedule
+        default_tz: Asia/Seoul
+        onhour: 8
+        opt-out: true
+    actions:
+      - start
+
+  - name: rds-offhours-stop
+    resource: aws.rds
+    description: |
+      RDS stop is capped at seven days by AWS, so the start policy is not optional.
+    filters:
+      - "DBInstanceStatus": available
+      - type: offhour
+        tag: c7n_schedule
+        default_tz: Asia/Seoul
+        offhour: 20
+        opt-out: true
+    actions:
+      - stop
+
+  - name: rds-onhours-start
+    resource: aws.rds
+    filters:
+      - "DBInstanceStatus": stopped
+      - type: onhour
+        tag: c7n_schedule
+        default_tz: Asia/Seoul
+        onhour: 8
+        opt-out: true
+    actions:
+      - start

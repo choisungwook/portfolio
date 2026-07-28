@@ -1,0 +1,27 @@
+# Step 1. Look only. No action block, so custodian can only report.
+policies:
+  - name: ec2-missing-cost-tags
+    resource: aws.ec2
+    description: |
+      Running instances that no cost report can attribute to anyone.
+    filters:
+      - "State.Name": running
+      - or:
+          - "tag:Owner": absent
+          - "tag:Environment": absent
+
+  - name: rds-missing-cost-tags
+    resource: aws.rds
+    description: |
+      Same question for RDS. The filter language does not change per resource.
+    filters:
+      - or:
+          - "tag:Owner": absent
+          - "tag:Environment": absent
+
+  - name: ebs-unattached-audit
+    resource: aws.ebs
+    description: |
+      Volumes nothing is attached to. They bill at the full gp3 rate.
+    filters:
+      - State: available

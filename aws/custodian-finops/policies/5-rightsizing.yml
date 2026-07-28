@@ -1,0 +1,53 @@
+# Step 5. The resource is used, just not enough. Evidence comes from CloudWatch,
+# so these policies cannot be exercised against the local mock.
+policies:
+  - name: ec2-low-cpu-tag
+    resource: aws.ec2
+    description: |
+      Under 5 percent average CPU for 14 days. Tag only, because CPU alone is not proof.
+    filters:
+      - "State.Name": running
+      - type: metrics
+        name: CPUUtilization
+        days: 14
+        period: 86400
+        value: 5
+        op: less-than
+    actions:
+      - type: tag
+        key: c7n_rightsizing
+        value: cpu-under-5-percent-14d
+
+  - name: ec2-stopped-too-long
+    resource: aws.ec2
+    description: |
+      Stopped for over 60 days. Compute is free, the attached EBS is not.
+    filters:
+      - "State.Name": stopped
+      - type: instance-age
+        days: 60
+        op: greater-than
+    actions:
+      - type: mark-for-op
+        tag: c7n_stale
+        op: terminate
+        days: 14
+
+  - name: rds-idle-mark
+    resource: aws.rds
+    description: |
+      Never more than one connection in 14 days. Nothing is talking to this database.
+    filters:
+      - "DBInstanceStatus": available
+      - type: metrics
+        name: DatabaseConnections
+        days: 14
+        period: 86400
+        statistics: Maximum
+        value: 1
+        op: less-than
+    actions:
+      - type: mark-for-op
+        tag: c7n_idle
+        op: stop
+        days: 3

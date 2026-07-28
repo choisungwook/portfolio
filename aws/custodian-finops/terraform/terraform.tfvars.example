@@ -1,0 +1,5 @@
+aws_region   = "ap-northeast-2"
+project_name = "custodian-finops"
+
+# Set false to skip RDS and run the EC2 and EBS half of the lab only.
+create_rds = true
