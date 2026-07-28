@@ -12,5 +12,5 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/renderer"]
+  "exclude": ["src/renderer", "src/web"]
 }

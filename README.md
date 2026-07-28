@@ -109,7 +109,7 @@
 - [AI agent용 카드뉴스 레이아웃 레퍼런스](./product/cardnews-reference/)
 - [JVM heap dump OOM 원인 분석 데스크톱 도구](./product/hprof-oom-analyzer/) (26.7.18)
 - [git graph 데스크톱 앱 (akbun-gitdesktop)](./product/akbun-gitdesktop/) (26.7.25)
-- [언어 공부용 구간 반복 오디오 플레이어 (akbun-shadowing-player)](./product/akbun-shadowing-player/) (26.7.25)
+- [언어 공부용 구간 반복 오디오 플레이어 (akbun-shadowing-player, shadowing.akbun.com)](./product/akbun-shadowing-player/) (26.7.25)
 - [EKS 업그레이드용 노드/파드 조회 데스크톱 앱 (akbun-k8supgradeview)](./product/akbun-k8supgradeview/) (26.7.26)
 
 ## Dockerfile

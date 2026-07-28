@@ -12,7 +12,9 @@
 |---|---|
 | src/main | 메인 프로세스: main.ts, library.ts(목록 영속), preload.ts, logger.ts, update.ts |
 | src/renderer | 렌더러 UI: waveform.ts(파형 캔버스), renderer.ts(화면 전환·컨트롤) |
+| src/web | 웹 배포용 window.api 구현: IndexedDB, input[type=file] |
 | static | index.html, style.css |
+| scripts | build-web.mjs: dist-web/ 정적 산출물 생성 |
 | test | node:test 검증 (plain JS, dist/를 읽음) |
 
 ## 명령어
@@ -25,13 +27,15 @@ npm install
 npm run build
 npm test
 npm start
-npm run dist    # release/에 dmg 생성
+npm run dist      # release/에 dmg 생성
+npm run build:web # dist-web/에 웹 정적 산출물 생성
 ```
 
 ## 아키텍처 제약
 
 - **renderer는 모듈이 아니다.** import/export 금지. index.html이 waveform.js → renderer.js 순서로 전역 script를 로드한다. [ADR](./knowledge/decisions/2026-07-plain-tsc-script-renderer.md)
-- **main↔renderer 타입은 수동 동기화.** IPC 채널을 추가하면 preload.ts와 src/renderer/api.d.ts를 함께 고친다.
+- **main↔renderer 타입은 수동 동기화.** IPC 채널을 추가하면 preload.ts와 src/renderer/api.d.ts를 함께 고친다. **웹 배포가 있으므로 src/web/api.ts도 같이 고친다.** renderer가 Electron API를 직접 부르면 웹 빌드가 깨진다. [ADR](./knowledge/decisions/2026-07-web-build-window-api-shim.md)
+- **static/index.html의 script 태그와 stylesheet 링크를 고치면 scripts/build-web.mjs의 치환 문자열도 같이 고친다.** 못 찾으면 웹 빌드가 오류로 멈춘다.
 - **재생과 파형은 경로가 다르다.** 재생은 HTMLAudioElement(preservesPitch), 파형은 Web Audio decode. 합치면 배속 시 음정이 변하므로 합치지 않는다. [ADR](./knowledge/decisions/2026-07-html-audio-plus-webaudio-split.md)
 - **화면 섹션 표시는 hidden 속성으로 제어한다.** 섹션을 추가하면 style.css의 `[hidden] { display: none }` 규칙에 선택자를 추가한다.
 - **테마 색은 style.css :root 변수 한 곳에만 둔다.** `light-dark()` 사용. 예외는 `--wave-*` — canvas가 getComputedStyle로 읽으므로 선택자별로 값을 나눈다. 테마 변경 시 `waveform.refreshColors()` 호출.
@@ -41,6 +45,10 @@ npm run dist    # release/에 dmg 생성
 ## 테스트
 
 node:test 내장 러너만 쓴다. 현재 대상은 업데이트의 임시 파일 정리다. **업데이트 관련 코드(update.ts, main.ts의 installUpdate)를 고치면 npm test로 확인한다.** 교체 스크립트 테스트는 hdiutil이 없는 ubuntu 러너에서도 동작한다.
+
+## 웹 배포
+
+shadowing.akbun.com에 Cloudflare Pages로 배포한다. master push가 dist-web/을 빌드해 올린다. 설정과 데스크톱 대비 제약은 [deploy.md](./deploy.md)에 있다.
 
 ## CI와 릴리스
 

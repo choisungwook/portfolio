@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-28
+
+* **Creation**: [웹 배포는 renderer를 그대로 두고 window.api만 브라우저 구현으로 갈아 끼운다](decisions/2026-07-web-build-window-api-shim.md) 결정 기록. shadowing.akbun.com Cloudflare 배포 작업.
+
 ## 2026-07-25 (4차)
 
 * **Creation**: [릴리스 버전의 단일 출처를 package.json으로 되돌림](decisions/2026-07-version-source-package-json.md) 결정 기록. tag 자동 계산 결정을 대체.

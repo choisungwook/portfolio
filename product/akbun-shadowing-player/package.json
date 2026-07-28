@@ -1,7 +1,7 @@
 {
   "name": "akbun-shadowing-player",
   "productName": "akbun-shadowing-player",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "언어 공부(쉐도잉)용 구간 반복 오디오 플레이어",
   "main": "dist/main/main.js",
   "author": "akbun",
@@ -12,15 +12,18 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json",
+    "build:web": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.web.json && node scripts/build-web.mjs",
     "test": "npm run build && node --test \"test/*.test.js\"",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --mac --publish never"
+    "dist": "npm run build && electron-builder --mac --publish never",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "wrangler": "^4.114.0"
   },
   "build": {
     "appId": "dev.akbun.shadowing-player",
