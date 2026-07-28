@@ -16,6 +16,8 @@
 - AWS provider 및 모듈 버전은 **하드코딩하지 않는다**. 웹 검색으로 최신 안정 버전을 확인한다.
 - `default_tags`에 `ManagedBy = "Terraform"`과 `Project = var.project_name`을 반드시 포함한다.
 
+버전 고정과 default_tags를 갖춘 최소 형태:
+
 ```hcl
 # terraform.tf
 terraform {
@@ -51,7 +53,10 @@ provider "aws" {
 - AMI 조회: 반드시 `data "aws_ami"` 블록을 사용하고, `var.arch`(`arm64` | `x86_64`)로 아키텍처를 제어한다.
 - 기본 EBS: **30 GB**, `gp3`, **암호화 필수** (기본 AWS 관리형 KMS 키)
 - 원격 접속: **AWS SSM Session Manager**를 사용한다. SSH를 사용하지 않으므로 key pair, port 22 ingress, bastion을 만들지 않는다.
-- SSM 접속을 위해 `AmazonSSMManagedInstanceCore` 정책이 붙은 IAM instance profile을 EC2에 연결한다.
+- SSM 접속을 위해 `AmazonSSMManagedInstanceCore` 정책이 붙은 IAM instance profile을 만들어 EC2의 `iam_instance_profile`에 연결한다. role의 assume role policy는 `ec2.amazonaws.com`이 `sts:AssumeRole`을 하도록 허용한다.
+- EBS는 `aws_instance`의 `root_block_device`에 `volume_type = "gp3"`, `encrypted = true`, `volume_size = 30`을 지정한다.
+
+AMI 이름 필터는 OS와 아키텍처마다 달라 외우기 어려우므로 아래 형태를 그대로 쓴다.
 
 ```hcl
 # data.tf - AMI 조회 패턴
@@ -77,49 +82,6 @@ data "aws_ami" "al2023" {
   filter {
     name   = "virtualization-type"
     values = ["hvm"]
-  }
-}
-
-# iam.tf - SSM 접속용 IAM instance profile 패턴
-resource "aws_iam_role" "ec2_ssm" {
-  name = "${var.project_name}-ec2-ssm"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = { Service = "ec2.amazonaws.com" }
-        Action    = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
-  role       = aws_iam_role.ec2_ssm.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "ec2_ssm" {
-  name = "${var.project_name}-ec2-ssm"
-  role = aws_iam_role.ec2_ssm.name
-}
-
-# ec2.tf - EC2 인스턴스 패턴
-resource "aws_instance" "web" {
-  ami                  = local.ami_id
-  instance_type        = var.instance_type
-  iam_instance_profile = aws_iam_instance_profile.ec2_ssm.name
-
-  root_block_device {
-    volume_size = var.ebs_size
-    volume_type = "gp3"
-    encrypted   = true
-  }
-
-  tags = {
-    Name = "${var.project_name}-web"
   }
 }
 ```
@@ -162,27 +124,7 @@ data "aws_subnets" "default" {
 - **Performance Insights 필수**: 7일 보관 (프리 티어)
 - 로그는 **선택사항** — 사용자가 요청할 때만 활성화한다.
 - `skip_final_snapshot = true` (실습 환경)
-
-```hcl
-resource "aws_db_instance" "main" {
-  identifier     = "${var.project_name}-db"
-  engine         = "mysql"
-  engine_version = "8.0"
-  instance_class = var.db_instance_class
-
-  allocated_storage = var.db_allocated_storage
-  storage_encrypted = true
-
-  performance_insights_enabled          = true
-  performance_insights_retention_period = 7
-
-  skip_final_snapshot = true
-
-  tags = {
-    Name = "${var.project_name}-db"
-  }
-}
-```
+- `aws_db_instance`에 설정할 인자는 `storage_encrypted = true`, `performance_insights_enabled = true`, `performance_insights_retention_period = 7`이다.
 
 ## ElastiCache 규칙
 
@@ -190,92 +132,13 @@ resource "aws_db_instance" "main" {
 - 최소 버전: **Valkey 7.2 이상**. RBAC(user group)과 IAM 인증이 모두 이 버전부터 가능하다.
 - 기본 노드 타입: **cache.t4g.micro** (Graviton, 비용 절약). 스케일업 시 `cache.t4g` 패밀리를 사용한다.
 - **암호화 필수**: 전송 중 암호화(`transit_encryption_enabled = true`, `transit_encryption_mode = "required"`)와 저장 시 암호화(`at_rest_encryption_enabled = true`)를 항상 켠다.
-- **인증은 RBAC + IAM을 기본**으로 한다. AUTH token 단독 방식은 쓰지 않는다.
-  - `aws_elasticache_user`로 IAM user를 만든다. IAM user는 `user_id`와 `user_name`이 같아야 하고 `authentication_mode { type = "iam" }`을 쓴다.
-  - `aws_elasticache_user_group`으로 user들을 묶고, `aws_elasticache_replication_group`의 `user_group_ids`에 연결한다.
-  - IAM 인증으로 접속하는 주체(EC2 instance role 등)의 IAM role에 `elasticache:Connect` 권한을 replication group ARN과 user ARN에 부여한다.
+- **인증은 RBAC + IAM을 기본**으로 한다. AUTH token 단독 방식은 쓰지 않는다. AUTH token은 클러스터 공용 password라 사용자 단위 권한 분리와 감사가 안 되고 장기 password가 코드에 남는 반면, IAM 인증은 SigV4로 서명한 15분짜리 임시 token을 쓴다.
+  - `aws_elasticache_user`로 IAM user를 만든다. `authentication_mode { type = "iam" }`을 쓰고, IAM user는 `user_id`와 `user_name`이 같아야 한다. `access_string`은 실습 기준 `on ~* +@all`이면 충분하다.
+  - `aws_elasticache_user_group`에 `engine = "valkey"`와 user들을 묶고, `aws_elasticache_replication_group`의 `user_group_ids`에 연결한다. Valkey user group은 default user가 반드시 있어야 하는 제약이 없어 IAM user만 남긴 IAM 전용 구성이 가능하다.
+  - IAM 인증으로 접속하는 주체(EC2 instance role 등)의 IAM role에 `elasticache:Connect` 권한을 준다. 대상 리소스는 replication group ARN(`arn:aws:elasticache:<region>:<account>:replicationgroup:<id>`)과 user ARN(`arn:aws:elasticache:<region>:<account>:user:<user_id>`) 두 개다. 둘 중 하나만 주면 연결 token 서명이 실패한다.
 - 장기 password가 필요하면(레거시 클라이언트 호환 등) `default` user를 `authentication_mode { type = "password" }`로 추가한다. 새로 만드는 클러스터는 IAM 전용을 기본으로 한다.
-- Security Group: ElastiCache는 퍼블릭에 노출하지 않는다. 접속하는 app security group에서만 port 6379 ingress를 허용한다(`referenced_security_group_id` 사용).
-- 이미 떠 있는 AUTH token 클러스터를 RBAC/IAM으로 무중단 전환하는 절차는 별도다. `aws/elasticache-authentication` 핸즈온과 [ElastiCache 인증 전환 결정](../../knowledge/decisions/2026-07-elasticache-valkey-rbac.md)을 참고한다.
-
-RBAC user, user group, IAM 인증을 갖춘 Valkey replication group 패턴:
-
-```hcl
-# elasticache.tf - IAM 전용 user와 user group
-resource "aws_elasticache_user" "iam" {
-  user_id       = var.iam_user_name
-  user_name     = var.iam_user_name # IAM user는 user_id와 user_name이 같아야 한다
-  access_string = "on ~* +@all"
-  engine        = "valkey"
-
-  authentication_mode {
-    type = "iam"
-  }
-}
-
-resource "aws_elasticache_user_group" "this" {
-  engine        = "valkey"
-  user_group_id = "${var.project_name}-users"
-  user_ids      = [aws_elasticache_user.iam.user_id]
-}
-
-resource "aws_elasticache_replication_group" "this" {
-  replication_group_id = var.project_name
-  description          = "Valkey RBAC + IAM auth"
-
-  engine         = "valkey"
-  engine_version = "8.0" # RBAC/IAM은 Valkey 7.2 이상 필요
-  node_type      = var.cache_node_type
-  port           = 6379
-
-  subnet_group_name  = aws_elasticache_subnet_group.this.name
-  security_group_ids = [aws_security_group.elasticache.id]
-
-  at_rest_encryption_enabled = true
-  transit_encryption_enabled = true
-  transit_encryption_mode    = "required"
-  user_group_ids             = [aws_elasticache_user_group.this.id]
-
-  tags = {
-    Name = var.project_name
-  }
-}
-```
-
-IAM 인증 주체의 role에 붙일 `elasticache:Connect` 정책 패턴:
-
-```hcl
-# iam.tf - IAM 클라이언트가 연결 token을 서명할 때 필요한 권한
-data "aws_iam_policy_document" "elasticache_connect" {
-  statement {
-    actions = ["elasticache:Connect"]
-    resources = [
-      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:replicationgroup:${var.project_name}",
-      "arn:aws:elasticache:${var.aws_region}:${data.aws_caller_identity.current.account_id}:user:${var.iam_user_name}",
-    ]
-  }
-}
-
-resource "aws_iam_role_policy" "elasticache_connect" {
-  name   = "${var.project_name}-elasticache-connect"
-  role   = aws_iam_role.app.id
-  policy = data.aws_iam_policy_document.elasticache_connect.json
-}
-```
-
-app security group에서만 Valkey port를 여는 Security Group 패턴:
-
-```hcl
-# security_group.tf - app security group에서만 6379 허용
-resource "aws_vpc_security_group_ingress_rule" "elasticache_from_app" {
-  security_group_id            = aws_security_group.elasticache.id
-  description                  = "TLS Valkey from the app security group"
-  referenced_security_group_id = aws_security_group.app.id
-  from_port                    = 6379
-  ip_protocol                  = "tcp"
-  to_port                      = 6379
-}
-```
+- Security Group: ElastiCache는 퍼블릭에 노출하지 않는다. 접속하는 app security group에서만 port 6379 ingress를 허용한다. `aws_vpc_security_group_ingress_rule`에 CIDR 대신 `referenced_security_group_id`로 app security group을 지정한다.
+- 이미 떠 있는 AUTH token 클러스터를 RBAC/IAM으로 무중단 전환할 때는 `default` user의 password를 기존 AUTH token으로 둔 채 다리로 삼고, IAM user로 트래픽을 옮긴 뒤 `default` user를 user group에서 뺀다. AUTH는 연결이 맺어질 때 한 번만 검사하므로 이미 붙어 있는 연결은 전환 중에도 끊기지 않는다.
 
 ## Security Group 규칙
 
@@ -304,37 +167,5 @@ data "http" "my_ip" {
 - OAC 설정: `signing_behavior = "always"`, `signing_protocol = "sigv4"`
 - Origin의 Cache-Control을 존중하려면 캐시 정책에 **`min_ttl = 0`**을 설정한다. `min_ttl`이 0보다 크면 Origin 헤더를 무시하고 강제 캐시한다.
 - `viewer_protocol_policy`는 실습 환경에서는 `"allow-all"`, 프로덕션에서는 `"redirect-to-https"`를 사용한다.
-
-OAC와 S3 버킷 정책 예시:
-
-```hcl
-resource "aws_cloudfront_origin_access_control" "s3" {
-  name                              = "${var.project_name}-s3-oac"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
-}
-
-resource "aws_s3_bucket_policy" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowCloudFrontOAC"
-        Effect    = "Allow"
-        Principal = { Service = "cloudfront.amazonaws.com" }
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.this.arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn"     = aws_cloudfront_distribution.this.arn
-            "AWS:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-        }
-      }
-    ]
-  })
-}
-```
+- `aws_cloudfront_origin_access_control`에 `origin_access_control_origin_type = "s3"`를 지정하고, distribution의 origin 블록에 `origin_access_control_id`로 연결한다.
+- S3 버킷 정책은 principal을 IAM user가 아니라 서비스(`cloudfront.amazonaws.com`)로 두고 `s3:GetObject`를 허용한다. 이 상태로는 모든 distribution이 접근할 수 있으므로, `StringEquals` 조건에 `AWS:SourceArn`(해당 distribution의 ARN)과 `AWS:SourceAccount`(계정 ID)를 함께 걸어 내 distribution으로 좁힌다. 이 조건을 빠뜨리는 것이 OAC 구성에서 가장 흔한 실수다.
