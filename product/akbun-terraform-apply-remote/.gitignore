@@ -1,0 +1,7 @@
+/target
+/data
+Cargo.lock
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup

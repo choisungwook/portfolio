@@ -1,0 +1,37 @@
+mod auth;
+mod command;
+mod config;
+mod events;
+mod format;
+mod github;
+mod handler;
+mod jobs;
+mod locks;
+mod project;
+mod server;
+mod signature;
+mod state;
+mod terraform;
+mod workspace;
+
+fn main() {
+  let cfg = match config::Config::from_env() {
+    Ok(cfg) => cfg,
+    Err(e) => {
+      eprintln!("config error: {e}");
+      std::process::exit(1);
+    }
+  };
+  let state = match handler::AppState::new(cfg) {
+    Ok(state) => state,
+    Err(e) => {
+      eprintln!("startup error: {e}");
+      std::process::exit(1);
+    }
+  };
+  println!(
+    "akbun-terraform-apply-remote listening on 0.0.0.0:{} (trigger word: {})",
+    state.cfg.port, state.cfg.trigger
+  );
+  server::run(state);
+}

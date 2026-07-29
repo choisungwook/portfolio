@@ -1,5 +1,12 @@
 # Knowledge Update Log
 
+## 2026-07-29
+
+* **Creation**: [GitHub App installation tokens as the recommended auth for the terraform bot](decisions/2026-07-github-app-tokens-for-terraform-bot.md) 결정 기록. akbun-terraform-apply-remote에 GitHub App 인증과 import 명령을 추가하면서 남긴다.
+* **Creation**: [Deploys drain in-flight runs and hand state over via disk](decisions/2026-07-deploy-drain-and-persisted-takeover.md) 결정 기록. akbun-terraform-apply-remote에 graceful drain, 상태 영속화, EC2/ECS 배포 스택을 추가하면서 남긴다.
+* **Creation**: [Apply only the saved plan file, never a fresh plan](decisions/2026-07-terraform-apply-saved-plan.md) 결정 기록. akbun-terraform-apply-remote 제품을 만들면서 남긴다.
+* **Creation**: [Rust with a small synchronous stack for the terraform PR server](decisions/2026-07-rust-sync-stack-for-webhook-server.md) 결정 기록. 같은 작업에서 기술 스택 선택 이유를 남긴다.
+
 ## 2026-07-28
 
 * **Creation**: [규칙 문서는 도구 중립으로 쓰고 상시 로드 비용으로 정리한다](decisions/2026-07-agents-md-tool-neutral.md) 결정 기록. AGENTS.md 정리와 `.claude/rules/terraform.md`의 코드 템플릿 제거와 함께 남긴다.
