@@ -1,7 +1,7 @@
 /*
  * 색은 전부 CSS 변수로 선언한다. light가 기본값이고
  * prefers-color-scheme: dark 미디어 쿼리가 dark 값으로 덮는다.
- * headlamp처럼 사이드바는 두 테마 모두에서 어두운 톤을 유지한다.
+ * 사이드바는 본문과 구획이 나뉘도록 두 테마 모두에서 어두운 톤을 유지한다.
  */
 :root {
   --bg: #f6f7f9;
@@ -133,7 +133,7 @@ body {
   background: var(--sidebar-hover-bg);
 }
 
-/* headlamp처럼 왼쪽 굵은 선으로 현재 메뉴를 표시한다. 선 두께만큼 패딩을 줄여 정렬을 유지한다. */
+/* 현재 메뉴는 왼쪽 굵은 강조선으로 표시한다. 선 두께만큼 패딩을 줄여 정렬을 유지한다. */
 .tab-button.active {
   background: var(--sidebar-active-bg);
   color: var(--sidebar-active-fg);
