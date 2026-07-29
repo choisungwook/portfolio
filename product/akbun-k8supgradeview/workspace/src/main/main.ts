@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "path";
@@ -18,9 +18,11 @@ import { AppSettings, loadSettings, saveSettings } from "./settings";
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from "./update";
 
 function createWindow(): void {
+  // 렌더러의 테마 배경과 맞춰 기동 시 흰 화면 깜빡임을 막는다.
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#14171c" : "#f6f7f9",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

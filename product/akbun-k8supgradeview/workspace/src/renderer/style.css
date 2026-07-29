@@ -1,46 +1,159 @@
+/*
+ * 색은 전부 CSS 변수로 선언한다. light가 기본값이고
+ * prefers-color-scheme: dark 미디어 쿼리가 dark 값으로 덮는다.
+ * 사이드바는 본문과 구획이 나뉘도록 두 테마 모두에서 어두운 톤을 유지한다.
+ */
+:root {
+  --bg: #f6f7f9;
+  --fg: #1f2328;
+  --surface: #ffffff;
+  --surface-muted: #f3f4f6;
+  --surface-hover: #e5e7eb;
+  --border: #d0d7de;
+  --border-soft: #eaeef2;
+  --muted: #57606a;
+  --muted-soft: #6b7280;
+  --disabled: #8c959f;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --accent-soft: #eff6ff;
+  --accent-strong: #dbeafe;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-strong-bg: #fee2e2;
+  --sidebar-bg: #1f2937;
+  --sidebar-fg: #d1d5db;
+  --sidebar-active-bg: #374151;
+  --sidebar-active-fg: #ffffff;
+  --sidebar-hover-bg: #2b3544;
+  --shadow: rgba(31, 35, 40, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --fg: #e6e8eb;
+    --surface: #1c2128;
+    --surface-muted: #262c35;
+    --surface-hover: #313945;
+    --border: #3a4250;
+    --border-soft: #2c333e;
+    --muted: #9aa4b2;
+    --muted-soft: #8b93a0;
+    --disabled: #6b7482;
+    --accent: #60a5fa;
+    --accent-fg: #0b1220;
+    --accent-soft: #1c2a41;
+    --accent-strong: #24344f;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --danger-bg: #33201f;
+    --danger-border: #7f2c2c;
+    --danger-strong-bg: #4a2222;
+    --sidebar-bg: #171c24;
+    --sidebar-fg: #aeb6c2;
+    --sidebar-active-bg: #313b4b;
+    --sidebar-active-fg: #ffffff;
+    --sidebar-hover-bg: #232b37;
+    --shadow: rgba(0, 0, 0, 0.4);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
 
+/* 사이드바와 본문을 좌우로 나눈다. 스크롤은 본문 영역 안에서만 일어난다. */
 body {
   margin: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #f6f7f9;
-  color: #1f2328;
+  background: var(--bg);
+  color: var(--fg);
 }
 
-header {
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 240px;
+  overflow-y: auto;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+}
+
+.sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 12px 20px;
-  background: #1f2937;
-  color: #f9fafb;
+  gap: 10px;
+  padding: 16px 16px 14px;
 }
 
-header h1 {
-  margin: 0;
-  font-size: 18px;
-}
-
-nav {
+.sidebar-logo {
   display: flex;
-  gap: 8px;
+  color: var(--sidebar-active-fg);
+}
+
+.sidebar-brand h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sidebar-active-fg);
+  overflow-wrap: anywhere;
+}
+
+#sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px 16px;
 }
 
 .tab-button {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #d1d5db;
-  font-size: 14px;
+  color: var(--sidebar-fg);
+  font-size: 13px;
+  text-align: left;
   cursor: pointer;
 }
 
+.tab-button:hover {
+  background: var(--sidebar-hover-bg);
+}
+
+/* 현재 메뉴는 왼쪽 굵은 강조선으로 표시한다. 선 두께만큼 패딩을 줄여 정렬을 유지한다. */
 .tab-button.active {
-  background: #374151;
-  color: #ffffff;
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-fg);
+  border-left: 3px solid var(--accent);
+  padding-left: 9px;
+}
+
+.tab-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tab-label {
+  overflow-wrap: anywhere;
+}
+
+#content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
 }
 
 main {
@@ -71,17 +184,18 @@ main {
 
 .filter-button {
   padding: 6px 12px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--surface);
+  color: var(--fg);
   font-size: 13px;
   cursor: pointer;
 }
 
 .filter-button.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
 
 button {
@@ -99,17 +213,18 @@ button {
 #copy-overprovision,
 #save-settings {
   padding: 6px 14px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--surface);
+  color: var(--fg);
   font-size: 13px;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   font-size: 13px;
@@ -119,12 +234,12 @@ th,
 td {
   padding: 8px 12px;
   text-align: left;
-  border-bottom: 1px solid #eaeef2;
+  border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
 }
 
 th {
-  background: #f3f4f6;
+  background: var(--surface-muted);
   font-weight: 600;
 }
 
@@ -135,17 +250,17 @@ th.sortable {
 }
 
 th.sortable:hover {
-  background: #e5e7eb;
+  background: var(--surface-hover);
 }
 
 /* 키보드로 헤더를 옮겨 다닐 때 지금 어디에 있는지 보이게 한다. */
 th.sortable:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 th.sortable.sorted {
-  color: #2563eb;
+  color: var(--accent);
 }
 
 /* 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 자리를 미리 잡아 둔다. */
@@ -161,11 +276,11 @@ th.sortable.sorted {
 }
 
 #node-table tbody tr:hover {
-  background: #eff6ff;
+  background: var(--accent-soft);
 }
 
 #node-table tbody tr.selected {
-  background: #dbeafe;
+  background: var(--accent-strong);
 }
 
 /* td 자체를 flex로 만들면 표 정렬이 깨지므로 칸 안에 감싸는 요소를 하나 둔다. */
@@ -177,58 +292,59 @@ th.sortable.sorted {
 
 .copy-button {
   padding: 2px 8px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #ffffff;
-  color: #57606a;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 11px;
   flex-shrink: 0;
 }
 
 .copy-button:hover {
-  background: #f3f4f6;
+  background: var(--surface-muted);
 }
 
 /* 행 클릭(파드 조회)과 구분되도록 테두리를 준다. */
 .cordon-button {
   padding: 3px 10px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--surface);
+  color: var(--fg);
   font-size: 12px;
 }
 
 .cordon-button:disabled {
-  color: #8c959f;
+  color: var(--disabled);
   cursor: progress;
 }
 
 .status-ready {
-  color: #15803d;
+  color: var(--success);
   font-weight: 600;
 }
 
 .status-warning {
-  color: #b45309;
+  color: var(--warning);
   font-weight: 600;
 }
 
 .status-error {
-  color: #b91c1c;
+  color: var(--danger);
   font-weight: 600;
 }
 
 /* event와 로그에서 error 낱말만 눈에 띄게 칠한다. 배경까지 줘야 긴 본문에서도 먼저 보인다. */
 .error-keyword {
-  color: #b91c1c;
+  color: var(--danger);
   font-weight: 700;
-  background: #fee2e2;
+  background: var(--danger-strong-bg);
   border-radius: 3px;
   padding: 0 2px;
 }
 
 .empty {
-  color: #6b7280;
+  color: var(--muted-soft);
   padding: 12px 4px;
 }
 
@@ -244,10 +360,10 @@ th.sortable.sorted {
 #error-banner {
   margin: 12px 20px 0;
   padding: 10px 14px;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  color: var(--danger);
   font-size: 13px;
   white-space: pre-wrap;
 }
@@ -276,10 +392,10 @@ th.sortable.sorted {
 .resource-error {
   margin: 0 0 8px;
   padding: 8px 12px;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  color: var(--danger);
   font-size: 13px;
   white-space: pre-wrap;
 }
@@ -299,9 +415,9 @@ th.sortable.sorted {
   max-height: 260px;
   overflow: auto;
   padding: 10px 12px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .checkbox-item {
@@ -318,9 +434,9 @@ th.sortable.sorted {
   max-height: 420px;
   overflow: auto;
   padding: 12px 14px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.5;
@@ -334,7 +450,7 @@ th.sortable.sorted {
 .log-block h3 {
   font-size: 13px;
   margin: 0 0 4px;
-  color: #57606a;
+  color: var(--muted);
 }
 
 .log-block pre {
@@ -342,9 +458,9 @@ th.sortable.sorted {
   max-height: 320px;
   overflow: auto;
   padding: 10px 12px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.5;
@@ -353,9 +469,9 @@ th.sortable.sorted {
 }
 
 .log-block pre.log-error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 #namespace-filter,
@@ -369,8 +485,10 @@ th.sortable.sorted {
 #karpenter-label-selector,
 #karpenter-log-since {
   padding: 6px 10px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
   font-size: 13px;
 }
 
@@ -408,12 +526,12 @@ th.sortable.sorted {
 }
 
 #settings-saved {
-  color: #15803d;
+  color: var(--success);
   font-size: 13px;
 }
 
 .help {
-  color: #57606a;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -422,7 +540,7 @@ th.sortable.sorted {
   padding: 0;
   border: none;
   background: none;
-  color: #2563eb;
+  color: var(--accent);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -445,9 +563,9 @@ th.sortable.sorted {
   display: flex;
   flex-direction: column;
   width: min(720px, 90vw);
-  background: #ffffff;
-  border-left: 1px solid #d0d7de;
-  box-shadow: -8px 0 24px rgba(31, 35, 40, 0.12);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px var(--shadow);
 }
 
 .pod-detail-header {
@@ -456,7 +574,7 @@ th.sortable.sorted {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #eaeef2;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .pod-detail-header h2 {
@@ -473,9 +591,10 @@ th.sortable.sorted {
 
 .pod-detail-actions button {
   padding: 4px 10px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--surface);
+  color: var(--fg);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -495,5 +614,5 @@ th.sortable.sorted {
 }
 
 #pod-detail-body.detail-error {
-  color: #b91c1c;
+  color: var(--danger);
 }
