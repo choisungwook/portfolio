@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-07-28
+
+* **Creation**: [규칙 문서는 도구 중립으로 쓰고 상시 로드 비용으로 정리한다](decisions/2026-07-agents-md-tool-neutral.md) 결정 기록. AGENTS.md 정리와 `.claude/rules/terraform.md`의 코드 템플릿 제거와 함께 남긴다.
+* **Update**: [ElastiCache는 Valkey + RBAC/IAM 기본](decisions/2026-07-elasticache-valkey-rbac.md)에서 terraform 규칙의 HCL 패턴을 가리키던 문장을 갱신했다. 해당 HCL 블록이 규칙 문장으로 대체됐다.
+
 ## 2026-07-27
 
 * **Creation**: [Karpenter over-provisioning은 음수 우선순위 placeholder로 노드를 미리 잡아 둔다](topics/karpenter-overprovisioning.md) topic 작성. akbun-k8supgradeview에 over-provisioning manifest 생성 기능을 넣으면서 남긴다.

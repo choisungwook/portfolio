@@ -11,3 +11,4 @@
 * [Electron 릴리스 빌드는 macOS만](2026-07-electron-release-macos-only.md) - Windows 러너의 checkout 실패와 수요 부재로 릴리스 workflow를 macOS 빌드만 유지하는 결정.
 * [릴리스 버전은 태그에서 계산한다](2026-07-release-version-from-tags.md) - 기존 태그의 patch를 +1 해서 매 실행마다 새 릴리스를 만드는 결정.
 * [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](2026-07-build-before-tag-and-release.md) - 빌드가 실패해도 빈 release가 남던 문제를 순서로 막는 결정.
+* [규칙 문서는 도구 중립으로 쓰고 상시 로드 비용으로 정리한다](2026-07-agents-md-tool-neutral.md) - AGENTS.md에 도구 전용 내용을 두지 않고 규칙 파일을 코드 템플릿 대신 규칙 문장으로 유지하는 결정.
