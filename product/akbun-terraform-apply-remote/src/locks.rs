@@ -21,12 +21,8 @@ pub enum LockOutcome {
 }
 
 impl LockManager {
-  pub fn new() -> LockManager {
-    LockManager { locks: Mutex::new(HashMap::new()) }
-  }
-
-  /// Rebuilds the manager from a persisted snapshot, so locks survive a
-  /// server restart or redeploy.
+  /// Builds the manager from a persisted snapshot (empty on first boot),
+  /// so locks survive a server restart or redeploy.
   pub fn from_snapshot(snapshot: HashMap<String, u64>) -> LockManager {
     LockManager { locks: Mutex::new(snapshot) }
   }
@@ -84,41 +80,41 @@ mod tests {
 
   #[test]
   fn first_pr_acquires_lock() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 1), LockOutcome::Acquired);
   }
 
   #[test]
   fn lock_is_reentrant_for_same_pr() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 1), LockOutcome::Acquired);
   }
 
   #[test]
   fn second_pr_is_rejected_with_holder() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 2), LockOutcome::HeldByOther { pr_number: 1 });
   }
 
   #[test]
   fn different_projects_do_not_conflict() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     assert_eq!(locks.try_lock("o/r", "aws/rds", 2), LockOutcome::Acquired);
   }
 
   #[test]
   fn same_dir_in_different_repos_do_not_conflict() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r1", "aws/vpc", 1);
     assert_eq!(locks.try_lock("o/r2", "aws/vpc", 2), LockOutcome::Acquired);
   }
 
   #[test]
   fn unlock_frees_the_project_for_others() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     locks.unlock("o/r", "aws/vpc", 1);
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 2), LockOutcome::Acquired);
@@ -126,7 +122,7 @@ mod tests {
 
   #[test]
   fn unlock_by_non_holder_is_a_no_op() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     locks.unlock("o/r", "aws/vpc", 2);
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 3), LockOutcome::HeldByOther { pr_number: 1 });
@@ -134,7 +130,7 @@ mod tests {
 
   #[test]
   fn snapshot_round_trip_preserves_holders() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     locks.try_lock("o/r", "aws/rds", 2);
     let restored = LockManager::from_snapshot(locks.snapshot());
@@ -145,7 +141,7 @@ mod tests {
 
   #[test]
   fn release_all_frees_only_this_prs_locks() {
-    let locks = LockManager::new();
+    let locks = LockManager::from_snapshot(HashMap::new());
     locks.try_lock("o/r", "aws/vpc", 1);
     locks.try_lock("o/r", "aws/rds", 1);
     locks.try_lock("o/r", "aws/alb", 2);

@@ -190,6 +190,10 @@ fn plan_one_project(
 
   let project_dir = ws.dir.join(dir);
   if !project_dir.is_dir() {
+    // Not a real project: give the lock back so a typo does not block
+    // other pull requests.
+    state.locks.unlock(&repo.full_name(), dir, pr_number);
+    state.forget_plan(repo, pr_number, dir);
     return RunResult {
       dir: dir.to_string(),
       success: false,
@@ -198,11 +202,18 @@ fn plan_one_project(
   }
   let init = terraform::init(&state.cfg.terraform_bin, &project_dir);
   if !init.success {
+    state.forget_plan(repo, pr_number, dir);
     return RunResult { dir: dir.to_string(), success: false, output: init.output };
   }
   let plan = terraform::plan(&state.cfg.terraform_bin, &project_dir);
   if plan.success {
     state.record_plan(repo, pr_number, dir, head_sha);
+  } else {
+    // A failed re-plan must not leave an older plan record behind, or
+    // apply could ship a plan nobody reviewed against the current run.
+    // The lock is kept on purpose: this PR still claims the project until
+    // apply, close, or unlock.
+    state.forget_plan(repo, pr_number, dir);
   }
   RunResult { dir: dir.to_string(), success: plan.success, output: plan.output }
 }

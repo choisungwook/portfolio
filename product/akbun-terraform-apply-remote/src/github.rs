@@ -23,29 +23,33 @@ impl GithubClient {
     Ok(PrInfo { head_sha: head_sha.to_string() })
   }
 
-  /// Lists every changed file path in the pull request, following pagination.
+  /// Lists every changed file path in the pull request, following
+  /// pagination until the API returns a partial or empty page.
   pub fn list_changed_files(&self, repo: &RepoRef, pr_number: u64) -> Result<Vec<String>, String> {
+    const PER_PAGE: usize = 100;
     let mut files = Vec::new();
-    for page in 1..=30 {
+    let mut page = 1;
+    loop {
       let url = format!(
-        "{}/repos/{}/pulls/{}/files?per_page=100&page={}",
+        "{}/repos/{}/pulls/{}/files?per_page={}&page={}",
         self.api_base,
         repo.full_name(),
         pr_number,
+        PER_PAGE,
         page
       );
       let body: Value = self.get(&url)?;
       let items = body.as_array().ok_or("files response is not an array")?;
-      if items.is_empty() {
-        break;
-      }
       for item in items {
         if let Some(filename) = item["filename"].as_str() {
           files.push(filename.to_string());
         }
       }
+      if items.len() < PER_PAGE {
+        return Ok(files);
+      }
+      page += 1;
     }
-    Ok(files)
   }
 
   pub fn post_comment(&self, repo: &RepoRef, pr_number: u64, body: &str) -> Result<(), String> {
