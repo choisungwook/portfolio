@@ -1,0 +1,64 @@
+name: build-terraform-apply-remote
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-terraform-apply-remote/**'
+      - '.github/workflows/build-terraform-apply-remote.yml'
+  pull_request:
+    paths:
+      - 'product/akbun-terraform-apply-remote/**'
+      - '.github/workflows/build-terraform-apply-remote.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-terraform-apply-remote
+
+jobs:
+  # test는 PR 검증용으로만 실행한다. master merge 시에는 build만 실행한다.
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ubuntu 러너에 rustup stable이 기본 설치되어 있어 별도 toolchain 설치가 필요 없다.
+      - name: Show toolchain
+        run: rustc --version && cargo --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-terraform-apply-remote
+
+      # 저장소 규칙상 lock 파일을 커밋하지 않으므로 --locked 없이 빌드한다.
+      - name: Build with warnings as errors
+        run: cargo build
+        env:
+          RUSTFLAGS: -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+  build:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-terraform-apply-remote
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: akbun-terraform-apply-remote-linux-x86_64
+          path: product/akbun-terraform-apply-remote/target/release/akbun-terraform-apply-remote

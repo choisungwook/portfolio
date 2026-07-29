@@ -12,3 +12,5 @@
 * [릴리스 버전은 태그에서 계산한다](2026-07-release-version-from-tags.md) - 기존 태그의 patch를 +1 해서 매 실행마다 새 릴리스를 만드는 결정.
 * [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](2026-07-build-before-tag-and-release.md) - 빌드가 실패해도 빈 release가 남던 문제를 순서로 막는 결정.
 * [규칙 문서는 도구 중립으로 쓰고 상시 로드 비용으로 정리한다](2026-07-agents-md-tool-neutral.md) - AGENTS.md에 도구 전용 내용을 두지 않고 규칙 파일을 코드 템플릿 대신 규칙 문장으로 유지하는 결정.
+* [Apply only the saved plan file, never a fresh plan](2026-07-terraform-apply-saved-plan.md) - akbun-terraform-apply-remote가 마지막 plan이 저장한 tfplan 파일만 apply하고 PR head가 바뀌면 거부하는 결정.
+* [Rust with a small synchronous stack for the terraform PR server](2026-07-rust-sync-stack-for-webhook-server.md) - async 프레임워크 없이 tiny_http/ureq 동기 스택으로 만들고 핵심 로직만 테스트하는 결정.
