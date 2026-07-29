@@ -7,18 +7,86 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>akbun-k8supgradeview</h1>
+  <!-- headlamp처럼 왼쪽 사이드메뉴로 화면을 나눈다. 위는 브랜드, 아래는 세로 메뉴다. -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 3.5 6.5v11L12 22l8.5-4.5v-11z" />
+          <path d="M12 22V12M12 12 3.5 6.5M12 12l8.5-5.5" />
+        </svg>
+      </span>
+      <h1>akbun-k8supgradeview</h1>
+    </div>
     <nav>
-      <button class="tab-button active" data-tab="nodes">Nodes</button>
-      <button class="tab-button" data-tab="pods">Pods</button>
-      <button class="tab-button" data-tab="karpenter">Karpenter Event</button>
-      <button class="tab-button" data-tab="nodepools">NodePool / EC2NodeClass</button>
-      <button class="tab-button" data-tab="utilize">Utilize</button>
-      <button class="tab-button" data-tab="settings">Settings</button>
+      <button class="tab-button active" data-tab="nodes">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="7" rx="1.5" />
+            <rect x="3" y="13" width="18" height="7" rx="1.5" />
+            <path d="M6.5 7.5h.01M6.5 16.5h.01" />
+          </svg>
+        </span>
+        <span class="tab-label">Nodes</span>
+      </button>
+      <button class="tab-button" data-tab="pods">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3 5 6.5v7L12 17l7-3.5v-7z" />
+            <path d="M12 17V10M12 10 5 6.5M12 10l7-3.5" />
+            <path d="M5 20h14" />
+          </svg>
+        </span>
+        <span class="tab-label">Pods</span>
+      </button>
+      <button class="tab-button" data-tab="karpenter">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2 4 14h6l-1 8 9-12h-6z" />
+          </svg>
+        </span>
+        <span class="tab-label">Karpenter Event</span>
+      </button>
+      <button class="tab-button" data-tab="nodepools">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="2.5" />
+            <circle cx="18" cy="6" r="2.5" />
+            <circle cx="6" cy="18" r="2.5" />
+            <circle cx="18" cy="18" r="2.5" />
+            <path d="M8.5 6h7M6 8.5v7M18 8.5v7M8.5 18h7" />
+          </svg>
+        </span>
+        <span class="tab-label">NodePool / EC2NodeClass</span>
+      </button>
+      <button class="tab-button" data-tab="utilize">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />
+          </svg>
+        </span>
+        <span class="tab-label">Utilize</span>
+      </button>
+      <button class="tab-button" data-tab="settings">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.1-1.2L14 3h-4l-.5 2.7a7 7 0 0 0-2.1 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.1 1.2L10 21h4l.5-2.7a7 7 0 0 0 2.1-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z" />
+          </svg>
+        </span>
+        <span class="tab-label">Settings</span>
+      </button>
     </nav>
-  </header>
+  </aside>
 
+  <div id="content">
   <div id="error-banner" class="hidden"></div>
 
   <main>
@@ -284,6 +352,7 @@
       </div>
     </section>
   </main>
+  </div>
 
   <!-- 파드 이름을 누르면 열리는 describe 사이드 패널. 표를 가리지 않도록 오른쪽에 붙는다. -->
   <aside id="pod-detail-panel" class="hidden" role="dialog" aria-label="파드 describe">
