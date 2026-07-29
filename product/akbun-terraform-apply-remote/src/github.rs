@@ -1,10 +1,14 @@
+use crate::auth::TokenProvider;
 use crate::events::RepoRef;
 use serde_json::Value;
+use std::sync::Arc;
 
 /// Minimal GitHub REST API client for the endpoints this server needs.
+/// Tokens come from the provider per call, so short-lived App tokens are
+/// refreshed transparently.
 pub struct GithubClient {
   api_base: String,
-  token: String,
+  provider: Arc<TokenProvider>,
 }
 
 pub struct PrInfo {
@@ -12,8 +16,8 @@ pub struct PrInfo {
 }
 
 impl GithubClient {
-  pub fn new(api_base: &str, token: &str) -> GithubClient {
-    GithubClient { api_base: api_base.trim_end_matches('/').to_string(), token: token.to_string() }
+  pub fn new(api_base: &str, provider: Arc<TokenProvider>) -> GithubClient {
+    GithubClient { api_base: api_base.trim_end_matches('/').to_string(), provider }
   }
 
   pub fn get_pr(&self, repo: &RepoRef, pr_number: u64) -> Result<PrInfo, String> {
@@ -56,7 +60,7 @@ impl GithubClient {
     let url =
       format!("{}/repos/{}/issues/{}/comments", self.api_base, repo.full_name(), pr_number);
     ureq::post(&url)
-      .set("Authorization", &format!("Bearer {}", self.token))
+      .set("Authorization", &format!("Bearer {}", self.provider.token()?))
       .set("Accept", "application/vnd.github+json")
       .set("User-Agent", "akbun-terraform-apply-remote")
       .send_json(serde_json::json!({ "body": body }))
@@ -66,7 +70,7 @@ impl GithubClient {
 
   fn get(&self, url: &str) -> Result<Value, String> {
     ureq::get(url)
-      .set("Authorization", &format!("Bearer {}", self.token))
+      .set("Authorization", &format!("Bearer {}", self.provider.token()?))
       .set("Accept", "application/vnd.github+json")
       .set("User-Agent", "akbun-terraform-apply-remote")
       .call()

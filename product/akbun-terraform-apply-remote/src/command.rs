@@ -5,6 +5,8 @@ pub enum Command {
   Plan { dir: Option<String> },
   /// Apply the saved plan. `dir` narrows the run to one project directory.
   Apply { dir: Option<String> },
+  /// Import an existing resource into terraform state.
+  Import { dir: Option<String>, address: String, id: String },
   /// Release every lock this pull request holds.
   Unlock,
   /// Post usage help.
@@ -39,9 +41,36 @@ fn parse_tokens(tokens: &[&str]) -> Result<Command, ParseError> {
   match tokens.first() {
     Some(&"plan") => Ok(Command::Plan { dir: parse_dir_flag(&tokens[1..])? }),
     Some(&"apply") => Ok(Command::Apply { dir: parse_dir_flag(&tokens[1..])? }),
+    Some(&"import") => parse_import(&tokens[1..]),
     Some(&"unlock") => Ok(Command::Unlock),
     Some(&"help") | None => Ok(Command::Help),
     Some(other) => Err(ParseError::Unrecognized(format!("unknown subcommand: {other}"))),
+  }
+}
+
+/// Parses "import [-d <dir>] <address> <id>". The -d flag may appear
+/// before or after the two positional arguments.
+fn parse_import(tokens: &[&str]) -> Result<Command, ParseError> {
+  let mut dir = None;
+  let mut positional = Vec::new();
+  let mut iter = tokens.iter();
+  while let Some(token) = iter.next() {
+    if *token == "-d" || *token == "--dir" {
+      match iter.next() {
+        Some(value) => dir = Some(normalize_dir(value)),
+        None => return Err(ParseError::Unrecognized("-d needs a directory".to_string())),
+      }
+    } else {
+      positional.push(*token);
+    }
+  }
+  match positional.as_slice() {
+    [address, id] => {
+      Ok(Command::Import { dir, address: address.to_string(), id: id.to_string() })
+    }
+    _ => Err(ParseError::Unrecognized(
+      "import needs exactly two arguments: <resource address> <resource id>".to_string(),
+    )),
   }
 }
 
@@ -67,6 +96,7 @@ pub fn usage(trigger: &str) -> String {
     "Usage:\n\
      - {trigger} plan [-d <dir>]: run terraform plan for changed projects (or one directory)\n\
      - {trigger} apply [-d <dir>]: apply the plan saved by the latest plan run\n\
+     - {trigger} import [-d <dir>] <address> <id>: import an existing resource into state\n\
      - {trigger} unlock: release locks held by this pull request\n\
      - {trigger} help: show this message"
   )
@@ -136,6 +166,35 @@ mod tests {
   #[test]
   fn dir_flag_without_value_is_reported() {
     assert!(matches!(parse("akbun", "akbun plan -d"), Err(ParseError::Unrecognized(_))));
+  }
+
+  #[test]
+  fn parses_import_with_address_and_id() {
+    assert_eq!(
+      parse("akbun", "akbun import aws_instance.web i-1234567890abcdef0"),
+      Ok(Command::Import {
+        dir: None,
+        address: "aws_instance.web".to_string(),
+        id: "i-1234567890abcdef0".to_string(),
+      })
+    );
+  }
+
+  #[test]
+  fn parses_import_with_dir_flag_in_any_position() {
+    let expected = Ok(Command::Import {
+      dir: Some("aws/vpc".to_string()),
+      address: "aws_vpc.main".to_string(),
+      id: "vpc-123".to_string(),
+    });
+    assert_eq!(parse("akbun", "akbun import -d aws/vpc aws_vpc.main vpc-123"), expected);
+    assert_eq!(parse("akbun", "akbun import aws_vpc.main vpc-123 -d aws/vpc"), expected);
+  }
+
+  #[test]
+  fn import_with_wrong_arity_is_reported() {
+    assert!(matches!(parse("akbun", "akbun import aws_vpc.main"), Err(ParseError::Unrecognized(_))));
+    assert!(matches!(parse("akbun", "akbun import a b c"), Err(ParseError::Unrecognized(_))));
   }
 
   #[test]

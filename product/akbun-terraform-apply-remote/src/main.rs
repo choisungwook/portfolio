@@ -1,3 +1,4 @@
+mod auth;
 mod command;
 mod config;
 mod events;
@@ -21,9 +22,16 @@ fn main() {
       std::process::exit(1);
     }
   };
+  let state = match handler::AppState::new(cfg) {
+    Ok(state) => state,
+    Err(e) => {
+      eprintln!("startup error: {e}");
+      std::process::exit(1);
+    }
+  };
   println!(
     "akbun-terraform-apply-remote listening on 0.0.0.0:{} (trigger word: {})",
-    cfg.port, cfg.trigger
+    state.cfg.port, state.cfg.trigger
   );
-  server::run(cfg);
+  server::run(state);
 }

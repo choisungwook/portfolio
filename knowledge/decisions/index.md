@@ -15,3 +15,4 @@
 * [Apply only the saved plan file, never a fresh plan](2026-07-terraform-apply-saved-plan.md) - akbun-terraform-apply-remote가 마지막 plan이 저장한 tfplan 파일만 apply하고 PR head가 바뀌면 거부하는 결정.
 * [Rust with a small synchronous stack for the terraform PR server](2026-07-rust-sync-stack-for-webhook-server.md) - async 프레임워크 없이 tiny_http/ureq 동기 스택으로 만들고 핵심 로직만 테스트하는 결정.
 * [Deploys drain in-flight runs and hand state over via disk](2026-07-deploy-drain-and-persisted-takeover.md) - 멀티 노드 HA 대신 SIGTERM drain과 state.json 영속화로 배포 중 인수인계를 해결하는 결정.
+* [GitHub App installation tokens as the recommended auth for the terraform bot](2026-07-github-app-tokens-for-terraform-bot.md) - 장기 PAT 대신 1시간짜리 App installation token을 권장 인증으로 두는 결정.

@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::handler::{self, AppState};
 use crate::jobs::JobTracker;
 use crate::{events, signature};
@@ -24,9 +23,10 @@ const DRAIN_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 /// /healthz starts failing because the port closes) and the server drains:
 /// it waits for running plan/apply jobs to finish before exiting. State is
 /// persisted after every event, so the next instance takes over from disk.
-pub fn run(cfg: Config) {
-  let server = Arc::new(Server::http(("0.0.0.0", cfg.port)).expect("failed to bind server port"));
-  let state = Arc::new(AppState::new(cfg));
+pub fn run(state: AppState) {
+  let server =
+    Arc::new(Server::http(("0.0.0.0", state.cfg.port)).expect("failed to bind server port"));
+  let state = Arc::new(state);
   let jobs = Arc::new(JobTracker::new());
 
   spawn_signal_listener(server.clone());

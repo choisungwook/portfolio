@@ -7,13 +7,15 @@ GitHub pull request에서 terraform plan/apply를 실행하는 셀프호스팅 �
 1. GitHub webhook(`issue_comment`, `pull_request`)을 받는다. HMAC-SHA256 서명을 검증한다.
 2. PR이 열리거나 갱신되면 변경된 파일에서 terraform 프로젝트 디렉터리를 찾아 자동으로 plan한다.
 3. plan 결과를 PR comment로 남기고, plan 파일(`.akbun.tfplan`)을 저장한다.
-4. `akbun apply` comment를 받으면 저장된 plan 파일을 apply한다. plan 이후 PR head가 바뀌었으면 거부하고 재plan을 요구한다.
+4. `akbun apply` comment를 받으면 저장된 plan 파일을 apply한다. plan 이후 PR head가 바뀌었으면 거부하고 재plan을 요구한다. `akbun import`로 기존 리소스를 state에 넣을 수도 있다.
 5. 프로젝트 디렉터리 단위 lock으로 여러 PR이 같은 state를 동시에 건드리는 것을 막는다.
 6. lock과 plan 기록을 state.json으로 영속화하고 SIGTERM 시 진행 중인 실행을 drain하므로, 재배포해도 새 인스턴스가 상태를 이어받는다.
+7. 인증은 PAT 또는 GitHub App 임시 토큰(installation token, 1시간) 중 선택한다.
 
 ## 문서
 
-- 설치와 사용법: [docs/user-guide.md](./docs/user-guide.md)
+- 아키텍처(mermaid 다이어그램): [docs/architecture.md](./docs/architecture.md)
+- 설치와 사용법, 인증 옵션: [docs/user-guide.md](./docs/user-guide.md)
 - AWS 배포(EC2, ECS Terraform 코드): [docs/deploy-guide.md](./docs/deploy-guide.md)
 
 ## 개발

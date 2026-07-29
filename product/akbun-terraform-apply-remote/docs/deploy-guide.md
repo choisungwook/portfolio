@@ -14,6 +14,7 @@ AWS에 서버를 배포하는 Terraform 코드(deploy/ec2, deploy/ecs)의 사용
 
 - GitHub token(대상 저장소 Contents read, Issues/PR write)과 webhook secret을 준비한다.
 - 두 스택 모두 secret을 SSM SecureString 파라미터로 만들어 전달하므로 코드나 user data에 평문이 남지 않는다.
+- 두 스택은 PAT 방식(`ATR_GITHUB_TOKEN`)을 기본으로 배선한다. GitHub App 임시 토큰 방식을 쓰려면 [user-guide.md](./user-guide.md)의 인증 옵션 절을 따라 `ATR_GITHUB_APP_*` 환경변수와 private key 파일을 대신 주입한다(EC2는 env 파일, ECS는 task definition 수정).
 - 서버 안의 terraform이 AWS 리소스를 만들 때 쓰는 권한은 실습 기준 PowerUserAccess를 붙인다. 운영에서는 관리 대상에 맞게 좁힌다.
 
 ## EC2 배포 (deploy/ec2)

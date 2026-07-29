@@ -14,6 +14,7 @@ hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 signal-hook = "0.3"
+jsonwebtoken = "10"
 
 [profile.release]
 strip = true

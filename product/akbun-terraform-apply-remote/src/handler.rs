@@ -1,3 +1,4 @@
+use crate::auth::TokenProvider;
 use crate::command::{self, Command, ParseError};
 use crate::config::Config;
 use crate::events::{Event, RepoRef};
@@ -6,7 +7,7 @@ use crate::github::GithubClient;
 use crate::locks::{LockManager, LockOutcome};
 use crate::{project, terraform, workspace};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// State shared across webhook deliveries: locks and the record of which
 /// head SHA each saved plan was produced from.
@@ -17,11 +18,13 @@ use std::sync::Mutex;
 pub struct AppState {
   pub cfg: Config,
   pub locks: LockManager,
+  pub provider: Arc<TokenProvider>,
   planned_shas: Mutex<HashMap<String, String>>,
 }
 
 impl AppState {
-  pub fn new(cfg: Config) -> AppState {
+  pub fn new(cfg: Config) -> Result<AppState, String> {
+    let provider = Arc::new(TokenProvider::new(&cfg.auth, &cfg.github_api)?);
     let persisted = crate::state::load(&crate::state::state_file(&cfg.data_dir));
     if !persisted.locks.is_empty() || !persisted.planned_shas.is_empty() {
       println!(
@@ -30,11 +33,12 @@ impl AppState {
         persisted.planned_shas.len()
       );
     }
-    AppState {
+    Ok(AppState {
       cfg,
       locks: LockManager::from_snapshot(persisted.locks),
+      provider,
       planned_shas: Mutex::new(persisted.planned_shas),
-    }
+    })
   }
 
   /// Writes the current locks and plan records to disk. Called after each
@@ -107,6 +111,9 @@ fn handle_comment(state: &AppState, repo: &RepoRef, pr_number: u64, body: &str) 
   match command::parse(&state.cfg.trigger, body) {
     Ok(Command::Plan { dir }) => run_plan(state, repo, pr_number, dir),
     Ok(Command::Apply { dir }) => run_apply(state, repo, pr_number, dir),
+    Ok(Command::Import { dir, address, id }) => {
+      run_import(state, repo, pr_number, dir, &address, &id)
+    }
     Ok(Command::Unlock) => {
       let released = state.locks.release_all(&repo.full_name(), pr_number);
       state.forget_pr(repo, pr_number);
@@ -158,7 +165,7 @@ fn run_plan(
     );
   }
 
-  let ws = workspace::checkout_pr(&state.cfg.data_dir, &state.cfg.github_token, repo, pr_number, &pr.head_sha)?;
+  let ws = workspace::checkout_pr(&state.cfg.data_dir, &state.provider.token()?, repo, pr_number, &pr.head_sha)?;
   let mut results = Vec::new();
   for dir in dirs {
     results.push(plan_one_project(state, repo, pr_number, &pr.head_sha, &ws, &dir));
@@ -238,7 +245,7 @@ fn run_apply(
     );
   }
 
-  let ws = workspace::checkout_pr(&state.cfg.data_dir, &state.cfg.github_token, repo, pr_number, &pr.head_sha)?;
+  let ws = workspace::checkout_pr(&state.cfg.data_dir, &state.provider.token()?, repo, pr_number, &pr.head_sha)?;
   let mut results = Vec::new();
   for dir in dirs {
     results.push(apply_one_project(state, repo, pr_number, &pr.head_sha, &ws, &dir));
@@ -295,6 +302,87 @@ fn apply_one_project(
   RunResult { dir: dir.to_string(), success: apply.success, output: apply.output }
 }
 
+/// Imports an existing resource into the project's terraform state. The
+/// target directory is taken from -d, or inferred when the pull request
+/// changed exactly one terraform project.
+fn run_import(
+  state: &AppState,
+  repo: &RepoRef,
+  pr_number: u64,
+  dir_override: Option<String>,
+  address: &str,
+  id: &str,
+) -> Result<(), String> {
+  let github = client(state);
+  let pr = github.get_pr(repo, pr_number)?;
+  let dir = match dir_override {
+    Some(dir) => dir,
+    None => {
+      let changed =
+        project::projects_from_changed_files(&github.list_changed_files(repo, pr_number)?);
+      match changed.as_slice() {
+        [only] => only.clone(),
+        _ => {
+          return github.post_comment(
+            repo,
+            pr_number,
+            "import needs -d <dir> when the pull request does not change \
+             exactly one terraform project.",
+          )
+        }
+      }
+    }
+  };
+
+  let ws = workspace::checkout_pr(&state.cfg.data_dir, &state.provider.token()?, repo, pr_number, &pr.head_sha)?;
+  let result = import_one_project(state, repo, pr_number, &ws, &dir, address, id);
+  let mut comment = render_comment("import", &[result]);
+  comment.push_str(&format!(
+    "\n\nState changed: run \"{} plan\" to review the diff before apply.",
+    state.cfg.trigger
+  ));
+  github.post_comment(repo, pr_number, &comment)
+}
+
+fn import_one_project(
+  state: &AppState,
+  repo: &RepoRef,
+  pr_number: u64,
+  ws: &workspace::Workspace,
+  dir: &str,
+  address: &str,
+  id: &str,
+) -> RunResult {
+  if let LockOutcome::HeldByOther { pr_number: holder } =
+    state.locks.try_lock(&repo.full_name(), dir, pr_number)
+  {
+    return RunResult {
+      dir: dir.to_string(),
+      success: false,
+      output: format!("This project is locked by pull request #{holder}."),
+    };
+  }
+  let project_dir = ws.dir.join(dir);
+  if !project_dir.is_dir() {
+    state.locks.unlock(&repo.full_name(), dir, pr_number);
+    return RunResult {
+      dir: dir.to_string(),
+      success: false,
+      output: format!("directory not found in the PR head: {dir}"),
+    };
+  }
+  let init = terraform::init(&state.cfg.terraform_bin, &project_dir);
+  if !init.success {
+    return RunResult { dir: dir.to_string(), success: false, output: init.output };
+  }
+  let import = terraform::import(&state.cfg.terraform_bin, &project_dir, address, id);
+  if import.success {
+    // The import mutated state, so any saved plan no longer matches it.
+    state.forget_plan(repo, pr_number, dir);
+  }
+  RunResult { dir: dir.to_string(), success: import.success, output: import.output }
+}
+
 fn cleanup_pr(state: &AppState, repo: &RepoRef, pr_number: u64) -> Result<(), String> {
   state.locks.release_all(&repo.full_name(), pr_number);
   state.forget_pr(repo, pr_number);
@@ -307,5 +395,5 @@ fn short(sha: &str) -> &str {
 }
 
 fn client(state: &AppState) -> GithubClient {
-  GithubClient::new(&state.cfg.github_api, &state.cfg.github_token)
+  GithubClient::new(&state.cfg.github_api, state.provider.clone())
 }

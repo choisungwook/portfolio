@@ -24,6 +24,10 @@ pub fn apply_saved_plan(bin: &str, project_dir: &Path) -> TerraformOutput {
   run(bin, project_dir, &["apply", "-input=false", "-no-color", PLAN_FILE])
 }
 
+pub fn import(bin: &str, project_dir: &Path, address: &str, id: &str) -> TerraformOutput {
+  run(bin, project_dir, &["import", "-input=false", "-no-color", address, id])
+}
+
 fn run(bin: &str, project_dir: &Path, args: &[&str]) -> TerraformOutput {
   match Command::new(bin).args(args).current_dir(project_dir).output() {
     Ok(result) => {
