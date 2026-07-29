@@ -6,11 +6,9 @@ on:
       - master
     paths:
       - 'product/akbun-terraform-apply-remote/**'
-      - '.github/workflows/build-terraform-apply-remote.yml'
   pull_request:
     paths:
       - 'product/akbun-terraform-apply-remote/**'
-      - '.github/workflows/build-terraform-apply-remote.yml'
   workflow_dispatch:
 
 permissions:
