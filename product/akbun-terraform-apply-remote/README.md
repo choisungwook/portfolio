@@ -9,10 +9,12 @@ GitHub pull request에서 terraform plan/apply를 실행하는 셀프호스팅 �
 3. plan 결과를 PR comment로 남기고, plan 파일(`.akbun.tfplan`)을 저장한다.
 4. `akbun apply` comment를 받으면 저장된 plan 파일을 apply한다. plan 이후 PR head가 바뀌었으면 거부하고 재plan을 요구한다.
 5. 프로젝트 디렉터리 단위 lock으로 여러 PR이 같은 state를 동시에 건드리는 것을 막는다.
+6. lock과 plan 기록을 state.json으로 영속화하고 SIGTERM 시 진행 중인 실행을 drain하므로, 재배포해도 새 인스턴스가 상태를 이어받는다.
 
 ## 문서
 
 - 설치와 사용법: [docs/user-guide.md](./docs/user-guide.md)
+- AWS 배포(EC2, ECS Terraform 코드): [docs/deploy-guide.md](./docs/deploy-guide.md)
 
 ## 개발
 

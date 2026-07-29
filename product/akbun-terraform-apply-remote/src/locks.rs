@@ -25,6 +25,17 @@ impl LockManager {
     LockManager { locks: Mutex::new(HashMap::new()) }
   }
 
+  /// Rebuilds the manager from a persisted snapshot, so locks survive a
+  /// server restart or redeploy.
+  pub fn from_snapshot(snapshot: HashMap<String, u64>) -> LockManager {
+    LockManager { locks: Mutex::new(snapshot) }
+  }
+
+  /// Copies the current lock table for persistence.
+  pub fn snapshot(&self) -> HashMap<String, u64> {
+    self.locks.lock().unwrap().clone()
+  }
+
   pub fn try_lock(&self, repo_full_name: &str, dir: &str, pr_number: u64) -> LockOutcome {
     let key = lock_key(repo_full_name, dir);
     let mut locks = self.locks.lock().unwrap();
@@ -119,6 +130,17 @@ mod tests {
     locks.try_lock("o/r", "aws/vpc", 1);
     locks.unlock("o/r", "aws/vpc", 2);
     assert_eq!(locks.try_lock("o/r", "aws/vpc", 3), LockOutcome::HeldByOther { pr_number: 1 });
+  }
+
+  #[test]
+  fn snapshot_round_trip_preserves_holders() {
+    let locks = LockManager::new();
+    locks.try_lock("o/r", "aws/vpc", 1);
+    locks.try_lock("o/r", "aws/rds", 2);
+    let restored = LockManager::from_snapshot(locks.snapshot());
+    assert_eq!(restored.try_lock("o/r", "aws/vpc", 9), LockOutcome::HeldByOther { pr_number: 1 });
+    assert_eq!(restored.try_lock("o/r", "aws/rds", 9), LockOutcome::HeldByOther { pr_number: 2 });
+    assert_eq!(restored.try_lock("o/r", "aws/alb", 9), LockOutcome::Acquired);
   }
 
   #[test]

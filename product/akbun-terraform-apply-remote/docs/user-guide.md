@@ -68,7 +68,9 @@ PR을 열면 변경된 terraform 디렉터리를 자동으로 plan하고 결과�
 - **apply는 저장된 plan만 적용한다.** plan 이후 PR에 push가 있으면 apply를 거부하고 재plan을 요구한다. 리뷰한 내용과 적용되는 내용이 항상 같다.
 - **프로젝트 lock**: 한 프로젝트 디렉터리를 먼저 plan한 PR이 lock을 잡는다. 다른 PR은 apply가 끝나거나 unlock될 때까지 그 프로젝트를 plan/apply할 수 없다. lock은 apply 성공, PR close, `akbun unlock` 시 해제된다.
 - **fork PR 지원**: PR head를 base 저장소의 `pull/N/head` ref에서 가져오므로 fork에서 온 PR도 동작한다.
-- 서버를 재시작하면 저장된 plan 기록이 사라진다. 이때는 `akbun plan`을 다시 실행한다.
+- **재시작/재배포에 안전**: lock과 plan 기록은 data 디렉터리의 state.json에 영속화되어 재시작한 서버가 이어받는다. SIGTERM을 받으면 진행 중인 terraform 실행을 마친 뒤 종료한다(graceful drain). data 디렉터리 자체를 잃은 경우에만 `akbun plan`을 다시 실행한다.
+
+AWS(EC2, ECS) 배포는 [deploy-guide.md](./deploy-guide.md)를 본다.
 
 ## 문제 해결
 

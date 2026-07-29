@@ -2,6 +2,7 @@
 
 ## 2026-07-29
 
+* **Creation**: [Deploys drain in-flight runs and hand state over via disk](decisions/2026-07-deploy-drain-and-persisted-takeover.md) 결정 기록. akbun-terraform-apply-remote에 graceful drain, 상태 영속화, EC2/ECS 배포 스택을 추가하면서 남긴다.
 * **Creation**: [Apply only the saved plan file, never a fresh plan](decisions/2026-07-terraform-apply-saved-plan.md) 결정 기록. akbun-terraform-apply-remote 제품을 만들면서 남긴다.
 * **Creation**: [Rust with a small synchronous stack for the terraform PR server](decisions/2026-07-rust-sync-stack-for-webhook-server.md) 결정 기록. 같은 작업에서 기술 스택 선택 이유를 남긴다.
 

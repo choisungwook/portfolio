@@ -10,6 +10,10 @@ use std::sync::Mutex;
 
 /// State shared across webhook deliveries: locks and the record of which
 /// head SHA each saved plan was produced from.
+///
+/// Both maps are persisted to state.json under the data directory after
+/// every handled event and reloaded at startup, so a restarted or
+/// redeployed instance takes over the previous instance's locks and plans.
 pub struct AppState {
   pub cfg: Config,
   pub locks: LockManager,
@@ -18,7 +22,31 @@ pub struct AppState {
 
 impl AppState {
   pub fn new(cfg: Config) -> AppState {
-    AppState { cfg, locks: LockManager::new(), planned_shas: Mutex::new(HashMap::new()) }
+    let persisted = crate::state::load(&crate::state::state_file(&cfg.data_dir));
+    if !persisted.locks.is_empty() || !persisted.planned_shas.is_empty() {
+      println!(
+        "restored state: {} lock(s), {} saved plan record(s)",
+        persisted.locks.len(),
+        persisted.planned_shas.len()
+      );
+    }
+    AppState {
+      cfg,
+      locks: LockManager::from_snapshot(persisted.locks),
+      planned_shas: Mutex::new(persisted.planned_shas),
+    }
+  }
+
+  /// Writes the current locks and plan records to disk. Called after each
+  /// handled event; failures are logged, not fatal.
+  pub fn persist(&self) {
+    let snapshot = crate::state::PersistedState {
+      locks: self.locks.snapshot(),
+      planned_shas: self.planned_shas.lock().unwrap().clone(),
+    };
+    if let Err(e) = crate::state::save(&crate::state::state_file(&self.cfg.data_dir), &snapshot) {
+      eprintln!("failed to persist state: {e}");
+    }
   }
 
   fn record_plan(&self, repo: &RepoRef, pr_number: u64, dir: &str, sha: &str) {
@@ -71,6 +99,7 @@ pub fn handle_event(state: &AppState, event: Event) {
   if let Err(e) = outcome {
     eprintln!("event handling failed: {e} (event: {event:?})");
   }
+  state.persist();
 }
 
 fn handle_comment(state: &AppState, repo: &RepoRef, pr_number: u64, body: &str) -> Result<(), String> {

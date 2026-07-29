@@ -1,30 +1,67 @@
 use crate::config::Config;
 use crate::handler::{self, AppState};
+use crate::jobs::JobTracker;
 use crate::{events, signature};
+use signal_hook::consts::{SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
 use std::io::Read;
 use std::sync::Arc;
+use std::time::Duration;
 use tiny_http::{Method, Request, Response, Server};
 
 /// Webhook bodies larger than this are rejected outright.
 const MAX_BODY_BYTES: usize = 5 * 1024 * 1024;
 
-/// Runs the webhook server forever. Each valid delivery is acknowledged
-/// immediately and processed on a background thread so GitHub's 10-second
-/// webhook timeout never hits a long terraform run.
+/// How long shutdown waits for in-flight terraform runs before giving up.
+/// Long on purpose: killing an apply halfway is worse than a slow deploy.
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
+/// Runs the webhook server until SIGTERM/SIGINT. Each valid delivery is
+/// acknowledged immediately and processed on a background thread so
+/// GitHub's 10-second webhook timeout never hits a long terraform run.
+///
+/// On SIGTERM the accept loop stops (a load balancer health check on
+/// /healthz starts failing because the port closes) and the server drains:
+/// it waits for running plan/apply jobs to finish before exiting. State is
+/// persisted after every event, so the next instance takes over from disk.
 pub fn run(cfg: Config) {
-  let server = Server::http(("0.0.0.0", cfg.port)).expect("failed to bind server port");
+  let server = Arc::new(Server::http(("0.0.0.0", cfg.port)).expect("failed to bind server port"));
   let state = Arc::new(AppState::new(cfg));
+  let jobs = Arc::new(JobTracker::new());
+
+  spawn_signal_listener(server.clone());
 
   for request in server.incoming_requests() {
     match (request.method(), request.url()) {
       (Method::Get, "/healthz") => respond(request, 200, "ok"),
-      (Method::Post, "/events") => handle_delivery(state.clone(), request),
+      (Method::Post, "/events") => handle_delivery(state.clone(), &jobs, request),
       _ => respond(request, 404, "not found"),
     }
   }
+
+  let active = jobs.active();
+  if active > 0 {
+    println!("shutdown requested: draining {active} in-flight job(s)");
+  }
+  if !jobs.wait_idle(DRAIN_TIMEOUT) {
+    eprintln!("drain timeout after {}s; exiting with jobs still running", DRAIN_TIMEOUT.as_secs());
+  }
+  println!("shutdown complete");
 }
 
-fn handle_delivery(state: Arc<AppState>, mut request: Request) {
+/// Unblocks the accept loop when SIGTERM/SIGINT arrives, which ends
+/// incoming_requests() and lets run() drain and exit.
+fn spawn_signal_listener(server: Arc<Server>) {
+  let mut signals = Signals::new([SIGTERM, SIGINT]).expect("failed to register signal handler");
+  std::thread::spawn(move || {
+    if signals.forever().next().is_some() {
+      println!("received shutdown signal");
+      server.unblock();
+    }
+  });
+}
+
+fn handle_delivery(state: Arc<AppState>, jobs: &Arc<JobTracker>, mut request: Request) {
   let event_name = header(&request, "X-GitHub-Event").unwrap_or_default();
   let signature_header = header(&request, "X-Hub-Signature-256").unwrap_or_default();
 
@@ -44,7 +81,11 @@ fn handle_delivery(state: Arc<AppState>, mut request: Request) {
 
   match events::interpret(&event_name, &payload) {
     Ok(event) => {
-      std::thread::spawn(move || handler::handle_event(&state, event));
+      let guard = JobTracker::begin(jobs);
+      std::thread::spawn(move || {
+        handler::handle_event(&state, event);
+        drop(guard);
+      });
       respond(request, 200, "accepted");
     }
     Err(reason) => respond(request, 200, &format!("ignored: {reason}")),
