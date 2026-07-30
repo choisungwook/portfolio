@@ -1,0 +1,40 @@
+{
+  "name": "akbun-iam-simulator",
+  "version": "0.1.0",
+  "description": "AWS profile을 골라 aws 명령어 실행 권한을 테스트하는 데스크톱 앱",
+  "author": "akbun",
+  "license": "MIT",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && node scripts/copy-static.js",
+    "start": "npm run build && electron .",
+    "test": "npm run build && node --test \"test/*.test.js\"",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "io.akbun.iamsimulator",
+    "productName": "akbun-iam-simulator",
+    "files": [
+      "dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}

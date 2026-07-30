@@ -112,6 +112,7 @@
 - [언어 공부용 구간 반복 오디오 플레이어 (akbun-shadowing-player)](./product/akbun-shadowing-player/) (26.7.25)
 - [EKS 업그레이드용 노드/파드 조회 데스크톱 앱 (akbun-k8supgradeview)](./product/akbun-k8supgradeview/) (26.7.26)
 - [GitHub PR에서 terraform plan/apply를 실행하는 Atlantis 방식 서버 (akbun-terraform-apply-remote)](./product/akbun-terraform-apply-remote/) (26.7.29)
+- [AWS profile로 aws 명령어 실행 권한을 테스트하는 데스크톱 앱 (akbun-iam-simulator)](./product/akbun-iam-simulator/) (26.7.30)
 
 ## Dockerfile
 

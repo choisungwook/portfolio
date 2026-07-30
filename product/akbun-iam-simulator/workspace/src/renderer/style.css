@@ -1,0 +1,320 @@
+/*
+ * 색은 전부 CSS 변수로 선언한다. light가 기본값이고
+ * prefers-color-scheme: dark 미디어 쿼리가 dark 값으로 덮는다.
+ * 사이드바는 본문과 구획이 나뉘도록 두 테마 모두에서 어두운 톤을 유지한다.
+ */
+:root {
+  --bg: #f6f7f9;
+  --fg: #1f2328;
+  --surface: #ffffff;
+  --surface-muted: #f3f4f6;
+  --border: #d0d7de;
+  --muted: #57606a;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --success: #15803d;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --sidebar-bg: #1f2937;
+  --sidebar-fg: #d1d5db;
+  --sidebar-muted: #9ca3af;
+  --sidebar-active-bg: #374151;
+  --sidebar-active-fg: #ffffff;
+  --sidebar-hover-bg: #2b3544;
+  --sidebar-border: #374151;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --fg: #e6e8eb;
+    --surface: #1c2128;
+    --surface-muted: #262c35;
+    --border: #3a4250;
+    --muted: #9aa4b2;
+    --accent: #60a5fa;
+    --accent-fg: #0b1220;
+    --success: #4ade80;
+    --danger: #f87171;
+    --danger-bg: #33201f;
+    --sidebar-bg: #171c24;
+    --sidebar-fg: #aeb6c2;
+    --sidebar-muted: #7c8594;
+    --sidebar-active-bg: #313b4b;
+    --sidebar-active-fg: #ffffff;
+    --sidebar-hover-bg: #232b37;
+    --sidebar-border: #2c333e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 사이드바와 본문을 좌우로 나눈다. 스크롤은 각 영역 안에서만 일어난다. */
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* 왼쪽: profile 목록 */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.sidebar-header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sidebar-header button {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sidebar-fg);
+  cursor: pointer;
+}
+
+.sidebar-header button:hover {
+  background: var(--sidebar-hover-bg);
+}
+
+.profile-list {
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+
+.profile-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.profile-item:hover {
+  background: var(--sidebar-hover-bg);
+}
+
+.profile-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-fg);
+}
+
+.profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.profile-detail {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--sidebar-muted);
+  word-break: break-all;
+}
+
+.profile-item.active .profile-detail {
+  color: var(--sidebar-fg);
+}
+
+.profile-empty {
+  padding: 16px;
+  font-size: 12px;
+  color: var(--sidebar-muted);
+}
+
+/* 가운데: 명령어 입력(위)과 실행 결과(아래) */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+  gap: 16px;
+}
+
+.content h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.command-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.command-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selected-profile {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.selected-profile.chosen {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#command-input {
+  height: 140px;
+  resize: vertical;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+#command-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.command-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#run-button {
+  padding: 7px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+
+#run-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.result-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 8px;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.result-status {
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.result-status.success {
+  color: var(--success);
+  background: var(--surface-muted);
+}
+
+.result-status.failure {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.result-duration {
+  color: var(--muted);
+}
+
+.result-body {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.result-placeholder {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.output-block h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.output-block + .output-block {
+  margin-top: 12px;
+}
+
+.output-block pre {
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.output-block pre.stderr {
+  color: var(--danger);
+  background: var(--danger-bg);
+}

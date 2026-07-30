@@ -7,6 +7,7 @@
 | 디렉터리 | 설명 |
 |---|---|
 | [akbun-gitdesktop](./akbun-gitdesktop/) | git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱 |
+| [akbun-iam-simulator](./akbun-iam-simulator/) | AWS profile을 골라 aws 명령어 실행 권한을 테스트하는 Electron 데스크톱 앱 |
 | [cardnews-reference](./cardnews-reference/) | AI agent용 카드뉴스 레이아웃 레퍼런스 |
 | [envelope_encryption_simulator](./envelope_encryption_simulator/) | KMS 봉투암호화 암복호화 과정을 보여주는 시뮬레이터 |
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
+    <title>akbun-iam-simulator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>AWS Profiles</h1>
+        <button id="refresh-profiles" title="profile 목록 새로고침">새로고침</button>
+      </div>
+      <ul id="profile-list" class="profile-list"></ul>
+      <p id="profile-empty" class="profile-empty hidden">
+        ~/.aws/config, ~/.aws/credentials에서 profile을 찾지 못했다
+      </p>
+    </aside>
+
+    <main class="content">
+      <section class="command-section">
+        <div class="command-header">
+          <h2>테스트할 aws 명령어</h2>
+          <span id="selected-profile" class="selected-profile">profile을 고른다</span>
+        </div>
+        <textarea
+          id="command-input"
+          placeholder="aws sts get-caller-identity"
+          spellcheck="false"
+        ></textarea>
+        <div class="command-actions">
+          <button id="run-button" disabled>실행</button>
+          <span class="hint">Cmd/Ctrl + Enter로도 실행한다. 명령어는 실제로 실행된다.</span>
+        </div>
+      </section>
+
+      <section class="result-section">
+        <div class="result-header">
+          <h2>실행 결과</h2>
+          <div id="result-meta" class="result-meta hidden">
+            <span id="result-status" class="result-status"></span>
+            <span id="result-duration" class="result-duration"></span>
+          </div>
+        </div>
+        <div id="result-body" class="result-body">
+          <p id="result-placeholder" class="result-placeholder">
+            왼쪽에서 profile을 고르고 명령어를 실행하면 결과가 여기에 보인다
+          </p>
+          <div id="stdout-block" class="output-block hidden">
+            <h3>stdout</h3>
+            <pre id="stdout-output"></pre>
+          </div>
+          <div id="stderr-block" class="output-block hidden">
+            <h3>stderr</h3>
+            <pre id="stderr-output" class="stderr"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
