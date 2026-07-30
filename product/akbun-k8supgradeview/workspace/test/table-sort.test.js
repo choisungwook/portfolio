@@ -21,15 +21,17 @@ const source = fs.readFileSync(rendererPath, "utf8");
 const marker = "const nodeSort =";
 assert.ok(source.includes(marker), "정렬 controller 선언을 찾지 못했다");
 
+// 규칙이 늘어도 테스트를 고치지 않도록 선언된 SortSpec을 이름으로 모두 꺼낸다.
+const pureSource = source.slice(0, source.indexOf(marker));
+const specNames = [...new Set([...pureSource.matchAll(/\b(\w+_SORT)\b/g)].map((m) => m[1]))];
+assert.ok(specNames.length > 0, "정렬 규칙 선언을 찾지 못했다");
+
 const sortModule = {};
 new Function(
   "exports",
-  `${source.slice(0, source.indexOf(marker))}
+  `${pureSource}
   exports.sortRows = sortRows;
-  exports.NODE_SORT = NODE_SORT;
-  exports.POD_SORT = POD_SORT;
-  exports.NODEPOOL_SORT = NODEPOOL_SORT;
-  exports.KARPENTER_EVENT_SORT = KARPENTER_EVENT_SORT;`
+  ${specNames.map((name) => `exports["${name}"] = ${name};`).join("\n")}`
 )(sortModule);
 
 const { sortRows, NODE_SORT, POD_SORT, NODEPOOL_SORT, KARPENTER_EVENT_SORT } = sortModule;
@@ -172,22 +174,20 @@ test("헤더의 data-sort-key는 모두 그 표의 정렬 규칙에 있다", () 
     path.join(__dirname, "..", "dist", "renderer", "index.html"),
     "utf8"
   );
-  const specNames = [...source.matchAll(/createSortController\(\s*"([^"]+)",\s*(\w+),/g)];
-  assert.ok(specNames.length > 0, "정렬 controller를 찾지 못했다");
+  const controllers = [...source.matchAll(/createSortController\(\s*"([^"]+)",\s*(\w+),/g)];
+  assert.ok(controllers.length > 0, "정렬 controller를 찾지 못했다");
 
-  for (const [, tableId, specName] of specNames) {
-    const table = html.match(new RegExp(`<table id="${tableId}">([\\s\\S]*?)</table>`));
+  for (const [, tableId, specName] of controllers) {
+    // table에 나중에 class 같은 속성이 붙어도 id로만 찾는다.
+    const table = html.match(new RegExp(`<table[^>]*\\bid="${tableId}"[^>]*>([\\s\\S]*?)</table>`));
     assert.ok(table, `${tableId} 표를 찾지 못했다`);
     const keys = [...table[1].matchAll(/data-sort-key="([^"]+)"/g)].map((match) => match[1]);
     assert.ok(keys.length > 0, `${tableId}에 정렬 헤더가 없다`);
-    // 규칙에 없는 key를 헤더에 적으면 헤더를 눌러도 아무 일도 일어나지 않는다.
-    const columns = new RegExp(`const ${specName} = \\{([\\s\\S]*?)\\n\\};`).exec(source);
-    assert.ok(columns, `${specName} 선언을 찾지 못했다`);
+    const spec = sortModule[specName];
+    assert.ok(spec, `${specName} 선언을 찾지 못했다`);
     for (const key of keys) {
-      assert.ok(
-        new RegExp(`\\b${key}: \\{ kind`).test(columns[1]),
-        `${tableId}의 ${key}가 ${specName}에 없다`
-      );
+      // 규칙에 없는 key를 헤더에 적으면 헤더를 눌러도 아무 일도 일어나지 않는다.
+      assert.ok(spec.columns[key], `${tableId}의 ${key}가 ${specName}에 없다`);
     }
   }
 });
