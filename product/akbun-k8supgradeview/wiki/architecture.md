@@ -61,15 +61,36 @@ kubectl get nodepools.karpenter.sh -o json
 kubectl get ec2nodeclasses.karpenter.k8s.aws -o json
 ```
 
-## Pods 탭 정렬과 상태 필터
+## 표 정렬
 
-정렬과 필터는 모두 renderer 안에서만 돈다. 파드 목록은 이미 한 번에 다 받아 두므로 kubectl을 다시 부르지 않는다.
+정렬과 필터는 모두 renderer 안에서만 돈다. 목록은 이미 한 번에 다 받아 두므로 정렬만 바꿀 때는 kubectl을 다시 부르지 않는다.
 
-정렬 대상은 Namespace와 Status 두 칼럼이다. 헤더에 `data-sort-key`를 두고 클릭하면 그 키로 오름차순 정렬하며, 같은 헤더를 다시 누르면 방향만 뒤집는다. 다른 헤더를 누르면 오름차순부터 다시 시작한다. 정렬 기준은 `localeCompare`이고, 두 칼럼 모두 같은 값이 여럿 몰려 있어 2차 기준으로 파드 이름을 쓴다. 그래야 새로고침할 때마다 같은 값 안에서 순서가 흔들리지 않는다. Pod, Node, Age는 정렬하지 않는다. 이름과 노드는 검색과 노드 탭이 이미 다루고, Age는 `45s`와 `5d`처럼 단위가 섞인 문자열이라 알파벳 순으로 정렬하면 시간 순서와 어긋난다.
+정렬 대상은 모든 표의 모든 칼럼이다. Nodes, 노드의 파드, Pods, Karpenter Version, Karpenter Event, NodePool, EC2NodeClass 일곱 표가 같은 배선을 쓴다. 예외는 Nodes 표의 Action 칼럼 하나인데, 값이 아니라 버튼이라 견줄 것이 없다.
 
-정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다.
+칸마다 값의 종류가 달라 견주는 방법도 달라야 화면에 보이는 대로 정렬된다. 그래서 칼럼마다 종류(`SortKind`)를 붙인다.
 
-정렬 헤더는 Pods 탭과 NodePool 표가 같은 배선을 쓴다(`registerSortHeaders`). `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만"과 "Ready 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
+| 종류 | 쓰는 칸 | 견주는 방법 |
+|---|---|---|
+| `text` | 이름, namespace, status, group 등 | `localeCompare` |
+| `natural` | kubelet/karpenter 버전, 파드 Ready(`2/2`) | 숫자를 수로 읽는 `localeCompare`(`numeric: true`). `v1.9`가 `v1.29`보다, `2/2`가 `10/10`보다 앞에 온다 |
+| `number` | NodePool weight와 nodes, event count | 수로 바꿔 뺀다. 알파벳 순이면 `10`이 `9`보다 앞에 온다 |
+| `ip` | 노드 Internal IP | octet을 하나씩 수로 견준다. 글자로 견주면 `10.0.0.10`이 `10.0.0.9`보다 앞에 온다 |
+| `age` | 노드, 파드, NodePool의 Age | `creationTimestamp`를 견주고 뒤집는다. 화면에 보이는 값은 나이라 최신일수록 어리다. 오름차순이 "어린 것부터"로 읽혀야 한다 |
+| `time` | Karpenter Event의 Time | 시각을 그대로 견준다. 오름차순이 "오래된 것부터"다 |
+
+Age를 화면 문자열(`45s`, `5d`)로 견주지 않는 이유는 단위가 섞여 있어 글자로 견주면 시간 순서와 어긋나기 때문이다. 원본 timestamp가 손에 있으므로 그것으로 견주고 표시만 축약한다.
+
+값이 없거나(`-`, 빈 값) 읽을 수 없는 줄은 숫자와 시각 칸에서 방향과 상관없이 늘 맨 뒤로 보낸다. `-`는 0이나 가장 오래된 시각이 아니라 "모르는 값"(weight 미지정, 노드 조회 실패)이라 크기로 견줄 수 없다. 글자 칸에서는 `-`도 그대로 견줄 수 있는 글자라 예외로 두지 않는다.
+
+정렬 기준 값이 같을 때는 표마다 정한 2차 기준(`tiebreak`, 대개 이름)을 쓴다. 그래야 같은 값이 몰려 있는 칸으로 정렬해도 새로고침할 때마다 순서가 흔들리지 않는다.
+
+표마다 정렬 상태를 따로 들고 있다. 상태는 `createSortController`가 만든 closure 안에 가둬 두어 표끼리 서로의 정렬을 건드릴 수 없다. controller는 그릴 때 쓸 `apply`, 헤더 표시를 맞추는 `refreshIndicators`, 헤더에 처리를 붙이는 `register` 셋만 밖으로 낸다. 정렬은 원본 배열을 건드리지 않고 사본을 만들어 돌려주므로 필터와 조회 결과가 그대로 남는다. 노드 탭의 파드 표도 조회 결과를 `nodePods`에 들고 있어야 정렬만 바꿀 때 kubectl을 다시 부르지 않는다.
+
+정렬을 한 번도 고르지 않았으면 kubectl이 준 순서를 그대로 둔다. 기본값을 정렬된 상태로 두면 kubectl 출력과 화면이 달라져 두 결과를 나란히 볼 때 헷갈린다. 헤더를 누르면 오름차순부터 시작하고, 같은 헤더를 다시 누르면 방향만 뒤집는다. 어느 칼럼으로 어느 방향인지는 헤더의 `.sort-arrow`에 ▲/▼로 표시하고, 화살표가 붙고 빠질 때 헤더 너비가 흔들리지 않도록 CSS에서 자리를 미리 잡아 둔다. 정렬 상태는 새로고침해도 유지된다.
+
+헤더 배선은 `registerSortHeaders` 하나다. `th`는 원래 focus를 받지 않아 `tabindex="0"`과 `role="button"`을 주고 Enter와 Space keydown을 클릭과 같은 동작에 잇는다. 마우스 없이 키보드만 쓰는 경우에도 정렬에 닿게 하기 위함이며, Space는 기본 동작이 화면 스크롤이라 막는다. 화살표와 색은 눈으로만 읽히므로 같은 내용을 `aria-sort`(`ascending`/`descending`/`none`)로도 적는다. "Running 아닌 파드만"과 "Ready 아닌 파드만" 토글도 눌린 상태를 색뿐 아니라 `aria-pressed`로 알린다.
+
+## Pods 탭 상태 필터
 
 상태 필터는 "Running 아닌 파드만" 버튼 하나다. 업그레이드 중에는 정상인 파드보다 Running에서 벗어난 파드를 먼저 봐야 하는데, 벗어난 상태 이름이 Pending, Terminating, CrashLoopBackOff처럼 여럿이라 낱낱이 고르게 하면 새 상태가 나올 때마다 목록을 늘려야 한다. `status !== "Running"` 하나로 두면 상태 이름이 무엇이든 걸린다.
 
@@ -123,7 +144,7 @@ NodePool의 AMI 칼럼은 두지 않는다. AMI는 NodePool이 아니라 EC2Node
 
 EC2NodeClass의 ami는 `spec.amiSelectorTerms`를 `alias=al2023@latest` 같은 표기로 이어 붙여 보여주고, term이 없으면 예전 필드인 `spec.amiFamily`를 쓴다. 둘 다 없으면 `-`다.
 
-Weight와 Nodes 헤더를 누르면 정렬한다. 두 칸 모두 숫자라 알파벳 순으로 정렬하면 `10`이 `9`보다 앞에 오므로 수로 바꿔 비교한다. 값이 `-`인 줄은 방향과 상관없이 늘 맨 뒤로 보낸다. `-`는 0이 아니라 "모르는 값"(weight 미지정, 노드 조회 실패)이라 크기로 견줄 수 없기 때문이다. 정렬 상태는 새로고침해도 유지된다.
+두 표의 칼럼은 모두 헤더 클릭으로 정렬한다. 규칙은 [표 정렬](#표-정렬)에 있다.
 
 nodes는 NodePool status에 없어서 노드 목록의 `karpenter.sh/nodepool` label을 세어 채운다. 노드 조회가 실패하면 0과 구분해야 하므로 0이 아니라 `-`를 표시한다. `-`는 "셀 수 없었다"이고 0은 "정말 노드가 없다"다.
 

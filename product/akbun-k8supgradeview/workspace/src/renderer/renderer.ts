@@ -109,30 +109,20 @@ declare const api: Api;
 
 type NodeFilterKind = "all" | "karpenter" | "managed" | "cordoned";
 
-type PodSortKey = "namespace" | "status";
-type NodePoolSortKey = "weight" | "nodes";
-type SortDirection = "asc" | "desc";
-
-interface PodSort {
-  key: PodSortKey;
-  direction: SortDirection;
-}
-
-interface NodePoolSort {
-  key: NodePoolSortKey;
-  direction: SortDirection;
-}
-
 let allNodes: NodeInfo[] = [];
 let allPods: PodInfo[] = [];
+// 노드 탭의 파드 표. 정렬만 바꿀 때 다시 조회하지 않고 그리려면 들고 있어야 한다.
+let nodePods: PodInfo[] = [];
 let nodeFilter: NodeFilterKind = "all";
-// 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
-let podSort: PodSort | null = null;
 let podOnlyNotRunning = false;
 let podOnlyNotReady = false;
-let nodePoolSort: NodePoolSort | null = null;
 let allNodePools: NodePoolInfo[] = [];
 let nodePoolsError = "";
+let allEc2NodeClasses: Ec2NodeClassInfo[] = [];
+let ec2NodeClassesError = "";
+let allKarpenterEvents: EventInfo[] = [];
+let allKarpenterVersions: KarpenterVersion[] = [];
+let karpenterVersionsError = "";
 let selectedNode = "";
 let karpenterLoaded = false;
 let nodePoolsLoaded = false;
@@ -140,6 +130,212 @@ let allNamespaces: string[] = [];
 // 새로고침으로 목록이 바뀌어도 고른 값을 잃지 않도록 이름으로 들고 있는다.
 const selectedNamespaces = new Set<string>();
 let namespacesLoaded = false;
+
+type SortDirection = "asc" | "desc";
+
+/**
+ * 칸의 값이 어떤 종류인지 정한다. 종류마다 견주는 방법이 달라야 화면에 보이는 대로
+ * 정렬된다. text는 글자, natural은 숫자가 섞인 글자(v1.9와 v1.29, 2/2와 10/10),
+ * number는 숫자, ip는 octet, age는 나이, time은 시각이다.
+ */
+type SortKind = "text" | "natural" | "number" | "ip" | "age" | "time";
+
+interface SortState {
+  key: string;
+  direction: SortDirection;
+}
+
+interface SortColumn<T> {
+  kind: SortKind;
+  value(row: T): string;
+}
+
+/**
+ * 표 하나의 정렬 규칙. columns의 key는 헤더의 data-sort-key와 같아야 하고,
+ * tiebreak는 정렬 기준 값이 같을 때 쓰는 두 번째 기준이다. 두 번째 기준이 없으면
+ * 같은 값이 몰려 있는 칸으로 정렬할 때 새로고침마다 순서가 흔들린다.
+ */
+interface SortSpec<T> {
+  columns: Record<string, SortColumn<T>>;
+  tiebreak(row: T): string;
+}
+
+const NO_VALUE = "-";
+
+/**
+ * 숫자와 시각 칸은 값이 없거나 읽을 수 없으면 크기로 견줄 수 없다. "-"는 0이 아니라
+ * "모르는 값"이다. 글자 칸에서는 "-"도 그대로 견줄 수 있는 글자라 예외로 두지 않는다.
+ */
+function isUnknownValue(kind: SortKind, value: string): boolean {
+  if (kind === "text" || kind === "natural") return false;
+  if (!value || value === NO_VALUE) return true;
+  if (kind === "number") return Number.isNaN(Number(value));
+  if (kind === "ip") return false;
+  return Number.isNaN(Date.parse(value));
+}
+
+/** 10.0.0.9가 10.0.0.10보다 앞에 오도록 octet을 하나씩 숫자로 견준다. */
+function compareIps(left: string, right: string): number {
+  const leftOctets = left.split(".");
+  const rightOctets = right.split(".");
+  for (let index = 0; index < 4; index += 1) {
+    const order = Number(leftOctets[index] ?? 0) - Number(rightOctets[index] ?? 0);
+    if (order) return order;
+  }
+  return 0;
+}
+
+function compareByKind(kind: SortKind, left: string, right: string): number {
+  if (kind === "number") return Number(left) - Number(right);
+  if (kind === "ip") return compareIps(left, right);
+  if (kind === "natural") return left.localeCompare(right, undefined, { numeric: true });
+  if (kind === "text") return left.localeCompare(right);
+  // age는 시각이 최신일수록 나이가 어리다. 오름차순을 "어린 것부터"로 읽히게 뒤집는다.
+  const order = Date.parse(left) - Date.parse(right);
+  return kind === "age" ? -order : order;
+}
+
+/**
+ * 모르는 값은 방향과 상관없이 늘 맨 뒤로 보내 정상 값들 사이에 끼지 않게 한다.
+ * 원본 배열은 건드리지 않는다. 필터와 조회 결과를 그대로 두어야 정렬을 풀 수 있다.
+ */
+function sortRows<T>(rows: T[], spec: SortSpec<T>, state: SortState | null): T[] {
+  const column = state ? spec.columns[state.key] : undefined;
+  if (!state || !column) return rows;
+  const direction = state.direction;
+  return [...rows].sort((a, b) => {
+    const left = column.value(a);
+    const right = column.value(b);
+    const leftUnknown = isUnknownValue(column.kind, left);
+    const rightUnknown = isUnknownValue(column.kind, right);
+    if (leftUnknown || rightUnknown) {
+      if (leftUnknown && rightUnknown) return spec.tiebreak(a).localeCompare(spec.tiebreak(b));
+      return leftUnknown ? 1 : -1;
+    }
+    const order =
+      compareByKind(column.kind, left, right) || spec.tiebreak(a).localeCompare(spec.tiebreak(b));
+    return direction === "asc" ? order : -order;
+  });
+}
+
+interface SortController<T> {
+  /** 그리기 직전에 불러 정렬된 사본을 받는다. */
+  apply(rows: T[]): T[];
+  /** 헤더의 화살표와 aria-sort를 지금 상태에 맞춘다. */
+  refreshIndicators(): void;
+  /** 헤더에 마우스와 키보드 처리를 붙인다. 시작할 때 한 번만 부른다. */
+  register(): void;
+}
+
+/**
+ * 표마다 정렬 상태와 헤더 처리를 되풀이하게 되므로 한 곳에 묶는다. render는 정렬이
+ * 바뀔 때 그 표를 다시 그리는 함수다. 상태를 controller 안에 가둬 두어 표끼리 서로의
+ * 정렬을 건드릴 수 없게 한다.
+ */
+function createSortController<T>(
+  tableId: string,
+  spec: SortSpec<T>,
+  render: () => void
+): SortController<T> {
+  // 정렬을 고르기 전에는 kubectl이 준 순서를 그대로 둔다.
+  let state: SortState | null = null;
+  return {
+    apply: (rows) => sortRows(rows, spec, state),
+    refreshIndicators: () => renderSortIndicators(tableId, state),
+    register: () =>
+      registerSortHeaders(tableId, (key) => {
+        state = { key, direction: nextDirection(state, key) };
+        render();
+      }),
+  };
+}
+
+const NODE_SORT: SortSpec<NodeInfo> = {
+  columns: {
+    name: { kind: "text", value: (node) => node.name },
+    internalIp: { kind: "ip", value: (node) => node.internalIp },
+    version: { kind: "natural", value: (node) => node.version },
+    status: { kind: "text", value: (node) => node.status },
+    age: { kind: "age", value: (node) => node.creationTimestamp },
+    group: { kind: "text", value: (node) => node.group },
+  },
+  tiebreak: (node) => node.name,
+};
+
+// 노드 탭의 파드 표와 Pods 탭의 파드 표는 같은 값을 보여주므로 규칙을 함께 쓴다.
+// 노드 탭에 없는 Node 칸이 규칙에 남아 있어도 헤더가 없으면 쓰이지 않는다.
+const POD_SORT: SortSpec<PodInfo> = {
+  columns: {
+    namespace: { kind: "text", value: (pod) => pod.namespace },
+    name: { kind: "text", value: (pod) => pod.name },
+    status: { kind: "text", value: (pod) => pod.status },
+    ready: { kind: "natural", value: (pod) => pod.ready },
+    nodeName: { kind: "text", value: (pod) => pod.nodeName },
+    age: { kind: "age", value: (pod) => pod.creationTimestamp },
+  },
+  tiebreak: (pod) => `${pod.namespace}/${pod.name}`,
+};
+
+const KARPENTER_VERSION_SORT: SortSpec<KarpenterVersion> = {
+  columns: {
+    deployment: { kind: "text", value: (version) => version.deployment },
+    version: { kind: "natural", value: (version) => version.version },
+    image: { kind: "text", value: (version) => version.image },
+  },
+  tiebreak: (version) => version.deployment,
+};
+
+const KARPENTER_EVENT_SORT: SortSpec<EventInfo> = {
+  columns: {
+    timestamp: { kind: "time", value: (event) => event.timestamp },
+    type: { kind: "text", value: (event) => event.type },
+    reason: { kind: "text", value: (event) => event.reason },
+    object: { kind: "text", value: (event) => event.object },
+    count: { kind: "number", value: (event) => String(event.count) },
+    message: { kind: "text", value: (event) => event.message },
+  },
+  tiebreak: (event) => `${event.timestamp} ${event.object} ${event.reason}`,
+};
+
+const NODEPOOL_SORT: SortSpec<NodePoolInfo> = {
+  columns: {
+    name: { kind: "text", value: (nodePool) => nodePool.name },
+    nodeClassName: { kind: "text", value: (nodePool) => nodePool.nodeClassName || NO_VALUE },
+    weight: { kind: "number", value: (nodePool) => nodePool.weight },
+    nodes: { kind: "number", value: (nodePool) => nodePool.nodes },
+    ready: { kind: "text", value: (nodePool) => nodePool.ready },
+    age: { kind: "age", value: (nodePool) => nodePool.creationTimestamp },
+  },
+  tiebreak: (nodePool) => nodePool.name,
+};
+
+const EC2NODECLASS_SORT: SortSpec<Ec2NodeClassInfo> = {
+  columns: {
+    name: { kind: "text", value: (resource) => resource.name },
+    ami: { kind: "text", value: (resource) => resource.ami },
+  },
+  tiebreak: (resource) => resource.name,
+};
+
+const nodeSort = createSortController("node-table", NODE_SORT, renderNodes);
+const nodePodSort = createSortController("node-pod-table", POD_SORT, renderNodePods);
+const podSort = createSortController("pod-table", POD_SORT, renderPods);
+const karpenterVersionSort = createSortController(
+  "karpenter-version-table",
+  KARPENTER_VERSION_SORT,
+  renderKarpenterVersions
+);
+const karpenterEventSort = createSortController(
+  "karpenter-event-table",
+  KARPENTER_EVENT_SORT,
+  renderKarpenterEvents
+);
+const nodePoolSort = createSortController("nodepool-table", NODEPOOL_SORT, renderNodePools);
+const ec2NodeClassSort = createSortController(
+  "ec2nodeclass-table",
+  EC2NODECLASS_SORT,
+  renderEc2NodeClasses
+);
 
 function $(selector: string): HTMLElement {
   return document.querySelector(selector) as HTMLElement;
@@ -353,7 +549,8 @@ async function toggleCordon(node: NodeInfo, button: HTMLButtonElement): Promise<
 function renderNodes(): void {
   const tbody = $("#node-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  const nodes = allNodes.filter(matchesFilter);
+  nodeSort.refreshIndicators();
+  const nodes = nodeSort.apply(allNodes.filter(matchesFilter));
   $("#node-empty").classList.toggle("hidden", nodes.length > 0);
 
   for (const node of nodes) {
@@ -380,17 +577,18 @@ async function selectNode(nodeName: string): Promise<void> {
 
   try {
     clearError();
-    const pods = await api.getPods(nodeName);
-    renderNodePods(pods);
+    nodePods = await api.getPods(nodeName);
+    renderNodePods();
   } catch (error) {
     showError(String(error));
   }
 }
 
-function renderNodePods(pods: PodInfo[]): void {
+function renderNodePods(): void {
   const tbody = $("#node-pod-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  for (const pod of pods) {
+  nodePodSort.refreshIndicators();
+  for (const pod of nodePodSort.apply(nodePods)) {
     const row = tbody.insertRow();
     appendCell(row, pod.namespace);
     appendPodNameCell(row, pod);
@@ -449,25 +647,10 @@ function podReadyClass(pod: PodInfo): string {
 }
 
 /**
- * namespace와 status를 알파벳 순으로 정렬한다. 같은 값이 몰려 있는 칸이라
- * 두 번째 기준으로 pod 이름을 써야 새로고침할 때마다 순서가 흔들리지 않는다.
- */
-function comparePods(a: PodInfo, b: PodInfo, sort: PodSort): number {
-  const order = a[sort.key].localeCompare(b[sort.key]) || a.name.localeCompare(b.name);
-  return sort.direction === "asc" ? order : -order;
-}
-
-function sortPods(pods: PodInfo[]): PodInfo[] {
-  if (!podSort) return pods;
-  const sort = podSort;
-  return [...pods].sort((a, b) => comparePods(a, b, sort));
-}
-
-/**
  * 어느 칼럼으로 어느 방향인지 헤더에 남긴다. 화살표와 색은 눈으로만 읽히므로
  * 같은 내용을 aria-sort로도 적어 스크린리더가 정렬 상태를 말할 수 있게 한다.
  */
-function renderSortIndicators(tableId: string, sort: { key: string; direction: SortDirection } | null): void {
+function renderSortIndicators(tableId: string, sort: SortState | null): void {
   document.querySelectorAll(`#${tableId} th[data-sort-key]`).forEach((header) => {
     const active = sort?.key === (header as HTMLElement).dataset.sortKey;
     const ascending = sort?.direction === "asc";
@@ -479,7 +662,7 @@ function renderSortIndicators(tableId: string, sort: { key: string; direction: S
 }
 
 /** 같은 칼럼을 다시 누르면 방향만 뒤집고, 다른 칼럼이면 오름차순부터 시작한다. */
-function nextDirection(current: { key: string; direction: SortDirection } | null, key: string): SortDirection {
+function nextDirection(current: SortState | null, key: string): SortDirection {
   return current?.key === key && current.direction === "asc" ? "desc" : "asc";
 }
 
@@ -502,19 +685,14 @@ function registerSortHeaders(tableId: string, toggle: (key: string) => void): vo
   });
 }
 
-function togglePodSort(key: PodSortKey): void {
-  podSort = { key, direction: nextDirection(podSort, key) };
-  renderPods();
-}
-
 function renderPods(): void {
   const namespace = ($("#namespace-filter") as HTMLSelectElement).value;
   const search = ($("#pod-search") as HTMLInputElement).value.trim().toLowerCase();
   const tbody = $("#pod-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  renderSortIndicators("pod-table", podSort);
+  podSort.refreshIndicators();
 
-  const pods = sortPods(
+  const pods = podSort.apply(
     allPods.filter(
       (pod) =>
         (!namespace || pod.namespace === namespace) &&
@@ -557,13 +735,14 @@ function formatEventTime(timestamp: string): string {
   return `${date} ${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`;
 }
 
-function renderKarpenterEvents(events: EventInfo[]): void {
+function renderKarpenterEvents(): void {
   const tbody = $("#karpenter-event-table tbody") as HTMLTableSectionElement;
   tbody.innerHTML = "";
-  $("#karpenter-event-empty").classList.toggle("hidden", events.length > 0);
+  karpenterEventSort.refreshIndicators();
+  $("#karpenter-event-empty").classList.toggle("hidden", allKarpenterEvents.length > 0);
 
   // reason과 message에 섞여 있는 error를 눈으로 먼저 찾도록 그 낱말만 빨갛게 칠한다.
-  for (const event of events) {
+  for (const event of karpenterEventSort.apply(allKarpenterEvents)) {
     const row = tbody.insertRow();
     appendCell(row, formatEventTime(event.timestamp));
     appendCell(row, event.type, event.type === "Warning" ? "status-warning" : "");
@@ -604,9 +783,14 @@ function renderKarpenterLogs(result: KarpenterLogs): void {
     `namespace ${result.namespace} / label ${result.labelSelector} / 최근 ${result.sinceMinutes}분`;
 }
 
-function renderKarpenterVersions(result: KarpenterVersions): void {
-  const tbody = prepareResourceTable("karpenter-version", result.versions.length, result.error);
-  for (const version of result.versions) {
+function renderKarpenterVersions(): void {
+  const tbody = prepareResourceTable(
+    "karpenter-version",
+    allKarpenterVersions.length,
+    karpenterVersionsError
+  );
+  karpenterVersionSort.refreshIndicators();
+  for (const version of karpenterVersionSort.apply(allKarpenterVersions)) {
     const row = tbody.insertRow();
     appendCell(row, version.deployment);
     appendCell(row, version.version);
@@ -622,8 +806,11 @@ async function refreshKarpenter(): Promise<void> {
       api.getKarpenterEvents(),
       api.getKarpenterLogs(),
     ]);
-    renderKarpenterVersions(versions);
-    renderKarpenterEvents(events);
+    allKarpenterVersions = versions.versions;
+    karpenterVersionsError = versions.error;
+    allKarpenterEvents = events;
+    renderKarpenterVersions();
+    renderKarpenterEvents();
     renderKarpenterLogs(logs);
     karpenterLoaded = true;
   } catch (error) {
@@ -657,34 +844,10 @@ function prepareResourceTable(
   return tbody;
 }
 
-const NO_VALUE = "-";
-
-/**
- * Weight와 Nodes는 숫자 칸이라 알파벳 순으로 정렬하면 10이 9보다 앞에 온다.
- * 값이 없으면 "-"인데, 이것은 0이 아니라 "모르는 값"이라 크기로 견줄 수 없다.
- * 방향과 상관없이 늘 맨 뒤로 보내 숫자들 사이에 끼지 않게 한다.
- */
-function compareNodePools(a: NodePoolInfo, b: NodePoolInfo, sort: NodePoolSort): number {
-  const left = a[sort.key];
-  const right = b[sort.key];
-  if (left === NO_VALUE || right === NO_VALUE) {
-    if (left === right) return a.name.localeCompare(b.name);
-    return left === NO_VALUE ? 1 : -1;
-  }
-  const order = Number(left) - Number(right) || a.name.localeCompare(b.name);
-  return sort.direction === "asc" ? order : -order;
-}
-
-function sortNodePools(nodePools: NodePoolInfo[]): NodePoolInfo[] {
-  if (!nodePoolSort) return nodePools;
-  const sort = nodePoolSort;
-  return [...nodePools].sort((a, b) => compareNodePools(a, b, sort));
-}
-
 function renderNodePools(): void {
-  const nodePools = sortNodePools(allNodePools);
+  const nodePools = nodePoolSort.apply(allNodePools);
   const tbody = prepareResourceTable("nodepool", nodePools.length, nodePoolsError);
-  renderSortIndicators("nodepool-table", nodePoolSort);
+  nodePoolSort.refreshIndicators();
   for (const nodePool of nodePools) {
     const row = tbody.insertRow();
     appendCell(row, nodePool.name);
@@ -696,15 +859,14 @@ function renderNodePools(): void {
   }
 }
 
-function toggleNodePoolSort(key: NodePoolSortKey): void {
-  nodePoolSort = { key, direction: nextDirection(nodePoolSort, key) };
-  renderNodePools();
-}
-
-/** 조회한 순서 그대로 이름과 AMI만 나열한다. */
-function renderEc2NodeClasses(resources: Ec2NodeClassInfo[], error: string): void {
-  const tbody = prepareResourceTable("ec2nodeclass", resources.length, error);
-  for (const resource of resources) {
+function renderEc2NodeClasses(): void {
+  const tbody = prepareResourceTable(
+    "ec2nodeclass",
+    allEc2NodeClasses.length,
+    ec2NodeClassesError
+  );
+  ec2NodeClassSort.refreshIndicators();
+  for (const resource of ec2NodeClassSort.apply(allEc2NodeClasses)) {
     const row = tbody.insertRow();
     appendCell(row, resource.name);
     appendCell(row, resource.ami);
@@ -717,8 +879,10 @@ async function refreshKarpenterResources(): Promise<void> {
     const result = await api.getKarpenterResources();
     allNodePools = result.nodePools;
     nodePoolsError = result.nodePoolsError;
+    allEc2NodeClasses = result.ec2NodeClasses;
+    ec2NodeClassesError = result.ec2NodeClassesError;
     renderNodePools();
-    renderEc2NodeClasses(result.ec2NodeClasses, result.ec2NodeClassesError);
+    renderEc2NodeClasses();
     nodePoolsLoaded = true;
   } catch (error) {
     showError(String(error));
@@ -891,8 +1055,17 @@ function registerEventHandlers(): void {
   $("#refresh-nodepools").addEventListener("click", () => void refreshKarpenterResources());
   $("#namespace-filter").addEventListener("change", renderPods);
   $("#pod-search").addEventListener("input", renderPods);
-  registerSortHeaders("pod-table", (key) => togglePodSort(key as PodSortKey));
-  registerSortHeaders("nodepool-table", (key) => toggleNodePoolSort(key as NodePoolSortKey));
+  for (const sort of [
+    nodeSort,
+    nodePodSort,
+    podSort,
+    karpenterVersionSort,
+    karpenterEventSort,
+    nodePoolSort,
+    ec2NodeClassSort,
+  ]) {
+    sort.register();
+  }
   $("#pod-status-filter").addEventListener("click", () => {
     podOnlyNotRunning = !podOnlyNotRunning;
     const button = $("#pod-status-filter");

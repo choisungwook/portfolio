@@ -15,4 +15,5 @@ akbun-k8supgradeview 프로젝트의 의사결정을 "결정 - 이유" 구조로
 * [NodePool 표는 숫자 칼럼을 정렬하고 EC2NodeClass 표는 평평하게 되돌린다](2026-07-nodepool-sort-and-flat-ec2nodeclass.md) - NodePool의 AMI 칼럼을 없애고 Weight/Nodes 정렬을 넣으며 EC2NodeClass 그룹핑을 걷어내기로 한 결정.
 * [파드 describe는 이름 클릭으로 여는 오른쪽 사이드 패널에서 원문 그대로 보여준다](2026-07-pod-describe-side-panel.md) - describe 출력을 파싱하지 않고 겹치는 사이드 패널에 붙이기로 한 결정.
 * [Pods 탭에 Ready 칼럼을 두고 Ready 필터는 상태 필터와 따로 둔다](2026-07-pod-ready-column-and-filter.md) - Ready를 컨테이너 개수 표기로 보여주고 "Ready 아닌 파드만" 토글을 상태 필터와 분리하기로 한 결정.
+* [모든 표의 모든 칼럼을 정렬 가능하게 두고 칸의 종류로 견주는 방법을 정한다](2026-07-all-column-sort.md) - 정렬 대상을 네 칼럼에서 전체로 넓히고 칼럼마다 값의 종류를 붙여 비교 방법을 나누기로 한 결정.
 * [상단 탭 바를 왼쪽 고정 사이드메뉴로 바꾸고 테마를 CSS 변수로 옮긴다](2026-07-sidebar-navigation-ui.md) - 배치만 어두운 톤의 세로 사이드메뉴로 바꾸고 색을 CSS 변수로 옮겨 dark mode를 함께 지원하되 renderer 로직은 그대로 두기로 한 결정.
