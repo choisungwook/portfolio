@@ -4,42 +4,45 @@ All commands run in `workspace/`.
 
 ## Build and run
 
-There is no build step. The app is plain CommonJS and Electron loads `src/main.js` directly.
+SwiftPM builds a bare executable, which is not enough. A menu bar app needs a bundle: `LSUIElement` keeps it out of the Dock from the first instant, and the bundle identifier is what macOS keys the Accessibility permission on, so a bare binary would ask again on every build.
 
 ```bash
-npm install && npm start
+./scripts/bundle.sh && open build/akbun-mactaskbar.app
 ```
 
-The app has no dock icon, so the only sign it started is the control icon appearing in the menu bar. Quit it from the control icon's right-click menu, or with `pkill -f electron`.
+The script builds in release, assembles `build/akbun-mactaskbar.app`, ad-hoc signs it and packs `build/akbun-mactaskbar-<version>-<arch>.dmg`. The ad-hoc signature is not optional: arm64 refuses to run an unsigned binary at all.
+
+`swift build` alone is still the fast way to check that the code compiles.
+
+Quit the app from the control icon's right-click menu. When the icon is not drawn, quit it by pid.
 
 ## Test
 
-Tests are plain `node --test` files with no framework and no electron import, so CI can run them on Linux without downloading the electron binary.
-
 ```bash
-npm test
+swift test
 ```
 
-Three files cover the parts where a mistake is invisible until it matters.
+Tests live in `MacTaskbarCoreTests` and cover `MacTaskbarCore` only, which is why that target exists. Nothing there imports AppKit, so the tests are about arithmetic rather than about a running menu bar.
 
-| File | What it guards |
+| Suite | What it guards |
 |---|---|
-| `test/sections.test.js` | the state to spacer-width mapping, including that `all` really collapses both dividers |
-| `test/menubar.test.js` | scan script quoting and the position filter that separates status items from the application menu |
-| `test/update.test.js` | all three temp directory cleanup points, version comparison, dmg architecture pick |
+| Section state machine | the state to divider-width mapping, including that `all` really narrows both dividers and that a wide one always outruns the screen |
+| Bar geometry | that an item under the camera housing counts as invisible despite a positive x, against coordinates measured on a real full bar |
+| Release arithmetic | version comparison, tag prefix, and that no dmg for this architecture means no update rather than a guess |
+| Item labels | the fallback from the generic accessibility description to the owning app name |
 
-`sections.js`, `menubar.js` and `update.js` avoid importing electron for this reason. Anything added to them that needs electron belongs in `main.js` instead.
+Anything added to `MacTaskbarCore` that needs AppKit belongs in the executable target instead.
 
 ## Release
 
-Pushing to master with changes under `product/akbun-mactaskbar/workspace/` runs `.github/workflows/release-akbun-mactaskbar.yml`. It reads the version from `package.json`, runs the tests, builds the dmg, then creates the tag `akbun-mactaskbar-v<version>` and the release. Build comes before tag and tag before release, so a failed build leaves no dangling tag.
+Pushing to master with changes under `product/akbun-mactaskbar/workspace/` runs `.github/workflows/release-akbun-mactaskbar.yml`. It reads the version from `VERSION`, runs the tests, builds the dmg, then creates the tag `akbun-mactaskbar-v<version>` and the release. Build comes before tag and tag before release, so a failed build leaves no dangling tag.
 
-Bump `version` in `package.json` in the same change as the feature. Forgetting to bump it makes the tag step fail on a tag that already exists.
+Bump `VERSION` in the same change as the feature. Forgetting to bump it makes the tag step fail on a tag that already exists.
 
 ## Caveats
 
 - Assigning icons to sections needs the `all` state. A wide divider sits off screen and there is nothing to drag across.
-- The item list needs Accessibility permission. Under `npm start` the permission belongs to the terminal that launched it; a packaged build asks for itself.
-- A scan takes about ten seconds. Raising the pool size does not help, the accessibility calls contend and items start dropping out of the result.
-- The spacer width assumes a space is roughly 4pt. If a future macOS changes the menu bar font enough to break that, `spacerLength` in `sections.js` is the one place to adjust.
-- Self update only offers to install from a packaged build. Under `npm start` the bundle it would replace is `Electron.app`.
+- The control icon can be invisible on a full bar with a camera housing, because macOS gives new status items the leftmost slot. The app opens its window on launch when it detects this, and `⌃⌘B` works regardless. Getting the icon back means freeing room to the right of the housing and dragging the icon there with Command held.
+- The item list needs Accessibility permission. The permission is keyed to the bundle identifier, so a rebuild in place keeps it, but moving the app somewhere new asks again.
+- The hotkey is fixed at `⌃⌘B`. There is no recorder UI and no conflict detection; if something else owns that combination, `Hotkey.swift` is the one place to change.
+- Only the app's own status items can be moved by this app, and only in width. Reordering another app's icon is something only the user can do, by dragging.

@@ -20,29 +20,18 @@ defaults:
     working-directory: product/akbun-mactaskbar/workspace
 
 jobs:
-  # Pull request check. No test imports electron, so the binary is not needed.
+  # Pull request check. macOS only, because the package links AppKit.
   verify:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: product/akbun-mactaskbar/workspace/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-
       - name: Run tests
-        run: npm test
+        run: swift test
 
   # macOS arm64 only. The build has to succeed before the tag is created, and
-  # the tag before the release. Version comes from workspace/package.json.
+  # the tag before the release. Version comes from workspace/VERSION.
   release:
     if: github.event_name != 'pull_request'
     runs-on: macos-latest
@@ -51,30 +40,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: product/akbun-mactaskbar/workspace/package-lock.json
-
-      - name: Read version from package.json
+      - name: Read version
         id: version
         run: |
-          version=$(node -p "require('./package.json').version")
+          version=$(tr -d '[:space:]' < VERSION)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=akbun-mactaskbar-v$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Run tests
-        run: npm test
+        run: swift test
 
       - name: Build dmg
-        run: npm run dist
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: ./scripts/bundle.sh
 
       # Only tag once the build succeeded.
       - name: Create tag
@@ -93,9 +71,11 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          macOS menu bar manager. Two divider icons split the status bar into three sections, and one click on the control icon pages through them: visible only, visible plus hidden, everything. The item list window shows every status item on the bar, including the ones currently pushed off screen.
+          macOS menu bar manager. Two divider icons split the status bar into three sections, and one click on the control icon pages through them: visible only, visible plus hidden, everything. A revealed section folds back up on its own after a while, and ⌃⌘B cycles the sections from anywhere. The item list window shows every status item on the bar, including the ones macOS is currently drawing nowhere.
 
           Assign icons to a section in the "all" state: hold Command and drag an icon to the left of a divider. macOS remembers the order.
+
+          If no icon appears after launch, the menu bar had no room left and macOS placed the control icon under the camera housing, where nothing is drawn. The app opens its item list window when it detects this, and ⌃⌘B works regardless.
 
           The dmg is Apple Silicon (arm64) only and unsigned, so the first launch fails with "damaged and can't be opened". Remove the quarantine attribute after installing:
 
@@ -106,4 +86,4 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
-            product/akbun-mactaskbar/workspace/release/*.dmg
+            product/akbun-mactaskbar/workspace/build/*.dmg

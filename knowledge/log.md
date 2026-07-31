@@ -2,6 +2,8 @@
 
 ## 2026-07-31
 
+* **Update**: [macOS 메뉴바 status item은 넓은 자리 차지로만 가릴 수 있고, 노치 뒤에서는 좌표가 있어도 그려지지 않는다](topics/macos-menubar-status-items.md)를 노치 제약과 네이티브 실측으로 갱신했다. akbun-mactaskbar를 Swift로 다시 만들면서 아이콘이 하우징 아래에 배치되어 보이지 않던 원인을 찾았고, Electron 전제로 쓰인 부분을 걷어냈다.
+
 * **Creation**: [PR body 형식의 기준은 pull request template 하나다](decisions/2026-07-pr-body-format-in-template.md) 결정 기록. PR body를 Decisions와 Implementation으로 바꾸면서 형식이 네 파일에 흩어져 있던 문제를 함께 정리한다.
 * **Creation**: [Electron 메뉴바 앱은 창 정리와 메뉴바 공간에서 조용히 실패한다](topics/electron-menubar-silent-failures.md) topic 기록. akbun-screenshot의 프리뷰 창이 화면 밖으로 밀려나던 버그를 고치면서 남긴다.
 * **Creation**: [macOS 메뉴바 status item은 넓은 자리 차지로만 가릴 수 있고, 목록은 프로세스 단위로만 읽을 수 있다](topics/macos-menubar-status-items.md) topic 작성. akbun-mactaskbar를 만들며 실측한 제약과 우회 방법을 남긴다.
