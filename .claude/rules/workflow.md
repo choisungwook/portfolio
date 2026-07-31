@@ -46,7 +46,7 @@ PR을 생성할 때 기록용 GitHub Issue를 함께 만들고 PR body에서 링
 
 - 템플릿: [.github/pull_request_template.md](../../.github/pull_request_template.md)를 따른다.
 - **Goal**: 해결하려는 문제 또는 공부하려는 주제를 3문장 미만으로 작성한다.
-- **어떻게 해결했는가**: 해결 과정 또는 정리한 내용을 항목으로 작성한다.
+- **How I solved it**: 해결 과정 또는 정리한 내용을 항목으로 작성한다.
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
 - 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.

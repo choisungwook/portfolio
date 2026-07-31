@@ -1,0 +1,38 @@
+{
+  "name": "akbun-screenshot",
+  "version": "0.1.0",
+  "description": "macOS menu bar screenshot app with area capture, clipboard, and floating preview",
+  "author": "akbun",
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "io.akbun.screenshot",
+    "productName": "akbun-screenshot",
+    "files": [
+      "src/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities"
+    }
+  }
+}
