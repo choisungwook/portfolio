@@ -39,6 +39,6 @@ Pull requests touching `workspace/` run a verify job on ubuntu with `ELECTRON_SK
 ## Caveats
 
 - The default shortcut Cmd+Shift+4 collides with the macOS system screenshot shortcut. If the system keeps handling it, either disable the system shortcut in System Settings > Keyboard > Keyboard Shortcuts > Screenshots, or set a different accelerator in the app settings.
-- The first capture needs Screen Recording permission for the app (or for the terminal that launched `npm start` during development).
+- The first capture needs Screen Recording permission for the app (or for the terminal that launched `npm start` during development). The Settings > Permissions tab shows the current status and opens the right System Settings pane. macOS applies the permission only at launch, so the app must be relaunched after granting it.
 - The dmg is unsigned. The release notes carry the `xattr -cr` command that removes the quarantine attribute after installing.
 - The tray icon is the 📷 emoji set via `tray.setTitle`. If it ever renders poorly, replace it with a 16pt template png passed to the Tray constructor.

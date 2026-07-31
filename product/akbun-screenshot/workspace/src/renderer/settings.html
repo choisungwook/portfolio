@@ -10,6 +10,8 @@
       --fg: #1a1a1a;
       --border: #e0e0e0;
       --accent: #0a66c2;
+      --ok: #2e7d32;
+      --warn: #c62828;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -18,17 +20,36 @@
         --fg: #e8e8e8;
         --border: #3a3a3a;
         --accent: #4da3ff;
+        --ok: #66bb6a;
+        --warn: #ef5350;
       }
     }
 
     body {
       margin: 0;
-      padding: 20px;
+      padding: 16px 20px;
       font-family: -apple-system, sans-serif;
       font-size: 13px;
       background: var(--bg);
       color: var(--fg);
     }
+
+    nav { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+
+    nav button {
+      padding: 8px 14px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      color: var(--fg);
+      opacity: 0.6;
+      cursor: pointer;
+    }
+
+    nav button.active { opacity: 1; border-bottom-color: var(--accent); font-weight: 600; }
+
+    .pane { display: none; }
+    .pane.active { display: block; }
 
     label { display: block; margin-bottom: 6px; font-weight: 600; }
     .row { margin-bottom: 16px; }
@@ -57,25 +78,56 @@
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     .hint { color: var(--fg); opacity: 0.6; margin-top: 4px; }
     #status { margin-left: 10px; }
+
+    .perm-status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .badge { padding: 2px 10px; border-radius: 10px; font-weight: 600; color: #fff; }
+    .badge.granted { background: var(--ok); }
+    .badge.missing { background: var(--warn); }
+
+    ol { margin: 8px 0 16px; padding-left: 20px; line-height: 1.7; }
   </style>
 </head>
 <body>
-  <div class="row">
-    <label for="shortcut">Capture shortcut</label>
-    <input id="shortcut" spellcheck="false">
-    <div class="hint">Electron accelerator format, e.g. CommandOrControl+Shift+4</div>
-  </div>
+  <nav>
+    <button id="tab-general" class="active">General</button>
+    <button id="tab-permissions">Permissions</button>
+  </nav>
 
-  <div class="row">
-    <label for="save-dir">Default save location</label>
-    <div class="dir-row">
-      <input id="save-dir" spellcheck="false">
-      <button id="choose-dir">Choose…</button>
+  <div id="pane-general" class="pane active">
+    <div class="row">
+      <label for="shortcut">Capture shortcut</label>
+      <input id="shortcut" spellcheck="false">
+      <div class="hint">Electron accelerator format, e.g. CommandOrControl+Shift+4</div>
     </div>
+
+    <div class="row">
+      <label for="save-dir">Default save location</label>
+      <div class="dir-row">
+        <input id="save-dir" spellcheck="false">
+        <button id="choose-dir">Choose…</button>
+      </div>
+    </div>
+
+    <button id="save" class="primary">Save</button>
+    <span id="status"></span>
   </div>
 
-  <button id="save" class="primary">Save</button>
-  <span id="status"></span>
+  <div id="pane-permissions" class="pane">
+    <div class="perm-status">
+      <label style="margin: 0">Screen Recording</label>
+      <span id="screen-badge" class="badge missing">checking…</span>
+    </div>
+    <div class="hint">Required to capture the screen. Without it macOS returns an empty or black capture.</div>
+
+    <ol id="screen-guide">
+      <li>Click the button below. macOS opens Privacy &amp; Security &gt; Screen Recording.</li>
+      <li>Turn on akbun-screenshot. During development, turn on the terminal that runs npm start instead.</li>
+      <li>Quit and relaunch the app. macOS applies this permission only at launch.</li>
+    </ol>
+
+    <button id="open-screen-settings" class="primary">Open System Settings</button>
+    <div class="hint" id="screen-ok-note" hidden>Permission granted. Nothing to do here.</div>
+  </div>
 
   <script src="settings.js"></script>
 </body>

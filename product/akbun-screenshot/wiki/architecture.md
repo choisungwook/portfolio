@@ -9,7 +9,9 @@ Electron app in plain JavaScript with no build step. It lives in the menu bar on
 - `workspace/src/settings.js`: reads and writes settings.json under the Electron userData path.
 - `workspace/src/lib.js`: pure helpers (filename, settings merge, preview position). No electron imports so tests run with plain node.
 - `workspace/src/preload.js`: exposes `window.api` to renderers via contextBridge.
-- `workspace/src/renderer/`: two small pages. `settings.html` edits the shortcut and save directory; `preview.html` shows one captured image with Save and Delete buttons.
+- `workspace/src/renderer/`: two small pages. `settings.html` has a General tab (shortcut, save directory) and a Permissions tab; `preview.html` shows one captured image with Save and Delete buttons.
+
+The Permissions tab reads the Screen Recording status via `systemPreferences.getMediaAccessStatus('screen')`, shows a granted/missing badge with step-by-step guidance, and a button that deep-links into System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus, so coming back from System Settings updates the badge.
 
 Renderers run with `nodeIntegration: false` and `contextIsolation: true` and talk to main only through IPC.
 
@@ -32,6 +34,8 @@ Save copies the temp file into the configured save directory as `akbun-screensho
 | `settings:get` | Return current settings |
 | `settings:save` | Validate the new shortcut by registering it, then persist |
 | `settings:choose-dir` | Open a directory picker |
+| `permissions:get` | Return the Screen Recording permission status |
+| `permissions:open-screen-settings` | Open macOS System Settings at the Screen Recording pane |
 | `preview:save` | Move the temp png to the save directory and close the preview |
 | `preview:delete` | Remove the temp png and close the preview |
 

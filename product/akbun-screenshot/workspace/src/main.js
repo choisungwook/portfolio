@@ -10,6 +10,8 @@ const {
   ipcMain,
   nativeImage,
   nativeTheme,
+  shell,
+  systemPreferences,
 } = require('electron');
 const path = require('path');
 const { loadSettings, saveSettings } = require('./settings');
@@ -50,7 +52,7 @@ function openSettingsWindow() {
   }
   settingsWindow = new BrowserWindow({
     width: 440,
-    height: 280,
+    height: 330,
     resizable: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: {
@@ -85,6 +87,18 @@ ipcMain.handle('settings:choose-dir', async () => {
   });
   return result.canceled ? null : result.filePaths[0];
 });
+
+// Screen Recording permission for the screencapture binary. In development
+// the permission belongs to the terminal that launched npm start.
+ipcMain.handle('permissions:get', () => ({
+  screen: systemPreferences.getMediaAccessStatus('screen'),
+}));
+
+ipcMain.handle('permissions:open-screen-settings', () =>
+  shell.openExternal(
+    'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+  )
+);
 
 ipcMain.handle('preview:save', (event) => savePreview(event.sender.id));
 ipcMain.handle('preview:delete', (event) => deletePreview(event.sender.id));
