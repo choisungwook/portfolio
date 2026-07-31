@@ -10,13 +10,23 @@ const {
   ipcMain,
   nativeImage,
   nativeTheme,
+  session,
   shell,
   systemPreferences,
 } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('path');
 const { loadSettings, saveSettings } = require('./settings');
-const { captureArea, savePreview, copyPreview, closePreview } = require('./capture');
+const {
+  captureArea,
+  savePreview,
+  copyPreview,
+  closePreview,
+  openEditor,
+  editorImage,
+  saveEditor,
+  closeEditor,
+} = require('./capture');
 const { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } = require('./update');
 
 let settings = loadSettings();
@@ -132,7 +142,7 @@ function openSettingsWindow() {
   }
   settingsWindow = new BrowserWindow({
     width: 440,
-    height: 330,
+    height: 410,
     resizable: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: {
@@ -183,8 +193,23 @@ ipcMain.handle('permissions:open-screen-settings', () =>
 ipcMain.handle('preview:save', (event) => savePreview(event.sender.id));
 ipcMain.handle('preview:copy', (event) => copyPreview(event.sender.id));
 ipcMain.handle('preview:close', (event) => closePreview(event.sender.id));
+ipcMain.handle('preview:edit', (event) => openEditor(event.sender.id));
+
+ipcMain.handle('editor:image', (event) => editorImage(event.sender.id));
+ipcMain.handle('editor:save', (event, dataUrl) => saveEditor(event.sender.id, dataUrl));
+ipcMain.handle('editor:close', (event) => closeEditor(event.sender.id));
 
 app.whenReady().then(() => {
+  // The editor's font picker reads the installed families through
+  // queryLocalFonts. Nothing else in the app requests a permission, so
+  // everything but that stays denied.
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) =>
+    callback(permission === 'local-fonts')
+  );
+  session.defaultSession.setPermissionCheckHandler(
+    (_contents, permission) => permission === 'local-fonts'
+  );
+
   // Drop update temp dirs left by a killed process. Failure is harmless.
   void cleanupTempDirs().catch(() => {});
 

@@ -1,12 +1,17 @@
 'use strict';
 
+/* global fillFontSelect, wireFontSelect */
+
 const shortcutInput = document.getElementById('shortcut');
 const saveDirInput = document.getElementById('save-dir');
+const fontSelect = document.getElementById('font');
 const status = document.getElementById('status');
 
 window.api.getSettings().then((settings) => {
   shortcutInput.value = settings.shortcut;
   saveDirInput.value = settings.saveDir;
+  fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
+  wireFontSelect(fontSelect, () => fontSelect.value || settings.defaultFont);
 });
 
 document.getElementById('choose-dir').addEventListener('click', async () => {
@@ -18,6 +23,7 @@ document.getElementById('save').addEventListener('click', async () => {
   const result = await window.api.saveSettings({
     shortcut: shortcutInput.value.trim(),
     saveDir: saveDirInput.value.trim(),
+    defaultFont: fontSelect.value,
   });
   status.textContent = result.ok ? 'Saved' : result.error;
 });

@@ -1,7 +1,7 @@
 {
   "name": "akbun-screenshot",
-  "version": "0.2.0",
-  "description": "macOS menu bar screenshot app with area capture, clipboard, and floating preview",
+  "version": "0.3.0",
+  "description": "macOS menu bar screenshot app with area capture, clipboard, floating preview, and an annotation editor",
   "author": "akbun",
   "license": "MIT",
   "main": "src/main.js",

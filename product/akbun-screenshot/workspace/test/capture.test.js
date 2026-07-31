@@ -34,10 +34,12 @@ class FakeWindow {
     this.listeners[event] = handler;
   }
 
-  // main passes the temp png through the query string, so the fake can record
-  // which file this preview belongs to.
-  loadFile(_file, options) {
-    this.tmpFile = options.query.file;
+  // A preview gets its temp png through the query string, so the fake can
+  // record which file it belongs to. The editor asks for its image over IPC
+  // instead and passes no options.
+  loadFile(page, options) {
+    this.page = page;
+    this.tmpFile = options?.query?.file;
   }
 
   isDestroyed() {
@@ -53,9 +55,15 @@ class FakeWindow {
 const fakeElectron = {
   BrowserWindow: FakeWindow,
   clipboard: { writeImage: (image) => clipboardWrites.push(image) },
-  nativeImage: { createFromPath: (file) => ({ file }) },
+  nativeImage: {
+    createFromPath: (file) => ({ file, getSize: () => ({ width: 800, height: 600 }) }),
+  },
+  nativeTheme: { shouldUseDarkColors: false },
   screen: {
-    getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1440, height: 900 } }),
+    getPrimaryDisplay: () => ({
+      workArea: { x: 0, y: 0, width: 1440, height: 900 },
+      scaleFactor: 2,
+    }),
   },
 };
 
@@ -76,7 +84,16 @@ Module._load = function (request, ...rest) {
   return load.call(this, request, ...rest);
 };
 
-const { captureArea, savePreview, copyPreview, closePreview } = require('../src/capture');
+const {
+  captureArea,
+  savePreview,
+  copyPreview,
+  closePreview,
+  openEditor,
+  editorImage,
+  saveEditor,
+  closeEditor,
+} = require('../src/capture');
 
 Module._load = load;
 
@@ -155,5 +172,40 @@ test('a window closed outside the buttons still removes the temp png', () => {
     win.close();
 
     assert.strictEqual(fs.existsSync(win.tmpFile), false);
+  });
+});
+
+// Edit dismisses the preview, and dismissing a preview deletes its temp png.
+// The editor works on a copy for exactly that reason.
+test('edit keeps an image after the preview it came from is gone', () => {
+  withSaveDir((saveDir) => {
+    captureArea(() => saveDir);
+    const previewId = nextId - 1;
+    const previewWindow = openedWindows.at(-1);
+
+    openEditor(previewId);
+    const editorId = nextId - 1;
+
+    assert.strictEqual(fs.existsSync(previewWindow.tmpFile), false, 'preview temp png gone');
+    assert.ok(editorImage(editorId).startsWith('data:image/png;base64,'));
+
+    closeEditor(editorId);
+    assert.strictEqual(editorImage(editorId), null, 'editor temp png released');
+  });
+});
+
+// Save writes the edited canvas, not the file the editor opened.
+test('editor save writes the canvas bytes into the save directory', () => {
+  withSaveDir((saveDir) => {
+    captureArea(() => saveDir);
+    openEditor(nextId - 1);
+    const editorId = nextId - 1;
+
+    const edited = `data:image/png;base64,${Buffer.from('edited').toString('base64')}`;
+    const target = saveEditor(editorId, edited);
+
+    assert.ok(target.startsWith(saveDir), 'saved into the configured directory');
+    assert.strictEqual(fs.readFileSync(target, 'utf8'), 'edited');
+    assert.strictEqual(saveEditor(editorId, edited), null, 'the editor closed after saving');
   });
 });

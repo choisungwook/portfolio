@@ -11,4 +11,8 @@ contextBridge.exposeInMainWorld('api', {
   savePreview: () => ipcRenderer.invoke('preview:save'),
   copyPreview: () => ipcRenderer.invoke('preview:copy'),
   closePreview: () => ipcRenderer.invoke('preview:close'),
+  editPreview: () => ipcRenderer.invoke('preview:edit'),
+  editorImage: () => ipcRenderer.invoke('editor:image'),
+  saveEditor: (dataUrl) => ipcRenderer.invoke('editor:save', dataUrl),
+  closeEditor: () => ipcRenderer.invoke('editor:close'),
 });

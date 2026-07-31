@@ -9,6 +9,9 @@ const { mergeSettings } = require('./lib');
 const DEFAULTS = {
   shortcut: 'CommandOrControl+Shift+4',
   saveDir: path.join(os.homedir(), 'Pictures', 'akbun-screenshot'),
+  // Ships with macOS and covers Korean and English, so the editor renders both
+  // without bundling a font.
+  defaultFont: 'Apple SD Gothic Neo',
 };
 
 function settingsPath() {

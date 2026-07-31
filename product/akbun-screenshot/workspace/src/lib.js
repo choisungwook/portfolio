@@ -33,4 +33,22 @@ function previewPosition(workArea, size, index, margin = 20, gap = 12) {
   };
 }
 
-module.exports = { buildScreenshotFilename, mergeSettings, previewPosition };
+// Toolbar and padding around the canvas, in content pixels.
+const EDITOR_CHROME = { width: 32, height: 92 };
+
+// The toolbar does not fit below this, so a small screenshot still gets a wide window.
+const EDITOR_MIN_WIDTH = 740;
+
+// Content size for the editor window. The png is in device pixels, so on a
+// retina display it is twice the points the window is measured in; without the
+// divide a normal selection opens a window larger than the screen.
+function editorWindowSize(image, workArea, scaleFactor = 1, chrome = EDITOR_CHROME) {
+  const width = Math.round(image.width / scaleFactor) + chrome.width;
+  const height = Math.round(image.height / scaleFactor) + chrome.height;
+  return {
+    width: Math.min(Math.max(width, EDITOR_MIN_WIDTH), workArea.width),
+    height: Math.min(height, workArea.height),
+  };
+}
+
+module.exports = { buildScreenshotFilename, editorWindowSize, mergeSettings, previewPosition };

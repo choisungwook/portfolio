@@ -5,12 +5,12 @@ Electron app in plain JavaScript with no build step. It lives in the menu bar on
 ## Process structure
 
 - `workspace/src/main.js`: app bootstrap. Tray icon, tray menu, global shortcut registration, IPC handlers, settings window.
-- `workspace/src/capture.js`: capture flow. Runs the native screencapture binary and opens preview windows.
+- `workspace/src/capture.js`: capture flow. Runs the native screencapture binary and opens preview and editor windows.
 - `workspace/src/settings.js`: reads and writes settings.json under the Electron userData path.
 - `workspace/src/update.js`: update check against GitHub Releases, dmg download, and the bundle swap script.
-- `workspace/src/lib.js`: pure helpers (filename, settings merge, preview position). No electron imports so tests run with plain node.
+- `workspace/src/lib.js`: pure helpers (filename, settings merge, preview position, editor window size). No electron imports so tests run with plain node.
 - `workspace/src/preload.js`: exposes `window.api` to renderers via contextBridge.
-- `workspace/src/renderer/`: two small pages. `settings.html` has a General tab (shortcut, save directory) and a Permissions tab; `preview.html` shows one captured image with Save, Copy and Close buttons.
+- `workspace/src/renderer/`: three pages plus two shared scripts. `settings.html` has a General tab (shortcut, save directory, default font) and a Permissions tab; `preview.html` shows one captured image with Save, Copy, Edit and Close buttons; `editor.html` is the annotation editor. `shapes.js` holds the editor's pure geometry and `fonts.js` the font picker shared with the settings window.
 
 The Permissions tab reads the Screen Recording status via `systemPreferences.getMediaAccessStatus('screen')`, shows a granted/missing badge with step-by-step guidance, and a button that deep-links into System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus, so coming back from System Settings updates the badge.
 
@@ -26,9 +26,23 @@ screencapture -i -s -x <tmpfile>.png
 
 The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x). When the user finishes the drag, main opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
 
-The preview has three buttons and each one dismisses it. Save copies the temp file into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy writes the image to the clipboard. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md). The temp png is removed by the window's `closed` handler rather than by the buttons, so Cmd+W from the default application menu and app quit drop it too. The clipboard does not need it, because it holds the bitmap rather than a path.
+The preview has four buttons and each one dismisses it. Save copies the temp file into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy writes the image to the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md). The temp png is removed by the window's `closed` handler rather than by the buttons, so Cmd+W from the default application menu and app quit drop it too. The clipboard does not need it, because it holds the bitmap rather than a path.
 
 One open preview per window, tracked in a `webContents.id` keyed map that holds the temp path and the window itself. Four details in there exist because they broke or would have. The id is read while the window is alive, since `webContents` throws once macOS has destroyed it, and the window is stored in the map rather than found by scanning a list, since scanning reads `webContents` on every entry including ones already closed. The temp filename carries a counter as well as a timestamp, so two captures inside the same millisecond cannot share a file. And temp cleanup sits in the `closed` handler because a preview closed by Cmd+W or by app quit never reaches a button handler. `workspace/test/capture.test.js` covers all four with a fake `BrowserWindow` that throws after close, so it runs on plain node with no Electron binary.
+
+## Editor
+
+Edit copies the preview's temp png, dismisses the preview, and opens an editor window sized to the image. The copy exists because dismissing a preview deletes its temp file, and the editor would otherwise race that deletion. The window content size comes from `editorWindowSize`, which divides the png size by the display scale factor, since a retina capture is twice the points it was selected in.
+
+The editor is one canvas plus a toolbar. The canvas is never edited in place: the page keeps an array of shapes and redraws the original image and every shape on each change. Undo moves the last shape into a second array, redo moves it back, and the next badge number is the count of badges currently in the array. That is what makes undo renumber correctly for free. Tools are rectangle, ellipse, line, text and numbered badge; holding Shift squares a drag, which turns the ellipse into a circle and snaps a line to the nearest 45 degrees. See [Annotation editor as one redrawn canvas](../adr/2026-07-annotation-editor.md).
+
+The window receives its image as a data URL rather than a file path. A `file://` image drawn into a canvas taints it, and `toDataURL` on a tainted canvas throws, which would break Save. Save posts the canvas data URL to main, which writes those bytes into the save directory under the usual filename.
+
+Text uses an inline input positioned over the canvas, because Electron does not implement `prompt()`. The input stops keydown propagation so Cmd+Z while typing does not undo the drawing behind it.
+
+Fonts come from `queryLocalFonts`, which needs the `local-fonts` permission; main grants that one and denies everything else. The picker also reloads on the first click in the window, since Chromium may want a user gesture before handing over the list. If the call fails the picker falls back to four macOS families, so it is never empty. Both the editor toolbar and the settings window use `fonts.js` for this.
+
+`shapes.js` holds the geometry that is worth testing on its own, guarded with `typeof module` so it loads both as a plain script in the editor and as a require in `workspace/test/shapes.test.js`.
 
 ## IPC channels
 
@@ -42,6 +56,10 @@ One open preview per window, tracked in a `webContents.id` keyed map that holds 
 | `preview:save` | Copy the temp png to the save directory and close the preview |
 | `preview:copy` | Write the image to the clipboard and close the preview |
 | `preview:close` | Close the preview, keeping nothing |
+| `preview:edit` | Open the editor on a copy of the temp png and close the preview |
+| `editor:image` | Return the editor's image as a data URL |
+| `editor:save` | Write the edited canvas to the save directory and close the editor |
+| `editor:close` | Close the editor, keeping nothing |
 
 ## Update
 
@@ -63,4 +81,4 @@ macOS only, by decision rather than by accident. Capture shells out to the `scre
 
 ## Settings
 
-`settings.json` under the userData path holds two keys: `shortcut` (Electron accelerator string, default `CommandOrControl+Shift+4`) and `saveDir` (default `~/Pictures/akbun-screenshot`). Unknown keys and empty values are dropped on load, so a broken file falls back to defaults.
+`settings.json` under the userData path holds three keys: `shortcut` (Electron accelerator string, default `CommandOrControl+Shift+4`), `saveDir` (default `~/Pictures/akbun-screenshot`) and `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English). Unknown keys and empty values are dropped on load, so a broken file falls back to defaults.
