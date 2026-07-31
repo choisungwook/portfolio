@@ -34,7 +34,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 8px;
       opacity: 0;
       background: rgba(0, 0, 0, 0.45);
       transition: opacity 0.15s;
@@ -44,7 +44,7 @@
 
     button {
       -webkit-app-region: no-drag;
-      padding: 8px 18px;
+      padding: 8px 12px;
       border: none;
       border-radius: 8px;
       font-size: 13px;
@@ -54,7 +54,8 @@
     }
 
     #save { background: #2e7d32; }
-    #delete { background: #c62828; }
+    #copy { background: #1565c0; }
+    #close { background: #c62828; }
   </style>
 </head>
 <body>
@@ -62,7 +63,8 @@
     <img id="shot" alt="screenshot">
     <div class="actions">
       <button id="save">Save</button>
-      <button id="delete">Delete</button>
+      <button id="copy">Copy</button>
+      <button id="close">Close</button>
     </div>
   </div>
 

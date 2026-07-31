@@ -16,7 +16,7 @@ const {
 const fs = require('node:fs/promises');
 const path = require('path');
 const { loadSettings, saveSettings } = require('./settings');
-const { captureArea, savePreview, deletePreview } = require('./capture');
+const { captureArea, savePreview, copyPreview, closePreview } = require('./capture');
 const { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } = require('./update');
 
 let settings = loadSettings();
@@ -181,7 +181,8 @@ ipcMain.handle('permissions:open-screen-settings', () =>
 );
 
 ipcMain.handle('preview:save', (event) => savePreview(event.sender.id));
-ipcMain.handle('preview:delete', (event) => deletePreview(event.sender.id));
+ipcMain.handle('preview:copy', (event) => copyPreview(event.sender.id));
+ipcMain.handle('preview:close', (event) => closePreview(event.sender.id));
 
 app.whenReady().then(() => {
   // Drop update temp dirs left by a killed process. Failure is harmless.

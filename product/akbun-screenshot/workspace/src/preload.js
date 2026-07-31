@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   getPermissions: () => ipcRenderer.invoke('permissions:get'),
   openScreenPermissionSettings: () => ipcRenderer.invoke('permissions:open-screen-settings'),
   savePreview: () => ipcRenderer.invoke('preview:save'),
-  deletePreview: () => ipcRenderer.invoke('preview:delete'),
+  copyPreview: () => ipcRenderer.invoke('preview:copy'),
+  closePreview: () => ipcRenderer.invoke('preview:close'),
 });
