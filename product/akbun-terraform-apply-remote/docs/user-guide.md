@@ -25,7 +25,7 @@ cargo build --release
 export ATR_GITHUB_TOKEN=ghp_xxx        # 인증 방식 1: PAT
 export ATR_WEBHOOK_SECRET=random-long  # 필수. webhook 서명 검증 secret
 export ATR_PORT=4141                   # 선택. 기본 4141
-export ATR_TRIGGER=akbun               # 선택. comment 명령 트리거 단어
+export ATR_TRIGGER=terraform           # 선택. comment 명령 트리거 단어
 export ATR_TERRAFORM_BIN=terraform     # 선택. terraform 실행 파일 경로
 export ATR_DATA_DIR=./data             # 선택. PR checkout 저장 위치
 ./akbun-terraform-apply-remote
@@ -78,24 +78,24 @@ PR을 열면 변경된 terraform 디렉터리를 자동으로 plan하고 결과�
 
 | 명령 | 동작 |
 |---|---|
-| `akbun plan` | 변경된 모든 terraform 프로젝트를 plan한다 |
-| `akbun plan -d <dir>` | 지정한 디렉터리만 plan한다 |
-| `akbun apply` | 저장된 plan을 모두 apply한다 |
-| `akbun apply -d <dir>` | 지정한 디렉터리의 plan만 apply한다 |
-| `akbun import <주소> <ID>` | 기존 리소스를 terraform state로 import한다. 예: `akbun import aws_vpc.main vpc-123` |
-| `akbun import -d <dir> <주소> <ID>` | 지정한 디렉터리에서 import한다. PR이 여러 프로젝트를 바꿨으면 -d가 필수다 |
-| `akbun unlock` | 이 PR이 잡은 lock을 모두 해제한다 |
-| `akbun help` | 사용법을 comment로 남긴다 |
+| `terraform plan` | 변경된 모든 terraform 프로젝트를 plan한다 |
+| `terraform plan -d <dir>` | 지정한 디렉터리만 plan한다 |
+| `terraform apply` | 저장된 plan을 모두 apply한다 |
+| `terraform apply -d <dir>` | 지정한 디렉터리의 plan만 apply한다 |
+| `terraform import <주소> <ID>` | 기존 리소스를 terraform state로 import한다. 예: `terraform import aws_vpc.main vpc-123` |
+| `terraform import -d <dir> <주소> <ID>` | 지정한 디렉터리에서 import한다. PR이 여러 프로젝트를 바꿨으면 -d가 필수다 |
+| `terraform unlock` | 이 PR이 잡은 lock을 모두 해제한다 |
+| `terraform help` | 사용법을 comment로 남긴다 |
 
-트리거 단어(`akbun`)는 `ATR_TRIGGER`로 바꿀 수 있다. 명령은 comment의 한 줄이 트리거 단어로 시작할 때만 인식한다.
+트리거 단어(`terraform`)는 `ATR_TRIGGER`로 바꿀 수 있다. 명령은 comment의 한 줄이 트리거 단어로 시작할 때만 인식한다.
 
 ## 동작 규칙
 
 - **apply는 저장된 plan만 적용한다.** plan 이후 PR에 push가 있으면 apply를 거부하고 재plan을 요구한다. 리뷰한 내용과 적용되는 내용이 항상 같다.
-- **프로젝트 lock**: 한 프로젝트 디렉터리를 먼저 plan한 PR이 lock을 잡는다. 다른 PR은 apply가 끝나거나 unlock될 때까지 그 프로젝트를 plan/apply할 수 없다. lock은 apply 성공, PR close, `akbun unlock` 시 해제된다.
+- **프로젝트 lock**: 한 프로젝트 디렉터리를 먼저 plan한 PR이 lock을 잡는다. 다른 PR은 apply가 끝나거나 unlock될 때까지 그 프로젝트를 plan/apply할 수 없다. lock은 apply 성공, PR close, `terraform unlock` 시 해제된다.
 - **import 후에는 재plan**: import는 state를 바꾸므로 저장된 plan을 무효화한다. import 결과 comment의 안내대로 plan을 다시 실행하고 리뷰한 뒤 apply한다.
 - **fork PR 지원**: PR head를 base 저장소의 `pull/N/head` ref에서 가져오므로 fork에서 온 PR도 동작한다.
-- **재시작/재배포에 안전**: lock과 plan 기록은 data 디렉터리의 state.json에 영속화되어 재시작한 서버가 이어받는다. SIGTERM을 받으면 진행 중인 terraform 실행을 마친 뒤 종료한다(graceful drain). data 디렉터리 자체를 잃은 경우에만 `akbun plan`을 다시 실행한다.
+- **재시작/재배포에 안전**: lock과 plan 기록은 data 디렉터리의 state.json에 영속화되어 재시작한 서버가 이어받는다. SIGTERM을 받으면 진행 중인 terraform 실행을 마친 뒤 종료한다(graceful drain). data 디렉터리 자체를 잃은 경우에만 `terraform plan`을 다시 실행한다.
 
 AWS(EC2, ECS) 배포는 [deploy-guide.md](./deploy-guide.md)를 본다.
 

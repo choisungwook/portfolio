@@ -25,7 +25,7 @@ pub enum ParseError {
 /// Parses a pull request comment body into a command.
 ///
 /// A command is a line whose first word is the trigger word, e.g.
-/// "akbun plan -d aws/vpc". Only the first trigger line is honored.
+/// "terraform plan -d aws/vpc". Only the first trigger line is honored.
 pub fn parse(trigger: &str, comment_body: &str) -> Result<Command, ParseError> {
   for line in comment_body.lines() {
     let tokens: Vec<&str> = line.split_whitespace().collect();
@@ -108,13 +108,13 @@ mod tests {
 
   #[test]
   fn parses_plain_plan() {
-    assert_eq!(parse("akbun", "akbun plan"), Ok(Command::Plan { dir: None }));
+    assert_eq!(parse("terraform", "terraform plan"), Ok(Command::Plan { dir: None }));
   }
 
   #[test]
   fn parses_apply_with_dir_flag() {
     assert_eq!(
-      parse("akbun", "akbun apply -d aws/vpc"),
+      parse("terraform", "terraform apply -d aws/vpc"),
       Ok(Command::Apply { dir: Some("aws/vpc".to_string()) })
     );
   }
@@ -122,56 +122,56 @@ mod tests {
   #[test]
   fn parses_long_dir_flag_and_normalizes() {
     assert_eq!(
-      parse("akbun", "akbun plan --dir ./aws/vpc/"),
+      parse("terraform", "terraform plan --dir ./aws/vpc/"),
       Ok(Command::Plan { dir: Some("aws/vpc".to_string()) })
     );
   }
 
   #[test]
   fn trigger_is_case_insensitive() {
-    assert_eq!(parse("akbun", "AKBUN plan"), Ok(Command::Plan { dir: None }));
+    assert_eq!(parse("terraform", "TERRAFORM plan"), Ok(Command::Plan { dir: None }));
   }
 
   #[test]
   fn finds_command_on_later_line() {
-    let body = "LGTM overall.\n\nakbun apply";
-    assert_eq!(parse("akbun", body), Ok(Command::Apply { dir: None }));
+    let body = "LGTM overall.\n\nterraform apply";
+    assert_eq!(parse("terraform", body), Ok(Command::Apply { dir: None }));
   }
 
   #[test]
   fn ignores_trigger_mentioned_mid_sentence() {
-    assert_eq!(parse("akbun", "please run akbun plan later"), Err(ParseError::NotACommand));
+    assert_eq!(parse("terraform", "please run terraform plan later"), Err(ParseError::NotACommand));
   }
 
   #[test]
   fn plain_comment_is_not_a_command() {
-    assert_eq!(parse("akbun", "looks good to me"), Err(ParseError::NotACommand));
+    assert_eq!(parse("terraform", "looks good to me"), Err(ParseError::NotACommand));
   }
 
   #[test]
   fn bare_trigger_shows_help() {
-    assert_eq!(parse("akbun", "akbun"), Ok(Command::Help));
+    assert_eq!(parse("terraform", "terraform"), Ok(Command::Help));
   }
 
   #[test]
   fn parses_unlock() {
-    assert_eq!(parse("akbun", "akbun unlock"), Ok(Command::Unlock));
+    assert_eq!(parse("terraform", "terraform unlock"), Ok(Command::Unlock));
   }
 
   #[test]
   fn unknown_subcommand_is_reported() {
-    assert!(matches!(parse("akbun", "akbun destroy"), Err(ParseError::Unrecognized(_))));
+    assert!(matches!(parse("terraform", "terraform destroy"), Err(ParseError::Unrecognized(_))));
   }
 
   #[test]
   fn dir_flag_without_value_is_reported() {
-    assert!(matches!(parse("akbun", "akbun plan -d"), Err(ParseError::Unrecognized(_))));
+    assert!(matches!(parse("terraform", "terraform plan -d"), Err(ParseError::Unrecognized(_))));
   }
 
   #[test]
   fn parses_import_with_address_and_id() {
     assert_eq!(
-      parse("akbun", "akbun import aws_instance.web i-1234567890abcdef0"),
+      parse("terraform", "terraform import aws_instance.web i-1234567890abcdef0"),
       Ok(Command::Import {
         dir: None,
         address: "aws_instance.web".to_string(),
@@ -187,19 +187,19 @@ mod tests {
       address: "aws_vpc.main".to_string(),
       id: "vpc-123".to_string(),
     });
-    assert_eq!(parse("akbun", "akbun import -d aws/vpc aws_vpc.main vpc-123"), expected);
-    assert_eq!(parse("akbun", "akbun import aws_vpc.main vpc-123 -d aws/vpc"), expected);
+    assert_eq!(parse("terraform", "terraform import -d aws/vpc aws_vpc.main vpc-123"), expected);
+    assert_eq!(parse("terraform", "terraform import aws_vpc.main vpc-123 -d aws/vpc"), expected);
   }
 
   #[test]
   fn import_with_wrong_arity_is_reported() {
-    assert!(matches!(parse("akbun", "akbun import aws_vpc.main"), Err(ParseError::Unrecognized(_))));
-    assert!(matches!(parse("akbun", "akbun import a b c"), Err(ParseError::Unrecognized(_))));
+    assert!(matches!(parse("terraform", "terraform import aws_vpc.main"), Err(ParseError::Unrecognized(_))));
+    assert!(matches!(parse("terraform", "terraform import a b c"), Err(ParseError::Unrecognized(_))));
   }
 
   #[test]
   fn custom_trigger_word_is_honored() {
     assert_eq!(parse("terraform-bot", "terraform-bot plan"), Ok(Command::Plan { dir: None }));
-    assert_eq!(parse("terraform-bot", "akbun plan"), Err(ParseError::NotACommand));
+    assert_eq!(parse("terraform-bot", "terraform plan"), Err(ParseError::NotACommand));
   }
 }

@@ -85,7 +85,7 @@ mod tests {
     json!({
       "action": action,
       "issue": issue,
-      "comment": {"body": "akbun plan", "user": {"login": "alice", "type": user_type}},
+      "comment": {"body": "terraform plan", "user": {"login": "alice", "type": user_type}},
       "repository": {"full_name": "octo/infra"}
     })
   }
@@ -98,7 +98,7 @@ mod tests {
       Event::Comment {
         repo: RepoRef { owner: "octo".to_string(), name: "infra".to_string() },
         pr_number: 7,
-        body: "akbun plan".to_string(),
+        body: "terraform plan".to_string(),
         author: "alice".to_string(),
       }
     );
