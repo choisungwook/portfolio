@@ -12,7 +12,7 @@ Electron + TypeScript 데스크톱 앱이다. 클러스터 조회는 Kubernetes 
   - `preload.ts`: contextBridge로 renderer에 `window.api` 노출
 - `workspace/src/renderer/`: 화면. Nodes, Pods, Karpenter Event, NodePool / EC2NodeClass, Utilize, Settings 6개 탭과 테이블 렌더링. 프레임워크 없이 DOM API만 사용한다.
 
-renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:describe-pod`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
+renderer는 `nodeIntegration: false`, `contextIsolation: true`이며 main 프로세스와는 IPC(`kubectl:nodes`, `kubectl:pods`, `kubectl:describe-pod`, `kubectl:describe-node`, `kubectl:set-node-cordon`, `kubectl:karpenter-events`, `kubectl:karpenter-logs`, `kubectl:karpenter-resources`, `kubectl:karpenter-versions`, `kubectl:namespaces`, `overprovision:build`, `clipboard:write`, `settings:get`, `settings:save`)로만 통신한다.
 
 ## kubectl 실행 흐름
 
@@ -26,10 +26,11 @@ kubectl get pods --all-namespaces -o json
 kubectl get pods --all-namespaces -o json --field-selector spec.nodeName=<노드이름>
 ```
 
-파드 이름을 눌러 describe 사이드 패널을 열 때 사용하는 명령:
+이름을 눌러 describe 사이드 패널을 열 때 사용하는 명령. 노드는 cluster scope라 namespace를 붙이지 않는다:
 
 ```bash
 kubectl describe pod <파드이름> -n <namespace>
+kubectl describe node <노드이름>
 ```
 
 Utilize 탭이 manifest를 만들 대상 목록을 채울 때 사용하는 명령:
@@ -108,15 +109,15 @@ Pods 탭의 두 토글은 노드 필터와 같은 `.filter-button` 모양을 쓴
 
 Ready 칸도 상태처럼 색으로 먼저 읽히게 한다. 다만 상태와 달리 중간 단계를 두지 않고 모두 Ready면 초록, 아니면 빨강 두 가지만 쓴다. Ready는 개수가 다 찼는가 아닌가의 문제라 그 사이에 둘 단계가 없다.
 
-## 파드 describe 사이드 패널
+## describe 사이드 패널
 
-Pods 탭과 노드 상세의 파드 표에서 이름 칸만 버튼(`.pod-name-button`)이다. 누르면 화면 오른쪽에 `#pod-detail-panel`이 열리고 `kubectl describe pod`의 출력을 그대로 붙인다. 패널은 `position: fixed`로 표 위에 겹친다. 표를 밀어내면 칼럼이 접혀 어느 파드를 열었는지 보이지 않기 때문이다.
+Nodes 탭, Pods 탭, 노드 상세의 파드 표에서 이름 칸만 버튼(`.name-button`)이다. 누르면 화면 오른쪽에 `#pod-detail-panel`이 열리고 `kubectl describe`의 출력을 그대로 붙인다. 패널은 `position: fixed`로 표 위에 겹친다. 표를 밀어내면 칼럼이 접혀 어느 대상을 열었는지 보이지 않기 때문이다. 너비는 `min(1100px, 95vw)`다. describe는 한 줄이 길어 좁은 패널에서는 줄바꿈이 잦아 읽기 어렵다.
 
-describe 결과는 파싱하지 않는다. main은 `describePod(namespace, name)`이 문자열을 그대로 돌려주고, renderer는 error 낱말 하이라이트(`appendErrorHighlighted`)만 얹는다. 들여쓰기가 계층을 나타내는 출력이라 `white-space: pre-wrap`으로 원문 형태를 지키고, 조각은 `textContent`로만 넣어 클러스터가 준 문자열이 HTML로 해석되지 않게 한다.
+describe 결과는 파싱하지 않는다. main은 `describePod(namespace, name)`과 `describeNode(name)`이 문자열을 그대로 돌려주고, renderer는 error 낱말 하이라이트(`appendErrorHighlighted`)만 얹는다. 들여쓰기가 계층을 나타내는 출력이라 `white-space: pre-wrap`으로 원문 형태를 지키고, 조각은 `textContent`로만 넣어 클러스터가 준 문자열이 HTML로 해석되지 않게 한다.
 
 패널은 `role="dialog"`로 선언하고, 이름 버튼으로 열 때 닫기 버튼으로 focus를 옮긴다. 표에 focus가 남아 있으면 키보드만 쓰는 경우 열린 패널에 닿을 수 없다. 연 버튼은 `detailOpener`에 들고 있다가 닫을 때 그 자리로 focus를 되돌린다. 패널 안의 새로고침으로 다시 읽을 때는 이미 패널 안에 있으므로 focus를 건드리지 않는다.
 
-지금 보고 있는 파드는 `detailPod`에 들고 있다. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓰고, 조회하는 동안 다른 파드를 눌렀을 때 늦게 온 응답이 화면을 덮지 않도록 응답의 대상과 비교하는 데도 쓴다. 조회 실패는 상단 배너가 아니라 패널 안에 적는다. 패널이 오른쪽을 덮고 있어 배너가 눈에 들어오지 않는다.
+지금 보고 있는 대상은 `detailTarget`(kind, namespace, name)에 들고 있다. 노드와 파드가 한 패널을 쓰므로 kind까지 담아야 새로고침이 어느 명령을 다시 돌릴지 정할 수 있다. 조회하는 동안 다른 대상을 눌렀을 때 늦게 온 응답이 화면을 덮지 않도록 응답의 대상과 비교하는 데도 쓴다. 조회 실패는 상단 배너가 아니라 패널 안에 적는다. 패널이 오른쪽을 덮고 있어 배너가 눈에 들어오지 않는다.
 
 이름 검증은 IPC 경계에서 노드와 같은 `assertResourceName`이 한다. shell을 거치지 않아 인젝션은 없지만 `-`로 시작하는 값은 kubectl이 이름이 아니라 옵션으로 읽는다. 배경은 [describe 사이드 패널 ADR](../adr/2026-07-pod-describe-side-panel.md)에 있다.
 
@@ -180,9 +181,9 @@ Nodes 탭 노드 행 끝 Action 칼럼에 버튼 하나를 두고, 글자를 `un
 
 subcommand를 반대로 넘기면 노드를 열려다 닫으므로 `test/node-cordon.test.js`가 실제 실행 경로에서 넘어간 인자를 확인한다.
 
-## 노드 이름 복사
+## 이름 복사
 
-Nodes 탭 Name 칼럼의 이름 오른쪽에 복사 버튼을 둔다. 클릭하면 renderer가 `clipboard:write` IPC로 이름을 넘기고 main이 electron `clipboard.writeText`로 복사한다. renderer의 `navigator.clipboard`를 쓰지 않는 이유는 focus와 권한 상태를 타서 조용히 실패하기 때문이며, 배경은 [이름 복사 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
+Nodes, Pods, 노드 상세의 파드 표 Name 칼럼에서 이름 오른쪽에 복사 버튼을 둔다. 세 표 모두 `appendNameCell` 하나를 쓴다. 클릭하면 renderer가 `clipboard:write` IPC로 이름을 넘기고 main이 electron `clipboard.writeText`로 복사한다. renderer의 `navigator.clipboard`를 쓰지 않는 이유는 focus와 권한 상태를 타서 조용히 실패하기 때문이며, 배경은 [이름 복사 ADR](../adr/2026-07-name-copy-and-error-highlight.md)에 있다.
 
 복사에 성공하면 버튼 글자를 1.5초 동안 "복사됨"으로 바꾼다. 행 클릭은 파드 조회에 쓰고 있으므로 cordon 버튼과 마찬가지로 `stopPropagation`으로 전파를 멈춘다. `td`를 직접 flex로 만들면 표 정렬이 깨지므로 칸 안에 감싸는 요소(`.name-box`)를 하나 두고 그것을 flex로 만든다.
 
@@ -193,6 +194,12 @@ Nodes 탭 Name 칼럼의 이름 오른쪽에 복사 버튼을 둔다. 클릭하�
 | Karpenter 노드 | `karpenter.sh/nodepool` 또는 구버전 `karpenter.sh/provisioner-name` label 존재 |
 | Managed NodeGroup 노드 | `eks.amazonaws.com/nodegroup` label 존재 |
 | Cordoned 노드 | `spec.unschedulable == true`, 상태에 SchedulingDisabled로 표시 |
+
+## Instance Type 칼럼
+
+Nodes 탭의 Instance Type 칼럼은 `node.kubernetes.io/instance-type` label에서 읽고, 그 label이 없으면 예전 이름인 `beta.kubernetes.io/instance-type`을 본다. 업그레이드 중에는 같은 NodePool에서도 노드마다 타입이 달라질 수 있어, 어느 노드를 먼저 비울지 정할 때 이 값을 본다.
+
+둘 다 없으면 빈 문자열로 두고 아무것도 적지 않는다. EC2가 아닌 노드에는 이 label이 없는데, `-`를 적으면 "타입을 못 읽었다"와 "값이 원래 없다"가 같은 모양이 된다. 값이 있고 없고는 `test/node-instance-type.test.js`가 확인한다.
 
 ## 업데이트 흐름
 

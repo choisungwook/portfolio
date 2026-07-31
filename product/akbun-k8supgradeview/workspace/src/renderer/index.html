@@ -111,6 +111,9 @@
             <th class="sortable" data-sort-key="internalIp" tabindex="0" role="button" aria-sort="none">
               Internal IP<span class="sort-arrow"></span>
             </th>
+            <th class="sortable" data-sort-key="instanceType" tabindex="0" role="button" aria-sort="none">
+              Instance Type<span class="sort-arrow"></span>
+            </th>
             <th class="sortable" data-sort-key="version" tabindex="0" role="button" aria-sort="none">
               Version<span class="sort-arrow"></span>
             </th>
@@ -416,8 +419,8 @@
   </main>
   </div>
 
-  <!-- 파드 이름을 누르면 열리는 describe 사이드 패널. 표를 가리지 않도록 오른쪽에 붙는다. -->
-  <aside id="pod-detail-panel" class="hidden" role="dialog" aria-label="파드 describe">
+  <!-- 노드나 파드 이름을 누르면 열리는 describe 사이드 패널. 표를 가리지 않도록 오른쪽에 붙는다. -->
+  <aside id="pod-detail-panel" class="hidden" role="dialog" aria-label="describe">
     <div class="pod-detail-header">
       <h2 id="pod-detail-title"></h2>
       <div class="pod-detail-actions">

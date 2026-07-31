@@ -4,6 +4,8 @@ import { loadSettings } from "./settings";
 export interface NodeInfo {
   name: string;
   internalIp: string;
+  // EC2 인스턴스 타입(t3.medium 등). label이 없는 노드도 있어 그때는 빈 문자열이다.
+  instanceType: string;
   version: string;
   status: string;
   creationTimestamp: string;
@@ -87,6 +89,8 @@ export interface KarpenterLogs {
 
 const KARPENTER_LABELS = ["karpenter.sh/nodepool", "karpenter.sh/provisioner-name"];
 const MANAGED_NODEGROUP_LABEL = "eks.amazonaws.com/nodegroup";
+// beta.는 예전 이름이다. 오래된 노드에도 값이 보이도록 둘 다 본다.
+const INSTANCE_TYPE_LABELS = ["node.kubernetes.io/instance-type", "beta.kubernetes.io/instance-type"];
 
 // 설정된 kubectl 명령("tsh kubectl" 등)을 공백으로 나눠 shell 없이 실행한다.
 function runKubectl(args: string[]): Promise<string> {
@@ -129,11 +133,20 @@ function nodeGroup(labels: Record<string, string>): string {
   return labels[MANAGED_NODEGROUP_LABEL] ?? "";
 }
 
+/** EC2가 아닌 노드에는 이 label이 없다. 없으면 빈 칸으로 두고 아무것도 적지 않는다. */
+function instanceType(labels: Record<string, string>): string {
+  for (const label of INSTANCE_TYPE_LABELS) {
+    if (labels[label]) return labels[label];
+  }
+  return "";
+}
+
 function toNodeInfo(node: any): NodeInfo {
   const labels: Record<string, string> = node.metadata?.labels ?? {};
   return {
     name: node.metadata?.name ?? "",
     internalIp: internalIp(node),
+    instanceType: instanceType(labels),
     version: node.status?.nodeInfo?.kubeletVersion ?? "",
     status: nodeStatus(node),
     creationTimestamp: node.metadata?.creationTimestamp ?? "",
@@ -216,6 +229,12 @@ export async function getPods(nodeName?: string): Promise<PodInfo[]> {
  */
 export async function describePod(namespace: string, name: string): Promise<string> {
   const stdout = await runKubectl(["describe", "pod", name, "-n", namespace]);
+  return stdout.trimEnd();
+}
+
+/** 노드도 같은 이유로 원문을 그대로 돌려준다. 노드는 cluster scope라 namespace가 없다. */
+export async function describeNode(name: string): Promise<string> {
+  const stdout = await runKubectl(["describe", "node", name]);
   return stdout.trimEnd();
 }
 

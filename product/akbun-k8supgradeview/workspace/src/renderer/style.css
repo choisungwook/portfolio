@@ -536,7 +536,7 @@ th.sortable.sorted {
 }
 
 /* 파드 이름은 눌러서 describe를 여는 자리라 링크처럼 보이게 한다. */
-.pod-name-button {
+.name-button {
   padding: 0;
   border: none;
   background: none;
@@ -546,7 +546,7 @@ th.sortable.sorted {
   cursor: pointer;
 }
 
-.pod-name-button:hover {
+.name-button:hover {
   text-decoration: underline;
 }
 
@@ -562,7 +562,8 @@ th.sortable.sorted {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  width: min(720px, 90vw);
+  /* describe는 한 줄이 길다. 줄바꿈이 잦으면 읽기 어려워 화면 대부분을 준다. */
+  width: min(1100px, 95vw);
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: -8px 0 24px var(--shadow);

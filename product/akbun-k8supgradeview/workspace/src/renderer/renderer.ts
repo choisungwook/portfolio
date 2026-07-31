@@ -1,6 +1,7 @@
 interface NodeInfo {
   name: string;
   internalIp: string;
+  instanceType: string;
   version: string;
   status: string;
   creationTimestamp: string;
@@ -93,6 +94,7 @@ interface Api {
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
   describePod(namespace: string, name: string): Promise<string>;
+  describeNode(name: string): Promise<string>;
   getNamespaces(): Promise<string[]>;
   buildOverprovisionYaml(options: OverprovisionOptions): Promise<string>;
   setNodeCordon(nodeName: string, cordon: boolean): Promise<boolean>;
@@ -254,6 +256,7 @@ const NODE_SORT: SortSpec<NodeInfo> = {
   columns: {
     name: { kind: "text", value: (node) => node.name },
     internalIp: { kind: "ip", value: (node) => node.internalIp },
+    instanceType: { kind: "text", value: (node) => node.instanceType },
     version: { kind: "natural", value: (node) => node.version },
     status: { kind: "text", value: (node) => node.status },
     age: { kind: "age", value: (node) => node.creationTimestamp },
@@ -420,88 +423,90 @@ async function copyToClipboard(text: string, button: HTMLButtonElement): Promise
   }
 }
 
-/** 노드 이름은 kubectl 명령에 그대로 붙여 쓰는 값이라 이름 옆에 복사 버튼을 둔다. */
-function appendNameCellWithCopy(row: HTMLTableRowElement, name: string): void {
+/**
+ * 이름 칸. 이름을 누르면 describe가 열리고, 옆의 버튼으로 이름만 복사한다.
+ * 이름은 kubectl 명령에 그대로 붙여 쓰는 값이라 노드와 파드 모두 복사가 필요하다.
+ */
+function appendNameCell(row: HTMLTableRowElement, name: string, open: () => void): void {
   const cell = row.insertCell();
   cell.className = "name-cell";
   const box = document.createElement("div");
   box.className = "name-box";
   cell.appendChild(box);
 
-  const label = document.createElement("span");
-  label.textContent = name;
-  box.appendChild(label);
-
-  const button = document.createElement("button");
-  button.className = "copy-button";
-  button.textContent = "복사";
-  button.title = `${name} 복사`;
-  // 행 클릭은 파드 조회다. 복사할 때 그 동작까지 함께 돌지 않게 막는다.
-  button.addEventListener("click", (event) => {
+  const nameButton = document.createElement("button");
+  nameButton.className = "name-button";
+  nameButton.textContent = name;
+  nameButton.title = `${name} describe 보기`;
+  // 행 클릭은 노드 선택(파드 조회)이다. 이름을 눌렀을 때 함께 돌지 않게 막는다.
+  nameButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    void copyToClipboard(name, button);
+    open();
   });
-  box.appendChild(button);
-}
+  box.appendChild(nameButton);
 
-/** 사이드 패널이 보고 있는 파드. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓴다. */
-let detailPod: { namespace: string; name: string } | null = null;
+  const copyButton = document.createElement("button");
+  copyButton.className = "copy-button";
+  copyButton.textContent = "복사";
+  copyButton.title = `${name} 복사`;
+  copyButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void copyToClipboard(name, copyButton);
+  });
+  box.appendChild(copyButton);
+}
 
 /**
- * 파드 이름 칸을 눌러 describe를 여는 버튼으로 만든다. 표의 다른 칸은 그대로 두어
- * 어디를 눌러야 열리는지 한 곳으로 모은다.
+ * 사이드 패널이 보고 있는 대상. 새로고침 버튼이 같은 대상을 다시 읽는 데 쓴다.
+ * 노드는 cluster scope라 namespace가 빈 문자열이다.
  */
-function appendPodNameCell(row: HTMLTableRowElement, pod: PodInfo): void {
-  const cell = row.insertCell();
-  const button = document.createElement("button");
-  button.className = "pod-name-button";
-  button.textContent = pod.name;
-  button.title = `${pod.name} describe 보기`;
-  button.addEventListener("click", (event) => {
-    // 노드 탭의 파드 표는 행 클릭이 노드 선택이라 그 동작까지 함께 돌지 않게 막는다.
-    event.stopPropagation();
-    void openPodDetail(pod.namespace, pod.name);
-  });
-  cell.appendChild(button);
-}
+let detailTarget: { kind: "pod" | "node"; namespace: string; name: string } | null = null;
 
 /** 패널을 연 버튼. 닫을 때 그 자리로 focus를 되돌려 표에서 이어서 볼 수 있게 한다. */
 let detailOpener: HTMLElement | null = null;
 
 function closePodDetail(): void {
-  detailPod = null;
+  detailTarget = null;
   $("#pod-detail-panel").classList.add("hidden");
   detailOpener?.focus();
   detailOpener = null;
+}
+
+function isSameTarget(kind: string, namespace: string, name: string): boolean {
+  return (
+    detailTarget?.kind === kind &&
+    detailTarget.namespace === namespace &&
+    detailTarget.name === name
+  );
 }
 
 /**
  * describe는 한 번에 수십 줄이 나오고 클러스터가 멀면 몇 초가 걸린다.
  * 여는 즉시 대상과 조회 중임을 적어 두어 빈 화면을 보여주지 않는다.
  */
-async function openPodDetail(namespace: string, name: string): Promise<void> {
-  detailPod = { namespace, name };
+async function openDetail(kind: "pod" | "node", namespace: string, name: string): Promise<void> {
+  detailTarget = { kind, namespace, name };
   $("#pod-detail-panel").classList.remove("hidden");
   // 표에 focus가 남아 있으면 키보드만 쓰는 경우 열린 패널에 닿을 수 없다.
   // 패널 안의 새로고침으로 다시 읽을 때는 이미 패널에 있으므로 focus를 건드리지 않는다.
   const active = document.activeElement as HTMLElement | null;
-  if (active?.classList.contains("pod-name-button")) {
+  if (active?.classList.contains("name-button")) {
     detailOpener = active;
     ($("#close-pod-detail") as HTMLButtonElement).focus();
   }
-  $("#pod-detail-title").textContent = `${namespace} / ${name}`;
+  $("#pod-detail-title").textContent = kind === "pod" ? `${namespace} / ${name}` : `node / ${name}`;
   const body = $("#pod-detail-body");
   body.className = "";
   body.textContent = "조회 중...";
 
   try {
-    const text = await api.describePod(namespace, name);
-    // 조회하는 동안 다른 파드를 눌렀으면 늦게 온 결과가 화면을 덮지 않게 버린다.
-    if (detailPod?.namespace !== namespace || detailPod.name !== name) return;
+    const text = kind === "pod" ? await api.describePod(namespace, name) : await api.describeNode(name);
+    // 조회하는 동안 다른 대상을 눌렀으면 늦게 온 결과가 화면을 덮지 않게 버린다.
+    if (!isSameTarget(kind, namespace, name)) return;
     body.textContent = "";
     appendErrorHighlighted(body, text);
   } catch (error) {
-    if (detailPod?.namespace !== namespace || detailPod.name !== name) return;
+    if (!isSameTarget(kind, namespace, name)) return;
     // 상단 배너로 보내면 패널을 보는 동안 눈에 들어오지 않아 패널 안에 적는다.
     body.className = "detail-error";
     body.textContent = String(error instanceof Error ? error.message : error);
@@ -557,8 +562,9 @@ function renderNodes(): void {
     const row = tbody.insertRow();
     row.dataset.name = node.name;
     if (node.name === selectedNode) row.classList.add("selected");
-    appendNameCellWithCopy(row, node.name);
+    appendNameCell(row, node.name, () => void openDetail("node", "", node.name));
     appendCell(row, node.internalIp);
+    appendCell(row, node.instanceType);
     appendCell(row, node.version);
     appendCell(row, node.status, statusClass(node.status));
     appendCell(row, formatAge(node.creationTimestamp));
@@ -591,7 +597,7 @@ function renderNodePods(): void {
   for (const pod of nodePodSort.apply(nodePods)) {
     const row = tbody.insertRow();
     appendCell(row, pod.namespace);
-    appendPodNameCell(row, pod);
+    appendNameCell(row, pod.name, () => void openDetail("pod", pod.namespace, pod.name));
     appendCell(row, pod.status, statusClass(pod.status));
     appendCell(row, pod.ready, podReadyClass(pod));
     appendCell(row, formatAge(pod.creationTimestamp));
@@ -706,7 +712,7 @@ function renderPods(): void {
   for (const pod of pods) {
     const row = tbody.insertRow();
     appendCell(row, pod.namespace);
-    appendPodNameCell(row, pod);
+    appendNameCell(row, pod.name, () => void openDetail("pod", pod.namespace, pod.name));
     appendCell(row, pod.status, statusClass(pod.status));
     appendCell(row, pod.ready, podReadyClass(pod));
     appendCell(row, pod.nodeName);
@@ -1083,7 +1089,7 @@ function registerEventHandlers(): void {
   });
   $("#close-pod-detail").addEventListener("click", closePodDetail);
   $("#refresh-pod-detail").addEventListener("click", () => {
-    if (detailPod) void openPodDetail(detailPod.namespace, detailPod.name);
+    if (detailTarget) void openDetail(detailTarget.kind, detailTarget.namespace, detailTarget.name);
   });
   $("#copy-pod-detail").addEventListener("click", () => {
     const button = $("#copy-pod-detail") as HTMLButtonElement;
@@ -1091,7 +1097,7 @@ function registerEventHandlers(): void {
   });
   // 패널을 닫는 데 마우스를 쓰지 않아도 되게 Escape를 받는다.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && detailPod) closePodDetail();
+    if (event.key === "Escape" && detailTarget) closePodDetail();
   });
   $("#save-settings").addEventListener("click", () => void submitSettings());
   $("#refresh-namespaces").addEventListener("click", () => void refreshNamespaces());
