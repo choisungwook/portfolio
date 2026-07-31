@@ -1,6 +1,6 @@
 # akbun-terraform-apply-remote
 
-GitHub pull request에서 terraform plan/apply를 실행하는 셀프호스팅 자동화 서버다. Atlantis와 같은 방식으로 동작한다. PR이 열리면 변경된 terraform 프로젝트를 자동으로 plan하고, 리뷰어가 comment로 `akbun apply`를 남기면 리뷰한 plan 파일을 그대로 apply한다.
+GitHub pull request에서 terraform plan/apply를 실행하는 셀프호스팅 자동화 서버다. PR이 열리면 변경된 terraform 프로젝트를 자동으로 plan하고, 리뷰어가 comment로 `akbun apply`를 남기면 리뷰한 plan 파일을 그대로 apply한다.
 
 ## 동작 방식
 

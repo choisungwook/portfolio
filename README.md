@@ -96,7 +96,7 @@
 86. LiteLLM AI gateway 3시간 학습과 폐쇄망 Bedrock 실습 (26.7.11) - [링크](./computer_science/ai/litellm/)
 87. Bifrost AI gateway 학습(LiteLLM 비교) (26.7.11) - [링크](./computer_science/ai/bifrost/)
 88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
-89. git credential helper 원리와 CodeBuild connection 학습지 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
+89. git credential helper 원리와 CodeBuild connection 핸즈온 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
 
 ## 직접 만든 제품
 
@@ -111,7 +111,7 @@
 - [git graph 데스크톱 앱 (akbun-gitdesktop)](./product/akbun-gitdesktop/) (26.7.25)
 - [언어 공부용 구간 반복 오디오 플레이어 (akbun-shadowing-player)](./product/akbun-shadowing-player/) (26.7.25)
 - [EKS 업그레이드용 노드/파드 조회 데스크톱 앱 (akbun-k8supgradeview)](./product/akbun-k8supgradeview/) (26.7.26)
-- [GitHub PR에서 terraform plan/apply를 실행하는 Atlantis 방식 서버 (akbun-terraform-apply-remote)](./product/akbun-terraform-apply-remote/) (26.7.29)
+- [GitHub PR에서 terraform plan/apply를 실행하는 서버 (akbun-terraform-apply-remote)](./product/akbun-terraform-apply-remote/) (26.7.29)
 - [macOS 메뉴바 스크린샷 앱 (akbun-screenshot)](./product/akbun-screenshot/) (26.7.31)
 
 ## Dockerfile
