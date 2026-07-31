@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     sections.onContextMenu = { [weak self] in self?.contextMenu() ?? NSMenu() }
     model = ItemsModel(sections: sections)
 
-    Hotkey.register()
+    Hotkey.apply(Defaults.hotkey)
     NotificationCenter.default.addObserver(
       forName: .mactaskbarHotkey, object: nil, queue: .main
     ) { [weak self] _ in
@@ -70,8 +70,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     Task { await model.rescan() }
   }
 
-  /// Launching the app again from Finder or the Dock brings the window back,
-  /// which is the recovery path when the control icon cannot be clicked.
+  /// Launching the app again from Finder or Launchpad brings the window back.
+  /// This is the only way in when the control icon cannot be drawn, so it is
+  /// not a convenience.
   func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
     openItemsWindow()
     return true

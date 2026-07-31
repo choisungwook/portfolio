@@ -42,7 +42,7 @@ Bump `VERSION` in the same change as the feature. Forgetting to bump it makes th
 ## Caveats
 
 - Assigning icons to sections needs the `all` state. A wide divider sits off screen and there is nothing to drag across.
-- The control icon can be invisible on a full bar with a camera housing, because macOS gives new status items the leftmost slot. The app opens its window on launch when it detects this, and `⌃⌘B` works regardless. Getting the icon back means freeing room to the right of the housing and dragging the icon there with Command held.
+- The control icon can be invisible on a full bar with a camera housing, because macOS gives new status items the leftmost slot. The app opens its window on launch when it detects this, the shortcut works regardless, and launching the app again reopens the window. Getting the icon back means freeing room to the right of the housing and dragging the icon there with Command held.
 - The item list needs Accessibility permission. The permission is keyed to the bundle identifier, so a rebuild in place keeps it, but moving the app somewhere new asks again.
-- The hotkey is fixed at `⌃⌘B`. There is no recorder UI and no conflict detection; if something else owns that combination, `Hotkey.swift` is the one place to change.
+- The hotkey offers four choices including off, not a recorder. Conflict detection is not possible: registering a combination another app owns can succeed and never fire, so the symptom of a clash is a shortcut that does nothing. Switching to another entry is the fix, and `Hotkey.choices` is where to add one.
 - Only the app's own status items can be moved by this app, and only in width. Reordering another app's icon is something only the user can do, by dragging.

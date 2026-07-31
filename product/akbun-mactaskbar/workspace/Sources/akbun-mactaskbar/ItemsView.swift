@@ -21,7 +21,8 @@ struct ItemsView: View {
           "The control icon is behind the camera housing",
           detail:
             "macOS puts a new status item in the leftmost slot, and this bar has no room left. "
-            + "Press \(Hotkey.displayName) to cycle sections, or free up room and drag the icon right with Command held.",
+            + "Use \(model.hotkey.label) or this window to cycle sections. "
+            + "To get the icon back, free up room to the right of the housing and drag it there with Command held.",
           action: nil
         )
       }
@@ -55,10 +56,18 @@ struct ItemsView: View {
         }
         .labelsHidden()
         .frame(width: 90)
+
         Spacer()
-        Text(Hotkey.displayName)
-          .foregroundStyle(.secondary)
-          .help("Cycles sections from anywhere")
+
+        Text("Shortcut")
+        Picker("", selection: $model.hotkey) {
+          ForEach(Hotkey.choices) { choice in
+            Text(choice.label).tag(choice)
+          }
+        }
+        .labelsHidden()
+        .frame(width: 90)
+        .help("Cycles sections from anywhere. Pick another if it clashes with an app you use.")
       }
 
       TextField("Filter by app or label", text: $model.query)

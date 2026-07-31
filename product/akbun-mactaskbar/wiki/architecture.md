@@ -45,7 +45,9 @@ This matters twice.
 
 The item list would otherwise report items as visible that nobody can see. On the bar this was developed against, four items sat between 878 and 955 and were invisible while reporting positive coordinates.
 
-The app's own control icon is subject to the same rule. macOS hands a new status item the leftmost free slot, and on a full bar that slot is under the housing, so the app can start with its only click target undrawable, on exactly the machines it is meant for. `SectionController.controlIsHidden` compares the control item's window frame against the geometry, and the app opens the item list window on launch when the answer is yes rather than looking like it failed to start. The Carbon hotkey covers the same case, since it needs no visible target and no accessibility permission.
+The app's own control icon is subject to the same rule. macOS hands a new status item the leftmost free slot, and on a full bar that slot is under the housing, so the app can start with its only click target undrawable, on exactly the machines it is meant for. `SectionController.controlIsHidden` compares the control item's window frame against the geometry, and the app opens the item list window on launch when the answer is yes rather than looking like it failed to start. `applicationShouldHandleReopen` brings that window back when the app is launched again, which is what makes closing it safe. The Carbon hotkey covers the same case, since it needs no visible target and no accessibility permission.
+
+The hotkey combination is a setting, not a constant. Claiming one system-wide takes it from whatever else wanted it, and macOS gives no way to ask what that is: registering a combination another app already owns can succeed and never fire, so a conflict cannot be detected and reported. `Hotkey.choices` is therefore a short list plus an off entry, and changing it unregisters and re-registers on the spot.
 
 ## Reading the bar
 

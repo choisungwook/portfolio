@@ -24,7 +24,7 @@ Clicking the control icon cycles three states.
 
 The `expanded` state folds itself back up after a while, so a peek does not have to be undone by hand. The delay is set in the item list window, and `never` turns it off. The `all` state stays put, since that is where icons get dragged between sections.
 
-`⌃⌘B` cycles the sections from anywhere. That shortcut is not only a convenience, see the caveat below.
+A system-wide shortcut cycles the sections, `⌃⌘B` by default. macOS gives no way to find out whether another app already owns a combination, so the item list window offers a short list of alternatives and an `off` setting. Changing it re-registers straight away.
 
 ## Quick start
 
@@ -42,6 +42,6 @@ The item list window opens from the control icon's right-click menu. It needs Ac
 
 macOS gives a new status item the leftmost free slot on the bar. On a display with a camera housing and a bar that is already full, that slot is under the housing, where nothing is drawn. The app is then running with its control icon invisible, which is the same bar this app exists to fix.
 
-The app detects this and opens the item list window on launch instead of looking like it failed to start. From there `⌃⌘B` and the window's own controls work as normal.
+The app detects this and opens the item list window on launch instead of looking like it failed to start. The window carries every action the icon would have offered, and the shortcut works regardless. Launching the app again from Finder or Launchpad brings the window back.
 
 To get the icon itself back, free up room to the right of the housing (turn off a couple of Control Center items in System Settings, or quit an app), relaunch, then hold Command and drag the control icon further right. macOS remembers the position from then on.

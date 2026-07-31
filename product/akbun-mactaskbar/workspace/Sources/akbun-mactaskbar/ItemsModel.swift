@@ -21,11 +21,21 @@ final class ItemsModel {
     didSet { Defaults.autoCollapseSeconds = autoCollapseSeconds }
   }
 
+  /// Changing this re-registers immediately, so a combination that turns out to
+  /// clash with another app can be swapped without restarting.
+  var hotkey: Hotkey.Choice {
+    didSet {
+      Defaults.hotkey = hotkey
+      Hotkey.apply(hotkey)
+    }
+  }
+
   init(sections: SectionController) {
     self.sections = sections
     self.section = sections.state
     self.isTrusted = MenuBarScanner.isTrusted
     self.autoCollapseSeconds = Defaults.autoCollapseSeconds
+    self.hotkey = Defaults.hotkey
     sections.onStateChange = { [weak self] state in
       self?.section = state
     }
