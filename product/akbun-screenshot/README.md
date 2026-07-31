@@ -7,7 +7,7 @@ macOS menu bar app for area screenshots. Drag to select, the capture lands on th
 | Directory | Description |
 |---|---|
 | `workspace/` | App source code and build config. Development happens here |
-| `wiki/` | Project record the next agent reads before taking over |
+| `wiki/` | Project notes the next agent reads before taking over |
 | `adr/` | Architecture decision records |
 
 ## Quick start

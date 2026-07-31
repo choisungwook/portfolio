@@ -107,7 +107,8 @@ app.whenReady().then(() => {
   // menu bar app: no dock icon, no main window
   if (app.dock) app.dock.hide();
 
-  // ponytail: emoji as the status bar icon, swap for a template png if it ever looks off
+  // deliberate shortcut: emoji as the status bar icon, no image asset needed.
+  // Swap for a 16pt template png if it ever renders poorly.
   tray = new Tray(nativeImage.createEmpty());
   tray.setTitle('📷');
   tray.setToolTip('akbun-screenshot');

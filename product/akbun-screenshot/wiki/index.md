@@ -1,6 +1,6 @@
 # akbun-screenshot Wiki
 
-The record the next agent reads before taking over this project. Read [adr/index.md](../adr/index.md) together for the reasoning behind decisions.
+This is the record the next agent reads before taking over this project. Read [adr/index.md](../adr/index.md) together for the reasoning behind decisions.
 
 ## Contents
 
