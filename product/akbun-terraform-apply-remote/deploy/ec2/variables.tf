@@ -48,7 +48,7 @@ variable "github_token" {
 variable "trigger_word" {
   description = "Comment trigger word for plan/apply commands"
   type        = string
-  default     = "akbun"
+  default     = "terraform"
 }
 
 variable "server_port" {

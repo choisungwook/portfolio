@@ -89,7 +89,7 @@ sequenceDiagram
   participant S as 서버
   participant T as terraform
 
-  R->>GH: comment "akbun apply"
+  R->>GH: comment "terraform apply"
   GH->>S: webhook (issue_comment)
   S->>S: 서명 검증, 명령 파싱
   S->>S: plan 기록 확인
@@ -102,7 +102,7 @@ sequenceDiagram
     S->>GH: apply 결과 comment
   end
 
-  R->>GH: comment "akbun import aws_vpc.main vpc-123"
+  R->>GH: comment "terraform import aws_vpc.main vpc-123"
   GH->>S: webhook (issue_comment)
   S->>T: terraform import aws_vpc.main vpc-123
   T-->>S: import 출력
@@ -114,11 +114,11 @@ sequenceDiagram
 
 | comment | 동작 |
 |---|---|
-| akbun plan [-d dir] | 변경된(또는 지정한) 프로젝트를 plan |
-| akbun apply [-d dir] | 저장된 plan 파일을 apply |
-| akbun import [-d dir] 주소 ID | 기존 리소스를 state로 import, 이후 재plan 요구 |
-| akbun unlock | 이 PR의 lock 전부 해제 |
-| akbun help | 사용법 안내 |
+| terraform plan [-d dir] | 변경된(또는 지정한) 프로젝트를 plan |
+| terraform apply [-d dir] | 저장된 plan 파일을 apply |
+| terraform import [-d dir] 주소 ID | 기존 리소스를 state로 import, 이후 재plan 요구 |
+| terraform unlock | 이 PR의 lock 전부 해제 |
+| terraform help | 사용법 안내 |
 
 ## 동시성 제어: 프로젝트 lock과 저장된 plan
 

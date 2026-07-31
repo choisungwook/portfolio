@@ -31,7 +31,7 @@ impl Config {
       auth,
       webhook_secret,
       port,
-      trigger: env::var("ATR_TRIGGER").unwrap_or_else(|_| "akbun".to_string()),
+      trigger: env::var("ATR_TRIGGER").unwrap_or_else(|_| "terraform".to_string()),
       terraform_bin: env::var("ATR_TERRAFORM_BIN").unwrap_or_else(|_| "terraform".to_string()),
       data_dir: env::var("ATR_DATA_DIR").unwrap_or_else(|_| "./data".to_string()),
       github_api: env::var("ATR_GITHUB_API")
