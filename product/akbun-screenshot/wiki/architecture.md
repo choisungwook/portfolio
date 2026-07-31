@@ -7,6 +7,7 @@ Electron app in plain JavaScript with no build step. It lives in the menu bar on
 - `workspace/src/main.js`: app bootstrap. Tray icon, tray menu, global shortcut registration, IPC handlers, settings window.
 - `workspace/src/capture.js`: capture flow. Runs the native screencapture binary, writes the result to the clipboard, and opens preview windows.
 - `workspace/src/settings.js`: reads and writes settings.json under the Electron userData path.
+- `workspace/src/update.js`: update check against GitHub Releases, dmg download, and the bundle swap script.
 - `workspace/src/lib.js`: pure helpers (filename, settings merge, preview position). No electron imports so tests run with plain node.
 - `workspace/src/preload.js`: exposes `window.api` to renderers via contextBridge.
 - `workspace/src/renderer/`: two small pages. `settings.html` has a General tab (shortcut, save directory) and a Permissions tab; `preview.html` shows one captured image with Save and Delete buttons.
@@ -38,6 +39,20 @@ Save copies the temp file into the configured save directory as `akbun-screensho
 | `permissions:open-screen-settings` | Open macOS System Settings at the Screen Recording pane |
 | `preview:save` | Move the temp png to the save directory and close the preview |
 | `preview:delete` | Remove the temp png and close the preview |
+
+## Update
+
+The tray menu has Check for Updates. It reads the GitHub Releases API, finds the newest `akbun-screenshot-v` tag, and compares it with `app.getVersion()`. On a newer version the dialog offers Update Now, which downloads the arm64 dmg into a temp directory, writes a swap script, spawns it detached, and quits. The script waits for the app to exit, mounts the dmg, replaces the `.app` bundle with `ditto`, and relaunches. If `ditto` fails it restores the bundle it moved aside.
+
+The dmg is unsigned, so Squirrel.Mac auto update is not an option. A file the app downloads itself carries no quarantine attribute, which is what makes the in-place swap work.
+
+Temp cleanup happens in three places, and `workspace/test/update.test.js` checks all three:
+
+- `downloadDmg` removes its temp directory when the download fails.
+- The swap script's `trap` removes the mount point and work directory on any exit.
+- `cleanupTempDirs` on app start removes directories left by a killed process.
+
+Update Now is hidden when the app is not packaged, because in development the bundle would be Electron.app. That case shows Open Release instead.
 
 ## Settings
 

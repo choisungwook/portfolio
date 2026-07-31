@@ -6,3 +6,4 @@ Decision records for akbun-screenshot in "decision - reason" form. Filenames fol
 
 * [Electron with native screencapture](2026-07-electron-native-screencapture.md) - Chose Electron over Rust and delegated capture to the macOS screencapture binary.
 * [Release from package.json version](2026-07-release-workflow.md) - The version field drives the tag and an unsigned arm64 dmg ships with an xattr note.
+* [Update by dmg download and bundle swap](2026-07-update-download-and-swap.md) - The tray menu checks GitHub Releases and swaps the .app bundle, with three temp file cleanup points.

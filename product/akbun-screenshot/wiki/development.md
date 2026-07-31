@@ -12,7 +12,7 @@ npm install
 npm start
 ```
 
-Run the tests (pure functions only, no Electron binary needed):
+Run the tests (pure functions and the update temp file cleanup, no Electron binary needed):
 
 ```bash
 npm test

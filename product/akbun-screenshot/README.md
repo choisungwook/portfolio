@@ -1,6 +1,6 @@
 # akbun-screenshot
 
-macOS menu bar app for area screenshots. Drag to select, the capture lands on the clipboard, and a floating preview in the bottom-left corner lets you save it as png or discard it.
+macOS menu bar app for area screenshots. Drag to select, the capture lands on the clipboard, and a floating preview in the bottom-left corner lets you save it as png or discard it. The menu bar icon also carries Check for Updates, which pulls the newest dmg from GitHub Releases and replaces the app in place.
 
 ## Directory layout
 
