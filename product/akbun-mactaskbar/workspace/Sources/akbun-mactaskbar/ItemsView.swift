@@ -59,7 +59,8 @@ struct ItemsView: View {
 
         Spacer()
 
-        Text("Shortcut")
+        Text(model.hotkeyFailed ? "Shortcut unavailable" : "Shortcut")
+          .foregroundStyle(model.hotkeyFailed ? AnyShapeStyle(.red) : AnyShapeStyle(.primary))
         Picker("", selection: $model.hotkey) {
           ForEach(Hotkey.choices) { choice in
             Text(choice.label).tag(choice)

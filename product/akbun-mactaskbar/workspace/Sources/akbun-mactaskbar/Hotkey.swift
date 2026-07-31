@@ -46,6 +46,15 @@ enum Hotkey {
   private static var hotKeyRef: EventHotKeyRef?
   private static var handlerRef: EventHandlerRef?
 
+  /// True when the last `apply` asked for a combination and did not get it.
+  ///
+  /// This never catches a clash with another app, which returns `noErr` and
+  /// then stays silent. It catches the case where there is no shortcut at all,
+  /// and that one is worth reporting: the shortcut is the way in when the
+  /// control icon cannot be drawn, so failing at it quietly leaves the user
+  /// pressing keys at nothing.
+  private(set) static var registrationFailed = false
+
   /// Replaces whatever is registered with the given choice. Registering `off`
   /// leaves the combination to the rest of the system.
   static func apply(_ choice: Choice) {
@@ -53,6 +62,7 @@ enum Hotkey {
       UnregisterEventHotKey(existing)
       hotKeyRef = nil
     }
+    registrationFailed = false
     guard choice != off else { return }
 
     if handlerRef == nil {
@@ -60,12 +70,18 @@ enum Hotkey {
         eventClass: OSType(kEventClassKeyboard),
         eventKind: OSType(kEventHotKeyPressed)
       )
-      InstallEventHandler(GetApplicationEventTarget(), hotkeyHandler, 1, &eventType, nil, &handlerRef)
+      let installed = InstallEventHandler(
+        GetApplicationEventTarget(), hotkeyHandler, 1, &eventType, nil, &handlerRef)
+      guard installed == noErr else {
+        // Without the handler a registration would succeed and deliver nowhere.
+        registrationFailed = true
+        return
+      }
     }
 
     // Four bytes identifying this registration, in the Carbon tradition.
     let id = EventHotKeyID(signature: OSType(0x414B_4254), id: 1)
-    RegisterEventHotKey(
+    let registered = RegisterEventHotKey(
       choice.keyCode,
       choice.modifiers,
       id,
@@ -73,6 +89,7 @@ enum Hotkey {
       0,
       &hotKeyRef
     )
+    registrationFailed = registered != noErr || hotKeyRef == nil
   }
 }
 

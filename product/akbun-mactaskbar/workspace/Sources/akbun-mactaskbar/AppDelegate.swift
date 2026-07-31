@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NotificationCenter.default.addObserver(
       forName: .mactaskbarHotkey, object: nil, queue: .main
     ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.sections.cycle() }
+      Task { @MainActor in self?.sections.cycle() }
     }
 
     // Divider width is derived from the screen, so a display change has to
@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NotificationCenter.default.addObserver(
       forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
     ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.sections.refreshForScreenChange() }
+      Task { @MainActor in self?.sections.refreshForScreenChange() }
     }
 
     Updater.cleanupTempDirs()

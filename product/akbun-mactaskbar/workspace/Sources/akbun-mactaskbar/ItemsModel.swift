@@ -27,8 +27,13 @@ final class ItemsModel {
     didSet {
       Defaults.hotkey = hotkey
       Hotkey.apply(hotkey)
+      hotkeyFailed = Hotkey.registrationFailed
     }
   }
+
+  /// Set when the shortcut could not be registered at all. A combination taken
+  /// by another app does not land here, since macOS reports that as success.
+  var hotkeyFailed = Hotkey.registrationFailed
 
   init(sections: SectionController) {
     self.sections = sections
