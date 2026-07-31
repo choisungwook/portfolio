@@ -5,3 +5,4 @@
 ## 목록
 
 * [Karpenter over-provisioning은 음수 우선순위 placeholder로 노드를 미리 잡아 둔다](karpenter-overprovisioning.md) - 빈 파드를 미리 띄워 노드 대기 시간을 줄이는 패턴의 동작 원리와 비용 대가.
+* [Electron 메뉴바 앱은 창 정리와 메뉴바 공간에서 조용히 실패한다](electron-menubar-silent-failures.md) - 앱이 살아 있는데 아무것도 안 보일 때 원인을 코드와 환경으로 갈라내는 방법.

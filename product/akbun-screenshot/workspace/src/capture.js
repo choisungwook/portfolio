@@ -51,10 +51,15 @@ function openPreview(tmpFile, getSaveDir) {
     },
   });
 
-  previewFiles.set(win.webContents.id, { tmpFile, getSaveDir });
+  // webContents is already destroyed once 'closed' fires, so the id has to be
+  // read while the window is alive. Reading it later throws and the cleanup
+  // below never runs, which leaves previews stacking off the top of the screen.
+  const id = win.webContents.id;
+
+  previewFiles.set(id, { tmpFile, getSaveDir });
   previewWindows.push(win);
   win.on('closed', () => {
-    previewFiles.delete(win.webContents.id);
+    previewFiles.delete(id);
     previewWindows.splice(previewWindows.indexOf(win), 1);
   });
 
