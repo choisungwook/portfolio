@@ -53,8 +53,11 @@ async function installUpdate(dmgUrl) {
     await spawnSwap(appBundlePath(), dmgPath);
     app.quit();
   } catch (error) {
-    if (dmgPath) await fs.rm(path.dirname(dmgPath), { recursive: true, force: true });
+    // Clear the flag first. A throwing rm must not leave the menu item dead.
     updating = false;
+    if (dmgPath) {
+      await fs.rm(path.dirname(dmgPath), { recursive: true, force: true }).catch(() => {});
+    }
     await dialog.showMessageBox({
       type: 'error',
       message: 'Update failed',

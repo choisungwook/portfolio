@@ -17,7 +17,10 @@ const path = require('node:path');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
-const RELEASES_API = 'https://api.github.com/repos/choisungwook/portfolio/releases';
+// This repository releases several products, so one page of 30 would push this
+// app's newest release out of reach as releases pile up. 100 is the API maximum.
+const RELEASES_API =
+  'https://api.github.com/repos/choisungwook/portfolio/releases?per_page=100';
 const TAG_PREFIX = 'akbun-screenshot-v';
 const TEMP_PREFIX = 'akbun-screenshot-update-';
 
