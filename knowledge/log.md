@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-07-31
+
+* **Creation**: [Electron 메뉴바 앱은 창 정리와 메뉴바 공간에서 조용히 실패한다](topics/electron-menubar-silent-failures.md) topic 기록. akbun-screenshot의 프리뷰 창이 화면 밖으로 밀려나던 버그를 고치면서 남긴다.
+
 ## 2026-07-29
 
 * **Creation**: [GitHub App installation tokens as the recommended auth for the terraform bot](decisions/2026-07-github-app-tokens-for-terraform-bot.md) 결정 기록. akbun-terraform-apply-remote에 GitHub App 인증과 import 명령을 추가하면서 남긴다.
