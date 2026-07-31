@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>akbun-screenshot Settings</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1a1a1a;
+      --border: #e0e0e0;
+      --accent: #0a66c2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --fg: #e8e8e8;
+        --border: #3a3a3a;
+        --accent: #4da3ff;
+      }
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, sans-serif;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    label { display: block; margin-bottom: 6px; font-weight: 600; }
+    .row { margin-bottom: 16px; }
+    .dir-row { display: flex; gap: 8px; }
+    .dir-row input { flex: 1; }
+
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    button {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--fg);
+      cursor: pointer;
+    }
+
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .hint { color: var(--fg); opacity: 0.6; margin-top: 4px; }
+    #status { margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <label for="shortcut">Capture shortcut</label>
+    <input id="shortcut" spellcheck="false">
+    <div class="hint">Electron accelerator format, e.g. CommandOrControl+Shift+4</div>
+  </div>
+
+  <div class="row">
+    <label for="save-dir">Default save location</label>
+    <div class="dir-row">
+      <input id="save-dir" spellcheck="false">
+      <button id="choose-dir">Choose…</button>
+    </div>
+  </div>
+
+  <button id="save" class="primary">Save</button>
+  <span id="status"></span>
+
+  <script src="settings.js"></script>
+</body>
+</html>
