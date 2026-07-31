@@ -65,7 +65,14 @@ function openPreview(tmpFile, getSaveDir) {
   const id = win.webContents.id;
 
   previews.set(id, { tmpFile, getSaveDir, win });
-  win.on('closed', () => previews.delete(id));
+
+  // Every way a preview can end lands here: the three buttons, Cmd+W from the
+  // default application menu, and app quit. Removing the temp png here rather
+  // than in the button handlers is what keeps the last two from leaking it.
+  win.on('closed', () => {
+    previews.delete(id);
+    fs.rmSync(tmpFile, { force: true });
+  });
 
   win.loadFile(path.join(__dirname, 'renderer', 'preview.html'), {
     query: { file: tmpFile },
@@ -86,7 +93,7 @@ function savePreview(webContentsId) {
 }
 
 // Copy button: put the image on the clipboard. The clipboard holds the bitmap
-// itself, not a path, so dropping the temp file right after is safe.
+// itself, not a path, so the temp file going away with the preview is fine.
 function copyPreview(webContentsId) {
   const entry = previews.get(webContentsId);
   if (!entry) return;
@@ -95,13 +102,11 @@ function copyPreview(webContentsId) {
   dismissPreview(webContentsId);
 }
 
-// Also the Close button: keep nothing.
+// Also the Close button. Closing is the only step: the 'closed' handler above
+// removes the temp png and the map entry.
 function dismissPreview(webContentsId) {
   const entry = previews.get(webContentsId);
-  if (!entry) return;
-
-  fs.rmSync(entry.tmpFile, { force: true });
-  if (!entry.win.isDestroyed()) entry.win.close();
+  if (entry && !entry.win.isDestroyed()) entry.win.close();
 }
 
 module.exports = { captureArea, savePreview, copyPreview, closePreview: dismissPreview };

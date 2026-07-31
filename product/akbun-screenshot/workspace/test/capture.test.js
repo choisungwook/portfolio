@@ -14,6 +14,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const clipboardWrites = [];
+const openedWindows = [];
 let nextId = 1;
 
 class FakeWindow {
@@ -21,6 +22,7 @@ class FakeWindow {
     this.id = nextId++;
     this.destroyed = false;
     this.listeners = {};
+    openedWindows.push(this);
   }
 
   get webContents() {
@@ -32,7 +34,11 @@ class FakeWindow {
     this.listeners[event] = handler;
   }
 
-  loadFile() {}
+  // main passes the temp png through the query string, so the fake can record
+  // which file this preview belongs to.
+  loadFile(_file, options) {
+    this.tmpFile = options.query.file;
+  }
 
   isDestroyed() {
     return this.destroyed;
@@ -113,7 +119,8 @@ test('copy puts the image on the clipboard and keeps no temp file', () => {
   });
 });
 
-// Capture is the only clipboard write left; the Copy button is now the other one.
+// Capture used to write to the clipboard before the preview even appeared.
+// Copy is now the only thing that writes to it.
 test('capture alone does not touch the clipboard', () => {
   withSaveDir((saveDir) => {
     clipboardWrites.length = 0;
@@ -135,5 +142,18 @@ test('close keeps nothing', () => {
 
     assert.strictEqual(fs.existsSync(saveDir) && fs.readdirSync(saveDir).length, 0);
     assert.doesNotThrow(() => closePreview(id), 'a second close is a no-op');
+  });
+});
+
+// Cmd+W from the default application menu, and app quit, close the window
+// without going through any button. The temp png has to go with it.
+test('a window closed outside the buttons still removes the temp png', () => {
+  withSaveDir((saveDir) => {
+    captureArea(() => saveDir);
+    const win = openedWindows.at(-1);
+
+    win.close();
+
+    assert.strictEqual(fs.existsSync(win.tmpFile), false);
   });
 });
