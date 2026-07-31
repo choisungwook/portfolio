@@ -39,3 +39,5 @@
 ## 작업 흐름
 
 **git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시할 때만 실행한다.** agent는 구현과 검증까지만 하고 멈춘 뒤 변경 요약을 보고한다. plan 승인이나 이 문서의 표준 흐름은 실행 허가가 아니다.
+
+PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓰기 전에 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
