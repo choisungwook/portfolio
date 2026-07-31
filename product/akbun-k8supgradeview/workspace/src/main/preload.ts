@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("api", {
   getPods: (nodeName?: string) => ipcRenderer.invoke("kubectl:pods", nodeName),
   describePod: (namespace: string, name: string) =>
     ipcRenderer.invoke("kubectl:describe-pod", namespace, name),
+  describeNode: (name: string) => ipcRenderer.invoke("kubectl:describe-node", name),
   getNamespaces: () => ipcRenderer.invoke("kubectl:namespaces"),
   buildOverprovisionYaml: (options: unknown) => ipcRenderer.invoke("overprovision:build", options),
   setNodeCordon: (nodeName: string, cordon: boolean) =>

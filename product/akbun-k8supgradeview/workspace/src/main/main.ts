@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "path";
 import {
   describePod,
+  describeNode,
   getKarpenterEvents,
   getKarpenterLogs,
   getKarpenterResources,
@@ -81,6 +82,10 @@ function registerIpcHandlers(): void {
     assertResourceName(namespace, "namespace");
     assertResourceName(name, "파드 이름");
     return describePod(namespace, name);
+  });
+  ipcMain.handle("kubectl:describe-node", (_event, name: unknown) => {
+    assertResourceName(name, "노드 이름");
+    return describeNode(name);
   });
   ipcMain.handle("kubectl:namespaces", () => getNamespaces());
   /**
