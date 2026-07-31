@@ -4,7 +4,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { scanScript, parseItems, isStatusItem } = require('../src/menubar');
+const { scanScript, parseItems, isStatusItem, shareInFlight } = require('../src/menubar');
 
 test('the scan script quotes the process name', () => {
   const script = scanScript('CleanShot X', 2);
@@ -27,6 +27,34 @@ test('parsing keeps labelled rows and drops the rest', () => {
 
 test('parsing a failed call yields nothing', () => {
   assert.deepStrictEqual(parseItems(null), []);
+});
+
+test('callers during a scan share it instead of starting another', async () => {
+  let starts = 0;
+  const shared = shareInFlight(async () => {
+    starts += 1;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return ['item'];
+  });
+
+  const [first, second] = await Promise.all([shared(), shared()]);
+  assert.strictEqual(starts, 1, 'a second scan ran alongside the first');
+  assert.strictEqual(first, second, 'callers got different results');
+
+  await shared();
+  assert.strictEqual(starts, 2, 'a later call must run a fresh scan');
+});
+
+test('a failed scan does not block the next one', async () => {
+  let starts = 0;
+  const shared = shareInFlight(async () => {
+    starts += 1;
+    throw new Error('osascript died');
+  });
+
+  await assert.rejects(() => shared());
+  await assert.rejects(() => shared());
+  assert.strictEqual(starts, 2, 'a failure left the slot stuck');
 });
 
 test('application menu entries are dropped, off screen items are kept', () => {

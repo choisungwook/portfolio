@@ -96,3 +96,15 @@ test('all three cleanup points are still wired up', () => {
   assert.match(main, /cleanupTempDirs/, 'app start no longer sweeps leftovers');
   assert.match(main, /fs\.rm\(/, 'a failed install no longer removes the dmg');
 });
+
+// Both fetches need a deadline. Without one a stalled connection hangs the
+// check with no way back, and hangs the download with the install already
+// marked in progress, which kills the menu item until the app restarts.
+// Waiting out a real timeout is not worth the test time, so the wiring is what
+// gets checked.
+test('both fetch calls carry a timeout', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/update.js'), 'utf-8');
+  const signals = source.match(/signal: AbortSignal\.timeout\(/g) || [];
+
+  assert.strictEqual(signals.length, 2, 'a fetch lost its deadline');
+});

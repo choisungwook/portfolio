@@ -27,6 +27,14 @@ const RELEASES_API = 'https://api.github.com/repos/choisungwook/portfolio/releas
 const TAG_PREFIX = 'akbun-mactaskbar-v';
 const TEMP_PREFIX = 'akbun-mactaskbar-update-';
 
+// Neither fetch can be left without a deadline. A stalled connection would hang
+// the check with no way back, and hang the download with the install already
+// marked in progress, so the menu item stays dead until the app restarts.
+// The download deadline covers the streamed body too, so it is generous enough
+// for a large dmg on a slow link rather than tuned to a fast one.
+const CHECK_TIMEOUT_MS = 15_000;
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
 // Compares two "0.2.0" strings. Positive when a is newer.
 function compareVersion(a, b) {
   const left = a.split('.').map(Number);
@@ -48,6 +56,7 @@ function pickDmg(assets) {
 async function checkUpdate(currentVersion) {
   const response = await fetch(RELEASES_API, {
     headers: { Accept: 'application/vnd.github+json' },
+    signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
 
@@ -72,7 +81,9 @@ async function checkUpdate(currentVersion) {
 async function downloadDmg(dmgUrl) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), TEMP_PREFIX));
   try {
-    const response = await fetch(dmgUrl);
+    const response = await fetch(dmgUrl, {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
     if (!response.ok) throw new Error(`dmg download failed: ${response.status}`);
     if (!response.body) throw new Error('dmg response body is empty');
     const dmgPath = path.join(dir, path.basename(new URL(dmgUrl).pathname));

@@ -117,10 +117,28 @@ async function pooled(items, worker) {
 
 // Every status item on the bar, left to right. Duplicated x values are fine:
 // they mean two agents drew at the same spot before the bar settled.
-async function listMenuBarItems(screenWidth) {
+async function runScan(screenWidth) {
   const names = await listProcessNames();
   const perProcess = await pooled(names, (name) => scanProcess(name, screenWidth));
   return perProcess.flat().sort((a, b) => a.x - b.x);
 }
 
-module.exports = { listMenuBarItems, scanScript, parseItems, isStatusItem };
+// Hands every caller the scan already running instead of starting another. A
+// scan holds eight osascript calls open; a second one alongside it doubles that
+// and pushes both back into the contention that loses items. The wrapper sits
+// here rather than at the caller so no future caller can skip it.
+function shareInFlight(work) {
+  let running = null;
+  return (...args) => {
+    if (!running) {
+      running = work(...args).finally(() => {
+        running = null;
+      });
+    }
+    return running;
+  };
+}
+
+const listMenuBarItems = shareInFlight(runScan);
+
+module.exports = { listMenuBarItems, shareInFlight, scanScript, parseItems, isStatusItem };

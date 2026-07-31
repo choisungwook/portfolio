@@ -42,11 +42,15 @@ Status items live in `menu bar 2` for apps that also have an application menu an
 
 An item pushed off screen keeps reporting a negative x, so it stays in the list and is flagged as off screen. That is the point of the list.
 
+`listMenuBarItems` hands a caller the scan already running instead of starting a second one. Two scans at once mean sixteen accessibility calls in flight, which is the contention that loses items. The sharing wrapper sits in `menubar.js` rather than in the IPC handler, so a later caller cannot skip it.
+
 ## Updating
 
 Builds are unsigned, so Squirrel.Mac cannot be used. `update.js` reads the releases of this repository, matches tags prefixed `akbun-mactaskbar-v`, and picks the dmg for the running architecture. On confirmation it streams the dmg to a temp directory, writes a shell script there and spawns it detached, then quits. The script waits for the pid to disappear, mounts the dmg, replaces the bundle with `ditto`, restores the previous bundle if the copy fails, clears extended attributes and relaunches.
 
 Downloading through the app matters: a file the app fetched itself carries no quarantine attribute, so Gatekeeper never inspects the replacement.
+
+Both fetches carry an `AbortSignal.timeout`, 15 seconds for the release check and 10 minutes for the download. Without one, a stalled connection hangs the check with no way back, and hangs the download with `updating` already set, which leaves the menu item dead until the app restarts. The download deadline covers the streamed body, so it is set for a large dmg on a slow link rather than a fast one.
 
 Cleanup of the temp directory has three points, because the dmg is large and a leak fills the disk. `downloadDmg` removes the directory when the download fails, the script traps EXIT so any later failure still unmounts and deletes, and `cleanupTempDirs` sweeps leftovers at app start for the case where something was killed outright.
 
