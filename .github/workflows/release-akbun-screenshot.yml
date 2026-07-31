@@ -93,7 +93,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          macOS menu bar screenshot app. Area capture by drag, clipboard copy, floating preview with save or delete.
+          macOS menu bar screenshot app. Area capture by drag, then a floating preview with save, copy and close.
 
           The dmg is Apple Silicon (arm64) only and unsigned, so the first launch fails with "damaged and can't be opened". Remove the quarantine attribute after installing:
 
