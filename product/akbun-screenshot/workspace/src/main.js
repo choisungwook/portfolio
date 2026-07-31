@@ -13,9 +13,11 @@ const {
   shell,
   systemPreferences,
 } = require('electron');
+const fs = require('node:fs/promises');
 const path = require('path');
 const { loadSettings, saveSettings } = require('./settings');
 const { captureArea, savePreview, deletePreview } = require('./capture');
+const { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } = require('./update');
 
 let settings = loadSettings();
 let tray = null;
@@ -34,12 +36,90 @@ function registerShortcut(shortcut) {
   }
 }
 
+// Running .app bundle path. exe is <app>.app/Contents/MacOS/<binary>.
+function appBundlePath() {
+  return path.resolve(app.getPath('exe'), '../../..');
+}
+
+// Guard so a second click cannot start an overlapping download.
+let updating = false;
+
+// Download the dmg, start the swap script, quit. The script relaunches the app.
+async function installUpdate(dmgUrl) {
+  updating = true;
+  let dmgPath = null;
+  try {
+    dmgPath = await downloadDmg(dmgUrl);
+    await spawnSwap(appBundlePath(), dmgPath);
+    app.quit();
+  } catch (error) {
+    // Clear the flag first. A throwing rm must not leave the menu item dead.
+    updating = false;
+    if (dmgPath) {
+      await fs.rm(path.dirname(dmgPath), { recursive: true, force: true }).catch(() => {});
+    }
+    await dialog.showMessageBox({
+      type: 'error',
+      message: 'Update failed',
+      detail: String(error),
+    });
+  }
+}
+
+async function runUpdateCheck() {
+  if (updating) return;
+  try {
+    const result = await checkUpdate(app.getVersion());
+    if (!result.hasUpdate) {
+      await dialog.showMessageBox({
+        type: 'info',
+        message: 'You are on the latest version',
+        detail: `Current version ${result.current}`,
+      });
+      return;
+    }
+
+    // In development the bundle is Electron.app, so installing is blocked.
+    const canInstall = app.isPackaged && result.dmgUrl !== null;
+    const buttons = canInstall
+      ? ['Update Now', 'Open Release', 'Close']
+      : ['Open Release', 'Close'];
+    const detail = canInstall
+      ? `Current version ${result.current}. Update Now downloads the dmg, replaces the app, and relaunches it.`
+      : `Current version ${result.current}. Download the dmg from the release page.`;
+
+    const answer = await dialog.showMessageBox({
+      type: 'info',
+      message: `Version ${result.latest} is available`,
+      detail,
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+    });
+
+    if (canInstall && answer.response === 0) {
+      await installUpdate(result.dmgUrl);
+      return;
+    }
+    const openIndex = canInstall ? 1 : 0;
+    if (answer.response === openIndex && result.url) await shell.openExternal(result.url);
+  } catch (error) {
+    await dialog.showMessageBox({
+      type: 'error',
+      message: 'Cannot check for updates',
+      detail: String(error),
+    });
+  }
+}
+
 function buildTrayMenu() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Capture Area', accelerator: settings.shortcut, click: capture },
       { label: 'Settings…', click: openSettingsWindow },
+      { label: 'Check for Updates…', click: () => void runUpdateCheck() },
       { type: 'separator' },
+      { label: `Version ${app.getVersion()}`, enabled: false },
       { label: 'Quit', role: 'quit' },
     ])
   );
@@ -104,6 +184,9 @@ ipcMain.handle('preview:save', (event) => savePreview(event.sender.id));
 ipcMain.handle('preview:delete', (event) => deletePreview(event.sender.id));
 
 app.whenReady().then(() => {
+  // Drop update temp dirs left by a killed process. Failure is harmless.
+  void cleanupTempDirs().catch(() => {});
+
   // menu bar app: no dock icon, no main window
   if (app.dock) app.dock.hide();
 
