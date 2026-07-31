@@ -2,6 +2,7 @@
 
 ## 2026-07-31
 
+* **Creation**: [PR body 형식의 기준은 pull request template 하나다](decisions/2026-07-pr-body-format-in-template.md) 결정 기록. PR body를 Decisions와 Implementation으로 바꾸면서 형식이 네 파일에 흩어져 있던 문제를 함께 정리한다.
 * **Creation**: [Electron 메뉴바 앱은 창 정리와 메뉴바 공간에서 조용히 실패한다](topics/electron-menubar-silent-failures.md) topic 기록. akbun-screenshot의 프리뷰 창이 화면 밖으로 밀려나던 버그를 고치면서 남긴다.
 * **Creation**: [macOS 메뉴바 status item은 넓은 자리 차지로만 가릴 수 있고, 목록은 프로세스 단위로만 읽을 수 있다](topics/macos-menubar-status-items.md) topic 작성. akbun-mactaskbar를 만들며 실측한 제약과 우회 방법을 남긴다.
 * **Creation**: [서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다](decisions/2026-07-unsigned-desktop-app-self-update.md) 결정 기록. 세 번째 제품에 같은 구현을 포팅하면서 제품 생성 규칙으로 옮긴다.
