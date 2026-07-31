@@ -16,8 +16,10 @@ function constrain(type, x1, y1, x2, y2) {
     return { x: x1 + Math.cos(angle) * length, y: y1 + Math.sin(angle) * length };
   }
 
+  // Not Math.sign, which is 0 for an axis that has not moved. A drag straight
+  // down would then square to zero width and the circle would vanish.
   const size = Math.max(Math.abs(dx), Math.abs(dy));
-  return { x: x1 + Math.sign(dx) * size, y: y1 + Math.sign(dy) * size };
+  return { x: x1 + (dx < 0 ? -size : size), y: y1 + (dy < 0 ? -size : size) };
 }
 
 // Counting the existing badges rather than keeping a counter is what makes

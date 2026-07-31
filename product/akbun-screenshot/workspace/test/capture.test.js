@@ -209,3 +209,21 @@ test('editor save writes the canvas bytes into the save directory', () => {
     assert.strictEqual(saveEditor(editorId, edited), null, 'the editor closed after saving');
   });
 });
+
+// The payload crosses an IPC boundary, so a broken one has to fail before the
+// save directory is created rather than throw halfway through the write.
+test('editor save refuses a payload that is not a png data url', () => {
+  withSaveDir((saveDir) => {
+    const missing = path.join(saveDir, 'nested');
+    captureArea(() => missing);
+    openEditor(nextId - 1);
+    const editorId = nextId - 1;
+
+    for (const bad of [undefined, '', 'not a data url', 'data:image/png;base64,']) {
+      assert.strictEqual(saveEditor(editorId, bad), null, `refused ${String(bad)}`);
+    }
+
+    assert.strictEqual(fs.existsSync(missing), false, 'no save directory created');
+    assert.ok(saveEditor(editorId, `data:image/png;base64,${Buffer.from('ok').toString('base64')}`));
+  });
+});

@@ -164,15 +164,23 @@ function editorImage(webContentsId) {
   return `data:image/png;base64,${fs.readFileSync(entry.file).toString('base64')}`;
 }
 
+const PNG_DATA_URL = 'data:image/png;base64,';
+
 // Save button in the editor: write the edited canvas, not the original file.
+// The payload is decoded before anything touches the disk, so a malformed one
+// leaves no directory and no empty png behind.
 function saveEditor(webContentsId, dataUrl) {
   const entry = editors.get(webContentsId);
   if (!entry) return null;
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(PNG_DATA_URL)) return null;
+
+  const png = Buffer.from(dataUrl.slice(PNG_DATA_URL.length), 'base64');
+  if (png.length === 0) return null;
 
   const saveDir = entry.getSaveDir();
   fs.mkdirSync(saveDir, { recursive: true });
   const target = path.join(saveDir, buildScreenshotFilename(new Date()));
-  fs.writeFileSync(target, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  fs.writeFileSync(target, png);
   closeEditor(webContentsId);
   return target;
 }
