@@ -1,7 +1,7 @@
 'use strict';
 
-/* global constrain, nextNumber, hitTest, bounds, moveShape, scaleShape,
-   fillFontSelect, wireFontSelect */
+/* global constrain, nextNumber, hitTest, bounds, handles, handleAt, moveShape,
+   scaleShape, fillFontSelect, wireFontSelect */
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -21,9 +21,16 @@ let tool = 'select';
 let draft = null;
 
 // Select mode. `selected` is the shape the outline is drawn around, `dragFrom`
-// the last mouse position while it is being pushed around.
+// the last mouse position while it is being pushed around, `resizing` the corner
+// grip being pulled when the drag started on one.
 let selected = null;
 let dragFrom = null;
+let resizing = null;
+
+// Radius of a corner grip in css pixels, and how far off one a click still
+// counts as grabbing it.
+const HANDLE = 6;
+const GRAB = 10;
 
 // Image pixels per css pixel. The png from a retina display is twice the size
 // it is shown at, so a 3px stroke would come out half as thick as it looks.
@@ -65,7 +72,8 @@ function redraw() {
 }
 
 // Drawn on the canvas rather than as an overlay element, which keeps the one
-// redraw path. Save clears the selection first so the outline is never exported.
+// redraw path. Save clears the selection first so neither the outline nor the
+// grips are ever exported.
 function drawSelection(s) {
   const b = bounds(s);
   const pad = 4 * unit;
@@ -74,6 +82,17 @@ function drawSelection(s) {
   ctx.lineWidth = Math.max(1, unit);
   ctx.setLineDash([6 * unit, 4 * unit]);
   ctx.strokeRect(b.x1 - pad, b.y1 - pad, b.x2 - b.x1 + pad * 2, b.y2 - b.y1 + pad * 2);
+
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4da3ff';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(1, 2 * unit);
+  for (const handle of handles(s)) {
+    ctx.beginPath();
+    ctx.arc(handle.x, handle.y, HANDLE * unit, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -82,7 +101,9 @@ function drawShape(s) {
   ctx.strokeStyle = s.color;
   ctx.fillStyle = s.color;
   ctx.lineWidth = s.width;
-  ctx.lineCap = 'round';
+  // A round cap sticks out half a stroke past the endpoint, which on an arrow
+  // shows up as a bead poking through the tip of the head.
+  ctx.lineCap = s.type === 'arrow' || s.type === 'arrow2' ? 'butt' : 'round';
 
   if (s.type === 'rect') {
     ctx.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
@@ -125,11 +146,13 @@ function drawShape(s) {
 
 // Filled triangle at (toX, toY) pointing away from (fromX, fromY). Called from
 // inside drawShape, so fillStyle is already the shape's color. The head follows
-// the stroke width, otherwise a thick arrow ends in a pinhead.
+// the stroke width, otherwise a thick arrow ends in a pinhead. Seven times and a
+// 30 degree spread rather than something tighter, because at four the head was
+// close enough to the line's own thickness that the arrow read as a plain line.
 function arrowHead(fromX, fromY, toX, toY, width) {
   const angle = Math.atan2(toY - fromY, toX - fromX);
-  const length = width * 4;
-  const spread = Math.PI / 7;
+  const length = width * 7;
+  const spread = Math.PI / 6;
   ctx.beginPath();
   ctx.moveTo(toX, toY);
   ctx.lineTo(toX - length * Math.cos(angle - spread), toY - length * Math.sin(angle - spread));
@@ -171,6 +194,11 @@ canvas.addEventListener('mousedown', (event) => {
   const point = toImage(event);
 
   if (tool === 'select') {
+    // A grip on the current selection is checked before anything else, since it
+    // sits on the outline where the shape below would otherwise take the click.
+    resizing = selected ? handleAt(selected, point.x, point.y, GRAB * unit) : null;
+    if (resizing) return;
+
     // A generous pad, because a thin line is hard to land on exactly.
     selected = hitTest(shapes, point.x, point.y, 6 * unit);
     dragFrom = selected ? point : null;
@@ -197,6 +225,23 @@ canvas.addEventListener('mousedown', (event) => {
 window.addEventListener('mousemove', (event) => {
   const point = toImage(event);
 
+  // Shift squares the shape or snaps the segment while resizing, the same as it
+  // does while drawing one, since the grip drags the same corner the draw did.
+  if (resizing) {
+    // The corner diagonally across from the grip, which is the one that stays put.
+    const anchor = {
+      x: selected[resizing.fx === 'x1' ? 'x2' : 'x1'],
+      y: selected[resizing.fy === 'y1' ? 'y2' : 'y1'],
+    };
+    const end = event.shiftKey
+      ? constrain(selected.type, anchor.x, anchor.y, point.x, point.y)
+      : point;
+    selected[resizing.fx] = end.x;
+    selected[resizing.fy] = end.y;
+    redraw();
+    return;
+  }
+
   // A move is not undoable, undo only covers adding shapes. Recording the start
   // position on mousedown would fix it if it turns out to matter.
   if (dragFrom) {
@@ -217,6 +262,7 @@ window.addEventListener('mousemove', (event) => {
 
 window.addEventListener('mouseup', () => {
   dragFrom = null;
+  resizing = null;
   if (!draft) return;
   const shape = draft;
   draft = null;

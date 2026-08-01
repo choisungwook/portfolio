@@ -62,6 +62,24 @@ function hitTest(shapes, x, y, pad = 0) {
   return null;
 }
 
+// Grips drawn on a selected shape. Each one names the two fields it writes, so
+// dragging a grip is a two field assignment and a segment endpoint is just the
+// corner that happens to own both of its shape's coordinates. Text and badges
+// hang off one anchor and have no corner to pull, so they keep the [ ] keys.
+function handles(s) {
+  if (s.x2 === undefined) return [];
+  const corners = SEGMENTS.includes(s.type)
+    ? [['x1', 'y1'], ['x2', 'y2']]
+    : [['x1', 'y1'], ['x2', 'y1'], ['x1', 'y2'], ['x2', 'y2']];
+  return corners.map(([fx, fy]) => ({ fx, fy, x: s[fx], y: s[fy] }));
+}
+
+// Grips win over the shape itself, otherwise a corner grip sitting on the
+// outline would start a move instead of a resize.
+function handleAt(s, x, y, radius) {
+  return handles(s).find((h) => Math.hypot(h.x - x, h.y - y) <= radius) || null;
+}
+
 function moveShape(s, dx, dy) {
   s.x1 += dx;
   s.y1 += dy;
@@ -98,5 +116,14 @@ function scaleShape(s, factor) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { constrain, nextNumber, bounds, hitTest, moveShape, scaleShape };
+  module.exports = {
+    constrain,
+    nextNumber,
+    bounds,
+    hitTest,
+    handles,
+    handleAt,
+    moveShape,
+    scaleShape,
+  };
 }

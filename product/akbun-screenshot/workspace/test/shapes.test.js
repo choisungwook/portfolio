@@ -7,6 +7,8 @@ const {
   nextNumber,
   bounds,
   hitTest,
+  handles,
+  handleAt,
   moveShape,
   scaleShape,
 } = require('../src/renderer/shapes');
@@ -67,6 +69,35 @@ test('hitTest pad reaches just outside the shape', () => {
   const shape = { type: 'rect', x1: 0, y1: 0, x2: 10, y2: 10 };
   assert.strictEqual(hitTest([shape], 14, 5, 6), shape);
   assert.strictEqual(hitTest([shape], 20, 5, 6), null);
+});
+
+test('handles puts a grip on each corner of a box shape', () => {
+  const rect = { type: 'rect', x1: 0, y1: 10, x2: 100, y2: 60 };
+  assert.deepStrictEqual(
+    handles(rect).map((h) => [h.x, h.y]),
+    [[0, 10], [100, 10], [0, 60], [100, 60]]
+  );
+});
+
+// A segment has no corners worth pulling, only its two ends.
+test('handles puts a grip on each end of a segment', () => {
+  const arrow = { type: 'arrow', x1: 0, y1: 0, x2: 50, y2: 80 };
+  assert.deepStrictEqual(handles(arrow).map((h) => [h.x, h.y]), [[0, 0], [50, 80]]);
+});
+
+// Text and badges hang off one anchor, so there is no corner to drag and the
+// [ ] keys stay the only way to resize them.
+test('handles gives an anchored shape nothing to grab', () => {
+  assert.deepStrictEqual(handles({ type: 'text', x1: 0, y1: 0, text: 'hi', size: 20 }), []);
+});
+
+// Writing the two named fields is what a grip drag does, so the names have to
+// be the corner the grip sits on.
+test('handleAt names the fields the grabbed corner writes', () => {
+  const rect = { type: 'rect', x1: 0, y1: 10, x2: 100, y2: 60 };
+  const grip = handleAt(rect, 98, 12, 6);
+  assert.deepStrictEqual({ fx: grip.fx, fy: grip.fy }, { fx: 'x2', fy: 'y1' });
+  assert.strictEqual(handleAt(rect, 50, 35, 6), null);
 });
 
 test('moveShape shifts a badge that has no second corner', () => {
