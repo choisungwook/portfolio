@@ -21,7 +21,8 @@ defaults:
     working-directory: product/akbun-folderview/workspace
 
 jobs:
-  # PR 검증용. electron 바이너리 없이 테스트만 확인한다.
+  # PR 검증용. 앱 바이너리 없이 두 테스트 스위트만 확인한다.
+  # 검색과 트리는 node로, 스캔과 rescan merge는 cargo로 돈다.
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -32,21 +33,18 @@ jobs:
         with:
           node-version: '24'
 
-      # 저장소 규칙상 lock 파일을 커밋하지 않으므로 npm ci 대신 npm install을 쓴다.
-      - name: Install dependencies
-        run: npm install
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-
-      # 업데이트 기능이 임시 파일을 남기지 않는지 확인한다. 교체 스크립트는
-      # batch 파일이라 ubuntu에서 실행되지 않고 skip되며, release job이
-      # windows에서 같은 테스트를 다시 돌려 그 부분까지 확인한다.
-      - name: Run tests
+      # Rust는 ubuntu runner에 이미 있다. webkit2gtk 등 시스템 의존성은
+      # tauri crate를 컴파일할 때만 필요하고, 아래 두 테스트는 순수 로직이라
+      # 필요하지 않다.
+      - name: Run page tests
         run: npm test
 
-  # Windows 전용 빌드. NSIS 설치 파일 빌드가 성공해야 tag를 만들고,
-  # tag가 만들어져야 release를 만든다. 버전은 package.json의 version을 그대로
-  # 쓰므로 workspace를 고치면 버전도 함께 올린다.
+      - name: Run library tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+  # Windows 전용 빌드. tauri-action이 NSIS 설치 파일과 서명, latest.json까지
+  # 만들고 release를 생성한다. tag는 git tag가 아니라 release를 만들 때
+  # GitHub이 함께 만든다.
   release:
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
@@ -59,51 +57,38 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Read version from package.json
-        id: version
-        shell: bash
-        run: |
-          version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=akbun-folderview-v$version" >> "$GITHUB_OUTPUT"
-          echo "Version: $version"
+      - uses: dtolnay/rust-toolchain@stable
+
+      # target 디렉터리를 캐시하지 않으면 매 릴리스마다 의존성을 다시 빌드한다.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-folderview/workspace/src-tauri
 
       - name: Install dependencies
         run: npm install
 
-      # windows runner이므로 교체 스크립트 테스트까지 실제로 실행된다.
-      - name: Run tests
-        run: npm test
-
-      - name: Build installer
-        run: npm run dist
-
-      # 빌드가 성공한 뒤에만 tag를 만든다.
-      - name: Create tag
-        working-directory: .
-        shell: bash
+      - uses: tauri-apps/tauri-action@action-v1.0.0
         env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          git tag "$TAG"
-          git push origin "$TAG"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 업데이터가 설치 전에 검증하는 서명이다. 이 두 값이 없으면
+          # .sig 파일이 안 만들어지고, tauri-action은 latest.json 업로드를
+          # 조용히 건너뛴다. release는 초록불인데 업데이트만 안 된다.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: product/akbun-folderview/workspace
+          tagName: akbun-folderview-v__VERSION__
+          releaseName: akbun-folderview-v__VERSION__
+          # draft로 두면 releases/latest/download/latest.json이 404가 되어
+          # 아무도 업데이트를 못 받는다. 릴리스는 바로 공개한다.
+          releaseDraft: false
+          prerelease: false
+          # NSIS만 빌드하지만 기본값이 msi 우선이라 명시한다.
+          updaterJsonPreferNsis: true
+          releaseBody: |
+            직접 추가한 사진과 영상만 모아 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱이다.
 
-      # tag 생성이 성공한 뒤에만 release를 만든다.
-      - name: Create release with installer
-        working-directory: .
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          cat > release-notes.md <<'EOF'
-          - 직접 추가한 사진과 영상만 모아 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱이다.
-          - 설치 파일은 Windows x64 전용이다.
-          - exe를 내려받아 실행하면 사용자 폴더에 설치되고 바로 실행된다. 관리자 권한은 필요 없다.
-          - 코드 서명이 없어 SmartScreen 경고가 나온다. "추가 정보"를 누르고 "실행"을 선택하면 설치된다.
-          - 설치 후에는 Help > Check for Updates로 다음 버전을 받는다.
-          EOF
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            product/akbun-folderview/workspace/release/*.exe
+            - 설치 파일은 Windows x64 전용이다.
+            - exe를 내려받아 실행하면 사용자 폴더에 설치되고 바로 실행된다. 관리자 권한은 필요 없다.
+            - 코드 서명이 없어 SmartScreen 경고가 나온다. "추가 정보"를 누르고 "실행"을 선택하면 설치된다.
+            - 설치 후에는 Settings의 Check for Updates로 다음 버전을 받는다.

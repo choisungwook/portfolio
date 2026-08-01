@@ -1,17 +1,17 @@
 'use strict';
 
-// The library model has no electron import, so these run on plain node and the
-// pull request job needs no app binary.
+// What the page does with the library once it has it: search, the tree, the
+// counts. Plain node, no app binary, so the pull request job needs neither
+// Rust nor a webview.
+//
+// Scanning, the rescan merge and the settings fallback live in Rust now and are
+// tested in src-tauri/src/library.rs.
 
 const assert = require('node:assert');
 const { test } = require('node:test');
 const {
   buildTree,
-  fileKind,
   formatSize,
-  makeEntry,
-  mergeScan,
-  mergeSettings,
   normalizeTag,
   parseQuery,
   ratingCounts,
@@ -19,8 +19,22 @@ const {
   tagCounts,
 } = require('../src/library');
 
-function entry(filePath, extra = {}) {
-  return { ...makeEntry(filePath), ...extra };
+// The shape Rust serialises. Written out here rather than built by a helper
+// from the source, so that a field rename in Rust fails this test.
+function entry(path, extra = {}) {
+  const name = path.split(/[\\/]/).pop();
+  return {
+    path,
+    name,
+    dir: path.slice(0, path.length - name.length - 1),
+    kind: /\.(mp4|mov|mkv)$/i.test(name) ? 'video' : 'photo',
+    size: 1024,
+    mtime: 0,
+    rating: 0,
+    favorite: false,
+    tags: [],
+    ...extra,
+  };
 }
 
 const LIBRARY = [
@@ -29,21 +43,6 @@ const LIBRARY = [
   entry('C:\\photos\\clips\\dive.mp4', { rating: 4, tags: ['summer'] }),
   entry('C:\\photos\\notes.jpg'),
 ];
-
-test('fileKind knows photos from videos and ignores anything else', () => {
-  assert.strictEqual(fileKind('a.JPG'), 'photo');
-  assert.strictEqual(fileKind('a.mp4'), 'video');
-  assert.strictEqual(fileKind('a.txt'), null);
-  assert.strictEqual(fileKind('README'), null);
-});
-
-test('makeEntry splits a Windows path into name and folder', () => {
-  const made = makeEntry('C:\\photos\\trip\\beach.jpg', { size: 10, mtime: 1 });
-  assert.strictEqual(made.name, 'beach.jpg');
-  assert.strictEqual(made.dir, 'C:\\photos\\trip');
-  assert.strictEqual(made.kind, 'photo');
-  assert.deepStrictEqual(made.tags, []);
-});
 
 test('normalizeTag folds case and closes the gap that would break tag:', () => {
   assert.strictEqual(normalizeTag('  Beach Trip '), 'beach-trip');
@@ -89,11 +88,10 @@ test('tokens combine, and two tags mean both rather than either', () => {
 });
 
 test('an unknown token stays free text instead of dropping out', () => {
-  const query = parseQuery('holiday size:big');
-  assert.strictEqual(query.text, 'holiday size:big');
+  assert.strictEqual(parseQuery('holiday size:big').text, 'holiday size:big');
 });
 
-test('rating:9 and type:audio are ignored rather than matching nothing', () => {
+test('rating:12 and type:audio are ignored rather than matching nothing', () => {
   assert.strictEqual(parseQuery('rating:12').rating, null);
   assert.strictEqual(parseQuery('type:audio').kind, null);
 });
@@ -110,7 +108,7 @@ test('the tree keeps folders and files apart and sorts both', () => {
   );
 });
 
-test('a file outside the root does not leak into its tree', () => {
+test('a sibling folder with a shared prefix does not leak into the tree', () => {
   const [root] = buildTree([{ path: 'C:\\photos' }], [
     ...LIBRARY,
     entry('C:\\photos-backup\\other.jpg'),
@@ -119,38 +117,12 @@ test('a file outside the root does not leak into its tree', () => {
   assert.strictEqual(root.files.length, 1);
 });
 
-test('a rescan keeps the tags, rating and favorite the user set', () => {
-  const scanned = [
-    makeEntry('C:\\photos\\trip\\beach.jpg', { size: 999, mtime: 2 }),
-    makeEntry('C:\\photos\\trip\\new.jpg'),
-  ];
-  const merged = mergeScan(LIBRARY, scanned);
-
-  assert.deepStrictEqual(merged[0].tags, ['beach', 'summer']);
-  assert.strictEqual(merged[0].rating, 5);
-  assert.strictEqual(merged[0].favorite, true);
-  // The file itself changed on disk, so the size does come from the scan.
-  assert.strictEqual(merged[0].size, 999);
-  assert.strictEqual(merged[1].rating, 0);
-});
-
 test('tag counts are ordered by use', () => {
   assert.deepStrictEqual(tagCounts(LIBRARY), [
     { tag: 'beach', count: 2 },
     { tag: 'summer', count: 2 },
   ]);
   assert.deepStrictEqual(ratingCounts(LIBRARY), [1, 0, 0, 1, 1, 1]);
-});
-
-test('stored settings keep only keys of the expected type', () => {
-  const defaults = { theme: 'system', cardSize: 180 };
-  assert.deepStrictEqual(mergeSettings(defaults, { theme: 'dark' }), {
-    theme: 'dark',
-    cardSize: 180,
-  });
-  // A hand-edited file with the wrong type must not break the window.
-  assert.deepStrictEqual(mergeSettings(defaults, { cardSize: 'huge', junk: 1 }), defaults);
-  assert.deepStrictEqual(mergeSettings(defaults, null), defaults);
 });
 
 test('formatSize picks the unit', () => {

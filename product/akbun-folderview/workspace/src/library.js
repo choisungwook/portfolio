@@ -1,42 +1,19 @@
 'use strict';
 
-// The library model. Every function here is pure so the tests run on plain
-// node with no electron binary: no electron import, no file system access.
+// What the window does with the library once Rust has handed it over: search,
+// the folder tree, and the tag and rating counts.
+//
+// Everything here is pure, so the tests run on plain node with no app binary.
+// Scanning the disk and persisting the library live in Rust instead; this file
+// never learns where an entry came from.
 //
 // The library only holds files the user added. Search never touches the disk,
 // so it is a scan over an in-memory array rather than a query to the operating
 // system, and that is what makes it feel instant.
 
-const IMAGE_EXTENSIONS = new Set([
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.avif', '.heic', '.tif', '.tiff',
-]);
-const VIDEO_EXTENSIONS = new Set([
-  '.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.wmv', '.flv', '.mpg', '.mpeg',
-]);
-
-// Windows paths use "\", the tests and any future macOS build use "/".
+// Windows paths use "\", the tests and a macOS dev run use "/".
 // Splitting on both keeps this module free of a platform choice.
 const SEPARATOR = /[\\/]/;
-
-const DEFAULT_SETTINGS = {
-  // "system" follows the operating system. See wiki/architecture.md.
-  theme: 'system',
-  // The system file browser opens on double click, so that is the default here
-  // too. Single click is offered because this window is a viewer.
-  openOnSingleClick: false,
-  cardSize: 180,
-};
-
-// Photo, video, or null for anything else. Extension only: reading headers for
-// a few thousand files would make adding a folder slow for no visible gain.
-function fileKind(name) {
-  const dot = name.lastIndexOf('.');
-  if (dot < 0) return null;
-  const extension = name.slice(dot).toLowerCase();
-  if (IMAGE_EXTENSIONS.has(extension)) return 'photo';
-  if (VIDEO_EXTENSIONS.has(extension)) return 'video';
-  return null;
-}
 
 function baseName(filePath) {
   const parts = filePath.split(SEPARATOR);
@@ -52,31 +29,6 @@ function parentPath(filePath) {
 // break the "tag:value" search token, so they collapse into "-".
 function normalizeTag(tag) {
   return String(tag).trim().toLowerCase().replace(/\s+/g, '-');
-}
-
-function makeEntry(filePath, stat = {}) {
-  return {
-    path: filePath,
-    name: baseName(filePath),
-    dir: parentPath(filePath),
-    kind: fileKind(filePath),
-    size: stat.size ?? 0,
-    mtime: stat.mtime ?? 0,
-    rating: 0,
-    favorite: false,
-    tags: [],
-  };
-}
-
-// Keep the tags, rating and favorite the user set. A rescan sees files, not the
-// meaning attached to them, so it must not overwrite that.
-function mergeScan(existing, scanned) {
-  const byPath = new Map(existing.map((entry) => [entry.path, entry]));
-  return scanned.map((entry) => {
-    const old = byPath.get(entry.path);
-    if (!old) return entry;
-    return { ...entry, rating: old.rating, favorite: old.favorite, tags: old.tags };
-  });
 }
 
 // Lowercased name, cached on the entry so a keystroke does not lowercase the
@@ -206,17 +158,6 @@ function buildTree(roots, entries) {
   });
 }
 
-// Unknown keys in a stored settings file are dropped, and a missing key falls
-// back to the default, so an older or hand-edited file still loads.
-function mergeSettings(defaults, stored) {
-  const merged = { ...defaults };
-  if (!stored || typeof stored !== 'object') return merged;
-  for (const key of Object.keys(defaults)) {
-    if (typeof stored[key] === typeof defaults[key]) merged[key] = stored[key];
-  }
-  return merged;
-}
-
 function formatSize(bytes) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let value = bytes;
@@ -229,17 +170,10 @@ function formatSize(bytes) {
 }
 
 const exported = {
-  DEFAULT_SETTINGS,
-  IMAGE_EXTENSIONS,
-  VIDEO_EXTENSIONS,
   baseName,
   buildTree,
-  fileKind,
   formatSize,
-  makeEntry,
   matchesEntry,
-  mergeScan,
-  mergeSettings,
   normalizeTag,
   parentPath,
   parseQuery,
@@ -248,10 +182,10 @@ const exported = {
   tagCounts,
 };
 
-// Loaded two ways on purpose. Main and the tests require it; the renderer takes
-// it as a plain script tag, because search has to run on the page's own copy of
-// the entries. Sending the array across the context bridge on every keystroke
-// would be the slow way to do the same thing.
+// Loaded two ways on purpose. The tests require it; the page takes it as a
+// plain script tag, because search has to run on the page's own copy of the
+// entries. Asking Rust on every keystroke would be the slow way to do the same
+// thing, and it is the reason this logic is here rather than in the backend.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = exported;
 } else {

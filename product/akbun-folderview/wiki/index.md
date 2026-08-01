@@ -6,5 +6,5 @@ This is the record the next agent reads before taking over this project. Read [a
 
 | Document | Description |
 |---|---|
-| [architecture.md](architecture.md) | Process structure, the library model, search, IPC channels, storage |
-| [development.md](development.md) | Build, run, test, release procedure, and caveats |
+| [architecture.md](architecture.md) | The Rust and page split, the library model, search, the command surface, the asset protocol, storage |
+| [development.md](development.md) | Prerequisites, run, test, version, release, the one-time updater key setup, and caveats |

@@ -2,10 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src file: data:; media-src file:"
-    />
+    <!-- No CSP meta tag here on purpose. Tauri injects the policy from
+         app.security.csp in tauri.conf.json, and a second policy declared here
+         would intersect with it and block the asset protocol. -->
     <title>akbun-folderview</title>
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -28,7 +27,10 @@
         <section class="panel">
           <header class="panel-head">
             <h2>Catalog</h2>
-            <button id="rescan" title="Look for new and removed files">Rescan</button>
+            <div class="panel-actions">
+              <button id="rescan" title="Look for new and removed files">Rescan</button>
+              <button id="open-settings" title="Settings and updates">Settings</button>
+            </div>
           </header>
           <div class="panel-body" id="catalog"></div>
         </section>
@@ -106,7 +108,8 @@
       </div>
     </div>
 
-    <script src="../library.js"></script>
+    <script src="library.js"></script>
+    <script src="api.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

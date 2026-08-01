@@ -36,12 +36,12 @@ function escapeHtml(text) {
   );
 }
 
-// C:\photos\a b.jpg becomes file:///C:/photos/a%20b.jpg. encodeURI leaves "#"
-// and "?" alone, and both are legal in a Windows file name, so they are
-// escaped after it or the rest of the name would be read as a URL fragment.
+// The webview will not load file:// directly. convertFileSrc turns a path into
+// an asset protocol URL and does its own escaping, which is what makes "#" and
+// "?" in a Windows file name safe; both are legal in a name and either one
+// would otherwise cut the URL short.
 function fileUrl(filePath) {
-  const posix = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
-  return `file:///${encodeURI(posix).replace(/#/g, '%23').replace(/\?/g, '%3F')}`;
+  return window.api.fileUrl(filePath);
 }
 
 function visibleEntries() {
@@ -135,8 +135,7 @@ function fileRow(entry) {
   row.addEventListener('click', () => window.api.openEntry(entry.path));
   row.addEventListener('contextmenu', async (event) => {
     event.preventDefault();
-    const action = await window.api.entryMenu();
-    if (action) await runAction(action, entry);
+    await window.api.entryMenu((action) => void runAction(action, entry));
   });
   return row;
 }
@@ -451,8 +450,7 @@ $('grid').addEventListener('contextmenu', async (event) => {
   const entry = entryAt(event.target);
   if (!entry) return;
   event.preventDefault();
-  const action = await window.api.entryMenu();
-  if (action) await runAction(action, entry);
+  await window.api.entryMenu((action) => void runAction(action, entry));
 });
 
 $('prop-stars').addEventListener('click', (event) => {
@@ -476,23 +474,32 @@ $('set-close').addEventListener('click', () => {
   $('settings').hidden = true;
 });
 
+$('open-settings').addEventListener('click', openSettings);
+
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape') return;
-  $('properties').hidden = true;
-  $('settings').hidden = true;
+  if (event.key === 'Escape') {
+    $('properties').hidden = true;
+    $('settings').hidden = true;
+    return;
+  }
+  // There is no menu bar to hang an accelerator on, so the page owns this one.
+  if (event.key === 'f' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    $('search').select();
+  }
 });
 
-window.api.onLibraryChanged((library) => {
-  state.roots = library.roots;
-  state.entries = library.entries;
+// Every mutating command answers with the whole library, and api.js routes it
+// here. The page therefore never merges a partial update into its own copy.
+window.api.onLibraryChanged((snapshot) => {
+  state.roots = snapshot.roots;
+  state.entries = snapshot.entries;
   derived = null;
   render();
 });
-window.api.onOpenSettings(openSettings);
-window.api.onFocusSearch(() => $('search').select());
 
-window.api.getLibrary().then((library) => {
-  state = { ...state, ...library };
+window.api.getLibrary().then((snapshot) => {
+  state = { ...state, ...snapshot };
   applySettings();
   render();
 });

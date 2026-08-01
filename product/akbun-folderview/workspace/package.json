@@ -1,43 +1,18 @@
 {
   "name": "akbun-folderview",
   "version": "0.1.0",
+  "private": true,
   "description": "Windows desktop browser for a hand-picked photo and video library with tags, ratings and instant search",
   "author": "akbun",
   "license": "MIT",
-  "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "tauri dev",
     "test": "node --test test/*.test.js",
-    "dist": "electron-builder --win --publish never"
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "dist": "tauri build",
+    "tauri": "tauri"
   },
   "devDependencies": {
-    "electron": "^43.0.0",
-    "electron-builder": "^26.0.0"
-  },
-  "build": {
-    "appId": "io.akbun.folderview",
-    "productName": "akbun-folderview",
-    "files": [
-      "src/**/*"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
-    }
+    "@tauri-apps/cli": "^2"
   }
 }
