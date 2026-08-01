@@ -35,15 +35,19 @@ window.api.editorImage().then((dataUrl) => {
   image.src = dataUrl;
 });
 
+// Both boxes are in image pixels, so what is typed is what is drawn. The
+// defaults are the on screen 24px and 3px scaled up to match, which is why they
+// are functions of unit rather than constants.
+const defaultSize = () => Math.round(24 * unit);
+const defaultStroke = () => Math.max(1, Math.round(3 * unit));
+
 image.onload = () => {
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const shown = canvas.getBoundingClientRect().width;
   unit = shown > 0 ? image.naturalWidth / shown : 1;
-  // Both boxes are in image pixels, so what is typed is what is drawn. The
-  // defaults are the on screen 24px and 3px scaled up to match.
-  sizeInput.value = Math.round(24 * unit);
-  strokeInput.value = Math.max(1, Math.round(3 * unit));
+  sizeInput.value = defaultSize();
+  strokeInput.value = defaultStroke();
   redraw();
 };
 
@@ -134,11 +138,14 @@ function arrowHead(fromX, fromY, toX, toY, width) {
   ctx.fill();
 }
 
+// An emptied box falls back to the same value the image load put there, not to
+// a bare 24 and 3. On a retina capture those two numbers are half the intended
+// size, so the fallback has to carry the scale as well.
 function style() {
   return {
     color: colorInput.value,
-    width: Math.max(1, Number(strokeInput.value) || 3),
-    size: Number(sizeInput.value) || 24,
+    width: Math.max(1, Number(strokeInput.value) || defaultStroke()),
+    size: Number(sizeInput.value) || defaultSize(),
     font: fontSelect.value,
   };
 }
@@ -190,8 +197,8 @@ canvas.addEventListener('mousedown', (event) => {
 window.addEventListener('mousemove', (event) => {
   const point = toImage(event);
 
-  // ponytail: a move is not undoable, undo only covers adding shapes. Recording
-  // the start position on mousedown would fix it if it turns out to matter.
+  // A move is not undoable, undo only covers adding shapes. Recording the start
+  // position on mousedown would fix it if it turns out to matter.
   if (dragFrom) {
     moveShape(selected, point.x - dragFrom.x, point.y - dragFrom.y);
     dragFrom = point;
@@ -245,8 +252,9 @@ function askText(event, point) {
 }
 
 // Resizing an existing shape. Two keys rather than a box, since the shape is
-// already selected and one tap per step is faster than typing a number.
-const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1, '-': 1 / 1.1, '+': 1.1, '=': 1.1 };
+// already selected and one tap per step is faster than typing a number. Two and
+// only two, so the toolbar hint can name every key that does this.
+const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
 
 window.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {

@@ -96,7 +96,29 @@ test('scaleShape keeps the shape centred where it was', () => {
   assert.strictEqual(rect.width, 2);
 });
 
-test('scaleShape floors size and stroke so a shape cannot vanish', () => {
+// Text hangs from its top left, so growing the glyph pushes the box down and to
+// the right unless the anchor is pulled back by half of what the box gained.
+test('scaleShape keeps text centred on the same point', () => {
+  const text = { type: 'text', x1: 100, y1: 100, text: 'hello', size: 20, width: 3 };
+  const before = bounds(text);
+  scaleShape(text, 2);
+  const after = bounds(text);
+  assert.strictEqual((after.x1 + after.x2) / 2, (before.x1 + before.x2) / 2);
+  assert.strictEqual((after.y1 + after.y2) / 2, (before.y1 + before.y2) / 2);
+  assert.strictEqual(after.x2 - after.x1, (before.x2 - before.x1) * 2);
+});
+
+// A badge is already centred on its anchor, so the same re-anchoring must be a
+// no-op for it rather than shifting it by half the growth.
+test('scaleShape leaves a badge anchor where it was', () => {
+  const badge = { type: 'number', x1: 50, y1: 60, n: 1, size: 20, width: 3 };
+  scaleShape(badge, 1.5);
+  assert.strictEqual(badge.x1, 50);
+  assert.strictEqual(badge.y1, 60);
+  assert.strictEqual(badge.size, 30);
+});
+
+test('scaleShape clamps size and stroke so a shape cannot vanish', () => {
   const text = { type: 'text', x1: 0, y1: 0, text: 'hi', size: 9, width: 1 };
   scaleShape(text, 0.1);
   assert.strictEqual(text.size, 8);

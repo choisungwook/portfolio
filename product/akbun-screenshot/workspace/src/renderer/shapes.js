@@ -51,7 +51,7 @@ function bounds(s) {
 }
 
 // Topmost first, so the shape drawn last is the one a click picks up.
-// ponytail: box test, not outline test. Clicking inside an empty rectangle
+// A box test rather than an outline test: clicking inside an empty rectangle
 // selects it, which is what you want when the point is to drag it. The cost is
 // a diagonal line whose box reaches well past the stroke.
 function hitTest(shapes, x, y, pad = 0) {
@@ -74,9 +74,21 @@ function moveShape(s, dx, dy) {
 // Scales about the shape's own centre, so resizing does not walk it across the
 // image. Stroke follows, otherwise a shrunk shape keeps a fat outline.
 function scaleShape(s, factor) {
+  const before = bounds(s);
   s.size = Math.max(8, s.size * factor);
   s.width = Math.max(1, s.width * factor);
-  if (s.x2 === undefined) return;
+
+  // Text hangs from its top left corner, so a bigger glyph grows down and to
+  // the right and the centre drifts. Re-anchoring by how far the box moved
+  // fixes that, and costs a badge nothing since its box is already centred on
+  // the anchor.
+  if (s.x2 === undefined) {
+    const after = bounds(s);
+    s.x1 += (before.x1 + before.x2 - after.x1 - after.x2) / 2;
+    s.y1 += (before.y1 + before.y2 - after.y1 - after.y2) / 2;
+    return;
+  }
+
   const cx = (s.x1 + s.x2) / 2;
   const cy = (s.y1 + s.y2) / 2;
   s.x1 = cx + (s.x1 - cx) * factor;
