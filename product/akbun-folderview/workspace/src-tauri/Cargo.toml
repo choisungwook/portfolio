@@ -1,0 +1,47 @@
+[workspace]
+members = ["crates/library"]
+
+[package]
+name = "akbun-folderview"
+version = "0.1.0"
+description = "Windows desktop browser for a hand-picked photo and video library"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. The number here is not read by the bundler and is only present
+# because cargo requires it.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_folderview_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# The model lives in its own crate so the pull request job can test it without
+# compiling tauri, which would mean installing GTK and WebKit on the runner.
+folderview-library = { path = "crates/library" }
+tauri = { version = "2", features = ["protocol-asset", "image-png"] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Recursive directory walk that skips unreadable folders instead of stopping.
+walkdir = "2"
+# Recycle Bin. std has no equivalent, and the Win32 call underneath is easy to
+# get wrong in a way that deletes permanently instead of trashing.
+trash = "5"
+
+# Desktop only. These three have no mobile implementation and this app has no
+# mobile target, but keeping the cfg means a stray mobile build fails at
+# resolve time rather than deep inside a plugin.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"

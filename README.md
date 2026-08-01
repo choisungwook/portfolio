@@ -114,6 +114,7 @@
 - [GitHub PR에서 terraform plan/apply를 실행하는 서버 (akbun-terraform-apply-remote)](./product/akbun-terraform-apply-remote/) (26.7.29)
 - [macOS 메뉴바 스크린샷 앱 (akbun-screenshot)](./product/akbun-screenshot/) (26.7.31)
 - [macOS 메뉴바 관리 앱 (akbun-mactaskbar)](./product/akbun-mactaskbar/) (26.7.31)
+- [사진과 영상 태그, 등급, 검색 Windows 데스크톱 앱 (akbun-folderview)](./product/akbun-folderview/) (26.8.1)
 
 ## Dockerfile
 

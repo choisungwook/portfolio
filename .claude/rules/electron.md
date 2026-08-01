@@ -1,6 +1,8 @@
 # Electron 데스크톱 앱 규칙
 
-`product/`에 Electron 또는 데스크톱 앱을 만들 때 따른다. 디렉터리와 인덱스 규칙은 [product.md](./product.md)를 따른다.
+`product/`에 Electron 앱을 만들 때 따른다. 디렉터리와 인덱스 규칙은 [product.md](./product.md)를 따른다.
+
+데스크톱 앱의 기본은 [tauri.md](./tauri.md)다. Electron은 macOS나 Linux 빌드가 지금 필요할 때, 트레이·메뉴바가 앱의 주 화면일 때, Rust 대체재가 없는 node 라이브러리에 의존할 때, 그리고 이미 Electron으로 되어 있는 제품을 고칠 때 고른다. 아래 테마 규칙의 CSS 부분은 Tauri에도 그대로 적용된다.
 
 ## 테마
 

@@ -1,0 +1,88 @@
+name: release-akbun-folderview
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-folderview/**'
+  pull_request:
+    paths:
+      - 'product/akbun-folderview/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-folderview/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Run page tests
+        run: npm test
+
+      # folderview-library depends on neither tauri nor a webview, so -p keeps
+      # this to serde and walkdir. Testing the app crate instead would need GTK
+      # and WebKit installed on the runner.
+      - name: Run library tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p folderview-library
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-folderview/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-folderview/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: product/akbun-folderview/workspace
+          tagName: akbun-folderview-v__VERSION__
+          releaseName: akbun-folderview-v__VERSION__
+          # A draft is not reachable at releases/latest/download/latest.json,
+          # so every installed copy would get a 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          # Only NSIS is built, but latest.json prefers msi by default.
+          updaterJsonPreferNsis: true
+          releaseBody: |
+            직접 추가한 사진과 영상만 모아 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱이다.
+
+            - 설치 파일은 Windows x64 전용이다.
+            - exe를 내려받아 실행하면 사용자 폴더에 설치되고 바로 실행된다. 관리자 권한은 필요 없다.
+            - 코드 서명이 없어 SmartScreen 경고가 나온다. "추가 정보"를 누르고 "실행"을 선택하면 설치된다.
+            - 설치 후에는 Settings의 Check for Updates로 다음 버전을 받는다.

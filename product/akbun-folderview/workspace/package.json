@@ -1,0 +1,18 @@
+{
+  "name": "akbun-folderview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows desktop browser for a hand-picked photo and video library with tags, ratings and instant search",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "test": "node --test test/*.test.js",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p folderview-library",
+    "dist": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

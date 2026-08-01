@@ -19,28 +19,49 @@ product/<name>/
 
 ## Steps
 
-1. Build the app in workspace/. Prefer the laziest stack that works and reuse patterns from existing products: akbun-screenshot for a plain JavaScript Electron app, akbun-k8supgradeview when TypeScript earns its build step. Keep tests runnable with plain node, importing no electron, so CI verify needs no app binary.
-2. Keep the version in package.json or the equivalent source file. It drives the git tag, the release name, and the self update check.
-3. Add self update to any desktop app, ported from akbun-k8supgradeview. See "Self update" below.
-4. Create .github/workflows/release-<name>.yml modeled on release-akbun-screenshot.yml:
-   - Check the latest stable major of every action (actions/checkout, actions/setup-node) and tool before writing it; never copy old pins.
-   - pull_request runs a verify job on ubuntu with ELECTRON_SKIP_BINARY_DOWNLOAD, tests only.
-   - master push reads the version, runs tests, builds, then creates tag <name>-v<version>, then the release. Build before tag, tag before release, so a failed build leaves no dangling tag.
-   - For unsigned macOS builds the release notes must include the Gatekeeper bypass:
+1. Pick the stack. **Tauri is the default for a desktop app.** See "Choosing the stack" below. Build the app in workspace/, preferring the laziest thing that works and reusing patterns from an existing product of the same stack. Keep tests runnable without an app binary, so CI verify needs no webview and no Electron download.
+2. Keep the version in package.json. It drives the tag, the release name, and the self update check. In Tauri, point tauri.conf.json at it with `"version": "../package.json"` rather than copying the number.
+3. Add self update to any desktop app. In Tauri that is the official updater plugin; in Electron see "Self update in Electron" below.
+4. Create .github/workflows/release-<name>.yml modeled on the workflow of the product you reused:
+   - Check the latest stable major of every action (actions/checkout, actions/setup-node, tauri-apps/tauri-action) and tool before writing it; never copy old pins.
+   - pull_request runs a verify job on ubuntu, tests only. Electron needs ELECTRON_SKIP_BINARY_DOWNLOAD.
+   - master push builds and releases. In Electron, build then tag then release, so a failed build leaves no dangling tag. In Tauri, tauri-action creates the release and GitHub creates the tag from it, so there is no git tag step.
+   - Unsigned builds need the platform's bypass in the release notes. macOS:
 
      ```bash
      xattr -cr /Applications/<name>.app
      ```
 
+     Windows: tell the user to choose "More info" and then "Run anyway" past the SmartScreen warning.
+
 5. Write wiki/: index.md, architecture.md (process structure, key flows, IPC or API surface), development.md (build, run, test, release, caveats). No marketing language, no references to benchmarked products or PR bodies.
 6. Write adr/ with index.md plus one file per decision (YYYY-MM-<topic>.md), each with Decision and Reason sections.
 7. Update both indexes in the same commit: the product/README.md table and the root README.md "직접 만든 제품" list.
 
-## Self update
+## Choosing the stack
 
-Builds are unsigned, so Squirrel.Mac and electron-updater cannot install. Copy the working implementation instead of inventing one: akbun-k8supgradeview/workspace/src/main/update.ts with its main.ts update flow and its disk leak test. akbun-mactaskbar/workspace/src/update.js is the same code as plain JavaScript.
+Default to Tauri, in plain JavaScript with no build step, following .claude/rules/tauri.md. Reuse akbun-folderview. It ships an installer under 10 MB against roughly 90 MB for the same app in Electron, the page is ordinary HTML and CSS, and the release action produces the installer, the signature and the update manifest in one step.
 
-What the port must keep:
+Choose Electron instead when one of these is true, and record which one in an ADR:
+
+- The app needs a macOS or Linux build now. Tauri renders in each platform's own webview, so the UI has to be checked on every platform shipped. Electron carries one engine everywhere.
+- The app needs a tray or menu bar icon as its primary surface. akbun-screenshot and akbun-mactaskbar are there for a reason.
+- The app depends on a node library with no Rust equivalent, and porting it is larger than the size saving.
+- The work is a change to an existing Electron product. Do not rewrite a working app to change its framework unless asked.
+
+For Electron, reuse akbun-screenshot for plain JavaScript and akbun-k8supgradeview when TypeScript earns its build step.
+
+Swift is a third option and almost always the wrong one. akbun-mactaskbar went native only because Electron could not reach the AppKit APIs it needed. Absent that, a rewrite costs the working app and closes the door on other platforms.
+
+## Self update in Electron
+
+Only for the Electron path; Tauri uses the updater plugin described in .claude/rules/tauri.md.
+
+On macOS, Squirrel.Mac cannot install an unsigned build, so copy the working implementation instead of inventing one: akbun-k8supgradeview/workspace/src/main/update.ts with its main.ts update flow and its disk leak test. akbun-mactaskbar/workspace/src/update.js is the same code as plain JavaScript.
+
+On Windows this hand-rolled path is not needed. electron-updater installs unsigned NSIS builds when `verifyUpdateCodeSignature` is `false`, which is documented for exactly that case. Do not carry the macOS reasoning over to Windows; that mistake shipped once already.
+
+What the macOS port must keep:
 
 - Read the repository releases from the GitHub API, match tags prefixed `<name>-v`, and pick the dmg for `process.arch`. electron-builder suffixes arm64 only.
 - Compare versions numerically, not as strings, against `app.getVersion()`.
@@ -52,5 +73,5 @@ Reach it from the app menu or the tray context menu as "Check for Updates…".
 
 ## Rules
 
-- Follow .claude/rules/product.md, markdown.md, and the language-specific rules.
+- Follow .claude/rules/product.md, markdown.md, and the stack rules: tauri.md by default, electron.md when the reasons above apply.
 - Do not commit, push, or create Issues/PRs unless the user explicitly asks; /repo-pr-create handles that.
