@@ -19,4 +19,8 @@ akbun-folderview의 썸네일 캐시는 webview가 만든다. 카드의 img가 o
 
 같은 상황의 다른 Tauri product에도 이 구성을 기본으로 한다. 단, blob URL로 갓 만든 썸네일을 보여주므로 CSP img-src에 blob:이 필요하고, 생성용 video 엘리먼트 때문에 media-src도 유지해야 한다.
 
+## 지뢰: canvas에 그릴 asset은 crossOrigin이 필수다
+
+첫 출시 버전은 썸네일이 하나도 만들어지지 않았다. asset protocol(Windows에서는 asset.localhost 호스트)은 페이지(tauri.localhost)와 다른 origin이라, crossOrigin 없이 로드한 img/video를 canvas에 그리면 canvas가 taint되어 toBlob이 실패한다. 에러는 카드마다 "no preview"로만 보이고 콘솔의 SecurityError는 릴리스 빌드에서 아무도 보지 않는다. Tauri v2의 asset protocol은 Access-Control-Allow-Origin을 window origin으로 응답하므로, 생성용 img/video 엘리먼트에 crossOrigin = 'anonymous'를 주면 끝난다. 표시만 하는 엘리먼트에는 필요 없다.
+
 관련: [서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다](2026-07-unsigned-desktop-app-self-update.md)

@@ -5,10 +5,11 @@
 :root {
   --bg: #f6f6f7;
   --panel: #ffffff;
+  --sidebar: #eceef3;
   --fg: #1a1a1c;
   --muted: #6b6b70;
   --border: #dedee1;
-  --hover: #eeeef0;
+  --hover: #e2e4ea;
   --accent: #3b6ef5;
   --accent-fg: #ffffff;
   --star: #e2a03f;
@@ -19,10 +20,11 @@
   :root {
     --bg: #1b1b1d;
     --panel: #232326;
+    --sidebar: #26262c;
     --fg: #e9e9ea;
     --muted: #9a9aa0;
     --border: #343438;
-    --hover: #2d2d31;
+    --hover: #323238;
     --accent: #5b86f7;
     --accent-fg: #ffffff;
     --star: #f0b95c;
@@ -32,10 +34,11 @@
 :root[data-theme='light'] {
   --bg: #f6f6f7;
   --panel: #ffffff;
+  --sidebar: #eceef3;
   --fg: #1a1a1c;
   --muted: #6b6b70;
   --border: #dedee1;
-  --hover: #eeeef0;
+  --hover: #e2e4ea;
   --accent: #3b6ef5;
   --star: #e2a03f;
 }
@@ -43,10 +46,11 @@
 :root[data-theme='dark'] {
   --bg: #1b1b1d;
   --panel: #232326;
+  --sidebar: #26262c;
   --fg: #e9e9ea;
   --muted: #9a9aa0;
   --border: #343438;
-  --hover: #2d2d31;
+  --hover: #323238;
   --accent: #5b86f7;
   --star: #f0b95c;
 }
@@ -75,7 +79,8 @@ select {
 
 .app {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  /* The sidebar owns 30% of the window and the grid the remaining 70%. */
+  grid-template-columns: 30% 1fr;
   height: 100vh;
 }
 
@@ -83,7 +88,8 @@ select {
   display: grid;
   grid-template-rows: 1fr 1fr auto;
   border-right: 1px solid var(--border);
-  background: var(--panel);
+  /* Its own tint, so the two panels read as two panels. */
+  background: var(--sidebar);
   min-height: 0;
   /* Nothing in the sidebar may paint over the grid, whatever the panels do. */
   overflow: hidden;
@@ -106,7 +112,7 @@ select {
   flex-direction: column;
   min-height: 0;
   /* Without this a long file name widens the sidebar's inner track past its
-     260px column and the tree paints over the grid. Held to the column, the
+     30% column and the tree paints over the grid. Held to the column, the
      wide rows overflow the panel body instead, which scrolls sideways. */
   min-width: 0;
   border-bottom: 1px solid var(--border);
@@ -212,7 +218,9 @@ button.primary {
 }
 
 .twisty {
-  width: 12px;
+  /* Wide enough for the folder and file emoji icons. */
+  width: 18px;
+  flex-shrink: 0;
   color: var(--muted);
 }
 
@@ -383,6 +391,17 @@ button.primary {
 
 .show-more {
   margin: 0 14px 14px;
+}
+
+/* Folder headers over filter results. A path is not a label, so the sidebar's
+   uppercase transform is turned back off, and in grid mode the header takes
+   the whole row. */
+.grid .group-title {
+  grid-column: 1 / -1;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------ list view */
