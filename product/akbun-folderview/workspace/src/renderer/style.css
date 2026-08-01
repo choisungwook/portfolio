@@ -1,0 +1,433 @@
+/* Light is the base and the dark media query overrides it, so the app follows
+   the system with no listener. The data-theme attribute wins over both and is
+   set only when the user picks a theme in Settings. */
+
+:root {
+  --bg: #f6f6f7;
+  --panel: #ffffff;
+  --fg: #1a1a1c;
+  --muted: #6b6b70;
+  --border: #dedee1;
+  --hover: #eeeef0;
+  --accent: #3b6ef5;
+  --accent-fg: #ffffff;
+  --star: #e2a03f;
+  --card-size: 180px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1b1d;
+    --panel: #232326;
+    --fg: #e9e9ea;
+    --muted: #9a9aa0;
+    --border: #343438;
+    --hover: #2d2d31;
+    --accent: #5b86f7;
+    --accent-fg: #ffffff;
+    --star: #f0b95c;
+  }
+}
+
+:root[data-theme='light'] {
+  --bg: #f6f6f7;
+  --panel: #ffffff;
+  --fg: #1a1a1c;
+  --muted: #6b6b70;
+  --border: #dedee1;
+  --hover: #eeeef0;
+  --accent: #3b6ef5;
+  --star: #e2a03f;
+}
+
+:root[data-theme='dark'] {
+  --bg: #1b1b1d;
+  --panel: #232326;
+  --fg: #e9e9ea;
+  --muted: #9a9aa0;
+  --border: #343438;
+  --hover: #2d2d31;
+  --accent: #5b86f7;
+  --star: #f0b95c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* The two sidebar panels scroll on their own, so a long tree cannot push the
+   catalog out of the window. */
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--hover);
+}
+
+button.on,
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* -------------------------------------------------------------------- tree */
+
+.node {
+  padding-left: 10px;
+}
+
+.row-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-item:hover {
+  background: var(--hover);
+}
+
+.row-item.selected {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.row-item .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.row-item.selected .count {
+  color: var(--accent-fg);
+}
+
+.twisty {
+  width: 12px;
+  color: var(--muted);
+}
+
+.group-title {
+  padding: 8px 6px 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.empty {
+  padding: 12px 8px;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------------- toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+#search {
+  flex: 1;
+  min-width: 240px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+#search:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+}
+
+.status {
+  padding: 6px 14px;
+  color: var(--muted);
+}
+
+/* -------------------------------------------------------------------- grid */
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-size), 1fr));
+  gap: 12px;
+  padding: 0 14px 14px;
+  align-content: start;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+.thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb img,
+.thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+}
+
+.card-body {
+  padding: 6px 8px 8px;
+}
+
+.card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.stars {
+  display: flex;
+  gap: 1px;
+  cursor: pointer;
+}
+
+.star {
+  color: var(--border);
+}
+
+.star.on {
+  color: var(--star);
+}
+
+.fav {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.fav.on {
+  color: #e05563;
+}
+
+.tag-chip {
+  display: inline-block;
+  margin: 3px 3px 0 0;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.show-more {
+  margin: 0 14px 14px;
+}
+
+/* ------------------------------------------------------------------ dialog */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.dialog {
+  width: 460px;
+  max-height: 88vh;
+  overflow: auto;
+  padding: 18px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.dialog h3 {
+  margin: 0 0 14px;
+}
+
+.dialog label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+
+.dialog label.inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+
+.dialog input[type='text'],
+.dialog select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  user-select: text;
+}
+
+.dialog .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.facts {
+  margin: 0 0 14px;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 4px 10px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

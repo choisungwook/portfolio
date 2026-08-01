@@ -1,0 +1,259 @@
+'use strict';
+
+// The library model. Every function here is pure so the tests run on plain
+// node with no electron binary: no electron import, no file system access.
+//
+// The library only holds files the user added. Search never touches the disk,
+// so it is a scan over an in-memory array rather than a query to the operating
+// system, and that is what makes it feel instant.
+
+const IMAGE_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.avif', '.heic', '.tif', '.tiff',
+]);
+const VIDEO_EXTENSIONS = new Set([
+  '.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.wmv', '.flv', '.mpg', '.mpeg',
+]);
+
+// Windows paths use "\", the tests and any future macOS build use "/".
+// Splitting on both keeps this module free of a platform choice.
+const SEPARATOR = /[\\/]/;
+
+const DEFAULT_SETTINGS = {
+  // "system" follows the operating system. See wiki/architecture.md.
+  theme: 'system',
+  // The system file browser opens on double click, so that is the default here
+  // too. Single click is offered because this window is a viewer.
+  openOnSingleClick: false,
+  cardSize: 180,
+};
+
+// Photo, video, or null for anything else. Extension only: reading headers for
+// a few thousand files would make adding a folder slow for no visible gain.
+function fileKind(name) {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return null;
+  const extension = name.slice(dot).toLowerCase();
+  if (IMAGE_EXTENSIONS.has(extension)) return 'photo';
+  if (VIDEO_EXTENSIONS.has(extension)) return 'video';
+  return null;
+}
+
+function baseName(filePath) {
+  const parts = filePath.split(SEPARATOR);
+  return parts[parts.length - 1];
+}
+
+function parentPath(filePath) {
+  const cut = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+  return cut < 0 ? '' : filePath.slice(0, cut);
+}
+
+// Tags are compared lowercase so "Trip" and "trip" are one tag. Spaces would
+// break the "tag:value" search token, so they collapse into "-".
+function normalizeTag(tag) {
+  return String(tag).trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function makeEntry(filePath, stat = {}) {
+  return {
+    path: filePath,
+    name: baseName(filePath),
+    dir: parentPath(filePath),
+    kind: fileKind(filePath),
+    size: stat.size ?? 0,
+    mtime: stat.mtime ?? 0,
+    rating: 0,
+    favorite: false,
+    tags: [],
+  };
+}
+
+// Keep the tags, rating and favorite the user set. A rescan sees files, not the
+// meaning attached to them, so it must not overwrite that.
+function mergeScan(existing, scanned) {
+  const byPath = new Map(existing.map((entry) => [entry.path, entry]));
+  return scanned.map((entry) => {
+    const old = byPath.get(entry.path);
+    if (!old) return entry;
+    return { ...entry, rating: old.rating, favorite: old.favorite, tags: old.tags };
+  });
+}
+
+// Lowercased name, cached on the entry so a keystroke does not lowercase the
+// whole library again. Not persisted; it is rebuilt when the library loads.
+function searchKey(entry) {
+  if (entry._key === undefined) entry._key = entry.name.toLowerCase();
+  return entry._key;
+}
+
+// Understands "holiday tag:beach rating:>=4 type:photo fav". Anything that is
+// not a known token is free text matched against the file name.
+function parseQuery(text) {
+  const query = { text: '', tags: [], rating: null, ratingOp: '>=', kind: null, favorite: false };
+  const words = [];
+
+  for (const token of String(text).trim().split(/\s+/)) {
+    if (!token) continue;
+    const lower = token.toLowerCase();
+
+    if (lower.startsWith('tag:')) {
+      const tag = normalizeTag(lower.slice(4));
+      if (tag) query.tags.push(tag);
+    } else if (lower.startsWith('rating:')) {
+      const match = lower.slice(7).match(/^(>=|<=|=)?(\d)$/);
+      if (match) {
+        query.ratingOp = match[1] === '=' ? '=' : (match[1] ?? '>=');
+        query.rating = Number(match[2]);
+      }
+    } else if (lower.startsWith('type:')) {
+      const kind = lower.slice(5);
+      if (kind === 'photo' || kind === 'video') query.kind = kind;
+    } else if (lower === 'fav' || lower === 'favorite' || lower === 'is:favorite') {
+      query.favorite = true;
+    } else {
+      words.push(lower);
+    }
+  }
+
+  query.text = words.join(' ');
+  return query;
+}
+
+function matchesRating(entry, query) {
+  if (query.rating === null) return true;
+  if (query.ratingOp === '=') return entry.rating === query.rating;
+  if (query.ratingOp === '<=') return entry.rating <= query.rating;
+  return entry.rating >= query.rating;
+}
+
+function matchesEntry(entry, query) {
+  if (query.favorite && !entry.favorite) return false;
+  if (query.kind && entry.kind !== query.kind) return false;
+  if (!matchesRating(entry, query)) return false;
+  if (query.tags.some((tag) => !entry.tags.includes(tag))) return false;
+  if (query.text && !searchKey(entry).includes(query.text)) return false;
+  return true;
+}
+
+// ponytail: a linear scan. It stays under a frame for the tens of thousands of
+// files a hand-picked library holds. Build an inverted index on name trigrams
+// if a library ever grows past a few hundred thousand.
+function searchEntries(entries, text) {
+  const query = parseQuery(text);
+  return entries.filter((entry) => matchesEntry(entry, query));
+}
+
+// Every tag in the library with its count, most used first. Feeds both the
+// catalog panel and the search box autocomplete.
+function tagCounts(entries) {
+  const counts = new Map();
+  for (const entry of entries) {
+    for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+// How many files carry each star count, 1 through 5.
+function ratingCounts(entries) {
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (const entry of entries) counts[entry.rating] += 1;
+  return counts;
+}
+
+function isUnder(filePath, rootPath) {
+  return filePath.startsWith(rootPath) && SEPARATOR.test(filePath.slice(rootPath.length, rootPath.length + 1));
+}
+
+function makeNode(name, nodePath) {
+  return { name, path: nodePath, folders: [], files: [] };
+}
+
+function childFolder(node, name, separator) {
+  const found = node.folders.find((folder) => folder.name === name);
+  if (found) return found;
+  const created = makeNode(name, node.path + separator + name);
+  node.folders.push(created);
+  return created;
+}
+
+function sortNode(node) {
+  node.folders.sort((a, b) => a.name.localeCompare(b.name));
+  node.files.sort((a, b) => a.name.localeCompare(b.name));
+  node.folders.forEach(sortNode);
+}
+
+// The tree is derived from the indexed files rather than read from disk, so
+// what it shows and what search finds can never disagree.
+function buildTree(roots, entries) {
+  return roots.map((root) => {
+    const separator = root.path.includes('\\') ? '\\' : '/';
+    const node = makeNode(baseName(root.path) || root.path, root.path);
+
+    for (const entry of entries) {
+      if (!isUnder(entry.path, root.path)) continue;
+      const segments = entry.path.slice(root.path.length + 1).split(SEPARATOR);
+      let cursor = node;
+      for (const folderName of segments.slice(0, -1)) {
+        cursor = childFolder(cursor, folderName, separator);
+      }
+      cursor.files.push(entry);
+    }
+
+    sortNode(node);
+    return node;
+  });
+}
+
+// Unknown keys in a stored settings file are dropped, and a missing key falls
+// back to the default, so an older or hand-edited file still loads.
+function mergeSettings(defaults, stored) {
+  const merged = { ...defaults };
+  if (!stored || typeof stored !== 'object') return merged;
+  for (const key of Object.keys(defaults)) {
+    if (typeof stored[key] === typeof defaults[key]) merged[key] = stored[key];
+  }
+  return merged;
+}
+
+function formatSize(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`;
+}
+
+const exported = {
+  DEFAULT_SETTINGS,
+  IMAGE_EXTENSIONS,
+  VIDEO_EXTENSIONS,
+  baseName,
+  buildTree,
+  fileKind,
+  formatSize,
+  makeEntry,
+  matchesEntry,
+  mergeScan,
+  mergeSettings,
+  normalizeTag,
+  parentPath,
+  parseQuery,
+  ratingCounts,
+  searchEntries,
+  tagCounts,
+};
+
+// Loaded two ways on purpose. Main and the tests require it; the renderer takes
+// it as a plain script tag, because search has to run on the page's own copy of
+// the entries. Sending the array across the context bridge on every keystroke
+// would be the slow way to do the same thing.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = exported;
+} else {
+  globalThis.folderviewLib = exported;
+}

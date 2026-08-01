@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src file: data:; media-src file:"
+    />
+    <title>akbun-folderview</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <!-- Top panel: the folder tree, built from the files in the library. -->
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Folders</h2>
+            <div class="panel-actions">
+              <button id="add-folder" title="Add a folder">+ Folder</button>
+              <button id="add-files" title="Add single files">+ Files</button>
+            </div>
+          </header>
+          <div class="panel-body" id="tree"></div>
+        </section>
+
+        <!-- Bottom panel: the catalog. Favorites, ratings and every tag. -->
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Catalog</h2>
+            <button id="rescan" title="Look for new and removed files">Rescan</button>
+          </header>
+          <div class="panel-body" id="catalog"></div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <div class="toolbar">
+          <input
+            id="search"
+            type="search"
+            list="tag-list"
+            autocomplete="off"
+            placeholder="Search by name, or type tag:beach rating:>=4 type:video fav"
+          />
+          <datalist id="tag-list"></datalist>
+          <div class="filters" id="filters">
+            <button data-token="" class="on">All</button>
+            <button data-token="type:photo">Photos</button>
+            <button data-token="type:video">Videos</button>
+            <button data-token="fav">Favorites</button>
+            <button data-token="rating:>=4">4 stars and up</button>
+          </div>
+        </div>
+
+        <div class="status" id="status"></div>
+        <div class="grid" id="grid"></div>
+        <button id="show-more" class="show-more" hidden>Show more</button>
+      </main>
+    </div>
+
+    <!-- Properties, also used for renaming and for editing tags and rating. -->
+    <div class="overlay" id="properties" hidden>
+      <div class="dialog">
+        <h3>Properties</h3>
+        <label>Name<input id="prop-name" type="text" /></label>
+        <label>Tags<input id="prop-tags" type="text" placeholder="beach, 2026, family" /></label>
+        <div class="row">
+          <span>Rating</span>
+          <div class="stars" id="prop-stars"></div>
+          <label class="inline"><input id="prop-favorite" type="checkbox" /> Favorite</label>
+        </div>
+        <dl class="facts" id="prop-facts"></dl>
+        <div class="dialog-actions">
+          <button id="prop-cancel">Cancel</button>
+          <button id="prop-save" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="settings" hidden>
+      <div class="dialog">
+        <h3>Settings</h3>
+        <label>Theme
+          <select id="set-theme">
+            <option value="system">Follow the system</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <label class="inline">
+          <input id="set-single-click" type="checkbox" /> Open a file with a single click
+        </label>
+        <label>Card size<input id="set-card-size" type="range" min="120" max="320" step="20" /></label>
+        <dl class="facts">
+          <dt>Settings and library file</dt>
+          <dd><code id="set-data-dir"></code></dd>
+          <dt>Version</dt>
+          <dd id="set-version"></dd>
+        </dl>
+        <div class="dialog-actions">
+          <button id="set-open-dir">Open Folder</button>
+          <button id="set-update">Check for Updates</button>
+          <button id="set-close" class="primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../library.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>
