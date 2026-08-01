@@ -137,7 +137,7 @@ function fileRow(entry) {
   row.addEventListener('click', () => window.api.openEntry(entry.path));
   row.addEventListener('contextmenu', async (event) => {
     event.preventDefault();
-    await window.api.entryMenu((action) => void runAction(action, entry));
+    await window.api.entryMenu((action) => void runAction(action, entry), tagMenu(entry));
   });
   return row;
 }
@@ -502,9 +502,28 @@ async function runAction(action, entry) {
   if (action === 'copyPath') return window.api.copyPath(entry.path);
   if (action === 'delete') return window.api.deleteEntry(entry.path);
   // Rename shares the Properties dialog, so there is one place that edits a
-  // file's name, tags and rating.
-  if (action === 'rename') return openProperties(entry, true);
-  if (action === 'properties') return openProperties(entry, false);
+  // file's name, tags and rating. A brand-new tag lands there too, because it
+  // needs typing and a native menu cannot take text.
+  if (action === 'rename') return openProperties(entry, 'name');
+  if (action === 'newTag') return openProperties(entry, 'tags');
+  if (action === 'properties') return openProperties(entry);
+  if (action.startsWith('tag:')) {
+    const tag = action.slice(4);
+    const tags = entry.tags.includes(tag)
+      ? entry.tags.filter((existing) => existing !== tag)
+      : [...entry.tags, tag];
+    return patch(entry, { tags });
+  }
+}
+
+// Every tag in the library, checked when this file already has it, so the
+// context menu can toggle tags without opening a dialog.
+function tagMenu(entry) {
+  const known = derive().tags.map(({ tag }) => tag);
+  return [...new Set([...known, ...entry.tags])].map((tag) => ({
+    tag,
+    on: entry.tags.includes(tag),
+  }));
 }
 
 /* ---------------------------------------------------------------- dialogs */
@@ -512,7 +531,9 @@ async function runAction(action, entry) {
 let propertyTarget = null;
 let propertyRating = 0;
 
-function openProperties(entry, focusName) {
+// focus names the field the user came for: 'name' from Rename, 'tags' from
+// New Tag…, nothing from Properties itself.
+function openProperties(entry, focus) {
   propertyTarget = entry;
   propertyRating = entry.rating;
 
@@ -530,7 +551,8 @@ function openProperties(entry, focusName) {
     <dt>Location</dt><dd>${escapeHtml(entry.dir)}</dd>`;
 
   $('properties').hidden = false;
-  if (focusName) $('prop-name').select();
+  if (focus === 'name') $('prop-name').select();
+  if (focus === 'tags') $('prop-tags').focus();
 }
 
 async function saveProperties() {
@@ -665,7 +687,7 @@ $('grid').addEventListener('contextmenu', async (event) => {
   const entry = entryAt(event.target);
   if (!entry) return;
   event.preventDefault();
-  await window.api.entryMenu((action) => void runAction(action, entry));
+  await window.api.entryMenu((action) => void runAction(action, entry), tagMenu(entry));
 });
 
 $('prop-stars').addEventListener('click', (event) => {

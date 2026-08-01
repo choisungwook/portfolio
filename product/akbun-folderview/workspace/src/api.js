@@ -127,13 +127,31 @@ window.api = {
   // A real system menu. Each item runs the handler directly rather than the
   // menu resolving a promise, because there is no dismissed event to settle a
   // promise with when the user clicks away.
-  entryMenu: async (run) => {
+  //
+  // tags is [{ tag, on }]: every tag in the library, checked when this file
+  // has it. Clicking one toggles it; New Tag… is for a tag that does not
+  // exist yet, which needs typing and therefore the Properties dialog.
+  entryMenu: async (run, tags = []) => {
     const item = (id, text) => ({ id, text, action: () => run(id) });
+    const tagItems = tags.map(({ tag, on }) => ({
+      text: tag,
+      checked: on,
+      action: () => run(`tag:${tag}`),
+    }));
     const menu = await Menu.new({
       items: [
         item('open', 'Open'),
         item('rename', 'Rename…'),
         item('delete', 'Delete'),
+        { item: 'Separator' },
+        {
+          text: 'Tags',
+          items: [
+            ...tagItems,
+            ...(tagItems.length > 0 ? [{ item: 'Separator' }] : []),
+            item('newTag', 'New Tag…'),
+          ],
+        },
         { item: 'Separator' },
         item('copyPath', 'Copy Path'),
         item('reveal', 'Show in Folder'),
