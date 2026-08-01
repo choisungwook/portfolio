@@ -1,11 +1,11 @@
 'use strict';
 
-const { BrowserWindow, clipboard, nativeImage, screen } = require('electron');
+const { BrowserWindow, clipboard, nativeImage, nativeTheme, screen } = require('electron');
 const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { buildScreenshotFilename, previewPosition } = require('./lib');
+const { buildScreenshotFilename, editorWindowSize, previewPosition } = require('./lib');
 
 const PREVIEW_SIZE = { width: 280, height: 200 };
 
@@ -14,6 +14,10 @@ const PREVIEW_SIZE = { width: 280, height: 200 };
 // finding it by scanning a list reads w.webContents on every element, which
 // throws "Object has been destroyed" as soon as one of them is already closed.
 const previews = new Map();
+
+// webContents.id -> { file, getSaveDir, win } for open editor windows. Same
+// shape and same reasons as previews above.
+const editors = new Map();
 
 let capturing = false;
 
@@ -109,4 +113,90 @@ function dismissPreview(webContentsId) {
   if (entry && !entry.win.isDestroyed()) entry.win.close();
 }
 
-module.exports = { captureArea, savePreview, copyPreview, closePreview: dismissPreview };
+// Edit button: open the editor on a copy of the temp png and dismiss the
+// preview. A copy rather than the same path, because dismissing the preview
+// deletes its temp file and the editor would race that deletion.
+function openEditor(previewId) {
+  const entry = previews.get(previewId);
+  if (!entry) return;
+
+  const file = path.join(
+    os.tmpdir(),
+    `akbun-screenshot-edit-${Date.now()}-${tmpCounter++}.png`
+  );
+  fs.copyFileSync(entry.tmpFile, file);
+  const getSaveDir = entry.getSaveDir;
+  dismissPreview(previewId);
+
+  const display = screen.getPrimaryDisplay();
+  const win = new BrowserWindow({
+    ...editorWindowSize(
+      nativeImage.createFromPath(file).getSize(),
+      display.workArea,
+      display.scaleFactor
+    ),
+    useContentSize: true,
+    title: 'Edit screenshot',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const id = win.webContents.id;
+  editors.set(id, { file, getSaveDir, win });
+  win.on('closed', () => {
+    editors.delete(id);
+    fs.rmSync(file, { force: true });
+  });
+
+  win.loadFile(path.join(__dirname, 'renderer', 'editor.html'));
+}
+
+// The renderer draws the screenshot into a canvas and then reads it back with
+// toDataURL, which a file:// image would taint. Handing it the bytes as a data
+// URL keeps the canvas same-origin.
+function editorImage(webContentsId) {
+  const entry = editors.get(webContentsId);
+  if (!entry) return null;
+  return `data:image/png;base64,${fs.readFileSync(entry.file).toString('base64')}`;
+}
+
+const PNG_DATA_URL = 'data:image/png;base64,';
+
+// Save button in the editor: write the edited canvas, not the original file.
+// The payload is decoded before anything touches the disk, so a malformed one
+// leaves no directory and no empty png behind.
+function saveEditor(webContentsId, dataUrl) {
+  const entry = editors.get(webContentsId);
+  if (!entry) return null;
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(PNG_DATA_URL)) return null;
+
+  const png = Buffer.from(dataUrl.slice(PNG_DATA_URL.length), 'base64');
+  if (png.length === 0) return null;
+
+  const saveDir = entry.getSaveDir();
+  fs.mkdirSync(saveDir, { recursive: true });
+  const target = path.join(saveDir, buildScreenshotFilename(new Date()));
+  fs.writeFileSync(target, png);
+  closeEditor(webContentsId);
+  return target;
+}
+
+function closeEditor(webContentsId) {
+  const entry = editors.get(webContentsId);
+  if (entry && !entry.win.isDestroyed()) entry.win.close();
+}
+
+module.exports = {
+  captureArea,
+  savePreview,
+  copyPreview,
+  closePreview: dismissPreview,
+  openEditor,
+  editorImage,
+  saveEditor,
+  closeEditor,
+};
