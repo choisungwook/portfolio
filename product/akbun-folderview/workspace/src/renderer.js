@@ -267,11 +267,16 @@ const thumbQueued = new Set();
 // A drive that is unplugged fails every read. Remembered for the session so a
 // dead disk is asked once per file, not once per render.
 const thumbFailed = new Set();
+// Thumbnails built this session. Their cache URL 404ed once before the build,
+// so a re-render asks with a changed URL rather than trusting the webview not
+// to have remembered that 404.
+const thumbBuilt = new Set();
 const thumbWaiting = new Map();
 let thumbActive = 0;
 
 function thumbUrl(entry) {
-  return fileUrl(`${state.thumbsDir}/${lib.thumbName(entry.path, entry.mtime, entry.size)}`);
+  const url = fileUrl(`${state.thumbsDir}/${lib.thumbName(entry.path, entry.mtime, entry.size)}`);
+  return thumbBuilt.has(entry.path) ? `${url}?fresh` : url;
 }
 
 function markMissing(img) {
@@ -313,7 +318,9 @@ function loadVideoFrame(path) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.muted = true;
-    video.preload = 'auto';
+    // metadata is enough: the seek itself pulls the range around the target
+    // frame, and auto would read far more of the file than a poster needs.
+    video.preload = 'metadata';
     // Clearing src releases the file handle, or a later rename or delete of
     // the video would fail while this element is still holding it.
     const done = (blob, error) => {
@@ -341,6 +348,7 @@ async function makeThumb(entry) {
 }
 
 function showThumb(path, blob) {
+  thumbBuilt.add(path);
   const img = thumbWaiting.get(path);
   if (!img || !img.isConnected) return;
   // The blob that was just drawn is shown directly; the saved file serves the
@@ -602,6 +610,7 @@ $('refresh-thumbs').addEventListener('click', () =>
     if (!(await window.api.refreshThumbs())) return;
     // Forget this session's failures too, so a re-plugged drive gets retried.
     thumbFailed.clear();
+    thumbBuilt.clear();
     renderGrid();
   })
 );
@@ -673,6 +682,7 @@ $('prop-save').addEventListener('click', () => void saveProperties());
 
 $('set-theme').addEventListener('change', () => void saveCurrentSettings());
 $('set-single-click').addEventListener('change', () => void saveCurrentSettings());
+$('set-video-thumbs').addEventListener('change', () => void saveCurrentSettings());
 $('set-card-size').addEventListener('input', () => void saveCurrentSettings());
 $('set-open-dir').addEventListener('click', () => window.api.openDataDir());
 $('set-update').addEventListener('click', () => window.api.checkUpdate());

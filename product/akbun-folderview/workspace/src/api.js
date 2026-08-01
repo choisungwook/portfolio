@@ -151,12 +151,17 @@ window.api = {
   // this throws away the cached thumbnails so they are rebuilt from originals.
   refreshThumbs: async () => {
     const confirmed = await ask(
-      'Throw away all cached thumbnails and rebuild them from the original files?\n\nThe originals must be reachable to rebuild.',
+      'Throw away all cached thumbnails?\n\nThey are rebuilt from the original files as cards come into view, so the originals must be reachable.',
       { title: 'Refresh Thumbnails' }
     );
     if (!confirmed) return false;
-    await invoke('clear_thumbs');
-    return true;
+    try {
+      await invoke('clear_thumbs');
+      return true;
+    } catch (error) {
+      await message(String(error), { title: 'Refresh failed', kind: 'error' });
+      return false;
+    }
   },
 
   saveSettings: (settings) => invoke('save_settings', { settings }),

@@ -291,10 +291,17 @@ pub fn open_data_dir(app: AppHandle) -> Result<(), String> {
 /// exactly the formats that thumbnail.
 #[tauri::command]
 pub fn save_thumb(app: AppHandle, name: String, bytes: Vec<u8>) -> Result<(), String> {
-    // The name is computed in the page. Reject anything that could step out
-    // of the thumbs folder.
-    if name.is_empty() || name.contains(['/', '\\']) || name.contains("..") {
+    // The name comes from the page, so it is held to exactly what thumbName
+    // produces: sixteen hex digits and .jpg. Nothing else can land in the
+    // thumbs folder, and nothing can step out of it.
+    let hex = name.strip_suffix(".jpg").unwrap_or_default();
+    if hex.len() != 16 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err("bad thumbnail name".into());
+    }
+    // A 512px JPEG is tens of kilobytes; anything near this cap is a bug, not
+    // a thumbnail.
+    if bytes.len() > 2 * 1024 * 1024 {
+        return Err("thumbnail too large".into());
     }
     let dir = store::thumbs_dir(&app)?;
     std::fs::write(dir.join(&name), bytes).map_err(|error| error.to_string())
