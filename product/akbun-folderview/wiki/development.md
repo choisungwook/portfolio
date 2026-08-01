@@ -40,7 +40,9 @@ The Rust suite covers `src-tauri/src/library.rs`: which extensions count as a ph
 npm run test:rust
 ```
 
-The split follows the runtime split rather than being a convention. The page holds the whole library and searches it in memory, so searching, the tree and the counts are page code and are tested by node. Scanning the disk and persisting the library are Rust, so the part of that side which needs neither a disk nor an app handle is tested by cargo. `scan_folder` and `store.rs` are not covered, because both need one. Neither suite needs a webview, an app binary, or an installed app, which is why the pull request job runs both on a Linux runner. It is not quick: `verify` has no cargo cache, so every pull request compiles the Rust dependency tree from scratch.
+The split follows the runtime split rather than being a convention. The page holds the whole library and searches it in memory, so searching, the tree and the counts are page code and are tested by node. Scanning the disk and persisting the library are Rust, so the part of that side which needs neither a disk nor an app handle is tested by cargo. `scan_folder` and `store.rs` are not covered, because both need one. Neither suite needs a webview, an app binary, or an installed app, so the pull request job runs both on a Linux runner.
+
+`library.rs` uses no Tauri type, but it lives in the same crate as the app, so cargo builds the whole dependency tree to run four unit tests. That is why the pull request job installs the Linux webview and GTK development packages, and why it caches the cargo build. The consolation is that the job also compiles the Rust on every pull request, so a compile error surfaces there instead of on the release runner. Splitting the model into its own crate would make the tests cheap and the system packages unnecessary; it has not been worth the extra crate yet.
 
 `npm test` also needs no `npm install`. The only dependency in `package.json` is the CLI, and the page suite does not use it.
 
@@ -73,7 +75,7 @@ gh release list
 
 `.github/workflows/release-akbun-folderview.yml` has two jobs. Both triggers filter on `product/akbun-folderview/**`, so a change to the workflow file alone does not start a build.
 
-`verify` runs on pull requests, on `ubuntu-latest`. It checks out, sets up Node, and runs the two suites. That is the whole job. It does not look at the version, does not build the app, and does not install npm dependencies.
+`verify` runs on pull requests, on `ubuntu-latest`. It checks out, sets up Node, runs the page suite, installs the Linux build packages, restores the cargo cache, and runs the Rust suite. It does not look at the version, does not build the installer, and does not install npm dependencies.
 
 `release` runs on a master push and on `workflow_dispatch`, on `windows-latest`, with `contents: write`. It checks out, sets up Node and a stable Rust toolchain, restores the cargo cache keyed to `src-tauri` (without it every release rebuilds the entire dependency tree), runs `npm install`, and hands the rest to the Tauri release action. That action builds the installer, signs the update artifact, writes `latest.json`, creates the GitHub release, and uploads everything to it.
 

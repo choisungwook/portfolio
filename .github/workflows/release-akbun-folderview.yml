@@ -33,11 +33,22 @@ jobs:
         with:
           node-version: '24'
 
-      # Rust는 ubuntu runner에 이미 있다. webkit2gtk 등 시스템 의존성은
-      # tauri crate를 컴파일할 때만 필요하고, 아래 두 테스트는 순수 로직이라
-      # 필요하지 않다.
       - name: Run page tests
         run: npm test
+
+      # library.rs 자체는 tauri를 쓰지 않지만 같은 crate에 있어서 cargo가
+      # tauri까지 빌드한다. 그래서 순수 로직 테스트인데도 리눅스 시스템
+      # 의존성이 필요하다. 대신 이 job이 Rust 컴파일 검증도 겸하게 된다.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+        working-directory: .
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-folderview/workspace/src-tauri
 
       - name: Run library tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
