@@ -251,22 +251,158 @@ function renderCatalog() {
     .join('');
 }
 
-function thumb(entry) {
-  if (entry.kind === 'video') {
-    // The #t fragment makes Chromium seek to that second and paint the frame,
-    // which is a poster image without decoding the file ourselves.
-    return `<video src="${fileUrl(entry.path)}#t=0.5" preload="metadata" muted></video>
-            <span class="badge">VIDEO</span>`;
+/* ------------------------------------------------------------- thumbnails */
+
+// A card reads a small cached JPEG instead of the original file, so a normal
+// start never touches the added folders' disk — the reason a slow external
+// drive froze the first paint. The cache fills lazily: when a card's
+// thumbnail is missing, the original is read once, drawn small on a canvas,
+// and the JPEG bytes are handed to Rust to keep for every later run.
+const THUMB_EDGE = 512;
+// ponytail: 2 concurrent reads keeps a spinning external disk responsive.
+// Make it a setting if a fast NAS ever needs more.
+const THUMB_JOBS = 2;
+const thumbQueue = [];
+const thumbQueued = new Set();
+// A drive that is unplugged fails every read. Remembered for the session so a
+// dead disk is asked once per file, not once per render.
+const thumbFailed = new Set();
+// Thumbnails built this session. Their cache URL 404ed once before the build,
+// so a re-render asks with a changed URL rather than trusting the webview not
+// to have remembered that 404.
+const thumbBuilt = new Set();
+const thumbWaiting = new Map();
+let thumbActive = 0;
+
+function thumbUrl(entry) {
+  const url = fileUrl(`${state.thumbsDir}/${lib.thumbName(entry.path, entry.mtime, entry.size)}`);
+  return thumbBuilt.has(entry.path) ? `${url}?fresh` : url;
+}
+
+function markMissing(img) {
+  const host = img.closest('.thumb');
+  if (host) host.classList.add('missing');
+  img.remove();
+}
+
+// A read from a dying disk can hang rather than fail, and it would pin one of
+// the queue slots forever.
+function withTimeout(promise, seconds) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out')), seconds * 1000);
+    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
+function drawThumb(source, width, height) {
+  const scale = Math.min(1, THUMB_EDGE / Math.max(width, height, 1));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('cannot draw'))), 'image/jpeg', 0.82)
+  );
+}
+
+function loadPhoto(path) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`cannot read ${path}`));
+    image.src = fileUrl(path);
+  }).then((image) => drawThumb(image, image.naturalWidth, image.naturalHeight));
+}
+
+function loadVideoFrame(path) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    // metadata is enough: the seek itself pulls the range around the target
+    // frame, and auto would read far more of the file than a poster needs.
+    video.preload = 'metadata';
+    // Clearing src releases the file handle, or a later rename or delete of
+    // the video would fail while this element is still holding it.
+    const done = (blob, error) => {
+      video.removeAttribute('src');
+      video.load();
+      if (error) reject(error);
+      else resolve(blob);
+    };
+    video.onerror = () => done(null, new Error(`cannot read ${path}`));
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(0.5, video.duration || 0);
+    };
+    video.onseeked = () =>
+      drawThumb(video, video.videoWidth, video.videoHeight).then(done, (error) => done(null, error));
+    video.src = fileUrl(path);
+  });
+}
+
+async function makeThumb(entry) {
+  const blob =
+    entry.kind === 'video' ? await loadVideoFrame(entry.path) : await loadPhoto(entry.path);
+  const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+  await window.api.saveThumb(lib.thumbName(entry.path, entry.mtime, entry.size), bytes);
+  return blob;
+}
+
+function showThumb(path, blob) {
+  thumbBuilt.add(path);
+  const img = thumbWaiting.get(path);
+  if (!img || !img.isConnected) return;
+  // The blob that was just drawn is shown directly; the saved file serves the
+  // next run. Re-pointing at the cache here could hit the 404 the browser
+  // already remembers for this URL.
+  img.onerror = () => markMissing(img);
+  img.onload = () => URL.revokeObjectURL(img.src);
+  img.src = URL.createObjectURL(blob);
+}
+
+function pumpThumbs() {
+  while (thumbActive < THUMB_JOBS && thumbQueue.length > 0) {
+    const entry = thumbQueue.shift();
+    thumbActive += 1;
+    withTimeout(makeThumb(entry), 30)
+      .then((blob) => showThumb(entry.path, blob))
+      .catch(() => {
+        thumbFailed.add(entry.path);
+        const img = thumbWaiting.get(entry.path);
+        if (img && img.isConnected) markMissing(img);
+      })
+      .finally(() => {
+        thumbQueued.delete(entry.path);
+        thumbWaiting.delete(entry.path);
+        thumbActive -= 1;
+        pumpThumbs();
+      });
   }
-  return `<img src="${fileUrl(entry.path)}" loading="lazy" alt="" />`;
+}
+
+function requestThumb(entry, img) {
+  if (thumbFailed.has(entry.path)) return markMissing(img);
+  if (!thumbQueued.has(entry.path)) {
+    thumbQueued.add(entry.path);
+    thumbQueue.push(entry);
+  }
+  // The latest rendered card wins; an older one is disconnected by now.
+  thumbWaiting.set(entry.path, img);
+  pumpThumbs();
+}
+
+function thumb(entry) {
+  const badge = entry.kind === 'video' ? '<span class="badge">VIDEO</span>' : '';
+  if (entry.kind === 'video' && !state.settings.showVideoThumbs) return badge;
+  return `<img src="${thumbUrl(entry)}" loading="lazy" alt="" />${badge}`;
 }
 
 function card(entry) {
   const element = document.createElement('div');
   element.className = 'card';
   element.dataset.path = entry.path;
+  const videoOff = entry.kind === 'video' && !state.settings.showVideoThumbs;
   element.innerHTML = `
-    <div class="thumb">${thumb(entry)}</div>
+    <div class="thumb${videoOff ? ' off' : ''}">${thumb(entry)}</div>
     <div class="card-body">
       <div class="card-name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</div>
       <div class="card-meta">
@@ -275,6 +411,26 @@ function card(entry) {
       </div>
       <div>${entry.tags.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>
     </div>`;
+  // A missing thumbnail is the signal to build one. loading="lazy" means only
+  // cards near the viewport fire this, which is the queue's natural window.
+  const img = element.querySelector('.thumb img');
+  if (img) img.onerror = () => requestThumb(entry, img);
+  return element;
+}
+
+// Detail rows like the file explorer. No images at all, which also makes it
+// the fast view for a disk with no thumbnails yet.
+function listRow(entry) {
+  const element = document.createElement('div');
+  element.className = 'list-item';
+  element.dataset.path = entry.path;
+  element.innerHTML = `
+    <span class="list-name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</span>
+    ${entry.kind === 'video' ? '<span class="badge">VIDEO</span>' : ''}
+    <span class="stars">${starsHtml(entry.rating)}</span>
+    <span class="fav ${entry.favorite ? 'on' : ''}" data-fav="1">${entry.favorite ? '♥' : '♡'}</span>
+    <span class="list-size">${lib.formatSize(entry.size)}</span>
+    <span class="list-date">${entry.mtime ? new Date(entry.mtime).toLocaleDateString() : ''}</span>`;
   return element;
 }
 
@@ -291,13 +447,22 @@ function syncTokens() {
   }
 }
 
+function syncViews() {
+  const listMode = state.settings.view === 'list';
+  $('view-grid').classList.toggle('on', !listMode);
+  $('view-list').classList.toggle('on', listMode);
+}
+
 function renderGrid() {
   const matches = visibleEntries();
   const page = matches.slice(0, state.shown);
+  const listMode = state.settings.view === 'list';
 
   const grid = $('grid');
   grid.textContent = '';
-  for (const entry of page) grid.append(card(entry));
+  grid.classList.toggle('list', listMode);
+  for (const entry of page) grid.append(listMode ? listRow(entry) : card(entry));
+  syncViews();
 
   const where = state.folder ? ` in ${state.folder}` : '';
   $('status').textContent =
@@ -319,7 +484,7 @@ function render() {
 /* ------------------------------------------------------------ file actions */
 
 function entryAt(element) {
-  const host = element.closest('.card');
+  const host = element.closest('.card, .list-item');
   return host ? state.entries.find((entry) => entry.path === host.dataset.path) : null;
 }
 
@@ -386,6 +551,7 @@ async function saveProperties() {
 function openSettings() {
   $('set-theme').value = state.settings.theme;
   $('set-single-click').checked = state.settings.openOnSingleClick;
+  $('set-video-thumbs').checked = state.settings.showVideoThumbs;
   $('set-card-size').value = state.settings.cardSize;
   $('set-data-dir').textContent = state.dataDir;
   $('set-version').textContent = state.version;
@@ -393,12 +559,18 @@ function openSettings() {
 }
 
 async function saveCurrentSettings() {
+  // Spread first: the view mode lives in settings but is set from the
+  // toolbar, and rebuilding from the dialog alone would drop it.
   state.settings = {
+    ...state.settings,
     theme: $('set-theme').value,
     openOnSingleClick: $('set-single-click').checked,
+    showVideoThumbs: $('set-video-thumbs').checked,
     cardSize: Number($('set-card-size').value),
   };
   applySettings();
+  // Toggling video thumbnails changes what the cards show.
+  renderGrid();
   await window.api.saveSettings(state.settings);
 }
 
@@ -411,9 +583,47 @@ function applySettings() {
 
 /* ------------------------------------------------------------------- wiring */
 
-$('add-folder').addEventListener('click', () => window.api.addFolder());
+// A walk of a big or slow disk takes a while. The command runs off the main
+// thread, so the window stays alive; this makes the wait visible instead of
+// looking like a dead button.
+async function busy(button, label, task) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = label;
+  try {
+    return await task();
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+$('add-folder').addEventListener('click', () =>
+  busy($('add-folder'), 'Scanning…', () => window.api.addFolder())
+);
 $('add-files').addEventListener('click', () => window.api.addFiles());
-$('rescan').addEventListener('click', () => window.api.rescan());
+$('rescan').addEventListener('click', () =>
+  busy($('rescan'), 'Rescanning…', () => window.api.rescan())
+);
+$('refresh-thumbs').addEventListener('click', () =>
+  busy($('refresh-thumbs'), 'Clearing…', async () => {
+    if (!(await window.api.refreshThumbs())) return;
+    // Forget this session's failures too, so a re-plugged drive gets retried.
+    thumbFailed.clear();
+    thumbBuilt.clear();
+    renderGrid();
+  })
+);
+
+async function setView(view) {
+  if (state.settings.view === view) return;
+  state.settings.view = view;
+  renderGrid();
+  await window.api.saveSettings(state.settings);
+}
+
+$('view-grid').addEventListener('click', () => void setView('grid'));
+$('view-list').addEventListener('click', () => void setView('list'));
 $('show-more').addEventListener('click', () => {
   state.shown += PAGE;
   renderGrid();
@@ -472,6 +682,7 @@ $('prop-save').addEventListener('click', () => void saveProperties());
 
 $('set-theme').addEventListener('change', () => void saveCurrentSettings());
 $('set-single-click').addEventListener('change', () => void saveCurrentSettings());
+$('set-video-thumbs').addEventListener('change', () => void saveCurrentSettings());
 $('set-card-size').addEventListener('input', () => void saveCurrentSettings());
 $('set-open-dir').addEventListener('click', () => window.api.openDataDir());
 $('set-update').addEventListener('click', () => window.api.checkUpdate());

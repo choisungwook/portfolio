@@ -81,10 +81,22 @@ select {
 
 .sidebar {
   display: grid;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: 1fr 1fr auto;
   border-right: 1px solid var(--border);
   background: var(--panel);
   min-height: 0;
+}
+
+/* Pinned below both panels, so rescan and settings never scroll away. */
+.sidebar-foot {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.sidebar-foot button {
+  flex: 1;
+  white-space: nowrap;
 }
 
 .panel {
@@ -167,6 +179,11 @@ button.primary {
   border-radius: 5px;
   cursor: pointer;
   white-space: nowrap;
+  /* A long name widens the row instead of painting past it, so the panel's
+     own overflow turns into a horizontal scrollbar rather than text bleeding
+     into the grid. min-width keeps short rows hoverable edge to edge. */
+  width: max-content;
+  min-width: 100%;
 }
 
 .row-item:hover {
@@ -282,6 +299,20 @@ button.primary {
   object-fit: cover;
 }
 
+/* The original could not be read (drive unplugged, file gone), or video
+   thumbnails are turned off. The card stays useful without an image. */
+.thumb.missing::after {
+  content: 'no preview';
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.thumb.off::after {
+  content: '▶';
+  color: var(--muted);
+  font-size: 22px;
+}
+
 .badge {
   position: absolute;
   top: 6px;
@@ -346,6 +377,54 @@ button.primary {
 
 .show-more {
   margin: 0 14px 14px;
+}
+
+/* ------------------------------------------------------------ list view */
+
+/* Same container, different layout: detail rows like the file explorer. No
+   thumbnails at all, which also makes it the fast view for a slow disk. */
+.grid.list {
+  display: block;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.list-item:hover {
+  background: var(--hover);
+}
+
+.list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-item .badge {
+  position: static;
+}
+
+.list-size,
+.list-date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.list-size {
+  width: 70px;
+  text-align: right;
+}
+
+.list-date {
+  width: 130px;
 }
 
 /* ------------------------------------------------------------------ dialog */

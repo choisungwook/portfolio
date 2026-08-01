@@ -158,6 +158,19 @@ function buildTree(roots, entries) {
   });
 }
 
+// The thumbnail file name for an entry. Path, mtime and size together, so an
+// edited or replaced file gets a fresh thumbnail and the stale one is simply
+// never asked for again. FNV-1a, 64 bits so a large library will not collide.
+function thumbName(filePath, mtime, size) {
+  const text = `${filePath}|${mtime}|${size}`;
+  let hash = 0xcbf29ce484222325n;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= BigInt(text.charCodeAt(i));
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return `${hash.toString(16).padStart(16, '0')}.jpg`;
+}
+
 function formatSize(bytes) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let value = bytes;
@@ -181,6 +194,7 @@ const exported = {
   ratingCounts,
   searchEntries,
   tagCounts,
+  thumbName,
 };
 
 // Loaded two ways on purpose. The tests require it; the page takes it as a

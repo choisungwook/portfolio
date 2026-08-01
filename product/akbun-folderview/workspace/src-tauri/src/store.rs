@@ -54,6 +54,18 @@ pub fn save_library(app: &AppHandle, library: &Library) -> Result<(), String> {
     write_json(app, "library.json", library)
 }
 
+/// Where cached thumbnails live. Created on demand, so clearing the cache is
+/// just removing the folder.
+pub fn thumbs_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("no config directory: {error}"))?
+        .join("thumbs");
+    std::fs::create_dir_all(&dir).map_err(|error| format!("cannot create {dir:?}: {error}"))?;
+    Ok(dir)
+}
+
 pub fn load_settings(app: &AppHandle) -> Settings {
     read_json(app, "settings.json")
 }

@@ -55,6 +55,11 @@ pub struct Settings {
     /// here too. Single click is offered because this window is a viewer.
     pub open_on_single_click: bool,
     pub card_size: u32,
+    /// "grid" is thumbnail cards, "list" is detail rows like the file explorer.
+    pub view: String,
+    /// A video poster frame costs a read of the video file itself, so it can
+    /// be turned off for a slow disk.
+    pub show_video_thumbs: bool,
 }
 
 impl Default for Settings {
@@ -63,6 +68,8 @@ impl Default for Settings {
             theme: "system".to_string(),
             open_on_single_click: false,
             card_size: 180,
+            view: "grid".to_string(),
+            show_video_thumbs: true,
         }
     }
 }
@@ -209,5 +216,7 @@ mod tests {
         assert_eq!(parsed.theme, "dark");
         assert_eq!(parsed.card_size, 180);
         assert!(!parsed.open_on_single_click);
+        assert_eq!(parsed.view, "grid");
+        assert!(parsed.show_video_thumbs);
     }
 }
