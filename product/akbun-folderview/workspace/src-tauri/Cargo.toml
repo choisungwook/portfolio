@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/library"]
+
 [package]
 name = "akbun-folderview"
 version = "0.1.0"
@@ -20,6 +23,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# The model lives in its own crate so the pull request job can test it without
+# compiling tauri, which would mean installing GTK and WebKit on the runner.
+folderview-library = { path = "crates/library" }
 tauri = { version = "2", features = ["protocol-asset", "image-png"] }
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"

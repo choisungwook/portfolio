@@ -57,14 +57,14 @@ npm test
 Run the Rust tests, which cover which extensions get indexed, the rescan merge, the root containment check and the settings fallback:
 
 ```bash
-cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml -p folderview-library
 ```
 
 Both suites run in the pull request job.
 
 ## Before a release works
 
-`src-tauri/tauri.conf.json` still carries `REPLACE_WITH_MINISIGN_PUBLIC_KEY` as the updater public key. Until that is a real key, and its private half is in the `TAURI_SIGNING_PRIVATE_KEY` secret, a release builds and publishes but nobody can update from it.
+The updater public key is set in `src-tauri/tauri.conf.json` and its private half is in the `TAURI_SIGNING_PRIVATE_KEY` secret. If those ever come apart, a release still builds and publishes and nobody can update from it, so treat a missing signature as a release failure even when the run is green.
 
 Generate the key pair with `npm run tauri signer generate`, put the public half in `tauri.conf.json` and the private half in the repository secret. Keep the private key: losing it means never being able to update installed users again, because the new key would not verify against the one they already have.
 

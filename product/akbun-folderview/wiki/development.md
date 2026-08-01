@@ -1,6 +1,6 @@
 # Development
 
-Everything happens in `workspace/`. The page has no build step: `src/index.html`, `src/style.css` and the three script tags in it are the source that runs. The Rust side is a normal cargo crate under `src-tauri/`, so that half does get compiled.
+Everything happens in `workspace/`. The page has no build step: `src/index.html`, `src/style.css` and the three script tags in it are the source that runs. The Rust side is a cargo workspace under `src-tauri/` holding two crates, the app and the model, so that half does get compiled.
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ The page suite covers `src/library.js`: query token parsing, the folder tree, ta
 npm test
 ```
 
-The Rust suite covers `src-tauri/src/library.rs`: which extensions count as a photo or a video, the rescan merge that carries a user's rating and tags across a scan, the prefix check that keeps `C:\photos-backup` out of `C:\photos`, and the per-field settings fallback when `settings.json` is partial.
+The Rust suite covers `src-tauri/crates/library/`: which extensions count as a photo or a video, the rescan merge that carries a user's rating and tags across a scan, the prefix check that keeps `C:\photos-backup` out of `C:\photos`, and the per-field settings fallback when `settings.json` is partial.
 
 ```bash
 npm run test:rust
@@ -42,7 +42,9 @@ npm run test:rust
 
 The split follows the runtime split rather than being a convention. The page holds the whole library and searches it in memory, so searching, the tree and the counts are page code and are tested by node. Scanning the disk and persisting the library are Rust, so the part of that side which needs neither a disk nor an app handle is tested by cargo. `scan_folder` and `store.rs` are not covered, because both need one. Neither suite needs a webview, an app binary, or an installed app, so the pull request job runs both on a Linux runner.
 
-`library.rs` uses no Tauri type, but it lives in the same crate as the app, so cargo builds the whole dependency tree to run four unit tests. That is why the pull request job installs the Linux webview and GTK development packages, and why it caches the cargo build. The consolation is that the job also compiles the Rust on every pull request, so a compile error surfaces there instead of on the release runner. Splitting the model into its own crate would make the tests cheap and the system packages unnecessary; it has not been worth the extra crate yet.
+The model is its own crate, `folderview-library`, and that is what makes the Rust suite cheap. Cargo builds the dependency graph of whatever it is asked to test, so `-p folderview-library` compiles serde and walkdir and stops. It was briefly in the app crate, and the cost was concrete: the runner had to install GTK and WebKit development packages to run four unit tests, that step took about half a minute of every pull request, and the resulting cargo cache was over 700 MB per commit against a 10 GB repository budget.
+
+The trade is that the pull request job no longer compiles the app crate at all, so a Rust compile error in `commands.rs` or `lib.rs` first appears on the release runner. That is acceptable because the app crate is thin: it is the command surface, and the logic under it is what the tests cover.
 
 `npm test` also needs no `npm install`. The only dependency in `package.json` is the CLI, and the page suite does not use it.
 
@@ -75,9 +77,9 @@ gh release list
 
 `.github/workflows/release-akbun-folderview.yml` has two jobs. Both triggers filter on `product/akbun-folderview/**`, so a change to the workflow file alone does not start a build.
 
-`verify` runs on pull requests, on `ubuntu-latest`. It checks out, sets up Node, runs the page suite, installs the Linux build packages, restores the cargo cache, and runs the Rust suite. It does not look at the version, does not build the installer, and does not install npm dependencies.
+`verify` runs on pull requests, on `ubuntu-latest`. It checks out, sets up Node, and runs the two suites. That is the whole job: no system packages, no cargo cache, no npm install, and it does not look at the version or build the installer.
 
-`release` runs on a master push and on `workflow_dispatch`, on `windows-latest`, with `contents: write`. It checks out, sets up Node and a stable Rust toolchain, restores the cargo cache keyed to `src-tauri` (without it every release rebuilds the entire dependency tree), runs `npm install`, and hands the rest to the Tauri release action. That action builds the installer, signs the update artifact, writes `latest.json`, creates the GitHub release, and uploads everything to it.
+`release` runs on a master push and on `workflow_dispatch`, on `windows-latest`, with `contents: write`. It checks out, sets up Node with the npm cache, installs a stable Rust toolchain, restores the cargo cache keyed to `src-tauri` (without it every release rebuilds the entire dependency tree), runs `npm ci`, and hands the rest to the Tauri release action. That action builds the installer, signs the update artifact, writes `latest.json`, creates the GitHub release, and uploads everything to it.
 
 The release job does not run the tests. `verify` is the only place they run, so a direct push to master ships without them.
 
@@ -97,7 +99,9 @@ The installer lands under `src-tauri/target/release/bundle/`. It is not cross co
 
 ## Updater keys, one time
 
-The updater verifies a signature before it installs anything. The public half lives in `tauri.conf.json` and ships inside the app; the private half signs the artifact in CI. Right now `tauri.conf.json` still holds the placeholder `REPLACE_WITH_MINISIGN_PUBLIC_KEY`, so no release yet produces a working update. Do this once.
+The updater verifies a signature before it installs anything. The public half lives in `tauri.conf.json` and ships inside the app; the private half signs the artifact in CI. This has been done, so the steps below are the record of how, and what to repeat if the key is ever rotated.
+
+Note that this key is not a code signing certificate. It proves an update came from this repository; it does nothing about the SmartScreen warning, which needs a certificate bought from a certificate authority and is a separate decision.
 
 1. Generate the key pair, from `workspace/`. It asks for a password and prints the public key.
 
@@ -105,7 +109,7 @@ The updater verifies a signature before it installs anything. The public half li
    npm run tauri -- signer generate -w ~/.tauri/akbun-folderview.key
    ```
 
-2. Paste the printed public key into `tauri.conf.json` under `plugins.updater.pubkey`, replacing the placeholder, and commit it. A public key belongs in the repository.
+2. Put the printed public key into `tauri.conf.json` under `plugins.updater.pubkey` and commit it. A public key belongs in the repository.
 
 3. Add two repository secrets. The first is the whole contents of the private key file, the second is the password from step 1.
 
@@ -123,7 +127,7 @@ Without those two secrets the build still succeeds and the release still appears
 ## Caveats
 
 - The build is unsigned. Windows warns before running an executable it does not recognise, and a user who does not know to choose "More info" and then "Run anyway" will conclude the download is broken. The release notes say so for that reason. A certificate costs money every year, so this stays until somebody buys one.
-- The updater public key in `tauri.conf.json` is still the placeholder. Until it is replaced and the matching secrets are set, Check for Updates has nothing to verify against and no installed copy can update itself. Everything else about the release works, which is what makes this easy to miss.
+- The updater key and the code signing certificate are different things, and only the first exists here. Updates are verified; the first-run SmartScreen warning is not addressed by it.
 - The installer is per user (`installMode: currentUser`). It installs into the user folder, never asks for administrator rights, and that is also what lets an update install without an elevation prompt. The other side of it: each account on a machine has its own copy and its own library file.
 - Delete moves the file to the Recycle Bin rather than unlinking it, so a mis-click is recoverable outside this app. That call fails on some network drives and on some removable media. The error is shown and nothing is deleted; there is deliberately no fallback to a permanent delete.
 - Copy puts the file path on the clipboard, not the file. Placing a file on the clipboard so a file browser can paste it needs a clipboard format that is out of reach here, and was out of reach in the previous implementation too. Show in Folder covers the case where the file itself was what was wanted.

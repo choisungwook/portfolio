@@ -10,7 +10,7 @@ The Rust side is `workspace/src-tauri/src/`:
 
 - `lib.rs`: the builder. Registers the plugins, opens the devtools in a debug build, loads the settings and the library, re-applies the asset protocol grants, puts both into `AppState`, and lists every command in `generate_handler!`.
 - `commands.rs`: every command the page can invoke, plus `AppState`, the `Snapshot` returned to the page, and the two grant helpers `allow_asset_dir` and `allow_asset_file`.
-- `library.rs`: the model. `Entry`, `Root`, `Library`, `Settings`, and the functions `file_kind`, `make_entry`, `scan_folder`, `merge_scan`, `is_under`. No Tauri types, so the Rust suite, `npm run test:rust`, needs no webview.
+- `crates/library/`: the model, its own crate with no tauri dependency. `Entry`, `Root`, `Library`, `Settings`, and the functions `file_kind`, `make_entry`, `scan_folder`, `merge_scan`, `is_under`. No Tauri types, so the Rust suite, `npm run test:rust`, needs no webview.
 - `store.rs`: `library.json` and `settings.json` under the app config directory.
 
 The page is `workspace/src/`:
@@ -25,7 +25,7 @@ The split follows one rule. A blocking native dialog inside a command is a threa
 
 ## The library model
 
-`library.rs` serialises an entry in camelCase, and those field names are what the page reads. Renaming one in Rust breaks the renderer silently, which is why `test/library.test.js` writes the shape out by hand instead of building it from a helper.
+The model crate serialises an entry in camelCase, and those field names are what the page reads. Renaming one in Rust breaks the renderer silently, which is why `test/library.test.js` writes the shape out by hand instead of building it from a helper.
 
 The object the page receives for one photo or video:
 
@@ -176,6 +176,6 @@ Three things about this flow are worth knowing before touching it.
 
 Forgetting to bump the version fails nothing. The pull request job only runs tests. On master, `tauri-action` finds the existing release and republishes over it, and at runtime `check()` returns null because the version did not change. It is silent in both directions, so bump the version in the same commit that changes anything under `workspace/`, and check the master run rather than trusting the green pull request.
 
-The updater verifies a signature before it installs. The public half of the key pair goes in `tauri.conf.json` under `plugins.updater.pubkey`, the private half in the `TAURI_SIGNING_PRIVATE_KEY` secret. At the time of writing the pubkey is still `REPLACE_WITH_MINISIGN_PUBLIC_KEY`, so the release produces no working updater until it is filled in. Losing the private key means never being able to update installed users again; there is no recovery, because an installed app only trusts the key it shipped with.
+The updater verifies a signature before it installs. The public half of the key pair goes in `tauri.conf.json` under `plugins.updater.pubkey`, the private half in the `TAURI_SIGNING_PRIVATE_KEY` secret. Losing the private key means never being able to update installed users again; there is no recovery, because an installed app only trusts the key it shipped with.
 
 The installer is per user (`installMode: currentUser`), so it needs no administrator rights and shows no elevation prompt, which is also what lets the update install without one. The build is unsigned, so Windows warns the first time it runs.

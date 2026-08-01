@@ -8,7 +8,7 @@
   "scripts": {
     "start": "tauri dev",
     "test": "node --test test/*.test.js",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p folderview-library",
     "dist": "tauri build",
     "tauri": "tauri"
   },

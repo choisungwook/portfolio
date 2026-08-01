@@ -1,31 +1,40 @@
-# Tauri 데스크톱 앱 규칙
+# Tauri desktop app rules
 
-`product/`에 데스크톱 앱을 만들 때의 기본 스택이다. 디렉터리와 인덱스 규칙은 [product.md](./product.md)를 따른다. Tauri로 만들 수 없는 경우에만 [electron.md](./electron.md)로 간다.
+The default stack for a desktop app under `product/`. Directory and index rules follow [product.md](./product.md). Go to [electron.md](./electron.md) only when Tauri cannot do the job.
 
-여기 적힌 것은 대부분 실제로 한 번 밟은 지뢰다. 문서를 읽어서 알게 된 것이 아니라 앱을 띄워 보고 알게 된 것이므로, 확인 없이 지우지 않는다.
+Most of what follows is a mine that was actually stepped on. It was learned by running the app, not by reading the documentation, so do not delete a rule here without checking it first.
 
-## 디렉터리 구조
+## Directory layout
 
-빌드 단계를 두지 않는다. 화면이 React를 요구할 만큼 복잡하지 않으면 plain HTML/CSS/JS를 그대로 서빙한다. 그러면 실행되는 소스가 저장소에 있는 소스와 같다.
+No build step. Unless the UI is complex enough to need a framework, serve plain HTML, CSS and JavaScript as they are. Then the source that runs is the source in the repository.
 
 ```text
 workspace/
-  package.json          # version의 단일 출처. @tauri-apps/cli만 devDependency
-  src/                  # 페이지. 번들러 없음
+  package.json          # the only version. @tauri-apps/cli is the only devDependency
+  src/                  # the page, no bundler
   src-tauri/
-    Cargo.toml
+    Cargo.toml          # workspace root
     tauri.conf.json
     capabilities/default.json
-    src/lib.rs          # 플러그인 등록, setup, invoke_handler
-    src/commands.rs     # #[tauri::command] 모음
-  test/                 # node --test. 앱 바이너리 없이 도는 것만 둔다
+    crates/library/     # the pure model, no tauri dependency
+    src/lib.rs          # plugins, setup, invoke_handler
+    src/commands.rs     # the #[tauri::command] surface
+  test/                 # node --test, only things that run without an app binary
 ```
 
-`npm create tauri-app@latest <name> -- --template vanilla --manager npm --yes`로 뼈대를 만들고 거기서 고친다. Cargo.toml의 `[lib] name`에 붙는 `_lib` 접미사와 `crate-type`은 Windows에서 필요하므로 지우지 않는다.
+Scaffold with `npm create tauri-app@latest <name> -- --template vanilla --manager npm --yes` and edit from there. Keep the `_lib` suffix on `[lib] name` and the `crate-type` list; both are needed on Windows.
 
-## 버전
+## Put the pure model in its own crate
 
-버전은 `workspace/package.json`에만 둔다. tauri.conf.json은 값을 복사하지 않고 경로로 가리킨다.
+Anything that does not touch Tauri types goes in `src-tauri/crates/<name>/`, and the app depends on it by path.
+
+This is not tidiness. Cargo builds the dependency graph of whatever package it is asked to test, so a pure module sitting in the app crate drags all of Tauri in with it. On a Linux CI runner that means installing GTK and WebKit development packages to run four unit tests, roughly half a minute of apt on every pull request, and a Rust cache of several hundred megabytes per commit. A repository has a 10 GB cache budget, so those entries evict the caches that are earning their keep.
+
+With the split, `cargo test -p <crate>` compiles only that crate's own dependencies. No system packages, seconds instead of minutes, and a cache small enough to ignore.
+
+## Version
+
+The version lives only in `workspace/package.json`. tauri.conf.json points at it instead of copying the number.
 
 ```json
 {
@@ -33,20 +42,20 @@ workspace/
 }
 ```
 
-Cargo.toml의 `version`은 번들러가 읽지 않는다. cargo가 요구해서 있을 뿐이므로 신경 쓰지 않는다.
+The `version` in Cargo.toml is not read by the bundler. It exists because cargo demands it; do not bump it and do not trust it.
 
-## 무엇을 Rust에 두고 무엇을 페이지에 두는가
+## What goes in Rust and what stays in the page
 
-이 경계를 잘못 잡으면 나중에 전부 옮겨야 하므로 처음에 정한다.
+Getting this boundary wrong means moving everything later, so decide it up front.
 
-- **Rust command**: 파일시스템을 건드리는 모든 것. 스캔, 이름 변경, 휴지통, 저장. 그리고 열기·탐색기에서 보기·클립보드처럼 임의 경로를 다루는 것.
-- **페이지**: 파일 선택 다이얼로그, 확인 창, 컨텍스트 메뉴. 그리고 사용자 입력에 즉시 반응해야 하는 계산.
+- **Rust commands**: everything that touches the file system. Scanning, renaming, trashing, saving. Also opening, revealing and clipboard work on arbitrary paths.
+- **The page**: file pickers, confirmations, the context menu. And anything that has to answer a keystroke immediately.
 
-임의 경로를 다루는 플러그인 호출을 페이지에 두면 webview에 넓은 scope를 열어 줘야 한다. Rust에서 부르면 capability 검사 자체를 지나가므로 scope를 열 필요가 없다. capability는 IPC 경계를 지키는 것이지 Rust API 사용을 막는 것이 아니다.
+Calling a plugin on an arbitrary path from the page means granting the webview a wide scope. Calling it from Rust does not, because capabilities gate the IPC boundary, not Rust API use.
 
-반대로 blocking 네이티브 다이얼로그를 command 안에서 부르지 않는다. 스레드 문제가 생긴다. 페이지에서 경로를 받아 command에 넘긴다.
+The other direction: never call a blocking native dialog inside a command. That is a threading hazard. Let the page collect the path and hand it to a command.
 
-키 입력마다 백엔드에 묻지 않는다. 검색·필터처럼 즉시 반응해야 하는 것은 페이지가 자기 배열을 훑는다. 그 순수 로직은 별도 `.js`로 빼고 `<script>` 태그와 `require` 양쪽으로 로드해 node로 테스트한다.
+Never ask the backend on every keystroke. Search and filtering run in the page over its own array. Keep that pure logic in a separate `.js` and load it both as a `<script>` tag and through `require`, so node can test it.
 
 ```js
 if (typeof module !== 'undefined' && module.exports) {
@@ -56,24 +65,24 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 ```
 
-이때 그 파일의 최상위 이름들이 페이지의 전역이 되므로, 다른 스크립트에서 같은 이름으로 구조 분해하면 `Identifier has already been declared`로 죽는다. 하나의 이름 뒤에 두고 쓴다.
+A script tag makes that file's top level names globals on the page, so destructuring them in another script fails with `Identifier has already been declared`. Keep the exports behind one name.
 
-## 상태 갱신
+## Returning state
 
-변경을 일으키는 command는 전부 갱신된 전체 상태를 반환하게 한다. 페이지는 그것을 그대로 받아 다시 그린다. 부분 갱신을 페이지가 병합하기 시작하면 두 벌의 상태가 어긋나는 버그가 생긴다.
+Have every mutating command return the whole updated state, and let the page redraw from it. Once the page starts merging partial updates, the two copies drift apart and the bugs that follow are hard to see.
 
-## asset protocol
+## Asset protocol
 
-로컬 파일을 `<img>`나 `<video>`에 띄우려면 네 가지가 모두 맞아야 한다. 하나라도 빠지면 에러 없이 깨진 이미지만 나온다.
+Four things must line up to show a local file in an `<img>` or `<video>`. Miss one and you get a broken image with no error.
 
-1. Cargo feature에 `protocol-asset`을 넣는다. 없으면 `asset_protocol_scope()`가 아예 없다.
-2. tauri.conf.json에서 `app.security.assetProtocol.enable`을 `true`로 둔다.
-3. 경로를 `convertFileSrc()`로 바꿔서 쓴다. `file://`은 로드되지 않는다.
-4. CSP에 `img-src`와 `media-src`를 **둘 다** 적는다. Tauri가 대신 넣어 주지 않는다.
+1. Add `protocol-asset` to the tauri Cargo features. Without it `asset_protocol_scope()` does not exist.
+2. Set `app.security.assetProtocol.enable` to `true`.
+3. Convert paths with `convertFileSrc()`. `file://` will not load.
+4. Name **both** `img-src` and `media-src` in the CSP. Tauri does not add them for you.
 
-`media-src`를 빠뜨리는 것이 가장 흔한 실수다. 공식 예제가 `img-src`만 보여 주는데, `<video>`와 `<audio>`는 `media-src`가 관장하므로 이미지만 나오고 동영상은 차단된다.
+Forgetting `media-src` is the easy mistake. The official example shows only `img-src`, and `<video>` and `<audio>` are governed by `media-src`, so images appear and video is blocked.
 
-CSP는 플랫폼마다 URL이 달라서 둘 다 적는다. Windows는 `http://asset.localhost/...`, macOS와 Linux는 `asset://localhost/...`이다.
+The URL differs by platform, so list both forms: Windows uses `http://asset.localhost/...`, macOS and Linux use `asset://localhost/...`.
 
 ```json
 {
@@ -81,26 +90,26 @@ CSP는 플랫폼마다 URL이 달라서 둘 다 적는다. Windows는 `http://as
 }
 ```
 
-### scope는 설정이 아니라 런타임에서 연다
+### Grant the scope at runtime, not in the config
 
-**설정의 `scope`에 `"**"`를 적어도 절대 경로에는 매치되지 않는다.** 사용자가 고른 폴더를 다루는 앱이라면 설정으로는 표현할 수 없다. 설정 scope는 `[]`로 두고 폴더가 추가될 때 Rust에서 연다.
+**A `"**"` in the config scope does not match absolute paths.** An app that opens folders the user chooses cannot express its scope in configuration at all. Leave the config scope as `[]` and grant each folder from Rust as it is added.
 
 ```rust
 app.asset_protocol_scope().allow_directory(path, true);
 app.asset_protocol_scope().allow_file(path);
 ```
 
-이 허용은 메모리에만 있다. 앱을 다시 켜면 사라지므로 `setup`에서 저장된 목록을 보고 다시 열어 준다. 안 하면 재시작 후 썸네일이 전부 깨진다. `tauri-plugin-persisted-scope`를 쓰는 방법도 있지만, 어차피 저장된 목록이 있으면 의존성 하나를 안 늘리는 쪽이 낫다.
+The grant is in memory only. It is gone on restart, so re-apply it in `setup` from whatever list was persisted, or every thumbnail is broken the second time the app opens. `tauri-plugin-persisted-scope` also solves this, but if the list is already stored there is no reason to add a dependency.
 
-디스크 전체나 홈 전체를 여는 것보다 추가된 폴더만 여는 쪽이 좁다. 이것이 설정보다 런타임이 나은 이유이기도 하다.
+Granting only what was added is narrower than granting the whole disk or the whole home directory, which is a second reason to prefer the runtime call.
 
-동영상 첫 프레임은 `preload="metadata"`와 `#t=0.5`로 얻는다. asset protocol이 Range 요청에 응답하고 `<video>`는 항상 Range를 보내므로 동작한다.
+For a video poster frame, use `preload="metadata"` with a `#t=0.5` fragment. It works because the asset protocol answers Range requests and a video element always sends one.
 
-## 테마
+## Theme
 
-[electron.md](./electron.md)의 CSS 규칙을 그대로 따른다. light를 기본으로 두고 `@media (prefers-color-scheme: dark)`로 덮는다.
+Follow the CSS rules in [electron.md](./electron.md): light as the base, overridden by `@media (prefers-color-scheme: dark)`.
 
-Tauri에서 추가로 지킬 것은 하나다. 사용자가 "시스템 따름"을 골랐으면 창 테마를 **설정하지 않는다**. `None`으로 둬야 webview 안의 `prefers-color-scheme`이 OS를 계속 따라간다. 값을 박으면 그 순간부터 OS 변경을 무시한다.
+One extra rule here. When the user has chosen to follow the system, do **not** set a window theme. Leaving it `None` is what keeps `prefers-color-scheme` inside the webview tracking the OS. Pinning a value makes the window ignore OS changes from then on.
 
 ```rust
 let wanted = match theme {
@@ -111,17 +120,17 @@ let wanted = match theme {
 window.set_theme(wanted);
 ```
 
-창에 `backgroundColor`를 지정해 기동 시 흰 화면 깜빡임을 막는다.
+Set `backgroundColor` on the window so it does not flash white on start.
 
-## capability
+## Capabilities
 
-`capabilities/default.json`에 빠진 권한은 **컴파일이 아니라 런타임에** 실패한다. CI는 초록불이고 사용자 기계에서 깨진다. 그래서 목록은 짧게 유지하고, 페이지에서 실제로 부르는 플러그인 명령만 적는다.
+A permission missing from `capabilities/default.json` fails **at runtime, not at compile time**. CI is green and the user's machine is broken. Keep the list short and list only the plugin commands the page actually calls.
 
-파일시스템 작업을 Rust command로 옮기면 그만큼 이 목록이 짧아진다. 그것이 위의 경계를 그렇게 잡는 또 하나의 이유다.
+Moving file system work into Rust commands shortens this list, which is another reason for the boundary above.
 
-## 디버깅
+## Debugging
 
-`setup`에서 debug 빌드일 때 devtools를 연다. 창이 앱의 전부이므로 대부분의 버그가 여기서 먼저 보인다.
+Open the devtools from `setup` in a debug build. The window is the whole app, so most bugs surface there first.
 
 ```rust
 #[cfg(debug_assertions)]
@@ -130,35 +139,37 @@ if let Some(window) = app.get_webview_window("main") {
 }
 ```
 
-## 업데이트
+## Updates
 
-공식 updater 플러그인을 쓴다. 직접 만들지 않는다.
+Use the official updater plugin. Do not hand-roll one.
 
-- `bundle.createUpdaterArtifacts`를 `true`로 둔다. 기본값이 `false`라 그냥 두면 `.sig`가 안 만들어지고, tauri-action이 latest.json 업로드를 **조용히** 건너뛴다. 릴리스는 멀쩡해 보이는데 아무도 업데이트를 못 받는다.
-- `createUpdaterArtifacts: true`인데 `plugins.updater` 블록이 없으면 CLI가 에러로 죽는다. 둘은 같이 간다.
-- `pubkey`에는 키 **내용**을 넣는다. 파일 경로가 아니다.
-- endpoint는 HTTPS여야 한다. dev에서는 경고만 하고 릴리스 빌드에서 에러가 나므로, `tauri dev`에서 됐다고 안심하지 않는다.
-- 서명 개인키는 `TAURI_SIGNING_PRIVATE_KEY` 환경변수로 넘긴다. `.env` 파일은 동작하지 않는다.
-- **개인키를 잃어버리면 이미 설치된 사용자에게 영원히 업데이트를 못 보낸다.** 복구 경로가 없다. GitHub secret 말고 다른 곳에도 백업한다.
-- Windows에서는 설치 파일을 띄운 뒤 플러그인이 앱을 스스로 종료한다. `downloadAndInstall()` 다음의 `relaunch()`는 Windows에서 실행되지 않는다.
+- Set `bundle.createUpdaterArtifacts` to `true`. It defaults to `false`, and leaving it produces no `.sig` file, after which tauri-action **silently** skips uploading latest.json. The release looks fine and nobody can update.
+- `createUpdaterArtifacts: true` without a `plugins.updater` block is a hard CLI error. The two go together.
+- `pubkey` takes the key **contents**, not a file path.
+- The endpoint must be HTTPS. Dev only warns and the release build errors, so passing under `tauri dev` proves nothing.
+- Pass the private key through `TAURI_SIGNING_PRIVATE_KEY`. `.env` files do not work.
+- **Losing the private key means never updating installed users again.** There is no recovery path: their copy rejects a new key's signature. Back it up somewhere other than a GitHub secret, which cannot be read back.
+- On Windows the plugin exits the app after launching the installer, so a `relaunch()` after `downloadAndInstall()` never runs there.
 
-## 릴리스 workflow
+The updater signing key is not a code signing certificate. It proves an update came from you; it does nothing about SmartScreen, which needs a CA-issued certificate and is a separate purchase.
 
-`tauri-apps/tauri-action`을 쓴다. 최신 stable major를 확인해서 적고 오래된 핀을 복사하지 않는다.
+## Release workflow
 
-- tauri-action이 release를 만들고, **tag는 GitHub이 release를 만들면서 함께 만든다.** workflow에 `git tag` 단계를 두지 않는다.
-- `releaseDraft`를 `true`로 두지 않는다. draft면 `releases/latest/download/latest.json`이 404라서 업데이트가 아무에게도 안 간다.
-- NSIS만 빌드해도 `updaterJsonPreferNsis: true`를 적는다. 기본값이 msi 우선이다.
-- Windows 설치 파일은 `installMode: "currentUser"`로 만든다. 관리자 권한이 필요 없고, 그래야 업데이트가 UAC 없이 조용히 돈다.
-- `swatinem/rust-cache`로 `src-tauri`를 캐시한다. 안 하면 릴리스마다 의존성을 전부 다시 빌드한다.
-- PR job은 테스트만 돌린다. 순수 로직 테스트는 webkit2gtk 같은 시스템 의존성이 없어도 ubuntu에서 돈다.
+Use `tauri-apps/tauri-action`. Check the current stable major rather than copying an old pin.
 
-### 버전을 안 올리면 조용히 실패한다
+- The action creates the release, and **GitHub creates the tag as a side effect.** Do not add a `git tag` step.
+- Do not set `releaseDraft: true`. A draft makes `releases/latest/download/latest.json` a 404, so no update reaches anyone.
+- Set `updaterJsonPreferNsis: true` even when only NSIS is built. The default prefers msi.
+- Build the Windows installer with `installMode: "currentUser"`. It needs no administrator rights, which is also what lets updates install without a prompt.
+- Cache `src-tauri` with `swatinem/rust-cache` on the job that builds the app. The pull request job does not need it once the model is a separate crate.
+- The pull request job runs tests only.
 
-[product.md](./product.md)에 적힌 함정이 Tauri에서는 더 조용해진다. electron-builder는 tag 생성에서 빨간불이라도 났지만, tauri-action은 기존 release를 찾아 그 위에 다시 올린다. 빌드도 초록불이고 릴리스도 멀쩡해 보이는데 내용만 예전 버전이다. 런타임에서도 `check()`가 그냥 `null`을 반환한다.
+### A forgotten version bump fails silently
 
-그래서 `workspace/`를 건드린 PR을 머지한 뒤에는 `gh release list`로 새 버전이 실제로 올라갔는지 눈으로 확인한다.
+The trap in [product.md](./product.md) gets quieter with Tauri. electron-builder at least went red at the tag step; tauri-action finds the existing release and republishes over it. The build is green, the release looks right, and the contents are the old version. At runtime `check()` simply returns null.
 
-## 서명과 SmartScreen
+So after merging a PR that touched `workspace/`, confirm with `gh release list` that the new version actually shipped.
 
-코드 서명이 없으면 Windows SmartScreen이 첫 실행에서 경고한다. 릴리스 노트에 "추가 정보"를 누르고 "실행"을 선택하라는 안내를 넣는다. macOS의 `xattr -cr` 안내와 같은 자리다.
+## Signing and SmartScreen
+
+Without code signing, Windows SmartScreen warns on first run. Put the "More info" then "Run anyway" instruction in the release notes. It occupies the same place as the `xattr -cr` note for macOS.

@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - master
-    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-folderview/**'
   pull_request:
-    # workflow 파일만 바뀐 경우는 빌드할 이유가 없으므로 트리거에서 뺀다.
     paths:
       - 'product/akbun-folderview/**'
   workflow_dispatch:
@@ -21,8 +19,6 @@ defaults:
     working-directory: product/akbun-folderview/workspace
 
 jobs:
-  # PR 검증용. 앱 바이너리 없이 두 테스트 스위트만 확인한다.
-  # 검색과 트리는 node로, 스캔과 rescan merge는 cargo로 돈다.
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -36,26 +32,12 @@ jobs:
       - name: Run page tests
         run: npm test
 
-      # library.rs 자체는 tauri를 쓰지 않지만 같은 crate에 있어서 cargo가
-      # tauri까지 빌드한다. 그래서 순수 로직 테스트인데도 리눅스 시스템
-      # 의존성이 필요하다. 대신 이 job이 Rust 컴파일 검증도 겸하게 된다.
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-        working-directory: .
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: product/akbun-folderview/workspace/src-tauri
-
+      # folderview-library depends on neither tauri nor a webview, so -p keeps
+      # this to serde and walkdir. Testing the app crate instead would need GTK
+      # and WebKit installed on the runner.
       - name: Run library tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p folderview-library
 
-  # Windows 전용 빌드. tauri-action이 NSIS 설치 파일과 서명, latest.json까지
-  # 만들고 release를 생성한다. tag는 git tag가 아니라 release를 만들 때
-  # GitHub이 함께 만든다.
   release:
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
@@ -67,36 +49,35 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-folderview/workspace/package-lock.json
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # target 디렉터리를 캐시하지 않으면 매 릴리스마다 의존성을 다시 빌드한다.
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: product/akbun-folderview/workspace/src-tauri
 
-      # lock 파일을 커밋하므로 npm ci로 고정된 버전을 설치한다. Cargo.lock과
-      # 같은 이유다. 릴리스가 재현 가능해야 한다.
       - name: Install dependencies
         run: npm ci
 
       - uses: tauri-apps/tauri-action@action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 업데이터가 설치 전에 검증하는 서명이다. 이 두 값이 없으면
-          # .sig 파일이 안 만들어지고, tauri-action은 latest.json 업로드를
-          # 조용히 건너뛴다. release는 초록불인데 업데이트만 안 된다.
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: product/akbun-folderview/workspace
           tagName: akbun-folderview-v__VERSION__
           releaseName: akbun-folderview-v__VERSION__
-          # draft로 두면 releases/latest/download/latest.json이 404가 되어
-          # 아무도 업데이트를 못 받는다. 릴리스는 바로 공개한다.
+          # A draft is not reachable at releases/latest/download/latest.json,
+          # so every installed copy would get a 404 on its update check.
           releaseDraft: false
           prerelease: false
-          # NSIS만 빌드하지만 기본값이 msi 우선이라 명시한다.
+          # Only NSIS is built, but latest.json prefers msi by default.
           updaterJsonPreferNsis: true
           releaseBody: |
             직접 추가한 사진과 영상만 모아 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱이다.

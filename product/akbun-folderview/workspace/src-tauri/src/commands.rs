@@ -6,7 +6,7 @@
 // happens here, because the user's photos live anywhere on the disk and the
 // alternative would be granting the webview an unrestricted open-path scope.
 
-use crate::library::{self, Entry, Library, Root, Settings};
+use folderview_library::{self as library, Entry, Library, Root, Settings};
 use crate::store;
 use serde::Serialize;
 use std::path::{Path, PathBuf};

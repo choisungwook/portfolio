@@ -1,5 +1,5 @@
 mod commands;
-mod library;
+
 mod store;
 
 use commands::AppState;

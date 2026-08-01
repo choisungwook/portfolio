@@ -5,7 +5,7 @@
 // normal user, so a write there fails or lands in a per-user shadow copy the
 // app cannot find again. See adr/2026-08-settings-in-appdata.md.
 
-use crate::library::{Library, Settings};
+use folderview_library::{Library, Settings};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 

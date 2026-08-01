@@ -1,0 +1,17 @@
+[package]
+name = "folderview-library"
+version = "0.1.0"
+description = "The photo and video library model: entries, scanning, and the rescan merge"
+edition = "2021"
+license = "MIT"
+
+# Deliberately depends on neither tauri nor anything that needs a webview.
+# That is what lets the pull request job test this on Linux in seconds without
+# installing GTK and WebKit development packages.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+walkdir = "2"
+
+[dev-dependencies]
+serde_json = "1"
