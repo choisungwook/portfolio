@@ -27,13 +27,18 @@
         <section class="panel">
           <header class="panel-head">
             <h2>Catalog</h2>
-            <div class="panel-actions">
-              <button id="rescan" title="Look for new and removed files">Rescan</button>
-              <button id="open-settings" title="Settings and updates">Settings</button>
-            </div>
           </header>
           <div class="panel-body" id="catalog"></div>
         </section>
+
+        <!-- App-wide actions, pinned so a long catalog cannot push them away.
+             Rescan and Refresh Thumbs are deliberately two buttons: one walks
+             the disk for file changes, the other rebuilds the thumbnail cache. -->
+        <footer class="sidebar-foot">
+          <button id="rescan" title="Walk the added folders for new and removed files">Rescan Disk</button>
+          <button id="refresh-thumbs" title="Throw away cached thumbnails and rebuild them">Refresh Thumbs</button>
+          <button id="open-settings" title="Settings and updates">Settings</button>
+        </footer>
       </aside>
 
       <main class="main">
@@ -52,6 +57,10 @@
             <button data-token="type:video">Videos</button>
             <button data-token="fav">Favorites</button>
             <button data-token="rating:>=4">4 stars and up</button>
+          </div>
+          <div class="filters" id="views">
+            <button id="view-grid" title="Thumbnail cards">Grid</button>
+            <button id="view-list" title="Details like the file explorer">List</button>
           </div>
         </div>
 
@@ -92,6 +101,9 @@
         </label>
         <label class="inline">
           <input id="set-single-click" type="checkbox" /> Open a file with a single click
+        </label>
+        <label class="inline">
+          <input id="set-video-thumbs" type="checkbox" /> Show video thumbnails
         </label>
         <label>Card size<input id="set-card-size" type="range" min="120" max="320" step="20" /></label>
         <dl class="facts">

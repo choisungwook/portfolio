@@ -127,20 +127,20 @@ pub fn allow_asset_dir(app: &AppHandle, path: &str) {
 The CSP has to name both `img-src` and `media-src` for the asset protocol. Tauri does not add them, and with `img-src` alone every video thumbnail is blocked. The policy in `tauri.conf.json`:
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: http://asset.localhost https://asset.localhost data:; media-src 'self' asset: http://asset.localhost https://asset.localhost
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost https://asset.localhost
 ```
 
-Both schemes are listed because the URL `convertFileSrc` produces differs by platform.
+Both schemes are listed because the URL `convertFileSrc` produces differs by platform. `blob:` in `img-src` is for a freshly generated thumbnail, which is shown from the blob that was just drawn rather than re-requested from the cache URL the browser has already remembered a 404 for. `media-src` stays even though the grid no longer holds `<video>` elements, because thumbnail generation still reads the video through one.
 
 ## Thumbnails
 
-A photo is an `<img loading="lazy">` pointed at the asset URL. A video is a `<video>` with `preload="metadata"` and a `#t=0.5` fragment:
+A card is an `<img loading="lazy">` pointed at a cached thumbnail under the app config directory (`thumbs/`), not at the original file. That is what keeps a start from touching the added folders' disk at all: the first version pointed every card at the original, and two hundred concurrent reads against a spinning external drive froze the first paint.
 
-```html
-<video src="asset://.../clip.mp4#t=0.5" preload="metadata" muted></video>
-```
+The cache fills lazily in the page. When a card's thumbnail is missing the `<img>` fires `onerror`, the original is read once through the asset protocol, drawn small on a canvas, and the JPEG bytes go to the `save_thumb` command. Rust needs no image library this way, and the formats that thumbnail are exactly the formats the webview can display. For a video the frame at `0.5s` is drawn from a `<video>` element, and Settings can turn video thumbnails off entirely, because a poster frame costs a read of the video file itself. `loading="lazy"` means only cards near the viewport fire `onerror`, and the queue runs two reads at a time so a slow disk stays responsive.
 
-The engine seeks to that second and paints the frame, which is a poster image without decoding the file ourselves. It works because the asset protocol answers Range requests and a video element always sends one; `preload="metadata"` then pulls the header and just enough around the seek point instead of the whole file.
+The thumbnail file name is an FNV-1a hash of path, mtime and size (`thumbName` in `library.js`), so an edited file gets a fresh thumbnail and the stale one is simply never asked for again. A read that fails — the drive is unplugged — is remembered for the session and the card shows "no preview" instead of retrying on every render.
+
+Refresh Thumbs in the sidebar is deliberately a separate button from Rescan Disk: Rescan walks the roots for new and removed files, Refresh throws the `thumbs/` folder away (`clear_thumbs`) so thumbnails rebuild from the originals. Dropping the whole folder is also what cleans up thumbnails orphaned by renames and deletes.
 
 File names are escaped before they reach `innerHTML`. A name is data from the disk, and without escaping a file called `<img onerror=...>.jpg` would run its own script inside the window.
 

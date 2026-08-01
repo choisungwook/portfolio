@@ -144,6 +144,21 @@ window.api = {
     await menu.popup();
   },
 
+  // The page draws the thumbnail on a canvas and hands the JPEG bytes over.
+  saveThumb: (name, bytes) => invoke('save_thumb', { name, bytes }),
+
+  // Distinct from Rescan on purpose: Rescan walks the disk for file changes,
+  // this throws away the cached thumbnails so they are rebuilt from originals.
+  refreshThumbs: async () => {
+    const confirmed = await ask(
+      'Throw away all cached thumbnails and rebuild them from the original files?\n\nThe originals must be reachable to rebuild.',
+      { title: 'Refresh Thumbnails' }
+    );
+    if (!confirmed) return false;
+    await invoke('clear_thumbs');
+    return true;
+  },
+
   saveSettings: (settings) => invoke('save_settings', { settings }),
   checkUpdate,
 };

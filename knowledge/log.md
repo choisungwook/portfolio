@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-01
+
+* **Creation**: [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](decisions/2026-08-thumbnails-in-the-webview.md) 결정 기록. akbun-folderview에 썸네일 캐시를 넣어 외장하드 시작 멈춤을 고치면서 남긴다.
+
 ## 2026-07-31
 
 * **Creation**: [PR body 형식의 기준은 pull request template 하나다](decisions/2026-07-pr-body-format-in-template.md) 결정 기록. PR body를 Decisions와 Implementation으로 바꾸면서 형식이 네 파일에 흩어져 있던 문제를 함께 정리한다.

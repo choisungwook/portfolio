@@ -29,6 +29,7 @@ pub struct Snapshot {
     pub settings: Settings,
     pub version: String,
     pub data_dir: String,
+    pub thumbs_dir: String,
 }
 
 /// Let the webview read this folder through the asset protocol.
@@ -55,6 +56,9 @@ fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
         settings: state.settings.lock().unwrap().clone(),
         version: app.package_info().version.to_string(),
         data_dir: store::data_dir(app),
+        thumbs_dir: store::thumbs_dir(app)
+            .map(|dir| dir.to_string_lossy().to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -280,6 +284,29 @@ pub fn open_data_dir(app: AppHandle) -> Result<(), String> {
     app.opener()
         .open_path(dir, None::<&str>)
         .map_err(|error| error.to_string())
+}
+
+/// The page generates thumbnails with its own codecs and hands the JPEG bytes
+/// here, so Rust needs no image library and the formats that display are
+/// exactly the formats that thumbnail.
+#[tauri::command]
+pub fn save_thumb(app: AppHandle, name: String, bytes: Vec<u8>) -> Result<(), String> {
+    // The name is computed in the page. Reject anything that could step out
+    // of the thumbs folder.
+    if name.is_empty() || name.contains(['/', '\\']) || name.contains("..") {
+        return Err("bad thumbnail name".into());
+    }
+    let dir = store::thumbs_dir(&app)?;
+    std::fs::write(dir.join(&name), bytes).map_err(|error| error.to_string())
+}
+
+/// Refresh Thumbnails in the page. Dropping the whole folder is also what
+/// cleans up thumbnails orphaned by renames and deletes.
+#[tauri::command]
+pub fn clear_thumbs(app: AppHandle) -> Result<(), String> {
+    let dir = store::thumbs_dir(&app)?;
+    std::fs::remove_dir_all(&dir).map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

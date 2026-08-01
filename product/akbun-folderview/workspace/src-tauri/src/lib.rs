@@ -59,6 +59,11 @@ pub fn run() {
             for entry in &library.entries {
                 commands::allow_asset_file(handle, &entry.path);
             }
+            // The grid reads cached thumbnails instead of the originals, so
+            // this local folder is the only thing a normal start touches.
+            if let Ok(thumbs) = store::thumbs_dir(handle) {
+                commands::allow_asset_dir(handle, &thumbs.to_string_lossy());
+            }
 
             app.manage(AppState {
                 library: Mutex::new(library),
@@ -80,6 +85,8 @@ pub fn run() {
             commands::copy_path,
             commands::open_data_dir,
             commands::save_settings,
+            commands::save_thumb,
+            commands::clear_thumbs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

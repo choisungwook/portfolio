@@ -18,6 +18,7 @@ const {
   ratingCounts,
   searchEntries,
   tagCounts,
+  thumbName,
 } = require('../src/library');
 
 // The shape Rust serialises. Written out here rather than built by a helper
@@ -136,6 +137,16 @@ test('tag counts are ordered by use', () => {
     { tag: 'summer', count: 2 },
   ]);
   assert.deepStrictEqual(ratingCounts(LIBRARY), [1, 0, 0, 1, 1, 1]);
+});
+
+// The name is the cache key: stable for the same file, different the moment
+// the file changes, safe to hand to the file system.
+test('thumbName is stable and changes with the file', () => {
+  const name = thumbName('C:\\photos\\여행\\a.jpg', 100, 5);
+  assert.strictEqual(name, thumbName('C:\\photos\\여행\\a.jpg', 100, 5));
+  assert.match(name, /^[0-9a-f]{16}\.jpg$/);
+  assert.notStrictEqual(name, thumbName('C:\\photos\\여행\\a.jpg', 101, 5));
+  assert.notStrictEqual(name, thumbName('C:\\photos\\여행\\b.jpg', 100, 5));
 });
 
 test('formatSize picks the unit', () => {
