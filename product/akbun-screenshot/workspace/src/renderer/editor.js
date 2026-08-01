@@ -1,6 +1,7 @@
 'use strict';
 
-/* global constrain, nextNumber, fillFontSelect, wireFontSelect */
+/* global constrain, nextNumber, hitTest, bounds, moveShape, scaleShape,
+   fillFontSelect, wireFontSelect */
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -8,6 +9,7 @@ const wrap = document.getElementById('wrap');
 const colorInput = document.getElementById('color');
 const fontSelect = document.getElementById('font');
 const sizeInput = document.getElementById('size');
+const strokeInput = document.getElementById('stroke');
 
 // The whole document is the undo history: undo moves the last shape into
 // `undone`, redo moves it back. Nothing else is stored, so redrawing from the
@@ -15,8 +17,13 @@ const sizeInput = document.getElementById('size');
 const shapes = [];
 const undone = [];
 
-let tool = 'rect';
+let tool = 'select';
 let draft = null;
+
+// Select mode. `selected` is the shape the outline is drawn around, `dragFrom`
+// the last mouse position while it is being pushed around.
+let selected = null;
+let dragFrom = null;
 
 // Image pixels per css pixel. The png from a retina display is twice the size
 // it is shown at, so a 3px stroke would come out half as thick as it looks.
@@ -28,12 +35,19 @@ window.api.editorImage().then((dataUrl) => {
   image.src = dataUrl;
 });
 
+// Both boxes are in image pixels, so what is typed is what is drawn. The
+// defaults are the on screen 24px and 3px scaled up to match, which is why they
+// are functions of unit rather than constants.
+const defaultSize = () => Math.round(24 * unit);
+const defaultStroke = () => Math.max(1, Math.round(3 * unit));
+
 image.onload = () => {
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const shown = canvas.getBoundingClientRect().width;
   unit = shown > 0 ? image.naturalWidth / shown : 1;
-  sizeInput.value = Math.round(24 * unit);
+  sizeInput.value = defaultSize();
+  strokeInput.value = defaultStroke();
   redraw();
 };
 
@@ -47,6 +61,20 @@ function redraw() {
   ctx.drawImage(image, 0, 0);
   for (const shape of shapes) drawShape(shape);
   if (draft) drawShape(draft);
+  if (selected) drawSelection(selected);
+}
+
+// Drawn on the canvas rather than as an overlay element, which keeps the one
+// redraw path. Save clears the selection first so the outline is never exported.
+function drawSelection(s) {
+  const b = bounds(s);
+  const pad = 4 * unit;
+  ctx.save();
+  ctx.strokeStyle = '#4da3ff';
+  ctx.lineWidth = Math.max(1, unit);
+  ctx.setLineDash([6 * unit, 4 * unit]);
+  ctx.strokeRect(b.x1 - pad, b.y1 - pad, b.x2 - b.x1 + pad * 2, b.y2 - b.y1 + pad * 2);
+  ctx.restore();
 }
 
 function drawShape(s) {
@@ -70,11 +98,13 @@ function drawShape(s) {
       Math.PI * 2
     );
     ctx.stroke();
-  } else if (s.type === 'line') {
+  } else if (s.type === 'line' || s.type === 'arrow' || s.type === 'arrow2') {
     ctx.beginPath();
     ctx.moveTo(s.x1, s.y1);
     ctx.lineTo(s.x2, s.y2);
     ctx.stroke();
+    if (s.type !== 'line') arrowHead(s.x1, s.y1, s.x2, s.y2, s.width);
+    if (s.type === 'arrow2') arrowHead(s.x2, s.y2, s.x1, s.y1, s.width);
   } else if (s.type === 'text') {
     ctx.font = `${s.size}px "${s.font}"`;
     ctx.textBaseline = 'top';
@@ -93,11 +123,29 @@ function drawShape(s) {
   ctx.restore();
 }
 
+// Filled triangle at (toX, toY) pointing away from (fromX, fromY). Called from
+// inside drawShape, so fillStyle is already the shape's color. The head follows
+// the stroke width, otherwise a thick arrow ends in a pinhead.
+function arrowHead(fromX, fromY, toX, toY, width) {
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const length = width * 4;
+  const spread = Math.PI / 7;
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - length * Math.cos(angle - spread), toY - length * Math.sin(angle - spread));
+  ctx.lineTo(toX - length * Math.cos(angle + spread), toY - length * Math.sin(angle + spread));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// An emptied box falls back to the same value the image load put there, not to
+// a bare 24 and 3. On a retina capture those two numbers are half the intended
+// size, so the fallback has to carry the scale as well.
 function style() {
   return {
     color: colorInput.value,
-    width: Math.max(1, Math.round(3 * unit)),
-    size: Number(sizeInput.value) || 24,
+    width: Math.max(1, Number(strokeInput.value) || defaultStroke()),
+    size: Number(sizeInput.value) || defaultSize(),
     font: fontSelect.value,
   };
 }
@@ -122,11 +170,22 @@ function toImage(event) {
 canvas.addEventListener('mousedown', (event) => {
   const point = toImage(event);
 
+  if (tool === 'select') {
+    // A generous pad, because a thin line is hard to land on exactly.
+    selected = hitTest(shapes, point.x, point.y, 6 * unit);
+    dragFrom = selected ? point : null;
+    redraw();
+    return;
+  }
   if (tool === 'number') {
     push({ type: 'number', x1: point.x, y1: point.y, n: nextNumber(shapes), ...style() });
     return;
   }
   if (tool === 'text') {
+    // The default action of mousedown moves focus off the input we are about to
+    // create, which fires its blur handler and removes it in the same frame.
+    // That is why the text box used to never appear.
+    event.preventDefault();
     askText(event, point);
     return;
   }
@@ -136,8 +195,18 @@ canvas.addEventListener('mousedown', (event) => {
 // On window rather than on the canvas, so a drag that leaves the image still
 // tracks and still finishes.
 window.addEventListener('mousemove', (event) => {
-  if (!draft) return;
   const point = toImage(event);
+
+  // A move is not undoable, undo only covers adding shapes. Recording the start
+  // position on mousedown would fix it if it turns out to matter.
+  if (dragFrom) {
+    moveShape(selected, point.x - dragFrom.x, point.y - dragFrom.y);
+    dragFrom = point;
+    redraw();
+    return;
+  }
+
+  if (!draft) return;
   const end = event.shiftKey
     ? constrain(draft.type, draft.x1, draft.y1, point.x, point.y)
     : point;
@@ -147,6 +216,7 @@ window.addEventListener('mousemove', (event) => {
 });
 
 window.addEventListener('mouseup', () => {
+  dragFrom = null;
   if (!draft) return;
   const shape = draft;
   draft = null;
@@ -181,26 +251,55 @@ function askText(event, point) {
   input.addEventListener('blur', () => input.remove());
 }
 
+// Resizing an existing shape. Two keys rather than a box, since the shape is
+// already selected and one tap per step is faster than typing a number. Two and
+// only two, so the toolbar hint can name every key that does this.
+const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
+
 window.addEventListener('keydown', (event) => {
-  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+    event.preventDefault();
+    const from = event.shiftKey ? undone : shapes;
+    const to = event.shiftKey ? shapes : undone;
+    const shape = from.pop();
+    if (shape) to.push(shape);
+    // The outline would otherwise stay on a shape that is no longer in the list.
+    selected = null;
+    redraw();
+    return;
+  }
+
+  // Otherwise typing a minus into the size box would shrink the selected shape.
+  const typing = event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT';
+  if (!selected || typing) return;
+  if (event.key === 'Escape') {
+    selected = null;
+    redraw();
+    return;
+  }
+  const factor = SCALE_KEYS[event.key];
+  if (!factor) return;
   event.preventDefault();
-  const from = event.shiftKey ? undone : shapes;
-  const to = event.shiftKey ? shapes : undone;
-  const shape = from.pop();
-  if (shape) to.push(shape);
+  scaleShape(selected, factor);
   redraw();
 });
 
 for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => {
     tool = button.dataset.tool;
+    canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    if (tool !== 'select') selected = null;
     for (const other of document.querySelectorAll('[data-tool]')) {
       other.classList.toggle('active', other === button);
     }
+    redraw();
   });
 }
 
 document.getElementById('save').addEventListener('click', () => {
+  // The dashed outline lives on the canvas, so it has to go before the export.
+  selected = null;
+  redraw();
   window.api.saveEditor(canvas.toDataURL('image/png'));
 });
 
