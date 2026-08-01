@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-02
+
+* **Update**: [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](decisions/2026-08-thumbnails-in-the-webview.md)에 canvas taint 지뢰를 추가했다. asset protocol은 다른 origin이라 crossOrigin 없이 그리면 toBlob이 실패하고, 첫 출시 버전의 썸네일 캐시가 이것 때문에 통째로 동작하지 않았다.
+
 ## 2026-08-01
 
 * **Creation**: [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](decisions/2026-08-thumbnails-in-the-webview.md) 결정 기록. akbun-folderview에 썸네일 캐시를 넣어 외장하드 시작 멈춤을 고치면서 남긴다.

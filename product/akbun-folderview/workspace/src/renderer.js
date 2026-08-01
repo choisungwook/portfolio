@@ -83,6 +83,19 @@ function toggleToken(token) {
 // once per library change instead of once per keystroke.
 let derived = null;
 
+// Which folders are open, by path. Selecting a folder calls render(), which
+// rebuilds the tree from scratch; without this map that rebuild would close
+// every folder the user had opened. Roots default open, everything else closed.
+const expandedFolders = new Map();
+
+function folderIcon(open) {
+  return open ? '📂' : '📁';
+}
+
+function fileIcon(entry) {
+  return entry.kind === 'video' ? '🎬' : '🖼️';
+}
+
 function derive() {
   if (!derived) {
     derived = {
@@ -127,6 +140,7 @@ function fileRow(entry) {
 
   const twisty = document.createElement('span');
   twisty.className = 'twisty';
+  twisty.textContent = fileIcon(entry);
   row.append(twisty);
 
   const label = document.createElement('span');
@@ -149,9 +163,10 @@ function folderNode(node, isRoot) {
   if (state.folder === node.path) row.classList.add('selected');
 
   const hasChildren = node.folders.length > 0 || node.files.length > 0;
+  const open = expandedFolders.get(node.path) ?? isRoot;
   const twisty = document.createElement('span');
   twisty.className = 'twisty';
-  twisty.textContent = hasChildren ? (isRoot ? '▾' : '▸') : '';
+  twisty.textContent = folderIcon(open && hasChildren);
   row.append(twisty);
 
   const label = document.createElement('span');
@@ -169,7 +184,7 @@ function folderNode(node, isRoot) {
   // thousands of rows in the page before anyone asked to see them.
   const children = document.createElement('div');
   children.className = 'node';
-  children.hidden = !isRoot;
+  children.hidden = !open;
   let built = false;
   const build = () => {
     if (built) return;
@@ -177,22 +192,27 @@ function folderNode(node, isRoot) {
     for (const child of node.folders) children.append(folderNode(child, false));
     for (const file of node.files) children.append(fileRow(file));
   };
-  if (isRoot) build();
+  if (open) build();
 
   row.addEventListener('click', () => {
-    state.folder = state.folder === node.path ? null : node.path;
+    const selecting = state.folder !== node.path;
+    state.folder = selecting ? node.path : null;
+    // Selecting a folder also opens it, so the first click shows its contents
+    // in both panels instead of appearing to close the tree.
+    if (selecting) expandedFolders.set(node.path, true);
     state.shown = PAGE;
     render();
   });
 
-  // The twisty is the one part of the row that opens the folder instead of
-  // selecting it.
+  // The folder icon is the one part of the row that opens the folder instead
+  // of selecting it.
   twisty.addEventListener('click', (event) => {
     event.stopPropagation();
     if (!hasChildren) return;
     build();
     children.hidden = !children.hidden;
-    twisty.textContent = children.hidden ? '▸' : '▾';
+    expandedFolders.set(node.path, !children.hidden);
+    twisty.textContent = folderIcon(!children.hidden);
   });
 
   // A root folder can be dropped from the library. Its files stay on disk.
@@ -308,6 +328,10 @@ function drawThumb(source, width, height) {
 function loadPhoto(path) {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    // The asset protocol is a different origin from the page. Without a CORS
+    // load the canvas is tainted and toBlob fails, so nothing ever reaches the
+    // cache. Tauri answers with Access-Control-Allow-Origin for exactly this.
+    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error(`cannot read ${path}`));
     image.src = fileUrl(path);
@@ -318,6 +342,9 @@ function loadVideoFrame(path) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.muted = true;
+    // Same as loadPhoto: a non-CORS load taints the canvas and the poster
+    // frame can never be drawn out of it.
+    video.crossOrigin = 'anonymous';
     // metadata is enough: the seek itself pulls the range around the target
     // frame, and auto would read far more of the file than a poster needs.
     video.preload = 'metadata';
@@ -454,14 +481,30 @@ function syncViews() {
 }
 
 function renderGrid() {
-  const matches = visibleEntries();
+  let matches = visibleEntries();
+  // Filter results come from anywhere in the library, so a flat list loses
+  // where each file lives. Sorting by folder and putting a folder header over
+  // each run keeps the tree visible in the results.
+  const grouped = state.query.trim() !== '';
+  if (grouped) {
+    matches = [...matches].sort(
+      (a, b) => a.dir.localeCompare(b.dir) || a.name.localeCompare(b.name)
+    );
+  }
   const page = matches.slice(0, state.shown);
   const listMode = state.settings.view === 'list';
 
   const grid = $('grid');
   grid.textContent = '';
   grid.classList.toggle('list', listMode);
-  for (const entry of page) grid.append(listMode ? listRow(entry) : card(entry));
+  let lastDir = null;
+  for (const entry of page) {
+    if (grouped && entry.dir !== lastDir) {
+      lastDir = entry.dir;
+      grid.append(groupTitle(`📂 ${entry.dir}`));
+    }
+    grid.append(listMode ? listRow(entry) : card(entry));
+  }
   syncViews();
 
   const where = state.folder ? ` in ${state.folder}` : '';
