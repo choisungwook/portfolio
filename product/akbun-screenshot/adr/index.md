@@ -10,4 +10,5 @@ Decision records for akbun-screenshot in "decision - reason" form. Filenames fol
 * [Three explicit preview buttons](2026-07-save-copy-close-buttons.md) - Save writes a file, Copy owns the clipboard, Close keeps nothing, and capture no longer copies on its own.
 * [Annotation editor as one redrawn canvas](2026-07-annotation-editor.md) - The editor keeps a shape list instead of pixels, which is what makes undo and badge renumbering free.
 * [Select mode, moving and resizing](2026-08-select-move-resize.md) - The editor opens on Select, shapes are picked by their box and dragged or scaled about their own centre, and moves stay outside undo.
+* [Corner handles for resizing](2026-08-corner-handles.md) - A selected shape carries grips named by the two coordinate fields they write, arrows lose their round cap and grow a bigger head, and the toolbar boxes say what they drive.
 * [Windows portability](2026-07-windows-portability.md) - Stayed on Electron and kept the app macOS only, since Windows would cost a new capture path, a new updater and an icon.
