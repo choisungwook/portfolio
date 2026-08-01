@@ -75,8 +75,10 @@ jobs:
         with:
           workspaces: product/akbun-folderview/workspace/src-tauri
 
+      # lock 파일을 커밋하므로 npm ci로 고정된 버전을 설치한다. Cargo.lock과
+      # 같은 이유다. 릴리스가 재현 가능해야 한다.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - uses: tauri-apps/tauri-action@action-v1.0.0
         env:

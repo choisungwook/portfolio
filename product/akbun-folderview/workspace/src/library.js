@@ -173,6 +173,7 @@ const exported = {
   baseName,
   buildTree,
   formatSize,
+  isUnder,
   matchesEntry,
   normalizeTag,
   parentPath,

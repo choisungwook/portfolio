@@ -46,7 +46,9 @@ function fileUrl(filePath) {
 
 function visibleEntries() {
   const inFolder = state.folder
-    ? state.entries.filter((entry) => entry.path.startsWith(state.folder))
+    // A plain prefix test would pull in a sibling: selecting C:\photos\trip
+    // would also match C:\photos\trip2. isUnder requires a separator after it.
+    ? state.entries.filter((entry) => lib.isUnder(entry.path, state.folder))
     : state.entries;
   return lib.searchEntries(inFolder, state.query);
 }
@@ -106,7 +108,7 @@ function renderTree() {
 
   // Files added one at a time sit under no root, so the tree would lose them.
   const loose = state.entries.filter(
-    (entry) => !state.roots.some((root) => entry.path.startsWith(root.path))
+    (entry) => !state.roots.some((root) => lib.isUnder(entry.path, root.path))
   );
   if (loose.length > 0) {
     host.append(groupTitle(`Single files (${loose.length})`));
@@ -353,11 +355,14 @@ function openProperties(entry, focusName) {
   $('prop-tags').value = entry.tags.join(', ');
   $('prop-favorite').checked = entry.favorite;
   $('prop-stars').innerHTML = starsHtml(entry.rating);
+  // Escaped for the same reason the card is: a folder named with a tag would
+  // otherwise run its own markup here. kind comes from Rust and is safe today,
+  // but escaping it too costs nothing and removes the need to remember which.
   $('prop-facts').innerHTML = `
-    <dt>Type</dt><dd>${entry.kind ?? 'file'}</dd>
+    <dt>Type</dt><dd>${escapeHtml(entry.kind ?? 'file')}</dd>
     <dt>Size</dt><dd>${lib.formatSize(entry.size)}</dd>
     <dt>Modified</dt><dd>${entry.mtime ? new Date(entry.mtime).toLocaleString() : 'unknown'}</dd>
-    <dt>Location</dt><dd>${entry.dir}</dd>`;
+    <dt>Location</dt><dd>${escapeHtml(entry.dir)}</dd>`;
 
   $('properties').hidden = false;
   if (focusName) $('prop-name').select();

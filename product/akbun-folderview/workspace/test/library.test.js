@@ -12,6 +12,7 @@ const { test } = require('node:test');
 const {
   buildTree,
   formatSize,
+  isUnder,
   normalizeTag,
   parseQuery,
   ratingCounts,
@@ -43,6 +44,18 @@ const LIBRARY = [
   entry('C:\\photos\\clips\\dive.mp4', { rating: 4, tags: ['summer'] }),
   entry('C:\\photos\\notes.jpg'),
 ];
+
+// The page uses this to narrow the grid to a selected folder and to find the
+// files that belong to no root. A plain startsWith would pull in a sibling
+// whose name merely begins the same way, which showed the wrong files in the
+// grid and dropped loose files out of the tree.
+test('isUnder requires a separator, so a sibling prefix does not match', () => {
+  assert.ok(isUnder('C:\\photos\\trip\\a.jpg', 'C:\\photos'));
+  assert.ok(isUnder('/photos/trip/a.jpg', '/photos'));
+  assert.ok(!isUnder('C:\\photos\\trip2\\a.jpg', 'C:\\photos\\trip'));
+  assert.ok(!isUnder('C:\\photos-backup\\a.jpg', 'C:\\photos'));
+  assert.ok(!isUnder('C:\\photos', 'C:\\photos'));
+});
 
 test('normalizeTag folds case and closes the gap that would break tag:', () => {
   assert.strictEqual(normalizeTag('  Beach Trip '), 'beach-trip');
