@@ -103,7 +103,8 @@
       max-height: 100%;
       outline: 2px solid var(--accent);
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-      cursor: crosshair;
+      /* Select is the tool the editor opens on. The tool buttons swap this. */
+      cursor: default;
     }
 
     .text-input {
@@ -122,9 +123,12 @@
   <header>
     <div class="left">
       <div class="group">
-        <button data-tool="rect" class="active">Rect</button>
+        <button data-tool="select" class="active">Select</button>
+        <button data-tool="rect">Rect</button>
         <button data-tool="ellipse">Circle</button>
         <button data-tool="line">Line</button>
+        <button data-tool="arrow">Arrow</button>
+        <button data-tool="arrow2">Arrow &#8596;</button>
         <button data-tool="text">Text</button>
         <button data-tool="number">Number</button>
       </div>
@@ -132,10 +136,13 @@
       <div class="group">
         <input type="color" id="color" value="#ff3b30">
         <select id="font"></select>
+        <label for="size">Size</label>
         <input type="number" id="size" min="8" max="300" value="24">
+        <label for="stroke">Line</label>
+        <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
+      <span class="hint">Select: drag to move, [ ] to resize &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
     </div>
 
     <div class="group actions">
