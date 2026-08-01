@@ -85,6 +85,8 @@ select {
   border-right: 1px solid var(--border);
   background: var(--panel);
   min-height: 0;
+  /* Nothing in the sidebar may paint over the grid, whatever the panels do. */
+  overflow: hidden;
 }
 
 /* Pinned below both panels, so rescan and settings never scroll away. */
@@ -103,6 +105,10 @@ select {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Without this a long file name widens the sidebar's inner track past its
+     260px column and the tree paints over the grid. Held to the column, the
+     wide rows overflow the panel body instead, which scrolls sideways. */
+  min-width: 0;
   border-bottom: 1px solid var(--border);
 }
 
