@@ -269,8 +269,13 @@ function renderShapeSvg(shape, options) {
     }
     case 'image': {
       const b = shapeBBox(shape);
-      // src is a data URL produced by the pptx importer, never user markup.
-      return `<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${shape.src || ''}" preserveAspectRatio="none"/>`;
+      // A deck is a file someone else may have made, so src is untrusted
+      // even though the importer only ever writes data URLs. Anything but
+      // an inline image renders empty rather than letting the markup out or
+      // sending the webview to fetch an address.
+      const src = String(shape.src || '');
+      const href = src.startsWith('data:image/') ? escapeXml(src) : '';
+      return `<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${href}" preserveAspectRatio="none"/>`;
     }
     case 'text': {
       if (hideText) return '';

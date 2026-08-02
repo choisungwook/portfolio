@@ -120,16 +120,42 @@ impl MediaStore {
     }
 }
 
+/// The picture formats that survive a round trip: a webview draws them in
+/// an image element, and pptx readers accept them as a picture part. Both
+/// directions and the content types read this one table, so import can
+/// never accept a format export would silently drop.
+const IMAGE_FORMATS: [(&str, &str); 6] = [
+    ("png", "image/png"),
+    ("jpeg", "image/jpeg"),
+    ("gif", "image/gif"),
+    ("svg", "image/svg+xml"),
+    ("webp", "image/webp"),
+    ("bmp", "image/bmp"),
+];
+
+/// The media part extension for a mime type, e.g. image/png -> png.
+fn ext_for_mime(mime: &str) -> Option<&'static str> {
+    IMAGE_FORMATS
+        .iter()
+        .find(|(_, m)| *m == mime)
+        .map(|(ext, _)| *ext)
+}
+
+/// The mime type for a media part extension. Only .jpg needs an alias;
+/// every other extension is already the table's own spelling.
+fn mime_for_ext(ext: &str) -> Option<&'static str> {
+    let ext = ext.to_ascii_lowercase();
+    let ext = if ext == "jpg" { "jpeg" } else { &ext };
+    IMAGE_FORMATS
+        .iter()
+        .find(|(e, _)| *e == ext)
+        .map(|(_, mime)| *mime)
+}
+
 fn decode_data_url(src: &str) -> Option<(&'static str, Vec<u8>)> {
     let rest = src.strip_prefix("data:")?;
     let (mime, b64) = rest.split_once(";base64,")?;
-    let ext = match mime {
-        "image/png" => "png",
-        "image/jpeg" => "jpeg",
-        "image/gif" => "gif",
-        "image/svg+xml" => "svg",
-        _ => return None,
-    };
+    let ext = ext_for_mime(mime)?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64)
         .ok()?;
@@ -143,15 +169,20 @@ fn content_types(slides: usize) -> String {
             "<Override PartName=\"/ppt/slides/slide{i}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>"
         ));
     }
+    // Every writable picture format needs its extension declared here, or
+    // the package is invalid for readers that check.
+    let mut images = String::new();
+    for (ext, mime) in IMAGE_FORMATS {
+        images.push_str(&format!(
+            "<Default Extension=\"{ext}\" ContentType=\"{mime}\"/>"
+        ));
+    }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
 <Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\
 <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\
 <Default Extension=\"xml\" ContentType=\"application/xml\"/>\
-<Default Extension=\"png\" ContentType=\"image/png\"/>\
-<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>\
-<Default Extension=\"gif\" ContentType=\"image/gif\"/>\
-<Default Extension=\"svg\" ContentType=\"image/svg+xml\"/>\
+{images}\
 <Override PartName=\"/ppt/presentation.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml\"/>\
 <Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml\"/>\
 <Override PartName=\"/ppt/slideLayouts/slideLayout1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml\"/>\
@@ -667,15 +698,7 @@ fn media_data_url<R: Read + Seek>(
     if let Some(url) = cache.get(path) {
         return Some(url.clone());
     }
-    let mime = match path.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "svg" => "image/svg+xml",
-        "webp" => "image/webp",
-        "bmp" => "image/bmp",
-        _ => return None,
-    };
+    let mime = mime_for_ext(path.rsplit('.').next().unwrap_or(""))?;
     let mut bytes = Vec::new();
     archive.by_name(path).ok()?.read_to_end(&mut bytes).ok()?;
     let url = format!(
@@ -1546,6 +1569,32 @@ mod tests {
         ] {
             assert!(archive.by_name(part).is_ok(), "missing {part}");
         }
+    }
+
+    /// Import and export must accept the same formats. When they drifted
+    /// apart, a webp picture imported fine and then vanished on save.
+    #[test]
+    fn every_importable_picture_format_is_writable() {
+        let types = content_types(1);
+        for (ext, mime) in IMAGE_FORMATS {
+            assert_eq!(mime_for_ext(ext), Some(mime), "{ext} not importable");
+            let url = format!("data:{mime};base64,AAAA");
+            assert_eq!(
+                decode_data_url(&url).map(|(e, _)| e),
+                Some(ext),
+                "{mime} imports but does not export"
+            );
+            assert!(
+                types.contains(&format!("Extension=\"{ext}\"")),
+                "{ext} is missing from the content types"
+            );
+        }
+        // .jpg parts are common and map onto the jpeg entry.
+        assert_eq!(mime_for_ext("JPG"), Some("image/jpeg"));
+        // Formats a webview cannot draw stay out of both directions.
+        assert_eq!(mime_for_ext("tiff"), None);
+        assert_eq!(decode_data_url("data:image/tiff;base64,AAAA"), None);
+        assert_eq!(decode_data_url("https://example.com/a.png"), None);
     }
 
     #[test]

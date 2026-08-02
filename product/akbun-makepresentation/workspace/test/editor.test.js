@@ -201,6 +201,18 @@ test('renderShapeSvg draws an imported picture as an image element', () => {
   assert.ok(svg.includes('x="10"') && svg.includes('width="100"'));
 });
 
+test('renderShapeSvg renders only inline images, never a remote or crafted src', () => {
+  const at = (src) => {
+    const svg = L.renderShapeSvg({ kind: 'image', x: 0, y: 0, w: 10, h: 10, src });
+    return svg.match(/href="([^"]*)"/)[1];
+  };
+  assert.equal(at('https://example.com/track.png'), '');
+  assert.equal(at('javascript:alert(1)'), '');
+  assert.equal(at(''), '');
+  // A quote in the value must not be able to close the attribute.
+  assert.equal(at('data:image/png;base64,A"/><script>x</script>'), 'data:image/png;base64,A&quot;/&gt;&lt;script&gt;x&lt;/script&gt;');
+});
+
 test('renderShapeSvg escapes text content', () => {
   const shape = L.createShape('text', 0, 0, {});
   shape.text = 'a <b> & "c"';
