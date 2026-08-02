@@ -28,11 +28,16 @@
       object-fit: contain;
     }
 
+    /* A 2x2 grid rather than one row. Four buttons across a 280px card left
+       each one barely wider than its label, and the row had to be aimed at.
+       The grid is centred as a block, so the buttons stay together instead of
+       spreading to the card's edges. */
     .actions {
       position: absolute;
       inset: 0;
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(2, 88px);
+      align-content: center;
       justify-content: center;
       gap: 8px;
       opacity: 0;

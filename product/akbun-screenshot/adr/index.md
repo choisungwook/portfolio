@@ -13,4 +13,5 @@ Decision records for akbun-screenshot in "decision - reason" form. Filenames fol
 * [Corner handles for resizing](2026-08-corner-handles.md) - A selected shape carries grips named by the two coordinate fields they write, arrows lose their round cap and grow a bigger head, and the toolbar boxes say what they drive.
 * [Delete, crop and a document undo stack](2026-08-delete-crop-undo.md) - Deleting a shape from the middle forced undo to stack whole documents, which carried crop, move and resize in with it, and badges renumber after a delete.
 * [Crop as a box you can reframe](2026-08-crop-box-reframe.md) - The drag leaves a bracketed box instead of cutting on release, and the shape geometry drives it through a named drag target.
+* [Copy in the editor, Cmd+S for save, and a two by two preview](2026-08-editor-copy-and-cmd-s.md) - The editor can end on the clipboard instead of a file, Cmd+S saves wherever the caret is, and the preview's four buttons stop crowding one row.
 * [Windows portability](2026-07-windows-portability.md) - Stayed on Electron and kept the app macOS only, since Windows would cost a new capture path, a new updater and an icon.

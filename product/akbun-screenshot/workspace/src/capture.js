@@ -250,6 +250,20 @@ async function saveEditorAs(webContentsId, dataUrl) {
   return result.filePath;
 }
 
+// Copy in the editor: the annotated canvas onto the clipboard, then the window
+// closes the same way Save does. Nothing is written to disk, so a screenshot
+// that only ever needed to be pasted never leaves a file behind.
+function copyEditor(webContentsId, dataUrl) {
+  const entry = editors.get(webContentsId);
+  if (!entry) return false;
+  const png = decodePng(dataUrl);
+  if (!png) return false;
+
+  clipboard.writeImage(nativeImage.createFromBuffer(png));
+  closeEditor(webContentsId);
+  return true;
+}
+
 function closeEditor(webContentsId) {
   const entry = editors.get(webContentsId);
   if (entry && !entry.win.isDestroyed()) entry.win.close();
@@ -264,5 +278,6 @@ module.exports = {
   editorImage,
   saveEditor,
   saveEditorAs,
+  copyEditor,
   closeEditor,
 };

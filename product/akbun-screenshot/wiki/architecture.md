@@ -62,7 +62,9 @@ The window receives its image as a data URL rather than a file path. A `file://`
 
 Save as posts the same bytes to a second channel, where main opens `showSaveDialog` on the save directory with `buildEditedFilename` filling in the name: the name Save would have used plus `-edited-<timestamp>` before the extension. A capture has no name of its own before something writes it, so that generated name is the only "current filename" there is. The dialog carries a png filter, without which the panel takes a typed name verbatim and anyone replacing the suggestion gets an extensionless file full of png bytes. The dialog belongs to main rather than the renderer so a cancel writes nothing and leaves the editor open, which saving first and moving the file afterwards could not do.
 
-Both paths decode the data URL before touching the disk, so a malformed payload leaves no directory and no empty png behind, and both write through `writePng`, which is also the only place that creates the directory. A write that throws puts up a dialog and leaves the editor open. That matters more than it looks: the canvas holds the only copy of the annotated image, so a silent failure reads as a dead button, and the next thing clicked is Close, whose `closed` handler drops the temp png as well. `workspace/test/capture.test.js` covers it by pointing the save directory at a path where a file already sits.
+Copy posts the same bytes to a third channel, where main turns them into a `nativeImage` and puts that on the clipboard. It reuses the editor's `decodePng`, so a malformed payload leaves the clipboard alone instead of clearing it, and it ends the window the way Save does: an annotated image that only had to be pasted never becomes a file. Cmd+S in the editor runs the Save button's handler. The check sits above the guard that hands a keystroke to a focused toolbar box, because no box on that toolbar has its own use for Cmd+S and a save should not depend on where the caret happens to be.
+
+Both save paths decode the data URL before touching the disk, so a malformed payload leaves no directory and no empty png behind, and both write through `writePng`, which is also the only place that creates the directory. A write that throws puts up a dialog and leaves the editor open. That matters more than it looks: the canvas holds the only copy of the annotated image, so a silent failure reads as a dead button, and the next thing clicked is Close, whose `closed` handler drops the temp png as well. `workspace/test/capture.test.js` covers it by pointing the save directory at a path where a file already sits.
 
 Text uses an inline input positioned over the canvas, because Electron does not implement `prompt()`. The input stops keydown propagation so Cmd+Z while typing does not undo the drawing behind it. The mousedown that creates the input calls `preventDefault`, without which the default action of that same mousedown moves focus off the input, its blur handler removes it, and the box vanishes in the frame it was created. That is why the Text tool used to look like it did nothing at all.
 
@@ -88,6 +90,7 @@ Fonts come from `queryLocalFonts`, which needs the `local-fonts` permission; mai
 | `editor:image` | Return the editor's image as a data URL |
 | `editor:save` | Write the edited canvas to the save directory and close the editor |
 | `editor:save-as` | Ask for a path with a save dialog, write the canvas there and close the editor |
+| `editor:copy` | Write the edited canvas to the clipboard and close the editor |
 | `editor:close` | Close the editor, keeping nothing |
 
 ## Update

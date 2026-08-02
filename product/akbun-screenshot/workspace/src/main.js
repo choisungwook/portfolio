@@ -26,6 +26,7 @@ const {
   editorImage,
   saveEditor,
   saveEditorAs,
+  copyEditor,
   closeEditor,
 } = require('./capture');
 const { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } = require('./update');
@@ -199,6 +200,7 @@ ipcMain.handle('preview:edit', (event) => openEditor(event.sender.id));
 ipcMain.handle('editor:image', (event) => editorImage(event.sender.id));
 ipcMain.handle('editor:save', (event, dataUrl) => saveEditor(event.sender.id, dataUrl));
 ipcMain.handle('editor:save-as', (event, dataUrl) => saveEditorAs(event.sender.id, dataUrl));
+ipcMain.handle('editor:copy', (event, dataUrl) => copyEditor(event.sender.id, dataUrl));
 ipcMain.handle('editor:close', (event) => closeEditor(event.sender.id));
 
 app.whenReady().then(() => {

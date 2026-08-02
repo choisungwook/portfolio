@@ -98,6 +98,7 @@
     /* Outlined in the same green rather than filled, so the pair reads as one
        action with two endings and Save stays the obvious one. */
     #save-as { border-color: var(--ok); color: var(--ok); font-weight: 600; }
+    #copy { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
     #close { background: var(--warn); border-color: var(--warn); color: #fff; font-weight: 600; }
 
     select, input[type='number'] {
@@ -192,12 +193,13 @@
         <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
+      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo &middot; &#8984;S save</span>
     </div>
 
     <div class="group actions">
       <button id="save">Save</button>
       <button id="save-as">Save as&hellip;</button>
+      <button id="copy">Copy</button>
       <button id="close">Close</button>
     </div>
   </header>
