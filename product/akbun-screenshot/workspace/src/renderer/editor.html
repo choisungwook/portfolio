@@ -75,8 +75,10 @@
 
     button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-    /* Square icon buttons. The label is a title tooltip rather than text, so
-       the whole tool row fits without wrapping on a narrow window. */
+    /* Square icon buttons. The name is a title tooltip rather than text, so the
+       whole tool row fits without wrapping on a narrow window. Each also
+       carries an aria-label, since title is only a last-resort accessible name
+       and an icon-only button would otherwise be announced as nothing. */
     button.tool {
       width: 32px;
       height: 30px;
@@ -147,36 +149,36 @@
   <header>
     <div class="left">
       <div class="group">
-        <button class="tool active" data-tool="select" title="Select">
+        <button class="tool active" data-tool="select" title="Select" aria-label="Select">
           <svg viewBox="0 0 24 24"><path class="solid" d="M5 3l14 8-6 1.5L10 19z"/></svg>
         </button>
-        <button class="tool" data-tool="rect" title="Rectangle">
+        <button class="tool" data-tool="rect" title="Rectangle" aria-label="Rectangle">
           <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/></svg>
         </button>
-        <button class="tool" data-tool="ellipse" title="Circle">
+        <button class="tool" data-tool="ellipse" title="Circle" aria-label="Circle">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
         </button>
-        <button class="tool" data-tool="line" title="Line">
+        <button class="tool" data-tool="line" title="Line" aria-label="Line">
           <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg>
         </button>
         <!-- Stroked heads rather than filled triangles: a triangle big enough to
              read at 18px does not fit inside the diagonal's corner. -->
-        <button class="tool" data-tool="arrow" title="Arrow">
+        <button class="tool" data-tool="arrow" title="Arrow" aria-label="Arrow">
           <svg viewBox="0 0 24 24"><path d="M19 5L5 19"/><path d="M5 12v7h7"/></svg>
         </button>
-        <button class="tool" data-tool="arrow2" title="Double arrow">
+        <button class="tool" data-tool="arrow2" title="Double arrow" aria-label="Double arrow">
           <svg viewBox="0 0 24 24"><path d="M19 5L5 19"/><path d="M5 12v7h7"/><path d="M19 12V5h-7"/></svg>
         </button>
-        <button class="tool" data-tool="text" title="Text">
+        <button class="tool" data-tool="text" title="Text" aria-label="Text">
           <svg viewBox="0 0 24 24"><path d="M5 19l7-14 7 14"/><path d="M8 14h8"/></svg>
         </button>
-        <button class="tool" data-tool="number" title="Number badge">
+        <button class="tool" data-tool="number" title="Number badge" aria-label="Number badge">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 9.5L12.5 8v8"/></svg>
         </button>
-        <button class="tool" data-tool="pencil" title="Pencil">
+        <button class="tool" data-tool="pencil" title="Pencil" aria-label="Pencil">
           <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>
         </button>
-        <button class="tool" data-tool="crop" title="Crop">
+        <button class="tool" data-tool="crop" title="Crop" aria-label="Crop">
           <svg viewBox="0 0 24 24"><path d="M6 2v16h16"/><path d="M2 6h16v16"/></svg>
         </button>
       </div>

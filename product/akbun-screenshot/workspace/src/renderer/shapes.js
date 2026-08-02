@@ -51,11 +51,18 @@ function renumber(shapes) {
 // measured, since this file has no canvas to ask.
 function bounds(s) {
   // A pencil stroke is a list of points rather than two corners, so its box is
-  // the extent of the run.
+  // the extent of the run. One pass rather than two mapped arrays and a spread:
+  // this runs inside hitTest, which runs on every shape on every redraw, which
+  // is every mousemove of a drag.
   if (s.points) {
-    const xs = s.points.map((p) => p.x);
-    const ys = s.points.map((p) => p.y);
-    return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
+    const box = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
+    for (const p of s.points) {
+      box.x1 = Math.min(box.x1, p.x);
+      box.y1 = Math.min(box.y1, p.y);
+      box.x2 = Math.max(box.x2, p.x);
+      box.y2 = Math.max(box.y2, p.y);
+    }
+    return box;
   }
   if (s.type === 'text') {
     return { x1: s.x1, y1: s.y1, x2: s.x1 + s.text.length * s.size * 0.6, y2: s.y1 + s.size };
