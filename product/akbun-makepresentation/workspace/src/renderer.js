@@ -135,6 +135,9 @@ function renderAll() {
 
 function markDirty() {
   state.dirty = true;
+  // Some callers redraw only the canvas, so the title dot updates here
+  // rather than waiting for the next full render.
+  updateTitle();
 }
 
 // --- tools ---------------------------------------------------------------------

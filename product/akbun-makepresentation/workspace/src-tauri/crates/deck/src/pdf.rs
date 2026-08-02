@@ -23,69 +23,73 @@ pub fn write<W: Write>(pages: &[JpegPage], mut out: W) -> Result<(), String> {
     }
 
     // Objects: 1 catalog, 2 page tree, then per page i: 3+3i page,
-    // 4+3i contents, 5+3i image.
-    let mut body: Vec<Vec<u8>> = Vec::new();
-    let page_ids: Vec<usize> = (0..pages.len()).map(|i| 3 + 3 * i).collect();
+    // 4+3i contents, 5+3i image. Ids never depend on sizes, so everything
+    // streams into one buffer while the xref offsets are recorded in passing.
+    let object_count = 2 + 3 * pages.len();
+    let mut written = Vec::new();
+    let mut offsets = Vec::with_capacity(object_count);
+    written.extend_from_slice(b"%PDF-1.4\n");
 
-    let kids = page_ids
-        .iter()
-        .map(|id| format!("{id} 0 R"))
+    let mut begin = |written: &mut Vec<u8>, offsets: &mut Vec<usize>| {
+        offsets.push(written.len());
+        written.extend_from_slice(format!("{} 0 obj\n", offsets.len()).as_bytes());
+    };
+
+    begin(&mut written, &mut offsets);
+    written.extend_from_slice(b"<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+    let kids = (0..pages.len())
+        .map(|i| format!("{} 0 R", 3 + 3 * i))
         .collect::<Vec<_>>()
         .join(" ");
-    body.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
-    body.push(
+    begin(&mut written, &mut offsets);
+    written.extend_from_slice(
         format!(
-            "<< /Type /Pages /Kids [{kids}] /Count {} >>",
+            "<< /Type /Pages /Kids [{kids}] /Count {} >>\nendobj\n",
             pages.len()
         )
-        .into_bytes(),
+        .as_bytes(),
     );
 
     for (i, page) in pages.iter().enumerate() {
         let contents_id = 4 + 3 * i;
         let image_id = 5 + 3 * i;
-        body.push(
+        begin(&mut written, &mut offsets);
+        written.extend_from_slice(
             format!(
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] \
-/Resources << /XObject << /Im0 {image_id} 0 R >> >> /Contents {contents_id} 0 R >>"
+/Resources << /XObject << /Im0 {image_id} 0 R >> >> /Contents {contents_id} 0 R >>\nendobj\n"
             )
-            .into_bytes(),
+            .as_bytes(),
         );
 
         let stream = format!("q {PAGE_W} 0 0 {PAGE_H} 0 0 cm /Im0 Do Q");
-        body.push(
+        begin(&mut written, &mut offsets);
+        written.extend_from_slice(
             format!(
-                "<< /Length {} >>\nstream\n{stream}\nendstream",
+                "<< /Length {} >>\nstream\n{stream}\nendstream\nendobj\n",
                 stream.len()
             )
-            .into_bytes(),
+            .as_bytes(),
         );
 
-        let mut image = format!(
-            "<< /Type /XObject /Subtype /Image /Width {} /Height {} \
+        begin(&mut written, &mut offsets);
+        written.extend_from_slice(
+            format!(
+                "<< /Type /XObject /Subtype /Image /Width {} /Height {} \
 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n",
-            page.width,
-            page.height,
-            page.data.len()
-        )
-        .into_bytes();
-        image.extend_from_slice(&page.data);
-        image.extend_from_slice(b"\nendstream");
-        body.push(image);
-    }
-
-    let mut offsets = Vec::new();
-    let mut written = Vec::new();
-    written.extend_from_slice(b"%PDF-1.4\n");
-    for (i, object) in body.iter().enumerate() {
-        offsets.push(written.len());
-        written.extend_from_slice(format!("{} 0 obj\n", i + 1).as_bytes());
-        written.extend_from_slice(object);
-        written.extend_from_slice(b"\nendobj\n");
+                page.width,
+                page.height,
+                page.data.len()
+            )
+            .as_bytes(),
+        );
+        written.extend_from_slice(&page.data);
+        written.extend_from_slice(b"\nendstream\nendobj\n");
     }
 
     let xref_at = written.len();
-    written.extend_from_slice(format!("xref\n0 {}\n", body.len() + 1).as_bytes());
+    written.extend_from_slice(format!("xref\n0 {}\n", object_count + 1).as_bytes());
     written.extend_from_slice(b"0000000000 65535 f \n");
     for offset in &offsets {
         written.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
@@ -93,7 +97,7 @@ pub fn write<W: Write>(pages: &[JpegPage], mut out: W) -> Result<(), String> {
     written.extend_from_slice(
         format!(
             "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n",
-            body.len() + 1
+            object_count + 1
         )
         .as_bytes(),
     );
