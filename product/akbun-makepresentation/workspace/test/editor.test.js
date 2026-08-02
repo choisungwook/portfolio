@@ -196,7 +196,7 @@ test('renderShapeSvg draws an imported picture as an image element', () => {
     src: 'data:image/png;base64,AAAA',
   };
   const svg = L.renderShapeSvg(shape);
-  assert.ok(svg.startsWith('<image '));
+  assert.ok(svg.includes('<image '));
   assert.ok(svg.includes('href="data:image/png;base64,AAAA"'));
   assert.ok(svg.includes('x="10"') && svg.includes('width="100"'));
 });
@@ -233,6 +233,26 @@ test('renderShapeSvg applies dash styles', () => {
   const shape = L.createShape('rect', 0, 0, { dash: 'dash', strokeWidth: 2 });
   L.dragShape(shape, 0, 0, 50, 50);
   assert.ok(L.renderShapeSvg(shape).includes('stroke-dasharray="6 4"'));
+});
+
+test('renderShapeSvg embeds and crops imported images', () => {
+  const shape = L.createShape('image', 10, 20, {});
+  shape.w = 300;
+  shape.h = 200;
+  shape.src = 'data:image/png;base64,abc';
+  shape.cropLeft = 0.1;
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('<image'));
+  assert.ok(svg.includes('href="data:image/png;base64,abc"'));
+  assert.ok(svg.includes('viewBox="0.1 0 0.9 1"'));
+});
+
+test('wrapTextLines wraps at word boundaries', () => {
+  assert.deepStrictEqual(L.wrapTextLines('one two three', 45, 20), [
+    'one',
+    'two',
+    'three',
+  ]);
 });
 
 test('renderSlideSvg is a standalone svg with a white background', () => {

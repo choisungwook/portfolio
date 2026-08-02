@@ -21,7 +21,7 @@ const DEFAULT_STYLE = {
   fontFamily: 'Helvetica',
 };
 
-const BOXY = new Set(['rect', 'ellipse', 'text']);
+const BOXY = new Set(['rect', 'ellipse', 'text', 'image']);
 
 function createDeck() {
   return { slides: [createSlide()] };
@@ -48,6 +48,16 @@ function createShape(kind, x, y, style) {
     fontSize: s.fontSize,
     textColor: s.textColor,
     fontFamily: s.fontFamily,
+    src: '',
+    bold: false,
+    italic: false,
+    textAlign: 'left',
+    verticalAlign: 'top',
+    cropLeft: 0,
+    cropTop: 0,
+    cropRight: 0,
+    cropBottom: 0,
+    rotation: 0,
   };
 }
 
@@ -246,6 +256,38 @@ function fontAttr(shape) {
   return `font-family="${escapeXml(shape.fontFamily || 'Helvetica')}, sans-serif"`;
 }
 
+function wrapTextLines(text, width, fontSize) {
+  if (!(width > 0)) return String(text || '').split('\n');
+  const max = Math.max(1, Math.floor(width / Math.max(fontSize * 0.52, 1)));
+  const lines = [];
+  for (const paragraph of String(text || '').split('\n')) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      lines.push('');
+      continue;
+    }
+    let line = words.shift();
+    for (const word of words) {
+      if (`${line} ${word}`.length <= max) {
+        line += ` ${word}`;
+      } else {
+        lines.push(line);
+        line = word;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+function rotateSvg(shape, markup) {
+  if (!shape.rotation) return markup;
+  const b = shapeBBox(shape);
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  return `<g transform="rotate(${shape.rotation} ${cx} ${cy})">${markup}</g>`;
+}
+
 // Markup for one shape. `options.hideText` suppresses the glyphs while the
 // overlay textarea is editing that shape.
 function renderShapeSvg(shape, options) {
@@ -267,26 +309,37 @@ function renderShapeSvg(shape, options) {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
       return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>`;
     }
-    case 'image': {
-      const b = shapeBBox(shape);
-      // A deck is a file someone else may have made, so src is untrusted
-      // even though the importer only ever writes data URLs. Anything but
-      // an inline image renders empty rather than letting the markup out or
-      // sending the webview to fetch an address.
-      const src = String(shape.src || '');
-      const href = src.startsWith('data:image/') ? escapeXml(src) : '';
-      return `<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${href}" preserveAspectRatio="none"/>`;
-    }
     case 'text': {
       if (hideText) return '';
-      const lines = String(shape.text || '').split('\n');
+      const lines = wrapTextLines(shape.text, shape.w, shape.fontSize);
+      const lineHeight = shape.fontSize * 1.3;
+      const blockHeight = lines.length * lineHeight;
+      let y = shape.y + shape.fontSize;
+      if (shape.verticalAlign === 'center') y += Math.max(0, (shape.h - blockHeight) / 2);
+      if (shape.verticalAlign === 'bottom') y += Math.max(0, shape.h - blockHeight);
+      const align = shape.textAlign || 'left';
+      const x = align === 'center'
+        ? shape.x + shape.w / 2
+        : align === 'right' ? shape.x + shape.w : shape.x;
+      const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
       const spans = lines
         .map(
           (line, i) =>
-            `<tspan x="${shape.x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
+            `<tspan x="${x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
         )
         .join('');
-      return `<text x="${shape.x}" y="${shape.y + shape.fontSize}" font-size="${shape.fontSize}" fill="${shape.textColor}" ${fontAttr(shape)}>${spans}</text>`;
+      const markup = `<text x="${x}" y="${y}" font-size="${shape.fontSize}" fill="${shape.textColor}" text-anchor="${anchor}" font-weight="${shape.bold ? '700' : '400'}" font-style="${shape.italic ? 'italic' : 'normal'}" ${fontAttr(shape)}>${spans}</text>`;
+      return rotateSvg(shape, markup);
+    }
+    case 'image': {
+      const src = String(shape.src || '');
+      const href = src.startsWith('data:image/') ? escapeXml(src) : '';
+      const left = Math.max(0, Math.min(0.999, shape.cropLeft || 0));
+      const top = Math.max(0, Math.min(0.999, shape.cropTop || 0));
+      const width = Math.max(0.001, 1 - left - Math.max(0, shape.cropRight || 0));
+      const height = Math.max(0.001, 1 - top - Math.max(0, shape.cropBottom || 0));
+      const markup = `<svg x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" viewBox="${left} ${top} ${width} ${height}" preserveAspectRatio="none" overflow="hidden"><image x="0" y="0" width="1" height="1" preserveAspectRatio="none" href="${href}"/></svg>`;
+      return rotateSvg(shape, markup);
     }
     default:
       return '';
@@ -347,6 +400,7 @@ const exported = {
   duplicateSlide,
   slideNumberShape,
   escapeXml,
+  wrapTextLines,
   renderShapeSvg,
   renderSlideSvg,
 };
