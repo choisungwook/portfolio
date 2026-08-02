@@ -186,6 +186,21 @@ test('renderShapeSvg uses the shape font family with a fallback', () => {
   assert.ok(L.renderShapeSvg(fallback).includes('font-family="Helvetica, sans-serif"'));
 });
 
+test('renderShapeSvg draws an imported picture as an image element', () => {
+  const shape = {
+    kind: 'image',
+    x: 10,
+    y: 20,
+    w: 100,
+    h: 50,
+    src: 'data:image/png;base64,AAAA',
+  };
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.startsWith('<image '));
+  assert.ok(svg.includes('href="data:image/png;base64,AAAA"'));
+  assert.ok(svg.includes('x="10"') && svg.includes('width="100"'));
+});
+
 test('renderShapeSvg escapes text content', () => {
   const shape = L.createShape('text', 0, 0, {});
   shape.text = 'a <b> & "c"';

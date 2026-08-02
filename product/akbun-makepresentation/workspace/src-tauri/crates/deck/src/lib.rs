@@ -62,6 +62,9 @@ pub struct Shape {
     /// `a:latin` typeface.
     #[serde(default = "default_font_family")]
     pub font_family: String,
+    /// Data URL of the picture bytes; only for kind "image".
+    #[serde(default)]
+    pub src: String,
 }
 
 fn default_stroke() -> String {
@@ -100,6 +103,7 @@ impl Default for Shape {
             font_size: default_font_size(),
             text_color: default_stroke(),
             font_family: default_font_family(),
+            src: String::new(),
         }
     }
 }

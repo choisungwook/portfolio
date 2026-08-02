@@ -267,6 +267,11 @@ function renderShapeSvg(shape, options) {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
       return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>`;
     }
+    case 'image': {
+      const b = shapeBBox(shape);
+      // src is a data URL produced by the pptx importer, never user markup.
+      return `<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${shape.src || ''}" preserveAspectRatio="none"/>`;
+    }
     case 'text': {
       if (hideText) return '';
       const lines = String(shape.text || '').split('\n');

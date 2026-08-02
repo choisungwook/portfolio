@@ -111,7 +111,7 @@ function renderProps() {
   const kind = shape ? shape.kind : 'defaults';
 
   const showFill = kind === 'rect' || kind === 'ellipse' || kind === 'defaults';
-  const showStroke = kind !== 'text';
+  const showStroke = kind !== 'text' && kind !== 'image';
   const showText = kind === 'text' || kind === 'defaults';
 
   $('props-fill').hidden = !showFill;
