@@ -4,13 +4,33 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 
 ## What it does
 
-- Slides: add, delete, switch, thumbnail panel
+- Slides: add, delete, duplicate, switch, thumbnail panel
 - Shapes: rectangle, ellipse, line, arrow, freehand pen
-- Text boxes with font size and color
+- Text boxes with font family, size and color
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
+- Slide numbers, toggled from the № button
+- Undo and redo, copy and paste, duplicate
 - Open and save .pptx, export every slide as a .pdf
 - Presentation mode (fullscreen, arrow keys)
 - Self update from the Updates button
+
+## Shortcuts
+
+Cmd on macOS, Ctrl on Windows and Linux.
+
+| Key | What it does |
+|---|---|
+| Cmd+Z / Shift+Cmd+Z | Undo / redo |
+| Cmd+C, Cmd+V | Copy the selected shape, paste it down and to the right |
+| Cmd+D | Duplicate the selected shape, or the whole slide when nothing is selected |
+| Cmd+S | Save |
+| Shift while drawing | Square or circle; lines and arrows snap to 45 degrees |
+| Shift while dragging | Move on one axis only |
+| Cmd+drag | Drag a copy and leave the original in place |
+| Cmd+Shift+drag | Same, with the copy kept on one axis |
+| V R O L A P T | Select, rectangle, ellipse, line, arrow, pen, text |
+| Arrows | Nudge the selection by 1px, or 10px with Shift |
+| Delete | Delete the selection |
 
 ## Directory layout
 

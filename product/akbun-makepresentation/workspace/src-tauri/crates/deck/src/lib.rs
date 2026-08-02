@@ -58,6 +58,10 @@ pub struct Shape {
     pub font_size: f64,
     #[serde(default = "default_stroke")]
     pub text_color: String,
+    /// One family name, not a CSS stack, so it maps straight onto the pptx
+    /// `a:latin` typeface.
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
 }
 
 fn default_stroke() -> String {
@@ -74,6 +78,9 @@ fn default_none() -> String {
 }
 fn default_font_size() -> f64 {
     24.0
+}
+fn default_font_family() -> String {
+    "Helvetica".into()
 }
 
 impl Default for Shape {
@@ -92,6 +99,7 @@ impl Default for Shape {
             text: String::new(),
             font_size: default_font_size(),
             text_color: default_stroke(),
+            font_family: default_font_family(),
         }
     }
 }

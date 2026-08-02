@@ -240,6 +240,13 @@ main {
   gap: 10px;
 }
 
+/* These groups toggle with the hidden attribute, and a display rule of their
+   own outranks the browser default for [hidden]. Without this they never go
+   away and a rectangle gets asked about its font. */
+[hidden] {
+  display: none !important;
+}
+
 .prop-row {
   display: flex;
   align-items: center;
@@ -252,6 +259,12 @@ main {
 
 .prop-row input[type='number'] {
   width: 60px;
+}
+
+/* The font names are long, so the select gets a hard cap rather than pushing
+   the panel wider. */
+.prop-row select {
+  max-width: 110px;
 }
 
 input[type='color'] {

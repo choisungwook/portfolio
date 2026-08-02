@@ -36,6 +36,43 @@ test('dragShape appends pen points and skips micro-moves', () => {
   assert.strictEqual(shape.points.length, 3);
 });
 
+test('dragShape with Shift makes a rect square from any corner', () => {
+  const shape = L.createShape('rect', 100, 100, {});
+  L.dragShape(shape, 100, 100, 160, 200, true);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 100, y: 100, w: 100, h: 100 }
+  );
+
+  const up = L.createShape('ellipse', 100, 100, {});
+  L.dragShape(up, 100, 100, 40, 20, true);
+  assert.deepStrictEqual(
+    { x: up.x, y: up.y, w: up.w, h: up.h },
+    { x: 20, y: 20, w: 80, h: 80 }
+  );
+});
+
+test('dragShape with Shift snaps a line to 45 degrees', () => {
+  const flat = L.createShape('line', 0, 0, {});
+  L.dragShape(flat, 0, 0, 200, 12, true);
+  assert.deepStrictEqual({ w: flat.w, h: flat.h }, { w: 200.36, h: 0 });
+
+  const diagonal = L.createShape('arrow', 0, 0, {});
+  L.dragShape(diagonal, 0, 0, 100, 90, true);
+  assert.strictEqual(diagonal.w, diagonal.h);
+
+  const vertical = L.createShape('line', 0, 0, {});
+  L.dragShape(vertical, 0, 0, -8, -150, true);
+  assert.strictEqual(vertical.w, 0);
+  assert.ok(vertical.h < 0);
+});
+
+test('dragShape without Shift is unchanged', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 60, 20, false);
+  assert.deepStrictEqual({ w: shape.w, h: shape.h }, { w: 60, h: 20 });
+});
+
 test('isDegenerate spots a click that drew nothing', () => {
   const rect = L.createShape('rect', 5, 5, {});
   assert.ok(L.isDegenerate(rect));
@@ -114,6 +151,39 @@ test('deleteSlide never leaves an empty deck', () => {
   const at = L.deleteSlide(deck, 0);
   assert.strictEqual(at, 0);
   assert.strictEqual(deck.slides.length, 1);
+});
+
+test('duplicateSlide inserts an independent copy right after', () => {
+  const deck = L.createDeck();
+  deck.slides[0].shapes.push(L.createShape('rect', 10, 10, {}));
+  const at = L.duplicateSlide(deck, 0);
+  assert.strictEqual(at, 1);
+  assert.strictEqual(deck.slides.length, 2);
+  deck.slides[1].shapes[0].x = 999;
+  assert.strictEqual(deck.slides[0].shapes[0].x, 10);
+});
+
+test('slideNumberShape is a text shape carrying the number', () => {
+  const shape = L.slideNumberShape(7);
+  assert.strictEqual(shape.kind, 'text');
+  assert.strictEqual(shape.text, '7');
+  assert.ok(shape.x > L.SLIDE_W / 2 && shape.y > L.SLIDE_H / 2);
+});
+
+test('renderSlideSvg draws the number only when asked', () => {
+  const slide = L.createSlide();
+  assert.ok(!L.renderSlideSvg(slide).includes('>3<'));
+  assert.ok(L.renderSlideSvg(slide, { number: 3 }).includes('>3<'));
+});
+
+test('renderShapeSvg uses the shape font family with a fallback', () => {
+  const shape = L.createShape('text', 0, 0, { fontFamily: 'Georgia' });
+  shape.text = 'hi';
+  assert.ok(L.renderShapeSvg(shape).includes('font-family="Georgia, sans-serif"'));
+
+  const fallback = L.createShape('text', 0, 0, {});
+  fallback.text = 'hi';
+  assert.ok(L.renderShapeSvg(fallback).includes('font-family="Helvetica, sans-serif"'));
 });
 
 test('renderShapeSvg escapes text content', () => {

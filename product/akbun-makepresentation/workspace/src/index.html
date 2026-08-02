@@ -25,6 +25,7 @@
       <button data-tool="text" title="Text (T)">T</button>
     </div>
     <div class="group">
+      <button id="btn-numbers" title="Show a slide number on every slide">№</button>
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
       <button id="btn-update" title="Check for a newer version">Updates</button>
     </div>
@@ -72,6 +73,20 @@
         </div>
       </div>
       <div id="props-text">
+        <div class="prop-row">
+          <label>Font</label>
+          <select id="prop-font-family">
+            <option value="Helvetica">Helvetica</option>
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Apple SD Gothic Neo">애플 SD 산돌고딕</option>
+            <option value="Malgun Gothic">맑은 고딕</option>
+            <option value="Batang">바탕</option>
+          </select>
+        </div>
         <div class="prop-row">
           <label>Font size</label>
           <input type="number" id="prop-font-size" min="6" max="200" />
