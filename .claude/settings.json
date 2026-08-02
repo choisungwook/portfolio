@@ -7,6 +7,19 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrail.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/no-session-trace.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*github.*__(create_pull_request|update_pull_request|issue_write)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/no-session-trace.sh"
           }
         ]
       }
