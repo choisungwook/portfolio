@@ -7,6 +7,10 @@
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
 
+// Paper white. A slide keeps its own background so changing it touches that
+// one field and nothing else on the slide.
+const DEFAULT_BACKGROUND = '#ffffff';
+
 const DEFAULT_STYLE = {
   stroke: '#1a1a1a',
   strokeWidth: 2,
@@ -19,6 +23,11 @@ const DEFAULT_STYLE = {
   // offer lives in the markup of #prop-font-family, which is also where the
   // display labels belong; anything outside it still opens and renders.
   fontFamily: 'Helvetica',
+  bold: false,
+  italic: false,
+  underline: false,
+  textAlign: 'left',
+  verticalAlign: 'top',
 };
 
 const BOXY = new Set(['rect', 'ellipse', 'text', 'image']);
@@ -28,7 +37,14 @@ function createDeck() {
 }
 
 function createSlide() {
-  return { shapes: [] };
+  return { shapes: [], background: DEFAULT_BACKGROUND };
+}
+
+// A deck saved before slides carried a background, or a slide read from a
+// pptx that declares none, has no field here. Both mean paper white.
+function slideBackground(slide) {
+  const color = slide && slide.background;
+  return color && color !== 'none' ? color : DEFAULT_BACKGROUND;
 }
 
 function createShape(kind, x, y, style) {
@@ -49,10 +65,11 @@ function createShape(kind, x, y, style) {
     textColor: s.textColor,
     fontFamily: s.fontFamily,
     src: '',
-    bold: false,
-    italic: false,
-    textAlign: 'left',
-    verticalAlign: 'top',
+    bold: s.bold,
+    italic: s.italic,
+    underline: s.underline,
+    textAlign: s.textAlign,
+    verticalAlign: s.verticalAlign,
     cropLeft: 0,
     cropTop: 0,
     cropRight: 0,
@@ -328,7 +345,8 @@ function renderShapeSvg(shape, options) {
             `<tspan x="${x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
         )
         .join('');
-      const markup = `<text x="${x}" y="${y}" font-size="${shape.fontSize}" fill="${shape.textColor}" text-anchor="${anchor}" font-weight="${shape.bold ? '700' : '400'}" font-style="${shape.italic ? 'italic' : 'normal'}" ${fontAttr(shape)}>${spans}</text>`;
+      const decoration = shape.underline ? ' text-decoration="underline"' : '';
+      const markup = `<text x="${x}" y="${y}" font-size="${shape.fontSize}" fill="${shape.textColor}" text-anchor="${anchor}" font-weight="${shape.bold ? '700' : '400'}" font-style="${shape.italic ? 'italic' : 'normal'}"${decoration} ${fontAttr(shape)}>${spans}</text>`;
       return rotateSvg(shape, markup);
     }
     case 'image': {
@@ -391,16 +409,40 @@ function renderSlideSvg(slide, options) {
   }
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SLIDE_W} ${SLIDE_H}">` +
-    `<rect width="${SLIDE_W}" height="${SLIDE_H}" fill="#ffffff"/>${shapes}</svg>`
+    `<rect width="${SLIDE_W}" height="${SLIDE_H}" fill="${slideBackground(slide)}"/>${shapes}</svg>`
   );
+}
+
+// --- zoom ---------------------------------------------------------------------
+//
+// Fixed steps rather than a free factor: every stop is a round number the
+// label can show, and repeated presses land on the same places every time.
+// 1 is the slide fitted to the stage, which is where the editor starts.
+
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
+const ZOOM_FIT = 1;
+
+function zoomIn(zoom) {
+  return ZOOM_STEPS.find((step) => step > zoom + 0.001) || ZOOM_STEPS[ZOOM_STEPS.length - 1];
+}
+
+function zoomOut(zoom) {
+  const smaller = ZOOM_STEPS.filter((step) => step < zoom - 0.001);
+  return smaller.length ? smaller[smaller.length - 1] : ZOOM_STEPS[0];
 }
 
 const exported = {
   SLIDE_W,
   SLIDE_H,
   DEFAULT_STYLE,
+  DEFAULT_BACKGROUND,
+  ZOOM_STEPS,
+  ZOOM_FIT,
+  zoomIn,
+  zoomOut,
   createDeck,
   createSlide,
+  slideBackground,
   createShape,
   dragShape,
   isDegenerate,

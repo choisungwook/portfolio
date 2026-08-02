@@ -12,15 +12,19 @@ Two sides, one JSON model between them.
 One JSON object, identical on both sides (serde mirrors it in Rust):
 
 ```json
-{ "slides": [ { "shapes": [ {
-  "kind": "rect | ellipse | line | arrow | pen | text",
+{ "slides": [ { "background": "#ffffff", "shapes": [ {
+  "kind": "rect | ellipse | line | arrow | pen | text | image",
   "x": 0, "y": 0, "w": 0, "h": 0,
   "points": [[0, 0]],
   "stroke": "#1a1a1a", "strokeWidth": 2, "dash": "solid | dash | dot",
   "fill": "none | #rrggbb",
-  "text": "", "fontSize": 24, "textColor": "#1a1a1a", "fontFamily": "Helvetica"
+  "text": "", "fontSize": 24, "textColor": "#1a1a1a", "fontFamily": "Helvetica",
+  "bold": false, "italic": false, "underline": false,
+  "textAlign": "left | center | right", "verticalAlign": "top | center | bottom"
 } ] } ] }
 ```
+
+`background` belongs to the slide rather than to a page-sized shape, so the one control that changes it cannot touch a shape and the background cannot be selected or dragged ([ADR](../adr/2026-08-background-is-a-slide-field.md)). A slide with no `background` is white, which is what a deck saved before the field existed deserializes to.
 
 `fontFamily` is one plain family name, not a CSS stack, so it maps straight onto the pptx `a:latin` typeface and survives a round trip unchanged. A generic fallback is appended when the SVG is drawn.
 
@@ -46,7 +50,7 @@ Three commands, each takes a path the page picked with a native dialog:
 
 **Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates.
 
-**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white slide/layout/master background becomes a page-sized rect, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas. Picture crop and rotation plus basic text alignment and emphasis survive save/open round trips. Other presets become their bounding rectangle; unsupported tables are skipped.
+**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas. Picture crop and rotation plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. Other presets become their bounding rectangle; unsupported tables are skipped.
 
 **PDF export**: the page rasterizes each slide (SVG string → blob URL → Image → 1920x1080 canvas → JPEG data URL) and `export_pdf` wraps the JPEGs into PDF pages by hand — JPEG is a native PDF filter, so no PDF library is involved.
 
@@ -61,6 +65,12 @@ Every mutation goes through the model and the page redraws from it (`renderAll`)
 `markDirty` is the one hook every mutation already passes through, so history hangs off it rather than off each call site. It pushes the deck as it stood at the previous commit onto a past stack and takes a fresh snapshot; undo and redo move whole-deck clones between the two stacks. Snapshots are `structuredClone` of the whole deck, which is cheap at this scale — a deck is a few hundred small objects.
 
 Opening a file or starting a new deck clears both stacks, because a history that reaches back across a different document has nothing sensible to restore.
+
+## Zoom
+
+Zoom is a view setting: it lives in `state`, not in the deck, and nothing about the model changes with it. The stage is a scroller wrapping the slide, and zoom is one CSS variable multiplying the fitted width, so the browser does the scaling and scrollbars appear on their own once the slide outgrows the window.
+
+Nothing else has to know. Pointer positions come from `getBoundingClientRect`, which already reports the zoomed box, so clicks map onto slide coordinates at any zoom. The one exception is the overlay textarea, placed in screen pixels: zooming while a text box is open would strand it, so a zoom commits the edit first.
 
 ## Slide numbers
 

@@ -1,6 +1,7 @@
 /* Colors only through variables. Light is the base; dark overrides via the
    media query, which is all it takes to follow the system setting. The slide
-   itself stays white in both themes, like paper. */
+   itself ignores the theme: it shows the background the deck stores, so the
+   editor and the projector agree. */
 
 :root {
   --bg: #f1f3f5;
@@ -153,27 +154,73 @@ main {
 
 /* --- stage --- */
 
+/* The stage holds the scroller and the zoom control. Only the scroller
+   scrolls, so the control stays pinned to the corner at any zoom. */
 #stage {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--stage);
-  padding: 20px;
   min-width: 0;
+  display: flex;
+  position: relative;
+  background: var(--stage);
 }
 
+#stage-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow: auto;
+  padding: 20px;
+}
+
+/* Centred with auto margins rather than justify-content, which puts the
+   overflowing top-left of a zoomed-in slide out of the scroll range. */
 #stage-inner {
   position: relative;
-  width: min(100%, calc((100vh - 140px) * 16 / 9));
+  margin: auto;
+  flex: none;
+  width: calc(min(100%, (100vh - 140px) * 16 / 9) * var(--zoom, 1));
 }
 
+/* --- zoom control --- */
+
+#zoom {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+}
+
+#zoom button {
+  border: none;
+  padding: 3px 8px;
+  background: transparent;
+}
+
+#zoom button:hover {
+  background: var(--accent-soft);
+}
+
+#btn-zoom-level {
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* The background is the slide's own, set inline from the deck. The hairline
+   in the shadow is what keeps the slide edge visible when a dark background
+   meets the dark stage. */
 #canvas {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #ffffff;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 1px var(--border), 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
 #canvas[data-tool='rect'],
@@ -231,6 +278,86 @@ main {
 #props-hint {
   margin: 0;
   color: var(--muted);
+}
+
+/* --- slide background card --- */
+
+/* Its own card, because a control that repaints the whole slide should not
+   look like the one that repaints the selected rectangle. */
+#props-background {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+#props-background h2 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.swatch {
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  background: var(--swatch);
+  /* The swatch is the color, so its own border must not read as part of it. */
+  border: 1px solid var(--border);
+}
+
+.swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+#btn-bg-all {
+  padding: 5px;
+}
+
+/* --- button sets --- */
+
+.btn-set {
+  display: flex;
+  gap: 3px;
+}
+
+.btn-set button {
+  min-width: 28px;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-set .icon {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* The frame is scaffolding for the bar that carries the meaning. */
+.btn-set .icon.box rect {
+  opacity: 0.35;
+}
+
+.glyph {
+  font-size: 13px;
+  line-height: 1;
 }
 
 #props-stroke,
