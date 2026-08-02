@@ -40,6 +40,16 @@ let selected = null;
 let dragFrom = null;
 let resizing = null;
 
+// What `dragFrom` and `resizing` write to. Usually the selection, but the crop
+// box is moved and resized by the same two branches without ever being a shape
+// in the document, so the target is named rather than assumed.
+let dragTarget = null;
+
+// The crop box, once a drag has put one down. It stays on screen instead of
+// cropping immediately, so its corners can be pulled until the framing is
+// right; Enter or a double click is what finally cuts the image.
+let cropBox = null;
+
 // A mousedown that picks a shape up may turn out to be a plain click. Recording
 // the document then would fill the history with entries that undo to the state
 // they were taken from, so the entry waits for the first mousemove that
@@ -113,6 +123,7 @@ function redraw() {
   ctx.drawImage(base, 0, 0);
   for (const shape of shapes) drawShape(shape);
   if (draft) drawShape(draft);
+  if (cropBox) drawCrop(cropBox);
   if (selected) drawSelection(selected);
 }
 
@@ -141,23 +152,58 @@ function drawSelection(s) {
   ctx.restore();
 }
 
-// The crop drag is not a shape, it only ever exists as the draft. Dimming
-// everything outside the box rather than outlining it, so what the drag is
-// about to keep is the part that still looks like the screenshot.
+// The crop box is never a shape in the document. Everything outside it is
+// dimmed hard rather than outlined, so the part about to be thrown away already
+// reads as gone while the corners are still being pulled.
 function drawCrop(s) {
   const b = bounds(s);
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
   ctx.fillRect(0, 0, canvas.width, b.y1);
   ctx.fillRect(0, b.y2, canvas.width, canvas.height - b.y2);
   ctx.fillRect(0, b.y1, b.x1, b.y2 - b.y1);
   ctx.fillRect(b.x2, b.y1, canvas.width - b.x2, b.y2 - b.y1);
 
-  ctx.strokeStyle = '#4da3ff';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
   ctx.lineWidth = Math.max(1, unit);
-  ctx.setLineDash([6 * unit, 4 * unit]);
   ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+
+  // Thirds, the guide every crop tool draws, faint enough not to be mistaken
+  // for something in the picture.
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.beginPath();
+  for (let i = 1; i < 3; i += 1) {
+    const x = b.x1 + ((b.x2 - b.x1) * i) / 3;
+    const y = b.y1 + ((b.y2 - b.y1) * i) / 3;
+    ctx.moveTo(x, b.y1);
+    ctx.lineTo(x, b.y2);
+    ctx.moveTo(b.x1, y);
+    ctx.lineTo(b.x2, y);
+  }
+  ctx.stroke();
+
+  drawCropCorners(b);
   ctx.restore();
+}
+
+// L shaped brackets rather than the round grips a shape gets, because they are
+// what the corner of a crop looks like everywhere else and they read as a frame
+// instead of as part of the image. The arm is capped at a third of the box so a
+// small crop does not end up as four overlapping brackets.
+function drawCropCorners(b) {
+  const arm = Math.min(22 * unit, (b.x2 - b.x1) / 3, (b.y2 - b.y1) / 3);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(2, 3 * unit);
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (const [x, sx] of [[b.x1, 1], [b.x2, -1]]) {
+    for (const [y, sy] of [[b.y1, 1], [b.y2, -1]]) {
+      ctx.moveTo(x + sx * arm, y);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y + sy * arm);
+    }
+  }
+  ctx.stroke();
 }
 
 function drawShape(s) {
@@ -195,6 +241,15 @@ function drawShape(s) {
     ctx.stroke();
     if (s.type !== 'line') arrowHead(s.x1, s.y1, s.x2, s.y2, s.width);
     if (s.type === 'arrow2') arrowHead(s.x2, s.y2, s.x1, s.y1, s.width);
+  } else if (s.type === 'pencil') {
+    // Every sample the mouse gave, joined. No smoothing: a hand drawn line is
+    // meant to look like one, and the samples are close enough that the corners
+    // a round join leaves are not visible.
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    for (let i = 1; i < s.points.length; i += 1) ctx.lineTo(s.points[i].x, s.points[i].y);
+    ctx.stroke();
   } else if (s.type === 'text') {
     ctx.font = `${s.size}px "${s.font}"`;
     ctx.textBaseline = 'top';
@@ -244,7 +299,14 @@ function style() {
 
 function snapshot() {
   return {
-    shapes: shapes.map((shape) => ({ ...shape })),
+    // Shallow, except for a pencil stroke's point list. Sharing that array with
+    // the live shape would let a later move rewrite the history entry meant to
+    // undo it, and the stroke would come back already moved.
+    shapes: shapes.map((shape) =>
+      shape.points
+        ? { ...shape, points: shape.points.map((point) => ({ ...point })) }
+        : { ...shape }
+    ),
     base,
     width: canvas.width,
     height: canvas.height,
@@ -277,8 +339,10 @@ function dropPointers() {
   selected = null;
   dragFrom = null;
   resizing = null;
+  dragTarget = null;
   draft = null;
   pendingCommit = false;
+  styleEditing = null;
 }
 
 function push(shape) {
@@ -304,6 +368,7 @@ function deleteSelected() {
 // history entry, which is what makes a crop undoable at all.
 function applyCrop(box) {
   const rect = cropRect(box.x1, box.y1, box.x2, box.y2, canvas.width, canvas.height);
+  cropBox = null;
   if (!rect) {
     redraw();
     return;
@@ -356,6 +421,7 @@ canvas.addEventListener('mousedown', (event) => {
     // sits on the outline where the shape below would otherwise take the click.
     resizing = selected ? handleAt(selected, point.x, point.y, GRAB * unit) : null;
     if (resizing) {
+      dragTarget = selected;
       pendingCommit = true;
       return;
     }
@@ -363,8 +429,39 @@ canvas.addEventListener('mousedown', (event) => {
     // A generous pad, because a thin line is hard to land on exactly.
     selected = hitTest(shapes, point.x, point.y, 6 * unit);
     dragFrom = selected ? point : null;
+    dragTarget = selected;
     pendingCommit = selected !== null;
+    // A different shape means the boxes describe something else now, and the
+    // run of style edits they were collecting into one history entry is over.
+    styleEditing = null;
+    syncStyleInputs(selected);
     redraw();
+    return;
+  }
+  if (tool === 'crop') {
+    // A box that is already down is adjusted rather than replaced, which is the
+    // whole point of leaving it on screen: corners resize, inside moves.
+    if (cropBox) {
+      const grip = handleAt(cropBox, point.x, point.y, GRAB * unit);
+      if (grip) {
+        resizing = grip;
+        dragTarget = cropBox;
+        return;
+      }
+      const b = bounds(cropBox);
+      if (point.x >= b.x1 && point.x <= b.x2 && point.y >= b.y1 && point.y <= b.y2) {
+        dragFrom = point;
+        dragTarget = cropBox;
+        return;
+      }
+      // A drag that starts outside the box is a new framing, not an edit.
+      cropBox = null;
+    }
+    draft = { type: 'crop', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+    return;
+  }
+  if (tool === 'pencil') {
+    draft = { type: 'pencil', points: [point], ...style() };
     return;
   }
   if (tool === 'number') {
@@ -394,34 +491,39 @@ window.addEventListener('mousemove', (event) => {
     // Text and badges have no corner to write, so their one grip scales the
     // whole shape about its centre instead. Shift has nothing to square there.
     if (resizing.scale) {
-      scaleShape(selected, scaleFactorAt(selected, point.x, point.y));
+      scaleShape(dragTarget, scaleFactorAt(dragTarget, point.x, point.y));
       redraw();
       return;
     }
 
     // The corner diagonally across from the grip, which is the one that stays put.
     const anchor = {
-      x: selected[resizing.fx === 'x1' ? 'x2' : 'x1'],
-      y: selected[resizing.fy === 'y1' ? 'y2' : 'y1'],
+      x: dragTarget[resizing.fx === 'x1' ? 'x2' : 'x1'],
+      y: dragTarget[resizing.fy === 'y1' ? 'y2' : 'y1'],
     };
     const end = event.shiftKey
-      ? constrain(selected.type, anchor.x, anchor.y, point.x, point.y)
+      ? constrain(dragTarget.type, anchor.x, anchor.y, point.x, point.y)
       : point;
-    selected[resizing.fx] = end.x;
-    selected[resizing.fy] = end.y;
+    dragTarget[resizing.fx] = end.x;
+    dragTarget[resizing.fy] = end.y;
     redraw();
     return;
   }
 
   if (dragFrom) {
     startChange();
-    moveShape(selected, point.x - dragFrom.x, point.y - dragFrom.y);
+    moveShape(dragTarget, point.x - dragFrom.x, point.y - dragFrom.y);
     dragFrom = point;
     redraw();
     return;
   }
 
   if (!draft) return;
+  if (draft.type === 'pencil') {
+    draft.points.push(point);
+    redraw();
+    return;
+  }
   const end = event.shiftKey
     ? constrain(draft.type, draft.x1, draft.y1, point.x, point.y)
     : point;
@@ -442,17 +544,34 @@ function startChange() {
 window.addEventListener('mouseup', () => {
   dragFrom = null;
   resizing = null;
+  dragTarget = null;
   pendingCommit = false;
   if (!draft) return;
   const shape = draft;
   draft = null;
   if (shape.type === 'crop') {
-    applyCrop(shape);
+    // The box stays put instead of cutting now, so the corners can be pulled
+    // first. Nothing is thrown away until Enter or a double click.
+    if (cropRect(shape.x1, shape.y1, shape.x2, shape.y2, canvas.width, canvas.height)) {
+      cropBox = shape;
+    }
+    redraw();
+    return;
+  }
+  if (shape.type === 'pencil') {
+    // One sample is a click, not a stroke, and would draw nothing.
+    if (shape.points.length > 1) push(shape);
+    else redraw();
     return;
   }
   // A click with no drag would leave an invisible zero sized shape in the history.
   if (Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1) > 2) push(shape);
   else redraw();
+});
+
+// The second half of the crop: the box has been framed, this takes it.
+canvas.addEventListener('dblclick', () => {
+  if (cropBox) applyCrop(cropBox);
 });
 
 // Inline input instead of prompt(), which Electron does not support.
@@ -467,18 +586,73 @@ function askText(event, point) {
   wrap.appendChild(input);
   input.focus();
 
-  input.addEventListener('keydown', (keyEvent) => {
-    // Otherwise Cmd+Z while typing would undo the drawing behind the input.
-    keyEvent.stopPropagation();
-    if (keyEvent.key === 'Escape') input.remove();
-    if (keyEvent.key !== 'Enter') return;
-    if (input.value.trim()) {
+  // Enter used to be the only way in, and clicking away threw the typing out,
+  // which is the opposite of what every text tool does. Now a click elsewhere
+  // commits and only Escape discards. The flag is what keeps the two paths from
+  // both firing, since Escape removes the input and that blurs it.
+  let done = false;
+
+  const finish = (keep) => {
+    if (done) return;
+    done = true;
+    if (keep && input.value.trim()) {
       push({ type: 'text', x1: point.x, y1: point.y, text: input.value, ...style() });
     }
     input.remove();
+  };
+
+  input.addEventListener('keydown', (keyEvent) => {
+    // Otherwise Cmd+Z while typing would undo the drawing behind the input.
+    keyEvent.stopPropagation();
+    if (keyEvent.key === 'Escape') finish(false);
+    if (keyEvent.key === 'Enter') finish(true);
   });
 
-  input.addEventListener('blur', () => input.remove());
+  input.addEventListener('blur', () => finish(true));
+}
+
+// The style boxes used to arm the next shape only, so changing the colour of
+// something already drawn meant deleting it and drawing it again. They now edit
+// the selection as well, which is also why selecting a shape loads them.
+const STYLE_EDITS = [
+  [colorInput, (s, value) => { s.color = value; }],
+  [sizeInput, (s, value) => { if (s.size !== undefined) s.size = Math.max(8, Number(value) || s.size); }],
+  [strokeInput, (s, value) => { s.width = Math.max(1, Number(value) || s.width); }],
+  [fontSelect, (s, value) => { if (s.font && value) s.font = value; }],
+];
+
+// The box whose run of edits already has a history entry. Without it the colour
+// picker would push one entry per pixel it is dragged through and undo would
+// take a hundred taps to get back. Cleared when focus leaves the box or the
+// selection changes, so each visit to a box is one undoable step.
+let styleEditing = null;
+
+for (const [input, apply] of STYLE_EDITS) {
+  input.addEventListener('input', () => {
+    if (!selected) return;
+    if (styleEditing !== input) {
+      commit();
+      styleEditing = input;
+    }
+    apply(selected, input.value);
+    redraw();
+  });
+  input.addEventListener('blur', () => {
+    if (styleEditing === input) styleEditing = null;
+  });
+}
+
+// Selecting a shape loads the boxes from it. Otherwise the first nudge of the
+// size box would jump a 60px caption to whatever the box happened to be left
+// on. A font the picker does not list is left alone rather than blanked.
+function syncStyleInputs(s) {
+  if (!s) return;
+  if (s.color) colorInput.value = s.color;
+  if (s.size !== undefined) sizeInput.value = Math.round(s.size);
+  if (s.width !== undefined) strokeInput.value = Math.round(s.width);
+  if (s.font && [...fontSelect.options].some((option) => option.value === s.font)) {
+    fontSelect.value = s.font;
+  }
 }
 
 // Resizing an existing shape. Two keys rather than a box, since the shape is
@@ -504,6 +678,23 @@ window.addEventListener('keydown', (event) => {
     to.push(snapshot());
     restore(entry);
     return;
+  }
+
+  // The crop box is not a shape, so it needs its own two keys: one to take the
+  // framing and one to drop it. Checked before the selection, since a crop in
+  // progress is what Escape should be cancelling.
+  if (cropBox) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      applyCrop(cropBox);
+      return;
+    }
+    if (event.key === 'Escape') {
+      cropBox = null;
+      dropPointers();
+      redraw();
+      return;
+    }
   }
 
   if (!selected) return;
@@ -536,6 +727,9 @@ function selectTool(name) {
   tool = name;
   canvas.style.cursor = name === 'select' ? 'default' : 'crosshair';
   if (name !== 'select') selected = null;
+  // Leaving the crop tool abandons an unapplied box rather than carrying it
+  // over as an overlay no other tool can act on.
+  if (name !== 'crop') cropBox = null;
   for (const button of document.querySelectorAll('[data-tool]')) {
     button.classList.toggle('active', button.dataset.tool === name);
   }
@@ -550,6 +744,10 @@ for (const button of document.querySelectorAll('[data-tool]')) {
 
 // The dashed outline lives on the canvas, so it has to go before the export.
 function exportPng() {
+  // A framed but unapplied crop is on the canvas too, and the dimming would be
+  // saved into the png. Taking the framing is what the screen is promising, so
+  // saving with a box up crops rather than throwing the box away.
+  if (cropBox) applyCrop(cropBox);
   selected = null;
   redraw();
   return canvas.toDataURL('image/png');

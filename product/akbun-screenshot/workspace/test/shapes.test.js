@@ -193,6 +193,38 @@ test('scaleShape leaves a badge anchor where it was', () => {
   assert.strictEqual(badge.size, 30);
 });
 
+// A pencil stroke is a run of points rather than two corners, so every function
+// that reads a shape's geometry has to go through the point list instead.
+test('bounds wraps a pencil stroke around its points', () => {
+  const stroke = { type: 'pencil', points: [{ x: 30, y: 90 }, { x: 10, y: 40 }, { x: 50, y: 60 }] };
+  assert.deepStrictEqual(bounds(stroke), { x1: 10, y1: 40, x2: 50, y2: 90 });
+  assert.strictEqual(hitTest([stroke], 20, 50), stroke);
+  assert.strictEqual(hitTest([stroke], 60, 50), null);
+});
+
+test('moveShape shifts every point of a pencil stroke', () => {
+  const stroke = { type: 'pencil', points: [{ x: 0, y: 0 }, { x: 10, y: 20 }] };
+  moveShape(stroke, 5, -5);
+  assert.deepStrictEqual(stroke.points, [{ x: 5, y: -5 }, { x: 15, y: 15 }]);
+});
+
+// It has no size field, so the clamp that keeps text readable must not turn the
+// stroke's geometry into NaN on the way past.
+test('scaleShape grows a pencil stroke about its centre', () => {
+  const stroke = { type: 'pencil', points: [{ x: 0, y: 0 }, { x: 100, y: 100 }], width: 3 };
+  scaleShape(stroke, 2);
+  assert.deepStrictEqual(stroke.points, [{ x: -50, y: -50 }, { x: 150, y: 150 }]);
+  assert.strictEqual(stroke.width, 6);
+  assert.strictEqual(stroke.size, undefined);
+});
+
+// One grip, the same as text and badges, since there is no corner whose two
+// fields a drag could write.
+test('handles gives a pencil stroke one scaling grip', () => {
+  const stroke = { type: 'pencil', points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] };
+  assert.deepStrictEqual(handles(stroke), [{ scale: true, x: 40, y: 20 }]);
+});
+
 test('scaleShape clamps size and stroke so a shape cannot vanish', () => {
   const text = { type: 'text', x1: 0, y1: 0, text: 'hi', size: 9, width: 1 };
   scaleShape(text, 0.1);
