@@ -1,0 +1,97 @@
+//! The deck model shared with the page as JSON, plus pptx and pdf writers.
+//!
+//! Coordinates are pixels on a 1280x720 slide. pptx uses EMU with a slide of
+//! 12192000x6858000, which is exactly 9525 EMU per pixel, so the conversion
+//! is a single multiply with no rounding drift worth caring about.
+
+use serde::{Deserialize, Serialize};
+
+pub mod pdf;
+pub mod pptx;
+
+pub const SLIDE_W: f64 = 1280.0;
+pub const SLIDE_H: f64 = 720.0;
+pub const EMU_PER_PX: f64 = 9525.0;
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Deck {
+    pub slides: Vec<Slide>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Slide {
+    pub shapes: Vec<Shape>,
+}
+
+/// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text.
+///
+/// rect/ellipse/text use x,y,w,h. line/arrow run from (x,y) to (x+w,y+h), so
+/// w and h may be negative. pen keeps absolute points and ignores x,y,w,h.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Shape {
+    pub kind: String,
+    #[serde(default)]
+    pub x: f64,
+    #[serde(default)]
+    pub y: f64,
+    #[serde(default)]
+    pub w: f64,
+    #[serde(default)]
+    pub h: f64,
+    #[serde(default)]
+    pub points: Vec<[f64; 2]>,
+    #[serde(default = "default_stroke")]
+    pub stroke: String,
+    #[serde(default = "default_stroke_width")]
+    pub stroke_width: f64,
+    /// solid | dash | dot
+    #[serde(default = "default_dash")]
+    pub dash: String,
+    /// "none" or "#rrggbb"
+    #[serde(default = "default_none")]
+    pub fill: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: f64,
+    #[serde(default = "default_stroke")]
+    pub text_color: String,
+}
+
+fn default_stroke() -> String {
+    "#1a1a1a".into()
+}
+fn default_stroke_width() -> f64 {
+    2.0
+}
+fn default_dash() -> String {
+    "solid".into()
+}
+fn default_none() -> String {
+    "none".into()
+}
+fn default_font_size() -> f64 {
+    24.0
+}
+
+impl Default for Shape {
+    fn default() -> Self {
+        Shape {
+            kind: "rect".into(),
+            x: 0.0,
+            y: 0.0,
+            w: 0.0,
+            h: 0.0,
+            points: Vec::new(),
+            stroke: default_stroke(),
+            stroke_width: default_stroke_width(),
+            dash: default_dash(),
+            fill: default_none(),
+            text: String::new(),
+            font_size: default_font_size(),
+            text_color: default_stroke(),
+        }
+    }
+}
