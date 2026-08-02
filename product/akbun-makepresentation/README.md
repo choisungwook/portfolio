@@ -9,8 +9,8 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Shapes: rectangle, ellipse, line, arrow, freehand pen
 - Text boxes with font family, size, color, bold, italic, underline and alignment
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
-- Zoom from 50% to 400%, from the control in the corner of the stage or the keyboard
-- Slide numbers, toggled from the Numbers button
+- Zoom from 50% to 400%, from the status bar or the keyboard
+- Slide numbers, toggled from the status bar
 - Undo and redo, copy and paste, duplicate
 - Open and save .pptx, export every slide as a .pdf
 - Presentation mode (fullscreen, arrow keys)

@@ -154,13 +154,10 @@ main {
 
 /* --- stage --- */
 
-/* The stage holds the scroller and the zoom control. Only the scroller
-   scrolls, so the control stays pinned to the corner at any zoom. */
 #stage {
   flex: 1;
   min-width: 0;
   display: flex;
-  position: relative;
   background: var(--stage);
 }
 
@@ -173,41 +170,49 @@ main {
 }
 
 /* Centred with auto margins rather than justify-content, which puts the
-   overflowing top-left of a zoomed-in slide out of the scroll range. */
+   overflowing top-left of a zoomed-in slide out of the scroll range.
+
+   The subtracted 176px is everything the slide does not get: the toolbar,
+   the status bar, the stage padding, and breathing room around the slide.
+   Change either bar's height and this changes with it. */
 #stage-inner {
   position: relative;
   margin: auto;
   flex: none;
-  width: calc(min(100%, (100vh - 140px) * 16 / 9) * var(--zoom, 1));
+  width: calc(min(100%, (100vh - 176px) * 16 / 9) * var(--zoom, 1));
 }
 
-/* --- zoom control --- */
+/* --- status bar --- */
+
+#statusbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+#statusbar button {
+  padding: 3px 8px;
+}
 
 #zoom {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
   display: flex;
+  align-items: center;
   gap: 2px;
-  padding: 3px;
-  border-radius: 7px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
 }
 
 #zoom button {
-  border: none;
-  padding: 3px 8px;
-  background: transparent;
-}
-
-#zoom button:hover {
-  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
 }
 
 #btn-zoom-level {
-  min-width: 52px;
+  min-width: 54px;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
@@ -273,6 +278,14 @@ main {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* A short window would otherwise cut the last rows off with no way to
+     reach them. */
+  overflow-y: auto;
+}
+
+/* Rows must keep their height when the panel scrolls, not be squeezed. */
+#props > * {
+  flex: none;
 }
 
 #props-hint {
@@ -341,7 +354,7 @@ main {
   justify-content: center;
 }
 
-.btn-set .icon {
+.icon {
   width: 14px;
   height: 14px;
   stroke: currentColor;
@@ -351,7 +364,7 @@ main {
 }
 
 /* The frame is scaffolding for the bar that carries the meaning. */
-.btn-set .icon.box rect {
+.icon.box rect {
   opacity: 0.35;
 }
 

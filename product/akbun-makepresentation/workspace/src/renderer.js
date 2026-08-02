@@ -253,7 +253,10 @@ let lastPress = { index: -1, time: -Infinity };
 function isSecondPress(index) {
   const now = performance.now();
   const again = index === lastPress.index && now - lastPress.time < DOUBLE_PRESS_MS;
-  lastPress = { index, time: now };
+  // A consumed pair ends the sequence, the way a triple click is not two
+  // double clicks. Without the reset the press after one counts as a second
+  // press again, and a plain click keeps reopening the box just closed.
+  lastPress = { index: again ? -1 : index, time: now };
   return again;
 }
 

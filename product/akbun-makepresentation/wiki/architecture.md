@@ -78,6 +78,8 @@ Opening a file or starting a new deck clears both stacks, because a history that
 
 Zoom is a view setting: it lives in `state`, not in the deck, and nothing about the model changes with it. The stage is a scroller wrapping the slide, and zoom is one CSS variable multiplying the fitted width, so the browser does the scaling and scrollbars appear on their own once the slide outgrows the window.
 
+Its control lives in the status bar along the bottom, next to the slide-number toggle. Both answer the same question — how the deck is shown, not what it contains — which is why they sit together and away from the toolbar.
+
 Nothing else has to know. Pointer positions come from `getBoundingClientRect`, which already reports the zoomed box, so clicks map onto slide coordinates at any zoom. The one exception is the overlay textarea, placed in screen pixels: zooming while a text box is open would strand it, so a zoom commits the edit first.
 
 ## Slide numbers

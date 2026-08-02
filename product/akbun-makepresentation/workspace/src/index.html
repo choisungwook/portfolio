@@ -25,7 +25,6 @@
       <button data-tool="text" title="Text (T)">T</button>
     </div>
     <div class="group">
-      <button id="btn-numbers" title="Show a slide number on every slide">Numbers</button>
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
       <button id="btn-update" title="Check for a newer version">Updates</button>
     </div>
@@ -46,11 +45,6 @@
           <svg id="canvas" viewBox="0 0 1280 720"></svg>
           <textarea id="text-editor" hidden spellcheck="false"></textarea>
         </div>
-      </div>
-      <div id="zoom">
-        <button id="btn-zoom-out" title="Zoom out (Cmd+-)">−</button>
-        <button id="btn-zoom-level" title="Fit the slide to the window (Cmd+0)">100%</button>
-        <button id="btn-zoom-in" title="Zoom in (Cmd++)">+</button>
       </div>
     </section>
 
@@ -165,6 +159,22 @@
       <button id="btn-delete-shape">Delete shape</button>
     </aside>
   </main>
+
+  <!-- The view controls: what the deck looks like on screen, not what it
+       contains. They sit together at the bottom, away from the tools that
+       change the slide. -->
+  <footer id="statusbar">
+    <button id="btn-numbers" title="Show a slide number on every slide">№ Slide numbers</button>
+    <div id="zoom">
+      <button id="btn-zoom-out" title="Zoom out (Cmd+-)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4" /></svg>
+      </button>
+      <button id="btn-zoom-level" title="Fit the slide to the window (Cmd+0)">100%</button>
+      <button id="btn-zoom-in" title="Zoom in (Cmd++)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4M6 4v4" /></svg>
+      </button>
+    </div>
+  </footer>
 
   <div id="present" hidden></div>
 
