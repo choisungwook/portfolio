@@ -14,22 +14,12 @@ const DEFAULT_STYLE = {
   fill: 'none',
   fontSize: 24,
   textColor: '#1a1a1a',
+  // One plain family name, not a CSS stack, so it survives a pptx round trip
+  // unchanged. A generic fallback is appended at render time. The list on
+  // offer lives in the markup of #prop-font-family, which is also where the
+  // display labels belong; anything outside it still opens and renders.
   fontFamily: 'Helvetica',
 };
-
-// One plain family name per entry, not a CSS stack, so a name survives a pptx
-// round trip unchanged. A generic fallback is appended at render time.
-const FONTS = [
-  'Helvetica',
-  'Arial',
-  'Verdana',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Apple SD Gothic Neo',
-  'Malgun Gothic',
-  'Batang',
-];
 
 const BOXY = new Set(['rect', 'ellipse', 'text']);
 
@@ -333,7 +323,6 @@ const exported = {
   SLIDE_W,
   SLIDE_H,
   DEFAULT_STYLE,
-  FONTS,
   createDeck,
   createSlide,
   createShape,

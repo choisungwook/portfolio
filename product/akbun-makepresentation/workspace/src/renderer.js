@@ -271,6 +271,7 @@ canvas.addEventListener('pointerdown', (event) => {
   const group = event.target.closest('g[data-i]');
   if (group) {
     let index = Number(group.dataset.i);
+    const clicked = index;
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
     const duplicated = event.metaKey || event.ctrlKey;
@@ -286,6 +287,7 @@ canvas.addEventListener('pointerdown', (event) => {
       y0: p.y,
       moved: false,
       duplicated,
+      clicked,
     };
     canvas.setPointerCapture(event.pointerId);
   } else {
@@ -339,10 +341,11 @@ canvas.addEventListener('pointerup', () => {
   } else if (drag.mode === 'resize' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {
-    // A Cmd+click that never moved should select, not stack a copy on top of
-    // the original where nobody can see it.
+    // A Cmd+click that never moved selects the shape it hit, the way a plain
+    // click does. The copy pointerdown made has nowhere useful to sit: on top
+    // of the original nobody can see it.
     slide().shapes.pop();
-    state.selected = -1;
+    state.selected = drag.clicked;
   }
   renderAll();
 });
