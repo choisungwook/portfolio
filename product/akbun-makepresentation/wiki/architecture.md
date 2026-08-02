@@ -46,7 +46,7 @@ Three commands, each takes a path the page picked with a native dialog:
 
 **Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates.
 
-**Open**: the deck crate walks each slide part with a pull parser and keeps what the editor understands: preset rects/ellipses/lines, custom-geometry paths (read back as pen), and text boxes. Other presets become their bounding rectangle; grouped shapes are skipped. Round-tripping a file this app wrote preserves everything.
+**Open**: the deck crate walks each slide part with a pull parser and keeps what the editor understands: preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, and pictures (read into the deck as data URLs). Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the theme part and the master clrMap, placeholders inherit their box from the layout or master, a non-white slide/layout/master background becomes a page-sized rect, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas — so decks made in PowerPoint keep their look. Other presets become their bounding rectangle; grouped shapes are skipped. Round-tripping a file this app wrote preserves everything.
 
 **PDF export**: the page rasterizes each slide (SVG string → blob URL → Image → 1920x1080 canvas → JPEG data URL) and `export_pdf` wraps the JPEGs into PDF pages by hand — JPEG is a native PDF filter, so no PDF library is involved.
 

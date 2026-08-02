@@ -18,5 +18,6 @@
 * [GitHub App installation tokens as the recommended auth for the terraform bot](2026-07-github-app-tokens-for-terraform-bot.md) - 장기 PAT 대신 1시간짜리 App installation token을 권장 인증으로 두는 결정.
 * [서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다](2026-07-unsigned-desktop-app-self-update.md) - electron-updater가 막힌 상황에서 dmg 교체 방식을 모든 데스크톱 product의 기본으로 두는 결정.
 * [PR body 형식의 기준은 pull request template 하나다](2026-07-pr-body-format-in-template.md) - PR body를 Decisions와 Implementation으로 바꾸고 형식을 template 한 곳에만 두는 결정.
+* [pptx import는 OOXML을 직접 파싱하고 검증은 생성기가 다른 corpus로 한다](2026-08-pptx-import-parses-ooxml-directly.md) - PowerPoint 덱의 상속 체계(테마 색, placeholder, 배경, 페이지 크기)를 reader가 해석하고 단일 샘플 과적합을 corpus 교차 검증으로 막는 결정.
 * [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](2026-08-thumbnails-in-the-webview.md) - akbun-folderview의 썸네일 캐시를 Rust 이미지 라이브러리 없이 canvas로 생성하기로 한 결정.
 * [핸즈온은 terraform으로 기반까지만 만들고 학습 대상은 console에서 조작한다](2026-08-handson-terraform-base-console-operation.md) - terraform 범위를 기반 리소스로 한정하는 결정과 state 밖 리소스가 만드는 비용.

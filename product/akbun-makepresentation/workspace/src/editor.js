@@ -267,6 +267,16 @@ function renderShapeSvg(shape, options) {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
       return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>`;
     }
+    case 'image': {
+      const b = shapeBBox(shape);
+      // A deck is a file someone else may have made, so src is untrusted
+      // even though the importer only ever writes data URLs. Anything but
+      // an inline image renders empty rather than letting the markup out or
+      // sending the webview to fetch an address.
+      const src = String(shape.src || '');
+      const href = src.startsWith('data:image/') ? escapeXml(src) : '';
+      return `<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${href}" preserveAspectRatio="none"/>`;
+    }
     case 'text': {
       if (hideText) return '';
       const lines = String(shape.text || '').split('\n');
