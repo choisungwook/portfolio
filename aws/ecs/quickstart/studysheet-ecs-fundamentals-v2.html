@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECS로 컨테이너 운영 자동화하기 — EC2 launch type과 Fargate</title>
+<style>
+:root{
+  --dark:#212022;       /* 하단 내비게이션 버튼 */
+  --ink:#000000;        /* 본문·도형선 */
+  --point:#FFC000;      /* 포인트(노랑) */
+  --hl:#FFE066;         /* 본문 형광펜 */
+  --prob:#FF0000;       /* 문제·에러(빨강) */
+  --wl:#FFF2CC;         /* 다이어그램 워크로드 채움(연노랑) */
+  --rs:#E2EFDA;         /* 다이어그램 리소스 채움(연초록) */
+  --grp:#F2F2F2;        /* 다이어그램 묶음 채움(연회색) */
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;  /* VS Code Dark+ 코드 패널 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 글씨는 슬라이드(뷰포트) 크기에 비례해 커진다 — FHD 전체 화면에서 약 38px */
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+/* 슬라이드(16:9): 화면 높이에 맞춰 최대 크기로 띄운다 */
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── 표지(라이트) ── */
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}                       /* "이런 상황이 있다면" */
+.p-point{background:var(--point);font-weight:700;padding:0 4px}  /* "어떻게 풀까?"·"푸는 방법 중 하나" */
+
+/* ── 내용 페이지 머리: "N. 섹션명" 헤더 ── */
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}          /* 노란 형광펜 */
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+/* ■/- 불릿 */
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+/* ── 다이어그램: 흰 채움 + 검정 얇은 테두리 ── */
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}     /* 워크로드(pod·앱) */
+.dbox.rs{background:var(--rs)}     /* 인프라 리소스(service 등) */
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}  /* 지금 설명하는 주인공 */
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+/* 구조 애니메이션(stepper): 필요할 때만 쓴다 */
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+/* ── 코드 패널: VS Code Dark+ ── */
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}          /* 키·키워드 */
+pre.code .s{color:#CE9178}          /* 문자열 */
+pre.code .c{color:#6A9955}          /* 주석 */
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+/* 확인 문제: 클릭형 객관식 — 보기 클릭 즉시 정답 여부 + 피드백 */
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+/* 트레이드오프: 박스 없이 두 단 리스트 */
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+/* 링크 푸터(핸즈온 재현 링크 등) */
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+/* ── 하단 내비게이션 ── */
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+/* 인쇄: 전 페이지 펼침 */
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+/* 좁은 화면: 16:9 고정을 풀고 세로로 읽는다 */
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+
+<!-- ════════ 1장. 표지 + 미리보기 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>컨테이너 운영, <mark>ECS</mark>에게 맡기기</h1>
+    <p class="sub">docker run 수동 운영에서 출발해 같은 컨테이너를 EC2 launch type과 Fargate로 모두 띄워 보고 차이를 확인하는 학습지</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — EC2 한 대에서 docker run으로 서비스 운영 중. 새벽에 컨테이너가 죽으면 SSH로 들어가 다시 올리고, 새 버전 배포 때마다 서비스가 잠시 끊김.</p>
+    <p><b class="p-point">어떻게 풀까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">컨테이너 하나를 사람이 지키는 운영</h2>
+  <p class="dim">이런 상황을 가정함</p>
+  <p>EC2 한 대에 docker run으로 웹 서비스 운영 중.</p>
+  <ul class="bullets">
+    <li><span class="xmark">✕</span> 컨테이너가 죽어도 아무도 모름 — 장애 제보 후에야 SSH 접속, 수동 재기동</li>
+    <li><span class="xmark">✕</span> 배포는 stop → run 순서 — 그 사이 서비스 중단</li>
+    <li><span class="xmark">✕</span> 스케일아웃은 EC2 추가·컨테이너 배치·LB 연결 전부 수동</li>
+  </ul>
+  <p>재기동 스크립트로 버틸 수는 있으나, "죽음 감지 → 재기동 → LB 연결"을 직접 만들면 orchestrator 재발명.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 원하는 상태(컨테이너 수·버전)만 선언하고 유지 책임을 넘기는 container orchestration. 그중 AWS 관리형인 <b>ECS</b>(Elastic Container Service).</p>
+</section>
+
+<!-- ════════ 3장. 원리: reconciliation ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">선언하면, 시스템이 맞춘다</h2>
+  <p>ECS의 핵심은 <mark>desired state 선언</mark>. "컨테이너 2개 항상 실행"을 선언하면 service scheduler가 실제 상태(actual)와 계속 비교, 다르면 조정함.</p>
+  <ul class="bullets">
+    <li>작은 예 — desired count = 2 선언
+      <ul>
+        <li>task 1개 죽음 → actual 1 ≠ desired 2 → scheduler가 새 task 1개 기동</li>
+      </ul>
+    </li>
+    <li>설계 이유 — 분산 환경에서 죽음은 일상. 복구를 사람의 절차가 아니라 제어 루프에 맡김</li>
+    <li>(잠깐 용어) task definition = 실행 설계도 / task = 실행 단위 / service = 유지 선언 — 다시 돌아와서, 셋을 잇는 것이 scheduler</li>
+  </ul>
+  <p><b>다른 곳에도 적용됨.</b> Kubernetes ReplicaSet, EC2 Auto Scaling Group도 같은 reconciliation 원리.</p>
+</section>
+
+<!-- ════════ 4장. 원리: launch type ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">task는 어디서 도는가 — launch type</h2>
+  <p>무엇을 몇 개 띄울지(선언)와 어디서 띄울지(실행 기반)는 분리된 선택 — 실행 기반이 <mark>launch type</mark>. 선언·복구·배포는 두 방식 모두 동일.</p>
+  <ul class="bullets">
+    <li>EC2 launch type — 내가 등록한 EC2(container instance) 위에서 실행
+      <ul>
+        <li>인스턴스의 ECS agent가 cluster에 등록을 보고, scheduler가 그 위에 task 배치</li>
+        <li>OS 패치·용량 계획이 내 몫. GPU·특수 인스턴스 필요 시 선택</li>
+      </ul>
+    </li>
+    <li>Fargate — 호스트 없이 task 단위로 CPU·메모리를 빌림. 서버 관리 제로, task별 과금</li>
+  </ul>
+  <p>Fargate의 등장 이유 — orchestrator가 컨테이너를 살려도 호스트 관리 문제는 남기 때문. 이 학습지는 <b>같은 이미지를 두 방식 모두로 실습</b>해 차이를 눈으로 확인.</p>
+</section>
+
+<!-- ════════ 5장. 구조 이해하기: 정적 구조 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">task definition → service → task</h2>
+  <p>설계도(task definition)를 service가 참조해, cluster 안에서 task를 desired count만큼 유지. task가 놓이는 곳만 launch type에 따라 갈림.</p>
+  <div class="diagram" style="gap:18px;padding:8px">
+    <div class="dbox">task definition<small>이미지·CPU·메모리·포트</small></div>
+    <div class="darrow">→</div>
+    <div class="dgroup" style="margin-top:0"><b>ECS cluster</b>
+      <div class="diagram" style="padding:6px;margin:0">
+        <div class="dbox rs">service<small>desired count</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">task<small>Fargate</small></div>
+        <div class="dbox wl">task<small>container instance(EC2) 위</small></div>
+      </div>
+    </div>
+  </div>
+  <ul class="bullets">
+    <li>cluster — task·service·container instance를 담는 논리 경계</li>
+    <li>service — desired count 유지 + LB 연결·배포 담당</li>
+    <li>task — 실행 중인 컨테이너 묶음. 놓이는 곳이 Fargate 또는 내 EC2</li>
+  </ul>
+</section>
+
+<!-- ════════ 6장. 구조 이해하기: 자동 복구 흐름 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">task가 죽으면 벌어지는 일</h2>
+  <p>같은 구조 위에서 원리 장의 reconciliation이 도는 장면. launch type과 무관하게 동일. 단계를 넘겨 확인.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker bad">1</span>
+        <div class="dbox rs dim">service<small>desired = 2</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">task 1</div>
+        <div class="dbox bad">task 2 <span class="xmark">✕</span></div>
+      </div>
+      <p class="exp"><b>1단계.</b> task 2가 비정상 종료. actual count = 1.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox hot">service<small>desired 2 ≠ actual 1</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">task 1</div>
+        <div class="dbox dim">task 2 ✕</div>
+      </div>
+      <p class="exp"><b>2단계.</b> service scheduler가 desired와 actual의 차이를 감지.</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox rs">service<small>desired = 2</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox wl">task 1</div>
+        <div class="dbox hot">task 3 (신규)</div>
+      </div>
+      <p class="exp"><b>3단계.</b> 새 task를 기동해 desired 회복. 사람 개입 없음.</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 7장. 핸즈온 ①: 로컬 확인 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">① 올릴 이미지를 로컬에서 먼저 확인</h2>
+  <p>ECS task로 띄울 것과 같은 이미지를 로컬에서 실행. 도구 설치는 docs/setup.md 참조.</p>
+  <p class="codedesc">workspace 루트(aws/ecs/quickstart)에서 실행 — 주석이 기대 결과</p>
+  <pre class="code">docker compose up -d
+curl -s http://localhost:8080 | grep title
+<span class="c"># 기대: &lt;title&gt;Welcome to nginx!&lt;/title&gt;</span></pre>
+  <p><b>체크포인트.</b> ECS에 올릴 이미지가 로컬에서 동작함을 확인.</p>
+</section>
+
+<!-- ════════ 8장. 핸즈온 ②: terraform 기반 생성 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">② terraform으로 기반 리소스 생성</h2>
+  <p>service 직전까지를 준비 — cluster, task definition 2개(Fargate용·EC2용), <mark>container instance(t4g.small)</mark>, IAM role, log group, security group(내 IP만 80 허용). service 생성·배포는 console에서 직접.</p>
+  <p class="codedesc">terraform 디렉터리에서 실행</p>
+  <pre class="code">terraform -chdir=terraform init
+terraform -chdir=terraform apply</pre>
+  <p class="codedesc">기대 결과 (마지막 줄)</p>
+  <pre class="code">Apply complete! Resources: <span class="hot">14 added</span>, 0 changed, 0 destroyed.</pre>
+  <p><b>체크포인트.</b> cluster → Infrastructure 탭에 container instance 1대 등록 확인 — EC2 launch type의 자리 준비 완료.</p>
+</section>
+
+<!-- ════════ 9장. 핸즈온 ③: outputs 확인 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">③ console 입력값을 outputs로 확인</h2>
+  <p>다음 장부터 console 화면에 그대로 입력할 값들.</p>
+  <p class="codedesc">outputs 조회</p>
+  <pre class="code">terraform -chdir=terraform output</pre>
+  <p class="codedesc">기대 결과</p>
+  <pre class="code">cluster_name = <span class="s">"ecs-fundamentals"</span>
+container_instance_public_ip = <span class="s">"3.x.x.x"</span>
+ec2_task_definition_family = <span class="s">"ecs-fundamentals-web-ec2"</span>
+security_group_id = <span class="s">"sg-..."</span>
+subnet_ids = [ <span class="s">"subnet-..."</span>, ... ]
+task_definition_family = <span class="s">"ecs-fundamentals-web"</span></pre>
+  <p><b>체크포인트.</b> cluster·설계도 2벌·네트워크 값 확보 — console에서 조립만 남음.</p>
+</section>
+
+<!-- ════════ 10장. 핸즈온 ④: Fargate service ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">④ Fargate service 생성 (quickstart)</h2>
+  <ul class="bullets">
+    <li><span class="marker">1</span> ECS console → Clusters → ecs-fundamentals → Services → Create</li>
+    <li><span class="marker">2</span> Launch type <mark>Fargate</mark> / Family: ecs-fundamentals-web / Service name: web / Desired tasks: 1</li>
+    <li><span class="marker">3</span> Networking — outputs의 subnet·security group 선택, Public IP 켜기</li>
+    <li><span class="marker">4</span> Tasks 탭에서 RUNNING 확인 후 task의 Public IP 복사</li>
+  </ul>
+  <p class="codedesc">task public IP로 접속 확인 — 주석이 기대 결과</p>
+  <pre class="code">curl http://&lt;task public IP&gt;
+<span class="c"># 기대: &lt;h1&gt;Welcome to nginx!&lt;/h1&gt;</span></pre>
+  <p><b>체크포인트.</b> 호스트 없이 선언만으로 컨테이너가 배치·기동됨.</p>
+</section>
+
+<!-- ════════ 11장. 핸즈온 ⑤: EC2 launch type service ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">⑤ 같은 이미지를 EC2 launch type으로</h2>
+  <ul class="bullets">
+    <li><span class="marker">1</span> 같은 cluster → Services → Create</li>
+    <li><span class="marker">2</span> Launch type <mark>EC2</mark> / Family: ecs-fundamentals-web-ec2 / Service name: web-ec2 / Desired tasks: 1</li>
+    <li><span class="marker">3</span> bridge 모드라 Networking 설정 없음 — 그대로 Create</li>
+    <li><span class="marker">4</span> Tasks 탭에서 RUNNING 확인 — task가 container instance 위에 배치됨</li>
+  </ul>
+  <p class="codedesc">이번엔 인스턴스 public IP로 접속 — outputs의 container_instance_public_ip</p>
+  <pre class="code">curl http://&lt;container instance public IP&gt;
+<span class="c"># 기대: &lt;h1&gt;Welcome to nginx!&lt;/h1&gt;</span></pre>
+  <p><b>체크포인트.</b> 같은 설계도·같은 선언이 내가 관리하는 EC2 위에서도 동작.</p>
+</section>
+
+<!-- ════════ 12장. 핸즈온 ⑥: 두 방식 차이 관찰 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">⑥ 두 task를 나란히 놓고 차이 관찰</h2>
+  <p>console에서 web(Fargate)·web-ec2(EC2)의 task 상세를 열어 비교.</p>
+  <ul class="bullets">
+    <li>네트워크 — Fargate task는 awsvpc: <mark>task마다 자기 ENI·IP</mark> / EC2 task는 bridge: 인스턴스 IP와 host port 공유
+      <ul>
+        <li>그래서 접속 주소가 달랐음 — task IP vs 인스턴스 IP</li>
+      </ul>
+    </li>
+    <li>호스트 가시성 — EC2 console에 container instance가 보임(패치·용량 내 몫) / Fargate는 볼 호스트 자체가 없음</li>
+    <li>task 상세 — Fargate: ENI ID 표시 / EC2: Container instance 표시</li>
+  </ul>
+  <p><b>체크포인트.</b> 같은 선언이라도 실행 기반에 따라 네트워크 모양과 운영 책임이 달라짐을 확인.</p>
+</section>
+
+<!-- ════════ 13장. 핸즈온 ⑦: 자동 복구 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">⑦ task를 죽여서 자동 복구 관찰</h2>
+  <p>도입 문제의 "새벽 SSH 재기동"이 사라지는지 확인 — reconciliation의 실물. 두 service 중 아무 쪽이나, 여유가 되면 둘 다.</p>
+  <ul class="bullets">
+    <li><span class="marker">1</span> Tasks 탭 → 실행 중 task 선택 → Stop</li>
+    <li><span class="marker">2</span> 수십 초 내 새 task 자동 기동 (PROVISIONING → RUNNING)</li>
+    <li><span class="marker">3</span> service → Events 탭에서 복구 기록 확인</li>
+  </ul>
+  <p class="codedesc">Events 탭 기대 메시지</p>
+  <pre class="code">service web <span class="hot">has started 1 tasks</span> ... has reached a steady state.</pre>
+  <p><b>체크포인트.</b> 감지 → 신규 기동까지 사람 개입 없음. launch type과 무관하게 동일.</p>
+</section>
+
+<!-- ════════ 14장. 배포전략: rolling 핸즈온 ════════ -->
+<section class="page">
+  <p class="sec">5. 배포전략</p>
+  <h2 class="page-title">배포 = revision 교체, 기본은 rolling</h2>
+  <p>ECS의 배포 = task definition의 <mark>새 revision 등록 + service의 참조 교체</mark>. 설계도가 불변(immutable)이라 revision 번호로 버전 추적됨. web(Fargate) service로 실습.</p>
+  <ul class="bullets">
+    <li><span class="marker">1</span> Task definitions → ecs-fundamentals-web → Create new revision — 환경변수 추가(예: DEPLOY_VER=2)</li>
+    <li><span class="marker">2</span> service web → Update service → 새 revision 선택</li>
+    <li><span class="marker">3</span> Deployments 탭에서 교체 과정 관찰</li>
+  </ul>
+  <p class="codedesc">Deployments 탭 기대 흐름</p>
+  <pre class="code">신 revision task 기동 → 정상 확인 → 구 revision task 종료 (잠시 공존)</pre>
+  <p><b>체크포인트.</b> 중단 없는 rolling update 관찰 완료.</p>
+</section>
+
+<!-- ════════ 15장. 배포전략: 전략 비교 ════════ -->
+<section class="page">
+  <p class="sec">5. 배포전략</p>
+  <h2 class="page-title">rolling만 있는 게 아니다</h2>
+  <ul class="bullets">
+    <li>rolling (기본) — 새 task를 띄우며 구 task를 점진 교체
+      <ul>
+        <li>minimumHealthyPercent(유지 최소)·maximumPercent(순간 최대)로 속도 제어</li>
+        <li>추가 비용 없음. 두 버전이 동시에 트래픽 받는 구간 존재</li>
+      </ul>
+    </li>
+    <li>blue/green (CodeDeploy 연동) — 신버전 세트를 따로 띄워 트래픽 일괄 전환. 즉시 롤백, 배포 중 인프라 2배</li>
+    <li>external — 배포 제어를 외부 시스템에 위임</li>
+  </ul>
+  <p>판단 기준 — 두 버전 공존 가능하면 rolling, DB 스키마 비호환 등 <span class="prob-text">공존 불가</span>면 blue/green.</p>
+</section>
+
+<!-- ════════ 16장. 확인해 보기 Q1 ════════ -->
+<section class="page">
+  <p class="sec">6. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 (1/2)</h2>
+  <div class="quiz">
+    <p class="q">Q1. desired count 3인 service에서 task 2개가 동시에 죽었다. 운영자가 할 일은?</p>
+    <ul class="opts">
+      <li>새 task 2개를 수동으로 run task 실행</li>
+      <li data-answer>없음 — scheduler가 자동으로 2개 기동</li>
+      <li>service를 삭제하고 다시 생성</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> scheduler가 desired(3) ≠ actual(1)을 감지해 스스로 채움. 복구는 제어 루프의 일.</p>
+  </div>
+</section>
+
+<!-- ════════ 17장. 확인해 보기 Q2 ════════ -->
+<section class="page">
+  <p class="sec">6. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검 (2/2)</h2>
+  <div class="quiz">
+    <p class="q">Q2. GPU 추론 컨테이너를 ECS에서 운영해야 한다. launch type 선택은?</p>
+    <ul class="opts">
+      <li>Fargate — 서버 관리가 없어 운영이 가장 단순</li>
+      <li data-answer>EC2 launch type — GPU 인스턴스를 cluster에 등록해 실행</li>
+      <li>어느 쪽이든 동일하게 동작</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> Fargate는 GPU 미지원. 특수 하드웨어·privileged가 필요하면 호스트를 직접 가져오는 EC2 launch type.</p>
+  </div>
+</section>
+
+<!-- ════════ 18장. 트레이드오프: EC2 vs Fargate ════════ -->
+<section class="page">
+  <p class="sec">7. 트레이드오프</p>
+  <h2 class="page-title">Fargate를 고르면 얻는 것, 잃는 것</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>얻는 것</h3>
+      <ul>
+        <li>호스트 관리 제로 — 패치·용량 계획·bin packing 소멸</li>
+        <li>task 단위 과금 — 빈 인스턴스 비용 없음</li>
+        <li>task마다 ENI — SG를 task 단위로 분리 가능</li>
+      </ul>
+    </div>
+    <div class="con"><h3>잃는 것</h3>
+      <ul>
+        <li>GPU·특수 인스턴스·privileged 불가</li>
+        <li>같은 상시 부하면 vCPU 단가가 EC2보다 높음</li>
+        <li>호스트 데몬·인스턴스 캐시 활용 불가</li>
+      </ul>
+    </div>
+  </div>
+  <p><b>언제 쓰는가.</b> 기본값은 Fargate. GPU·특수 하드웨어, 상시 고밀도 부하로 인스턴스를 꽉 채워 쓰는 경우면 EC2 launch type.</p>
+</section>
+
+<!-- ════════ 19장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">8. 결론</p>
+  <h2 class="page-title">도입 문제로 돌아가서</h2>
+  <ul class="bullets">
+    <li>죽으면 사람이 재기동 → reconciliation이 자동 복구 (핸즈온 ⑦)</li>
+    <li>배포 중 서비스 중단 → rolling이 새 task 확인 후 구 task 종료</li>
+    <li>어디서 띄울지는 별도 선택 — 기본 Fargate, 특수 요구만 EC2 launch type (핸즈온 ④~⑥)</li>
+  </ul>
+  <p>기억할 한 문장 — <mark>선언(무엇을 몇 개)과 실행 기반(어디서)은 분리된 선택</mark>이고, 유지·복구·배포는 launch type과 무관하게 scheduler의 일. 단, ECS는 AWS 밖 이식·K8s 생태계(Helm·Operator)가 없는 점은 한계.</p>
+  <p>실습 정리 — console에서 service 2개(web, web-ec2) 삭제 후 terraform destroy (docs/3-cleanup.md).</p>
+  <p class="foot">github 링크: https://github.com/choisungwook/portfolio (aws/ecs/quickstart)</p>
+</section>
+
+</main>
+
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+// 페이지 넘김: 이전/다음 버튼, 점 클릭, 키보드 ←/→
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+// 전체 화면 보기: 버튼 클릭으로 진입/해제 토글
+// Fullscreen API를 못 쓰는 환경(미지원 브라우저, allowfullscreen 없는 iframe)에서는 버튼을 숨긴다
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});   // 정책상 차단되면 조용히 무시
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+// 확인 문제: 보기 클릭 → 정답이면 노랑, 오답이면 클릭한 보기 빨강 + 정답 노랑 표시
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+// 구조 애니메이션: stepper마다 독립 동작
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
