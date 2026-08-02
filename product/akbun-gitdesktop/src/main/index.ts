@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electro
 import path from 'node:path'
 import type { GitResult, ThemePreference } from '../shared/types'
 import * as git from './git'
+import * as github from './github'
 import { openInApp, listOpenerApps } from './openWith'
 import { addRepo, loadRepos, removeRepo } from './repoStore'
 import { loadSettings, saveTheme } from './settingsStore'
@@ -102,7 +103,20 @@ function registerIpcHandlers(): void {
       wrap(() => git.getRangeDiff(repoPath, base, head, filePath))
   )
 
-  ipcMain.handle('gh:pullRequests', (_event, repoPath: string) => wrap(() => git.getPullRequests(repoPath)))
+  ipcMain.handle('gh:pullRequests', (_event, repoPath: string) =>
+    wrap(() => github.getPullRequests(repoPath))
+  )
+  ipcMain.handle('gh:pullRequestDetail', (_event, repoPath: string, number: number) =>
+    wrap(() => github.getPullRequestDetail(repoPath, number))
+  )
+  ipcMain.handle('gh:issues', (_event, repoPath: string) => wrap(() => github.getIssues(repoPath)))
+  ipcMain.handle('gh:issueDetail', (_event, repoPath: string, number: number) =>
+    wrap(() => github.getIssueDetail(repoPath, number))
+  )
+  ipcMain.handle('gh:projects', (_event, repoPath: string) => wrap(() => github.getProjects(repoPath)))
+  ipcMain.handle('gh:projectBoard', (_event, repoPath: string, owner: string, number: number) =>
+    wrap(() => github.getProjectBoard(repoPath, owner, number))
+  )
 
   ipcMain.handle('open:external', (_event, url: string) => wrap(() => shell.openExternal(url)))
   ipcMain.handle('open:apps', () => wrap(async () => listOpenerApps()))

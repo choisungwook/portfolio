@@ -5,7 +5,6 @@ import type {
   CliToolStatus,
   CommitInfo,
   FileChange,
-  PullRequestInfo,
   WorktreeInfo
 } from '../shared/types'
 
@@ -16,18 +15,6 @@ const DEFAULT_BRANCH_CANDIDATES = ['main', 'master', 'develop']
 export function runGit(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr.trim() || error.message))
-        return
-      }
-      resolve(stdout)
-    })
-  })
-}
-
-function runGh(cwd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile('gh', args, { cwd, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr.trim() || error.message))
         return
@@ -287,35 +274,4 @@ export async function getRangeDiff(
   filePath: string
 ): Promise<string> {
   return runGit(repoPath, ['diff', '--no-color', `${base}...${head}`, '--', filePath])
-}
-
-export async function getPullRequests(repoPath: string): Promise<PullRequestInfo[]> {
-  const out = await runGh(repoPath, [
-    'pr',
-    'list',
-    '--state',
-    'all',
-    '--limit',
-    '50',
-    '--json',
-    'number,title,state,author,headRefName,url,updatedAt'
-  ])
-  const rows = JSON.parse(out) as Array<{
-    number: number
-    title: string
-    state: string
-    author: { login: string }
-    headRefName: string
-    url: string
-    updatedAt: string
-  }>
-  return rows.map((row) => ({
-    number: row.number,
-    title: row.title,
-    state: row.state,
-    author: row.author?.login ?? '',
-    headRefName: row.headRefName,
-    url: row.url,
-    updatedAt: row.updatedAt
-  }))
 }

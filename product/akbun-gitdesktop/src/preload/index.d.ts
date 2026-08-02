@@ -5,10 +5,14 @@ import type {
   CommitInfo,
   FileChange,
   GitResult,
+  IssueInfo,
   OpenerApp,
+  ProjectBoard,
+  ProjectListResult,
   PullRequestInfo,
   RepoEntry,
   ThemePreference,
+  ThreadDetail,
   WorktreeInfo
 } from '../shared/types'
 
@@ -47,6 +51,11 @@ export interface GitDesktopApi {
   ) => Promise<GitResult<string>>
 
   getPullRequests: (repoPath: string) => Promise<GitResult<PullRequestInfo[]>>
+  getPullRequestDetail: (repoPath: string, number: number) => Promise<GitResult<ThreadDetail>>
+  getIssues: (repoPath: string) => Promise<GitResult<IssueInfo[]>>
+  getIssueDetail: (repoPath: string, number: number) => Promise<GitResult<ThreadDetail>>
+  getProjects: (repoPath: string) => Promise<GitResult<ProjectListResult>>
+  getProjectBoard: (repoPath: string, owner: string, number: number) => Promise<GitResult<ProjectBoard>>
 
   openExternal: (url: string) => Promise<GitResult<void>>
   listOpenerApps: () => Promise<GitResult<OpenerApp[]>>

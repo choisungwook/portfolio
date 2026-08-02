@@ -1,16 +1,16 @@
 import { useEffect, useState, type JSX } from 'react'
-import type { PullRequestInfo } from '../../../shared/types'
+import type { IssueInfo } from '../../../shared/types'
 import { clickable } from '../lib/clickable'
 import { ghErrorMessage, shortDate, stateClass } from '../lib/github'
 
 interface Props {
   repoPath: string
   selectedNumber: number
-  onSelect: (pr: PullRequestInfo) => void
+  onSelect: (issue: IssueInfo) => void
 }
 
-export default function PrPanel({ repoPath, selectedNumber, onSelect }: Props): JSX.Element {
-  const [prs, setPrs] = useState<PullRequestInfo[]>([])
+export default function IssuePanel({ repoPath, selectedNumber, onSelect }: Props): JSX.Element {
+  const [issues, setIssues] = useState<IssueInfo[]>([])
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -18,13 +18,13 @@ export default function PrPanel({ repoPath, selectedNumber, onSelect }: Props): 
     let cancelled = false
     setLoading(true)
     setLoadError('')
-    window.gitdesktop.getPullRequests(repoPath).then((result) => {
+    window.gitdesktop.getIssues(repoPath).then((result) => {
       if (cancelled) return
       setLoading(false)
       if (result.ok) {
-        setPrs(result.data)
+        setIssues(result.data)
       } else {
-        setLoadError(ghErrorMessage('pull requests', result.error))
+        setLoadError(ghErrorMessage('issues', result.error))
       }
     })
     return () => {
@@ -32,44 +32,44 @@ export default function PrPanel({ repoPath, selectedNumber, onSelect }: Props): 
     }
   }, [repoPath])
 
-  if (loading) return <p className="placeholder">Loading pull requests...</p>
+  if (loading) return <p className="placeholder">Loading issues...</p>
   if (loadError) return <div className="error-banner">{loadError}</div>
 
   return (
     <ul className="pr-list">
-      {prs.map((pr) => (
+      {issues.map((issue) => (
         <li
-          key={pr.number}
-          className={pr.number === selectedNumber ? 'selected' : ''}
-          {...clickable(() => onSelect(pr))}
-          title={`Show pull request #${pr.number}`}
+          key={issue.number}
+          className={issue.number === selectedNumber ? 'selected' : ''}
+          {...clickable(() => onSelect(issue))}
+          title={`Show issue #${issue.number}`}
         >
-          <span className={stateClass(pr.state)}>{pr.state}</span>
+          <span className={stateClass(issue.state)}>{issue.state}</span>
           <span className="pr-title">
-            #{pr.number} {pr.title}
+            #{issue.number} {issue.title}
           </span>
-          {pr.labels.map((label) => (
+          {issue.labels.map((label) => (
             <span key={label} className="label-chip">
               {label}
             </span>
           ))}
           <span className="pr-meta">
-            {pr.author} · {pr.headRefName} · {shortDate(pr.updatedAt)}
+            {issue.author} · {shortDate(issue.updatedAt)}
           </span>
           <button
             className="icon-button"
             title="Open on GitHub"
-            aria-label={`Open pull request ${pr.number} on GitHub`}
+            aria-label={`Open issue ${issue.number} on GitHub`}
             onClick={(event) => {
               event.stopPropagation()
-              window.gitdesktop.openExternal(pr.url)
+              window.gitdesktop.openExternal(issue.url)
             }}
           >
             ↗
           </button>
         </li>
       ))}
-      {prs.length === 0 && <li className="placeholder">No pull requests.</li>}
+      {issues.length === 0 && <li className="placeholder">No issues.</li>}
     </ul>
   )
 }

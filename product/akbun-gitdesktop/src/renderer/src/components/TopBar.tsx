@@ -24,17 +24,17 @@ function noticeFor(status: CliStatus): string {
     return 'git CLI was not found. This app runs git commands directly, so install git to use any feature.'
   }
   if (!status.gh.available) {
-    return 'gh CLI was not found. Every feature works except the pull request list.'
+    return 'gh CLI was not found. Every feature works except the pull request, issue and project tabs.'
   }
   if (!status.gh.authenticated) {
-    return 'gh CLI is installed but not logged in. Run gh auth login to load pull requests.'
+    return 'gh CLI is installed but not logged in. Run gh auth login to load pull requests, issues and projects.'
   }
   return ''
 }
 
 /**
  * Fixed top bar. It shows how the app depends on the two CLIs it shells out to,
- * git for everything and gh for pull requests, and opens the settings dialog.
+ * git for everything and gh for the GitHub tabs, and opens the settings dialog.
  */
 export default function TopBar({ status, onOpenSettings }: Props): JSX.Element {
   const notice = status ? noticeFor(status) : ''

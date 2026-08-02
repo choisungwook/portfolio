@@ -1,6 +1,6 @@
 # akbun-gitdesktop
 
-로컬 git 저장소의 commit, branch, worktree, git graph, GitHub PR을 한 화면에서 보는 데스크톱 앱이다. Electron + TypeScript + React로 만들었고 macOS를 우선 지원하며 Windows, Linux 빌드도 제공한다.
+로컬 git 저장소의 commit, branch, worktree, git graph와 GitHub의 PR, issue, project를 한 화면에서 보는 데스크톱 앱이다. Electron + TypeScript + React로 만들었고 macOS를 우선 지원하며 Windows, Linux 빌드도 제공한다.
 
 UI 언어는 영어다.
 
@@ -9,8 +9,8 @@ UI 언어는 영어다.
 - 상단 바: git과 gh CLI 인식 상태 chip, Settings 버튼
 - 왼쪽 사이드바: 가져온 git 폴더 목록과 폴더 가져오기 버튼
 - 두 번째 열: 선택한 저장소의 worktree 목록. 각 worktree 옆에 "Open with"(VS Code, Finder, Terminal 등)가 있다
-- 나머지 화면: 선택한 worktree의 git graph, 브랜치 목록, GitHub PR 목록 탭
-- 오른쪽 drawer: commit이나 branch를 클릭하면 열리는 변경 파일 목록과 git diff
+- 나머지 화면: 선택한 worktree의 Graph, Branches, Pull requests, Issues, Projects 탭
+- 오른쪽 drawer: Graph와 Branches 탭에서는 변경 파일 목록과 git diff, GitHub 탭에서는 issue나 PR의 본문과 comment
 
 선택한 저장소와 worktree는 accent 색 배경과 왼쪽 세로 바로 표시한다.
 
@@ -22,7 +22,10 @@ UI 언어는 영어다.
 - branch를 클릭하면 기본 브랜치와의 3-dot diff 파일 목록과 diff를 표시
 - branch 보기, 생성, 삭제 (미병합 브랜치는 확인 후 강제 삭제)
 - worktree 보기, 생성(새 브랜치와 함께), 삭제
-- GitHub PR 목록 보기 (gh CLI 사용, 클릭하면 브라우저로 이동)
+- GitHub PR과 issue 목록 보기 (state, label, 작성자, 갱신일)
+- PR이나 issue를 클릭하면 본문과 comment 전체를 오른쪽 drawer에 표시. PR은 base ← head와 변경 파일 수, 추가/삭제 줄 수도 함께 표시
+- GitHub project를 Status 필드 기준 칸반으로 보기. 카드가 이 저장소의 issue나 PR이면 클릭해서 drawer로 열고, 다른 저장소의 카드나 draft issue는 브라우저로 연다
+- 목록의 ↗ 버튼이나 drawer의 "Open in browser"로 GitHub 원본 열기
 - worktree를 외부 앱으로 열기
 - dark/light 테마 전환, 기본값은 시스템 설정을 따르는 system
 - Settings에서 git, gh CLI의 인식 여부와 버전, 경로, gh 로그인 상태 확인과 재검사
@@ -33,9 +36,11 @@ Settings의 Appearance에서 System, Light, Dark 중 하나를 고른다. 기본
 
 ## 설계 원칙: git CLI + gh CLI
 
-git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. gh CLI는 항상 쓰는 것이 아니라 GitHub PR 목록을 조회할 때만 실행한다. gh가 없어도 나머지 기능은 모두 동작하며, PR 보기만 사용할 수 없다.
+git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. gh CLI는 항상 쓰는 것이 아니라 GitHub의 PR, issue, project를 조회할 때만 실행한다. gh가 없어도 나머지 기능은 모두 동작하며, GitHub 탭 세 개만 사용할 수 없다.
 
-앱을 켜면 상단 바가 git과 gh 설치 여부를 chip으로 보여 준다. git이 없으면 앱이 동작하지 않으므로 경고 배너로 강조하고, gh가 없거나 로그인이 안 되어 있으면 PR 보기만 사용할 수 없다고 알린다. Settings의 Command line tools에서 각 CLI의 버전과 경로, gh 로그인 상태를 확인하고 다시 검사할 수 있다.
+앱을 켜면 상단 바가 git과 gh 설치 여부를 chip으로 보여 준다. git이 없으면 앱이 동작하지 않으므로 경고 배너로 강조하고, gh가 없거나 로그인이 안 되어 있으면 GitHub 탭만 사용할 수 없다고 알린다. Settings의 Command line tools에서 각 CLI의 버전과 경로, gh 로그인 상태를 확인하고 다시 검사할 수 있다.
+
+main 프로세스의 코드도 이 경계를 따라 나뉜다. git command는 `src/main/git.ts`, gh command는 `src/main/github.ts`다. CLI 탐지만 `git.ts`에 함께 둔다.
 
 라이브러리 후보를 검토한 결과다.
 
@@ -45,6 +50,20 @@ git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main �
 - PR 조회에 Octokit(REST API) 대신 gh CLI를 쓰는 이유: gh는 사용자가 이미 로그인한 인증을 그대로 재사용한다. Octokit을 쓰면 토큰 입력 UI와 안전한 저장(keytar 등)을 앱이 직접 구현해야 한다.
 
 개발자 머신에는 git이 이미 있고 이 앱의 사용자는 개발자이므로, git CLI 직접 실행이 가장 단순하고 유지보수하기 쉬운 선택이다.
+
+## GitHub project를 읽는 방법
+
+project는 저장소가 아니라 user나 organization이 소유한다. 그래서 `gh repo view`로 이 저장소의 owner를 먼저 구하고 그 owner의 project 목록을 조회한다. 저장소 owner와 project owner가 다르면(예: 개인 저장소를 organization project에 연결한 경우) 그 project는 목록에 나오지 않는다.
+
+칸반의 열은 Status 단일 선택 필드의 옵션 순서를 따른다. `gh project field-list`로 옵션을 읽어 비어 있는 열도 자리를 지키게 하고, 이 조회가 실패하면 항목이 도착한 순서로 열을 만든다. Status가 없는 항목은 마지막 "No status" 열로 모은다.
+
+project 조회는 `gh auth login`이 기본으로 주지 않는 scope를 요구한다. 권한이 없으면 Projects 탭이 다음 명령을 안내한다.
+
+```bash
+gh auth refresh -s read:project
+```
+
+issue와 PR의 본문은 GitHub Markdown이지만 렌더링하지 않고 원문 그대로 보여 준다. 렌더링하려면 Markdown parser와 sanitizer를 앱에 들여야 하고, 읽는 용도에는 원문으로 충분하다.
 
 ## 개발
 
