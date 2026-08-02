@@ -1,11 +1,23 @@
 'use strict';
 
-const { BrowserWindow, clipboard, nativeImage, nativeTheme, screen } = require('electron');
+const {
+  BrowserWindow,
+  clipboard,
+  dialog,
+  nativeImage,
+  nativeTheme,
+  screen,
+} = require('electron');
 const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { buildScreenshotFilename, editorWindowSize, previewPosition } = require('./lib');
+const {
+  buildEditedFilename,
+  buildScreenshotFilename,
+  editorWindowSize,
+  previewPosition,
+} = require('./lib');
 
 const PREVIEW_SIZE = { width: 280, height: 200 };
 
@@ -166,23 +178,76 @@ function editorImage(webContentsId) {
 
 const PNG_DATA_URL = 'data:image/png;base64,';
 
-// Save button in the editor: write the edited canvas, not the original file.
 // The payload is decoded before anything touches the disk, so a malformed one
 // leaves no directory and no empty png behind.
-function saveEditor(webContentsId, dataUrl) {
+function decodePng(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(PNG_DATA_URL)) return null;
+  const png = Buffer.from(dataUrl.slice(PNG_DATA_URL.length), 'base64');
+  return png.length > 0 ? png : null;
+}
+
+// A save that throws must not look like a save that did nothing. The canvas
+// holds the only copy of the annotated image, so a user who reads a dead button
+// as "nothing happened" clicks Close, and the window's 'closed' handler takes
+// the temp png with it. An unwritable save directory would have cost the work
+// silently. Both save paths go through here, which is also the only place that
+// creates the directory.
+async function writePng(win, target, png) {
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, png);
+    return true;
+  } catch (error) {
+    await dialog.showMessageBox(win, {
+      type: 'error',
+      message: 'Could not save the image',
+      detail: `${target}\n\n${error.message}`,
+    });
+    return false;
+  }
+}
+
+// Save button in the editor: write the edited canvas, not the original file.
+async function saveEditor(webContentsId, dataUrl) {
   const entry = editors.get(webContentsId);
   if (!entry) return null;
-  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(PNG_DATA_URL)) return null;
+  const png = decodePng(dataUrl);
+  if (!png) return null;
 
-  const png = Buffer.from(dataUrl.slice(PNG_DATA_URL.length), 'base64');
-  if (png.length === 0) return null;
-
-  const saveDir = entry.getSaveDir();
-  fs.mkdirSync(saveDir, { recursive: true });
-  const target = path.join(saveDir, buildScreenshotFilename(new Date()));
-  fs.writeFileSync(target, png);
+  const target = path.join(entry.getSaveDir(), buildScreenshotFilename(new Date()));
+  // The editor stays open on a failure, so the annotations are still there to
+  // save somewhere else.
+  if (!(await writePng(entry.win, target, png))) return null;
   closeEditor(webContentsId);
   return target;
+}
+
+// Save as: the same png under a name and folder the user picks. The dialog
+// opens on the configured save directory with the name Save would have used
+// plus an edited stamp, so accepting it straight through is a sensible file
+// rather than "Untitled". Cancelling writes nothing and leaves the editor open,
+// which is the whole reason this asks main for the dialog instead of saving
+// first and moving the file afterwards.
+async function saveEditorAs(webContentsId, dataUrl) {
+  const entry = editors.get(webContentsId);
+  if (!entry) return null;
+  const png = decodePng(dataUrl);
+  if (!png) return null;
+
+  const now = new Date();
+  const suggested = buildEditedFilename(buildScreenshotFilename(now), now);
+  const result = await dialog.showSaveDialog(entry.win, {
+    defaultPath: path.join(entry.getSaveDir(), suggested),
+    // Without this the panel takes the typed name verbatim, so anyone who
+    // replaces the suggested name with one of their own gets a file with no
+    // extension holding png bytes.
+    filters: [{ name: 'PNG', extensions: ['png'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+
+  if (!(await writePng(entry.win, result.filePath, png))) return null;
+  closeEditor(webContentsId);
+  return result.filePath;
 }
 
 function closeEditor(webContentsId) {
@@ -198,5 +263,6 @@ module.exports = {
   openEditor,
   editorImage,
   saveEditor,
+  saveEditorAs,
   closeEditor,
 };

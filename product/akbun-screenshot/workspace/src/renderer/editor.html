@@ -58,7 +58,10 @@
       gap: 6px 12px;
     }
 
-    .group { display: flex; align-items: center; gap: 4px; }
+    /* The tools wrap among themselves, not just as a block. Nine of them plus
+       the three action buttons overflow the minimum window width, and without
+       this the last tool is painted underneath Save. */
+    .group { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
     .actions { flex: none; }
 
     button {
@@ -72,6 +75,9 @@
 
     button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     #save { background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; }
+    /* Outlined in the same green rather than filled, so the pair reads as one
+       action with two endings and Save stays the obvious one. */
+    #save-as { border-color: var(--ok); color: var(--ok); font-weight: 600; }
     #close { background: var(--warn); border-color: var(--warn); color: #fff; font-weight: 600; }
 
     select, input[type='number'] {
@@ -131,6 +137,7 @@
         <button data-tool="arrow2">Arrow &#8596;</button>
         <button data-tool="text">Text</button>
         <button data-tool="number">Number</button>
+        <button data-tool="crop">Crop</button>
       </div>
 
       <div class="group">
@@ -142,11 +149,12 @@
         <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Select: drag to move, corner dots or [ ] to resize &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
+      <span class="hint">Select: drag to move, dots or [ ] to resize, Delete or Backspace to remove &middot; Crop: drag to keep &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
     </div>
 
     <div class="group actions">
       <button id="save">Save</button>
+      <button id="save-as">Save as&hellip;</button>
       <button id="close">Close</button>
     </div>
   </header>

@@ -12,6 +12,10 @@ const DEFAULTS = {
   // Ships with macOS and covers Korean and English, so the editor renders both
   // without bundling a font.
   defaultFont: 'Apple SD Gothic Neo',
+  // Delete and Backspace remove the selected annotation in the editor. A
+  // setting because Backspace is muscle memory for "go back" and someone who
+  // keeps losing shapes to it needs a way out.
+  deleteKeys: true,
 };
 
 function settingsPath() {

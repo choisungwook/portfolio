@@ -5,11 +5,13 @@
 const shortcutInput = document.getElementById('shortcut');
 const saveDirInput = document.getElementById('save-dir');
 const fontSelect = document.getElementById('font');
+const deleteKeysInput = document.getElementById('delete-keys');
 const status = document.getElementById('status');
 
 window.api.getSettings().then((settings) => {
   shortcutInput.value = settings.shortcut;
   saveDirInput.value = settings.saveDir;
+  deleteKeysInput.checked = settings.deleteKeys !== false;
   fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
   wireFontSelect(fontSelect, () => fontSelect.value || settings.defaultFont);
 });
@@ -24,6 +26,7 @@ document.getElementById('save').addEventListener('click', async () => {
     shortcut: shortcutInput.value.trim(),
     saveDir: saveDirInput.value.trim(),
     defaultFont: fontSelect.value,
+    deleteKeys: deleteKeysInput.checked,
   });
   status.textContent = result.ok ? 'Saved' : result.error;
 });

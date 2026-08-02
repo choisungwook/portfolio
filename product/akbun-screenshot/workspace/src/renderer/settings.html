@@ -77,6 +77,15 @@
 
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     .hint { color: var(--fg); opacity: 0.6; margin-top: 4px; }
+
+    /* The full width rule above is for text boxes. A checkbox stretched to the
+       pane is a horizontal bar with a tick somewhere in it. */
+    .check { display: flex; align-items: center; gap: 8px; }
+    /* The padding and border above are for text boxes too. Left on, Chromium
+       stops drawing the native tick and leaves a rounded empty rectangle. */
+    .check input { width: auto; margin: 0; padding: 0; border: none; }
+    .check label { margin: 0; }
+
     #status { margin-left: 10px; }
 
     .perm-status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -112,6 +121,14 @@
       <label for="font">Default text font</label>
       <select id="font"></select>
       <div class="hint">Used by the editor's Text and Number tools.</div>
+    </div>
+
+    <div class="row">
+      <div class="check">
+        <input type="checkbox" id="delete-keys">
+        <label for="delete-keys">Delete and Backspace remove the selected shape</label>
+      </div>
+      <div class="hint">Only in the editor, and only while a shape is selected. Turn this off if Backspace keeps taking shapes away while you work.</div>
     </div>
 
     <button id="save" class="primary">Save</button>

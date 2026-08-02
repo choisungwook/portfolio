@@ -32,6 +32,21 @@ function nextNumber(shapes) {
   return shapes.filter((shape) => shape.type === 'number').length + 1;
 }
 
+// Counting only works while the badges are 1..n with nothing missing. Deleting
+// one out of the middle breaks that: 1 2 3 minus the first leaves 2 3, and the
+// next badge would come out 3 as well. So every delete renumbers in array
+// order, which is creation order, and the count is a valid next number again.
+function renumber(shapes) {
+  let n = 0;
+  for (const shape of shapes) {
+    if (shape.type === 'number') {
+      n += 1;
+      shape.n = n;
+    }
+  }
+  return shapes;
+}
+
 // Box a shape occupies. Text is estimated from the glyph count rather than
 // measured, since this file has no canvas to ask.
 function bounds(s) {
@@ -64,10 +79,16 @@ function hitTest(shapes, x, y, pad = 0) {
 
 // Grips drawn on a selected shape. Each one names the two fields it writes, so
 // dragging a grip is a two field assignment and a segment endpoint is just the
-// corner that happens to own both of its shape's coordinates. Text and badges
-// hang off one anchor and have no corner to pull, so they keep the [ ] keys.
+// corner that happens to own both of its shape's coordinates.
 function handles(s) {
-  if (s.x2 === undefined) return [];
+  // Text and badges hang off one anchor, so there is no corner whose two fields
+  // a drag could write. They get a single grip at the bottom right of their box
+  // that scales the whole thing instead, marked so the caller knows to run it
+  // through scaleShape rather than assign to it.
+  if (s.x2 === undefined) {
+    const b = bounds(s);
+    return [{ scale: true, x: b.x2, y: b.y2 }];
+  }
   const corners = SEGMENTS.includes(s.type)
     ? [['x1', 'y1'], ['x2', 'y2']]
     : [['x1', 'y1'], ['x2', 'y1'], ['x1', 'y2'], ['x2', 'y2']];
@@ -115,15 +136,55 @@ function scaleShape(s, factor) {
   s.y2 = cy + (s.y2 - cy) * factor;
 }
 
+// Factor that puts the bottom right of an anchored shape's box under the
+// pointer. Measured from the centre because that is the point scaleShape holds
+// still, so feeding this straight back in lands the corner where the mouse is
+// and the drag tracks instead of drifting.
+function scaleFactorAt(s, x, y) {
+  const b = bounds(s);
+  const cx = (b.x1 + b.x2) / 2;
+  const cy = (b.y1 + b.y2) / 2;
+  const now = Math.hypot(b.x2 - cx, b.y2 - cy);
+  return now > 0 ? Math.hypot(x - cx, y - cy) / now : 1;
+}
+
+// Whether any part of the shape is still on an image of this size. A shape
+// hanging half over the edge is visible and stays; one entirely outside is what
+// the crop was asked to throw away.
+function overlaps(s, width, height) {
+  const b = bounds(s);
+  return b.x2 >= 0 && b.y2 >= 0 && b.x1 <= width && b.y1 <= height;
+}
+
+// A crop under this in either direction is a stray click rather than a drag.
+const MIN_CROP = 8;
+
+// Crop box in image pixels: corners sorted, clipped to the image, rounded to
+// whole pixels so the cropped canvas is not a fraction wide. Null when the drag
+// was too small to mean anything, which is what keeps a misclick from
+// collapsing the image to nothing.
+function cropRect(x1, y1, x2, y2, width, height) {
+  const left = Math.round(Math.max(0, Math.min(x1, x2)));
+  const top = Math.round(Math.max(0, Math.min(y1, y2)));
+  const right = Math.round(Math.min(width, Math.max(x1, x2)));
+  const bottom = Math.round(Math.min(height, Math.max(y1, y2)));
+  if (right - left < MIN_CROP || bottom - top < MIN_CROP) return null;
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     constrain,
     nextNumber,
+    renumber,
     bounds,
     hitTest,
     handles,
     handleAt,
     moveShape,
     scaleShape,
+    scaleFactorAt,
+    overlaps,
+    cropRect,
   };
 }
