@@ -25,6 +25,7 @@ const {
   openEditor,
   editorImage,
   saveEditor,
+  saveEditorAs,
   closeEditor,
 } = require('./capture');
 const { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } = require('./update');
@@ -142,7 +143,7 @@ function openSettingsWindow() {
   }
   settingsWindow = new BrowserWindow({
     width: 440,
-    height: 410,
+    height: 500,
     resizable: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: {
@@ -197,6 +198,7 @@ ipcMain.handle('preview:edit', (event) => openEditor(event.sender.id));
 
 ipcMain.handle('editor:image', (event) => editorImage(event.sender.id));
 ipcMain.handle('editor:save', (event, dataUrl) => saveEditor(event.sender.id, dataUrl));
+ipcMain.handle('editor:save-as', (event, dataUrl) => saveEditorAs(event.sender.id, dataUrl));
 ipcMain.handle('editor:close', (event) => closeEditor(event.sender.id));
 
 app.whenReady().then(() => {

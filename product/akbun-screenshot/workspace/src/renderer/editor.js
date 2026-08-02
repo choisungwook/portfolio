@@ -1,7 +1,8 @@
 'use strict';
 
-/* global constrain, nextNumber, hitTest, bounds, handles, handleAt, moveShape,
-   scaleShape, fillFontSelect, wireFontSelect */
+/* global constrain, nextNumber, renumber, hitTest, bounds, handles, handleAt,
+   moveShape, scaleShape, scaleFactorAt, overlaps, cropRect, fillFontSelect,
+   wireFontSelect */
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -11,11 +12,23 @@ const fontSelect = document.getElementById('font');
 const sizeInput = document.getElementById('size');
 const strokeInput = document.getElementById('stroke');
 
-// The whole document is the undo history: undo moves the last shape into
-// `undone`, redo moves it back. Nothing else is stored, so redrawing from the
-// original image and this list always reproduces the current state.
+// The document: the shapes drawn so far over the image they sit on. Redrawing
+// from these two always reproduces the current state, so nothing else is kept.
 const shapes = [];
-const undone = [];
+
+// The picture under the shapes, an <img> until a crop replaces it with a
+// smaller canvas. A crop builds a new one and never touches the old, which is
+// what lets a history entry hold it by reference.
+let base = null;
+
+// Undo used to pop the last shape off the list and redo pushed it back. Delete
+// takes a shape out of the middle, which that model cannot express: undoing
+// after one would pop whatever happened to be last and the deleted shape would
+// never come back. So each entry is the whole document as it was before a
+// change. Copies are shallow because a shape holds only numbers and strings,
+// and a crop hands over the old base canvas rather than copying its pixels.
+const past = [];
+const future = [];
 
 let tool = 'select';
 let draft = null;
@@ -26,6 +39,17 @@ let draft = null;
 let selected = null;
 let dragFrom = null;
 let resizing = null;
+
+// A mousedown that picks a shape up may turn out to be a plain click. Recording
+// the document then would fill the history with entries that undo to the state
+// they were taken from, so the entry waits for the first mousemove that
+// actually changes something.
+let pendingCommit = false;
+
+// Whether Delete and Backspace remove the selected shape. Off in settings for
+// anyone who keeps hitting them by accident; the toolbar has no delete button
+// because a shape has to be selected first and Esc is right there.
+let deleteKeys = true;
 
 // Radius of a corner grip in css pixels, and how far off one a click still
 // counts as grabbing it.
@@ -49,23 +73,44 @@ const defaultSize = () => Math.round(24 * unit);
 const defaultStroke = () => Math.max(1, Math.round(3 * unit));
 
 image.onload = () => {
+  base = image;
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
-  const shown = canvas.getBoundingClientRect().width;
-  unit = shown > 0 ? image.naturalWidth / shown : 1;
+  measureUnit();
   sizeInput.value = defaultSize();
   strokeInput.value = defaultStroke();
   redraw();
 };
 
+// The canvas is laid out to fit the window, so the ratio has to be read back
+// from the page rather than assumed. Called again after every crop, since a
+// smaller image is shown at a different size.
+function measureUnit() {
+  const shown = canvas.getBoundingClientRect().width;
+  if (shown > 0 && canvas.width > 0) unit = canvas.width / shown;
+}
+
 window.api.getSettings().then((settings) => {
+  deleteKeys = settings.deleteKeys !== false;
   fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
   wireFontSelect(fontSelect, () => fontSelect.value || settings.defaultFont);
 });
 
+// Read again whenever the window comes back, the way the settings page rechecks
+// permissions. Someone who has just lost a shape to a stray Backspace goes
+// straight to Settings and turns the keys off; without this they would have to
+// close the editor to pick the change up, and closing throws the annotations
+// away. The font is not re-read because the picker is already on screen and
+// resetting it under the user would be worse than leaving it.
+window.addEventListener('focus', () => {
+  window.api.getSettings().then((settings) => {
+    deleteKeys = settings.deleteKeys !== false;
+  });
+});
+
 function redraw() {
-  if (!image.complete) return;
-  ctx.drawImage(image, 0, 0);
+  if (!base) return;
+  ctx.drawImage(base, 0, 0);
   for (const shape of shapes) drawShape(shape);
   if (draft) drawShape(draft);
   if (selected) drawSelection(selected);
@@ -96,7 +141,31 @@ function drawSelection(s) {
   ctx.restore();
 }
 
+// The crop drag is not a shape, it only ever exists as the draft. Dimming
+// everything outside the box rather than outlining it, so what the drag is
+// about to keep is the part that still looks like the screenshot.
+function drawCrop(s) {
+  const b = bounds(s);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillRect(0, 0, canvas.width, b.y1);
+  ctx.fillRect(0, b.y2, canvas.width, canvas.height - b.y2);
+  ctx.fillRect(0, b.y1, b.x1, b.y2 - b.y1);
+  ctx.fillRect(b.x2, b.y1, canvas.width - b.x2, b.y2 - b.y1);
+
+  ctx.strokeStyle = '#4da3ff';
+  ctx.lineWidth = Math.max(1, unit);
+  ctx.setLineDash([6 * unit, 4 * unit]);
+  ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+  ctx.restore();
+}
+
 function drawShape(s) {
+  if (s.type === 'crop') {
+    drawCrop(s);
+    return;
+  }
+
   ctx.save();
   ctx.strokeStyle = s.color;
   ctx.fillStyle = s.color;
@@ -173,10 +242,99 @@ function style() {
   };
 }
 
-// A new shape kills the redo stack, the same as any editor.
+function snapshot() {
+  return {
+    shapes: shapes.map((shape) => ({ ...shape })),
+    base,
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+// Called before the change it undoes, never after. Any new change kills the
+// redo stack, the same as in any editor.
+function commit() {
+  past.push(snapshot());
+  future.length = 0;
+}
+
+function restore(entry) {
+  shapes.length = 0;
+  for (const shape of entry.shapes) shapes.push(shape);
+  base = entry.base;
+  canvas.width = entry.width;
+  canvas.height = entry.height;
+  measureUnit();
+  dropPointers();
+  redraw();
+}
+
+// Everything holding a shape object that is about to leave the document. Both
+// callers can fire in the middle of a drag, since a keystroke does not wait for
+// the mouse button, and the next mousemove would otherwise write through a
+// selection that is gone.
+function dropPointers() {
+  selected = null;
+  dragFrom = null;
+  resizing = null;
+  draft = null;
+  pendingCommit = false;
+}
+
 function push(shape) {
+  commit();
   shapes.push(shape);
-  undone.length = 0;
+  redraw();
+}
+
+// Renumbering is what keeps the badges 1..n after one is taken out of the
+// middle, which is also what nextNumber needs to stay correct.
+function deleteSelected() {
+  const index = shapes.indexOf(selected);
+  if (index < 0) return;
+  commit();
+  shapes.splice(index, 1);
+  renumber(shapes);
+  dropPointers();
+  redraw();
+}
+
+// Crop swaps in a smaller base and pulls every shape back by the same offset,
+// so an annotation stays over the pixels it was drawn on. Both go into one
+// history entry, which is what makes a crop undoable at all.
+function applyCrop(box) {
+  const rect = cropRect(box.x1, box.y1, box.x2, box.y2, canvas.width, canvas.height);
+  if (!rect) {
+    redraw();
+    return;
+  }
+
+  commit();
+  const cropped = document.createElement('canvas');
+  cropped.width = rect.width;
+  cropped.height = rect.height;
+  cropped
+    .getContext('2d')
+    .drawImage(base, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+
+  base = cropped;
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  for (const shape of shapes) moveShape(shape, -rect.x, -rect.y);
+
+  // A shape the crop cut away entirely has to leave the document, not just the
+  // view. Left in, it is invisible and unclickable but nextNumber still counts
+  // it, so the badges stop being the 1..n run that renumber exists to keep and
+  // the next badge comes out with a number nothing on screen uses.
+  const kept = shapes.filter((shape) => overlaps(shape, rect.width, rect.height));
+  shapes.length = 0;
+  for (const shape of kept) shapes.push(shape);
+  renumber(shapes);
+
+  measureUnit();
+  // One crop per trip to the tool. Staying on it would invite a second drag
+  // over an image that is already the size the first drag asked for.
+  selectTool('select');
   redraw();
 }
 
@@ -197,11 +355,15 @@ canvas.addEventListener('mousedown', (event) => {
     // A grip on the current selection is checked before anything else, since it
     // sits on the outline where the shape below would otherwise take the click.
     resizing = selected ? handleAt(selected, point.x, point.y, GRAB * unit) : null;
-    if (resizing) return;
+    if (resizing) {
+      pendingCommit = true;
+      return;
+    }
 
     // A generous pad, because a thin line is hard to land on exactly.
     selected = hitTest(shapes, point.x, point.y, 6 * unit);
     dragFrom = selected ? point : null;
+    pendingCommit = selected !== null;
     redraw();
     return;
   }
@@ -228,6 +390,15 @@ window.addEventListener('mousemove', (event) => {
   // Shift squares the shape or snaps the segment while resizing, the same as it
   // does while drawing one, since the grip drags the same corner the draw did.
   if (resizing) {
+    startChange();
+    // Text and badges have no corner to write, so their one grip scales the
+    // whole shape about its centre instead. Shift has nothing to square there.
+    if (resizing.scale) {
+      scaleShape(selected, scaleFactorAt(selected, point.x, point.y));
+      redraw();
+      return;
+    }
+
     // The corner diagonally across from the grip, which is the one that stays put.
     const anchor = {
       x: selected[resizing.fx === 'x1' ? 'x2' : 'x1'],
@@ -242,9 +413,8 @@ window.addEventListener('mousemove', (event) => {
     return;
   }
 
-  // A move is not undoable, undo only covers adding shapes. Recording the start
-  // position on mousedown would fix it if it turns out to matter.
   if (dragFrom) {
+    startChange();
     moveShape(selected, point.x - dragFrom.x, point.y - dragFrom.y);
     dragFrom = point;
     redraw();
@@ -260,12 +430,26 @@ window.addEventListener('mousemove', (event) => {
   redraw();
 });
 
+// The first mousemove of a drag, where the click is finally known to be a
+// change. Recording the document on mousedown instead would leave an entry
+// behind every click that only selected something.
+function startChange() {
+  if (!pendingCommit) return;
+  pendingCommit = false;
+  commit();
+}
+
 window.addEventListener('mouseup', () => {
   dragFrom = null;
   resizing = null;
+  pendingCommit = false;
   if (!draft) return;
   const shape = draft;
   draft = null;
+  if (shape.type === 'crop') {
+    applyCrop(shape);
+    return;
+  }
   // A click with no drag would leave an invisible zero sized shape in the history.
   if (Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1) > 2) push(shape);
   else redraw();
@@ -305,17 +489,18 @@ const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
 window.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
     event.preventDefault();
-    const from = event.shiftKey ? undone : shapes;
-    const to = event.shiftKey ? shapes : undone;
-    const shape = from.pop();
-    if (shape) to.push(shape);
-    // The outline would otherwise stay on a shape that is no longer in the list.
-    selected = null;
-    redraw();
+    const from = event.shiftKey ? future : past;
+    const to = event.shiftKey ? past : future;
+    const entry = from.pop();
+    if (!entry) return;
+    // Where the document is now becomes the entry to come back to.
+    to.push(snapshot());
+    restore(entry);
     return;
   }
 
-  // Otherwise typing a minus into the size box would shrink the selected shape.
+  // Otherwise typing a minus into the size box would shrink the selected shape,
+  // and Backspace in the text input would delete the shape behind it.
   const typing = event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT';
   if (!selected || typing) return;
   if (event.key === 'Escape') {
@@ -323,37 +508,59 @@ window.addEventListener('keydown', (event) => {
     redraw();
     return;
   }
+  // Both keys, because which one deletes forward is a habit that differs by
+  // keyboard and neither is worth being wrong about. The guard above is what
+  // keeps Backspace usable for editing text in the toolbar boxes.
+  if (deleteKeys && (event.key === 'Delete' || event.key === 'Backspace')) {
+    event.preventDefault();
+    deleteSelected();
+    return;
+  }
   const factor = SCALE_KEYS[event.key];
   if (!factor) return;
   event.preventDefault();
+  // One entry per tap. Holding the key down fills the history, which is a
+  // fair trade for every step being reachable again.
+  commit();
   scaleShape(selected, factor);
   redraw();
 });
 
+function selectTool(name) {
+  tool = name;
+  canvas.style.cursor = name === 'select' ? 'default' : 'crosshair';
+  if (name !== 'select') selected = null;
+  for (const button of document.querySelectorAll('[data-tool]')) {
+    button.classList.toggle('active', button.dataset.tool === name);
+  }
+}
+
 for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => {
-    tool = button.dataset.tool;
-    canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
-    if (tool !== 'select') selected = null;
-    for (const other of document.querySelectorAll('[data-tool]')) {
-      other.classList.toggle('active', other === button);
-    }
+    selectTool(button.dataset.tool);
     redraw();
   });
 }
 
-document.getElementById('save').addEventListener('click', () => {
-  // The dashed outline lives on the canvas, so it has to go before the export.
+// The dashed outline lives on the canvas, so it has to go before the export.
+function exportPng() {
   selected = null;
   redraw();
-  window.api.saveEditor(canvas.toDataURL('image/png'));
+  return canvas.toDataURL('image/png');
+}
+
+document.getElementById('save').addEventListener('click', () => {
+  window.api.saveEditor(exportPng());
+});
+
+// Save as picks the name and the folder instead of generating both. Main owns
+// the dialog, so the window stays open when it is cancelled.
+document.getElementById('save-as').addEventListener('click', () => {
+  window.api.saveEditorAs(exportPng());
 });
 
 document.getElementById('close').addEventListener('click', () => window.api.closeEditor());
 
 // The canvas scales with the window, so the ratio behind stroke width has to
 // follow it. Existing shapes keep the width they were drawn with.
-window.addEventListener('resize', () => {
-  const shown = canvas.getBoundingClientRect().width;
-  if (shown > 0 && canvas.width > 0) unit = canvas.width / shown;
-});
+window.addEventListener('resize', measureUnit);

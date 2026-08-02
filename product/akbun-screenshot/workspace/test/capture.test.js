@@ -52,9 +52,18 @@ class FakeWindow {
   }
 }
 
+// A failed save has to reach the user, so the test needs to see the dialog.
+const dialogMessages = [];
+
 const fakeElectron = {
   BrowserWindow: FakeWindow,
   clipboard: { writeImage: (image) => clipboardWrites.push(image) },
+  dialog: {
+    showMessageBox: (_win, options) => {
+      dialogMessages.push(options);
+      return Promise.resolve({ response: 0 });
+    },
+  },
   nativeImage: {
     createFromPath: (file) => ({ file, getSize: () => ({ width: 800, height: 600 }) }),
   },
@@ -97,10 +106,12 @@ const {
 
 Module._load = load;
 
-function withSaveDir(run) {
+// Awaits run, since the editor save path became async. Without the await the
+// finally would remove the directory before the save had written into it.
+async function withSaveDir(run) {
   const saveDir = fs.mkdtempSync(path.join(os.tmpdir(), 'akbun-screenshot-test-'));
   try {
-    return run(saveDir);
+    return await run(saveDir);
   } finally {
     fs.rmSync(saveDir, { recursive: true, force: true });
   }
@@ -109,8 +120,8 @@ function withSaveDir(run) {
 // Capture twice, close the first preview the way the user would, then act on
 // the second. The old code scanned a list of windows to find the one to close,
 // which touched the dead window and threw.
-test('save still works after another preview was closed', () => {
-  withSaveDir((saveDir) => {
+test('save still works after another preview was closed', async () => {
+  await withSaveDir((saveDir) => {
     captureArea(() => saveDir);
     const first = nextId - 1;
     captureArea(() => saveDir);
@@ -124,8 +135,8 @@ test('save still works after another preview was closed', () => {
   });
 });
 
-test('copy puts the image on the clipboard and keeps no temp file', () => {
-  withSaveDir((saveDir) => {
+test('copy puts the image on the clipboard and keeps no temp file', async () => {
+  await withSaveDir((saveDir) => {
     captureArea(() => saveDir);
     const id = nextId - 1;
 
@@ -138,8 +149,8 @@ test('copy puts the image on the clipboard and keeps no temp file', () => {
 
 // Capture used to write to the clipboard before the preview even appeared.
 // Copy is now the only thing that writes to it.
-test('capture alone does not touch the clipboard', () => {
-  withSaveDir((saveDir) => {
+test('capture alone does not touch the clipboard', async () => {
+  await withSaveDir((saveDir) => {
     clipboardWrites.length = 0;
     captureArea(() => saveDir);
     const id = nextId - 1;
@@ -150,8 +161,8 @@ test('capture alone does not touch the clipboard', () => {
 });
 
 // Close keeps nothing: no file in the save directory, no temp png left behind.
-test('close keeps nothing', () => {
-  withSaveDir((saveDir) => {
+test('close keeps nothing', async () => {
+  await withSaveDir((saveDir) => {
     captureArea(() => saveDir);
     const id = nextId - 1;
 
@@ -164,8 +175,8 @@ test('close keeps nothing', () => {
 
 // Cmd+W from the default application menu, and app quit, close the window
 // without going through any button. The temp png has to go with it.
-test('a window closed outside the buttons still removes the temp png', () => {
-  withSaveDir((saveDir) => {
+test('a window closed outside the buttons still removes the temp png', async () => {
+  await withSaveDir((saveDir) => {
     captureArea(() => saveDir);
     const win = openedWindows.at(-1);
 
@@ -177,8 +188,8 @@ test('a window closed outside the buttons still removes the temp png', () => {
 
 // Edit dismisses the preview, and dismissing a preview deletes its temp png.
 // The editor works on a copy for exactly that reason.
-test('edit keeps an image after the preview it came from is gone', () => {
-  withSaveDir((saveDir) => {
+test('edit keeps an image after the preview it came from is gone', async () => {
+  await withSaveDir((saveDir) => {
     captureArea(() => saveDir);
     const previewId = nextId - 1;
     const previewWindow = openedWindows.at(-1);
@@ -195,35 +206,59 @@ test('edit keeps an image after the preview it came from is gone', () => {
 });
 
 // Save writes the edited canvas, not the file the editor opened.
-test('editor save writes the canvas bytes into the save directory', () => {
-  withSaveDir((saveDir) => {
+test('editor save writes the canvas bytes into the save directory', async () => {
+  await withSaveDir(async (saveDir) => {
     captureArea(() => saveDir);
     openEditor(nextId - 1);
     const editorId = nextId - 1;
 
     const edited = `data:image/png;base64,${Buffer.from('edited').toString('base64')}`;
-    const target = saveEditor(editorId, edited);
+    const target = await saveEditor(editorId, edited);
 
     assert.ok(target.startsWith(saveDir), 'saved into the configured directory');
     assert.strictEqual(fs.readFileSync(target, 'utf8'), 'edited');
-    assert.strictEqual(saveEditor(editorId, edited), null, 'the editor closed after saving');
+    assert.strictEqual(await saveEditor(editorId, edited), null, 'the editor closed after saving');
   });
 });
 
 // The payload crosses an IPC boundary, so a broken one has to fail before the
 // save directory is created rather than throw halfway through the write.
-test('editor save refuses a payload that is not a png data url', () => {
-  withSaveDir((saveDir) => {
+test('editor save refuses a payload that is not a png data url', async () => {
+  await withSaveDir(async (saveDir) => {
     const missing = path.join(saveDir, 'nested');
     captureArea(() => missing);
     openEditor(nextId - 1);
     const editorId = nextId - 1;
 
     for (const bad of [undefined, '', 'not a data url', 'data:image/png;base64,']) {
-      assert.strictEqual(saveEditor(editorId, bad), null, `refused ${String(bad)}`);
+      assert.strictEqual(await saveEditor(editorId, bad), null, `refused ${String(bad)}`);
     }
 
     assert.strictEqual(fs.existsSync(missing), false, 'no save directory created');
-    assert.ok(saveEditor(editorId, `data:image/png;base64,${Buffer.from('ok').toString('base64')}`));
+    assert.ok(
+      await saveEditor(editorId, `data:image/png;base64,${Buffer.from('ok').toString('base64')}`)
+    );
+  });
+});
+
+// The canvas is the only copy of the annotated image. A write that fails
+// silently reads as a dead button, and the next click is Close, which drops it.
+test('editor save reports a failed write and keeps the editor open', async () => {
+  await withSaveDir(async (saveDir) => {
+    // A file where the save directory should be, so mkdir cannot make one.
+    const blocked = path.join(saveDir, 'blocked');
+    fs.writeFileSync(blocked, 'not a directory');
+
+    captureArea(() => blocked);
+    openEditor(nextId - 1);
+    const editorId = nextId - 1;
+
+    dialogMessages.length = 0;
+    const png = `data:image/png;base64,${Buffer.from('edited').toString('base64')}`;
+    assert.strictEqual(await saveEditor(editorId, png), null, 'reported as not saved');
+    assert.strictEqual(dialogMessages.length, 1, 'the user was told');
+    assert.match(dialogMessages[0].message, /save/i);
+    // Still open, so the annotations can go somewhere else.
+    assert.ok(editorImage(editorId), 'the editor is still alive');
   });
 });
