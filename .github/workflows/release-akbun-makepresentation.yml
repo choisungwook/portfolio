@@ -1,0 +1,102 @@
+name: release-akbun-makepresentation
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-makepresentation/**'
+  pull_request:
+    paths:
+      - 'product/akbun-makepresentation/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-makepresentation/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Run page tests
+        run: npm test
+
+      # makepresentation-deck depends on neither tauri nor a webview, so -p
+      # keeps this to serde, zip and quick-xml. Testing the app crate instead
+      # would need GTK and WebKit installed on the runner.
+      - name: Run deck model tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makepresentation-deck
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-makepresentation/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-makepresentation/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEPRESENTATION }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEPRESENTATION_PASSWORD }}
+        with:
+          projectPath: product/akbun-makepresentation/workspace
+          tagName: akbun-makepresentation-v__VERSION__
+          releaseName: akbun-makepresentation-v__VERSION__
+          # A draft is not reachable by the updater endpoint, so every
+          # installed copy would 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            Desktop slide deck editor: shapes, text, pptx open/save, pdf export, presentation mode.
+
+            - The installer is a macOS (Apple Silicon) dmg.
+            - The build is not code signed, so after dragging the app to Applications run once in Terminal:
+              xattr -cr /Applications/akbun-makepresentation.app
+            - After that, the Updates button inside the app fetches newer versions on its own.
+
+      # Several products release from this repository, so the GitHub-wide
+      # "latest" release is whichever product shipped last. The app therefore
+      # polls a fixed tag that only this step touches, instead of
+      # releases/latest.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-makepresentation-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-makepresentation-updater \
+            --title "akbun-makepresentation updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-makepresentation-updater "$RUNNER_TEMP/latest.json" --clobber

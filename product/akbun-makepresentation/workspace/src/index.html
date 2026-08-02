@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>akbun-makepresentation</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <div class="group">
+      <button id="btn-new" title="New deck">New</button>
+      <button id="btn-open" title="Open a .pptx file">Open</button>
+      <button id="btn-save" title="Save (Cmd+S)">Save</button>
+      <button id="btn-save-as" title="Save under a new name">Save As</button>
+      <button id="btn-pdf" title="Export every slide as a PDF">PDF</button>
+    </div>
+    <div class="group tools">
+      <button data-tool="select" title="Select (V)">Select</button>
+      <button data-tool="rect" title="Rectangle (R)">▭</button>
+      <button data-tool="ellipse" title="Ellipse (O)">◯</button>
+      <button data-tool="line" title="Line (L)">╱</button>
+      <button data-tool="arrow" title="Arrow (A)">➔</button>
+      <button data-tool="pen" title="Freehand (P)">✎</button>
+      <button data-tool="text" title="Text (T)">T</button>
+    </div>
+    <div class="group">
+      <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
+      <button id="btn-update" title="Check for a newer version">Updates</button>
+    </div>
+  </header>
+
+  <main>
+    <aside id="slides">
+      <div id="thumbs"></div>
+      <div class="slide-actions">
+        <button id="btn-add-slide" title="Add a slide after this one">+ Slide</button>
+        <button id="btn-del-slide" title="Delete this slide">Delete</button>
+      </div>
+    </aside>
+
+    <section id="stage">
+      <div id="stage-inner">
+        <svg id="canvas" viewBox="0 0 1280 720"></svg>
+        <textarea id="text-editor" hidden spellcheck="false"></textarea>
+      </div>
+    </section>
+
+    <aside id="props">
+      <p id="props-hint"></p>
+      <div id="props-fill" class="prop-row">
+        <label>Fill</label>
+        <span><input type="checkbox" id="prop-fill-none" /> none</span>
+        <input type="color" id="prop-fill" />
+      </div>
+      <div id="props-stroke">
+        <div class="prop-row">
+          <label>Line color</label>
+          <input type="color" id="prop-stroke" />
+        </div>
+        <div class="prop-row">
+          <label>Line width</label>
+          <input type="number" id="prop-width" min="1" max="30" />
+        </div>
+        <div class="prop-row">
+          <label>Line style</label>
+          <select id="prop-dash">
+            <option value="solid">Solid</option>
+            <option value="dash">Dashed</option>
+            <option value="dot">Dotted</option>
+          </select>
+        </div>
+      </div>
+      <div id="props-text">
+        <div class="prop-row">
+          <label>Font size</label>
+          <input type="number" id="prop-font-size" min="6" max="200" />
+        </div>
+        <div class="prop-row">
+          <label>Text color</label>
+          <input type="color" id="prop-text-color" />
+        </div>
+      </div>
+      <button id="btn-delete-shape">Delete shape</button>
+    </aside>
+  </main>
+
+  <div id="present" hidden></div>
+
+  <script src="editor.js"></script>
+  <script src="api.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
