@@ -117,6 +117,7 @@
 - [macOS 메뉴바 관리 앱 (akbun-mactaskbar)](./product/akbun-mactaskbar/) (26.7.31)
 - [사진과 영상 태그, 등급, 검색 Windows 데스크톱 앱 (akbun-folderview)](./product/akbun-folderview/) (26.8.1)
 - [슬라이드 덱을 만들고 편집하는 macOS 데스크톱 앱 (akbun-makepresentation)](./product/akbun-makepresentation/) (26.8.2)
+- [오디오 인터페이스로 녹음하고 파형을 보는 팟캐스트 녹음 macOS 데스크톱 앱 (akbun-makepodcast)](./product/akbun-makepodcast/) (26.8.2)
 
 ## Dockerfile
 

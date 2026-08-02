@@ -1,0 +1,44 @@
+[workspace]
+members = ["crates/recorder"]
+
+[package]
+name = "akbun-makepodcast"
+version = "0.1.0"
+description = "Podcast recorder: audio interface capture, live waveform, take playback"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. The number here is not read by the bundler and is only present
+# because cargo requires it.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_makepodcast_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# The model lives in its own crate so the pull request job can test it without
+# compiling cpal or tauri, which would mean ALSA, GTK and WebKit on the runner.
+makepodcast-recorder = { path = "crates/recorder" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The audio device layer. cpal reaches CoreAudio on macOS, WASAPI on Windows
+# and ALSA on Linux behind one API, and hound reads and writes the WAV files.
+cpal = "0.18"
+hound = "3"
+
+# Desktop only. These have no mobile implementation and this app has no mobile
+# target, but keeping the cfg means a stray mobile build fails at resolve time
+# rather than deep inside a plugin.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"

@@ -1,0 +1,16 @@
+[package]
+name = "makepodcast-recorder"
+version = "0.1.0"
+description = "The recorder model: settings, level metering, the waveform accumulator, and the playback queue"
+edition = "2021"
+license = "MIT"
+
+# Deliberately depends on neither tauri nor cpal. cpal pulls in ALSA on Linux
+# and tauri pulls in GTK and WebKit, so a test over this crate on the pull
+# request runner needs no system packages at all.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

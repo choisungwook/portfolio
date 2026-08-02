@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The bundler merges this into the generated Info.plist.
+
+  NSMicrophoneUsageDescription is not optional. Without it macOS does not show
+  a permission prompt and does not deny the request either: the app opens the
+  input stream, every callback delivers silence, and the waveform is a flat
+  line with no error anywhere. The string below is what the user reads in that
+  prompt, so it says what the app does with the microphone.
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>akbun-makepodcast records your microphone or audio interface into a wav file in your recordings folder.</string>
+  </dict>
+</plist>

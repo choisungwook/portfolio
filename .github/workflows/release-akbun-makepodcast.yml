@@ -1,0 +1,103 @@
+name: release-akbun-makepodcast
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-makepodcast/**'
+  pull_request:
+    paths:
+      - 'product/akbun-makepodcast/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-makepodcast/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Run page tests
+        run: npm test
+
+      # makepodcast-recorder depends on neither cpal nor tauri, so -p keeps this
+      # to serde. Testing the app crate instead would need ALSA, GTK and WebKit
+      # installed on the runner to run arithmetic over sample buffers.
+      - name: Run recorder model tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makepodcast-recorder
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-makepodcast/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-makepodcast/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEPODCAST }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEPODCAST_PASSWORD }}
+        with:
+          projectPath: product/akbun-makepodcast/workspace
+          tagName: akbun-makepodcast-v__VERSION__
+          releaseName: akbun-makepodcast-v__VERSION__
+          # A draft is not reachable by the updater endpoint, so every
+          # installed copy would 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            Podcast recorder: pick an audio interface, record, watch the waveform, play the take back.
+
+            - The installer is a macOS (Apple Silicon) dmg.
+            - The build is not code signed, so after dragging the app to Applications run once in Terminal:
+              xattr -cr /Applications/akbun-makepodcast.app
+            - macOS asks for microphone permission the first time you record. Denying it does not fail: the take is silent.
+            - After that, Check for Updates in the Settings dialog fetches newer versions on its own.
+
+      # Several products release from this repository, so the GitHub-wide
+      # "latest" release is whichever product shipped last. The app therefore
+      # polls a fixed tag that only this step touches, instead of
+      # releases/latest.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-makepodcast-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-makepodcast-updater \
+            --title "akbun-makepodcast updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-makepodcast-updater "$RUNNER_TEMP/latest.json" --clobber

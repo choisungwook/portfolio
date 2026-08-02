@@ -1,0 +1,422 @@
+/*
+  Light is the base and the dark rules override it, so the window follows the
+  system with no listener and no toggle. There is no data-theme override here
+  because the app has no theme setting to honour.
+
+  Every colour is a variable. A colour written into a rule below is a colour
+  that will be wrong in one of the two themes.
+*/
+:root {
+  --bg: #f1f3f5;
+  --panel: #ffffff;
+  --panel-2: #f7f8fa;
+  --fg: #1a1a1a;
+  --fg-dim: #6b7280;
+  --border: #dfe3e8;
+  --accent: #2563eb;
+  --record: #dc2626;
+  --wave: #2563eb;
+  --wave-dim: #93b4f7;
+  --meter-low: #22c55e;
+  --meter-high: #f59e0b;
+  --clip: #dc2626;
+  --grid: #e6e9ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141518;
+    --panel: #1c1e22;
+    --panel-2: #232529;
+    --fg: #e8e8e8;
+    --fg-dim: #9aa1ab;
+    --border: #32353b;
+    --accent: #60a5fa;
+    --record: #ef4444;
+    --wave: #60a5fa;
+    --wave-dim: #2f4d80;
+    --meter-low: #4ade80;
+    --meter-high: #fbbf24;
+    --clip: #ef4444;
+    --grid: #2a2d33;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button.quiet {
+  background: transparent;
+}
+
+select,
+input[type='text'] {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  min-width: 0;
+}
+
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.menubar-gap {
+  flex: 1;
+}
+
+.version {
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px;
+  gap: 10px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* The track panel takes the space left over, so a taller window makes the
+   waveform taller rather than adding empty space under the settings. */
+.panel-track {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 10px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.project {
+  font-weight: 600;
+}
+
+.take,
+.track-source {
+  color: var(--fg-dim);
+}
+
+.track {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.track-label {
+  width: 132px;
+  flex: none;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.track-id {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.track-source {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.track-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The indicator that travels the timeline. It is a div rather than part of the
+   canvas so that moving it during playback costs no redraw. */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--record);
+  pointer-events: none;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transport-button {
+  width: 38px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.glyph-record {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--record);
+}
+
+.glyph-stop {
+  width: 12px;
+  height: 12px;
+  background: var(--fg);
+}
+
+.glyph-play {
+  width: 0;
+  height: 0;
+  border-left: 12px solid var(--fg);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+/* Recording is the one state worth seeing from across the room. */
+.record.armed {
+  border-color: var(--record);
+  background: color-mix(in srgb, var(--record) 18%, transparent);
+}
+
+.record.armed .glyph-record {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record.armed .glyph-record {
+    animation: none;
+  }
+}
+
+.timecode {
+  font: 600 18px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+
+.status {
+  color: var(--fg-dim);
+}
+
+.panel-settings {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 12px;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.setting > label {
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.row select {
+  flex: 1;
+}
+
+.row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+label.inline {
+  font-weight: 400;
+  color: var(--fg-dim);
+}
+
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meter-name {
+  color: var(--fg-dim);
+  width: 38px;
+  flex: none;
+}
+
+.meter {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* The bar is one gradient clipped by width rather than a row of segments, so
+   the colour at a given level is the same whatever the width of the window. */
+.meter-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(
+    to right,
+    var(--meter-low) 0%,
+    var(--meter-low) 70%,
+    var(--meter-high) 88%,
+    var(--clip) 100%
+  );
+  background-size: 100vw 100%;
+}
+
+.meter-value {
+  width: 62px;
+  flex: none;
+  text-align: right;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.clip {
+  color: var(--clip);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.path {
+  color: var(--fg-dim);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--fg);
+  padding: 18px;
+  min-width: 380px;
+  max-width: 520px;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+dialog h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+dialog p {
+  margin: 0 0 10px;
+  color: var(--fg-dim);
+}
+
+dialog input[type='text'] {
+  width: 100%;
+}
+
+dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+dialog .field > span:first-child {
+  color: var(--fg-dim);
+}
+
+dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+dialog menu.inline-menu {
+  justify-content: flex-start;
+  margin: 0 0 12px;
+}

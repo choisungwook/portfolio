@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>akbun-makepodcast</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- The top menu. Everything the app can be told to do is here, so the
+         track panel below needs no chrome of its own beyond the transport. -->
+    <nav class="menubar">
+      <button id="menu-new">New Project</button>
+      <button id="menu-save">Save WAV…</button>
+      <button id="menu-settings">Settings</button>
+      <span class="menubar-gap"></span>
+      <span class="version" id="version"></span>
+      <button id="menu-close" class="quiet">Close</button>
+    </nav>
+
+    <main class="panels">
+      <!-- Top panel: the track. One track, A, holding the take recorded from
+           the chosen interface. -->
+      <section class="panel panel-track">
+        <header class="panel-head">
+          <span class="project" id="project-name">No project</span>
+          <span class="take" id="take-name"></span>
+        </header>
+
+        <div class="track">
+          <div class="track-label">
+            <span class="track-id">A</span>
+            <span class="track-source" id="track-source">—</span>
+          </div>
+          <div class="track-body">
+            <canvas id="waveform"></canvas>
+            <div class="playhead" id="playhead" hidden></div>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button id="record" class="transport-button record" title="Record">
+            <span class="glyph-record"></span>
+          </button>
+          <button id="stop" class="transport-button" title="Stop" disabled>
+            <span class="glyph-stop"></span>
+          </button>
+          <button id="play" class="transport-button" title="Play the take" disabled>
+            <span class="glyph-play"></span>
+          </button>
+          <span class="timecode" id="timecode">00:00.000</span>
+          <span class="status" id="status">Idle</span>
+        </div>
+      </section>
+
+      <!-- Bottom panel: what the recording is coming from and going to. -->
+      <section class="panel panel-settings">
+        <div class="setting">
+          <label for="input-device">Input</label>
+          <div class="row">
+            <select id="input-device"></select>
+            <button id="refresh-devices" class="quiet" title="Look for interfaces plugged in since the app started">Refresh</button>
+          </div>
+          <div class="meter-row">
+            <span class="meter-name">Level</span>
+            <div class="meter"><div class="meter-fill" id="input-meter"></div></div>
+            <span class="meter-value" id="input-db">-60 dB</span>
+            <span class="clip" id="input-clip" hidden>CLIP</span>
+          </div>
+        </div>
+
+        <div class="setting">
+          <label for="output-device">Output</label>
+          <div class="row">
+            <select id="output-device"></select>
+          </div>
+          <div class="meter-row">
+            <span class="meter-name">Level</span>
+            <div class="meter"><div class="meter-fill" id="output-meter"></div></div>
+            <span class="meter-value" id="output-db">-60 dB</span>
+          </div>
+          <div class="row">
+            <label class="inline" for="volume">Volume</label>
+            <input type="range" id="volume" min="0" max="100" value="100" />
+            <span class="meter-value" id="volume-value">100%</span>
+          </div>
+        </div>
+
+        <div class="setting">
+          <label>Recordings</label>
+          <div class="path" id="project-dir"></div>
+          <div class="row">
+            <button id="open-dir" class="quiet">Open Folder</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Native dialogs. showModal traps focus and Escape closes them, which is
+         keyboard behaviour that would otherwise have to be written by hand. -->
+    <dialog id="project-dialog">
+      <form method="dialog">
+        <h2>New Project</h2>
+        <p>A folder of this name is created under the recordings folder. Takes are numbered inside it.</p>
+        <input type="text" id="project-input" placeholder="episode 12" autocomplete="off" />
+        <menu>
+          <button value="cancel" class="quiet">Cancel</button>
+          <button value="create">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog">
+      <form method="dialog">
+        <h2>Settings</h2>
+        <div class="field">
+          <span>Recordings folder</span>
+          <span class="path" id="settings-dir"></span>
+        </div>
+        <menu class="inline-menu">
+          <button value="change" id="settings-change" class="quiet">Change…</button>
+          <button value="reset" id="settings-reset" class="quiet">Use Default</button>
+        </menu>
+        <div class="field">
+          <span>Settings file</span>
+          <span class="path" id="settings-file"></span>
+        </div>
+        <div class="field">
+          <span>Version</span>
+          <span id="settings-version"></span>
+        </div>
+        <menu>
+          <button value="update" id="settings-update" class="quiet">Check for Updates</button>
+          <button value="close">Close</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="meters.js"></script>
+    <script src="api.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>
