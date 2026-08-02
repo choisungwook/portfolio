@@ -191,6 +191,32 @@
     </div>
   </div>
 
+  <div id="new-project" class="overlay" hidden>
+    <div class="sheet">
+      <h3>New Project</h3>
+      <label class="row">Name <input type="text" id="np-name" placeholder="summer trip" /></label>
+      <p class="dim small-text" id="np-where"></p>
+      <p class="small-text danger-text" id="np-error" hidden></p>
+      <div class="sheet-actions">
+        <button data-close="new-project">Cancel</button>
+        <button id="np-create" class="primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="open-project" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Open Project</h3>
+      <p class="dim small-text" id="op-where"></p>
+      <ul id="op-list"></ul>
+      <p id="op-empty" class="dim small-text">No projects in the workspace yet.</p>
+      <div class="sheet-actions">
+        <button data-close="open-project">Cancel</button>
+        <button id="op-browse">Browse…</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app-settings" class="overlay" hidden>
     <div class="sheet">
       <h3>Preview &amp; Tools</h3>
@@ -216,6 +242,13 @@
           <option value="dark">Dark</option>
         </select>
       </label>
+      <label class="row">Workspace folder
+        <span class="row-input">
+          <input type="text" id="as-workspace" placeholder="Documents/akbun-makevideo" />
+          <button id="as-workspace-pick" class="small" type="button">Choose…</button>
+        </span>
+      </label>
+      <p class="dim small-text" id="as-workspace-note"></p>
       <label class="row">Render acceleration
         <select id="as-accel">
           <option value="auto">Auto — GPU when available</option>

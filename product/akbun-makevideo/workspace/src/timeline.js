@@ -7,7 +7,7 @@
 // This lives in the page rather than in Rust because a drag has to answer on
 // the next frame; a round trip per mouse move would not keep up. Rust reads the
 // same shape back through serde for the render, so the two halves agree without
-// either reimplementing the other. See wiki/architecture.md.
+// either reimplementing the other. See wiki/architecture/timeline.md.
 
 const MAX_TRACKS_PER_KIND = 4;
 // Below this a clip is a sliver nobody can grab again, so trims and splits

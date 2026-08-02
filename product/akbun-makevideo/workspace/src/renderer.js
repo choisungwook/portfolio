@@ -76,6 +76,23 @@ function stem(path) {
   return baseName(path).replace(/\.[^.]+$/, '');
 }
 
+/** The folder the project lives in, which is also where a render defaults to. */
+function projectDir() {
+  if (!state.path) return null;
+  const cut = state.path.replace(/[\\/][^\\/]+$/, '');
+  return cut === state.path ? null : cut;
+}
+
+/** A project made here is `<workspace>/<name>/project.akbunvideo`, so the name
+ *  is the folder. A stray .akbunvideo opened through Browse is named by its
+ *  file instead, because its folder is somebody else's. */
+function projectName() {
+  if (!state.path) return 'Untitled';
+  const dir = projectDir();
+  if (dir && baseName(state.path) === 'project.akbunvideo') return baseName(dir);
+  return stem(state.path);
+}
+
 function zoomToPxPerSecond(value) {
   return 5 * Math.pow(1.04, Number(value));
 }
@@ -90,7 +107,7 @@ function markDirty() {
 }
 
 function updateTitle() {
-  const name = state.path ? stem(state.path) : 'Untitled';
+  const name = projectName();
   dom.projectName.textContent = state.dirty ? `${name} •` : name;
   window.api.setTitle(`akbun-makevideo — ${name}${state.dirty ? ' •' : ''}`);
 }
@@ -556,8 +573,11 @@ async function startRender(preset) {
     await window.api.message('The timeline is empty.', { title: 'Nothing to render' });
     return;
   }
-  const suggested = `${state.path ? stem(state.path) : 'untitled'}-${preset}.mp4`;
-  const output = await window.api.pickRenderOutput(suggested);
+  // Renders land next to the project by default, so a project folder ends up
+  // holding the edit and what came out of it.
+  const dir = projectDir();
+  const file = `${projectName().toLowerCase().replace(/\s+/g, '-')}-${preset}.mp4`;
+  const output = await window.api.pickRenderOutput(dir ? `${dir}/${file}` : file);
   if (!output) return;
 
   state.rendering = true;
@@ -642,22 +662,69 @@ function loadProject(project, path) {
   refresh();
 }
 
+function emptyProject() {
+  return L.createProject({
+    width: state.settings.defaultWidth,
+    height: state.settings.defaultHeight,
+    fps: state.settings.defaultFps,
+  });
+}
+
+/** A project is a folder under the workspace, so New asks for a name rather
+ *  than for a place to put a file. The folder is made now and the project file
+ *  written straight away, so the project has a home before the first import. */
 async function newProject() {
   if (!(await confirmDiscard('Start a new project'))) return;
-  loadProject(
-    L.createProject({
-      width: state.settings.defaultWidth,
-      height: state.settings.defaultHeight,
-      fps: state.settings.defaultFps,
-    }),
-    null
-  );
+  el('np-name').value = '';
+  el('np-error').hidden = true;
+  el('np-where').textContent = `A folder will be made in ${state.boot.workspace}`;
+  openSheet('new-project');
+  el('np-name').focus();
+}
+
+async function createProjectFromSheet() {
+  const error = el('np-error');
+  try {
+    const entry = await window.api.createProject(el('np-name').value);
+    closeSheet('new-project');
+    loadProject(emptyProject(), entry.path);
+    // Written immediately: an empty folder with no project file in it would not
+    // show up in Open, and would look like the project was never made.
+    await window.api.saveProject(entry.path, state.project);
+    state.dirty = false;
+    updateTitle();
+  } catch (failure) {
+    error.textContent = String(failure);
+    error.hidden = false;
+  }
 }
 
 async function openProject() {
   if (!(await confirmDiscard('Open another project'))) return;
-  const path = await window.api.pickProjectOpen();
-  if (!path) return;
+  const projects = await window.api.listProjects();
+  const list = el('op-list');
+  list.textContent = '';
+  for (const entry of projects) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'project-row';
+    button.dataset.path = entry.path;
+    const name = document.createElement('span');
+    name.textContent = entry.name;
+    const when = document.createElement('span');
+    when.className = 'project-when';
+    when.textContent = entry.modifiedMs ? new Date(entry.modifiedMs).toLocaleString() : '';
+    button.append(name, when);
+    item.appendChild(button);
+    list.appendChild(item);
+  }
+  el('op-empty').hidden = projects.length > 0;
+  el('op-where').textContent = state.boot.workspace;
+  openSheet('open-project');
+}
+
+async function openProjectPath(path) {
+  closeSheet('open-project');
   try {
     const project = await window.api.openProject(path);
     loadProject(project, path);
@@ -669,7 +736,9 @@ async function openProject() {
 async function saveProject(forcePicker) {
   let path = state.path;
   if (!path || forcePicker) {
-    path = await window.api.pickProjectSave(`${state.path ? stem(state.path) : 'untitled'}.akbunvideo`);
+    const dir = projectDir();
+    const suggested = `${projectName() === 'Untitled' ? 'untitled' : projectName()}.akbunvideo`;
+    path = await window.api.pickProjectSave(dir ? `${dir}/${suggested}` : suggested);
     if (!path) return false;
   }
   try {
@@ -686,14 +755,7 @@ async function saveProject(forcePicker) {
 
 async function closeProject() {
   if (!(await confirmDiscard('Close this project'))) return;
-  loadProject(
-    L.createProject({
-      width: state.settings.defaultWidth,
-      height: state.settings.defaultHeight,
-      fps: state.settings.defaultFps,
-    }),
-    null
-  );
+  loadProject(emptyProject(), null);
 }
 
 // --- settings sheets -------------------------------------------------------
@@ -743,6 +805,8 @@ function fillAppSheet() {
   el('as-scrub-mute').checked = state.settings.previewMuteWhileScrubbing;
   el('as-snap').checked = state.settings.snap;
   el('as-theme').value = state.settings.theme;
+  el('as-workspace').value = state.settings.workspaceDir;
+  el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
   el('as-accel').value = state.settings.renderAcceleration;
   el('as-accel-note').textContent = accelerationNote();
   el('as-ffmpeg').value = state.settings.ffmpegDir;
@@ -1007,12 +1071,29 @@ function wireSheets() {
       snap: el('as-snap').checked,
       theme: el('as-theme').value,
       renderAcceleration: el('as-accel').value,
+      workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
     });
     closeSheet('app-settings');
     state.boot = await window.api.saveSettings(next);
     applySettings(state.boot.settings);
     updateToolWarning();
+  });
+  el('as-workspace-pick').addEventListener('click', async () => {
+    const folder = await window.api.pickFolder('Workspace folder');
+    if (folder) el('as-workspace').value = folder;
+  });
+  el('np-create').addEventListener('click', createProjectFromSheet);
+  el('np-name').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') createProjectFromSheet();
+  });
+  el('op-list').addEventListener('click', (event) => {
+    const row = event.target.closest('[data-path]');
+    if (row) openProjectPath(row.dataset.path);
+  });
+  el('op-browse').addEventListener('click', async () => {
+    const path = await window.api.pickProjectOpen();
+    if (path) openProjectPath(path);
   });
   dom.renderCancel.addEventListener('click', () => window.api.cancelRender());
   dom.renderClose.addEventListener('click', () => {

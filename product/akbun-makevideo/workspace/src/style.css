@@ -767,6 +767,66 @@ button.icon.on {
   min-width: 190px;
 }
 
+.row-input {
+  display: flex;
+  gap: 6px;
+}
+
+.row-input input {
+  min-width: 150px;
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
+#op-list {
+  max-height: 260px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+#op-list:empty {
+  display: none;
+}
+
+.project-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.project-row:last-child {
+  border-bottom: none;
+}
+
+.project-row:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.project-when {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.project-row:hover .project-when {
+  color: inherit;
+}
+
 .sheet-actions {
   display: flex;
   justify-content: flex-end;

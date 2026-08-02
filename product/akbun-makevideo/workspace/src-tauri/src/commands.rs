@@ -6,10 +6,10 @@
 //! system scope of its own.
 
 use makevideo_render::accel::{self, Acceleration};
-use makevideo_render::{ffmpeg, probe, tools, Asset, AssetKind, Project};
+use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -34,6 +34,9 @@ pub struct Settings {
     pub default_width: u32,
     pub default_height: u32,
     pub default_fps: u32,
+    /// Where project folders are made. Empty means the default, which is
+    /// ~/Documents/akbun-makevideo.
+    pub workspace_dir: String,
     /// Folder holding ffmpeg and ffprobe. Empty means look in the usual places.
     pub ffmpeg_dir: String,
     /// "auto" to encode on the GPU when this machine has one that works, "cpu"
@@ -52,6 +55,7 @@ impl Default for Settings {
             default_width: 1920,
             default_height: 1080,
             default_fps: 30,
+            workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
         }
@@ -90,12 +94,27 @@ pub struct AccelProbe {
     pub tried: Vec<TriedCandidate>,
 }
 
+/// One project folder found under the workspace root.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectEntry {
+    pub name: String,
+    pub dir: String,
+    /// The project file inside it.
+    pub path: String,
+    /// Unix milliseconds, for sorting the Open list by most recent.
+    pub modified_ms: u64,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bootstrap {
     pub settings: Settings,
     pub version: String,
     pub data_dir: String,
+    /// The workspace root as actually resolved, so the page can show it whether
+    /// or not the user has set one.
+    pub workspace: String,
     /// None when the tool could not be found, which the page turns into a
     /// banner rather than a failure at render time.
     pub ffmpeg: Option<String>,
@@ -211,6 +230,82 @@ fn chosen_acceleration(state: &State<AppState>) -> Option<Acceleration> {
     acceleration(state, program.as_ref()).available
 }
 
+/// Where project folders live. The setting wins; otherwise it is the Documents
+/// folder, or the home folder on a system that has no Documents.
+fn workspace_root(app: &AppHandle, settings: &Settings) -> PathBuf {
+    let configured = settings.workspace_dir.trim();
+    if !configured.is_empty() {
+        return PathBuf::from(configured);
+    }
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().home_dir())
+        .unwrap_or_else(|_| PathBuf::from("."));
+    base.join(workspace::DEFAULT_FOLDER)
+}
+
+/// The project folders under the root, newest first. A directory without a
+/// project file in it is somebody else's folder and is left alone.
+#[tauri::command]
+pub fn list_projects(app: AppHandle, state: State<AppState>) -> Vec<ProjectEntry> {
+    let root = workspace_root(&app, &state.settings.lock().unwrap().clone());
+    let Ok(entries) = std::fs::read_dir(&root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<ProjectEntry> = entries
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let dir = entry.path();
+            let file = dir.join(workspace::PROJECT_FILE);
+            if !file.is_file() {
+                return None;
+            }
+            let modified_ms = file
+                .metadata()
+                .and_then(|meta| meta.modified())
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|since| since.as_millis() as u64)
+                .unwrap_or(0);
+            Some(ProjectEntry {
+                name: dir.file_name()?.to_string_lossy().to_string(),
+                dir: dir.to_string_lossy().to_string(),
+                path: file.to_string_lossy().to_string(),
+                modified_ms,
+            })
+        })
+        .collect();
+    found.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+    found
+}
+
+/// Makes `<workspace>/<name>/` and reports where the project file will go.
+/// Nothing is written into it yet; the first save does that.
+#[tauri::command]
+pub fn create_project(
+    app: AppHandle,
+    state: State<AppState>,
+    name: String,
+) -> Result<ProjectEntry, String> {
+    let name = workspace::sanitize_project_name(&name)?;
+    let root = workspace_root(&app, &state.settings.lock().unwrap().clone());
+    let dir = root.join(&name);
+    if dir.join(workspace::PROJECT_FILE).exists() {
+        return Err(format!("a project called {name} is already there"));
+    }
+    std::fs::create_dir_all(&dir).map_err(|error| format!("cannot create {dir:?}: {error}"))?;
+    Ok(ProjectEntry {
+        name,
+        dir: dir.to_string_lossy().to_string(),
+        path: dir
+            .join(workspace::PROJECT_FILE)
+            .to_string_lossy()
+            .to_string(),
+        modified_ms: 0,
+    })
+}
+
 #[tauri::command]
 pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     let settings = state.settings.lock().unwrap().clone();
@@ -218,6 +313,9 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     Bootstrap {
         version: app.package_info().version.to_string(),
         data_dir: crate::store::data_dir(&app),
+        workspace: workspace_root(&app, &settings)
+            .to_string_lossy()
+            .to_string(),
         acceleration: acceleration(&state, ffmpeg.as_ref()),
         ffprobe: find_tool("ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
@@ -306,9 +404,18 @@ pub fn open_project(app: AppHandle, path: String) -> Result<Project, String> {
     Ok(project)
 }
 
+/// Writes the project file and nothing else. In particular it does not copy a
+/// single frame of media: the file holds absolute paths to whatever the user
+/// imported, wherever that lives. See wiki/architecture/workspace-and-files.md.
 #[tauri::command]
 pub fn save_project(path: String, project: Project) -> Result<(), String> {
     let text = serde_json::to_string_pretty(&project).map_err(|error| error.to_string())?;
+    // A project folder deleted from Finder between two saves should not lose
+    // the edit that is in memory right now.
+    if let Some(parent) = Path::new(&path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create {parent:?}: {error}"))?;
+    }
     std::fs::write(&path, text).map_err(|error| format!("cannot write {path}: {error}"))
 }
 

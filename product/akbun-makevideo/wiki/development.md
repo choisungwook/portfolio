@@ -100,9 +100,18 @@ The app polls a fixed tag, `akbun-makevideo-updater`, rather than `releases/late
 
 ### The signing key
 
-`plugins.updater.pubkey` in `tauri.conf.json` is the public half. The private half is the repository secret `TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO`, with `TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO_PASSWORD` for its password (empty for this key).
+`plugins.updater.pubkey` in `tauri.conf.json` is the public half, and it is committed. The private half is **not in this repository and is not meant to be**. The workflow refers to it by name only:
 
-**Losing the private key means never updating installed users again.** There is no recovery: their copy rejects a signature from a new key. A GitHub secret cannot be read back, so it needs a backup somewhere else.
+| Secret | What goes in it |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO` | The private key generated alongside the committed pubkey |
+| `TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO_PASSWORD` | Its password. Empty for this key, but the secret still has to exist |
+
+Until both are set, the release job runs and produces no `.sig`, and tauri-action then skips `latest.json` **without failing** — a release that looks complete and that nobody can update from. That is the failure to watch for on the first release.
+
+**Losing the private key means never updating installed users again.** There is no recovery: an installed copy rejects a signature from a new key, so the only way out is for every user to download a fresh install by hand. A GitHub secret cannot be read back once set, so the backup has to be somewhere else and has to happen before the key is pasted in.
+
+Regenerating a lost key is a new pubkey in `tauri.conf.json` and a version bump, and everyone already running the app is stranded on their current version. Treat it as unrecoverable and back it up.
 
 ### Unsigned builds
 

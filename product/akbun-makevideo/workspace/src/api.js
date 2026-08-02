@@ -39,9 +39,11 @@ if (!window.__TAURI__) {
         defaultWidth: 1920,
         defaultHeight: 1080,
         defaultFps: 30,
+        workspaceDir: '',
         ffmpegDir: '',
         renderAcceleration: 'auto',
       },
+      workspace: '',
       version: '0.0.0-browser',
       dataDir: '',
       ffmpeg: null,
@@ -50,6 +52,7 @@ if (!window.__TAURI__) {
     }),
     saveSettings: async (settings) => ({
       settings,
+      workspace: settings.workspaceDir || '',
       version: '0.0.0-browser',
       dataDir: '',
       ffmpeg: null,
@@ -60,6 +63,16 @@ if (!window.__TAURI__) {
     pickProjectOpen: unavailable,
     pickProjectSave: unavailable,
     pickRenderOutput: unavailable,
+    pickFolder: unavailable,
+    listProjects: async () => [],
+    // Pretends the folder was made, the way saveProject below pretends the
+    // file was written, so the New Project flow can be walked in a browser.
+    createProject: async (name) => ({
+      name,
+      dir: `/workspace/${name}`,
+      path: `/workspace/${name}/project.akbunvideo`,
+      modifiedMs: 0,
+    }),
     importAssets: async () => [],
     openProject: unavailable,
     saveProject: async () => {},
@@ -153,6 +166,12 @@ window.api = {
       filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
     }),
 
+  pickFolder: (title) => openDialog({ title, directory: true, multiple: false }),
+
+  listProjects: () => invoke('list_projects'),
+  createProject: (name) => invoke('create_project', { name }),
+
+  // Only paths cross this line. Nothing here copies a byte of media.
   importAssets: (paths) => invoke('import_assets', { paths }),
   openProject: (path) => invoke('open_project', { path }),
   saveProject: (path, project) => invoke('save_project', { path, project }),

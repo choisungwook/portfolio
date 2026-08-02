@@ -5,7 +5,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 ## What it does
 
 - Menu bar: new, open, save, save as, close, import media, render, settings
-- Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe
+- Projects are folders under a workspace directory (`~/Documents/akbun-makevideo` by default, settable), with an Open list instead of a file dialog
+- Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Preview: the timeline composited live, or a single asset on its own
 - Timeline: up to four video and four audio tracks, drag to move, drag an edge to trim
 - Split at the playhead, from the toolbar button or Cmd+B
@@ -49,8 +50,19 @@ Cmd on macOS, Ctrl elsewhere.
 | Directory | Description |
 |---|---|
 | [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the render crate in src-tauri/ |
-| [wiki/](./wiki/) | What the next agent reads before taking over |
+| [wiki/](./wiki/) | What the next agent reads before taking over, one page per part under [wiki/architecture/](./wiki/architecture/) |
 | [adr/](./adr/) | Decision records |
+
+## Where things go
+
+```text
+~/Documents/akbun-makevideo/     the workspace, set in Settings
+  summer trip/                   one folder per project
+    project.akbunvideo           the edit: settings, media paths, tracks, clips
+    summer-trip-fhd.mp4          renders default here
+```
+
+The project file stores **paths** to media, not media. Moving or deleting an imported file breaks its clips, which show hatched red in the timeline and are skipped by the render. See [wiki/architecture/workspace-and-files.md](./wiki/architecture/workspace-and-files.md).
 
 ## Quick start
 

@@ -40,6 +40,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::bootstrap,
             commands::save_settings,
+            commands::list_projects,
+            commands::create_project,
             commands::import_assets,
             commands::open_project,
             commands::save_project,
