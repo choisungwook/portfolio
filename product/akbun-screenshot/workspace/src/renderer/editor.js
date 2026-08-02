@@ -487,6 +487,13 @@ function askText(event, point) {
 const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
 
 window.addEventListener('keydown', (event) => {
+  // A key typed into a toolbar box belongs to the box, and that has to be
+  // decided before undo rather than after it. Otherwise Cmd+Z while correcting
+  // a font size undoes the drawing behind the box instead of the digit just
+  // typed. The same guard stops a minus from shrinking the selected shape and
+  // Backspace from deleting it.
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
+
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
     event.preventDefault();
     const from = event.shiftKey ? future : past;
@@ -499,18 +506,17 @@ window.addEventListener('keydown', (event) => {
     return;
   }
 
-  // Otherwise typing a minus into the size box would shrink the selected shape,
-  // and Backspace in the text input would delete the shape behind it.
-  const typing = event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT';
-  if (!selected || typing) return;
+  if (!selected) return;
   if (event.key === 'Escape') {
-    selected = null;
+    // Not just the selection. Escape can land with the mouse still down, and
+    // the drag would then run on with nothing to write to.
+    dropPointers();
     redraw();
     return;
   }
   // Both keys, because which one deletes forward is a habit that differs by
-  // keyboard and neither is worth being wrong about. The guard above is what
-  // keeps Backspace usable for editing text in the toolbar boxes.
+  // keyboard and neither is worth being wrong about. The guard at the top is
+  // what keeps Backspace usable for editing the toolbar boxes.
   if (deleteKeys && (event.key === 'Delete' || event.key === 'Backspace')) {
     event.preventDefault();
     deleteSelected();
