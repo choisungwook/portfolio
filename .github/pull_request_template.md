@@ -2,60 +2,45 @@
 이 파일이 PR body 형식의 기준이다. slash command와 rules는 이 파일을 참조한다.
 여기는 형식만 정한다. 문체와 label 같은 공통 작성 규칙은 .claude/rules/workflow.md를 따른다.
 
-아래 H1 네 개가 PR body의 전체 구조다. PR body는 .claude/rules/markdown.md의 헤더 규칙 대상이 아니므로 H1을 그대로 쓴다.
-Goal은 산문으로 쓰고, 나머지 세 섹션은 요약 한 줄과 그 아래 근거 항목들로 구성한다.
-앞으로의 작업에도 영향을 주는 항목은 요약 줄 앞에 **[Important]** 를 붙이고 섹션 위로 올린다.
-남길 내용이 없는 섹션은 헤더째 지운다. Goal은 항상 쓴다.
+목표와 의사결정은 여기 쓰지 않는다. 기록용 issue에 있고 PR은 링크만 한다.
+PR은 구현하면서 실제로 겪은 것만 남긴다. 어려웠던 점과 감수하는 리스크다.
+
+형식 규칙:
+- 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
+- 섹션마다 요약 한 줄, 그 아래 근거는 마크다운 리스트 최대 1개다.
+- 남길 내용이 없는 섹션은 헤더째 지운다. 구현과 issue 링크는 항상 쓴다.
+- 아래 H1 세 개가 전체 구조다. PR body는 .claude/rules/markdown.md의 헤더 규칙 대상이 아니다.
 -->
 
-# Goal
+# 구현
 
 <!--
-무엇이 문제였고 이 PR이 무엇을 더하는지 3문장 이내로 쓴다. 항목으로 나누지 않는다.
+무엇을 바꿨는지 한 줄. 검증 결과나 수치가 있으면 근거 한 줄.
 
 예시:
-A crowded macOS menu bar hides icons past the screen edge. You cannot click them.
-This PR adds akbun-mactaskbar. It splits the bar into three sections and pages through them with one click.
+메뉴바 아이콘 세 구획 분할, 클릭으로 페이지 전환
+- 전체 스캔 약 10초, 실제 아이템 19개 전부 탐지
 -->
 
-# Decisions
+# 어려웠던 점
 
 <!--
-작업 중 내린 의사결정을 쓴다. 요약 줄은 무엇을 정했는지, 아래 항목은 왜 그렇게 정했는지다.
+막힌 지점 한 줄. 버린 방법과 그 판단 근거가 된 수치를 근거 한 줄.
 
 예시:
-**[Important]** We hide icons with two spacer status items made of spaces.
-- macOS has no hide API. Widening one item is the only way to push others off screen.
-- Electron only exposes setTitle. So we express width as long runs of spaces.
-
-We let macOS own which section an icon belongs to.
-- Icon order is system state. Only a Command drag changes it.
+프로세스 일괄 순회 osascript 과도하게 느림
+- 전체 2분 34초, 프로세스당 150ms라 프로세스별 호출로 분리
 -->
 
-# Implementation
+# 리스크
 
 <!--
-실제로 구현한 것과 검증 결과를 쓴다. 수치와 측정값이 있으면 항목으로 남긴다.
+이 PR을 머지하면 감수하는 것 한 줄. 언제 문제가 되는지 근거 한 줄.
 
 예시:
-**[Important]** The item scan runs one short call per process, in a pool of eight.
-- The process list is fetched once, then reused.
-- A full scan takes about 10 seconds and finds all 19 real items.
+공백 문자열 폭으로 아이콘을 밀어내므로 폰트 변경 시 폭 어긋남
+- macOS 숨김 API 부재로 대안 없음. 어긋나면 상수 재측정
 -->
 
-# Challenges
-
-<!--
-막혔던 지점과 시도했다가 버린 방법을 쓴다. 왜 버렸는지 판단 근거가 된 수치를 남긴다.
-
-예시:
-One osascript walking every process was far too slow.
-- Measured 2m34s for the full walk. One named process took 150ms.
-- So we split it into one short call per process.
-
-A pool of sixteen was faster but lost data.
-- Item count dropped from 19 to 13. We kept the pool at eight.
--->
-
-<!-- 아래에 기록용 issue를 링크한다. 예: Issue #123 -->
+<!-- 기록용 issue를 링크한다. 목표와 의사결정은 여기서 읽는다. -->
 Issue #

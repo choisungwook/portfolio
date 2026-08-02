@@ -30,23 +30,67 @@ git commit, push, PR 생성, Issue 생성은 사용자가 명시적으로 지시
 
 ## Issue와 PR 공통 작성 규칙
 
-- 문어체로 간단명료하게 작성한다. 주절주절 설명하지 않는다.
+- 한글 개조식으로 쓴다. 서술형 종결어미(-다, -한다, -했다, -된다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
+  - 서술형: `PR body가 길어서 읽지 않게 되는 문제를 없앤다.`
+  - 개조식: `길어서 읽지 않게 되는 PR body 축소`
+- Goal은 번호 리스트 3개 이내로 쪼갠다. 문단으로 잇지 않는다.
+- 근거는 마크다운 리스트 최대 1개다. 한 항목에 여러 근거를 나열하지 않는다.
 - backtick을 사용하지 않는다.
 - label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
+
+## Issue와 PR의 역할 분리
+
+같은 내용을 두 곳에 쓰지 않는다.
+
+- Issue: 목표와 의사결정. 왜 이 작업을 하는가.
+- PR: 어려웠던 점과 감수하는 리스크. 구현하면서 실제로 겪은 것.
+
+PR에는 목표와 의사결정을 다시 쓰지 않고 issue 링크로 대체한다.
+
+## Issue 계층
+
+모든 기록용 issue는 root issue의 하위 issue로 등록한다. root issue 하나가 그 그룹의 작업 전체를 모으는 지도가 된다.
+
+- root issue는 그룹당 하나다. `product/<이름>`을 건드리면 그 product, `.claude`나 `.github`를 건드리면 저장소 규칙과 도구, 나머지는 핸즈온이다.
+- root issue에는 `root` label을 붙이고 제목은 그룹 이름으로 한다. 예: `akbun-screenshot`
+- root issue가 없으면 만든다. body는 그 그룹이 무엇인지 한 줄이면 된다. 하위 issue 목록은 GitHub가 자동으로 렌더링하므로 직접 적지 않는다.
+- root issue는 닫지 않는다. 그룹이 살아 있는 한 열어 둔다.
+
+하위 issue 등록은 GitHub sub-issue API로 한다. 하위 issue의 번호가 아니라 database id를 넘겨야 한다.
+
+```bash
+CHILD_ID=$(gh api repos/choisungwook/portfolio/issues/<하위번호> --jq .id)
+gh api --method POST repos/choisungwook/portfolio/issues/<root번호>/sub_issues -F sub_issue_id=$CHILD_ID
+```
+
+## GitHub Project
+
+root issue와 하위 issue는 저장소 project에 담아 칸반으로 본다.
+
+```bash
+gh project item-add <project번호> --owner choisungwook --url <issue URL>
+```
+
+`read:project` scope가 없으면 이 단계는 실패한다. 실패하면 아래를 사용자에게 안내하고 issue 생성 자체는 그대로 진행한다.
+
+```bash
+gh auth refresh -s project
+```
 
 ## Issue 작성 규칙
 
 PR을 생성할 때 기록용 GitHub Issue를 함께 만들고 PR body에서 링크한다.
 
 - 템플릿: [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따른다.
-- **Goal**: 작업의 목표를 2문장 미만으로 작성한다.
-- **ADR**: 작업 중 내린 의사결정을 "결정 - 이유" 형태로 항목화한다.
+- **Goal**: 작업의 목표를 번호 리스트 3개 이내로 작성한다.
+- **ADR**: 의사결정 한 줄, 그 아래 이유 한 줄로 항목화한다.
 
 ## PR 작성 규칙
 
 body 형식의 기준은 [.github/pull_request_template.md](../../.github/pull_request_template.md) 하나다. 섹션 구성과 항목 형식은 이 규칙 파일에 중복해 적지 않고 템플릿에서 읽는다.
 
 - PR을 쓰기 전에 템플릿을 읽고 그 섹션과 형식을 그대로 따른다.
+- 섹션마다 요약 한 줄과 근거 최대 1개다. 쓸 내용이 없는 섹션은 헤더째 지운다.
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
 - 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
