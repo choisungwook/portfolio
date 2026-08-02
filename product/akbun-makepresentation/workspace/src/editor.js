@@ -14,7 +14,22 @@ const DEFAULT_STYLE = {
   fill: 'none',
   fontSize: 24,
   textColor: '#1a1a1a',
+  fontFamily: 'Helvetica',
 };
+
+// One plain family name per entry, not a CSS stack, so a name survives a pptx
+// round trip unchanged. A generic fallback is appended at render time.
+const FONTS = [
+  'Helvetica',
+  'Arial',
+  'Verdana',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+  'Apple SD Gothic Neo',
+  'Malgun Gothic',
+  'Batang',
+];
 
 const BOXY = new Set(['rect', 'ellipse', 'text']);
 
@@ -42,28 +57,50 @@ function createShape(kind, x, y, style) {
     text: '',
     fontSize: s.fontSize,
     textColor: s.textColor,
+    fontFamily: s.fontFamily,
   };
 }
 
 // Update a shape while the pointer drags from (x0,y0) to (x,y) during
 // creation. Boxy shapes normalize so w and h stay positive; lines keep their
 // direction; the pen appends points.
-function dragShape(shape, x0, y0, x, y) {
+//
+// `constrain` is the Shift key: boxy shapes become a square or circle, lines
+// snap to the nearest 45 degrees. The pen ignores it.
+function dragShape(shape, x0, y0, x, y, constrain) {
   if (shape.kind === 'pen') {
     const last = shape.points[shape.points.length - 1];
     if (!last || Math.abs(last[0] - x) + Math.abs(last[1] - y) >= 2) {
       shape.points.push([x, y]);
     }
   } else if (BOXY.has(shape.kind)) {
-    shape.x = Math.min(x0, x);
-    shape.y = Math.min(y0, y);
-    shape.w = Math.abs(x - x0);
-    shape.h = Math.abs(y - y0);
+    let w = x - x0;
+    let h = y - y0;
+    if (constrain) {
+      const size = Math.max(Math.abs(w), Math.abs(h));
+      w = w < 0 ? -size : size;
+      h = h < 0 ? -size : size;
+    }
+    shape.x = Math.min(x0, x0 + w);
+    shape.y = Math.min(y0, y0 + h);
+    shape.w = Math.abs(w);
+    shape.h = Math.abs(h);
   } else {
+    let w = x - x0;
+    let h = y - y0;
+    if (constrain) {
+      const step = Math.PI / 4;
+      const angle = Math.round(Math.atan2(h, w) / step) * step;
+      const length = Math.hypot(w, h);
+      // Rounding kills the 1e-16 leftovers that would make a "horizontal"
+      // line one hair off horizontal.
+      w = Math.round(Math.cos(angle) * length * 100) / 100;
+      h = Math.round(Math.sin(angle) * length * 100) / 100;
+    }
     shape.x = x0;
     shape.y = y0;
-    shape.w = x - x0;
-    shape.h = y - y0;
+    shape.w = w;
+    shape.h = h;
   }
 }
 
@@ -172,6 +209,24 @@ function deleteSlide(deck, index) {
   return Math.min(index, deck.slides.length - 1);
 }
 
+function duplicateSlide(deck, index) {
+  deck.slides.splice(index + 1, 0, structuredClone(deck.slides[index]));
+  return index + 1;
+}
+
+// The page number as an ordinary text shape rather than a special case, so it
+// draws, rasterizes and exports to pptx through the paths that already exist.
+function slideNumberShape(number) {
+  const shape = createShape('text', SLIDE_W - 110, SLIDE_H - 52, {
+    fontSize: 18,
+    textColor: '#868e96',
+  });
+  shape.w = 90;
+  shape.h = 24;
+  shape.text = String(number);
+  return shape;
+}
+
 // --- SVG markup --------------------------------------------------------------
 
 function escapeXml(text) {
@@ -197,7 +252,9 @@ function strokeAttrs(shape) {
   );
 }
 
-const FONT = 'font-family="Helvetica, Arial, sans-serif"';
+function fontAttr(shape) {
+  return `font-family="${escapeXml(shape.fontFamily || 'Helvetica')}, sans-serif"`;
+}
 
 // Markup for one shape. `options.hideText` suppresses the glyphs while the
 // overlay textarea is editing that shape.
@@ -229,7 +286,7 @@ function renderShapeSvg(shape, options) {
             `<tspan x="${shape.x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
         )
         .join('');
-      return `<text x="${shape.x}" y="${shape.y + shape.fontSize}" font-size="${shape.fontSize}" fill="${shape.textColor}" ${FONT}>${spans}</text>`;
+      return `<text x="${shape.x}" y="${shape.y + shape.fontSize}" font-size="${shape.fontSize}" fill="${shape.textColor}" ${fontAttr(shape)}>${spans}</text>`;
     }
     default:
       return '';
@@ -256,13 +313,16 @@ function arrowSvg(shape) {
 // A whole slide as standalone SVG markup, used for thumbnails, the
 // presentation view, and rasterizing pages for the pdf export.
 function renderSlideSvg(slide, options) {
-  const shapes = slide.shapes
+  let shapes = slide.shapes
     .map((shape, i) =>
       renderShapeSvg(shape, {
         hideText: options && options.hideTextIndex === i,
       })
     )
     .join('');
+  if (options && options.number) {
+    shapes += renderShapeSvg(slideNumberShape(options.number));
+  }
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SLIDE_W} ${SLIDE_H}">` +
     `<rect width="${SLIDE_W}" height="${SLIDE_H}" fill="#ffffff"/>${shapes}</svg>`
@@ -273,6 +333,7 @@ const exported = {
   SLIDE_W,
   SLIDE_H,
   DEFAULT_STYLE,
+  FONTS,
   createDeck,
   createSlide,
   createShape,
@@ -284,6 +345,8 @@ const exported = {
   resizeShape,
   addSlide,
   deleteSlide,
+  duplicateSlide,
+  slideNumberShape,
   escapeXml,
   renderShapeSvg,
   renderSlideSvg,

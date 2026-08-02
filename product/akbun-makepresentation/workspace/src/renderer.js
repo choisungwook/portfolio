@@ -17,6 +17,8 @@ const state = {
   editingIndex: -1,
   presenting: false,
   presentIndex: 0,
+  showNumbers: false,
+  clipboard: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -69,6 +71,13 @@ function selectionSvg(shape) {
   return parts.join('');
 }
 
+// The slide number is not part of slide().shapes, so it draws after them and
+// outside the g[data-i] groups that make shapes selectable.
+function slideNumberSvg(index) {
+  if (!state.showNumbers) return '';
+  return L.renderShapeSvg(L.slideNumberShape(index + 1));
+}
+
 function renderCanvas() {
   const shapes = slide()
     .shapes.map(
@@ -79,7 +88,10 @@ function renderCanvas() {
     )
     .join('');
   const sel = selectedShape();
-  canvas.innerHTML = shapes + (sel && state.editingIndex < 0 ? selectionSvg(sel) : '');
+  canvas.innerHTML =
+    shapes +
+    slideNumberSvg(state.current) +
+    (sel && state.editingIndex < 0 ? selectionSvg(sel) : '');
 }
 
 function renderThumbs() {
@@ -87,7 +99,8 @@ function renderThumbs() {
     .map(
       (s, i) =>
         `<div class="thumb${i === state.current ? ' active' : ''}" data-slide="${i}">` +
-        `${L.renderSlideSvg(s)}<span class="num">${i + 1}</span></div>`
+        `${L.renderSlideSvg(s, { number: state.showNumbers ? i + 1 : 0 })}` +
+        `<span class="num">${i + 1}</span></div>`
     )
     .join('');
 }
@@ -117,6 +130,16 @@ function renderProps() {
   $('prop-dash').value = source.dash;
   $('prop-font-size').value = source.fontSize;
   $('prop-text-color').value = source.textColor;
+
+  // A pptx from another editor can name a font this list does not offer.
+  // Adding it keeps the select honest instead of silently showing the wrong
+  // family.
+  const fonts = $('prop-font-family');
+  const family = source.fontFamily || 'Helvetica';
+  if (!Array.from(fonts.options).some((o) => o.value === family)) {
+    fonts.add(new Option(family, family));
+  }
+  fonts.value = family;
 }
 
 function updateTitle() {
@@ -133,11 +156,55 @@ function renderAll() {
   updateTitle();
 }
 
+// --- undo history -------------------------------------------------------------
+//
+// Every mutation already funnels through markDirty, so history hangs off that
+// one hook instead of every call site. `committed` is the deck as of the last
+// commit, which is exactly what an undo has to restore.
+// ponytail: whole-deck snapshots. A slide of shapes is small; switch to diffs
+// only if a deck ever gets big enough to feel it.
+
+const HISTORY_LIMIT = 100;
+const history = { past: [], future: [] };
+let committed = structuredClone(state.deck);
+
+function resetHistory() {
+  history.past.length = 0;
+  history.future.length = 0;
+  committed = structuredClone(state.deck);
+}
+
 function markDirty() {
+  history.past.push(committed);
+  if (history.past.length > HISTORY_LIMIT) history.past.shift();
+  history.future.length = 0;
+  committed = structuredClone(state.deck);
   state.dirty = true;
   // Some callers redraw only the canvas, so the title dot updates here
   // rather than waiting for the next full render.
   updateTitle();
+}
+
+function restore(deck) {
+  state.deck = structuredClone(deck);
+  state.current = Math.min(state.current, state.deck.slides.length - 1);
+  state.selected = -1;
+  state.dirty = true;
+  renderAll();
+}
+
+function undo() {
+  if (history.past.length === 0) return;
+  history.future.push(committed);
+  committed = history.past.pop();
+  restore(committed);
+}
+
+function redo() {
+  if (history.future.length === 0) return;
+  history.past.push(committed);
+  committed = history.future.pop();
+  restore(committed);
 }
 
 // --- tools ---------------------------------------------------------------------
@@ -203,13 +270,22 @@ canvas.addEventListener('pointerdown', (event) => {
 
   const group = event.target.closest('g[data-i]');
   if (group) {
-    state.selected = Number(group.dataset.i);
+    let index = Number(group.dataset.i);
+    // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
+    // way PowerPoint does. Add Shift and the copy travels on one axis.
+    const duplicated = event.metaKey || event.ctrlKey;
+    if (duplicated) {
+      slide().shapes.push(structuredClone(slide().shapes[index]));
+      index = slide().shapes.length - 1;
+    }
+    state.selected = index;
     state.drag = {
       mode: 'move',
       from: structuredClone(selectedShape()),
       x0: p.x,
       y0: p.y,
       moved: false,
+      duplicated,
     };
     canvas.setPointerCapture(event.pointerId);
   } else {
@@ -227,14 +303,18 @@ canvas.addEventListener('pointermove', (event) => {
   const dy = p.y - drag.y0;
 
   if (drag.mode === 'draw') {
-    L.dragShape(slide().shapes[drag.index], drag.x0, drag.y0, p.x, p.y);
+    L.dragShape(slide().shapes[drag.index], drag.x0, drag.y0, p.x, p.y, event.shiftKey);
   } else {
     const shape = selectedShape();
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
     if (drag.mode === 'move') {
-      L.moveShape(shape, dx, dy);
-      drag.moved = drag.moved || dx !== 0 || dy !== 0;
+      // Shift keeps the move on whichever axis has travelled further.
+      const straight = event.shiftKey;
+      const mx = straight && Math.abs(dx) <= Math.abs(dy) ? 0 : dx;
+      const my = straight && Math.abs(dx) > Math.abs(dy) ? 0 : dy;
+      L.moveShape(shape, mx, my);
+      drag.moved = drag.moved || mx !== 0 || my !== 0;
     } else {
       L.resizeShape(shape, drag.from, drag.handle, dx, dy);
     }
@@ -258,6 +338,11 @@ canvas.addEventListener('pointerup', () => {
     setTool('select');
   } else if (drag.mode === 'resize' || drag.moved) {
     markDirty();
+  } else if (drag.duplicated) {
+    // A Cmd+click that never moved should select, not stack a copy on top of
+    // the original where nobody can see it.
+    slide().shapes.pop();
+    state.selected = -1;
   }
   renderAll();
 });
@@ -288,6 +373,7 @@ function startTextEdit(index) {
   textEditor.style.width = `${Math.max(shape.w, 120) * scale}px`;
   textEditor.style.height = `${Math.max(shape.h, shape.fontSize * 1.3 * lines) * scale}px`;
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
+  textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
   textEditor.style.color = shape.textColor;
   textEditor.hidden = false;
   // Deferred so it wins over whatever focus change the triggering click
@@ -342,12 +428,21 @@ document.addEventListener('keydown', (event) => {
     return;
   }
 
-  if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+  // Cmd on macOS, Ctrl elsewhere. event.key is already the unshifted letter
+  // for these, so Shift only picks the redo branch.
+  if (event.metaKey || event.ctrlKey) {
+    const key = event.key.toLowerCase();
+    if (key === 's') saveFile(false);
+    else if (key === 'z' && event.shiftKey) redo();
+    else if (key === 'z') undo();
+    else if (key === 'y') redo();
+    else if (key === 'c') copyShape();
+    else if (key === 'v') pasteShape();
+    else if (key === 'd') duplicateSelection();
+    else return;
     event.preventDefault();
-    saveFile(false);
     return;
   }
-  if (event.metaKey || event.ctrlKey) return;
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
     deleteSelectedShape();
@@ -384,6 +479,45 @@ function deleteSelectedShape() {
   renderAll();
 }
 
+// --- copy, paste, duplicate ----------------------------------------------------
+
+const PASTE_OFFSET = 20;
+
+function addCopy(shape) {
+  const copy = structuredClone(shape);
+  L.moveShape(copy, PASTE_OFFSET, PASTE_OFFSET);
+  slide().shapes.push(copy);
+  state.selected = slide().shapes.length - 1;
+  markDirty();
+  renderAll();
+  return copy;
+}
+
+function copyShape() {
+  const shape = selectedShape();
+  if (shape) state.clipboard = structuredClone(shape);
+}
+
+function pasteShape() {
+  if (!state.clipboard) return;
+  // The clipboard follows the last paste so a run of them walks down the
+  // slide instead of piling up on one spot.
+  state.clipboard = structuredClone(addCopy(state.clipboard));
+}
+
+// Cmd+D duplicates the selected shape, or the whole slide when nothing on it
+// is selected. Same split PowerPoint makes.
+function duplicateSelection() {
+  const shape = selectedShape();
+  if (shape) {
+    addCopy(shape);
+    return;
+  }
+  state.current = L.duplicateSlide(state.deck, state.current);
+  markDirty();
+  renderAll();
+}
+
 // --- property panel -------------------------------------------------------------------
 
 function applyProp(patch) {
@@ -412,6 +546,9 @@ $('prop-font-size').addEventListener('input', (e) =>
   applyProp({ fontSize: Math.max(6, Number(e.target.value) || 24) })
 );
 $('prop-text-color').addEventListener('input', (e) => applyProp({ textColor: e.target.value }));
+$('prop-font-family').addEventListener('change', (e) =>
+  applyProp({ fontFamily: e.target.value })
+);
 $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
 
 // --- slide panel ------------------------------------------------------------------------
@@ -463,6 +600,7 @@ async function newDeck() {
   state.selected = -1;
   state.filePath = null;
   state.dirty = false;
+  resetHistory();
   renderAll();
 }
 
@@ -476,6 +614,11 @@ async function openFile() {
     state.selected = -1;
     state.filePath = path;
     state.dirty = false;
+    // The number flag has nowhere to live in a .pptx, so an opened file
+    // starts with it off; any numbers baked in on save are plain text boxes.
+    state.showNumbers = false;
+    setNumbersButton();
+    resetHistory();
     renderAll();
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
@@ -488,6 +631,16 @@ function suggestName(extension) {
   return base.replace(/\.pptx$/i, '') + '.' + extension;
 }
 
+// pptx has no field for "show slide numbers", so the number goes into the
+// file as a real text box on each slide, which is what PowerPoint would show
+// anyway.
+function deckForSave() {
+  if (!state.showNumbers) return state.deck;
+  const copy = structuredClone(state.deck);
+  copy.slides.forEach((s, i) => s.shapes.push(L.slideNumberShape(i + 1)));
+  return copy;
+}
+
 async function saveFile(alwaysAsk) {
   let path = state.filePath;
   if (alwaysAsk || !path) {
@@ -495,7 +648,7 @@ async function saveFile(alwaysAsk) {
     if (!path) return;
   }
   try {
-    await window.api.saveDeck(path, state.deck);
+    await window.api.saveDeck(path, deckForSave());
     state.filePath = path;
     state.dirty = false;
     updateTitle();
@@ -506,9 +659,9 @@ async function saveFile(alwaysAsk) {
 
 // Rasterize one slide for the pdf: SVG markup into an image, image onto a
 // canvas, canvas to JPEG. 1920x1080 is plenty for print at this slide size.
-function rasterizeSlide(s) {
+function rasterizeSlide(s, number) {
   return new Promise((resolve, reject) => {
-    const svg = L.renderSlideSvg(s);
+    const svg = L.renderSlideSvg(s, { number });
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const image = new Image();
     image.onload = () => {
@@ -532,7 +685,9 @@ async function exportPdf() {
   if (!path) return;
   try {
     const pages = [];
-    for (const s of state.deck.slides) pages.push(await rasterizeSlide(s));
+    for (const [i, s] of state.deck.slides.entries()) {
+      pages.push(await rasterizeSlide(s, state.showNumbers ? i + 1 : 0));
+    }
     await window.api.exportPdf(path, pages);
     await window.api.message('PDF saved.', { title: 'akbun-makepresentation' });
   } catch (error) {
@@ -543,7 +698,9 @@ async function exportPdf() {
 // --- presentation mode ------------------------------------------------------------------------
 
 function renderPresent() {
-  present.innerHTML = L.renderSlideSvg(state.deck.slides[state.presentIndex]);
+  present.innerHTML = L.renderSlideSvg(state.deck.slides[state.presentIndex], {
+    number: state.showNumbers ? state.presentIndex + 1 : 0,
+  });
 }
 
 function enterPresent() {
@@ -580,6 +737,16 @@ $('btn-save').addEventListener('click', () => saveFile(false));
 $('btn-save-as').addEventListener('click', () => saveFile(true));
 $('btn-pdf').addEventListener('click', exportPdf);
 $('btn-present').addEventListener('click', enterPresent);
+
+function setNumbersButton() {
+  $('btn-numbers').classList.toggle('active', state.showNumbers);
+}
+
+$('btn-numbers').addEventListener('click', () => {
+  state.showNumbers = !state.showNumbers;
+  setNumbersButton();
+  renderAll();
+});
 $('btn-update').addEventListener('click', () => window.api.checkUpdate());
 for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => setTool(button.dataset.tool));

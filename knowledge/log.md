@@ -2,6 +2,7 @@
 
 ## 2026-08-02
 
+* **Creation**: [hidden 속성으로 감추는 패널은 자기 display 규칙에 조용히 진다](topics/hidden-attribute-loses-to-display.md) topic 기록. akbun-makepresentation에 폰트 선택을 넣다가 속성 패널이 처음부터 한 번도 감춰지지 않았다는 것을 발견하면서 남긴다.
 * **Update**: [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](decisions/2026-08-thumbnails-in-the-webview.md)에 canvas taint 지뢰를 추가했다. asset protocol은 다른 origin이라 crossOrigin 없이 그리면 toBlob이 실패하고, 첫 출시 버전의 썸네일 캐시가 이것 때문에 통째로 동작하지 않았다.
 
 ## 2026-08-01

@@ -269,10 +269,14 @@ fn xfrm(x: f64, y: f64, w: f64, h: f64, flip_h: bool, flip_v: bool) -> String {
 fn text_body(shape: &Shape) -> String {
     let size = ((shape.font_size * 100.0 / 1.3333).round() as i64).max(100);
     let color = hex(&shape.text_color);
+    let latin = format!(
+        "<a:latin typeface=\"{}\"/>",
+        xml_escape(&shape.font_family)
+    );
     let mut paragraphs = String::new();
     for line in shape.text.split('\n') {
         paragraphs.push_str(&format!(
-            "<a:p><a:r><a:rPr lang=\"en-US\" sz=\"{size}\" dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill></a:rPr><a:t>{}</a:t></a:r></a:p>",
+            "<a:p><a:r><a:rPr lang=\"en-US\" sz=\"{size}\" dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>{latin}</a:rPr><a:t>{}</a:t></a:r></a:p>",
             xml_escape(line)
         ));
     }
@@ -425,6 +429,7 @@ struct Pending {
     text: String,
     font_size: Option<f64>,
     text_color: Option<String>,
+    font_family: Option<String>,
 }
 
 fn attr(e: &quick_xml::events::BytesStart, name: &[u8]) -> Option<String> {
@@ -583,6 +588,11 @@ fn handle_element(
                 .and_then(|v| v.parse::<f64>().ok())
                 .map(|sz| (sz / 100.0 * 1.3333 * 10.0).round() / 10.0);
         }
+        // The rPr guard keeps this off the typeface entries in a lstStyle
+        // defRPr, which belong to the layout rather than to this run.
+        "latin" if p.font_family.is_none() && in_ctx(stack, "rPr") => {
+            p.font_family = get(b"typeface").filter(|t| !t.is_empty());
+        }
         _ => {}
     }
 }
@@ -655,6 +665,9 @@ fn finish(p: Pending) -> Option<Shape> {
         if let Some(color) = p.text_color {
             shape.text_color = color;
         }
+        if let Some(family) = p.font_family {
+            shape.font_family = family;
+        }
     }
     Some(shape)
 }
@@ -707,6 +720,7 @@ mod tests {
                             text: "hello <deck>\nsecond & line".into(),
                             font_size: 32.0,
                             text_color: "#2f9e44".into(),
+                            font_family: "Times New Roman".into(),
                             stroke: "none".into(),
                             ..Shape::default()
                         },
@@ -757,6 +771,7 @@ mod tests {
                 if a.kind == "text" {
                     assert!(close(a.font_size, b.font_size));
                     assert_eq!(a.text_color, b.text_color);
+                    assert_eq!(a.font_family, b.font_family);
                 }
             }
         }
