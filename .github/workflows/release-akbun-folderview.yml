@@ -86,3 +86,16 @@ jobs:
             - exe를 내려받아 실행하면 사용자 폴더에 설치되고 바로 실행된다. 관리자 권한은 필요 없다.
             - 코드 서명이 없어 SmartScreen 경고가 나온다. "추가 정보"를 누르고 "실행"을 선택하면 설치된다.
             - 설치 후에는 Settings의 Check for Updates로 다음 버전을 받는다.
+
+      # releases/latest is repository-wide, so any other product's release
+      # steals it and installed copies silently see the wrong latest.json.
+      # The updater endpoint points at this fixed tag instead, and this step
+      # is the only thing that moves it.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          gh release download "akbun-folderview-v$version" --pattern latest.json --output latest.json --repo ${{ github.repository }}
+          gh release view akbun-folderview-updater --repo ${{ github.repository }} || gh release create akbun-folderview-updater --latest=false --title akbun-folderview-updater --notes "akbun-folderview updater manifest. Do not delete." --repo ${{ github.repository }}
+          gh release upload akbun-folderview-updater latest.json --clobber --repo ${{ github.repository }}
