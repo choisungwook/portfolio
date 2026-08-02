@@ -5,9 +5,11 @@
 //! the timeline, the composite written to an encoder on a pipe, and a playable
 //! file at the other end with the right pixels in it.
 //!
-//! It needs ffmpeg and a graphics device on the machine. Both are installed by
-//! the verify job for exactly this test; a render path nobody has run is the
-//! thing this whole crate exists to avoid.
+//! It needs ffmpeg. A graphics device is optional — `Compositor::new()` falls
+//! back to the software backend — so this runs the whole pipeline either way,
+//! and the verify job installs a software Vulkan device so the GPU half is
+//! exercised too. A render path nobody has run is the thing this crate exists
+//! to avoid.
 
 use makevideo_compositor::{pipeline, Compositor};
 use makevideo_render::{
@@ -175,7 +177,7 @@ fn near(got: (u8, u8, u8), want: (u8, u8, u8)) -> bool {
 }
 
 fn render(project: &Project, output: &str) -> Result<(), String> {
-    let compositor = Compositor::new().expect("a graphics device is needed for this test");
+    let compositor = Compositor::new();
     let slot = Arc::new(Mutex::new(None));
     let cancelled = Arc::new(AtomicBool::new(false));
     let mut seen: Vec<u64> = Vec::new();
@@ -372,7 +374,7 @@ fn the_preview_frame_matches_the_rendered_frame() {
     let output = temp_dir().join("match.mp4").to_string_lossy().to_string();
     render(&project, &output).expect("the render should succeed");
 
-    let compositor = Compositor::new().expect("a graphics device");
+    let compositor = Compositor::new();
     let (out_w, out_h) = output_size();
     let preview =
         pipeline::preview_frame(&compositor, &ffmpeg_path(), &project, 1500, out_w, out_h)

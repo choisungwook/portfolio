@@ -10,6 +10,10 @@ shader, and pipes the finished frames back to an ffmpeg encoder on stdin. The
 preview asks the same compositor for one frame whenever the playhead is not
 moving, and shows it over the stacked media elements.
 
+The compositor has two interchangeable backends: wgpu, and a software one that
+needs nothing. wgpu is an optional Cargo feature, and `Compositor::new()` never
+fails — with no graphics device the software backend draws the same frame.
+
 Encoding, decoding and audio mixing stay in ffmpeg subprocesses. The old filter
 graph route stays too, chosen in Settings and used automatically if the
 composited route fails.
@@ -53,6 +57,24 @@ playing stops, with a badge saying which is on screen. That is not a
 compromise hidden in the implementation — it is the professional pattern, and
 the case where the difference matters is exactly the case this serves: checking
 what the render will look like before spending an hour on it.
+
+### Why wgpu is optional and the CPU can do it all
+
+A compositor that only works with a graphics device would make "no GPU" mean
+"the preview cannot show you the render", which is the one thing this change
+was for. It would also make wgpu — a large dependency — mandatory for a build
+that might never use it.
+
+So the software backend is not a stub. It mirrors the shader down to the blend
+factors and there is a test asserting the two agree within one unorm8 step. It
+is slower: 114 ms a frame at 1080p with two layers, against 23 ms for a
+software Vulkan device and much less for a real one. Slow is a fine answer;
+"cannot draw" is not.
+
+Being able to build without wgpu at all is the other half. It keeps the option
+honest — a feature that is never compiled out rots — and the verify job builds
+and tests `--no-default-features` before it installs any graphics driver, so
+the CPU path is proved on a machine that has nothing.
 
 ### What was rejected
 

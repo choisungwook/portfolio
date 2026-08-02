@@ -39,14 +39,23 @@ jobs:
       - name: Run render model tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render
 
-      # The compositor draws with a real graphics device, and its end to end
-      # test renders an actual file. lavapipe is a software Vulkan device, so
-      # both run on a runner with no GPU. These two packages are small and pull
-      # in no Rust dependencies; GTK and WebKit are still kept out.
-      - name: Install a software GPU and ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq mesa-vulkan-drivers ffmpeg
+      # The compositor has a software backend that needs nothing, so this runs
+      # the whole pipeline on a machine with no graphics stack at all. It is
+      # also what proves wgpu is genuinely optional rather than optional on
+      # paper: --no-default-features must not pull it in.
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Run compositor tests
+      - name: Run compositor tests without a GPU
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features
+
+      # And again with wgpu, against lavapipe: a software Vulkan device, so the
+      # GPU half is exercised on a runner with no hardware. That is what makes
+      # "both backends draw the same frame" meaningful here.
+      - name: Install a software GPU
+        run: sudo apt-get install -y -qq mesa-vulkan-drivers
+
+      - name: Run compositor tests with the GPU backend
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
 
   release:

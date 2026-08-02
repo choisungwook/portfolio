@@ -5,7 +5,7 @@
 //! capabilities/default.json short, because the webview never needs a file
 //! system scope of its own.
 
-use makevideo_compositor::Compositor;
+use makevideo_compositor::{Backend, Compositor};
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project};
 use serde::{Deserialize, Serialize};
@@ -44,10 +44,11 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
-    /// "gpu" to draw every frame with the same compositor the preview uses,
-    /// "ffmpeg" to let the filter graph do it. The first is what makes the
-    /// preview and the render agree; the second is faster because the frames
-    /// never leave ffmpeg.
+    /// How a frame gets drawn: "auto" for the graphics device with the
+    /// software compositor behind it, "cpu" to stay off the GPU entirely, or
+    /// "ffmpeg" to let the filter graph draw instead. The first two are the
+    /// same code and make the preview and the render agree; the third is
+    /// faster because frames never leave ffmpeg.
     pub compositor: String,
 }
 
@@ -64,7 +65,7 @@ impl Default for Settings {
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
-            compositor: "gpu".into(),
+            compositor: "auto".into(),
         }
     }
 }
@@ -80,8 +81,9 @@ pub struct AppState {
     /// None means it has not been asked yet.
     pub accel: Mutex<Option<AccelProbe>>,
     /// Opening a graphics device costs a moment and the answer never changes,
-    /// so it is made once and shared. None means it has not been tried.
-    pub compositor: Mutex<Option<Result<Arc<Compositor>, String>>>,
+    /// so it is made once and shared. Keyed by backend, because asking for the
+    /// CPU after the GPU has been opened should not hand back the GPU.
+    pub compositor: Mutex<Vec<(Backend, Arc<Compositor>)>>,
 }
 
 /// One candidate and what happened when it was actually tried. Kept so Settings
@@ -130,8 +132,8 @@ pub struct Bootstrap {
     pub ffmpeg: Option<String>,
     pub ffprobe: Option<String>,
     pub acceleration: AccelProbe,
-    /// What the compositor is drawing with, or why it could not start.
-    pub compositor: Result<String, String>,
+    /// What is drawing frames, and whether it is a real graphics device.
+    pub compositor: CompositorInfo,
 }
 
 pub fn allow_asset_file(app: &AppHandle, path: &str) {
@@ -232,14 +234,61 @@ fn acceleration(state: &State<AppState>, program: Option<&String>) -> AccelProbe
     probe
 }
 
-/// The graphics device, opened once. A machine with none is not an error until
-/// something actually asks to draw with it.
-fn compositor(state: &State<AppState>) -> Result<Arc<Compositor>, String> {
-    let mut slot = state.compositor.lock().unwrap();
-    if slot.is_none() {
-        *slot = Some(Compositor::new().map(Arc::new));
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositorInfo {
+    /// "auto", "cpu" or "ffmpeg", as asked for.
+    pub setting: String,
+    /// What is actually drawing: a device name, or "software (CPU)".
+    pub device: String,
+    /// Whether that is a graphics device rather than the software path.
+    pub gpu: bool,
+    /// True when a graphics device was wanted and there was none, so the
+    /// software compositor took over. The picture is the same either way.
+    pub fell_back: bool,
+}
+
+/// Which backend a setting asks for. Anything that is not "cpu" means auto,
+/// including the "gpu" that older settings files hold: a machine with no
+/// device should quietly use the software path, not refuse to draw.
+fn wanted_backend(setting: &str) -> Backend {
+    if setting == "cpu" {
+        Backend::Cpu
+    } else {
+        Backend::Auto
     }
-    slot.as_ref().unwrap().clone()
+}
+
+/// The compositor for a backend, made once and shared. This never fails: with
+/// no graphics device the software compositor draws the same picture, only
+/// slower, so "no GPU" stopped being a reason to give up.
+fn compositor(state: &State<AppState>, backend: Backend) -> Arc<Compositor> {
+    let mut made = state.compositor.lock().unwrap();
+    if let Some((_, existing)) = made.iter().find(|(kind, _)| *kind == backend) {
+        return Arc::clone(existing);
+    }
+    let built = Arc::new(Compositor::with_backend(backend).unwrap_or_else(|_| Compositor::new()));
+    made.push((backend, Arc::clone(&built)));
+    built
+}
+
+fn compositor_info(state: &State<AppState>, setting: &str) -> CompositorInfo {
+    if setting == "ffmpeg" {
+        return CompositorInfo {
+            setting: setting.to_string(),
+            device: "ffmpeg filter graph".into(),
+            gpu: false,
+            fell_back: false,
+        };
+    }
+    let backend = wanted_backend(setting);
+    let made = compositor(state, backend);
+    CompositorInfo {
+        setting: setting.to_string(),
+        device: made.adapter().to_string(),
+        gpu: made.is_gpu(),
+        fell_back: backend == Backend::Auto && !made.is_gpu(),
+    }
 }
 
 /// What this render should use, honouring the setting.
@@ -339,7 +388,7 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
             .to_string_lossy()
             .to_string(),
         acceleration: acceleration(&state, ffmpeg.as_ref()),
-        compositor: compositor(&state).map(|gpu| gpu.adapter().to_string()),
+        compositor: compositor_info(&state, &settings.compositor),
         ffprobe: find_tool("ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
         settings,
@@ -360,8 +409,9 @@ pub fn preview_frame(
     time_ms: u64,
     max_width: u32,
 ) -> Result<tauri::ipc::Response, String> {
-    let gpu = compositor(&state)?;
-    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let settings = state.settings.lock().unwrap().clone();
+    let gpu = compositor(&state, wanted_backend(&settings.compositor));
+    let configured = settings.ffmpeg_dir.clone();
     let ffmpeg_path = find_tool("ffmpeg", &configured)
         .ok_or("ffmpeg was not found, so no frame can be decoded")?;
 
@@ -679,7 +729,7 @@ pub fn start_render(
     let gpu = if settings.compositor == "ffmpeg" {
         None
     } else {
-        compositor(&state).ok()
+        Some(compositor(&state, wanted_backend(&settings.compositor)))
     };
 
     let mut routes: Vec<Route> = Vec::new();

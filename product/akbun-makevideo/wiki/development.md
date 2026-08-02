@@ -24,12 +24,15 @@ None of them need an app binary. The first two need nothing installed at all; th
 ```bash
 npm test           # node --test over the timeline model
 npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
-npm run test:gpu   # cargo test -p makevideo-compositor, needs a GPU and ffmpeg
+npm run test:gpu   # cargo test -p makevideo-compositor, needs ffmpeg
+npm run test:nogpu # the same, with wgpu compiled out entirely
 ```
 
 `-p makevideo-render` is not decoration. The render crate depends on neither tauri nor a webview, so this compiles serde and nothing else. Dropping the `-p` pulls in the app crate, which on a Linux runner means installing GTK and WebKit development packages for what is otherwise a few seconds of work.
 
-The compositor tests are the exception to "no system packages": they draw with a real graphics device and render real files, so they need `mesa-vulkan-drivers` and `ffmpeg`. Both are small, neither adds a Rust dependency, and the verify job installs them. They fail loudly rather than skipping when there is no adapter — a render path nobody has run is what the crate exists to prevent.
+The compositor tests render real files, so they need `ffmpeg`. They do **not** need a GPU: the software backend is always compiled and every drawing test runs on both. What `mesa-vulkan-drivers` adds is an adapter for the wgpu half, which then fails loudly rather than skipping — a render path nobody has run is what the crate exists to prevent.
+
+`test:nogpu` is the one that keeps wgpu genuinely optional. It builds with the feature off, so wgpu is not in the dependency tree at all, and CI runs it *before* installing any graphics driver.
 
 ```bash
 sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
@@ -76,6 +79,8 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 **The asset protocol scope is in memory.** It has to be re-granted on every run, which `open_project` does for the project's assets.
 
 **A media element per clip is a decoder per clip.** `preview.prune()` removes elements whose clips are gone and has to be called after any edit that drops clips.
+
+**The software compositor is slow, not broken.** 114 ms a frame at 1080p with two layers, against 23 ms for a software Vulkan device. It is what runs on a machine with no graphics adapter, and the picture is the same.
 
 **The composited route moves a lot of bytes.** Every frame leaves ffmpeg as raw RGBA and goes back the same way, about 250 MB for each second of 1080p30 timeline. On a software rasteriser that made a test render 3.4x slower than the filter graph; on a Mac the drawing is on the GPU and the pipe traffic is what remains. `Settings → Compositor → ffmpeg filter graph` is the faster route when the preview matching the file does not matter.
 

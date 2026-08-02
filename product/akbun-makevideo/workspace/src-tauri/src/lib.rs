@@ -34,7 +34,7 @@ pub fn run() {
                 render: Arc::new(Mutex::new(None)),
                 cancelled: Arc::new(AtomicBool::new(false)),
                 accel: Mutex::new(None),
-                compositor: Mutex::new(None),
+                compositor: Mutex::new(Vec::new()),
             });
             Ok(())
         })

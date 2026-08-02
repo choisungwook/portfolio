@@ -852,16 +852,16 @@ function accelerationNote() {
 
 /** What is drawing, and what the choice costs. */
 function compositorNote() {
-  const found = state.boot && state.boot.compositor;
-  const device = found && typeof found === 'object' && 'Ok' in found ? found.Ok : null;
-  const failure = found && typeof found === 'object' && 'Err' in found ? found.Err : null;
-  if (state.settings.compositor === 'ffmpeg') {
-    return 'The filter graph draws the render and the preview separately, so they can differ. Faster, because frames never leave ffmpeg.';
+  const found = (state.boot && state.boot.compositor) || {};
+  if (found.setting === 'ffmpeg') {
+    return 'The filter graph draws the render, and the preview is drawn separately by the browser, so the two can differ. Faster, because frames never leave ffmpeg.';
   }
-  if (device) {
-    return `Drawing with ${device}. The preview frame and the render come out of the same shader, at the cost of every frame crossing a pipe.`;
+  const same =
+    'The preview frame and the render come out of the same code, at the cost of every frame crossing a pipe.';
+  if (found.fellBack) {
+    return `No graphics device was found, so ${found.device} is drawing. Same picture, slower. ${same}`;
   }
-  return `No graphics device, so the filter graph will draw instead${failure ? `: ${failure}` : '.'}`;
+  return `Drawing with ${found.device || 'the software compositor'}. ${same}`;
 }
 
 function fillAppSheet() {

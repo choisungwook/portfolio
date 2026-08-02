@@ -252,8 +252,9 @@
       <p class="dim small-text" id="as-workspace-note"></p>
       <label class="row">Compositor
         <select id="as-compositor">
-          <option value="gpu">GPU — preview matches the render</option>
-          <option value="ffmpeg">ffmpeg filter graph — faster</option>
+          <option value="auto">Auto — GPU if there is one, CPU if not</option>
+          <option value="cpu">CPU only — never touch the GPU</option>
+          <option value="ffmpeg">ffmpeg filter graph — faster, preview may differ</option>
         </select>
       </label>
       <p class="dim small-text" id="as-compositor-note"></p>

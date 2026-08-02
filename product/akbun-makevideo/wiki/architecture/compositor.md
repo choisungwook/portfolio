@@ -12,6 +12,44 @@ takes decoded RGBA in and gives one composited frame out, and it knows nothing
 about files or ffmpeg. `crates/compositor/src/composite.wgsl` is the shader —
 one file, one draw call per layer, ordinary source-over alpha blending.
 
+## wgpu is optional, and the CPU draws the same picture
+
+There are two backends behind one `Compositor`:
+
+| Backend | Needs | Chosen when |
+|---|---|---|
+| `gpu.rs` | the `gpu` feature and a graphics adapter | by default, when there is one |
+| `cpu.rs` | nothing at all | no adapter, the feature off, or Settings says so |
+
+`Compositor::new()` cannot fail. With no graphics device it returns the
+software compositor, so "this machine has no GPU" stopped being a reason for
+anything to break — the frame is the same, it just takes longer to draw.
+
+wgpu is an **optional dependency**. `cargo build -p makevideo-compositor
+--no-default-features` produces a crate with no wgpu anywhere in its dependency
+tree, and the verify job builds and tests exactly that, so the option is real
+rather than declared.
+
+`cpu.rs` mirrors `composite.wgsl` on purpose, down to the blend factors, and
+`both_backends_draw_the_same_frame` asserts they land within one unorm8 step of
+each other on every channel. If the shader changes and the software half is
+left behind, that test is what says so.
+
+The one place they can differ: the shader samples linearly and `cpu.rs` samples
+nearest, which only shows when a source is not already at its destination size.
+The pipeline always scales with ffmpeg first, so in the app it never arises.
+
+Measured at 1080p with two layers, per frame of compositing alone:
+
+| Backend | Per frame |
+|---|---|
+| llvmpipe, a software Vulkan device | 23 ms |
+| `cpu.rs` | 114 ms |
+
+A real GPU is far quicker than either. The scalar loop being slower than a
+software *rasteriser* is expected: llvmpipe is vectorised and threaded, and
+this is neither.
+
 ## Where the geometry comes from
 
 Not from the compositor. `makevideo_render::layout` decides what is on screen
@@ -33,10 +71,10 @@ opinion: ffmpeg carries out a decision, it does not make one.
 Settings → Compositor picks between them.
 
 ```text
-GPU (default)
+Auto or CPU (default is Auto)
   ffmpeg decode per clip  ─┐
-  ffmpeg decode per clip  ─┼─► wgpu compositor ─► ffmpeg encode ─► file
-  ffmpeg decode per clip  ─┘        (shader)        (+ audio)
+  ffmpeg decode per clip  ─┼─► compositor ─► ffmpeg encode ─► file
+  ffmpeg decode per clip  ─┘   (gpu or cpu)     (+ audio)
 
 ffmpeg filter graph
   every clip ─► scale, pad, overlay, amix inside one ffmpeg ─► file
@@ -99,12 +137,21 @@ pillarboxed edge.
 
 ## Testing without a GPU
 
-The compositor tests fail loudly when there is no graphics adapter rather than
-skipping, and the verify job installs `mesa-vulkan-drivers` so lavapipe
-provides one. A software Vulkan device draws the same frames a real one does,
-which is what makes a pixel assertion meaningful on a runner with no hardware.
+Every drawing test runs on both backends. The software one is always there, so
+the suite passes on a machine with no graphics stack; when the `gpu` feature is
+on, the GPU one **fails loudly rather than skipping**, and the verify job
+installs `mesa-vulkan-drivers` so lavapipe provides an adapter. A software
+Vulkan device draws the same frames a real one does, which is what makes a
+pixel assertion meaningful on a runner with no hardware.
+
+The verify job runs the crate twice, and the order matters:
+
+1. `--no-default-features`, before mesa is installed. No wgpu is compiled and
+   no adapter exists, so this is the CPU path standing entirely on its own.
+2. With the feature and with lavapipe, so the GPU half and
+   `both_backends_draw_the_same_frame` actually run.
 
 `tests/render.rs` needs ffmpeg as well, and renders real files into a temp
-directory. It is slower than the rest of the suite — about half a minute — and
-it is the only thing standing between a broken pipeline and a user finding out
-at the end of a long render.
+directory. It is the slowest part of the suite — about half a minute on the
+GPU backend and a minute on the CPU one — and it is the only thing standing
+between a broken pipeline and a user finding out at the end of a long render.

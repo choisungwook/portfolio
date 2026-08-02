@@ -13,7 +13,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
 - Render to mp4 at FHD or 4K with a progress bar and a cancel button
-- Renders composite on the GPU by default so the preview frame and the file agree, with the ffmpeg filter graph as a faster fallback
+- Renders composite on the GPU by default so the preview frame and the file agree, with a software compositor when there is no GPU and the ffmpeg filter graph as a faster route
 - GPU rendering when the machine has it: the encode moves to Apple VideoToolbox (or NVENC), detected by actually trying it, with an automatic fall back to the CPU if it fails
 - Preview quality, defaulted to Half so a few tracks at once still play
 - Light and dark, following the system unless told otherwise

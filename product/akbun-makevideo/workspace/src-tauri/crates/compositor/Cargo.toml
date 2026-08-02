@@ -1,15 +1,23 @@
 [package]
 name = "makevideo-compositor"
 version = "0.1.0"
-description = "The GPU compositor the preview and the render both draw with"
+description = "The compositor the preview and the render both draw with, on the GPU or the CPU"
 edition = "2021"
 license = "MIT"
 
 # Depends on the render crate only for its geometry types, and on neither tauri
 # nor ffmpeg. It takes decoded RGBA in and gives one composited frame back, so
-# it can be tested headless against a software Vulkan device.
+# it can be tested against a software Vulkan device, or against no graphics
+# stack at all.
+
+[features]
+# wgpu is a large dependency and a machine may have nothing for it to talk to,
+# so it is a choice rather than a requirement. Without it the software
+# compositor is the whole crate and the build never mentions wgpu.
+default = ["gpu"]
+gpu = ["dep:wgpu", "dep:pollster"]
 
 [dependencies]
 makevideo-render = { path = "../render" }
-wgpu = "30"
-pollster = "1"
+wgpu = { version = "30", optional = true }
+pollster = { version = "1", optional = true }
