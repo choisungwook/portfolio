@@ -1,7 +1,10 @@
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useMemo, useState, type JSX } from 'react'
 import type { IssueInfo } from '../../../shared/types'
 import { clickable } from '../lib/clickable'
-import { ghErrorMessage, shortDate, stateClass } from '../lib/github'
+import { buildIssueTree, ghErrorMessage, shortDate, stateClass } from '../lib/github'
+
+/** Indent per tree level, wide enough for the connector to read as a corner. */
+const INDENT_PX = 22
 
 interface Props {
   repoPath: string
@@ -32,44 +35,65 @@ export default function IssuePanel({ repoPath, selectedNumber, onSelect }: Props
     }
   }, [repoPath])
 
+  const rows = useMemo(() => buildIssueTree(issues), [issues])
+
   if (loading) return <p className="placeholder">Loading issues...</p>
   if (loadError) return <div className="error-banner">{loadError}</div>
 
   return (
-    <ul className="pr-list">
-      {issues.map((issue) => (
+    <ul className="pr-list issue-tree">
+      {rows.map((row) => (
         <li
-          key={issue.number}
-          className={issue.number === selectedNumber ? 'selected' : ''}
-          {...clickable(() => onSelect(issue))}
-          title={`Show issue #${issue.number}`}
+          key={row.issue.number}
+          className={row.issue.number === selectedNumber ? 'selected' : ''}
+          style={{ paddingLeft: 6 + row.depth * INDENT_PX }}
+          {...clickable(() => onSelect(row.issue))}
+          title={`Show issue #${row.issue.number}`}
         >
-          <span className={stateClass(issue.state)}>{issue.state}</span>
+          {row.depth > 0 && (
+            <span className="issue-rails" aria-hidden="true">
+              {row.guides.map((keepsGoing, level) => (
+                <span key={level} className={keepsGoing ? 'issue-rail through' : 'issue-rail'} />
+              ))}
+              <span className={row.isLast ? 'issue-rail elbow last' : 'issue-rail elbow'} />
+            </span>
+          )}
+          <span className={stateClass(row.issue.state)}>{row.issue.state}</span>
           <span className="pr-title">
-            #{issue.number} {issue.title}
+            #{row.issue.number} {row.issue.title}
           </span>
-          {issue.labels.map((label) => (
+          {row.childCount > 0 && (
+            <span className="issue-sub-count" title={`${row.childCount} sub-issues`}>
+              ↳ {row.childCount}
+            </span>
+          )}
+          {row.detachedParent > 0 && (
+            <span className="pr-meta" title="The parent issue is outside this list">
+              ↰ #{row.detachedParent}
+            </span>
+          )}
+          {row.issue.labels.map((label) => (
             <span key={label} className="label-chip">
               {label}
             </span>
           ))}
           <span className="pr-meta">
-            {issue.author} · {shortDate(issue.updatedAt)}
+            {row.issue.author} · {shortDate(row.issue.updatedAt)}
           </span>
           <button
             className="icon-button"
             title="Open on GitHub"
-            aria-label={`Open issue ${issue.number} on GitHub`}
+            aria-label={`Open issue ${row.issue.number} on GitHub`}
             onClick={(event) => {
               event.stopPropagation()
-              window.gitdesktop.openExternal(issue.url)
+              window.gitdesktop.openExternal(row.issue.url)
             }}
           >
             ↗
           </button>
         </li>
       ))}
-      {issues.length === 0 && <li className="placeholder">No issues.</li>}
+      {rows.length === 0 && <li className="placeholder">No issues.</li>}
     </ul>
   )
 }

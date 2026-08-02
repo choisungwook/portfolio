@@ -12,6 +12,8 @@ import type {
 } from '../shared/types'
 
 const LIST_LIMIT = 50
+/** Wider than the issue list so every listed issue has its parent looked up. */
+const PARENT_LOOKUP_LIMIT = 100
 const BOARD_ITEM_LIMIT = 200
 const FIELD_LIMIT = 50
 /** Column for project items whose Status field is empty. */
@@ -80,10 +82,16 @@ interface GhRepo {
   nameWithOwner?: string
 }
 
-async function getRepoIdentity(repoPath: string): Promise<{ owner: string; nameWithOwner: string }> {
+async function getRepoIdentity(
+  repoPath: string
+): Promise<{ owner: string; name: string; nameWithOwner: string }> {
   const out = await runGh(repoPath, ['repo', 'view', '--json', 'owner,name,nameWithOwner'])
   const repo = JSON.parse(out) as GhRepo
-  return { owner: repo.owner?.login ?? '', nameWithOwner: repo.nameWithOwner ?? '' }
+  return {
+    owner: repo.owner?.login ?? '',
+    name: repo.name ?? '',
+    nameWithOwner: repo.nameWithOwner ?? ''
+  }
 }
 
 interface GhPullRequest {
@@ -131,6 +139,49 @@ interface GhIssue {
   labels?: GhLabel[]
 }
 
+/**
+ * Reads the sub-issue parent of every issue, keyed by issue number.
+ *
+ * gh issue list does not carry the sub-issue link, so it takes a GraphQL query
+ * of its own. The window is wider than the list and is ordered the same way, so
+ * every listed issue is covered. A repository or a gh old enough to not know the
+ * field still has to show its issues, so a failure here means a flat list.
+ */
+async function readIssueParents(repoPath: string): Promise<Map<number, number>> {
+  const query = `query($owner: String!, $name: String!, $limit: Int!) {
+    repository(owner: $owner, name: $name) {
+      issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
+        nodes { number parent { number } }
+      }
+    }
+  }`
+  const parents = new Map<number, number>()
+  try {
+    const identity = await getRepoIdentity(repoPath)
+    const out = await runGh(repoPath, [
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-f',
+      `owner=${identity.owner}`,
+      '-f',
+      `name=${identity.name}`,
+      '-F',
+      `limit=${PARENT_LOOKUP_LIMIT}`
+    ])
+    const parsed = JSON.parse(out) as {
+      data?: { repository?: { issues?: { nodes?: Array<{ number: number; parent?: { number: number } | null }> } } }
+    }
+    for (const node of parsed.data?.repository?.issues?.nodes ?? []) {
+      if (node.parent?.number) parents.set(node.number, node.parent.number)
+    }
+  } catch {
+    // The issue list is worth more than the tree, so keep the list and drop the tree.
+  }
+  return parents
+}
+
 export async function getIssues(repoPath: string): Promise<IssueInfo[]> {
   const out = await runGh(repoPath, [
     'issue',
@@ -143,6 +194,7 @@ export async function getIssues(repoPath: string): Promise<IssueInfo[]> {
     ISSUE_LIST_FIELDS
   ])
   const rows = JSON.parse(out) as GhIssue[]
+  const parents = await readIssueParents(repoPath)
   return rows.map((row) => ({
     number: row.number,
     title: row.title,
@@ -150,7 +202,8 @@ export async function getIssues(repoPath: string): Promise<IssueInfo[]> {
     author: row.author?.login ?? '',
     url: row.url,
     updatedAt: row.updatedAt,
-    labels: labelNames(row.labels)
+    labels: labelNames(row.labels),
+    parent: parents.get(row.number) ?? 0
   }))
 }
 

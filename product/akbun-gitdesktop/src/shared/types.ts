@@ -47,6 +47,8 @@ export interface IssueInfo {
   url: string
   updatedAt: string
   labels: string[]
+  /** Number of the issue this one is a sub-issue of. 0 when it has no parent. */
+  parent: number
 }
 
 export interface ThreadComment {

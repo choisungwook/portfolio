@@ -23,6 +23,7 @@ UI 언어는 영어다.
 - branch 보기, 생성, 삭제 (미병합 브랜치는 확인 후 강제 삭제)
 - worktree 보기, 생성(새 브랜치와 함께), 삭제
 - GitHub PR과 issue 목록 보기 (state, label, 작성자, 갱신일)
+- 하위 issue가 있으면 issue 목록을 트리로 표시. 부모 아래에 하위 issue를 들여쓰고 세로선으로 상하관계를 그리며, 부모 행에는 하위 개수를 ↳ 배지로 표시
 - PR이나 issue를 클릭하면 본문과 comment 전체를 오른쪽 drawer에 표시. PR은 base ← head와 변경 파일 수, 추가/삭제 줄 수도 함께 표시
 - GitHub project를 Status 필드 기준 칸반으로 보기. 카드가 이 저장소의 issue나 PR이면 클릭해서 drawer로 열고, 다른 저장소의 카드나 draft issue는 브라우저로 연다
 - 목록의 ↗ 버튼이나 drawer의 "Open in browser"로 GitHub 원본 열기
@@ -62,6 +63,22 @@ project 조회는 `gh auth login`이 기본으로 주지 않는 scope를 요구�
 ```bash
 gh auth refresh -s read:project
 ```
+
+## 하위 issue 트리를 만드는 방법
+
+`gh issue list --json`에는 하위 issue 관계가 없다. 그래서 목록은 그대로 `gh issue list`로 받고, 부모 번호만 GraphQL 한 번으로 따로 받아 합친다. GraphQL은 목록보다 넓은 범위를 같은 정렬(생성 역순)로 조회하므로 목록에 있는 issue는 모두 부모 조회 범위 안에 들어온다.
+
+```bash
+gh api graphql -f query='query($owner:String!,$name:String!,$limit:Int!){repository(owner:$owner,name:$name){issues(first:$limit,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number parent{number}}}}}'
+```
+
+이 조회가 실패하면 트리 없이 평평한 목록을 보여 준다. 하위 issue 필드를 모르는 GitHub Enterprise나 오래된 gh에서도 issue 목록 자체는 보이는 편이 낫기 때문이다.
+
+트리를 그릴 때 지키는 것 세 가지다.
+
+- 부모가 목록 범위 밖이면 그 issue를 최상위에 두고 `↰ #번호`로 부모를 표시한다. 목록은 최근 issue만 담는 창이라 부모가 밖에 있을 수 있다.
+- 부모 관계가 순환하면 도달하지 못한 issue를 최상위로 올린다. 화면에서 issue가 사라지는 것보다 낫다.
+- 세로선은 행 안이 아니라 행 전체 높이에 절대 위치로 그린다. 행 안에 두면 padding에서 선이 끊긴다.
 
 issue와 PR의 본문은 GitHub Markdown이지만 렌더링하지 않고 원문 그대로 보여 준다. 렌더링하려면 Markdown parser와 sanitizer를 앱에 들여야 하고, 읽는 용도에는 원문으로 충분하다.
 
