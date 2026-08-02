@@ -65,6 +65,24 @@ pub struct Shape {
     /// Data URL of the picture bytes; only for kind "image".
     #[serde(default)]
     pub src: String,
+    #[serde(default)]
+    pub bold: bool,
+    #[serde(default)]
+    pub italic: bool,
+    #[serde(default = "default_text_align")]
+    pub text_align: String,
+    #[serde(default = "default_vertical_align")]
+    pub vertical_align: String,
+    #[serde(default)]
+    pub crop_left: f64,
+    #[serde(default)]
+    pub crop_top: f64,
+    #[serde(default)]
+    pub crop_right: f64,
+    #[serde(default)]
+    pub crop_bottom: f64,
+    #[serde(default)]
+    pub rotation: f64,
 }
 
 fn default_stroke() -> String {
@@ -86,6 +104,14 @@ fn default_font_family() -> String {
     "Helvetica".into()
 }
 
+fn default_text_align() -> String {
+    "left".into()
+}
+
+fn default_vertical_align() -> String {
+    "top".into()
+}
+
 impl Default for Shape {
     fn default() -> Self {
         Shape {
@@ -104,6 +130,15 @@ impl Default for Shape {
             text_color: default_stroke(),
             font_family: default_font_family(),
             src: String::new(),
+            bold: false,
+            italic: false,
+            text_align: default_text_align(),
+            vertical_align: default_vertical_align(),
+            crop_left: 0.0,
+            crop_top: 0.0,
+            crop_right: 0.0,
+            crop_bottom: 0.0,
+            rotation: 0.0,
         }
     }
 }

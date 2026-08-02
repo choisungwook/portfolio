@@ -6,8 +6,7 @@
 //! keeps what this editor understands: preset rects, ellipses and lines,
 //! freehand paths, text boxes, and pictures. Theme colors are resolved
 //! through the theme part, and placeholders inherit their box from the
-//! layout or master. Groups and tables are still skipped rather than
-//! guessed at.
+//! layout or master. Group transforms are flattened; tables are skipped.
 
 use crate::{Deck, Shape, Slide, EMU_PER_PX, SLIDE_H, SLIDE_W};
 use base64::Engine;
@@ -333,11 +332,34 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
 }
 
 fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
+    let crop = if shape.crop_left != 0.0
+        || shape.crop_top != 0.0
+        || shape.crop_right != 0.0
+        || shape.crop_bottom != 0.0
+    {
+        format!(
+            "<a:srcRect l=\"{}\" t=\"{}\" r=\"{}\" b=\"{}\"/>",
+            (shape.crop_left * 100000.0).round() as i64,
+            (shape.crop_top * 100000.0).round() as i64,
+            (shape.crop_right * 100000.0).round() as i64,
+            (shape.crop_bottom * 100000.0).round() as i64,
+        )
+    } else {
+        String::new()
+    };
+    let rotation = if shape.rotation == 0.0 {
+        String::new()
+    } else {
+        format!(" rot=\"{}\"", (shape.rotation * 60000.0).round() as i64)
+    };
     format!(
         "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"Picture {id}\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
-<p:blipFill><a:blip r:embed=\"rId{rid}\"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>\
-<p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr></p:pic>",
-        xfrm(shape.x, shape.y, shape.w, shape.h, false, false)
+<p:blipFill><a:blip r:embed=\"rId{rid}\"/>{crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>\
+<p:spPr><a:xfrm{rotation}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr></p:pic>",
+        emu(shape.x),
+        emu(shape.y),
+        emu(shape.w).max(1),
+        emu(shape.h).max(1),
     )
 }
 
@@ -389,15 +411,27 @@ fn text_body(shape: &Shape) -> String {
         "<a:latin typeface=\"{}\"/>",
         xml_escape(&shape.font_family)
     );
+    let bold = if shape.bold { " b=\"1\"" } else { "" };
+    let italic = if shape.italic { " i=\"1\"" } else { "" };
+    let align = match shape.text_align.as_str() {
+        "center" => "ctr",
+        "right" => "r",
+        _ => "l",
+    };
+    let anchor = match shape.vertical_align.as_str() {
+        "center" => "ctr",
+        "bottom" => "b",
+        _ => "t",
+    };
     let mut paragraphs = String::new();
     for line in shape.text.split('\n') {
         paragraphs.push_str(&format!(
-            "<a:p><a:r><a:rPr lang=\"en-US\" sz=\"{size}\" dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>{latin}</a:rPr><a:t>{}</a:t></a:r></a:p>",
+            "<a:p><a:pPr algn=\"{align}\"/><a:r><a:rPr lang=\"en-US\" sz=\"{size}\"{bold}{italic} dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>{latin}</a:rPr><a:t>{}</a:t></a:r></a:p>",
             xml_escape(line)
         ));
     }
     format!(
-        "<p:txBody><a:bodyPr wrap=\"square\" lIns=\"0\" tIns=\"0\" rIns=\"0\" bIns=\"0\"><a:noAutofit/></a:bodyPr><a:lstStyle/>{paragraphs}</p:txBody>"
+        "<p:txBody><a:bodyPr wrap=\"square\" anchor=\"{anchor}\" lIns=\"0\" tIns=\"0\" rIns=\"0\" bIns=\"0\"><a:noAutofit/></a:bodyPr><a:lstStyle/>{paragraphs}</p:txBody>"
     )
 }
 
@@ -950,6 +984,7 @@ struct Pending {
     saw_ext: bool,
     flip_h: bool,
     flip_v: bool,
+    rotation: f64,
     prst: Option<String>,
     has_custgeom: bool,
     path_pts: Vec<(i64, i64)>,
@@ -963,10 +998,31 @@ struct Pending {
     font_size: Option<f64>,
     text_color: Option<String>,
     font_family: Option<String>,
+    bold: Option<bool>,
+    italic: Option<bool>,
+    text_align: Option<String>,
+    vertical_align: Option<String>,
     blip: Option<String>,
+    svg_blip: Option<String>,
+    crop_left: f64,
+    crop_top: f64,
+    crop_right: f64,
+    crop_bottom: f64,
     is_ph: bool,
     ph_type: Option<String>,
     ph_idx: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct GroupTransform {
+    x: i64,
+    y: i64,
+    cx: i64,
+    cy: i64,
+    child_x: i64,
+    child_y: i64,
+    child_cx: i64,
+    child_cy: i64,
 }
 
 fn attr(e: &quick_xml::events::BytesStart, name: &[u8]) -> Option<String> {
@@ -988,9 +1044,7 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
     let mut slide = Slide::default();
     let mut stack: Vec<String> = Vec::new();
     let mut pending: Option<Pending> = None;
-    // Depth of nested groups. Shapes inside a group use group-relative
-    // coordinates this reader does not resolve, so they are skipped.
-    let mut group_depth = 0u32;
+    let mut groups: Vec<GroupTransform> = Vec::new();
 
     loop {
         let event = reader.read_event().map_err(|e| e.to_string())?;
@@ -1000,10 +1054,8 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
                 let empty = matches!(event, Event::Empty(_));
 
                 if local == "grpSp" && !empty {
-                    group_depth += 1;
-                } else if group_depth == 0
-                    && (local == "sp" || local == "cxnSp" || local == "pic")
-                    && !empty
+                    groups.push(GroupTransform::default());
+                } else if (local == "sp" || local == "cxnSp" || local == "pic") && !empty
                 {
                     pending = Some(Pending {
                         is_cxn: local == "cxnSp",
@@ -1012,6 +1064,8 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
                     });
                 } else if let Some(p) = pending.as_mut() {
                     handle_element(p, &local, e, &stack, ctx);
+                } else if in_ctx(&stack, "grpSpPr") {
+                    handle_group_element(groups.last_mut(), &local, e, &stack);
                 }
 
                 if !empty {
@@ -1048,12 +1102,11 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
                 let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 stack.pop();
                 if local == "grpSp" {
-                    group_depth = group_depth.saturating_sub(1);
-                } else if (local == "sp" || local == "cxnSp" || local == "pic")
-                    && group_depth == 0
-                {
+                    groups.pop();
+                } else if local == "sp" || local == "cxnSp" || local == "pic" {
                     if let Some(p) = pending.take() {
-                        if let Some(shape) = finish(p, ctx) {
+                        if let Some(mut shape) = finish(p, ctx) {
+                            apply_group_transforms(&mut shape, &groups);
                             slide.shapes.push(shape);
                         }
                     }
@@ -1070,6 +1123,29 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
     Ok(slide)
 }
 
+fn handle_group_element(
+    group: Option<&mut GroupTransform>,
+    local: &str,
+    e: &quick_xml::events::BytesStart,
+    stack: &[String],
+) {
+    let Some(group) = group else { return };
+    if stack.last().map(String::as_str) != Some("xfrm") {
+        return;
+    }
+    let x = attr(e, b"x").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let y = attr(e, b"y").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let cx = attr(e, b"cx").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let cy = attr(e, b"cy").and_then(|v| v.parse().ok()).unwrap_or(0);
+    match local {
+        "off" => (group.x, group.y) = (x, y),
+        "ext" => (group.cx, group.cy) = (cx, cy),
+        "chOff" => (group.child_x, group.child_y) = (x, y),
+        "chExt" => (group.child_cx, group.child_cy) = (cx, cy),
+        _ => {}
+    }
+}
+
 /// Which color of the shape a color element inside this context sets.
 /// Colors inside effects (shadows, glows) belong to the effect, not the
 /// shape, so they land nowhere.
@@ -1078,7 +1154,7 @@ fn color_slot<'a>(p: &'a mut Pending, stack: &[String]) -> Option<&'a mut Option
         None
     } else if in_ctx(stack, "ln") {
         Some(&mut p.stroke)
-    } else if in_ctx(stack, "rPr") {
+    } else if in_ctx(stack, "rPr") || in_ctx(stack, "defRPr") || in_ctx(stack, "endParaRPr") {
         Some(&mut p.text_color)
     } else if in_ctx(stack, "spPr") && !in_ctx(stack, "txBody") {
         Some(&mut p.fill)
@@ -1135,17 +1211,22 @@ fn handle_element(
                 p.blip = get(b"embed");
             }
         }
+        "svgBlip" if p.is_pic => p.svg_blip = get(b"embed"),
         "xfrm" if !in_ctx(stack, "txBody") => {
             p.flip_h = get(b"flipH").as_deref() == Some("1");
             p.flip_v = get(b"flipV").as_deref() == Some("1");
+            p.rotation = get(b"rot")
+                .and_then(|v| v.parse::<f64>().ok())
+                .map(|value| value / 60000.0)
+                .unwrap_or(0.0);
         }
-        "off" => {
+        "off" if in_ctx(stack, "xfrm") => {
             p.x = get(b"x").and_then(|v| v.parse().ok()).unwrap_or(0);
             p.y = get(b"y").and_then(|v| v.parse().ok()).unwrap_or(0);
         }
         // a:ext is also the extension-list element, which has a uri instead
         // of a size; only a real size counts.
-        "ext" => {
+        "ext" if in_ctx(stack, "xfrm") => {
             if let (Some(cx), Some(cy)) = (
                 get(b"cx").and_then(|v| v.parse().ok()),
                 get(b"cy").and_then(|v| v.parse().ok()),
@@ -1201,17 +1282,60 @@ fn handle_element(
                 p.arrow = true;
             }
         }
-        "rPr" if p.font_size.is_none() => {
-            p.font_size = get(b"sz")
-                .and_then(|v| v.parse::<f64>().ok())
-                .map(|sz| (sz / 100.0 * 1.3333 * 10.0).round() / 10.0);
-        }
+        "rPr" | "defRPr" | "endParaRPr" => read_text_properties(p, e),
         // The rPr guard keeps this off the typeface entries in a lstStyle
         // defRPr, which belong to the layout rather than to this run.
-        "latin" if p.font_family.is_none() && in_ctx(stack, "rPr") => {
+        "latin"
+            if p.font_family.is_none()
+                && (in_ctx(stack, "rPr")
+                    || in_ctx(stack, "defRPr")
+                    || in_ctx(stack, "endParaRPr")) =>
+        {
             p.font_family = get(b"typeface").filter(|t| !t.is_empty());
         }
+        "pPr" | "lvl1pPr" if p.text_align.is_none() => {
+            p.text_align = get(b"algn").map(|value| match value.as_str() {
+                "ctr" => "center".into(),
+                "r" => "right".into(),
+                _ => "left".into(),
+            });
+        }
+        "bodyPr" => {
+            p.vertical_align = get(b"anchor").map(|value| match value.as_str() {
+                "ctr" => "center".into(),
+                "b" => "bottom".into(),
+                _ => "top".into(),
+            });
+        }
+        "srcRect" => {
+            p.crop_left = crop_value(get(b"l"));
+            p.crop_top = crop_value(get(b"t"));
+            p.crop_right = crop_value(get(b"r"));
+            p.crop_bottom = crop_value(get(b"b"));
+        }
+        "br" if in_ctx(stack, "txBody") => p.text.push('\n'),
         _ => {}
+    }
+}
+
+fn crop_value(value: Option<String>) -> f64 {
+    value
+        .and_then(|value| value.parse::<f64>().ok())
+        .map(|value| value / 100000.0)
+        .unwrap_or(0.0)
+}
+
+fn read_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
+    if p.font_size.is_none() {
+        p.font_size = attr(e, b"sz")
+            .and_then(|v| v.parse::<f64>().ok())
+            .map(|sz| (sz / 100.0 * 1.3333 * 10.0).round() / 10.0);
+    }
+    if p.bold.is_none() {
+        p.bold = attr(e, b"b").map(|value| value == "1");
+    }
+    if p.italic.is_none() {
+        p.italic = attr(e, b"i").map(|value| value == "1");
     }
 }
 
@@ -1245,7 +1369,8 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
     let mut shape = Shape::default();
 
     if p.is_pic {
-        let (_, target) = ctx.rels.get(p.blip.as_deref().unwrap_or(""))?;
+        let embed = p.svg_blip.as_ref().or(p.blip.as_ref())?;
+        let (_, target) = ctx.rels.get(embed)?;
         shape.kind = "image".into();
         // Still the media part path here; read() swaps it for a data URL.
         shape.src = target.clone();
@@ -1254,6 +1379,11 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
         shape.w = px(p.cx);
         shape.h = px(p.cy);
         shape.stroke = "none".into();
+        shape.crop_left = p.crop_left;
+        shape.crop_top = p.crop_top;
+        shape.crop_right = p.crop_right;
+        shape.crop_bottom = p.crop_bottom;
+        shape.rotation = p.rotation;
         return Some(shape);
     }
 
@@ -1314,6 +1444,7 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
         Some("dot") | Some("sysDot") => "dot".into(),
         _ => "solid".into(),
     };
+    shape.rotation = p.rotation;
     let text = p.text.trim_end_matches('\n');
     if !text.is_empty() {
         shape.text = text.to_string();
@@ -1326,8 +1457,48 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
         if let Some(family) = p.font_family {
             shape.font_family = family;
         }
+        if let Some(value) = p.bold {
+            shape.bold = value;
+        }
+        if let Some(value) = p.italic {
+            shape.italic = value;
+        }
+        if let Some(value) = p.text_align {
+            shape.text_align = value;
+        }
+        if let Some(value) = p.vertical_align {
+            shape.vertical_align = value;
+        }
     }
     Some(shape)
+}
+
+fn apply_group_transforms(shape: &mut Shape, groups: &[GroupTransform]) {
+    for group in groups.iter().rev() {
+        let sx = if group.child_cx == 0 {
+            1.0
+        } else {
+            group.cx as f64 / group.child_cx as f64
+        };
+        let sy = if group.child_cy == 0 {
+            1.0
+        } else {
+            group.cy as f64 / group.child_cy as f64
+        };
+        let map_x = |value: f64| px(group.x) + (value - px(group.child_x)) * sx;
+        let map_y = |value: f64| px(group.y) + (value - px(group.child_y)) * sy;
+        if shape.kind == "pen" {
+            for point in &mut shape.points {
+                point[0] = map_x(point[0]);
+                point[1] = map_y(point[1]);
+            }
+        } else {
+            shape.x = map_x(shape.x);
+            shape.y = map_y(shape.y);
+            shape.w *= sx;
+            shape.h *= sy;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1382,6 +1553,10 @@ mod tests {
                             font_size: 32.0,
                             text_color: "#2f9e44".into(),
                             font_family: "Times New Roman".into(),
+                            bold: true,
+                            italic: true,
+                            text_align: "center".into(),
+                            vertical_align: "bottom".into(),
                             stroke: "none".into(),
                             ..Shape::default()
                         },
@@ -1392,6 +1567,9 @@ mod tests {
                             w: 320.0,
                             h: 180.0,
                             src: TINY_PNG.into(),
+                            crop_left: 0.1,
+                            crop_top: 0.2,
+                            rotation: 15.0,
                             stroke: "none".into(),
                             ..Shape::default()
                         },
@@ -1443,9 +1621,16 @@ mod tests {
                     assert!(close(a.font_size, b.font_size));
                     assert_eq!(a.text_color, b.text_color);
                     assert_eq!(a.font_family, b.font_family);
+                    assert_eq!(a.bold, b.bold);
+                    assert_eq!(a.italic, b.italic);
+                    assert_eq!(a.text_align, b.text_align);
+                    assert_eq!(a.vertical_align, b.vertical_align);
                 }
                 if a.kind == "image" {
                     assert_eq!(a.src, b.src);
+                    assert!(close(a.crop_left, b.crop_left));
+                    assert!(close(a.crop_top, b.crop_top));
+                    assert!(close(a.rotation, b.rotation));
                 }
             }
         }
