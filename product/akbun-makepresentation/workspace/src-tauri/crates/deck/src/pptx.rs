@@ -2,11 +2,10 @@
 //!
 //! A .pptx is a zip of XML parts. Writing builds each part from string
 //! templates: the presentation, one master, one blank layout, one theme, and
-//! one part per slide. Reading walks each slide part with a pull parser and
-//! keeps what this editor understands: preset rects, ellipses and lines,
-//! freehand paths, text boxes, and pictures. Theme colors are resolved
-//! through the theme part, and placeholders inherit their box from the
-//! layout or master. Group transforms are flattened; tables are skipped.
+//! one part per slide. Reading follows each slide's layout, master and theme,
+//! then keeps what this editor understands: preset shapes, flattened groups,
+//! backgrounds, pictures, freehand paths, and text boxes with inherited
+//! placeholder styling. Unsupported tables are skipped.
 
 use crate::{Deck, Shape, Slide, EMU_PER_PX, SLIDE_H, SLIDE_W};
 use base64::Engine;
@@ -544,128 +543,128 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         return Err("no slides found in file".into());
     }
 
-    // Theme colors and the master's scheme-name mapping, so schemeClr
-    // references resolve to real colors. The theme part is found through the
-    // master's relationships rather than assumed to be theme1.xml. A file
-    // without these parts still opens; unresolved theme colors just stay at
-    // their defaults.
-    let theme_path = part(&mut archive, "ppt/slideMasters/_rels/slideMaster1.xml.rels")
-        .map(|xml| parse_rels(&xml))
-        .and_then(|rels| {
-            rels.into_values()
-                .find(|(kind, _)| kind.ends_with("/theme"))
-                .map(|(_, target)| target)
-        })
-        .unwrap_or_else(|| "ppt/theme/theme1.xml".into());
-    let scheme = part(&mut archive, &theme_path)
-        .map(|xml| parse_scheme(&xml))
-        .unwrap_or_default();
-    let master = part(&mut archive, "ppt/slideMasters/slideMaster1.xml");
-    let clr_map = master.as_deref().map(parse_clr_map).unwrap_or_default();
-    let master_ph = master.as_deref().map(parse_ph_boxes).unwrap_or_default();
-    let master_bg = master
-        .as_deref()
-        .and_then(|xml| parse_bg(xml, &scheme, &clr_map));
-
     // The declared page size, for fitting foreign canvases onto 1280x720.
     let sld_sz = part(&mut archive, "ppt/presentation.xml").and_then(|xml| parse_sld_sz(&xml));
     let (page_w, page_h) = sld_sz
         .map(|(cx, cy)| (cx / EMU_PER_PX, cy / EMU_PER_PX))
         .unwrap_or((SLIDE_W, SLIDE_H));
 
-    let mut layouts: HashMap<String, HashMap<String, (i64, i64, i64, i64)>> = HashMap::new();
-    let mut layout_bg: HashMap<String, Option<String>> = HashMap::new();
     let mut media_cache: HashMap<String, String> = HashMap::new();
-    let empty_ph = HashMap::new();
 
     let mut deck = Deck::default();
-    for (num, name) in names {
+    for (_, name) in names {
         let xml = part(&mut archive, &name).ok_or(format!("cannot read {name}"))?;
-        let rels = part(&mut archive, &format!("ppt/slides/_rels/slide{num}.xml.rels"))
-            .map(|xml| parse_rels(&xml))
+        let rels = rels_for_part(&mut archive, &name);
+        let layout_path = relation_target(&rels, "/slideLayout");
+        let layout_xml = layout_path.as_deref().and_then(|path| part(&mut archive, path));
+        let layout_rels = layout_path
+            .as_deref()
+            .map(|path| rels_for_part(&mut archive, path))
+            .unwrap_or_default();
+        let master_path = relation_target(&layout_rels, "/slideMaster")
+            .unwrap_or_else(|| "ppt/slideMasters/slideMaster1.xml".into());
+        let master_xml = part(&mut archive, &master_path);
+        let master_rels = rels_for_part(&mut archive, &master_path);
+        let theme_path = relation_target(&master_rels, "/theme")
+            .unwrap_or_else(|| "ppt/theme/theme1.xml".into());
+        let scheme = part(&mut archive, &theme_path)
+            .map(|theme| parse_scheme(&theme))
             .unwrap_or_default();
 
-        // Placeholder boxes and the background come from this slide's
-        // layout, then the master.
-        let layout_path = rels
-            .values()
-            .find(|(kind, _)| kind.ends_with("/slideLayout"))
-            .map(|(_, target)| target.clone());
-        if let Some(path) = &layout_path {
-            if !layouts.contains_key(path) {
-                let layout_xml = part(&mut archive, path);
-                layouts.insert(
-                    path.clone(),
-                    layout_xml
-                        .as_deref()
-                        .map(parse_ph_boxes)
-                        .unwrap_or_default(),
-                );
-                layout_bg.insert(
-                    path.clone(),
-                    layout_xml
-                        .as_deref()
-                        .and_then(|xml| parse_bg(xml, &scheme, &clr_map)),
-                );
-            }
-        }
-        let ctx = SlideCtx {
+        let master_clr_map = master_xml
+            .as_deref()
+            .map(parse_clr_map)
+            .unwrap_or_default();
+        let master_text = master_xml
+            .as_deref()
+            .map(|master| parse_master_text_styles(master, &scheme, &master_clr_map))
+            .transpose()?
+            .unwrap_or_default();
+        let master_ctx = SlideCtx {
             scheme: &scheme,
-            clr_map: &clr_map,
-            rels: &rels,
-            layout_ph: layout_path
-                .as_ref()
-                .and_then(|p| layouts.get(p))
-                .unwrap_or(&empty_ph),
-            master_ph: &master_ph,
+            clr_map: &master_clr_map,
+            rels: &master_rels,
+            defaults: &master_text,
         };
-        let mut slide = parse_slide(&xml, &ctx)?;
+        let master = master_xml
+            .as_deref()
+            .map(|master| parse_part(master, &master_ctx, false))
+            .transpose()?
+            .unwrap_or_default();
+        let master_defaults = merged_placeholders(&master_text, &master.placeholders);
 
-        // Image shapes leave parse_slide holding the media part path; swap
+        let layout_clr_map = layout_xml
+            .as_deref()
+            .map(parse_clr_map)
+            .filter(|map| !map.is_empty())
+            .unwrap_or_else(|| master_clr_map.clone());
+        let layout_ctx = SlideCtx {
+            scheme: &scheme,
+            clr_map: &layout_clr_map,
+            rels: &layout_rels,
+            defaults: &master_defaults,
+        };
+        let layout = layout_xml
+            .as_deref()
+            .map(|layout| parse_part(layout, &layout_ctx, false))
+            .transpose()?
+            .unwrap_or_default();
+
+        let defaults = merged_placeholders(&master_defaults, &layout.placeholders);
+        let slide_clr_map = {
+            let map = parse_clr_map(&xml);
+            if map.is_empty() {
+                layout_clr_map.clone()
+            } else {
+                map
+            }
+        };
+        let slide_ctx = SlideCtx {
+            scheme: &scheme,
+            clr_map: &slide_clr_map,
+            rels: &rels,
+            defaults: &defaults,
+        };
+        let slide = parse_part(&xml, &slide_ctx, true)?;
+
+        let mut shapes = Vec::new();
+        let bg = parse_background(&xml, &slide_ctx, page_w, page_h)
+            .or_else(|| {
+                layout_xml
+                    .as_deref()
+                    .and_then(|layout| parse_background(layout, &layout_ctx, page_w, page_h))
+            })
+            .or_else(|| {
+                master_xml
+                    .as_deref()
+                    .and_then(|master| parse_background(master, &master_ctx, page_w, page_h))
+            });
+        if let Some(background) = bg {
+            shapes.push(background);
+        }
+        shapes.extend(master.visible);
+        shapes.extend(layout.visible);
+        shapes.extend(slide.visible);
+
+        // Image shapes leave parse_part holding the media part path; swap
         // it for a data URL, dropping shapes whose bytes cannot be shown.
         let mut i = 0;
-        while i < slide.shapes.len() {
-            if slide.shapes[i].kind == "image" {
-                match media_data_url(&mut archive, &mut media_cache, &slide.shapes[i].src) {
+        while i < shapes.len() {
+            if shapes[i].kind == "image" {
+                match media_data_url(&mut archive, &mut media_cache, &shapes[i].src) {
                     Some(url) => {
-                        slide.shapes[i].src = url;
+                        shapes[i].src = url;
                         i += 1;
                     }
                     None => {
-                        slide.shapes.remove(i);
+                        shapes.remove(i);
                     }
                 }
             } else {
                 i += 1;
             }
         }
-
-        // Slides on a dark background lean on it: their text is light. The
-        // editor has no background concept, so a non-white background
-        // becomes a page-sized rect behind everything else.
-        let bg = parse_bg(&xml, &scheme, &clr_map)
-            .or_else(|| {
-                layout_path
-                    .as_ref()
-                    .and_then(|p| layout_bg.get(p).cloned().flatten())
-            })
-            .or_else(|| master_bg.clone());
-        if let Some(color) = bg {
-            if color != "#ffffff" {
-                slide.shapes.insert(
-                    0,
-                    Shape {
-                        kind: "rect".into(),
-                        w: page_w,
-                        h: page_h,
-                        fill: color,
-                        stroke: "none".into(),
-                        ..Shape::default()
-                    },
-                );
-            }
-        }
-        deck.slides.push(slide);
+        deck.slides.push(Slide { shapes });
     }
 
     // Other editors use other canvases: 4:3, Google Slides' smaller 16:9,
@@ -724,6 +723,42 @@ fn part<R: Read + Seek>(archive: &mut zip::ZipArchive<R>, name: &str) -> Option<
     Some(text)
 }
 
+fn relationships_path(part: &str) -> String {
+    let (dir, file) = part.rsplit_once('/').unwrap_or(("", part));
+    if dir.is_empty() {
+        format!("_rels/{file}.rels")
+    } else {
+        format!("{dir}/_rels/{file}.rels")
+    }
+}
+
+fn rels_for_part<R: Read + Seek>(
+    archive: &mut zip::ZipArchive<R>,
+    owner: &str,
+) -> HashMap<String, (String, String)> {
+    part(archive, &relationships_path(owner))
+        .map(|xml| parse_rels_for_owner(&xml, owner))
+        .unwrap_or_default()
+}
+
+fn relation_target(
+    rels: &HashMap<String, (String, String)>,
+    suffix: &str,
+) -> Option<String> {
+    rels.values()
+        .find(|(kind, _)| kind.ends_with(suffix))
+        .map(|(_, target)| target.clone())
+}
+
+fn merged_placeholders(
+    base: &HashMap<String, Shape>,
+    over: &HashMap<String, Shape>,
+) -> HashMap<String, Shape> {
+    let mut merged = base.clone();
+    merged.extend(over.clone());
+    merged
+}
+
 fn media_data_url<R: Read + Seek>(
     archive: &mut zip::ZipArchive<R>,
     cache: &mut HashMap<String, String>,
@@ -751,15 +786,20 @@ struct SlideCtx<'a> {
     clr_map: &'a HashMap<String, String>,
     /// rId -> (relationship type, normalized target path).
     rels: &'a HashMap<String, (String, String)>,
-    /// Placeholder key -> box, from the slide's layout and the master.
-    layout_ph: &'a HashMap<String, (i64, i64, i64, i64)>,
-    master_ph: &'a HashMap<String, (i64, i64, i64, i64)>,
+    /// Placeholder key -> inherited box and text style.
+    defaults: &'a HashMap<String, Shape>,
 }
 
 impl SlideCtx<'_> {
     fn scheme_hex(&self, name: &str) -> Option<String> {
         scheme_hex(self.scheme, self.clr_map, name)
     }
+}
+
+#[derive(Default)]
+struct ParsedPart {
+    visible: Vec<Shape>,
+    placeholders: HashMap<String, Shape>,
 }
 
 fn scheme_hex(
@@ -771,51 +811,104 @@ fn scheme_hex(
     scheme.get(slot).map(|hex| format!("#{}", hex.to_lowercase()))
 }
 
-/// The solid background color a slide, layout or master part declares in
-/// its p:bg element, if any. A bgRef is approximated by its scheme color,
-/// which is what the referenced background style paints with anyway.
-fn parse_bg(
+/// The background a slide, layout or master declares. Embedded pictures are
+/// kept as page-sized images; solid and scheme colors become a page-sized rect.
+fn parse_background(
     xml: &str,
-    scheme: &HashMap<String, String>,
-    clr_map: &HashMap<String, String>,
-) -> Option<String> {
+    ctx: &SlideCtx,
+    page_w: f64,
+    page_h: f64,
+) -> Option<Shape> {
     let mut reader = Reader::from_str(xml);
-    let mut in_bg = false;
+    let mut stack = Vec::new();
+    let mut image_id = None;
     let mut color: Option<String> = None;
     while let Ok(event) = reader.read_event() {
         match event {
             Event::Start(ref e) | Event::Empty(ref e) => {
-                let local = e.local_name();
-                match local.as_ref() {
-                    b"bg" => in_bg = true,
-                    b"srgbClr" if in_bg && color.is_none() => {
-                        color = attr(e, b"val").map(|v| format!("#{}", v.to_lowercase()));
-                    }
-                    b"schemeClr" if in_bg && color.is_none() => {
-                        color = attr(e, b"val").and_then(|v| scheme_hex(scheme, clr_map, &v));
-                    }
-                    b"lumMod" | b"lumOff" | b"shade" | b"tint" if in_bg => {
-                        if let (Some(c), Some(val)) = (
-                            color.as_deref(),
-                            attr(e, b"val").and_then(|v| v.parse::<f64>().ok()),
-                        ) {
-                            let op = String::from_utf8_lossy(local.as_ref()).to_string();
-                            color = Some(mod_color(c, &op, val / 100000.0));
+                let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let empty = matches!(event, Event::Empty(_));
+                if in_ctx(&stack, "bg") {
+                    match local.as_str() {
+                        "blip" => image_id = attr(e, b"embed"),
+                        "srgbClr" if color.is_none() => {
+                            color = attr(e, b"val").map(|v| format!("#{}", v.to_lowercase()));
                         }
+                        "schemeClr" if color.is_none() => {
+                            color = attr(e, b"val").and_then(|v| ctx.scheme_hex(&v));
+                        }
+                        "lumMod" | "lumOff" | "shade" | "tint" => {
+                            if let (Some(c), Some(val)) = (
+                                color.as_deref(),
+                                attr(e, b"val").and_then(|v| v.parse::<f64>().ok()),
+                            ) {
+                                color = Some(mod_color(c, &local, val / 100000.0));
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                }
+                if !empty {
+                    stack.push(local);
                 }
             }
-            Event::End(ref e) if e.local_name().as_ref() == b"bg" => break,
+            Event::End(ref e) => {
+                let is_bg = e.local_name().as_ref() == b"bg";
+                stack.pop();
+                if is_bg {
+                    break;
+                }
+            }
             Event::Eof => break,
             _ => {}
         }
     }
-    color
+    let mut shape = Shape {
+        w: page_w,
+        h: page_h,
+        stroke: "none".into(),
+        ..Shape::default()
+    };
+    if let Some(id) = image_id {
+        if let Some((_, target)) = ctx.rels.get(&id) {
+            shape.kind = "image".into();
+            shape.src = target.clone();
+            return Some(shape);
+        }
+    }
+    if let Some(color) = color {
+        if color.eq_ignore_ascii_case("#ffffff") {
+            return None;
+        }
+        shape.kind = "rect".into();
+        shape.fill = color;
+        return Some(shape);
+    }
+    None
+}
+
+fn resolve_target(owner: &str, target: &str) -> String {
+    if let Some(absolute) = target.strip_prefix('/') {
+        return absolute.to_string();
+    }
+    let mut parts = owner
+        .rsplit_once('/')
+        .map(|(dir, _)| dir.split('/').collect::<Vec<_>>())
+        .unwrap_or_default();
+    for component in target.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            value => parts.push(value),
+        }
+    }
+    parts.join("/")
 }
 
 /// rId -> (type, target) with targets normalized onto zip entry names.
-fn parse_rels(xml: &str) -> HashMap<String, (String, String)> {
+fn parse_rels_for_owner(xml: &str, owner: &str) -> HashMap<String, (String, String)> {
     let mut reader = Reader::from_str(xml);
     let mut rels = HashMap::new();
     while let Ok(event) = reader.read_event() {
@@ -826,11 +919,7 @@ fn parse_rels(xml: &str) -> HashMap<String, (String, String)> {
                 if let (Some(id), Some(kind), Some(target)) =
                     (attr(e, b"Id"), attr(e, b"Type"), attr(e, b"Target"))
                 {
-                    let target = if let Some(rest) = target.strip_prefix("../") {
-                        format!("ppt/{rest}")
-                    } else {
-                        target.trim_start_matches('/').to_string()
-                    };
+                    let target = resolve_target(owner, &target);
                     rels.insert(id, (kind, target));
                 }
             }
@@ -914,64 +1003,6 @@ fn parse_clr_map(xml: &str) -> HashMap<String, String> {
     map
 }
 
-/// Placeholder boxes in a layout or master part. Keys are "i<idx>" and
-/// "t<type>" so a slide placeholder can match by index first, type second.
-fn parse_ph_boxes(xml: &str) -> HashMap<String, (i64, i64, i64, i64)> {
-    let mut reader = Reader::from_str(xml);
-    let mut map = HashMap::new();
-    let mut in_sp = false;
-    let mut ph: Option<(Option<String>, Option<String>)> = None;
-    let mut boxed = (0i64, 0i64, 0i64, 0i64);
-    let mut saw_ext = false;
-    while let Ok(event) = reader.read_event() {
-        match event {
-            Event::Start(ref e) | Event::Empty(ref e) => {
-                let local = e.local_name();
-                match local.as_ref() {
-                    b"sp" => {
-                        in_sp = true;
-                        ph = None;
-                        boxed = (0, 0, 0, 0);
-                        saw_ext = false;
-                    }
-                    b"ph" if in_sp => ph = Some((attr(e, b"type"), attr(e, b"idx"))),
-                    b"off" if in_sp => {
-                        boxed.0 = attr(e, b"x").and_then(|v| v.parse().ok()).unwrap_or(0);
-                        boxed.1 = attr(e, b"y").and_then(|v| v.parse().ok()).unwrap_or(0);
-                    }
-                    b"ext" if in_sp => {
-                        if let (Some(cx), Some(cy)) = (
-                            attr(e, b"cx").and_then(|v| v.parse().ok()),
-                            attr(e, b"cy").and_then(|v| v.parse().ok()),
-                        ) {
-                            boxed.2 = cx;
-                            boxed.3 = cy;
-                            saw_ext = true;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Event::End(ref e) => {
-                if e.local_name().as_ref() == b"sp" && in_sp {
-                    in_sp = false;
-                    if let (Some((kind, idx)), true) = (ph.take(), saw_ext) {
-                        if let Some(idx) = idx {
-                            map.insert(format!("i{idx}"), boxed);
-                        }
-                        if let Some(kind) = kind {
-                            map.entry(format!("t{kind}")).or_insert(boxed);
-                        }
-                    }
-                }
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    map
-}
-
 #[derive(Default)]
 struct Pending {
     is_cxn: bool,
@@ -981,6 +1012,7 @@ struct Pending {
     y: i64,
     cx: i64,
     cy: i64,
+    saw_off: bool,
     saw_ext: bool,
     flip_h: bool,
     flip_v: bool,
@@ -998,6 +1030,8 @@ struct Pending {
     font_size: Option<f64>,
     text_color: Option<String>,
     font_family: Option<String>,
+    has_explicit_text_style: bool,
+    accept_explicit_text_style: bool,
     bold: Option<bool>,
     italic: Option<bool>,
     text_align: Option<String>,
@@ -1039,9 +1073,13 @@ fn in_ctx(stack: &[String], name: &str) -> bool {
     stack.iter().any(|s| s == name)
 }
 
-fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
+fn parse_part(
+    xml: &str,
+    ctx: &SlideCtx,
+    placeholders_are_visible: bool,
+) -> Result<ParsedPart, String> {
     let mut reader = Reader::from_str(xml);
-    let mut slide = Slide::default();
+    let mut part = ParsedPart::default();
     let mut stack: Vec<String> = Vec::new();
     let mut pending: Option<Pending> = None;
     let mut groups: Vec<GroupTransform> = Vec::new();
@@ -1101,13 +1139,32 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
             Event::End(ref e) => {
                 let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 stack.pop();
+                if local == "rPr" {
+                    if let Some(p) = pending.as_mut() {
+                        p.accept_explicit_text_style = false;
+                    }
+                }
                 if local == "grpSp" {
                     groups.pop();
                 } else if local == "sp" || local == "cxnSp" || local == "pic" {
                     if let Some(p) = pending.take() {
-                        if let Some(mut shape) = finish(p, ctx) {
+                        let keys = placeholder_keys(&p);
+                        let default = placeholder_default(&p, ctx.defaults);
+                        if let Some(mut shape) = finish(p, ctx, default) {
                             apply_group_transforms(&mut shape, &groups);
-                            slide.shapes.push(shape);
+                            if placeholders_are_visible || keys.is_empty() {
+                                if keys.is_empty()
+                                    || shape.kind == "image"
+                                    || !shape.text.trim().is_empty()
+                                    || shape.fill != Shape::default().fill
+                                {
+                                    part.visible.push(shape);
+                                }
+                            } else {
+                                for key in keys {
+                                    part.placeholders.insert(key, shape.clone());
+                                }
+                            }
                         }
                     }
                 } else if local == "p" && in_ctx(&stack, "txBody") {
@@ -1120,7 +1177,7 @@ fn parse_slide(xml: &str, ctx: &SlideCtx) -> Result<Slide, String> {
             _ => {}
         }
     }
-    Ok(slide)
+    Ok(part)
 }
 
 fn handle_group_element(
@@ -1223,6 +1280,7 @@ fn handle_element(
         "off" if in_ctx(stack, "xfrm") => {
             p.x = get(b"x").and_then(|v| v.parse().ok()).unwrap_or(0);
             p.y = get(b"y").and_then(|v| v.parse().ok()).unwrap_or(0);
+            p.saw_off = true;
         }
         // a:ext is also the extension-list element, which has a uri instead
         // of a size; only a real size counts.
@@ -1245,18 +1303,11 @@ fn handle_element(
         }
         "ln" if in_ctx(stack, "spPr") => p.stroke_w = get(b"w").and_then(|v| v.parse().ok()),
         "srgbClr" => {
-            if let Some(color) = get(b"val").map(|v| format!("#{}", v.to_lowercase())) {
-                if let Some(slot) = color_slot(p, stack) {
-                    *slot = Some(color);
-                }
-            }
+            let color = get(b"val").map(|v| format!("#{}", v.to_lowercase()));
+            assign_color(p, color, stack);
         }
         "schemeClr" => {
-            if let Some(color) = get(b"val").and_then(|v| ctx.scheme_hex(&v)) {
-                if let Some(slot) = color_slot(p, stack) {
-                    *slot = Some(color);
-                }
-            }
+            assign_color(p, get(b"val").and_then(|v| ctx.scheme_hex(&v)), stack);
         }
         "lumMod" | "lumOff" | "shade" | "tint"
             if in_ctx(stack, "srgbClr") || in_ctx(stack, "schemeClr") =>
@@ -1282,11 +1333,18 @@ fn handle_element(
                 p.arrow = true;
             }
         }
-        "rPr" | "defRPr" | "endParaRPr" => read_text_properties(p, e),
-        // The rPr guard keeps this off the typeface entries in a lstStyle
-        // defRPr, which belong to the layout rather than to this run.
+        "rPr" => {
+            if in_ctx(stack, "r") && !p.has_explicit_text_style {
+                p.has_explicit_text_style = true;
+                p.accept_explicit_text_style = true;
+                overwrite_text_properties(p, e);
+            } else if !p.has_explicit_text_style {
+                read_text_properties(p, e);
+            }
+        }
+        "defRPr" | "endParaRPr" => read_text_properties(p, e),
         "latin"
-            if p.font_family.is_none()
+            if (p.accept_explicit_text_style || p.font_family.is_none())
                 && (in_ctx(stack, "rPr")
                     || in_ctx(stack, "defRPr")
                     || in_ctx(stack, "endParaRPr")) =>
@@ -1325,6 +1383,26 @@ fn crop_value(value: Option<String>) -> f64 {
         .unwrap_or(0.0)
 }
 
+fn assign_color(p: &mut Pending, color: Option<String>, stack: &[String]) {
+    if in_ctx(stack, "effectLst") {
+        return;
+    }
+    if in_ctx(stack, "ln") {
+        p.stroke = color;
+    } else if in_ctx(stack, "rPr")
+        || in_ctx(stack, "defRPr")
+        || in_ctx(stack, "endParaRPr")
+    {
+        if p.accept_explicit_text_style
+            || (!p.has_explicit_text_style && p.text_color.is_none())
+        {
+            p.text_color = color;
+        }
+    } else if in_ctx(stack, "spPr") && !in_ctx(stack, "txBody") {
+        p.fill = color;
+    }
+}
+
 fn read_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
     if p.font_size.is_none() {
         p.font_size = attr(e, b"sz")
@@ -1339,34 +1417,144 @@ fn read_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
     }
 }
 
-fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
-    // A placeholder without its own box inherits it from the layout, or
-    // failing that the master. Match by idx first, then by type.
-    if !p.saw_ext && p.is_ph {
-        let keys = [
-            p.ph_idx.as_ref().map(|i| format!("i{i}")),
-            p.ph_type.as_ref().map(|t| format!("t{t}")),
-        ];
-        let boxed = keys
-            .iter()
-            .flatten()
-            .find_map(|k| ctx.layout_ph.get(k))
-            .or_else(|| keys.iter().flatten().find_map(|k| ctx.master_ph.get(k)));
-        if let Some(&(x, y, cx, cy)) = boxed {
-            p.x = x;
-            p.y = y;
-            p.cx = cx;
-            p.cy = cy;
+fn overwrite_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
+    if let Some(value) = attr(e, b"sz")
+        .and_then(|value| value.parse::<f64>().ok())
+        .map(|size| (size / 100.0 * 1.3333 * 10.0).round() / 10.0)
+    {
+        p.font_size = Some(value);
+    }
+    if let Some(value) = attr(e, b"b") {
+        p.bold = Some(value == "1");
+    }
+    if let Some(value) = attr(e, b"i") {
+        p.italic = Some(value == "1");
+    }
+}
+
+fn placeholder_keys(p: &Pending) -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Some(idx) = &p.ph_idx {
+        keys.push(format!("idx:{idx}"));
+    }
+    if let Some(kind) = &p.ph_type {
+        keys.push(format!("type:{kind}"));
+    }
+    keys
+}
+
+fn placeholder_default<'a>(
+    p: &Pending,
+    defaults: &'a HashMap<String, Shape>,
+) -> Option<&'a Shape> {
+    p.ph_idx
+        .as_ref()
+        .and_then(|idx| defaults.get(&format!("idx:{idx}")))
+        .or_else(|| {
+            p.ph_type
+                .as_ref()
+                .and_then(|kind| defaults.get(&format!("type:{kind}")))
+        })
+}
+
+fn parse_master_text_styles(
+    xml: &str,
+    scheme: &HashMap<String, String>,
+    clr_map: &HashMap<String, String>,
+) -> Result<HashMap<String, Shape>, String> {
+    let empty_rels = HashMap::new();
+    let empty_defaults = HashMap::new();
+    let ctx = SlideCtx {
+        scheme,
+        clr_map,
+        rels: &empty_rels,
+        defaults: &empty_defaults,
+    };
+    let mut reader = Reader::from_str(xml);
+    let mut stack = Vec::new();
+    let mut current: Option<(&str, Pending)> = None;
+    let mut defaults = HashMap::new();
+    loop {
+        let event = reader.read_event().map_err(|e| e.to_string())?;
+        match event {
+            Event::Start(ref e) | Event::Empty(ref e) => {
+                let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let empty = matches!(event, Event::Empty(_));
+                if current.is_none() {
+                    let kind = match local.as_str() {
+                        "titleStyle" => Some("title"),
+                        "bodyStyle" => Some("body"),
+                        "otherStyle" => Some("other"),
+                        _ => None,
+                    };
+                    if let Some(kind) = kind {
+                        current = Some((kind, Pending::default()));
+                    }
+                } else if let Some((_, pending)) = current.as_mut() {
+                    handle_element(pending, &local, e, &stack, &ctx);
+                }
+                if !empty {
+                    stack.push(local);
+                }
+            }
+            Event::End(ref e) => {
+                let local = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                stack.pop();
+                if matches!(local.as_str(), "titleStyle" | "bodyStyle" | "otherStyle") {
+                    if let Some((kind, pending)) = current.take() {
+                        let mut shape = Shape {
+                            kind: "text".into(),
+                            stroke: "none".into(),
+                            ..Shape::default()
+                        };
+                        apply_text_properties(&mut shape, &pending);
+                        let keys: &[&str] = match kind {
+                            "title" => &["title", "ctrTitle"],
+                            "body" => &["body", "subTitle", "obj"],
+                            _ => &["ftr", "sldNum", "dt"],
+                        };
+                        for key in keys {
+                            defaults.insert(format!("type:{key}"), shape.clone());
+                        }
+                    }
+                }
+            }
+            Event::Eof => break,
+            _ => {}
         }
     }
-    // Empty prompt placeholders ("Click to add title") have no text and no
-    // styling of their own; importing them would litter slides with ghost
-    // rectangles.
-    if p.is_ph && !p.is_pic && p.text.trim().is_empty() && p.fill.is_none() && !p.has_custgeom {
-        return None;
-    }
+    Ok(defaults)
+}
 
-    let mut shape = Shape::default();
+fn apply_text_properties(shape: &mut Shape, p: &Pending) {
+    if let Some(value) = p.font_size {
+        shape.font_size = value;
+    }
+    if let Some(value) = &p.text_color {
+        shape.text_color = value.clone();
+    }
+    if let Some(value) = &p.font_family {
+        shape.font_family = value.clone();
+    }
+    if let Some(value) = p.bold {
+        shape.bold = value;
+    }
+    if let Some(value) = p.italic {
+        shape.italic = value;
+    }
+    if let Some(value) = &p.text_align {
+        shape.text_align = value.clone();
+    }
+    if let Some(value) = &p.vertical_align {
+        shape.vertical_align = value.clone();
+    }
+}
+
+fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> {
+    let mut shape = default.cloned().unwrap_or_default();
+    shape.text.clear();
+    shape.src.clear();
+    shape.points.clear();
 
     if p.is_pic {
         let embed = p.svg_blip.as_ref().or(p.blip.as_ref())?;
@@ -1374,26 +1562,19 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
         shape.kind = "image".into();
         // Still the media part path here; read() swaps it for a data URL.
         shape.src = target.clone();
-        shape.x = px(p.x);
-        shape.y = px(p.y);
-        shape.w = px(p.cx);
-        shape.h = px(p.cy);
         shape.stroke = "none".into();
         shape.crop_left = p.crop_left;
         shape.crop_top = p.crop_top;
         shape.crop_right = p.crop_right;
         shape.crop_bottom = p.crop_bottom;
-        shape.rotation = p.rotation;
-        return Some(shape);
     }
-
     let is_line = p.is_cxn
         || matches!(
             p.prst.as_deref(),
             Some("line") | Some("straightConnector1")
         );
 
-    if p.has_custgeom {
+    if !p.is_pic && p.has_custgeom {
         shape.kind = "pen".into();
         shape.points = p
             .path_pts
@@ -1403,14 +1584,14 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
         if shape.points.is_empty() {
             return None;
         }
-    } else if is_line {
+    } else if !p.is_pic && is_line {
         shape.kind = if p.arrow { "arrow" } else { "line" }.into();
         // Stored as start -> end; flips say which corner of the box starts.
         shape.x = px(if p.flip_h { p.x + p.cx } else { p.x });
         shape.y = px(if p.flip_v { p.y + p.cy } else { p.y });
         shape.w = px(if p.flip_h { -p.cx } else { p.cx });
         shape.h = px(if p.flip_v { -p.cy } else { p.cy });
-    } else {
+    } else if !p.is_pic {
         shape.kind = if p.tx_box || (!p.text.trim().is_empty() && p.stroke.is_none()) {
             "text".into()
         } else if p.prst.as_deref() == Some("ellipse") {
@@ -1420,8 +1601,13 @@ fn finish(mut p: Pending, ctx: &SlideCtx) -> Option<Shape> {
             // than dropped, so the slide stays editable.
             "rect".into()
         };
+    }
+
+    if p.saw_off && shape.kind != "line" && shape.kind != "arrow" {
         shape.x = px(p.x);
         shape.y = px(p.y);
+    }
+    if p.saw_ext && shape.kind != "line" && shape.kind != "arrow" {
         shape.w = px(p.cx);
         shape.h = px(p.cy);
     }
@@ -1652,19 +1838,33 @@ mod tests {
 <a:accent5><a:srgbClr val=\"000000\"/></a:accent5><a:accent6><a:srgbClr val=\"000000\"/></a:accent6>\
 <a:hlink><a:srgbClr val=\"000000\"/></a:hlink><a:folHlink><a:srgbClr val=\"000000\"/></a:folHlink>\
 </a:clrScheme></a:themeElements></a:theme>";
+        let master = "<?xml version=\"1.0\"?>\
+<p:sldMaster xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\
+<p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Master band\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
+<p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"952500\" cy=\"476250\"/></a:xfrm>\
+<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:schemeClr val=\"accent2\"/></a:solidFill></p:spPr></p:sp>\
+</p:spTree></p:cSld>\
+<p:clrMap bg1=\"dk1\" tx1=\"lt1\" bg2=\"dk2\" tx2=\"lt2\" accent1=\"accent1\" accent2=\"accent2\" accent3=\"accent3\" accent4=\"accent4\" accent5=\"accent5\" accent6=\"accent6\"/>\
+<p:txStyles><p:titleStyle><a:lvl1pPr algn=\"ctr\"><a:defRPr sz=\"3200\" b=\"1\">\
+<a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill><a:latin typeface=\"Arial\"/></a:defRPr></a:lvl1pPr></p:titleStyle>\
+</p:txStyles></p:sldMaster>";
         let layout = "<?xml version=\"1.0\"?>\
-<p:sldLayout xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\
+<p:sldLayout xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\
 <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"212022\"/></a:solidFill></p:bgPr></p:bg>\
 <p:spTree><p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Title\"/><p:cNvSpPr/>\
 <p:nvPr><p:ph type=\"title\" idx=\"4\"/></p:nvPr></p:nvSpPr>\
 <p:spPr><a:xfrm><a:off x=\"952500\" y=\"476250\"/><a:ext cx=\"3810000\" cy=\"952500\"/></a:xfrm></p:spPr>\
-</p:sp></p:spTree></p:cSld></p:sldLayout>";
+</p:sp>\
+<p:pic><p:nvPicPr><p:cNvPr id=\"3\" name=\"Layout logo\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
+<p:blipFill><a:blip r:embed=\"rId2\"/></p:blipFill><p:spPr><a:xfrm><a:off x=\"10477500\" y=\"476250\"/>\
+<a:ext cx=\"952500\" cy=\"952500\"/></a:xfrm><a:prstGeom prst=\"rect\"/></p:spPr></p:pic>\
+</p:spTree></p:cSld></p:sldLayout>";
         let slide = "<?xml version=\"1.0\"?>\
 <p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\
 <p:cSld><p:spTree>\
 <p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Title 1\"/><p:cNvSpPr/>\
 <p:nvPr><p:ph type=\"title\" idx=\"4\"/></p:nvPr></p:nvSpPr><p:spPr/>\
-<p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang=\"en-US\"><a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill></a:rPr><a:t>Title</a:t></a:r></a:p></p:txBody></p:sp>\
+<p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang=\"en-US\"/><a:t>Title</a:t></a:r></a:p></p:txBody></p:sp>\
 <p:sp><p:nvSpPr><p:cNvPr id=\"3\" name=\"Empty prompt\"/><p:cNvSpPr/>\
 <p:nvPr><p:ph type=\"body\" idx=\"9\"/></p:nvPr></p:nvSpPr><p:spPr/>\
 <p:txBody><a:bodyPr/><a:p><a:endParaRPr/></a:p></p:txBody></p:sp>\
@@ -1683,6 +1883,15 @@ mod tests {
 <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/>\
 <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image1.png\"/>\
 </Relationships>";
+        let layout_rels = "<?xml version=\"1.0\"?>\
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
+<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"../slideMasters/slideMaster2.xml\"/>\
+<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image1.png\"/>\
+</Relationships>";
+        let master_rels = "<?xml version=\"1.0\"?>\
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
+<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"../theme/theme2.xml\"/>\
+</Relationships>";
         let png = base64::engine::general_purpose::STANDARD
             .decode(TINY_PNG.split_once("base64,").unwrap().1)
             .unwrap();
@@ -1692,9 +1901,17 @@ mod tests {
             let mut zip = zip::ZipWriter::new(&mut buffer);
             let opts = zip::write::SimpleFileOptions::default();
             for (name, body) in [
-                ("ppt/theme/theme1.xml", theme.as_bytes()),
-                ("ppt/slideMasters/slideMaster1.xml", MASTER.as_bytes()),
+                ("ppt/theme/theme2.xml", theme.as_bytes()),
+                ("ppt/slideMasters/slideMaster2.xml", master.as_bytes()),
+                (
+                    "ppt/slideMasters/_rels/slideMaster2.xml.rels",
+                    master_rels.as_bytes(),
+                ),
                 ("ppt/slideLayouts/slideLayout1.xml", layout.as_bytes()),
+                (
+                    "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+                    layout_rels.as_bytes(),
+                ),
                 ("ppt/slides/slide1.xml", slide.as_bytes()),
                 ("ppt/slides/_rels/slide1.xml.rels", slide_rels.as_bytes()),
                 ("ppt/media/image1.png", &png),
@@ -1708,32 +1925,68 @@ mod tests {
         let deck = read(buffer).unwrap();
         let shapes = &deck.slides[0].shapes;
 
-        // The empty prompt placeholder is gone; the layout's dark background
-        // arrives as a page-sized rect, then title, band and picture.
-        assert_eq!(shapes.len(), 4);
+        // The empty prompt placeholder is gone. Background, master artwork,
+        // layout logo and slide-owned shapes keep their layer order.
+        assert_eq!(shapes.len(), 6);
 
         let bg = &shapes[0];
         assert_eq!(bg.kind, "rect");
         assert_eq!(bg.fill, "#212022");
         assert!((bg.w - 1280.0).abs() < 0.5 && (bg.h - 720.0).abs() < 0.5);
 
-        let title = &shapes[1];
+        let master_band = &shapes[1];
+        assert_eq!(master_band.kind, "rect");
+        assert_eq!(master_band.fill, "#037f0c");
+
+        let layout_logo = &shapes[2];
+        assert_eq!(layout_logo.kind, "image");
+        assert_eq!(layout_logo.src, TINY_PNG);
+
+        let title = &shapes[3];
         assert_eq!(title.kind, "text");
         // 952500 EMU = 100 px: the box came from the layout.
         assert!((title.x - 100.0).abs() < 0.5 && (title.y - 50.0).abs() < 0.5);
         assert!((title.w - 400.0).abs() < 0.5 && (title.h - 100.0).abs() < 0.5);
-        // schemeClr tx1 -> clrMap -> dk1 -> the theme's windowText.
-        assert_eq!(title.text_color, "#111111");
+        assert_eq!(title.text_color, "#ffffff");
+        assert!((title.font_size - 42.7).abs() < 0.1);
+        assert_eq!(title.font_family, "Arial");
+        assert!(title.bold);
+        assert_eq!(title.text_align, "center");
 
-        let band = &shapes[2];
+        let band = &shapes[4];
         assert_eq!(band.kind, "rect");
         // accent1 ED7100 shaded to 50%.
         assert_eq!(band.fill, "#773900");
 
-        let pic = &shapes[3];
+        let pic = &shapes[5];
         assert_eq!(pic.kind, "image");
         assert_eq!(pic.src, TINY_PNG);
         assert!((pic.x - 100.0).abs() < 0.5 && (pic.w - 100.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn imports_relationship_backed_background_images() {
+        let xml = "<p:sldLayout xmlns:a=\"a\" xmlns:r=\"r\" xmlns:p=\"p\">\
+<p:cSld><p:bg><p:bgPr><a:blipFill><a:blip r:embed=\"rId2\"/>\
+</a:blipFill></p:bgPr></p:bg></p:cSld></p:sldLayout>";
+        let rels = HashMap::from([(
+            "rId2".into(),
+            ("image".into(), "ppt/media/background.png".into()),
+        )]);
+        let scheme = HashMap::new();
+        let clr_map = HashMap::new();
+        let defaults = HashMap::new();
+        let ctx = SlideCtx {
+            scheme: &scheme,
+            clr_map: &clr_map,
+            rels: &rels,
+            defaults: &defaults,
+        };
+
+        let background = parse_background(xml, &ctx, 1280.0, 720.0).unwrap();
+        assert_eq!(background.kind, "image");
+        assert_eq!(background.src, "ppt/media/background.png");
+        assert_eq!((background.w, background.h), (1280.0, 720.0));
     }
 
     #[test]
