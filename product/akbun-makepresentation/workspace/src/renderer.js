@@ -244,6 +244,19 @@ function setTool(tool) {
 
 // --- pointer interaction --------------------------------------------------------
 
+// Two presses on the same shape inside this window are a double click. The
+// value is the platform default a double click is judged by; longer and an
+// ordinary pair of clicks starts opening text boxes.
+const DOUBLE_PRESS_MS = 400;
+let lastPress = { index: -1, time: -Infinity };
+
+function isSecondPress(index) {
+  const now = performance.now();
+  const again = index === lastPress.index && now - lastPress.time < DOUBLE_PRESS_MS;
+  lastPress = { index, time: now };
+  return again;
+}
+
 function toPoint(event) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -296,6 +309,24 @@ canvas.addEventListener('pointerdown', (event) => {
   const group = event.target.closest('g[data-i]');
   if (group) {
     let index = Number(group.dataset.i);
+
+    // Opening a text box for editing is decided here rather than from a
+    // dblclick event, because the browser never reports one: pointerup
+    // redraws the canvas, so mouseup lands on a freshly built element and
+    // not the one that took mousedown, and a click needs both.
+    //
+    // preventDefault keeps the focus the overlay is about to take. Without
+    // it the press moves focus back to the page, and from there Backspace
+    // deletes the box being typed into instead of a character.
+    if (isSecondPress(index) && slide().shapes[index].kind === 'text') {
+      event.preventDefault();
+      state.selected = index;
+      renderCanvas();
+      renderProps();
+      startTextEdit(index);
+      return;
+    }
+
     const clicked = index;
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
@@ -375,16 +406,6 @@ canvas.addEventListener('pointerup', () => {
   renderAll();
 });
 
-canvas.addEventListener('dblclick', (event) => {
-  const group = event.target.closest('g[data-i]');
-  if (!group) return;
-  const index = Number(group.dataset.i);
-  if (slide().shapes[index].kind === 'text') {
-    state.selected = index;
-    renderCanvas();
-    startTextEdit(index);
-  }
-});
 
 // --- text editing -----------------------------------------------------------------
 
@@ -429,6 +450,15 @@ function commitTextEdit() {
   state.editingIndex = -1;
   textEditor.hidden = true;
 
+  // The shape can be gone by now: an undo, or a delete that reached the page
+  // while the overlay was open. There is nothing to commit into, and reading
+  // through it would take the whole page down.
+  if (!shape) {
+    state.selected = -1;
+    renderAll();
+    return;
+  }
+
   const text = textEditor.value.replace(/\s+$/, '');
   if (text === '') {
     slide().shapes.splice(index, 1);
@@ -471,6 +501,16 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') presentStep(1);
     else if (event.key === 'ArrowLeft' || event.key === 'PageUp') presentStep(-1);
     else if (event.key === 'Escape') exitPresent();
+    event.preventDefault();
+    return;
+  }
+
+  // A text box open for editing owns the keyboard, and its own handler below
+  // deals with every key it should answer. Reaching here at all means focus
+  // slipped off the overlay; without this the shortcuts would run against the
+  // box being typed into — Backspace deleting it, a letter switching tools.
+  if (state.editingIndex >= 0 && event.target !== textEditor) {
+    textEditor.focus();
     event.preventDefault();
     return;
   }

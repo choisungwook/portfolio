@@ -35,7 +35,8 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Cmd+Shift+drag | Same, with the copy kept on one axis |
 | V R O L A P T | Select, rectangle, ellipse, line, arrow, pen, text |
 | Arrows | Nudge the selection by 1px, or 10px with Shift |
-| Delete | Delete the selection |
+| Delete, Backspace | Delete the selection. Inside a text box being edited they delete a character instead |
+| Double click on a text box | Edit its text |
 
 ## Directory layout
 
