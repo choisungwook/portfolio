@@ -250,6 +250,27 @@ async function saveEditorAs(webContentsId, dataUrl) {
   return result.filePath;
 }
 
+// Copy in the editor: the annotated canvas onto the clipboard, then the window
+// closes the same way Save does. Nothing is written to disk, so a screenshot
+// that only ever needed to be pasted never leaves a file behind.
+function copyEditor(webContentsId, dataUrl) {
+  const entry = editors.get(webContentsId);
+  if (!entry) return false;
+  const png = decodePng(dataUrl);
+  if (!png) return false;
+
+  // decodePng only proves the payload claims to be a png and carries bytes.
+  // Anything else decodes into an empty nativeImage, and writing that clears
+  // the clipboard, which is worse than doing nothing: what was on it belonged
+  // to whatever the user copied last. So the image is checked, not the string.
+  const image = nativeImage.createFromBuffer(png);
+  if (image.isEmpty()) return false;
+
+  clipboard.writeImage(image);
+  closeEditor(webContentsId);
+  return true;
+}
+
 function closeEditor(webContentsId) {
   const entry = editors.get(webContentsId);
   if (entry && !entry.win.isDestroyed()) entry.win.close();
@@ -264,5 +285,6 @@ module.exports = {
   editorImage,
   saveEditor,
   saveEditorAs,
+  copyEditor,
   closeEditor,
 };

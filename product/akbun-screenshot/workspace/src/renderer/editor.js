@@ -661,6 +661,17 @@ function syncStyleInputs(s) {
 const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
 
 window.addEventListener('keydown', (event) => {
+  // Before the toolbar box guard below: Cmd+S means save wherever the caret is,
+  // and no box on this toolbar has its own use for it. A held key repeats, and
+  // each repeat would export the canvas again and post another save before the
+  // first one has closed the window, so only the first keydown counts.
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    if (event.repeat) return;
+    window.api.saveEditor(exportPng());
+    return;
+  }
+
   // A key typed into a toolbar box belongs to the box, and that has to be
   // decided before undo rather than after it. Otherwise Cmd+Z while correcting
   // a font size undoes the drawing behind the box instead of the digit just
@@ -761,6 +772,13 @@ document.getElementById('save').addEventListener('click', () => {
 // the dialog, so the window stays open when it is cancelled.
 document.getElementById('save-as').addEventListener('click', () => {
   window.api.saveEditorAs(exportPng());
+});
+
+// Copy takes the annotated image to the clipboard and closes the editor, the
+// same ending Save has. Both are a way of being done with the image, and an
+// editor left open after one would be a window with nothing left to do.
+document.getElementById('copy').addEventListener('click', () => {
+  window.api.copyEditor(exportPng());
 });
 
 document.getElementById('close').addEventListener('click', () => window.api.closeEditor());
