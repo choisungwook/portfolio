@@ -10,5 +10,6 @@
 | [2026-08-projects-reference-media.md](./2026-08-projects-reference-media.md) | A project is a folder that references media, never a copy of it |
 | [2026-08-render-preset-is-the-long-edge.md](./2026-08-render-preset-is-the-long-edge.md) | FHD and 4K set the long edge and keep the project aspect |
 | [2026-08-gpu-means-hardware-encode.md](./2026-08-gpu-means-hardware-encode.md) | GPU rendering means hardware encode, detected by trying it |
+| [2026-08-one-compositor-for-preview-and-render.md](./2026-08-one-compositor-for-preview-and-render.md) | One compositor for the preview and the render |
 | [2026-08-in-page-menu-bar.md](./2026-08-in-page-menu-bar.md) | The menu bar is HTML, not a native menu |
 | [2026-08-updater-fixed-tag-endpoint.md](./2026-08-updater-fixed-tag-endpoint.md) | The updater polls a fixed per-product tag, not releases/latest |

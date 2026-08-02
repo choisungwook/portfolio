@@ -8,6 +8,7 @@
 
 pub mod accel;
 pub mod ffmpeg;
+pub mod layout;
 pub mod probe;
 pub mod tools;
 pub mod workspace;

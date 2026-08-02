@@ -42,6 +42,7 @@ if (!window.__TAURI__) {
         workspaceDir: '',
         ffmpegDir: '',
         renderAcceleration: 'auto',
+        compositor: 'gpu',
       },
       workspace: '',
       version: '0.0.0-browser',
@@ -49,6 +50,7 @@ if (!window.__TAURI__) {
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
+      compositor: { Err: 'no desktop app, so no graphics device' },
     }),
     saveSettings: async (settings) => ({
       settings,
@@ -58,6 +60,7 @@ if (!window.__TAURI__) {
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
+      compositor: { Err: 'no desktop app, so no graphics device' },
     }),
     pickMedia: unavailable,
     pickProjectOpen: unavailable,
@@ -65,6 +68,7 @@ if (!window.__TAURI__) {
     pickRenderOutput: unavailable,
     pickFolder: unavailable,
     listProjects: async () => [],
+    previewFrame: unavailable,
     // Pretends the folder was made, the way saveProject below pretends the
     // file was written, so the New Project flow can be walked in a browser.
     createProject: async (name) => ({
@@ -169,6 +173,19 @@ window.api = {
   pickFolder: (title) => openDialog({ title, directory: true, multiple: false }),
 
   listProjects: () => invoke('list_projects'),
+  // Raw RGBA, not an encoded image: this frame exists to show exactly what the
+  // render will contain, and a lossy hop to the screen would undo that. The
+  // first eight bytes are the width and height.
+  previewFrame: async (project, timeMs, maxWidth) => {
+    const raw = await invoke('preview_frame', { project, timeMs, maxWidth });
+    const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return {
+      width: view.getUint32(0, true),
+      height: view.getUint32(4, true),
+      pixels: bytes.subarray(8),
+    };
+  },
   createProject: (name) => invoke('create_project', { name }),
 
   // Only paths cross this line. Nothing here copies a byte of media.

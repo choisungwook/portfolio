@@ -39,6 +39,16 @@ jobs:
       - name: Run render model tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render
 
+      # The compositor draws with a real graphics device, and its end to end
+      # test renders an actual file. lavapipe is a software Vulkan device, so
+      # both run on a runner with no GPU. These two packages are small and pull
+      # in no Rust dependencies; GTK and WebKit are still kept out.
+      - name: Install a software GPU and ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mesa-vulkan-drivers ffmpeg
+
+      - name: Run compositor tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
+
   release:
     if: github.event_name != 'pull_request'
     runs-on: macos-latest

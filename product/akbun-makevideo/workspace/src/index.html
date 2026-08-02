@@ -93,7 +93,8 @@
           </div>
         </header>
         <div id="stage-wrap">
-          <div id="stage"><div id="stage-inner"></div></div>
+          <div id="stage"><div id="stage-inner"><canvas id="stage-exact"></canvas></div></div>
+          <span id="stage-mode" hidden></span>
           <p id="stage-hint">Drop media on the timeline below to see it here.</p>
         </div>
         <div id="transport">
@@ -249,6 +250,13 @@
         </span>
       </label>
       <p class="dim small-text" id="as-workspace-note"></p>
+      <label class="row">Compositor
+        <select id="as-compositor">
+          <option value="gpu">GPU — preview matches the render</option>
+          <option value="ffmpeg">ffmpeg filter graph — faster</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="as-compositor-note"></p>
       <label class="row">Render acceleration
         <select id="as-accel">
           <option value="auto">Auto — GPU when available</option>

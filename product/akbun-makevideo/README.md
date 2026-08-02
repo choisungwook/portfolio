@@ -7,12 +7,13 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Menu bar: new, open, save, save as, close, import media, render, settings
 - Projects are folders under a workspace directory (`~/Documents/akbun-makevideo` by default, settable), with an Open list instead of a file dialog
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
-- Preview: the timeline composited live, or a single asset on its own
+- Preview: stacked playback while running, and the exact rendered frame when the playhead stops — drawn by the same shader the render uses
 - Timeline: up to four video and four audio tracks, drag to move, drag an edge to trim
 - Split at the playhead, from the toolbar button or Cmd+B
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
 - Render to mp4 at FHD or 4K with a progress bar and a cancel button
+- Renders composite on the GPU by default so the preview frame and the file agree, with the ffmpeg filter graph as a faster fallback
 - GPU rendering when the machine has it: the encode moves to Apple VideoToolbox (or NVENC), detected by actually trying it, with an automatic fall back to the CPU if it fails
 - Preview quality, defaulted to Half so a few tracks at once still play
 - Light and dark, following the system unless told otherwise

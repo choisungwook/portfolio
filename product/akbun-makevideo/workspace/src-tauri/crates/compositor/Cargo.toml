@@ -1,0 +1,15 @@
+[package]
+name = "makevideo-compositor"
+version = "0.1.0"
+description = "The GPU compositor the preview and the render both draw with"
+edition = "2021"
+license = "MIT"
+
+# Depends on the render crate only for its geometry types, and on neither tauri
+# nor ffmpeg. It takes decoded RGBA in and gives one composited frame back, so
+# it can be tested headless against a software Vulkan device.
+
+[dependencies]
+makevideo-render = { path = "../render" }
+wgpu = "30"
+pollster = "1"

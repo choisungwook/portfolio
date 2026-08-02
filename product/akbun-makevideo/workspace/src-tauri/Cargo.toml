@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/render"]
+members = ["crates/render", "crates/compositor"]
 
 [package]
 name = "akbun-makevideo"
@@ -27,6 +27,10 @@ tauri-build = { version = "2", features = [] }
 # the pull request job can test them without compiling tauri, which would mean
 # installing GTK and WebKit on the runner.
 makevideo-render = { path = "crates/render" }
+# The GPU compositor the preview frame and the render both draw with. Pulls in
+# wgpu, which is why it is a separate crate: the pull request job tests the
+# model without it.
+makevideo-compositor = { path = "crates/compositor" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
 tauri = { version = "2", features = ["protocol-asset"] }

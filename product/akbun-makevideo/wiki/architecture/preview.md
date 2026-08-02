@@ -13,7 +13,9 @@ This is not the render. The differences are real and worth knowing:
 - The preview does not mix audio; it plays several elements at once and lets the system add them up. The render uses `amix` with `normalize=0`.
 - The preview cannot honour a frame rate. It shows whatever the element decodes.
 
-Anything that looks wrong in the preview should be checked against a render before it is called a bug.
+Anything that looks wrong **during playback** should be checked against the exact frame before it is called a bug.
+
+That exact frame is the other half of the preview: when the playhead stops, the page asks Rust for the frame the render would produce and draws it over the stack, with a badge saying which of the two is on screen. It is the same compositor, the same shader and the same geometry the render uses, so it is not an approximation of anything. See [compositor.md](./compositor.md).
 
 ## Preview quality
 

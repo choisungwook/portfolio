@@ -5,6 +5,7 @@
 //! capabilities/default.json short, because the webview never needs a file
 //! system scope of its own.
 
+use makevideo_compositor::Compositor;
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project};
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,11 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
+    /// "gpu" to draw every frame with the same compositor the preview uses,
+    /// "ffmpeg" to let the filter graph do it. The first is what makes the
+    /// preview and the render agree; the second is faster because the frames
+    /// never leave ffmpeg.
+    pub compositor: String,
 }
 
 impl Default for Settings {
@@ -58,6 +64,7 @@ impl Default for Settings {
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
+            compositor: "gpu".into(),
         }
     }
 }
@@ -72,6 +79,9 @@ pub struct AppState {
     /// subprocesses, and the answer cannot change while the app is running.
     /// None means it has not been asked yet.
     pub accel: Mutex<Option<AccelProbe>>,
+    /// Opening a graphics device costs a moment and the answer never changes,
+    /// so it is made once and shared. None means it has not been tried.
+    pub compositor: Mutex<Option<Result<Arc<Compositor>, String>>>,
 }
 
 /// One candidate and what happened when it was actually tried. Kept so Settings
@@ -120,6 +130,8 @@ pub struct Bootstrap {
     pub ffmpeg: Option<String>,
     pub ffprobe: Option<String>,
     pub acceleration: AccelProbe,
+    /// What the compositor is drawing with, or why it could not start.
+    pub compositor: Result<String, String>,
 }
 
 pub fn allow_asset_file(app: &AppHandle, path: &str) {
@@ -220,6 +232,16 @@ fn acceleration(state: &State<AppState>, program: Option<&String>) -> AccelProbe
     probe
 }
 
+/// The graphics device, opened once. A machine with none is not an error until
+/// something actually asks to draw with it.
+fn compositor(state: &State<AppState>) -> Result<Arc<Compositor>, String> {
+    let mut slot = state.compositor.lock().unwrap();
+    if slot.is_none() {
+        *slot = Some(Compositor::new().map(Arc::new));
+    }
+    slot.as_ref().unwrap().clone()
+}
+
 /// What this render should use, honouring the setting.
 fn chosen_acceleration(state: &State<AppState>) -> Option<Acceleration> {
     let settings = state.settings.lock().unwrap().clone();
@@ -317,10 +339,54 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
             .to_string_lossy()
             .to_string(),
         acceleration: acceleration(&state, ffmpeg.as_ref()),
+        compositor: compositor(&state).map(|gpu| gpu.adapter().to_string()),
         ffprobe: find_tool("ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
         settings,
     }
+}
+
+/// One composited frame for the preview, drawn by the same shader the render
+/// uses. Returns eight bytes of width and height then RGBA rows, which the page
+/// blits straight onto a canvas.
+///
+/// Raw rather than an encoded image on purpose: the whole point is to show
+/// exactly what the render will contain, and a lossy re-encode on the way to
+/// the screen would undo that.
+#[tauri::command]
+pub fn preview_frame(
+    state: State<AppState>,
+    project: Project,
+    time_ms: u64,
+    max_width: u32,
+) -> Result<tauri::ipc::Response, String> {
+    let gpu = compositor(&state)?;
+    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let ffmpeg_path = find_tool("ffmpeg", &configured)
+        .ok_or("ffmpeg was not found, so no frame can be decoded")?;
+
+    // The preview is drawn at the project shape, scaled down to what the panel
+    // can show. Same aspect, so the framing matches the render exactly.
+    let settings = &project.settings;
+    let width = max_width.clamp(16, settings.width.max(16));
+    let height = ((width as u64 * settings.height.max(1) as u64) / settings.width.max(1) as u64)
+        .max(2) as u32;
+    let width = width - (width % 2);
+    let height = height - (height % 2);
+
+    let pixels = makevideo_compositor::pipeline::preview_frame(
+        &gpu,
+        &ffmpeg_path,
+        &project,
+        time_ms,
+        width,
+        height,
+    )?;
+    let mut payload = Vec::with_capacity(pixels.len() + 8);
+    payload.extend_from_slice(&width.to_le_bytes());
+    payload.extend_from_slice(&height.to_le_bytes());
+    payload.extend_from_slice(&pixels);
+    Ok(tauri::ipc::Response::new(payload))
 }
 
 #[tauri::command]
@@ -548,14 +614,43 @@ fn run_ffmpeg(
     }
 }
 
-/// Starts ffmpeg and returns as soon as it is running. Progress arrives as
+/// How one attempt at a render turned out.
+enum Attempt {
+    Done,
+    Cancelled,
+    Failed(String),
+}
+
+/// One way of producing the file. The composited route draws every frame with
+/// the same shader the preview uses; the graph route leaves the picture inside
+/// ffmpeg and is faster because the frames never cross a pipe.
+enum Route {
+    Composited {
+        label: String,
+        accel: Option<Acceleration>,
+    },
+    Graph {
+        label: String,
+        args: Vec<String>,
+    },
+}
+
+impl Route {
+    fn label(&self) -> &str {
+        match self {
+            Route::Composited { label, .. } | Route::Graph { label, .. } => label,
+        }
+    }
+}
+
+/// Starts a render and returns as soon as it is under way. Progress arrives as
 /// `render:progress` events and the outcome as one `render:done`.
 ///
-/// When the hardware path is used it may still fail on this particular file —
-/// a resolution the media engine will not take, a busy encoder — so a hardware
-/// failure is retried once on the CPU rather than reported. Both argument lists
-/// are built up front so a bad project fails here, synchronously, instead of
-/// halfway through a render.
+/// Everything that can fail on a bad project is built here, synchronously, so
+/// the dialog never opens on a render that was never going to start. Each route
+/// is then tried in turn: anything that fails without being cancelled falls
+/// back to the plain ffmpeg filter graph on the CPU, which is the combination
+/// with the fewest moving parts.
 #[tauri::command]
 pub fn start_render(
     app: AppHandle,
@@ -569,20 +664,43 @@ pub fn start_render(
     }
     let preset = ffmpeg::Preset::parse(&preset)?;
     let total_ms = project.duration_ms();
-    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let program = find_tool("ffmpeg", &configured).ok_or_else(|| {
+    let settings = state.settings.lock().unwrap().clone();
+    let program = find_tool("ffmpeg", &settings.ffmpeg_dir).ok_or_else(|| {
         "ffmpeg was not found. Install it with `brew install ffmpeg`, or point Settings at the \
          folder that holds it."
             .to_string()
     })?;
 
     let chosen = chosen_acceleration(&state);
-    let hardware_args = match chosen.as_ref() {
-        Some(hardware) => Some(ffmpeg::build_args(&project, &path, preset, Some(hardware))?),
-        None => None,
+    let accel_label = chosen
+        .as_ref()
+        .map(|hardware| hardware.label.clone())
+        .unwrap_or_else(|| "CPU".into());
+    let gpu = if settings.compositor == "ffmpeg" {
+        None
+    } else {
+        compositor(&state).ok()
     };
-    let cpu_args = ffmpeg::build_args(&project, &path, preset, None)?;
-    let label = chosen.map(|hardware| hardware.label).unwrap_or_default();
+
+    let mut routes: Vec<Route> = Vec::new();
+    if let Some(gpu) = gpu.as_ref() {
+        // Validated now so a broken project fails before the sheet opens.
+        ffmpeg::encoder_args(&project, &path, preset, chosen.as_ref())?;
+        routes.push(Route::Composited {
+            label: format!("{} compositor, {accel_label} encoder", gpu.adapter()),
+            accel: chosen.clone(),
+        });
+    } else if let Some(hardware) = chosen.as_ref() {
+        routes.push(Route::Graph {
+            label: format!("ffmpeg filter graph, {accel_label} encoder"),
+            args: ffmpeg::build_args(&project, &path, preset, Some(hardware))?,
+        });
+    }
+    let plain = ffmpeg::build_args(&project, &path, preset, None)?;
+    routes.push(Route::Graph {
+        label: "ffmpeg filter graph, CPU encoder".into(),
+        args: plain,
+    });
 
     state.cancelled.store(false, Ordering::SeqCst);
     let shared = Arc::clone(&state.render);
@@ -590,36 +708,84 @@ pub fn start_render(
 
     std::thread::spawn(move || {
         let mut fell_back = false;
-        let mut outcome = None;
+        let mut used = String::new();
+        let mut outcome = Attempt::Failed("no route was tried".into());
 
-        if let Some(args) = hardware_args {
-            let attempt = run_ffmpeg(&app, &shared, &cancelled, &program, &args, total_ms);
-            if attempt.ok || attempt.cancelled {
-                outcome = Some(attempt);
-            } else {
+        for (index, route) in routes.iter().enumerate() {
+            if index > 0 {
                 fell_back = true;
                 let _ = app.emit(
                     "render:fallback",
                     RenderFallback {
-                        from: label.clone(),
+                        from: routes[index - 1].label().to_string(),
                     },
                 );
             }
+            used = route.label().to_string();
+            outcome = match route {
+                Route::Composited { accel, .. } => {
+                    let gpu = gpu.as_ref().expect("a composited route needs a device");
+                    let emit = |position_ms: u64, total: u64| {
+                        let _ = app.emit(
+                            "render:progress",
+                            RenderProgress {
+                                position_ms,
+                                total_ms: total,
+                            },
+                        );
+                    };
+                    match makevideo_compositor::pipeline::run(
+                        gpu,
+                        makevideo_compositor::pipeline::Options {
+                            ffmpeg: &program,
+                            project: &project,
+                            output: &path,
+                            preset,
+                            accel: accel.as_ref(),
+                        },
+                        &shared,
+                        &cancelled,
+                        emit,
+                    ) {
+                        Ok(()) => Attempt::Done,
+                        Err(error) if cancelled.load(Ordering::SeqCst) => {
+                            let _ = error;
+                            Attempt::Cancelled
+                        }
+                        Err(error) => Attempt::Failed(error),
+                    }
+                }
+                Route::Graph { args, .. } => {
+                    let result = run_ffmpeg(&app, &shared, &cancelled, &program, args, total_ms);
+                    if result.cancelled {
+                        Attempt::Cancelled
+                    } else if result.ok {
+                        Attempt::Done
+                    } else {
+                        Attempt::Failed(result.message)
+                    }
+                }
+            };
+            if matches!(outcome, Attempt::Done | Attempt::Cancelled) {
+                break;
+            }
         }
-        let outcome = outcome.unwrap_or_else(|| {
-            run_ffmpeg(&app, &shared, &cancelled, &program, &cpu_args, total_ms)
-        });
 
         cancelled.store(false, Ordering::SeqCst);
+        let (ok, was_cancelled, message) = match outcome {
+            Attempt::Done => (true, false, String::new()),
+            Attempt::Cancelled => (false, true, "Render cancelled.".to_string()),
+            Attempt::Failed(error) => (false, false, tail(&error)),
+        };
         let _ = app.emit(
             "render:done",
             RenderDone {
-                ok: outcome.ok,
-                cancelled: outcome.cancelled,
+                ok,
+                cancelled: was_cancelled,
                 path,
-                message: outcome.message,
-                fell_back,
-                accelerator: if fell_back { String::new() } else { label },
+                message,
+                fell_back: fell_back && ok,
+                accelerator: if ok { used } else { String::new() },
             },
         );
     });

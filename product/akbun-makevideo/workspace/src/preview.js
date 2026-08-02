@@ -23,7 +23,7 @@ function clamp01(value) {
 }
 
 function createPreview(options) {
-  const { stage, inner, wrap, getProject, onTick } = options;
+  const { stage, inner, wrap, exactCanvas, getProject, onTick } = options;
   const L = globalThis.timelineLib;
 
   const pool = new Map();
@@ -189,6 +189,7 @@ function createPreview(options) {
   function play() {
     if (playing) return;
     if (totalMs() <= 0) return;
+    clearExact();
     if (mode === 'timeline' && positionMs >= totalMs()) positionMs = 0;
     playing = true;
     clockOrigin = performance.now() - positionMs;
@@ -250,6 +251,7 @@ function createPreview(options) {
 
   function showAsset(asset) {
     mode = 'asset';
+    clearExact();
     pause();
     for (const entry of pool.values()) hide(entry);
     if (assetElement) assetElement.remove();
@@ -278,6 +280,33 @@ function createPreview(options) {
     positionMs = 0;
   }
 
+  /** Show one frame drawn by the Rust compositor — the same shader, the same
+   *  geometry and the same source frames the render uses. It sits above the
+   *  stacked elements, so what is underneath keeps its place for when playback
+   *  starts again. */
+  function showExact(frame) {
+    if (!exactCanvas || !frame || !frame.width || !frame.height) return false;
+    exactCanvas.width = frame.width;
+    exactCanvas.height = frame.height;
+    const context = exactCanvas.getContext('2d');
+    if (!context) return false;
+    context.putImageData(
+      new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height),
+      0,
+      0
+    );
+    exactCanvas.classList.add('on');
+    return true;
+  }
+
+  function clearExact() {
+    if (exactCanvas) exactCanvas.classList.remove('on');
+  }
+
+  function isExact() {
+    return Boolean(exactCanvas && exactCanvas.classList.contains('on'));
+  }
+
   function setQuality(next) {
     if (!QUALITY[next]) return;
     quality = next;
@@ -301,6 +330,9 @@ function createPreview(options) {
     layout,
     play,
     pause,
+    showExact,
+    clearExact,
+    isExact,
     toggle: () => (playing ? pause() : play()),
     isPlaying: () => playing,
     seek,

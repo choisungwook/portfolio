@@ -1,5 +1,11 @@
 # The render
 
+There are two routes to a file. This page is the ffmpeg filter graph, which
+does everything inside ffmpeg and is the faster of the two. The default route
+composites every frame in the app so the preview and the render agree; see
+[compositor.md](./compositor.md). Both share the encoder settings below, and
+there is a test asserting they are identical.
+
 `crates/render/src/ffmpeg.rs` builds the whole argument list. Shape:
 
 ```text

@@ -19,34 +19,37 @@ brew install ffmpeg
 
 ## Tests
 
-Both suites run without an app binary, and both run without ffmpeg installed.
+None of them need an app binary. The first two need nothing installed at all; the third needs a graphics device and ffmpeg.
 
 ```bash
-npm test          # node --test over the timeline model
-npm run test:rust # cargo test -p makevideo-render
+npm test           # node --test over the timeline model
+npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
+npm run test:gpu   # cargo test -p makevideo-compositor, needs a GPU and ffmpeg
 ```
 
 `-p makevideo-render` is not decoration. The render crate depends on neither tauri nor a webview, so this compiles serde and nothing else. Dropping the `-p` pulls in the app crate, which on a Linux runner means installing GTK and WebKit development packages for what is otherwise a few seconds of work.
 
+The compositor tests are the exception to "no system packages": they draw with a real graphics device and render real files, so they need `mesa-vulkan-drivers` and `ffmpeg`. Both are small, neither adds a Rust dependency, and the verify job installs them. They fail loudly rather than skipping when there is no adapter — a render path nobody has run is what the crate exists to prevent.
+
+```bash
+sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
+```
+
 What is covered:
 
 - `test/timeline.test.js` — placing, overlap, moving between tracks, trimming against the source bounds, splitting, snapping, track limits, and reading an older project file
-- `crates/render/src/ffmpeg.rs` — one test per feature of the filter graph, plus the preset sizes and the progress parser
+- `crates/render/src/layout.rs` — where a clip lands in the frame, the case both paths used to answer separately
+- `crates/render/src/ffmpeg.rs` — one test per feature of the filter graph, the decoder and encoder arguments for the composited route, the preset sizes and the progress parser
 - `crates/render/src/probe.rs` — ffprobe output including the cover art case, where an mp3 reports a video stream
 - `crates/render/src/tools.rs` — where ffmpeg is looked for
+- `crates/compositor/src/lib.rs` — the shader: layer order, opacity, placement, and that a pillarboxed layer lets the one underneath show at the sides
+- `crates/compositor/tests/render.rs` — a real render end to end, and that the preview frame matches the frame the render wrote at the same instant
 
 ### What the tests cannot tell you
 
-The filter graph is a string. It type checks whatever it says, and a mistake in it surfaces at render time on the user's machine and nowhere else. The tests assert the string, which catches a change that did not mean to alter the graph, but the first version of any new graph feature has to be run against a real ffmpeg once.
+The composited route is covered end to end by `crates/compositor/tests/render.rs`, which renders real files and reads pixels out of them. **The filter graph route is not.** Its tests assert the argument string, which catches a change that did not mean to alter the graph but proves nothing about what ffmpeg does with it.
 
-The way to do that without committing anything: build a project file, print the arguments, run them.
-
-```bash
-cd workspace/src-tauri
-cargo run -q -p makevideo-render --example print-args 2>/dev/null || true   # no example; use a scratch bin
-```
-
-There is no example binary in the tree, deliberately — the check is a one-off. Write a five line `main` in a scratch crate that depends on `makevideo-render` by path, deserialize a project, call `ffmpeg::build_args`, and print the arguments NUL separated. Then feed them to ffmpeg and probe the result. Synthetic inputs are enough:
+So any new feature of that graph has to be run against a real ffmpeg once. Build a project file, print the arguments with a five line scratch crate that depends on `makevideo-render` by path, and feed them to ffmpeg. Synthetic inputs are enough:
 
 ```bash
 ffmpeg -f lavfi -i "color=c=red:s=1280x720:d=6:r=30" -f lavfi -i "sine=frequency=440:duration=6" \
@@ -74,11 +77,13 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 
 **A media element per clip is a decoder per clip.** `preview.prune()` removes elements whose clips are gone and has to be called after any edit that drops clips.
 
+**The composited route moves a lot of bytes.** Every frame leaves ffmpeg as raw RGBA and goes back the same way, about 250 MB for each second of 1080p30 timeline. On a software rasteriser that made a test render 3.4x slower than the filter graph; on a Mac the drawing is on the GPU and the pipe traffic is what remains. `Settings → Compositor → ffmpeg filter graph` is the faster route when the preview matching the file does not matter.
+
 ## Release
 
 `.github/workflows/release-akbun-makevideo.yml`.
 
-- A pull request runs `verify` on ubuntu: the two test suites and nothing else. No Rust cache, because the render crate compiles in seconds.
+- A pull request runs `verify` on ubuntu: the three test suites and nothing else. It installs `mesa-vulkan-drivers` and `ffmpeg` for the compositor tests. No Rust cache, because neither the render nor the compositor crate pulls in tauri.
 - A push to master builds on macOS and `tauri-apps/tauri-action` creates the release. **GitHub creates the tag from the release**, so there is no `git tag` step to add.
 - The version lives only in `workspace/package.json`; `tauri.conf.json` points at it. The number in `Cargo.toml` is not read by the bundler.
 

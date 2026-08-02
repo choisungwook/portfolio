@@ -34,6 +34,7 @@ pub fn run() {
                 render: Arc::new(Mutex::new(None)),
                 cancelled: Arc::new(AtomicBool::new(false)),
                 accel: Mutex::new(None),
+                compositor: Mutex::new(None),
             });
             Ok(())
         })
@@ -47,6 +48,7 @@ pub fn run() {
             commands::save_project,
             commands::start_render,
             commands::cancel_render,
+            commands::preview_frame,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

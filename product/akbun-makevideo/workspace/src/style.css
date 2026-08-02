@@ -429,6 +429,38 @@ select {
   display: block;
 }
 
+/* The exact frame sits over the stacked elements rather than replacing them,
+   so playback can resume without rebuilding the pool. */
+#stage-exact {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  z-index: 60;
+}
+
+#stage-exact.on {
+  display: block;
+}
+
+#stage-mode {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #d8dade;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+#stage-mode.exact {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
 audio.stage-media {
   display: none !important;
 }

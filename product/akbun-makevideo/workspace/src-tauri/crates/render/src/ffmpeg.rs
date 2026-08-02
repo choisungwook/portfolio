@@ -239,25 +239,12 @@ pub fn build_args(
         if !item.audio {
             continue;
         }
-        // adelay is the audio half of tpad: every stream starts at 0 so amix
-        // has nothing to line up.
-        chains.push(format!(
-            "[{index}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,\
-             asetpts=PTS-STARTPTS,volume={:.3},adelay={}:all=1[a{index}]",
-            item.clip.volume.max(0.0),
-            item.clip.start_ms
-        ));
+        chains.push(audio_chain(item, index));
         audio_labels.push(format!("[a{index}]"));
     }
     let has_audio = !audio_labels.is_empty();
     if has_audio {
-        // normalize=0 keeps a single clip at its own level instead of dividing
-        // it by the number of inputs.
-        chains.push(format!(
-            "{}amix=inputs={}:normalize=0:dropout_transition=0[aout]",
-            audio_labels.concat(),
-            audio_labels.len()
-        ));
+        chains.push(mix_chain(&audio_labels));
     }
 
     args.extend(["-filter_complex".into(), chains.join(";")]);
@@ -265,6 +252,57 @@ pub fn build_args(
     if has_audio {
         args.extend(["-map".into(), "[aout]".into()]);
     }
+    args.extend(video_codec_args(accel, width, height, fps));
+    if has_audio {
+        args.extend(audio_codec_args());
+    }
+    args.extend([
+        // The base already ends at the right time; this bounds the audio too.
+        "-t".into(),
+        total,
+        "-movflags".into(),
+        "+faststart".into(),
+        // The progress block is the only thing the app reads from stdout.
+        "-progress".into(),
+        "pipe:1".into(),
+        "-nostats".into(),
+    ]);
+    args.push(output.to_string());
+    Ok(args)
+}
+
+/// One audio clip's chain. `input` is its position in the argument list, which
+/// differs between the two paths: the filter graph feeds every clip in as its
+/// own input, while the composited path puts the frame pipe at 0 and shifts
+/// audio up by one.
+fn audio_chain(item: &Item, input: usize) -> String {
+    // adelay is the audio half of tpad: every stream starts at 0 so amix has
+    // nothing to line up.
+    format!(
+        "[{input}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,\
+         asetpts=PTS-STARTPTS,volume={:.3},adelay={}:all=1[a{input}]",
+        item.clip.volume.max(0.0),
+        item.clip.start_ms
+    )
+}
+
+/// normalize=0 keeps a single clip at its own level instead of dividing it by
+/// the number of inputs.
+fn mix_chain(labels: &[String]) -> String {
+    format!(
+        "{}amix=inputs={}:normalize=0:dropout_transition=0[aout]",
+        labels.concat(),
+        labels.len()
+    )
+}
+
+fn video_codec_args(
+    accel: Option<&Acceleration>,
+    width: u32,
+    height: u32,
+    fps: u32,
+) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
     match accel {
         Some(hardware) => {
             // -preset and -crf are libx264 options. A hardware encoder ignores
@@ -282,12 +320,6 @@ pub fn build_args(
                 // the media engine is busy, instead of failing the render.
                 args.extend(["-allow_sw".into(), "1".into()]);
             }
-            args.extend([
-                "-pix_fmt".into(),
-                "yuv420p".into(),
-                "-r".into(),
-                fps.to_string(),
-            ]);
         }
         None => {
             args.extend([
@@ -297,32 +329,178 @@ pub fn build_args(
                 "medium".into(),
                 "-crf".into(),
                 "20".into(),
-                "-pix_fmt".into(),
-                "yuv420p".into(),
-                "-r".into(),
-                fps.to_string(),
             ]);
         }
     }
+    args.extend([
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-r".into(),
+        fps.to_string(),
+    ]);
+    args
+}
+
+fn audio_codec_args() -> Vec<String> {
+    vec![
+        "-c:a".into(),
+        "aac".into(),
+        "-b:a".into(),
+        "192k".into(),
+        "-ar".into(),
+        "48000".into(),
+    ]
+}
+
+// --- the composited path ---------------------------------------------------
+//
+// The graph above does everything in ffmpeg. These two build the other route:
+// one decoder per clip handing raw frames to the wgpu compositor, and one
+// encoder taking the composited frames back on stdin. Audio never leaves
+// ffmpeg either way, because amix is not something worth reimplementing.
+
+/// What one decoder is being asked for.
+pub struct Decode<'a> {
+    pub path: &'a str,
+    pub kind: AssetKind,
+    pub in_ms: u64,
+    pub duration_ms: u64,
+    /// From `layout::fit_rect`, so the size is a decision made in one place.
+    pub width: u32,
+    pub height: u32,
+    pub fps: u32,
+    pub hwaccel: Option<&'a str>,
+}
+
+/// Decode one clip to raw RGBA at the project frame rate, already scaled to
+/// the size it will be drawn at.
+///
+/// The scaling is here rather than in the compositor because ffmpeg is already
+/// decoding the frame and its scaler is better than a bilinear texture fetch.
+/// The *size* is still decided by `layout::fit_rect`, so this is ffmpeg
+/// carrying out a decision made in one place, not making one of its own.
+pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
+    let Decode {
+        path,
+        kind,
+        in_ms,
+        duration_ms,
+        width,
+        height,
+        fps,
+        hwaccel,
+    } = *request;
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-nostdin".into(),
+        "-loglevel".into(),
+        "error".into(),
+    ];
+    if kind == AssetKind::Image {
+        args.extend(["-loop".into(), "1".into()]);
+        args.extend(["-framerate".into(), fps.to_string()]);
+        args.extend(["-t".into(), secs(duration_ms)]);
+    } else {
+        if let Some(name) = hwaccel {
+            args.extend(["-hwaccel".into(), name.to_string()]);
+        }
+        args.extend(["-ss".into(), secs(in_ms)]);
+        args.extend(["-t".into(), secs(duration_ms)]);
+    }
+    args.extend(["-i".into(), path.to_string()]);
+    // fps= is what makes the frame count predictable: the reader takes exactly
+    // one frame per output frame and a variable frame rate source would
+    // otherwise drift out of step with the timeline.
+    args.extend([
+        "-vf".into(),
+        format!("scale={width}:{height},fps={fps}"),
+        "-f".into(),
+        "rawvideo".into(),
+        "-pix_fmt".into(),
+        "rgba".into(),
+        "-".into(),
+    ]);
+    args
+}
+
+/// Encode composited RGBA frames arriving on stdin. Audio is still read from
+/// the source files and mixed by ffmpeg, so only the picture takes the long
+/// way round.
+pub fn encoder_args(
+    project: &Project,
+    output: &str,
+    preset: Preset,
+    accel: Option<&Acceleration>,
+) -> Result<Vec<String>, String> {
+    let total_ms = project.duration_ms();
+    if total_ms == 0 {
+        return Err("the timeline is empty, there is nothing to render".into());
+    }
+    let (width, height) = output_size(&project.settings, preset);
+    let fps = project.settings.fps.max(1);
+    let total = secs(total_ms);
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+        // Input 0 is the compositor. Every audio input below is shifted by one
+        // because of it.
+        "-f".into(),
+        "rawvideo".into(),
+        "-pix_fmt".into(),
+        "rgba".into(),
+        "-s".into(),
+        format!("{width}x{height}"),
+        "-r".into(),
+        fps.to_string(),
+        "-i".into(),
+        "pipe:0".into(),
+    ];
+
+    let items = collect_items(project);
+    let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
+    for item in &audio {
+        args.extend(["-ss".into(), secs(item.clip.in_ms)]);
+        args.extend(["-t".into(), secs(item.clip.duration_ms())]);
+        args.extend(["-i".into(), item.path.to_string()]);
+    }
+
+    let has_audio = !audio.is_empty();
     if has_audio {
-        args.extend([
-            "-c:a".into(),
-            "aac".into(),
-            "-b:a".into(),
-            "192k".into(),
-            "-ar".into(),
-            "48000".into(),
-        ]);
+        let mut chains = Vec::new();
+        let mut labels = Vec::new();
+        for (index, item) in audio.iter().enumerate() {
+            let input = index + 1;
+            chains.push(audio_chain(item, input));
+            labels.push(format!("[a{input}]"));
+        }
+        chains.push(format!(
+            "{}amix=inputs={}:normalize=0:dropout_transition=0[aout]",
+            labels.concat(),
+            labels.len()
+        ));
+        args.extend(["-filter_complex".into(), chains.join(";")]);
+    }
+
+    args.extend(["-map".into(), "0:v".into()]);
+    if has_audio {
+        args.extend(["-map".into(), "[aout]".into()]);
+    }
+    args.extend(video_codec_args(accel, width, height, fps));
+    if has_audio {
+        args.extend(audio_codec_args());
     }
     args.extend([
-        // The base already ends at the right time; this bounds the audio too.
         "-t".into(),
         total,
         "-movflags".into(),
         "+faststart".into(),
-        // The progress block is the only thing the app reads from stdout.
-        "-progress".into(),
-        "pipe:1".into(),
+        // No -progress here: the frame loop counts frames, so it knows exactly
+        // where the render is and does not need ffmpeg to guess. Asking for it
+        // anyway would mean draining a pipe nobody reads, and a full pipe stops
+        // ffmpeg dead.
         "-nostats".into(),
     ]);
     args.push(output.to_string());
@@ -678,6 +856,135 @@ mod tests {
         // A tiny frame still gets something usable, a huge one stays sane.
         assert_eq!(target_bitrate_kbps(64, 64, 24), 2_000);
         assert_eq!(target_bitrate_kbps(7680, 4320, 60), 80_000);
+    }
+
+    #[test]
+    fn a_decoder_hands_over_raw_frames_at_the_project_rate() {
+        let args = decoder_args(&Decode {
+            path: "/media/a1.mp4",
+            kind: AssetKind::Video,
+            in_ms: 1_000,
+            duration_ms: 3_000,
+            width: 1440,
+            height: 1080,
+            fps: 30,
+            hwaccel: None,
+        })
+        .join(" ");
+        assert!(
+            args.contains("-ss 1.000 -t 3.000 -i /media/a1.mp4"),
+            "{args}"
+        );
+        // The size comes from layout::fit_rect, and fps= is what keeps the
+        // frame count in step with the timeline.
+        assert!(args.contains("-vf scale=1440:1080,fps=30"), "{args}");
+        assert!(args.ends_with("-f rawvideo -pix_fmt rgba -"), "{args}");
+    }
+
+    #[test]
+    fn a_still_decoder_loops_instead_of_seeking() {
+        let args = decoder_args(&Decode {
+            path: "/m/a.png",
+            kind: AssetKind::Image,
+            in_ms: 0,
+            duration_ms: 2_000,
+            width: 800,
+            height: 600,
+            fps: 25,
+            hwaccel: None,
+        })
+        .join(" ");
+        assert!(args.contains("-loop 1 -framerate 25 -t 2.000"), "{args}");
+        assert!(!args.contains("-ss"), "{args}");
+        assert!(!args.contains("-hwaccel"), "a still has nothing to decode");
+    }
+
+    #[test]
+    fn a_decoder_uses_the_hardware_when_there_is_some() {
+        let args = decoder_args(&Decode {
+            path: "/m/a.mp4",
+            kind: AssetKind::Video,
+            in_ms: 0,
+            duration_ms: 1_000,
+            width: 640,
+            height: 480,
+            fps: 30,
+            hwaccel: Some("videotoolbox"),
+        })
+        .join(" ");
+        assert!(args.contains("-hwaccel videotoolbox -ss"), "{args}");
+    }
+
+    #[test]
+    fn the_encoder_takes_the_picture_from_the_pipe_and_the_sound_from_the_files() {
+        let args = encoder_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
+        let text = joined(&args);
+        assert!(
+            text.contains("-f rawvideo -pix_fmt rgba -s 1920x1080 -r 30 -i pipe:0"),
+            "{text}"
+        );
+        assert!(text.contains("-map 0:v"), "{text}");
+        assert!(text.contains("-map [aout]"), "{text}");
+        // The audio file is a real input after the pipe, so its index is 1.
+        assert!(text.contains("-i /media/a1.mp4"), "{text}");
+        assert!(filter_of(&args).contains("[1:a]"), "{}", filter_of(&args));
+        assert!(filter_of(&args).contains("adelay=2000:all=1"));
+        // No video filtering at all: the compositor already drew the frame.
+        assert!(
+            !filter_of(&args).contains("overlay"),
+            "{}",
+            filter_of(&args)
+        );
+        assert!(!filter_of(&args).contains("[vout]"));
+    }
+
+    #[test]
+    fn a_silent_project_encodes_video_only_from_the_pipe() {
+        let mut project = one_video_project();
+        project.assets[0].has_audio = false;
+        let args = encoder_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let text = joined(&args);
+        assert!(text.contains("-map 0:v"), "{text}");
+        assert!(!text.contains("[aout]"), "{text}");
+        assert!(!text.contains("-filter_complex"), "{text}");
+        assert!(!text.contains("-c:a"), "{text}");
+    }
+
+    #[test]
+    fn both_paths_encode_with_the_same_settings() {
+        // The route the picture takes must not change what it is encoded as.
+        let project = one_video_project();
+        let graph = joined(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
+        let piped = joined(&encoder_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
+        for setting in [
+            "-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -r 30",
+            "-c:a aac -b:a 192k -ar 48000",
+            "-t 5.000 -movflags +faststart",
+        ] {
+            assert!(graph.contains(setting), "filter graph missing {setting}");
+            assert!(piped.contains(setting), "piped encoder missing {setting}");
+        }
+    }
+
+    #[test]
+    fn the_piped_encoder_uses_the_hardware_encoder_too() {
+        let hardware = videotoolbox();
+        let args =
+            encoder_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        let text = joined(&args);
+        assert!(text.contains("-c:v h264_videotoolbox -b:v 7465k"), "{text}");
+        // The decode hint belongs on the decoders, not on a pipe of raw frames.
+        assert!(!text.contains("-hwaccel"), "{text}");
+    }
+
+    #[test]
+    fn an_empty_timeline_has_nothing_to_encode_either() {
+        let project = Project {
+            settings: settings(1920, 1080),
+            assets: vec![],
+            tracks: vec![],
+        };
+        assert!(encoder_args(&project, "/o.mp4", Preset::Fhd, None).is_err());
     }
 
     #[test]

@@ -9,6 +9,7 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 | [workspace-and-files.md](./workspace-and-files.md) | The workspace folder, what a project folder holds, and why media is never copied |
 | [timeline.md](./timeline.md) | Why the editing model lives in JavaScript |
 | [preview.md](./preview.md) | Stacked media elements, the clock, and what preview quality really changes |
+| [compositor.md](./compositor.md) | The one shader the preview frame and the render both draw with |
 | [render.md](./render.md) | The ffmpeg filter graph, line by line, and the render presets |
 | [acceleration.md](./acceleration.md) | GPU encoding: detection by trial, and the fallback |
 | [ipc.md](./ipc.md) | The command surface, the asset protocol, and the key flows |
@@ -16,5 +17,5 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 Three things are easy to break by accident and hard to notice:
 
 1. **Importing references media, it never copies it.** [workspace-and-files.md](./workspace-and-files.md)
-2. **The preview is not the render.** They are two independent implementations of the same timeline and they can disagree. [preview.md](./preview.md)
+2. **The preview has two modes and only one of them is the render.** The frame shown when the playhead stops comes from the same compositor the render uses; playback is still an approximation. [compositor.md](./compositor.md)
 3. **The filter graph fails on the user's machine or nowhere.** It is a string, so a mistake in it compiles and type checks. [render.md](./render.md)

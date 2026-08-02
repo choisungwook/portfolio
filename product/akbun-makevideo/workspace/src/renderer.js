@@ -26,6 +26,8 @@ const dom = {
   stageWrap: el('stage-wrap'),
   stage: el('stage'),
   stageInner: el('stage-inner'),
+  stageExact: el('stage-exact'),
+  stageMode: el('stage-mode'),
   stageHint: el('stage-hint'),
   btnPlay: el('btn-play'),
   clock: el('clock'),
@@ -310,6 +312,7 @@ function renderTimeline() {
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
   dom.btnAddVideo.disabled = L.tracksOf(state.project, 'video').length >= L.MAX_TRACKS_PER_KIND;
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
+  scheduleExactFrame();
 }
 
 function refresh() {
@@ -336,6 +339,53 @@ function followPlayhead(ms) {
   const left = dom.scroll.scrollLeft;
   const right = left + dom.scroll.clientWidth;
   if (x < left || x > right - 40) dom.scroll.scrollLeft = Math.max(0, x - dom.scroll.clientWidth * 0.3);
+}
+
+// --- the exact frame -------------------------------------------------------
+
+let exactTimer = null;
+let exactToken = 0;
+
+function setStageMode(mode) {
+  if (!dom.stageMode) return;
+  const known = mode === 'exact' || mode === 'live';
+  dom.stageMode.hidden = !known || L.projectDurationMs(state.project) <= 0;
+  dom.stageMode.textContent = mode === 'exact' ? 'exact frame' : 'live preview';
+  dom.stageMode.classList.toggle('exact', mode === 'exact');
+}
+
+/** Ask Rust for the frame the render would produce here. It costs an ffmpeg
+ *  call per visible clip, so it is only ever asked for when the playhead has
+ *  stopped, and a newer request cancels an older one by token. */
+async function requestExactFrame() {
+  if (!window.api.available) return;
+  if (preview.isPlaying() || preview.mode() !== 'timeline') return;
+  if (L.projectDurationMs(state.project) <= 0) return;
+  if (state.settings.compositor === 'ffmpeg') return;
+  const token = (exactToken += 1);
+  const box = dom.stageInner.getBoundingClientRect();
+  const maxWidth = Math.max(160, Math.round(box.width));
+  try {
+    const frame = await window.api.previewFrame(
+      state.project,
+      Math.round(preview.position()),
+      maxWidth
+    );
+    if (token !== exactToken || preview.isPlaying()) return;
+    setStageMode(preview.showExact(frame) ? 'exact' : 'live');
+  } catch (error) {
+    // No graphics device, no ffmpeg, or a source that will not decode. The
+    // stacked elements are still showing something, so this is not worth a
+    // dialog; the badge keeps saying "live".
+    setStageMode('live');
+  }
+}
+
+function scheduleExactFrame() {
+  if (!window.api.available) return;
+  window.clearTimeout(exactTimer);
+  if (preview.isPlaying() || preview.mode() !== 'timeline') return;
+  exactTimer = window.setTimeout(requestExactFrame, 180);
 }
 
 // --- selection and editing -------------------------------------------------
@@ -800,6 +850,20 @@ function accelerationNote() {
   return `No usable hardware encoder. ${reasons}`;
 }
 
+/** What is drawing, and what the choice costs. */
+function compositorNote() {
+  const found = state.boot && state.boot.compositor;
+  const device = found && typeof found === 'object' && 'Ok' in found ? found.Ok : null;
+  const failure = found && typeof found === 'object' && 'Err' in found ? found.Err : null;
+  if (state.settings.compositor === 'ffmpeg') {
+    return 'The filter graph draws the render and the preview separately, so they can differ. Faster, because frames never leave ffmpeg.';
+  }
+  if (device) {
+    return `Drawing with ${device}. The preview frame and the render come out of the same shader, at the cost of every frame crossing a pipe.`;
+  }
+  return `No graphics device, so the filter graph will draw instead${failure ? `: ${failure}` : '.'}`;
+}
+
 function fillAppSheet() {
   el('as-quality').value = state.settings.previewQuality;
   el('as-scrub-mute').checked = state.settings.previewMuteWhileScrubbing;
@@ -807,6 +871,8 @@ function fillAppSheet() {
   el('as-theme').value = state.settings.theme;
   el('as-workspace').value = state.settings.workspaceDir;
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
+  el('as-compositor').value = state.settings.compositor;
+  el('as-compositor-note').textContent = compositorNote();
   el('as-accel').value = state.settings.renderAcceleration;
   el('as-accel-note').textContent = accelerationNote();
   el('as-ffmpeg').value = state.settings.ffmpegDir;
@@ -865,6 +931,7 @@ const actions = {
         `ffmpeg: ${state.boot.ffmpeg || 'not found'}`,
         `ffprobe: ${state.boot.ffprobe || 'not found'}`,
         accelerationNote(),
+        compositorNote(),
       ].join('\n'),
       { title: 'About' }
     ),
@@ -877,6 +944,8 @@ function setPreviewSource(source) {
     button.classList.toggle('on', button.dataset.source === source);
   }
   if (source === 'asset') {
+    preview.clearExact();
+    setStageMode('');
     const asset = state.selectedAssetId && L.findAsset(state.project, state.selectedAssetId);
     preview.showAsset(asset || null);
     dom.stageHint.hidden = Boolean(asset);
@@ -1070,6 +1139,7 @@ function wireSheets() {
       previewMuteWhileScrubbing: el('as-scrub-mute').checked,
       snap: el('as-snap').checked,
       theme: el('as-theme').value,
+      compositor: el('as-compositor').value,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
@@ -1177,12 +1247,21 @@ async function boot() {
   preview = globalThis.previewLib.createPreview({
     stage: dom.stage,
     inner: dom.stageInner,
+    exactCanvas: dom.stageExact,
     wrap: dom.stageWrap,
     getProject: () => state.project,
     onTick: (ms, playing) => {
       updatePlayhead(ms);
       followPlayhead(ms);
       dom.btnPlay.textContent = playing ? '❚❚' : '▶';
+      if (playing) {
+        // Playing is the stacked elements; the composited frame cannot keep up
+        // and would only freeze one moment over moving video.
+        preview.clearExact();
+        setStageMode('live');
+      } else {
+        scheduleExactFrame();
+      }
     },
   });
 
