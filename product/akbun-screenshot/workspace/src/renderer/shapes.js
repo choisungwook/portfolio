@@ -50,6 +50,13 @@ function renumber(shapes) {
 // Box a shape occupies. Text is estimated from the glyph count rather than
 // measured, since this file has no canvas to ask.
 function bounds(s) {
+  // A pencil stroke is a list of points rather than two corners, so its box is
+  // the extent of the run.
+  if (s.points) {
+    const xs = s.points.map((p) => p.x);
+    const ys = s.points.map((p) => p.y);
+    return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
+  }
   if (s.type === 'text') {
     return { x1: s.x1, y1: s.y1, x2: s.x1 + s.text.length * s.size * 0.6, y2: s.y1 + s.size };
   }
@@ -102,6 +109,13 @@ function handleAt(s, x, y, radius) {
 }
 
 function moveShape(s, dx, dy) {
+  if (s.points) {
+    for (const p of s.points) {
+      p.x += dx;
+      p.y += dy;
+    }
+    return;
+  }
   s.x1 += dx;
   s.y1 += dy;
   // Text and badges are anchored by one point and have no second corner.
@@ -114,8 +128,19 @@ function moveShape(s, dx, dy) {
 // image. Stroke follows, otherwise a shrunk shape keeps a fat outline.
 function scaleShape(s, factor) {
   const before = bounds(s);
-  s.size = Math.max(8, s.size * factor);
+  if (s.size !== undefined) s.size = Math.max(8, s.size * factor);
   s.width = Math.max(1, s.width * factor);
+
+  // A pencil stroke has no corners to rewrite, so every point moves instead.
+  if (s.points) {
+    const cx = (before.x1 + before.x2) / 2;
+    const cy = (before.y1 + before.y2) / 2;
+    for (const p of s.points) {
+      p.x = cx + (p.x - cx) * factor;
+      p.y = cy + (p.y - cy) * factor;
+    }
+    return;
+  }
 
   // Text hangs from its top left corner, so a bigger glyph grows down and to
   // the right and the centre drifts. Re-anchoring by how far the box moved

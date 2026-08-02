@@ -74,6 +74,24 @@
     }
 
     button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* Square icon buttons. The label is a title tooltip rather than text, so
+       the whole tool row fits without wrapping on a narrow window. */
+    button.tool {
+      width: 32px;
+      height: 30px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button.tool svg { width: 18px; height: 18px; }
+    /* One colour for both stroked and filled parts, so .active inverts the
+       whole glyph by changing nothing but the button's own color. */
+    button.tool svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    button.tool svg .solid { fill: currentColor; stroke: none; }
+
     #save { background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; }
     /* Outlined in the same green rather than filled, so the pair reads as one
        action with two endings and Save stays the obvious one. */
@@ -129,15 +147,38 @@
   <header>
     <div class="left">
       <div class="group">
-        <button data-tool="select" class="active">Select</button>
-        <button data-tool="rect">Rect</button>
-        <button data-tool="ellipse">Circle</button>
-        <button data-tool="line">Line</button>
-        <button data-tool="arrow">Arrow</button>
-        <button data-tool="arrow2">Arrow &#8596;</button>
-        <button data-tool="text">Text</button>
-        <button data-tool="number">Number</button>
-        <button data-tool="crop">Crop</button>
+        <button class="tool active" data-tool="select" title="Select">
+          <svg viewBox="0 0 24 24"><path class="solid" d="M5 3l14 8-6 1.5L10 19z"/></svg>
+        </button>
+        <button class="tool" data-tool="rect" title="Rectangle">
+          <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/></svg>
+        </button>
+        <button class="tool" data-tool="ellipse" title="Circle">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+        </button>
+        <button class="tool" data-tool="line" title="Line">
+          <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg>
+        </button>
+        <!-- Stroked heads rather than filled triangles: a triangle big enough to
+             read at 18px does not fit inside the diagonal's corner. -->
+        <button class="tool" data-tool="arrow" title="Arrow">
+          <svg viewBox="0 0 24 24"><path d="M19 5L5 19"/><path d="M5 12v7h7"/></svg>
+        </button>
+        <button class="tool" data-tool="arrow2" title="Double arrow">
+          <svg viewBox="0 0 24 24"><path d="M19 5L5 19"/><path d="M5 12v7h7"/><path d="M19 12V5h-7"/></svg>
+        </button>
+        <button class="tool" data-tool="text" title="Text">
+          <svg viewBox="0 0 24 24"><path d="M5 19l7-14 7 14"/><path d="M8 14h8"/></svg>
+        </button>
+        <button class="tool" data-tool="number" title="Number badge">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 9.5L12.5 8v8"/></svg>
+        </button>
+        <button class="tool" data-tool="pencil" title="Pencil">
+          <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>
+        </button>
+        <button class="tool" data-tool="crop" title="Crop">
+          <svg viewBox="0 0 24 24"><path d="M6 2v16h16"/><path d="M2 6h16v16"/></svg>
+        </button>
       </div>
 
       <div class="group">
@@ -149,7 +190,7 @@
         <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Select: drag to move, dots or [ ] to resize, Delete or Backspace to remove &middot; Crop: drag to keep &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
+      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo</span>
     </div>
 
     <div class="group actions">
