@@ -259,7 +259,14 @@ function copyEditor(webContentsId, dataUrl) {
   const png = decodePng(dataUrl);
   if (!png) return false;
 
-  clipboard.writeImage(nativeImage.createFromBuffer(png));
+  // decodePng only proves the payload claims to be a png and carries bytes.
+  // Anything else decodes into an empty nativeImage, and writing that clears
+  // the clipboard, which is worse than doing nothing: what was on it belonged
+  // to whatever the user copied last. So the image is checked, not the string.
+  const image = nativeImage.createFromBuffer(png);
+  if (image.isEmpty()) return false;
+
+  clipboard.writeImage(image);
   closeEditor(webContentsId);
   return true;
 }

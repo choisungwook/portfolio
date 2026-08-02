@@ -55,6 +55,13 @@ class FakeWindow {
 // A failed save has to reach the user, so the test needs to see the dialog.
 const dialogMessages = [];
 
+// The first four bytes of every png. Enough for the fake nativeImage to tell a
+// real payload from the text the other tests use as stand-in bytes.
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+const pngDataUrl = (bytes) =>
+  `data:image/png;base64,${Buffer.concat([PNG_MAGIC, Buffer.from(bytes)]).toString('base64')}`;
+
 const fakeElectron = {
   BrowserWindow: FakeWindow,
   clipboard: { writeImage: (image) => clipboardWrites.push(image) },
@@ -66,6 +73,14 @@ const fakeElectron = {
   },
   nativeImage: {
     createFromPath: (file) => ({ file, getSize: () => ({ width: 800, height: 600 }) }),
+    // Electron hands back an empty image rather than throwing when the bytes
+    // are not an image it can decode, so the fake decides the same way the real
+    // one would: by looking at the bytes. Without that the empty case cannot be
+    // told apart from the real one and the clipboard guard proves nothing.
+    createFromBuffer: (buffer) => ({
+      buffer,
+      isEmpty: () => !buffer.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC),
+    }),
   },
   nativeTheme: { shouldUseDarkColors: false },
   screen: {
@@ -101,6 +116,7 @@ const {
   openEditor,
   editorImage,
   saveEditor,
+  copyEditor,
   closeEditor,
 } = require('../src/capture');
 
@@ -260,5 +276,51 @@ test('editor save reports a failed write and keeps the editor open', async () =>
     assert.match(dialogMessages[0].message, /save/i);
     // Still open, so the annotations can go somewhere else.
     assert.ok(editorImage(editorId), 'the editor is still alive');
+  });
+});
+
+// Copy is the editor's other ending: the clipboard instead of a file, and the
+// window closes either way. Nothing may reach the save directory.
+test('editor copy writes the clipboard, closes the editor and saves no file', async () => {
+  await withSaveDir(async (saveDir) => {
+    captureArea(() => saveDir);
+    openEditor(nextId - 1);
+    const editorId = nextId - 1;
+
+    clipboardWrites.length = 0;
+    assert.strictEqual(copyEditor(editorId, pngDataUrl('edited')), true);
+
+    assert.strictEqual(clipboardWrites.length, 1, 'one clipboard write');
+    assert.strictEqual(fs.readdirSync(saveDir).length, 0, 'no file written');
+    assert.strictEqual(editorImage(editorId), null, 'the editor closed');
+    assert.strictEqual(copyEditor(editorId, pngDataUrl('edited')), false, 'a second copy is a no-op');
+    assert.strictEqual(clipboardWrites.length, 1, 'and it wrote nothing more');
+  });
+});
+
+// Writing an empty image would clear the clipboard, so a payload that is not an
+// image has to stop before the write. Whatever the user copied last stays.
+test('editor copy leaves the clipboard alone on a payload that is not an image', async () => {
+  await withSaveDir(async (saveDir) => {
+    captureArea(() => saveDir);
+    openEditor(nextId - 1);
+    const editorId = nextId - 1;
+
+    clipboardWrites.length = 0;
+    const notImages = [
+      undefined,
+      '',
+      'not a data url',
+      'data:image/png;base64,',
+      // The prefix is right and the bytes are there, but they decode to nothing.
+      `data:image/png;base64,${Buffer.from('not an image').toString('base64')}`,
+    ];
+    for (const bad of notImages) {
+      assert.strictEqual(copyEditor(editorId, bad), false, `refused ${String(bad)}`);
+    }
+
+    assert.strictEqual(clipboardWrites.length, 0, 'the clipboard was never written');
+    // Refusing must not have closed the window, so a real copy still works.
+    assert.strictEqual(copyEditor(editorId, pngDataUrl('edited')), true);
   });
 });

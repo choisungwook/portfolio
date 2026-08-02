@@ -10,7 +10,7 @@ The preview already had Copy, but going through Edit lost it: the only ways out 
 
 Copy closes the window because that is the shape Save already set: the editor is a place the image passes through, and the two are both ways of being done with it. An editor left open after a copy is a window with nothing left to do, and it is not obvious that a second copy after further edits would replace the first.
 
-Copy reuses the same payload decoder both save paths use. A malformed one leaves the clipboard alone rather than clearing it, which matters more here than on disk, since what the clipboard held before was probably somebody else's.
+Copy reuses the same payload decoder both save paths use, and then checks the decoded image as well. The decoder only proves the payload claims to be a png and carries bytes; bytes that are not an image come back as an empty image, and writing an empty image clears the clipboard instead of leaving it alone. That matters more here than on disk, because what the clipboard held before was probably somebody else's.
 
 Cmd+S is checked above the guard that hands a keystroke to a focused toolbar box. That guard exists so Cmd+Z while correcting a font size undoes the digit and not the drawing behind it, but no box on this toolbar has its own use for Cmd+S. A save that depends on where the caret happens to be is worse than the one case the guard protects.
 

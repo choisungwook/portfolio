@@ -662,9 +662,12 @@ const SCALE_KEYS = { '[': 1 / 1.1, ']': 1.1 };
 
 window.addEventListener('keydown', (event) => {
   // Before the toolbar box guard below: Cmd+S means save wherever the caret is,
-  // and no box on this toolbar has its own use for it.
+  // and no box on this toolbar has its own use for it. A held key repeats, and
+  // each repeat would export the canvas again and post another save before the
+  // first one has closed the window, so only the first keydown counts.
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault();
+    if (event.repeat) return;
     window.api.saveEditor(exportPng());
     return;
   }
