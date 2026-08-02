@@ -12,6 +12,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
 - Render to mp4 at FHD or 4K with a progress bar and a cancel button
+- GPU rendering when the machine has it: the encode moves to Apple VideoToolbox (or NVENC), detected by actually trying it, with an automatic fall back to the CPU if it fails
 - Preview quality, defaulted to Half so a few tracks at once still play
 - Light and dark, following the system unless told otherwise
 - Self update from Settings → Check for Updates
@@ -25,6 +26,8 @@ brew install ffmpeg
 ```
 
 Everything else works without it. An app launched from Finder does not inherit a login shell, so `/opt/homebrew/bin` is not on its PATH; the app looks there directly, and Settings → Preview & Tools takes a folder if ffmpeg lives somewhere else.
+
+Homebrew's ffmpeg is built with VideoToolbox, so GPU encoding works out of the box on a Mac. Settings → Preview & Tools says which encoder was found, or why none was.
 
 ## Shortcuts
 

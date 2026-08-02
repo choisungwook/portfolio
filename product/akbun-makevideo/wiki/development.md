@@ -66,6 +66,8 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 
 **Capabilities fail at runtime, not at compile time.** A plugin command missing from `capabilities/default.json` works in every test and breaks on the user's machine. The generated `src-tauri/gen/schemas/desktop-schema.json` lists every valid identifier; it exists after any build and is worth grepping when adding one.
 
+**The hardware encoder path has never run where it was written.** VideoToolbox is macOS only; the dev container and the pull request runner are Linux. What has been checked there is the shape of it: that the detection narrows to the right candidate, that the trial encode rejects an encoder ffmpeg lists but cannot run (`h264_nvenc` with no libcuda), that a failed hardware attempt followed by the CPU command produces a correct file, and that both commands carry an identical filter graph. The first real `h264_videotoolbox` run happens on a Mac. If it misbehaves, the fallback means a slow render rather than a broken one — and `Settings → Render acceleration → CPU only` turns it off.
+
 **An app launched from Finder has a bare PATH.** It is `/usr/bin:/bin:/usr/sbin:/sbin` — no login shell, so no `/opt/homebrew/bin`. Looking up `ffmpeg` by name alone works under `npm start` and fails in the installed app, which is the worst shape a bug can take. `tools.rs` tries the absolute paths first and the bare name last.
 
 **The asset protocol scope is in memory.** It has to be re-granted on every run, which `open_project` does for the project's assets.

@@ -4,6 +4,7 @@
 //! asserted on a runner with no ffmpeg installed, because a graph that is one
 //! character wrong fails at render time on the user's machine and nowhere else.
 
+use crate::accel::Acceleration;
 use crate::{AssetKind, Clip, Project, ProjectSettings, TrackKind};
 
 /// What the Render menu offers. The number is the long edge, not the width, so
@@ -118,8 +119,30 @@ fn collect_items(project: &Project) -> Vec<Item<'_>> {
     items
 }
 
+/// What a hardware encoder should be asked for, in kbps.
+///
+/// x264 is given a quality target with `-crf`; a hardware encoder has no
+/// equivalent that is available everywhere, so it gets a bitrate. The figure is
+/// deliberately generous — around 0.12 bits per pixel per frame — because a
+/// media engine spends more bits than x264 for the same picture. That is the
+/// trade being made when this is switched on.
+pub fn target_bitrate_kbps(width: u32, height: u32, fps: u32) -> u32 {
+    let raw = f64::from(width) * f64::from(height) * f64::from(fps) * 0.12 / 1000.0;
+    (raw.round() as u32).clamp(2_000, 80_000)
+}
+
 /// The full argv after the program name.
-pub fn build_args(project: &Project, output: &str, preset: Preset) -> Result<Vec<String>, String> {
+///
+/// `accel` is the hardware path confirmed by `accel::candidates` plus a trial
+/// encode, or None for the CPU. Only the encoder and the decode hint change:
+/// the filter graph is identical either way, which is what makes falling back
+/// to the CPU after a failed hardware render a re-run rather than a rebuild.
+pub fn build_args(
+    project: &Project,
+    output: &str,
+    preset: Preset,
+    accel: Option<&Acceleration>,
+) -> Result<Vec<String>, String> {
     let total_ms = project.duration_ms();
     if total_ms == 0 {
         return Err("the timeline is empty, there is nothing to render".into());
@@ -145,11 +168,20 @@ pub fn build_args(project: &Project, output: &str, preset: Preset) -> Result<Vec
         let duration = secs(item.clip.duration_ms());
         if item.kind == AssetKind::Image {
             // A still has no timeline of its own, so the input options are what
-            // give it one.
+            // give it one. No -hwaccel: there is nothing to decode.
             args.extend(["-loop".into(), "1".into()]);
             args.extend(["-framerate".into(), fps.to_string()]);
             args.extend(["-t".into(), duration]);
         } else {
+            // Decode on the GPU where it is offered. No -hwaccel_output_format,
+            // so frames land back in system memory and the filter graph below
+            // is untouched. A codec the hardware cannot handle falls back to
+            // software on its own.
+            if item.kind == AssetKind::Video {
+                if let Some(name) = accel.and_then(|a| a.hwaccel.as_deref()) {
+                    args.extend(["-hwaccel".into(), name.to_string()]);
+                }
+            }
             // -ss ahead of -i seeks before decoding, which is the difference
             // between a render that skips to the in point and one that decodes
             // everything before it and throws the frames away.
@@ -233,18 +265,45 @@ pub fn build_args(project: &Project, output: &str, preset: Preset) -> Result<Vec
     if has_audio {
         args.extend(["-map".into(), "[aout]".into()]);
     }
-    args.extend([
-        "-c:v".into(),
-        "libx264".into(),
-        "-preset".into(),
-        "medium".into(),
-        "-crf".into(),
-        "20".into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        "-r".into(),
-        fps.to_string(),
-    ]);
+    match accel {
+        Some(hardware) => {
+            // -preset and -crf are libx264 options. A hardware encoder ignores
+            // them with a warning and then encodes at whatever its default
+            // happens to be, so the bitrate has to be asked for explicitly or
+            // the output quality is nobody's decision.
+            args.extend([
+                "-c:v".into(),
+                hardware.encoder.clone(),
+                "-b:v".into(),
+                format!("{}k", target_bitrate_kbps(width, height, fps)),
+            ]);
+            if hardware.encoder.contains("videotoolbox") {
+                // Lets VideoToolbox fall back to its own software encoder when
+                // the media engine is busy, instead of failing the render.
+                args.extend(["-allow_sw".into(), "1".into()]);
+            }
+            args.extend([
+                "-pix_fmt".into(),
+                "yuv420p".into(),
+                "-r".into(),
+                fps.to_string(),
+            ]);
+        }
+        None => {
+            args.extend([
+                "-c:v".into(),
+                "libx264".into(),
+                "-preset".into(),
+                "medium".into(),
+                "-crf".into(),
+                "20".into(),
+                "-pix_fmt".into(),
+                "yuv420p".into(),
+                "-r".into(),
+                fps.to_string(),
+            ]);
+        }
+    }
     if has_audio {
         args.extend([
             "-c:a".into(),
@@ -384,12 +443,12 @@ mod tests {
             assets: vec![],
             tracks: vec![track("V1", TrackKind::Video, vec![])],
         };
-        assert!(build_args(&project, "/out.mp4", Preset::Fhd).is_err());
+        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None).is_err());
     }
 
     #[test]
     fn a_clip_seeks_its_in_point_and_takes_its_own_length() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let text = joined(&args);
         assert!(
             text.contains("-ss 1.000 -t 3.000 -i /media/a1.mp4"),
@@ -400,7 +459,7 @@ mod tests {
 
     #[test]
     fn the_clip_lands_at_its_timeline_position() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
         assert!(filter.contains("tpad=start_duration=2.000"), "{filter}");
         assert!(
@@ -411,7 +470,7 @@ mod tests {
 
     #[test]
     fn the_base_runs_for_the_whole_timeline() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         assert!(filter_of(&args).contains("color=c=black:s=1920x1080:r=30:d=5.000"));
         // The output is bounded too, so stray audio cannot run past the video.
         assert!(joined(&args).contains("-t 5.000 -movflags"));
@@ -421,14 +480,14 @@ mod tests {
     fn a_silent_asset_produces_no_audio_output() {
         let mut project = one_video_project();
         project.assets[0].has_audio = false;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         assert!(!joined(&args).contains("[aout]"));
         assert!(!joined(&args).contains("-c:a"));
     }
 
     #[test]
     fn audio_is_delayed_rather_than_trimmed_into_place() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
         assert!(filter.contains("adelay=2000:all=1"), "{filter}");
         assert!(filter.contains("amix=inputs=1:normalize=0"), "{filter}");
@@ -440,7 +499,7 @@ mod tests {
         let mut project = one_video_project();
         project.assets[0].kind = AssetKind::Image;
         project.assets[0].has_audio = false;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         let text = joined(&args);
         assert!(text.contains("-loop 1 -framerate 30 -t 3.000 -i"), "{text}");
         assert!(!text.contains("-ss"), "{text}");
@@ -459,7 +518,7 @@ mod tests {
                 track("V2", TrackKind::Video, vec![clip("c2", "a2", 0, 0, 4_000)]),
             ],
         };
-        let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd).unwrap());
+        let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap());
         assert!(filter.contains("[base][v0]overlay"), "{filter}");
         assert!(filter.contains("[ov0][v1]overlay"), "{filter}");
         assert!(filter.contains("[ov1]format=yuv420p[vout]"), "{filter}");
@@ -469,14 +528,14 @@ mod tests {
     fn a_hidden_track_drops_out_of_the_render_entirely() {
         let mut project = one_video_project();
         project.tracks[0].hidden = true;
-        assert!(build_args(&project, "/out.mp4", Preset::Fhd).is_err());
+        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None).is_err());
     }
 
     #[test]
     fn muting_a_video_track_keeps_its_picture() {
         let mut project = one_video_project();
         project.tracks[0].muted = true;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         assert!(joined(&args).contains("-map [vout]"));
         assert!(!joined(&args).contains("[aout]"));
     }
@@ -492,7 +551,7 @@ mod tests {
                 vec![clip("c1", "a1", 500, 0, 3_000)],
             )],
         };
-        let args = build_args(&project, "/out.mp4", Preset::Fhd).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
         assert!(!filter.contains("overlay"), "{filter}");
         assert!(filter.contains("[base]format=yuv420p[vout]"), "{filter}");
@@ -503,12 +562,12 @@ mod tests {
     fn opacity_only_shows_up_when_it_is_not_full() {
         let mut project = one_video_project();
         assert!(
-            !filter_of(&build_args(&project, "/o.mp4", Preset::Fhd).unwrap())
+            !filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap())
                 .contains("colorchannelmixer")
         );
         project.tracks[0].clips[0].opacity = 0.5;
         assert!(
-            filter_of(&build_args(&project, "/o.mp4", Preset::Fhd).unwrap())
+            filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap())
                 .contains("colorchannelmixer=aa=0.500")
         );
     }
@@ -544,6 +603,81 @@ mod tests {
         let (width, height) = output_size(&settings(1920, 1079), Preset::Fhd);
         assert_eq!(width % 2, 0);
         assert_eq!(height % 2, 0);
+    }
+
+    fn videotoolbox() -> Acceleration {
+        Acceleration {
+            encoder: "h264_videotoolbox".into(),
+            hwaccel: Some("videotoolbox".into()),
+            label: "Apple VideoToolbox".into(),
+        }
+    }
+
+    #[test]
+    fn hardware_swaps_the_encoder_for_a_bitrate_target() {
+        let hardware = videotoolbox();
+        let args =
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        let text = joined(&args);
+        assert!(text.contains("-c:v h264_videotoolbox"), "{text}");
+        // -crf and -preset are libx264 options and would be silently ignored.
+        assert!(!text.contains("-crf"), "{text}");
+        assert!(!text.contains("-preset medium"), "{text}");
+        assert!(text.contains("-b:v 7465k"), "{text}");
+        assert!(text.contains("-allow_sw 1"), "{text}");
+    }
+
+    #[test]
+    fn hardware_decode_is_asked_for_per_video_input() {
+        let hardware = videotoolbox();
+        let args =
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        assert!(joined(&args).contains("-hwaccel videotoolbox -ss 1.000"));
+    }
+
+    #[test]
+    fn a_still_is_not_given_a_decoder_it_does_not_use() {
+        let mut project = one_video_project();
+        project.assets[0].kind = AssetKind::Image;
+        project.assets[0].has_audio = false;
+        let hardware = videotoolbox();
+        let args = build_args(&project, "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        assert!(!joined(&args).contains("-hwaccel"), "{}", joined(&args));
+    }
+
+    #[test]
+    fn an_encoder_without_a_decoder_still_encodes_on_the_gpu() {
+        let hardware = Acceleration {
+            encoder: "h264_nvenc".into(),
+            hwaccel: None,
+            label: "NVIDIA NVENC".into(),
+        };
+        let args =
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        let text = joined(&args);
+        assert!(text.contains("-c:v h264_nvenc"), "{text}");
+        assert!(!text.contains("-hwaccel"), "{text}");
+        // allow_sw is a VideoToolbox option and means nothing to nvenc.
+        assert!(!text.contains("-allow_sw"), "{text}");
+    }
+
+    #[test]
+    fn the_graph_is_the_same_on_the_gpu_as_on_the_cpu() {
+        // This is what lets a failed hardware render be retried on the CPU by
+        // re-running rather than by rebuilding the project.
+        let hardware = videotoolbox();
+        let cpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None).unwrap();
+        let gpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        assert_eq!(filter_of(&cpu), filter_of(&gpu));
+    }
+
+    #[test]
+    fn the_bitrate_follows_the_frame_and_stays_in_range() {
+        assert_eq!(target_bitrate_kbps(1920, 1080, 30), 7465);
+        assert_eq!(target_bitrate_kbps(3840, 2160, 30), 29860);
+        // A tiny frame still gets something usable, a huge one stays sane.
+        assert_eq!(target_bitrate_kbps(64, 64, 24), 2_000);
+        assert_eq!(target_bitrate_kbps(7680, 4320, 60), 80_000);
     }
 
     #[test]

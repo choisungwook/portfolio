@@ -6,6 +6,7 @@
 //! shape read back through serde, so the render and the project file agree with
 //! the editor without either side reimplementing the other's arithmetic.
 
+pub mod accel;
 pub mod ffmpeg;
 pub mod probe;
 pub mod tools;

@@ -5,6 +5,7 @@
 //! capabilities/default.json short, because the webview never needs a file
 //! system scope of its own.
 
+use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, Asset, AssetKind, Project};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read};
@@ -35,6 +36,10 @@ pub struct Settings {
     pub default_fps: u32,
     /// Folder holding ffmpeg and ffprobe. Empty means look in the usual places.
     pub ffmpeg_dir: String,
+    /// "auto" to encode on the GPU when this machine has one that works, "cpu"
+    /// to always use libx264. There is no "force GPU": if the hardware path
+    /// fails there is nothing to do but use the CPU, so auto already covers it.
+    pub render_acceleration: String,
 }
 
 impl Default for Settings {
@@ -48,6 +53,7 @@ impl Default for Settings {
             default_height: 1080,
             default_fps: 30,
             ffmpeg_dir: String::new(),
+            render_acceleration: "auto".into(),
         }
     }
 }
@@ -58,6 +64,30 @@ pub struct AppState {
     /// thread that reads its progress.
     pub render: Arc<Mutex<Option<Child>>>,
     pub cancelled: Arc<AtomicBool>,
+    /// Detecting the hardware encoder costs a few hundred milliseconds of
+    /// subprocesses, and the answer cannot change while the app is running.
+    /// None means it has not been asked yet.
+    pub accel: Mutex<Option<AccelProbe>>,
+}
+
+/// One candidate and what happened when it was actually tried. Kept so Settings
+/// can say why there is no hardware encoder instead of just saying there is
+/// none.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriedCandidate {
+    pub label: String,
+    pub encoder: String,
+    pub works: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccelProbe {
+    /// The first candidate whose trial encode succeeded.
+    pub available: Option<Acceleration>,
+    pub tried: Vec<TriedCandidate>,
 }
 
 #[derive(Serialize)]
@@ -70,6 +100,7 @@ pub struct Bootstrap {
     /// banner rather than a failure at render time.
     pub ffmpeg: Option<String>,
     pub ffprobe: Option<String>,
+    pub acceleration: AccelProbe,
 }
 
 pub fn allow_asset_file(app: &AppHandle, path: &str) {
@@ -96,14 +127,100 @@ fn find_tool(name: &str, configured: &str) -> Option<String> {
         .find(|candidate| !candidate.contains('/') || Path::new(candidate).is_file())
 }
 
+fn run_text(program: &str, args: Vec<String>) -> String {
+    Command::new(program)
+        .args(args)
+        .output()
+        .map(|out| {
+            let mut text = String::from_utf8_lossy(&out.stdout).to_string();
+            text.push_str(&String::from_utf8_lossy(&out.stderr));
+            text
+        })
+        .unwrap_or_default()
+}
+
+/// Which hardware encoder this machine can really use.
+///
+/// `ffmpeg -encoders` only says what ffmpeg was built with — a Homebrew build
+/// lists h264_nvenc on a Mac that has never seen an NVIDIA card. So the listing
+/// picks the candidates and a one frame encode decides, which costs about 50 ms
+/// each and is the whole difference between knowing and guessing.
+fn detect_acceleration(program: &str) -> AccelProbe {
+    let encoders = accel::parse_encoders(&run_text(program, accel::encoders_args()));
+    let hwaccels = accel::parse_hwaccels(&run_text(program, accel::hwaccels_args()));
+
+    let mut tried = Vec::new();
+    let mut available = None;
+    for candidate in accel::candidates(&encoders, &hwaccels) {
+        let output = Command::new(program)
+            .args(accel::trial_args(&candidate.encoder))
+            .output();
+        let (works, note) = match output {
+            Ok(out) if out.status.success() => (true, String::new()),
+            Ok(out) => (
+                false,
+                String::from_utf8_lossy(&out.stderr)
+                    .lines()
+                    .next()
+                    .unwrap_or("the trial encode failed")
+                    .to_string(),
+            ),
+            Err(error) => (false, error.to_string()),
+        };
+        tried.push(TriedCandidate {
+            label: candidate.label.clone(),
+            encoder: candidate.encoder.clone(),
+            works,
+            note,
+        });
+        if works && available.is_none() {
+            available = Some(candidate);
+        }
+    }
+    AccelProbe { available, tried }
+}
+
+/// Cached for the life of the app: the answer costs subprocesses and cannot
+/// change while it is running.
+fn acceleration(state: &State<AppState>, program: Option<&String>) -> AccelProbe {
+    if let Some(cached) = state.accel.lock().unwrap().as_ref() {
+        return cached.clone();
+    }
+    let probe = match program {
+        Some(program) => detect_acceleration(program),
+        None => AccelProbe {
+            available: None,
+            tried: Vec::new(),
+        },
+    };
+    // Nothing was detected because ffmpeg is missing, so do not cache it: the
+    // user may point Settings at it and expect the next render to pick it up.
+    if program.is_some() {
+        *state.accel.lock().unwrap() = Some(probe.clone());
+    }
+    probe
+}
+
+/// What this render should use, honouring the setting.
+fn chosen_acceleration(state: &State<AppState>) -> Option<Acceleration> {
+    let settings = state.settings.lock().unwrap().clone();
+    if settings.render_acceleration == "cpu" {
+        return None;
+    }
+    let program = find_tool("ffmpeg", &settings.ffmpeg_dir);
+    acceleration(state, program.as_ref()).available
+}
+
 #[tauri::command]
 pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     let settings = state.settings.lock().unwrap().clone();
+    let ffmpeg = find_tool("ffmpeg", &settings.ffmpeg_dir);
     Bootstrap {
         version: app.package_info().version.to_string(),
         data_dir: crate::store::data_dir(&app),
-        ffmpeg: find_tool("ffmpeg", &settings.ffmpeg_dir),
+        acceleration: acceleration(&state, ffmpeg.as_ref()),
         ffprobe: find_tool("ffprobe", &settings.ffmpeg_dir),
+        ffmpeg,
         settings,
     }
 }
@@ -116,7 +233,15 @@ pub fn save_settings(
 ) -> Result<Bootstrap, String> {
     apply_theme(&app, &settings.theme);
     crate::store::save_settings(&app, &settings)?;
-    *state.settings.lock().unwrap() = settings;
+    {
+        let mut current = state.settings.lock().unwrap();
+        // Pointing at a different ffmpeg means a different set of encoders, so
+        // the cached answer is about the wrong binary.
+        if current.ffmpeg_dir != settings.ffmpeg_dir {
+            *state.accel.lock().unwrap() = None;
+        }
+        *current = settings;
+    }
     Ok(bootstrap(app, state))
 }
 
@@ -201,6 +326,16 @@ struct RenderDone {
     cancelled: bool,
     path: String,
     message: String,
+    /// The hardware attempt failed and the CPU finished the job.
+    fell_back: bool,
+    /// What did the encoding, empty when it was the CPU.
+    accelerator: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenderFallback {
+    from: String,
 }
 
 /// ffmpeg's own error text, trimmed to something a dialog can hold.
@@ -212,61 +347,55 @@ fn tail(text: &str) -> String {
     }
 }
 
-/// Starts ffmpeg and returns as soon as it is running. Progress arrives as
-/// `render:progress` events and the outcome as one `render:done`.
-#[tauri::command]
-pub fn start_render(
-    app: AppHandle,
-    state: State<AppState>,
-    path: String,
-    project: Project,
-    preset: String,
-) -> Result<(), String> {
-    if state.render.lock().unwrap().is_some() {
-        return Err("a render is already running".into());
-    }
-    let preset = ffmpeg::Preset::parse(&preset)?;
-    let args = ffmpeg::build_args(&project, &path, preset)?;
-    let total_ms = project.duration_ms();
-    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let program = find_tool("ffmpeg", &configured).ok_or_else(|| {
-        "ffmpeg was not found. Install it with `brew install ffmpeg`, or point Settings at the \
-         folder that holds it."
-            .to_string()
-    })?;
+struct Outcome {
+    ok: bool,
+    cancelled: bool,
+    message: String,
+}
 
-    let mut child = Command::new(&program)
-        .args(&args)
+/// Runs ffmpeg to completion, emitting progress as it goes. Blocks, so it is
+/// only ever called from the render thread.
+fn run_ffmpeg(
+    app: &AppHandle,
+    shared: &Arc<Mutex<Option<Child>>>,
+    cancelled: &Arc<AtomicBool>,
+    program: &str,
+    args: &[String],
+    total_ms: u64,
+) -> Outcome {
+    let spawned = Command::new(program)
+        .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("cannot start {program}: {error}"))?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("ffmpeg produced no progress pipe")?;
-    let mut stderr = child.stderr.take().ok_or("ffmpeg produced no error pipe")?;
-
-    state.cancelled.store(false, Ordering::SeqCst);
-    *state.render.lock().unwrap() = Some(child);
+        .spawn();
+    let mut child = match spawned {
+        Ok(child) => child,
+        Err(error) => {
+            return Outcome {
+                ok: false,
+                cancelled: false,
+                message: format!("cannot start {program}: {error}"),
+            }
+        }
+    };
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    *shared.lock().unwrap() = Some(child);
 
     // stderr has to be drained even when nobody reads it, or a chatty failure
     // fills the pipe and ffmpeg blocks on a write that never completes.
     let errors = Arc::new(Mutex::new(String::new()));
-    {
+    let drain = stderr.map(|mut stderr| {
         let errors = Arc::clone(&errors);
         std::thread::spawn(move || {
             let mut text = String::new();
             let _ = stderr.read_to_string(&mut text);
             *errors.lock().unwrap() = text;
-        });
-    }
+        })
+    });
 
-    let shared = Arc::clone(&state.render);
-    let cancelled = Arc::clone(&state.cancelled);
-    std::thread::spawn(move || {
+    if let Some(stdout) = stdout {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if let Some(ffmpeg::Progress::Position(position_ms)) =
                 ffmpeg::parse_progress_line(&line)
@@ -280,33 +409,110 @@ pub fn start_render(
                 );
             }
         }
-        // The pipe closed, so ffmpeg has either finished or been killed.
-        let status = shared
-            .lock()
-            .unwrap()
-            .take()
-            .and_then(|mut child| child.wait().ok());
-        let was_cancelled = cancelled.swap(false, Ordering::SeqCst);
-        let ok = !was_cancelled && status.map(|status| status.success()).unwrap_or(false);
-        let message = if ok {
-            String::new()
-        } else if was_cancelled {
-            "Render cancelled.".into()
+    }
+    // The pipe closed, so ffmpeg has either finished or been killed.
+    let status = shared
+        .lock()
+        .unwrap()
+        .take()
+        .and_then(|mut child| child.wait().ok());
+    if let Some(handle) = drain {
+        let _ = handle.join();
+    }
+
+    let was_cancelled = cancelled.load(Ordering::SeqCst);
+    let ok = !was_cancelled && status.map(|status| status.success()).unwrap_or(false);
+    let message = if ok {
+        String::new()
+    } else if was_cancelled {
+        "Render cancelled.".into()
+    } else {
+        let text = errors.lock().unwrap().clone();
+        if text.trim().is_empty() {
+            "ffmpeg stopped without writing the file.".into()
         } else {
-            let text = errors.lock().unwrap().clone();
-            if text.trim().is_empty() {
-                "ffmpeg stopped without writing the file.".into()
+            tail(&text)
+        }
+    };
+    Outcome {
+        ok,
+        cancelled: was_cancelled,
+        message,
+    }
+}
+
+/// Starts ffmpeg and returns as soon as it is running. Progress arrives as
+/// `render:progress` events and the outcome as one `render:done`.
+///
+/// When the hardware path is used it may still fail on this particular file —
+/// a resolution the media engine will not take, a busy encoder — so a hardware
+/// failure is retried once on the CPU rather than reported. Both argument lists
+/// are built up front so a bad project fails here, synchronously, instead of
+/// halfway through a render.
+#[tauri::command]
+pub fn start_render(
+    app: AppHandle,
+    state: State<AppState>,
+    path: String,
+    project: Project,
+    preset: String,
+) -> Result<(), String> {
+    if state.render.lock().unwrap().is_some() {
+        return Err("a render is already running".into());
+    }
+    let preset = ffmpeg::Preset::parse(&preset)?;
+    let total_ms = project.duration_ms();
+    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let program = find_tool("ffmpeg", &configured).ok_or_else(|| {
+        "ffmpeg was not found. Install it with `brew install ffmpeg`, or point Settings at the \
+         folder that holds it."
+            .to_string()
+    })?;
+
+    let chosen = chosen_acceleration(&state);
+    let hardware_args = match chosen.as_ref() {
+        Some(hardware) => Some(ffmpeg::build_args(&project, &path, preset, Some(hardware))?),
+        None => None,
+    };
+    let cpu_args = ffmpeg::build_args(&project, &path, preset, None)?;
+    let label = chosen.map(|hardware| hardware.label).unwrap_or_default();
+
+    state.cancelled.store(false, Ordering::SeqCst);
+    let shared = Arc::clone(&state.render);
+    let cancelled = Arc::clone(&state.cancelled);
+
+    std::thread::spawn(move || {
+        let mut fell_back = false;
+        let mut outcome = None;
+
+        if let Some(args) = hardware_args {
+            let attempt = run_ffmpeg(&app, &shared, &cancelled, &program, &args, total_ms);
+            if attempt.ok || attempt.cancelled {
+                outcome = Some(attempt);
             } else {
-                tail(&text)
+                fell_back = true;
+                let _ = app.emit(
+                    "render:fallback",
+                    RenderFallback {
+                        from: label.clone(),
+                    },
+                );
             }
-        };
+        }
+        let outcome = outcome.unwrap_or_else(|| {
+            run_ffmpeg(&app, &shared, &cancelled, &program, &cpu_args, total_ms)
+        });
+
+        cancelled.store(false, Ordering::SeqCst);
         let _ = app.emit(
             "render:done",
             RenderDone {
-                ok,
-                cancelled: was_cancelled,
+                ok: outcome.ok,
+                cancelled: outcome.cancelled,
                 path,
-                message,
+                message: outcome.message,
+                fell_back,
+                accelerator: if fell_back { String::new() } else { label },
             },
         );
     });

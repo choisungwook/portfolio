@@ -33,6 +33,7 @@ pub fn run() {
                 settings: Mutex::new(settings),
                 render: Arc::new(Mutex::new(None)),
                 cancelled: Arc::new(AtomicBool::new(false)),
+                accel: Mutex::new(None),
             });
             Ok(())
         })

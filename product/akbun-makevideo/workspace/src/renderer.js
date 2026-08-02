@@ -562,7 +562,13 @@ async function startRender(preset) {
 
   state.rendering = true;
   preview.pause();
-  dom.renderTitle.textContent = `Rendering ${preset.toUpperCase()}`;
+  const hardware =
+    state.settings.renderAcceleration !== 'cpu' &&
+    state.boot.acceleration &&
+    state.boot.acceleration.available;
+  dom.renderTitle.textContent = hardware
+    ? `Rendering ${preset.toUpperCase()} on ${hardware.label}`
+    : `Rendering ${preset.toUpperCase()} on the CPU`;
   dom.renderStatus.textContent = 'Starting ffmpeg…';
   dom.renderBar.style.width = '0%';
   dom.renderCancel.hidden = false;
@@ -584,6 +590,16 @@ function onRenderProgress(payload) {
   dom.renderStatus.textContent = `${L.formatTime(payload.positionMs)} of ${L.formatTime(payload.totalMs)} — ${Math.round(percent)}%`;
 }
 
+/** The hardware encoder failed on this particular file, so the CPU is redoing
+ *  it from the start. Saying so beats a progress bar that jumps back to zero
+ *  for no visible reason. */
+function onRenderFallback(payload) {
+  if (!state.rendering) return;
+  dom.renderTitle.textContent = 'Rendering on the CPU';
+  dom.renderStatus.textContent = `${payload.from} could not encode this one. Starting again with libx264…`;
+  dom.renderBar.style.width = '0%';
+}
+
 function onRenderDone(payload) {
   state.rendering = false;
   dom.renderCancel.hidden = true;
@@ -591,7 +607,12 @@ function onRenderDone(payload) {
   if (payload.ok) {
     dom.renderBar.style.width = '100%';
     dom.renderTitle.textContent = 'Render finished';
-    dom.renderStatus.textContent = payload.path;
+    const how = payload.fellBack
+      ? ' (the CPU finished it after the hardware encoder failed)'
+      : payload.accelerator
+        ? ` (${payload.accelerator})`
+        : '';
+    dom.renderStatus.textContent = `${payload.path}${how}`;
   } else {
     dom.renderTitle.textContent = payload.cancelled ? 'Render cancelled' : 'Render failed';
     dom.renderStatus.textContent = payload.message || '';
@@ -695,11 +716,35 @@ function fillProjectSheet() {
   preset.value = [...preset.options].some((option) => option.value === key) ? key : 'custom';
 }
 
+/** What the machine was found to have, in a sentence. "No hardware encoder"
+ *  on its own is the kind of answer nobody can act on, so the reason each
+ *  candidate was rejected comes with it. */
+function accelerationNote() {
+  const probe = (state.boot && state.boot.acceleration) || { available: null, tried: [] };
+  if (probe.available) {
+    const decode = probe.available.hwaccel ? `, decoding with ${probe.available.hwaccel}` : '';
+    return `Encoding on ${probe.available.label} (${probe.available.encoder})${decode}.`;
+  }
+  if (!state.boot || !state.boot.ffmpeg) {
+    return 'ffmpeg was not found, so nothing could be tested.';
+  }
+  if (!probe.tried.length) {
+    return 'This ffmpeg build has no hardware encoder this app can use. Rendering on the CPU.';
+  }
+  const reasons = probe.tried
+    .filter((item) => !item.works)
+    .map((item) => `${item.label} — ${item.note}`)
+    .join(' · ');
+  return `No usable hardware encoder. ${reasons}`;
+}
+
 function fillAppSheet() {
   el('as-quality').value = state.settings.previewQuality;
   el('as-scrub-mute').checked = state.settings.previewMuteWhileScrubbing;
   el('as-snap').checked = state.settings.snap;
   el('as-theme').value = state.settings.theme;
+  el('as-accel').value = state.settings.renderAcceleration;
+  el('as-accel-note').textContent = accelerationNote();
   el('as-ffmpeg').value = state.settings.ffmpegDir;
   el('as-tools').textContent = state.boot.ffmpeg
     ? `Found ffmpeg at ${state.boot.ffmpeg}`
@@ -755,6 +800,7 @@ const actions = {
         `settings: ${state.boot.dataDir}`,
         `ffmpeg: ${state.boot.ffmpeg || 'not found'}`,
         `ffprobe: ${state.boot.ffprobe || 'not found'}`,
+        accelerationNote(),
       ].join('\n'),
       { title: 'About' }
     ),
@@ -960,6 +1006,7 @@ function wireSheets() {
       previewMuteWhileScrubbing: el('as-scrub-mute').checked,
       snap: el('as-snap').checked,
       theme: el('as-theme').value,
+      renderAcceleration: el('as-accel').value,
       ffmpegDir: el('as-ffmpeg').value.trim(),
     });
     closeSheet('app-settings');
@@ -1075,6 +1122,7 @@ async function boot() {
 
   window.api.onRenderProgress(onRenderProgress);
   window.api.onRenderDone(onRenderDone);
+  window.api.onRenderFallback(onRenderFallback);
   window.api.onFileDrop(handleOsDrop);
   window.api.onCloseRequested(async (event) => {
     if (state.dirty) {

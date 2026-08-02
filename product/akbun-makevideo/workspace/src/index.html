@@ -216,6 +216,13 @@
           <option value="dark">Dark</option>
         </select>
       </label>
+      <label class="row">Render acceleration
+        <select id="as-accel">
+          <option value="auto">Auto — GPU when available</option>
+          <option value="cpu">CPU only (libx264)</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="as-accel-note"></p>
       <label class="row">ffmpeg folder
         <input type="text" id="as-ffmpeg" placeholder="empty = look in the usual places" />
       </label>
