@@ -1,0 +1,18 @@
+[package]
+name = "makevideo-render"
+version = "0.1.0"
+description = "The project model plus the ffmpeg command the render runs"
+edition = "2021"
+license = "MIT"
+
+# Deliberately depends on neither tauri nor anything that needs a webview.
+# That is what lets the pull request job test this on Linux in seconds without
+# installing GTK and WebKit development packages. It also shells out to nothing:
+# building the argument list is pure, so the graph can be asserted on a runner
+# that has no ffmpeg installed.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
