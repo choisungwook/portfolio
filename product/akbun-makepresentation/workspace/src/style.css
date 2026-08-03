@@ -174,7 +174,8 @@ main {
 
    The subtracted 176px is everything the slide does not get: the toolbar,
    the status bar, the stage padding, and breathing room around the slide.
-   Change either bar's height and this changes with it. */
+   It is a hand-measured constant, so changing either bar's height means
+   changing this number too. */
 #stage-inner {
   position: relative;
   margin: auto;

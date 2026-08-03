@@ -413,8 +413,10 @@ canvas.addEventListener('pointerup', () => {
 // --- text editing -----------------------------------------------------------------
 
 // The overlay has to look like the glyphs it hides, or every text box jumps
-// the moment editing starts or ends.
+// the moment editing starts or ends. A missing shape means the box being
+// edited is already gone, the same case commitTextEdit guards against.
 function styleTextEditor(shape) {
+  if (!shape) return;
   const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
   const lines = (shape.text || '').split('\n').length;
   textEditor.style.left = `${shape.x * scale}px`;
@@ -462,16 +464,22 @@ function commitTextEdit() {
     return;
   }
 
+  // Both answers are needed before the shape is touched. Asking afterwards
+  // compares the new text with itself, which is never a change, and then an
+  // edit reaches neither the undo history nor the dirty marker.
   const text = textEditor.value.replace(/\s+$/, '');
-  if (text === '') {
+  const removed = text === '';
+  const changed = !removed && text !== shape.text;
+
+  if (removed) {
     slide().shapes.splice(index, 1);
     state.selected = -1;
-  } else if (text !== shape.text) {
+  } else if (changed) {
     shape.text = text;
     const lines = text.split('\n').length;
     shape.h = Math.max(shape.h, lines * shape.fontSize * 1.35);
   }
-  if (text !== shape.text || text === '') markDirty();
+  if (removed || changed) markDirty();
   renderAll();
 }
 
