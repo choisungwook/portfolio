@@ -17,6 +17,7 @@
 
 - akbun-screenshot, akbun-k8supgradeview, akbun-gitdesktop, akbun-shadowing-player: `workspace/package.json`의 `version`
 - akbun-mactaskbar: `workspace/VERSION`
+- akbun-agent-k8s: `workspace/pyproject.toml`의 `version`
 
 버전을 안 올리면 그 PR의 변경은 사용자에게 도달하지 않는다. release workflow가 두 job으로 갈라져 있기 때문이다.
 

@@ -1,0 +1,27 @@
+[project]
+name = "akbun-agent-k8s"
+version = "0.1.0"
+description = "Agent CLI that learns cross-service relationships from MSA source code and helps debug failures"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "claude-agent-sdk>=0.2,<0.3",
+]
+
+[project.scripts]
+akbun-agent-k8s = "akbun_agent_k8s.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/akbun_agent_k8s"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

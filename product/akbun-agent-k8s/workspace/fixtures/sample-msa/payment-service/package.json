@@ -1,0 +1,9 @@
+{
+  "name": "payment-service",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.19.0",
+    "redis": "^4.6.0"
+  }
+}
