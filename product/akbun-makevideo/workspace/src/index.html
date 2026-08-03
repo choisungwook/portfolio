@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>akbun-makevideo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- The hidden attribute does not take an svg out of the layout on its own,
+       so the class is what collapses it. Without it this block reserves the
+       default 300x150 of an svg and pushes the whole app down the page. -->
+  <svg class="icon-defs" aria-hidden="true">
+    <defs>
+      <g id="icon-split">
+        <circle cx="5" cy="17" r="2.6" />
+        <circle cx="15" cy="17" r="2.6" />
+        <path d="M6.4 15.2 15.5 3M13.6 15.2 4.5 3" />
+      </g>
+      <g id="icon-magnet">
+        <path d="M5 4v7a5 5 0 0 0 10 0V4" />
+        <path d="M5 9h4M11 9h4" />
+      </g>
+      <g id="icon-trash">
+        <path d="M4 6h12M8 6V4h4v2M6.5 6l.8 10h5.4l.8-10" />
+      </g>
+    </defs>
+  </svg>
+
+  <header id="menubar">
+    <span class="brand">akbun-makevideo</span>
+
+    <nav id="menus">
+      <div class="menu">
+        <button class="menu-title" data-menu="project">Project</button>
+        <ul class="menu-list" data-list="project">
+          <li><button data-action="new-project">New Project<kbd>⌘N</kbd></button></li>
+          <li><button data-action="open-project">Open Project…<kbd>⌘O</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="save-project">Save<kbd>⌘S</kbd></button></li>
+          <li><button data-action="save-project-as">Save As…<kbd>⇧⌘S</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="import-assets">Import Media…<kbd>⌘I</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="close-project">Close Project<kbd>⌘W</kbd></button></li>
+        </ul>
+      </div>
+
+      <div class="menu">
+        <button class="menu-title" data-menu="render">Render</button>
+        <ul class="menu-list" data-list="render">
+          <li><button data-action="render-fhd">Render FHD — 1920 long edge</button></li>
+          <li><button data-action="render-4k">Render 4K — 3840 long edge</button></li>
+          <li class="sep"></li>
+          <li><button data-action="cancel-render">Cancel Render</button></li>
+        </ul>
+      </div>
+
+      <div class="menu">
+        <button class="menu-title" data-menu="settings">Settings</button>
+        <ul class="menu-list" data-list="settings">
+          <li><button data-action="project-settings">Project Resolution…</button></li>
+          <li><button data-action="app-settings">Preview &amp; Tools…</button></li>
+          <li class="sep"></li>
+          <li><button data-action="check-update">Check for Updates</button></li>
+          <li><button data-action="about">About</button></li>
+        </ul>
+      </div>
+    </nav>
+
+    <span class="menubar-gap"></span>
+    <button id="tool-warning" hidden title="Rendering needs ffmpeg on this machine">ffmpeg not found</button>
+    <span id="project-name">Untitled</span>
+  </header>
+
+  <main id="panels">
+    <section id="upper">
+      <aside id="assets-panel">
+        <header class="panel-head">
+          <h2>Assets</h2>
+          <button id="btn-import" class="small">Import…</button>
+        </header>
+        <ul id="asset-list"></ul>
+        <p id="asset-empty">Drop video, audio or image files here, or use Import.</p>
+      </aside>
+
+      <section id="preview-panel">
+        <header class="panel-head">
+          <h2>Preview</h2>
+          <div class="segmented" id="preview-source">
+            <button data-source="timeline" class="on">Timeline</button>
+            <button data-source="asset">Asset</button>
+          </div>
+        </header>
+        <div id="stage-wrap">
+          <div id="stage"><div id="stage-inner"><canvas id="stage-exact"></canvas></div></div>
+          <span id="stage-mode" hidden></span>
+          <p id="stage-hint">Drop media on the timeline below to see it here.</p>
+        </div>
+        <div id="transport">
+          <button id="btn-play" title="Play or pause (Space)">▶</button>
+          <span id="clock" class="mono">0:00:00.00</span>
+          <span class="dim mono">/</span>
+          <span id="duration" class="mono dim">0:00:00.00</span>
+          <span class="menubar-gap"></span>
+          <label class="inline">
+            Preview quality
+            <select id="preview-quality">
+              <option value="full">Full</option>
+              <option value="half">Half</option>
+              <option value="quarter">Quarter</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    </section>
+
+    <section id="lower">
+      <div id="timeline-toolbar">
+        <button id="btn-split" class="icon" title="Split at the playhead (⌘B)">
+          <svg viewBox="0 0 20 20"><use href="#icon-split" /></svg>
+        </button>
+        <button id="btn-magnet" class="icon" title="Snap clips to nearby edges">
+          <svg viewBox="0 0 20 20"><use href="#icon-magnet" /></svg>
+        </button>
+        <button id="btn-delete" class="icon" title="Delete the selected clip (Delete)">
+          <svg viewBox="0 0 20 20"><use href="#icon-trash" /></svg>
+        </button>
+        <span class="sep-v"></span>
+        <button id="btn-add-video" class="small">+ Video track</button>
+        <button id="btn-add-audio" class="small">+ Audio track</button>
+        <span class="menubar-gap"></span>
+        <label class="inline">Zoom <input type="range" id="zoom" min="0" max="100" value="45" /></label>
+      </div>
+
+      <div id="timeline">
+        <div id="timeline-heads"><div class="ruler-spacer"></div></div>
+        <div id="timeline-scroll">
+          <div id="timeline-content">
+            <div id="ruler"></div>
+            <div id="lanes"></div>
+            <div id="playhead"><span class="playhead-grip"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="render-overlay" class="overlay" hidden>
+    <div class="sheet">
+      <h3 id="render-title">Rendering</h3>
+      <div class="progress"><div id="render-bar"></div></div>
+      <p id="render-status" class="dim">Starting ffmpeg…</p>
+      <div class="sheet-actions">
+        <button id="render-cancel">Cancel</button>
+        <button id="render-close" hidden class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="project-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Project Resolution</h3>
+      <label class="row">Preset
+        <select id="ps-preset">
+          <option value="1280x720">HD 1280 × 720</option>
+          <option value="1920x1080">FHD 1920 × 1080</option>
+          <option value="3840x2160">4K 3840 × 2160</option>
+          <option value="1080x1920">Vertical 1080 × 1920</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label class="row">Width <input type="number" id="ps-width" min="16" max="7680" step="2" /></label>
+      <label class="row">Height <input type="number" id="ps-height" min="16" max="7680" step="2" /></label>
+      <label class="row">Frames per second
+        <select id="ps-fps">
+          <option value="24">24</option>
+          <option value="25">25</option>
+          <option value="30">30</option>
+          <option value="50">50</option>
+          <option value="60">60</option>
+        </select>
+      </label>
+      <p class="dim small-text">
+        This is the editing canvas. Render presets set the long edge and keep this shape,
+        so a vertical project renders vertical.
+      </p>
+      <div class="sheet-actions">
+        <button data-close="project-settings">Cancel</button>
+        <button id="ps-save" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="new-project" class="overlay" hidden>
+    <div class="sheet">
+      <h3>New Project</h3>
+      <label class="row">Name <input type="text" id="np-name" placeholder="summer trip" /></label>
+      <p class="dim small-text" id="np-where"></p>
+      <p class="small-text danger-text" id="np-error" hidden></p>
+      <div class="sheet-actions">
+        <button data-close="new-project">Cancel</button>
+        <button id="np-create" class="primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="open-project" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Open Project</h3>
+      <p class="dim small-text" id="op-where"></p>
+      <ul id="op-list"></ul>
+      <p id="op-empty" class="dim small-text">No projects in the workspace yet.</p>
+      <div class="sheet-actions">
+        <button data-close="open-project">Cancel</button>
+        <button id="op-browse">Browse…</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Preview &amp; Tools</h3>
+      <label class="row">Preview quality
+        <select id="as-quality">
+          <option value="full">Full</option>
+          <option value="half">Half — default</option>
+          <option value="quarter">Quarter</option>
+        </select>
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="as-scrub-mute" />
+        Mute preview audio while dragging the playhead
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="as-snap" />
+        Snap clips to nearby edges
+      </label>
+      <label class="row">Theme
+        <select id="as-theme">
+          <option value="system">Follow the system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <label class="row">Workspace folder
+        <span class="row-input">
+          <input type="text" id="as-workspace" placeholder="Documents/akbun-makevideo" />
+          <button id="as-workspace-pick" class="small" type="button">Choose…</button>
+        </span>
+      </label>
+      <p class="dim small-text" id="as-workspace-note"></p>
+      <label class="row">Compositor
+        <select id="as-compositor">
+          <option value="auto">Auto — GPU if there is one, CPU if not</option>
+          <option value="cpu">CPU only — never touch the GPU</option>
+          <option value="ffmpeg">ffmpeg filter graph — faster, preview may differ</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="as-compositor-note"></p>
+      <label class="row">Render acceleration
+        <select id="as-accel">
+          <option value="auto">Auto — GPU when available</option>
+          <option value="cpu">CPU only (libx264)</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="as-accel-note"></p>
+      <label class="row">ffmpeg folder
+        <input type="text" id="as-ffmpeg" placeholder="empty = look in the usual places" />
+      </label>
+      <p class="dim small-text" id="as-tools"></p>
+      <div class="sheet-actions">
+        <button data-close="app-settings">Cancel</button>
+        <button id="as-save" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="timeline.js"></script>
+  <script src="api.js"></script>
+  <script src="preview.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

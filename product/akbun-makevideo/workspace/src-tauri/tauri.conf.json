@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "akbun-makevideo",
+  "version": "../package.json",
+  "identifier": "io.akbun.makevideo",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "akbun-makevideo",
+        "width": 1500,
+        "height": 940,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "backgroundColor": "#f2f3f5",
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost https://asset.localhost blob:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/choisungwook/portfolio/releases/download/akbun-makevideo-updater/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0QjdDMDAyMEFGMkJGMTUKUldRVnYvSUtBc0MzOURWaW53UkViVWFZOEVPRkJYVmh4OXVVL1NIUjEwWHgxcTQramgrWVVPaTcK"
+    }
+  }
+}

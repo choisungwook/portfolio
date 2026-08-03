@@ -9,6 +9,7 @@
 | [akbun-gitdesktop](./akbun-gitdesktop/) | git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱 |
 | [akbun-folderview](./akbun-folderview/) | 직접 추가한 사진과 영상을 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱 |
 | [akbun-makepresentation](./akbun-makepresentation/) | 도형, 텍스트, pptx 열기/저장, pdf 내보내기, 발표 모드를 갖춘 슬라이드 편집 macOS 데스크톱 앱 |
+| [akbun-makevideo](./akbun-makevideo/) | 멀티 트랙 타임라인, 미리보기, ffmpeg FHD/4K 렌더링을 갖춘 영상 편집 macOS 데스크톱 앱 |
 | [cardnews-reference](./cardnews-reference/) | AI agent용 카드뉴스 레이아웃 레퍼런스 |
 | [envelope_encryption_simulator](./envelope_encryption_simulator/) | KMS 봉투암호화 암복호화 과정을 보여주는 시뮬레이터 |
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |

@@ -1,0 +1,123 @@
+name: release-akbun-makevideo
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-makevideo/**'
+  pull_request:
+    paths:
+      - 'product/akbun-makevideo/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-makevideo/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Run page tests
+        run: npm test
+
+      # makevideo-render depends on neither tauri nor a webview, so -p keeps
+      # this to serde. Testing the app crate instead would need GTK and WebKit
+      # installed on the runner. ffmpeg is not needed either: the crate builds
+      # the argument list and runs nothing.
+      - name: Run render model tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render
+
+      # The compositor has a software backend that needs nothing, so this runs
+      # the whole pipeline on a machine with no graphics stack at all. It is
+      # also what proves wgpu is genuinely optional rather than optional on
+      # paper: --no-default-features must not pull it in.
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Run compositor tests without a GPU
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features
+
+      # And again with wgpu, against lavapipe: a software Vulkan device, so the
+      # GPU half is exercised on a runner with no hardware. That is what makes
+      # "both backends draw the same frame" meaningful here.
+      - name: Install a software GPU
+        run: sudo apt-get install -y -qq mesa-vulkan-drivers
+
+      - name: Run compositor tests with the GPU backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-makevideo/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-makevideo/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO_PASSWORD }}
+        with:
+          projectPath: product/akbun-makevideo/workspace
+          tagName: akbun-makevideo-v__VERSION__
+          releaseName: akbun-makevideo-v__VERSION__
+          # A draft is not reachable by the updater endpoint, so every
+          # installed copy would 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            Desktop video editor: multi track timeline, live preview, render to FHD and 4K.
+
+            - The installer is a macOS (Apple Silicon) dmg.
+            - Rendering needs ffmpeg on the machine: `brew install ffmpeg`.
+            - The build is not code signed, so after dragging the app to Applications run once in Terminal:
+              xattr -cr /Applications/akbun-makevideo.app
+            - After that, Settings → Check for Updates fetches newer versions on its own.
+
+      # Several products release from this repository, so the GitHub-wide
+      # "latest" release is whichever product shipped last. The app therefore
+      # polls a fixed tag that only this step touches, instead of
+      # releases/latest.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-makevideo-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-makevideo-updater \
+            --title "akbun-makevideo updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-makevideo-updater "$RUNNER_TEMP/latest.json" --clobber
