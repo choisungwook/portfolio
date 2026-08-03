@@ -8,14 +8,29 @@
 // rather than the render itself; see adr/2026-08-preview-in-the-webview.md.
 
 // scale is what the stacked elements are actually laid out at before being
-// scaled back up, so a lower setting composites a smaller surface. drift is how
-// far an element may run from the playhead before it is seeked back: seeking is
-// the expensive part, so a looser tolerance is most of the saving.
+// scaled back up, so a lower setting composites a smaller surface.
 const QUALITY = {
-  full: { scale: 1, drift: 0.12 },
-  half: { scale: 0.5, drift: 0.25 },
-  quarter: { scale: 0.25, drift: 0.4 },
+  full: { scale: 1 },
+  half: { scale: 0.5 },
+  quarter: { scale: 0.25 },
 };
+
+const RATE_SYNC_THRESHOLD = 0.04;
+const HARD_SYNC_THRESHOLD = 1;
+const MAX_RATE_ADJUSTMENT = 0.05;
+
+function timelineTimeFromMedia(clip, currentTime) {
+  return clip.startMs + (currentTime * 1000 - clip.inMs);
+}
+
+function playbackRateForDrift(drift) {
+  if (Math.abs(drift) <= RATE_SYNC_THRESHOLD) return 1;
+  const adjustment = Math.max(
+    -MAX_RATE_ADJUSTMENT,
+    Math.min(MAX_RATE_ADJUSTMENT, drift * 0.25)
+  );
+  return 1 + adjustment;
+}
 
 function clamp01(value) {
   if (!Number.isFinite(value)) return 1;
@@ -34,9 +49,14 @@ function createPreview(options) {
   let scrubbing = false;
   let muteWhileScrubbing = true;
   let playing = false;
+  let starting = false;
   let positionMs = 0;
   let clockOrigin = 0;
+  let clock = null;
+  let timelineDiscontinuity = false;
+  let playGeneration = 0;
   let lastReported = -1;
+  const playPromises = new WeakMap();
 
   function settings() {
     const project = getProject();
@@ -97,19 +117,35 @@ function createPreview(options) {
 
   function hide(entry) {
     entry.element.classList.remove('on');
-    if (entry.kind !== 'image' && !entry.element.paused) entry.element.pause();
+    if (entry.kind !== 'image') {
+      entry.element.playbackRate = 1;
+      if (!entry.element.paused) entry.element.pause();
+    }
   }
 
-  /** Put every element where the playhead says it should be. Called every
-   *  frame, so it does the least work it can: a seek only when the element has
-   *  drifted past the tolerance for the current quality. */
+  function ensurePlaying(element) {
+    if (!element.paused) return Promise.resolve(true);
+    const pending = playPromises.get(element);
+    if (pending) return pending;
+    const started = Promise.resolve(element.play())
+      .then(() => !element.paused)
+      .catch(() => false)
+      .finally(() => playPromises.delete(element));
+    playPromises.set(element, started);
+    return started;
+  }
+
+  /** Put every element where the playhead says it should be. The clock element
+   *  runs freely. Followers change rate for ordinary drift and seek only when
+   *  they are far enough away that gradual correction would be visible. */
   function syncTimeline() {
     const project = getProject();
-    if (!project) return;
-    const drift = QUALITY[quality].drift;
+    if (!project) return null;
     const videoTracks = L.tracksOf(project, 'video');
     const active = L.clipsAt(project, positionMs);
     const live = new Set();
+    const media = [];
+    let seekFailed = false;
 
     for (const { track, clip, sourceMs } of active) {
       if (track.hidden) continue;
@@ -118,6 +154,7 @@ function createPreview(options) {
       if (!asset) continue;
       const wantsPicture = track.kind === 'video' && asset.kind !== 'audio';
       const entry = entryFor(clip, asset, wantsPicture);
+      const wasLive = entry.element.classList.contains('on');
       live.add(clip.id);
       entry.element.classList.add('on');
       if (wantsPicture) {
@@ -127,30 +164,47 @@ function createPreview(options) {
       if (entry.kind === 'image') continue;
 
       const target = sourceMs / 1000;
-      if (Math.abs(entry.element.currentTime - target) > (playing ? drift : 0.03)) {
+      media.push({ entry, track, clip, target, wasLive });
+    }
+
+    const reference =
+      media.find(({ clip }) => clock && clip.id === clock.clip.id) || media[0] || null;
+
+    for (const item of media) {
+      const { entry, track, clip, target, wasLive } = item;
+      const drift = target - entry.element.currentTime;
+      const isReference = item === reference;
+      const needsInitialSeek = !playing || !wasLive || timelineDiscontinuity;
+      const needsHardSeek = !isReference && Math.abs(drift) >= HARD_SYNC_THRESHOLD;
+
+      if ((needsInitialSeek && Math.abs(drift) > 0.03) || needsHardSeek) {
         try {
           entry.element.currentTime = target;
         } catch (error) {
-          // Seeking before metadata arrives throws; the next frame retries.
+          seekFailed = true;
         }
       }
+      entry.element.playbackRate =
+        playing && !isReference && !needsHardSeek ? playbackRateForDrift(drift) : 1;
       entry.element.volume = clamp01(clip.volume);
       entry.element.muted =
         (track.kind === 'video' && track.muted) || (scrubbing && muteWhileScrubbing);
-      if (playing && entry.element.paused) entry.element.play().catch(() => {});
-      if (!playing && !entry.element.paused) entry.element.pause();
+      if (playing || starting) ensurePlaying(entry.element);
+      if (!playing && !starting && !entry.element.paused) entry.element.pause();
     }
 
     for (const [clipId, entry] of pool) {
       if (!live.has(clipId)) hide(entry);
     }
+    timelineDiscontinuity = seekFailed;
+    return reference;
   }
 
   function syncAsset() {
     if (!assetElement) return;
     if (assetElement.tagName === 'IMG') return;
-    if (playing && assetElement.paused) assetElement.play().catch(() => {});
-    if (!playing && !assetElement.paused) assetElement.pause();
+    if ((playing || starting) && assetElement.paused) ensurePlaying(assetElement);
+    if (!playing && !starting && !assetElement.paused) assetElement.pause();
     positionMs = assetElement.currentTime * 1000;
   }
 
@@ -168,15 +222,24 @@ function createPreview(options) {
 
   function frame() {
     if (playing && mode === 'timeline') {
-      positionMs = performance.now() - clockOrigin;
+      if (clock && Number.isFinite(clock.entry.element.currentTime)) {
+        positionMs = timelineTimeFromMedia(clock.clip, clock.entry.element.currentTime);
+      } else {
+        positionMs = performance.now() - clockOrigin;
+      }
       const total = totalMs();
       if (positionMs >= total) {
         positionMs = total;
         pause();
       }
     }
-    if (mode === 'timeline') syncTimeline();
-    else syncAsset();
+    if (mode === 'timeline') {
+      const nextClock = syncTimeline();
+      if (!clock || !nextClock || clock.clip.id !== nextClock.clip.id) {
+        clock = nextClock;
+        clockOrigin = performance.now() - positionMs;
+      }
+    } else syncAsset();
 
     const rounded = Math.round(positionMs);
     if (rounded !== lastReported) {
@@ -186,21 +249,46 @@ function createPreview(options) {
     requestAnimationFrame(frame);
   }
 
-  function play() {
-    if (playing) return;
+  async function play() {
+    if (playing || starting) return;
     if (totalMs() <= 0) return;
     clearExact();
     if (mode === 'timeline' && positionMs >= totalMs()) positionMs = 0;
+    starting = true;
+    const generation = ++playGeneration;
+    let reference = null;
+    if (mode === 'timeline') {
+      clock = null;
+      reference = syncTimeline();
+      if (reference && !(await ensurePlaying(reference.entry.element))) {
+        if (generation === playGeneration) pause();
+        return;
+      }
+    } else if (assetElement) {
+      if (!(await ensurePlaying(assetElement))) {
+        if (generation === playGeneration) pause();
+        return;
+      }
+    }
+    if (generation !== playGeneration || !starting) return;
+    starting = false;
     playing = true;
+    clock = reference;
     clockOrigin = performance.now() - positionMs;
     if (onTick) onTick(positionMs, playing);
   }
 
   function pause() {
-    if (!playing) return;
+    if (!playing && !starting) return;
+    playGeneration += 1;
+    starting = false;
     playing = false;
+    clock = null;
     for (const entry of pool.values()) {
-      if (entry.kind !== 'image' && !entry.element.paused) entry.element.pause();
+      if (entry.kind !== 'image') {
+        entry.element.playbackRate = 1;
+        if (!entry.element.paused) entry.element.pause();
+      }
     }
     if (assetElement && assetElement.pause) assetElement.pause();
     if (onTick) onTick(positionMs, playing);
@@ -209,6 +297,8 @@ function createPreview(options) {
   function seek(ms) {
     positionMs = Math.max(0, Math.min(ms, Math.max(totalMs(), 0)));
     clockOrigin = performance.now() - positionMs;
+    clock = null;
+    timelineDiscontinuity = mode === 'timeline';
     if (mode === 'asset' && assetElement && assetElement.currentTime !== undefined) {
       try {
         assetElement.currentTime = positionMs / 1000;
@@ -216,6 +306,7 @@ function createPreview(options) {
         // Same as above: retried on the next frame.
       }
     }
+    if (mode === 'timeline') clock = syncTimeline();
     if (onTick) onTick(positionMs, playing);
   }
 
@@ -246,7 +337,9 @@ function createPreview(options) {
     }
     pool.clear();
     positionMs = 0;
+    starting = false;
     playing = false;
+    clock = null;
   }
 
   function showAsset(asset) {
@@ -333,8 +426,8 @@ function createPreview(options) {
     showExact,
     clearExact,
     isExact,
-    toggle: () => (playing ? pause() : play()),
-    isPlaying: () => playing,
+    toggle: () => (playing || starting ? pause() : play()),
+    isPlaying: () => playing || starting,
     seek,
     position: () => positionMs,
     total: totalMs,
@@ -350,7 +443,13 @@ function createPreview(options) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createPreview, QUALITY };
+  module.exports = {
+    createPreview,
+    QUALITY,
+    timelineTimeFromMedia,
+    playbackRateForDrift,
+    HARD_SYNC_THRESHOLD,
+  };
 } else {
   globalThis.previewLib = { createPreview, QUALITY };
 }
