@@ -25,7 +25,6 @@
       <button data-tool="text" title="Text (T)">T</button>
     </div>
     <div class="group">
-      <button id="btn-numbers" title="Show a slide number on every slide">№</button>
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
       <button id="btn-update" title="Check for a newer version">Updates</button>
     </div>
@@ -41,16 +40,41 @@
     </aside>
 
     <section id="stage">
-      <div id="stage-inner">
-        <svg id="canvas" viewBox="0 0 1280 720"></svg>
-        <textarea id="text-editor" hidden spellcheck="false"></textarea>
+      <div id="stage-scroll">
+        <div id="stage-inner">
+          <svg id="canvas" viewBox="0 0 1280 720"></svg>
+          <textarea id="text-editor" hidden spellcheck="false"></textarea>
+        </div>
       </div>
     </section>
 
     <aside id="props">
+      <!-- The background belongs to the slide, not to any shape, so it sits
+           in its own card above the selection properties. Sharing the Fill
+           row with shapes is what made people recolor a rectangle while
+           trying to recolor the slide. -->
+      <section id="props-background">
+        <h2>Slide background</h2>
+        <div class="swatches" id="bg-swatches">
+          <button class="swatch" data-bg="#ffffff" title="White" style="--swatch: #ffffff"></button>
+          <button class="swatch" data-bg="#f8f9fa" title="Paper" style="--swatch: #f8f9fa"></button>
+          <button class="swatch" data-bg="#fff9db" title="Cream" style="--swatch: #fff9db"></button>
+          <button class="swatch" data-bg="#e7f5ff" title="Sky" style="--swatch: #e7f5ff"></button>
+          <button class="swatch" data-bg="#e6fcf5" title="Mint" style="--swatch: #e6fcf5"></button>
+          <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="--swatch: #f3f0ff"></button>
+          <button class="swatch" data-bg="#343a40" title="Charcoal" style="--swatch: #343a40"></button>
+          <button class="swatch" data-bg="#212022" title="Ink" style="--swatch: #212022"></button>
+        </div>
+        <div class="prop-row">
+          <label for="prop-background">Custom</label>
+          <input type="color" id="prop-background" />
+        </div>
+        <button id="btn-bg-all" title="Give every slide this background">Apply to all slides</button>
+      </section>
+
       <p id="props-hint"></p>
       <div id="props-fill" class="prop-row">
-        <label>Fill</label>
+        <label>Shape fill</label>
         <span><input type="checkbox" id="prop-fill-none" /> none</span>
         <input type="color" id="prop-fill" />
       </div>
@@ -95,10 +119,62 @@
           <label>Text color</label>
           <input type="color" id="prop-text-color" />
         </div>
+        <div class="prop-row">
+          <label>Style</label>
+          <span class="btn-set">
+            <button id="prop-bold" class="glyph" title="Bold (Cmd+B)"><b>B</b></button>
+            <button id="prop-italic" class="glyph" title="Italic (Cmd+I)"><i>I</i></button>
+            <button id="prop-underline" class="glyph" title="Underline (Cmd+U)"><u>U</u></button>
+          </span>
+        </div>
+        <div class="prop-row">
+          <label>Align</label>
+          <span class="btn-set" id="prop-align">
+            <button data-align="left" title="Align left" aria-label="Align left">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M2 7h6M2 11h10" /></svg>
+            </button>
+            <button data-align="center" title="Align center" aria-label="Align center">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M4 7h6M2 11h10" /></svg>
+            </button>
+            <button data-align="right" title="Align right" aria-label="Align right">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M6 7h6M2 11h10" /></svg>
+            </button>
+          </span>
+        </div>
+        <div class="prop-row">
+          <label>Anchor</label>
+          <span class="btn-set" id="prop-vertical-align">
+            <button data-valign="top" title="Anchor to the top of the box" aria-label="Anchor to the top of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 4h6" /></svg>
+            </button>
+            <button data-valign="center" title="Anchor to the middle of the box" aria-label="Anchor to the middle of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 7h6" /></svg>
+            </button>
+            <button data-valign="bottom" title="Anchor to the bottom of the box" aria-label="Anchor to the bottom of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 10h6" /></svg>
+            </button>
+          </span>
+        </div>
       </div>
       <button id="btn-delete-shape">Delete shape</button>
     </aside>
   </main>
+
+  <!-- The view controls: what the deck looks like on screen, not what it
+       contains. They sit together at the bottom, away from the tools that
+       change the slide. -->
+  <footer id="statusbar">
+    <button id="btn-numbers" title="Show a slide number on every slide">№ Slide numbers</button>
+    <div id="zoom">
+      <button id="btn-zoom-out" title="Zoom out (Cmd+-)" aria-label="Zoom out (Cmd+-)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4" /></svg>
+      </button>
+      <button id="btn-zoom-level" title="Fit the slide to the window (Cmd+0)">100%</button>
+      <button id="btn-zoom-in" title="Zoom in (Cmd++)" aria-label="Zoom in (Cmd++)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4M6 4v4" /></svg>
+      </button>
+    </div>
+  </footer>
 
   <div id="present" hidden></div>
 

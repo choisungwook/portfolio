@@ -320,14 +320,32 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
     }
     let xml = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
-<p:sld{NS}><p:cSld><p:spTree>{EMPTY_TREE_HEADER}{shapes}</p:spTree></p:cSld>\
-<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>"
+<p:sld{NS}><p:cSld>{}<p:spTree>{EMPTY_TREE_HEADER}{shapes}</p:spTree></p:cSld>\
+<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>",
+        background_xml(&slide.background)
     );
     let rels = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
 <Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">{rels}</Relationships>"
     );
     (xml, rels)
+}
+
+/// The slide's `p:bg` element, empty for white. The master this writer emits
+/// already resolves to white, so leaving the element out says the same thing
+/// in fewer bytes and keeps files written before backgrounds existed
+/// byte-identical.
+fn background_xml(background: &str) -> String {
+    if background.is_empty()
+        || background == "none"
+        || background.eq_ignore_ascii_case("#ffffff")
+    {
+        return String::new();
+    }
+    format!(
+        "<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>",
+        hex(background)
+    )
 }
 
 fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
@@ -412,6 +430,7 @@ fn text_body(shape: &Shape) -> String {
     );
     let bold = if shape.bold { " b=\"1\"" } else { "" };
     let italic = if shape.italic { " i=\"1\"" } else { "" };
+    let underline = if shape.underline { " u=\"sng\"" } else { "" };
     let align = match shape.text_align.as_str() {
         "center" => "ctr",
         "right" => "r",
@@ -425,7 +444,7 @@ fn text_body(shape: &Shape) -> String {
     let mut paragraphs = String::new();
     for line in shape.text.split('\n') {
         paragraphs.push_str(&format!(
-            "<a:p><a:pPr algn=\"{align}\"/><a:r><a:rPr lang=\"en-US\" sz=\"{size}\"{bold}{italic} dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>{latin}</a:rPr><a:t>{}</a:t></a:r></a:p>",
+            "<a:p><a:pPr algn=\"{align}\"/><a:r><a:rPr lang=\"en-US\" sz=\"{size}\"{bold}{italic}{underline} dirty=\"0\"><a:solidFill><a:srgbClr val=\"{color}\"/></a:solidFill>{latin}</a:rPr><a:t>{}</a:t></a:r></a:p>",
             xml_escape(line)
         ));
     }
@@ -639,8 +658,15 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
                     .as_deref()
                     .and_then(|master| parse_background(master, &master_ctx, page_w, page_h))
             });
-        if let Some(background) = bg {
-            shapes.push(background);
+        // A solid background is the slide's own color. Only a picture has to
+        // stay a shape, since a slide holds one color and not an image.
+        let mut background = crate::default_background();
+        if let Some(shape) = bg {
+            if shape.kind == "image" {
+                shapes.push(shape);
+            } else {
+                background = shape.fill;
+            }
         }
         shapes.extend(master.visible);
         shapes.extend(layout.visible);
@@ -664,7 +690,7 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
                 i += 1;
             }
         }
-        deck.slides.push(Slide { shapes });
+        deck.slides.push(Slide { shapes, background });
     }
 
     // Other editors use other canvases: 4:3, Google Slides' smaller 16:9,
@@ -812,7 +838,8 @@ fn scheme_hex(
 }
 
 /// The background a slide, layout or master declares. Embedded pictures are
-/// kept as page-sized images; solid and scheme colors become a page-sized rect.
+/// kept as page-sized images; solid and scheme colors come back as a rect
+/// whose fill `read` lifts onto the slide's own background field.
 fn parse_background(
     xml: &str,
     ctx: &SlideCtx,
@@ -1034,6 +1061,7 @@ struct Pending {
     accept_explicit_text_style: bool,
     bold: Option<bool>,
     italic: Option<bool>,
+    underline: Option<bool>,
     text_align: Option<String>,
     vertical_align: Option<String>,
     blip: Option<String>,
@@ -1415,6 +1443,9 @@ fn read_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
     if p.italic.is_none() {
         p.italic = attr(e, b"i").map(|value| value == "1");
     }
+    if p.underline.is_none() {
+        p.underline = attr(e, b"u").map(|value| value != "none");
+    }
 }
 
 fn overwrite_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart) {
@@ -1429,6 +1460,9 @@ fn overwrite_text_properties(p: &mut Pending, e: &quick_xml::events::BytesStart)
     }
     if let Some(value) = attr(e, b"i") {
         p.italic = Some(value == "1");
+    }
+    if let Some(value) = attr(e, b"u") {
+        p.underline = Some(value != "none");
     }
 }
 
@@ -1542,6 +1576,9 @@ fn apply_text_properties(shape: &mut Shape, p: &Pending) {
     if let Some(value) = p.italic {
         shape.italic = value;
     }
+    if let Some(value) = p.underline {
+        shape.underline = value;
+    }
     if let Some(value) = &p.text_align {
         shape.text_align = value.clone();
     }
@@ -1649,6 +1686,9 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
         if let Some(value) = p.italic {
             shape.italic = value;
         }
+        if let Some(value) = p.underline {
+            shape.underline = value;
+        }
         if let Some(value) = p.text_align {
             shape.text_align = value;
         }
@@ -1741,6 +1781,7 @@ mod tests {
                             font_family: "Times New Roman".into(),
                             bold: true,
                             italic: true,
+                            underline: true,
                             text_align: "center".into(),
                             vertical_align: "bottom".into(),
                             stroke: "none".into(),
@@ -1760,6 +1801,7 @@ mod tests {
                             ..Shape::default()
                         },
                     ],
+                    background: "#212022".into(),
                 },
                 Slide {
                     shapes: vec![Shape {
@@ -1770,6 +1812,7 @@ mod tests {
                         dash: "dot".into(),
                         ..Shape::default()
                     }],
+                    ..Slide::default()
                 },
             ],
         }
@@ -1787,6 +1830,7 @@ mod tests {
         let close = |a: f64, b: f64| (a - b).abs() < 0.5;
         for (slide_a, slide_b) in deck.slides.iter().zip(&back.slides) {
             assert_eq!(slide_a.shapes.len(), slide_b.shapes.len());
+            assert_eq!(slide_a.background, slide_b.background);
             for (a, b) in slide_a.shapes.iter().zip(&slide_b.shapes) {
                 assert_eq!(a.kind, b.kind);
                 assert_eq!(a.stroke, b.stroke);
@@ -1809,6 +1853,7 @@ mod tests {
                     assert_eq!(a.font_family, b.font_family);
                     assert_eq!(a.bold, b.bold);
                     assert_eq!(a.italic, b.italic);
+                    assert_eq!(a.underline, b.underline);
                     assert_eq!(a.text_align, b.text_align);
                     assert_eq!(a.vertical_align, b.vertical_align);
                 }
@@ -1925,24 +1970,23 @@ mod tests {
         let deck = read(buffer).unwrap();
         let shapes = &deck.slides[0].shapes;
 
-        // The empty prompt placeholder is gone. Background, master artwork,
-        // layout logo and slide-owned shapes keep their layer order.
-        assert_eq!(shapes.len(), 6);
+        // The layout's solid background is the slide's color, not a shape on
+        // top of it.
+        assert_eq!(deck.slides[0].background, "#212022");
 
-        let bg = &shapes[0];
-        assert_eq!(bg.kind, "rect");
-        assert_eq!(bg.fill, "#212022");
-        assert!((bg.w - 1280.0).abs() < 0.5 && (bg.h - 720.0).abs() < 0.5);
+        // The empty prompt placeholder is gone. Master artwork, layout logo
+        // and slide-owned shapes keep their layer order.
+        assert_eq!(shapes.len(), 5);
 
-        let master_band = &shapes[1];
+        let master_band = &shapes[0];
         assert_eq!(master_band.kind, "rect");
         assert_eq!(master_band.fill, "#037f0c");
 
-        let layout_logo = &shapes[2];
+        let layout_logo = &shapes[1];
         assert_eq!(layout_logo.kind, "image");
         assert_eq!(layout_logo.src, TINY_PNG);
 
-        let title = &shapes[3];
+        let title = &shapes[2];
         assert_eq!(title.kind, "text");
         // 952500 EMU = 100 px: the box came from the layout.
         assert!((title.x - 100.0).abs() < 0.5 && (title.y - 50.0).abs() < 0.5);
@@ -1953,12 +1997,12 @@ mod tests {
         assert!(title.bold);
         assert_eq!(title.text_align, "center");
 
-        let band = &shapes[4];
+        let band = &shapes[3];
         assert_eq!(band.kind, "rect");
         // accent1 ED7100 shaded to 50%.
         assert_eq!(band.fill, "#773900");
 
-        let pic = &shapes[5];
+        let pic = &shapes[4];
         assert_eq!(pic.kind, "image");
         assert_eq!(pic.src, TINY_PNG);
         assert!((pic.x - 100.0).abs() < 0.5 && (pic.w - 100.0).abs() < 0.5);
@@ -1987,6 +2031,23 @@ mod tests {
         assert_eq!(background.kind, "image");
         assert_eq!(background.src, "ppt/media/background.png");
         assert_eq!((background.w, background.h), (1280.0, 720.0));
+    }
+
+    /// A slide part carries its background before its shape tree, and a white
+    /// slide writes no background element at all.
+    #[test]
+    fn background_is_written_only_when_it_is_not_white() {
+        let mut buffer = Cursor::new(Vec::new());
+        write(&sample_deck(), &mut buffer).unwrap();
+        buffer.set_position(0);
+        let mut archive = zip::ZipArchive::new(buffer).unwrap();
+
+        let colored = part(&mut archive, "ppt/slides/slide1.xml").unwrap();
+        assert!(colored.contains("<p:bg><p:bgPr><a:solidFill><a:srgbClr val=\"212022\"/>"));
+        assert!(colored.find("<p:bg>").unwrap() < colored.find("<p:spTree>").unwrap());
+
+        let white = part(&mut archive, "ppt/slides/slide2.xml").unwrap();
+        assert!(!white.contains("<p:bg>"));
     }
 
     #[test]

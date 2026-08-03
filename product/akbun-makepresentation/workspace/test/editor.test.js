@@ -291,3 +291,52 @@ test('renderSlideSvg is a standalone svg with a white background', () => {
   assert.ok(svg.startsWith('<svg xmlns='));
   assert.ok(svg.includes('fill="#ffffff"'));
 });
+
+test('renderSlideSvg paints the slide background and leaves shapes alone', () => {
+  const slide = L.createSlide();
+  const shape = L.createShape('rect', 10, 10, { fill: '#ffd43b' });
+  L.dragShape(shape, 10, 10, 100, 100);
+  slide.shapes.push(shape);
+  slide.background = '#212022';
+
+  const svg = L.renderSlideSvg(slide);
+  assert.ok(svg.includes(`<rect width="1280" height="720" fill="#212022"/>`));
+  assert.ok(svg.includes('fill="#ffd43b"'));
+});
+
+test('slideBackground falls back to white for a slide saved without one', () => {
+  assert.strictEqual(L.slideBackground({ shapes: [] }), '#ffffff');
+  assert.strictEqual(L.slideBackground({ shapes: [], background: 'none' }), '#ffffff');
+  assert.strictEqual(L.slideBackground({ shapes: [], background: '#212022' }), '#212022');
+});
+
+test('createShape carries the text style defaults it is handed', () => {
+  const shape = L.createShape('text', 0, 0, { bold: true, underline: true, textAlign: 'center' });
+  assert.deepStrictEqual(
+    { bold: shape.bold, italic: shape.italic, underline: shape.underline, align: shape.textAlign },
+    { bold: true, italic: false, underline: true, align: 'center' }
+  );
+});
+
+test('renderShapeSvg marks up bold, italic and underlined text', () => {
+  const shape = L.createShape('text', 0, 0, { bold: true, italic: true, underline: true });
+  shape.text = 'hi';
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('font-weight="700"'));
+  assert.ok(svg.includes('font-style="italic"'));
+  assert.ok(svg.includes('text-decoration="underline"'));
+
+  const plain = L.createShape('text', 0, 0, {});
+  plain.text = 'hi';
+  assert.ok(!L.renderShapeSvg(plain).includes('text-decoration'));
+});
+
+test('zoomIn and zoomOut walk the steps and stop at the ends', () => {
+  assert.strictEqual(L.zoomIn(1), 1.25);
+  assert.strictEqual(L.zoomOut(1), 0.75);
+  assert.strictEqual(L.zoomIn(L.ZOOM_STEPS[L.ZOOM_STEPS.length - 1]), 4);
+  assert.strictEqual(L.zoomOut(L.ZOOM_STEPS[0]), 0.5);
+  // A factor between two steps snaps to the neighbour in that direction.
+  assert.strictEqual(L.zoomIn(1.1), 1.25);
+  assert.strictEqual(L.zoomOut(1.1), 1);
+});

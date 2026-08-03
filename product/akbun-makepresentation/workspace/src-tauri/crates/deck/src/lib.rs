@@ -19,9 +19,28 @@ pub struct Deck {
     pub slides: Vec<Slide>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+/// One slide: its own background color plus the shapes drawn on it. The
+/// background is a field rather than a page-sized rect so recoloring it
+/// cannot touch a shape, and so it can never be selected or dragged.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Slide {
     pub shapes: Vec<Shape>,
+    #[serde(default = "default_background")]
+    pub background: String,
+}
+
+impl Default for Slide {
+    fn default() -> Self {
+        Slide {
+            shapes: Vec::new(),
+            background: default_background(),
+        }
+    }
+}
+
+pub fn default_background() -> String {
+    "#ffffff".into()
 }
 
 /// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text.
@@ -69,6 +88,8 @@ pub struct Shape {
     pub bold: bool,
     #[serde(default)]
     pub italic: bool,
+    #[serde(default)]
+    pub underline: bool,
     #[serde(default = "default_text_align")]
     pub text_align: String,
     #[serde(default = "default_vertical_align")]
@@ -132,6 +153,7 @@ impl Default for Shape {
             src: String::new(),
             bold: false,
             italic: false,
+            underline: false,
             text_align: default_text_align(),
             vertical_align: default_vertical_align(),
             crop_left: 0.0,

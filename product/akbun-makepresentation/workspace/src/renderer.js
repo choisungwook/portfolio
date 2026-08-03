@@ -19,6 +19,7 @@ const state = {
   presentIndex: 0,
   showNumbers: false,
   clipboard: null,
+  zoom: L.ZOOM_FIT,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -79,6 +80,9 @@ function slideNumberSvg(index) {
 }
 
 function renderCanvas() {
+  // The slide's own color, not the app theme: what the editor shows here is
+  // what the pdf and the projector show.
+  canvas.style.background = L.slideBackground(slide());
   const shapes = slide()
     .shapes.map(
       (shape, i) =>
@@ -130,6 +134,18 @@ function renderProps() {
   $('prop-dash').value = source.dash;
   $('prop-font-size').value = source.fontSize;
   $('prop-text-color').value = source.textColor;
+  $('prop-bold').classList.toggle('active', !!source.bold);
+  $('prop-italic').classList.toggle('active', !!source.italic);
+  $('prop-underline').classList.toggle('active', !!source.underline);
+  for (const button of document.querySelectorAll('[data-align]')) {
+    button.classList.toggle('active', button.dataset.align === (source.textAlign || 'left'));
+  }
+  for (const button of document.querySelectorAll('[data-valign]')) {
+    button.classList.toggle(
+      'active',
+      button.dataset.valign === (source.verticalAlign || 'top')
+    );
+  }
 
   // A pptx from another editor can name a font this list does not offer.
   // Adding it keeps the select honest instead of silently showing the wrong
@@ -140,6 +156,14 @@ function renderProps() {
     fonts.add(new Option(family, family));
   }
   fonts.value = family;
+}
+
+function renderBackground() {
+  const color = L.slideBackground(slide());
+  $('prop-background').value = color;
+  for (const button of document.querySelectorAll('[data-bg]')) {
+    button.classList.toggle('active', button.dataset.bg.toLowerCase() === color.toLowerCase());
+  }
 }
 
 function updateTitle() {
@@ -153,6 +177,7 @@ function renderAll() {
   renderCanvas();
   renderThumbs();
   renderProps();
+  renderBackground();
   updateTitle();
 }
 
@@ -219,6 +244,22 @@ function setTool(tool) {
 
 // --- pointer interaction --------------------------------------------------------
 
+// Two presses on the same shape inside this window are a double click. The
+// value is the platform default a double click is judged by; longer and an
+// ordinary pair of clicks starts opening text boxes.
+const DOUBLE_PRESS_MS = 400;
+let lastPress = { index: -1, time: -Infinity };
+
+function isSecondPress(index) {
+  const now = performance.now();
+  const again = index === lastPress.index && now - lastPress.time < DOUBLE_PRESS_MS;
+  // A consumed pair ends the sequence, the way a triple click is not two
+  // double clicks. Without the reset the press after one counts as a second
+  // press again, and a plain click keeps reopening the box just closed.
+  lastPress = { index: again ? -1 : index, time: now };
+  return again;
+}
+
 function toPoint(event) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -271,6 +312,24 @@ canvas.addEventListener('pointerdown', (event) => {
   const group = event.target.closest('g[data-i]');
   if (group) {
     let index = Number(group.dataset.i);
+
+    // Opening a text box for editing is decided here rather than from a
+    // dblclick event, because the browser never reports one: pointerup
+    // redraws the canvas, so mouseup lands on a freshly built element and
+    // not the one that took mousedown, and a click needs both.
+    //
+    // preventDefault keeps the focus the overlay is about to take. Without
+    // it the press moves focus back to the page, and from there Backspace
+    // deletes the box being typed into instead of a character.
+    if (isSecondPress(index) && slide().shapes[index].kind === 'text') {
+      event.preventDefault();
+      state.selected = index;
+      renderCanvas();
+      renderProps();
+      startTextEdit(index);
+      return;
+    }
+
     const clicked = index;
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
@@ -350,27 +409,16 @@ canvas.addEventListener('pointerup', () => {
   renderAll();
 });
 
-canvas.addEventListener('dblclick', (event) => {
-  const group = event.target.closest('g[data-i]');
-  if (!group) return;
-  const index = Number(group.dataset.i);
-  if (slide().shapes[index].kind === 'text') {
-    state.selected = index;
-    renderCanvas();
-    startTextEdit(index);
-  }
-});
 
 // --- text editing -----------------------------------------------------------------
 
-function startTextEdit(index) {
-  const shape = slide().shapes[index];
-  state.editingIndex = index;
-  renderCanvas();
-
+// The overlay has to look like the glyphs it hides, or every text box jumps
+// the moment editing starts or ends. A missing shape means the box being
+// edited is already gone, the same case commitTextEdit guards against.
+function styleTextEditor(shape) {
+  if (!shape) return;
   const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
   const lines = (shape.text || '').split('\n').length;
-  textEditor.value = shape.text;
   textEditor.style.left = `${shape.x * scale}px`;
   textEditor.style.top = `${shape.y * scale}px`;
   textEditor.style.width = `${Math.max(shape.w, 120) * scale}px`;
@@ -378,6 +426,19 @@ function startTextEdit(index) {
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
   textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
   textEditor.style.color = shape.textColor;
+  textEditor.style.fontWeight = shape.bold ? '700' : '400';
+  textEditor.style.fontStyle = shape.italic ? 'italic' : 'normal';
+  textEditor.style.textDecoration = shape.underline ? 'underline' : 'none';
+  textEditor.style.textAlign = shape.textAlign || 'left';
+}
+
+function startTextEdit(index) {
+  const shape = slide().shapes[index];
+  state.editingIndex = index;
+  renderCanvas();
+
+  textEditor.value = shape.text;
+  styleTextEditor(shape);
   textEditor.hidden = false;
   // Deferred so it wins over whatever focus change the triggering click
   // still has queued.
@@ -394,23 +455,52 @@ function commitTextEdit() {
   state.editingIndex = -1;
   textEditor.hidden = true;
 
+  // The shape can be gone by now: an undo, or a delete that reached the page
+  // while the overlay was open. There is nothing to commit into, and reading
+  // through it would take the whole page down.
+  if (!shape) {
+    state.selected = -1;
+    renderAll();
+    return;
+  }
+
+  // Both answers are needed before the shape is touched. Asking afterwards
+  // compares the new text with itself, which is never a change, and then an
+  // edit reaches neither the undo history nor the dirty marker.
   const text = textEditor.value.replace(/\s+$/, '');
-  if (text === '') {
+  const removed = text === '';
+  const changed = !removed && text !== shape.text;
+
+  if (removed) {
     slide().shapes.splice(index, 1);
     state.selected = -1;
-  } else if (text !== shape.text) {
+  } else if (changed) {
     shape.text = text;
     const lines = text.split('\n').length;
     shape.h = Math.max(shape.h, lines * shape.fontSize * 1.35);
   }
-  if (text !== shape.text || text === '') markDirty();
+  if (removed || changed) markDirty();
   renderAll();
 }
 
 textEditor.addEventListener('blur', commitTextEdit);
 textEditor.addEventListener('keydown', (event) => {
+  // The document handler must not see plain typing: every letter is a tool
+  // shortcut out there. Formatting and zoom are the exceptions, handled here
+  // so Cmd+B works mid-sentence like it does in any other editor.
   event.stopPropagation();
-  if (event.key === 'Escape') textEditor.blur();
+  if (event.key === 'Escape') {
+    textEditor.blur();
+    return;
+  }
+  if (!(event.metaKey || event.ctrlKey)) return;
+  const style = TEXT_STYLE_KEYS[event.key.toLowerCase()];
+  if (style) {
+    toggleTextStyle(style);
+    event.preventDefault();
+  } else if (handleZoomKey(event.key)) {
+    event.preventDefault();
+  }
 });
 
 // --- keyboard ------------------------------------------------------------------------
@@ -422,6 +512,23 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') presentStep(1);
     else if (event.key === 'ArrowLeft' || event.key === 'PageUp') presentStep(-1);
     else if (event.key === 'Escape') exitPresent();
+    event.preventDefault();
+    return;
+  }
+
+  // A text box open for editing owns the keyboard, and its own handler below
+  // deals with every key it should answer. Reaching here at all means focus
+  // slipped off the overlay; without this the shortcuts would run against the
+  // box being typed into — Backspace deleting it, a letter switching tools.
+  if (state.editingIndex >= 0 && event.target !== textEditor) {
+    textEditor.focus();
+    event.preventDefault();
+    return;
+  }
+
+  // Zoom answers even while a field has focus: it is about the view, not
+  // about whatever is being typed into.
+  if ((event.metaKey || event.ctrlKey) && handleZoomKey(event.key)) {
     event.preventDefault();
     return;
   }
@@ -442,6 +549,7 @@ document.addEventListener('keydown', (event) => {
     else if (key === 'c') copyShape();
     else if (key === 'v') pasteShape();
     else if (key === 'd') duplicateSelection();
+    else if (TEXT_STYLE_KEYS[key]) toggleTextStyle(TEXT_STYLE_KEYS[key]);
     else return;
     event.preventDefault();
     return;
@@ -536,6 +644,56 @@ function applyProp(patch) {
   renderProps();
 }
 
+// --- slide background --------------------------------------------------------
+//
+// Deliberately not part of applyProp: it writes to the slide, never to a
+// shape or to the defaults for new shapes, whatever happens to be selected.
+
+function setBackground(color, allSlides) {
+  const targets = allSlides ? state.deck.slides : [slide()];
+  for (const target of targets) target.background = color;
+  markDirty();
+  renderCanvas();
+  renderThumbs();
+  renderBackground();
+}
+
+$('bg-swatches').addEventListener('click', (event) => {
+  const swatch = event.target.closest('[data-bg]');
+  if (swatch) setBackground(swatch.dataset.bg, false);
+});
+$('prop-background').addEventListener('input', (e) => setBackground(e.target.value, false));
+$('btn-bg-all').addEventListener('click', () =>
+  setBackground(L.slideBackground(slide()), true)
+);
+
+// --- zoom ---------------------------------------------------------------------
+
+function setZoom(zoom) {
+  state.zoom = zoom;
+  stageInner.style.setProperty('--zoom', String(zoom));
+  $('btn-zoom-level').textContent = `${Math.round(zoom * 100)}%`;
+  // The overlay textarea is placed in screen pixels, so a zoom while a text
+  // box is open would leave it behind the glyphs it is meant to cover.
+  if (state.editingIndex >= 0) textEditor.blur();
+}
+
+$('btn-zoom-in').addEventListener('click', () => setZoom(L.zoomIn(state.zoom)));
+$('btn-zoom-out').addEventListener('click', () => setZoom(L.zoomOut(state.zoom)));
+$('btn-zoom-level').addEventListener('click', () => setZoom(L.ZOOM_FIT));
+
+// True when the key was a zoom command, so the caller can swallow it. Cmd+=
+// rather than Cmd+Shift+= for zooming in, which is the habit everywhere else.
+function handleZoomKey(key) {
+  if (key === '=' || key === '+') setZoom(L.zoomIn(state.zoom));
+  else if (key === '-' || key === '_') setZoom(L.zoomOut(state.zoom));
+  else if (key === '0') setZoom(L.ZOOM_FIT);
+  else return false;
+  return true;
+}
+
+// --- shape properties ------------------------------------------------------
+
 $('prop-fill-none').addEventListener('change', (e) =>
   applyProp({ fill: e.target.checked ? 'none' : $('prop-fill').value })
 );
@@ -553,6 +711,43 @@ $('prop-font-family').addEventListener('change', (e) =>
   applyProp({ fontFamily: e.target.value })
 );
 $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
+
+// --- text formatting -----------------------------------------------------------
+//
+// Formatting is a property of the whole text box, not of a run inside it, so
+// these apply to the selected box, or to the style new boxes start with when
+// nothing is selected.
+
+function textStyleTarget() {
+  const shape = selectedShape();
+  if (shape) return shape.kind === 'text' ? shape : null;
+  return state.defaults;
+}
+
+function toggleTextStyle(name) {
+  const target = textStyleTarget();
+  if (!target) return;
+  applyProp({ [name]: !target[name] });
+  // A box open for editing shows its glyphs in the textarea, not on the
+  // canvas, so the overlay has to be restyled too.
+  if (state.editingIndex >= 0) styleTextEditor(slide().shapes[state.editingIndex]);
+}
+
+$('prop-bold').addEventListener('click', () => toggleTextStyle('bold'));
+$('prop-italic').addEventListener('click', () => toggleTextStyle('italic'));
+$('prop-underline').addEventListener('click', () => toggleTextStyle('underline'));
+
+$('prop-align').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-align]');
+  if (button) applyProp({ textAlign: button.dataset.align });
+});
+
+$('prop-vertical-align').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-valign]');
+  if (button) applyProp({ verticalAlign: button.dataset.valign });
+});
+
+const TEXT_STYLE_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 
 // --- slide panel ------------------------------------------------------------------------
 
@@ -756,4 +951,5 @@ for (const button of document.querySelectorAll('[data-tool]')) {
 }
 
 setTool('select');
+setZoom(state.zoom);
 renderAll();

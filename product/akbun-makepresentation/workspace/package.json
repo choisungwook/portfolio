@@ -1,6 +1,6 @@
 {
   "name": "akbun-makepresentation",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "description": "Desktop slide deck editor: shapes, text, pptx open/save, pdf export, presentation mode",
   "author": "akbun",
