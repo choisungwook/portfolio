@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-03
+
+* **Creation**: [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](decisions/2026-08-arrow-shaft-square-cap.md) 결정 기록. akbun-makepresentation에서 화살표 끝에 점이 붙는다는 보고를 받고 고치다가, 같은 판단이 akbun-screenshot Issue #617의 ADR에만 남아 있어 두 번째로 만난 것을 알게 되면서 남긴다.
+
 ## 2026-08-02
 
 * **Creation**: [pptx import는 OOXML을 직접 파싱하고 검증은 생성기가 다른 corpus로 한다](decisions/2026-08-pptx-import-parses-ooxml-directly.md) 결정 기록. PowerPoint 덱 import가 깨지던 akbun-makepresentation을 고치면서, 단일 샘플 검증이 흰 배경과 16:9에 과적합해 두 구멍을 놓쳤던 경험을 함께 남긴다.

@@ -21,3 +21,4 @@
 * [pptx import는 OOXML을 직접 파싱하고 검증은 생성기가 다른 corpus로 한다](2026-08-pptx-import-parses-ooxml-directly.md) - PowerPoint 덱의 상속 체계(테마 색, placeholder, 배경, 페이지 크기)를 reader가 해석하고 단일 샘플 과적합을 corpus 교차 검증으로 막는 결정.
 * [Tauri 앱의 썸네일은 webview가 그리고 Rust는 바이트만 저장한다](2026-08-thumbnails-in-the-webview.md) - akbun-folderview의 썸네일 캐시를 Rust 이미지 라이브러리 없이 canvas로 생성하기로 한 결정.
 * [핸즈온은 terraform으로 기반까지만 만들고 학습 대상은 console에서 조작한다](2026-08-handson-terraform-base-console-operation.md) - terraform 범위를 기반 리소스로 한정하는 결정과 state 밖 리소스가 만드는 비용.
+* [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](2026-08-arrow-shaft-square-cap.md) - 화살표 끝에 구슬 같은 점이 붙던 현상을 두 product에서 같은 방식으로 없앤 결정.
