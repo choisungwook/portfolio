@@ -2,7 +2,7 @@
 
 ## Decision
 
-The preview keeps one `<video>` or `<audio>` element per clip, stacks them in the stage, and drives them from a `requestAnimationFrame` clock. Rust decodes nothing for the preview. The preview and the render are therefore two independent implementations of the same timeline, and the wiki says so.
+The preview keeps one `<video>` or `<audio>` element per clip and stacks them in the stage. The active reference element's `currentTime` drives the playhead, while followers use small `playbackRate` changes and seek only after large drift. Rust decodes nothing for the preview. The preview and the render are therefore two independent implementations of the same timeline, and the wiki says so.
 
 ## Reason
 
@@ -20,9 +20,8 @@ The honest limit of this approach is the number of simultaneous elements. Four v
 
 ## Where a lower quality actually saves
 
-Not where it looks like it does. A `<video>` decodes its source at full resolution whatever size it is drawn at, so shrinking the stage does not make the decoder do less work. The two things that do change:
+Not where it looks like it does. A `<video>` decodes its source at full resolution whatever size it is drawn at, so shrinking the stage does not make the decoder do less work. The thing that changes:
 
 1. `#stage-inner` is laid out at the quality scale and transformed back up, so the browser composites a smaller surface.
-2. The drift tolerance loosens, from 0.12 s to 0.4 s. Seeking is the expensive operation during playback, and letting an element run further before it is pulled back is most of the saving.
 
-Writing this down because "quality" reads like it should reduce decode cost, and someone will otherwise spend an afternoon wondering why Quarter did not help as much as expected.
+Playback synchronization is independent of preview quality. The reference element runs freely, ordinary follower drift changes playback speed by at most 5%, and a follower seeks only after one second of drift. Writing this down because "quality" reads like it should reduce decode cost, and someone will otherwise spend an afternoon wondering why Quarter did not help as much as expected.
