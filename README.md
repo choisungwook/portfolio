@@ -117,7 +117,7 @@
 - [macOS 메뉴바 관리 앱 (akbun-mactaskbar)](./product/akbun-mactaskbar/) (26.7.31)
 - [사진과 영상 태그, 등급, 검색 Windows 데스크톱 앱 (akbun-folderview)](./product/akbun-folderview/) (26.8.1)
 - [슬라이드 덱을 만들고 편집하는 macOS 데스크톱 앱 (akbun-makepresentation)](./product/akbun-makepresentation/) (26.8.2)
-- [MSA 서비스 간 관계를 학습해 장애 원인을 분석하는 agent CLI (akbun-agent-k8s)](./product/akbun-agent-k8s/) (26.8.3)
+- [MSA 서비스 간 관계를 학습해 장애 원인을 분석하는 agent CLI (akbun-agent-analysiscode)](./product/akbun-agent-analysiscode/) (26.8.3)
 
 ## Dockerfile
 

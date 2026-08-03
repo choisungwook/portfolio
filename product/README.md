@@ -6,7 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
-| [akbun-agent-k8s](./akbun-agent-k8s/) | MSA 소스코드에서 서비스 간 관계를 학습해 장애 원인과 변경 영향도를 분석하는 agent CLI |
+| [akbun-agent-analysiscode](./akbun-agent-analysiscode/) | MSA 소스코드에서 서비스 간 관계를 학습해 장애 원인과 변경 영향도를 분석하는 agent CLI |
 | [akbun-gitdesktop](./akbun-gitdesktop/) | git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱 |
 | [akbun-folderview](./akbun-folderview/) | 직접 추가한 사진과 영상을 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱 |
 | [akbun-makepresentation](./akbun-makepresentation/) | 도형, 텍스트, pptx 열기/저장, pdf 내보내기, 발표 모드를 갖춘 슬라이드 편집 macOS 데스크톱 앱 |
