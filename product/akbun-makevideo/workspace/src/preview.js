@@ -174,7 +174,8 @@ function createPreview(options) {
       const { entry, track, clip, target, wasLive } = item;
       const drift = target - entry.element.currentTime;
       const isReference = item === reference;
-      const needsInitialSeek = !playing || !wasLive || timelineDiscontinuity;
+      const needsInitialSeek =
+        !playing || !wasLive || timelineDiscontinuity || (isReference && entry.element.paused);
       const needsHardSeek = !isReference && Math.abs(drift) >= HARD_SYNC_THRESHOLD;
 
       if ((needsInitialSeek && Math.abs(drift) > 0.03) || needsHardSeek) {
@@ -220,9 +221,17 @@ function createPreview(options) {
     return project ? L.projectDurationMs(project) : 0;
   }
 
+  function transportActive() {
+    return playing || starting;
+  }
+
   function frame() {
     if (playing && mode === 'timeline') {
-      if (clock && Number.isFinite(clock.entry.element.currentTime)) {
+      if (
+        clock &&
+        !clock.entry.element.paused &&
+        Number.isFinite(clock.entry.element.currentTime)
+      ) {
         positionMs = timelineTimeFromMedia(clock.clip, clock.entry.element.currentTime);
       } else {
         positionMs = performance.now() - clockOrigin;
@@ -235,8 +244,9 @@ function createPreview(options) {
     }
     if (mode === 'timeline') {
       const nextClock = syncTimeline();
-      if (!clock || !nextClock || clock.clip.id !== nextClock.clip.id) {
-        clock = nextClock;
+      const readyClock = nextClock && !nextClock.entry.element.paused ? nextClock : null;
+      if (!clock || !readyClock || clock.clip.id !== readyClock.clip.id) {
+        clock = readyClock;
         clockOrigin = performance.now() - positionMs;
       }
     } else syncAsset();
@@ -244,7 +254,7 @@ function createPreview(options) {
     const rounded = Math.round(positionMs);
     if (rounded !== lastReported) {
       lastReported = rounded;
-      if (onTick) onTick(positionMs, playing);
+      if (onTick) onTick(positionMs, transportActive());
     }
     requestAnimationFrame(frame);
   }
@@ -255,6 +265,7 @@ function createPreview(options) {
     clearExact();
     if (mode === 'timeline' && positionMs >= totalMs()) positionMs = 0;
     starting = true;
+    if (onTick) onTick(positionMs, transportActive());
     const generation = ++playGeneration;
     let reference = null;
     if (mode === 'timeline') {
@@ -275,7 +286,7 @@ function createPreview(options) {
     playing = true;
     clock = reference;
     clockOrigin = performance.now() - positionMs;
-    if (onTick) onTick(positionMs, playing);
+    if (onTick) onTick(positionMs, transportActive());
   }
 
   function pause() {
@@ -291,7 +302,7 @@ function createPreview(options) {
       }
     }
     if (assetElement && assetElement.pause) assetElement.pause();
-    if (onTick) onTick(positionMs, playing);
+    if (onTick) onTick(positionMs, transportActive());
   }
 
   function seek(ms) {
@@ -307,7 +318,7 @@ function createPreview(options) {
       }
     }
     if (mode === 'timeline') clock = syncTimeline();
-    if (onTick) onTick(positionMs, playing);
+    if (onTick) onTick(positionMs, transportActive());
   }
 
   /** Elements outlive the clips that made them unless something removes them,
@@ -427,7 +438,7 @@ function createPreview(options) {
     clearExact,
     isExact,
     toggle: () => (playing || starting ? pause() : play()),
-    isPlaying: () => playing || starting,
+    isPlaying: transportActive,
     seek,
     position: () => positionMs,
     total: totalMs,

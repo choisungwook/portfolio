@@ -77,6 +77,7 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
     window: global.window,
     timelineLib: global.timelineLib,
     requestAnimationFrame: global.requestAnimationFrame,
+    performance: global.performance,
   };
   context.after(() => Object.assign(global, original));
 
@@ -86,6 +87,7 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   });
   const elements = [];
   const frames = [];
+  let now = 0;
   global.document = {
     createElement(tagName) {
       const start = elements.length === 0 ? () => referenceStarted : () => Promise.resolve();
@@ -96,6 +98,7 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   };
   global.window = { api: { fileUrl: (path) => path } };
   global.requestAnimationFrame = (callback) => frames.push(callback);
+  global.performance = { now: () => now };
 
   const videoTrack = { id: 'v1', kind: 'video', clips: [], hidden: false, muted: false };
   const audioTrack = { id: 'a1', kind: 'audio', clips: [], hidden: false, muted: false };
@@ -133,7 +136,8 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
 
   const play = preview.play();
   await Promise.resolve();
-  assert.strictEqual(ticks.some((tick) => tick.playing), false);
+  assert.strictEqual(ticks.at(-1).playing, true);
+  assert.strictEqual(preview.position(), 0);
 
   startReference();
   await play;
@@ -146,6 +150,11 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   assert.strictEqual(preview.position(), 200);
   assert.strictEqual(follower.currentTime, 0.1);
   assert.strictEqual(follower.playbackRate, 1.025);
+
+  reference.paused = true;
+  now = 300;
+  frames.shift()();
+  assert.strictEqual(preview.position(), 300);
 
   preview.seek(500);
   assert.strictEqual(reference.currentTime, 0.5);
