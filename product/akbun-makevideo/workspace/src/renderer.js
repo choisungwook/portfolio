@@ -429,10 +429,36 @@ function deleteSelected() {
   renderTimeline();
 }
 
+/** Persist a setting changed from a toolbar or the transport, where there is no
+ *  sheet to report into.
+ *
+ *  These are one-click toggles, so blocking on the write would make the button
+ *  feel slow for something that has already visibly happened. What must not
+ *  happen is an unhandled rejection: the toggle is put back and the reason is
+ *  shown, so a setting that did not persist does not silently look as though it
+ *  did. `bootstrap` is the source of truth on the next launch either way.
+ */
+async function persistSettings(revert) {
+  try {
+    state.boot = await window.api.saveSettings(state.settings);
+    state.settings = state.boot.settings;
+  } catch (error) {
+    if (revert) revert();
+    await window.api.message(`That setting could not be saved.\n\n${error}`, {
+      title: 'Settings',
+      kind: 'error',
+    });
+  }
+}
+
 function toggleSnap() {
-  state.settings.snap = !state.settings.snap;
-  window.api.saveSettings(state.settings);
+  const previous = state.settings.snap;
+  state.settings.snap = !previous;
   dom.btnMagnet.classList.toggle('on', state.settings.snap);
+  persistSettings(() => {
+    state.settings.snap = previous;
+    dom.btnMagnet.classList.toggle('on', previous);
+  });
 }
 
 // --- dragging clips --------------------------------------------------------
@@ -1102,9 +1128,14 @@ function wireTimeline() {
 function wireTransport() {
   dom.btnPlay.addEventListener('click', () => preview.toggle());
   dom.previewQuality.addEventListener('change', () => {
+    const previous = state.settings.previewQuality;
     state.settings.previewQuality = dom.previewQuality.value;
     preview.setQuality(state.settings.previewQuality);
-    window.api.saveSettings(state.settings);
+    persistSettings(() => {
+      state.settings.previewQuality = previous;
+      dom.previewQuality.value = previous;
+      preview.setQuality(previous);
+    });
   });
   dom.previewSource.addEventListener('click', (event) => {
     const button = event.target.closest('[data-source]');
@@ -1145,7 +1176,15 @@ function wireSheets() {
       ffmpegDir: el('as-ffmpeg').value.trim(),
     });
     closeSheet('app-settings');
-    state.boot = await window.api.saveSettings(next);
+    try {
+      state.boot = await window.api.saveSettings(next);
+    } catch (error) {
+      await window.api.message(`Those settings could not be saved.\n\n${error}`, {
+        title: 'Settings',
+        kind: 'error',
+      });
+      return;
+    }
     applySettings(state.boot.settings);
     updateToolWarning();
   });

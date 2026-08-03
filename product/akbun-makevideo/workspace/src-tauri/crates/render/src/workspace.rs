@@ -15,6 +15,29 @@ pub const PROJECT_FILE: &str = "project.akbunvideo";
 /// tail so the page and the tests can agree on it without one.
 pub const DEFAULT_FOLDER: &str = "akbun-makevideo";
 
+/// Expand a leading `~` against the home directory.
+///
+/// A path a user types into a settings field is a path they would type in a
+/// shell, and the docs and the placeholder both write the default as
+/// `~/Documents/akbun-makevideo`. Without this, typing that back in makes a
+/// directory literally called `~` next to the app's working directory.
+///
+/// `~user` is deliberately not handled: resolving another account's home needs
+/// the password database, and nobody types it into this field.
+pub fn expand_home(path: &str, home: &str) -> String {
+    let path = path.trim();
+    if home.is_empty() || !path.starts_with('~') {
+        return path.to_string();
+    }
+    let home = home.trim_end_matches('/');
+    match path {
+        "~" => home.to_string(),
+        rest if rest.starts_with("~/") => format!("{home}/{}", &rest[2..]),
+        // ~someone-else: left alone rather than mangled.
+        other => other.to_string(),
+    }
+}
+
 /// Windows reserves these whatever the extension, and a directory named for one
 /// cannot be created. macOS does not care, but a project folder that will not
 /// survive being copied to another machine is worth refusing here.
@@ -104,6 +127,51 @@ mod tests {
     fn an_empty_name_says_so() {
         assert!(sanitize_project_name("").is_err());
         assert!(sanitize_project_name("   ").is_err());
+    }
+
+    #[test]
+    fn a_typed_tilde_reaches_the_home_directory() {
+        // The docs and the settings placeholder both write the default this
+        // way, so it is the exact string a user is most likely to type back in.
+        assert_eq!(
+            expand_home("~/Documents/akbun-makevideo", "/Users/akbun"),
+            "/Users/akbun/Documents/akbun-makevideo"
+        );
+        assert_eq!(expand_home("~", "/Users/akbun"), "/Users/akbun");
+        assert_eq!(
+            expand_home("  ~/edits  ", "/Users/akbun"),
+            "/Users/akbun/edits"
+        );
+    }
+
+    #[test]
+    fn a_trailing_slash_on_home_does_not_double_up() {
+        assert_eq!(
+            expand_home("~/edits", "/Users/akbun/"),
+            "/Users/akbun/edits"
+        );
+    }
+
+    #[test]
+    fn an_absolute_path_is_left_alone() {
+        assert_eq!(
+            expand_home("/Volumes/work", "/Users/akbun"),
+            "/Volumes/work"
+        );
+        assert_eq!(expand_home("", "/Users/akbun"), "");
+    }
+
+    #[test]
+    fn another_users_home_is_not_guessed_at() {
+        // Resolving ~someone needs the password database, and the alternative
+        // of mangling it into /Users/akbunsomeone would be worse than leaving
+        // it to fail visibly.
+        assert_eq!(expand_home("~bob/edits", "/Users/akbun"), "~bob/edits");
+    }
+
+    #[test]
+    fn with_no_home_to_expand_against_nothing_changes() {
+        assert_eq!(expand_home("~/edits", ""), "~/edits");
     }
 
     #[test]

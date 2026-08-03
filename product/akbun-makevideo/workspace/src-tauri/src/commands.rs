@@ -154,10 +154,22 @@ pub fn apply_theme(app: &AppHandle, theme: &str) {
     }
 }
 
-fn find_tool(name: &str, configured: &str) -> Option<String> {
-    tools::candidate_paths(name, configured)
+/// The user's home directory as a plain string, for expanding a typed `~`.
+fn home_dir(app: &AppHandle) -> String {
+    app.path()
+        .home_dir()
+        .map(|dir| dir.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+/// The first candidate that is really a file. Every candidate is absolute, so
+/// "not found" means not found rather than "there was a bare name at the end of
+/// the list that always matched".
+fn find_tool(app: &AppHandle, name: &str, configured: &str) -> Option<String> {
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    tools::candidate_paths(name, configured, &path_env, &home_dir(app))
         .into_iter()
-        .find(|candidate| !candidate.contains('/') || Path::new(candidate).is_file())
+        .find(|candidate| Path::new(candidate).is_file())
 }
 
 fn run_text(program: &str, args: Vec<String>) -> String {
@@ -292,19 +304,21 @@ fn compositor_info(state: &State<AppState>, setting: &str) -> CompositorInfo {
 }
 
 /// What this render should use, honouring the setting.
-fn chosen_acceleration(state: &State<AppState>) -> Option<Acceleration> {
+fn chosen_acceleration(app: &AppHandle, state: &State<AppState>) -> Option<Acceleration> {
     let settings = state.settings.lock().unwrap().clone();
     if settings.render_acceleration == "cpu" {
         return None;
     }
-    let program = find_tool("ffmpeg", &settings.ffmpeg_dir);
+    let program = find_tool(app, "ffmpeg", &settings.ffmpeg_dir);
     acceleration(state, program.as_ref()).available
 }
 
 /// Where project folders live. The setting wins; otherwise it is the Documents
 /// folder, or the home folder on a system that has no Documents.
 fn workspace_root(app: &AppHandle, settings: &Settings) -> PathBuf {
-    let configured = settings.workspace_dir.trim();
+    // A path typed into a settings field is a path someone would type in a
+    // shell, and the placeholder shows the default with a ~ in it.
+    let configured = workspace::expand_home(&settings.workspace_dir, &home_dir(app));
     if !configured.is_empty() {
         return PathBuf::from(configured);
     }
@@ -380,7 +394,7 @@ pub fn create_project(
 #[tauri::command]
 pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     let settings = state.settings.lock().unwrap().clone();
-    let ffmpeg = find_tool("ffmpeg", &settings.ffmpeg_dir);
+    let ffmpeg = find_tool(&app, "ffmpeg", &settings.ffmpeg_dir);
     Bootstrap {
         version: app.package_info().version.to_string(),
         data_dir: crate::store::data_dir(&app),
@@ -389,7 +403,7 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
             .to_string(),
         acceleration: acceleration(&state, ffmpeg.as_ref()),
         compositor: compositor_info(&state, &settings.compositor),
-        ffprobe: find_tool("ffprobe", &settings.ffmpeg_dir),
+        ffprobe: find_tool(&app, "ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
         settings,
     }
@@ -404,6 +418,7 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
 /// the screen would undo that.
 #[tauri::command]
 pub fn preview_frame(
+    app: AppHandle,
     state: State<AppState>,
     project: Project,
     time_ms: u64,
@@ -412,7 +427,7 @@ pub fn preview_frame(
     let settings = state.settings.lock().unwrap().clone();
     let gpu = compositor(&state, wanted_backend(&settings.compositor));
     let configured = settings.ffmpeg_dir.clone();
-    let ffmpeg_path = find_tool("ffmpeg", &configured)
+    let ffmpeg_path = find_tool(&app, "ffmpeg", &configured)
         .ok_or("ffmpeg was not found, so no frame can be decoded")?;
 
     // The preview is drawn at the project shape, scaled down to what the panel
@@ -478,7 +493,7 @@ fn probe_asset(ffprobe: Option<&String>, path: &str) -> probe::Probed {
 #[tauri::command]
 pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>) -> Vec<Asset> {
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let ffprobe = find_tool("ffprobe", &configured);
+    let ffprobe = find_tool(&app, "ffprobe", &configured);
     let mut assets = Vec::new();
     for path in paths {
         let Some(kind) = AssetKind::from_path(&path) else {
@@ -715,13 +730,13 @@ pub fn start_render(
     let preset = ffmpeg::Preset::parse(&preset)?;
     let total_ms = project.duration_ms();
     let settings = state.settings.lock().unwrap().clone();
-    let program = find_tool("ffmpeg", &settings.ffmpeg_dir).ok_or_else(|| {
+    let program = find_tool(&app, "ffmpeg", &settings.ffmpeg_dir).ok_or_else(|| {
         "ffmpeg was not found. Install it with `brew install ffmpeg`, or point Settings at the \
          folder that holds it."
             .to_string()
     })?;
 
-    let chosen = chosen_acceleration(&state);
+    let chosen = chosen_acceleration(&app, &state);
     let accel_label = chosen
         .as_ref()
         .map(|hardware| hardware.label.clone())
