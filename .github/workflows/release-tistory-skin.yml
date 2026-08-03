@@ -62,7 +62,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd product/tistory-skin/akbun
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - Tistory blog skin, distributed as a zip artifact.
+
+          ## Install
+
+          - The zip contains skin.html, style.css, index.xml and the images directory.
+          - Upload it from the Tistory skin editor. No build step needed.
+          EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
           gh release create "${{ steps.version.outputs.tag }}" akbun-skin.zip \
             --target "${{ github.sha }}" \
             --title "tistory-${{ steps.version.outputs.version }}" \
-            --notes "티스토리 스킨 tistory-${{ steps.version.outputs.version }} 배포 아티팩트. skin.html, style.css, index.xml 포함."
+            --notes-file release-notes.md \
+            --generate-notes

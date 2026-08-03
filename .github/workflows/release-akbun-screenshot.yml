@@ -93,15 +93,20 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          macOS menu bar screenshot app. Area capture by drag, then a floating preview with save, copy and close.
+          ## About
 
-          The dmg is Apple Silicon (arm64) only and unsigned, so the first launch fails with "damaged and can't be opened". Remove the quarantine attribute after installing:
+          - macOS menu bar screenshot app.
+          - Area capture by drag, then a floating preview with save, copy and close.
 
-          ```bash
-          xattr -cr /Applications/akbun-screenshot.app
-          ```
+          ## Install
+
+          - The dmg is Apple Silicon (arm64) only.
+          - Unsigned build, so the first launch fails with "damaged and can't be opened".
+          - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-screenshot.app`
           EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
+            --generate-notes \
             product/akbun-screenshot/workspace/release/*.dmg

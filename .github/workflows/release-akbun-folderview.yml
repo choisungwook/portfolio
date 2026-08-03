@@ -80,12 +80,28 @@ jobs:
           # Only NSIS is built, but latest.json prefers msi by default.
           updaterJsonPreferNsis: true
           releaseBody: |
-            직접 추가한 사진과 영상만 모아 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱이다.
+            ## About
 
-            - 설치 파일은 Windows x64 전용이다.
-            - exe를 내려받아 실행하면 사용자 폴더에 설치되고 바로 실행된다. 관리자 권한은 필요 없다.
-            - 코드 서명이 없어 SmartScreen 경고가 나온다. "추가 정보"를 누르고 "실행"을 선택하면 설치된다.
-            - 설치 후에는 Settings의 Check for Updates로 다음 버전을 받는다.
+            - Windows desktop app that collects only the photos and videos you add, and finds them again by tag, rating and search.
+
+            ## Install
+
+            - The installer is Windows x64 only.
+            - Downloading and running the exe installs into the user folder and launches at once. No administrator rights needed.
+            - Unsigned build, so SmartScreen warns. Choose "More info" then "Run anyway".
+            - After installing, Check for Updates in Settings fetches newer versions.
+
+      # tauri-action has no --generate-notes equivalent, so the commit list is
+      # generated and appended to the body the action already wrote.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          $tag = "akbun-folderview-v$version"
+          gh release view $tag --json body --jq .body --repo ${{ github.repository }} > notes.md
+          gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name=$tag --jq .body >> notes.md
+          gh release edit $tag --notes-file notes.md --repo ${{ github.repository }}
 
       # releases/latest is repository-wide, so any other product's release
       # steals it and installed copies silently see the wrong latest.json.

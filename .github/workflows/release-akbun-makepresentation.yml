@@ -78,12 +78,28 @@ jobs:
           releaseDraft: false
           prerelease: false
           releaseBody: |
-            Desktop slide deck editor: shapes, text, pptx open/save, pdf export, presentation mode.
+            ## About
+
+            - Desktop slide deck editor: shapes, text, pptx open/save, pdf export, presentation mode.
+
+            ## Install
 
             - The installer is a macOS (Apple Silicon) dmg.
-            - The build is not code signed, so after dragging the app to Applications run once in Terminal:
-              xattr -cr /Applications/akbun-makepresentation.app
+            - Unsigned build, so after dragging the app to Applications run once in Terminal: `xattr -cr /Applications/akbun-makepresentation.app`
             - After that, the Updates button inside the app fetches newer versions on its own.
+
+      # tauri-action has no --generate-notes equivalent, so the commit list is
+      # generated and appended to the body the action already wrote.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="akbun-makepresentation-v${VERSION}"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
       # Several products release from this repository, so the GitHub-wide
       # "latest" release is whichever product shipped last. The app therefore
