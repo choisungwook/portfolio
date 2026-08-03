@@ -36,6 +36,89 @@ export interface PullRequestInfo {
   headRefName: string
   url: string
   updatedAt: string
+  labels: string[]
+}
+
+export interface IssueInfo {
+  number: number
+  title: string
+  state: string
+  author: string
+  url: string
+  updatedAt: string
+  labels: string[]
+  /** Number of the issue this one is a sub-issue of. 0 when it has no parent. */
+  parent: number
+}
+
+export interface ThreadComment {
+  author: string
+  createdAt: string
+  body: string
+}
+
+/**
+ * One issue or pull request with its body and comments.
+ * The two are one type because GitHub numbers them in one sequence and the app
+ * shows them in one drawer. The branch and diff size fields stay empty for issues.
+ */
+export interface ThreadDetail {
+  kind: 'issue' | 'pr'
+  number: number
+  title: string
+  state: string
+  author: string
+  url: string
+  createdAt: string
+  updatedAt: string
+  labels: string[]
+  assignees: string[]
+  body: string
+  comments: ThreadComment[]
+  baseRefName: string
+  headRefName: string
+  additions: number
+  deletions: number
+  changedFiles: number
+}
+
+export interface ProjectInfo {
+  number: number
+  title: string
+  url: string
+  closed: boolean
+  itemCount: number
+}
+
+/** Projects belong to an owner, not to a repository, so the owner comes with the list. */
+export interface ProjectListResult {
+  owner: string
+  nameWithOwner: string
+  projects: ProjectInfo[]
+}
+
+export interface ProjectItem {
+  id: string
+  title: string
+  status: string
+  /** Issue, PullRequest or DraftIssue. */
+  type: string
+  url: string
+  /** 0 for a draft issue, which has no issue number. */
+  number: number
+  /** owner/name of the repository the item lives in. Empty for a draft issue. */
+  repository: string
+  assignees: string[]
+  labels: string[]
+}
+
+export interface ProjectColumn {
+  name: string
+  items: ProjectItem[]
+}
+
+export interface ProjectBoard {
+  columns: ProjectColumn[]
 }
 
 export interface OpenerApp {

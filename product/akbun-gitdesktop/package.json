@@ -1,7 +1,7 @@
 {
   "name": "akbun-gitdesktop",
   "productName": "akbun-gitdesktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Git graph desktop viewer for local repositories and worktrees",
   "main": "out/main/index.js",
   "author": "akbun",

@@ -33,6 +33,14 @@ const api = {
     ipcRenderer.invoke('git:rangeDiff', repoPath, base, head, filePath),
 
   getPullRequests: (repoPath: string) => ipcRenderer.invoke('gh:pullRequests', repoPath),
+  getPullRequestDetail: (repoPath: string, number: number) =>
+    ipcRenderer.invoke('gh:pullRequestDetail', repoPath, number),
+  getIssues: (repoPath: string) => ipcRenderer.invoke('gh:issues', repoPath),
+  getIssueDetail: (repoPath: string, number: number) =>
+    ipcRenderer.invoke('gh:issueDetail', repoPath, number),
+  getProjects: (repoPath: string) => ipcRenderer.invoke('gh:projects', repoPath),
+  getProjectBoard: (repoPath: string, owner: string, number: number) =>
+    ipcRenderer.invoke('gh:projectBoard', repoPath, owner, number),
 
   openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
   listOpenerApps: () => ipcRenderer.invoke('open:apps'),

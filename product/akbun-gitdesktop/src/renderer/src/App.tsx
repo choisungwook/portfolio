@@ -3,15 +3,31 @@ import type { BranchInfo, CommitInfo, OpenerApp, RepoEntry, WorktreeInfo } from 
 import BranchPanel from './components/BranchPanel'
 import DiffDrawer, { type DiffSource } from './components/DiffDrawer'
 import GraphView from './components/GraphView'
+import IssuePanel from './components/IssuePanel'
 import PrPanel from './components/PrPanel'
+import ProjectPanel from './components/ProjectPanel'
 import RepoSidebar from './components/RepoSidebar'
 import SettingsDialog from './components/SettingsDialog'
+import ThreadDrawer, { type ThreadRef } from './components/ThreadDrawer'
 import TopBar from './components/TopBar'
 import WorktreePanel from './components/WorktreePanel'
 import { useCliStatus } from './lib/useCliStatus'
 import { useTheme } from './lib/useTheme'
 
-type Tab = 'graph' | 'branches' | 'prs'
+type Tab = 'graph' | 'branches' | 'prs' | 'issues' | 'projects'
+
+const TAB_LABELS: Array<[Tab, string]> = [
+  ['graph', 'Graph'],
+  ['branches', 'Branches'],
+  ['prs', 'Pull requests'],
+  ['issues', 'Issues'],
+  ['projects', 'Projects']
+]
+
+/** The git tabs show a diff on the right, the GitHub tabs show an issue or a pull request. */
+function isGitTab(tab: Tab): boolean {
+  return tab === 'graph' || tab === 'branches'
+}
 
 export default function App(): JSX.Element {
   const [repos, setRepos] = useState<RepoEntry[]>([])
@@ -24,6 +40,7 @@ export default function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [defaultBranch, setDefaultBranch] = useState('HEAD')
   const [diffSource, setDiffSource] = useState<DiffSource | null>(null)
+  const [thread, setThread] = useState<ThreadRef | null>(null)
   const theme = useTheme()
   const cli = useCliStatus()
   // The repository whose default branch lookup is still allowed to win.
@@ -56,6 +73,7 @@ export default function App(): JSX.Element {
       setSelectedRepo(repo)
       setTab('graph')
       setDiffSource(null)
+      setThread(null)
       refreshWorktrees(repo)
       pendingRepoPath.current = repo.path
       setDefaultBranch('HEAD')
@@ -89,6 +107,7 @@ export default function App(): JSX.Element {
           setWorktrees([])
           setSelectedWorktree(null)
           setDiffSource(null)
+          setThread(null)
         }
       } else {
         setError(result.error)
@@ -126,18 +145,28 @@ export default function App(): JSX.Element {
     [targetPath, defaultBranch]
   )
 
+  const showThread = useCallback(
+    (kind: 'issue' | 'pr', number: number, title: string) => {
+      setThread({ kind, repoPath: targetPath, number, title })
+    },
+    [targetPath]
+  )
+
   const selectWorktree = useCallback((worktree: WorktreeInfo) => {
     setSelectedWorktree(worktree)
     setDiffSource(null)
+    setThread(null)
   }, [])
 
   const selectTab = useCallback((next: Tab) => {
     setTab(next)
     setDiffSource(null)
+    setThread(null)
   }, [])
 
   const selectedHash = diffSource?.kind === 'commit' ? diffSource.hash : ''
   const selectedBranch = diffSource?.kind === 'range' ? diffSource.head : ''
+  const selectedThreadNumber = thread?.number ?? 0
 
   return (
     <div className="app-shell">
@@ -163,15 +192,15 @@ export default function App(): JSX.Element {
             />
             <main className="main-view">
               <nav className="tabs">
-                <button className={tab === 'graph' ? 'active' : ''} onClick={() => selectTab('graph')}>
-                  Graph
-                </button>
-                <button className={tab === 'branches' ? 'active' : ''} onClick={() => selectTab('branches')}>
-                  Branches
-                </button>
-                <button className={tab === 'prs' ? 'active' : ''} onClick={() => selectTab('prs')}>
-                  Pull requests
-                </button>
+                {TAB_LABELS.map(([id, label]) => (
+                  <button
+                    key={id}
+                    className={tab === id ? 'active' : ''}
+                    onClick={() => selectTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
                 <span className="target-path">{targetPath}</span>
               </nav>
               {error && <div className="error-banner">{error}</div>}
@@ -192,10 +221,33 @@ export default function App(): JSX.Element {
                       onSelectBranch={showBranchDiff}
                     />
                   )}
-                  {tab === 'prs' && targetPath && <PrPanel repoPath={targetPath} />}
+                  {tab === 'prs' && targetPath && (
+                    <PrPanel
+                      repoPath={targetPath}
+                      selectedNumber={selectedThreadNumber}
+                      onSelect={(pr) => showThread('pr', pr.number, pr.title)}
+                    />
+                  )}
+                  {tab === 'issues' && targetPath && (
+                    <IssuePanel
+                      repoPath={targetPath}
+                      selectedNumber={selectedThreadNumber}
+                      onSelect={(issue) => showThread('issue', issue.number, issue.title)}
+                    />
+                  )}
+                  {tab === 'projects' && targetPath && (
+                    <ProjectPanel
+                      repoPath={targetPath}
+                      selectedNumber={selectedThreadNumber}
+                      onSelectThread={showThread}
+                    />
+                  )}
                 </div>
-                {diffSource && tab !== 'prs' && (
+                {isGitTab(tab) && diffSource && (
                   <DiffDrawer source={diffSource} onClose={() => setDiffSource(null)} />
+                )}
+                {!isGitTab(tab) && thread && (
+                  <ThreadDrawer thread={thread} onClose={() => setThread(null)} />
                 )}
               </div>
             </main>
