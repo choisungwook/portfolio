@@ -41,6 +41,7 @@ sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
 What is covered:
 
 - `test/timeline.test.js` — placing, overlap, moving between tracks, trimming against the source bounds, splitting, snapping, track limits, and reading an older project file
+- `test/quality.test.js` — quality percentiles, the six acceptance checks and report aggregation
 - `crates/render/src/layout.rs` — where a clip lands in the frame, the case both paths used to answer separately
 - `crates/render/src/ffmpeg.rs` — one test per feature of the filter graph, the decoder and encoder arguments for the composited route, the preset sizes and the progress parser
 - `crates/render/src/probe.rs` — ffprobe output including the cover art case, where an mp3 reports a video stream
@@ -83,6 +84,10 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 **The software compositor is slow, not broken.** 114 ms a frame at 1080p with two layers, against 23 ms for a software Vulkan device. It is what runs on a machine with no graphics adapter, and the picture is the same.
 
 **The composited route moves a lot of bytes.** Every frame leaves ffmpeg as raw RGBA and goes back the same way, about 250 MB for each second of 1080p30 timeline. On a software rasteriser that made a test render 3.4x slower than the filter graph; on a Mac the drawing is on the GPU and the pipe traffic is what remains. `Settings → Compositor → ffmpeg filter graph` is the faster route when the preview matching the file does not matter.
+
+## Playback quality
+
+The repeatable playback soak and its media element baseline live in [quality/](../quality/README.md). The source video is generated locally, and the app reports frame timing, drops, A/V drift, startup delay and process-tree memory growth as JSON.
 
 ## Release
 

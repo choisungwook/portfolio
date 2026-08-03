@@ -67,6 +67,7 @@ const state = {
 };
 
 let preview = null;
+let qualityMonitor = null;
 
 // --- helpers ---------------------------------------------------------------
 
@@ -871,9 +872,23 @@ async function openProjectPath(path) {
   try {
     const project = await window.api.openProject(path);
     loadProject(project, path);
+    return true;
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open', kind: 'error' });
+    return false;
   }
+}
+
+function qualitySmokeConfig() {
+  return {
+    continuousMs: 5000,
+    restartCount: 2,
+    restartPlayMs: 1000,
+    restartPauseMs: 100,
+    trackStepMs: 1000,
+    seekCount: 3,
+    seekIntervalMs: 300,
+  };
 }
 
 async function saveProject(forcePicker) {
@@ -1014,6 +1029,20 @@ const actions = {
   'app-settings': () => {
     fillAppSheet();
     openSheet('app-settings');
+  },
+  'quality-soak': async () => {
+    try {
+      await globalThis.makevideoQuality.runAndSave();
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Playback quality failed' });
+    }
+  },
+  'quality-smoke': async () => {
+    try {
+      await globalThis.makevideoQuality.runAndSave(qualitySmokeConfig());
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Playback quality failed' });
+    }
   },
   'check-update': () => window.api.checkUpdate(),
   about: () =>
@@ -1329,12 +1358,14 @@ async function boot() {
   state.settings = state.boot.settings;
   state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
 
+  qualityMonitor = globalThis.qualityLib.createQualityMonitor({});
   preview = globalThis.previewLib.createPreview({
     stage: dom.stage,
     inner: dom.stageInner,
     exactCanvas: dom.stageExact,
     wrap: dom.stageWrap,
     getProject: () => state.project,
+    qualityMonitor,
     onTick: (ms, playing) => {
       updatePlayhead(ms);
       followPlayhead(ms);
@@ -1356,6 +1387,14 @@ async function boot() {
     fps: state.settings.defaultFps,
   });
   applySettings(state.settings);
+  globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
+    monitor: qualityMonitor,
+    preview,
+    getProject: () => state.project,
+    refresh,
+    memoryBytes: window.api.processMemoryBytes,
+    saveReport: window.api.saveQualityReport,
+  });
   updateToolWarning();
 
   wireMenus();
@@ -1380,6 +1419,15 @@ async function boot() {
 
   refresh();
   setPreviewSource('timeline');
+  if (state.boot.qualityProject && state.boot.qualityReport) {
+    window.setTimeout(async () => {
+      if (!(await openProjectPath(state.boot.qualityProject))) return;
+      const config = state.boot.qualitySmoke ? qualitySmokeConfig() : undefined;
+      const report = await globalThis.makevideoQuality.runAll(config);
+      await window.api.writeQualityReport(state.boot.qualityReport, report);
+      window.api.closeWindow();
+    }, 250);
+  }
 }
 
 // lib.rs opens the devtools in debug builds because the window is the whole

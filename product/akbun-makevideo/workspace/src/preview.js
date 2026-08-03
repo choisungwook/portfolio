@@ -38,7 +38,7 @@ function clamp01(value) {
 }
 
 function createPreview(options) {
-  const { stage, inner, wrap, exactCanvas, getProject, onTick } = options;
+  const { stage, inner, wrap, exactCanvas, getProject, onTick, qualityMonitor } = options;
   const L = globalThis.timelineLib;
 
   const pool = new Map();
@@ -96,13 +96,17 @@ function createPreview(options) {
     element.preload = 'auto';
     element.className = 'stage-media';
     element.playsInline = true;
+    if (wantsPicture && qualityMonitor) qualityMonitor.watchVideo(element);
     return { element, kind: wantsPicture ? 'video' : 'audio' };
   }
 
   function entryFor(clip, asset, wantsPicture) {
     let entry = pool.get(clip.id);
     if (entry && entry.path === asset.path && entry.wantsPicture === wantsPicture) return entry;
-    if (entry) entry.element.remove();
+    if (entry) {
+      if (entry.kind === 'video' && qualityMonitor) qualityMonitor.unwatchVideo(entry.element);
+      entry.element.remove();
+    }
     const made = makeElement(asset, wantsPicture);
     entry = {
       element: made.element,
@@ -190,6 +194,15 @@ function createPreview(options) {
       entry.element.volume = clamp01(clip.volume);
       entry.element.muted =
         (track.kind === 'video' && track.muted) || (scrubbing && muteWhileScrubbing);
+      if (
+        qualityMonitor &&
+        (playing || starting) &&
+        !isReference &&
+        reference &&
+        track.kind !== reference.track.kind
+      ) {
+        qualityMonitor.sampleDrift(drift * 1000);
+      }
       if (playing || starting) ensurePlaying(entry.element);
       if (!playing && !starting && !entry.element.paused) entry.element.pause();
     }
@@ -264,6 +277,7 @@ function createPreview(options) {
     if (totalMs() <= 0) return;
     clearExact();
     if (mode === 'timeline' && positionMs >= totalMs()) positionMs = 0;
+    if (qualityMonitor) qualityMonitor.playbackRequested();
     starting = true;
     if (onTick) onTick(positionMs, transportActive());
     const generation = ++playGeneration;
@@ -306,6 +320,7 @@ function createPreview(options) {
   }
 
   function seek(ms) {
+    if (qualityMonitor && qualityMonitor.isRunning()) qualityMonitor.discontinuity();
     positionMs = Math.max(0, Math.min(ms, Math.max(totalMs(), 0)));
     clockOrigin = performance.now() - positionMs;
     clock = null;
@@ -334,6 +349,7 @@ function createPreview(options) {
     for (const [clipId, entry] of pool) {
       if (alive.has(clipId)) continue;
       entry.element.pause && entry.element.pause();
+      if (entry.kind === 'video' && qualityMonitor) qualityMonitor.unwatchVideo(entry.element);
       entry.element.removeAttribute('src');
       entry.element.remove();
       pool.delete(clipId);
@@ -343,6 +359,7 @@ function createPreview(options) {
   function clear() {
     for (const entry of pool.values()) {
       entry.element.pause && entry.element.pause();
+      if (entry.kind === 'video' && qualityMonitor) qualityMonitor.unwatchVideo(entry.element);
       entry.element.removeAttribute('src');
       entry.element.remove();
     }
@@ -358,7 +375,12 @@ function createPreview(options) {
     clearExact();
     pause();
     for (const entry of pool.values()) hide(entry);
-    if (assetElement) assetElement.remove();
+    if (assetElement) {
+      if (assetElement.tagName === 'VIDEO' && qualityMonitor) {
+        qualityMonitor.unwatchVideo(assetElement);
+      }
+      assetElement.remove();
+    }
     assetShown = asset || null;
     if (!asset) {
       assetElement = null;
@@ -377,6 +399,9 @@ function createPreview(options) {
     mode = 'timeline';
     pause();
     if (assetElement) {
+      if (assetElement.tagName === 'VIDEO' && qualityMonitor) {
+        qualityMonitor.unwatchVideo(assetElement);
+      }
       assetElement.remove();
       assetElement = null;
     }

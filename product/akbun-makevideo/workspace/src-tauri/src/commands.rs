@@ -9,6 +9,7 @@ use makevideo_compositor::{Backend, Compositor};
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -134,6 +135,9 @@ pub struct Bootstrap {
     pub acceleration: AccelProbe,
     /// What is drawing frames, and whether it is a real graphics device.
     pub compositor: CompositorInfo,
+    pub quality_project: Option<String>,
+    pub quality_report: Option<String>,
+    pub quality_smoke: bool,
 }
 
 pub fn allow_asset_file(app: &AppHandle, path: &str) {
@@ -406,6 +410,9 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
         ffprobe: find_tool(&app, "ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
         settings,
+        quality_project: std::env::var("AKBUN_MAKEVIDEO_QUALITY_PROJECT").ok(),
+        quality_report: std::env::var("AKBUN_MAKEVIDEO_QUALITY_REPORT").ok(),
+        quality_smoke: std::env::var("AKBUN_MAKEVIDEO_QUALITY_SMOKE").as_deref() == Ok("1"),
     }
 }
 
@@ -862,5 +869,75 @@ pub fn cancel_render(state: State<AppState>) {
     state.cancelled.store(true, Ordering::SeqCst);
     if let Some(child) = state.render.lock().unwrap().as_mut() {
         let _ = child.kill();
+    }
+}
+
+fn process_tree_rss_bytes(output: &str, root: u32) -> u64 {
+    let rows: Vec<(u32, u32, u64)> = output
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            Some((
+                fields.next()?.parse().ok()?,
+                fields.next()?.parse().ok()?,
+                fields.next()?.parse().ok()?,
+            ))
+        })
+        .collect();
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut rss = HashMap::new();
+    for (pid, parent, kib) in rows {
+        children.entry(parent).or_default().push(pid);
+        rss.insert(pid, kib);
+    }
+    let mut pending = vec![root];
+    let mut found = HashSet::new();
+    while let Some(pid) = pending.pop() {
+        if !found.insert(pid) {
+            continue;
+        }
+        if let Some(next) = children.get(&pid) {
+            pending.extend(next);
+        }
+    }
+    found
+        .iter()
+        .filter_map(|pid| rss.get(pid))
+        .sum::<u64>()
+        .saturating_mul(1024)
+}
+
+/// Resident memory for the app and its webview/helper children. The quality
+/// harness samples the whole process tree because decoder memory does not live
+/// solely in the Rust process.
+#[tauri::command]
+pub fn process_memory_bytes() -> Result<u64, String> {
+    let output = Command::new("ps")
+        .args(["-axo", "pid=,ppid=,rss="])
+        .output()
+        .map_err(|error| format!("cannot read process memory: {error}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(process_tree_rss_bytes(
+        &String::from_utf8_lossy(&output.stdout),
+        std::process::id(),
+    ))
+}
+
+#[tauri::command]
+pub fn save_quality_report(path: String, report: serde_json::Value) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
+    std::fs::write(&path, text).map_err(|error| format!("cannot write {path}: {error}"))
+}
+
+#[cfg(test)]
+mod quality_tests {
+    use super::process_tree_rss_bytes;
+
+    #[test]
+    fn memory_includes_descendants_but_not_neighbours() {
+        let ps = "10 1 100\n11 10 20\n12 11 5\n20 1 900\n";
+        assert_eq!(process_tree_rss_bytes(ps, 10), 125 * 1024);
     }
 }

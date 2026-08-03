@@ -53,6 +53,7 @@ Cmd on macOS, Ctrl elsewhere.
 | [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the render crate in src-tauri/ |
 | [wiki/](./wiki/) | What the next agent reads before taking over, one page per part under [wiki/architecture/](./wiki/architecture/) |
 | [adr/](./adr/) | Decision records |
+| [quality/](./quality/) | Playback quality harness, thresholds and baseline |
 
 ## Where things go
 
