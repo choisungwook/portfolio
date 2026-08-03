@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from 'react'
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { ProjectBoard, ProjectInfo, ProjectItem } from '../../../shared/types'
 import { clickable } from '../lib/clickable'
 import { ghErrorMessage, PROJECT_SCOPE_HINT } from '../lib/github'
@@ -11,6 +11,20 @@ interface Props {
 
 const EMPTY_BOARD: ProjectBoard = { columns: [] }
 
+/**
+ * The projects of one repository, tagged with the repository they were read from.
+ * They travel together because an owner only means anything next to the path it
+ * came from: a board loaded with the previous repository's owner is the wrong board.
+ */
+interface ProjectSource {
+  repoPath: string
+  owner: string
+  nameWithOwner: string
+  projects: ProjectInfo[]
+}
+
+const EMPTY_SOURCE: ProjectSource = { repoPath: '', owner: '', nameWithOwner: '', projects: [] }
+
 function itemKind(item: ProjectItem): 'issue' | 'pr' | null {
   if (item.type === 'Issue') return 'issue'
   if (item.type === 'PullRequest') return 'pr'
@@ -22,30 +36,36 @@ function itemKind(item: ProjectItem): 'issue' | 'pr' | null {
  * Columns come from the Status field, which is what the board on GitHub groups by.
  */
 export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread }: Props): JSX.Element {
-  const [projects, setProjects] = useState<ProjectInfo[]>([])
-  const [owner, setOwner] = useState('')
-  const [nameWithOwner, setNameWithOwner] = useState('')
+  const [source, setSource] = useState<ProjectSource>(EMPTY_SOURCE)
   const [selected, setSelected] = useState(0)
   const [board, setBoard] = useState<ProjectBoard>(EMPTY_BOARD)
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
+  // Only the newest board request may write state. An older one landing late
+  // would put another repository's board on screen.
+  const boardRequest = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    boardRequest.current += 1
     setLoading(true)
     setLoadError('')
     setBoard(EMPTY_BOARD)
+    setSource(EMPTY_SOURCE)
+    setSelected(0)
     window.gitdesktop.getProjects(repoPath).then((result) => {
       if (cancelled) return
       setLoading(false)
       if (!result.ok) {
-        setProjects([])
         setLoadError(ghErrorMessage('projects', result.error, PROJECT_SCOPE_HINT))
         return
       }
-      setOwner(result.data.owner)
-      setNameWithOwner(result.data.nameWithOwner)
-      setProjects(result.data.projects)
+      setSource({
+        repoPath,
+        owner: result.data.owner,
+        nameWithOwner: result.data.nameWithOwner,
+        projects: result.data.projects
+      })
       const open = result.data.projects.find((project) => !project.closed)
       setSelected(open?.number ?? result.data.projects[0]?.number ?? 0)
     })
@@ -55,9 +75,13 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
   }, [repoPath])
 
   const loadBoard = useCallback(async () => {
-    if (!owner || !selected) return
+    // A repository change re-runs this before the new owner has arrived, and the
+    // stale owner would ask for a project the new repository does not own.
+    if (source.repoPath !== repoPath || !source.owner || !selected) return
+    const request = ++boardRequest.current
     setLoading(true)
-    const result = await window.gitdesktop.getProjectBoard(repoPath, owner, selected)
+    const result = await window.gitdesktop.getProjectBoard(repoPath, source.owner, selected)
+    if (request !== boardRequest.current) return
     setLoading(false)
     if (result.ok) {
       setBoard(result.data)
@@ -66,7 +90,7 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
       setBoard(EMPTY_BOARD)
       setLoadError(ghErrorMessage('this project board', result.error, PROJECT_SCOPE_HINT))
     }
-  }, [repoPath, owner, selected])
+  }, [repoPath, source, selected])
 
   useEffect(() => {
     loadBoard()
@@ -76,14 +100,14 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
     const kind = itemKind(item)
     // A card from another repository cannot be read with gh in this working copy,
     // and a draft issue has no number at all, so both fall back to the browser.
-    if (kind && item.number > 0 && item.repository === nameWithOwner) {
+    if (kind && item.number > 0 && item.repository === source.nameWithOwner) {
       onSelectThread(kind, item.number, item.title)
       return
     }
     if (item.url) window.gitdesktop.openExternal(item.url)
   }
 
-  const project = projects.find((entry) => entry.number === selected) ?? null
+  const project = source.projects.find((entry) => entry.number === selected) ?? null
 
   return (
     <div className="project-panel">
@@ -93,8 +117,8 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
           onChange={(event) => setSelected(Number(event.target.value))}
           aria-label="Project"
         >
-          {projects.length === 0 && <option value={0}>No project</option>}
-          {projects.map((entry) => (
+          {source.projects.length === 0 && <option value={0}>No project</option>}
+          {source.projects.map((entry) => (
             <option key={entry.number} value={entry.number}>
               #{entry.number} {entry.title}
               {entry.closed ? ' (closed)' : ''}
@@ -109,12 +133,12 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
             Open in browser
           </button>
         )}
-        {owner && <span className="pr-meta">owner {owner}</span>}
+        {source.owner && <span className="pr-meta">owner {source.owner}</span>}
       </div>
 
       {loadError && <div className="error-banner">{loadError}</div>}
       {loading && <p className="placeholder">Loading project...</p>}
-      {!loading && !loadError && projects.length === 0 && (
+      {!loading && !loadError && source.projects.length === 0 && (
         <p className="placeholder">This owner has no project.</p>
       )}
 
@@ -136,7 +160,7 @@ export default function ProjectPanel({ repoPath, selectedNumber, onSelectThread 
                   <span className="project-card-title">{item.title}</span>
                   <span className="project-card-meta">
                     {item.number > 0 ? `#${item.number}` : 'draft'}
-                    {item.repository && item.repository !== nameWithOwner ? ` · ${item.repository}` : ''}
+                    {item.repository && item.repository !== source.nameWithOwner ? ` · ${item.repository}` : ''}
                     {item.assignees.length > 0 ? ` · ${item.assignees.join(', ')}` : ''}
                   </span>
                   {item.labels.length > 0 && (
