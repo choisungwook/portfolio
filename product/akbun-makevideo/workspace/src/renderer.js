@@ -147,7 +147,6 @@ function renderAssets() {
     const item = document.createElement('li');
     item.className = 'asset';
     item.dataset.id = asset.id;
-    item.draggable = true;
     item.title = asset.path;
     if (asset.id === state.selectedAssetId) item.classList.add('selected');
 
@@ -600,6 +599,61 @@ function laneAtPoint(x, y) {
   return under.closest('.lane');
 }
 
+/** Dragging an asset out of the panel and onto a lane runs on pointer events
+ *  rather than HTML5 drag and drop.
+ *
+ *  The webview that shows this page is also the view that catches files dropped
+ *  from Finder, and that handler reports every drag event as handled — including
+ *  a drag that started inside the page and carries no file at all. WebKit never
+ *  gets it, so `dragover` and `drop` do not fire and a `draggable` asset lands
+ *  nowhere. Pointer events are not routed through it. */
+let assetDrag = null;
+
+function beginAssetDrag(event) {
+  if (event.button !== 0) return;
+  const item = event.target.closest('.asset');
+  if (!item || event.target.closest('[data-remove]')) return;
+  const asset = L.findAsset(state.project, item.dataset.id);
+  if (!asset) return;
+  assetDrag = { asset, startX: event.clientX, startY: event.clientY, ghost: null };
+}
+
+function updateAssetDrag(event) {
+  // A few pixels of slack, so a click that wobbles still reads as a click.
+  if (!assetDrag.ghost) {
+    const travelled =
+      Math.abs(event.clientX - assetDrag.startX) + Math.abs(event.clientY - assetDrag.startY);
+    if (travelled < 4) return;
+    assetDrag.ghost = document.createElement('div');
+    assetDrag.ghost.className = 'drag-ghost';
+    assetDrag.ghost.textContent = assetDrag.asset.name || baseName(assetDrag.asset.path);
+    document.body.appendChild(assetDrag.ghost);
+    document.body.classList.add('dragging');
+  }
+  assetDrag.ghost.style.left = `${event.clientX + 12}px`;
+  assetDrag.ghost.style.top = `${event.clientY + 12}px`;
+  const lane = laneAtPoint(event.clientX, event.clientY);
+  for (const node of dom.lanes.querySelectorAll('.lane')) {
+    node.classList.toggle('drop-target', node === lane);
+  }
+}
+
+function endAssetDrag(event) {
+  const current = assetDrag;
+  assetDrag = null;
+  if (!current || !current.ghost) return;
+  current.ghost.remove();
+  document.body.classList.remove('dragging');
+  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+
+  const lane = laneAtPoint(event.clientX, event.clientY);
+  if (!lane) return;
+  const at = L.snapTime(state.project, timeAtClientX(event.clientX), snapTolerance());
+  if (!dropAssetsOnTrack(lane.dataset.trackId, [current.asset], at)) return;
+  markDirty();
+  renderTimeline();
+}
+
 async function handleOsDrop(payload) {
   if (payload.type === 'over') {
     const point = payload.position || { x: 0, y: 0 };
@@ -1009,6 +1063,13 @@ function wireMenus() {
   document.addEventListener('pointerdown', (event) => {
     if (!event.target.closest('#menus')) closeMenus();
   });
+  // The webview brings its own right-click menu, and the first item on it is
+  // Reload. The project lives in this page and nowhere else until it is saved,
+  // so that one click empties the assets and the timeline with no warning.
+  // Text fields keep their menu, because copy and paste belong there.
+  document.addEventListener('contextmenu', (event) => {
+    if (!event.target.closest('input, textarea')) event.preventDefault();
+  });
 }
 
 function wireAssets() {
@@ -1033,12 +1094,11 @@ function wireAssets() {
     if (!item) return;
     setPreviewSource('asset');
   });
-  dom.assetList.addEventListener('dragstart', (event) => {
-    const item = event.target.closest('.asset');
-    if (!item) return;
-    event.dataTransfer.setData('text/plain', item.dataset.id);
-    event.dataTransfer.effectAllowed = 'copy';
+  dom.assetList.addEventListener('pointerdown', beginAssetDrag);
+  window.addEventListener('pointermove', (event) => {
+    if (assetDrag) updateAssetDrag(event);
   });
+  window.addEventListener('pointerup', endAssetDrag);
 }
 
 function wireTimeline() {
@@ -1092,35 +1152,6 @@ function wireTimeline() {
     if (scrubbing) {
       scrubbing = false;
       preview.setScrubbing(false);
-    }
-  });
-
-  // Dragging an asset out of the panel and onto a lane.
-  dom.lanes.addEventListener('dragover', (event) => {
-    const lane = event.target.closest('.lane');
-    if (!lane) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-    for (const node of dom.lanes.querySelectorAll('.lane')) {
-      node.classList.toggle('drop-target', node === lane);
-    }
-  });
-  dom.lanes.addEventListener('dragleave', (event) => {
-    const lane = event.target.closest('.lane');
-    if (lane) lane.classList.remove('drop-target');
-  });
-  dom.lanes.addEventListener('drop', (event) => {
-    const lane = event.target.closest('.lane');
-    for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
-    if (!lane) return;
-    event.preventDefault();
-    const assetId = event.dataTransfer.getData('text/plain');
-    const asset = L.findAsset(state.project, assetId);
-    if (!asset) return;
-    const at = L.snapTime(state.project, timeAtClientX(event.clientX), snapTolerance());
-    if (dropAssetsOnTrack(lane.dataset.trackId, [asset], at)) {
-      markDirty();
-      renderTimeline();
     }
   });
 }
