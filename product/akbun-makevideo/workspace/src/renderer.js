@@ -638,13 +638,26 @@ function updateAssetDrag(event) {
   }
 }
 
-function endAssetDrag(event) {
+/** Put the page back the way it was and report the drag that was running, if it
+ *  had got as far as showing a ghost.
+ *
+ *  A drag does not always end in a pointerup: the pointer sequence can be
+ *  cancelled, or the window can lose focus mid-drag and the button come up
+ *  somewhere else entirely. Every one of those paths comes through here, so a
+ *  ghost is never left stuck to the cursor. */
+function clearAssetDrag() {
   const current = assetDrag;
   assetDrag = null;
-  if (!current || !current.ghost) return;
+  if (!current || !current.ghost) return null;
   current.ghost.remove();
   document.body.classList.remove('dragging');
   for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+  return current;
+}
+
+function endAssetDrag(event) {
+  const current = clearAssetDrag();
+  if (!current) return;
 
   const lane = laneAtPoint(event.clientX, event.clientY);
   if (!lane) return;
@@ -1099,6 +1112,8 @@ function wireAssets() {
     if (assetDrag) updateAssetDrag(event);
   });
   window.addEventListener('pointerup', endAssetDrag);
+  window.addEventListener('pointercancel', clearAssetDrag);
+  window.addEventListener('blur', clearAssetDrag);
 }
 
 function wireTimeline() {
