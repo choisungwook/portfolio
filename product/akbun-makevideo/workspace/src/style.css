@@ -667,6 +667,24 @@ button.icon.on {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* What follows the pointer while an asset is on its way to a lane. */
+.drag-ghost {
+  position: fixed;
+  z-index: 400;
+  padding: 3px 8px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--fg);
+  font-size: 12px;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
 .clip {
   position: absolute;
   top: 4px;
