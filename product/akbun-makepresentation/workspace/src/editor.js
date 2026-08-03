@@ -349,16 +349,29 @@ function renderShapeSvg(shape, options) {
 function arrowSvg(shape) {
   const x1 = shape.x, y1 = shape.y;
   const x2 = shape.x + shape.w, y2 = shape.y + shape.h;
-  const length = Math.hypot(shape.w, shape.h) || 1;
+  const length = Math.hypot(shape.w, shape.h);
+  // A zero length arrow has no direction to point in. Drawing nothing beats
+  // drawing the dot a round cap would leave behind; the handles still select it.
+  if (!length) return '';
   const ux = shape.w / length, uy = shape.h / length;
-  const head = Math.max(10, shape.strokeWidth * 4);
+  // Never more than half the arrow, so the base of the head stays in front of
+  // the tail. Past that the shaft is drawn backwards and its far end shows up
+  // as a dot sitting behind the arrow.
+  const head = Math.min(length / 2, Math.max(10, shape.strokeWidth * 4));
   // Shorten the line so it does not poke through the head tip.
   const bx = x2 - ux * head, by = y2 - uy * head;
-  const half = head * 0.45;
+  // Widening a shortened head keeps it visible on a stubby arrow, where a head
+  // proportional to its own length would be narrower than the shaft it sits on.
+  // A head that is not clamped is already wider than this, so nothing moves.
+  const half = Math.max(head * 0.45, shape.strokeWidth);
   const p1 = `${bx - uy * half},${by + ux * half}`;
   const p2 = `${bx + uy * half},${by - ux * half}`;
+  // Both ends of the shaft take the default butt cap, which stops exactly on
+  // the endpoint. The other two both overshoot it by half a stroke, and that
+  // overshoot reads as a bead stuck on the end of the arrow: round leaves a
+  // semicircle, square a rectangle.
   return (
-    `<line x1="${x1}" y1="${y1}" x2="${bx}" y2="${by}" ${strokeAttrs(shape)} stroke-linecap="round"/>` +
+    `<line x1="${x1}" y1="${y1}" x2="${bx}" y2="${by}" ${strokeAttrs(shape)}/>` +
     `<polygon points="${x2},${y2} ${p1} ${p2}" fill="${shape.stroke === 'none' ? '#1a1a1a' : shape.stroke}"/>`
   );
 }

@@ -229,6 +229,36 @@ test('renderShapeSvg draws an arrow head polygon', () => {
   assert.ok(svg.includes('100,0'));
 });
 
+// Round and square both run half a stroke past the endpoint, which on an arrow
+// reads as a bead stuck on the end. Only butt stops on it. Asking for the cap
+// rather than for the attribute lets an explicit butt pass. Lines and pen
+// strokes keep their round cap.
+test('renderShapeSvg gives the arrow shaft a butt cap at both ends', () => {
+  const shape = L.createShape('arrow', 0, 0, { strokeWidth: 8 });
+  L.dragShape(shape, 0, 0, 100, 0);
+  const cap = L.renderShapeSvg(shape).match(/stroke-linecap="(\w+)"/);
+  assert.strictEqual(cap ? cap[1] : 'butt', 'butt');
+
+  const line = L.createShape('line', 0, 0, {});
+  L.dragShape(line, 0, 0, 100, 0);
+  assert.ok(L.renderShapeSvg(line).includes('stroke-linecap="round"'));
+});
+
+// The head used to keep its full length on a short arrow, which pushed the
+// shaft backwards and left its far end sitting behind the tail as a dot.
+test('renderShapeSvg keeps a short arrow inside its own span', () => {
+  const shape = L.createShape('arrow', 20, 20, { strokeWidth: 6 });
+  L.dragShape(shape, 20, 20, 32, 20);
+  const svg = L.renderShapeSvg(shape);
+  const shaftEnd = Number(svg.match(/x2="([\d.]+)"/)[1]);
+  assert.ok(shaftEnd >= 20 && shaftEnd <= 32);
+});
+
+test('renderShapeSvg draws nothing for a zero length arrow', () => {
+  const shape = L.createShape('arrow', 40, 40, {});
+  assert.strictEqual(L.renderShapeSvg(shape), '');
+});
+
 test('renderShapeSvg applies dash styles', () => {
   const shape = L.createShape('rect', 0, 0, { dash: 'dash', strokeWidth: 2 });
   L.dragShape(shape, 0, 0, 50, 50);
