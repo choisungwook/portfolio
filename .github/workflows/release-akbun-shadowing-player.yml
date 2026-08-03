@@ -92,12 +92,19 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          - 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 macOS 빌드다.
-          - dmg는 Apple Silicon(arm64) 전용이다.
-          - 코드 서명이 없어 처음 실행하면 "damaged and can't be opened" 오류가 난다.
-          - 설치 후 `xattr -cr /Applications/akbun-shadowing-player.app`로 quarantine 속성을 지우면 실행된다.
+          ## About
+
+          - Section-repeat audio player for language shadowing practice, macOS build.
+
+          ## Install
+
+          - The dmg is Apple Silicon (arm64) only.
+          - Unsigned build, so the first launch fails with "damaged and can't be opened".
+          - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-shadowing-player.app`
           EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
+            --generate-notes \
             product/akbun-shadowing-player/release/*.dmg

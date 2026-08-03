@@ -98,13 +98,29 @@ jobs:
           releaseDraft: false
           prerelease: false
           releaseBody: |
-            Desktop video editor: multi track timeline, live preview, render to FHD and 4K.
+            ## About
+
+            - Desktop video editor: multi track timeline, live preview, render to FHD and 4K.
+
+            ## Install
 
             - The installer is a macOS (Apple Silicon) dmg.
             - Rendering needs ffmpeg on the machine: `brew install ffmpeg`.
-            - The build is not code signed, so after dragging the app to Applications run once in Terminal:
-              xattr -cr /Applications/akbun-makevideo.app
+            - Unsigned build, so after dragging the app to Applications run once in Terminal: `xattr -cr /Applications/akbun-makevideo.app`
             - After that, Settings → Check for Updates fetches newer versions on its own.
+
+      # tauri-action has no --generate-notes equivalent, so the commit list is
+      # generated and appended to the body the action already wrote.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="akbun-makevideo-v${VERSION}"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
       # Several products release from this repository, so the GitHub-wide
       # "latest" release is whichever product shipped last. The app therefore

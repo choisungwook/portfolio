@@ -86,11 +86,18 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          - GitHub pull request comment로 terraform plan/apply를 실행하는 셀프호스팅 서버다.
-          - 바이너리는 linux x86_64 전용이다. 다른 아키텍처는 소스에서 직접 빌드한다.
-          - 실행에는 terraform CLI와 GitHub webhook 설정이 필요하다. docs/user-guide.md를 참고한다.
+          ## About
+
+          - Self-hosted server that runs terraform plan and apply from GitHub pull request comments.
+
+          ## Install
+
+          - The binary is linux x86_64 only. Other architectures build from source.
+          - Running it needs the terraform CLI and a GitHub webhook. See docs/user-guide.md.
           EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
+            --generate-notes \
             product/akbun-terraform-apply-remote/target/release/akbun-terraform-apply-remote

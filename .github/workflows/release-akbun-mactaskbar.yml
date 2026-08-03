@@ -71,21 +71,25 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<'EOF'
-          macOS menu bar manager. Two divider icons split the status bar into three sections, and one click on the control icon pages through them: visible only, visible plus hidden, everything. A revealed section folds back up on its own after a while, and ⌃⌘B cycles the sections from anywhere. The item list window shows every status item on the bar, including the ones macOS is currently drawing nowhere.
+          ## About
 
-          Assign icons to a section in the "all" state: hold Command and drag an icon to the left of a divider. macOS remembers the order.
+          - macOS menu bar manager. Two divider icons split the status bar into three sections.
+          - One click on the control icon pages through them: visible only, visible plus hidden, everything.
+          - A revealed section folds back up on its own after a while. `⌃⌘B` cycles the sections from anywhere.
+          - The item list window lists every status item on the bar, including the ones macOS is currently drawing nowhere.
+          - To pin icons to a section in the "all" state, hold Command and drag an icon to the left of a divider. macOS remembers the order.
+          - The shortcut defaults to `⌃⌘B`, changeable or removable in the item list window, since macOS gives no way to find out whether another app already owns a combination.
+          - No icon after launch means the menu bar had no room left and macOS placed the control icon under the camera housing. The app opens its item list window on detecting this, and the shortcut works regardless.
 
-          The shortcut defaults to ⌃⌘B and can be changed or turned off in the item list window, since macOS gives no way to find out whether another app already owns a combination.
+          ## Install
 
-          If no icon appears after launch, the menu bar had no room left and macOS placed the control icon under the camera housing, where nothing is drawn. The app opens its item list window when it detects this, and the shortcut works regardless.
-
-          The dmg is Apple Silicon (arm64) only and unsigned, so the first launch fails with "damaged and can't be opened". Remove the quarantine attribute after installing:
-
-          ```bash
-          xattr -cr /Applications/akbun-mactaskbar.app
-          ```
+          - The dmg is Apple Silicon (arm64) only.
+          - Unsigned build, so the first launch fails with "damaged and can't be opened".
+          - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-mactaskbar.app`
           EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
+            --generate-notes \
             product/akbun-mactaskbar/workspace/build/*.dmg
