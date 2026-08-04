@@ -302,6 +302,22 @@
         <input type="text" id="as-ffmpeg" placeholder="empty = look in the usual places" />
       </label>
       <p class="dim small-text" id="as-tools"></p>
+      <label class="row">Error log folder
+        <span class="row-input">
+          <input type="text" id="as-log-dir" placeholder="empty = operating system default" />
+          <button id="as-log-dir-pick" class="small" type="button">Choose…</button>
+        </span>
+      </label>
+      <p class="dim small-text" id="as-log-note"></p>
+      <label class="row">Rotate error log at
+        <span class="row-input compact">
+          <input type="number" id="as-log-size" min="1" max="1024" />
+          <select id="as-log-unit">
+            <option value="kb">KB</option>
+            <option value="mb">MB</option>
+          </select>
+        </span>
+      </label>
       <div class="sheet-actions">
         <button data-close="app-settings">Cancel</button>
         <button id="as-save" class="primary">Apply</button>
@@ -309,9 +325,9 @@
     </div>
   </div>
 
+  <script src="api.js"></script>
   <script src="time.js"></script>
   <script src="timeline.js"></script>
-  <script src="api.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>
   <script src="renderer.js"></script>

@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 // The DOM. Everything that plays lives in preview.js and the arithmetic a
 // redraw needs lives in timeline.js; this file listens, sends commands, and
 // redraws from what comes back.
@@ -25,6 +27,23 @@ const SNAP_PX = 10;
 // How much timeline is kept past the end of the edit, so there is always
 // somewhere to drop the next clip.
 const TAIL_SECONDS = 10;
+
+const DEFAULT_SETTINGS = {
+  theme: 'system',
+  previewQuality: 'half',
+  previewMuteWhileScrubbing: true,
+  snap: true,
+  defaultWidth: 1920,
+  defaultHeight: 1080,
+  defaultRate: { num: 30, den: 1 },
+  workspaceDir: '',
+  ffmpegDir: '',
+  renderAcceleration: 'auto',
+  compositor: 'auto',
+  logDir: '',
+  logRotationSize: 5,
+  logRotationUnit: 'mb',
+};
 
 const el = (id) => document.getElementById(id);
 
@@ -79,8 +98,21 @@ const state = {
   // flag, which means undoing back to where the last save was leaves the
   // project clean again instead of permanently modified.
   savedRevision: 0,
-  settings: null,
-  boot: null,
+  settings: { ...DEFAULT_SETTINGS },
+  boot: {
+    settings: { ...DEFAULT_SETTINGS },
+    workspace: '',
+    version: '',
+    dataDir: '',
+    logDir: '',
+    ffmpeg: null,
+    ffprobe: null,
+    acceleration: { available: null, tried: [] },
+    compositor: { setting: 'auto', device: 'initializing', gpu: false, fellBack: true },
+    qualityProject: null,
+    qualityReport: null,
+    qualitySmoke: false,
+  },
   path: null,
   selectedClipId: null,
   selectedAssetId: null,
@@ -92,6 +124,19 @@ let preview = null;
 let qualityMonitor = null;
 
 // --- helpers ---------------------------------------------------------------
+
+function errorText(error) {
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+
+function reportError(error, source) {
+  const message = errorText(error);
+  console.error(source, error);
+  Promise.resolve(window.api.reportError(source, message)).catch((logError) => {
+    console.error('error-log', logError);
+  });
+}
 
 function baseName(path) {
   return String(path).split(/[\\/]/).pop();
@@ -571,6 +616,7 @@ async function persistSettings(revert) {
     state.boot = await window.api.saveSettings(state.settings);
     state.settings = state.boot.settings;
   } catch (error) {
+    reportError(error, 'settings:persist');
     if (revert) revert();
     await window.api.message(`That setting could not be saved.\n\n${error}`, {
       title: 'Settings',
@@ -880,6 +926,7 @@ async function startRender(preset) {
     // this runs cannot half reach the file being written.
     await window.api.startRender(output, preset);
   } catch (error) {
+    reportError(error, 'render:start');
     state.rendering = false;
     dom.renderOverlay.hidden = true;
     await window.api.message(String(error), { title: 'Render failed', kind: 'error' });
@@ -928,6 +975,7 @@ function onRenderDone(payload) {
   } else {
     dom.renderTitle.textContent = payload.cancelled ? 'Render cancelled' : 'Render failed';
     dom.renderStatus.textContent = payload.message || '';
+    if (!payload.cancelled) reportError(payload.message || 'Render failed', 'render');
   }
 }
 
@@ -980,6 +1028,7 @@ async function createProjectFromSheet() {
     await window.api.saveProject(entry.path);
     updateTitle();
   } catch (failure) {
+    reportError(failure, 'project:create');
     error.textContent = String(failure);
     error.hidden = false;
   }
@@ -1021,6 +1070,7 @@ async function openProjectPath(path) {
     loadDocument(doc, path);
     return true;
   } catch (error) {
+    reportError(error, 'project:open');
     await window.api.message(String(error), { title: 'Cannot open', kind: 'error' });
     return false;
   }
@@ -1055,6 +1105,7 @@ async function saveProject(forcePicker) {
     updateTitle();
     return true;
   } catch (error) {
+    reportError(error, 'project:save');
     await window.api.message(String(error), { title: 'Cannot save', kind: 'error' });
     return false;
   }
@@ -1136,6 +1187,11 @@ function fillAppSheet() {
   el('as-tools').textContent = state.boot.ffmpeg
     ? `Found ffmpeg at ${state.boot.ffmpeg}`
     : 'ffmpeg was not found. Rendering is unavailable until it is.';
+  el('as-log-dir').value = state.settings.logDir;
+  el('as-log-size').value = state.settings.logRotationSize;
+  el('as-log-unit').value = state.settings.logRotationUnit;
+  const logDir = state.boot.logDir || 'the operating system application log folder';
+  el('as-log-note').textContent = `Only errors are written to ${logDir}/errors.log. The previous file is kept as errors.log.1.`;
 }
 
 function applySettings(next) {
@@ -1253,7 +1309,7 @@ function wireMenus() {
     if (!item) return;
     closeMenus();
     const run = actions[item.dataset.action];
-    if (run) run();
+    if (run) Promise.resolve().then(run).catch((error) => reportError(error, `menu:${item.dataset.action}`));
   });
   dom.menus.addEventListener('pointerover', (event) => {
     const title = event.target.closest('.menu-title');
@@ -1406,11 +1462,18 @@ function wireSheets() {
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
+      logDir: el('as-log-dir').value.trim(),
+      logRotationSize: Math.min(
+        1024,
+        Math.max(1, Math.floor(Number(el('as-log-size').value) || 5)),
+      ),
+      logRotationUnit: el('as-log-unit').value,
     });
     closeSheet('app-settings');
     try {
       state.boot = await window.api.saveSettings(next);
     } catch (error) {
+      reportError(error, 'settings:save');
       await window.api.message(`Those settings could not be saved.\n\n${error}`, {
         title: 'Settings',
         kind: 'error',
@@ -1423,6 +1486,10 @@ function wireSheets() {
   el('as-workspace-pick').addEventListener('click', async () => {
     const folder = await window.api.pickFolder('Workspace folder');
     if (folder) el('as-workspace').value = folder;
+  });
+  el('as-log-dir-pick').addEventListener('click', async () => {
+    const folder = await window.api.pickFolder('Error log folder');
+    if (folder) el('as-log-dir').value = folder;
   });
   el('np-create').addEventListener('click', createProjectFromSheet);
   el('np-name').addEventListener('keydown', (event) => {
@@ -1521,9 +1588,15 @@ function updateToolWarning() {
   dom.toolWarning.hidden = Boolean(state.boot && state.boot.ffmpeg);
 }
 
+function subscribe(source, register, handler) {
+  try {
+    Promise.resolve(register(handler)).catch((error) => reportError(error, source));
+  } catch (error) {
+    reportError(error, source);
+  }
+}
+
 async function boot() {
-  state.boot = await window.api.bootstrap();
-  state.settings = state.boot.settings;
   state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
 
   qualityMonitor = globalThis.qualityLib.createQualityMonitor({});
@@ -1549,10 +1622,6 @@ async function boot() {
     },
   });
 
-  // The app already has an empty document open, made from these same defaults
-  // when the window came up.
-  adopt(await window.api.editState());
-  state.savedRevision = state.doc.revision;
   applySettings(state.settings);
   globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
     monitor: qualityMonitor,
@@ -1573,11 +1642,13 @@ async function boot() {
   wireSheets();
   wireKeyboard();
 
-  window.api.onRenderProgress(onRenderProgress);
-  window.api.onRenderDone(onRenderDone);
-  window.api.onRenderFallback(onRenderFallback);
-  window.api.onFileDrop(handleOsDrop);
-  window.api.onCloseRequested(async (event) => {
+  subscribe('events:render-progress', window.api.onRenderProgress, onRenderProgress);
+  subscribe('events:render-done', window.api.onRenderDone, onRenderDone);
+  subscribe('events:render-fallback', window.api.onRenderFallback, onRenderFallback);
+  subscribe('events:file-drop', window.api.onFileDrop, (payload) => {
+    Promise.resolve(handleOsDrop(payload)).catch((error) => reportError(error, 'file-drop'));
+  });
+  subscribe('events:close-requested', window.api.onCloseRequested, async (event) => {
     if (isDirty()) {
       if (event && event.preventDefault) event.preventDefault();
       if (!(await confirmDiscard('Quit'))) return;
@@ -1588,6 +1659,28 @@ async function boot() {
 
   refresh();
   setPreviewSource('timeline');
+
+  try {
+    adopt(await window.api.editState());
+    state.savedRevision = state.doc.revision;
+    refresh();
+  } catch (error) {
+    reportError(error, 'edit-state');
+  }
+
+  try {
+    state.boot = await window.api.bootstrap();
+    state.settings = { ...DEFAULT_SETTINGS, ...state.boot.settings };
+    applySettings(state.settings);
+    updateToolWarning();
+    refresh();
+  } catch (error) {
+    reportError(error, 'bootstrap');
+    dom.toolWarning.hidden = false;
+    dom.toolWarning.textContent = 'Initialization failed';
+    dom.toolWarning.title = 'Open Settings to inspect the error log location';
+  }
+
   if (state.boot.qualityProject && state.boot.qualityReport) {
     window.setTimeout(async () => {
       if (!(await openProjectPath(state.boot.qualityProject))) return;
@@ -1609,4 +1702,5 @@ globalThis.makevideo = {
   lib: L,
 };
 
-boot();
+boot().catch((error) => reportError(error, 'ui-initialization'));
+})();
