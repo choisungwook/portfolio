@@ -5,14 +5,19 @@ import {
   MAX_CANVAS_EDGE,
   ZOOM_MAX,
   ZOOM_MIN,
+  ZOOM_STEP,
   clampZoom,
   diagramType,
+  errorText,
   exportScale,
   fitZoom,
   isBlank,
   pngFileName,
   readSvgSize,
+  shrinkToFitZoom,
+  stepZoom,
   withExplicitSize,
+  zoomAction,
 } from '../src/lib/diagram.js';
 
 test('readSvgSize prefers the viewBox over a percentage width', () => {
@@ -84,6 +89,57 @@ test('fitZoom enlarges a diagram smaller than the viewport', () => {
 
 test('fitZoom keeps its result inside the zoom range', () => {
   assert.equal(fitZoom(4000, 4000, 1, 1), ZOOM_MAX);
+});
+
+test('stepZoom moves one step in each direction', () => {
+  assert.equal(stepZoom(1, 1), ZOOM_STEP);
+  assert.equal(stepZoom(1, -1), 1 / ZOOM_STEP);
+});
+
+test('stepZoom stops at the ends of the range', () => {
+  assert.equal(stepZoom(ZOOM_MAX, 1), ZOOM_MAX);
+  assert.equal(stepZoom(ZOOM_MIN, -1), ZOOM_MIN);
+});
+
+test('stepZoom recovers from a broken current value', () => {
+  assert.equal(stepZoom(Number.NaN, 1), ZOOM_STEP);
+  assert.equal(stepZoom(0, 1), ZOOM_STEP);
+});
+
+test('shrinkToFitZoom scales an oversized diagram down', () => {
+  assert.equal(shrinkToFitZoom(1048, 800, 2000, 500, 24), 1000 / 2000);
+});
+
+test('shrinkToFitZoom leaves a small diagram at its own size', () => {
+  assert.equal(shrinkToFitZoom(1200, 900, 300, 200), 1);
+});
+
+test('zoomAction maps the keys the shortcut accepts', () => {
+  assert.equal(zoomAction('+', true), 'in');
+  assert.equal(zoomAction('=', true), 'in');
+  assert.equal(zoomAction('-', true), 'out');
+  assert.equal(zoomAction('_', true), 'out');
+  assert.equal(zoomAction('0', true), 'reset');
+});
+
+test('zoomAction ignores everything else, and every key without the modifier', () => {
+  assert.equal(zoomAction('a', true), null);
+  assert.equal(zoomAction('1', true), null);
+  assert.equal(zoomAction('+', false), null);
+});
+
+test('errorText reads the message of an Error', () => {
+  assert.equal(errorText(new Error('Parse error on line 2')), 'Parse error on line 2');
+});
+
+test('errorText takes a thrown string as it is', () => {
+  assert.equal(errorText('something broke'), 'something broke');
+});
+
+test('errorText falls back when there is no message to show', () => {
+  assert.equal(errorText(null), 'Unknown error.');
+  assert.equal(errorText(new Error('')), 'Unknown error.');
+  assert.equal(errorText({}), 'Unknown error.');
 });
 
 test('diagramType reads the first meaningful keyword', () => {

@@ -35,7 +35,7 @@ The build warns that a chunk is over 500 kB. That chunk is mermaid, it is expect
 
 ## Deploy
 
-Cloudflare Pages builds on push to master. There is no GitHub Actions release job, no tag and no version to bump; the version in `package.json` exists only to name the package.
+Cloudflare Pages builds on push to master. There is no GitHub Actions release job and no tag, so nothing breaks when the version in `package.json` stands still. It is bumped anyway, by the repository rule that a change under `workspace/` carries one, and it reads as a note about how far the page has moved rather than as something a build looks at.
 
 First time setup, once:
 

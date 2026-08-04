@@ -3,6 +3,7 @@
 
 export const ZOOM_MIN = 0.2;
 export const ZOOM_MAX = 8;
+export const ZOOM_STEP = 1.25;
 
 // Browsers refuse to allocate a canvas beyond a few thousand pixels per side.
 // 8192 is the smallest limit still in the field, so exports stay under it.
@@ -90,6 +91,52 @@ export function fitZoom(viewportWidth, viewportHeight, diagramWidth, diagramHeig
   const usableWidth = Math.max(1, viewportWidth - padding * 2);
   const usableHeight = Math.max(1, viewportHeight - padding * 2);
   return clampZoom(Math.min(usableWidth / diagramWidth, usableHeight / diagramHeight));
+}
+
+/**
+ * One zoom step away from the current value. `direction` is positive to zoom
+ * in and negative to zoom out, so a button and a wheel share one code path.
+ */
+export function stepZoom(current, direction, step = ZOOM_STEP) {
+  const base = Number.isFinite(current) && current > 0 ? current : 1;
+  return clampZoom(direction >= 0 ? base * step : base / step);
+}
+
+/**
+ * Zoom that fits the diagram in the pane but never enlarges it past its
+ * natural size. The preview is the place you read the code next to, so a small
+ * diagram blown up to fill the pane would only lie about its real size. The
+ * large view is where `fitZoom` scales up.
+ */
+export function shrinkToFitZoom(viewportWidth, viewportHeight, diagramWidth, diagramHeight, padding = 24) {
+  return Math.min(1, fitZoom(viewportWidth, viewportHeight, diagramWidth, diagramHeight, padding));
+}
+
+/**
+ * Maps a pressed key to a zoom action, or null when the key is not one.
+ * `withModifier` is whether Ctrl or Cmd was held; the caller decides whether
+ * that is required, because the large view takes the bare keys too.
+ */
+export function zoomAction(key, withModifier = true) {
+  if (!withModifier) return null;
+  if (key === '+' || key === '=' || key === 'Add') return 'in';
+  if (key === '-' || key === '_' || key === 'Subtract') return 'out';
+  if (key === '0') return 'reset';
+  return null;
+}
+
+/** The message to show for a thrown value, whatever shape it arrived in. */
+export function errorText(error) {
+  if (error == null) return 'Unknown error.';
+  if (typeof error === 'string') return error.trim() || 'Unknown error.';
+
+  const message = typeof error.message === 'string' ? error.message.trim() : '';
+  if (message) return message;
+
+  // `String(new Error(''))` is just `Error`, which tells a reader nothing.
+  const text = String(error).trim();
+  if (!text || text === '[object Object]' || /^\w*Error$/.test(text)) return 'Unknown error.';
+  return text;
 }
 
 /**

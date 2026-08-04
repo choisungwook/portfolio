@@ -7,8 +7,8 @@ import '../styles/global.css';
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mermaid Renderer</title>
-  <meta name="description" content="Write mermaid code on the left, see the diagram on the right. Save it as PNG, open it large, toggle the grid. Runs entirely in the browser.">
+  <title>akbun mermaid render</title>
+  <meta name="description" content="Write mermaid code on the left, see the diagram on the right. Zoom it, save it as PNG, open it large. Runs entirely in the browser.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -16,15 +16,8 @@ import '../styles/global.css';
 <body>
   <header class="app-header">
     <div class="app-title">
-      <h1>Mermaid Renderer</h1>
+      <h1>akbun mermaid render</h1>
       <p>Write on the left, read the diagram on the right. Nothing leaves the browser.</p>
-    </div>
-
-    <div class="toolbar">
-      <button id="render" type="button" title="Render now (Ctrl/Cmd + Enter)">Render</button>
-      <button id="save-png" class="ghost" type="button" disabled>Save PNG</button>
-      <button id="large" class="ghost" type="button" disabled>Large view</button>
-      <button id="grid" class="ghost" type="button" aria-pressed="true">Grid</button>
     </div>
   </header>
 
@@ -36,8 +29,25 @@ import '../styles/global.css';
     </section>
 
     <section class="pane-right">
-      <div class="pane-head"><span>Preview</span></div>
-      <div id="preview" class="preview grid-on">
+      <!-- The toolbar sits at the inner edge of the preview, next to the code
+           you were just reading, rather than in the far corner of the window. -->
+      <div class="pane-head toolbar-bar">
+        <button id="render" type="button" title="Render now (Ctrl/Cmd + Enter)">Render</button>
+        <button id="refresh" class="ghost" type="button" title="Clear the preview and draw it again">Refresh</button>
+        <button id="save-png" class="ghost" type="button" disabled>Save PNG</button>
+        <button id="large" class="ghost" type="button" disabled>Large view</button>
+        <button id="dots" class="ghost" type="button" aria-pressed="true">Dots</button>
+
+        <div class="zoom-group" role="group" aria-label="Preview zoom">
+          <button id="preview-zoom-out" class="ghost" type="button" aria-label="Zoom out" title="Zoom out (Ctrl/Cmd + -)">−</button>
+          <span id="preview-zoom-level" class="zoom-level">100%</span>
+          <button id="preview-zoom-in" class="ghost" type="button" aria-label="Zoom in" title="Zoom in (Ctrl/Cmd + +)">+</button>
+          <button id="preview-zoom-fit" class="ghost" type="button">Fit</button>
+          <button id="preview-zoom-reset" class="ghost" type="button" title="Back to 100% (Ctrl/Cmd + 0)">Reset</button>
+        </div>
+      </div>
+
+      <div id="preview" class="preview dots-on">
         <div id="diagram" class="is-empty"></div>
       </div>
     </section>
@@ -45,11 +55,11 @@ import '../styles/global.css';
 
   <div id="large-view" class="large-view" role="dialog" aria-modal="true" aria-label="Large view">
     <div class="large-bar">
-      <button id="zoom-out" class="ghost" type="button" aria-label="Zoom out">-</button>
+      <button id="zoom-out" class="ghost" type="button" aria-label="Zoom out">−</button>
       <span id="zoom-level" class="zoom-level">100%</span>
       <button id="zoom-in" class="ghost" type="button" aria-label="Zoom in">+</button>
       <button id="zoom-fit" class="ghost" type="button">Fit</button>
-      <button id="zoom-reset" class="ghost" type="button">100%</button>
+      <button id="zoom-reset" class="ghost" type="button">Reset</button>
       <button id="close-large" type="button">Close</button>
     </div>
     <div id="large-stage" class="large-stage">

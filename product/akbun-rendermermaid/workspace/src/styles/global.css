@@ -10,11 +10,12 @@
   --divider: #D6D0C4;
   --danger: #b3261e;
   --danger-bg: #FDECEA;
-  --grid-line: #E3DED2;
+  --danger-border: #F3C7C2;
+  --dot: #CFC8B8;
   --font-title: 'Sora', sans-serif;
   --font-body: 'Outfit', sans-serif;
   --font-mono: 'Fira Code', monospace;
-  --header-height: 60px;
+  --header-height: 76px;
 }
 
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
@@ -36,7 +37,6 @@ body {
   height: var(--header-height);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   padding: 0 1.25rem;
   border-bottom: 3px solid var(--text);
@@ -46,44 +46,38 @@ body {
 .app-title {
   display: flex;
   align-items: baseline;
-  gap: 0.65rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
 .app-title h1 {
   font-family: var(--font-title);
-  font-size: 1.15rem;
+  font-size: 1.95rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
 .app-title p {
-  font-size: 0.8rem;
+  font-size: 1.05rem;
   color: var(--text-sub);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
 button {
   margin: 0;
-  padding: 0.42rem 0.85rem;
+  padding: 0.45rem 0.95rem;
   color: #fff;
   background: var(--accent);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1.05rem;
   font-weight: 500;
+  line-height: 1.35;
   transition: all 0.15s;
   user-select: none;
   white-space: nowrap;
@@ -139,11 +133,36 @@ button.ghost[aria-pressed='true'] {
   padding: 0.5rem 0.9rem;
   border-bottom: 1px solid var(--divider);
   font-family: var(--font-title);
-  font-size: 0.82rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--text-sub);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+/* The editor side keeps its original scale; only the reading side grew. */
+.pane-left .pane-head { font-size: 0.82rem; }
+
+.toolbar-bar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--surface);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* A pill rather than a separator, because the toolbar wraps on a narrow
+   window and a separator left dangling at the end of a row reads as an error. */
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: var(--bg);
 }
 
 #code {
@@ -179,7 +198,7 @@ button.ghost[aria-pressed='true'] {
 .status.error {
   color: var(--danger);
   background: var(--danger-bg);
-  border-top-color: #F3C7C2;
+  border-top-color: var(--danger-border);
 }
 
 /* ===== Preview ===== */
@@ -187,19 +206,17 @@ button.ghost[aria-pressed='true'] {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* Centring with `margin: auto` on the child rather than `align-items`, so a
+     diagram larger than the pane can still be scrolled to on every side. */
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 1.5rem;
   background: var(--bg);
 }
 
-/* The grid is a background of the pane, so it never lands in an exported PNG. */
-.preview.grid-on {
-  background-image:
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  background-size: 20px 20px;
+/* The dots are a background of the pane, so they never land in an exported PNG. */
+.preview.dots-on {
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 1.6px, transparent 0);
+  background-size: 22px 22px;
 }
 
 #diagram {
@@ -209,11 +226,12 @@ button.ghost[aria-pressed='true'] {
   border: 1px solid var(--divider);
   border-radius: 10px;
 }
-#diagram svg { display: block; max-width: 100%; height: auto; }
+/* The script sets the zoomed pixel size on the SVG, so no CSS cap here. */
+#diagram svg { display: block; max-width: none; }
 #diagram.is-empty {
   color: var(--text-sub);
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 1.1rem;
   padding: 2rem;
 }
 
@@ -240,10 +258,10 @@ button.ghost[aria-pressed='true'] {
 }
 
 .zoom-level {
-  min-width: 4.2rem;
+  min-width: 4.6rem;
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1.05rem;
   color: var(--text-sub);
 }
 
@@ -274,8 +292,8 @@ button.ghost[aria-pressed='true'] {
 @media (max-width: 900px) {
   body { overflow: auto; }
   .app-header { height: auto; flex-wrap: wrap; padding: 0.7rem 1rem; }
+  .app-title { flex-direction: column; gap: 0.15rem; }
   .app-title p { display: none; }
-  .toolbar { flex-wrap: wrap; }
   .split { flex-direction: column; }
   .pane-left {
     width: 100%;
