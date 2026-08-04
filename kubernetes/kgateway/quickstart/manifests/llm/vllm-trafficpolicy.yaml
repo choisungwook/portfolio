@@ -1,0 +1,21 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: vllm
+  namespace: llm
+  labels:
+    app.kubernetes.io/name: kgateway-quickstart
+    app.kubernetes.io/component: llm
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: vllm
+  timeouts:
+    # 생성 요청은 초 단위로 끝나지 않는다. 기본 timeout으로는 긴 응답이 잘린다
+    request: 300s
+    streamIdle: 60s
+  retry:
+    attempts: 2
+    perTryTimeout: 120s
+    backoffBaseInterval: 100ms

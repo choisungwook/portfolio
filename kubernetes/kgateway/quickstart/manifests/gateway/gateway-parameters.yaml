@@ -1,0 +1,15 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayParameters
+metadata:
+  name: nodeport-proxy
+  namespace: kgateway-system
+  labels:
+    app.kubernetes.io/name: kgateway-quickstart
+    app.kubernetes.io/component: gateway
+spec:
+  kube:
+    service:
+      type: NodePort
+      ports:
+        - port: 8080
+          nodePort: 30080

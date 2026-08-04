@@ -98,6 +98,7 @@
 88. Java heap dump 자동 수집과 분석 핸즈온 (OOM 증거 남기기) (26.7.18) - [링크](./computer_science/java/heapdump/)
 89. git credential helper 원리와 CodeBuild connection 핸즈온 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
 90. ECS quickstart (26.8.2) - [링크](./aws/ecs/quickstart/)
+91. kgateway quickstart (Gateway API 라우팅, TrafficPolicy, GPU 노드 LLM 백엔드) (26.8.4) - [링크](./kubernetes/kgateway/quickstart/)
 
 ## 직접 만든 제품
 

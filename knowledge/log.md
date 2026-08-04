@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-04
+
+* **Creation**: [kgateway의 AI·추론 라우팅은 Envoy data plane을 떠나 agentgateway로 갔다](topics/kgateway-ai-moved-to-agentgateway.md) topic 기록. kgateway quickstart 핸즈온을 만들며 검색으로 나오는 InferencePool 문서가 v2.4 chart에 존재하지 않는 값을 쓰고 있다는 것을 확인하고, 문서 대신 chart values와 ClusterRole로 판정하는 방법을 남긴다.
+
 ## 2026-08-03
 
 * **Creation**: [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](decisions/2026-08-arrow-shaft-square-cap.md) 결정 기록. akbun-makepresentation에서 화살표 끝에 점이 붙는다는 보고를 받고 고치다가, 같은 판단이 akbun-screenshot Issue #617의 ADR에만 남아 있어 두 번째로 만난 것을 알게 되면서 남긴다.

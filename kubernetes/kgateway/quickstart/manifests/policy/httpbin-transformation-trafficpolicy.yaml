@@ -1,0 +1,22 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: httpbin-transformation
+  namespace: httpbin
+  labels:
+    app.kubernetes.io/name: kgateway-quickstart
+    app.kubernetes.io/component: policy
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: httpbin
+  transformation:
+    request:
+      set:
+        - name: x-handson
+          value: kgateway-quickstart
+    response:
+      add:
+        - name: x-gateway
+          value: kgateway
