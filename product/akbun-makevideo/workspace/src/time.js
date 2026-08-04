@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 // Time, expressed once, as a count of frames on a rate. The page half of the
 // makevideo-time crate; the two have to agree because the project file passes
 // between them, so the tests on both sides check the same rates.
@@ -224,3 +226,4 @@ if (typeof module !== 'undefined' && module.exports) {
 } else {
   globalThis.timeLib = exported;
 }
+})();

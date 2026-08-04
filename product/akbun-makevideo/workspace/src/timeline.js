@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 // What the page needs in order to draw a project and to answer a pointer.
 //
 // This file used to own the project. It does not any more: the model lives in
@@ -236,3 +238,4 @@ if (typeof module !== 'undefined' && module.exports) {
 } else {
   globalThis.timelineLib = exported;
 }
+})();

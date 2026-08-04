@@ -793,7 +793,9 @@ button.icon.on {
 
 .sheet {
   width: min(460px, 90vw);
+  max-height: 90vh;
   padding: 18px 20px;
+  overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -821,6 +823,20 @@ button.icon.on {
 .sheet .row input[type='number'],
 .sheet .row select {
   min-width: 190px;
+}
+
+.sheet .row .row-input.compact input {
+  flex: 0 1 140px;
+  min-width: 100px;
+}
+
+.sheet .row .row-input.compact {
+  justify-content: flex-start;
+}
+
+.sheet .row .row-input.compact select {
+  flex: 0 0 90px;
+  min-width: 90px;
 }
 
 .row-input {

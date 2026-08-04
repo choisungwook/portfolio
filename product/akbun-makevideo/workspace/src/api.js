@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 // The only bridge between the page and the operating system.
 //
 // withGlobalTauri puts the Tauri APIs on window.__TAURI__, so this file needs no
@@ -64,10 +66,14 @@ if (!window.__TAURI__) {
         ffmpegDir: '',
         renderAcceleration: 'auto',
         compositor: 'auto',
+        logDir: '',
+        logRotationSize: 5,
+        logRotationUnit: 'mb',
       },
       workspace: '',
       version: '0.0.0-browser',
       dataDir: '',
+      logDir: '',
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
@@ -81,6 +87,7 @@ if (!window.__TAURI__) {
       workspace: settings.workspaceDir || '',
       version: '0.0.0-browser',
       dataDir: '',
+      logDir: settings.logDir || '',
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
@@ -134,6 +141,7 @@ if (!window.__TAURI__) {
     onCloseRequested: () => {},
     closeWindow: () => {},
     checkUpdate: async () => {},
+    reportError: async (source, text) => console.error(source, text),
   };
   throw new Error('not running under Tauri; using the browser fallback api');
 }
@@ -161,6 +169,9 @@ async function checkUpdate() {
     await update.downloadAndInstall();
     await relaunch();
   } catch (error) {
+    invoke('report_error', { source: 'update:check', message: String(error) }).catch((logError) => {
+      console.error('error-log', logError);
+    });
     await message(`Cannot check for updates.\n\n${error}`, {
       title: 'Update failed',
       kind: 'error',
@@ -195,6 +206,7 @@ window.api = {
 
   bootstrap: () => invoke('bootstrap'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+  reportError: (source, message) => invoke('report_error', { source, message }),
 
   pickMedia: () =>
     openDialog({ title: 'Import Media', multiple: true, filters: MEDIA_FILTERS }),
@@ -282,3 +294,22 @@ window.api = {
   closeWindow: () => getCurrentWindow().destroy(),
   checkUpdate,
 };
+
+function pageErrorText(error) {
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+
+function reportPageError(error, source) {
+  window.api.reportError(source, pageErrorText(error)).catch((logError) => {
+    console.error('error-log', logError);
+  });
+}
+
+window.addEventListener('error', (event) => {
+  reportPageError(event.error || event.message, 'page');
+});
+window.addEventListener('unhandledrejection', (event) => {
+  reportPageError(event.reason, 'page:promise');
+});
+})();
