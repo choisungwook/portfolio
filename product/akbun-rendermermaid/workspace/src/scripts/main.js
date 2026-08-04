@@ -33,6 +33,7 @@ const gridBtn = document.querySelector('#grid');
 const largeView = document.querySelector('#large-view');
 const largeStage = document.querySelector('#large-stage');
 const largeCanvas = document.querySelector('#large-canvas');
+const closeLargeBtn = document.querySelector('#close-large');
 const zoomLabel = document.querySelector('#zoom-level');
 
 mermaid.initialize({
@@ -53,6 +54,7 @@ let renderSeq = 0;
 let renderTimer = null;
 let zoom = 1;
 let largeSize = { width: 0, height: 0 };
+let launcher = null;
 
 /* ===== Rendering ===== */
 
@@ -133,7 +135,9 @@ function download(blob, name) {
   link.href = url;
   link.download = name;
   link.click();
-  URL.revokeObjectURL(url);
+  // Revoking in the same tick cancels the download in some browsers, because
+  // the click has not necessarily started reading the blob yet.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function savePng() {
@@ -155,6 +159,8 @@ async function savePng() {
     canvas.height = Math.round(height * scale);
 
     const context = canvas.getContext('2d');
+    if (!context) throw new Error('This browser refused a 2D canvas context.');
+
     // PNG keeps transparency, and a transparent diagram is unreadable on a
     // dark background, so the export gets the same white the preview shows.
     context.fillStyle = '#FFFFFF';
@@ -204,11 +210,19 @@ function openLargeView() {
   largeSize = readSvgSize(new XMLSerializer().serializeToString(svg));
   largeView.classList.add('open');
   setZoom(fitZoom(largeStage.clientWidth, largeStage.clientHeight, largeSize.width, largeSize.height));
+
+  // The overlay claims to be a modal, so the keyboard has to go into it.
+  // Without this, tabbing walks the toolbar hidden behind the backdrop.
+  launcher = document.activeElement;
+  closeLargeBtn.focus();
 }
 
 function closeLargeView() {
   largeView.classList.remove('open');
   largeCanvas.replaceChildren();
+
+  if (launcher instanceof HTMLElement) launcher.focus();
+  launcher = null;
 }
 
 function dragToPan() {
@@ -278,7 +292,7 @@ document.querySelector('#zoom-reset').addEventListener('click', () => setZoom(1)
 document.querySelector('#zoom-fit').addEventListener('click', () => {
   setZoom(fitZoom(largeStage.clientWidth, largeStage.clientHeight, largeSize.width, largeSize.height));
 });
-document.querySelector('#close-large').addEventListener('click', closeLargeView);
+closeLargeBtn.addEventListener('click', closeLargeView);
 
 largeStage.addEventListener('wheel', (event) => {
   if (!event.ctrlKey && !event.metaKey) return;

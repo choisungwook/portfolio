@@ -47,6 +47,8 @@ The overlay clones the rendered SVG rather than moving it, so the preview stays 
 
 Zoom is a CSS transform on the SVG. A transform does not change layout size, so the wrapper is given the scaled width and height explicitly; otherwise the stage has nothing to scroll over and a zoomed-in diagram cannot be reached. Panning is pointer events writing `scrollLeft` and `scrollTop`, which works with a trackpad and a touch screen without a second code path.
 
+The overlay declares itself a modal, so it has to take the keyboard with it: opening moves focus to Close and closing hands it back to whatever opened it. Without that, tab walks the toolbar sitting behind the backdrop.
+
 Fit scales up as well as down. SVG is vector, so filling the window costs nothing, and a large view that leaves a small diagram at its original size is not large.
 
 ## Storage
