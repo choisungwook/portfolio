@@ -118,6 +118,7 @@
 - [사진과 영상 태그, 등급, 검색 Windows 데스크톱 앱 (akbun-folderview)](./product/akbun-folderview/) (26.8.1)
 - [슬라이드 덱을 만들고 편집하는 macOS 데스크톱 앱 (akbun-makepresentation)](./product/akbun-makepresentation/) (26.8.2)
 - [멀티 트랙 타임라인으로 영상을 편집하는 macOS 데스크톱 앱 (akbun-makevideo)](./product/akbun-makevideo/) (26.8.2)
+- [mermaid를 렌더링하고 PNG로 저장하는 웹 페이지 (mermaid.akbun.com)](./product/akbun-rendermermaid/) (26.8.4)
 
 ## Dockerfile
 
