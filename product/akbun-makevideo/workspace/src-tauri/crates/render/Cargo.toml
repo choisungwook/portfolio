@@ -12,6 +12,9 @@ license = "MIT"
 # that has no ffmpeg installed.
 
 [dependencies]
+# The project shape this crate renders. It is defined next door rather than
+# here because the app edits it, and the render is one of its readers.
+makevideo-edit = { path = "../edit" }
 # Time is the bottom of the stack: this crate stores frame counts and hands
 # seconds to ffmpeg, and both go through that one place.
 makevideo-time = { path = "../time" }

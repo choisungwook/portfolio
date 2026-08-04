@@ -37,6 +37,12 @@ jobs:
       - name: Run time model tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-time
 
+      # The editing model: every command, the invariants, and undo. This is
+      # where the timeline actually lives, so it is the suite that has to stay
+      # cheap to run. It depends on serde and the time crate and nothing else.
+      - name: Run edit model tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-edit
+
       # makevideo-render depends on neither tauri nor a webview, so -p keeps
       # this to serde. Testing the app crate instead would need GTK and WebKit
       # installed on the runner. ffmpeg is not needed either: the crate builds

@@ -7,7 +7,7 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 | [processes.md](./processes.md) | What runs where: the page, the Tauri app crate, the render crate |
 | [project-model.md](./project-model.md) | The JSON a project is, and the rules the two sides agree on |
 | [workspace-and-files.md](./workspace-and-files.md) | The workspace folder, what a project folder holds, and why media is never copied |
-| [timeline.md](./timeline.md) | Why the editing model lives in JavaScript, and what a time is |
+| [timeline.md](./timeline.md) | The editing model, its commands and its undo, and what a time is |
 | [preview.md](./preview.md) | Stacked media elements, the clock, and what preview quality really changes |
 | [compositor.md](./compositor.md) | The one shader the preview frame and the render both draw with |
 | [render.md](./render.md) | The ffmpeg filter graph, line by line, and the render presets |

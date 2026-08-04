@@ -5,28 +5,6 @@
 //! process is run by the caller; only the argument list and the parsing live
 //! here, so both can be tested without ffprobe on the runner.
 
-use crate::AssetKind;
-
-impl AssetKind {
-    /// The extension is the only thing available before ffprobe runs, and it is
-    /// also the fallback when ffprobe is not installed at all.
-    pub fn from_path(path: &str) -> Option<AssetKind> {
-        let extension = path.rsplit_once('.')?.1.to_ascii_lowercase();
-        match extension.as_str() {
-            "mp4" | "mov" | "m4v" | "mkv" | "webm" | "avi" | "mpg" | "mpeg" | "wmv" | "flv" => {
-                Some(AssetKind::Video)
-            }
-            "mp3" | "wav" | "m4a" | "aac" | "flac" | "ogg" | "opus" | "aiff" | "aif" | "wma" => {
-                Some(AssetKind::Audio)
-            }
-            "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "tif" | "tiff" | "heic" => {
-                Some(AssetKind::Image)
-            }
-            _ => None,
-        }
-    }
-}
-
 /// One asset's worth of what ffprobe found.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Probed {
@@ -149,14 +127,5 @@ mod tests {
     #[test]
     fn empty_output_is_not_a_panic() {
         assert_eq!(parse(""), Probed::default());
-    }
-
-    #[test]
-    fn the_extension_decides_the_kind_before_ffprobe_runs() {
-        assert_eq!(AssetKind::from_path("/a/b.MP4"), Some(AssetKind::Video));
-        assert_eq!(AssetKind::from_path("/a/b.wav"), Some(AssetKind::Audio));
-        assert_eq!(AssetKind::from_path("/a/b.png"), Some(AssetKind::Image));
-        assert_eq!(AssetKind::from_path("/a/b.txt"), None);
-        assert_eq!(AssetKind::from_path("/a/noextension"), None);
     }
 }

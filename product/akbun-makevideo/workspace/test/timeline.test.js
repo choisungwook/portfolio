@@ -5,68 +5,48 @@ const assert = require('node:assert');
 const L = require('../src/timeline.js');
 const T = require('../src/time.js');
 
+// What is left in timeline.js is the read side: what a redraw and a drag need
+// between frames. Placing, moving, trimming and splitting are commands now and
+// are tested in the makevideo-edit crate, which is the only thing that performs
+// them. What is checked here is the half the page still answers on its own.
+//
 // Every project here is on the default 30, so a second is 30 frames and the
-// numbers below read as frames throughout. The rates that cannot be counted in
-// whole milliseconds have their own tests at the end.
-function projectWith(assets) {
-  const project = L.createProject();
-  L.addAssets(project, assets);
-  return project;
-}
+// numbers below read as frames throughout.
 
 const VIDEO = { id: 'v', path: '/m/a.mp4', name: 'a.mp4', kind: 'video', durationMs: 10000, width: 1920, height: 1080, hasAudio: true };
 const SILENT = { id: 's', path: '/m/s.mp4', name: 's.mp4', kind: 'video', durationMs: 8000, width: 1920, height: 1080, hasAudio: false };
 const SOUND = { id: 'm', path: '/m/m.mp3', name: 'm.mp3', kind: 'audio', durationMs: 30000, width: 0, height: 0, hasAudio: true };
 const STILL = { id: 'p', path: '/m/p.png', name: 'p.png', kind: 'image', durationMs: 0, width: 800, height: 600, hasAudio: false };
 
-function videoTrack(project, index) {
-  return L.tracksOf(project, 'video')[index || 0];
+function clip(id, assetId, start, inPoint, outPoint) {
+  return { id, assetId, start, in: inPoint, out: outPoint, volume: 1, opacity: 1 };
 }
 
-function audioTrack(project, index) {
-  return L.tracksOf(project, 'audio')[index || 0];
+function track(id, kind, name, clips) {
+  return { id, kind, name, clips: clips || [], muted: false, hidden: false };
 }
 
-test('a new project starts with one video and one audio track', () => {
-  const project = L.createProject();
-  assert.deepStrictEqual(
-    project.tracks.map((track) => track.name),
-    ['V1', 'A1']
-  );
+/** A document state as Rust hands it over, which is the only way the page ever
+ *  gets one. */
+function projectOf(assets, tracks, rate) {
+  return {
+    version: 2,
+    settings: { width: 1920, height: 1080, rate: rate || T.fps(30) },
+    assets: assets || [],
+    tracks: tracks || [track('t1', 'video', 'V1'), track('t2', 'audio', 'A1')],
+  };
+}
+
+test('the placeholder project is empty and on the defaults', () => {
+  const project = L.blankProject();
   assert.deepStrictEqual(project.settings, { width: 1920, height: 1080, rate: T.fps(30) });
-  assert.strictEqual(project.version, L.FORMAT_VERSION);
-});
-
-test('tracks stop at four of each kind', () => {
-  const project = L.createProject();
-  for (let index = 0; index < 3; index += 1) {
-    assert.ok(L.addTrack(project, 'video'), `video track ${index + 2}`);
-    assert.ok(L.addTrack(project, 'audio'), `audio track ${index + 2}`);
-  }
-  assert.strictEqual(L.addTrack(project, 'video'), null);
-  assert.strictEqual(L.addTrack(project, 'audio'), null);
-  assert.deepStrictEqual(
-    L.tracksOf(project, 'video').map((track) => track.name),
-    ['V1', 'V2', 'V3', 'V4']
-  );
-});
-
-test('only the last track of a kind can be removed, and never the only one', () => {
-  const project = L.createProject();
-  const first = videoTrack(project);
-  assert.strictEqual(L.removeTrack(project, first.id), false, 'the only video track stays');
-  const second = L.addTrack(project, 'video');
-  const third = L.addTrack(project, 'video');
-  // Removing V2 while V3 exists would leave V1 and V3 named out of step.
-  assert.strictEqual(L.removeTrack(project, second.id), false);
-  assert.strictEqual(L.removeTrack(project, third.id), true);
-  assert.strictEqual(L.tracksOf(project, 'video').length, 2);
+  assert.deepStrictEqual(project.tracks, []);
+  assert.deepStrictEqual(project.assets, []);
 });
 
 test('a track only takes what it can play', () => {
-  const project = projectWith([VIDEO, SILENT, SOUND, STILL]);
-  const video = videoTrack(project);
-  const audio = audioTrack(project);
+  const video = track('t1', 'video', 'V1');
+  const audio = track('t2', 'audio', 'A1');
   assert.strictEqual(L.canAccept(video, VIDEO), true);
   assert.strictEqual(L.canAccept(video, STILL), true);
   assert.strictEqual(L.canAccept(video, SOUND), false);
@@ -75,107 +55,8 @@ test('a track only takes what it can play', () => {
   assert.strictEqual(L.canAccept(audio, SILENT), false);
   assert.strictEqual(L.canAccept(audio, SOUND), true);
   assert.strictEqual(L.canAccept(audio, STILL), false);
-});
-
-test('a clip lands where it was dropped', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 75);
-  assert.strictEqual(clip.start, 75);
-  assert.strictEqual(clip.in, 0);
-  assert.strictEqual(clip.out, 300, 'ten seconds of source is 300 frames of 30');
-});
-
-test('an asset the track cannot play is refused rather than half added', () => {
-  const project = projectWith([SOUND]);
-  assert.strictEqual(L.addClip(project, videoTrack(project).id, 'm', 0), null);
-  assert.strictEqual(videoTrack(project).clips.length, 0);
-});
-
-test('a still gets a default length because it has none of its own', () => {
-  const project = projectWith([STILL]);
-  const clip = L.addClip(project, videoTrack(project).id, 'p', 0);
-  assert.strictEqual(L.clipDuration(clip), L.DEFAULT_IMAGE_SECONDS * 30);
-});
-
-test('a clip dropped on top of another is pushed past it', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  L.addClip(project, track.id, 'v', 0);
-  const second = L.addClip(project, track.id, 'v', 120);
-  assert.strictEqual(second.start, 300, 'lands after the first clip ends');
-});
-
-test('a drop into a gap too small for it keeps walking right', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  // Two clips back to back, then a drop aimed at the seam between them.
-  L.addClip(project, track.id, 'v', 0);
-  L.addClip(project, track.id, 'v', 300);
-  const third = L.addClip(project, track.id, 'v', 270);
-  assert.strictEqual(third.start, 600);
-});
-
-test('moving a clip inside its track does not collide with itself', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  const clip = L.addClip(project, track.id, 'v', 0);
-  L.moveClip(project, clip.id, track.id, 90);
-  assert.strictEqual(clip.start, 90);
-});
-
-test('a clip moved to another track leaves the first one', () => {
-  const project = projectWith([VIDEO]);
-  const from = videoTrack(project);
-  const to = L.addTrack(project, 'video');
-  const clip = L.addClip(project, from.id, 'v', 30);
-  L.moveClip(project, clip.id, to.id, 30);
-  assert.strictEqual(from.clips.length, 0);
-  assert.strictEqual(to.clips.length, 1);
-});
-
-test('a move onto a track that cannot play the asset changes nothing', () => {
-  const project = projectWith([SILENT]);
-  const video = videoTrack(project);
-  const audio = audioTrack(project);
-  const clip = L.addClip(project, video.id, 's', 0);
-  assert.strictEqual(L.moveClip(project, clip.id, audio.id, 0), null);
-  assert.strictEqual(video.clips.length, 1);
-  assert.strictEqual(audio.clips.length, 0);
-});
-
-test('trimming the start moves the in point so the frame under the cursor stays', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 150);
-  L.trimClip(project, clip.id, 'start', 210);
-  assert.strictEqual(clip.start, 210);
-  assert.strictEqual(clip.in, 60);
-  assert.strictEqual(clip.out, 300);
-});
-
-test('the start cannot be dragged past the beginning of the source', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 150);
-  L.trimClip(project, clip.id, 'start', 0);
-  // The source has nothing before frame 0, so the clip stops at 150 - 0.
-  assert.strictEqual(clip.start, 150);
-  assert.strictEqual(clip.in, 0);
-});
-
-test('the end cannot be dragged past the end of the source', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 0);
-  L.trimClip(project, clip.id, 'start', 90);
-  L.trimClip(project, clip.id, 'end', 999999);
-  assert.strictEqual(clip.out, 300, 'stops at the source duration');
-  assert.strictEqual(L.clipEnd(clip), 300);
-});
-
-test('a trim will not shrink a clip below the minimum', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 0);
-  L.trimClip(project, clip.id, 'end', 1);
-  assert.strictEqual(L.clipDuration(clip), L.minClipFrames(T.fps(30)));
-  assert.strictEqual(L.minClipFrames(T.fps(30)), 3, 'a tenth of a second of 30');
+  // A lane under the pointer with nothing to drop on it.
+  assert.strictEqual(L.canAccept(video, null), false);
 });
 
 test('the shortest clip is never shorter than the minimum on any rate', () => {
@@ -189,90 +70,39 @@ test('the shortest clip is never shorter than the minimum on any rate', () => {
     );
   }
   assert.strictEqual(L.minClipFrames(T.ntsc(24)), 3);
-});
-
-test('splitting cuts every clip the playhead crosses', () => {
-  const project = projectWith([VIDEO, SOUND]);
-  const video = videoTrack(project);
-  const audio = audioTrack(project);
-  L.addClip(project, video.id, 'v', 0);
-  L.addClip(project, audio.id, 'm', 0);
-  const created = L.splitAt(project, 120);
-  assert.strictEqual(created.length, 2);
-  assert.strictEqual(video.clips.length, 2);
-  assert.strictEqual(audio.clips.length, 2);
-});
-
-test('splitting with a clip selected leaves the others whole', () => {
-  const project = projectWith([VIDEO, SOUND]);
-  const video = videoTrack(project);
-  const audio = audioTrack(project);
-  const target = L.addClip(project, video.id, 'v', 0);
-  L.addClip(project, audio.id, 'm', 0);
-  L.splitAt(project, 120, target.id);
-  assert.strictEqual(video.clips.length, 2);
-  assert.strictEqual(audio.clips.length, 1);
-});
-
-test('the two halves of a split are continuous in the source', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  const clip = L.addClip(project, track.id, 'v', 60);
-  const wasEnd = L.clipEnd(clip);
-  L.splitAt(project, 150);
-  const [left, right] = track.clips;
-  assert.strictEqual(left.out, right.in, 'no frames lost or repeated at the cut');
-  assert.strictEqual(L.clipEnd(left), right.start, 'no gap at the cut');
-  assert.strictEqual(right.start, 150);
-  assert.strictEqual(L.clipEnd(right), wasEnd, 'the tail still ends where it did');
-  assert.strictEqual(L.projectDurationFrames(project), 360, 'the timeline is the same length');
-});
-
-test('splitting on an edge or inside a sliver does nothing', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  L.addClip(project, track.id, 'v', 30);
-  assert.strictEqual(L.splitAt(project, 30).length, 0, 'the clip start is not a cut');
-  assert.strictEqual(L.splitAt(project, 330).length, 0, 'the clip end is not a cut');
-  assert.strictEqual(L.splitAt(project, 31).length, 0, 'would leave a one frame sliver');
-  assert.strictEqual(track.clips.length, 1);
+  assert.strictEqual(L.minClipFrames(T.fps(30)), 3, 'a tenth of a second of 30');
 });
 
 test('a hidden track does not stretch the timeline', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  const second = L.addTrack(project, 'video');
-  L.addClip(project, track.id, 'v', 0);
-  L.addClip(project, second.id, 'v', 900);
+  const second = track('t3', 'video', 'V2', [clip('c2', 'v', 900, 0, 300)]);
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 300)]), second]);
   assert.strictEqual(L.projectDurationFrames(project), 1200);
   second.hidden = true;
   assert.strictEqual(L.projectDurationFrames(project), 300);
 });
 
 test('a muted audio track drops out of the length too', () => {
-  const project = projectWith([SOUND]);
-  const audio = audioTrack(project);
-  L.addClip(project, audio.id, 'm', 0);
+  const audio = track('t2', 'audio', 'A1', [clip('c1', 'm', 0, 0, 900)]);
+  const project = projectOf([SOUND], [audio]);
   assert.strictEqual(L.projectDurationFrames(project), 900);
   audio.muted = true;
   assert.strictEqual(L.projectDurationFrames(project), 0);
 });
 
 test('what is under the playhead knows which frame of the asset it is', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 60);
-  L.trimClip(project, clip.id, 'start', 90);
+  // A clip starting a second into the timeline and a second into the source.
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 60, 30, 300)])]);
   const active = L.clipsAt(project, 150);
   assert.strictEqual(active.length, 1);
-  // Two seconds into the clip, which starts a second into the source.
-  assert.strictEqual(active[0].sourceFrame, 90);
+  assert.strictEqual(active[0].sourceFrame, 120);
   assert.strictEqual(L.clipsAt(project, 99999).length, 0);
+  // The end frame is exclusive, so the last frame of that clip is 329.
+  assert.strictEqual(L.clipsAt(project, 330).length, 0);
+  assert.strictEqual(L.clipsAt(project, 329).length, 1);
 });
 
 test('the playhead snaps to the nearest edge inside the tolerance', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  L.addClip(project, track.id, 'v', 120);
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 120, 0, 300)])]);
   assert.strictEqual(L.snapTime(project, 122, 5), 120, 'to a clip start');
   assert.strictEqual(L.snapTime(project, 417, 5), 420, 'to a clip end');
   assert.strictEqual(L.snapTime(project, 210, 5), 210, 'nothing nearby');
@@ -280,143 +110,68 @@ test('the playhead snaps to the nearest edge inside the tolerance', () => {
 });
 
 test('a tolerance of zero is the magnet turned off', () => {
-  const project = projectWith([VIDEO]);
-  L.addClip(project, videoTrack(project).id, 'v', 120);
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 120, 0, 300)])]);
   assert.strictEqual(L.snapTime(project, 122, 0), 122);
 });
 
 test('a dragged clip snaps by its tail as well as its head', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  const first = L.addClip(project, track.id, 'v', 300);
-  const second = L.addTrack(project, 'video');
-  const moving = L.addClip(project, second.id, 'v', 0);
+  const project = projectOf(
+    [VIDEO],
+    [
+      track('t1', 'video', 'V1', [clip('c1', 'v', 300, 0, 300)]),
+      track('t3', 'video', 'V2', [clip('c2', 'v', 0, 0, 300)]),
+    ]
+  );
   // Dragging so the clip ends near the start of the other one: the tail is
   // what should stick, which means a start of 300 - 300 = 0.
-  const start = L.snapClipStart(project, 4, 300, 6, { exceptClipId: moving.id });
-  assert.strictEqual(start, 0);
-  assert.strictEqual(first.start, 300);
+  assert.strictEqual(L.snapClipStart(project, 4, 300, 6, { exceptClipId: 'c2' }), 0);
 });
 
 test('a clip is never snapped to itself', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  const clip = L.addClip(project, track.id, 'v', 120);
-  const start = L.snapClipStart(project, 122, 300, 6, { exceptClipId: clip.id });
-  assert.strictEqual(start, 122, 'its own edges are not targets');
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 120, 0, 300)])]);
+  assert.strictEqual(
+    L.snapClipStart(project, 122, 300, 6, { exceptClipId: 'c1' }),
+    122,
+    'its own edges are not targets'
+  );
 });
 
-test('a project read back from disk does not reuse its own ids', () => {
-  const project = projectWith([VIDEO]);
-  const track = videoTrack(project);
-  L.addClip(project, track.id, 'v', 0);
-  const reopened = L.normalize(JSON.parse(JSON.stringify(project)));
-  const fresh = L.addClip(reopened, reopened.tracks[0].id, 'v', 600);
-  const ids = reopened.tracks.flatMap((each) => each.clips.map((clip) => clip.id));
-  assert.strictEqual(new Set(ids).size, ids.length, `duplicate id in ${ids.join(',')}`);
-  assert.ok(fresh);
+test('the playhead is a snap target when the caller passes it in', () => {
+  const project = projectOf([VIDEO], [track('t1', 'video', 'V1')]);
+  assert.strictEqual(L.snapTime(project, 448, 5, { extra: [450] }), 450);
+  assert.strictEqual(L.snapTime(project, 448, 5, { extra: [] }), 448);
 });
 
-test('a millisecond project file opens as frames', () => {
-  // What version 1 wrote. Nothing downstream should have to know it existed.
-  const restored = L.normalize({
-    version: 1,
-    settings: { width: 1920, height: 1080, fps: 30 },
-    tracks: [
-      {
-        id: 't1',
-        kind: 'video',
-        name: 'V1',
-        clips: [{ id: 'c1', assetId: 'v', startMs: 2000, inMs: 1000, outMs: 4000 }],
-      },
-    ],
-  });
-  const clip = restored.tracks[0].clips[0];
-  assert.strictEqual(restored.version, L.FORMAT_VERSION);
-  assert.deepStrictEqual(restored.settings.rate, T.fps(30));
-  assert.deepStrictEqual([clip.start, clip.in, clip.out], [60, 30, 120]);
-  // And the millisecond keys are gone rather than riding along into the file
-  // the next save writes.
-  assert.strictEqual('startMs' in clip, false);
-});
-
-test('a millisecond file that says 29.97 opens on 30000/1001', () => {
-  const restored = L.normalize({
-    version: 1,
-    settings: { width: 1920, height: 1080, fps: 29.97 },
-    tracks: [
-      { id: 't1', kind: 'video', name: 'V1', clips: [{ id: 'c1', assetId: 'v', startMs: 1001, inMs: 0, outMs: 1001 }] },
-    ],
-  });
-  assert.deepStrictEqual(restored.settings.rate, T.ntsc(30));
-  assert.strictEqual(restored.tracks[0].clips[0].start, 30, '1001ms of 29.97 is exactly 30 frames');
-});
-
-test('normalize fills in what an older project file did not have', () => {
-  const restored = L.normalize({
-    tracks: [{ id: 't1', kind: 'video', name: 'V1', clips: [{ id: 'c1', assetId: 'v', start: 0, in: 0, out: 30 }] }],
-  });
-  assert.strictEqual(restored.tracks[0].clips[0].volume, 1);
-  assert.strictEqual(restored.tracks[0].clips[0].opacity, 1);
-  assert.deepStrictEqual(restored.settings, { width: 1920, height: 1080, rate: T.fps(30) });
-  assert.deepStrictEqual(restored.assets, []);
-});
-
-test('an empty project file still opens with tracks to work on', () => {
-  const restored = L.normalize({});
-  assert.deepStrictEqual(restored.tracks.map((track) => track.name), ['V1', 'A1']);
-});
-
-test('changing the rate carries the edit with it instead of the frame numbers', () => {
-  const project = projectWith([VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 30);
-  L.retime(project, T.fps(60));
-  assert.deepStrictEqual(project.settings.rate, T.fps(60));
-  // One second in, ten seconds long, on both rates.
-  assert.strictEqual(clip.start, 60);
-  assert.strictEqual(L.clipDuration(clip), 600);
-  // And back again, which 30 and 60 can do exactly.
-  L.retime(project, T.fps(30));
-  assert.strictEqual(clip.start, 30);
-  assert.strictEqual(L.clipDuration(clip), 300);
+test('finding by id reaches into every track', () => {
+  const project = projectOf(
+    [VIDEO, SOUND],
+    [
+      track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 300)]),
+      track('t2', 'audio', 'A1', [clip('c2', 'm', 0, 0, 900)]),
+    ]
+  );
+  assert.strictEqual(L.findClip(project, 'c2').track.id, 't2');
+  assert.strictEqual(L.findClip(project, 'gone'), null);
+  assert.strictEqual(L.findTrack(project, 't1').name, 'V1');
+  assert.strictEqual(L.findAsset(project, 'm').kind, 'audio');
+  assert.deepStrictEqual(L.tracksOf(project, 'video').map((each) => each.id), ['t1']);
 });
 
 test('a project on a broadcast rate counts its own frames', () => {
-  const project = L.createProject({ rate: T.ntsc(30) });
-  L.addAssets(project, [VIDEO]);
-  const clip = L.addClip(project, videoTrack(project).id, 'v', 0);
+  const project = projectOf(
+    [VIDEO],
+    [track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 300)])],
+    T.ntsc(30)
+  );
   // Ten seconds of source is 300 frames of 29.97 too — those frames are just
   // each a thousandth longer.
-  assert.strictEqual(L.clipDuration(clip), 300);
   assert.strictEqual(L.projectDurationFrames(project), 300);
-  assert.strictEqual(T.framesToMillis(300, project.settings.rate), 10010);
+  assert.strictEqual(T.framesToMillis(300, L.rateOf(project)), 10010);
 });
 
-test('removing an asset takes its clips with it', () => {
-  const project = projectWith([VIDEO, SOUND]);
-  L.addClip(project, videoTrack(project).id, 'v', 0);
-  L.addClip(project, audioTrack(project).id, 'm', 0);
-  L.removeAsset(project, 'v');
-  assert.strictEqual(videoTrack(project).clips.length, 0);
-  assert.strictEqual(audioTrack(project).clips.length, 1);
-  assert.strictEqual(project.assets.length, 1);
-});
-
-test('importing the same file twice updates the row instead of adding one', () => {
-  const project = projectWith([VIDEO]);
-  const added = L.addAssets(project, [Object.assign({}, VIDEO, { durationMs: 12000 })]);
-  assert.strictEqual(added.length, 0, 'nothing new was added');
-  assert.strictEqual(project.assets.length, 1);
-  assert.strictEqual(project.assets[0].durationMs, 12000, 'the newer probe wins');
-});
-
-test('an asset ffprobe could not measure still gets a usable length', () => {
-  const rate = T.fps(30);
-  assert.strictEqual(
-    L.assetLengthFrames(Object.assign({}, VIDEO, { durationMs: 0 }), rate),
-    L.DEFAULT_IMAGE_SECONDS * 30
-  );
-  assert.strictEqual(L.assetLengthFrames(VIDEO, rate), 300);
+test('a project with no rate in it is read as 30 rather than as nothing', () => {
+  assert.deepStrictEqual(L.rateOf(null), T.fps(30));
+  assert.deepStrictEqual(L.rateOf({}), T.fps(30));
 });
 
 test('the clock reads in frames, which is what a two frame trim is visible in', () => {
@@ -446,4 +201,9 @@ test('pixels and frames convert both ways', () => {
   const rate = T.fps(30);
   assert.strictEqual(L.framesToPx(60, rate, 50), 100);
   assert.strictEqual(L.pxToFrames(100, rate, 50), 60);
+});
+
+test('a clip with nothing left of it has no negative length', () => {
+  assert.strictEqual(L.clipDuration(clip('c1', 'v', 0, 30, 10)), 0);
+  assert.strictEqual(L.clipEnd(clip('c1', 'v', 100, 30, 10)), 100);
 });

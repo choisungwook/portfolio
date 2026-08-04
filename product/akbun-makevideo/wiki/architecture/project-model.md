@@ -23,7 +23,7 @@ project
 
 Version 1 was the first format: every time in whole milliseconds (`startMs`, `inMs`, `outMs`) and `settings.fps` as a single integer. Version 2 is the shape above.
 
-A version 1 file still opens. Both sides convert it once as it is read — `crates/render/src/migrate.rs` and `normalize` in `src/timeline.js` — and what gets written back is version 2 only, with the millisecond keys gone rather than carried along beside the frame counts that replaced them. Which format a clip is in is read off the clip rather than taken from the header, because the two use different keys and a header can be wrong.
+A version 1 file still opens. `crates/edit/src/migrate.rs` converts it once as it is read, and what gets written back is version 2 only, with the millisecond keys gone rather than carried along beside the frame counts that replaced them. Which format a clip is in is read off the clip rather than taken from the header, because the two use different keys and a header can be wrong.
 
 A version 1 file whose `fps` says `29.97` opens on 30000/1001, because that is what the number meant. Believing the decimal is how the approximation gets back in.
 
@@ -31,6 +31,10 @@ A version 1 file whose `fps` says `29.97` opens on 30000/1001, because that is w
 
 Changing the rate in Project Settings rescales every clip to the nearest frame of the new one, so a cut stays where it was in time rather than keeping its frame number. Between rates that divide — 30 and 60 — it is exact and reversible. Between 23.976 and 24 it is not, and a clip can move by up to half a frame, which is as close as the new rate can hold.
 
-## Two implementations
+## One implementation
 
-The page defines this shape; Rust reads it back through serde with `rename_all = "camelCase"`. Every clip field added later needs a `#[serde(default)]` on the Rust side or an older project file stops opening.
+Rust defines this shape, in `crates/edit`, and the page reads it. There is no second definition to keep in step any more — the page never constructs a project, it draws one. Every clip field added later still needs a `#[serde(default)]`, or an older project file stops opening.
+
+## What is guaranteed about a clip
+
+A clip that comes out of the model has a length, has a non-negative in point, does not reach past the end of its source, and does not overlap its neighbours. Those are checked after every command; the reasoning and the one exception — opening a file repairs rather than refuses — are in [the timeline model](./timeline.md).

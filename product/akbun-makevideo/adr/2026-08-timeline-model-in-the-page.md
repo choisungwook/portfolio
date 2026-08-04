@@ -1,5 +1,7 @@
 # The editing model lives in JavaScript, Rust reads the same shape
 
+Replaced by [the editing model lives in Rust](./2026-08-edit-model-in-rust.md). What follows is what was decided at the time and why; the part of it that survived is that a drag still draws itself in the page.
+
 ## Decision
 
 `src/timeline.js` owns the project model and every piece of arithmetic on it: placing, moving, trimming, splitting, snapping, and answering what is under the playhead. Rust deserializes the same JSON into serde types in `crates/render` for the render and the project file, and never edits it.

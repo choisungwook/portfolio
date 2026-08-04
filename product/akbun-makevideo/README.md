@@ -1,6 +1,6 @@
 # akbun-makevideo
 
-Desktop video editor: a multi track timeline, a live preview, and a render to FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in the page; ffmpeg does the render.
+Desktop video editor: a multi track timeline, a live preview, and a render to FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in Rust and every edit is an undoable command; ffmpeg does the render.
 
 ## What it does
 
@@ -11,6 +11,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Timeline: up to four video and four audio tracks, drag to move, drag an edge to trim
 - Frame rates including the broadcast ones — 23.976, 29.97 and 59.94 are held as the exact ratios they are, so a camera file stays in step with itself. The clock reads in timecode and the arrow keys step a frame at a time
 - Split at the playhead, from the toolbar button or Cmd+B
+- Undo and redo across everything: moves, trims, splits, imports, track changes and the timebase. A drop that imports three files and lays down three clips comes back on one press
+- Ripple delete: take a clip out and close the gap behind it
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
 - Render to mp4 at FHD or 4K with a progress bar and a cancel button
@@ -42,7 +44,9 @@ Cmd on macOS, Ctrl elsewhere.
 | Cmd+B | Split at the playhead |
 | Cmd+N / Cmd+O / Cmd+S / Shift+Cmd+S | New, open, save, save as |
 | Cmd+I | Import media |
+| Cmd+Z / Shift+Cmd+Z | Undo, redo |
 | Delete | Delete the selected clip |
+| Shift+Delete | Delete it and close the gap behind it |
 | ← → | Step one frame, or one second with Shift |
 | Home | Back to the start |
 | Escape | Close a menu or a sheet |
@@ -51,7 +55,7 @@ Cmd on macOS, Ctrl elsewhere.
 
 | Directory | Description |
 |---|---|
-| [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the render crate in src-tauri/ |
+| [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the model, render and compositor crates in src-tauri/ |
 | [wiki/](./wiki/) | What the next agent reads before taking over, one page per part under [wiki/architecture/](./wiki/architecture/) |
 | [adr/](./adr/) | Decision records |
 | [quality/](./quality/) | Playback quality harness, thresholds and baseline |
@@ -81,6 +85,7 @@ Run the tests, which need neither an app binary nor ffmpeg:
 
 ```bash
 npm test
+npm run test:edit
 npm run test:rust
 ```
 

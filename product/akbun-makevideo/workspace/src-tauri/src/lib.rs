@@ -29,7 +29,17 @@ pub fn run() {
             let settings = store::load_settings(handle);
             commands::apply_theme(handle, &settings.theme);
 
+            // The app opens on an empty project of whatever shape new projects
+            // are set to, so there is an edit to send commands to before the
+            // page has finished loading.
+            let document = makevideo_edit::Document::new(makevideo_edit::ProjectSettings {
+                width: settings.default_width,
+                height: settings.default_height,
+                rate: settings.default_rate,
+            });
+
             app.manage(AppState {
+                document: Arc::new(Mutex::new(document)),
                 settings: Mutex::new(settings),
                 render: Arc::new(Mutex::new(None)),
                 cancelled: Arc::new(AtomicBool::new(false)),
@@ -44,6 +54,12 @@ pub fn run() {
             commands::list_projects,
             commands::create_project,
             commands::import_assets,
+            commands::edit_state,
+            commands::edit_apply,
+            commands::edit_undo,
+            commands::edit_redo,
+            commands::describe_asset,
+            commands::new_document,
             commands::open_project,
             commands::save_project,
             commands::start_render,

@@ -1,0 +1,20 @@
+[package]
+name = "makevideo-edit"
+version = "0.1.0"
+description = "The editing model: the project, the commands that change it and the history that undoes them"
+edition = "2021"
+license = "MIT"
+
+# Depends on the time crate and on serde, and on nothing else. Not tauri, not
+# the compositor, not anything that shells out to ffmpeg. This is the crate the
+# whole app is now built around, so it is also the one that has to stay cheap to
+# test: `cargo test -p makevideo-edit` compiles serde and finishes in seconds on
+# a runner with no GTK, no WebKit, no Vulkan and no ffmpeg installed.
+
+[dependencies]
+# Every time in the model is a frame count on a rate, and both live there.
+makevideo-time = { path = "../time" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

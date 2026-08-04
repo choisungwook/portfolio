@@ -279,7 +279,9 @@ function createQualityHarness(options) {
   const monitor = options.monitor;
   const preview = options.preview;
   const getProject = options.getProject;
-  const refresh = options.refresh || (() => {});
+  // Sends one setTrackFlags edit and resolves when the page has redrawn from
+  // what came back.
+  const setTrackFlags = options.setTrackFlags || (async () => {});
   const memoryBytes = options.memoryBytes || (async () => null);
 
   async function measure(name, action, metadata) {
@@ -318,28 +320,37 @@ function createQualityHarness(options) {
     }, { repetitions: config.restartCount });
   }
 
+  /** What each additional track costs, measured by hiding them all and
+   *  bringing them back one at a time.
+   *
+   *  Hiding a track is an edit, so it goes through setTrackFlags rather than
+   *  being written onto the page's copy of the project: the page does not own
+   *  one to write on. That also means every step here is undoable, which is
+   *  untidy in a history and much better than a harness that measures a
+   *  timeline the compositor cannot see. */
   async function trackGrowth(config) {
     const tracks = getProject().tracks;
-    const saved = tracks.map((track) => ({ track, hidden: track.hidden, muted: track.muted }));
-    const video = tracks.filter((track) => track.kind === 'video');
-    const audio = tracks.filter((track) => track.kind === 'audio');
+    const saved = tracks.map((track) => ({ id: track.id, hidden: track.hidden, muted: track.muted }));
+    const video = tracks.filter((track) => track.kind === 'video').map((track) => track.id);
+    const audio = tracks.filter((track) => track.kind === 'audio').map((track) => track.id);
     try {
       return await measure('increasing-track-count', async () => {
         const maximum = Math.max(video.length, audio.length);
         for (let count = 1; count <= maximum; count += 1) {
-          video.forEach((track, index) => { track.hidden = index >= count; });
-          audio.forEach((track, index) => { track.muted = index >= count; });
-          refresh();
+          for (const [index, id] of video.entries()) {
+            await setTrackFlags(id, { hidden: index >= count });
+          }
+          for (const [index, id] of audio.entries()) {
+            await setTrackFlags(id, { muted: index >= count });
+          }
           preview.seek(0);
           await playFor(config.trackStepMs);
         }
       }, { maximumVideoTracks: video.length, maximumAudioTracks: audio.length });
     } finally {
       for (const item of saved) {
-        item.track.hidden = item.hidden;
-        item.track.muted = item.muted;
+        await setTrackFlags(item.id, { hidden: item.hidden, muted: item.muted });
       }
-      refresh();
     }
   }
 
