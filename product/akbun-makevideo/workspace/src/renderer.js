@@ -551,9 +551,10 @@ function splitAtPlayhead() {
 async function deleteSelected(ripple) {
   const clipId = liveSelection();
   if (!clipId) return;
-  if (await edit({ op: ripple ? 'rippleDelete' : 'removeClip', clipId })) {
-    state.selectedClipId = null;
-  }
+  // edit() answers null when the edit was refused. The empty array a delete
+  // gets back is a success that made no clips, and it is not null.
+  const done = await edit({ op: ripple ? 'rippleDelete' : 'removeClip', clipId });
+  if (done) state.selectedClipId = null;
 }
 
 /** Persist a setting changed from a toolbar or the transport, where there is no
@@ -1011,7 +1012,13 @@ async function openProject() {
 async function openProjectPath(path) {
   closeSheet('open-project');
   try {
-    loadDocument(await window.api.openProject(path), path);
+    const doc = await window.api.openProject(path);
+    // Anything that is not a document is a failure, whether or not it arrived
+    // as one: the browser fallback answers null rather than throwing, and
+    // handing that to loadDocument would take the page down with a type error
+    // instead of showing why the project would not open.
+    if (!doc || !doc.project) throw new Error(`${path} could not be opened.`);
+    loadDocument(doc, path);
     return true;
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open', kind: 'error' });
