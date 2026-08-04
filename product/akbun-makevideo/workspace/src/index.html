@@ -175,15 +175,23 @@
       </label>
       <label class="row">Width <input type="number" id="ps-width" min="16" max="7680" step="2" /></label>
       <label class="row">Height <input type="number" id="ps-height" min="16" max="7680" step="2" /></label>
-      <label class="row">Frames per second
-        <select id="ps-fps">
+      <label class="row">Frame rate
+        <select id="ps-rate">
+          <option value="24000/1001">23.976 (NTSC film)</option>
           <option value="24">24</option>
-          <option value="25">25</option>
+          <option value="25">25 (PAL)</option>
+          <option value="30000/1001">29.97 (NTSC)</option>
           <option value="30">30</option>
           <option value="50">50</option>
+          <option value="60000/1001">59.94 (NTSC)</option>
           <option value="60">60</option>
         </select>
       </label>
+      <p class="dim small-text">
+        The broadcast rates are exact ratios — 29.97 is 30000/1001 — so a camera file
+        stays in step with itself for the whole edit. Changing this moves every clip to
+        the nearest frame of the new rate rather than leaving it on its old frame number.
+      </p>
       <p class="dim small-text">
         This is the editing canvas. Render presets set the long edge and keep this shape,
         so a vertical project renders vertical.
@@ -279,6 +287,7 @@
     </div>
   </div>
 
+  <script src="time.js"></script>
   <script src="timeline.js"></script>
   <script src="api.js"></script>
   <script src="quality.js"></script>

@@ -12,7 +12,7 @@
 
 use crate::{Compositor, Placement as Draw, Source};
 use makevideo_render::accel::Acceleration;
-use makevideo_render::{ffmpeg, layout, AssetKind, Project};
+use makevideo_render::{ffmpeg, layout, AssetKind, Project, RationalTime};
 use std::io::{Read, Write};
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -23,8 +23,7 @@ use std::sync::{Arc, Mutex};
 /// a process per clip for the whole render.
 struct Decoder {
     placement: layout::Placement,
-    start_frame: u64,
-    end_frame: u64,
+    end_frame: i64,
     frame_bytes: usize,
     child: Option<Child>,
     stdout: Option<ChildStdout>,
@@ -37,8 +36,8 @@ struct Decoder {
 }
 
 impl Decoder {
-    fn wants(&self, frame: u64) -> bool {
-        frame >= self.start_frame && frame < self.end_frame
+    fn wants(&self, frame: i64) -> bool {
+        self.placement.covers(frame) && frame < self.end_frame
     }
 }
 
@@ -65,10 +64,12 @@ where
     F: FnMut(u64, u64),
 {
     let project = options.project;
-    let total_ms = project.duration_ms();
-    let fps = project.settings.fps.max(1);
+    let rate = project.rate();
+    // The progress bar is the only thing here that still speaks milliseconds,
+    // because that is what a progress bar is for.
+    let total_ms = project.duration().to_millis().max(0) as u64;
     let (width, height) = ffmpeg::output_size(&project.settings, options.preset);
-    let frames = layout::frame_count(total_ms, fps);
+    let frames = layout::frame_count(project);
     if frames == 0 {
         return Err("the timeline is empty, there is nothing to render".into());
     }
@@ -104,12 +105,14 @@ where
     let mut decoders: Vec<Decoder> = layout::placements(project, width, height)
         .into_iter()
         .map(|placement| {
-            let start_frame = placement.start_ms * fps as u64 / 1000;
-            let end_frame = layout::frame_count(placement.end_ms(), fps).min(frames);
+            // Both of these used to be a millisecond position multiplied by a
+            // frame rate and rounded, which is how a decoder could be started
+            // one frame late and every clip after it read from the wrong place.
+            // A placement is already counted in frames.
+            let end_frame = placement.end_frame().min(frames);
             Decoder {
                 frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
                 buffer: Vec::new(),
-                start_frame,
                 end_frame,
                 placement,
                 child: None,
@@ -149,11 +152,11 @@ where
                 let args = ffmpeg::decoder_args(&ffmpeg::Decode {
                     path: &decoder.placement.path,
                     kind: decoder.placement.kind,
-                    in_ms: decoder.placement.in_ms,
-                    duration_ms: decoder.placement.duration_ms,
+                    in_time: decoder.placement.in_time(rate),
+                    duration: decoder.placement.duration(rate),
                     width: decoder.placement.dst.w,
                     height: decoder.placement.dst.h,
-                    fps,
+                    rate,
                     // A still has nothing to decode, so no hint for it.
                     hwaccel: if decoder.placement.kind == AssetKind::Video {
                         options.accel.and_then(|a| a.hwaccel.as_deref())
@@ -224,7 +227,8 @@ where
             break;
         }
         if frame % 10 == 0 || frame + 1 == frames {
-            on_progress(layout::frame_time_ms(frame, fps).min(total_ms), total_ms);
+            let position = layout::frame_time(frame, rate).to_millis().max(0) as u64;
+            on_progress(position.min(total_ms), total_ms);
         }
     }
 
@@ -278,24 +282,25 @@ pub fn preview_frame(
     compositor: &Compositor,
     ffmpeg_path: &str,
     project: &Project,
-    time_ms: u64,
+    frame: i64,
     width: u32,
     height: u32,
 ) -> Result<Vec<u8>, String> {
-    let fps = project.settings.fps.max(1);
-    let layers = layout::layers_at(project, time_ms, width, height);
+    let rate = project.rate();
+    let layers = layout::layers_at(project, frame, width, height);
 
     let mut frames = Vec::new();
     for layer in &layers {
         let args = ffmpeg::decoder_args(&ffmpeg::Decode {
             path: &layer.path,
             kind: layer.kind,
-            in_ms: layer.source_ms,
-            // One frame's worth. Asking for less can round down to nothing.
-            duration_ms: (1000 / fps as u64) + 1,
+            in_time: layer.source_time(rate),
+            // Two frames' worth, because a source that starts a fraction late
+            // can hand back nothing at all for one. Only the first is read.
+            duration: RationalTime::new(2, rate),
             width: layer.dst.w,
             height: layer.dst.h,
-            fps,
+            rate,
             hwaccel: None,
         });
         let output = Command::new(ffmpeg_path)

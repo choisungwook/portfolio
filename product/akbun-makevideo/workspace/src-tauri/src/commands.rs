@@ -7,7 +7,7 @@
 
 use makevideo_compositor::{Backend, Compositor};
 use makevideo_render::accel::{self, Acceleration};
-use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project};
+use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
@@ -35,7 +35,11 @@ pub struct Settings {
     /// The resolution a new project starts with.
     pub default_width: u32,
     pub default_height: u32,
-    pub default_fps: u32,
+    /// The timebase a new project starts on, as a ratio so 29.97 is a choice
+    /// somebody can actually make. A settings file written before this was a
+    /// ratio has `defaultFps` instead, which is not read: losing a preference
+    /// is a smaller thing than opening a project on the wrong rate.
+    pub default_rate: Rate,
     /// Where project folders are made. Empty means the default, which is
     /// ~/Documents/akbun-makevideo.
     pub workspace_dir: String,
@@ -62,7 +66,7 @@ impl Default for Settings {
             snap: true,
             default_width: 1920,
             default_height: 1080,
-            default_fps: 30,
+            default_rate: Rate::fps(30),
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
@@ -428,7 +432,7 @@ pub fn preview_frame(
     app: AppHandle,
     state: State<AppState>,
     project: Project,
-    time_ms: u64,
+    frame: i64,
     max_width: u32,
 ) -> Result<tauri::ipc::Response, String> {
     let settings = state.settings.lock().unwrap().clone();
@@ -450,7 +454,7 @@ pub fn preview_frame(
         &gpu,
         &ffmpeg_path,
         &project,
-        time_ms,
+        frame,
         width,
         height,
     )?;
@@ -735,7 +739,8 @@ pub fn start_render(
         return Err("a render is already running".into());
     }
     let preset = ffmpeg::Preset::parse(&preset)?;
-    let total_ms = project.duration_ms();
+    // Only the progress bar wants this; every decision below is in frames.
+    let total_ms = project.duration().to_millis().max(0) as u64;
     let settings = state.settings.lock().unwrap().clone();
     let program = find_tool(&app, "ffmpeg", &settings.ffmpeg_dir).ok_or_else(|| {
         "ffmpeg was not found. Install it with `brew install ffmpeg`, or point Settings at the \

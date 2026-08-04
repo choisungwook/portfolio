@@ -3,9 +3,22 @@
 //! Nothing here runs a process. The whole point is that the filter graph can be
 //! asserted on a runner with no ffmpeg installed, because a graph that is one
 //! character wrong fails at render time on the user's machine and nowhere else.
+//!
+//! Times arrive as frame counts and leave as seconds, and that conversion is
+//! the only place rounding is allowed to happen. Frame rates leave as the ratio
+//! they are — `30000/1001`, which ffmpeg takes everywhere a rate is wanted —
+//! because a decimal here would quietly reintroduce the drift.
 
 use crate::accel::Acceleration;
-use crate::{AssetKind, Clip, Project, ProjectSettings, TrackKind};
+use crate::{AssetKind, Clip, Project, ProjectSettings, Rate, RationalTime, TrackKind};
+
+/// Everything is resampled to this on the way in, so a sample count means the
+/// same thing in every chain.
+const AUDIO_HZ: u32 = 48_000;
+
+/// Enough places that the error is under a microsecond, which is four orders of
+/// magnitude below a frame at any rate anybody shoots.
+const SECOND_DECIMALS: u32 = 6;
 
 /// What the Render menu offers. The number is the long edge, not the width, so
 /// a vertical project renders 1080x1920 rather than a letterboxed landscape
@@ -58,8 +71,8 @@ pub fn output_size(settings: &ProjectSettings, preset: Preset) -> (u32, u32) {
     }
 }
 
-fn secs(ms: u64) -> String {
-    format!("{:.3}", ms as f64 / 1000.0)
+fn secs(time: RationalTime) -> String {
+    time.seconds_text(SECOND_DECIMALS)
 }
 
 /// One ffmpeg input plus what the graph should take from it.
@@ -83,9 +96,9 @@ fn collect_items(project: &Project) -> Vec<Item<'_>> {
             let mut clips: Vec<&Clip> = track
                 .clips
                 .iter()
-                .filter(|clip| clip.duration_ms() > 0)
+                .filter(|clip| clip.duration_frames() > 0)
                 .collect();
-            clips.sort_by_key(|clip| clip.start_ms);
+            clips.sort_by_key(|clip| clip.start);
 
             for clip in clips {
                 let Some(asset) = project.asset(&clip.asset_id) else {
@@ -126,8 +139,8 @@ fn collect_items(project: &Project) -> Vec<Item<'_>> {
 /// deliberately generous — around 0.12 bits per pixel per frame — because a
 /// media engine spends more bits than x264 for the same picture. That is the
 /// trade being made when this is switched on.
-pub fn target_bitrate_kbps(width: u32, height: u32, fps: u32) -> u32 {
-    let raw = f64::from(width) * f64::from(height) * f64::from(fps) * 0.12 / 1000.0;
+pub fn target_bitrate_kbps(width: u32, height: u32, rate: Rate) -> u32 {
+    let raw = f64::from(width) * f64::from(height) * rate.as_f64() * 0.12 / 1000.0;
     (raw.round() as u32).clamp(2_000, 80_000)
 }
 
@@ -143,8 +156,9 @@ pub fn build_args(
     preset: Preset,
     accel: Option<&Acceleration>,
 ) -> Result<Vec<String>, String> {
-    let total_ms = project.duration_ms();
-    if total_ms == 0 {
+    let rate = project.rate();
+    let duration = project.duration();
+    if duration.value() == 0 {
         return Err("the timeline is empty, there is nothing to render".into());
     }
     let items = collect_items(project);
@@ -153,8 +167,8 @@ pub fn build_args(
     }
 
     let (width, height) = output_size(&project.settings, preset);
-    let fps = project.settings.fps.max(1);
-    let total = secs(total_ms);
+    let fps = rate.ratio_text();
+    let total = secs(duration);
 
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
@@ -165,13 +179,13 @@ pub fn build_args(
     ];
 
     for item in &items {
-        let duration = secs(item.clip.duration_ms());
+        let length = secs(item.clip.duration(rate));
         if item.kind == AssetKind::Image {
             // A still has no timeline of its own, so the input options are what
             // give it one. No -hwaccel: there is nothing to decode.
             args.extend(["-loop".into(), "1".into()]);
-            args.extend(["-framerate".into(), fps.to_string()]);
-            args.extend(["-t".into(), duration]);
+            args.extend(["-framerate".into(), fps.clone()]);
+            args.extend(["-t".into(), length]);
         } else {
             // Decode on the GPU where it is offered. No -hwaccel_output_format,
             // so frames land back in system memory and the filter graph below
@@ -185,8 +199,8 @@ pub fn build_args(
             // -ss ahead of -i seeks before decoding, which is the difference
             // between a render that skips to the in point and one that decodes
             // everything before it and throws the frames away.
-            args.extend(["-ss".into(), secs(item.clip.in_ms)]);
-            args.extend(["-t".into(), duration]);
+            args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
+            args.extend(["-t".into(), length]);
         }
         args.extend(["-i".into(), item.path.to_string()]);
     }
@@ -205,8 +219,8 @@ pub fn build_args(
         if !item.video {
             continue;
         }
-        let start = secs(item.clip.start_ms);
-        let end = secs(item.clip.end_ms());
+        let start = secs(item.clip.start_time(rate));
+        let end = secs(item.clip.end_time(rate));
         let opacity = if item.clip.opacity < 1.0 {
             format!(",colorchannelmixer=aa={:.3}", item.clip.opacity.max(0.0))
         } else {
@@ -239,7 +253,7 @@ pub fn build_args(
         if !item.audio {
             continue;
         }
-        chains.push(audio_chain(item, index));
+        chains.push(audio_chain(item, index, rate));
         audio_labels.push(format!("[a{index}]"));
     }
     let has_audio = !audio_labels.is_empty();
@@ -252,7 +266,7 @@ pub fn build_args(
     if has_audio {
         args.extend(["-map".into(), "[aout]".into()]);
     }
-    args.extend(video_codec_args(accel, width, height, fps));
+    args.extend(video_codec_args(accel, width, height, rate));
     if has_audio {
         args.extend(audio_codec_args());
     }
@@ -275,14 +289,17 @@ pub fn build_args(
 /// differs between the two paths: the filter graph feeds every clip in as its
 /// own input, while the composited path puts the frame pipe at 0 and shifts
 /// audio up by one.
-fn audio_chain(item: &Item, input: usize) -> String {
+fn audio_chain(item: &Item, input: usize, rate: Rate) -> String {
     // adelay is the audio half of tpad: every stream starts at 0 so amix has
-    // nothing to line up.
+    // nothing to line up. The delay is given in samples rather than in the
+    // milliseconds adelay takes by default, because a frame of 29.97 is not a
+    // whole number of milliseconds and half a millisecond of slip per clip is
+    // exactly the kind of thing nobody can hear and everybody can measure.
     format!(
-        "[{input}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,\
-         asetpts=PTS-STARTPTS,volume={:.3},adelay={}:all=1[a{input}]",
+        "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo,\
+         asetpts=PTS-STARTPTS,volume={:.3},adelay={}S:all=1[a{input}]",
         item.clip.volume.max(0.0),
-        item.clip.start_ms
+        item.clip.start_time(rate).to_samples(AUDIO_HZ)
     )
 }
 
@@ -300,7 +317,7 @@ fn video_codec_args(
     accel: Option<&Acceleration>,
     width: u32,
     height: u32,
-    fps: u32,
+    rate: Rate,
 ) -> Vec<String> {
     let mut args: Vec<String> = Vec::new();
     match accel {
@@ -313,7 +330,7 @@ fn video_codec_args(
                 "-c:v".into(),
                 hardware.encoder.clone(),
                 "-b:v".into(),
-                format!("{}k", target_bitrate_kbps(width, height, fps)),
+                format!("{}k", target_bitrate_kbps(width, height, rate)),
             ]);
             if hardware.encoder.contains("videotoolbox") {
                 // Lets VideoToolbox fall back to its own software encoder when
@@ -332,12 +349,7 @@ fn video_codec_args(
             ]);
         }
     }
-    args.extend([
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        "-r".into(),
-        fps.to_string(),
-    ]);
+    args.extend(["-pix_fmt".into(), "yuv420p".into(), "-r".into(), rate.ratio_text()]);
     args
 }
 
@@ -348,7 +360,7 @@ fn audio_codec_args() -> Vec<String> {
         "-b:a".into(),
         "192k".into(),
         "-ar".into(),
-        "48000".into(),
+        AUDIO_HZ.to_string(),
     ]
 }
 
@@ -363,12 +375,14 @@ fn audio_codec_args() -> Vec<String> {
 pub struct Decode<'a> {
     pub path: &'a str,
     pub kind: AssetKind,
-    pub in_ms: u64,
-    pub duration_ms: u64,
+    /// Where to seek to, and how much to read, as times rather than as frame
+    /// indexes: ffmpeg takes seconds.
+    pub in_time: RationalTime,
+    pub duration: RationalTime,
     /// From `layout::fit_rect`, so the size is a decision made in one place.
     pub width: u32,
     pub height: u32,
-    pub fps: u32,
+    pub rate: Rate,
     pub hwaccel: Option<&'a str>,
 }
 
@@ -383,13 +397,14 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
     let Decode {
         path,
         kind,
-        in_ms,
-        duration_ms,
+        in_time,
+        duration,
         width,
         height,
-        fps,
+        rate,
         hwaccel,
     } = *request;
+    let fps = rate.ratio_text();
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-nostdin".into(),
@@ -398,14 +413,14 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
     ];
     if kind == AssetKind::Image {
         args.extend(["-loop".into(), "1".into()]);
-        args.extend(["-framerate".into(), fps.to_string()]);
-        args.extend(["-t".into(), secs(duration_ms)]);
+        args.extend(["-framerate".into(), fps.clone()]);
+        args.extend(["-t".into(), secs(duration)]);
     } else {
         if let Some(name) = hwaccel {
             args.extend(["-hwaccel".into(), name.to_string()]);
         }
-        args.extend(["-ss".into(), secs(in_ms)]);
-        args.extend(["-t".into(), secs(duration_ms)]);
+        args.extend(["-ss".into(), secs(in_time)]);
+        args.extend(["-t".into(), secs(duration)]);
     }
     args.extend(["-i".into(), path.to_string()]);
     // fps= is what makes the frame count predictable: the reader takes exactly
@@ -432,13 +447,13 @@ pub fn encoder_args(
     preset: Preset,
     accel: Option<&Acceleration>,
 ) -> Result<Vec<String>, String> {
-    let total_ms = project.duration_ms();
-    if total_ms == 0 {
+    let rate = project.rate();
+    let duration = project.duration();
+    if duration.value() == 0 {
         return Err("the timeline is empty, there is nothing to render".into());
     }
     let (width, height) = output_size(&project.settings, preset);
-    let fps = project.settings.fps.max(1);
-    let total = secs(total_ms);
+    let total = secs(duration);
 
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
@@ -454,7 +469,7 @@ pub fn encoder_args(
         "-s".into(),
         format!("{width}x{height}"),
         "-r".into(),
-        fps.to_string(),
+        rate.ratio_text(),
         "-i".into(),
         "pipe:0".into(),
     ];
@@ -462,8 +477,8 @@ pub fn encoder_args(
     let items = collect_items(project);
     let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
     for item in &audio {
-        args.extend(["-ss".into(), secs(item.clip.in_ms)]);
-        args.extend(["-t".into(), secs(item.clip.duration_ms())]);
+        args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
+        args.extend(["-t".into(), secs(item.clip.duration(rate))]);
         args.extend(["-i".into(), item.path.to_string()]);
     }
 
@@ -473,7 +488,7 @@ pub fn encoder_args(
         let mut labels = Vec::new();
         for (index, item) in audio.iter().enumerate() {
             let input = index + 1;
-            chains.push(audio_chain(item, input));
+            chains.push(audio_chain(item, input, rate));
             labels.push(format!("[a{input}]"));
         }
         chains.push(format!(
@@ -488,7 +503,7 @@ pub fn encoder_args(
     if has_audio {
         args.extend(["-map".into(), "[aout]".into()]);
     }
-    args.extend(video_codec_args(accel, width, height, fps));
+    args.extend(video_codec_args(accel, width, height, rate));
     if has_audio {
         args.extend(audio_codec_args());
     }
@@ -510,7 +525,9 @@ pub fn encoder_args(
 /// A line of `-progress pipe:1` output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Progress {
-    /// How far into the output ffmpeg has written, in milliseconds.
+    /// How far into the output ffmpeg has written, in milliseconds. This one is
+    /// a progress bar rather than a decision about a frame, so milliseconds are
+    /// all it needs and all ffmpeg reports.
     Position(u64),
     Done,
 }
@@ -550,7 +567,7 @@ mod tests {
         ProjectSettings {
             width,
             height,
-            fps: 30,
+            rate: Rate::fps(30),
         }
     }
 
@@ -567,13 +584,13 @@ mod tests {
         }
     }
 
-    fn clip(id: &str, asset_id: &str, start_ms: u64, in_ms: u64, out_ms: u64) -> Clip {
+    fn clip(id: &str, asset_id: &str, start: i64, in_point: i64, out_point: i64) -> Clip {
         Clip {
             id: id.into(),
             asset_id: asset_id.into(),
-            start_ms,
-            in_ms,
-            out_ms,
+            start,
+            in_point,
+            out_point,
             volume: 1.0,
             opacity: 1.0,
         }
@@ -590,14 +607,17 @@ mod tests {
         }
     }
 
+    /// One clip, two seconds in, three seconds long, on a five second timeline.
+    /// At 30 fps that is frames 60 to 150, taken from frame 30 of the source.
     fn one_video_project() -> Project {
         Project {
+            version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
             assets: vec![asset("a1", AssetKind::Video, true)],
             tracks: vec![track(
                 "V1",
                 TrackKind::Video,
-                vec![clip("c1", "a1", 2_000, 1_000, 4_000)],
+                vec![clip("c1", "a1", 60, 30, 120)],
             )],
         }
     }
@@ -617,6 +637,7 @@ mod tests {
     #[test]
     fn empty_timeline_is_an_error() {
         let project = Project {
+            version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![track("V1", TrackKind::Video, vec![])],
@@ -629,7 +650,7 @@ mod tests {
         let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let text = joined(&args);
         assert!(
-            text.contains("-ss 1.000 -t 3.000 -i /media/a1.mp4"),
+            text.contains("-ss 1.000000 -t 3.000000 -i /media/a1.mp4"),
             "{text}"
         );
         assert_eq!(args.last().unwrap(), "/out.mp4");
@@ -639,9 +660,9 @@ mod tests {
     fn the_clip_lands_at_its_timeline_position() {
         let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
-        assert!(filter.contains("tpad=start_duration=2.000"), "{filter}");
+        assert!(filter.contains("tpad=start_duration=2.000000"), "{filter}");
         assert!(
-            filter.contains("enable='between(t,2.000,5.000)'"),
+            filter.contains("enable='between(t,2.000000,5.000000)'"),
             "{filter}"
         );
     }
@@ -649,9 +670,28 @@ mod tests {
     #[test]
     fn the_base_runs_for_the_whole_timeline() {
         let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
-        assert!(filter_of(&args).contains("color=c=black:s=1920x1080:r=30:d=5.000"));
+        assert!(filter_of(&args).contains("color=c=black:s=1920x1080:r=30:d=5.000000"));
         // The output is bounded too, so stray audio cannot run past the video.
-        assert!(joined(&args).contains("-t 5.000 -movflags"));
+        assert!(joined(&args).contains("-t 5.000000 -movflags"));
+    }
+
+    #[test]
+    fn a_broadcast_rate_reaches_ffmpeg_as_the_ratio_it_is() {
+        // The reason the whole model changed. A decimal here would be 29.97,
+        // ffmpeg would round it to something of its own, and every clip would
+        // land on a slightly different frame than the timeline says.
+        let mut project = one_video_project();
+        project.settings.rate = Rate::ntsc(30);
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let filter = filter_of(&args);
+        assert!(
+            filter.contains("color=c=black:s=1920x1080:r=30000/1001"),
+            "{filter}"
+        );
+        assert!(filter.contains("fps=30000/1001"), "{filter}");
+        assert!(joined(&args).contains("-r 30000/1001"), "{}", joined(&args));
+        // 150 frames of 29.97 is 5.005 seconds, not 5.
+        assert!(joined(&args).contains("-t 5.005000 -movflags"), "{}", joined(&args));
     }
 
     #[test]
@@ -664,12 +704,24 @@ mod tests {
     }
 
     #[test]
-    fn audio_is_delayed_rather_than_trimmed_into_place() {
+    fn audio_is_delayed_by_a_sample_count_rather_than_a_millisecond_count() {
         let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
-        assert!(filter.contains("adelay=2000:all=1"), "{filter}");
+        // Two seconds at 48 kHz.
+        assert!(filter.contains("adelay=96000S:all=1"), "{filter}");
         assert!(filter.contains("amix=inputs=1:normalize=0"), "{filter}");
         assert!(joined(&args).contains("-map [aout]"));
+    }
+
+    #[test]
+    fn a_broadcast_rate_delays_audio_to_the_sample_the_picture_starts_on() {
+        let mut project = one_video_project();
+        project.settings.rate = Rate::ntsc(30);
+        let filter = filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
+        // Frame 60 of 29.97 is 2.002 seconds, which is 96096 samples. In
+        // milliseconds this was 2002 either way; the difference shows on the
+        // frames whose time is not a whole number of them.
+        assert!(filter.contains("adelay=96096S:all=1"), "{filter}");
     }
 
     #[test]
@@ -679,21 +731,25 @@ mod tests {
         project.assets[0].has_audio = false;
         let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         let text = joined(&args);
-        assert!(text.contains("-loop 1 -framerate 30 -t 3.000 -i"), "{text}");
+        assert!(
+            text.contains("-loop 1 -framerate 30 -t 3.000000 -i"),
+            "{text}"
+        );
         assert!(!text.contains("-ss"), "{text}");
     }
 
     #[test]
     fn tracks_paint_in_order_with_track_one_underneath() {
         let project = Project {
+            version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
             assets: vec![
                 asset("a1", AssetKind::Video, false),
                 asset("a2", AssetKind::Video, false),
             ],
             tracks: vec![
-                track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 4_000)]),
-                track("V2", TrackKind::Video, vec![clip("c2", "a2", 0, 0, 4_000)]),
+                track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 120)]),
+                track("V2", TrackKind::Video, vec![clip("c2", "a2", 0, 0, 120)]),
             ],
         };
         let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap());
@@ -721,19 +777,21 @@ mod tests {
     #[test]
     fn an_audio_track_contributes_sound_but_no_layer() {
         let project = Project {
+            version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
             assets: vec![asset("a1", AssetKind::Audio, true)],
             tracks: vec![track(
                 "A1",
                 TrackKind::Audio,
-                vec![clip("c1", "a1", 500, 0, 3_000)],
+                vec![clip("c1", "a1", 15, 0, 90)],
             )],
         };
         let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
         assert!(!filter.contains("overlay"), "{filter}");
         assert!(filter.contains("[base]format=yuv420p[vout]"), "{filter}");
-        assert!(filter.contains("adelay=500:all=1"), "{filter}");
+        // Half a second in, which is 24000 samples.
+        assert!(filter.contains("adelay=24000S:all=1"), "{filter}");
     }
 
     #[test]
@@ -810,7 +868,7 @@ mod tests {
         let hardware = videotoolbox();
         let args =
             build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
-        assert!(joined(&args).contains("-hwaccel videotoolbox -ss 1.000"));
+        assert!(joined(&args).contains("-hwaccel videotoolbox -ss 1.000000"));
     }
 
     #[test]
@@ -851,28 +909,31 @@ mod tests {
 
     #[test]
     fn the_bitrate_follows_the_frame_and_stays_in_range() {
-        assert_eq!(target_bitrate_kbps(1920, 1080, 30), 7465);
-        assert_eq!(target_bitrate_kbps(3840, 2160, 30), 29860);
+        assert_eq!(target_bitrate_kbps(1920, 1080, Rate::fps(30)), 7465);
+        assert_eq!(target_bitrate_kbps(3840, 2160, Rate::fps(30)), 29860);
+        // 29.97 asks for slightly less than 30 does, which it should.
+        assert_eq!(target_bitrate_kbps(1920, 1080, Rate::ntsc(30)), 7458);
         // A tiny frame still gets something usable, a huge one stays sane.
-        assert_eq!(target_bitrate_kbps(64, 64, 24), 2_000);
-        assert_eq!(target_bitrate_kbps(7680, 4320, 60), 80_000);
+        assert_eq!(target_bitrate_kbps(64, 64, Rate::fps(24)), 2_000);
+        assert_eq!(target_bitrate_kbps(7680, 4320, Rate::fps(60)), 80_000);
     }
 
     #[test]
     fn a_decoder_hands_over_raw_frames_at_the_project_rate() {
+        let rate = Rate::fps(30);
         let args = decoder_args(&Decode {
             path: "/media/a1.mp4",
             kind: AssetKind::Video,
-            in_ms: 1_000,
-            duration_ms: 3_000,
+            in_time: RationalTime::new(30, rate),
+            duration: RationalTime::new(90, rate),
             width: 1440,
             height: 1080,
-            fps: 30,
+            rate,
             hwaccel: None,
         })
         .join(" ");
         assert!(
-            args.contains("-ss 1.000 -t 3.000 -i /media/a1.mp4"),
+            args.contains("-ss 1.000000 -t 3.000000 -i /media/a1.mp4"),
             "{args}"
         );
         // The size comes from layout::fit_rect, and fps= is what keeps the
@@ -882,33 +943,53 @@ mod tests {
     }
 
     #[test]
-    fn a_still_decoder_loops_instead_of_seeking() {
+    fn a_decoder_on_a_broadcast_rate_asks_for_the_ratio() {
+        let rate = Rate::ntsc(24);
         let args = decoder_args(&Decode {
-            path: "/m/a.png",
-            kind: AssetKind::Image,
-            in_ms: 0,
-            duration_ms: 2_000,
-            width: 800,
-            height: 600,
-            fps: 25,
+            path: "/m/a.mp4",
+            kind: AssetKind::Video,
+            in_time: RationalTime::new(24, rate),
+            duration: RationalTime::new(24, rate),
+            width: 640,
+            height: 480,
+            rate,
             hwaccel: None,
         })
         .join(" ");
-        assert!(args.contains("-loop 1 -framerate 25 -t 2.000"), "{args}");
+        assert!(args.contains("-ss 1.001000 -t 1.001000"), "{args}");
+        assert!(args.contains("fps=24000/1001"), "{args}");
+    }
+
+    #[test]
+    fn a_still_decoder_loops_instead_of_seeking() {
+        let rate = Rate::fps(25);
+        let args = decoder_args(&Decode {
+            path: "/m/a.png",
+            kind: AssetKind::Image,
+            in_time: RationalTime::zero(rate),
+            duration: RationalTime::new(50, rate),
+            width: 800,
+            height: 600,
+            rate,
+            hwaccel: None,
+        })
+        .join(" ");
+        assert!(args.contains("-loop 1 -framerate 25 -t 2.000000"), "{args}");
         assert!(!args.contains("-ss"), "{args}");
         assert!(!args.contains("-hwaccel"), "a still has nothing to decode");
     }
 
     #[test]
     fn a_decoder_uses_the_hardware_when_there_is_some() {
+        let rate = Rate::fps(30);
         let args = decoder_args(&Decode {
             path: "/m/a.mp4",
             kind: AssetKind::Video,
-            in_ms: 0,
-            duration_ms: 1_000,
+            in_time: RationalTime::zero(rate),
+            duration: RationalTime::new(30, rate),
             width: 640,
             height: 480,
-            fps: 30,
+            rate,
             hwaccel: Some("videotoolbox"),
         })
         .join(" ");
@@ -928,7 +1009,7 @@ mod tests {
         // The audio file is a real input after the pipe, so its index is 1.
         assert!(text.contains("-i /media/a1.mp4"), "{text}");
         assert!(filter_of(&args).contains("[1:a]"), "{}", filter_of(&args));
-        assert!(filter_of(&args).contains("adelay=2000:all=1"));
+        assert!(filter_of(&args).contains("adelay=96000S:all=1"));
         // No video filtering at all: the compositor already drew the frame.
         assert!(
             !filter_of(&args).contains("overlay"),
@@ -959,7 +1040,7 @@ mod tests {
         for setting in [
             "-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -r 30",
             "-c:a aac -b:a 192k -ar 48000",
-            "-t 5.000 -movflags +faststart",
+            "-t 5.000000 -movflags +faststart",
         ] {
             assert!(graph.contains(setting), "filter graph missing {setting}");
             assert!(piped.contains(setting), "piped encoder missing {setting}");
@@ -980,6 +1061,7 @@ mod tests {
     #[test]
     fn an_empty_timeline_has_nothing_to_encode_either() {
         let project = Project {
+            version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![],
@@ -1009,19 +1091,20 @@ mod tests {
         let project = one_video_project();
         let text = serde_json::to_string(&project).unwrap();
         let back: Project = serde_json::from_str(&text).unwrap();
-        assert_eq!(back.duration_ms(), 5_000);
+        assert_eq!(back.duration_frames(), 150);
         // camelCase on the wire, because the page writes the same file.
-        assert!(text.contains("\"startMs\""), "{text}");
         assert!(text.contains("\"assetId\""), "{text}");
+        assert!(text.contains("\"start\":60"), "{text}");
     }
 
     #[test]
     fn a_clip_written_before_volume_existed_still_opens() {
         let text = r#"{
-            "settings": {"width": 1920, "height": 1080, "fps": 30},
+            "version": 2,
+            "settings": {"width": 1920, "height": 1080, "rate": {"num": 30, "den": 1}},
             "assets": [{"id": "a1", "path": "/m.mp4", "kind": "video", "hasAudio": true}],
             "tracks": [{"id": "V1", "kind": "video", "clips": [
-                {"id": "c1", "assetId": "a1", "startMs": 0, "inMs": 0, "outMs": 1000}
+                {"id": "c1", "assetId": "a1", "start": 0, "in": 0, "out": 30}
             ]}]
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();

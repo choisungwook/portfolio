@@ -6,6 +6,12 @@
 // sits in the stage, the playhead decides which are visible, and the browser
 // does the drawing. That is why the preview is an approximation of the render
 // rather than the render itself; see adr/2026-08-preview-in-the-webview.md.
+//
+// The position this reports and takes is a frame on the project rate, because
+// that is what the timeline is counted in. It is allowed a fraction, because a
+// media element's clock does not stop on frame boundaries and rounding it to
+// one would make playback stutter for no reason. Everything handed to a media
+// element is seconds, converted at that boundary through time.js.
 
 // scale is what the stacked elements are actually laid out at before being
 // scaled back up, so a lower setting composites a smaller surface.
@@ -15,12 +21,17 @@ const QUALITY = {
   quarter: { scale: 0.25 },
 };
 
+const T =
+  typeof module !== 'undefined' && module.exports ? require('./time.js') : globalThis.timeLib;
+
 const RATE_SYNC_THRESHOLD = 0.04;
 const HARD_SYNC_THRESHOLD = 1;
 const MAX_RATE_ADJUSTMENT = 0.05;
 
-function timelineTimeFromMedia(clip, currentTime) {
-  return clip.startMs + (currentTime * 1000 - clip.inMs);
+/** Where the timeline is, given where the clip that is driving the clock has
+ *  got to in its own source. */
+function timelineTimeFromMedia(clip, currentTime, rate) {
+  return clip.start + (T.secondsToFrames(currentTime, rate) - clip.in);
 }
 
 function playbackRateForDrift(drift) {
@@ -50,7 +61,7 @@ function createPreview(options) {
   let muteWhileScrubbing = true;
   let playing = false;
   let starting = false;
-  let positionMs = 0;
+  let positionFrames = 0;
   let clockOrigin = 0;
   let clock = null;
   let timelineDiscontinuity = false;
@@ -60,7 +71,17 @@ function createPreview(options) {
 
   function settings() {
     const project = getProject();
-    return (project && project.settings) || { width: 1920, height: 1080, fps: 30 };
+    return (project && project.settings) || { width: 1920, height: 1080, rate: T.fps(30) };
+  }
+
+  function rate() {
+    return settings().rate || T.fps(30);
+  }
+
+  /** Where the playhead is in seconds, which is the only thing a media element
+   *  understands. */
+  function positionSeconds() {
+    return T.framesToSeconds(positionFrames, rate());
   }
 
   /** Fit the project shape into the panel, then lay the media out at the
@@ -146,12 +167,12 @@ function createPreview(options) {
     const project = getProject();
     if (!project) return null;
     const videoTracks = L.tracksOf(project, 'video');
-    const active = L.clipsAt(project, positionMs);
+    const active = L.clipsAt(project, positionFrames);
     const live = new Set();
     const media = [];
     let seekFailed = false;
 
-    for (const { track, clip, sourceMs } of active) {
+    for (const { track, clip, sourceFrame } of active) {
       if (track.hidden) continue;
       if (track.kind === 'audio' && track.muted) continue;
       const asset = L.findAsset(project, clip.assetId);
@@ -167,7 +188,7 @@ function createPreview(options) {
       }
       if (entry.kind === 'image') continue;
 
-      const target = sourceMs / 1000;
+      const target = T.framesToSeconds(sourceFrame, rate());
       media.push({ entry, track, clip, target, wasLive });
     }
 
@@ -219,19 +240,22 @@ function createPreview(options) {
     if (assetElement.tagName === 'IMG') return;
     if ((playing || starting) && assetElement.paused) ensurePlaying(assetElement);
     if (!playing && !starting && !assetElement.paused) assetElement.pause();
-    positionMs = assetElement.currentTime * 1000;
+    positionFrames = T.secondsToFrames(assetElement.currentTime, rate());
   }
 
-  function totalMs() {
+  /** How long what is being shown is, in frames of the project rate. An asset
+   *  being previewed on its own is measured on that rate too: it is the clock
+   *  the transport reads, not a claim about the file. */
+  function totalFrames() {
     if (mode === 'asset') {
       if (!assetShown) return 0;
       if (assetElement && Number.isFinite(assetElement.duration)) {
-        return assetElement.duration * 1000;
+        return T.secondsToFrames(assetElement.duration, rate());
       }
-      return assetShown.durationMs || 0;
+      return T.framesFromMillis(assetShown.durationMs || 0, rate());
     }
     const project = getProject();
-    return project ? L.projectDurationMs(project) : 0;
+    return project ? L.projectDurationFrames(project) : 0;
   }
 
   function transportActive() {
@@ -245,13 +269,19 @@ function createPreview(options) {
         !clock.entry.element.paused &&
         Number.isFinite(clock.entry.element.currentTime)
       ) {
-        positionMs = timelineTimeFromMedia(clock.clip, clock.entry.element.currentTime);
+        positionFrames = timelineTimeFromMedia(
+          clock.clip,
+          clock.entry.element.currentTime,
+          rate()
+        );
       } else {
-        positionMs = performance.now() - clockOrigin;
+        // Nothing is playing yet, so the wall clock stands in. It is in
+        // milliseconds because performance.now() is.
+        positionFrames = T.secondsToFrames((performance.now() - clockOrigin) / 1000, rate());
       }
-      const total = totalMs();
-      if (positionMs >= total) {
-        positionMs = total;
+      const total = totalFrames();
+      if (positionFrames >= total) {
+        positionFrames = total;
         pause();
       }
     }
@@ -260,26 +290,28 @@ function createPreview(options) {
       const readyClock = nextClock && !nextClock.entry.element.paused ? nextClock : null;
       if (!clock || !readyClock || clock.clip.id !== readyClock.clip.id) {
         clock = readyClock;
-        clockOrigin = performance.now() - positionMs;
+        clockOrigin = performance.now() - positionSeconds() * 1000;
       }
     } else syncAsset();
 
-    const rounded = Math.round(positionMs);
+    // Reported when it lands on a new frame, which is also how often the
+    // playhead and the clock can actually change.
+    const rounded = Math.round(positionFrames);
     if (rounded !== lastReported) {
       lastReported = rounded;
-      if (onTick) onTick(positionMs, transportActive());
+      if (onTick) onTick(positionFrames, transportActive());
     }
     requestAnimationFrame(frame);
   }
 
   async function play() {
     if (playing || starting) return;
-    if (totalMs() <= 0) return;
+    if (totalFrames() <= 0) return;
     clearExact();
-    if (mode === 'timeline' && positionMs >= totalMs()) positionMs = 0;
+    if (mode === 'timeline' && positionFrames >= totalFrames()) positionFrames = 0;
     if (qualityMonitor) qualityMonitor.playbackRequested();
     starting = true;
-    if (onTick) onTick(positionMs, transportActive());
+    if (onTick) onTick(positionFrames, transportActive());
     const generation = ++playGeneration;
     let reference = null;
     if (mode === 'timeline') {
@@ -299,8 +331,8 @@ function createPreview(options) {
     starting = false;
     playing = true;
     clock = reference;
-    clockOrigin = performance.now() - positionMs;
-    if (onTick) onTick(positionMs, transportActive());
+    clockOrigin = performance.now() - positionSeconds() * 1000;
+    if (onTick) onTick(positionFrames, transportActive());
   }
 
   function pause() {
@@ -316,24 +348,27 @@ function createPreview(options) {
       }
     }
     if (assetElement && assetElement.pause) assetElement.pause();
-    if (onTick) onTick(positionMs, transportActive());
+    if (onTick) onTick(positionFrames, transportActive());
   }
 
-  function seek(ms) {
+  /** `frames` is a position on the project rate. Whole ones come from the
+   *  keyboard and the transport; a scrub gives a fraction and it is kept, so
+   *  dragging the playhead does not feel notched. */
+  function seek(frames) {
     if (qualityMonitor && qualityMonitor.isRunning()) qualityMonitor.discontinuity();
-    positionMs = Math.max(0, Math.min(ms, Math.max(totalMs(), 0)));
-    clockOrigin = performance.now() - positionMs;
+    positionFrames = Math.max(0, Math.min(frames, Math.max(totalFrames(), 0)));
+    clockOrigin = performance.now() - positionSeconds() * 1000;
     clock = null;
     timelineDiscontinuity = mode === 'timeline';
     if (mode === 'asset' && assetElement && assetElement.currentTime !== undefined) {
       try {
-        assetElement.currentTime = positionMs / 1000;
+        assetElement.currentTime = positionSeconds();
       } catch (error) {
         // Same as above: retried on the next frame.
       }
     }
     if (mode === 'timeline') clock = syncTimeline();
-    if (onTick) onTick(positionMs, transportActive());
+    if (onTick) onTick(positionFrames, transportActive());
   }
 
   /** Elements outlive the clips that made them unless something removes them,
@@ -364,7 +399,7 @@ function createPreview(options) {
       entry.element.remove();
     }
     pool.clear();
-    positionMs = 0;
+    positionFrames = 0;
     starting = false;
     playing = false;
     clock = null;
@@ -392,7 +427,7 @@ function createPreview(options) {
     assetElement.classList.add('on');
     assetElement.style.zIndex = '50';
     inner.appendChild(assetElement);
-    positionMs = 0;
+    positionFrames = 0;
   }
 
   function showTimeline() {
@@ -406,7 +441,7 @@ function createPreview(options) {
       assetElement = null;
     }
     assetShown = null;
-    positionMs = 0;
+    positionFrames = 0;
   }
 
   /** Show one frame drawn by the Rust compositor — the same shader, the same
@@ -465,8 +500,8 @@ function createPreview(options) {
     toggle: () => (playing || starting ? pause() : play()),
     isPlaying: transportActive,
     seek,
-    position: () => positionMs,
-    total: totalMs,
+    position: () => positionFrames,
+    total: totalFrames,
     mode: () => mode,
     prune,
     clear,

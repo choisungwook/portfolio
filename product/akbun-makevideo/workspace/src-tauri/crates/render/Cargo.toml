@@ -12,6 +12,9 @@ license = "MIT"
 # that has no ffmpeg installed.
 
 [dependencies]
+# Time is the bottom of the stack: this crate stores frame counts and hands
+# seconds to ffmpeg, and both go through that one place.
+makevideo-time = { path = "../time" }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

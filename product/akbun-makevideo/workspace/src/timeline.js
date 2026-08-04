@@ -8,13 +8,25 @@
 // the next frame; a round trip per mouse move would not keep up. Rust reads the
 // same shape back through serde for the render, so the two halves agree without
 // either reimplementing the other. See wiki/architecture/timeline.md.
+//
+// Every time here is a frame index on the project rate — `start`, `in` and
+// `out` on a clip, and everything this file takes and returns. Milliseconds
+// only appear where something outside hands them over, and they are converted
+// at that boundary through time.js.
+
+const T =
+  typeof module !== 'undefined' && module.exports ? require('./time.js') : globalThis.timeLib;
 
 const MAX_TRACKS_PER_KIND = 4;
 // Below this a clip is a sliver nobody can grab again, so trims and splits
-// refuse to produce one.
-const MIN_CLIP_MS = 100;
+// refuse to produce one. A tenth of a second is between two and six frames
+// depending on the rate, which is why it is stated in seconds and converted.
+const MIN_CLIP_SECONDS = 0.1;
 // A still has no length of its own, so it gets one when it lands on a track.
-const DEFAULT_IMAGE_MS = 5000;
+const DEFAULT_IMAGE_SECONDS = 5;
+// What the format is called. Version 1 measured everything in milliseconds;
+// `normalize` converts one of those on the way in.
+const FORMAT_VERSION = 2;
 
 let sequence = 0;
 
@@ -23,16 +35,24 @@ function nextId(prefix) {
   return `${prefix}${sequence}`;
 }
 
+function minClipFrames(rate) {
+  return Math.max(1, Math.round(MIN_CLIP_SECONDS * T.rateToNumber(rate)));
+}
+
 function clipDuration(clip) {
-  return Math.max(0, clip.outMs - clip.inMs);
+  return Math.max(0, clip.out - clip.in);
 }
 
 function clipEnd(clip) {
-  return clip.startMs + clipDuration(clip);
+  return clip.start + clipDuration(clip);
 }
 
 function defaultSettings() {
-  return { width: 1920, height: 1080, fps: 30 };
+  return { width: 1920, height: 1080, rate: T.fps(30) };
+}
+
+function rateOf(project) {
+  return (project && project.settings && project.settings.rate) || T.fps(30);
 }
 
 function createTrack(kind, name) {
@@ -43,7 +63,7 @@ function createTrack(kind, name) {
 // of each.
 function createProject(settings) {
   return {
-    version: 1,
+    version: FORMAT_VERSION,
     settings: Object.assign(defaultSettings(), settings || {}),
     assets: [],
     tracks: [createTrack('video', 'V1'), createTrack('audio', 'A1')],
@@ -122,25 +142,29 @@ function canAccept(track, asset) {
   return asset.kind === 'audio' || (asset.kind === 'video' && asset.hasAudio);
 }
 
-function assetLengthMs(asset) {
-  if (asset.kind === 'image') return DEFAULT_IMAGE_MS;
+/** How many frames of the project an asset lasts. ffprobe reports a file's
+ *  length in milliseconds, which is a fact about the file rather than about the
+ *  timeline, so this is where it becomes frames. */
+function assetLengthFrames(asset, rate) {
+  const fallback = Math.round(DEFAULT_IMAGE_SECONDS * T.rateToNumber(rate));
+  if (asset.kind === 'image') return fallback;
   // 0 means ffprobe was not there to ask. The page patches it in once the
   // media element reports its own duration.
-  return asset.durationMs > 0 ? asset.durationMs : DEFAULT_IMAGE_MS;
+  return asset.durationMs > 0 ? T.framesFromMillis(asset.durationMs, rate) : fallback;
 }
 
-/** The first position at or after `wantedMs` where a clip of `durationMs` fits
- *  without overlapping. Clips never overlap on a track: two pictures in the
- *  same place at the same time is a question the timeline cannot answer, and
- *  pushing right is the answer every editor gives. */
-function freeStart(track, wantedMs, durationMs, ignoreClipId) {
+/** The first position at or after `wanted` where a clip of `duration` frames
+ *  fits without overlapping. Clips never overlap on a track: two pictures in
+ *  the same place at the same time is a question the timeline cannot answer,
+ *  and pushing right is the answer every editor gives. */
+function freeStart(track, wanted, duration, ignoreClipId) {
   const others = track.clips.filter((clip) => clip.id !== ignoreClipId);
-  let start = Math.max(0, Math.round(wantedMs));
+  let start = Math.max(0, Math.round(wanted));
   let moved = true;
   while (moved) {
     moved = false;
     for (const other of others) {
-      if (start < clipEnd(other) && other.startMs < start + durationMs) {
+      if (start < clipEnd(other) && other.start < start + duration) {
         start = clipEnd(other);
         moved = true;
       }
@@ -150,22 +174,22 @@ function freeStart(track, wantedMs, durationMs, ignoreClipId) {
 }
 
 function sortClips(track) {
-  track.clips.sort((a, b) => a.startMs - b.startMs);
+  track.clips.sort((a, b) => a.start - b.start);
 }
 
 /** Drop an asset onto a track. Returns the new clip, or null when the track
  *  cannot take that kind of asset. */
-function addClip(project, trackId, assetId, startMs) {
+function addClip(project, trackId, assetId, start) {
   const track = findTrack(project, trackId);
   const asset = findAsset(project, assetId);
   if (!track || !canAccept(track, asset)) return null;
-  const duration = assetLengthMs(asset);
+  const duration = assetLengthFrames(asset, rateOf(project));
   const clip = {
     id: nextId('c'),
     assetId,
-    startMs: freeStart(track, startMs, duration, null),
-    inMs: 0,
-    outMs: duration,
+    start: freeStart(track, start, duration, null),
+    in: 0,
+    out: duration,
     volume: 1,
     opacity: 1,
   };
@@ -176,7 +200,7 @@ function addClip(project, trackId, assetId, startMs) {
 
 /** Move a clip inside its track or to another one. Returns the clip, or null
  *  when the target track will not take it. */
-function moveClip(project, clipId, targetTrackId, startMs) {
+function moveClip(project, clipId, targetTrackId, start) {
   const found = findClip(project, clipId);
   if (!found) return null;
   const target = findTrack(project, targetTrackId);
@@ -188,31 +212,36 @@ function moveClip(project, clipId, targetTrackId, startMs) {
     found.track.clips = found.track.clips.filter((clip) => clip.id !== clipId);
     target.clips.push(found.clip);
   }
-  found.clip.startMs = freeStart(target, startMs, duration, clipId);
+  found.clip.start = freeStart(target, start, duration, clipId);
   sortClips(target);
   return found.clip;
 }
 
 /** Drag a clip edge. `edge` is 'start' or 'end'. The start edge moves the in
  *  point with it, so the frame under the cursor is the frame that stays. */
-function trimClip(project, clipId, edge, timeMs) {
+function trimClip(project, clipId, edge, frame) {
   const found = findClip(project, clipId);
   if (!found) return null;
   const { clip } = found;
+  const rate = rateOf(project);
+  const shortest = minClipFrames(rate);
   const asset = findAsset(project, clip.assetId);
-  const sourceLimit = asset && asset.kind !== 'image' && asset.durationMs > 0 ? asset.durationMs : Infinity;
+  const sourceLimit =
+    asset && asset.kind !== 'image' && asset.durationMs > 0
+      ? T.framesFromMillis(asset.durationMs, rate)
+      : Infinity;
 
   if (edge === 'start') {
-    const earliest = clip.startMs - clip.inMs;
-    const latest = clipEnd(clip) - MIN_CLIP_MS;
-    const at = Math.min(Math.max(Math.round(timeMs), Math.max(0, earliest)), latest);
-    clip.inMs += at - clip.startMs;
-    clip.startMs = at;
+    const earliest = clip.start - clip.in;
+    const latest = clipEnd(clip) - shortest;
+    const at = Math.min(Math.max(Math.round(frame), Math.max(0, earliest)), latest);
+    clip.in += at - clip.start;
+    clip.start = at;
   } else {
-    const earliest = clip.startMs + MIN_CLIP_MS;
-    const latest = sourceLimit === Infinity ? Infinity : clip.startMs + (sourceLimit - clip.inMs);
-    const at = Math.min(Math.max(Math.round(timeMs), earliest), latest);
-    clip.outMs = clip.inMs + (at - clip.startMs);
+    const earliest = clip.start + shortest;
+    const latest = sourceLimit === Infinity ? Infinity : clip.start + (sourceLimit - clip.in);
+    const at = Math.min(Math.max(Math.round(frame), earliest), latest);
+    clip.out = clip.in + (at - clip.start);
   }
   sortClips(found.track);
   return clip;
@@ -221,25 +250,26 @@ function trimClip(project, clipId, edge, timeMs) {
 /** Cut at the playhead. With a clip selected only that clip is cut; with
  *  nothing selected every clip the playhead crosses is, which is what the
  *  toolbar button and Cmd+B do. Returns the new right hand clips. */
-function splitAt(project, timeMs, onlyClipId) {
-  const at = Math.round(timeMs);
+function splitAt(project, frame, onlyClipId) {
+  const at = Math.round(frame);
+  const shortest = minClipFrames(rateOf(project));
   const created = [];
   for (const track of project.tracks) {
     for (const clip of track.clips.slice()) {
       if (onlyClipId && clip.id !== onlyClipId) continue;
-      if (at <= clip.startMs || at >= clipEnd(clip)) continue;
-      const offset = at - clip.startMs;
-      if (offset < MIN_CLIP_MS || clipDuration(clip) - offset < MIN_CLIP_MS) continue;
+      if (at <= clip.start || at >= clipEnd(clip)) continue;
+      const offset = at - clip.start;
+      if (offset < shortest || clipDuration(clip) - offset < shortest) continue;
       const right = {
         id: nextId('c'),
         assetId: clip.assetId,
-        startMs: at,
-        inMs: clip.inMs + offset,
-        outMs: clip.outMs,
+        start: at,
+        in: clip.in + offset,
+        out: clip.out,
         volume: clip.volume,
         opacity: clip.opacity,
       };
-      clip.outMs = clip.inMs + offset;
+      clip.out = clip.in + offset;
       track.clips.push(right);
       created.push(right);
     }
@@ -255,9 +285,9 @@ function removeClip(project, clipId) {
   return true;
 }
 
-/** How long the timeline is. A track that contributes nothing does not extend
- *  it, so the render and the ruler agree with each other. */
-function projectDurationMs(project) {
+/** How long the timeline is, in frames. A track that contributes nothing does
+ *  not extend it, so the render and the ruler agree with each other. */
+function projectDurationFrames(project) {
   let end = 0;
   for (const track of project.tracks) {
     if (track.hidden || (track.kind === 'audio' && track.muted)) continue;
@@ -268,17 +298,18 @@ function projectDurationMs(project) {
   return end;
 }
 
-/** What is under the playhead, bottom track first. `sourceMs` is where inside
- *  the asset that instant falls, which is what the preview seeks to. */
-function clipsAt(project, timeMs) {
+/** What is under the playhead, bottom track first. `sourceFrame` is which frame
+ *  of the asset that instant is, which is what the preview seeks to. */
+function clipsAt(project, frame) {
+  const at = Math.floor(frame);
   const active = [];
   for (const track of project.tracks) {
     for (const clip of track.clips) {
-      if (timeMs < clip.startMs || timeMs >= clipEnd(clip)) continue;
+      if (at < clip.start || at >= clipEnd(clip)) continue;
       active.push({
         track,
         clip,
-        sourceMs: clip.inMs + (timeMs - clip.startMs),
+        sourceFrame: clip.in + (at - clip.start),
       });
     }
   }
@@ -286,31 +317,31 @@ function clipsAt(project, timeMs) {
 }
 
 /** Everything worth snapping to: zero, both edges of every other clip, and
- *  whatever extra times the caller passes in (the playhead, usually). */
+ *  whatever extra frames the caller passes in (the playhead, usually). */
 function snapTargets(project, exceptClipId, extra) {
   const targets = [0];
   for (const track of project.tracks) {
     for (const clip of track.clips) {
       if (clip.id === exceptClipId) continue;
-      targets.push(clip.startMs, clipEnd(clip));
+      targets.push(clip.start, clipEnd(clip));
     }
   }
-  for (const time of extra || []) {
-    if (Number.isFinite(time)) targets.push(Math.round(time));
+  for (const frame of extra || []) {
+    if (Number.isFinite(frame)) targets.push(Math.round(frame));
   }
   return targets;
 }
 
-/** The nearest target within `toleranceMs`, or the time unchanged. This is the
- *  magnet button; passing tolerance 0 turns it off. */
-function snapTime(project, timeMs, toleranceMs, options) {
+/** The nearest target within `tolerance` frames, or the frame unchanged. This
+ *  is the magnet button; passing tolerance 0 turns it off. */
+function snapTime(project, frame, tolerance, options) {
   const settings = options || {};
-  if (!(toleranceMs > 0)) return Math.max(0, Math.round(timeMs));
-  let best = Math.max(0, Math.round(timeMs));
-  let bestDistance = toleranceMs + 1;
+  if (!(tolerance > 0)) return Math.max(0, Math.round(frame));
+  let best = Math.max(0, Math.round(frame));
+  let bestDistance = tolerance + 1;
   for (const target of snapTargets(project, settings.exceptClipId, settings.extra)) {
-    const distance = Math.abs(target - timeMs);
-    if (distance <= toleranceMs && distance < bestDistance) {
+    const distance = Math.abs(target - frame);
+    if (distance <= tolerance && distance < bestDistance) {
       best = target;
       bestDistance = distance;
     }
@@ -320,16 +351,16 @@ function snapTime(project, timeMs, toleranceMs, options) {
 
 /** Snapping a clip means snapping whichever of its two edges lands closest, so
  *  a clip dragged by its tail still butts up against the one before it. */
-function snapClipStart(project, startMs, durationMs, toleranceMs, options) {
+function snapClipStart(project, start, duration, tolerance, options) {
   const settings = options || {};
-  if (!(toleranceMs > 0)) return Math.max(0, Math.round(startMs));
+  if (!(tolerance > 0)) return Math.max(0, Math.round(start));
   const targets = snapTargets(project, settings.exceptClipId, settings.extra);
-  let best = Math.max(0, Math.round(startMs));
-  let bestDistance = toleranceMs + 1;
+  let best = Math.max(0, Math.round(start));
+  let bestDistance = tolerance + 1;
   for (const target of targets) {
-    for (const candidate of [target, target - durationMs]) {
-      const distance = Math.abs(candidate - startMs);
-      if (candidate >= 0 && distance <= toleranceMs && distance < bestDistance) {
+    for (const candidate of [target, target - duration]) {
+      const distance = Math.abs(candidate - start);
+      if (candidate >= 0 && distance <= tolerance && distance < bestDistance) {
         best = candidate;
         bestDistance = distance;
       }
@@ -338,27 +369,80 @@ function snapClipStart(project, startMs, durationMs, toleranceMs, options) {
   return Math.max(0, best);
 }
 
-/** A project read back from disk. Ids in the file were made by an earlier run
- *  of this same counter, so the counter is pushed past them; otherwise the
- *  first clip added after an open would collide with one already there. */
+/** Change the timebase and carry the edit with it, so a project cut at 30 and
+ *  then set to 29.97 keeps every clip where it was in time rather than where it
+ *  was in frame numbers. Rounding is to the nearest frame of the new rate,
+ *  which is the closest the new rate can hold. */
+function retime(project, nextRate) {
+  const from = rateOf(project);
+  const to = T.rate(nextRate.num, nextRate.den);
+  project.settings.rate = to;
+  if (T.sameRate(from, to)) return project;
+  for (const track of project.tracks) {
+    for (const clip of track.clips) {
+      clip.start = T.rescale(clip.start, from, to);
+      clip.in = T.rescale(clip.in, from, to);
+      clip.out = T.rescale(clip.out, from, to);
+    }
+    sortClips(track);
+  }
+  return project;
+}
+
+/** A project read back from disk, whatever version wrote it.
+ *
+ *  A version 1 file holds milliseconds and an integer fps; every time in it is
+ *  converted here, once, so nothing downstream has to remember which format it
+ *  came from. The two formats use different keys, so which one a clip is in is
+ *  read off the clip rather than trusted from the header.
+ *
+ *  Ids in the file were made by an earlier run of this same counter, so the
+ *  counter is pushed past them; otherwise the first clip added after an open
+ *  would collide with one already there. */
 function normalize(project) {
-  const restored = Object.assign(
-    { version: 1, settings: defaultSettings(), assets: [], tracks: [] },
-    project || {}
-  );
-  restored.settings = Object.assign(defaultSettings(), restored.settings || {});
+  const source = project || {};
+  const settings = source.settings || {};
+  const defaults = defaultSettings();
+  const rate = settings.rate
+    ? T.rate(settings.rate.num, settings.rate.den)
+    : settings.fps !== undefined
+      ? T.nearestRate(settings.fps)
+      : defaults.rate;
+
+  const restored = {
+    version: FORMAT_VERSION,
+    settings: {
+      width: settings.width || defaults.width,
+      height: settings.height || defaults.height,
+      rate,
+    },
+    assets: source.assets || [],
+    tracks: source.tracks || [],
+  };
   if (!restored.tracks.length) {
     restored.tracks = [createTrack('video', 'V1'), createTrack('audio', 'A1')];
   }
+
+  const frames = (value, millis) => {
+    if (typeof value === 'number') return value;
+    return T.framesFromMillis(typeof millis === 'number' ? millis : 0, rate);
+  };
+
   let highest = 0;
   for (const track of restored.tracks) {
-    track.clips = track.clips || [];
     track.muted = Boolean(track.muted);
     track.hidden = Boolean(track.hidden);
-    for (const clip of track.clips) {
-      clip.volume = typeof clip.volume === 'number' ? clip.volume : 1;
-      clip.opacity = typeof clip.opacity === 'number' ? clip.opacity : 1;
-    }
+    // Rebuilt rather than patched, so a millisecond key cannot survive into the
+    // next save alongside the frame count that replaced it.
+    track.clips = (track.clips || []).map((clip) => ({
+      id: clip.id,
+      assetId: clip.assetId,
+      start: frames(clip.start, clip.startMs),
+      in: frames(clip.in, clip.inMs),
+      out: frames(clip.out, clip.outMs),
+      volume: typeof clip.volume === 'number' ? clip.volume : 1,
+      opacity: typeof clip.opacity === 'number' ? clip.opacity : 1,
+    }));
     sortClips(track);
     for (const id of [track.id, ...track.clips.map((clip) => clip.id)]) {
       const match = /^[a-z]+(\d+)$/.exec(String(id));
@@ -371,40 +455,43 @@ function normalize(project) {
 
 // --- the timeline ruler ----------------------------------------------------
 
-function msToPx(ms, pxPerSecond) {
-  return (ms / 1000) * pxPerSecond;
+function framesToPx(frames, rate, pxPerSecond) {
+  return T.framesToSeconds(frames, rate) * pxPerSecond;
 }
 
-function pxToMs(px, pxPerSecond) {
-  return (px / pxPerSecond) * 1000;
+function pxToFrames(px, rate, pxPerSecond) {
+  return T.secondsToFrames(px / pxPerSecond, rate);
 }
 
-/** h:mm:ss.cc, which is short enough for the transport and still exact enough
- *  to see a two frame trim. */
-function formatTime(ms) {
-  const clamped = Math.max(0, Math.round(ms));
-  const hours = Math.floor(clamped / 3600000);
-  const minutes = Math.floor((clamped % 3600000) / 60000);
-  const seconds = Math.floor((clamped % 60000) / 1000);
-  const centis = Math.floor((clamped % 1000) / 10);
-  const pad = (value) => String(value).padStart(2, '0');
-  return `${hours}:${pad(minutes)}:${pad(seconds)}.${pad(centis)}`;
+/** h:mm:ss:ff. The frames field is what makes a two frame trim visible, which
+ *  a fraction of a second never was. */
+function formatTimecode(frames, rate) {
+  return T.formatTimecode(frames, rate);
+}
+
+/** The same clock with the leading hour and the trailing frames dropped when
+ *  they are zero, because a ruler tick has no room for either. */
+function formatRulerLabel(frames, rate) {
+  const [hours, minutes, seconds, frameField] = formatTimecode(frames, rate).split(':');
+  const head = hours === '0' ? `${minutes}:${seconds}` : `${hours}:${minutes}:${seconds}`;
+  return frameField === '00' ? head : `${head}:${frameField}`;
 }
 
 /** Ruler tick spacing that stays readable at every zoom, so the labels never
- *  collide and never thin out to two on the whole timeline. */
-function tickStepMs(pxPerSecond) {
-  const steps = [100, 200, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000];
-  for (const step of steps) {
-    if (msToPx(step, pxPerSecond) >= 70) return step;
-  }
-  return steps[steps.length - 1];
+ *  collide and never thin out to two on the whole timeline. Stated in seconds
+ *  and converted, because the useful steps are wall clock ones. */
+function tickStepFrames(pxPerSecond, rate) {
+  const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  const chosen = steps.find((seconds) => seconds * pxPerSecond >= 70) || steps[steps.length - 1];
+  return Math.max(1, Math.round(chosen * T.rateToNumber(rate)));
 }
 
 const exported = {
+  FORMAT_VERSION,
   MAX_TRACKS_PER_KIND,
-  MIN_CLIP_MS,
-  DEFAULT_IMAGE_MS,
+  MIN_CLIP_SECONDS,
+  DEFAULT_IMAGE_SECONDS,
+  minClipFrames,
   createProject,
   createTrack,
   addTrack,
@@ -416,7 +503,7 @@ const exported = {
   addAssets,
   removeAsset,
   canAccept,
-  assetLengthMs,
+  assetLengthFrames,
   clipDuration,
   clipEnd,
   freeStart,
@@ -425,16 +512,19 @@ const exported = {
   trimClip,
   splitAt,
   removeClip,
-  projectDurationMs,
+  projectDurationFrames,
   clipsAt,
+  rateOf,
+  retime,
   snapTargets,
   snapTime,
   snapClipStart,
   normalize,
-  msToPx,
-  pxToMs,
-  formatTime,
-  tickStepMs,
+  framesToPx,
+  pxToFrames,
+  formatTimecode,
+  formatRulerLabel,
+  tickStepFrames,
 };
 
 // A script tag makes top level names globals, so everything stays behind one

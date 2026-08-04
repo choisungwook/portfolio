@@ -267,6 +267,14 @@ function startMemorySampling(memoryBytes, monitor) {
   };
 }
 
+/** The project frame rate as a plain number. The model holds it as two
+ *  integers so 29.97 stays exact; a measurement of how many frames arrived is
+ *  happy with the decimal. */
+function rateNumber(project) {
+  const rate = (project && project.settings && project.settings.rate) || { num: 30, den: 1 };
+  return rate.num / rate.den;
+}
+
 function createQualityHarness(options) {
   const monitor = options.monitor;
   const preview = options.preview;
@@ -276,7 +284,9 @@ function createQualityHarness(options) {
 
   async function measure(name, action, metadata) {
     const project = getProject();
-    monitor.start(name, project.settings.fps || 30, metadata);
+    // The monitor counts presented frames against the rate they are meant to
+    // arrive at, so it wants a number rather than the ratio the project holds.
+    monitor.start(name, rateNumber(project), metadata);
     const stopMemorySampling = startMemorySampling(memoryBytes, monitor);
     try {
       await action();
@@ -336,10 +346,13 @@ function createQualityHarness(options) {
   async function repeatedSeek(config) {
     return measure('repeated-seek', async () => {
       await preview.play();
+      // Seven seconds apart, kept a second clear of the end. The preview
+      // counts frames now, so the distances are seconds times the rate.
+      const perSecond = rateNumber(getProject());
       for (let index = 0; index < config.seekCount; index += 1) {
         await delay(config.seekIntervalMs);
-        const span = Math.max(1000, preview.total() - 1000);
-        preview.seek((index * 7000) % span);
+        const span = Math.max(perSecond, preview.total() - perSecond);
+        preview.seek((index * 7 * perSecond) % span);
       }
     }, { repetitions: config.seekCount });
   }
@@ -372,7 +385,11 @@ function createQualityHarness(options) {
       project: {
         width: project.settings.width,
         height: project.settings.height,
-        fps: project.settings.fps,
+        // The report stays comparable with the ones taken before the timebase
+        // was a ratio, so this is still a number; the ratio it came from is
+        // next to it for the rates that are not one.
+        fps: rateNumber(project),
+        rate: (project.settings && project.settings.rate) || { num: 30, den: 1 },
       },
       config,
       pass: reports.every((report) => report.evaluation.pass),

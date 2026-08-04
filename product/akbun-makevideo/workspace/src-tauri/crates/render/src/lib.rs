@@ -5,15 +5,27 @@
 //! to answer a drag on the next frame. This crate is the other half: the same
 //! shape read back through serde, so the render and the project file agree with
 //! the editor without either side reimplementing the other's arithmetic.
+//!
+//! Every time in here is a frame count on `settings.rate`. Nothing divides to
+//! get one and nothing rounds to store one; the makevideo-time crate says why
+//! that matters.
 
 pub mod accel;
 pub mod ffmpeg;
 pub mod layout;
+pub mod migrate;
 pub mod probe;
 pub mod tools;
 pub mod workspace;
 
+pub use makevideo_time::{RationalTime, Rate};
+
 use serde::{Deserialize, Serialize};
+
+/// What `version` a project file written today holds. Version 1 measured
+/// everything in whole milliseconds; `migrate` turns one of those into this on
+/// the way in, so a project saved before this existed still opens.
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Missing fields deserialize to these, so a project file written by an older
 /// version still opens instead of failing at the first unknown clip.
@@ -34,14 +46,15 @@ pub fn asset_id(path: &str) -> String {
     format!("as{hash:016x}")
 }
 
+/// Deserialized through `migrate::WireProject`, which is what turns a
+/// millisecond file into this one. Serializing writes today's format only.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", from = "migrate::WireProject")]
 pub struct Project {
-    #[serde(default)]
+    /// The storage format, not the app version.
+    pub version: u32,
     pub settings: ProjectSettings,
-    #[serde(default)]
     pub assets: Vec<Asset>,
-    #[serde(default)]
     pub tracks: Vec<Track>,
 }
 
@@ -50,7 +63,10 @@ pub struct Project {
 pub struct ProjectSettings {
     pub width: u32,
     pub height: u32,
-    pub fps: u32,
+    /// The timebase. Every clip time in the file is a count of these frames,
+    /// which is why it is two integers: 29.97 kept as a decimal would put the
+    /// approximation straight back.
+    pub rate: Rate,
 }
 
 impl Default for ProjectSettings {
@@ -58,7 +74,7 @@ impl Default for ProjectSettings {
         ProjectSettings {
             width: 1920,
             height: 1080,
-            fps: 30,
+            rate: Rate::fps(30),
         }
     }
 }
@@ -79,6 +95,9 @@ pub struct Asset {
     #[serde(default)]
     pub name: String,
     pub kind: AssetKind,
+    /// What ffprobe measured. That is a property of the file rather than of the
+    /// timeline, so it stays in milliseconds and becomes frames the moment it
+    /// lands on a track.
     #[serde(default)]
     pub duration_ms: u64,
     #[serde(default)]
@@ -87,6 +106,13 @@ pub struct Asset {
     pub height: u32,
     #[serde(default)]
     pub has_audio: bool,
+}
+
+impl Asset {
+    /// How many frames of the project this asset lasts.
+    pub fn duration_frames(&self, rate: Rate) -> i64 {
+        RationalTime::from_millis(self.duration_ms as i64, rate).value()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,11 +158,13 @@ impl Track {
 pub struct Clip {
     pub id: String,
     pub asset_id: String,
-    /// Where the clip sits on the timeline.
-    pub start_ms: u64,
-    /// The span taken out of the source. `out_ms` is exclusive.
-    pub in_ms: u64,
-    pub out_ms: u64,
+    /// Where the clip sits on the timeline, in frames of the project rate.
+    pub start: i64,
+    /// The span taken out of the source, in frames too. `out` is exclusive.
+    #[serde(rename = "in")]
+    pub in_point: i64,
+    #[serde(rename = "out")]
+    pub out_point: i64,
     #[serde(default = "one")]
     pub volume: f32,
     #[serde(default = "one")]
@@ -144,12 +172,30 @@ pub struct Clip {
 }
 
 impl Clip {
-    pub fn duration_ms(&self) -> u64 {
-        self.out_ms.saturating_sub(self.in_ms)
+    pub fn duration_frames(&self) -> i64 {
+        (self.out_point - self.in_point).max(0)
     }
 
-    pub fn end_ms(&self) -> u64 {
-        self.start_ms + self.duration_ms()
+    pub fn end_frame(&self) -> i64 {
+        self.start + self.duration_frames()
+    }
+
+    /// The same numbers as times, for the places that have to hand seconds to
+    /// ffmpeg.
+    pub fn start_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.start, rate)
+    }
+
+    pub fn in_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.in_point, rate)
+    }
+
+    pub fn duration(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.duration_frames(), rate)
+    }
+
+    pub fn end_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.end_frame(), rate)
     }
 }
 
@@ -158,17 +204,25 @@ impl Project {
         self.assets.iter().find(|asset| asset.id == id)
     }
 
-    /// How long the rendered file is. Tracks that contribute nothing do not
-    /// extend it, so hiding the one long clip at the end actually shortens the
-    /// output instead of leaving black.
-    pub fn duration_ms(&self) -> u64 {
+    pub fn rate(&self) -> Rate {
+        self.settings.rate
+    }
+
+    /// How long the rendered file is, in frames. Tracks that contribute nothing
+    /// do not extend it, so hiding the one long clip at the end actually
+    /// shortens the output instead of leaving black.
+    pub fn duration_frames(&self) -> i64 {
         self.tracks
             .iter()
             .filter(|track| track.contributes())
             .flat_map(|track| track.clips.iter())
-            .filter(|clip| clip.duration_ms() > 0)
-            .map(|clip| clip.end_ms())
+            .filter(|clip| clip.duration_frames() > 0)
+            .map(|clip| clip.end_frame())
             .max()
             .unwrap_or(0)
+    }
+
+    pub fn duration(&self) -> RationalTime {
+        RationalTime::new(self.duration_frames(), self.rate())
     }
 }

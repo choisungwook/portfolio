@@ -38,7 +38,7 @@ if (!window.__TAURI__) {
         snap: true,
         defaultWidth: 1920,
         defaultHeight: 1080,
-        defaultFps: 30,
+        defaultRate: { num: 30, den: 1 },
         workspaceDir: '',
         ffmpegDir: '',
         renderAcceleration: 'auto',
@@ -188,8 +188,8 @@ window.api = {
   // Raw RGBA, not an encoded image: this frame exists to show exactly what the
   // render will contain, and a lossy hop to the screen would undo that. The
   // first eight bytes are the width and height.
-  previewFrame: async (project, timeMs, maxWidth) => {
-    const raw = await invoke('preview_frame', { project, timeMs, maxWidth });
+  previewFrame: async (project, frame, maxWidth) => {
+    const raw = await invoke('preview_frame', { project, frame, maxWidth });
     const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     return {

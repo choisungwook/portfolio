@@ -1995,6 +1995,15 @@ dependencies = [
 name = "makevideo-render"
 version = "0.1.0"
 dependencies = [
+ "makevideo-time",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "makevideo-time"
+version = "0.1.0"
+dependencies = [
  "serde",
  "serde_json",
 ]
