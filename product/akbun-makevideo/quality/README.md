@@ -100,6 +100,47 @@ npm start
 - `increasing-track-count`: 영상·오디오 활성 트랙을 1개에서 4개까지 증가
 - `repeated-seek`: 재생 중 20회 seek
 
+## 프레임 소스 공급 계측
+
+엔진 단계의 프레임 공급만 따로 재는 헤드리스 하네스다. 창을 띄우지 않고 [frame-source](../wiki/architecture/frame-source.md)에서 목표 fps로 프레임을 꺼내며, 한 시나리오라도 기준을 넘기면 종료 코드가 0이 아니다.
+
+```bash
+cd product/akbun-makevideo/workspace
+npm run quality:supply -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+```
+
+주요 옵션은 `--depth`(클립당 선공급 프레임 수), `--lead`(디코더 선행 시작 프레임 수), `--preset`, `--seek-every`, `--report`다.
+
+시나리오는 페이지 하네스와 이름을 맞춘다.
+
+- `continuous-supply`: 연속 공급
+- `repeated-seek`: 재생 중 반복 seek
+- `increasing-track-count`: 보이는 영상 트랙을 2개부터 전체까지 증가
+
+지표는 페이지 하네스와 같은 규칙으로 계산한다. 프레임 간격 p50·p99 기준값은 `ceil(1000/fps*1.25)`와 `ceil(1000/fps*2)`, 시작 지연 기준은 500 ms, 늦은 프레임 비율 기준은 0.1%다.
+
+- `lateFrames`: 소스가 제때 내주지 못한 프레임 수. 하네스 자신의 sleep 오차와 seek 직후 재충전은 제외한다
+- `lateByP99Ms`: 그 프레임들이 얼마나 늦었는지. 개수만으로는 4 ms 지연과 200 ms 지연이 구분되지 않음
+- `supplyWaitP50Ms`, `supplyWaitP99Ms`: 소비자가 소스를 기다린 시간. 여유가 얼마나 남았는지를 먼저 보여주는 값
+- `startupDelayP99Ms`: 재생 시작과 seek 직후 첫 프레임까지의 지연
+- `peakBufferedBytes`: 큐가 실제로 들고 있던 최대 메모리. 기준값은 `(depth+1) * 프레임 크기 * 클립 수`라 구현이 자기 약속을 지키는지 검사한다
+
+### 측정값
+
+기본값(depth 6, lead 15)으로 1080p30 합성 소재를 시나리오당 30초씩 측정했다. 4코어 Linux 컨테이너 기준이며, macOS 기준선과 직접 비교하는 값은 아니다.
+
+| 시나리오 | 영상 트랙 | 늦은 프레임 | 최대 지연 | 시작 지연 p99 | 간격 p99 | 최대 버퍼 |
+|---|---:|---:|---:|---:|---:|---:|
+| continuous-supply | 1 | 0 / 900 | - | 160 ms | 33.3 ms | 47 MiB |
+| repeated-seek | 1 | 0 / 900 | - | 150 ms | 33.3 ms | 47 MiB |
+| increasing-track-count | 2 | 0 / 900 | - | 159 ms | 33.3 ms | 95 MiB |
+| increasing-track-count | 3 | 4 / 900 | 8 ms | 241 ms | 33.3 ms | 142 MiB |
+| increasing-track-count | 4 | 7 / 900 | 49 ms | 283 ms | 33.3 ms | 190 MiB |
+
+- 1~2 트랙은 전 항목 통과. 3~4 트랙은 늦은 프레임 비율 0.1%를 넘겨 실패
+- 간격 p99가 모든 시나리오에서 프레임 주기 그대로라, 지연이 있어도 한 프레임을 넘기지 않았음
+- depth를 2로 낮추면 연속 공급에서 900 프레임 중 126개가 늦음. 12로 올려도 6보다 나아지지 않아 기본값을 6으로 정함
+
 ## 기준선
 
 - [media-element-macos.json](./media-element-macos.json)

@@ -19,11 +19,17 @@
 //! The geometry is not decided here. It comes from `makevideo_render::layout`,
 //! which the decoder command reads too, so the picture the preview draws and
 //! the picture the render encodes are placed by the same arithmetic.
+//!
+//! Getting the frames is `source`, and whether they arrive fast enough is
+//! `supply`. Both are next door rather than in here because drawing a frame and
+//! having a frame to draw are separate problems that look the same on screen.
 
 pub mod cpu;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 pub mod pipeline;
+pub mod source;
+pub mod supply;
 
 use makevideo_render::layout::Rect;
 

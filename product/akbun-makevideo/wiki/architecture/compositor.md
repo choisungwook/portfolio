@@ -83,11 +83,16 @@ ffmpeg filter graph
 Audio never leaves ffmpeg on either route. `amix` is not worth reimplementing,
 and sound is not what was diverging.
 
-`pipeline::run` walks the frames. A decoder is started when its clip's first
-frame is wanted and killed when its last one has been read, so a fifty clip
-project is not fifty processes for the whole render. Each frame it reads one
-frame from every active decoder, composes, and writes the result to the
-encoder's stdin. Closing that stdin is what tells ffmpeg the video is over.
+`pipeline::run` walks the frames, and it does not decode any of them. The
+frames come from `source::FrameSource` — a decoder per clip, each on its own
+thread and each buffering ahead — which is the same source playback uses. The
+render takes a frame, composes it, and writes the result to the encoder's
+stdin. Closing that stdin is what tells ffmpeg the video is over. See
+[frame-source.md](./frame-source.md).
+
+The render differs from playback in one thing only: when a frame is not ready
+it waits, because a file has no deadline. It waits in short spans so Cancel is
+still answered promptly.
 
 A decoder that cannot start, or that runs out early, marks itself dead and its
 clip stops drawing. That is deliberate: a clip whose media was moved leaves a
