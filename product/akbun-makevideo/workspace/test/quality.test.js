@@ -7,6 +7,7 @@ const {
   percentile,
   evaluateQuality,
   createQualityMonitor,
+  sampleMemorySafely,
 } = require('../src/quality.js');
 
 test('percentile uses the nearest rank', () => {
@@ -93,4 +94,13 @@ test('a seek discontinuity is not counted as thousands of dropped frames', () =>
   const report = monitor.finish();
   assert.strictEqual(report.metrics.droppedFrames, 0);
   assert.strictEqual(report.metrics.totalFrames, 3);
+});
+
+test('memory sampling failures are recorded without escaping', async () => {
+  const samples = [];
+  await sampleMemorySafely(
+    async () => { throw new Error('unavailable'); },
+    { sampleMemory: (value) => samples.push(value) },
+  );
+  assert.deepStrictEqual(samples, [null]);
 });

@@ -239,6 +239,34 @@ function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+async function sampleMemorySafely(memoryBytes, monitor) {
+  try {
+    monitor.sampleMemory(await memoryBytes());
+  } catch {
+    monitor.sampleMemory(null);
+  }
+}
+
+function startMemorySampling(memoryBytes, monitor) {
+  let stopped = false;
+  let timer = null;
+  let current = Promise.resolve();
+
+  function schedule() {
+    current = sampleMemorySafely(memoryBytes, monitor).then(() => {
+      if (!stopped) timer = window.setTimeout(schedule, 1000);
+    });
+  }
+
+  schedule();
+  return async () => {
+    stopped = true;
+    if (timer !== null) window.clearTimeout(timer);
+    await current;
+    await sampleMemorySafely(memoryBytes, monitor);
+  };
+}
+
 function createQualityHarness(options) {
   const monitor = options.monitor;
   const preview = options.preview;
@@ -246,22 +274,15 @@ function createQualityHarness(options) {
   const refresh = options.refresh || (() => {});
   const memoryBytes = options.memoryBytes || (async () => null);
 
-  async function sampleMemory() {
-    const value = await memoryBytes();
-    monitor.sampleMemory(value);
-  }
-
   async function measure(name, action, metadata) {
     const project = getProject();
     monitor.start(name, project.settings.fps || 30, metadata);
-    const timer = window.setInterval(sampleMemory, 1000);
-    await sampleMemory();
+    const stopMemorySampling = startMemorySampling(memoryBytes, monitor);
     try {
       await action();
     } finally {
       preview.pause();
-      window.clearInterval(timer);
-      await sampleMemory();
+      await stopMemorySampling();
     }
     return monitor.finish();
   }
@@ -374,6 +395,7 @@ if (typeof module !== 'undefined' && module.exports) {
     percentile,
     evaluateQuality,
     createQualityMonitor,
+    sampleMemorySafely,
   };
 } else {
   globalThis.qualityLib = {

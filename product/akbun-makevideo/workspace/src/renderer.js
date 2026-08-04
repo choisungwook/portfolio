@@ -1034,14 +1034,20 @@ const actions = {
     try {
       await globalThis.makevideoQuality.runAndSave();
     } catch (error) {
-      await window.api.message(String(error), { title: 'Playback quality failed' });
+      await window.api.message(String(error), {
+        title: 'Playback quality failed',
+        kind: 'error',
+      });
     }
   },
   'quality-smoke': async () => {
     try {
       await globalThis.makevideoQuality.runAndSave(qualitySmokeConfig());
     } catch (error) {
-      await window.api.message(String(error), { title: 'Playback quality failed' });
+      await window.api.message(String(error), {
+        title: 'Playback quality failed',
+        kind: 'error',
+      });
     }
   },
   'check-update': () => window.api.checkUpdate(),
