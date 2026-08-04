@@ -3,6 +3,7 @@
 ## 2026-08-04
 
 * **Creation**: [영상 편집 도구의 시간은 프레임 수와 두 정수 rate로 표현한다](decisions/2026-08-rational-time-model.md) 결정 기록. akbun-makevideo에 29.97과 23.976을 넣으려다 frame rate가 u32라 표현할 방법 자체가 없다는 것을 알게 되면서, 밀리초 왕복이 정확할 것이라 기대했다가 반 프레임 양자화를 다시 배운 것까지 함께 남긴다.
+* **Update**: [서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다](decisions/2026-07-unsigned-desktop-app-self-update.md)에 규칙의 자리를 옮긴 이유를 추가했다. akbun-gitdesktop에 업데이트를 넣으면서, 제품 생성 명령에만 있던 요구사항이 이미 있는 앱에는 한 번도 닿지 않는다는 것을 알게 되어 stack 규칙으로 올린다.
 
 ## 2026-08-03
 

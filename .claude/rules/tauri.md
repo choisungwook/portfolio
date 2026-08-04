@@ -141,7 +141,11 @@ if let Some(window) = app.get_webview_window("main") {
 
 ## Updates
 
-Use the official updater plugin. Do not hand-roll one.
+**Self update is a default feature, not an optional one.** Every app under `product/` ships it from the first release, and an existing app that lacks it gets it the next time it is touched. A release nobody can install is a release that did not happen — nobody re-downloads an installer by hand. The version rule in [product.md](./product.md) is the half that produces the release; this is the half that delivers it.
+
+Use the official updater plugin. Do not hand-roll one. The dmg-swap implementation in [electron.md](./electron.md) exists only because Squirrel.Mac refuses unsigned builds; the plugin has no such limit, so do not port that code here.
+
+Reach the check from a menu item or a settings entry labelled "Check for Updates…", the same entry point as the Electron apps.
 
 - Set `bundle.createUpdaterArtifacts` to `true`. It defaults to `false`, and leaving it produces no `.sig` file, after which tauri-action **silently** skips uploading latest.json. The release looks fine and nobody can update.
 - `createUpdaterArtifacts: true` without a `plugins.updater` block is a hard CLI error. The two go together.

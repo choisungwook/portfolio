@@ -6,6 +6,9 @@ on:
       - master
     paths:
       - 'product/akbun-gitdesktop/**'
+  pull_request:
+    paths:
+      - 'product/akbun-gitdesktop/**'
 
 permissions:
   contents: write
@@ -15,7 +18,35 @@ defaults:
     working-directory: product/akbun-gitdesktop
 
 jobs:
+  # PR 검증용. electron 바이너리 없이 typecheck와 테스트만 돌린다.
+  # 업데이트 기능이 임시 파일을 남기지 않는지 확인하는 테스트가 여기서 돈다.
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: product/akbun-gitdesktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
   release:
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
