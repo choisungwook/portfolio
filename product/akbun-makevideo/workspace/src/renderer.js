@@ -1463,7 +1463,10 @@ function wireSheets() {
       workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
       logDir: el('as-log-dir').value.trim(),
-      logRotationSize: Math.max(1, Number(el('as-log-size').value) || 5),
+      logRotationSize: Math.min(
+        1024,
+        Math.max(1, Math.floor(Number(el('as-log-size').value) || 5)),
+      ),
       logRotationUnit: el('as-log-unit').value,
     });
     closeSheet('app-settings');
