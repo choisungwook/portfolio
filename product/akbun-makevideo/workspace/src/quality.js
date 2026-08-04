@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 const DEFAULT_QUALITY_LIMITS = {
   frameIntervalP50Ms: Math.ceil(1000 / 30 * 1.25),
   frameIntervalP99Ms: Math.ceil(1000 / 30 * 2),
@@ -432,3 +434,4 @@ if (typeof module !== 'undefined' && module.exports) {
     createQualityHarness,
   };
 }
+})();

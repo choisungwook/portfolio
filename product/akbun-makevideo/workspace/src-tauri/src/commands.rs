@@ -63,6 +63,12 @@ pub struct Settings {
     /// same code and make the preview and the render agree; the third is
     /// faster because frames never leave ffmpeg.
     pub compositor: String,
+    /// Empty uses the operating system's application log directory.
+    pub log_dir: String,
+    /// Maximum size of errors.log before it becomes errors.log.1.
+    pub log_rotation_size: u64,
+    /// "kb" or "mb".
+    pub log_rotation_unit: String,
 }
 
 impl Default for Settings {
@@ -79,6 +85,9 @@ impl Default for Settings {
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
             compositor: "auto".into(),
+            log_dir: String::new(),
+            log_rotation_size: 5,
+            log_rotation_unit: "mb".into(),
         }
     }
 }
@@ -142,6 +151,7 @@ pub struct Bootstrap {
     pub settings: Settings,
     pub version: String,
     pub data_dir: String,
+    pub log_dir: String,
     /// The workspace root as actually resolved, so the page can show it whether
     /// or not the user has set one.
     pub workspace: String,
@@ -419,6 +429,9 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     Bootstrap {
         version: app.package_info().version.to_string(),
         data_dir: crate::store::data_dir(&app),
+        log_dir: crate::store::log_dir(&app, &settings)
+            .to_string_lossy()
+            .to_string(),
         workspace: workspace_root(&app, &settings)
             .to_string_lossy()
             .to_string(),
@@ -492,6 +505,7 @@ pub fn save_settings(
     state: State<AppState>,
     settings: Settings,
 ) -> Result<Bootstrap, String> {
+    crate::store::prepare_log_dir(&app, &settings)?;
     apply_theme(&app, &settings.theme);
     crate::store::save_settings(&app, &settings)?;
     {
@@ -504,6 +518,17 @@ pub fn save_settings(
         *current = settings;
     }
     Ok(bootstrap(app, state))
+}
+
+#[tauri::command]
+pub fn report_error(
+    app: AppHandle,
+    state: State<AppState>,
+    source: String,
+    message: String,
+) -> Result<(), String> {
+    let settings = state.settings.lock().unwrap().clone();
+    crate::store::append_error(&app, &settings, &source, &message)
 }
 
 fn probe_asset(ffprobe: Option<&String>, path: &str) -> probe::Probed {

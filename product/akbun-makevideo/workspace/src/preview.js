@@ -1,5 +1,7 @@
 'use strict';
 
+(function () {
+
 // The preview: real media elements, stacked and driven by a clock.
 //
 // There is no compositor here and no decoding in Rust. One element per clip
@@ -524,3 +526,4 @@ if (typeof module !== 'undefined' && module.exports) {
 } else {
   globalThis.previewLib = { createPreview, QUALITY };
 }
+})();
