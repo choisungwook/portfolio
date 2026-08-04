@@ -109,9 +109,14 @@ function rate() {
   return L.rateOf(state.project);
 }
 
+/** The magnet radius, which is a distance on screen rather than a number of
+ *  frames. It stays fractional: snapping compares it against positions that are
+ *  themselves fractional, so rounding it here would only make the radius drift
+ *  from the ten pixels it is meant to be — by 5% at full zoom on 23.976, and
+ *  further on any rate a future zoom range lands badly on. */
 function snapTolerance() {
   if (!(state.settings && state.settings.snap)) return 0;
-  return Math.round(L.pxToFrames(SNAP_PX, rate(), state.pxPerSecond));
+  return L.pxToFrames(SNAP_PX, rate(), state.pxPerSecond);
 }
 
 function markDirty() {

@@ -35,8 +35,11 @@ function nextId(prefix) {
   return `${prefix}${sequence}`;
 }
 
+/** Rounded up, so the constant above is a floor rather than an average: at
+ *  23.976 a tenth of a second is 2.4 frames, and rounding to 2 would make the
+ *  shortest clip shorter than the length that was decided to be grabbable. */
 function minClipFrames(rate) {
-  return Math.max(1, Math.round(MIN_CLIP_SECONDS * T.rateToNumber(rate)));
+  return Math.max(1, Math.ceil(MIN_CLIP_SECONDS * T.rateToNumber(rate)));
 }
 
 function clipDuration(clip) {

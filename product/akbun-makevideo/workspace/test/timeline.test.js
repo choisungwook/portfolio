@@ -178,6 +178,19 @@ test('a trim will not shrink a clip below the minimum', () => {
   assert.strictEqual(L.minClipFrames(T.fps(30)), 3, 'a tenth of a second of 30');
 });
 
+test('the shortest clip is never shorter than the minimum on any rate', () => {
+  // Rounding to the nearest frame would give 2 frames at 23.976, which is
+  // 0.083s — under the length that was decided to be grabbable.
+  for (const rate of T.STANDARD_RATES) {
+    const frames = L.minClipFrames(rate);
+    assert.ok(
+      T.framesToSeconds(frames, rate) >= L.MIN_CLIP_SECONDS,
+      `${T.rateLabel(rate)} gave ${frames} frames`
+    );
+  }
+  assert.strictEqual(L.minClipFrames(T.ntsc(24)), 3);
+});
+
 test('splitting cuts every clip the playhead crosses', () => {
   const project = projectWith([VIDEO, SOUND]);
   const video = videoTrack(project);
