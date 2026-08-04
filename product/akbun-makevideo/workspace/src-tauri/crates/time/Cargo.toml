@@ -1,0 +1,16 @@
+[package]
+name = "makevideo-time"
+version = "0.1.0"
+description = "The rational time model every other crate measures with"
+edition = "2021"
+license = "MIT"
+
+# Depends on nothing but serde. Time is the bottom of the stack: the render
+# model, the compositor and the app all read it, so it must not be able to pull
+# any of them back in.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

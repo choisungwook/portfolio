@@ -1,15 +1,16 @@
 //! Where every clip lands in the output frame.
 //!
-//! This is the one place that answers "what is on screen at time T, and where".
-//! Before it existed the answer was given twice — as CSS object-fit in the
-//! preview and as scale plus pad in the ffmpeg filter graph — and two
+//! This is the one place that answers "what is on screen at frame N, and
+//! where". Before it existed the answer was given twice — as CSS object-fit in
+//! the preview and as scale plus pad in the ffmpeg filter graph — and two
 //! implementations of the same arithmetic drift. Both the compositor and the
 //! decoder command now read their geometry from here.
 //!
-//! Everything is in output pixels and integers. Floats would let the two
-//! callers round differently, which is exactly the divergence this removes.
+//! Everything is in output pixels and integers, and every time is a frame
+//! index on the project rate. Floats would let the two callers round
+//! differently, which is exactly the divergence this removes.
 
-use crate::{AssetKind, Project, TrackKind};
+use crate::{AssetKind, Project, Rate, RationalTime, TrackKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -28,22 +29,32 @@ pub struct Placement {
     pub asset_id: String,
     pub path: String,
     pub kind: AssetKind,
-    /// Where the clip sits on the timeline, and how long it lasts.
-    pub start_ms: u64,
-    pub duration_ms: u64,
-    /// Where it starts inside the source.
-    pub in_ms: u64,
+    /// Where the clip sits on the timeline, and how long it lasts, in frames.
+    pub start_frame: i64,
+    pub duration_frames: i64,
+    /// Where it starts inside the source, in frames of the project rate.
+    pub in_frame: i64,
     pub dst: Rect,
     pub opacity: f32,
 }
 
 impl Placement {
-    pub fn end_ms(&self) -> u64 {
-        self.start_ms + self.duration_ms
+    pub fn end_frame(&self) -> i64 {
+        self.start_frame + self.duration_frames
     }
 
-    pub fn covers(&self, time_ms: u64) -> bool {
-        time_ms >= self.start_ms && time_ms < self.end_ms()
+    pub fn covers(&self, frame: i64) -> bool {
+        frame >= self.start_frame && frame < self.end_frame()
+    }
+
+    /// Where to seek the source, as a time rather than a frame index, because
+    /// that is what ffmpeg's `-ss` takes.
+    pub fn in_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.in_frame, rate)
+    }
+
+    pub fn duration(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.duration_frames, rate)
     }
 }
 
@@ -54,10 +65,16 @@ pub struct Layer {
     pub asset_id: String,
     pub path: String,
     pub kind: AssetKind,
-    /// Where in the source this instant falls.
-    pub source_ms: u64,
+    /// Which frame of the source this instant is.
+    pub source_frame: i64,
     pub dst: Rect,
     pub opacity: f32,
+}
+
+impl Layer {
+    pub fn source_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.source_frame, rate)
+    }
 }
 
 /// Scalers want even dimensions, and so does h264.
@@ -107,9 +124,9 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
         let mut clips: Vec<_> = track
             .clips
             .iter()
-            .filter(|clip| clip.duration_ms() > 0)
+            .filter(|clip| clip.duration_frames() > 0)
             .collect();
-        clips.sort_by_key(|clip| clip.start_ms);
+        clips.sort_by_key(|clip| clip.start);
         for clip in clips {
             let Some(asset) = project.asset(&clip.asset_id) else {
                 continue;
@@ -122,9 +139,9 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
                 asset_id: asset.id.clone(),
                 path: asset.path.clone(),
                 kind: asset.kind,
-                start_ms: clip.start_ms,
-                duration_ms: clip.duration_ms(),
-                in_ms: clip.in_ms,
+                start_frame: clip.start,
+                duration_frames: clip.duration_frames(),
+                in_frame: clip.in_point,
                 dst: fit_rect(asset.width, asset.height, out_width, out_height),
                 opacity: clip.opacity.clamp(0.0, 1.0),
             });
@@ -133,15 +150,15 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
     placements
 }
 
-/// What to draw at `time_ms`, bottom layer first. Derived from `placements` so
+/// What to draw on `frame`, bottom layer first. Derived from `placements` so
 /// the frame the preview shows and the frames the render encodes are chosen by
 /// one piece of code rather than two that agree by accident.
-pub fn layers_at(project: &Project, time_ms: u64, out_width: u32, out_height: u32) -> Vec<Layer> {
+pub fn layers_at(project: &Project, frame: i64, out_width: u32, out_height: u32) -> Vec<Layer> {
     placements(project, out_width, out_height)
         .into_iter()
-        .filter(|placement| placement.covers(time_ms))
+        .filter(|placement| placement.covers(frame))
         .map(|placement| Layer {
-            source_ms: placement.in_ms + (time_ms - placement.start_ms),
+            source_frame: placement.in_frame + (frame - placement.start_frame),
             clip_id: placement.clip_id,
             asset_id: placement.asset_id,
             path: placement.path,
@@ -154,15 +171,24 @@ pub fn layers_at(project: &Project, time_ms: u64, out_width: u32, out_height: u3
 
 /// How many frames the whole render is, so the frame loop and the progress bar
 /// agree on where the end is.
-pub fn frame_count(total_ms: u64, fps: u32) -> u64 {
-    (total_ms * fps as u64).div_ceil(1000)
+///
+/// It used to be a length in milliseconds multiplied by a rate and rounded up,
+/// which is where a render could end up a frame short of its own last clip.
+/// The project already counts frames, so there is nothing left to work out.
+pub fn frame_count(project: &Project) -> i64 {
+    project.duration_frames()
 }
 
 /// The instant frame `index` samples. Frames are sampled at their start, which
 /// is what ffmpeg's own fps filter does, so a clip starting exactly on a frame
 /// boundary appears on that frame and not the one after.
-pub fn frame_time_ms(index: u64, fps: u32) -> u64 {
-    index * 1000 / fps.max(1) as u64
+///
+/// This is the function that used to be `index * 1000 / fps` in whole
+/// milliseconds — 66 for the second frame of 30 fps where the truth is 66.67,
+/// and an error that grew with the index. A frame index simply is a time now,
+/// so there is nothing to divide.
+pub fn frame_time(index: i64, rate: Rate) -> RationalTime {
+    RationalTime::new(index, rate)
 }
 
 #[cfg(test)]
@@ -183,13 +209,13 @@ mod tests {
         }
     }
 
-    fn clip(id: &str, asset_id: &str, start_ms: u64, in_ms: u64, out_ms: u64) -> Clip {
+    fn clip(id: &str, asset_id: &str, start: i64, in_point: i64, out_point: i64) -> Clip {
         Clip {
             id: id.into(),
             asset_id: asset_id.into(),
-            start_ms,
-            in_ms,
-            out_ms,
+            start,
+            in_point,
+            out_point,
             volume: 1.0,
             opacity: 1.0,
         }
@@ -197,10 +223,11 @@ mod tests {
 
     fn project(tracks: Vec<Track>, assets: Vec<Asset>) -> Project {
         Project {
+            version: crate::FORMAT_VERSION,
             settings: ProjectSettings {
                 width: 1920,
                 height: 1080,
-                fps: 30,
+                rate: Rate::fps(30),
             },
             assets,
             tracks,
@@ -302,15 +329,15 @@ mod tests {
     fn layers_come_back_bottom_track_first() {
         let project = project(
             vec![
-                video_track("V1", vec![clip("c1", "a1", 0, 0, 4000)]),
-                video_track("V2", vec![clip("c2", "a2", 0, 0, 4000)]),
+                video_track("V1", vec![clip("c1", "a1", 0, 0, 120)]),
+                video_track("V2", vec![clip("c2", "a2", 0, 0, 120)]),
             ],
             vec![
                 asset("a1", AssetKind::Video, 1280, 720),
                 asset("a2", AssetKind::Video, 640, 480),
             ],
         );
-        let layers = layers_at(&project, 1000, 1920, 1080);
+        let layers = layers_at(&project, 30, 1920, 1080);
         assert_eq!(layers.len(), 2);
         assert_eq!(layers[0].clip_id, "c1", "V1 is drawn first, underneath");
         assert_eq!(layers[1].clip_id, "c2");
@@ -326,29 +353,29 @@ mod tests {
     }
 
     #[test]
-    fn a_layer_knows_where_it_is_inside_its_source() {
+    fn a_layer_knows_which_frame_of_its_source_it_is() {
         let project = project(
-            vec![video_track("V1", vec![clip("c1", "a1", 2000, 1500, 6000)])],
+            vec![video_track("V1", vec![clip("c1", "a1", 60, 45, 180)])],
             vec![asset("a1", AssetKind::Video, 1920, 1080)],
         );
-        // One second into a clip that starts 1.5s into its source.
-        assert_eq!(layers_at(&project, 3000, 1920, 1080)[0].source_ms, 2500);
+        // Thirty frames into a clip that starts 45 frames into its source.
+        assert_eq!(layers_at(&project, 90, 1920, 1080)[0].source_frame, 75);
     }
 
     #[test]
     fn nothing_is_drawn_outside_a_clip() {
         let project = project(
-            vec![video_track("V1", vec![clip("c1", "a1", 1000, 0, 2000)])],
+            vec![video_track("V1", vec![clip("c1", "a1", 30, 0, 60)])],
             vec![asset("a1", AssetKind::Video, 1920, 1080)],
         );
-        assert!(layers_at(&project, 999, 1920, 1080).is_empty());
+        assert!(layers_at(&project, 29, 1920, 1080).is_empty());
         assert_eq!(
-            layers_at(&project, 1000, 1920, 1080).len(),
+            layers_at(&project, 30, 1920, 1080).len(),
             1,
             "inclusive start"
         );
         assert!(
-            layers_at(&project, 3000, 1920, 1080).is_empty(),
+            layers_at(&project, 90, 1920, 1080).is_empty(),
             "exclusive end"
         );
     }
@@ -356,47 +383,53 @@ mod tests {
     #[test]
     fn a_hidden_track_draws_nothing() {
         let mut project = project(
-            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 4000)])],
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
             vec![asset("a1", AssetKind::Video, 1920, 1080)],
         );
         project.tracks[0].hidden = true;
-        assert!(layers_at(&project, 1000, 1920, 1080).is_empty());
+        assert!(layers_at(&project, 30, 1920, 1080).is_empty());
     }
 
     #[test]
     fn a_muted_video_track_still_draws() {
         let mut project = project(
-            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 4000)])],
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
             vec![asset("a1", AssetKind::Video, 1920, 1080)],
         );
         project.tracks[0].muted = true;
-        assert_eq!(layers_at(&project, 1000, 1920, 1080).len(), 1);
+        assert_eq!(layers_at(&project, 30, 1920, 1080).len(), 1);
     }
 
     #[test]
     fn an_audio_asset_on_a_video_track_is_not_a_layer() {
         let project = project(
-            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 4000)])],
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
             vec![asset("a1", AssetKind::Audio, 0, 0)],
         );
-        assert!(layers_at(&project, 1000, 1920, 1080).is_empty());
+        assert!(layers_at(&project, 30, 1920, 1080).is_empty());
     }
 
     #[test]
-    fn frames_are_counted_so_the_last_instant_is_covered() {
-        assert_eq!(frame_count(1000, 30), 30);
-        assert_eq!(
-            frame_count(1001, 30),
-            31,
-            "a partial frame still gets drawn"
+    fn the_render_is_exactly_as_long_as_the_timeline() {
+        let mut project = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 30)])],
+            vec![asset("a1", AssetKind::Video, 1920, 1080)],
         );
-        assert_eq!(frame_count(0, 30), 0);
+        assert_eq!(frame_count(&project), 30);
+        project.tracks[0].clips[0].out_point = 31;
+        assert_eq!(frame_count(&project), 31, "no partial frame to round up");
+        project.tracks[0].clips.clear();
+        assert_eq!(frame_count(&project), 0);
     }
 
     #[test]
-    fn a_frame_samples_its_own_start() {
-        assert_eq!(frame_time_ms(0, 30), 0);
-        assert_eq!(frame_time_ms(30, 30), 1000);
-        assert_eq!(frame_time_ms(1, 30), 33);
+    fn a_frame_index_is_its_own_time_at_every_rate() {
+        // The old version of this divided by the frame rate in milliseconds and
+        // gave 33 for frame 1 of 30 fps, then 66 for frame 2 where the truth is
+        // 66.67. Ten seconds of 29.97 is where it showed.
+        assert_eq!(frame_time(0, Rate::fps(30)).to_seconds(), 0.0);
+        assert_eq!(frame_time(30, Rate::fps(30)).seconds_text(6), "1.000000");
+        assert_eq!(frame_time(1, Rate::fps(30)).seconds_text(6), "0.033333");
+        assert_eq!(frame_time(300, Rate::ntsc(30)).seconds_text(6), "10.010000");
     }
 }

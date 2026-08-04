@@ -13,7 +13,8 @@
 
 use makevideo_compositor::{pipeline, Compositor};
 use makevideo_render::{
-    ffmpeg, Asset, AssetKind, Clip, Project, ProjectSettings, Track, TrackKind,
+    ffmpeg, Asset, AssetKind, Clip, Project, ProjectSettings, Rate, Track, TrackKind,
+    FORMAT_VERSION,
 };
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
@@ -30,7 +31,7 @@ fn output_size() -> (u32, u32) {
         &ProjectSettings {
             width: CANVAS_W,
             height: CANVAS_H,
-            fps: 30,
+            rate: Rate::fps(30),
         },
         ffmpeg::Preset::Fhd,
     )
@@ -111,13 +112,16 @@ fn asset(id: &str, path: &str, width: u32, height: u32, has_audio: bool) -> Asse
     }
 }
 
-fn clip(id: &str, asset_id: &str, start_ms: u64, out_ms: u64) -> Clip {
+/// Times are frames of the project rate, which is 30 throughout this file, so
+/// `clip("c1", "wide", 30, 60)` is a clip that starts a second in and runs for
+/// two.
+fn clip(id: &str, asset_id: &str, start: i64, out_point: i64) -> Clip {
     Clip {
         id: id.into(),
         asset_id: asset_id.into(),
-        start_ms,
-        in_ms: 0,
-        out_ms,
+        start,
+        in_point: 0,
+        out_point,
         volume: 1.0,
         opacity: 1.0,
     }
@@ -213,21 +217,22 @@ fn two_tracks_composite_the_way_the_timeline_says() {
     let wide = make_video("wide-red.mp4", "red", 320, 180, 4.0, true);
     let narrow = make_video("narrow-green.mp4", "green", 160, 120, 4.0, false);
     let project = Project {
+        version: FORMAT_VERSION,
         settings: ProjectSettings {
             width: CANVAS_W,
             height: CANVAS_H,
-            fps: 30,
+            rate: Rate::fps(30),
         },
         assets: vec![
             asset("wide", &wide, 320, 180, true),
             asset("narrow", &narrow, 160, 120, false),
         ],
         tracks: vec![
-            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 2000)]),
+            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 60)]),
             track(
                 "V2",
                 TrackKind::Video,
-                vec![clip("c2", "narrow", 1000, 2000)],
+                vec![clip("c2", "narrow", 30, 60)],
             ),
         ],
     };
@@ -269,16 +274,17 @@ fn two_tracks_composite_the_way_the_timeline_says() {
 fn the_output_is_the_length_the_timeline_says_with_the_sound_on_it() {
     let wide = make_video("wide-red.mp4", "red", 320, 180, 4.0, true);
     let project = Project {
+        version: FORMAT_VERSION,
         settings: ProjectSettings {
             width: CANVAS_W,
             height: CANVAS_H,
-            fps: 30,
+            rate: Rate::fps(30),
         },
         assets: vec![asset("wide", &wide, 320, 180, true)],
         tracks: vec![track(
             "V1",
             TrackKind::Video,
-            vec![clip("c1", "wide", 0, 3000)],
+            vec![clip("c1", "wide", 0, 90)],
         )],
     };
     let output = temp_dir().join("length.mp4").to_string_lossy().to_string();
@@ -321,18 +327,19 @@ fn the_output_is_the_length_the_timeline_says_with_the_sound_on_it() {
 fn a_missing_source_leaves_a_hole_rather_than_an_error() {
     let wide = make_video("wide-red.mp4", "red", 320, 180, 4.0, true);
     let project = Project {
+        version: FORMAT_VERSION,
         settings: ProjectSettings {
             width: CANVAS_W,
             height: CANVAS_H,
-            fps: 30,
+            rate: Rate::fps(30),
         },
         assets: vec![
             asset("wide", &wide, 320, 180, true),
             asset("gone", "/nowhere/at/all.mp4", 320, 180, false),
         ],
         tracks: vec![
-            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 2000)]),
-            track("V2", TrackKind::Video, vec![clip("c2", "gone", 0, 2000)]),
+            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 60)]),
+            track("V2", TrackKind::Video, vec![clip("c2", "gone", 0, 60)]),
         ],
     };
     let output = temp_dir().join("missing.mp4").to_string_lossy().to_string();
@@ -353,21 +360,22 @@ fn the_preview_frame_matches_the_rendered_frame() {
     let wide = make_video("wide-red.mp4", "red", 320, 180, 4.0, true);
     let narrow = make_video("narrow-green.mp4", "green", 160, 120, 4.0, false);
     let project = Project {
+        version: FORMAT_VERSION,
         settings: ProjectSettings {
             width: CANVAS_W,
             height: CANVAS_H,
-            fps: 30,
+            rate: Rate::fps(30),
         },
         assets: vec![
             asset("wide", &wide, 320, 180, true),
             asset("narrow", &narrow, 160, 120, false),
         ],
         tracks: vec![
-            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 3000)]),
+            track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 90)]),
             track(
                 "V2",
                 TrackKind::Video,
-                vec![clip("c2", "narrow", 1000, 2000)],
+                vec![clip("c2", "narrow", 30, 60)],
             ),
         ],
     };
@@ -377,7 +385,7 @@ fn the_preview_frame_matches_the_rendered_frame() {
     let compositor = Compositor::new();
     let (out_w, out_h) = output_size();
     let preview =
-        pipeline::preview_frame(&compositor, &ffmpeg_path(), &project, 1500, out_w, out_h)
+        pipeline::preview_frame(&compositor, &ffmpeg_path(), &project, 45, out_w, out_h)
             .expect("a preview frame");
     assert_eq!(preview.len(), (out_w * out_h * 4) as usize);
 

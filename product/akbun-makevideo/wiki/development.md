@@ -22,7 +22,8 @@ brew install ffmpeg
 None of them need an app binary. The first two need nothing installed at all; the third needs a graphics device and ffmpeg.
 
 ```bash
-npm test           # node --test over the timeline model
+npm test           # node --test over the time and timeline models
+npm run test:time  # cargo test -p makevideo-time, needs nothing installed
 npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
 npm run test:gpu   # cargo test -p makevideo-compositor, needs ffmpeg
 npm run test:nogpu # the same, with wgpu compiled out entirely
@@ -40,8 +41,11 @@ sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
 
 What is covered:
 
-- `test/timeline.test.js` — placing, overlap, moving between tracks, trimming against the source bounds, splitting, snapping, track limits, and reading an older project file
+- `test/time.test.js` — the rate arithmetic: conversion, rescale, compare, clamp and timecode, over all eight rates the app offers. The mirror of `crates/time`, and the two run the same cases
+- `test/timeline.test.js` — placing, overlap, moving between tracks, trimming against the source bounds, splitting, snapping, track limits, changing the rate, and reading a millisecond project file
 - `test/quality.test.js` — quality percentiles, the six acceptance checks and report aggregation
+- `crates/time/src/lib.rs` — the same rate arithmetic on the Rust side, including that ten thousand added frames land exactly on frame ten thousand at every rate
+- `crates/render/src/migrate.rs` — opening a millisecond project file, and writing back only today's format
 - `crates/render/src/layout.rs` — where a clip lands in the frame, the case both paths used to answer separately
 - `crates/render/src/ffmpeg.rs` — one test per feature of the filter graph, the decoder and encoder arguments for the composited route, the preset sizes and the progress parser
 - `crates/render/src/probe.rs` — ffprobe output including the cover art case, where an mp3 reports a video stream

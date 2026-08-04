@@ -9,6 +9,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Preview: stacked playback while running, and the exact rendered frame when the playhead stops — drawn by the same shader the render uses
 - Timeline: up to four video and four audio tracks, drag to move, drag an edge to trim
+- Frame rates including the broadcast ones — 23.976, 29.97 and 59.94 are held as the exact ratios they are, so a camera file stays in step with itself. The clock reads in timecode and the arrow keys step a frame at a time
 - Split at the playhead, from the toolbar button or Cmd+B
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track

@@ -7,10 +7,21 @@ const {
   playbackRateForDrift,
   HARD_SYNC_THRESHOLD,
 } = require('../src/preview.js');
+const T = require('../src/time.js');
 
 test('media time drives the timeline through clip trims and placement', () => {
-  const clip = { startMs: 5000, inMs: 2000 };
-  assert.strictEqual(timelineTimeFromMedia(clip, 3.5), 6500);
+  // The clip starts five seconds in and is taken from two seconds into its
+  // source, so 3.5s of media is 6.5s of timeline: frame 195 of 30.
+  const clip = { start: 150, in: 60 };
+  assert.strictEqual(timelineTimeFromMedia(clip, 3.5, T.fps(30)), 195);
+});
+
+test('a broadcast rate counts the media clock in its own frames', () => {
+  // 30000/1001 frames a second, so 1.001s of media is frame 30. The media
+  // clock is a float and stops wherever it likes, so the position keeps its
+  // fraction and is only rounded where a frame index is actually wanted.
+  const clip = { start: 0, in: 0 };
+  assert.strictEqual(Math.round(timelineTimeFromMedia(clip, 1.001, T.ntsc(30))), 30);
 });
 
 test('small follower drift keeps the normal playback rate', () => {
@@ -102,11 +113,12 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
 
   const videoTrack = { id: 'v1', kind: 'video', clips: [], hidden: false, muted: false };
   const audioTrack = { id: 'a1', kind: 'audio', clips: [], hidden: false, muted: false };
+  // Ten seconds at 30, which is what the fake project below is on.
   const videoClip = {
-    id: 'c1', assetId: 'video', startMs: 0, inMs: 0, outMs: 10000, opacity: 1, volume: 1,
+    id: 'c1', assetId: 'video', start: 0, in: 0, out: 300, opacity: 1, volume: 1,
   };
   const audioClip = {
-    id: 'c2', assetId: 'audio', startMs: 0, inMs: 0, outMs: 10000, opacity: 1, volume: 1,
+    id: 'c2', assetId: 'audio', start: 0, in: 0, out: 300, opacity: 1, volume: 1,
   };
   videoTrack.clips.push(videoClip);
   audioTrack.clips.push(audioClip);
@@ -114,14 +126,17 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
     video: { id: 'video', path: '/video.mp4', kind: 'video' },
     audio: { id: 'audio', path: '/audio.mp3', kind: 'audio' },
   };
-  const project = { settings: { width: 1920, height: 1080 }, tracks: [videoTrack, audioTrack] };
+  const project = {
+    settings: { width: 1920, height: 1080, rate: T.fps(30) },
+    tracks: [videoTrack, audioTrack],
+  };
   global.timelineLib = {
     tracksOf: (value, kind) => value.tracks.filter((track) => track.kind === kind),
-    clipsAt: (value, timeMs) => value.tracks.flatMap((track) => track.clips
-      .filter((clip) => timeMs >= clip.startMs && timeMs < clip.outMs)
-      .map((clip) => ({ track, clip, sourceMs: clip.inMs + timeMs - clip.startMs }))),
+    clipsAt: (value, frame) => value.tracks.flatMap((track) => track.clips
+      .filter((clip) => frame >= clip.start && frame < clip.out)
+      .map((clip) => ({ track, clip, sourceFrame: clip.in + frame - clip.start }))),
     findAsset: (value, assetId) => assets[assetId],
-    projectDurationMs: () => 10000,
+    projectDurationFrames: () => 300,
   };
 
   const ticks = [];
@@ -147,16 +162,16 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   reference.currentTime = 0.2;
   follower.currentTime = 0.1;
   frames.shift()();
-  assert.strictEqual(preview.position(), 200);
+  assert.strictEqual(preview.position(), 6, '0.2s is frame 6 of 30');
   assert.strictEqual(follower.currentTime, 0.1);
   assert.strictEqual(follower.playbackRate, 1.025);
 
   reference.paused = true;
   now = 300;
   frames.shift()();
-  assert.strictEqual(preview.position(), 300);
+  assert.strictEqual(preview.position(), 9, 'the wall clock takes over at 0.3s');
 
-  preview.seek(500);
+  preview.seek(15);
   assert.strictEqual(reference.currentTime, 0.5);
   assert.strictEqual(follower.currentTime, 0.5);
 });

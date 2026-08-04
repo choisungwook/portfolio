@@ -32,6 +32,11 @@ jobs:
       - name: Run page tests
         run: npm test
 
+      # The time model everything else measures with. It depends on serde and
+      # nothing else, so this is seconds.
+      - name: Run time model tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-time
+
       # makevideo-render depends on neither tauri nor a webview, so -p keeps
       # this to serde. Testing the app crate instead would need GTK and WebKit
       # installed on the runner. ffmpeg is not needed either: the crate builds

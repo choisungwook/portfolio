@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-04
+
+* **Creation**: [영상 편집 도구의 시간은 프레임 수와 두 정수 rate로 표현한다](decisions/2026-08-rational-time-model.md) 결정 기록. akbun-makevideo에 29.97과 23.976을 넣으려다 frame rate가 u32라 표현할 방법 자체가 없다는 것을 알게 되면서, 밀리초 왕복이 정확할 것이라 기대했다가 반 프레임 양자화를 다시 배운 것까지 함께 남긴다.
+
 ## 2026-08-03
 
 * **Creation**: [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](decisions/2026-08-arrow-shaft-square-cap.md) 결정 기록. akbun-makepresentation에서 화살표 끝에 점이 붙는다는 보고를 받고 고치다가, 같은 판단이 akbun-screenshot Issue #617의 ADR에만 남아 있어 두 번째로 만난 것을 알게 되면서 남긴다.

@@ -5,12 +5,16 @@
 // them, and redraws.
 
 const L = globalThis.timelineLib;
+const T = globalThis.timeLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
 // How near an edge has to be before the magnet takes it, in pixels rather than
-// milliseconds so it feels the same at every zoom.
+// frames so it feels the same at every zoom.
 const SNAP_PX = 10;
+// How much timeline is kept past the end of the edit, so there is always
+// somewhere to drop the next clip.
+const TAIL_SECONDS = 10;
 
 const el = (id) => document.getElementById(id);
 
@@ -100,8 +104,19 @@ function zoomToPxPerSecond(value) {
   return 5 * Math.pow(1.04, Number(value));
 }
 
+/** The project timebase. Everything on this page is counted in frames of it. */
+function rate() {
+  return L.rateOf(state.project);
+}
+
+/** The magnet radius, which is a distance on screen rather than a number of
+ *  frames. It stays fractional: snapping compares it against positions that are
+ *  themselves fractional, so rounding it here would only make the radius drift
+ *  from the ten pixels it is meant to be — by 5% at full zoom on 23.976, and
+ *  further on any rate a future zoom range lands badly on. */
 function snapTolerance() {
-  return state.settings && state.settings.snap ? L.pxToMs(SNAP_PX, state.pxPerSecond) : 0;
+  if (!(state.settings && state.settings.snap)) return 0;
+  return L.pxToFrames(SNAP_PX, rate(), state.pxPerSecond);
 }
 
 function markDirty() {
@@ -121,21 +136,25 @@ function displayTracks() {
   return [...L.tracksOf(state.project, 'video')].reverse().concat(L.tracksOf(state.project, 'audio'));
 }
 
-function contentMs() {
-  const visible = L.pxToMs(Math.max(dom.scroll.clientWidth, 320), state.pxPerSecond);
-  return Math.max(L.projectDurationMs(state.project) + 10000, visible);
+/** How many frames of timeline the ruler and the lanes are drawn for. */
+function contentFrames() {
+  const visible = L.pxToFrames(Math.max(dom.scroll.clientWidth, 320), rate(), state.pxPerSecond);
+  const tail = Math.round(TAIL_SECONDS * T.rateToNumber(rate()));
+  return Math.max(L.projectDurationFrames(state.project) + tail, visible);
 }
 
-function timeAtClientX(clientX) {
+function frameAtClientX(clientX) {
   const box = dom.content.getBoundingClientRect();
-  return Math.max(0, L.pxToMs(clientX - box.left, state.pxPerSecond));
+  return Math.max(0, L.pxToFrames(clientX - box.left, rate(), state.pxPerSecond));
 }
 
 // --- assets ----------------------------------------------------------------
 
 function assetSummary(asset) {
   const bits = [asset.kind];
-  if (asset.durationMs > 0) bits.push(L.formatTime(asset.durationMs));
+  if (asset.durationMs > 0) {
+    bits.push(L.formatTimecode(T.framesFromMillis(asset.durationMs, rate()), rate()));
+  }
   if (asset.width > 0) bits.push(`${asset.width}×${asset.height}`);
   if (asset.kind === 'video' && !asset.hasAudio) bits.push('silent');
   return bits.join(' · ');
@@ -256,8 +275,8 @@ function clipElement(track, clip) {
   const node = document.createElement('div');
   node.className = `clip ${track.kind}`;
   node.dataset.clipId = clip.id;
-  node.style.left = `${L.msToPx(clip.startMs, state.pxPerSecond)}px`;
-  node.style.width = `${Math.max(2, L.msToPx(L.clipDuration(clip), state.pxPerSecond))}px`;
+  node.style.left = `${L.framesToPx(clip.start, rate(), state.pxPerSecond)}px`;
+  node.style.width = `${Math.max(2, L.framesToPx(L.clipDuration(clip), rate(), state.pxPerSecond))}px`;
   if (clip.id === state.selectedClipId) node.classList.add('selected');
 
   const label = document.createElement('span');
@@ -274,7 +293,7 @@ function clipElement(track, clip) {
 
 function renderLanes() {
   dom.lanes.textContent = '';
-  const width = L.msToPx(contentMs(), state.pxPerSecond);
+  const width = L.framesToPx(contentFrames(), rate(), state.pxPerSecond);
   dom.content.style.width = `${width}px`;
 
   for (const track of displayTracks()) {
@@ -290,14 +309,14 @@ function renderLanes() {
 
 function renderRuler() {
   dom.ruler.textContent = '';
-  const total = contentMs();
-  const step = L.tickStepMs(state.pxPerSecond);
+  const total = contentFrames();
+  const step = L.tickStepFrames(state.pxPerSecond, rate());
   const fragment = document.createDocumentFragment();
-  for (let time = 0; time <= total; time += step) {
+  for (let frame = 0; frame <= total; frame += step) {
     const tick = document.createElement('div');
     tick.className = 'tick';
-    tick.style.left = `${L.msToPx(time, state.pxPerSecond)}px`;
-    tick.textContent = L.formatTime(time).replace(/^0:/, '').replace(/\.00$/, '');
+    tick.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
+    tick.textContent = L.formatRulerLabel(frame, rate());
     fragment.appendChild(tick);
   }
   dom.ruler.appendChild(fragment);
@@ -308,7 +327,7 @@ function renderTimeline() {
   renderRuler();
   renderLanes();
   updatePlayhead(preview ? preview.position() : 0);
-  dom.duration.textContent = L.formatTime(L.projectDurationMs(state.project));
+  dom.duration.textContent = L.formatTimecode(L.projectDurationFrames(state.project), rate());
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
   dom.btnAddVideo.disabled = L.tracksOf(state.project, 'video').length >= L.MAX_TRACKS_PER_KIND;
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
@@ -325,17 +344,17 @@ function refresh() {
   updateTitle();
 }
 
-function updatePlayhead(ms) {
-  dom.playhead.style.left = `${L.msToPx(ms, state.pxPerSecond)}px`;
-  dom.clock.textContent = L.formatTime(ms);
-  dom.stageHint.hidden = L.projectDurationMs(state.project) > 0 || preview.mode() === 'asset';
+function updatePlayhead(frame) {
+  dom.playhead.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
+  dom.clock.textContent = L.formatTimecode(frame, rate());
+  dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
 }
 
 /** Keep the playhead on screen while it runs, without fighting a user who is
  *  scrolling somewhere else. */
-function followPlayhead(ms) {
+function followPlayhead(frame) {
   if (!preview.isPlaying()) return;
-  const x = L.msToPx(ms, state.pxPerSecond);
+  const x = L.framesToPx(frame, rate(), state.pxPerSecond);
   const left = dom.scroll.scrollLeft;
   const right = left + dom.scroll.clientWidth;
   if (x < left || x > right - 40) dom.scroll.scrollLeft = Math.max(0, x - dom.scroll.clientWidth * 0.3);
@@ -349,7 +368,7 @@ let exactToken = 0;
 function setStageMode(mode) {
   if (!dom.stageMode) return;
   const known = mode === 'exact' || mode === 'live';
-  dom.stageMode.hidden = !known || L.projectDurationMs(state.project) <= 0;
+  dom.stageMode.hidden = !known || L.projectDurationFrames(state.project) <= 0;
   dom.stageMode.textContent = mode === 'exact' ? 'exact frame' : 'live preview';
   dom.stageMode.classList.toggle('exact', mode === 'exact');
 }
@@ -360,19 +379,19 @@ function setStageMode(mode) {
 async function requestExactFrame() {
   if (!window.api.available) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
-  if (L.projectDurationMs(state.project) <= 0) return;
+  if (L.projectDurationFrames(state.project) <= 0) return;
   if (state.settings.compositor === 'ffmpeg') return;
   const token = (exactToken += 1);
   const box = dom.stageInner.getBoundingClientRect();
   const maxWidth = Math.max(160, Math.round(box.width));
   try {
-    const frame = await window.api.previewFrame(
+    const drawn = await window.api.previewFrame(
       state.project,
       Math.round(preview.position()),
       maxWidth
     );
     if (token !== exactToken || preview.isPlaying()) return;
-    setStageMode(preview.showExact(frame) ? 'exact' : 'live');
+    setStageMode(preview.showExact(drawn) ? 'exact' : 'live');
   } catch (error) {
     // No graphics device, no ffmpeg, or a source that will not decode. The
     // stacked elements are still showing something, so this is not worth a
@@ -479,14 +498,14 @@ function beginClipDrag(event, node) {
     mode,
     clipId,
     node,
-    grabMs: L.pxToMs(offsetX, state.pxPerSecond),
-    startMs: found.clip.startMs,
-    endMs: L.clipEnd(found.clip),
-    durationMs: L.clipDuration(found.clip),
+    grabFrames: L.pxToFrames(offsetX, rate(), state.pxPerSecond),
+    startFrame: found.clip.start,
+    endFrame: L.clipEnd(found.clip),
+    durationFrames: L.clipDuration(found.clip),
     trackId: found.track.id,
     targetTrackId: found.track.id,
-    nextStartMs: found.clip.startMs,
-    nextEdgeMs: found.clip.startMs,
+    nextStart: found.clip.start,
+    nextEdge: found.clip.start,
     moved: false,
   };
   document.body.classList.add(mode === 'move' ? 'dragging' : 'trimming');
@@ -494,16 +513,16 @@ function beginClipDrag(event, node) {
 }
 
 function updateClipDrag(event) {
-  const pointerMs = timeAtClientX(event.clientX);
+  const pointer = frameAtClientX(event.clientX);
   const tolerance = snapTolerance();
 
   if (drag.mode === 'move') {
-    const wanted = Math.max(0, pointerMs - drag.grabMs);
-    drag.nextStartMs = L.snapClipStart(state.project, wanted, drag.durationMs, tolerance, {
+    const wanted = Math.max(0, pointer - drag.grabFrames);
+    drag.nextStart = L.snapClipStart(state.project, wanted, drag.durationFrames, tolerance, {
       exceptClipId: drag.clipId,
       extra: [preview.position()],
     });
-    drag.node.style.left = `${L.msToPx(drag.nextStartMs, state.pxPerSecond)}px`;
+    drag.node.style.left = `${L.framesToPx(drag.nextStart, rate(), state.pxPerSecond)}px`;
 
     // The lane under the pointer decides the target track, but only if it can
     // play this asset; otherwise the clip stays where it came from.
@@ -519,18 +538,19 @@ function updateClipDrag(event) {
       if (drag.node.parentElement !== lane) lane.appendChild(drag.node);
     }
   } else {
-    const snapped = L.snapTime(state.project, pointerMs, tolerance, {
+    const snapped = L.snapTime(state.project, pointer, tolerance, {
       exceptClipId: drag.clipId,
       extra: [preview.position()],
     });
-    drag.nextEdgeMs = snapped;
+    const shortest = L.minClipFrames(rate());
+    drag.nextEdge = snapped;
     if (drag.mode === 'trim-start') {
-      const at = Math.min(snapped, drag.endMs - L.MIN_CLIP_MS);
-      drag.node.style.left = `${L.msToPx(Math.max(0, at), state.pxPerSecond)}px`;
-      drag.node.style.width = `${Math.max(2, L.msToPx(drag.endMs - at, state.pxPerSecond))}px`;
+      const at = Math.min(snapped, drag.endFrame - shortest);
+      drag.node.style.left = `${L.framesToPx(Math.max(0, at), rate(), state.pxPerSecond)}px`;
+      drag.node.style.width = `${Math.max(2, L.framesToPx(drag.endFrame - at, rate(), state.pxPerSecond))}px`;
     } else {
-      const at = Math.max(snapped, drag.startMs + L.MIN_CLIP_MS);
-      drag.node.style.width = `${Math.max(2, L.msToPx(at - drag.startMs, state.pxPerSecond))}px`;
+      const at = Math.max(snapped, drag.startFrame + shortest);
+      drag.node.style.width = `${Math.max(2, L.framesToPx(at - drag.startFrame, rate(), state.pxPerSecond))}px`;
     }
   }
   drag.moved = true;
@@ -544,13 +564,13 @@ function endClipDrag() {
   if (!current) return;
   if (current.moved) {
     if (current.mode === 'move') {
-      L.moveClip(state.project, current.clipId, current.targetTrackId, current.nextStartMs);
+      L.moveClip(state.project, current.clipId, current.targetTrackId, current.nextStart);
     } else {
       L.trimClip(
         state.project,
         current.clipId,
         current.mode === 'trim-start' ? 'start' : 'end',
-        current.nextEdgeMs
+        current.nextEdge
       );
     }
     markDirty();
@@ -564,7 +584,7 @@ let scrubbing = false;
 
 function scrubTo(clientX) {
   const tolerance = snapTolerance();
-  preview.seek(L.snapTime(state.project, timeAtClientX(clientX), tolerance));
+  preview.seek(L.snapTime(state.project, frameAtClientX(clientX), tolerance));
 }
 
 function beginScrub(event) {
@@ -578,10 +598,10 @@ function beginScrub(event) {
 
 /** Place assets one after another from the drop point, so dropping three files
  *  on a track lays them end to end instead of stacking them all at once. */
-function dropAssetsOnTrack(trackId, assets, atMs) {
+function dropAssetsOnTrack(trackId, assets, atFrame) {
   const track = L.findTrack(state.project, trackId);
   if (!track) return false;
-  let cursor = atMs;
+  let cursor = atFrame;
   let placed = false;
   for (const asset of assets) {
     if (!L.canAccept(track, asset)) continue;
@@ -662,7 +682,7 @@ function endAssetDrag(event) {
 
   const lane = laneAtPoint(event.clientX, event.clientY);
   if (!lane) return;
-  const at = L.snapTime(state.project, timeAtClientX(event.clientX), snapTolerance());
+  const at = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
   if (!dropAssetsOnTrack(lane.dataset.trackId, [current.asset], at)) return;
   markDirty();
   renderTimeline();
@@ -696,7 +716,7 @@ async function handleOsDrop(payload) {
     return;
   }
   const tolerance = snapTolerance();
-  const at = L.snapTime(state.project, timeAtClientX(x), tolerance);
+  const at = L.snapTime(state.project, frameAtClientX(x), tolerance);
   if (dropAssetsOnTrack(lane.dataset.trackId, imported, at)) markDirty();
   refresh();
 }
@@ -713,7 +733,7 @@ async function startRender(preset) {
     );
     return;
   }
-  if (L.projectDurationMs(state.project) <= 0) {
+  if (L.projectDurationFrames(state.project) <= 0) {
     await window.api.message('The timeline is empty.', { title: 'Nothing to render' });
     return;
   }
@@ -749,9 +769,12 @@ async function startRender(preset) {
 
 function onRenderProgress(payload) {
   if (!state.rendering) return;
+  // ffmpeg reports where it has got to in milliseconds, which is all a
+  // progress bar needs; it becomes frames only to be read out as a timecode.
   const percent = payload.totalMs > 0 ? Math.min(100, (payload.positionMs / payload.totalMs) * 100) : 0;
+  const clock = (ms) => L.formatTimecode(T.framesFromMillis(ms, rate()), rate());
   dom.renderBar.style.width = `${percent}%`;
-  dom.renderStatus.textContent = `${L.formatTime(payload.positionMs)} of ${L.formatTime(payload.totalMs)} — ${Math.round(percent)}%`;
+  dom.renderStatus.textContent = `${clock(payload.positionMs)} of ${clock(payload.totalMs)} — ${Math.round(percent)}%`;
 }
 
 /** The hardware encoder failed on this particular file, so the CPU is redoing
@@ -810,7 +833,7 @@ function emptyProject() {
   return L.createProject({
     width: state.settings.defaultWidth,
     height: state.settings.defaultHeight,
-    fps: state.settings.defaultFps,
+    rate: state.settings.defaultRate,
   });
 }
 
@@ -927,10 +950,10 @@ function closeSheet(id) {
 }
 
 function fillProjectSheet() {
-  const { width, height, fps } = state.project.settings;
+  const { width, height } = state.project.settings;
   el('ps-width').value = width;
   el('ps-height').value = height;
-  el('ps-fps').value = String(fps);
+  el('ps-rate').value = T.rateRatio(rate());
   const key = `${width}x${height}`;
   const preset = el('ps-preset');
   preset.value = [...preset.options].some((option) => option.value === key) ? key : 'custom';
@@ -1083,7 +1106,7 @@ function setPreviewSource(source) {
     dom.stageHint.textContent = 'Drop media on the timeline below to see it here.';
   }
   preview.layout();
-  dom.duration.textContent = L.formatTime(preview.total());
+  dom.duration.textContent = L.formatTimecode(preview.total(), rate());
 }
 
 // --- wiring ----------------------------------------------------------------
@@ -1236,14 +1259,18 @@ function wireSheets() {
     el('ps-height').value = height;
   });
   el('ps-save').addEventListener('click', () => {
-    state.project.settings = {
-      width: Math.max(16, Number(el('ps-width').value) || 1920),
-      height: Math.max(16, Number(el('ps-height').value) || 1080),
-      fps: Number(el('ps-fps').value) || 30,
-    };
+    const at = preview.position();
+    const was = rate();
+    state.project.settings.width = Math.max(16, Number(el('ps-width').value) || 1920);
+    state.project.settings.height = Math.max(16, Number(el('ps-height').value) || 1080);
+    // The clips move with the timebase rather than keeping their frame
+    // numbers, so a cut stays where it was in time.
+    L.retime(state.project, T.parseRate(el('ps-rate').value));
     closeSheet('project-settings');
     markDirty();
+    preview.seek(T.rescale(at, was, rate()));
     preview.layout();
+    renderTimeline();
   });
   el('as-save').addEventListener('click', async () => {
     const next = Object.assign({}, state.settings, {
@@ -1347,8 +1374,11 @@ function wireKeyboard() {
     }
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault();
-      const step = event.shiftKey ? 1000 : 1000 / (state.project.settings.fps || 30);
-      preview.seek(preview.position() + (event.key === 'ArrowRight' ? step : -step));
+      // One frame, or a second with shift. A frame is 1 now, which is the
+      // point of counting in them.
+      const step = event.shiftKey ? Math.round(T.rateToNumber(rate())) : 1;
+      const at = Math.round(preview.position());
+      preview.seek(at + (event.key === 'ArrowRight' ? step : -step));
       return;
     }
     if (event.key === 'Home') preview.seek(0);
@@ -1372,9 +1402,9 @@ async function boot() {
     wrap: dom.stageWrap,
     getProject: () => state.project,
     qualityMonitor,
-    onTick: (ms, playing) => {
-      updatePlayhead(ms);
-      followPlayhead(ms);
+    onTick: (frame, playing) => {
+      updatePlayhead(frame);
+      followPlayhead(frame);
       dom.btnPlay.textContent = playing ? '❚❚' : '▶';
       if (playing) {
         // Playing is the stacked elements; the composited frame cannot keep up
@@ -1390,7 +1420,7 @@ async function boot() {
   state.project = L.createProject({
     width: state.settings.defaultWidth,
     height: state.settings.defaultHeight,
-    fps: state.settings.defaultFps,
+    rate: state.settings.defaultRate,
   });
   applySettings(state.settings);
   globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
