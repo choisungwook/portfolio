@@ -55,7 +55,6 @@ fn parse(mut args: std::env::Args) -> Result<Options, String> {
                 .ok_or_else(|| format!("{argument} needs a value"))
         };
         match argument.as_str() {
-            "--help" | "-h" => return Err(USAGE.into()),
             "--seconds" => {
                 options.seconds = value()?
                     .parse()
@@ -196,6 +195,12 @@ fn run() -> Result<Run, String> {
 }
 
 fn main() {
+    // Asking for the help is not a failure, and a script that treats a non-zero
+    // exit as one would call it a failure.
+    if std::env::args().any(|argument| argument == "--help" || argument == "-h") {
+        println!("{USAGE}");
+        return;
+    }
     match run() {
         Ok(report) => {
             println!(

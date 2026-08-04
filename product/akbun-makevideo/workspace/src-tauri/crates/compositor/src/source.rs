@@ -352,14 +352,41 @@ impl FrameSource {
             .sum()
     }
 
-    /// The most the queues can hold: every clip full, plus the one frame each
-    /// can be holding in its pending slot. The supply meter holds the source to
-    /// this, which is what turns "bounded memory" from a claim into a check.
+    /// The most the queues can hold at one instant: every clip that can be
+    /// buffering at the same time, full, plus the one frame each can be holding
+    /// in its pending slot. The supply meter holds the source to this, which is
+    /// what turns "bounded memory" from a claim into a check.
+    ///
+    /// Summing every clip in the project instead would be a bound nothing could
+    /// ever reach — a hundred clips one after another are never buffering
+    /// together — and a limit that loose catches no leak at all. A clip's queue
+    /// exists from `lead` frames before it appears until the playhead leaves
+    /// it, so what is wanted is the heaviest overlap of those spans.
     pub fn buffer_ceiling(&self) -> usize {
-        self.streams
-            .iter()
-            .map(|stream| (self.buffering.depth + 1) * stream.frame_bytes)
-            .sum()
+        // (position, starting, bytes). An end is applied before a start at the
+        // same position, because that is the order `tend` does it in.
+        let mut events: Vec<(i64, u8, usize)> = Vec::new();
+        for stream in &self.streams {
+            let from = stream.placement.start_frame - self.buffering.lead;
+            let until = stream.placement.end_frame();
+            if until <= from {
+                continue;
+            }
+            events.push((from, 1, stream.frame_bytes));
+            events.push((until, 0, stream.frame_bytes));
+        }
+        events.sort_by_key(|(position, starting, _)| (*position, *starting));
+
+        let (mut live, mut worst) = (0usize, 0usize);
+        for (_, starting, bytes) in events {
+            if starting == 1 {
+                live += bytes;
+                worst = worst.max(live);
+            } else {
+                live -= bytes;
+            }
+        }
+        (self.buffering.depth + 1) * worst
     }
 
     /// The clips with a decoder running, in paint order.
@@ -402,6 +429,7 @@ impl FrameSource {
 
         let frame = self.position;
         let mut starved = false;
+        let mut finished = Vec::new();
         for stream in self.streams.iter_mut() {
             if !stream.wants(frame) || stream.dead || stream.pending.is_some() {
                 continue;
@@ -416,10 +444,16 @@ impl FrameSource {
                     // drawing rather than holding the playhead.
                     stream.dead = true;
                     stream.receiver = None;
+                    // Its thread has already ended, so the handle is retired
+                    // here rather than at the end of the clip. Otherwise a
+                    // source that died on frame 10 of a ten minute clip is
+                    // reported as decoding for the other ten minutes.
+                    finished.extend(stream.decoder.take());
                 }
                 Some(Err(TryRecvError::Empty)) | None => starved = true,
             }
         }
+        self.retiring.append(&mut finished);
         if starved {
             return Supply::Starved;
         }
@@ -905,6 +939,64 @@ mod tests {
             assert_eq!(frame.layers.len(), 1, "the clip that is there still draws");
             assert_eq!(frame.layers[0].clip_id, "c1");
         }
+    }
+
+    #[test]
+    fn the_ceiling_counts_the_clips_that_can_buffer_at_once_not_all_of_them() {
+        // Three clips one after another on one track. Only one of them is ever
+        // buffering, so summing all three would be a bound nothing can reach
+        // and a limit that catches nothing.
+        let sequence = project(
+            vec![track(
+                "V1",
+                vec![
+                    clip("c1", "a1", 0, 0, 30),
+                    clip("c2", "a1", 30, 0, 30),
+                    clip("c3", "a1", 60, 0, 30),
+                ],
+            )],
+            vec![asset("a1")],
+        );
+        let one_frame = 16 * 16 * 4;
+        let sequential = source(&sequence, Buffering::new(3, 0), Arc::new(Fakes::default()));
+        assert_eq!(sequential.buffer_ceiling(), 4 * one_frame);
+
+        // Two tracks that overlap are two queues at once, and a lead makes the
+        // next clip's queue overlap the one before it.
+        let stacked = project(
+            vec![
+                track("V1", vec![clip("c1", "a1", 0, 0, 30)]),
+                track("V2", vec![clip("c2", "a2", 0, 0, 30)]),
+            ],
+            vec![asset("a1"), asset("a2")],
+        );
+        let overlapping = source(&stacked, Buffering::new(3, 0), Arc::new(Fakes::default()));
+        assert_eq!(overlapping.buffer_ceiling(), 8 * one_frame);
+        let led = source(&sequence, Buffering::new(3, 5), Arc::new(Fakes::default()));
+        assert_eq!(led.buffer_ceiling(), 8 * one_frame, "the lead overlaps");
+    }
+
+    #[test]
+    fn a_dead_decoder_is_retired_where_it_died() {
+        // Its thread ended when the source did. Holding the handle until the
+        // clip is over would report a decoder that is not running for as long
+        // as the clip lasts.
+        let project = project(
+            vec![track("V1", vec![clip("c1", "a1", 0, 0, 300)])],
+            vec![asset("a1")],
+        );
+        let readers = Arc::new(Fakes {
+            short: vec![("/m/a1".into(), 3)],
+            ..Fakes::default()
+        });
+        let mut source = source(&project, Buffering::default(), Arc::clone(&readers));
+        for _ in 0..4 {
+            next(&mut source);
+        }
+        assert!(
+            source.decoding().is_empty(),
+            "the source ran out three frames in"
+        );
     }
 
     #[test]

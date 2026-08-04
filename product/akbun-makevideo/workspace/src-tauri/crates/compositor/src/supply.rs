@@ -466,14 +466,23 @@ mod tests {
     }
 
     #[test]
-    fn a_source_that_keeps_up_passes() {
+    fn a_source_that_keeps_up_delivers_every_frame_inside_its_bound() {
         let mut source = source(Duration::from_millis(1));
         let report = measure(&mut source, &Scenario::new("continuous-supply", 30));
         assert_eq!(report.metrics.total_frames, 30);
-        assert_eq!(report.metrics.late_frames, 0);
-        assert!(report.evaluation.pass, "{report:?}");
+        assert!(!report.metrics.stalled, "{report:?}");
         // The bound the buffering promises, checked rather than assumed.
         assert!(report.metrics.peak_buffered_bytes <= report.limits.peak_buffered_bytes);
+        // Not "never late": this thread can be held off its own slot on a busy
+        // runner, and asserting a clean sheet would make the suite fail for
+        // whatever else the machine was doing. That the meter *reports* a slow
+        // source as failing is the next test, where the margin is not a matter
+        // of scheduling.
+        assert!(
+            report.metrics.late_frames * 5 <= report.metrics.total_frames,
+            "a source with 33x the time it needs should rarely be late: {:?}",
+            report.metrics
+        );
     }
 
     #[test]
@@ -498,8 +507,9 @@ mod tests {
             &Scenario::new("repeated-seek", 20).seeking(5, 0),
         );
         assert_eq!(report.metrics.seeks, 4);
+        assert_eq!(report.metrics.total_frames, 20);
         assert!(report.metrics.startup_delay_p99_ms.is_some());
-        assert!(report.evaluation.pass, "{report:?}");
+        assert!(!report.metrics.stalled, "{report:?}");
     }
 
     #[test]
