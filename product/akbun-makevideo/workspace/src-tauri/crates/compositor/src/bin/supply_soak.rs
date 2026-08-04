@@ -203,10 +203,14 @@ fn main() {
     }
     match run() {
         Ok(report) => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&report).unwrap_or_default()
-            );
+            let json = match serde_json::to_string_pretty(&report) {
+                Ok(json) => json,
+                Err(error) => {
+                    eprintln!("cannot serialize the report: {error}");
+                    std::process::exit(2);
+                }
+            };
+            println!("{json}");
             for scenario in &report.scenarios {
                 eprintln!(
                     "{:<24} {:>5} frames  p50 {:>6.1} ms  p99 {:>6.1} ms  late {:<5} {}",

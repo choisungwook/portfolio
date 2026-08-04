@@ -204,14 +204,12 @@ pub fn measure(source: &mut FrameSource, scenario: &Scenario) -> ScenarioReport 
     // Deadlines are counted from here, and a seek moves it: the frame after a
     // seek is due one frame period after the seek, not at the slot the old
     // playhead would have been in.
-    let mut base = started;
-    let mut elapsed_frames = 0u32;
+    let mut due = started;
     let mut shown_at: Option<Instant> = None;
     let mut first_after_start = true;
 
     while delivered < scenario.frames && source.frames() > 0 {
-        elapsed_frames += 1;
-        let due = base + interval * elapsed_frames;
+        due += interval;
         let asked = Instant::now();
         match source.take_by(due.max(asked) + grace) {
             Supply::Ready(_frame) => {
@@ -226,8 +224,7 @@ pub fn measure(source: &mut FrameSource, scenario: &Scenario) -> ScenarioReport 
                     // look like a supply failure.
                     startups.push(millis(wait));
                     first_after_start = false;
-                    base = ready;
-                    elapsed_frames = 0;
+                    due = ready;
                     ready
                 } else {
                     // Late only when the source made the frame wait. When this
@@ -257,8 +254,7 @@ pub fn measure(source: &mut FrameSource, scenario: &Scenario) -> ScenarioReport 
                     if delivered % every == 0 {
                         source.seek(scenario.seek_to);
                         seeks += 1;
-                        base = Instant::now();
-                        elapsed_frames = 0;
+                        due = Instant::now();
                         shown_at = None;
                         first_after_start = true;
                     }
@@ -274,8 +270,7 @@ pub fn measure(source: &mut FrameSource, scenario: &Scenario) -> ScenarioReport 
                 // just the same.
                 source.seek(0);
                 seeks += 1;
-                base = Instant::now();
-                elapsed_frames = 0;
+                due = Instant::now();
                 shown_at = None;
                 first_after_start = true;
             }

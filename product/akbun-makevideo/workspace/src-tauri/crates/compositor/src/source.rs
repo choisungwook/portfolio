@@ -24,9 +24,9 @@ use makevideo_render::layout::{self, Placement, Rect};
 use makevideo_render::{ffmpeg, AssetKind, Project, Rate, RationalTime};
 use std::io::Read;
 use std::process::{Child, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -58,6 +58,17 @@ pub trait FrameReader: Send {
     /// Fill `buffer` with the next frame. `false` means the source is over,
     /// whether it ran out or broke; either way the clip stops drawing.
     fn read(&mut self, buffer: &mut [u8]) -> bool;
+
+    /// A handle that can interrupt a blocking `read`, when the reader supports
+    /// it. The ffmpeg reader uses this to kill its process on seek or drop.
+    fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
+        None
+    }
+}
+
+/// Stops a reader without needing access to the thread currently reading it.
+pub trait CancelRead: Send + Sync {
+    fn cancel(&self);
 }
 
 /// What one clip's decoder is asked for. Owned, because the open happens on the
@@ -125,18 +136,37 @@ impl Readers for FfmpegReaders {
             .spawn()
             .ok()?;
         let stdout = child.stdout.take()?;
-        Some(Box::new(FfmpegReader { child, stdout }))
+        Some(Box::new(FfmpegReader {
+            child: Arc::new(Mutex::new(child)),
+            stdout,
+        }))
     }
 }
 
 struct FfmpegReader {
-    child: Child,
+    child: Arc<Mutex<Child>>,
     stdout: ChildStdout,
+}
+
+struct FfmpegCancel {
+    child: Arc<Mutex<Child>>,
+}
+
+impl CancelRead for FfmpegCancel {
+    fn cancel(&self) {
+        let _ = self.child.lock().unwrap().kill();
+    }
 }
 
 impl FrameReader for FfmpegReader {
     fn read(&mut self, buffer: &mut [u8]) -> bool {
         self.stdout.read_exact(buffer).is_ok()
+    }
+
+    fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
+        Some(Arc::new(FfmpegCancel {
+            child: Arc::clone(&self.child),
+        }))
     }
 }
 
@@ -145,8 +175,9 @@ impl Drop for FfmpegReader {
     /// and this is what stops the process it was feeding. Without it a seek
     /// would leave an ffmpeg per clip writing into a pipe nobody reads.
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let mut child = self.child.lock().unwrap();
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }
 
@@ -257,8 +288,33 @@ struct Stream {
     /// draining it.
     queued: Arc<AtomicUsize>,
     decoder: Option<JoinHandle<()>>,
+    cancellation: Arc<DecoderCancellation>,
     /// The source could not be opened or has run out. Its clip stops drawing.
     dead: bool,
+}
+
+#[derive(Default)]
+struct DecoderCancellation {
+    cancelled: AtomicBool,
+    reader: Mutex<Option<Arc<dyn CancelRead>>>,
+}
+
+impl DecoderCancellation {
+    fn attach(&self, reader: Option<Arc<dyn CancelRead>>) -> bool {
+        *self.reader.lock().unwrap() = reader;
+        if !self.cancelled.load(Ordering::SeqCst) {
+            return false;
+        }
+        self.cancel();
+        true
+    }
+
+    fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        if let Some(reader) = self.reader.lock().unwrap().as_ref() {
+            reader.cancel();
+        }
+    }
 }
 
 impl Stream {
@@ -302,6 +358,7 @@ impl FrameSource {
                 pending: None,
                 queued: Arc::new(AtomicUsize::new(0)),
                 decoder: None,
+                cancellation: Arc::new(DecoderCancellation::default()),
                 dead: false,
             })
             .collect();
@@ -543,12 +600,17 @@ impl FrameSource {
         let (sender, receiver) = sync_channel::<Vec<u8>>(depth);
         let queued = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&queued);
+        let cancellation = Arc::new(DecoderCancellation::default());
+        let decoder_cancellation = Arc::clone(&cancellation);
         let decoder = std::thread::spawn(move || {
             let Some(mut reader) = readers.open(&request) else {
                 // Dropping the sender closes the queue, which is how the
                 // consumer hears that this clip has nothing to give.
                 return;
             };
+            if decoder_cancellation.attach(reader.cancellation()) {
+                return;
+            }
             loop {
                 let mut buffer = vec![0u8; frame_bytes];
                 if !reader.read(&mut buffer) {
@@ -566,13 +628,14 @@ impl FrameSource {
         stream.receiver = Some(receiver);
         stream.queued = queued;
         stream.decoder = Some(decoder);
+        stream.cancellation = cancellation;
     }
 
-    /// Drop a clip's queue. The decoder's next send fails, so it ends on its
-    /// own and its process dies with the reader; nothing is joined here because
-    /// a seek must not wait for a decoder mid-frame.
+    /// Drop a clip's queue and interrupt a decoder blocked in a read. Nothing is
+    /// joined here because a seek must not wait for a decoder mid-frame.
     fn retire(&mut self, index: usize) {
         let stream = &mut self.streams[index];
+        stream.cancellation.cancel();
         stream.receiver = None;
         stream.pending = None;
         stream.queued = Arc::new(AtomicUsize::new(0));
@@ -614,7 +677,7 @@ impl Drop for FrameSource {
 mod tests {
     use super::*;
     use makevideo_render::{Asset, Clip, ProjectSettings, Track, TrackKind, FORMAT_VERSION};
-    use std::sync::Mutex;
+    use std::sync::Condvar;
 
     /// A source that hands back frames tagged with the clip and the frame
     /// number, so a test can assert *which* frame arrived rather than only that
@@ -685,6 +748,51 @@ mod tests {
                 first: request.in_frame,
                 frames,
                 delay,
+            }))
+        }
+    }
+
+    struct Blocking {
+        stopped: Arc<(Mutex<bool>, Condvar)>,
+        reading: Arc<AtomicBool>,
+    }
+
+    impl FrameReader for Blocking {
+        fn read(&mut self, _buffer: &mut [u8]) -> bool {
+            self.reading.store(true, Ordering::SeqCst);
+            let (lock, wake) = &*self.stopped;
+            let mut stopped = lock.lock().unwrap();
+            while !*stopped {
+                stopped = wake.wait(stopped).unwrap();
+            }
+            false
+        }
+
+        fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
+            Some(Arc::new(Unblock(Arc::clone(&self.stopped))))
+        }
+    }
+
+    struct Unblock(Arc<(Mutex<bool>, Condvar)>);
+
+    impl CancelRead for Unblock {
+        fn cancel(&self) {
+            let (lock, wake) = &*self.0;
+            *lock.lock().unwrap() = true;
+            wake.notify_all();
+        }
+    }
+
+    struct BlockingReaders {
+        stopped: Arc<(Mutex<bool>, Condvar)>,
+        reading: Arc<AtomicBool>,
+    }
+
+    impl Readers for BlockingReaders {
+        fn open(&self, _request: &Open) -> Option<Box<dyn FrameReader>> {
+            Some(Box::new(Blocking {
+                stopped: Arc::clone(&self.stopped),
+                reading: Arc::clone(&self.reading),
             }))
         }
     }
@@ -1042,6 +1150,26 @@ mod tests {
         assert_eq!(opened.len(), 2, "a seek is a new decoder");
         assert_eq!(opened[1].in_frame, 20);
         assert_eq!(opened[1].frames, 10, "what is left of the clip");
+    }
+
+    #[test]
+    fn dropping_interrupts_a_reader_blocked_mid_frame() {
+        let stopped = Arc::new((Mutex::new(false), Condvar::new()));
+        let reading = Arc::new(AtomicBool::new(false));
+        let readers = Arc::new(BlockingReaders {
+            stopped,
+            reading: Arc::clone(&reading),
+        });
+        let mut source = FrameSource::new(&one_clip(), 16, 16, Buffering::default(), readers);
+        assert!(matches!(source.take(), Supply::Starved));
+        assert!(wait_for(|| reading.load(Ordering::SeqCst)));
+
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            drop(source);
+            let _ = done.send(());
+        });
+        assert!(finished.recv_timeout(Duration::from_secs(1)).is_ok());
     }
 
     #[test]
