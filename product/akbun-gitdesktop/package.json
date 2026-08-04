@@ -1,7 +1,7 @@
 {
   "name": "akbun-gitdesktop",
   "productName": "akbun-gitdesktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Git graph desktop viewer for local repositories and worktrees",
   "main": "out/main/index.js",
   "author": "akbun",
@@ -11,6 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "node --test \"test/*.test.js\"",
     "start": "electron-vite preview",
     "dist": "electron-vite build && electron-builder --publish never",
     "dist:mac": "electron-vite build && electron-builder --mac --publish never",

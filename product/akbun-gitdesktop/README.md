@@ -30,6 +30,7 @@ UI 언어는 영어다.
 - worktree를 외부 앱으로 열기
 - dark/light 테마 전환, 기본값은 시스템 설정을 따르는 system
 - Settings에서 git, gh CLI의 인식 여부와 버전, 경로, gh 로그인 상태 확인과 재검사
+- 앱 메뉴의 Check for Updates…로 새 버전 확인과 설치
 
 ## 테마
 
@@ -97,6 +98,12 @@ npm run dev
 npm run typecheck
 ```
 
+테스트. 업데이트 기능이 임시 파일을 남기지 않는지 확인한다. node가 TypeScript의 타입을 벗겨 내고 `src/main/update.ts`를 그대로 읽으므로 빌드 없이 돈다:
+
+```bash
+npm test
+```
+
 플랫폼별 설치 파일 빌드:
 
 ```bash
@@ -105,6 +112,22 @@ npm run dist:win
 npm run dist:linux
 ```
 
+## 업데이트
+
+앱 메뉴 akbun-gitdesktop > Check for Updates…가 GitHub Release API에서 gitdesktop-v 태그의 최신 버전을 찾아 현재 버전과 비교한다. 새 버전이 있으면 dmg를 임시 디렉터리에 받아 교체 스크립트를 분리 프로세스로 띄우고 앱을 종료하며, 스크립트가 .app 번들을 통째로 바꾸고 다시 실행한다.
+
+dmg에 서명이 없어 Squirrel.Mac 기반 자동 업데이트(electron-updater)를 쓸 수 없다. 앱이 fetch로 받은 파일에는 quarantine 속성이 붙지 않아 Gatekeeper를 거치지 않고 교체할 수 있다는 점을 이용한다. 배경은 [knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](../../knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
+
+교체는 macOS 패키지 빌드에서만 동작한다. 개발 모드(`npm run dev`)에서는 교체 대상이 Electron.app이고, Windows와 Linux 빌드에는 받을 dmg가 없다. 두 경우 모두 릴리즈 페이지를 여는 버튼만 보여 준다.
+
+용량이 큰 dmg를 다루므로 정리 지점을 세 곳에 둔다. 세 지점은 `test/update-disk-leak.test.js`가 검증하고 PR의 verify job에서 돈다.
+
+1. `downloadDmg`가 내려받기에 실패하면 만든 임시 디렉터리를 지운다.
+2. 교체 스크립트의 trap이 어느 단계에서 실패해도 작업 디렉터리와 mount를 지운다.
+3. 앱 시작 때 `cleanupTempDirs`가 강제 종료로 남은 임시 디렉터리를 지운다.
+
 ## 릴리즈
+
+PR에서는 같은 workflow의 verify job이 ubuntu에서 typecheck와 테스트만 돌린다. `ELECTRON_SKIP_BINARY_DOWNLOAD`로 electron 바이너리를 받지 않으므로 앱 없이 끝난다.
 
 master에 이 디렉터리 변경이 병합되면 GitHub Actions(gitdesktop-release.yml)가 릴리즈를 만든다. 버전은 기존 gitdesktop-v 태그 중 가장 높은 값의 patch를 +1 해서 정하므로, 매 실행마다 새 버전이 나오고 기존 릴리즈를 덮어쓰지 않는다. package.json의 version이 그보다 높으면 그 값을 쓰므로 major, minor는 package.json을 직접 올려서 바꾼다. 태그가 이미 있으면 workflow는 실패한다.
