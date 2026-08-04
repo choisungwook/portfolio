@@ -23,3 +23,4 @@
 * [핸즈온은 terraform으로 기반까지만 만들고 학습 대상은 console에서 조작한다](2026-08-handson-terraform-base-console-operation.md) - terraform 범위를 기반 리소스로 한정하는 결정과 state 밖 리소스가 만드는 비용.
 * [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](2026-08-arrow-shaft-square-cap.md) - 화살표 끝에 구슬 같은 점이 붙던 현상을 두 product에서 같은 방식으로 없앤 결정.
 * [영상 편집 도구의 시간은 프레임 수와 두 정수 rate로 표현한다](2026-08-rational-time-model.md) - 밀리초 정수 시간을 유리수 시간 모델로 바꾸고 29.97 같은 실촬영 frame rate를 정확히 다루기로 한 결정.
+* [편집 모델은 backend가 소유하고 편집은 역연산을 가진 명령으로 표현한다](2026-08-edit-model-owned-by-the-backend.md) - 편집 상태 소유권을 페이지에서 Rust로 옮기고 undo를 상태 복사가 아닌 명령 이력으로 만든 결정.

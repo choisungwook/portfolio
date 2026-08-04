@@ -214,10 +214,16 @@ select {
   text-align: left;
 }
 
-.menu-list button:hover {
+.menu-list button:hover:not(:disabled) {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-fg);
+}
+
+/* Undo and Redo are only there to press some of the time, and a menu item that
+   highlights under the pointer but does nothing is worse than a grey one. */
+.menu-list button:disabled {
+  background: none;
 }
 
 .menu-list kbd {

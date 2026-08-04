@@ -23,11 +23,32 @@ const PROJECT_FILTERS = [{ name: 'akbun-makevideo project', extensions: ['akbunv
 // Opening src/index.html in a plain browser is handy for poking at the layout,
 // so without Tauri everything that needs the desktop app degrades to a no-op
 // instead of the whole page dying on the first line.
+//
+// Editing is one of the things that needs the desktop app now: the project
+// lives in Rust, so there is nothing in the page for a command to change. The
+// stub hands back an empty document every time, which is enough to lay the
+// timeline out and not enough to mistake for a working editor.
 if (!window.__TAURI__) {
   const unavailable = async () => {
     alert('This needs the desktop app.');
     return null;
   };
+  const emptyDocument = () => ({
+    project: {
+      version: 2,
+      settings: { width: 1920, height: 1080, rate: { num: 30, den: 1 } },
+      assets: [],
+      tracks: [
+        { id: 't1', kind: 'video', name: 'V1', clips: [], muted: false, hidden: false },
+        { id: 't2', kind: 'audio', name: 'A1', clips: [], muted: false, hidden: false },
+      ],
+    },
+    revision: 0,
+    canUndo: false,
+    canRedo: false,
+    undoLabel: '',
+    redoLabel: '',
+  });
   window.api = {
     available: false,
     bootstrap: async () => ({
@@ -90,6 +111,12 @@ if (!window.__TAURI__) {
       modifiedMs: 0,
     }),
     importAssets: async () => [],
+    editState: async () => emptyDocument(),
+    editApply: async () => emptyDocument(),
+    editUndo: async () => emptyDocument(),
+    editRedo: async () => emptyDocument(),
+    describeAsset: async () => emptyDocument(),
+    newDocument: async () => emptyDocument(),
     openProject: unavailable,
     saveProject: async () => {},
     startRender: unavailable,
@@ -188,8 +215,10 @@ window.api = {
   // Raw RGBA, not an encoded image: this frame exists to show exactly what the
   // render will contain, and a lossy hop to the screen would undo that. The
   // first eight bytes are the width and height.
-  previewFrame: async (project, frame, maxWidth) => {
-    const raw = await invoke('preview_frame', { project, frame, maxWidth });
+  // No project goes with the request: the compositor reads the document, which
+  // is the same copy the render will read.
+  previewFrame: async (frame, maxWidth) => {
+    const raw = await invoke('preview_frame', { frame, maxWidth });
     const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     return {
@@ -212,11 +241,26 @@ window.api = {
   writeQualityReport: (path, report) => invoke('save_quality_report', { path, report }),
   createProject: (name) => invoke('create_project', { name }),
 
-  // Only paths cross this line. Nothing here copies a byte of media.
+  // Only paths cross this line. Nothing here copies a byte of media, and
+  // importing does not change the project on its own: it reports what the
+  // files are, and the page decides what to do about it with a command.
   importAssets: (paths) => invoke('import_assets', { paths }),
+
+  // The edit. Every one of these hands back the whole document state, and the
+  // page draws that rather than its own idea of what just happened.
+  editState: () => invoke('edit_state'),
+  // A list, applied as one undo step: dropping three files is one thing the
+  // user did, so it takes one press to take back.
+  editApply: (commands) => invoke('edit_apply', { commands }),
+  editUndo: () => invoke('edit_undo'),
+  editRedo: () => invoke('edit_redo'),
+  describeAsset: (assetId, durationMs, width, height) =>
+    invoke('describe_asset', { assetId, durationMs, width, height }),
+  newDocument: () => invoke('new_document'),
+
   openProject: (path) => invoke('open_project', { path }),
-  saveProject: (path, project) => invoke('save_project', { path, project }),
-  startRender: (path, project, preset) => invoke('start_render', { path, project, preset }),
+  saveProject: (path) => invoke('save_project', { path }),
+  startRender: (path, preset) => invoke('start_render', { path, preset }),
   cancelRender: () => invoke('cancel_render'),
 
   // file:// will not load in the webview; this is what the asset protocol

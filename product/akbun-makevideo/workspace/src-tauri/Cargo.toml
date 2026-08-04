@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/time", "crates/render", "crates/compositor"]
+members = ["crates/time", "crates/edit", "crates/render", "crates/compositor"]
 
 [package]
 name = "akbun-makevideo"
@@ -23,9 +23,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# The timeline model and the ffmpeg command builder live in their own crate so
-# the pull request job can test them without compiling tauri, which would mean
-# installing GTK and WebKit on the runner.
+# The editing model. The app owns one Document made of these types and every
+# change to the project goes through a command on it, so this crate is where
+# the timeline actually lives.
+makevideo-edit = { path = "crates/edit" }
+# The ffmpeg command builder lives in its own crate so the pull request job can
+# test it without compiling tauri, which would mean installing GTK and WebKit
+# on the runner.
 makevideo-render = { path = "crates/render" }
 # The GPU compositor the preview frame and the render both draw with. Pulls in
 # wgpu, which is why it is a separate crate: the pull request job tests the

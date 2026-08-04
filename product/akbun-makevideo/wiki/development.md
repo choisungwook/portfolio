@@ -22,14 +22,15 @@ brew install ffmpeg
 None of them need an app binary. The first two need nothing installed at all; the third needs a graphics device and ffmpeg.
 
 ```bash
-npm test           # node --test over the time and timeline models
+npm test           # node --test over what the page still computes
 npm run test:time  # cargo test -p makevideo-time, needs nothing installed
+npm run test:edit  # cargo test -p makevideo-edit, needs nothing installed
 npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
 npm run test:gpu   # cargo test -p makevideo-compositor, needs ffmpeg
 npm run test:nogpu # the same, with wgpu compiled out entirely
 ```
 
-`-p makevideo-render` is not decoration. The render crate depends on neither tauri nor a webview, so this compiles serde and nothing else. Dropping the `-p` pulls in the app crate, which on a Linux runner means installing GTK and WebKit development packages for what is otherwise a few seconds of work.
+The `-p` is not decoration. None of those three crates depends on tauri or a webview, so each compiles serde and nothing else. Dropping the `-p` pulls in the app crate, which on a Linux runner means installing GTK and WebKit development packages for what is otherwise a few seconds of work.
 
 The compositor tests render real files, so they need `ffmpeg`. They do **not** need a GPU: the software backend is always compiled and every drawing test runs on both. What `mesa-vulkan-drivers` adds is an adapter for the wgpu half, which then fails loudly rather than skipping — a render path nobody has run is what the crate exists to prevent.
 
@@ -42,10 +43,12 @@ sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
 What is covered:
 
 - `test/time.test.js` — the rate arithmetic: conversion, rescale, compare, clamp and timecode, over all eight rates the app offers. The mirror of `crates/time`, and the two run the same cases
-- `test/timeline.test.js` — placing, overlap, moving between tracks, trimming against the source bounds, splitting, snapping, track limits, changing the rate, and reading a millisecond project file
+- `test/timeline.test.js` — what the page still answers on its own: snapping, what is under the playhead, the timeline length, and the ruler
 - `test/quality.test.js` — quality percentiles, the six acceptance checks and report aggregation
 - `crates/time/src/lib.rs` — the same rate arithmetic on the Rust side, including that ten thousand added frames land exactly on frame ten thousand at every rate
-- `crates/render/src/migrate.rs` — opening a millisecond project file, and writing back only today's format
+- `crates/edit/src/lib.rs` — what a track will take, where a drop lands, the invariants a clip has to satisfy, and that a project already on disk is repaired rather than refused
+- `crates/edit/src/document.rs` — placing, moving between tracks, trimming against the source bounds and against the neighbour, splitting, ripple delete, changing the rate; and the history: that redo hands back the same clips, that a failed transaction leaves the project byte for byte as it was, and that an edit breaking an invariant is refused whole
+- `crates/edit/src/migrate.rs` — opening a millisecond project file, and writing back only today's format
 - `crates/render/src/layout.rs` — where a clip lands in the frame, the case both paths used to answer separately
 - `crates/render/src/ffmpeg.rs` — one test per feature of the filter graph, the decoder and encoder arguments for the composited route, the preset sizes and the progress parser
 - `crates/render/src/probe.rs` — ffprobe output including the cover art case, where an mp3 reports a video stream
@@ -69,7 +72,7 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 
 ## Looking at the page without the app
 
-`src/index.html` opens in a plain browser. `api.js` installs a fallback `window.api` and throws, which stops the Tauri path and leaves the layout, the timeline and every keyboard shortcut working. Media will not load, because the asset protocol is not there.
+`src/index.html` opens in a plain browser. `api.js` installs a fallback `window.api` and throws, which stops the Tauri path and leaves the layout and every keyboard shortcut working. Media will not load, because the asset protocol is not there, and **nothing can be edited**: the project lives in Rust, so the fallback hands back the same empty document every time. What that view is for is the layout.
 
 `globalThis.makevideo` exposes `state`, `refresh()`, `preview()` and the timeline library, which is what the devtools console is for. `lib.rs` opens the devtools automatically in debug builds.
 

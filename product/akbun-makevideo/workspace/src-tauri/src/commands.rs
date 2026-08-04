@@ -4,8 +4,16 @@
 //! that touches the file system or spawns a process happens here. That keeps
 //! capabilities/default.json short, because the webview never needs a file
 //! system scope of its own.
+//!
+//! The edit itself lives here too, in the [`Document`] held by [`AppState`].
+//! The page sends a command and redraws from the state that comes back; the
+//! preview and the render read the same document rather than being handed a
+//! copy of the timeline along with the request.
 
 use makevideo_compositor::{Backend, Compositor};
+// Aliased because this file also spawns processes, and two things called
+// Command in one file is one too many.
+use makevideo_edit::{Command as Edit, Document, DocumentState, ProjectSettings};
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
 use serde::{Deserialize, Serialize};
@@ -76,6 +84,11 @@ impl Default for Settings {
 }
 
 pub struct AppState {
+    /// The edit. One copy, and this is it: the page draws what this says and
+    /// the render reads it directly. Behind an Arc because the render thread
+    /// outlives the command that started it and still has to ask, at the end,
+    /// whether the timeline moved while it was working.
+    pub document: Arc<Mutex<Document>>,
     pub settings: Mutex<Settings>,
     /// The running ffmpeg, so Cancel has something to kill. Shared with the
     /// thread that reads its progress.
@@ -427,14 +440,22 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
 /// Raw rather than an encoded image on purpose: the whole point is to show
 /// exactly what the render will contain, and a lossy re-encode on the way to
 /// the screen would undo that.
+///
+/// The timeline is read from the document rather than sent with the request.
+/// That is the difference between an engine that can decide for itself what to
+/// decode for a given frame and one that can only work from whatever snapshot
+/// happened to come with the call.
 #[tauri::command]
 pub fn preview_frame(
     app: AppHandle,
     state: State<AppState>,
-    project: Project,
     frame: i64,
     max_width: u32,
 ) -> Result<tauri::ipc::Response, String> {
+    // Cloned under the lock and used outside it: decoding a frame takes an
+    // ffmpeg call per visible clip, and holding the edit for that long would
+    // freeze every command the page sends in the meantime.
+    let project = state.document.lock().unwrap().project().clone();
     let settings = state.settings.lock().unwrap().clone();
     let gpu = compositor(&state, wanted_backend(&settings.compositor));
     let configured = settings.ffmpeg_dir.clone();
@@ -532,8 +553,78 @@ pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>)
     assets
 }
 
+// --- the edit ---------------------------------------------------------------
+
+/// What the page redraws from, right now.
 #[tauri::command]
-pub fn open_project(app: AppHandle, path: String) -> Result<Project, String> {
+pub fn edit_state(state: State<AppState>) -> DocumentState {
+    state.document.lock().unwrap().state()
+}
+
+/// Apply commands as one undo step, and hand back the new state.
+///
+/// A list rather than a single command because several edits often make up one
+/// thing a user did — dropping three files lays down three clips — and undoing
+/// that should take one press. Either all of them land or none do, so there is
+/// no state where part of a drop happened.
+#[tauri::command]
+pub fn edit_apply(
+    state: State<AppState>,
+    commands: Vec<Edit>,
+) -> Result<DocumentState, String> {
+    let mut document = state.document.lock().unwrap();
+    document.apply_all(commands)?;
+    Ok(document.state())
+}
+
+#[tauri::command]
+pub fn edit_undo(state: State<AppState>) -> Result<DocumentState, String> {
+    let mut document = state.document.lock().unwrap();
+    document.undo()?;
+    Ok(document.state())
+}
+
+#[tauri::command]
+pub fn edit_redo(state: State<AppState>) -> Result<DocumentState, String> {
+    let mut document = state.document.lock().unwrap();
+    document.redo()?;
+    Ok(document.state())
+}
+
+/// An asset's real length and size, once a media element could measure them.
+/// Only reached when there is no ffprobe to ask at import time.
+#[tauri::command]
+pub fn describe_asset(
+    state: State<AppState>,
+    asset_id: String,
+    duration_ms: u64,
+    width: u32,
+    height: u32,
+) -> Result<DocumentState, String> {
+    let mut document = state.document.lock().unwrap();
+    document.describe_asset(&asset_id, duration_ms, width, height)?;
+    Ok(document.state())
+}
+
+/// Start again on an empty timeline, at whatever shape new projects are set to.
+#[tauri::command]
+pub fn new_document(state: State<AppState>) -> DocumentState {
+    let settings = state.settings.lock().unwrap().clone();
+    let mut document = state.document.lock().unwrap();
+    *document = Document::new(ProjectSettings {
+        width: settings.default_width,
+        height: settings.default_height,
+        rate: settings.default_rate,
+    });
+    document.state()
+}
+
+#[tauri::command]
+pub fn open_project(
+    app: AppHandle,
+    state: State<AppState>,
+    path: String,
+) -> Result<DocumentState, String> {
     let text =
         std::fs::read_to_string(&path).map_err(|error| format!("cannot open {path}: {error}"))?;
     let project: Project =
@@ -543,15 +634,25 @@ pub fn open_project(app: AppHandle, path: String) -> Result<Project, String> {
     for asset in &project.assets {
         allow_asset_file(&app, &asset.path);
     }
-    Ok(project)
+    let mut document = state.document.lock().unwrap();
+    // Opening starts a fresh history: undo goes back through this session, not
+    // through the sessions that wrote the file.
+    *document = Document::opened(project);
+    Ok(document.state())
 }
 
 /// Writes the project file and nothing else. In particular it does not copy a
 /// single frame of media: the file holds absolute paths to whatever the user
 /// imported, wherever that lives. See wiki/architecture/workspace-and-files.md.
+///
+/// What gets written is the document, not something the page sent along with
+/// the request: there is one copy of the edit and this is the one that saves.
 #[tauri::command]
-pub fn save_project(path: String, project: Project) -> Result<(), String> {
-    let text = serde_json::to_string_pretty(&project).map_err(|error| error.to_string())?;
+pub fn save_project(state: State<AppState>, path: String) -> Result<(), String> {
+    let text = {
+        let document = state.document.lock().unwrap();
+        serde_json::to_string_pretty(document.project()).map_err(|error| error.to_string())?
+    };
     // A project folder deleted from Finder between two saves should not lose
     // the edit that is in memory right now.
     if let Some(parent) = Path::new(&path).parent() {
@@ -579,6 +680,12 @@ struct RenderDone {
     fell_back: bool,
     /// What did the encoding, empty when it was the CPU.
     accelerator: String,
+    /// The timeline was edited while this was running, so the file is the
+    /// timeline as it stood when the render started. This is what the revision
+    /// number is for: without it the app would have to either refuse to edit
+    /// during a render or quietly let somebody believe the output matches what
+    /// is on screen.
+    edited: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -732,12 +839,19 @@ pub fn start_render(
     app: AppHandle,
     state: State<AppState>,
     path: String,
-    project: Project,
     preset: String,
 ) -> Result<(), String> {
     if state.render.lock().unwrap().is_some() {
         return Err("a render is already running".into());
     }
+    // The timeline as it stands now, and the revision it stands at. A render
+    // takes minutes and the app stays editable throughout, so what goes into
+    // the file is this copy and the number is how the end of the job finds out
+    // whether it is still what the user is looking at.
+    let (project, started_at) = {
+        let document = state.document.lock().unwrap();
+        (document.project().clone(), document.revision())
+    };
     let preset = ffmpeg::Preset::parse(&preset)?;
     // Only the progress bar wants this; every decision below is in frames.
     let total_ms = project.duration().to_millis().max(0) as u64;
@@ -782,6 +896,7 @@ pub fn start_render(
     state.cancelled.store(false, Ordering::SeqCst);
     let shared = Arc::clone(&state.render);
     let cancelled = Arc::clone(&state.cancelled);
+    let document = Arc::clone(&state.document);
 
     std::thread::spawn(move || {
         let mut fell_back = false;
@@ -863,6 +978,7 @@ pub fn start_render(
                 message,
                 fell_back: fell_back && ok,
                 accelerator: if ok { used } else { String::new() },
+                edited: ok && document.lock().unwrap().revision() != started_at,
             },
         );
     });

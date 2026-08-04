@@ -1,8 +1,18 @@
 'use strict';
 
-// The DOM. Everything with an opinion about time lives in timeline.js and
-// everything that plays lives in preview.js; this file listens, calls into
-// them, and redraws.
+// The DOM. Everything that plays lives in preview.js and the arithmetic a
+// redraw needs lives in timeline.js; this file listens, sends commands, and
+// redraws from what comes back.
+//
+// It owns no part of the project. Every change goes through `edit()` below,
+// which is one round trip to Rust, and what it hands back is what gets drawn —
+// including when Rust decided something different from what was asked for,
+// which is the normal case for a drop onto an occupied stretch of track.
+//
+// The exception is a drag in progress. A clip being dragged is moved by
+// setting its element's own left and width, with no command sent and nothing
+// asked, right up until the pointer comes up. That is the whole reason the
+// arithmetic in timeline.js still exists.
 
 const L = globalThis.timelineLib;
 const T = globalThis.timeLib;
@@ -40,6 +50,7 @@ const dom = {
   btnSplit: el('btn-split'),
   btnMagnet: el('btn-magnet'),
   btnDelete: el('btn-delete'),
+  btnRipple: el('btn-ripple'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
   zoom: el('zoom'),
@@ -59,11 +70,18 @@ const dom = {
 };
 
 const state = {
-  project: L.createProject(),
+  // What Rust last said the document is. `project` is the same object as
+  // `doc.project`, kept under its own name because most of the page only cares
+  // about the timeline and not about how many undo steps there are.
+  doc: null,
+  project: L.blankProject(),
+  // The revision the file on disk holds. Dirty is a comparison rather than a
+  // flag, which means undoing back to where the last save was leaves the
+  // project clean again instead of permanently modified.
+  savedRevision: 0,
   settings: null,
   boot: null,
   path: null,
-  dirty: false,
   selectedClipId: null,
   selectedAssetId: null,
   pxPerSecond: 30,
@@ -119,16 +137,80 @@ function snapTolerance() {
   return L.pxToFrames(SNAP_PX, rate(), state.pxPerSecond);
 }
 
-function markDirty() {
-  state.dirty = true;
-  updateTitle();
+function isDirty() {
+  return Boolean(state.doc) && state.doc.revision !== state.savedRevision;
 }
 
 function updateTitle() {
   const name = projectName();
-  dom.projectName.textContent = state.dirty ? `${name} •` : name;
-  window.api.setTitle(`akbun-makevideo — ${name}${state.dirty ? ' •' : ''}`);
+  const mark = isDirty() ? ' •' : '';
+  dom.projectName.textContent = `${name}${mark}`;
+  window.api.setTitle(`akbun-makevideo — ${name}${mark}`);
 }
+
+// --- sending edits ---------------------------------------------------------
+
+/** Take on a document state Rust has just handed over. */
+function adopt(doc) {
+  state.doc = doc;
+  state.project = doc.project;
+}
+
+/** Send commands as one undo step and redraw from the answer.
+ *
+ *  Nothing is applied here first. A command can be refused — a track that will
+ *  not take that asset, a trim that would leave nothing of a clip — and a page
+ *  that had already drawn the change would then have to work out how to take it
+ *  back. Drawing only what came back means there is no such path: the timeline
+ *  on screen is always a state Rust actually holds.
+ *
+ *  Returns the ids of any clips that appeared, because the caller usually wants
+ *  to select what it just made and Rust is the one that named it, or null when
+ *  the edit was refused. */
+async function edit(...commands) {
+  const sent = commands.filter(Boolean);
+  if (!sent.length) return [];
+  const before = new Set();
+  for (const track of state.project.tracks) for (const clip of track.clips) before.add(clip.id);
+
+  try {
+    adopt(await window.api.editApply(sent));
+  } catch (error) {
+    // The document is untouched, so the page is the thing that is wrong. Take
+    // the state back from Rust rather than guessing at what survived.
+    adopt(await window.api.editState());
+    refresh();
+    await window.api.message(String(error), { title: 'That edit did not happen', kind: 'error' });
+    return null;
+  }
+
+  const made = [];
+  for (const track of state.project.tracks) {
+    for (const clip of track.clips) if (!before.has(clip.id)) made.push(clip.id);
+  }
+  refresh();
+  return made;
+}
+
+/** One step back or forward. The selection is left alone: a clip that came
+ *  back keeps its id, and one that went away is dropped by `liveSelection` the
+ *  next time anything asks. */
+async function stepHistory(which) {
+  const doc = state.doc;
+  if (!doc || (which === 'undo' ? !doc.canUndo : !doc.canRedo)) return;
+  try {
+    adopt(which === 'undo' ? await window.api.editUndo() : await window.api.editRedo());
+  } catch (error) {
+    adopt(await window.api.editState());
+    refresh();
+    await window.api.message(String(error), { title: 'History', kind: 'error' });
+    return;
+  }
+  refresh();
+}
+
+const undoEdit = () => stepHistory('undo');
+const redoEdit = () => stepHistory('redo');
 
 function displayTracks() {
   // Video tracks read top down, so V1 is the bottom layer both on screen and
@@ -190,45 +272,58 @@ function renderAssets() {
 }
 
 /** An asset whose length ffprobe could not report is measured by the browser
- *  instead, once. Without this every clip of it would be five seconds long. */
+ *  instead, once. Without this every clip of it would be five seconds long.
+ *
+ *  Learning a file's real length is not an edit and is not undoable, so it goes
+ *  in through its own command rather than as one more thing on the stack. */
 function hydrateDuration(asset) {
   if (asset.durationMs > 0 || asset.kind === 'image') return;
   const probe = document.createElement(asset.kind === 'audio' ? 'audio' : 'video');
   probe.preload = 'metadata';
   probe.src = window.api.fileUrl(asset.path);
-  probe.addEventListener('loadedmetadata', () => {
+  probe.addEventListener('loadedmetadata', async () => {
     if (!Number.isFinite(probe.duration) || probe.duration <= 0) return;
     const live = L.findAsset(state.project, asset.id);
     if (!live || live.durationMs > 0) return;
-    live.durationMs = Math.round(probe.duration * 1000);
-    if (probe.videoWidth) {
-      live.width = probe.videoWidth;
-      live.height = probe.videoHeight;
+    try {
+      adopt(
+        await window.api.describeAsset(
+          asset.id,
+          Math.round(probe.duration * 1000),
+          probe.videoWidth || 0,
+          probe.videoHeight || 0
+        )
+      );
+    } catch (error) {
+      // The asset went away between the load starting and finishing. There is
+      // nothing to say about it and nothing to fix.
+      return;
     }
-    renderAssets();
+    refresh();
   });
 }
 
-async function importPaths(paths) {
+/** What a set of paths turns out to be. Nothing is imported yet: the caller
+ *  decides what command that becomes, so dropping files on a track can put the
+ *  import and the clips into one undo step. */
+async function probePaths(paths) {
   if (!paths || !paths.length) return [];
-  const imported = await window.api.importAssets(paths);
-  if (!imported.length) {
+  const found = await window.api.importAssets(paths);
+  if (!found.length) {
     await window.api.message('None of those files are video, audio or images.', {
       title: 'Nothing imported',
     });
-    return [];
   }
-  L.addAssets(state.project, imported);
-  for (const asset of imported) hydrateDuration(asset);
-  markDirty();
-  renderAssets();
-  return imported;
+  return found;
 }
 
 async function importViaDialog() {
   const picked = await window.api.pickMedia();
   if (!picked) return;
-  await importPaths(Array.isArray(picked) ? picked : [picked]);
+  const found = await probePaths(Array.isArray(picked) ? picked : [picked]);
+  if (!found.length) return;
+  await edit({ op: 'addAssets', assets: found });
+  for (const asset of found) hydrateDuration(asset);
 }
 
 // --- timeline --------------------------------------------------------------
@@ -322,6 +417,19 @@ function renderRuler() {
   dom.ruler.appendChild(fragment);
 }
 
+/** The two menu items that are only sometimes there to press, and what they
+ *  say they will take back. */
+function updateHistoryUi() {
+  const doc = state.doc || { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '' };
+  const undo = el('menu-undo');
+  const redo = el('menu-redo');
+  if (!undo || !redo) return;
+  undo.disabled = !doc.canUndo;
+  redo.disabled = !doc.canRedo;
+  undo.firstChild.textContent = doc.canUndo ? `Undo ${doc.undoLabel}` : 'Undo';
+  redo.firstChild.textContent = doc.canRedo ? `Redo ${doc.redoLabel}` : 'Redo';
+}
+
 function renderTimeline() {
   renderHeads();
   renderRuler();
@@ -331,6 +439,7 @@ function renderTimeline() {
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
   dom.btnAddVideo.disabled = L.tracksOf(state.project, 'video').length >= L.MAX_TRACKS_PER_KIND;
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
+  updateHistoryUi();
   scheduleExactFrame();
 }
 
@@ -385,11 +494,7 @@ async function requestExactFrame() {
   const box = dom.stageInner.getBoundingClientRect();
   const maxWidth = Math.max(160, Math.round(box.width));
   try {
-    const drawn = await window.api.previewFrame(
-      state.project,
-      Math.round(preview.position()),
-      maxWidth
-    );
+    const drawn = await window.api.previewFrame(Math.round(preview.position()), maxWidth);
     if (token !== exactToken || preview.isPlaying()) return;
     setStageMode(preview.showExact(drawn) ? 'exact' : 'live');
   } catch (error) {
@@ -433,19 +538,23 @@ function liveSelection() {
 }
 
 function splitAtPlayhead() {
-  const created = L.splitAt(state.project, preview.position(), liveSelection() || undefined);
-  if (!created.length) return;
-  markDirty();
-  renderTimeline();
+  return edit({
+    op: 'splitAt',
+    frame: Math.round(preview.position()),
+    clipId: liveSelection(),
+  });
 }
 
-function deleteSelected() {
-  if (!liveSelection()) return;
-  if (!L.removeClip(state.project, state.selectedClipId)) return;
-  state.selectedClipId = null;
-  markDirty();
-  preview.prune();
-  renderTimeline();
+/** Delete, or delete and close the gap behind it. Ripple is destructive in a
+ *  way the timeline used to avoid on purpose, because until now there was no
+ *  way back from it. */
+async function deleteSelected(ripple) {
+  const clipId = liveSelection();
+  if (!clipId) return;
+  // edit() answers null when the edit was refused. The empty array a delete
+  // gets back is a success that made no clips, and it is not null.
+  const done = await edit({ op: ripple ? 'rippleDelete' : 'removeClip', clipId });
+  if (done) state.selectedClipId = null;
 }
 
 /** Persist a setting changed from a toolbar or the transport, where there is no
@@ -556,26 +665,36 @@ function updateClipDrag(event) {
   drag.moved = true;
 }
 
+/** The pointer came up, so the drag becomes a command. This is the only moment
+ *  in a drag that Rust hears about, which is what keeps a mouse move off the
+ *  IPC boundary. Rust may put the clip somewhere other than where it is being
+ *  drawn — pushed right past a clip it would have overlapped — and the redraw
+ *  is what settles it. */
 function endClipDrag() {
   const current = drag;
   drag = null;
   document.body.classList.remove('dragging', 'trimming');
   for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
   if (!current) return;
-  if (current.moved) {
-    if (current.mode === 'move') {
-      L.moveClip(state.project, current.clipId, current.targetTrackId, current.nextStart);
-    } else {
-      L.trimClip(
-        state.project,
-        current.clipId,
-        current.mode === 'trim-start' ? 'start' : 'end',
-        current.nextEdge
-      );
-    }
-    markDirty();
+  if (!current.moved) {
+    renderTimeline();
+    return;
   }
-  renderTimeline();
+  return edit(
+    current.mode === 'move'
+      ? {
+          op: 'moveClip',
+          clipId: current.clipId,
+          trackId: current.targetTrackId,
+          start: current.nextStart,
+        }
+      : {
+          op: 'trimClip',
+          clipId: current.clipId,
+          edge: current.mode === 'trim-start' ? 'start' : 'end',
+          frame: current.nextEdge,
+        }
+  );
 }
 
 // --- scrubbing -------------------------------------------------------------
@@ -596,22 +715,18 @@ function beginScrub(event) {
 
 // --- dropping --------------------------------------------------------------
 
-/** Place assets one after another from the drop point, so dropping three files
- *  on a track lays them end to end instead of stacking them all at once. */
-function dropAssetsOnTrack(trackId, assets, atFrame) {
+/** One addClip per asset, all asking for the same frame.
+ *
+ *  They come out end to end rather than on top of each other because a clip
+ *  never overlaps another one: the second lands after the first, the third
+ *  after the second. The page does not have to work out where any of them go,
+ *  which is exactly the arithmetic it no longer owns. */
+function dropCommands(trackId, assets, atFrame) {
   const track = L.findTrack(state.project, trackId);
-  if (!track) return false;
-  let cursor = atFrame;
-  let placed = false;
-  for (const asset of assets) {
-    if (!L.canAccept(track, asset)) continue;
-    const clip = L.addClip(state.project, trackId, asset.id, cursor);
-    if (!clip) continue;
-    cursor = L.clipEnd(clip);
-    placed = true;
-    state.selectedClipId = clip.id;
-  }
-  return placed;
+  if (!track) return [];
+  return assets
+    .filter((asset) => L.canAccept(track, asset))
+    .map((asset) => ({ op: 'addClip', trackId, assetId: asset.id, start: atFrame }));
 }
 
 function laneAtPoint(x, y) {
@@ -676,16 +791,15 @@ function clearAssetDrag() {
   return current;
 }
 
-function endAssetDrag(event) {
+async function endAssetDrag(event) {
   const current = clearAssetDrag();
   if (!current) return;
 
   const lane = laneAtPoint(event.clientX, event.clientY);
   if (!lane) return;
   const at = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
-  if (!dropAssetsOnTrack(lane.dataset.trackId, [current.asset], at)) return;
-  markDirty();
-  renderTimeline();
+  const made = await edit(...dropCommands(lane.dataset.trackId, [current.asset], at));
+  if (made && made.length) selectClip(made[made.length - 1]);
 }
 
 async function handleOsDrop(payload) {
@@ -710,15 +824,17 @@ async function handleOsDrop(payload) {
   const y = point.y / ratio;
   const lane = laneAtPoint(x, y);
 
-  const imported = await importPaths(payload.paths || []);
-  if (!imported.length || !lane) {
-    refresh();
-    return;
-  }
-  const tolerance = snapTolerance();
-  const at = L.snapTime(state.project, frameAtClientX(x), tolerance);
-  if (dropAssetsOnTrack(lane.dataset.trackId, imported, at)) markDirty();
-  refresh();
+  const found = await probePaths(payload.paths || []);
+  if (!found.length) return;
+  // The import and the clips it turns into are one thing the user did, so they
+  // go over as one transaction and come back on one press of undo.
+  const at = L.snapTime(state.project, frameAtClientX(x), snapTolerance());
+  const made = await edit(
+    { op: 'addAssets', assets: found },
+    ...(lane ? dropCommands(lane.dataset.trackId, found, at) : [])
+  );
+  if (made && made.length) selectClip(made[made.length - 1]);
+  for (const asset of found) hydrateDuration(asset);
 }
 
 // --- render ----------------------------------------------------------------
@@ -759,7 +875,10 @@ async function startRender(preset) {
   dom.renderClose.hidden = true;
   dom.renderOverlay.hidden = false;
   try {
-    await window.api.startRender(output, state.project, preset);
+    // No project goes with the request. Rust takes its own copy of the
+    // document and remembers which revision it took, so an edit made while
+    // this runs cannot half reach the file being written.
+    await window.api.startRender(output, preset);
   } catch (error) {
     state.rendering = false;
     dom.renderOverlay.hidden = true;
@@ -799,7 +918,13 @@ function onRenderDone(payload) {
       : payload.accelerator
         ? ` (${payload.accelerator})`
         : '';
-    dom.renderStatus.textContent = `${payload.path}${how}`;
+    // Editing during a render is allowed, so the file can be of a timeline
+    // that no longer exists. Saying so beats letting somebody compare the
+    // output against what is on screen and conclude the render is broken.
+    const stale = payload.edited
+      ? '\nThe timeline was edited while this was running, so the file is the timeline as it was when the render started.'
+      : '';
+    dom.renderStatus.textContent = `${payload.path}${how}${stale}`;
   } else {
     dom.renderTitle.textContent = payload.cancelled ? 'Render cancelled' : 'Render failed';
     dom.renderStatus.textContent = payload.message || '';
@@ -809,17 +934,20 @@ function onRenderDone(payload) {
 // --- project files ---------------------------------------------------------
 
 async function confirmDiscard(what) {
-  if (!state.dirty) return true;
+  if (!isDirty()) return true;
   return window.api.ask(`This project has unsaved changes. ${what} anyway?`, {
     title: 'Unsaved changes',
     kind: 'warning',
   });
 }
 
-function loadProject(project, path) {
-  state.project = L.normalize(project);
+/** Take on a document Rust has just opened or made, and reset everything the
+ *  page keeps alongside it. The history belongs to the document, so opening a
+ *  project starts with nothing to undo. */
+function loadDocument(doc, path) {
+  adopt(doc);
   state.path = path || null;
-  state.dirty = false;
+  state.savedRevision = doc.revision;
   state.selectedClipId = null;
   state.selectedAssetId = null;
   preview.clear();
@@ -827,14 +955,6 @@ function loadProject(project, path) {
   setPreviewSource('timeline');
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
-}
-
-function emptyProject() {
-  return L.createProject({
-    width: state.settings.defaultWidth,
-    height: state.settings.defaultHeight,
-    rate: state.settings.defaultRate,
-  });
 }
 
 /** A project is a folder under the workspace, so New asks for a name rather
@@ -854,11 +974,10 @@ async function createProjectFromSheet() {
   try {
     const entry = await window.api.createProject(el('np-name').value);
     closeSheet('new-project');
-    loadProject(emptyProject(), entry.path);
+    loadDocument(await window.api.newDocument(), entry.path);
     // Written immediately: an empty folder with no project file in it would not
     // show up in Open, and would look like the project was never made.
-    await window.api.saveProject(entry.path, state.project);
-    state.dirty = false;
+    await window.api.saveProject(entry.path);
     updateTitle();
   } catch (failure) {
     error.textContent = String(failure);
@@ -893,8 +1012,13 @@ async function openProject() {
 async function openProjectPath(path) {
   closeSheet('open-project');
   try {
-    const project = await window.api.openProject(path);
-    loadProject(project, path);
+    const doc = await window.api.openProject(path);
+    // Anything that is not a document is a failure, whether or not it arrived
+    // as one: the browser fallback answers null rather than throwing, and
+    // handing that to loadDocument would take the page down with a type error
+    // instead of showing why the project would not open.
+    if (!doc || !doc.project) throw new Error(`${path} could not be opened.`);
+    loadDocument(doc, path);
     return true;
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open', kind: 'error' });
@@ -923,9 +1047,11 @@ async function saveProject(forcePicker) {
     if (!path) return false;
   }
   try {
-    await window.api.saveProject(path, state.project);
+    await window.api.saveProject(path);
     state.path = path;
-    state.dirty = false;
+    // What is on disk is this revision, which is what makes the dot go away —
+    // and come back the moment anything else is done.
+    state.savedRevision = state.doc.revision;
     updateTitle();
     return true;
   } catch (error) {
@@ -936,7 +1062,7 @@ async function saveProject(forcePicker) {
 
 async function closeProject() {
   if (!(await confirmDiscard('Close this project'))) return;
-  loadProject(emptyProject(), null);
+  loadDocument(await window.api.newDocument(), null);
 }
 
 // --- settings sheets -------------------------------------------------------
@@ -1042,6 +1168,11 @@ const actions = {
   'save-project-as': () => saveProject(true),
   'import-assets': importViaDialog,
   'close-project': closeProject,
+  undo: undoEdit,
+  redo: redoEdit,
+  split: splitAtPlayhead,
+  'delete-clip': () => deleteSelected(false),
+  'ripple-delete': () => deleteSelected(true),
   'render-fhd': () => startRender('fhd'),
   'render-4k': () => startRender('4k'),
   'cancel-render': () => window.api.cancelRender(),
@@ -1148,11 +1279,8 @@ function wireAssets() {
   dom.assetList.addEventListener('click', (event) => {
     const remove = event.target.closest('[data-remove]');
     if (remove) {
-      L.removeAsset(state.project, remove.dataset.remove);
       if (state.selectedAssetId === remove.dataset.remove) state.selectedAssetId = null;
-      markDirty();
-      preview.prune();
-      refresh();
+      edit({ op: 'removeAsset', assetId: remove.dataset.remove });
       return;
     }
     const item = event.target.closest('.asset');
@@ -1183,26 +1311,18 @@ function wireTimeline() {
   });
   dom.btnSplit.addEventListener('click', splitAtPlayhead);
   dom.btnMagnet.addEventListener('click', toggleSnap);
-  dom.btnDelete.addEventListener('click', deleteSelected);
-  dom.btnAddVideo.addEventListener('click', () => {
-    if (!L.addTrack(state.project, 'video')) return;
-    markDirty();
-    renderTimeline();
-  });
-  dom.btnAddAudio.addEventListener('click', () => {
-    if (!L.addTrack(state.project, 'audio')) return;
-    markDirty();
-    renderTimeline();
-  });
+  dom.btnDelete.addEventListener('click', () => deleteSelected(false));
+  dom.btnRipple.addEventListener('click', () => deleteSelected(true));
+  dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
+  dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
 
   dom.heads.addEventListener('click', (event) => {
     const button = event.target.closest('[data-toggle]');
     if (!button) return;
     const track = L.findTrack(state.project, button.closest('.head').dataset.trackId);
     if (!track) return;
-    track[button.dataset.toggle] = !track[button.dataset.toggle];
-    markDirty();
-    renderTimeline();
+    const flag = button.dataset.toggle;
+    edit({ op: 'setTrackFlags', trackId: track.id, [flag]: !track[flag] });
   });
 
   dom.ruler.addEventListener('pointerdown', beginScrub);
@@ -1258,19 +1378,23 @@ function wireSheets() {
     el('ps-width').value = width;
     el('ps-height').value = height;
   });
-  el('ps-save').addEventListener('click', () => {
+  el('ps-save').addEventListener('click', async () => {
     const at = preview.position();
     const was = rate();
-    state.project.settings.width = Math.max(16, Number(el('ps-width').value) || 1920);
-    state.project.settings.height = Math.max(16, Number(el('ps-height').value) || 1080);
-    // The clips move with the timebase rather than keeping their frame
-    // numbers, so a cut stays where it was in time.
-    L.retime(state.project, T.parseRate(el('ps-rate').value));
     closeSheet('project-settings');
-    markDirty();
+    // Changing the rate carries every clip with it, so a cut stays where it
+    // was in time rather than where it was in frame numbers. That is one
+    // command over every clip in the project, and one press of undo back.
+    await edit({
+      op: 'setSettings',
+      settings: {
+        width: Math.max(16, Number(el('ps-width').value) || 1920),
+        height: Math.max(16, Number(el('ps-height').value) || 1080),
+        rate: T.parseRate(el('ps-rate').value),
+      },
+    });
     preview.seek(T.rescale(at, was, rate()));
     preview.layout();
-    renderTimeline();
   });
   el('as-save').addEventListener('click', async () => {
     const next = Object.assign({}, state.settings, {
@@ -1367,9 +1491,17 @@ function wireKeyboard() {
       preview.toggle();
       return;
     }
+    if (meta && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) redoEdit();
+      else undoEdit();
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
-      deleteSelected();
+      // Shift closes the gap behind it, which is the destructive one and the
+      // reason it is not the plain key.
+      deleteSelected(event.shiftKey);
       return;
     }
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -1417,17 +1549,18 @@ async function boot() {
     },
   });
 
-  state.project = L.createProject({
-    width: state.settings.defaultWidth,
-    height: state.settings.defaultHeight,
-    rate: state.settings.defaultRate,
-  });
+  // The app already has an empty document open, made from these same defaults
+  // when the window came up.
+  adopt(await window.api.editState());
+  state.savedRevision = state.doc.revision;
   applySettings(state.settings);
   globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
     monitor: qualityMonitor,
     preview,
     getProject: () => state.project,
-    refresh,
+    // The harness hides and mutes tracks to measure what each one costs, and
+    // that is an edit like any other, so it goes over the same wire.
+    setTrackFlags: (trackId, flags) => edit(Object.assign({ op: 'setTrackFlags', trackId }, flags)),
     memoryBytes: window.api.processMemoryBytes,
     saveReport: window.api.saveQualityReport,
   });
@@ -1445,7 +1578,7 @@ async function boot() {
   window.api.onRenderFallback(onRenderFallback);
   window.api.onFileDrop(handleOsDrop);
   window.api.onCloseRequested(async (event) => {
-    if (state.dirty) {
+    if (isDirty()) {
       if (event && event.preventDefault) event.preventDefault();
       if (!(await confirmDiscard('Quit'))) return;
     }
