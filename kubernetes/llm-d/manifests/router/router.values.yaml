@@ -1,0 +1,90 @@
+## llm-d-router-standalone chart v0.9.0 values
+## 노드 1개짜리 kind 클러스터 기준으로 upstream 기본값을 축소한 값이다.
+## upstream 원본: llm-d v0.8.1의 guides/recipes/router/base.values.yaml + guides/optimized-baseline/router/optimized-baseline.values.yaml
+
+router:
+  epp:
+    replicas: 1
+
+    # chart 기본값은 llm-d-router-endpoint-picker-dev:main + pullPolicy Always다.
+    # 재현 가능한 실습을 위해 release 이미지의 고정 tag를 쓴다.
+    image:
+      registry: ghcr.io/llm-d
+      repository: llm-d-router-endpoint-picker
+      tag: v0.9.0
+      pullPolicy: IfNotPresent
+
+    # v=2면 요청마다 선택한 endpoint와 scorer 점수가 로그에 남는다.
+    flags:
+      v: 2
+
+    pluginsConfigFile: "quickstart-plugins.yaml"
+    pluginsCustomConfig:
+      quickstart-plugins.yaml: |
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+        - type: queue-scorer
+        - type: kv-cache-utilization-scorer
+        - type: prefix-cache-scorer
+        - type: no-hit-lru-scorer
+        schedulingProfiles:
+        - name: default
+          plugins:
+          - pluginRef: queue-scorer
+            weight: 2
+          - pluginRef: kv-cache-utilization-scorer
+            weight: 2
+          - pluginRef: prefix-cache-scorer
+            weight: 3
+          - pluginRef: no-hit-lru-scorer
+            weight: 2
+
+    # upstream 기본값은 requests cpu 4 / memory 8Gi다. 노트북 kind에서는 pending으로 멈춘다.
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+  # EPP가 죽어도 proxy가 트래픽을 그대로 흘린다.
+  inferencePool:
+    failureMode: "FailOpen"
+
+  # InferencePool이 model server pod을 고르는 기준이다.
+  # sim과 GPU vLLM 모두 이 label을 달아 둬서 values 파일 하나로 두 환경을 쓴다.
+  modelServers:
+    protocol: http
+    targetPorts:
+      - number: 8000
+    matchLabels:
+      llm-d.ai/inference-serving: "true"
+
+  # 8081은 proxy의 listener 포트다. 80으로 노출해 port-forward를 단순하게 만든다.
+  extraServicePorts:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8081
+
+  proxy:
+    enabled: true
+    proxyType: envoy
+    mode: sidecar
+    args:
+      - "--service-node"
+      - "envoy-sidecar"
+      - "--log-level"
+      - "warn"
+      # 지정하지 않으면 Envoy가 호스트 코어 수만큼 worker thread를 만든다.
+      - "--concurrency"
+      - "2"
+      - "-c"
+      - "/etc/envoy/envoy.yaml"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi

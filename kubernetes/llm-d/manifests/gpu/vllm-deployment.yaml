@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-decode
+  labels:
+    app.kubernetes.io/name: vllm-decode
+    llm-d.ai/inference-serving: "true"
+spec:
+  # GPU 1장을 time-slicing으로 4등분했으므로 replica 2개가 같은 GPU에 올라간다.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vllm-decode
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vllm-decode
+        # InferencePool의 selector와 같은 label이다. sim 환경과 값을 맞춰 둔다.
+        llm-d.ai/inference-serving: "true"
+    spec:
+      containers:
+        - name: modelserver
+          image: vllm/vllm-openai:v0.23.0
+          imagePullPolicy: IfNotPresent
+          command: ["vllm", "serve"]
+          args:
+            - "Qwen/Qwen3-0.6B"
+            - "--port=8000"
+            - "--tensor-parallel-size=1"
+            - "--max-model-len=8192"
+            # time-slicing은 메모리를 나누지 않는다. 이 값을 안 낮추면 먼저 뜬 pod이 GPU 메모리를 다 잡는다.
+            - "--gpu-memory-utilization=0.35"
+            - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
+          env:
+            # vLLM v0.20.0+ (torch 2.11)에서 HOME 계산이 실패하는 것을 우회한다.
+            - name: USER
+              value: llm-d
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: shm
+            - mountPath: /.cache
+              name: cache
+            - mountPath: /.triton
+              name: triton-cache
+            - mountPath: /.config
+              name: vllm-config
+          # 모델 다운로드와 CUDA graph capture까지 최대 20분 기다린다.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 120
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: http
+            periodSeconds: 5
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+        - name: cache
+          emptyDir: {}
+        - name: triton-cache
+          emptyDir: {}
+        - name: vllm-config
+          emptyDir: {}

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-sim
+  labels:
+    app.kubernetes.io/name: vllm-sim
+    llm-d.ai/inference-serving: "true"
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vllm-sim
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vllm-sim
+        # InferencePool의 selector와 같은 label이다. 이게 없으면 EPP가 pod을 못 찾는다.
+        llm-d.ai/inference-serving: "true"
+    spec:
+      containers:
+        - name: vllm-sim
+          image: ghcr.io/llm-d/llm-d-inference-sim:v0.10.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--model"
+            - "Qwen/Qwen3-0.6B"
+            - "--port"
+            - "8000"
+            # 동시 처리 2개. 3번째 요청부터 대기 큐에 쌓여 queue-scorer 점수가 벌어진다.
+            - "--max-num-seqs"
+            - "2"
+            - "--max-model-len"
+            - "8192"
+            - "--mode"
+            - "random"
+            - "--latency-calculator"
+            - "constant"
+            - "--time-to-first-token"
+            - "500ms"
+            - "--inter-token-latency"
+            - "20ms"
+            # 동시 요청이 max-num-seqs에 가까워지면 응답 시간을 2배까지 늘린다.
+            - "--time-factor-under-load"
+            - "2.0"
+            # 어느 pod이 어떤 요청을 받았는지 로그로 확인하기 위해 켠다.
+            - "--log-http"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5

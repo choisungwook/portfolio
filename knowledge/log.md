@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-04
+
+* **Creation**: [GPU 없는 환경의 추론 인프라 핸즈온은 simulator를 model server 자리에 넣는다](decisions/2026-08-inference-sim-for-gpuless-handson.md) 결정 기록. llm-d quickstart 핸즈온을 만들며 맥과 GPU 1장짜리 노드로 환경을 나누다가, 라우팅 관찰에는 GPU가 필요 없고 오히려 GPU가 관찰을 방해한다는 것을 확인하면서 남긴다.
+
 ## 2026-08-03
 
 * **Creation**: [화살표 선분은 둥근 마감을 쓰지 않고 머리 길이를 화살표 길이로 제한한다](decisions/2026-08-arrow-shaft-square-cap.md) 결정 기록. akbun-makepresentation에서 화살표 끝에 점이 붙는다는 보고를 받고 고치다가, 같은 판단이 akbun-screenshot Issue #617의 ADR에만 남아 있어 두 번째로 만난 것을 알게 되면서 남긴다.
