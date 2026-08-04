@@ -19,5 +19,17 @@ gpu = ["dep:wgpu", "dep:pollster"]
 
 [dependencies]
 makevideo-render = { path = "../render" }
+# The supply meter's report is JSON in the same shape the page harness writes,
+# so the two engines can be compared file against file. serde is already in this
+# tree through the render crate; only the writer is new.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 wgpu = { version = "30", optional = true }
 pollster = { version = "1", optional = true }
+
+# Headless: measures the frame source against real media with no window and no
+# app binary. It is how the buffering settings are chosen and how playback
+# supply is judged.
+[[bin]]
+name = "supply-soak"
+path = "src/bin/supply_soak.rs"

@@ -14,6 +14,7 @@
     "test:gpu": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor",
     "test:nogpu": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features",
     "quality:media": "bash scripts/generate-quality-media.sh",
+    "quality:supply": "cargo run --release --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --bin supply-soak --",
     "dist": "tauri build",
     "tauri": "tauri"
   },

@@ -1,5 +1,4 @@
-//! The composited render: one decoder per clip, the wgpu compositor, one
-//! encoder.
+//! The composited render: the frame source, the wgpu compositor, one encoder.
 //!
 //! The picture takes the long way round here — decoded to raw RGBA, drawn by
 //! the compositor, handed back to ffmpeg on a pipe — so that the frame the
@@ -9,37 +8,33 @@
 //! The cost is real: 1080p30 is about 250 MB a second through the pipes, and it
 //! is why the filter graph is still there as the fast path. See
 //! wiki/architecture/compositor.md.
+//!
+//! The decoding is not here. It is `source::FrameSource`, the same buffered
+//! source playback uses, so the frames the render encodes and the frames
+//! playback shows are read by one piece of code. The render only differs in
+//! what it does when one is not ready: it waits, because a file has no
+//! deadline.
 
+use crate::source::{Buffering, FfmpegReaders, FrameSource, Supply};
 use crate::{Compositor, Placement as Draw, Source};
 use makevideo_render::accel::Acceleration;
-use makevideo_render::{ffmpeg, layout, AssetKind, Project, RationalTime};
+use makevideo_render::{ffmpeg, layout, Project, RationalTime};
 use std::io::{Read, Write};
-use std::process::{Child, ChildStdout, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-/// One clip being decoded, started when its first frame is wanted and killed
-/// as soon as its last one has been read. Starting them all at once would mean
-/// a process per clip for the whole render.
-struct Decoder {
-    placement: layout::Placement,
-    end_frame: i64,
-    frame_bytes: usize,
-    child: Option<Child>,
-    stdout: Option<ChildStdout>,
-    buffer: Vec<u8>,
-    /// The buffer holds a frame for the current index.
-    filled: bool,
-    /// The source ran out or never started. Its clip simply stops drawing,
-    /// which is the same thing a missing file does in the timeline.
-    dead: bool,
-}
+/// Shallower and later than playback asks for. A render has no deadline to
+/// miss, so the buffers are here to keep the decoders busy while a frame is
+/// composited and encoded, not to absorb jitter. Depth is what it costs: at 4K
+/// a frame is 33 MB, and this is per clip on screen.
+const RENDER_BUFFERING: Buffering = Buffering { depth: 3, lead: 8 };
 
-impl Decoder {
-    fn wants(&self, frame: i64) -> bool {
-        self.placement.covers(frame) && frame < self.end_frame
-    }
-}
+/// How long the frame loop waits before looking at the cancel flag again. A
+/// render frame is worth waiting for; a cancelled one is not worth waiting a
+/// whole frame for.
+const CANCEL_POLL: Duration = Duration::from_millis(50);
 
 pub struct Options<'a> {
     pub ffmpeg: &'a str,
@@ -102,117 +97,33 @@ where
         })
     });
 
-    let mut decoders: Vec<Decoder> = layout::placements(project, width, height)
-        .into_iter()
-        .map(|placement| {
-            // Both of these used to be a millisecond position multiplied by a
-            // frame rate and rounded, which is how a decoder could be started
-            // one frame late and every clip after it read from the wrong place.
-            // A placement is already counted in frames.
-            let end_frame = placement.end_frame().min(frames);
-            Decoder {
-                frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
-                buffer: Vec::new(),
-                end_frame,
-                placement,
-                child: None,
-                stdout: None,
-                filled: false,
-                dead: false,
-            }
-        })
-        .collect();
+    let mut source = FrameSource::new(
+        project,
+        width,
+        height,
+        RENDER_BUFFERING,
+        Arc::new(FfmpegReaders::new(
+            options.ffmpeg,
+            options.accel.and_then(|a| a.hwaccel.as_deref()),
+        )),
+    );
 
     let mut failure = None;
-    for frame in 0..frames {
-        if cancelled.load(Ordering::SeqCst) {
-            break;
-        }
+    'render: loop {
+        // Waiting in short spans rather than in one: a decoder is worth waiting
+        // for, a cancelled render is not.
+        let frame = loop {
+            if cancelled.load(Ordering::SeqCst) {
+                break 'render;
+            }
+            match source.take_by(Instant::now() + CANCEL_POLL) {
+                Supply::Ready(frame) => break frame,
+                Supply::End => break 'render,
+                Supply::Starved => continue,
+            }
+        };
 
-        // Start, feed and retire the decoders. Split from drawing below because
-        // reading needs them mutable and drawing borrows their buffers.
-        for decoder in decoders.iter_mut() {
-            if !decoder.wants(frame) {
-                if decoder.child.is_some() && frame >= decoder.end_frame {
-                    if let Some(mut child) = decoder.child.take() {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
-                    decoder.stdout = None;
-                    decoder.buffer = Vec::new();
-                }
-                decoder.filled = false;
-                continue;
-            }
-            if decoder.dead {
-                decoder.filled = false;
-                continue;
-            }
-            if decoder.child.is_none() {
-                let args = ffmpeg::decoder_args(&ffmpeg::Decode {
-                    path: &decoder.placement.path,
-                    kind: decoder.placement.kind,
-                    in_time: decoder.placement.in_time(rate),
-                    duration: decoder.placement.duration(rate),
-                    width: decoder.placement.dst.w,
-                    height: decoder.placement.dst.h,
-                    rate,
-                    // A still has nothing to decode, so no hint for it.
-                    hwaccel: if decoder.placement.kind == AssetKind::Video {
-                        options.accel.and_then(|a| a.hwaccel.as_deref())
-                    } else {
-                        None
-                    },
-                });
-                match Command::new(options.ffmpeg)
-                    .args(&args)
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::piped())
-                    // A decoder that cannot open its file just stops drawing,
-                    // the same as a clip whose media was moved.
-                    .stderr(Stdio::null())
-                    .spawn()
-                {
-                    Ok(mut child) => {
-                        decoder.stdout = child.stdout.take();
-                        decoder.child = Some(child);
-                        decoder.buffer = vec![0u8; decoder.frame_bytes];
-                    }
-                    Err(_) => {
-                        decoder.dead = true;
-                        decoder.filled = false;
-                        continue;
-                    }
-                }
-            }
-            let filled = match decoder.stdout.as_mut() {
-                Some(stdout) => stdout.read_exact(&mut decoder.buffer).is_ok(),
-                None => false,
-            };
-            if !filled {
-                decoder.dead = true;
-            }
-            decoder.filled = filled;
-        }
-
-        let layers: Vec<(Source<'_>, Draw)> = decoders
-            .iter()
-            .filter(|decoder| decoder.filled)
-            .map(|decoder| {
-                (
-                    Source {
-                        rgba: &decoder.buffer,
-                        width: decoder.placement.dst.w,
-                        height: decoder.placement.dst.h,
-                    },
-                    Draw {
-                        dst: decoder.placement.dst,
-                        opacity: decoder.placement.opacity,
-                    },
-                )
-            })
-            .collect();
-
+        let layers: Vec<(Source<'_>, Draw)> = frame.sources();
         let picture = match compositor.compose(width, height, &layers) {
             Ok(picture) => picture,
             Err(error) => {
@@ -226,20 +137,16 @@ where
             failure = Some(format!("the encoder stopped taking frames: {error}"));
             break;
         }
-        if frame % 10 == 0 || frame + 1 == frames {
-            let position = layout::frame_time(frame, rate).to_millis().max(0) as u64;
+        if frame.frame % 10 == 0 || frame.frame + 1 == frames {
+            let position = layout::frame_time(frame.frame, rate).to_millis().max(0) as u64;
             on_progress(position.min(total_ms), total_ms);
         }
     }
 
-    // Closing stdin is what tells ffmpeg the video stream is over.
+    // Closing stdin is what tells ffmpeg the video stream is over, and dropping
+    // the source is what stops the decoders still filling their queues.
+    drop(source);
     drop(stdin);
-    for decoder in decoders.iter_mut() {
-        if let Some(mut child) = decoder.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
 
     let status = encoder_slot
         .lock()

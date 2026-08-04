@@ -54,6 +54,8 @@ What is covered:
 - `crates/render/src/probe.rs` — ffprobe output including the cover art case, where an mp3 reports a video stream
 - `crates/render/src/tools.rs` — where ffmpeg is looked for
 - `crates/compositor/src/lib.rs` — the shader: layer order, opacity, placement, and that a pillarboxed layer lets the one underneath show at the sides
+- `crates/compositor/src/source.rs` — the frame buffering, against a fake reader rather than ffmpeg: a starved poll consuming nothing, a queue refusing to grow past its depth, a seek discarding what was buffered, a broken source leaving a hole
+- `crates/compositor/src/supply.rs` — the supply meter, including that a reader slower than the frame rate makes the run fail
 - `crates/compositor/tests/render.rs` — a real render end to end, and that the preview frame matches the frame the render wrote at the same instant
 
 ### What the tests cannot tell you
@@ -95,6 +97,15 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 ## Playback quality
 
 The repeatable playback soak and its media element baseline live in [quality/](../quality/README.md). The source video is generated locally, and the app reports frame timing, drops, A/V drift, startup delay and process-tree memory growth as JSON.
+
+The engine half of that is measured with no window at all, and the same source video:
+
+```bash
+npm run quality:media                                                   # the synthetic 1080p30 source
+npm run quality:supply -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+```
+
+It pulls frames from the [frame source](./architecture/frame-source.md) at the project rate and exits non-zero when a scenario misses its limits, which is what makes the buffering settings something to measure rather than something to argue about.
 
 ## Release
 

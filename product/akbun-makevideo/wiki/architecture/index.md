@@ -9,6 +9,7 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 | [workspace-and-files.md](./workspace-and-files.md) | The workspace folder, what a project folder holds, and why media is never copied |
 | [timeline.md](./timeline.md) | The editing model, its commands and its undo, and what a time is |
 | [preview.md](./preview.md) | Stacked media elements, the clock, and what preview quality really changes |
+| [frame-source.md](./frame-source.md) | Frames at playback speed: a decoder per clip, each buffering ahead |
 | [compositor.md](./compositor.md) | The one shader the preview frame and the render both draw with |
 | [render.md](./render.md) | The ffmpeg filter graph, line by line, and the render presets |
 | [acceleration.md](./acceleration.md) | GPU encoding: detection by trial, and the fallback |
