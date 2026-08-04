@@ -13,3 +13,4 @@
 | [2026-08-one-compositor-for-preview-and-render.md](./2026-08-one-compositor-for-preview-and-render.md) | One compositor for the preview and the render |
 | [2026-08-in-page-menu-bar.md](./2026-08-in-page-menu-bar.md) | The menu bar is HTML, not a native menu |
 | [2026-08-updater-fixed-tag-endpoint.md](./2026-08-updater-fixed-tag-endpoint.md) | The updater polls a fixed per-product tag, not releases/latest |
+| [2026-08-playback-quality-harness.md](./2026-08-playback-quality-harness.md) | Playback engines pass one numeric quality harness |

@@ -1,0 +1,170 @@
+{
+  "capturedAt": "2026-08-03T23:38:38.775Z",
+  "config": {
+    "continuousMs": 300000,
+    "restartCount": 10,
+    "restartPauseMs": 500,
+    "restartPlayMs": 3000,
+    "seekCount": 20,
+    "seekIntervalMs": 1000,
+    "trackStepMs": 15000
+  },
+  "engine": "media-element",
+  "pass": false,
+  "project": {
+    "fps": 30,
+    "height": 1080,
+    "width": 1920
+  },
+  "scenarios": [
+    {
+      "durationMs": 300082,
+      "evaluation": {
+        "checks": {
+          "avDriftP99Ms": true,
+          "droppedFrames": false,
+          "frameIntervalP50Ms": true,
+          "frameIntervalP99Ms": false,
+          "memoryGrowthBytes": true,
+          "startupDelayP99Ms": true
+        },
+        "pass": false
+      },
+      "fps": 30,
+      "limits": {
+        "avDriftP99Ms": 50,
+        "droppedFrameRate": 0.001,
+        "frameIntervalP50Ms": 42,
+        "frameIntervalP99Ms": 67,
+        "memoryGrowthBytes": 67108864,
+        "startupDelayP99Ms": 500
+      },
+      "metadata": {},
+      "metrics": {
+        "avDriftP99Ms": 0,
+        "droppedFrames": 14,
+        "frameIntervalP50Ms": 33,
+        "frameIntervalP99Ms": 69,
+        "memoryGrowthBytes": 47464448,
+        "memoryGrowthBytesPerMinute": 9490295.585873194,
+        "startupDelayP99Ms": 139,
+        "totalFrames": 8983
+      },
+      "scenario": "continuous-playback"
+    },
+    {
+      "durationMs": 42819,
+      "evaluation": {
+        "checks": {
+          "avDriftP99Ms": false,
+          "droppedFrames": false,
+          "frameIntervalP50Ms": true,
+          "frameIntervalP99Ms": false,
+          "memoryGrowthBytes": true,
+          "startupDelayP99Ms": true
+        },
+        "pass": false
+      },
+      "fps": 30,
+      "limits": {
+        "avDriftP99Ms": 50,
+        "droppedFrameRate": 0.001,
+        "frameIntervalP50Ms": 42,
+        "frameIntervalP99Ms": 67,
+        "memoryGrowthBytes": 67108864,
+        "startupDelayP99Ms": 500
+      },
+      "metadata": {
+        "repetitions": 10
+      },
+      "metrics": {
+        "avDriftP99Ms": 3492.1139990338443,
+        "droppedFrames": 2,
+        "frameIntervalP50Ms": 33,
+        "frameIntervalP99Ms": 330,
+        "memoryGrowthBytes": 56688640,
+        "memoryGrowthBytesPerMinute": 79434792.9657395,
+        "startupDelayP99Ms": 368.9999999999418,
+        "totalFrames": 878
+      },
+      "scenario": "stop-and-restart"
+    },
+    {
+      "durationMs": 62261,
+      "evaluation": {
+        "checks": {
+          "avDriftP99Ms": true,
+          "droppedFrames": true,
+          "frameIntervalP50Ms": true,
+          "frameIntervalP99Ms": false,
+          "memoryGrowthBytes": false,
+          "startupDelayP99Ms": false
+        },
+        "pass": false
+      },
+      "fps": 30,
+      "limits": {
+        "avDriftP99Ms": 50,
+        "droppedFrameRate": 0.001,
+        "frameIntervalP50Ms": 42,
+        "frameIntervalP99Ms": 67,
+        "memoryGrowthBytes": 67108864,
+        "startupDelayP99Ms": 500
+      },
+      "metadata": {
+        "maximumAudioTracks": 4,
+        "maximumVideoTracks": 4
+      },
+      "metrics": {
+        "avDriftP99Ms": 0,
+        "droppedFrames": 0,
+        "frameIntervalP50Ms": 33,
+        "frameIntervalP99Ms": 68,
+        "memoryGrowthBytes": 128925696,
+        "memoryGrowthBytesPerMinute": 124243776.36080372,
+        "startupDelayP99Ms": 1711,
+        "totalFrames": 1700
+      },
+      "scenario": "increasing-track-count"
+    },
+    {
+      "durationMs": 30654,
+      "evaluation": {
+        "checks": {
+          "avDriftP99Ms": false,
+          "droppedFrames": false,
+          "frameIntervalP50Ms": true,
+          "frameIntervalP99Ms": false,
+          "memoryGrowthBytes": true,
+          "startupDelayP99Ms": false
+        },
+        "pass": false
+      },
+      "fps": 30,
+      "limits": {
+        "avDriftP99Ms": 50,
+        "droppedFrameRate": 0.001,
+        "frameIntervalP50Ms": 42,
+        "frameIntervalP99Ms": 67,
+        "memoryGrowthBytes": 67108864,
+        "startupDelayP99Ms": 500
+      },
+      "metadata": {
+        "repetitions": 20
+      },
+      "metrics": {
+        "avDriftP99Ms": 14396.088316697344,
+        "droppedFrames": 3,
+        "frameIntervalP50Ms": 34,
+        "frameIntervalP99Ms": 499,
+        "memoryGrowthBytes": 56000512,
+        "memoryGrowthBytesPerMinute": 109611493.44294384,
+        "startupDelayP99Ms": 815,
+        "totalFrames": 546
+      },
+      "scenario": "repeated-seek"
+    }
+  ],
+  "schemaVersion": 1,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+}

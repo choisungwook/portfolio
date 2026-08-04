@@ -51,6 +51,9 @@ if (!window.__TAURI__) {
       ffprobe: null,
       acceleration: { available: null, tried: [] },
       compositor: { setting: 'auto', device: 'software (CPU)', gpu: false, fellBack: true },
+      qualityProject: null,
+      qualityReport: null,
+      qualitySmoke: false,
     }),
     saveSettings: async (settings) => ({
       settings,
@@ -61,6 +64,9 @@ if (!window.__TAURI__) {
       ffprobe: null,
       acceleration: { available: null, tried: [] },
       compositor: { setting: 'auto', device: 'software (CPU)', gpu: false, fellBack: true },
+      qualityProject: null,
+      qualityReport: null,
+      qualitySmoke: false,
     }),
     pickMedia: unavailable,
     pickProjectOpen: unavailable,
@@ -69,6 +75,12 @@ if (!window.__TAURI__) {
     pickFolder: unavailable,
     listProjects: async () => [],
     previewFrame: unavailable,
+    processMemoryBytes: async () =>
+      performance.memory && performance.memory.usedJSHeapSize
+        ? performance.memory.usedJSHeapSize
+        : null,
+    saveQualityReport: async () => null,
+    writeQualityReport: async () => null,
     // Pretends the folder was made, the way saveProject below pretends the
     // file was written, so the New Project flow can be walked in a browser.
     createProject: async (name) => ({
@@ -186,6 +198,18 @@ window.api = {
       pixels: bytes.subarray(8),
     };
   },
+  processMemoryBytes: () => invoke('process_memory_bytes'),
+  saveQualityReport: async (report) => {
+    const path = await saveDialog({
+      title: 'Save Playback Quality Report',
+      defaultPath: 'media-element-baseline.json',
+      filters: [{ name: 'JSON report', extensions: ['json'] }],
+    });
+    if (!path) return null;
+    await invoke('save_quality_report', { path, report });
+    return path;
+  },
+  writeQualityReport: (path, report) => invoke('save_quality_report', { path, report }),
   createProject: (name) => invoke('create_project', { name }),
 
   // Only paths cross this line. Nothing here copies a byte of media.
