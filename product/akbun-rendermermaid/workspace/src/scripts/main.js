@@ -2,18 +2,24 @@ import mermaid from 'mermaid';
 
 import {
   clampZoom,
+  errorText,
   exportScale,
   fitZoom,
   isBlank,
   pngFileName,
   readSvgSize,
+  shrinkToFitZoom,
+  stepZoom,
   withExplicitSize,
+  zoomAction,
 } from '../lib/diagram.js';
 
 const STORAGE_CODE = 'akbun-rendermermaid.code';
-const STORAGE_GRID = 'akbun-rendermermaid.grid';
+const STORAGE_DOTS = 'akbun-rendermermaid.dots';
+// The toggle used to be called the grid, and a reader's setting outlives a rename.
+const STORAGE_GRID_LEGACY = 'akbun-rendermermaid.grid';
 const RENDER_DELAY_MS = 400;
-const ZOOM_STEP = 1.25;
+const RESIZE_DELAY_MS = 150;
 
 const SAMPLE = `flowchart LR
   A[Write mermaid] --> B{Valid?}
@@ -27,9 +33,11 @@ const diagramEl = document.querySelector('#diagram');
 const previewEl = document.querySelector('#preview');
 const statusEl = document.querySelector('#status');
 const renderBtn = document.querySelector('#render');
+const refreshBtn = document.querySelector('#refresh');
 const pngBtn = document.querySelector('#save-png');
 const largeBtn = document.querySelector('#large');
-const gridBtn = document.querySelector('#grid');
+const dotsBtn = document.querySelector('#dots');
+const previewZoomLabel = document.querySelector('#preview-zoom-level');
 const largeView = document.querySelector('#large-view');
 const largeStage = document.querySelector('#large-stage');
 const largeCanvas = document.querySelector('#large-canvas');
@@ -52,15 +60,27 @@ mermaid.initialize({
 
 let renderSeq = 0;
 let renderTimer = null;
+let resizeTimer = null;
 let zoom = 1;
 let largeSize = { width: 0, height: 0 };
 let launcher = null;
+
+let previewZoom = 1;
+let previewSize = { width: 0, height: 0 };
+// Until the reader touches the zoom, every render re-fits the diagram. After
+// that the chosen zoom survives the next keystroke, which is the whole point
+// of having zoomed in on a corner of a big diagram.
+let previewZoomPinned = false;
 
 /* ===== Rendering ===== */
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle('error', isError);
+}
+
+function reportError(error) {
+  setStatus(errorText(error), true);
 }
 
 function setDiagramActions(enabled) {
@@ -71,8 +91,39 @@ function setDiagramActions(enabled) {
 function showEmpty() {
   diagramEl.classList.add('is-empty');
   diagramEl.textContent = 'Type mermaid code on the left.';
+  previewSize = { width: 0, height: 0 };
   setDiagramActions(false);
   setStatus('Waiting for input.');
+}
+
+/**
+ * Sizes the rendered SVG for the current preview zoom. The size goes on the
+ * element rather than into a transform, so the pane has something to scroll
+ * over once the diagram is larger than it.
+ */
+function applyPreviewZoom() {
+  previewZoomLabel.textContent = `${Math.round(previewZoom * 100)}%`;
+
+  const svg = diagramEl.querySelector('svg');
+  if (!svg || previewSize.width <= 0) return;
+
+  svg.style.width = `${previewSize.width * previewZoom}px`;
+  svg.style.height = `${previewSize.height * previewZoom}px`;
+}
+
+function setPreviewZoom(value, { pin = true } = {}) {
+  previewZoom = clampZoom(value);
+  if (pin) previewZoomPinned = true;
+  applyPreviewZoom();
+}
+
+function previewFitZoom() {
+  return shrinkToFitZoom(
+    previewEl.clientWidth,
+    previewEl.clientHeight,
+    previewSize.width,
+    previewSize.height,
+  );
 }
 
 async function render() {
@@ -92,16 +143,18 @@ async function render() {
 
     // Mermaid emits `width="100%"` with a max-width style. Inside a box that
     // shrinks to fit, that collapses the diagram to its minimum width, so the
-    // preview gets the same explicit size the PNG export uses. CSS then scales
-    // it down when it is wider than the pane.
+    // preview gets the same explicit size the PNG export uses. The zoom then
+    // scales it from there.
     const size = readSvgSize(svg);
     diagramEl.classList.remove('is-empty');
     diagramEl.innerHTML = withExplicitSize(svg, size.width, size.height);
+    previewSize = size;
+    setPreviewZoom(previewZoomPinned ? previewZoom : previewFitZoom(), { pin: false });
     setDiagramActions(true);
     setStatus('Rendered.');
   } catch (error) {
     if (seq !== renderSeq) return;
-    setStatus(error?.message ?? String(error), true);
+    reportError(error);
   } finally {
     // A failed render leaves its measuring node behind in the body.
     document.querySelector(`#d${id}`)?.remove();
@@ -115,6 +168,17 @@ function scheduleRender() {
 
 function renderNow() {
   window.clearTimeout(renderTimer);
+  render();
+}
+
+/** Throws the drawn diagram away and starts over, back at the fitted zoom. */
+function refresh() {
+  window.clearTimeout(renderTimer);
+  diagramEl.replaceChildren();
+  diagramEl.classList.add('is-empty');
+  diagramEl.textContent = 'Rendering…';
+  setDiagramActions(false);
+  previewZoomPinned = false;
   render();
 }
 
@@ -140,12 +204,25 @@ function download(blob, name) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/**
+ * The preview zoom lives in the SVG's inline style, and an inline width beats
+ * the width attribute the export pins on. So the export works from a copy with
+ * those two properties removed, and the PNG is the diagram's real size at any
+ * zoom.
+ */
+function exportableMarkup(svg) {
+  const copy = svg.cloneNode(true);
+  copy.style.removeProperty('width');
+  copy.style.removeProperty('height');
+  return new XMLSerializer().serializeToString(copy);
+}
+
 async function savePng() {
   const svg = diagramEl.querySelector('svg');
   if (!svg) return;
 
   pngBtn.disabled = true;
-  const markup = new XMLSerializer().serializeToString(svg);
+  const markup = exportableMarkup(svg);
   const { width, height } = readSvgSize(markup);
   const scale = exportScale(width, height);
   const source = URL.createObjectURL(
@@ -174,7 +251,7 @@ async function savePng() {
     download(blob, pngFileName(codeEl.value, new Date()));
     setStatus(`Saved PNG at ${canvas.width}x${canvas.height}.`);
   } catch (error) {
-    setStatus(error?.message ?? String(error), true);
+    reportError(error);
   } finally {
     URL.revokeObjectURL(source);
     pngBtn.disabled = false;
@@ -202,14 +279,18 @@ function setZoom(value) {
   applyZoom();
 }
 
+function largeFitZoom() {
+  return fitZoom(largeStage.clientWidth, largeStage.clientHeight, largeSize.width, largeSize.height);
+}
+
 function openLargeView() {
   const svg = diagramEl.querySelector('svg');
   if (!svg) return;
 
+  largeSize = readSvgSize(exportableMarkup(svg));
   largeCanvas.replaceChildren(svg.cloneNode(true));
-  largeSize = readSvgSize(new XMLSerializer().serializeToString(svg));
   largeView.classList.add('open');
-  setZoom(fitZoom(largeStage.clientWidth, largeStage.clientHeight, largeSize.width, largeSize.height));
+  setZoom(largeFitZoom());
 
   // The overlay claims to be a modal, so the keyboard has to go into it.
   // Without this, tabbing walks the toolbar hidden behind the backdrop.
@@ -259,9 +340,10 @@ function restore() {
   const saved = window.localStorage.getItem(STORAGE_CODE);
   codeEl.value = saved ?? SAMPLE;
 
-  const gridOn = window.localStorage.getItem(STORAGE_GRID) !== 'off';
-  previewEl.classList.toggle('grid-on', gridOn);
-  gridBtn.setAttribute('aria-pressed', String(gridOn));
+  const stored = window.localStorage.getItem(STORAGE_DOTS) ?? window.localStorage.getItem(STORAGE_GRID_LEGACY);
+  const dotsOn = stored !== 'off';
+  previewEl.classList.toggle('dots-on', dotsOn);
+  dotsBtn.setAttribute('aria-pressed', String(dotsOn));
 }
 
 codeEl.addEventListener('input', () => {
@@ -277,35 +359,70 @@ codeEl.addEventListener('keydown', (event) => {
 });
 
 renderBtn.addEventListener('click', renderNow);
+refreshBtn.addEventListener('click', refresh);
 pngBtn.addEventListener('click', savePng);
 largeBtn.addEventListener('click', openLargeView);
 
-gridBtn.addEventListener('click', () => {
-  const gridOn = previewEl.classList.toggle('grid-on');
-  gridBtn.setAttribute('aria-pressed', String(gridOn));
-  window.localStorage.setItem(STORAGE_GRID, gridOn ? 'on' : 'off');
+dotsBtn.addEventListener('click', () => {
+  const dotsOn = previewEl.classList.toggle('dots-on');
+  dotsBtn.setAttribute('aria-pressed', String(dotsOn));
+  window.localStorage.setItem(STORAGE_DOTS, dotsOn ? 'on' : 'off');
 });
 
-document.querySelector('#zoom-in').addEventListener('click', () => setZoom(zoom * ZOOM_STEP));
-document.querySelector('#zoom-out').addEventListener('click', () => setZoom(zoom / ZOOM_STEP));
+document.querySelector('#preview-zoom-in').addEventListener('click', () => setPreviewZoom(stepZoom(previewZoom, 1)));
+document.querySelector('#preview-zoom-out').addEventListener('click', () => setPreviewZoom(stepZoom(previewZoom, -1)));
+document.querySelector('#preview-zoom-reset').addEventListener('click', () => setPreviewZoom(1));
+document.querySelector('#preview-zoom-fit').addEventListener('click', () => setPreviewZoom(previewFitZoom()));
+
+previewEl.addEventListener('wheel', (event) => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
+  setPreviewZoom(stepZoom(previewZoom, event.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+
+document.querySelector('#zoom-in').addEventListener('click', () => setZoom(stepZoom(zoom, 1)));
+document.querySelector('#zoom-out').addEventListener('click', () => setZoom(stepZoom(zoom, -1)));
 document.querySelector('#zoom-reset').addEventListener('click', () => setZoom(1));
-document.querySelector('#zoom-fit').addEventListener('click', () => {
-  setZoom(fitZoom(largeStage.clientWidth, largeStage.clientHeight, largeSize.width, largeSize.height));
-});
+document.querySelector('#zoom-fit').addEventListener('click', () => setZoom(largeFitZoom()));
 closeLargeBtn.addEventListener('click', closeLargeView);
 
 largeStage.addEventListener('wheel', (event) => {
   if (!event.ctrlKey && !event.metaKey) return;
   event.preventDefault();
-  setZoom(zoom * (event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
+  setZoom(stepZoom(zoom, event.deltaY < 0 ? 1 : -1));
 }, { passive: false });
 
 document.addEventListener('keydown', (event) => {
-  if (!largeView.classList.contains('open')) return;
-  if (event.key === 'Escape') closeLargeView();
-  if (event.key === '+' || event.key === '=') setZoom(zoom * ZOOM_STEP);
-  if (event.key === '-') setZoom(zoom / ZOOM_STEP);
-  if (event.key === '0') setZoom(1);
+  const modifier = event.metaKey || event.ctrlKey;
+
+  if (largeView.classList.contains('open')) {
+    if (event.key === 'Escape') closeLargeView();
+    // The overlay is the whole window, so it answers the bare keys as well.
+    const action = zoomAction(event.key, true);
+    if (!action) return;
+    event.preventDefault();
+    if (action === 'in') setZoom(stepZoom(zoom, 1));
+    if (action === 'out') setZoom(stepZoom(zoom, -1));
+    if (action === 'reset') setZoom(1);
+    return;
+  }
+
+  // In the page the bare keys belong to the editor, so zooming needs Ctrl or
+  // Cmd. preventDefault is what keeps the browser from zooming the page too.
+  const action = zoomAction(event.key, modifier);
+  if (!action) return;
+  event.preventDefault();
+  if (action === 'in') setPreviewZoom(stepZoom(previewZoom, 1));
+  if (action === 'out') setPreviewZoom(stepZoom(previewZoom, -1));
+  if (action === 'reset') setPreviewZoom(1);
+});
+
+window.addEventListener('resize', () => {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    if (previewZoomPinned || previewSize.width <= 0) return;
+    setPreviewZoom(previewFitZoom(), { pin: false });
+  }, RESIZE_DELAY_MS);
 });
 
 dragToPan();

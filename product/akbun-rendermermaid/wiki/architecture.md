@@ -23,11 +23,21 @@ Each render takes a sequence number. `mermaid.render` is asynchronous, so a slow
 
 `mermaid.parse` runs before `mermaid.render` because it is the call that produces the readable error, with the offending line and a caret. On failure the preview is left untouched and only the status bar changes, so an unfinished line does not blank the diagram you are working from.
 
+The status bar under the editor is the only place the error goes. A toast in the corner of the preview was tried and removed: the message was already on screen a few centimetres away, under the code that caused it, and a second copy of it is noise rather than a second chance to notice.
+
 Mermaid builds a hidden measuring node under `body` while rendering and leaves it behind when the render throws. The `finally` block removes it. Left alone these accumulate one per failed keystroke.
 
 ## Sizing, and why the preview borrows the export code
 
-Mermaid emits `<svg width="100%" style="max-width: 752px">`. Dropped into a box that shrinks to fit its content, `width="100%"` resolves against nothing and the diagram collapses to a fraction of its size. So the render reads the true size out of the `viewBox` and rewrites the markup with explicit pixel width and height, using the same `withExplicitSize` the PNG export uses. CSS then caps it at `max-width: 100%` with `height: auto`, which is what scales an oversized diagram down to the pane.
+Mermaid emits `<svg width="100%" style="max-width: 752px">`. Dropped into a box that shrinks to fit its content, `width="100%"` resolves against nothing and the diagram collapses to a fraction of its size. So the render reads the true size out of the `viewBox` and rewrites the markup with explicit pixel width and height, using the same `withExplicitSize` the PNG export uses.
+
+## Preview zoom
+
+The zoom multiplies that size and writes the result into the SVG's inline width and height. A CSS transform would have been shorter, and it is what the large view uses, but a transform does not change layout size and the preview is a scrolling pane: at 300% there would be nothing to scroll over and three quarters of the diagram would be unreachable. Setting the element's size instead makes the overflow real. That is also why the pane centres its child with `margin: auto` rather than `align-items`, which is the flexbox arrangement that leaves the overflow scrollable on all four sides.
+
+Zoom starts at whatever fits the diagram into the pane, capped at 100%, and every render re-fits until the reader touches the zoom. From that point the value is pinned and survives the next keystroke, because having zoomed into one corner of a large diagram to edit it, the last thing wanted is the fit being restored 400 ms later. Refresh unpins it.
+
+This is also the reason the PNG export works from a clone with the inline width and height stripped. An inline style beats an attribute, so `withExplicitSize` would pin 261 px onto the tag while the style still said 392 px, and the canvas would be sized for one and drawn with the other. The export is the diagram's own size at any zoom.
 
 ## PNG export
 
@@ -53,4 +63,8 @@ Fit scales up as well as down. SVG is vector, so filling the window costs nothin
 
 ## Storage
 
-`localStorage` holds two keys, the code and the grid setting. There is no history, no named documents and no sharing. Anything more would be the point at which this stops being a page you open and paste into.
+`localStorage` holds two keys, the code and the dot background setting. The zoom is not one of them: it is a reading position, not a preference, and a page that opens at yesterday's 340% is a page that opens broken.
+
+That setting used to be called the grid, so the reader is read from the new key and falls back to the old one. A rename is not a reason to hand somebody back a background they had turned off.
+
+There is no history, no named documents and no sharing. Anything more would be the point at which this stops being a page you open and paste into.

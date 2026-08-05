@@ -9,13 +9,15 @@ Deployed at [mermaid.akbun.com](https://mermaid.akbun.com).
 | Feature | How it works |
 |---|---|
 | Render | The diagram redraws 400 ms after you stop typing. Ctrl or Cmd + Enter and the Render button skip the wait |
+| Refresh | Throws the drawn diagram away and renders it again from the code, back at the fitted zoom. The button next to Render |
+| Zoom | The preview zooms with its own buttons, with Ctrl or Cmd and +, - or 0, and with Ctrl or Cmd and the wheel. Fit re-fits it to the pane |
 | Errors | A failed parse leaves the last good diagram on screen and prints the mermaid message, with its line and caret, under the editor. Nothing flashes away while you are mid-edit |
-| Save PNG | Rasterizes the rendered SVG at 2x onto a white background and downloads it as `mermaid-<type>-<date>-<time>.png`. A diagram too wide for a canvas is exported at a lower scale instead of failing |
+| Save PNG | Rasterizes the rendered SVG at 2x onto a white background and downloads it as `mermaid-<type>-<date>-<time>.png`. The export is the diagram's own size whatever the preview zoom is, and a diagram too wide for a canvas is exported at a lower scale instead of failing |
 | Large view | Opens the diagram full screen, scaled to fill the window rather than left at its original size. Zoom with the buttons, +/-/0, or Ctrl and the wheel; drag to pan; Escape closes |
-| Grid | A 20 px grid behind the preview, for lining diagrams up by eye. It is a background of the pane, so it never appears in an exported PNG. The setting is remembered |
+| Dots | A 22 px dot grid behind the preview, for lining diagrams up by eye. It is a background of the pane, so it never appears in an exported PNG. The setting is remembered |
 | Restore | The code is kept in `localStorage`, so a reload or a closed tab does not lose the diagram |
 
-The preview shows the diagram at its natural size and scales it down only when it is wider than the pane. Under 900 px the two panes stack.
+The toolbar sits above the preview at the inner edge, next to the code, rather than in the far corner of the window. The preview opens at the zoom that fits the diagram in the pane, never larger than its natural size, and stays where you put it once you zoom by hand. Under 900 px the two panes stack.
 
 ## Directory layout
 
