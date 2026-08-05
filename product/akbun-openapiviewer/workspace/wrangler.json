@@ -1,0 +1,7 @@
+{
+  "name": "akbun-openapiviewer",
+  "compatibility_date": "2026-08-05",
+  "assets": {
+    "directory": "./dist"
+  }
+}

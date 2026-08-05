@@ -1,0 +1,64 @@
+---
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>akbun openapi viewer</title>
+  <meta name="description" content="Import an OpenAPI file or paste the spec as JSON or YAML, browse the API list on the left and read each operation on the right. Runs entirely in the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-title">
+      <h1>akbun openapi viewer</h1>
+      <p id="spec-title">Import an OpenAPI file or paste the spec. Nothing leaves the browser.</p>
+    </div>
+    <button id="open-loader" type="button">Load spec</button>
+  </header>
+
+  <main class="split">
+    <aside class="pane-left">
+      <div class="search-box">
+        <input id="search" type="search" placeholder="Search APIs (Ctrl/Cmd + K)"
+               autocomplete="off" spellcheck="false" aria-label="Search APIs">
+      </div>
+      <button id="all-apis" class="all-item" type="button">
+        All APIs <span id="op-count" class="count"></span>
+      </button>
+      <nav id="op-list" class="op-list" aria-label="API list"></nav>
+    </aside>
+
+    <section class="pane-right">
+      <div id="detail" class="detail"></div>
+    </section>
+  </main>
+
+  <div id="loader" class="loader" role="dialog" aria-modal="true" aria-label="Load an OpenAPI spec">
+    <div class="loader-card">
+      <h2>Load an OpenAPI spec</h2>
+      <p>Paste the document as JSON or YAML, or open a file. The spec is parsed in this browser and uploaded nowhere.</p>
+      <textarea id="spec-input" spellcheck="false" autocomplete="off"
+                placeholder='{"openapi": "3.0.3", "info": { ... }, "paths": { ... }}'
+                aria-label="OpenAPI document"></textarea>
+      <div id="load-status" class="status" role="status" aria-live="polite"></div>
+      <div class="loader-actions">
+        <button id="load-spec" type="button">Load</button>
+        <button id="pick-file" class="ghost" type="button">Open file…</button>
+        <input id="file-input" type="file" accept=".json,.yaml,.yml,application/json" hidden>
+        <button id="load-sample" class="ghost" type="button">Sample</button>
+        <button id="close-loader" class="ghost" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import '../scripts/main.js';
+  </script>
+</body>
+</html>
