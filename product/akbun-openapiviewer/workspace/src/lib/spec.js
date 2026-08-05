@@ -11,6 +11,10 @@ export const PAGE_SIZE = 10;
 // Nesting depth at which a schema tree is cut off with an ellipsis.
 const MAX_DEPTH = 6;
 
+// A pasted document is untrusted input. Unlimited YAML aliases allow a
+// billion-laughs expansion that freezes the tab; real specs use far fewer.
+const MAX_ALIASES = 1000;
+
 /**
  * Parses pasted or imported text into an OpenAPI document.
  * JSON first when it looks like JSON, because JSON.parse gives the better
@@ -21,7 +25,9 @@ export function parseSpec(text) {
   const source = String(text ?? '').trim();
   if (!source) throw new Error('The input is empty.');
 
-  const doc = source.startsWith('{') ? JSON.parse(source) : loadYaml(source);
+  const doc = source.startsWith('{')
+    ? JSON.parse(source)
+    : loadYaml(source, { maxAliases: MAX_ALIASES });
 
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
     throw new Error('Not an object. An OpenAPI document is a JSON or YAML object.');

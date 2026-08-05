@@ -54,6 +54,14 @@ test('parseSpec rejects what is not an OpenAPI document', () => {
   assert.throws(() => parseSpec('{"openapi": "3.0.3"}'), /paths/);
 });
 
+test('parseSpec caps YAML alias expansion', () => {
+  const fine = 'openapi: "3"\npaths:\n  /a:\n    get: {}\nx-anchor: &a 1\nx-alias: *a\n';
+  assert.equal(parseSpec(fine)['x-alias'], 1);
+
+  const bomb = `openapi: "3"\npaths: {}\nx-anchor: &a 1\nx-bomb: [${Array(1001).fill('*a').join(',')}]\n`;
+  assert.throws(() => parseSpec(bomb), /maxAliases/);
+});
+
 test('specTitle joins title and version with fallbacks', () => {
   assert.equal(specTitle(MINIMAL), 'T 2');
   assert.equal(specTitle({}), 'OpenAPI');
