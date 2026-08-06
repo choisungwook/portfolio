@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   parseSpec,
   specTitle,
+  specJson,
+  specFileName,
   listOperations,
   filterOperations,
   pageCount,
@@ -65,6 +67,26 @@ test('parseSpec caps YAML alias expansion', () => {
 test('specTitle joins title and version with fallbacks', () => {
   assert.equal(specTitle(MINIMAL), 'T 2');
   assert.equal(specTitle({}), 'OpenAPI');
+});
+
+test('specJson round-trips a YAML spec into indented JSON', () => {
+  const yaml = 'openapi: "3.0.3"\ninfo:\n  title: T\n  version: "2"\npaths:\n  /a:\n    get: {}\n';
+  const json = specJson(parseSpec(yaml));
+
+  assert.deepEqual(JSON.parse(json), parseSpec(yaml));
+  // one indent step per level, so top-level keys sit at 2 and info.title at 4
+  assert.match(json, /\n {2}"openapi": "3\.0\.3"/);
+  assert.match(json, /\n {4}"title": "T"/);
+  assert.ok(json.endsWith('\n'));
+});
+
+test('specFileName reduces the title to something a disk accepts', () => {
+  assert.equal(specFileName(MINIMAL), 't-2.json');
+  assert.equal(specFileName(parseSpec(SAMPLE_SPEC)), 'petstore-sample-1.0.0.json');
+  assert.equal(specFileName({ info: { title: 'Orders / Billing API!', version: 'v2' } }), 'orders-billing-api-v2.json');
+  assert.equal(specFileName({ info: { title: 'T' } }), 't.json');
+  assert.equal(specFileName({ info: { title: '///' } }), 'openapi.json');
+  assert.equal(specFileName({}), 'openapi.json');
 });
 
 test('listOperations flattens methods and merges path-level parameters', () => {

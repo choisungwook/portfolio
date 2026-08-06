@@ -13,7 +13,9 @@ Deployed as a static Astro build on Cloudflare.
 | All APIs | The top item of the list. The right pane shows every operation as a card, 10 per page with Prev/Next, so a thousand-operation spec does not freeze the first paint |
 | Search | The search bar filters live on every keystroke, no Enter needed. Ctrl/Cmd + K focuses it. Every word must match, over method, path, summary, operationId and tags |
 | Detail | Parameters as a table (path-level parameters merged in), request body and responses per content type, schemas as an indented tree with `$ref`s resolved in place, `*` marking required properties and circular refs cut off |
+| Export JSON | The header button saves the loaded document as JSON, named from `info` (`petstore-sample-1.0.0.json`). Loading YAML and exporting is how a YAML spec comes back out as JSON |
 | Restore | The spec is kept in `localStorage`, so a reload or a closed tab does not lose it |
+| Phone | Below 720px the API list becomes a drawer opened from the header, so an operation gets the whole screen, and each parameter reads down a card instead of across a table too wide to fit |
 
 ## Directory layout
 

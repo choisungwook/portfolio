@@ -3,6 +3,8 @@
 import {
   parseSpec,
   specTitle,
+  specJson,
+  specFileName,
   listOperations,
   filterOperations,
   pageSlice,
@@ -23,6 +25,14 @@ const loader = document.getElementById('loader');
 const specInput = document.getElementById('spec-input');
 const loadStatus = document.getElementById('load-status');
 const fileInput = document.getElementById('file-input');
+const exportButton = document.getElementById('export-json');
+const paneLeft = document.getElementById('pane-left');
+const paneBackdrop = document.getElementById('pane-backdrop');
+const toggleList = document.getElementById('toggle-list');
+
+// Below this width the sidebar is a drawer, not a pane. The same number lives
+// in global.css; the two have to move together.
+const drawerQuery = window.matchMedia('(max-width: 720px)');
 
 // view is either the paginated all-APIs view or one selected operation.
 const state = {
@@ -30,6 +40,7 @@ const state = {
   ops: [],
   query: '',
   view: { kind: 'all', page: 1 },
+  drawer: false,
 };
 
 function esc(value) {
@@ -40,6 +51,25 @@ function esc(value) {
 
 function visibleOps() {
   return filterOperations(state.ops, state.query);
+}
+
+// ===== Drawer =====
+
+// The drawer only exists below the breakpoint. Above it the pane is always
+// there, so the open flag is ignored and the pane must never be inert.
+function syncDrawer() {
+  const isDrawer = drawerQuery.matches;
+  if (!isDrawer) state.drawer = false;
+  const open = isDrawer && state.drawer;
+  paneLeft.classList.toggle('open', open);
+  paneLeft.inert = isDrawer && !open;
+  paneBackdrop.hidden = !open;
+  toggleList.setAttribute('aria-expanded', String(open));
+}
+
+function setDrawer(open) {
+  state.drawer = open;
+  syncDrawer();
 }
 
 // ===== Sidebar =====
@@ -91,22 +121,26 @@ function operationHtml(op) {
     .map((param) => (param && param.$ref ? resolveRef(spec, param.$ref) : param))
     .filter((param) => param && typeof param === 'object');
   if (params.length) {
+    // data-label carries the column header for the phone layout, where the
+    // header row is hidden and each cell prints its own label.
     const rows = params
       .map((param) => `
         <tr>
-          <td><code>${esc(param.name)}</code></td>
-          <td>${esc(param.in)}</td>
-          <td>${param.required ? '✓' : ''}</td>
-          <td><code>${esc(schemaText(spec, param.schema).split('\n')[0])}</code></td>
-          <td>${esc(param.description ?? '')}</td>
+          <td data-label="Name"><code>${esc(param.name)}</code></td>
+          <td data-label="In">${esc(param.in)}</td>
+          <td data-label="Required">${param.required ? '✓' : ''}</td>
+          <td data-label="Type"><code>${esc(schemaText(spec, param.schema).split('\n')[0])}</code></td>
+          <td data-label="Description">${esc(param.description ?? '')}</td>
         </tr>`)
       .join('');
     parts.push(`
       <h3>Parameters</h3>
-      <table class="params">
-        <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Description</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`);
+      <div class="table-wrap">
+        <table class="params">
+          <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`);
   }
 
   const body = operation.requestBody?.$ref
@@ -187,6 +221,22 @@ function render() {
   renderDetail();
 }
 
+// ===== Export =====
+
+// Exports the parsed document, not the pasted text, so a YAML spec comes back
+// out as JSON. The object URL is revoked once the click has been handed off,
+// or the whole document stays in memory for the life of the tab.
+function exportJson() {
+  if (!state.spec) return;
+  const blob = new Blob([specJson(state.spec)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = specFileName(state.spec);
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 // ===== Loading =====
 
 function loadSpec(text) {
@@ -195,8 +245,10 @@ function loadSpec(text) {
   state.ops = listOperations(spec);
   state.query = '';
   state.view = { kind: 'all', page: 1 };
+  setDrawer(false);
   searchInput.value = '';
   specTitleEl.textContent = `${specTitle(spec)} · ${state.ops.length} APIs`;
+  exportButton.disabled = false;
 
   // A spec near the localStorage quota is not worth failing the load over.
   try {
@@ -211,7 +263,9 @@ function openLoader() {
   loadStatus.textContent = '';
   loadStatus.classList.remove('error');
   loader.classList.add('open');
-  specInput.focus();
+  // Focusing the textarea throws the on-screen keyboard over the dialog before
+  // the reader has seen what it is asking for, so phones open it untouched.
+  if (!drawerQuery.matches) specInput.focus();
 }
 
 function closeLoader() {
@@ -231,6 +285,7 @@ function tryLoadFromInput() {
 // ===== Wiring =====
 
 document.getElementById('open-loader').addEventListener('click', openLoader);
+exportButton.addEventListener('click', exportJson);
 document.getElementById('close-loader').addEventListener('click', closeLoader);
 document.getElementById('load-spec').addEventListener('click', tryLoadFromInput);
 document.getElementById('load-sample').addEventListener('click', () => {
@@ -247,8 +302,13 @@ fileInput.addEventListener('change', async () => {
   tryLoadFromInput();
 });
 
+toggleList.addEventListener('click', () => setDrawer(!state.drawer));
+paneBackdrop.addEventListener('click', () => setDrawer(false));
+drawerQuery.addEventListener('change', syncDrawer);
+
 allButton.addEventListener('click', () => {
   state.view = { kind: 'all', page: 1 };
+  setDrawer(false);
   render();
 });
 
@@ -256,6 +316,7 @@ opList.addEventListener('click', (event) => {
   const item = event.target.closest('.op-item');
   if (!item) return;
   state.view = { kind: 'op', id: item.dataset.id };
+  setDrawer(false);
   render();
 });
 
@@ -275,16 +336,23 @@ searchInput.addEventListener('input', () => {
 document.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault();
+    // The search box lives in the drawer, so it has to be on screen first.
+    setDrawer(true);
     searchInput.focus();
     searchInput.select();
     return;
   }
-  if (event.key === 'Escape' && loader.classList.contains('open') && state.spec) {
-    closeLoader();
+  if (event.key !== 'Escape') return;
+  if (loader.classList.contains('open')) {
+    if (state.spec) closeLoader();
+    return;
   }
+  setDrawer(false);
 });
 
 // ===== Start =====
+
+syncDrawer();
 
 const saved = localStorage.getItem(STORAGE_KEY);
 if (saved) {
