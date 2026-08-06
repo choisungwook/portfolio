@@ -14,6 +14,7 @@ import {
 } from '../src/lib/spec.js';
 import { SAMPLE_SPEC } from '../src/lib/sample.js';
 
+
 const MINIMAL = {
   openapi: '3.0.3',
   info: { title: 'T', version: '2' },
