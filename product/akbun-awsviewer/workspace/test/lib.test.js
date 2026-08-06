@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const {
   filterInstances,
   sortInstances,
@@ -10,6 +12,15 @@ const {
   stateClass,
   sessionLabel,
 } = require('../src/lib.js');
+
+test('publishes the browser API when a CommonJS module global exists', () => {
+  const source = fs.readFileSync(require.resolve('../src/lib.js'), 'utf8');
+  const context = { module: { exports: {} } };
+
+  vm.runInNewContext(source, context);
+
+  assert.strictEqual(typeof context.awsviewerLib.filterInstances, 'function');
+});
 
 const instances = [
   { instanceId: 'i-0aaa', name: 'web-1', state: 'running', privateIp: '10.0.1.10' },

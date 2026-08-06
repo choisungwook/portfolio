@@ -64,8 +64,6 @@
       <button id="login-button">Log in</button>
     </header>
 
-    <div id="error-banner" class="hidden"></div>
-
     <main>
       <!-- Instances tab -->
       <section id="tab-instances" class="tab active">
@@ -177,6 +175,17 @@
     </div>
     <div id="detail-body"></div>
   </aside>
+
+  <dialog id="error-dialog" aria-labelledby="error-title" aria-describedby="error-message">
+    <div class="error-dialog-header">
+      <h2 id="error-title">An error occurred</h2>
+      <button id="close-error-dialog" aria-label="Close error message">✕</button>
+    </div>
+    <p id="error-message"></p>
+    <div class="error-dialog-actions">
+      <button id="confirm-error-dialog">OK</button>
+    </div>
+  </dialog>
 
   <script src="lib.js"></script>
   <script src="api.js"></script>
