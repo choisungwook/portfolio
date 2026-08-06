@@ -238,7 +238,14 @@ impl Engine {
                 let filled = producer.filled();
                 if filled >= target {
                     thread_feed.primed.store(true, Ordering::Relaxed);
-                    std::thread::sleep(POLL);
+                    // IDLE, not POLL. This is the steady state — the ring is
+                    // full enough and there is nothing to do — and it is where
+                    // the thread spends almost all of its life. Waking every
+                    // 500 us here would be two thousand wakeups a second to
+                    // decide each time that there is still nothing to do. A
+                    // command waits at most one IDLE to be noticed, which is
+                    // 5 ms on a seek and nothing next to the refill it starts.
+                    std::thread::sleep(IDLE);
                     continue;
                 }
                 if producer.free() < BLOCK_FRAMES || thread_feed.ended.load(Ordering::Relaxed) {

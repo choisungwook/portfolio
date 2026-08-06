@@ -277,6 +277,11 @@ fn a_project_with_nothing_audible_has_no_reference_to_compare_against() {
     for track in project.tracks.iter_mut() {
         track.muted = true;
     }
-    assert!(ffmpeg::mix_reference_args(&project, "/tmp/nothing.f32").is_none());
+    // The path is never written to — `mix_reference_args` answers `None`
+    // before it builds anything — but it comes from `temp_dir` like every
+    // other path here so that nothing in this file names a location the
+    // platform might not have.
+    let unused = temp_dir().join("no-reference.f32");
+    assert!(ffmpeg::mix_reference_args(&project, &unused.to_string_lossy()).is_none());
     assert!(makevideo_audio::mix::regions(&project).is_empty());
 }

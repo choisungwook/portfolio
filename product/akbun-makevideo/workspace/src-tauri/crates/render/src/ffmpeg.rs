@@ -458,12 +458,17 @@ pub struct DecodeAudio<'a> {
 
 /// Decode one clip's sound to raw interleaved f32 at `AUDIO_HZ`, in stereo.
 ///
-/// The `aformat` here is the same filter the export chain opens with, so a
-/// source at 44.1 kHz goes through the same resampler on the way to playback
-/// that it goes through on the way to the file. That is the whole reason the
-/// resampling is asked of ffmpeg rather than written again in Rust: two
-/// resamplers that disagree by a fraction of a sample per second are a project
-/// whose sound slides away from its picture over ten minutes.
+/// The `aformat` here asks for the same **rate and channel layout** the export
+/// chain opens with, so a source at 44.1 kHz goes through the same resampler on
+/// the way to playback that it goes through on the way to the file. That is the
+/// whole reason the resampling is asked of ffmpeg rather than written again in
+/// Rust: two resamplers that disagree by a fraction of a sample per second are
+/// a project whose sound slides away from its picture over ten minutes.
+///
+/// The sample format is the one thing that differs, and it changes nothing:
+/// `flt` here against `fltp` in the export chain is packed against planar, the
+/// same numbers in a different order. Packed is what `-f f32le` writes, and
+/// planar is what the rest of the export graph wants.
 ///
 /// `volume` is deliberately not applied. It is one multiply, the mixer does it,
 /// and leaving it out is what lets the mixer be tested on samples that are

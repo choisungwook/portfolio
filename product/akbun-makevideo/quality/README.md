@@ -180,11 +180,11 @@ seek 직후 재충전 시간은 `refillingMs`로 따로 빼고 underrun과 drift
 
 | 시나리오 | 오디오 트랙 | underrun | 시작 지연 p99 | 버퍼 간격 p99 | 링버퍼 최저 | drift |
 |---|---:|---:|---:|---:|---:|---:|
-| continuous-playback | 1 | 0 / 1875 | 48 ms | 15.7 ms | 2560 (53 ms) | 4.0 ms |
-| repeated-seek | 1 | 0 / 1875 | 75 ms | 15.7 ms | 2560 (53 ms) | 35.9 ms |
-| increasing-track-count | 2 | 0 / 1875 | 53 ms | 15.6 ms | 2560 (53 ms) | 1.1 ms |
-| increasing-track-count | 3 | 0 / 1875 | 57 ms | 15.6 ms | 2560 (53 ms) | 4.3 ms |
-| increasing-track-count | 4 | 0 / 1875 | 52 ms | 15.6 ms | 2560 (53 ms) | 1.2 ms |
+| continuous-playback | 1 | 0 / 1875 | 48 ms | 13.2 ms | 2560 (53 ms) | 2.7 ms |
+| repeated-seek | 1 | 0 / 1875 | 74 ms | 13.2 ms | 2560 (53 ms) | 15.1 ms |
+| increasing-track-count | 2 | 0 / 1875 | 32 ms | 13.1 ms | 2560 (53 ms) | 2.0 ms |
+| increasing-track-count | 3 | 0 / 1875 | 52 ms | 13.2 ms | 2560 (53 ms) | 1.6 ms |
+| increasing-track-count | 4 | 0 / 1875 | 40 ms | 13.2 ms | 2560 (53 ms) | 0.8 ms |
 
 - 4트랙까지 전 항목 통과. 프레임 소스가 같은 머신에서 3~4트랙을 재현하지 못했던 것과 달리 오디오는 여유가 남는다. 디코더가 그림을 건드리지 않기 때문이다
 - 링버퍼 최저가 목표치 3072에 못 미치는 2560으로 고정된 건 피더가 목표에 닿으면 자고 한 블록(1024)씩 채우기 때문이다. 즉 여유는 한 블록이 아니라 53 ms 전부
