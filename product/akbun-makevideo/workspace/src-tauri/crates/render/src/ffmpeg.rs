@@ -10,11 +10,16 @@
 //! because a decimal here would quietly reintroduce the drift.
 
 use crate::accel::Acceleration;
+use crate::layout;
 use crate::{AssetKind, Clip, Project, ProjectSettings, Rate, RationalTime, TrackKind};
 
 /// Everything is resampled to this on the way in, so a sample count means the
 /// same thing in every chain.
-const AUDIO_HZ: u32 = 48_000;
+///
+/// Public because the playback engine mixes at it too. Sharing the constant
+/// rather than writing 48000 twice is what makes "the mix you hear is the mix
+/// that renders" a statement the compiler helps keep true.
+pub const AUDIO_HZ: u32 = 48_000;
 
 /// Enough places that the error is under a microsecond, which is four orders of
 /// magnitude below a frame at any rate anybody shoots.
@@ -104,18 +109,17 @@ fn collect_items(project: &Project) -> Vec<Item<'_>> {
                 let Some(asset) = project.asset(&clip.asset_id) else {
                     continue;
                 };
-                let has_sound = match asset.kind {
-                    AssetKind::Audio => true,
-                    AssetKind::Video => asset.has_audio,
-                    AssetKind::Image => false,
-                };
                 // An audio asset on a video track draws nothing, and a silent
                 // asset on an audio track carries nothing. Either way the clip
                 // is dropped rather than turned into an input that would make
                 // ffmpeg fail on a missing stream.
                 let video = kind == TrackKind::Video
                     && matches!(asset.kind, AssetKind::Video | AssetKind::Image);
-                let audio = has_sound && !(kind == TrackKind::Video && track.muted);
+                // The audible rule is `layout::carries_sound` rather than a copy
+                // of it, because the playback mixer asks the same question and
+                // two answers to it would be a clip that plays and does not
+                // render, or the other way round.
+                let audio = layout::carries_sound(asset, track);
                 if !video && !audio {
                     continue;
                 }
@@ -295,9 +299,14 @@ fn audio_chain(item: &Item, input: usize, rate: Rate) -> String {
     // milliseconds adelay takes by default, because a frame of 29.97 is not a
     // whole number of milliseconds and half a millisecond of slip per clip is
     // exactly the kind of thing nobody can hear and everybody can measure.
+    // Six places on the gain, not three. A clip's volume is an f32 and the
+    // playback mixer multiplies by all of it, so three places make the file
+    // quieter or louder than what was heard by up to 5e-4 — and round a clip
+    // set below 0.0005 to silence. Six is past what an f32 in 0..1 can tell
+    // apart, so the two mixes agree exactly.
     format!(
         "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo,\
-         asetpts=PTS-STARTPTS,volume={:.3},adelay={}S:all=1[a{input}]",
+         asetpts=PTS-STARTPTS,volume={:.6},adelay={}S:all=1[a{input}]",
         item.clip.volume.max(0.0),
         item.clip.start_time(rate).to_samples(AUDIO_HZ)
     )
@@ -436,6 +445,112 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
         "-".into(),
     ]);
     args
+}
+
+/// What one clip's sound is being asked for.
+pub struct DecodeAudio<'a> {
+    pub path: &'a str,
+    /// Where to seek to and how much to read, as times rather than as sample
+    /// counts: ffmpeg's `-ss` and `-t` take seconds.
+    pub in_time: RationalTime,
+    pub duration: RationalTime,
+}
+
+/// Decode one clip's sound to raw interleaved f32 at `AUDIO_HZ`, in stereo.
+///
+/// The `aformat` here asks for the same **rate and channel layout** the export
+/// chain opens with, so a source at 44.1 kHz goes through the same resampler on
+/// the way to playback that it goes through on the way to the file. That is the
+/// whole reason the resampling is asked of ffmpeg rather than written again in
+/// Rust: two resamplers that disagree by a fraction of a sample per second are
+/// a project whose sound slides away from its picture over ten minutes.
+///
+/// The sample format is the one thing that differs, and it changes nothing:
+/// `flt` here against `fltp` in the export chain is packed against planar, the
+/// same numbers in a different order. Packed is what `-f f32le` writes, and
+/// planar is what the rest of the export graph wants.
+///
+/// `volume` is deliberately not applied. It is one multiply, the mixer does it,
+/// and leaving it out is what lets the mixer be tested on samples that are
+/// still the ones the file holds.
+pub fn audio_decoder_args(request: &DecodeAudio<'_>) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-nostdin".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-ss".into(),
+        secs(request.in_time),
+        "-t".into(),
+        secs(request.duration),
+        "-i".into(),
+        request.path.to_string(),
+        // A video file on an audio track is opened for its sound only. Decoding
+        // the picture to throw it away would cost more than the mixing does.
+        "-vn".into(),
+        "-af".into(),
+        format!("aformat=sample_fmts=flt:sample_rates={AUDIO_HZ}:channel_layouts=stereo"),
+        "-f".into(),
+        "f32le".into(),
+        "-ac".into(),
+        "2".into(),
+        "-ar".into(),
+        AUDIO_HZ.to_string(),
+        "-".into(),
+    ]
+}
+
+/// The export mix on its own, written as raw f32 rather than encoded.
+///
+/// Built from the same `audio_chain` and `amix` that `build_args` uses, and it
+/// exists so the playback mixer has something exact to be checked against.
+/// Going through the real output would put an aac encoder between the two
+/// answers, and then a difference would say nothing about the mixing.
+///
+/// `Ok(None)` means the project has no sound at all, which is not an error.
+pub fn mix_reference_args(project: &Project, output: &str) -> Option<Vec<String>> {
+    let rate = project.rate();
+    let items = collect_items(project);
+    let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
+    if audio.is_empty() {
+        return None;
+    }
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-nostdin".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+    ];
+    for item in &audio {
+        args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
+        args.extend(["-t".into(), secs(item.clip.duration(rate))]);
+        args.extend(["-i".into(), item.path.to_string()]);
+    }
+
+    let mut chains = Vec::new();
+    let mut labels = Vec::new();
+    for (index, item) in audio.iter().enumerate() {
+        chains.push(audio_chain(item, index, rate));
+        labels.push(format!("[a{index}]"));
+    }
+    chains.push(mix_chain(&labels));
+
+    args.extend(["-filter_complex".into(), chains.join(";")]);
+    args.extend(["-map".into(), "[aout]".into()]);
+    args.extend([
+        "-t".into(),
+        secs(project.duration()),
+        "-f".into(),
+        "f32le".into(),
+        "-ac".into(),
+        "2".into(),
+        "-ar".into(),
+        AUDIO_HZ.to_string(),
+    ]);
+    args.push(output.to_string());
+    Some(args)
 }
 
 /// Encode composited RGBA frames arriving on stdin. Audio is still read from
@@ -1067,6 +1182,103 @@ mod tests {
             tracks: vec![],
         };
         assert!(encoder_args(&project, "/o.mp4", Preset::Fhd, None).is_err());
+    }
+
+    #[test]
+    fn an_audio_decoder_resamples_with_the_same_filter_the_export_opens_with() {
+        // The claim the playback mixer stands on. A source at 44.1 kHz reaches
+        // the mixer through this filter and reaches the file through
+        // `audio_chain`, and both say sample_rates=48000, so the two answers
+        // come out of one resampler rather than two.
+        let rate = Rate::fps(30);
+        let args = audio_decoder_args(&DecodeAudio {
+            path: "/media/a1.mp4",
+            in_time: RationalTime::new(30, rate),
+            duration: RationalTime::new(90, rate),
+        })
+        .join(" ");
+        assert!(
+            args.contains("-ss 1.000000 -t 3.000000 -i /media/a1.mp4"),
+            "{args}"
+        );
+        assert!(args.contains("sample_rates=48000"), "{args}");
+        assert!(args.contains("channel_layouts=stereo"), "{args}");
+        assert!(args.contains("-vn"), "a video input is opened for its sound");
+        assert!(args.ends_with("-f f32le -ac 2 -ar 48000 -"), "{args}");
+        // Volume belongs to the mixer, so what arrives is still what the file
+        // holds.
+        assert!(!args.contains("volume="), "{args}");
+    }
+
+    #[test]
+    fn the_reference_mix_is_the_export_mix_written_as_raw_samples() {
+        let args = mix_reference_args(&one_video_project(), "/tmp/mix.f32").unwrap();
+        let text = joined(&args);
+        let filter = filter_of(&args);
+        // Character for character what build_args puts in the file, which is
+        // what makes a difference in the samples a difference in the mixing.
+        let exported = filter_of(&build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None).unwrap());
+        assert!(exported.contains("adelay=96000S:all=1"), "{exported}");
+        assert!(filter.contains("adelay=96000S:all=1"), "{filter}");
+        assert!(filter.contains("amix=inputs=1:normalize=0"), "{filter}");
+        assert!(text.contains("-map [aout]"), "{text}");
+        assert!(text.contains("-f f32le -ac 2 -ar 48000"), "{text}");
+        assert!(text.contains("-t 5.000000"), "the timeline bounds it: {text}");
+        assert!(!text.contains("-c:a"), "nothing is encoded: {text}");
+        assert_eq!(args.last().unwrap(), "/tmp/mix.f32");
+    }
+
+    #[test]
+    fn the_reference_mix_numbers_its_inputs_from_zero() {
+        // encoder_args shifts audio up by one because the frame pipe is input
+        // 0. There is no pipe here, so an off by one would line every clip up
+        // against the wrong file.
+        let project = Project {
+            version: crate::FORMAT_VERSION,
+            settings: settings(1920, 1080),
+            assets: vec![asset("a1", AssetKind::Video, true), asset("a2", AssetKind::Audio, true)],
+            tracks: vec![
+                track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 60)]),
+                track("A1", TrackKind::Audio, vec![clip("c2", "a2", 30, 0, 60)]),
+            ],
+        };
+        let filter = filter_of(&mix_reference_args(&project, "/tmp/mix.f32").unwrap());
+        assert!(filter.contains("[0:a]"), "{filter}");
+        assert!(filter.contains("[1:a]"), "{filter}");
+        assert!(filter.contains("[a0][a1]amix=inputs=2"), "{filter}");
+    }
+
+    #[test]
+    fn a_project_with_nothing_audible_has_no_reference_mix() {
+        let mut project = one_video_project();
+        project.assets[0].has_audio = false;
+        assert!(mix_reference_args(&project, "/tmp/mix.f32").is_none());
+    }
+
+    #[test]
+    fn the_export_takes_the_same_clips_the_playback_mixer_will() {
+        // Both sides ask layout::carries_sound, and this is the check that the
+        // render really routes through it rather than keeping a copy.
+        let mut project = one_video_project();
+        project.tracks.push(track(
+            "A1",
+            TrackKind::Audio,
+            vec![clip("c2", "a2", 0, 0, 60)],
+        ));
+        project.assets.push(asset("a2", AssetKind::Audio, true));
+        project.tracks[0].muted = true;
+
+        let audible: Vec<&str> = collect_items(&project)
+            .iter()
+            .filter(|item| item.audio)
+            .map(|item| item.clip.id.as_str())
+            .collect();
+        let mixed: Vec<String> = crate::layout::audio_placements(&project)
+            .into_iter()
+            .map(|placement| placement.clip_id)
+            .collect();
+        assert_eq!(audible, vec!["c2"], "the muted video track is out");
+        assert_eq!(mixed, audible);
     }
 
     #[test]

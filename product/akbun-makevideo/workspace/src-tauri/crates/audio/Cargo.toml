@@ -1,0 +1,33 @@
+[package]
+name = "makevideo-audio"
+version = "0.1.0"
+description = "The playback audio engine: the master clock, and the mix the render also produces"
+edition = "2021"
+license = "MIT"
+
+# Depends on the render crate for the timeline and for the ffmpeg argument
+# lists, and on neither tauri nor a graphics stack. Everything except the
+# device sink is arithmetic over f32, so the mixing, the clock and the ring can
+# be tested on a runner with no sound card at all.
+
+[features]
+# cpal is what opens a real output. A build server has nothing to open, and on
+# Linux the crate needs ALSA headers to compile at all, so the device half is a
+# choice. Without it this crate is the mix and the clock, which is the part
+# that has to be right.
+default = ["device"]
+device = ["dep:cpal"]
+
+[dependencies]
+makevideo-render = { path = "../render" }
+# The soak report is JSON in the same shape the frame supply meter writes, so
+# the two sit side by side in quality/.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = { version = "0.18", optional = true }
+
+# Headless: measures the engine against real media with no window and no app
+# binary, the same way supply-soak measures the frame source.
+[[bin]]
+name = "audio-soak"
+path = "src/bin/audio_soak.rs"

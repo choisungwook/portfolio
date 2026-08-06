@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-07
+
+* **Creation**: [재생 시각의 기준은 오디오 출력이고 영상이 그것을 따라간다](decisions/2026-08-audio-is-the-master-clock.md) 결정 기록. akbun-makevideo에 오디오 엔진을 넣으면서, seek가 함수 호출이 아니라 메시지라 요청 직후에도 링버퍼는 이전 위치로 가득 차 있다는 것과, 링버퍼를 비울 수 있는 쪽이 소비자뿐이라 seek가 정리되는 동안에도 재생 쪽이 계속 버퍼를 요청해야 한다는 것을 함께 남긴다.
+
 ## 2026-08-06
 
 * **Creation**: [멀티 제품 저장소의 What's Changed는 제품 접두사로 이전 tag를 고정한다](decisions/2026-08-whats-changed-previous-tag-scoped.md) 결정 기록. akbun-requesthttp의 release workflow를 makepresentation에서 복사하다가, generate-notes의 이전 tag 자동 선택이 멀티 제품 저장소에서는 남의 제품 tag를 고른다는 것을 알게 되어 남긴다.

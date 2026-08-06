@@ -54,8 +54,29 @@ jobs:
       # the whole pipeline on a machine with no graphics stack at all. It is
       # also what proves wgpu is genuinely optional rather than optional on
       # paper: --no-default-features must not pull it in.
+      #
+      # ffmpeg is also what the audio steps below decode with.
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      # The audio engine with no sound card and no cpal at all. That covers the
+      # mix, the clock and the lock free ring, which is the part that has to be
+      # right, and it proves the device half is genuinely optional. The mix is
+      # also compared against the render's own amix here, which needs the ffmpeg
+      # installed above but no output to play it on.
+      - name: Run audio engine tests without an output device
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-audio --no-default-features
+
+      # And again with cpal compiled in. It is not opened — a runner has nothing
+      # to open — so what this checks is that the device sink still builds and
+      # that its resampler takes exactly the frames it uses. ALSA headers are
+      # what cpal needs to compile on Linux, and needing them is the reason the
+      # feature exists.
+      - name: Install the ALSA headers cpal builds against
+        run: sudo apt-get install -y -qq libasound2-dev
+
+      - name: Run audio engine tests with the device sink compiled in
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-audio
 
       - name: Run compositor tests without a GPU
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features

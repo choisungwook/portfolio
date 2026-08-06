@@ -143,6 +143,60 @@ npm run quality:supply -- /tmp/akbun-makevideo-quality/project.akbunvideo --seco
 - 같은 binary로 연속 실행한 두 번이 늦은 프레임 8개와 49개로 갈리고, 4트랙은 아예 첫 프레임이 2초 안에 오지 않아 중단되기도 함
 - 1080p 디코더 4개가 4코어를 채우는 지점이라 측정 대상이 소스가 아니라 머신이 됨. 이 구간은 대상 머신에서 다시 재야 함
 
+## 오디오 엔진 계측
+
+엔진 단계의 소리만 따로 재는 헤드리스 하네스다. 출력 장치를 열지 않고 [audio](../wiki/architecture/audio.md)에서 버퍼 주기마다 512 프레임씩 꺼내며, 한 시나리오라도 기준을 넘기면 종료 코드가 0이 아니다.
+
+```bash
+cd product/akbun-makevideo/workspace
+npm run quality:audio -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+```
+
+주요 옵션은 `--depth`(클립당 선공급 블록 수), `--lead`(디코더 선행 시작 샘플 수), `--seek-every`, `--report`다.
+
+시나리오는 페이지 하네스와 이름을 맞춘다.
+
+- `continuous-playback`: 연속 재생
+- `repeated-seek`: 재생 중 반복 seek
+- `increasing-track-count`: 들리는 오디오 트랙을 1개에서 4개까지 증가
+
+지표는 다음과 같다.
+
+- `underruns`: 링버퍼가 비어 콜백이 무음을 써야 했던 횟수. 사람이 클릭 소리로 듣는 유일한 실패라서 기준이 가장 엄격하다. 기준은 0.1%
+- `silentFrames`: 그 구멍의 총 길이. 횟수만으로는 512 프레임과 5 프레임이 구분되지 않음
+- `endedOnTheSample`: 타임라인을 끝까지 재생했을 때 마지막 샘플에 정확히 도달했는지. 한 샘플만 어긋나도 실패다. 밀리초가 아니라 샘플로 세는 이유 자체를 검사하는 값
+- `driftMs`: 클럭과 벽시계의 차이. 영상이 이 클럭을 따라가므로 클럭이 세상보다 늦으면 영상도 늦는다. 기준은 재생 품질 기준표의 A/V drift와 같은 50 ms
+- `ringLowWaterFrames`: 링버퍼가 가장 적게 들고 있던 양. 여유가 얼마나 남았는지를 먼저 보여주는 값
+- `lateBlocks`: 디코더가 제때 내주지 못한 블록. 링버퍼가 흡수하므로 실패가 아니라 경고다
+- `startupDelayP99Ms`: 재생 시작과 seek 직후 소리가 나기까지의 지연
+
+seek 직후 재충전 시간은 `refillingMs`로 따로 빼고 underrun과 drift에서 제외한다. 클럭은 그동안 멈춰 있다가 옳은 자리에서 이어지므로 어긋남이 아니고, 이미 시작 지연으로 세고 있다. [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](../../../knowledge/decisions/2026-08-harness-does-not-count-its-own-delay.md)와 같은 규칙이다.
+
+메모리 지표는 두지 않았다. 프레임 소스가 최대 버퍼를 재는 건 1080p 큐가 클립당 50 MB라 메모리가 버퍼 설정의 교환 대상이기 때문이고, 스테레오 1초는 384 KB라 같은 검사를 두면 절대 실패할 수 없는 검사가 된다.
+
+### 측정값
+
+기본값(depth 8, lead 24000)으로 1080p30 합성 소재를 시나리오당 20초씩 측정했다. Apple M3 Pro의 macOS 기준이다.
+
+| 시나리오 | 오디오 트랙 | underrun | 시작 지연 p99 | 버퍼 간격 p99 | 링버퍼 최저 | drift |
+|---|---:|---:|---:|---:|---:|---:|
+| continuous-playback | 1 | 0 / 1875 | 48 ms | 13.2 ms | 2560 (53 ms) | 2.7 ms |
+| repeated-seek | 1 | 0 / 1875 | 74 ms | 13.2 ms | 2560 (53 ms) | 15.1 ms |
+| increasing-track-count | 2 | 0 / 1875 | 32 ms | 13.1 ms | 2560 (53 ms) | 2.0 ms |
+| increasing-track-count | 3 | 0 / 1875 | 52 ms | 13.2 ms | 2560 (53 ms) | 1.6 ms |
+| increasing-track-count | 4 | 0 / 1875 | 40 ms | 13.2 ms | 2560 (53 ms) | 0.8 ms |
+
+- 4트랙까지 전 항목 통과. 프레임 소스가 같은 머신에서 3~4트랙을 재현하지 못했던 것과 달리 오디오는 여유가 남는다. 디코더가 그림을 건드리지 않기 때문이다
+- 링버퍼 최저가 목표치 3072에 못 미치는 2560으로 고정된 건 피더가 목표에 닿으면 자고 한 블록(1024)씩 채우기 때문이다. 즉 여유는 한 블록이 아니라 53 ms 전부
+- `repeated-seek`의 drift가 다른 시나리오보다 큰 건 seek 자체가 아니라 재충전 경계에서 남는 잔여분이다. 기준 50 ms 안이고 underrun은 0이다
+
+짧은 타임라인으로 마지막 샘플 도달까지 확인한다. 10초 소재에 13초를 재생하면 한 번 wrap 하면서 `endedOnTheSample`이 검사된다.
+
+```bash
+DURATION_SECONDS=10 QUALITY_OUTPUT_DIR=/tmp/akbun-mv-short npm run quality:media
+npm run quality:audio -- /tmp/akbun-mv-short/project.akbunvideo --seconds 13
+```
+
 ## 기준선
 
 - [media-element-macos.json](./media-element-macos.json)

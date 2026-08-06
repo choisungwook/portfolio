@@ -1,6 +1,6 @@
 {
   "name": "akbun-makevideo",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "description": "Desktop video editor: multi track timeline, live preview, ffmpeg render to FHD and 4K",
   "author": "akbun",
@@ -13,8 +13,11 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render",
     "test:gpu": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor",
     "test:nogpu": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features",
+    "test:audio": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-audio",
+    "test:nodevice": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-audio --no-default-features",
     "quality:media": "bash scripts/generate-quality-media.sh",
     "quality:supply": "cargo run --release --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --bin supply-soak --",
+    "quality:audio": "cargo run --release --manifest-path src-tauri/Cargo.toml -p makevideo-audio --bin audio-soak --",
     "dist": "tauri build",
     "tauri": "tauri"
   },
