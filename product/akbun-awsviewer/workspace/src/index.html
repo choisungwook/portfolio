@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>akbun-awsviewer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Fixed left sidebar: brand on top, vertical menu below. -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17.5 18a4.5 4.5 0 0 0 .4-9 6 6 0 0 0-11.6 1.4A4 4 0 0 0 6.5 18z" />
+          <circle cx="11.5" cy="13.5" r="2.5" />
+          <path d="M13.4 15.4 16 18" />
+        </svg>
+      </span>
+      <h1>akbun-awsviewer</h1>
+    </div>
+    <nav>
+      <button class="tab-button active" data-tab="instances">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" />
+          </svg>
+        </span>
+        <span class="tab-label">Instances</span>
+      </button>
+      <button class="tab-button" data-tab="profile">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M5 20a7 7 0 0 1 14 0" />
+          </svg>
+        </span>
+        <span class="tab-label">AWS Profile</span>
+      </button>
+      <button class="tab-button" data-tab="settings">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.1-1.2L14 3h-4l-.5 2.7a7 7 0 0 0-2.1 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.1 1.2L10 21h4l.5-2.7a7 7 0 0 0 2.1-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z" />
+          </svg>
+        </span>
+        <span class="tab-label">Settings</span>
+      </button>
+    </nav>
+  </aside>
+
+  <div id="content">
+    <!-- Top bar: the current profile on the left, login on the right. -->
+    <header id="topbar">
+      <div id="topbar-profile">
+        <span class="topbar-label">Profile</span>
+        <span id="current-profile">none</span>
+        <span id="session-badge" class="session-badge logged-out">Not logged in</span>
+      </div>
+      <button id="login-button">Log in</button>
+    </header>
+
+    <div id="error-banner" class="hidden"></div>
+
+    <main>
+      <!-- Instances tab -->
+      <section id="tab-instances" class="tab active">
+        <div class="toolbar">
+          <input id="instance-filter" type="text"
+            placeholder="Filter by instance id or Name tag" />
+          <button id="refresh-instances">Refresh</button>
+        </div>
+        <p class="help">Click a header to sort by that column; click it again to flip the direction. Click a row for details.</p>
+        <table id="instance-table">
+          <thead>
+            <tr>
+              <th class="sortable" data-sort-key="name" tabindex="0" role="button" aria-sort="none">
+                Name<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="instanceId" tabindex="0" role="button" aria-sort="none">
+                Instance ID<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="state" tabindex="0" role="button" aria-sort="none">
+                State<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="instanceType" tabindex="0" role="button" aria-sort="none">
+                Type<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="availabilityZone" tabindex="0" role="button" aria-sort="none">
+                AZ<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="privateIp" tabindex="0" role="button" aria-sort="none">
+                Private IP<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="publicIp" tabindex="0" role="button" aria-sort="none">
+                Public IP<span class="sort-arrow"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="instance-empty" class="empty hidden">No instances.</p>
+        <p id="instance-login-hint" class="empty hidden">
+          Log in with the button in the top right to list instances.
+        </p>
+      </section>
+
+      <!-- AWS Profile tab -->
+      <section id="tab-profile" class="tab">
+        <p class="help">
+          Profiles come from ~/.aws/config. This app signs in through IAM
+          Identity Center only; profiles without SSO configuration are listed
+          but cannot be used.
+        </p>
+        <table id="profile-table">
+          <thead>
+            <tr>
+              <th>Profile</th>
+              <th>Region</th>
+              <th>SSO</th>
+              <th>Account</th>
+              <th>Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="profile-empty" class="empty hidden">
+          No profiles found in ~/.aws/config.
+        </p>
+      </section>
+
+      <!-- Settings tab -->
+      <section id="tab-settings" class="tab">
+        <h2>TLS</h2>
+        <div class="settings-form">
+          <label>
+            <input id="insecure-tls" type="checkbox" />
+            Skip TLS certificate verification on AWS calls
+          </label>
+        </div>
+        <p class="help">
+          Off by default. Turn this on only when a proxy resigns HTTPS with a
+          certificate the OS does not trust; it disables protection against
+          man-in-the-middle attacks.
+        </p>
+
+        <h2>Updates</h2>
+        <div class="settings-form">
+          <button id="check-updates">Check for Updates…</button>
+          <span id="update-status" class="help"></span>
+        </div>
+        <p class="help">Version <span id="app-version">-</span></p>
+      </section>
+    </main>
+  </div>
+
+  <!-- Opens when a row is clicked. Attached to the right so it does not
+       cover the table, like the AWS console's split view. -->
+  <aside id="detail-panel" class="hidden" role="dialog" aria-label="instance detail">
+    <div class="detail-header">
+      <h2 id="detail-title"></h2>
+      <div class="detail-actions">
+        <button id="refresh-detail">Refresh</button>
+        <button id="close-detail" aria-label="close">✕</button>
+      </div>
+    </div>
+    <div class="detail-tabs">
+      <button class="detail-tab-button active" data-detail-tab="details">Details</button>
+      <button class="detail-tab-button" data-detail-tab="network">Network</button>
+      <button class="detail-tab-button" data-detail-tab="storage">Storage</button>
+      <button class="detail-tab-button" data-detail-tab="security">Security</button>
+    </div>
+    <div id="detail-body"></div>
+  </aside>
+
+  <script src="lib.js"></script>
+  <script src="api.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

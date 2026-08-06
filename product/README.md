@@ -6,6 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
+| [akbun-awsviewer](./akbun-awsviewer/) | AWS profile을 골라 IAM Identity Center로 로그인하고 EC2를 조회 전용으로 보는 macOS 데스크톱 앱 |
 | [akbun-gitdesktop](./akbun-gitdesktop/) | git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱 |
 | [akbun-folderview](./akbun-folderview/) | 직접 추가한 사진과 영상을 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱 |
 | [akbun-makepresentation](./akbun-makepresentation/) | 도형, 텍스트, pptx 열기/저장, pdf 내보내기, 발표 모드를 갖춘 슬라이드 편집 macOS 데스크톱 앱 |
