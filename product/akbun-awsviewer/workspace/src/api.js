@@ -28,10 +28,10 @@ window.addEventListener('unhandledrejection', (event) => {
 const { invoke } = window.__TAURI__.core;
 
 async function checkUpdate() {
-  const { message, ask } = window.__TAURI__.dialog;
-  const { check } = window.__TAURI__.updater;
-  const { relaunch } = window.__TAURI__.process;
   try {
+    const { message, ask } = window.__TAURI__.dialog;
+    const { check } = window.__TAURI__.updater;
+    const { relaunch } = window.__TAURI__.process;
     const update = await check();
     if (!update) {
       await message('You are on the latest version.', { title: 'akbun-awsviewer' });
@@ -45,8 +45,11 @@ async function checkUpdate() {
     await update.downloadAndInstall();
     await relaunch();
   } catch (error) {
-    reportError(`update check: ${error}`);
-    await message(`Cannot check for updates.\n\n${error}`, {
+    const detail = error?.message || String(error);
+    reportError(`update check: ${detail}`);
+    // Optional chained: when the dialog plugin itself is what is missing,
+    // the log line above is the only reporting channel left.
+    await window.__TAURI__?.dialog?.message?.(`Cannot check for updates.\n\n${detail}`, {
       title: 'Update failed',
       kind: 'error',
     });

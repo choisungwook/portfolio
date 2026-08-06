@@ -75,7 +75,7 @@ function stateClass(state) {
 // The single largest unit is enough for a glance; sorting uses the raw
 // launchTime, not this label. Months and years are calendar approximations
 // (30 and 365 days), fine for a viewer.
-function formatAge(launchTime, nowMs) {
+function formatAge(launchTime, nowMs = Date.now()) {
   if (!launchTime) {
     return null;
   }

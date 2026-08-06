@@ -108,6 +108,7 @@ function renderInstances() {
 
   const body = $('#instance-table tbody');
   body.replaceChildren();
+  const nowMs = Date.now();
   for (const instance of rows) {
     const tr = document.createElement('tr');
     tr.dataset.instanceId = instance.instanceId;
@@ -120,7 +121,7 @@ function renderInstances() {
       el('td', null, dash(instance.availabilityZone)),
       el('td', null, dash(instance.privateIp)),
       el('td', null, dash(instance.publicIp)),
-      el('td', null, dash(lib.formatAge(instance.launchTime, Date.now()))),
+      el('td', null, dash(lib.formatAge(instance.launchTime, nowMs))),
     );
     tr.addEventListener('click', () => openDetail(instance.instanceId));
     body.append(tr);
@@ -363,6 +364,7 @@ function renderLoginDialog() {
   for (const profile of profiles) {
     const item = document.createElement('li');
     const button = el('button', 'login-profile-row');
+    button.type = 'button';
     const name = el('span', null, profile.name);
     if (profile.name === current) {
       name.append(' ', el('span', 'badge current', 'current'));
