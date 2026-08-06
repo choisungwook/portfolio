@@ -240,19 +240,19 @@ export function schemaExample(spec, schema, seen = [], depth = 0) {
 
   if (schema.$ref) {
     if (seen.includes(schema.$ref)) return null;
-    return schemaExample(spec, resolveRef(spec, schema.$ref), [...seen, schema.$ref], depth);
+    return schemaExample(spec, resolveRef(spec, schema.$ref), [...seen, schema.$ref], depth + 1);
   }
 
   // allOf is a merge, so the parts are combined; oneOf/anyOf is a choice, so the
   // first branch is shown rather than an object that satisfies none of them.
   if (Array.isArray(schema.allOf)) {
     return schema.allOf.reduce(
-      (acc, part) => Object.assign(acc, schemaExample(spec, part, seen, depth) ?? {}),
+      (acc, part) => Object.assign(acc, schemaExample(spec, part, seen, depth + 1) ?? {}),
       {},
     );
   }
   for (const key of ['oneOf', 'anyOf']) {
-    if (Array.isArray(schema[key])) return schemaExample(spec, schema[key][0], seen, depth);
+    if (Array.isArray(schema[key])) return schemaExample(spec, schema[key][0], seen, depth + 1);
   }
 
   if (Array.isArray(schema.enum)) return schema.enum[0] ?? null;

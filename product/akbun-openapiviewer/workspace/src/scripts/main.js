@@ -351,7 +351,7 @@ allButton.addEventListener('click', () => {
 });
 
 opList.addEventListener('click', (event) => {
-  const item = event.target.closest('.op-item');
+  const item = event.target.closest?.('.op-item');
   if (!item) return;
   state.view = { kind: 'op', id: item.dataset.id };
   setDrawer(false);
@@ -359,21 +359,21 @@ opList.addEventListener('click', (event) => {
 });
 
 detail.addEventListener('click', (event) => {
-  const lang = event.target.closest('[data-lang]');
+  const lang = event.target.closest?.('[data-lang]');
   if (lang) {
     state.lang = lang.dataset.lang;
     refreshCodeBoxes();
     return;
   }
 
-  const pretty = event.target.closest('[data-pretty]');
+  const pretty = event.target.closest?.('[data-pretty]');
   if (pretty) {
     state.pretty = pretty.dataset.pretty === '1';
     refreshCodeBoxes();
     return;
   }
 
-  const copy = event.target.closest('[data-copy]');
+  const copy = event.target.closest?.('[data-copy]');
   if (copy) {
     const code = copy.closest('.code-box').querySelector('.snippet').textContent;
     // No clipboard on an insecure origin, and the user can still select the
@@ -384,7 +384,7 @@ detail.addEventListener('click', (event) => {
     return;
   }
 
-  const button = event.target.closest('[data-page]');
+  const button = event.target.closest?.('[data-page]');
   if (!button || button.disabled) return;
   state.view = { kind: 'all', page: Number(button.dataset.page) };
   renderDetail();

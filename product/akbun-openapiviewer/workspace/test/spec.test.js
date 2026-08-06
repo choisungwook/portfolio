@@ -149,7 +149,7 @@ test('serverUrl takes the first server without its trailing slash', () => {
   assert.equal(serverUrl({}), 'https://api.example.com');
 });
 
-test('schemaExample fills a body and stops at circles', () => {
+test('schemaExample fills a body and stops at cycles', () => {
   assert.deepEqual(schemaExample(SAMPLE, { $ref: '#/components/schemas/Pet' }), {
     id: 0,
     name: 'string',
@@ -163,6 +163,20 @@ test('schemaExample fills a body and stops at circles', () => {
   });
   assert.equal(schemaExample({}, { type: 'boolean' }), true);
   assert.deepEqual(schemaExample({}, { allOf: [{ properties: { a: { type: 'string' } } }, { properties: { b: { type: 'boolean' } } }] }), { a: 'string', b: true });
+});
+
+test('schemaExample stops descending a chain of distinct $refs', () => {
+  // Every ref is a different name, so the cycle guard never fires and the depth
+  // limit is the only thing that can stop the descent.
+  const schemas = { S9: { type: 'string' } };
+  for (let i = 0; i < 9; i += 1) {
+    schemas[`S${i}`] = { type: 'object', properties: { next: { $ref: `#/components/schemas/S${i + 1}` } } };
+  }
+  const chain = { components: { schemas } };
+
+  assert.deepEqual(schemaExample(chain, { $ref: '#/components/schemas/S0' }), {
+    next: { next: { next: null } },
+  });
 });
 
 test('curl carries method, headers and body, on one line or several', () => {
