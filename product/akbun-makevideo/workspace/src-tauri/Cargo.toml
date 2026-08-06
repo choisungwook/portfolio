@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/time", "crates/edit", "crates/render", "crates/compositor"]
+members = ["crates/time", "crates/edit", "crates/render", "crates/compositor", "crates/audio"]
 
 [package]
 name = "akbun-makevideo"

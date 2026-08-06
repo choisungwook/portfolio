@@ -10,6 +10,7 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 | [timeline.md](./timeline.md) | The editing model, its commands and its undo, and what a time is |
 | [preview.md](./preview.md) | Stacked media elements, the clock, and what preview quality really changes |
 | [frame-source.md](./frame-source.md) | Frames at playback speed: a decoder per clip, each buffering ahead |
+| [audio.md](./audio.md) | The mix, the output, and the clock the picture follows |
 | [compositor.md](./compositor.md) | The one shader the preview frame and the render both draw with |
 | [render.md](./render.md) | The ffmpeg filter graph, line by line, and the render presets |
 | [acceleration.md](./acceleration.md) | GPU encoding: detection by trial, and the fallback |

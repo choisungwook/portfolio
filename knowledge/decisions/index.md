@@ -27,3 +27,4 @@
 * [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](2026-08-harness-does-not-count-its-own-delay.md) - 재생 공급 하네스에서 sleep 오차와 seek 직후 재충전을 늦은 프레임에서 빼고 별도 지표로 분리한 결정.
 * [브라우저에서 SVG를 PNG로 내보내려면 다이어그램을 더 단순하게 그린다](2026-08-svg-to-png-needs-a-plainer-svg.md) - canvas가 foreignObject를 빈칸으로 그리고 웹폰트를 받지 않으므로 렌더러 설정을 내보내기 쪽에 맞추는 결정.
 * [멀티 제품 저장소의 What's Changed는 제품 접두사로 이전 tag를 고정한다](2026-08-whats-changed-previous-tag-scoped.md) - generate-notes의 자동 이전 tag 선택이 다른 제품 릴리스를 가리키는 문제를 접두사 필터로 막는 결정.
+* [재생 시각의 기준은 오디오 출력이고 영상이 그것을 따라간다](2026-08-audio-is-the-master-clock.md) - 영상 편집 도구의 재생 클럭을 오디오 출력 진행량으로 삼고, 실시간 콜백에서 할당·잠금·파일 접근을 금지한 결정.

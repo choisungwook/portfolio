@@ -10,7 +10,7 @@
 //! index on the project rate. Floats would let the two callers round
 //! differently, which is exactly the divergence this removes.
 
-use crate::{AssetKind, Project, Rate, RationalTime, TrackKind};
+use crate::{Asset, AssetKind, Project, Rate, RationalTime, Track, TrackKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -56,6 +56,100 @@ impl Placement {
     pub fn duration(&self, rate: Rate) -> RationalTime {
         RationalTime::new(self.duration_frames, rate)
     }
+}
+
+/// Everything about one clip's sound that does not change while it plays.
+///
+/// The audio counterpart of `Placement`, and it exists for the same reason: the
+/// render mixes with `amix` and playback mixes in Rust, and the two have to
+/// agree on which clips are audible and where they sit. Times are frames of the
+/// project rate here; the sample offsets both sides use come from
+/// `RationalTime::to_samples`, so neither of them does the arithmetic twice.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AudioPlacement {
+    pub clip_id: String,
+    pub asset_id: String,
+    pub path: String,
+    pub kind: AssetKind,
+    pub start_frame: i64,
+    pub duration_frames: i64,
+    /// Where it starts inside the source, in frames of the project rate.
+    pub in_frame: i64,
+    pub volume: f32,
+}
+
+impl AudioPlacement {
+    pub fn end_frame(&self) -> i64 {
+        self.start_frame + self.duration_frames
+    }
+
+    pub fn covers(&self, frame: i64) -> bool {
+        frame >= self.start_frame && frame < self.end_frame()
+    }
+
+    pub fn in_time(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.in_frame, rate)
+    }
+
+    pub fn duration(&self, rate: Rate) -> RationalTime {
+        RationalTime::new(self.duration_frames, rate)
+    }
+}
+
+/// Whether this asset on this track puts sound into the output.
+///
+/// Written once because it is a rule with three parts and two callers. A hidden
+/// track is out whatever kind it is — hiding a video track to see what is under
+/// it silences it too. A muted track is out whichever kind it is, which for a
+/// video track means the picture stays and the sound goes. And an asset with no
+/// sound track contributes nothing to mix in the first place; a still never
+/// does.
+pub fn carries_sound(asset: &Asset, track: &Track) -> bool {
+    if track.hidden || track.muted {
+        return false;
+    }
+    match asset.kind {
+        AssetKind::Audio => true,
+        AssetKind::Video => asset.has_audio,
+        AssetKind::Image => false,
+    }
+}
+
+/// Every clip that is audible, video tracks first and then audio tracks, each
+/// in track order. The order does not change a sum, but keeping it the same as
+/// the render's input order means a report from either side lists the clips the
+/// same way.
+pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
+    let mut placements = Vec::new();
+    for kind in [TrackKind::Video, TrackKind::Audio] {
+        for track in project.tracks.iter().filter(|track| track.kind == kind) {
+            let mut clips: Vec<_> = track
+                .clips
+                .iter()
+                .filter(|clip| clip.duration_frames() > 0)
+                .collect();
+            clips.sort_by_key(|clip| clip.start);
+            for clip in clips {
+                let Some(asset) = project.asset(&clip.asset_id) else {
+                    continue;
+                };
+                if !carries_sound(asset, track) {
+                    continue;
+                }
+                placements.push(AudioPlacement {
+                    clip_id: clip.id.clone(),
+                    asset_id: asset.id.clone(),
+                    path: asset.path.clone(),
+                    kind: asset.kind,
+                    start_frame: clip.start,
+                    duration_frames: clip.duration_frames(),
+                    in_frame: clip.in_point,
+                    volume: clip.volume.max(0.0),
+                });
+            }
+        }
+    }
+    placements
 }
 
 /// One thing to draw for one frame, bottom layer first.
@@ -407,6 +501,132 @@ mod tests {
             vec![asset("a1", AssetKind::Audio, 0, 0)],
         );
         assert!(layers_at(&project, 30, 1920, 1080).is_empty());
+    }
+
+    fn audio_track(id: &str, clips: Vec<Clip>) -> Track {
+        Track {
+            id: id.into(),
+            kind: TrackKind::Audio,
+            name: id.into(),
+            clips,
+            muted: false,
+            hidden: false,
+        }
+    }
+
+    fn sounding(id: &str, kind: AssetKind) -> Asset {
+        Asset {
+            has_audio: true,
+            ..asset(id, kind, 1920, 1080)
+        }
+    }
+
+    fn audible(project: &Project) -> Vec<String> {
+        audio_placements(project)
+            .into_iter()
+            .map(|placement| placement.clip_id)
+            .collect()
+    }
+
+    #[test]
+    fn a_video_clip_with_sound_is_audible_and_a_silent_one_is_not() {
+        let mut project = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Video)],
+        );
+        assert_eq!(audible(&project), vec!["c1"]);
+        project.assets[0].has_audio = false;
+        assert!(audible(&project).is_empty());
+    }
+
+    #[test]
+    fn a_still_is_never_audible_however_it_is_labelled() {
+        let project = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Image)],
+        );
+        assert!(audible(&project).is_empty());
+    }
+
+    #[test]
+    fn muting_takes_the_sound_from_either_kind_of_track() {
+        // The asymmetry worth pinning: a muted video track keeps its picture
+        // and loses its sound, which is the pair of assertions here and next
+        // door in `a_muted_video_track_still_draws`.
+        let mut on_video = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Video)],
+        );
+        on_video.tracks[0].muted = true;
+        assert!(audible(&on_video).is_empty());
+        assert_eq!(layers_at(&on_video, 30, 1920, 1080).len(), 1);
+
+        let mut on_audio = project(
+            vec![audio_track("A1", vec![clip("c1", "a1", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Audio)],
+        );
+        assert_eq!(audible(&on_audio), vec!["c1"]);
+        on_audio.tracks[0].muted = true;
+        assert!(audible(&on_audio).is_empty());
+    }
+
+    #[test]
+    fn hiding_a_track_silences_it_too() {
+        // Hiding a track to see what is under it takes its sound with it, which
+        // is the point: what is left is what the render would produce.
+        let mut project = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Video)],
+        );
+        project.tracks[0].hidden = true;
+        assert!(audible(&project).is_empty());
+    }
+
+    #[test]
+    fn audible_clips_come_back_video_tracks_first_then_audio_tracks() {
+        // Not because a sum has an order, but because the render feeds its
+        // inputs to ffmpeg in this order and a report from either side should
+        // list the same clips the same way.
+        let project = project(
+            vec![
+                audio_track("A1", vec![clip("c3", "a2", 0, 0, 120)]),
+                video_track("V1", vec![clip("c1", "a1", 60, 0, 120)]),
+                video_track("V2", vec![clip("c2", "a1", 0, 0, 120)]),
+            ],
+            vec![sounding("a1", AssetKind::Video), sounding("a2", AssetKind::Audio)],
+        );
+        assert_eq!(audible(&project), vec!["c1", "c2", "c3"]);
+    }
+
+    #[test]
+    fn an_audible_clip_carries_its_own_volume_and_span() {
+        let mut project = project(
+            vec![video_track("V1", vec![clip("c1", "a1", 60, 45, 180)])],
+            vec![sounding("a1", AssetKind::Video)],
+        );
+        project.tracks[0].clips[0].volume = 0.25;
+        let placement = &audio_placements(&project)[0];
+        assert_eq!(placement.start_frame, 60);
+        assert_eq!(placement.duration_frames, 135);
+        assert_eq!(placement.end_frame(), 195);
+        assert_eq!(placement.in_frame, 45);
+        assert_eq!(placement.volume, 0.25);
+        assert!(placement.covers(60) && placement.covers(194));
+        assert!(!placement.covers(59) && !placement.covers(195));
+
+        // A negative volume is a file that has been edited by hand rather than
+        // an instruction to invert the phase.
+        project.tracks[0].clips[0].volume = -2.0;
+        assert_eq!(audio_placements(&project)[0].volume, 0.0);
+    }
+
+    #[test]
+    fn a_clip_pointing_at_an_asset_that_is_gone_is_simply_not_there() {
+        let project = project(
+            vec![video_track("V1", vec![clip("c1", "missing", 0, 0, 120)])],
+            vec![sounding("a1", AssetKind::Video)],
+        );
+        assert!(audible(&project).is_empty());
     }
 
     #[test]
