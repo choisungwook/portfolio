@@ -57,6 +57,18 @@ function formatPortRange(fromPort, toPort) {
   return `${fromPort} - ${toPort}`;
 }
 
+// EC2 instance states: green for running, red for the two end states, amber
+// for the transitions in between. Unknown or missing state gets no color
+// rather than pretending to be stopped.
+function stateClass(state) {
+  if (state === 'running') return 'state-running';
+  if (state === 'stopped' || state === 'terminated') return 'state-stopped';
+  if (state === 'pending' || state === 'stopping' || state === 'shutting-down') {
+    return 'state-transition';
+  }
+  return '';
+}
+
 function sessionLabel(session) {
   if (!session || !session.loggedIn) {
     return 'Not logged in';
@@ -72,6 +84,7 @@ const exported = {
   sortInstances,
   formatProtocol,
   formatPortRange,
+  stateClass,
   sessionLabel,
 };
 

@@ -55,12 +55,16 @@ pub fn load_token(path: &Path) -> Option<CachedToken> {
     serde_json::from_str(&text).ok()
 }
 
+/// Writes via a temp file and rename. The cache is shared with the AWS CLI,
+/// so a crash mid-write must not leave truncated JSON where a session was.
 pub fn save_token(path: &Path, token: &CachedToken) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let text = serde_json::to_string_pretty(token)?;
-    std::fs::write(path, text)
+    let temp = path.with_extension("json.tmp");
+    std::fs::write(&temp, text)?;
+    std::fs::rename(&temp, path)
 }
 
 /// Seconds until the token expires; negative when already expired, None when
@@ -150,6 +154,12 @@ mod tests {
         let original = token("2030-01-01T00:00:00Z");
         save_token(&path, &original).unwrap();
         assert_eq!(load_token(&path), Some(original));
+        // The atomic write must not leave its temp file behind.
+        let entries: Vec<_> = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(entries.len(), 1);
     }
 
     #[test]

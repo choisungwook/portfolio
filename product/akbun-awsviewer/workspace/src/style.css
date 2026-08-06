@@ -18,6 +18,7 @@
   --accent-soft: #eff6ff;
   --success: #15803d;
   --success-bg: #ecfdf3;
+  --warning: #b45309;
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
@@ -44,6 +45,7 @@
     --accent-soft: #1c2a41;
     --success: #4ade80;
     --success-bg: #16301f;
+    --warning: #fbbf24;
     --danger: #f87171;
     --danger-bg: #33201f;
     --danger-border: #7f2c2c;
@@ -338,6 +340,10 @@ th[aria-sort="descending"] .sort-arrow::after {
 
 .state-stopped {
   color: var(--danger);
+}
+
+.state-transition {
+  color: var(--warning);
 }
 
 .badge {

@@ -7,6 +7,7 @@ const {
   sortInstances,
   formatProtocol,
   formatPortRange,
+  stateClass,
   sessionLabel,
 } = require('../src/lib.js');
 
@@ -57,6 +58,17 @@ test('port ranges collapse when both ends match', () => {
   assert.strictEqual(formatPortRange(1024, 2048), '1024 - 2048');
   assert.strictEqual(formatPortRange(null, null), 'all');
   assert.strictEqual(formatPortRange(0, 0), '0');
+});
+
+test('state colors: green running, red end states, amber transitions', () => {
+  assert.strictEqual(stateClass('running'), 'state-running');
+  assert.strictEqual(stateClass('stopped'), 'state-stopped');
+  assert.strictEqual(stateClass('terminated'), 'state-stopped');
+  assert.strictEqual(stateClass('pending'), 'state-transition');
+  assert.strictEqual(stateClass('stopping'), 'state-transition');
+  assert.strictEqual(stateClass('shutting-down'), 'state-transition');
+  assert.strictEqual(stateClass(null), '');
+  assert.strictEqual(stateClass('weird'), '');
 });
 
 test('session label states', () => {

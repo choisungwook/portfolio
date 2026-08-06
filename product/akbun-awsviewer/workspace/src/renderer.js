@@ -5,7 +5,7 @@
 // an AWS call. Data changes only on Refresh, profile switch, and login.
 
 const api = globalThis.awsviewerApi;
-const { filterInstances, sortInstances, formatProtocol, formatPortRange, sessionLabel } =
+const { filterInstances, sortInstances, formatProtocol, formatPortRange, stateClass, sessionLabel } =
   globalThis.awsviewerLib;
 
 const state = {
@@ -108,7 +108,7 @@ function renderInstances() {
     tr.append(
       el('td', null, dash(instance.name)),
       el('td', null, instance.instanceId),
-      el('td', instance.state === 'running' ? 'state-running' : 'state-stopped', dash(instance.state)),
+      el('td', stateClass(instance.state) || null, dash(instance.state)),
       el('td', null, dash(instance.instanceType)),
       el('td', null, dash(instance.availabilityZone)),
       el('td', null, dash(instance.privateIp)),
@@ -429,6 +429,9 @@ function wire() {
     try {
       applySnapshot(await api.setInsecureTls(event.target.checked));
     } catch (error) {
+      // The toggle did not persist; put the checkbox back where the stored
+      // settings are so the UI never claims a state the backend refused.
+      event.target.checked = Boolean(state.snapshot?.settings?.insecureTls);
       handleError(error);
     }
   });
