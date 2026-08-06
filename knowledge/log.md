@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-06
+
+* **Creation**: [멀티 제품 저장소의 What's Changed는 제품 접두사로 이전 tag를 고정한다](decisions/2026-08-whats-changed-previous-tag-scoped.md) 결정 기록. akbun-requesthttp의 release workflow를 makepresentation에서 복사하다가, generate-notes의 이전 tag 자동 선택이 멀티 제품 저장소에서는 남의 제품 tag를 고른다는 것을 알게 되어 남긴다.
+
 ## 2026-08-04
 
 * **Creation**: [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](decisions/2026-08-harness-does-not-count-its-own-delay.md) 결정 기록. akbun-makevideo의 프레임 공급 계측을 만들면서, 처음 나온 300 프레임 중 126개 지연이 대부분 하네스의 sleep 오차와 seek 재충전이었다는 것을 알게 되어 남긴다.

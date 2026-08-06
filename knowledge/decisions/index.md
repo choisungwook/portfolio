@@ -26,3 +26,4 @@
 * [편집 모델은 backend가 소유하고 편집은 역연산을 가진 명령으로 표현한다](2026-08-edit-model-owned-by-the-backend.md) - 편집 상태 소유권을 페이지에서 Rust로 옮기고 undo를 상태 복사가 아닌 명령 이력으로 만든 결정.
 * [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](2026-08-harness-does-not-count-its-own-delay.md) - 재생 공급 하네스에서 sleep 오차와 seek 직후 재충전을 늦은 프레임에서 빼고 별도 지표로 분리한 결정.
 * [브라우저에서 SVG를 PNG로 내보내려면 다이어그램을 더 단순하게 그린다](2026-08-svg-to-png-needs-a-plainer-svg.md) - canvas가 foreignObject를 빈칸으로 그리고 웹폰트를 받지 않으므로 렌더러 설정을 내보내기 쪽에 맞추는 결정.
+* [멀티 제품 저장소의 What's Changed는 제품 접두사로 이전 tag를 고정한다](2026-08-whats-changed-previous-tag-scoped.md) - generate-notes의 자동 이전 tag 선택이 다른 제품 릴리스를 가리키는 문제를 접두사 필터로 막는 결정.

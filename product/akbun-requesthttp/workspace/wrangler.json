@@ -1,0 +1,9 @@
+{
+  "name": "akbun-requesthttp",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-08-06",
+  "assets": {
+    "directory": "./src",
+    "binding": "ASSETS"
+  }
+}
