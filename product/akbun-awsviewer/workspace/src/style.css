@@ -366,14 +366,53 @@ th[aria-sort="descending"] .sort-arrow::after {
   color: var(--muted);
 }
 
-#error-banner {
-  margin: 10px 20px 0;
-  padding: 8px 12px;
+#error-dialog {
+  width: min(460px, calc(100vw - 40px));
+  padding: 0;
   border: 1px solid var(--danger-border);
-  border-radius: 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+  color: var(--text);
+}
+
+#error-dialog::backdrop {
+  background: rgb(15 23 42 / 45%);
+}
+
+.error-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger);
+}
+
+.error-dialog-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.error-dialog-header button {
+  padding: 3px 7px;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+#error-message {
+  margin: 0;
+  padding: 18px 16px;
   overflow-wrap: anywhere;
+}
+
+.error-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
 }
 
 .settings-form {

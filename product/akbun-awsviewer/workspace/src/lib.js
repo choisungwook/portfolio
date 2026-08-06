@@ -88,10 +88,10 @@ const exported = {
   sessionLabel,
 };
 
-// One export name for both worlds: require() for node --test, a single global
-// for the script tag. Individual top-level names would collide across tags.
+// Always publish the browser global. Some WebViews expose a CommonJS-like
+// `module` object even though scripts are loaded with script tags.
+globalThis.awsviewerLib = exported;
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = exported;
-} else {
-  globalThis.awsviewerLib = exported;
 }

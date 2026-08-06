@@ -35,13 +35,15 @@ function dash(value) {
 // ---------------------------------------------------------------- errors
 
 function showError(message) {
-  const banner = $('#error-banner');
-  banner.textContent = message;
-  banner.classList.remove('hidden');
+  const dialog = $('#error-dialog');
+  $('#error-message').textContent = message;
+  if (!dialog.open) dialog.showModal();
+  $('#confirm-error-dialog').focus();
 }
 
 function clearError() {
-  $('#error-banner').classList.add('hidden');
+  const dialog = $('#error-dialog');
+  if (dialog.open) dialog.close();
 }
 
 /// Command failures arrive as { kind, message } from the backend, or as a
@@ -381,6 +383,14 @@ function switchTab(name) {
 }
 
 function wire() {
+  const errorDialog = $('#error-dialog');
+  const closeErrorDialog = () => errorDialog.close();
+  $('#close-error-dialog').addEventListener('click', closeErrorDialog);
+  $('#confirm-error-dialog').addEventListener('click', closeErrorDialog);
+  errorDialog.addEventListener('click', (event) => {
+    if (event.target === errorDialog) closeErrorDialog();
+  });
+
   for (const tabButton of document.querySelectorAll('#sidebar .tab-button')) {
     tabButton.addEventListener('click', () => switchTab(tabButton.dataset.tab));
   }
