@@ -5,14 +5,18 @@
 // an AWS call. Data changes only on Refresh, profile switch, and login.
 
 const api = globalThis.awsviewerApi;
-const { filterInstances, sortInstances, formatProtocol, formatPortRange, stateClass, sessionLabel } =
-  globalThis.awsviewerLib;
+// Accessed through the namespace only. Classic scripts share one global
+// scope, so a top-level `const { filterInstances } = …` here collides with
+// lib.js's function declarations and kills this whole file with a parse
+// error before a single listener is wired. That was the v0.1.0/v0.1.1 bug.
+const lib = globalThis.awsviewerLib;
 
 const state = {
   snapshot: null,
   instances: [],
   loaded: false,
   filter: '',
+  spotOnly: false,
   sort: { key: 'name', direction: 'asc' },
   selectedId: null,
   detail: null,
@@ -57,9 +61,10 @@ function errorInfo(error) {
 
 function handleError(error) {
   const info = errorInfo(error);
+  reportError(`${info.kind}: ${info.message}`);
   if (info.kind === 'login_required') {
     setLoginHint(true);
-    showError('The session for this profile is missing or expired. Log in from the top right.');
+    showError('The session for this profile is missing or expired. Use AWS login in the top right.');
   } else if (info.kind === 'cancelled') {
     clearError();
   } else {
@@ -75,7 +80,7 @@ function renderTopbar() {
   const session = state.snapshot?.session || null;
   $('#current-profile').textContent = settings.profile || 'none';
   const badge = $('#session-badge');
-  badge.textContent = sessionLabel(session);
+  badge.textContent = lib.sessionLabel(session);
   badge.classList.toggle('logged-in', Boolean(session?.loggedIn));
   badge.classList.toggle('logged-out', !session?.loggedIn);
 }
@@ -87,8 +92,8 @@ function setLoginHint(visible) {
 }
 
 function renderInstances() {
-  const rows = sortInstances(
-    filterInstances(state.instances, state.filter),
+  const rows = lib.sortInstances(
+    lib.filterInstances(state.instances, state.filter, state.spotOnly),
     state.sort.key,
     state.sort.direction,
   );
@@ -103,6 +108,7 @@ function renderInstances() {
 
   const body = $('#instance-table tbody');
   body.replaceChildren();
+  const nowMs = Date.now();
   for (const instance of rows) {
     const tr = document.createElement('tr');
     tr.dataset.instanceId = instance.instanceId;
@@ -110,11 +116,12 @@ function renderInstances() {
     tr.append(
       el('td', null, dash(instance.name)),
       el('td', null, instance.instanceId),
-      el('td', stateClass(instance.state) || null, dash(instance.state)),
+      el('td', lib.stateClass(instance.state) || null, dash(instance.state)),
       el('td', null, dash(instance.instanceType)),
       el('td', null, dash(instance.availabilityZone)),
       el('td', null, dash(instance.privateIp)),
       el('td', null, dash(instance.publicIp)),
+      el('td', null, dash(lib.formatAge(instance.launchTime, nowMs))),
     );
     tr.addEventListener('click', () => openDetail(instance.instanceId));
     body.append(tr);
@@ -163,8 +170,8 @@ function ruleTable(rules) {
   for (const rule of rules) {
     const tr = document.createElement('tr');
     tr.append(
-      el('td', null, formatProtocol(rule.protocol)),
-      el('td', null, formatPortRange(rule.fromPort, rule.toPort)),
+      el('td', null, lib.formatProtocol(rule.protocol)),
+      el('td', null, lib.formatPortRange(rule.fromPort, rule.toPort)),
       el('td', null, rule.sources.length ? rule.sources.join(', ') : '-'),
     );
     body.append(tr);
@@ -290,6 +297,8 @@ function closeDetail() {
 
 // ---------------------------------------------------------------- profiles
 
+// Read-only listing; signing in to a profile happens in the AWS login
+// dialog, not here.
 function renderProfiles() {
   const profiles = state.snapshot?.profiles || [];
   const current = state.snapshot?.settings?.profile || null;
@@ -301,10 +310,6 @@ function renderProfiles() {
     const action = el('td');
     if (profile.name === current) {
       action.append(el('span', 'badge current', 'current'));
-    } else {
-      const button = el('button', 'select-profile', 'Use');
-      button.addEventListener('click', () => useProfile(profile.name));
-      action.append(button);
     }
     tr.append(
       el('td', null, profile.name),
@@ -325,6 +330,7 @@ function applySnapshot(snapshot) {
   renderProfiles();
   $('#insecure-tls').checked = Boolean(snapshot.settings.insecureTls);
   $('#app-version').textContent = snapshot.version;
+  $('#log-dir').textContent = snapshot.logDir || '';
 }
 
 async function useProfile(name) {
@@ -348,12 +354,61 @@ async function useProfile(name) {
 
 // ---------------------------------------------------------------- login
 
-async function login() {
-  const button = $('#login-button');
-  if (!state.snapshot?.settings?.profile) {
-    showError('Pick a profile in the AWS Profile tab first.');
+// The dialog lists only profiles the SSO flow can use; the AWS Profile tab
+// keeps showing everything.
+function renderLoginDialog() {
+  const profiles = (state.snapshot?.profiles || []).filter((profile) => profile.sso);
+  const current = state.snapshot?.settings?.profile || null;
+  const list = $('#login-profile-list');
+  list.replaceChildren();
+  for (const profile of profiles) {
+    const item = document.createElement('li');
+    const button = el('button', 'login-profile-row');
+    button.type = 'button';
+    const name = el('span', null, profile.name);
+    if (profile.name === current) {
+      name.append(' ', el('span', 'badge current', 'current'));
+    }
+    const meta = [profile.region, profile.sso.accountId, profile.sso.roleName]
+      .filter(Boolean)
+      .join(' · ');
+    button.append(name, el('span', 'login-profile-meta', meta));
+    button.addEventListener('click', () => loginWithProfile(profile.name));
+    item.append(button);
+    list.append(item);
+  }
+  $('#login-profile-empty').classList.toggle('hidden', profiles.length > 0);
+}
+
+async function openLoginDialog() {
+  // Re-read ~/.aws/config on every open so a profile added while the app is
+  // running shows up without a restart.
+  try {
+    applySnapshot(await api.getSnapshot());
+  } catch (error) {
+    handleError(error);
     return;
   }
+  renderLoginDialog();
+  $('#login-dialog').showModal();
+}
+
+function closeLoginDialog() {
+  const dialog = $('#login-dialog');
+  if (dialog.open) dialog.close();
+}
+
+async function loginWithProfile(name) {
+  closeLoginDialog();
+  await useProfile(name);
+  // Selection failed (already reported) — do not sign in to the old profile.
+  if (state.snapshot?.settings?.profile !== name) return;
+  if (state.snapshot?.session?.loggedIn) return;
+  await login();
+}
+
+async function login() {
+  const button = $('#login-button');
   button.disabled = true;
   button.textContent = 'Waiting for sign-in…';
   try {
@@ -366,7 +421,7 @@ async function login() {
     handleError(error);
   } finally {
     button.disabled = false;
-    button.textContent = 'Log in';
+    button.textContent = 'AWS login';
     renderTopbar();
   }
 }
@@ -395,10 +450,20 @@ function wire() {
     tabButton.addEventListener('click', () => switchTab(tabButton.dataset.tab));
   }
 
-  $('#login-button').addEventListener('click', login);
+  const loginDialog = $('#login-dialog');
+  $('#close-login-dialog').addEventListener('click', closeLoginDialog);
+  loginDialog.addEventListener('click', (event) => {
+    if (event.target === loginDialog) closeLoginDialog();
+  });
+
+  $('#login-button').addEventListener('click', openLoginDialog);
   $('#refresh-instances').addEventListener('click', loadInstances);
   $('#instance-filter').addEventListener('input', (event) => {
     state.filter = event.target.value;
+    renderInstances();
+  });
+  $('#spot-only').addEventListener('change', (event) => {
+    state.spotOnly = event.target.checked;
     renderInstances();
   });
 
@@ -446,19 +511,21 @@ function wire() {
     }
   });
 
-  $('#check-updates').addEventListener('click', async () => {
-    const status = $('#update-status');
-    const button = $('#check-updates');
-    button.disabled = true;
-    try {
-      await api.checkUpdate((text) => {
-        status.textContent = text;
-      });
-    } catch (error) {
-      status.textContent = `Update failed: ${errorInfo(error).message}`;
-    } finally {
-      button.disabled = false;
-    }
+  // Two entry points, one flow: the topbar button mirrors the Settings one so
+  // an update is reachable without knowing the Settings tab exists.
+  for (const button of [$('#update-button'), $('#check-updates')]) {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await api.checkUpdate();
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  $('#open-log-dir').addEventListener('click', () => {
+    api.openLogDir().catch(handleError);
   });
 }
 

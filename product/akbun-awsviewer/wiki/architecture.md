@@ -20,16 +20,21 @@ The page owns the instance array; filtering and sorting run in lib.js on every k
 
 | Command | Does |
 |---|---|
-| get_snapshot | profiles + settings + session status + version, one round trip |
+| get_snapshot | profiles + settings + session status + version + log dir, one round trip |
 | select_profile | persists the choice, clears the credential cache, returns a snapshot |
 | set_insecure_tls | persists the TLS toggle, returns a snapshot |
 | sso_login | whole device flow: opens the login window, polls, writes the token cache |
 | list_instances | DescribeInstances for the selected profile's region |
 | instance_detail | one instance joined with its volumes and security groups |
+| open_log_dir | reveals the error log folder in Finder |
 
 Errors cross the boundary as `{ kind, message }`. The page treats `login_required` as "show the login hint", not as an error dump.
 
+api.js loads first and registers window `error`/`unhandledrejection` hooks before anything that can fail; together with the log plugin they append every uncaught page error — including a parse error in a later script — to a file under app_log_dir (~/Library/Logs/io.akbun.awsviewer). A log that has the startup line but no page errors and still misbehaves points at the webview, not the backend.
+
 ## Login flow
+
+The AWS login button in the topbar opens a profile picker dialog listing the SSO-capable profiles. Picking one selects it and, when the cached session is not already valid, starts this flow. The AWS Profile tab is a read-only listing.
 
 1. `sso_login` registers a public OIDC client and starts device authorization (both unsigned calls, this is how a client without credentials gets its first token).
 2. The verification URL opens in a separate `sso-login` window. That window is not in capabilities/default.json, so the remote identity page gets no IPC.

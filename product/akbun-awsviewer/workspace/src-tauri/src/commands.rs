@@ -39,6 +39,7 @@ pub struct Snapshot {
     pub settings: Settings,
     pub session: Option<SessionStatus>,
     pub version: String,
+    pub log_dir: String,
 }
 
 fn io_error(message: String) -> CoreError {
@@ -106,12 +107,33 @@ fn snapshot(app: &AppHandle, state: &State<'_, AppState>) -> Result<Snapshot, Co
         settings,
         session,
         version: app.package_info().version.to_string(),
+        log_dir: log_dir(app)
+            .map(|dir| dir.display().to_string())
+            .unwrap_or_default(),
     })
 }
 
 #[tauri::command]
 pub fn get_snapshot(app: AppHandle, state: State<'_, AppState>) -> Result<Snapshot, CoreError> {
     snapshot(&app, &state)
+}
+
+fn log_dir(app: &AppHandle) -> Result<PathBuf, CoreError> {
+    app.path()
+        .app_log_dir()
+        .map_err(|error| io_error(format!("no log directory: {error}")))
+}
+
+/// Reveals the error log folder in Finder. The bundle only targets macOS
+/// (app/dmg), so `open` is enough.
+#[tauri::command]
+pub fn open_log_dir(app: AppHandle) -> Result<(), CoreError> {
+    let dir = log_dir(&app)?;
+    std::process::Command::new("open")
+        .arg(&dir)
+        .spawn()
+        .map_err(|error| io_error(format!("cannot open {dir:?}: {error}")))?;
+    Ok(())
 }
 
 #[tauri::command]

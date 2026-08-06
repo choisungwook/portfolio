@@ -20,6 +20,8 @@ pub struct InstanceSummary {
     pub private_ip: Option<String>,
     pub public_ip: Option<String>,
     pub launch_time: Option<String>,
+    /// "spot" for spot instances; the API omits it for on-demand.
+    pub lifecycle: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -239,6 +241,9 @@ pub fn map_summary(instance: &Instance) -> InstanceSummary {
         launch_time: instance.launch_time().and_then(|t| {
             t.fmt(aws_smithy_types::date_time::Format::DateTime).ok()
         }),
+        lifecycle: instance
+            .instance_lifecycle()
+            .map(|l| l.as_str().to_string()),
     }
 }
 
@@ -453,6 +458,17 @@ mod tests {
         assert_eq!(summary.state.as_deref(), Some("running"));
         assert_eq!(summary.instance_type.as_deref(), Some("t4g.small"));
         assert_eq!(summary.availability_zone.as_deref(), Some("ap-northeast-2a"));
+        assert_eq!(summary.lifecycle, None);
+    }
+
+    #[test]
+    fn summary_marks_spot_lifecycle() {
+        let instance = Instance::builder()
+            .instance_id("i-spot")
+            .instance_lifecycle(aws_sdk_ec2::types::InstanceLifecycleType::Spot)
+            .build();
+        let summary = map_summary(&instance);
+        assert_eq!(summary.lifecycle.as_deref(), Some("spot"));
     }
 
     #[test]

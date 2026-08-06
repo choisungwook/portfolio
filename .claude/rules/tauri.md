@@ -65,7 +65,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 ```
 
-A script tag makes that file's top level names globals on the page, so destructuring them in another script fails with `Identifier has already been declared`. Keep the exports behind one name.
+A script tag makes that file's top level names globals on the page, so destructuring them in another script fails with `Identifier has already been declared`. Keep the exports behind one name, and consume them through that name too — `const lib = globalThis.myAppLib`, never a top-level destructure of the same function names. The collision is a parse error that kills the consuming file before it wires a single listener, so the symptom is every control dead at once; akbun-awsviewer shipped two frozen releases this way. When the whole page is dead, read the webview console before changing any code.
 
 ## Returning state
 

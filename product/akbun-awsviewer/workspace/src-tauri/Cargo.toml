@@ -28,6 +28,11 @@ tauri-build = { version = "2", features = [] }
 # WebKit on the runner.
 awsviewer-core = { path = "crates/core" }
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+# Page and backend errors go to a file under app_log_dir, so a dead-on-arrival
+# window still leaves something to debug from.
+tauri-plugin-log = "2"
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
