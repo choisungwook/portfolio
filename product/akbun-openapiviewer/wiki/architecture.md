@@ -8,7 +8,7 @@ There are two JavaScript files and the line between them is the only structural 
 
 | File | Holds | Tested by |
 |---|---|---|
-| `src/lib/spec.js` | Parsing, flattening, search, paging, `$ref` resolution, schema text. Plain functions over objects and strings | `node --test`, no browser |
+| `src/lib/spec.js` | Parsing, flattening, search, paging, `$ref` resolution, schema text, request snippets. Plain functions over objects and strings | `node --test`, no browser |
 | `src/scripts/main.js` | Everything that touches the DOM and `localStorage` | The browser |
 
 `spec.js` imports only `js-yaml`. That is what lets the pull request job run the tests on a bare ubuntu runner in seconds. `main.js` is a wiring file: it reads elements by id, holds the view state, and hands anything that needs logic to `spec.js`.
@@ -48,6 +48,16 @@ The parameter table is the one piece that does not use the breakpoint. Five colu
 Text rather than a collapsible tree was deliberate. The output is greppable with the browser's find, needs no per-node event handling, and one function covers every schema shape. The day interactive collapsing is wanted, it replaces one function and one CSS class.
 
 `resolveRef` walks local `#/` JSON pointers only, with `~0`/`~1` unescaping. Remote and file refs render as `(unresolved $ref)` instead of failing the page, because fetching them would make the page a network client and most pasted specs are self-contained.
+
+## Request snippets
+
+`snippet(spec, op, lang, pretty)` writes one operation as curl, python httpx or python requests. It builds the URL from the first declared server (`https://api.example.com` when the document names none) plus the path, appends required query parameters, collects required header parameters, and derives a body from the first JSON content type through `schemaExample`. Path placeholders are left as `{petId}`, and optional parameters are left out; the reasoning is in [the ADR](../adr/2026-08-request-snippets-from-the-schema.md).
+
+`schemaExample` mirrors `schemaText` but returns a value rather than a line: `example` wins, `allOf` merges, `oneOf`/`anyOf` takes the first branch, an enum takes its first member, and scalars become a placeholder of their type. It shares the same circular and depth guards.
+
+The two shapes come from the same builders. `pretty` splits curl on `\` continuations and the python calls one argument per line; the one-line form joins them and collapses the JSON. `pyLiteral` is what keeps python python — `True`, `False`, `None`, not the JSON spellings — and it handles both indentations, so there is one serializer rather than two.
+
+`main.js` keeps the chosen language and wrapping in `state`, shared by every card on the page. Changing either does not re-render the detail pane: `refreshCodeBoxes` rewrites the inside of each `.code-box` in place, because a full re-render scrolls the reader back to the top of a ten-card page. Copy goes through `navigator.clipboard` inside a promise chain, so a page served over plain HTTP flashes "Failed" on the button rather than throwing.
 
 ## Loading and storage
 

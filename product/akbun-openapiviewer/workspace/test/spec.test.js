@@ -11,6 +11,9 @@ import {
   pageSlice,
   resolveRef,
   schemaText,
+  serverUrl,
+  schemaExample,
+  snippet,
 } from '../src/lib/spec.js';
 import { SAMPLE_SPEC } from '../src/lib/sample.js';
 
@@ -133,4 +136,131 @@ test('schemaText labels scalars with format and enum', () => {
   assert.equal(schemaText({}, { type: 'integer', format: 'int64' }), 'integer(int64)');
   assert.equal(schemaText({}, { type: 'string', enum: ['a', 'b'] }), 'string enum[a, b]');
   assert.equal(schemaText({}, null), 'any');
+});
+
+// ===== Request snippets =====
+
+const SAMPLE = parseSpec(SAMPLE_SPEC);
+const opById = (spec, id) => listOperations(spec).find((op) => op.id === id);
+
+test('serverUrl takes the first server without its trailing slash', () => {
+  assert.equal(serverUrl({ servers: [{ url: 'https://api.dev/v1/' }] }), 'https://api.dev/v1');
+  assert.equal(serverUrl({ servers: [] }), 'https://api.example.com');
+  assert.equal(serverUrl({}), 'https://api.example.com');
+});
+
+test('schemaExample fills a body and stops at circles', () => {
+  assert.deepEqual(schemaExample(SAMPLE, { $ref: '#/components/schemas/Pet' }), {
+    id: 0,
+    name: 'string',
+    tag: 'string',
+    status: 'available',
+  });
+  assert.deepEqual(schemaExample(MINIMAL, { $ref: '#/components/schemas/Pet' }), {
+    name: 'string',
+    friend: null,
+    tags: ['string'],
+  });
+  assert.equal(schemaExample({}, { type: 'boolean' }), true);
+  assert.deepEqual(schemaExample({}, { allOf: [{ properties: { a: { type: 'string' } } }, { properties: { b: { type: 'boolean' } } }] }), { a: 'string', b: true });
+});
+
+test('curl carries method, headers and body, on one line or several', () => {
+  const post = opById(SAMPLE, 'post /pets');
+
+  const oneLine = snippet(SAMPLE, post, 'curl', false);
+  assert.equal(oneLine.split('\n').length, 1);
+  assert.match(oneLine, /^curl -X POST 'https:\/\/api\.example\.com\/pets'/);
+  assert.match(oneLine, /-H 'Content-Type: application\/json'/);
+  assert.match(oneLine, /-d '\{"id":0,"name":"string"/);
+
+  const pretty = snippet(SAMPLE, post, 'curl', true);
+  assert.match(pretty, /curl -X POST '[^']+' \\\n {2}-H /);
+  assert.match(pretty, /-d '\{\n {2}"id": 0/);
+});
+
+test('curl leaves path placeholders and adds required query parameters', () => {
+  const get = snippet(SAMPLE, opById(SAMPLE, 'get /pets/{petId}'), 'curl', false);
+  assert.match(get, /'https:\/\/api\.example\.com\/pets\/\{petId\}'/);
+  assert.doesNotMatch(get, / -d /);
+
+  const spec = parseSpec(JSON.stringify({
+    openapi: '3.0.3',
+    servers: [{ url: 'https://api.dev' }],
+    paths: {
+      '/search': {
+        get: {
+          parameters: [
+            { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
+            { name: 'page', in: 'query', schema: { type: 'integer' } },
+            { name: 'X-Key', in: 'header', required: true, example: 'abc', schema: { type: 'string' } },
+          ],
+        },
+      },
+    },
+  }));
+  const code = snippet(spec, opById(spec, 'get /search'), 'curl', false);
+  assert.match(code, /'https:\/\/api\.dev\/search\?q=string'/);
+  assert.match(code, /-H 'X-Key: abc'/);
+});
+
+test('curl escapes a single quote inside the payload', () => {
+  const spec = parseSpec(JSON.stringify({
+    openapi: '3.0.3',
+    paths: {
+      '/notes': {
+        post: {
+          requestBody: {
+            content: { 'application/json': { schema: { properties: { text: { type: 'string', example: "it's" } } } } },
+          },
+        },
+      },
+    },
+  }));
+  const code = snippet(spec, opById(spec, 'post /notes'), 'curl', false);
+  assert.match(code, /-d '\{"text":"it'\\''s"\}'/);
+});
+
+test('python snippets pick the client and the wrapping', () => {
+  const post = opById(SAMPLE, 'post /pets');
+
+  const pretty = snippet(SAMPLE, post, 'httpx', true);
+  assert.match(pretty, /^import httpx\n\nresponse = httpx\.post\(\n/);
+  assert.match(pretty, /\n {4}"https:\/\/api\.example\.com\/pets",\n/);
+  assert.match(pretty, /json=\{\n {8}"id": 0,/);
+  assert.ok(pretty.endsWith('\n)\nprint(response.json())'));
+
+  const oneLine = snippet(SAMPLE, post, 'requests', false);
+  assert.equal(oneLine.split('\n').length, 1);
+  assert.match(oneLine, /^import requests; print\(requests\.post\("https:/);
+  assert.match(oneLine, /json=\{"id": 0, "name": "string"/);
+});
+
+test('python writes True/False/None, not the JSON spellings', () => {
+  const spec = parseSpec(JSON.stringify({
+    openapi: '3.0.3',
+    paths: {
+      '/flags': {
+        post: {
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: { properties: { on: { type: 'boolean' }, note: {} } },
+              },
+            },
+          },
+        },
+      },
+    },
+  }));
+  const code = snippet(spec, opById(spec, 'post /flags'), 'httpx', false);
+  assert.match(code, /json=\{"on": True, "note": None\}/);
+});
+
+test('a method without a named python function goes through request()', () => {
+  const spec = parseSpec(JSON.stringify({
+    openapi: '3.0.3',
+    paths: { '/echo': { trace: {} } },
+  }));
+  assert.match(snippet(spec, opById(spec, 'trace /echo'), 'httpx', false), /httpx\.request\("TRACE", "https:/);
 });
