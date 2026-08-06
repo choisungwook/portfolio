@@ -17,6 +17,7 @@ Deployed as a static Astro build on Cloudflare.
 | Restore | The spec is kept in `localStorage`, so a reload or a closed tab does not lose it |
 | Phone | Below 720px the API list becomes a drawer opened from the header, so an operation gets the whole screen, and each parameter reads down a card instead of across a table too wide to fit |
 
+
 ## Directory layout
 
 | Directory | Description |
