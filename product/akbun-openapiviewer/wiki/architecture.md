@@ -53,4 +53,6 @@ Text rather than a collapsible tree was deliberate. The output is greppable with
 
 `parseSpec` tries JSON when the text starts with `{`, because `JSON.parse` produces the better error message, and hands everything else to `js-yaml`, which accepts JSON anyway. It rejects documents without `openapi`/`swagger` or `paths` with a message saying which field is missing; that message lands in the loader dialog.
 
+Exporting runs the other way and starts from the parsed object rather than the stored text, which is what makes a YAML paste come back out as JSON. `specJson` and `specFileName` are both in `spec.js`, so the serialization and the name are testable without a browser; `main.js` keeps only the four lines of Blob, object URL, synthetic anchor and revoke. The name is built from `info` and reduced to lowercase words joined by hyphens, because a title is free text and can hold slashes. Dots survive so a version stays `1.0.0`.
+
 The raw text, not the parsed object, is kept in `localStorage` under one key and re-parsed on load. Storing the source keeps the stored form identical to what the user pasted and survives changes to the parsed shape. A quota failure is swallowed: the page still works, it just starts empty next time. A stored spec that no longer parses is dropped and the loader opens.

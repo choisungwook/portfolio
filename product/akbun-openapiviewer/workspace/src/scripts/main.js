@@ -3,6 +3,8 @@
 import {
   parseSpec,
   specTitle,
+  specJson,
+  specFileName,
   listOperations,
   filterOperations,
   pageSlice,
@@ -23,6 +25,7 @@ const loader = document.getElementById('loader');
 const specInput = document.getElementById('spec-input');
 const loadStatus = document.getElementById('load-status');
 const fileInput = document.getElementById('file-input');
+const exportButton = document.getElementById('export-json');
 const paneLeft = document.getElementById('pane-left');
 const paneBackdrop = document.getElementById('pane-backdrop');
 const toggleList = document.getElementById('toggle-list');
@@ -218,6 +221,22 @@ function render() {
   renderDetail();
 }
 
+// ===== Export =====
+
+// Exports the parsed document, not the pasted text, so a YAML spec comes back
+// out as JSON. The object URL is revoked once the click has been handed off,
+// or the whole document stays in memory for the life of the tab.
+function exportJson() {
+  if (!state.spec) return;
+  const blob = new Blob([specJson(state.spec)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = specFileName(state.spec);
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 // ===== Loading =====
 
 function loadSpec(text) {
@@ -229,6 +248,7 @@ function loadSpec(text) {
   setDrawer(false);
   searchInput.value = '';
   specTitleEl.textContent = `${specTitle(spec)} · ${state.ops.length} APIs`;
+  exportButton.disabled = false;
 
   // A spec near the localStorage quota is not worth failing the load over.
   try {
@@ -265,6 +285,7 @@ function tryLoadFromInput() {
 // ===== Wiring =====
 
 document.getElementById('open-loader').addEventListener('click', openLoader);
+exportButton.addEventListener('click', exportJson);
 document.getElementById('close-loader').addEventListener('click', closeLoader);
 document.getElementById('load-spec').addEventListener('click', tryLoadFromInput);
 document.getElementById('load-sample').addEventListener('click', () => {

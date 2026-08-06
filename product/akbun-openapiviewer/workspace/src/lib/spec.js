@@ -49,6 +49,28 @@ export function specTitle(spec) {
 }
 
 /**
+ * The document re-serialized as JSON, two-space indented.
+ * Exporting this is how a YAML spec comes back out as JSON.
+ */
+export function specJson(spec) {
+  return `${JSON.stringify(spec, null, 2)}\n`;
+}
+
+/**
+ * File name for the export, built from `info`, e.g. `petstore-1.0.0.json`.
+ * A title is free text and can hold slashes, quotes or nothing usable, so it
+ * is reduced to lowercase words joined by hyphens before it reaches a disk.
+ * Dots survive, because a version reads worse as 1-0-0 than as 1.0.0.
+ */
+export function specFileName(spec) {
+  const info = spec?.info ?? {};
+  const parts = [info.title, info.version]
+    .map((part) => String(part ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^[-.]+|[-.]+$/g, ''))
+    .filter(Boolean);
+  return `${parts.join('-') || 'openapi'}.json`;
+}
+
+/**
  * Flattens `paths` into one operation per method. Path-level parameters apply
  * to every operation under the path, so they are merged in here once and the
  * rest of the code never has to know they existed.
