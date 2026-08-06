@@ -191,7 +191,9 @@ function runAssertions(step, response) {
   const failures = [];
   if (step.expectStatus !== '' && step.expectStatus != null) {
     const expected = Number(step.expectStatus);
-    if (response.status !== expected) {
+    if (!Number.isFinite(expected)) {
+      failures.push(`expected status "${step.expectStatus}" is not a number`);
+    } else if (response.status !== expected) {
       failures.push(`status ${response.status}, expected ${expected}`);
     }
   }
@@ -235,7 +237,7 @@ function formatSize(bytes) {
 
 function prettyBody(body, headers) {
   const contentType = (headers.find((h) => h.key.toLowerCase() === 'content-type') || {}).value || '';
-  if (!contentType.includes('json')) return body;
+  if (!contentType.toLowerCase().includes('json')) return body;
   try {
     return JSON.stringify(JSON.parse(body), null, 2);
   } catch {

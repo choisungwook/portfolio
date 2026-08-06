@@ -117,6 +117,12 @@ test('runAssertions checks status and body substring only when filled in', () =>
   });
 });
 
+test('runAssertions reports a non-numeric expected status instead of comparing NaN', () => {
+  const verdict = L.runAssertions({ expectStatus: 'ok', bodyContains: '' }, { status: 200, body: '' });
+  assert.strictEqual(verdict.passed, false);
+  assert.deepStrictEqual(verdict.failures, ['expected status "ok" is not a number']);
+});
+
 test('applyExtracts pulls JSON values into variables', () => {
   const variables = [];
   const step = {
@@ -151,6 +157,10 @@ test('applyExtracts does nothing on a non-JSON body', () => {
 test('prettyBody pretty-prints only JSON responses', () => {
   const headers = [{ key: 'Content-Type', value: 'application/json; charset=utf-8' }];
   assert.strictEqual(L.prettyBody('{"a":1}', headers), '{\n  "a": 1\n}');
+  assert.strictEqual(
+    L.prettyBody('{"a":1}', [{ key: 'Content-Type', value: 'Application/JSON' }]),
+    '{\n  "a": 1\n}'
+  );
   assert.strictEqual(L.prettyBody('<html>', [{ key: 'Content-Type', value: 'text/html' }]), '<html>');
   assert.strictEqual(L.prettyBody('not json', headers), 'not json');
 });
