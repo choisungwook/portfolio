@@ -1,0 +1,126 @@
+name: release-akbun-requesthttp
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-requesthttp/**'
+  pull_request:
+    paths:
+      - 'product/akbun-requesthttp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-requesthttp/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      # lib.js and the worker proxy are DOM free, so this needs no browser,
+      # no app binary and no Workers runtime. There is no Rust test job: the
+      # Rust side is an IO adapter with no pure crate, and compiling it here
+      # would mean installing GTK and WebKit on the runner.
+      - name: Run page and worker tests
+        run: npm test
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-requesthttp/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-requesthttp/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_REQUESTHTTP }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_REQUESTHTTP_PASSWORD }}
+        with:
+          projectPath: product/akbun-requesthttp/workspace
+          tagName: akbun-requesthttp-v__VERSION__
+          releaseName: akbun-requesthttp-v__VERSION__
+          # A draft is not reachable by the updater endpoint, so every
+          # installed copy would 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            ## About
+
+            - Desktop HTTP client: send requests, inspect responses, bookmarks, shared variables, curl import/export, scenario runs.
+
+            ## Install
+
+            - The installer is a macOS (Apple Silicon) dmg.
+            - Unsigned build, so after dragging the app to Applications run once in Terminal: `xattr -cr /Applications/akbun-requesthttp.app`
+            - After that, the Updates button inside the app fetches newer versions on its own.
+
+      # tauri-action has no --generate-notes equivalent, so the change list is
+      # generated and appended to the body the action already wrote. Several
+      # products tag this repository, so the previous tag is scoped to this
+      # product; GitHub's own auto-detection would pick whichever product
+      # released last.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="akbun-requesthttp-v${VERSION}"
+          PREV=$(gh release list --limit 100 --json tagName \
+            --jq "[.[].tagName | select(startswith(\"akbun-requesthttp-v\")) | select(. != \"$TAG\")] | first // empty")
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          if [ -n "$PREV" ]; then
+            gh api "repos/${{ github.repository }}/releases/generate-notes" \
+              -f tag_name="$TAG" -f previous_tag_name="$PREV" --jq .body >> "$RUNNER_TEMP/notes.md"
+          else
+            gh api "repos/${{ github.repository }}/releases/generate-notes" \
+              -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
+          fi
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+
+      # Several products release from this repository, so the GitHub-wide
+      # "latest" release is whichever product shipped last. The app therefore
+      # polls a fixed tag that only this step touches, instead of
+      # releases/latest.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-requesthttp-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-requesthttp-updater \
+            --title "akbun-requesthttp updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-requesthttp-updater "$RUNNER_TEMP/latest.json" --clobber

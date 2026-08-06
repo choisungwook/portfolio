@@ -1,0 +1,20 @@
+{
+  "name": "akbun-requesthttp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop HTTP client: send requests, inspect responses, bookmarks, variables, curl import/export, scenario runs",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "test": "node --test test/*.test.js",
+    "dist": "tauri build",
+    "web": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "wrangler": "^4"
+  }
+}

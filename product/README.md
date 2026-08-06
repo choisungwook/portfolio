@@ -16,6 +16,7 @@
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |
 | [akbun-k8supgradeview](./akbun-k8supgradeview/) | EKS 업그레이드 작업용 노드/파드 조회 Electron 데스크톱 앱 |
 | [akbun-rendermermaid](./akbun-rendermermaid/) | mermaid 코드를 왼쪽에 쓰면 오른쪽에 렌더링하고 PNG로 저장하는 웹 페이지 |
+| [akbun-requesthttp](./akbun-requesthttp/) | HTTP(S) 요청, 응답 확인, 북마크, 공통 변수, curl 변환, 시나리오 실행을 갖춘 데스크톱 HTTP 클라이언트 |
 | [akbun-openapiviewer](./akbun-openapiviewer/) | OpenAPI 스펙을 붙여넣거나 파일로 열어 API 목록과 상세를 탐색하는 웹 페이지 |
 | [akbun-mactaskbar](./akbun-mactaskbar/) | 메뉴바 아이콘을 구간으로 나눠 숨기고 목록으로 보는 macOS 메뉴바 관리 앱 |
 | [akbun-screenshot](./akbun-screenshot/) | 영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 macOS 메뉴바 스크린샷 앱 |

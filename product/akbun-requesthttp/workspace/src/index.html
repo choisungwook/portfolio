@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>akbun-requesthttp</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <span id="app-title">akbun-requesthttp</span>
+    <div class="group">
+      <button id="btn-variables" title="Shared variables usable as {{name}}">Variables</button>
+      <button id="btn-settings" title="TLS verification, timeout, redirects">Settings</button>
+      <button id="btn-update" title="Check for a newer version">Updates</button>
+    </div>
+  </header>
+
+  <div id="layout">
+    <aside id="sidebar">
+      <nav id="sidebar-tabs">
+        <button id="tab-requests" class="active">Requests</button>
+        <button id="tab-scenarios">Scenarios</button>
+      </nav>
+      <div id="requests-pane">
+        <button id="btn-new-request" class="new-item">+ New request</button>
+        <ul id="request-list"></ul>
+      </div>
+      <div id="scenarios-pane" hidden>
+        <button id="btn-new-scenario" class="new-item">+ New scenario</button>
+        <ul id="scenario-list"></ul>
+      </div>
+    </aside>
+
+    <main id="main">
+      <section id="request-view">
+        <div class="row name-row">
+          <input id="request-name" placeholder="Request name" />
+          <button id="btn-save-request" title="Bookmark this request in the sidebar">Save</button>
+          <button id="btn-copy-curl" title="Copy the resolved request as a curl command">Copy as curl</button>
+          <button id="btn-import-curl" title="Fill the editor from a pasted curl command">Import curl</button>
+        </div>
+        <div class="row send-row">
+          <select id="method">
+            <option>GET</option><option>POST</option><option>PUT</option>
+            <option>PATCH</option><option>DELETE</option><option>HEAD</option>
+            <option>OPTIONS</option>
+          </select>
+          <input id="url" placeholder="https://api.example.com/path?query=1 — {{variables}} allowed" />
+          <button id="btn-send">Send</button>
+        </div>
+        <details open>
+          <summary>Headers</summary>
+          <div id="headers-rows" class="kv-rows"></div>
+          <button id="btn-add-header" class="small">+ Header</button>
+        </details>
+        <details>
+          <summary>Body</summary>
+          <textarea id="body" rows="6" placeholder='{"raw": "body, sent as typed"}'></textarea>
+        </details>
+
+        <section id="response" hidden>
+          <div class="row">
+            <span id="resp-status"></span>
+            <span id="resp-meta"></span>
+            <span class="spacer"></span>
+            <label class="small"><input type="checkbox" id="resp-pretty" checked /> Pretty</label>
+          </div>
+          <nav class="resp-tabs">
+            <button id="resp-tab-body" class="active">Body</button>
+            <button id="resp-tab-headers">Headers</button>
+          </nav>
+          <pre id="resp-body"></pre>
+          <pre id="resp-headers" hidden></pre>
+        </section>
+      </section>
+
+      <section id="scenario-view" hidden>
+        <div class="row name-row">
+          <input id="scenario-name" placeholder="Scenario name" />
+          <button id="btn-run-scenario">Run</button>
+          <button id="btn-add-step" class="small">+ Step</button>
+        </div>
+        <p class="hint">
+          Steps run top to bottom against saved requests. A step can assert the
+          status and a body substring, and extract JSON values into variables
+          for the steps after it.
+        </p>
+        <ol id="steps"></ol>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="variables-dialog">
+    <h2>Variables</h2>
+    <p class="hint">Use anywhere as {{name}} — URL, headers and body.</p>
+    <div id="variables-rows" class="kv-rows"></div>
+    <div class="row">
+      <button id="btn-add-variable" class="small">+ Variable</button>
+      <span class="spacer"></span>
+      <button id="btn-close-variables">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <h2>Settings</h2>
+    <label class="setting">
+      <input type="checkbox" id="setting-verify-ssl" />
+      Verify TLS certificates
+      <span class="hint">Turn off only for networks where HTTPS inspection or
+      self-signed certificates break verification. Off sends requests without
+      checking who you are talking to.</span>
+    </label>
+    <label class="setting" id="setting-verify-ssl-web-note" hidden>
+      <span class="hint">The web build cannot skip TLS verification; use the
+      desktop app for that.</span>
+    </label>
+    <label class="setting">
+      Timeout (seconds)
+      <input type="number" id="setting-timeout" min="1" max="600" />
+    </label>
+    <label class="setting">
+      <input type="checkbox" id="setting-follow-redirects" />
+      Follow redirects
+    </label>
+    <div class="row">
+      <span class="spacer"></span>
+      <button id="btn-close-settings">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="curl-dialog">
+    <h2>Import curl</h2>
+    <textarea id="curl-input" rows="6" placeholder="curl -X POST https://... -H 'content-type: application/json' --data '{}'"></textarea>
+    <div class="row">
+      <span class="spacer"></span>
+      <button id="btn-close-curl">Cancel</button>
+      <button id="btn-do-import-curl">Import</button>
+    </div>
+  </dialog>
+
+  <script src="lib.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

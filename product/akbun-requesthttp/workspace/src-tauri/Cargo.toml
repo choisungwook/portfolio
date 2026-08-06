@@ -1,0 +1,39 @@
+[package]
+name = "akbun-requesthttp"
+version = "0.1.0"
+description = "Desktop HTTP client: requests, bookmarks, variables, curl, scenarios"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. The number here is not read by the bundler and is only present
+# because cargo requires it.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_requesthttp_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+# Not used directly, but tauri::generate_context! expands to serde_json calls
+# in this crate's namespace.
+serde_json = "1"
+# rustls instead of the platform TLS so the build needs no system OpenSSL
+# anywhere. danger_accept_invalid_certs still works, which is what the
+# "Verify TLS certificates" setting toggles.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "system-proxy"] }
+
+# Desktop only. These have no mobile implementation and this app has no mobile
+# target, but keeping the cfg means a stray mobile build fails at resolve time
+# rather than deep inside a plugin.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
