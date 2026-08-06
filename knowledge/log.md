@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-06
+
+* **Creation**: [LLM 백엔드는 모델 API가 아니라 agent 실행기 레벨에서 추상화한다](decisions/2026-08-agent-runner-level-backend.md) 결정 기록. akbun-agent-analysiscode를 만들며 Claude Agent SDK가 구독 로그인을 허용하지 않는 제약을 확인했고, 벤더 agent 실행기를 어댑터로 감싸는 구조를 앞으로의 AI agent 제품 기본으로 남긴다.
+
 ## 2026-08-02
 
 * **Creation**: [pptx import는 OOXML을 직접 파싱하고 검증은 생성기가 다른 corpus로 한다](decisions/2026-08-pptx-import-parses-ooxml-directly.md) 결정 기록. PowerPoint 덱 import가 깨지던 akbun-makepresentation을 고치면서, 단일 샘플 검증이 흰 배경과 16:9에 과적합해 두 구멍을 놓쳤던 경험을 함께 남긴다.
