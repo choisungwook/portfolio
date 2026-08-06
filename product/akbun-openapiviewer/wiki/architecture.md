@@ -29,6 +29,18 @@ The all view renders the same full detail card used for a single operation, for 
 
 Search and paging compose: the page is cut from the filtered list, and typing resets to page 1.
 
+## Layout across screen sizes
+
+There are two layouts and one breakpoint that matters, 720px. Above it the header, the sidebar and the detail pane sit side by side as they always have; 900px only shrinks the type and the sidebar's share.
+
+Below 720px the sidebar leaves the flow. It becomes a fixed drawer over the detail pane, the header grows a hamburger button, and a backdrop sits between the two. `main.js` holds the open flag in `state.drawer` and `syncDrawer` is the only function that touches the DOM for it: it toggles the class, shows the backdrop, sets `aria-expanded`, and marks the pane `inert` while it is off screen so nothing inside it takes focus or is read out. The breakpoint is written twice, as a media query in `global.css` and as a `matchMedia` in `main.js`, and the two have to be changed together. Widening past the breakpoint clears the flag, so a rotation never lands on an open drawer.
+
+Picking an operation, loading a spec and Escape all close the drawer. Ctrl/Cmd + K opens it first, because the search box lives inside it. The loader dialog does not focus its textarea on a phone, where that would throw the keyboard over the dialog before it has been read.
+
+The app shell is `100dvh`, not `100vh`, so the browser chrome does not cut off the bottom of the detail pane, and the document itself never scrolls: the drawer and the detail pane scroll inside themselves with `overscroll-behavior: contain`.
+
+The parameter table is the one piece that does not use the breakpoint. Five columns wide, it sits in a `.table-wrap` that scrolls sideways on its own, and `.op` is a query container so that a card narrower than 33rem drops the header row and turns each parameter into a labelled block, its cells printing their column name from `data-label`. It has to be a container query because card width and window width disagree: the split leaves a card 444px on a 768px tablet, while a 600px phone with the list in a drawer gives that same card 573px. Without the wrapper underneath it, the table pushed the whole document sideways and every other element inherited the misalignment.
+
 ## Schema rendering
 
 `schemaText` turns a schema into an indented text tree shown in a `<pre>`. `$ref`s are resolved in place and prefixed with their name (`Pet — object`), required properties carry `*`, scalars show their format and enum, and `allOf`/`oneOf`/`anyOf` become labelled lists. Two guards keep it finite: a ref already on the resolution path renders as `(circular)`, and depth past 6 becomes `…`.

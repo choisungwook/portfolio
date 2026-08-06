@@ -14,6 +14,7 @@ Deployed as a static Astro build on Cloudflare.
 | Search | The search bar filters live on every keystroke, no Enter needed. Ctrl/Cmd + K focuses it. Every word must match, over method, path, summary, operationId and tags |
 | Detail | Parameters as a table (path-level parameters merged in), request body and responses per content type, schemas as an indented tree with `$ref`s resolved in place, `*` marking required properties and circular refs cut off |
 | Restore | The spec is kept in `localStorage`, so a reload or a closed tab does not lose it |
+| Phone | Below 720px the API list becomes a drawer opened from the header, so an operation gets the whole screen, and each parameter reads down a card instead of across a table too wide to fit |
 
 ## Directory layout
 

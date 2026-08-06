@@ -23,8 +23,16 @@
   --m-other: #6B6560;
 }
 
-html { font-size: 16px; -webkit-font-smoothing: antialiased; }
-html, body { height: 100%; }
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  /* iOS inflates text when a phone is turned sideways unless this is pinned. */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* dvh keeps the app shell out from under the mobile browser chrome. The vh
+   line above it is the fallback for browsers that do not know dvh. */
+html, body { height: 100vh; height: 100dvh; }
 
 body {
   font-family: var(--font-body);
@@ -45,23 +53,30 @@ body {
   justify-content: space-between;
   gap: 1rem;
   padding: 0 1.25rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
   border-bottom: 3px solid var(--text);
   background: var(--surface);
 }
 
 .app-title {
+  flex: 1 1 auto;
   display: flex;
   align-items: baseline;
   gap: 0.8rem;
   min-width: 0;
 }
 
+/* The title is the only part of the header allowed to shrink, so a narrow
+   screen truncates the name instead of pushing the buttons off the edge. */
 .app-title h1 {
   font-family: var(--font-title);
   font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-title p {
@@ -73,6 +88,7 @@ body {
 }
 
 button {
+  flex-shrink: 0;
   margin: 0;
   padding: 0.45rem 0.95rem;
   color: #fff;
@@ -99,6 +115,25 @@ button.ghost {
 }
 button.ghost:hover { background: #F1EEE7; border-color: var(--text-sub); }
 button.ghost:disabled:hover { background: var(--surface); border-color: var(--divider); }
+
+/* Opens the API list on phones, where the list is a drawer instead of a pane.
+   Hidden until the drawer breakpoint, where the pane stops being visible. */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+.nav-toggle svg { display: block; width: 1.1rem; height: 1.1rem; }
+
+.pane-backdrop {
+  display: none;
+  position: fixed;
+  inset: var(--header-height) 0 0 0;
+  z-index: 14;
+  background: rgba(45, 42, 38, 0.45);
+}
 
 /* ===== Split layout ===== */
 .split {
@@ -181,6 +216,7 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
 }
@@ -246,6 +282,7 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.25rem 1.5rem 3rem;
 }
 
@@ -284,7 +321,12 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   color: var(--text-sub);
 }
 
+/* A query container, so the parameter table can restack on how much room the
+   card actually got rather than on how wide the window is. The two differ:
+   a tablet holding the split gives a card no more room than a phone does. */
 .op {
+  container-type: inline-size;
+  container-name: opcard;
   margin-bottom: 1rem;
   padding: 1rem 1.25rem;
   background: var(--surface);
@@ -362,9 +404,16 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   text-transform: none;
 }
 
+/* Five columns of parameter never fit a narrow card. The wrapper keeps the
+   overflow inside the card so the page itself never scrolls sideways. */
+.table-wrap {
+  margin-top: 0.4rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .params {
   width: 100%;
-  margin-top: 0.4rem;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -385,6 +434,56 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
 }
 .params code { font-family: var(--font-mono); font-size: 0.8rem; }
 
+/* Narrow card: the table stops being a table and each parameter becomes one
+   labelled block. Five columns below this width are unreadable whether they
+   are squeezed or scrolled, and reading down beats scrolling sideways. */
+@container opcard (max-width: 33rem) {
+  .table-wrap { overflow-x: visible; }
+
+  /* Kept in the DOM, off screen, so a screen reader still reads the columns
+     once. Parked to the left rather than clipped in place, or the cells keep
+     a layout box out past the right edge. */
+  .params thead {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .params, .params tbody, .params tr, .params td { display: block; width: 100%; }
+
+  .params tr {
+    margin-bottom: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--divider);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+
+  .params td {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.1rem 0;
+    border: none;
+    overflow-wrap: anywhere;
+  }
+  .params td::before {
+    content: attr(data-label);
+    flex: 0 0 5.5rem;
+    white-space: nowrap;
+    font-family: var(--font-title);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.9;
+    color: var(--text-sub);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  /* An unset "required" or a parameter with no description prints nothing. */
+  .params td:empty { display: none; }
+}
+
 .media { margin-top: 0.4rem; }
 .media-type code {
   font-family: var(--font-mono);
@@ -403,6 +502,7 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   font-size: 0.8rem;
   line-height: 1.55;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .response { margin-top: 0.6rem; }
@@ -485,18 +585,105 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   flex-wrap: wrap;
 }
 
+/* ===== Tablet: the split holds, the chrome around it shrinks ===== */
 @media (max-width: 900px) {
-  body { overflow: auto; }
-  .app-header { height: auto; flex-wrap: wrap; padding: 0.7rem 1rem; }
-  .app-title { flex-direction: column; gap: 0.15rem; }
+  :root { --header-height: 64px; }
+  .app-header { gap: 0.75rem; padding: 0 1rem; }
+  .app-title { gap: 0.6rem; }
+  .app-title h1 { font-size: 1.3rem; }
+  .app-title p { font-size: 0.85rem; }
+  .pane-left { width: 38%; min-width: 240px; }
+  .detail { padding: 1rem 1rem 2.5rem; }
+  .op { padding: 0.9rem 1rem; }
+}
+
+/* ===== Phone: the list becomes a drawer over the detail pane =====
+   Two panes side by side stop being readable somewhere around here, and
+   stacking them costs half the screen to a list nobody is reading while
+   they read an operation. The drawer gives the detail the whole screen. */
+@media (max-width: 720px) {
+  :root { --header-height: 56px; }
+
+  .app-header { gap: 0.5rem; padding: 0 0.75rem; }
+  .app-title h1 { font-size: 1.05rem; }
   .app-title p { display: none; }
-  .split { flex-direction: column; }
+  .nav-toggle { display: inline-flex; }
+  .pane-backdrop:not([hidden]) { display: block; }
+
+  .app-header button { min-height: 40px; }
+
   .pane-left {
-    width: 100%;
+    position: fixed;
+    z-index: 15;
+    top: var(--header-height);
+    bottom: 0;
+    left: 0;
+    width: min(86vw, 340px);
+    min-width: 0;
     max-width: none;
-    height: 45vh;
-    border-right: none;
-    border-bottom: 2px solid var(--divider);
+    padding-left: env(safe-area-inset-left);
+    border-right: 2px solid var(--text);
+    box-shadow: 0 0 24px rgba(45, 42, 38, 0.25);
+    transform: translateX(-101%);
+    transition: transform 0.2s ease;
   }
-  .pane-right { min-height: 55vh; }
+  .pane-left.open { transform: none; }
+
+  #search { min-height: 42px; font-size: 16px; }
+  .all-item { min-height: 48px; }
+  .op-item { min-height: 48px; justify-content: center; }
+  .op-list { padding-bottom: env(safe-area-inset-bottom); }
+
+  .detail {
+    padding: 0.85rem 0.85rem 3rem;
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+  }
+  .all-head h2 { font-size: 1.1rem; }
+  .pager button { min-height: 40px; }
+
+  .op { padding: 0.8rem 0.85rem; border-radius: 8px; }
+  .op-head .method { font-size: 0.78rem; }
+  .op-url { font-size: 0.95rem; }
+  .op-title { font-size: 1rem; }
+  .schema { padding: 0.6rem 0.7rem; font-size: 0.75rem; }
+
+  /* The loader fills the screen instead of floating in a phone-sized gap. */
+  .loader { padding: 0; align-items: stretch; }
+  .loader-card {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    overflow-y: auto;
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    border: none;
+    border-radius: 0;
+  }
+  .loader-card h2 { font-size: 1.15rem; }
+  #spec-input { min-height: 10rem; font-size: 16px; }
+  .loader-actions button { flex: 1 1 7rem; min-height: 44px; }
+}
+
+/* Below this the header name and both button labels cannot share a line. */
+@media (max-width: 400px) {
+  .nav-toggle-label { display: none; }
+  .nav-toggle { padding: 0.4rem 0.55rem; }
+  .app-title h1 { font-size: 0.95rem; }
+  .app-header button { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+}
+
+/* A phone on its side is wider than the drawer breakpoint, so it keeps the
+   split. What it has no room for is chrome and a wide sidebar. */
+@media (max-height: 480px) and (orientation: landscape) {
+  :root { --header-height: 48px; }
+  .app-title h1 { font-size: 1rem; }
+  .pane-left { width: 32%; min-width: 200px; }
+  .loader { padding: 0.5rem; }
+  .loader-card { padding: 0.6rem 1rem; }
+  #spec-input { min-height: 6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-left { transition: none; }
 }
