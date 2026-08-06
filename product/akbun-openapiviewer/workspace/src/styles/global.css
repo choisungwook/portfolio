@@ -684,8 +684,20 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
 /* Below this the header name and every button label cannot share a line, so
    the two icon buttons drop their labels and keep only the glyph. */
 @media (max-width: 520px) {
-  .nav-toggle-label, .icon-button-label { display: none; }
-  .nav-toggle, .icon-button { padding: 0.4rem 0.55rem; }
+  /* Hidden from the eye, kept in the accessibility tree. display:none would
+     drop it, and the glyph beside it is aria-hidden, so the button would be
+     left with no accessible name at all. */
+  .nav-toggle-label, .icon-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .nav-toggle, .icon-button { position: relative; padding: 0.4rem 0.55rem; }
 }
 
 @media (max-width: 400px) {
