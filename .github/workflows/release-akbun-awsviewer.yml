@@ -1,0 +1,153 @@
+name: release-akbun-awsviewer
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-awsviewer/**'
+  pull_request:
+    paths:
+      - 'product/akbun-awsviewer/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-awsviewer/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Run page tests
+        run: npm test
+
+      # awsviewer-core depends on neither tauri nor a webview, so -p keeps
+      # this to the AWS SDK crates. Testing the app crate instead would need
+      # GTK and WebKit installed on the runner.
+      - name: Run core tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p awsviewer-core
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The version step lists existing tags, which a shallow clone
+          # does not have.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-awsviewer/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-awsviewer/workspace/src-tauri
+
+      # A forgotten bump in package.json must not republish over an existing
+      # release, so the next version is computed from the latest tag the way
+      # akbun-gitdesktop does it: bump the released patch, and let a hand
+      # bumped package.json win when it is ahead.
+      - name: Compute next version
+        id: version
+        run: |
+          latest=$(git tag --list 'akbun-awsviewer-v*' | sed 's/^akbun-awsviewer-v//' | sort -V | tail -n1)
+          package=$(node -p "require('./package.json').version")
+          if [ -z "$latest" ]; then
+            next="$package"
+          else
+            IFS=. read -r major minor patch <<< "$latest"
+            bumped="$major.$minor.$((patch + 1))"
+            next=$(printf '%s\n%s\n' "$bumped" "$package" | sort -V | tail -n1)
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-awsviewer-v$next" >> "$GITHUB_OUTPUT"
+          echo "Releasing akbun-awsviewer-v$next (previous tag: ${latest:-none})"
+
+      - name: Fail if the tag already exists
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists. Refusing to overwrite a published release."
+            exit 1
+          fi
+
+      - name: Apply version to package.json
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these no .sig is produced, and the action then skips
+          # latest.json without failing. The release looks complete and no
+          # installed copy can update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_AWSVIEWER }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_AWSVIEWER_PASSWORD }}
+        with:
+          projectPath: product/akbun-awsviewer/workspace
+          tagName: akbun-awsviewer-v__VERSION__
+          releaseName: akbun-awsviewer-v__VERSION__
+          # A draft is not reachable by the updater endpoint, so every
+          # installed copy would 404 on its update check.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            ## About
+
+            - macOS desktop viewer for AWS: pick a profile from ~/.aws/config, sign in with IAM Identity Center, and browse EC2 read-only.
+
+            ## Install
+
+            - The installer is a macOS (Apple Silicon) dmg.
+            - Unsigned build, so after dragging the app to Applications run once in Terminal: `xattr -cr /Applications/akbun-awsviewer.app`
+            - After that, Check for Updates… in Settings fetches newer versions on its own.
+
+      # tauri-action has no --generate-notes equivalent, so the commit list is
+      # generated and appended to the body the action already wrote.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+
+      # Several products release from this repository, so the GitHub-wide
+      # "latest" release is whichever product shipped last. The app therefore
+      # polls a fixed tag that only this step touches, instead of
+      # releases/latest.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          gh release download "$TAG" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-awsviewer-updater \
+            --title "akbun-awsviewer updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-awsviewer-updater "$RUNNER_TEMP/latest.json" --clobber

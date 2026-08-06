@@ -120,6 +120,7 @@
 - [멀티 트랙 타임라인으로 영상을 편집하는 macOS 데스크톱 앱 (akbun-makevideo)](./product/akbun-makevideo/) (26.8.2)
 - [mermaid를 렌더링하고 PNG로 저장하는 웹 페이지 (mermaid.akbun.com)](./product/akbun-rendermermaid/) (26.8.4)
 - [OpenAPI 스펙을 탐색하는 API 뷰어 웹 페이지 (akbun-openapiviewer)](./product/akbun-openapiviewer/) (26.8.5)
+- [AWS profile로 로그인해 EC2를 조회하는 macOS 데스크톱 앱 (akbun-awsviewer)](./product/akbun-awsviewer/) (26.8.6)
 
 ## Dockerfile
 

@@ -1,0 +1,36 @@
+[package]
+name = "awsviewer-core"
+version = "0.1.0"
+description = "AWS profiles, IAM Identity Center sessions and the EC2 view model for akbun-awsviewer"
+edition = "2021"
+license = "MIT"
+
+# Deliberately depends on tauri in no way. That is what lets the pull request
+# job test this crate on Linux without installing GTK and WebKit development
+# packages. The AWS SDK is heavy but pure Rust, so it compiles anywhere.
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+tokio = { version = "1", features = ["time"] }
+
+# Official AWS SDK for Rust. ssooidc runs the device authorization flow, sso
+# exchanges the token for role credentials, ec2 is the only data plane.
+aws-sdk-ec2 = "1"
+aws-sdk-sso = "1"
+aws-sdk-ssooidc = "1"
+aws-credential-types = "1"
+aws-smithy-types = "1"
+aws-smithy-runtime-api = "1"
+
+# The skip-TLS-verify option. The modern smithy connector only accepts trust
+# stores, so the client that skips verification is built on the legacy hyper
+# 0.14 path, which accepts an arbitrary connector.
+aws-smithy-http-client = { version = "1", features = ["hyper-014"] }
+hyper-rustls = { version = "0.24", features = ["http2"] }
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tempfile = "3"

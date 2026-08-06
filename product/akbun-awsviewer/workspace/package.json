@@ -1,0 +1,18 @@
+{
+  "name": "akbun-awsviewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS desktop viewer for AWS resources: pick a profile from ~/.aws/config, log in with IAM Identity Center, and browse EC2 read-only",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "test": "node --test test/*.test.js",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p awsviewer-core",
+    "dist": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
