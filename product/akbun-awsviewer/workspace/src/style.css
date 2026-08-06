@@ -191,7 +191,8 @@ body {
   background: var(--surface-muted);
 }
 
-#login-button {
+/* Pushes itself and the login button to the right edge. */
+#update-button {
   margin-left: auto;
 }
 
@@ -222,6 +223,13 @@ main {
   max-width: 100%;
 }
 
+.toolbar-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 button {
   padding: 6px 12px;
   border: 1px solid var(--border);
@@ -241,15 +249,13 @@ button:disabled {
   cursor: default;
 }
 
-#login-button,
-.select-profile {
+#login-button {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-fg);
 }
 
-#login-button:hover,
-.select-profile:hover {
+#login-button:hover {
   filter: brightness(1.08);
   background: var(--accent);
 }
@@ -373,11 +379,74 @@ th[aria-sort="descending"] .sort-arrow::after {
   border-radius: 10px;
   background: var(--surface);
   box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
-  color: var(--text);
+  color: var(--fg);
 }
 
-#error-dialog::backdrop {
+#error-dialog::backdrop,
+#login-dialog::backdrop {
   background: rgb(15 23 42 / 45%);
+}
+
+#login-dialog {
+  width: min(520px, calc(100vw - 40px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+  color: var(--fg);
+}
+
+.login-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-muted);
+}
+
+.login-dialog-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.login-dialog-header button {
+  padding: 3px 7px;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+#login-dialog .help,
+#login-dialog .empty {
+  margin: 10px 16px;
+}
+
+#login-profile-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 16px 16px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.login-profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.login-profile-meta {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .error-dialog-header {

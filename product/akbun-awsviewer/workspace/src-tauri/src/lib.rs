@@ -8,7 +8,19 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: None,
+                    }),
+                ])
+                .level(log::LevelFilter::Info)
+                .build(),
+        );
 
     // One window only. The updater restarts the app while the installer may
     // also be starting it, and the second launch lands here instead of
@@ -39,6 +51,10 @@ pub fn run() {
                 window.open_devtools();
             }
 
+            // One line per launch: a log file that starts here but has no
+            // page activity after it points at the webview, not the backend.
+            log::info!("akbun-awsviewer {} starting", app.package_info().version);
+
             let handle = app.handle();
             app.manage(AppState {
                 settings: Mutex::new(store::load_settings(handle)),
@@ -53,6 +69,7 @@ pub fn run() {
             commands::sso_login,
             commands::list_instances,
             commands::instance_detail,
+            commands::open_log_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

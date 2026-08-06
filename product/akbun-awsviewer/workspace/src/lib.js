@@ -4,12 +4,15 @@
 // DOM, so node --test runs this file as is. Search never asks the backend —
 // it runs over the array the page already has, on every keystroke.
 
-function filterInstances(instances, query) {
+function filterInstances(instances, query, spotOnly) {
+  const pool = spotOnly
+    ? instances.filter((instance) => instance.lifecycle === 'spot')
+    : instances;
   const q = (query || '').trim().toLowerCase();
   if (!q) {
-    return instances.slice();
+    return pool.slice();
   }
-  return instances.filter(
+  return pool.filter(
     (instance) =>
       (instance.instanceId || '').toLowerCase().includes(q) ||
       (instance.name || '').toLowerCase().includes(q),
@@ -69,6 +72,28 @@ function stateClass(state) {
   return '';
 }
 
+// The single largest unit is enough for a glance; sorting uses the raw
+// launchTime, not this label. Months and years are calendar approximations
+// (30 and 365 days), fine for a viewer.
+function formatAge(launchTime, nowMs) {
+  if (!launchTime) {
+    return null;
+  }
+  const launched = Date.parse(launchTime);
+  if (Number.isNaN(launched)) {
+    return null;
+  }
+  const minutes = Math.floor((nowMs - launched) / 60_000);
+  if (minutes < 1) return '<1m';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  return `${Math.floor(days / 365)}y`;
+}
+
 function sessionLabel(session) {
   if (!session || !session.loggedIn) {
     return 'Not logged in';
@@ -84,6 +109,7 @@ const exported = {
   sortInstances,
   formatProtocol,
   formatPortRange,
+  formatAge,
   stateClass,
   sessionLabel,
 };

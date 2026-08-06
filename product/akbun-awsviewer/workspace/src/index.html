@@ -61,7 +61,8 @@
         <span id="current-profile">none</span>
         <span id="session-badge" class="session-badge logged-out">Not logged in</span>
       </div>
-      <button id="login-button">Log in</button>
+      <button id="update-button" title="Check for a newer version">Updates</button>
+      <button id="login-button">AWS login</button>
     </header>
 
     <main>
@@ -70,6 +71,10 @@
         <div class="toolbar">
           <input id="instance-filter" type="text"
             placeholder="Filter by instance id or Name tag" />
+          <label class="toolbar-check">
+            <input id="spot-only" type="checkbox" />
+            Spot only
+          </label>
           <button id="refresh-instances">Refresh</button>
         </div>
         <p class="help">Click a header to sort by that column; click it again to flip the direction. Click a row for details.</p>
@@ -97,22 +102,26 @@
               <th class="sortable" data-sort-key="publicIp" tabindex="0" role="button" aria-sort="none">
                 Public IP<span class="sort-arrow"></span>
               </th>
+              <th class="sortable" data-sort-key="launchTime" tabindex="0" role="button" aria-sort="none">
+                Age<span class="sort-arrow"></span>
+              </th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
         <p id="instance-empty" class="empty hidden">No instances.</p>
         <p id="instance-login-hint" class="empty hidden">
-          Log in with the button in the top right to list instances.
+          Use AWS login in the top right to list instances.
         </p>
       </section>
 
       <!-- AWS Profile tab -->
       <section id="tab-profile" class="tab">
         <p class="help">
-          Profiles come from ~/.aws/config. This app signs in through IAM
-          Identity Center only; profiles without SSO configuration are listed
-          but cannot be used.
+          Profiles come from ~/.aws/config, read-only. This app signs in
+          through IAM Identity Center only; profiles without SSO configuration
+          are listed but cannot be signed in to. Sign in and switch profiles
+          with AWS login in the top right.
         </p>
         <table id="profile-table">
           <thead>
@@ -150,9 +159,18 @@
         <h2>Updates</h2>
         <div class="settings-form">
           <button id="check-updates">Check for Updates…</button>
-          <span id="update-status" class="help"></span>
         </div>
         <p class="help">Version <span id="app-version">-</span></p>
+
+        <h2>Error log</h2>
+        <div class="settings-form">
+          <button id="open-log-dir">Open Log Folder</button>
+          <span id="log-dir" class="help"></span>
+        </div>
+        <p class="help">
+          Page and backend errors are appended to a file in this folder.
+          Attach it when reporting a bug.
+        </p>
       </section>
     </main>
   </div>
@@ -176,6 +194,22 @@
     <div id="detail-body"></div>
   </aside>
 
+  <!-- AWS login: pick the profile first, then the SSO flow starts. -->
+  <dialog id="login-dialog" aria-labelledby="login-dialog-title">
+    <div class="login-dialog-header">
+      <h2 id="login-dialog-title">AWS login</h2>
+      <button id="close-login-dialog" aria-label="Close login">✕</button>
+    </div>
+    <p class="help">
+      Pick the profile to sign in with. Only IAM Identity Center profiles
+      from ~/.aws/config are listed.
+    </p>
+    <ul id="login-profile-list"></ul>
+    <p id="login-profile-empty" class="empty hidden">
+      No IAM Identity Center profiles in ~/.aws/config.
+    </p>
+  </dialog>
+
   <dialog id="error-dialog" aria-labelledby="error-title" aria-describedby="error-message">
     <div class="error-dialog-header">
       <h2 id="error-title">An error occurred</h2>
@@ -187,8 +221,10 @@
     </div>
   </dialog>
 
-  <script src="lib.js"></script>
+  <!-- api.js first: its window error hooks catch failures in the other two,
+       including parse errors that would otherwise vanish without a trace. -->
   <script src="api.js"></script>
+  <script src="lib.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ const {
   sortInstances,
   formatProtocol,
   formatPortRange,
+  formatAge,
   stateClass,
   sessionLabel,
 } = require('../src/lib.js');
@@ -22,9 +23,51 @@ test('publishes the browser API when a CommonJS module global exists', () => {
   assert.strictEqual(typeof context.awsviewerLib.filterInstances, 'function');
 });
 
+// The page loads its scripts as classic script tags, so every top-level
+// declaration lands in one shared global scope. A `const` in one file named
+// like a function in another is a SyntaxError that kills the whole file
+// before it wires a single listener — v0.1.0 and v0.1.1 shipped frozen
+// because of exactly that. Run the files in one context the way the page
+// does; missing browser globals (window, document) are expected and fine,
+// a redeclaration is not.
+test('page scripts share one global scope without redeclaring names', () => {
+  // Just enough of a DOM that the wiring code runs to completion; every
+  // element answers every call with a no-op. Runtime errors from the missing
+  // Tauri bridge are expected and fine — only a SyntaxError is the bug.
+  const element = new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        if (prop === 'classList') return { toggle() {}, add() {}, remove() {} };
+        if (prop === 'dataset') return {};
+        if (prop === 'open' || prop === 'disabled' || prop === 'checked') return false;
+        if (prop === 'textContent') return '';
+        return () => {};
+      },
+      set: () => true,
+    },
+  );
+  const context = vm.createContext({
+    window: { addEventListener() {} },
+    document: { querySelector: () => element, querySelectorAll: () => [] },
+  });
+  const load = (name) => fs.readFileSync(require.resolve(`../src/${name}`), 'utf8');
+  for (const name of ['api.js', 'lib.js', 'renderer.js']) {
+    try {
+      vm.runInContext(load(name), context, { filename: name });
+    } catch (error) {
+      assert.notStrictEqual(
+        error.name,
+        'SyntaxError',
+        `${name} breaks the shared global scope: ${error.message}`,
+      );
+    }
+  }
+});
+
 const instances = [
   { instanceId: 'i-0aaa', name: 'web-1', state: 'running', privateIp: '10.0.1.10' },
-  { instanceId: 'i-0bbb', name: 'batch', state: 'stopped', privateIp: '10.0.1.2' },
+  { instanceId: 'i-0bbb', name: 'batch', state: 'stopped', privateIp: '10.0.1.2', lifecycle: 'spot' },
   { instanceId: 'i-0ccc', name: null, state: 'running', privateIp: null },
 ];
 
@@ -42,6 +85,24 @@ test('empty filter returns a copy of everything', () => {
   const found = filterInstances(instances, '  ');
   assert.deepStrictEqual(found, instances);
   assert.notStrictEqual(found, instances);
+});
+
+test('spot only keeps spot instances and composes with the query', () => {
+  const spot = filterInstances(instances, '', true);
+  assert.deepStrictEqual(spot.map((i) => i.instanceId), ['i-0bbb']);
+  assert.deepStrictEqual(filterInstances(instances, 'web', true), []);
+});
+
+test('age renders the single largest unit', () => {
+  const now = Date.parse('2026-08-07T12:00:00Z');
+  assert.strictEqual(formatAge('2026-08-07T11:59:40Z', now), '<1m');
+  assert.strictEqual(formatAge('2026-08-07T11:30:00Z', now), '30m');
+  assert.strictEqual(formatAge('2026-08-07T05:00:00Z', now), '7h');
+  assert.strictEqual(formatAge('2026-08-01T12:00:00Z', now), '6d');
+  assert.strictEqual(formatAge('2026-05-07T12:00:00Z', now), '3mo');
+  assert.strictEqual(formatAge('2024-08-07T12:00:00Z', now), '2y');
+  assert.strictEqual(formatAge(null, now), null);
+  assert.strictEqual(formatAge('not a date', now), null);
 });
 
 test('sort is ascending then reversible', () => {
