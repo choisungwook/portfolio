@@ -38,6 +38,28 @@ Secrets: TAURI_SIGNING_PRIVATE_KEY_AWSVIEWER and TAURI_SIGNING_PRIVATE_KEY_AWSVI
 
 After merging, confirm with `gh release list` that the new version actually shipped; a green PR is not a release.
 
+## Updater signing key (one-time setup)
+
+The build fails without the private key, because tauri.conf.json carries a pubkey and createUpdaterArtifacts is on. Generate the pair with the tauri CLI:
+
+```bash
+cd workspace && npx @tauri-apps/cli signer generate -w ~/.tauri/akbun-awsviewer.key -p ""
+```
+
+Put the private half and its password in the two repository secrets the workflow reads (run from the repository root):
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY_AWSVIEWER < ~/.tauri/akbun-awsviewer.key
+```
+
+```bash
+printf '' | gh secret set TAURI_SIGNING_PRIVATE_KEY_AWSVIEWER_PASSWORD
+```
+
+Then paste the contents of ~/.tauri/akbun-awsviewer.key.pub into plugins.updater.pubkey in src-tauri/tauri.conf.json — the key contents, not a path. The pubkey and the secret are one pair: regenerating the key without updating the config produces a signed release that installed copies refuse.
+
+Keep ~/.tauri/akbun-awsviewer.key somewhere that outlives this laptop. A repository secret cannot be read back, and losing the key means installed copies can never update again.
+
 ## Caveats
 
 - The SSO login window label is fixed (`sso-login`); a second login replaces it. Closing that window is the cancel path — the poll loop checks the window handle.
