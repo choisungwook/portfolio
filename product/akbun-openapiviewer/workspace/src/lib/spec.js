@@ -206,3 +206,188 @@ function typeLabel(schema) {
   if (schema.nullable === true) label += ' | null';
   return label;
 }
+
+// ===== Request snippets =====
+
+export const SNIPPET_LANGS = [
+  { id: 'curl', label: 'curl' },
+  { id: 'httpx', label: 'python httpx' },
+  { id: 'requests', label: 'python requests' },
+];
+
+// Stands in when the document declares no server. A snippet with a real-looking
+// host is easier to spot and replace than one starting at a bare path.
+const FALLBACK_SERVER = 'https://api.example.com';
+
+// Python clients that take the method as a named function. Anything else (trace)
+// goes through .request("TRACE", ...).
+const PY_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+
+/** First declared server, without its trailing slash. */
+export function serverUrl(spec) {
+  const url = spec?.servers?.[0]?.url;
+  return (typeof url === 'string' && url.trim() ? url.trim() : FALLBACK_SERVER).replace(/\/+$/, '');
+}
+
+/**
+ * A schema reduced to one example value, for a request body.
+ * `example` wins where the document gives one; otherwise a scalar becomes a
+ * placeholder of its type. Circular refs and deep nesting stop at null.
+ */
+export function schemaExample(spec, schema, seen = [], depth = 0) {
+  if (!schema || typeof schema !== 'object' || depth > MAX_DEPTH) return null;
+  if (schema.example !== undefined) return schema.example;
+
+  if (schema.$ref) {
+    if (seen.includes(schema.$ref)) return null;
+    return schemaExample(spec, resolveRef(spec, schema.$ref), [...seen, schema.$ref], depth);
+  }
+
+  // allOf is a merge, so the parts are combined; oneOf/anyOf is a choice, so the
+  // first branch is shown rather than an object that satisfies none of them.
+  if (Array.isArray(schema.allOf)) {
+    return schema.allOf.reduce(
+      (acc, part) => Object.assign(acc, schemaExample(spec, part, seen, depth) ?? {}),
+      {},
+    );
+  }
+  for (const key of ['oneOf', 'anyOf']) {
+    if (Array.isArray(schema[key])) return schemaExample(spec, schema[key][0], seen, depth);
+  }
+
+  if (Array.isArray(schema.enum)) return schema.enum[0] ?? null;
+
+  if (schema.type === 'array' || schema.items) {
+    return [schemaExample(spec, schema.items ?? {}, seen, depth + 1)];
+  }
+
+  if (schema.type === 'object' || schema.properties) {
+    const out = {};
+    for (const [name, prop] of Object.entries(schema.properties ?? {})) {
+      out[name] = schemaExample(spec, prop, seen, depth + 1);
+    }
+    return out;
+  }
+
+  return scalarExample(schema);
+}
+
+function scalarExample(schema) {
+  if (schema.default !== undefined) return schema.default;
+  switch (schema.type) {
+    case 'integer':
+    case 'number':
+      return 0;
+    case 'boolean':
+      return true;
+    case 'string':
+      return schema.format === 'date-time' ? '2026-01-01T00:00:00Z' : 'string';
+    default:
+      return null;
+  }
+}
+
+/**
+ * The pieces every snippet needs: URL with required query parameters filled in,
+ * required headers, and the JSON body when the operation takes one.
+ * Path placeholders are left as `{petId}` — substituting a made-up id hides the
+ * fact that the caller has to supply one.
+ */
+function requestParts(spec, op) {
+  const params = (op.parameters ?? [])
+    .map((param) => (param?.$ref ? resolveRef(spec, param.$ref) : param))
+    .filter((param) => param && typeof param === 'object' && param.required);
+
+  const query = params
+    .filter((param) => param.in === 'query')
+    .map((param) => `${encodeURIComponent(param.name)}=${encodeURIComponent(paramValue(spec, param))}`);
+
+  const headers = {};
+  for (const param of params.filter((p) => p.in === 'header')) {
+    headers[param.name] = String(paramValue(spec, param));
+  }
+
+  const raw = op.operation?.requestBody;
+  const requestBody = raw?.$ref ? resolveRef(spec, raw.$ref) : raw;
+  const jsonType = Object.keys(requestBody?.content ?? {}).find((type) => type.includes('json'));
+  const body = jsonType
+    ? schemaExample(spec, requestBody.content[jsonType].schema)
+    : undefined;
+  if (jsonType) headers['Content-Type'] = jsonType;
+
+  const url = `${serverUrl(spec)}${op.path}${query.length ? `?${query.join('&')}` : ''}`;
+  return { url, headers, body, hasBody: Boolean(jsonType) };
+}
+
+function paramValue(spec, param) {
+  const value = param.example ?? schemaExample(spec, param.schema);
+  return value == null || typeof value === 'object' ? param.name : value;
+}
+
+/**
+ * One request snippet for an operation.
+ * `pretty` breaks it across lines; otherwise it is a single line to paste.
+ */
+export function snippet(spec, op, lang, pretty = true) {
+  const parts = requestParts(spec, op);
+  if (lang === 'curl') return curlSnippet(op, parts, pretty);
+  return pySnippet(lang === 'requests' ? 'requests' : 'httpx', op, parts, pretty);
+}
+
+// Single quotes are the only shell quoting that leaves JSON alone, and the one
+// thing they cannot hold is a single quote, hence the close-escape-reopen dance.
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", `'\\''`)}'`;
+}
+
+function curlSnippet(op, { url, headers, body, hasBody }, pretty) {
+  // Method and URL are one argument here so that wrapping never splits them off
+  // onto a line of their own, which reads as if the request had no target.
+  const args = [`-X ${op.method} ${shellQuote(url)}`];
+  for (const [name, value] of Object.entries(headers)) args.push(`-H ${shellQuote(`${name}: ${value}`)}`);
+  if (hasBody) args.push(`-d ${shellQuote(JSON.stringify(body, null, pretty ? 2 : 0))}`);
+  return pretty ? `curl ${args.join(' \\\n  ')}` : `curl ${args.join(' ')}`;
+}
+
+function pySnippet(module, op, { url, headers, body, hasBody }, pretty) {
+  const method = op.method.toLowerCase();
+  const call = PY_METHODS.includes(method)
+    ? { name: `${module}.${method}`, lead: [] }
+    : { name: `${module}.request`, lead: [JSON.stringify(op.method)] };
+
+  const args = [...call.lead, JSON.stringify(url)];
+  if (Object.keys(headers).length) args.push(`headers=${pyLiteral(headers, pretty, '    ')}`);
+  if (hasBody) args.push(`json=${pyLiteral(body, pretty, '    ')}`);
+
+  if (!pretty) {
+    return `import ${module}; print(${call.name}(${args.join(', ')}).json())`;
+  }
+  return [
+    `import ${module}`,
+    '',
+    `response = ${call.name}(`,
+    ...args.map((arg) => `    ${arg},`),
+    ')',
+    'print(response.json())',
+  ].join('\n');
+}
+
+/** A JS value as a Python literal, one line or indented. */
+function pyLiteral(value, pretty, indent = '') {
+  if (value === null || value === undefined) return 'None';
+  if (typeof value === 'boolean') return value ? 'True' : 'False';
+  if (typeof value === 'number' || typeof value === 'string') return JSON.stringify(value);
+
+  const pad = `${indent}    `;
+  const wrap = (open, close, items) => (pretty
+    ? `${open}\n${items.map((item) => `${pad}${item},`).join('\n')}\n${indent}${close}`
+    : `${open}${items.join(', ')}${close}`);
+
+  if (Array.isArray(value)) {
+    return value.length ? wrap('[', ']', value.map((item) => pyLiteral(item, pretty, pad))) : '[]';
+  }
+  const entries = Object.entries(value);
+  return entries.length
+    ? wrap('{', '}', entries.map(([key, val]) => `${JSON.stringify(key)}: ${pyLiteral(val, pretty, pad)}`))
+    : '{}';
+}

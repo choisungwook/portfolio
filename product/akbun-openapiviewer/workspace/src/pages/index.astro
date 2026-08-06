@@ -25,7 +25,7 @@ import '../styles/global.css';
     </button>
     <div class="app-title">
       <h1>akbun openapi viewer</h1>
-      <p id="spec-title">Import an OpenAPI file or paste the spec. Nothing leaves the browser.</p>
+      <p>Import an OpenAPI file or paste the spec. Nothing leaves the browser.</p>
     </div>
     <div class="header-actions">
       <button id="export-json" class="icon-button ghost" type="button" disabled
@@ -43,6 +43,9 @@ import '../styles/global.css';
   <main class="split">
     <div id="pane-backdrop" class="pane-backdrop" hidden></div>
     <aside id="pane-left" class="pane-left">
+      <div class="spec-head">
+        <h2 id="spec-title">No spec loaded</h2>
+      </div>
       <div class="search-box">
         <input id="search" type="search" placeholder="Search APIs (Ctrl/Cmd + K)"
                autocomplete="off" spellcheck="false" aria-label="Search APIs">

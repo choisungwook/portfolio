@@ -178,6 +178,23 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
 }
 
 /* ===== Sidebar ===== */
+
+/* The spec's own name. It used to sit beside the brand in the header, where it
+   read as a subtitle of the app rather than as the title of what is loaded. */
+.spec-head {
+  flex-shrink: 0;
+  padding: 0.8rem 0.9rem 0.7rem;
+  border-bottom: 1px solid var(--divider);
+}
+.spec-head h2 {
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
 .search-box {
   flex-shrink: 0;
   padding: 0.65rem 0.75rem;
@@ -203,27 +220,27 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.6rem 0.9rem;
+  padding: 0.7rem 0.9rem;
   color: var(--text);
   background: var(--surface);
   border: none;
-  border-bottom: 1px solid var(--divider);
+  border-bottom: 2px solid var(--divider);
   border-radius: 0;
   font-family: var(--font-title);
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
   text-align: left;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 .all-item:hover { background: #F1EEE7; border-color: var(--divider); }
-.all-item.active { color: #fff; background: var(--text); }
-.all-item.active:hover { background: var(--text); }
+.all-item.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+.all-item.active:hover { background: var(--accent); }
 
 .count {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: 0.9rem;
+  font-weight: 500;
   color: var(--text-sub);
 }
 .all-item.active .count { color: #fff; }
@@ -521,6 +538,50 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   overscroll-behavior-x: contain;
 }
 
+/* ===== Request snippets ===== */
+.code-box { margin-top: 0.4rem; }
+
+.code-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+/* Pushes the format and copy buttons to the far end, away from the languages. */
+.tab-gap { flex: 1 1 auto; }
+
+.tab {
+  padding: 0.25rem 0.6rem;
+  color: var(--text-sub);
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.tab:hover { color: var(--text); background: #F1EEE7; border-color: var(--text-sub); }
+.tab.active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.tab.active:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+
+.snippet {
+  margin-top: 0.35rem;
+  padding: 0.7rem 0.9rem;
+  color: #F2EFE9;
+  background: #2D2A26;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .response { margin-top: 0.6rem; }
 .response-head { font-size: 0.9rem; }
 .status-code {
@@ -645,8 +706,12 @@ button.ghost:disabled:hover { background: var(--surface); border-color: var(--di
   }
   .pane-left.open { transform: none; }
 
+  .spec-head { padding: 0.65rem 0.75rem; }
+  .spec-head h2 { font-size: 1.15rem; }
   #search { min-height: 42px; font-size: 16px; }
-  .all-item { min-height: 48px; }
+  .all-item { min-height: 52px; }
+  .tab { min-height: 34px; }
+  .snippet { padding: 0.6rem 0.7rem; font-size: 0.74rem; }
   .op-item { min-height: 48px; justify-content: center; }
   .op-list { padding-bottom: env(safe-area-inset-bottom); }
 

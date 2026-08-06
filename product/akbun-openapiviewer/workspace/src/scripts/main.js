@@ -10,6 +10,8 @@ import {
   pageSlice,
   resolveRef,
   schemaText,
+  snippet,
+  SNIPPET_LANGS,
 } from '../lib/spec.js';
 import { SAMPLE_SPEC } from '../lib/sample.js';
 
@@ -35,12 +37,15 @@ const toggleList = document.getElementById('toggle-list');
 const drawerQuery = window.matchMedia('(max-width: 720px)');
 
 // view is either the paginated all-APIs view or one selected operation.
+// lang and pretty are the snippet choice, shared by every card on the page.
 const state = {
   spec: null,
   ops: [],
   query: '',
   view: { kind: 'all', page: 1 },
   drawer: false,
+  lang: SNIPPET_LANGS[0].id,
+  pretty: true,
 };
 
 function esc(value) {
@@ -152,6 +157,10 @@ function operationHtml(op) {
     parts.push(contentHtml(body.content));
   }
 
+  parts.push(`
+    <h3>Request</h3>
+    <div class="code-box" data-op="${esc(op.id)}">${codeBoxInner(op)}</div>`);
+
   const responses = Object.entries(operation.responses ?? {});
   if (responses.length) {
     parts.push('<h3>Responses</h3>');
@@ -168,6 +177,35 @@ function operationHtml(op) {
   }
 
   return `<article class="op">${parts.join('')}</article>`;
+}
+
+// The tabs and the snippet, without the surrounding box, so a language or
+// wrapping change can redraw the boxes in place instead of rebuilding the page
+// and throwing the reader back to the top of it.
+function codeBoxInner(op) {
+  const tabs = SNIPPET_LANGS
+    .map((lang) => `
+      <button class="tab${lang.id === state.lang ? ' active' : ''}" type="button"
+              data-lang="${lang.id}">${lang.label}</button>`)
+    .join('');
+
+  return `
+    <div class="code-tabs">
+      ${tabs}
+      <span class="tab-gap"></span>
+      <button class="tab" type="button" data-pretty="${state.pretty ? '0' : '1'}">
+        ${state.pretty ? 'One line' : 'Pretty'}
+      </button>
+      <button class="tab" type="button" data-copy>Copy</button>
+    </div>
+    <pre class="snippet">${esc(snippet(state.spec, op, state.lang, state.pretty))}</pre>`;
+}
+
+function refreshCodeBoxes() {
+  for (const box of detail.querySelectorAll('.code-box')) {
+    const op = state.ops.find((candidate) => candidate.id === box.dataset.op);
+    if (op) box.innerHTML = codeBoxInner(op);
+  }
 }
 
 function contentHtml(content) {
@@ -247,7 +285,7 @@ function loadSpec(text) {
   state.view = { kind: 'all', page: 1 };
   setDrawer(false);
   searchInput.value = '';
-  specTitleEl.textContent = `${specTitle(spec)} · ${state.ops.length} APIs`;
+  specTitleEl.textContent = specTitle(spec);
   exportButton.disabled = false;
 
   // A spec near the localStorage quota is not worth failing the load over.
@@ -321,11 +359,42 @@ opList.addEventListener('click', (event) => {
 });
 
 detail.addEventListener('click', (event) => {
+  const lang = event.target.closest('[data-lang]');
+  if (lang) {
+    state.lang = lang.dataset.lang;
+    refreshCodeBoxes();
+    return;
+  }
+
+  const pretty = event.target.closest('[data-pretty]');
+  if (pretty) {
+    state.pretty = pretty.dataset.pretty === '1';
+    refreshCodeBoxes();
+    return;
+  }
+
+  const copy = event.target.closest('[data-copy]');
+  if (copy) {
+    const code = copy.closest('.code-box').querySelector('.snippet').textContent;
+    // No clipboard on an insecure origin, and the user can still select the
+    // text, so a failure says so on the button rather than throwing.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(code))
+      .then(() => flash(copy, 'Copied'), () => flash(copy, 'Failed'));
+    return;
+  }
+
   const button = event.target.closest('[data-page]');
   if (!button || button.disabled) return;
   state.view = { kind: 'all', page: Number(button.dataset.page) };
   renderDetail();
 });
+
+function flash(button, text) {
+  const original = button.textContent;
+  button.textContent = text;
+  setTimeout(() => { button.textContent = original; }, 1200);
+}
 
 searchInput.addEventListener('input', () => {
   state.query = searchInput.value;
