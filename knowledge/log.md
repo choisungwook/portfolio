@@ -2,6 +2,8 @@
 
 ## 2026-08-07
 
+* **Creation**: [move 클로저가 필드 이름을 대면 Send는 wrapper에 남고 클로저는 필드만 가져간다](topics/move-closure-captures-the-field-not-the-wrapper.md) topic 기록. akbun-makevideo의 release 빌드가 unsafe impl Send를 붙여 둔 wrapper를 두고 안쪽 NonNull을 지목하며 실패해, 원인이 wrapper가 아니라 edition 2021의 캡처 단위였다는 것을 남긴다.
+* **Creation**: [업데이트 서명 불일치는 서명과 pubkey의 key ID를 뽑아 갈라낸다](topics/tauri-updater-key-id-mismatch.md) topic 기록. akbun-makevideo의 업데이트 실패를 짐작으로 재배포하지 않고 판정하려다, 읽을 수 없는 secret을 두고도 minisign key ID로 서명한 키와 신뢰하는 키를 비교할 수 있다는 것을 알게 되어 남긴다.
 * **Creation**: [늦은 프레임은 그리지 않고 건너뛰며, 디코더를 되돌리지 않는다](decisions/2026-08-late-frames-are-skipped-not-drawn.md) 결정 기록. akbun-makevideo의 프레임 소스와 오디오 클럭을 화면에 잇는 단계에서, 판정을 하네스에만 맡긴 덕에 눈으로는 찾지 못했을 결함 세 가지를 찾은 것을 함께 남긴다.
 * **Creation**: [재생 시각의 기준은 오디오 출력이고 영상이 그것을 따라간다](decisions/2026-08-audio-is-the-master-clock.md) 결정 기록. akbun-makevideo에 오디오 엔진을 넣으면서, seek가 함수 호출이 아니라 메시지라 요청 직후에도 링버퍼는 이전 위치로 가득 차 있다는 것과, 링버퍼를 비울 수 있는 쪽이 소비자뿐이라 seek가 정리되는 동안에도 재생 쪽이 계속 버퍼를 요청해야 한다는 것을 함께 남긴다.
 
