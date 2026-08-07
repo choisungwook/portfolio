@@ -40,7 +40,12 @@ const DEFAULT_SETTINGS = {
   ffmpegDir: '',
   renderAcceleration: 'auto',
   compositor: 'auto',
-  playbackEngine: 'native',
+  // The page's own default, and deliberately not Rust's. This value is what is
+  // in force before bootstrap answers and in a plain browser, and in both of
+  // those the media elements are what is really playing — there is no IPC to
+  // attach a monitor over. Rust's own default is native and overrides this the
+  // moment bootstrap lands.
+  playbackEngine: 'media-element',
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
@@ -1244,6 +1249,12 @@ function applySettings(next) {
   // The engine is picked once, when a monitor is asked for. Changing the
   // setting therefore means taking the running one down and asking again,
   // rather than hoping the next command notices.
+  //
+  // This is also what attaches the first time. The page starts on
+  // media-element and Rust's default is native, so bootstrap landing *is* a
+  // change and lands here — which is why there is no separate attach after it.
+  // A saved setting of media-element is no change and correctly attaches
+  // nothing.
   if (was !== next.playbackEngine) attachMonitor(true);
 }
 
@@ -1776,10 +1787,6 @@ async function boot() {
     applySettings(state.settings);
     updateToolWarning();
     refresh();
-    // After bootstrap, because the engine to ask for is a setting and the
-    // settings arrive here. Before this the page is on the media element
-    // preview, which is the right thing to be on while it does not yet know.
-    await attachMonitor(true);
   } catch (error) {
     reportError(error, 'bootstrap');
     dom.toolWarning.hidden = false;

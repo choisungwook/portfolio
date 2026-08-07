@@ -53,6 +53,25 @@ function samePlace(a, b) {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
+/** Whether the native view should be on screen right now.
+ *
+ *  The view sits **over** the webview and is not in the page's stacking order,
+ *  so anything the page draws on the stage would be behind it. That makes
+ *  visibility one rule with four inputs rather than a call at each of the
+ *  places that happens to cover it — which is how the asset preview ended up
+ *  hidden behind a paused monitor.
+ *
+ *  - `native`: there is a session at all.
+ *  - `timeline`: the stage is showing the timeline. An asset preview is a
+ *    media element in the page on both engines, so the view has to get out of
+ *    its way.
+ *  - `hasContent`: the timeline has something on it. An empty one puts the
+ *    "drop media here" hint on the stage, and that is drawn by the page too.
+ *  - `covered`: a sheet or an open menu is over the stage. */
+function shouldShowMonitor(state) {
+  return Boolean(state.native && state.timeline && state.hasContent && !state.covered);
+}
+
 /** What the page should do with the answer to `playbackAttach`.
  *
  *  Three outcomes and they are not two: a fallback and a preference both end at
@@ -74,6 +93,8 @@ function createMonitor(options) {
   const L = globalThis.timelineLib;
 
   let native = false;
+  let covered = false;
+  let lastVisible = null;
   let lastPlace = null;
   let polling = false;
   let position = 0;
@@ -101,6 +122,22 @@ function createMonitor(options) {
 
   function total() {
     return preview.total();
+  }
+
+  /** Send the view's visibility only when it actually changes. The renderer
+   *  asks on every timeline redraw, and one command per redraw would be a
+   *  round trip for every keystroke that moves a clip. */
+  function syncVisibility() {
+    if (!native) return;
+    const wanted = shouldShowMonitor({
+      native,
+      timeline: timelineMode(),
+      hasContent: total() > 0,
+      covered,
+    });
+    if (wanted === lastVisible) return;
+    lastVisible = wanted;
+    api.playbackVisible(wanted).catch(() => {});
   }
 
   function currentPlace() {
@@ -134,6 +171,8 @@ function createMonitor(options) {
           preview.clear();
           preview.clearExact();
         }
+        lastVisible = null;
+        syncVisibility();
         if (onNotice) onNotice(choice.notice);
         return native;
       } catch (error) {
@@ -151,6 +190,8 @@ function createMonitor(options) {
     if (!api || !api.available) return;
     native = false;
     lastPlace = null;
+    lastVisible = null;
+    covered = false;
     try {
       await api.playbackRelease();
     } catch (error) {
@@ -224,16 +265,17 @@ function createMonitor(options) {
     place,
     usesNativeMonitor: drivingNatively,
 
-    /** Show or hide the native view.
+    /** The page is about to draw over the stage, or has stopped.
      *
-     *  The page calls this before drawing anything over the stage. A native
-     *  view is not in the page's stacking order, so a settings sheet opened
-     *  over a visible monitor would be behind the picture. Playback keeps
-     *  running while it is hidden, which is why closing the sheet shows where
-     *  the playhead got to rather than where it was. */
+     *  A sheet or an open menu is one of four reasons the view might have to
+     *  get out of the way, so this records the reason rather than setting the
+     *  visibility — otherwise closing a sheet while an asset is being previewed
+     *  would put the monitor back on top of it. Playback keeps running while it
+     *  is hidden, which is why closing a sheet shows where the playhead got to
+     *  rather than where it was. */
     setVisible(visible) {
-      if (!native) return;
-      api.playbackVisible(Boolean(visible)).catch(() => {});
+      covered = !visible;
+      syncVisibility();
     },
 
     layout() {
@@ -277,6 +319,10 @@ function createMonitor(options) {
      *  alone: its frame source is already reading the edit it was built from,
      *  and rebuilding mid-playback would be a stall. */
     redraw() {
+      // Visibility first, and outside the guard: a timeline that has just
+      // become empty is exactly the case the guard would skip, and it is one
+      // of the reasons the view has to get out of the way.
+      syncVisibility();
       if (!drivingNatively()) return;
       api.playbackRedraw().catch(() => {});
     },
@@ -296,10 +342,13 @@ function createMonitor(options) {
     },
 
     showAsset(asset) {
-      // An asset preview is a media element even on the native engine, so the
-      // monitor is told to stop drawing the timeline behind it.
+      // An asset preview is a media element in the page on both engines, so
+      // the monitor stops playing *and* gets out of the way. Without the
+      // second half the asset plays behind a native view still showing the
+      // last timeline frame, because that view is over the webview.
       if (native) api.playbackPause().catch(() => {});
       preview.showAsset(asset);
+      syncVisibility();
     },
 
     showTimeline() {
@@ -307,6 +356,7 @@ function createMonitor(options) {
       position = 0;
       playing = false;
       place();
+      syncVisibility();
     },
 
     setQuality: preview.setQuality,
@@ -330,8 +380,8 @@ function createMonitor(options) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createMonitor, placeOf, samePlace, readChoice };
+  module.exports = { createMonitor, placeOf, samePlace, readChoice, shouldShowMonitor };
 } else {
-  globalThis.monitorLib = { createMonitor, placeOf, samePlace, readChoice };
+  globalThis.monitorLib = { createMonitor, placeOf, samePlace, readChoice, shouldShowMonitor };
 }
 })();

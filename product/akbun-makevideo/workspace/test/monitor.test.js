@@ -135,3 +135,55 @@ test('with no monitor attached the transport reaches the media elements', () => 
   assert.ok(called.includes('seek'), 'seek should have reached the preview');
   assert.strictEqual(monitor.usesNativeMonitor(), false);
 });
+
+// --- when the native view may be on screen ---------------------------------
+//
+// The view sits over the webview and is not in the page's stacking order, so
+// anything the page draws on the stage is behind it. Copilot caught the asset
+// preview case on PR #762; these cover the whole rule, because the failure is
+// invisible in every test that does not have a real window.
+
+const { shouldShowMonitor } = require('../src/monitor.js');
+
+const showing = { native: true, timeline: true, hasContent: true, covered: false };
+
+test('a native monitor showing a timeline with clips on it is visible', () => {
+  assert.strictEqual(shouldShowMonitor(showing), true);
+});
+
+test('an asset preview hides the view, or it covers the asset', () => {
+  assert.strictEqual(shouldShowMonitor({ ...showing, timeline: false }), false);
+});
+
+test('an empty timeline hides the view, or it covers the drop hint', () => {
+  assert.strictEqual(shouldShowMonitor({ ...showing, hasContent: false }), false);
+});
+
+test('a sheet or an open menu hides the view', () => {
+  assert.strictEqual(shouldShowMonitor({ ...showing, covered: true }), false);
+});
+
+test('with no native session there is nothing to show', () => {
+  assert.strictEqual(shouldShowMonitor({ ...showing, native: false }), false);
+});
+
+// The reason to make this one rule rather than a call at each covering site:
+// two reasons to hide have to survive one of them going away. Closing a sheet
+// while an asset is being previewed must not put the monitor back on top of it.
+test('one reason going away does not reveal the view while another holds', () => {
+  const both = { ...showing, timeline: false, covered: true };
+  assert.strictEqual(shouldShowMonitor(both), false);
+  assert.strictEqual(shouldShowMonitor({ ...both, covered: false }), false);
+  assert.strictEqual(shouldShowMonitor({ ...both, timeline: true }), false);
+});
+
+test('the page defaults to the engine that is really playing before Rust answers', () => {
+  // DEFAULT_SETTINGS in renderer.js is what is in force before bootstrap lands
+  // and in a plain browser, and in both of those there is no IPC to attach a
+  // monitor over. Rust's own default is native and overrides it.
+  const source = require('node:fs').readFileSync(`${__dirname}/../src/renderer.js`, 'utf8');
+  const defaults = source.slice(source.indexOf('const DEFAULT_SETTINGS'));
+  const engine = defaults.match(/playbackEngine:\s*'([a-z-]+)'/);
+  assert.ok(engine, 'DEFAULT_SETTINGS should carry a playback engine');
+  assert.strictEqual(engine[1], 'media-element');
+});
