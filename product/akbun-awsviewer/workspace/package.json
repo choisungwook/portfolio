@@ -1,6 +1,6 @@
 {
   "name": "akbun-awsviewer",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": true,
   "description": "macOS desktop viewer for AWS resources: pick a profile from ~/.aws/config, log in with IAM Identity Center, and browse EC2 read-only",
   "author": "akbun",

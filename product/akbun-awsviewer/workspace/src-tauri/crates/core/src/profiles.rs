@@ -39,8 +39,8 @@ pub fn parse_config(text: &str) -> Vec<Profile> {
 
     let mut sessions: HashMap<&str, &HashMap<String, String>> = HashMap::new();
     for (header, keys) in &sections {
-        if let Some(name) = header.strip_prefix("sso-session ") {
-            sessions.insert(name.trim(), keys);
+        if let Some(name) = named_section(header, "sso-session") {
+            sessions.insert(name, keys);
         }
     }
 
@@ -48,8 +48,8 @@ pub fn parse_config(text: &str) -> Vec<Profile> {
     for (header, keys) in &sections {
         let name = if header == "default" {
             "default"
-        } else if let Some(rest) = header.strip_prefix("profile ") {
-            rest.trim()
+        } else if let Some(rest) = named_section(header, "profile") {
+            rest
         } else {
             continue;
         };
@@ -63,31 +63,50 @@ pub fn parse_config(text: &str) -> Vec<Profile> {
 }
 
 /// Splits an INI-ish file into (section header, key map) in file order.
-/// Indented lines are nested values (the s3 block style); nothing here needs
-/// them, so they are skipped rather than mis-read as top-level keys.
+///
+/// Mirrors the configparser semantics the AWS CLI reads this file with: a key
+/// may sit at any indentation, and a line is a nested value (the s3 block
+/// style), not a key, only when it is indented deeper than the key line
+/// before it. Nothing here needs the nested values, so they are skipped.
+/// Key names compare case-insensitively, so they are stored lowercased.
 fn split_sections(text: &str) -> Vec<(String, HashMap<String, String>)> {
     let mut sections: Vec<(String, HashMap<String, String>)> = Vec::new();
+    // Indentation of the last key accepted; deeper lines continue its value.
+    let mut key_indent: Option<usize> = None;
     for raw in text.lines() {
-        if raw.starts_with(char::is_whitespace) {
-            continue;
-        }
         let line = raw.trim();
         if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        let indent = raw.chars().take_while(|c| c.is_whitespace()).count();
+        if key_indent.is_some_and(|base| indent > base) {
             continue;
         }
         if line.starts_with('[') && line.ends_with(']') {
             let header = line[1..line.len() - 1].trim().to_string();
             sections.push((header, HashMap::new()));
+            key_indent = None;
             continue;
         }
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
         if let Some((_, keys)) = sections.last_mut() {
-            keys.insert(key.trim().to_string(), value.trim().to_string());
+            keys.insert(key.trim().to_ascii_lowercase(), value.trim().to_string());
+            key_indent = Some(indent);
         }
     }
     sections
+}
+
+/// The name after a `profile` / `sso-session` marker. The CLI accepts any
+/// whitespace between the marker and the name, not only a single space.
+fn named_section<'a>(header: &'a str, marker: &str) -> Option<&'a str> {
+    let rest = header.strip_prefix(marker)?;
+    if !rest.starts_with(char::is_whitespace) {
+        return None;
+    }
+    Some(rest.trim())
 }
 
 fn resolve_sso(
@@ -215,5 +234,84 @@ sso_session = missing
             .unwrap()
             .sso
             .is_none());
+    }
+
+    // The CLI reads this file with Python's configparser, which accepts keys
+    // at any indentation. Dropping indented lines parsed a hand-indented
+    // config into profiles with no keys at all, so every profile lost its
+    // SSO configuration and the login dialog listed nothing.
+    #[test]
+    fn parses_indented_keys_like_the_cli() {
+        let text = r#"
+[profile dev]
+    sso_session = my-sso
+    sso_account_id = 123456789012
+    sso_role_name = ReadOnly
+    region = ap-northeast-2
+
+[sso-session my-sso]
+    sso_start_url = https://d-90000000.awsapps.com/start
+    sso_region = us-east-1
+"#;
+        let profiles = parse_config(text);
+        let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
+        assert_eq!(dev.region.as_deref(), Some("ap-northeast-2"));
+        let sso = dev.sso.as_ref().unwrap();
+        assert_eq!(sso.session_name.as_deref(), Some("my-sso"));
+        assert_eq!(sso.start_url, "https://d-90000000.awsapps.com/start");
+        assert_eq!(sso.sso_region, "us-east-1");
+        assert_eq!(sso.account_id.as_deref(), Some("123456789012"));
+        assert_eq!(sso.role_name.as_deref(), Some("ReadOnly"));
+    }
+
+    // configparser folds the lines under `s3 =` into that value, so a
+    // `region` in there must not shadow the profile's own keys.
+    #[test]
+    fn nested_block_lines_are_values_not_keys() {
+        let text = r#"
+[profile dev]
+s3 =
+  region = us-west-1
+  max_concurrent_requests = 20
+sso_start_url = https://d-90000000.awsapps.com/start
+sso_region = us-east-1
+region = ap-northeast-2
+"#;
+        let profiles = parse_config(text);
+        let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
+        assert_eq!(dev.region.as_deref(), Some("ap-northeast-2"));
+        assert_eq!(dev.sso.as_ref().unwrap().sso_region, "us-east-1");
+    }
+
+    #[test]
+    fn indented_profile_keeps_nested_blocks_as_values() {
+        let text = r#"
+[profile dev]
+  s3 =
+    region = us-west-1
+  sso_start_url = https://d-90000000.awsapps.com/start
+  sso_region = us-east-1
+"#;
+        let profiles = parse_config(text);
+        let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
+        assert_eq!(dev.region, None);
+        assert_eq!(dev.sso.as_ref().unwrap().sso_region, "us-east-1");
+    }
+
+    #[test]
+    fn section_markers_accept_any_whitespace() {
+        let text = "[profile\tdev]\nsso_session = s\n[sso-session\ts]\nsso_start_url = https://d-90000000.awsapps.com/start\nsso_region = us-east-1\n";
+        let profiles = parse_config(text);
+        let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
+        assert_eq!(dev.sso.as_ref().unwrap().session_name.as_deref(), Some("s"));
+    }
+
+    #[test]
+    fn key_names_match_case_insensitively() {
+        let text = "[profile dev]\nSSO_Start_URL = https://d-90000000.awsapps.com/start\nSSO_REGION = us-east-1\nRegion = ap-northeast-2\n";
+        let profiles = parse_config(text);
+        let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
+        assert_eq!(dev.region.as_deref(), Some("ap-northeast-2"));
+        assert_eq!(dev.sso.as_ref().unwrap().start_url, "https://d-90000000.awsapps.com/start");
     }
 }
