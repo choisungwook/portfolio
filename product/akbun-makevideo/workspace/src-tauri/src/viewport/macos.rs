@@ -24,7 +24,7 @@
 
 use super::Place;
 use objc2::rc::Retained;
-use objc2::MainThreadMarker;
+use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use raw_window_handle::{
@@ -53,6 +53,19 @@ struct Handle(NonNull<NSView>);
 // wgpu, which attaches a layer and then talks to Metal.
 unsafe impl Send for Handle {}
 unsafe impl Sync for Handle {}
+
+impl Handle {
+    /// The address, taken through the whole handle.
+    ///
+    /// Every closure below reaches the pointer through this rather than through
+    /// `.0`. A `move` closure that names the field captures the `NonNull`
+    /// alone, and a `NonNull` is not `Send` — the `unsafe impl` above is on
+    /// `Handle`, so the closure has to capture the `Handle`. Calling a method
+    /// that takes `self` is what makes it do that.
+    fn ptr(self) -> NonNull<NSView> {
+        self.0
+    }
+}
 
 /// What wgpu is given. Separate from [`Inner`] because a surface target has to
 /// be owned and `'static`, and because it must not carry the window with it.
@@ -111,7 +124,7 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
     let handle = window.clone();
     let view = on_main(window, move |main| {
         let content = content_view(&handle)?;
-        let view = unsafe { NSView::initWithFrame(NSView::alloc(main), rect(&content, place)) };
+        let view = NSView::initWithFrame(NSView::alloc(main), rect(&content, place));
         // Metal draws into this view's layer, so it has to have one. wgpu
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
@@ -119,9 +132,7 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
         // Over the webview. A `None` sibling with `Above` means "over all of
         // them", which is the front. The page hides it before drawing anything
         // on top; see the note in mod.rs for why it is not the other way round.
-        unsafe {
-            content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None)
-        };
+        content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
         let pointer = NonNull::new(Retained::into_raw(view))
@@ -141,8 +152,10 @@ pub fn place(inner: &Inner, at: Place) {
     // window nobody is looking at.
     let _ = on_main(&inner.window, move |_| {
         let content = content_view(&handle)?;
-        let view = unsafe { view.0.as_ref() };
-        unsafe { view.setFrame(rect(&content, at)) };
+        // SAFETY: messaged on the main thread, and the view is alive until
+        // `detach` releases it.
+        let view = unsafe { view.ptr().as_ref() };
+        view.setFrame(rect(&content, at));
         Ok(())
     });
 }
@@ -152,7 +165,7 @@ pub fn set_visible(inner: &Inner, visible: bool) {
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: messaged on the main thread, and the view is alive until
         // `detach` releases it.
-        unsafe { view.0.as_ref().setHidden(!visible) };
+        unsafe { view.ptr().as_ref().setHidden(!visible) };
         Ok(())
     });
 }
@@ -162,9 +175,9 @@ pub fn detach(inner: &Inner) {
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: the pointer came from `Retained::into_raw` in `attach` and is
         // released exactly once, here.
-        let view: Retained<NSView> = unsafe { Retained::from_raw(view.0.as_ptr()) }
+        let view: Retained<NSView> = unsafe { Retained::from_raw(view.ptr().as_ptr()) }
             .ok_or("the monitor view was already gone")?;
-        unsafe { view.removeFromSuperview() };
+        view.removeFromSuperview();
         Ok(())
     });
 }
@@ -187,7 +200,9 @@ fn content_view(window: &tauri::WebviewWindow) -> Result<Retained<NSView>, Strin
     let ns_window: Retained<NSWindow> = unsafe {
         Retained::retain(ns_window.cast::<NSWindow>()).ok_or("the native window went away")?
     };
-    unsafe { ns_window.contentView() }.ok_or_else(|| "the window has no content view".to_string())
+    ns_window
+        .contentView()
+        .ok_or_else(|| "the window has no content view".to_string())
 }
 
 /// The page's rectangle as AppKit's.
@@ -217,7 +232,7 @@ fn backing_scale(content: &NSView) -> f64 {
     if bounds.size.width <= 0.0 {
         return 1.0;
     }
-    let backing = unsafe { content.convertRectToBacking(bounds) };
+    let backing = content.convertRectToBacking(bounds);
     let scale = backing.size.width / bounds.size.width;
     if scale.is_finite() && scale > 0.0 {
         scale
