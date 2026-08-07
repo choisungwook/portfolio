@@ -124,6 +124,21 @@ impl Compositor {
         }
     }
 
+    /// The graphics device behind this compositor, when there is one.
+    ///
+    /// The viewport needs it because a surface belongs to the device that will
+    /// draw into it: opening a second one would put the picture on screen and
+    /// the picture in the file on two devices. `None` is the software
+    /// compositor, and it is why a machine with no graphics adapter falls back
+    /// to the media elements rather than showing nothing.
+    #[cfg(feature = "gpu")]
+    pub fn gpu(&self) -> Option<&gpu::GpuCompositor> {
+        match &self.inner {
+            Inner::Gpu(gpu) => Some(gpu),
+            Inner::Cpu(_) => None,
+        }
+    }
+
     /// What drew the frame, for the About box and for a bug report that says
     /// the picture is wrong.
     pub fn adapter(&self) -> &str {

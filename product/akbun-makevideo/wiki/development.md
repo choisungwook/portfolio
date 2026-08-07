@@ -28,6 +28,10 @@ npm run test:edit  # cargo test -p makevideo-edit, needs nothing installed
 npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
 npm run test:gpu   # cargo test -p makevideo-compositor, needs ffmpeg
 npm run test:nogpu # the same, with wgpu compiled out entirely
+npm run test:audio     # cargo test -p makevideo-audio, needs ffmpeg and ALSA headers
+npm run test:nodevice  # the same, with cpal compiled out entirely
+npm run test:present   # cargo test -p makevideo-present, needs nothing installed
+npm run test:nosurface # the same, with wgpu compiled out entirely
 ```
 
 The `-p` is not decoration. None of those three crates depends on tauri or a webview, so each compiles serde and nothing else. Dropping the `-p` pulls in the app crate, which on a Linux runner means installing GTK and WebKit development packages for what is otherwise a few seconds of work.
@@ -56,6 +60,12 @@ What is covered:
 - `crates/compositor/src/lib.rs` — the shader: layer order, opacity, placement, and that a pillarboxed layer lets the one underneath show at the sides
 - `crates/compositor/src/source.rs` — the frame buffering, against a fake reader rather than ffmpeg: a starved poll consuming nothing, a queue refusing to grow past its depth, a seek discarding what was buffered, a broken source leaving a hole
 - `crates/compositor/src/supply.rs` — the supply meter, including that a reader slower than the frame rate makes the run fail
+- `crates/present/src/schedule.rs` — when a frame is shown: every distance between the clock and the source swept, the resync threshold from both sides, and that a resync can never point backwards
+- `crates/present/src/player.rs` — a late frame skipped rather than drawn, a long gap jumped, a paused seek drawing one frame and stopping, nothing judged while a seek is settling, and the two roundings that make `clock_frame(frame_due_samples(n)) == n` hold at 29.97
+- `crates/present/src/transport.rs` — the two halves of a seek moving together, including that the second seek of a session is waited for as carefully as the first
+- `crates/present/src/fallback.rs` — which engine runs, and that choosing the media elements is not reported as a failure
+- `crates/present/src/soak.rs` — the scheduler meter, including that a source slower than the frame rate makes the run fail and that the run gives up inside its own budget
+- `test/monitor.test.js` — the page's half of the viewport: a stage box converted to physical pixels, and a fallback told apart from a preference
 - `crates/compositor/tests/render.rs` — a real render end to end, and that the preview frame matches the frame the render wrote at the same instant
 
 ### What the tests cannot tell you
@@ -88,7 +98,11 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 
 **The asset protocol scope is in memory.** It has to be re-granted on every run, which `open_project` does for the project's assets.
 
-**A media element per clip is a decoder per clip.** `preview.prune()` removes elements whose clips are gone and has to be called after any edit that drops clips.
+**A media element per clip is a decoder per clip.** `preview.prune()` removes elements whose clips are gone and has to be called after any edit that drops clips. This is the media element engine only: the native monitor holds no decoder at all while it is paused.
+
+**The native view is over the webview and not in the page's stacking order.** Anything the page draws over the stage — a sheet, an open menu — has to hide it first, which `openSheet`, `closeSheet` and the menu handlers do. A new overlay that forgets is a picture sitting on top of it. See [architecture/viewport.md](./architecture/viewport.md).
+
+**The macOS view layer is the one part of playback that has never run where it was written.** `src-tauri/src/viewport/macos.rs` is AppKit, and the pull request runner is Linux, where the platform module refuses and the app falls back to the media elements. Everything above it — the scheduler, the transport, the surface format choice, the fallback decision — is tested and measured on Linux. The first real `NSView` goes up on a Mac.
 
 **The software compositor is slow, not broken.** 114 ms a frame at 1080p with two layers, against 23 ms for a software Vulkan device. It is what runs on a machine with no graphics adapter, and the picture is the same.
 
@@ -101,11 +115,13 @@ The repeatable playback soak and its media element baseline live in [quality/](.
 The engine half of that is measured with no window at all, and the same source video:
 
 ```bash
-npm run quality:media                                                   # the synthetic 1080p30 source
-npm run quality:supply -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+npm run quality:media                                                    # the synthetic 1080p30 source
+npm run quality:supply  -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+npm run quality:audio   -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
+npm run quality:present -- /tmp/akbun-makevideo-quality/project.akbunvideo --seconds 30
 ```
 
-It pulls frames from the [frame source](./architecture/frame-source.md) at the project rate and exits non-zero when a scenario misses its limits, which is what makes the buffering settings something to measure rather than something to argue about.
+Each pulls from a different layer at the project rate and exits non-zero when a scenario misses its limits, which is what makes the buffering settings something to measure rather than something to argue about. The third one is the acceptance test for the [program monitor](./architecture/viewport.md): it runs the other two at once and measures the thing neither of them can see, which is whether the frame on screen matches the sound.
 
 ## Release
 

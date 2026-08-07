@@ -31,8 +31,19 @@ impl LayerUniform {
 }
 
 pub struct GpuCompositor {
+    /// Kept rather than dropped after `new`, because a surface can only be made
+    /// from the instance that made the adapter this device came from. The
+    /// viewport asks for one at a point where opening a second device would
+    /// mean the picture on screen and the picture in the file were drawn by two
+    /// different ones.
+    instance: wgpu::Instance,
+    /// Kept for the same reason as the instance: asking a surface what formats
+    /// it offers is a question about the adapter that will draw on it.
+    adapter_handle: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    shader: wgpu::ShaderModule,
+    pipeline_layout: wgpu::PipelineLayout,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
@@ -42,6 +53,14 @@ pub struct GpuCompositor {
 /// Every copy out of a texture has its rows padded to this, so the readback
 /// has to strip the padding rather than assume width times four.
 const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+
+/// What the offscreen path draws into.
+///
+/// Unorm rather than sRGB: ffmpeg hands over encoded values and blends in that
+/// domain, so converting here would make the composite disagree with the
+/// fallback filter graph for no benefit. A surface has to be asked for the same
+/// thing, which is what `Surface` picks its format for.
+pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 impl GpuCompositor {
     /// Picks whatever device this machine has: Metal on a Mac, and a software
@@ -99,46 +118,7 @@ impl GpuCompositor {
             immediate_size: 0,
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("composite"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                // Unorm rather than a sRGB format: ffmpeg hands over encoded
-                // values and blends in that domain, so converting here would
-                // make the composite disagree with the fallback filter graph
-                // for no benefit.
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8Unorm,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                        alpha: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let pipeline = make_pipeline(&device, &shader, &pipeline_layout, FRAME_FORMAT);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("source"),
@@ -150,8 +130,12 @@ impl GpuCompositor {
         });
 
         Ok(GpuCompositor {
+            instance,
+            adapter_handle: adapter,
             device,
             queue,
+            shader,
+            pipeline_layout,
             pipeline,
             layout,
             sampler,
@@ -163,33 +147,83 @@ impl GpuCompositor {
         &self.adapter
     }
 
-    pub fn compose(
+    /// The instance the adapter came from. A surface has to be made from this
+    /// one, not from a fresh `Instance::default()`.
+    pub fn instance(&self) -> &wgpu::Instance {
+        &self.instance
+    }
+
+    /// The adapter the device came from, for asking a surface what it can do.
+    pub fn adapter_handle(&self) -> &wgpu::Adapter {
+        &self.adapter_handle
+    }
+
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+
+    /// The same shader and the same blending, drawing into `format`.
+    ///
+    /// A swapchain rarely offers [`FRAME_FORMAT`] — on macOS it is usually
+    /// `Bgra8Unorm` — and a render pipeline is tied to the format of what it
+    /// draws into, so the viewport builds its own with this rather than
+    /// re-declaring the pipeline next to a second copy of the blend state.
+    pub fn pipeline_for(&self, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+        make_pipeline(&self.device, &self.shader, &self.pipeline_layout, format)
+    }
+
+    /// Draw the layers into `view`, which must be `width` x `height` and must
+    /// have been made in the format `pipeline` was built for.
+    ///
+    /// This is the whole of the drawing, and both callers reach the screen
+    /// through it: `compose` gives it a texture it then reads back, and the
+    /// viewport gives it the swapchain texture and presents. The frame the
+    /// monitor shows is therefore the frame the render writes, drawn by one
+    /// pass over one shader, rather than two implementations that agree today.
+    pub fn draw_onto(
+        &self,
+        view: &wgpu::TextureView,
+        pipeline: &wgpu::RenderPipeline,
+        width: u32,
+        height: u32,
+        layers: &[(Source<'_>, Placement)],
+    ) -> Result<(), String> {
+        let bindings = self.bind(width, height, layers)?;
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("frame"),
+            });
+        self.pass(&mut encoder, view, pipeline, &bindings);
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+
+    /// Block until the device has finished what it has been given.
+    ///
+    /// `draw_onto` submits and returns, which is what a swapchain wants — the
+    /// present is the synchronisation. A caller measuring how long a frame took
+    /// has to ask for the work to be finished, or it times the submission and
+    /// not the drawing.
+    pub fn wait(&self) -> Result<(), String> {
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .map(|_| ())
+            .map_err(|error| format!("the device stopped: {error}"))
+    }
+
+    /// Bind groups, one per layer, built before the pass opens because they
+    /// have to outlive it.
+    fn bind(
         &self,
         width: u32,
         height: u32,
         layers: &[(Source<'_>, Placement)],
-    ) -> Result<Vec<u8>, String> {
-        if width == 0 || height == 0 {
-            return Err("the output frame has no size".into());
-        }
-        let target = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("frame"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // Bind groups have to outlive the render pass, so they are all built
-        // before it opens.
+    ) -> Result<Vec<wgpu::BindGroup>, String> {
         let mut bindings = Vec::with_capacity(layers.len());
         for (source, placement) in layers {
             let expected = (source.width as usize) * (source.height as usize) * 4;
@@ -216,7 +250,7 @@ impl GpuCompositor {
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    format: FRAME_FORMAT,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING,
                     view_formats: &[],
                 },
@@ -261,6 +295,71 @@ impl GpuCompositor {
                 ],
             }));
         }
+        Ok(bindings)
+    }
+
+    fn pass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        pipeline: &wgpu::RenderPipeline,
+        bindings: &[wgpu::BindGroup],
+    ) {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("composite"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    // Opaque black, the same base the filter graph starts
+                    // from, so a frame with nothing on it matches.
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(pipeline);
+        for binding in bindings {
+            pass.set_bind_group(0, binding, &[]);
+            pass.draw(0..6, 0..1);
+        }
+    }
+
+    pub fn compose(
+        &self,
+        width: u32,
+        height: u32,
+        layers: &[(Source<'_>, Placement)],
+    ) -> Result<Vec<u8>, String> {
+        if width == 0 || height == 0 {
+            return Err("the output frame has no size".into());
+        }
+        let target = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("frame"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: FRAME_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        let bindings = self.bind(width, height, layers)?;
 
         let padded_row = ((width * 4).div_ceil(ROW_ALIGN)) * ROW_ALIGN;
         let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -275,36 +374,7 @@ impl GpuCompositor {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame"),
             });
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("composite"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        // Opaque black, the same base the filter graph starts
-                        // from, so a frame with nothing on it matches.
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_pipeline(&self.pipeline);
-            for binding in &bindings {
-                pass.set_bind_group(0, binding, &[]);
-                pass.draw(0..6, 0..1);
-            }
-        }
+        self.pass(&mut encoder, &view, &self.pipeline, &bindings);
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
                 texture: &target,
@@ -354,4 +424,52 @@ impl GpuCompositor {
         readback.unmap();
         Ok(pixels)
     }
+}
+
+/// One declaration of the pipeline, used for the offscreen frame and for the
+/// swapchain. The blend state is the picture, so having it written once is what
+/// stops the monitor and the file from drifting apart at the one place they
+/// could still disagree.
+fn make_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("composite"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_main"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    })
 }

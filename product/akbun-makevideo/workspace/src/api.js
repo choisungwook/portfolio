@@ -103,6 +103,18 @@ if (!window.__TAURI__) {
     pickFolder: unavailable,
     listProjects: async () => [],
     previewFrame: unavailable,
+    // No native monitor in a plain browser, so the page keeps the media
+    // element preview. Reported as the setting rather than as a fallback: in a
+    // browser there was never a graphics surface to lose.
+    playbackAttach: async () => ({ engine: 'media-element', fellBack: null, status: null }),
+    playbackRelease: async () => {},
+    playbackPlay: async () => null,
+    playbackPause: async () => null,
+    playbackSeek: async () => null,
+    playbackRedraw: async () => null,
+    playbackPlace: async () => null,
+    playbackVisible: async () => null,
+    playbackStatus: async () => null,
     processMemoryBytes: async () =>
       performance.memory && performance.memory.usedJSHeapSize
         ? performance.memory.usedJSHeapSize
@@ -239,6 +251,17 @@ window.api = {
       pixels: bytes.subarray(8),
     };
   },
+  // The native monitor. Transport commands and a position come back over this;
+  // frames never do. See wiki/architecture/viewport.md.
+  playbackAttach: (place, frame) => invoke('playback_attach', { place, frame }),
+  playbackRelease: () => invoke('playback_release'),
+  playbackPlay: () => invoke('playback_play'),
+  playbackPause: () => invoke('playback_pause'),
+  playbackSeek: (frame) => invoke('playback_seek', { frame }),
+  playbackRedraw: () => invoke('playback_redraw'),
+  playbackPlace: (place) => invoke('playback_place', { place }),
+  playbackVisible: (visible) => invoke('playback_visible', { visible }),
+  playbackStatus: () => invoke('playback_status'),
   processMemoryBytes: () => invoke('process_memory_bytes'),
   saveQualityReport: async (report) => {
     const path = await saveDialog({

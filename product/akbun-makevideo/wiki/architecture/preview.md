@@ -1,4 +1,12 @@
-# The preview
+# The media element preview
+
+The fallback engine, and what the app played with before the [program
+monitor](./viewport.md) existed. It runs when Settings asks for it, when the
+native monitor cannot start on this machine, and — always — when a single
+imported asset is being previewed rather than the timeline.
+
+`src/monitor.js` is what decides which of the two is driving. Everything below
+describes this one.
 
 `src/preview.js` keeps one media element per clip in a pool and stacks them in `#stage-inner`:
 
@@ -17,7 +25,9 @@ This is not the render. The differences are real and worth knowing:
 
 Anything that looks wrong **during playback** should be checked against the exact frame before it is called a bug.
 
-That exact frame is the other half of the preview: when the playhead stops, the page asks Rust for the frame the render would produce and draws it over the stack, with a badge saying which of the two is on screen. It is the same compositor, the same shader and the same geometry the render uses, so it is not an approximation of anything. See [compositor.md](./compositor.md).
+That exact frame is the other half of this engine: when the playhead stops, the page asks Rust for the frame the render would produce and draws it over the stack, with a badge saying which of the two is on screen. It is the same compositor, the same shader and the same geometry the render uses, so it is not an approximation of anything. See [compositor.md](./compositor.md).
+
+**Neither half runs on the native monitor.** There the frame under a stopped playhead and the frames during playback come out of one compositor onto one surface, so there is nothing for a second path to draw and nothing for a badge to tell apart. The exact frame is not asked for and the badge stays hidden.
 
 ## Preview quality
 

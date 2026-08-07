@@ -92,6 +92,7 @@
 
     <span class="menubar-gap"></span>
     <button id="tool-warning" hidden title="Rendering needs ffmpeg on this machine">ffmpeg not found</button>
+    <span id="playback-warning" class="dim small-text" hidden></span>
     <span id="project-name">Untitled</span>
   </header>
 
@@ -291,6 +292,13 @@
         </select>
       </label>
       <p class="dim small-text" id="as-compositor-note"></p>
+      <label class="row">Playback
+        <select id="as-playback">
+          <option value="native">Native monitor — the render's own compositor, in sync with the sound</option>
+          <option value="media-element">Media elements — the older preview</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="as-playback-note"></p>
       <label class="row">Render acceleration
         <select id="as-accel">
           <option value="auto">Auto — GPU when available</option>
@@ -330,6 +338,7 @@
   <script src="timeline.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>
+  <script src="monitor.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

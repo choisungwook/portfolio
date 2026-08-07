@@ -13,7 +13,13 @@ Every command is in `src-tauri/src/commands.rs`. The page picks paths with nativ
 | `describe_asset` | What a media element measured a file to be. Not an edit, so not undoable |
 | `new_document` | Starts again on an empty timeline |
 | `open_project` / `save_project` | Reads and writes the project file; opening re-grants the scope for every asset |
-| `preview_frame` | One composited frame of the open document |
+| `preview_frame` | One composited frame of the open document, for the media element fallback |
+| `playback_attach` | Starts the native monitor on a view, or says why it could not |
+| `playback_release` | Takes it down |
+| `playback_play` / `playback_pause` / `playback_seek` | The transport |
+| `playback_place` / `playback_visible` | Where the view is, and whether it is shown |
+| `playback_redraw` | The timeline changed under a stopped playhead |
+| `playback_status` | Where the playhead is, and what the monitor has drawn |
 | `start_render` | Spawns ffmpeg, returns immediately, emits `render:progress` then one `render:done` |
 | `cancel_render` | Kills the running ffmpeg |
 
@@ -22,6 +28,20 @@ Every command is in `src-tauri/src/commands.rs`. The page picks paths with nativ
 `edit_apply` sends commands and `preview_frame` and `start_render` send neither a project nor a timeline. There is one copy of the edit, in `AppState.document`, and everything reads that. The [edit model record](../../adr/2026-08-edit-model-in-rust.md) has the reasoning; the practical effect is that the compositor decides what to decode by reading the timeline rather than by being handed a snapshot taken when somebody pressed a button.
 
 A render takes its own copy and remembers the revision it took, because the app stays editable while it runs. When it finishes, `render:done` carries `edited` if the revision moved, and the dialog says the file is the timeline as it was when the render started.
+
+## No frame crosses this boundary
+
+`preview_frame` is the exception and it is why it only answers when the playhead
+has stopped: the frame is raw RGBA and at 1080p that is 8 MB a call.
+
+The native monitor does not use it. Its picture goes from the frame source to
+the compositor to the window's own surface, and what crosses here is a transport
+command one way and a position the other. At 1080p30 the copying the other route
+needs is about 250 MB a second, which is more than the whole real time budget.
+
+The position is **polled** on the page's animation frame rather than pushed. An
+event per frame is the same traffic in a smaller package, and the page only
+needs the playhead often enough to draw it.
 
 ## The asset protocol
 
