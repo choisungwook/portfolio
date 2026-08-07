@@ -40,6 +40,12 @@ const DEFAULT_SETTINGS = {
   ffmpegDir: '',
   renderAcceleration: 'auto',
   compositor: 'auto',
+  // The page's own default, and deliberately not Rust's. This value is what is
+  // in force before bootstrap answers and in a plain browser, and in both of
+  // those the media elements are what is really playing — there is no IPC to
+  // attach a monitor over. Rust's own default is native and overrides this the
+  // moment bootstrap lands.
+  playbackEngine: 'media-element',
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
@@ -51,6 +57,7 @@ const dom = {
   menus: el('menus'),
   projectName: el('project-name'),
   toolWarning: el('tool-warning'),
+  playbackWarning: el('playback-warning'),
   assetList: el('asset-list'),
   assetEmpty: el('asset-empty'),
   assetsPanel: el('assets-panel'),
@@ -118,9 +125,14 @@ const state = {
   selectedAssetId: null,
   pxPerSecond: 30,
   rendering: false,
+  /// Why the native monitor is not running, when the setting asked for it.
+  /// Shown next to the ffmpeg warning, because both mean the same thing to
+  /// somebody using the app: a part of this is not working and here is why.
+  playbackNotice: null,
 };
 
 let preview = null;
+let mediaPreview = null;
 let qualityMonitor = null;
 
 // --- helpers ---------------------------------------------------------------
@@ -486,6 +498,7 @@ function renderTimeline() {
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
   updateHistoryUi();
   scheduleExactFrame();
+  if (preview) preview.redraw();
 }
 
 function refresh() {
@@ -521,7 +534,10 @@ let exactToken = 0;
 
 function setStageMode(mode) {
   if (!dom.stageMode) return;
-  const known = mode === 'exact' || mode === 'live';
+  // The badge exists to say which of two pictures is on screen. On the native
+  // monitor there is only one — the same compositor draws the stopped frame and
+  // the playing ones — so there is nothing to tell apart and nothing to show.
+  const known = (mode === 'exact' || mode === 'live') && !preview.usesNativeMonitor();
   dom.stageMode.hidden = !known || L.projectDurationFrames(state.project) <= 0;
   dom.stageMode.textContent = mode === 'exact' ? 'exact frame' : 'live preview';
   dom.stageMode.classList.toggle('exact', mode === 'exact');
@@ -532,6 +548,7 @@ function setStageMode(mode) {
  *  stopped, and a newer request cancels an older one by token. */
 async function requestExactFrame() {
   if (!window.api.available) return;
+  if (preview.usesNativeMonitor()) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   if (L.projectDurationFrames(state.project) <= 0) return;
   if (state.settings.compositor === 'ffmpeg') return;
@@ -553,6 +570,7 @@ async function requestExactFrame() {
 function scheduleExactFrame() {
   if (!window.api.available) return;
   window.clearTimeout(exactTimer);
+  if (preview.usesNativeMonitor()) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   exactTimer = window.setTimeout(requestExactFrame, 180);
 }
@@ -1003,6 +1021,10 @@ function loadDocument(doc, path) {
   setPreviewSource('timeline');
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
+  // A monitor is built for the project it draws — the output size and the
+  // clips are read when the frame source is made — so opening a different one
+  // means a new session rather than a reused one.
+  attachMonitor(true);
 }
 
 /** A project is a folder under the workspace, so New asks for a name rather
@@ -1120,10 +1142,21 @@ async function closeProject() {
 
 function openSheet(id) {
   el(id).hidden = false;
+  // The monitor is a native view over the webview and is not in the page's
+  // stacking order, so a sheet drawn over the stage would be behind it.
+  if (preview) preview.setVisible(false);
 }
 
 function closeSheet(id) {
   el(id).hidden = true;
+  if (preview && !anySheetOpen()) preview.setVisible(true);
+}
+
+/** Whether anything is still drawn over the stage. Sheets can be stacked —
+ *  Settings opens over the project sheet — so closing one is not the same as
+ *  the stage being clear. */
+function anySheetOpen() {
+  return Boolean(document.querySelector('.sheet:not([hidden])'));
 }
 
 function fillProjectSheet() {
@@ -1172,6 +1205,16 @@ function compositorNote() {
   return `Drawing with ${found.device || 'the software compositor'}. ${same}`;
 }
 
+function playbackNote() {
+  if (state.settings.playbackEngine === 'media-element') {
+    return 'Stacked <video> elements, the way the app played before the monitor existed. The picture is the browser\u2019s approximation of the render rather than the render itself, and there is no frame rate to hold it to.';
+  }
+  if (state.playbackNotice) {
+    return `Asked for, and not running: ${state.playbackNotice}. The media element preview is playing instead.`;
+  }
+  return 'The render\u2019s own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Frames never cross into the page.';
+}
+
 function fillAppSheet() {
   el('as-quality').value = state.settings.previewQuality;
   el('as-scrub-mute').checked = state.settings.previewMuteWhileScrubbing;
@@ -1181,6 +1224,8 @@ function fillAppSheet() {
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
   el('as-compositor').value = state.settings.compositor;
   el('as-compositor-note').textContent = compositorNote();
+  el('as-playback').value = state.settings.playbackEngine;
+  el('as-playback-note').textContent = playbackNote();
   el('as-accel').value = state.settings.renderAcceleration;
   el('as-accel-note').textContent = accelerationNote();
   el('as-ffmpeg').value = state.settings.ffmpegDir;
@@ -1195,11 +1240,38 @@ function fillAppSheet() {
 }
 
 function applySettings(next) {
+  const was = state.settings.playbackEngine;
   state.settings = next;
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
   dom.previewQuality.value = next.previewQuality;
   dom.btnMagnet.classList.toggle('on', next.snap);
+  // The engine is picked once, when a monitor is asked for. Changing the
+  // setting therefore means taking the running one down and asking again,
+  // rather than hoping the next command notices.
+  //
+  // This is also what attaches the first time. The page starts on
+  // media-element and Rust's default is native, so bootstrap landing *is* a
+  // change and lands here — which is why there is no separate attach after it.
+  // A saved setting of media-element is no change and correctly attaches
+  // nothing.
+  if (was !== next.playbackEngine) attachMonitor(true);
+}
+
+/** Ask Rust for a monitor, or give the one that is running a new box.
+ *
+ *  Called when a project opens, when the playback setting changes and when the
+ *  window settles after a layout. `restart` takes down whatever is there first,
+ *  which is what a settings change needs and a resize must not do. */
+async function attachMonitor(restart) {
+  if (!preview) return;
+  if (restart) {
+    state.playbackNotice = null;
+    await preview.release();
+  }
+  await preview.attach();
+  updateToolWarning();
+  el('as-playback-note').textContent = playbackNote();
 }
 
 // --- menus -----------------------------------------------------------------
@@ -1207,12 +1279,16 @@ function applySettings(next) {
 function closeMenus() {
   for (const list of dom.menus.querySelectorAll('.menu-list')) list.classList.remove('open');
   for (const title of dom.menus.querySelectorAll('.menu-title')) title.classList.remove('open');
+  if (preview && !anySheetOpen()) preview.setVisible(true);
 }
 
 function openMenu(name) {
   const wasOpen = dom.menus.querySelector(`[data-list="${name}"]`).classList.contains('open');
   closeMenus();
   if (wasOpen) return;
+  // A menu list can reach over the stage, and the native view would be on top
+  // of it. Hidden while one is open, shown again by closeMenus.
+  if (preview) preview.setVisible(false);
   dom.menus.querySelector(`[data-list="${name}"]`).classList.add('open');
   dom.menus.querySelector(`[data-menu="${name}"]`).classList.add('open');
 }
@@ -1459,6 +1535,7 @@ function wireSheets() {
       snap: el('as-snap').checked,
       theme: el('as-theme').value,
       compositor: el('as-compositor').value,
+      playbackEngine: el('as-playback').value,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
@@ -1586,6 +1663,14 @@ function wireKeyboard() {
 
 function updateToolWarning() {
   dom.toolWarning.hidden = Boolean(state.boot && state.boot.ffmpeg);
+  if (!dom.playbackWarning) return;
+  dom.playbackWarning.hidden = !state.playbackNotice;
+  dom.playbackWarning.textContent = state.playbackNotice
+    ? `Playback is using media elements: ${state.playbackNotice}`
+    : '';
+  // The bar is narrow and the reason can be a sentence, so the element is
+  // truncated and the whole of it lives in the tooltip.
+  dom.playbackWarning.title = state.playbackNotice || '';
 }
 
 function subscribe(source, register, handler) {
@@ -1600,7 +1685,7 @@ async function boot() {
   state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
 
   qualityMonitor = globalThis.qualityLib.createQualityMonitor({});
-  preview = globalThis.previewLib.createPreview({
+  mediaPreview = globalThis.previewLib.createPreview({
     stage: dom.stage,
     inner: dom.stageInner,
     exactCanvas: dom.stageExact,
@@ -1619,6 +1704,29 @@ async function boot() {
       } else {
         scheduleExactFrame();
       }
+    },
+  });
+
+  // Everything below still says `preview`, and on the media element engine that
+  // is exactly what it is. On the native one the router forwards the transport
+  // to Rust instead and leaves the rest — the asset preview, the quality
+  // setting, the element pool — where it was.
+  preview = globalThis.monitorLib.createMonitor({
+    preview: mediaPreview,
+    stage: dom.stage,
+    api: window.api,
+    getProject: () => state.project,
+    onNotice: (reason) => {
+      state.playbackNotice = reason;
+      updateToolWarning();
+    },
+    onTick: (frame, playing) => {
+      updatePlayhead(frame);
+      followPlayhead(frame);
+      dom.btnPlay.textContent = playing ? '❚❚' : '▶';
+      // Nothing to schedule and nothing to badge: the monitor draws the frame
+      // under a stopped playhead with the same compositor it plays with.
+      setStageMode(null);
     },
   });
 
@@ -1655,7 +1763,12 @@ async function boot() {
     }
     window.api.closeWindow();
   });
-  window.addEventListener('resize', () => renderTimeline());
+  window.addEventListener('resize', () => {
+    renderTimeline();
+    // The window moving or resizing moves the stage, and the native view is
+    // placed in the window rather than laid out by the page.
+    if (preview) preview.place();
+  });
 
   refresh();
   setPreviewSource('timeline');

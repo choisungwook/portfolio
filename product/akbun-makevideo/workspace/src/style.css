@@ -245,6 +245,16 @@ select {
   color: var(--dim);
 }
 
+/* Next to the ffmpeg warning, and the same kind of thing: a part of the app is
+   not running and this says which. Truncated rather than allowed to push the
+   project name out of the bar, with the whole reason in the title. */
+#playback-warning {
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 #tool-warning {
   border-color: var(--danger);
   color: var(--danger);

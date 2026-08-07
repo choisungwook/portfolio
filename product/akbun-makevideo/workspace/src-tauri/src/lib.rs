@@ -1,5 +1,7 @@
 mod commands;
+mod playback;
 mod store;
+mod viewport;
 
 use commands::AppState;
 use std::sync::atomic::AtomicBool;
@@ -45,6 +47,7 @@ pub fn run() {
                 cancelled: Arc::new(AtomicBool::new(false)),
                 accel: Mutex::new(None),
                 compositor: Mutex::new(Vec::new()),
+                playback: Mutex::new(None),
             });
             Ok(())
         })
@@ -66,6 +69,15 @@ pub fn run() {
             commands::start_render,
             commands::cancel_render,
             commands::preview_frame,
+            commands::playback_attach,
+            commands::playback_release,
+            commands::playback_play,
+            commands::playback_pause,
+            commands::playback_seek,
+            commands::playback_redraw,
+            commands::playback_place,
+            commands::playback_visible,
+            commands::playback_status,
             commands::process_memory_bytes,
             commands::save_quality_report,
         ])

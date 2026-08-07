@@ -18,3 +18,4 @@
 | [2026-08-playback-quality-harness.md](./2026-08-playback-quality-harness.md) | Playback engines pass one numeric quality harness |
 | [2026-08-prefetch-frame-source.md](./2026-08-prefetch-frame-source.md) | Frames come from a per-clip prefetch buffer, not from a synchronous read |
 | [2026-08-audio-is-the-master-clock.md](./2026-08-audio-is-the-master-clock.md) | The audio output is the master clock and the picture follows it |
+| [2026-08-native-viewport-and-skip-late-frames.md](./2026-08-native-viewport-and-skip-late-frames.md) | The monitor draws on a native surface, and a late frame is skipped |

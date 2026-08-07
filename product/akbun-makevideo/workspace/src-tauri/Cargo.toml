@@ -1,5 +1,12 @@
 [workspace]
-members = ["crates/time", "crates/edit", "crates/render", "crates/compositor", "crates/audio"]
+members = [
+  "crates/time",
+  "crates/edit",
+  "crates/render",
+  "crates/compositor",
+  "crates/audio",
+  "crates/present",
+]
 
 [package]
 name = "akbun-makevideo"
@@ -35,9 +42,20 @@ makevideo-render = { path = "crates/render" }
 # wgpu, which is why it is a separate crate: the pull request job tests the
 # model without it.
 makevideo-compositor = { path = "crates/compositor" }
+# The playback scheduler and the surface the monitor draws on. Everything about
+# *when* a frame is shown lives there and is measured headless; what is left
+# here is a thread and a native view.
+makevideo-present = { path = "crates/present" }
+# The mix, the clock the picture follows, and the output device. The device half
+# is only used here, which is why this is a direct dependency rather than
+# something reached through the present crate.
+makevideo-audio = { path = "crates/audio" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
 tauri = { version = "2", features = ["protocol-asset"] }
+# The swapchain the monitor draws on is made from the compositor's own device,
+# so the app names the same wgpu the compositor does.
+wgpu = "30"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -48,3 +66,11 @@ serde_json = "1"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
+
+# The viewport is a native view under the webview, and making one is AppKit.
+# Only this file's worth of the app is platform specific; see src/viewport/.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow", "NSGraphics", "NSResponder"] }
+objc2-foundation = "0.3"
+raw-window-handle = "0.6"

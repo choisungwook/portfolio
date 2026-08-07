@@ -10,11 +10,14 @@
 //! preview and the render read the same document rather than being handed a
 //! copy of the timeline along with the request.
 
+use crate::playback::{Config as PlaybackConfig, Session, Status as PlaybackStatus};
+use crate::viewport::Place;
 use makevideo_compositor::{Backend, Compositor};
 // Aliased because this file also spawns processes, and two things called
 // Command in one file is one too many.
 use makevideo_edit::{Command as Edit, Document, DocumentState, ProjectSettings};
 use makevideo_render::accel::{self, Acceleration};
+use makevideo_present::fallback::{choose, Choice};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -63,6 +66,16 @@ pub struct Settings {
     /// same code and make the preview and the render agree; the third is
     /// faster because frames never leave ffmpeg.
     pub compositor: String,
+    /// "native" to play on a graphics surface with the audio clock deciding
+    /// when each frame is shown, "media-element" to stack `<video>` elements in
+    /// the page as the app always has.
+    ///
+    /// Anything unrecognised is native, so a settings file written before this
+    /// existed gets the new engine rather than being pinned to the old one.
+    /// When the native engine cannot start — no graphics device, no window
+    /// handle, a surface nobody can draw in — the app falls back on its own and
+    /// says why.
+    pub playback_engine: String,
     /// Empty uses the operating system's application log directory.
     pub log_dir: String,
     /// Maximum size of errors.log before it becomes errors.log.1.
@@ -85,6 +98,7 @@ impl Default for Settings {
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
             compositor: "auto".into(),
+            playback_engine: "native".into(),
             log_dir: String::new(),
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
@@ -111,6 +125,9 @@ pub struct AppState {
     /// so it is made once and shared. Keyed by backend, because asking for the
     /// CPU after the GPU has been opened should not hand back the GPU.
     pub compositor: Mutex<Vec<(Backend, Arc<Compositor>)>>,
+    /// The native monitor, when one is running. `None` is either the media
+    /// element preview or nothing open yet, and the page is told which.
+    pub playback: Mutex<Option<Session>>,
 }
 
 /// One candidate and what happened when it was actually tried. Kept so Settings
@@ -1075,6 +1092,184 @@ pub fn process_memory_bytes() -> Result<u64, String> {
 pub fn save_quality_report(path: String, report: serde_json::Value) -> Result<(), String> {
     let text = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
     std::fs::write(&path, text).map_err(|error| format!("cannot write {path}: {error}"))
+}
+
+/// What the page gets back when it asks for the monitor.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackChoice {
+    /// "native" or "media-element". The page runs the old preview for the
+    /// second one and leaves the transport to Rust for the first.
+    pub engine: String,
+    /// Why it is not native, when the setting asked for native and it could not
+    /// start. `None` when nothing went wrong, including when the media element
+    /// preview was simply chosen — a preference is not a failure.
+    pub fell_back: Option<String>,
+    pub status: Option<PlaybackStatus>,
+}
+
+impl PlaybackChoice {
+    fn from(choice: Choice, status: Option<PlaybackStatus>) -> PlaybackChoice {
+        PlaybackChoice {
+            engine: choice.engine.as_str().to_string(),
+            fell_back: choice.fell_back,
+            status,
+        }
+    }
+}
+
+/// Start the native monitor on a view at `place`, or say why it could not.
+///
+/// The page calls this when a project opens and whenever the setting changes,
+/// and it acts on the answer: `native` means the transport commands below are
+/// the playhead, `media-element` means the page's own preview is.
+///
+/// This never returns an error. A monitor that will not start is a fallback and
+/// not a failure — playback is the app's main path, and an editor that refuses
+/// to open because a graphics device is missing is worse than one that plays
+/// the way it always has.
+#[tauri::command]
+pub fn playback_attach(
+    window: tauri::WebviewWindow,
+    state: State<AppState>,
+    place: Place,
+    frame: i64,
+) -> PlaybackChoice {
+    let settings = state.settings.lock().unwrap().clone();
+    // Already running: place it and hand back what it is doing. The page asks
+    // again on every layout change, and tearing the session down to build the
+    // same one would restart the decoders every time somebody dragged a panel.
+    if let Some(session) = state.playback.lock().unwrap().as_ref() {
+        session.place(place);
+        return PlaybackChoice::from(Choice::native(), Some(session.status()));
+    }
+
+    // The setting is read before anything is built. Starting a session and
+    // then throwing it away because the setting said media elements would put a
+    // native view on screen for as long as it took to notice, which is a flash
+    // of the wrong picture over the stage.
+    if makevideo_present::Engine::parse(&settings.playback_engine)
+        == makevideo_present::Engine::MediaElement
+    {
+        return PlaybackChoice::from(choose(&settings.playback_engine, Ok(())), None);
+    }
+
+    let started = start_session(&window, &state, &settings, place, frame);
+    let (session, outcome) = match started {
+        Ok(session) => (Some(session), Ok(())),
+        Err(reason) => (None, Err(reason)),
+    };
+    let choice = choose(&settings.playback_engine, outcome);
+    let status = session.as_ref().map(|session| session.status());
+    *state.playback.lock().unwrap() = session;
+    PlaybackChoice::from(choice, status)
+}
+
+fn start_session(
+    window: &tauri::WebviewWindow,
+    state: &State<AppState>,
+    settings: &Settings,
+    place: Place,
+    frame: i64,
+) -> Result<Session, String> {
+    if !place.is_visible() {
+        return Err("the monitor has no room on screen yet".into());
+    }
+    let project = state.document.lock().unwrap().project().clone();
+    let ffmpeg = find_tool(&window.app_handle().clone(), "ffmpeg", &settings.ffmpeg_dir)
+        .ok_or("ffmpeg was not found, so nothing can be decoded")?;
+    // The monitor draws the project's own frame, the same one the render
+    // writes. What differs is only how big the view showing it is, which the
+    // surface handles by scaling on presentation.
+    let compositor = compositor(state, wanted_backend(&settings.compositor));
+    let config = PlaybackConfig::new(
+        compositor,
+        ffmpeg,
+        project.settings.width.max(2),
+        project.settings.height.max(2),
+    );
+    Session::start(
+        window,
+        Arc::clone(&state.document),
+        config,
+        place,
+        frame.max(0),
+    )
+}
+
+/// Stop the native monitor and take its view down. The page falls back to its
+/// own preview until it attaches again.
+#[tauri::command]
+pub fn playback_release(state: State<AppState>) {
+    // Dropped outside the lock: taking the session down joins its thread, and
+    // holding the lock through that would block every other command.
+    let session = state.playback.lock().unwrap().take();
+    drop(session);
+}
+
+#[tauri::command]
+pub fn playback_play(state: State<AppState>) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.play())
+}
+
+#[tauri::command]
+pub fn playback_pause(state: State<AppState>) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.pause())
+}
+
+#[tauri::command]
+pub fn playback_seek(state: State<AppState>, frame: i64) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.seek(frame.max(0)))
+}
+
+/// The timeline changed. A stopped playhead redraws its frame; a playing one
+/// ignores it, because the frame source is already reading the edit it was
+/// built from and rebuilding mid-playback would be a stall.
+#[tauri::command]
+pub fn playback_redraw(state: State<AppState>) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.redraw())
+}
+
+#[tauri::command]
+pub fn playback_place(state: State<AppState>, place: Place) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.place(place))
+}
+
+/// Show or hide the monitor's view.
+///
+/// The page calls this when it is about to draw over the stage — a settings
+/// sheet, an open menu — because a native view sits over the webview and is not
+/// in the page's stacking order. Playback carries on behind it, so closing the
+/// sheet shows the picture where it got to rather than where it was.
+#[tauri::command]
+pub fn playback_visible(state: State<AppState>, visible: bool) -> Option<PlaybackStatus> {
+    with_session(&state, |session| session.set_visible(visible))
+}
+
+/// Where the playhead is, and what the monitor has done since it started.
+///
+/// The page polls this rather than being pushed to. A frame is 33 ms and an
+/// event per frame across the IPC boundary is exactly the traffic the native
+/// monitor exists to remove; the page only needs the playhead often enough to
+/// draw it, which is its own animation frame.
+#[tauri::command]
+pub fn playback_status(state: State<AppState>) -> Option<PlaybackStatus> {
+    state
+        .playback
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|session| session.status())
+}
+
+fn with_session<F>(state: &State<AppState>, act: F) -> Option<PlaybackStatus>
+where
+    F: FnOnce(&Session),
+{
+    let running = state.playback.lock().unwrap();
+    let session = running.as_ref()?;
+    act(session);
+    Some(session.status())
 }
 
 #[cfg(test)]

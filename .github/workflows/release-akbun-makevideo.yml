@@ -81,6 +81,15 @@ jobs:
       - name: Run compositor tests without a GPU
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor --no-default-features
 
+      # The playback scheduler with no swapchain compiled in at all. Everything
+      # that decides *when* a frame is shown is in here and none of it needs a
+      # window, which is the whole reason it is a crate of its own — the same
+      # split the compositor and the audio engine already make. Run before the
+      # graphics driver is installed, so this really is the path with no wgpu in
+      # its dependency tree.
+      - name: Run playback scheduler tests without a surface
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present --no-default-features
+
       # And again with wgpu, against lavapipe: a software Vulkan device, so the
       # GPU half is exercised on a runner with no hardware. That is what makes
       # "both backends draw the same frame" meaningful here.
@@ -89,6 +98,12 @@ jobs:
 
       - name: Run compositor tests with the GPU backend
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
+
+      # And the scheduler again with the surface half compiled in, so the
+      # swapchain format choice and the offscreen sink that draws through the
+      # same call the swapchain uses are both exercised against lavapipe.
+      - name: Run playback scheduler tests with the surface
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present
 
   release:
     if: github.event_name != 'pull_request'

@@ -1,0 +1,38 @@
+[package]
+name = "makevideo-present"
+version = "0.1.0"
+description = "When a frame is shown: the playback scheduler, and the surface it draws on"
+edition = "2021"
+license = "MIT"
+
+# The join between the frame source and the audio clock. Depends on neither
+# tauri nor a window: the scheduler is arithmetic, the player drives it through
+# a trait, and the surface is the only part that needs a graphics device. That
+# is what lets the whole of the timing be tested, and measured, headless.
+
+[features]
+# The swapchain. Without it this crate is the scheduler, the player and the
+# meter, which is the half that decides *when* — and the half a build server can
+# run. `--no-default-features` mentions wgpu nowhere.
+default = ["gpu"]
+gpu = ["dep:wgpu", "makevideo-compositor/gpu"]
+
+[dependencies]
+makevideo-render = { path = "../render" }
+# Frames, and the shader that draws them. default-features off so this crate
+# can be built with no graphics stack at all.
+makevideo-compositor = { path = "../compositor", default-features = false }
+# The clock the picture follows. The device half is the app's business, not
+# this crate's, so cpal never enters here.
+makevideo-audio = { path = "../audio", default-features = false }
+# The soak report is JSON in the same shape the frame supply and audio meters
+# write, so the three sit side by side in quality/.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wgpu = { version = "30", optional = true }
+
+# Headless: measures the scheduler against real media with no window, the same
+# way supply-soak measures the frame source and audio-soak the mix.
+[[bin]]
+name = "present-soak"
+path = "src/bin/present_soak.rs"
