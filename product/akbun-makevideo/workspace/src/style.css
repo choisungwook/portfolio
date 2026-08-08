@@ -619,6 +619,12 @@ button.icon.on {
   color: #201800;
 }
 
+.head-buttons button.target.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
 #timeline-scroll {
   overflow-x: auto;
   overflow-y: hidden;

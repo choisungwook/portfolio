@@ -54,6 +54,12 @@ A clip being dragged is moved by setting its own `left` and `width`. Nothing is 
 
 The one rule that follows: **nothing in `timeline.js` may touch the DOM or `window.api`**, or the tests stop running.
 
+## Edit point navigation
+
+An edit point is the start or end frame of a clip on an enabled track. Up and Page Up move to the previous point; Down and Page Down move to the next. The destination is always an integer frame even when playback left the playhead between frames.
+
+With no target track, navigation combines and deduplicates the points from every enabled track. A track header's target button narrows navigation to that track until the button is pressed again. Hidden tracks and muted audio tracks do not contribute edit points. Home and End remain independent jumps to the timeline boundaries.
+
 ## What a time is
 
 Every time on both sides is a frame index on the project rate, and `src/time.js` is where anything that crosses a unit boundary happens: milliseconds from ffprobe, seconds from a media element, another rate. `crates/time` is the same model on the Rust side, tested over the same eight rates. The reason it is a frame count rather than a millisecond is in [rational time](../../adr/2026-08-rational-time.md).
