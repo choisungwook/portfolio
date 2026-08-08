@@ -124,6 +124,7 @@ const state = {
     qualitySmoke: false,
   },
   path: null,
+  waveforms: {},
   selectedClipId: null,
   selectedAssetId: null,
   pxPerSecond: 30,
@@ -250,7 +251,7 @@ async function edit(...commands) {
     for (const clip of track.clips) if (!before.has(clip.id)) made.push(clip.id);
   }
   refresh();
-  if (sent.some((command) => command.op === 'addAssets')) prepareProxies();
+  if (sent.some((command) => command.op === 'addAssets')) prepareDerivedMedia();
   return made;
 }
 
@@ -349,6 +350,25 @@ async function prepareProxies() {
   }
 }
 
+function adoptWaveformStatuses(statuses) {
+  state.waveforms = Object.fromEntries((statuses || []).map((status) => [status.assetId, status]));
+  renderLanes();
+}
+
+async function prepareWaveforms() {
+  if (!state.path || !window.api.available) return;
+  try {
+    adoptWaveformStatuses(await window.api.startWaveforms(state.path));
+  } catch (error) {
+    reportError(error, 'waveform:start');
+  }
+}
+
+function prepareDerivedMedia() {
+  prepareProxies();
+  prepareWaveforms();
+}
+
 function onProxyStatus(statuses) {
   const becameReady = (statuses || []).some((status) => {
     const before = state.proxies[status.assetId];
@@ -359,6 +379,10 @@ function onProxyStatus(statuses) {
     preview.redraw();
     if (preview.usesNativeMonitor()) attachMonitor(true);
   }
+}
+
+function onWaveformStatus(statuses) {
+  adoptWaveformStatuses(statuses);
 }
 
 function renderAssets() {
@@ -490,7 +514,8 @@ function clipElement(track, clip) {
   node.className = `clip ${track.kind}`;
   node.dataset.clipId = clip.id;
   node.style.left = `${L.framesToPx(clip.start, rate(), state.pxPerSecond)}px`;
-  node.style.width = `${Math.max(2, L.framesToPx(L.clipDuration(clip), rate(), state.pxPerSecond))}px`;
+  const width = Math.max(2, L.framesToPx(L.clipDuration(clip), rate(), state.pxPerSecond));
+  node.style.width = `${width}px`;
   if (clip.id === state.selectedClipId) node.classList.add('selected');
   if (clip.linkGroup) {
     node.classList.add('linked');
@@ -505,8 +530,49 @@ function clipElement(track, clip) {
   left.className = 'handle left';
   const right = document.createElement('span');
   right.className = 'handle right';
+  if (track.kind === 'audio' && asset) {
+    const waveform = state.waveforms[asset.id];
+    if (waveform && waveform.state === 'ready' && waveform.peaks.length) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'clip-waveform';
+      drawWaveform(canvas, clip, waveform, width);
+      node.appendChild(canvas);
+    }
+  }
   node.append(left, label, right);
   return node;
+}
+
+function drawWaveform(canvas, clip, waveform, cssWidth) {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.min(4096, Math.ceil(cssWidth * ratio)));
+  const height = Math.ceil(32 * ratio);
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  const { first, last } = L.waveformBucketRange(clip, rate(), waveform.bucketsPerSecond);
+  const span = Math.max(1, last - first);
+  context.strokeStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--waveform')
+    .trim() || '#205f42';
+  context.lineWidth = Math.max(1, ratio);
+  context.beginPath();
+  for (let x = 0; x < width; x += 1) {
+    const from = Math.max(0, Math.floor(first + (x / width) * span));
+    const to = Math.min(
+      waveform.peaks.length,
+      Math.max(from + 1, Math.ceil(first + ((x + 1) / width) * span))
+    );
+    let min = 0;
+    let max = 0;
+    for (let index = from; index < to; index += 1) {
+      min = Math.min(min, waveform.peaks[index][0]);
+      max = Math.max(max, waveform.peaks[index][1]);
+    }
+    context.moveTo(x + 0.5, ((1 - max) * height) / 2);
+    context.lineTo(x + 0.5, ((1 - min) * height) / 2);
+  }
+  context.stroke();
 }
 
 function renderLanes() {
@@ -1134,12 +1200,13 @@ function loadDocument(doc, path) {
   state.selectedClipId = null;
   state.selectedAssetId = null;
   state.proxies = {};
+  state.waveforms = {};
   preview.clear();
   preview.showTimeline();
   setPreviewSource('timeline');
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
-  prepareProxies();
+  prepareDerivedMedia();
   // A monitor is built for the project it draws — the output size and the
   // clips are read when the frame source is made — so opening a different one
   // means a new session rather than a reused one.
@@ -1240,7 +1307,7 @@ async function saveProject(forcePicker) {
   try {
     await window.api.saveProject(path);
     state.path = path;
-    prepareProxies();
+    prepareDerivedMedia();
     // What is on disk is this revision, which is what makes the dot go away —
     // and come back the moment anything else is done.
     state.savedRevision = state.doc.revision;
@@ -1951,6 +2018,7 @@ async function boot() {
   subscribe('events:render-done', window.api.onRenderDone, onRenderDone);
   subscribe('events:render-fallback', window.api.onRenderFallback, onRenderFallback);
   subscribe('events:proxy-status', window.api.onProxyStatus, onProxyStatus);
+  subscribe('events:waveform-status', window.api.onWaveformStatus, onWaveformStatus);
   subscribe('events:file-drop', window.api.onFileDrop, (payload) => {
     Promise.resolve(handleOsDrop(payload)).catch((error) => reportError(error, 'file-drop'));
   });

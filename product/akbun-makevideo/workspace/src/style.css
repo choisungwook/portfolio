@@ -724,6 +724,16 @@ button.icon.on {
   color: #0f2a1a;
 }
 
+.clip-waveform {
+  position: absolute;
+  inset: 50% 8px auto;
+  width: calc(100% - 16px);
+  height: 32px;
+  transform: translateY(-50%);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
 @media (prefers-color-scheme: dark) {
   .clip.video,
   .clip.audio {
@@ -750,6 +760,8 @@ button.icon.on {
 }
 
 .clip-name {
+  position: relative;
+  z-index: 1;
   padding: 0 10px;
   font-size: 11px;
   white-space: nowrap;

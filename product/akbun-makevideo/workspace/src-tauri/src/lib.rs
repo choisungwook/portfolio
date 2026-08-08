@@ -50,6 +50,8 @@ pub fn run() {
                 playback: Mutex::new(None),
                 proxies: Arc::new(Mutex::new(commands::ProxyState::default())),
                 proxy_workers: Mutex::new(Vec::new()),
+                waveforms: Arc::new(Mutex::new(commands::WaveformState::default())),
+                waveform_workers: Mutex::new(Vec::new()),
             });
             Ok(())
         })
@@ -63,6 +65,8 @@ pub fn run() {
             commands::import_assets,
             commands::proxy_status,
             commands::start_proxies,
+            commands::waveform_status,
+            commands::start_waveforms,
             commands::edit_state,
             commands::edit_apply,
             commands::edit_undo,
