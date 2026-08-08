@@ -147,11 +147,17 @@ function matches(event, chord) {
     && event.shiftKey === has('Shift');
 }
 
-function actionFor(event, shortcuts) {
+function exactActionFor(event, shortcuts) {
   for (const shortcut of shortcuts) {
     if (shortcut.keys.some((key) => matches(event, key))) return shortcut.action;
   }
   return null;
+}
+
+function actionFor(event, shortcuts) {
+  const action = exactActionFor(event, shortcuts);
+  if (action || !event.ctrlKey || event.metaKey) return action;
+  return exactActionFor({ ...event, ctrlKey: false, metaKey: true }, shortcuts);
 }
 
 function formatChord(chord) {
@@ -185,6 +191,7 @@ function formatKeys(keys) {
 function inputKeys(keys) {
   return keys.map((key) => key.split('+').map((part) => {
     if (part === 'Meta') return 'Cmd';
+    if (part === 'Alt') return 'Option';
     if (part.startsWith('Key')) return part.slice(3);
     if (part.startsWith('Digit')) return part.slice(5);
     return part;

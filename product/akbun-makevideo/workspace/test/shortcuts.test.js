@@ -41,3 +41,19 @@ test('typed shortcut input and keyboard events use the same chord', () => {
 
   assert.equal(action, 'split');
 });
+
+test('Ctrl falls back to Meta shortcuts after exact Ctrl bindings', () => {
+  const action = shortcuts.actionFor({
+    code: 'KeyB',
+    metaKey: false,
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: false,
+  }, shortcuts.resolved({}));
+
+  assert.equal(action, 'split');
+});
+
+test('editable shortcut input labels Alt as Option', () => {
+  assert.equal(shortcuts.inputKeys(['Alt+KeyA']), 'Option+A');
+});
