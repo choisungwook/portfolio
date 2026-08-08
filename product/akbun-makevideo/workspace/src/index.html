@@ -39,16 +39,16 @@
       <div class="menu">
         <button class="menu-title" data-menu="project">Project</button>
         <ul class="menu-list" data-list="project">
-          <li><button data-action="new-project">New Project<kbd>⌘N</kbd></button></li>
-          <li><button data-action="open-project">Open Project…<kbd>⌘O</kbd></button></li>
+          <li><button data-action="new-project">New Project<kbd data-shortcut="new-project"></kbd></button></li>
+          <li><button data-action="open-project">Open Project…<kbd data-shortcut="open-project"></kbd></button></li>
           <li class="sep"></li>
-          <li><button data-action="save-project">Save<kbd>⌘S</kbd></button></li>
-          <li><button data-action="save-project-as">Save As…<kbd>⇧⌘S</kbd></button></li>
+          <li><button data-action="save-project">Save<kbd data-shortcut="save-project"></kbd></button></li>
+          <li><button data-action="save-project-as">Save As…<kbd data-shortcut="save-project-as"></kbd></button></li>
           <li class="sep"></li>
-          <li><button data-action="import-assets">Import Media…<kbd>⌘I</kbd></button></li>
+          <li><button data-action="import-assets">Import Media…<kbd data-shortcut="import-assets"></kbd></button></li>
           <li class="sep"></li>
           <li><button id="menu-delete-project" data-action="delete-project">Delete Project…</button></li>
-          <li><button data-action="close-project">Close Project<kbd>⌘W</kbd></button></li>
+          <li><button data-action="close-project">Close Project<kbd data-shortcut="close-project"></kbd></button></li>
         </ul>
       </div>
 
@@ -57,12 +57,12 @@
         <ul class="menu-list" data-list="edit">
           <!-- The label says what will be taken back, so the two are filled in
                from the document state rather than written here. -->
-          <li><button id="menu-undo" data-action="undo">Undo<kbd>⌘Z</kbd></button></li>
-          <li><button id="menu-redo" data-action="redo">Redo<kbd>⇧⌘Z</kbd></button></li>
+          <li><button id="menu-undo" data-action="undo">Undo<kbd data-shortcut="undo"></kbd></button></li>
+          <li><button id="menu-redo" data-action="redo">Redo<kbd data-shortcut="redo"></kbd></button></li>
           <li class="sep"></li>
-          <li><button data-action="split">Split at Playhead<kbd>⌘B</kbd></button></li>
-          <li><button data-action="delete-clip">Delete Clip<kbd>⌫</kbd></button></li>
-          <li><button data-action="ripple-delete">Ripple Delete<kbd>⇧⌫</kbd></button></li>
+          <li><button data-action="split">Split at Playhead<kbd data-shortcut="split"></kbd></button></li>
+          <li><button data-action="delete-clip">Delete Clip<kbd data-shortcut="delete-clip"></kbd></button></li>
+          <li><button data-action="ripple-delete">Ripple Delete<kbd data-shortcut="ripple-delete"></kbd></button></li>
         </ul>
       </div>
 
@@ -79,10 +79,10 @@
       <div class="menu">
         <button class="menu-title" data-menu="playback">Playback</button>
         <ul class="menu-list" data-list="playback">
-          <li><button data-action="previous-edit">Previous Edit<kbd>↑ / Page Up</kbd></button></li>
-          <li><button data-action="next-edit">Next Edit<kbd>↓ / Page Down</kbd></button></li>
-          <li><button data-action="timeline-start">Timeline Start<kbd>Home</kbd></button></li>
-          <li><button data-action="timeline-end">Timeline End<kbd>End</kbd></button></li>
+          <li><button data-action="previous-edit">Previous Edit<kbd data-shortcut="previous-edit"></kbd></button></li>
+          <li><button data-action="next-edit">Next Edit<kbd data-shortcut="next-edit"></kbd></button></li>
+          <li><button data-action="timeline-start">Timeline Start<kbd data-shortcut="timeline-start"></kbd></button></li>
+          <li><button data-action="timeline-end">Timeline End<kbd data-shortcut="timeline-end"></kbd></button></li>
           <li class="sep"></li>
           <li><button data-action="proxy-media">Proxy Media…</button></li>
         </ul>
@@ -93,6 +93,7 @@
         <ul class="menu-list" data-list="settings">
           <li><button data-action="project-settings">Project Resolution…</button></li>
           <li><button data-action="app-settings">Preview &amp; Tools…</button></li>
+          <li><button data-action="shortcut-settings">Keyboard Shortcuts…</button></li>
           <li class="sep"></li>
           <li><button data-action="quality-soak">Playback Quality Soak…</button></li>
           <li><button data-action="quality-smoke">Playback Quality Smoke…</button></li>
@@ -370,9 +371,23 @@
     </div>
   </div>
 
+  <div id="shortcut-settings" class="overlay" hidden>
+    <div class="sheet shortcut-sheet">
+      <h3>Keyboard Shortcuts</h3>
+      <p class="dim small-text">Use Cmd, Shift, Option, Ctrl and a key. Separate multiple keys with commas.</p>
+      <p id="shortcut-error" class="small-text danger-text" hidden></p>
+      <div id="shortcut-list" class="shortcut-list"></div>
+      <div class="sheet-actions">
+        <button data-close="shortcut-settings">Cancel</button>
+        <button id="shortcut-save" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <script src="api.js"></script>
   <script src="time.js"></script>
   <script src="timeline.js"></script>
+  <script src="shortcuts.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>
   <script src="monitor.js"></script>

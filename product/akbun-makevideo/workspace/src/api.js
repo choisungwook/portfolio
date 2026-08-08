@@ -71,6 +71,7 @@ if (!window.__TAURI__) {
         logDir: '',
         logRotationSize: 5,
         logRotationUnit: 'mb',
+        shortcutOverrides: {},
       },
       workspace: '',
       version: '0.0.0-browser',
