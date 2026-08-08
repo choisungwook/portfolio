@@ -1641,7 +1641,15 @@ function wireSheets() {
   });
   el('proxy-generate').addEventListener('click', async () => {
     if (!state.path) return;
-    adoptProxyStatuses(await window.api.startProxies(state.path));
+    try {
+      adoptProxyStatuses(await window.api.startProxies(state.path));
+    } catch (error) {
+      reportError(error, 'proxy:generate');
+      await window.api.message(`Proxy generation could not start.\n\n${error}`, {
+        title: 'Proxy Media',
+        kind: 'error',
+      });
+    }
   });
   el('proxy-save').addEventListener('click', async () => {
     const next = Object.assign({}, state.settings, {
