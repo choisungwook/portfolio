@@ -46,6 +46,7 @@ The stage box stays the same size on screen. `#stage-inner` is laid out at `scal
 - 동영상 장변이 1920px보다 크면 프로젝트의 `proxies/` 폴더에 1280px 프록시 생성
 - 생성 중 asset 행에 진행률 표시
 - 준비 전 원본 재생, 준비 후 프록시 재생
+- 재생 중 준비된 프록시는 현재 재생을 유지하고 정지 후 다음 세션부터 사용
 - Playback → Proxy Media…에서 프록시 재생 사용 여부와 생성 상태 확인
 - 원본 경로·수정 시각 불일치 시 재생성
 - export와 정지 상태 exact frame은 원본 사용

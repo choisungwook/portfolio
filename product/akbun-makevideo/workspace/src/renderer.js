@@ -377,8 +377,7 @@ function onProxyStatus(statuses) {
   });
   adoptProxyStatuses(statuses);
   if (becameReady && preview) {
-    preview.redraw();
-    if (preview.usesNativeMonitor()) attachMonitor(true);
+    void Promise.resolve(preview.refreshMedia()).catch((error) => reportError(error, 'proxy:refresh'));
   }
 }
 

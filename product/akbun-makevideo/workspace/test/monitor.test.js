@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { placeOf, samePlace, readChoice } = require('../src/monitor.js');
+const { createMonitor, placeOf, samePlace, readChoice } = require('../src/monitor.js');
 
 // The page's half of the native viewport. Everything here is arithmetic over
 // plain objects on purpose: the rest of monitor.js needs a window, an IPC
@@ -101,9 +101,81 @@ test('the router answers everything the page asks a preview for', () => {
     'mode', 'prune', 'clear', 'showAsset', 'showTimeline', 'setQuality',
     'setScrubbing', 'setMuteWhileScrubbing', 'showExact', 'clearExact', 'isExact',
     'attach', 'release', 'place', 'redraw', 'setVisible', 'usesNativeMonitor',
+    'refreshMedia',
   ];
   const missing = asked.filter((name) => typeof monitor[name] !== 'function');
   assert.deepStrictEqual(missing, []);
+});
+
+test('a ready proxy waits for playback to stop before replacing the native session', async (t) => {
+  const previousWindow = global.window;
+  t.after(() => {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  });
+  global.window = { devicePixelRatio: 1 };
+  const calls = [];
+  const preview = {
+    mode: () => 'timeline',
+    total: () => 100,
+    pause: () => {},
+    clear: () => {},
+    clearExact: () => {},
+    isPlaying: () => false,
+    redraw: () => calls.push('previewRedraw'),
+  };
+  const api = {
+    available: true,
+    playbackAttach: async () => {
+      calls.push('attach');
+      return { engine: 'native' };
+    },
+    playbackRelease: async () => calls.push('release'),
+    playbackVisible: async () => {},
+    playbackPlay: async () => ({ position: 0, playing: true }),
+    playbackPause: async () => {
+      calls.push('pause');
+      return { position: 10, playing: false };
+    },
+  };
+  const monitor = createMonitor({
+    preview,
+    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    api,
+    getProject: () => ({ settings: { rate: { numerator: 30, denominator: 1 } } }),
+  });
+
+  await monitor.attach();
+  await monitor.play();
+  await monitor.refreshMedia();
+  assert.deepStrictEqual(calls, ['attach']);
+
+  await monitor.pause();
+  assert.deepStrictEqual(calls, ['attach', 'pause', 'release', 'attach']);
+});
+
+test('a ready proxy does not redraw playing media elements', async () => {
+  let playing = true;
+  let redraws = 0;
+  const preview = new Proxy(
+    {},
+    {
+      get: (_target, name) => {
+        if (name === 'mode') return () => 'timeline';
+        if (name === 'isPlaying') return () => playing;
+        if (name === 'pause') return () => { playing = false; };
+        if (name === 'redraw') return () => { redraws += 1; };
+        return () => undefined;
+      },
+    }
+  );
+  const monitor = createMonitor({ preview, stage: null, api: { available: false } });
+
+  await monitor.refreshMedia();
+  assert.strictEqual(redraws, 0);
+
+  await monitor.pause();
+  assert.strictEqual(redraws, 1);
 });
 
 // With no monitor attached, every transport call has to reach the media element
