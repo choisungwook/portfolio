@@ -502,7 +502,11 @@ impl Project {
                 .iter()
                 .filter(|item| item.contains_frame(frame))
                 .collect();
-            items.sort_by_key(|item| item.z_index);
+            items.sort_by(|left, right| {
+                left.z_index
+                    .cmp(&right.z_index)
+                    .then_with(|| left.id.cmp(&right.id))
+            });
             visible.extend(items.into_iter().map(|item| VisualItemAt {
                 track_id: track.id.clone(),
                 item: item.clone(),
@@ -927,7 +931,9 @@ mod tests {
         let mut project = Project::new(ProjectSettings::default());
         project.tracks[0].visual_items = vec![
             visual_item("front", 0, 60, 20),
+            visual_item("middle-b", 0, 60, 15),
             visual_item("back", 0, 60, 10),
+            visual_item("middle-a", 0, 60, 15),
         ];
         project.tracks.push(Track {
             id: "t3".into(),
@@ -946,7 +952,7 @@ mod tests {
                 .iter()
                 .map(|entry| entry.item.id.as_str())
                 .collect::<Vec<_>>(),
-            ["back", "front", "top-track"]
+            ["back", "middle-a", "middle-b", "front", "top-track"]
         );
         assert!(
             project.visual_items_at(60).is_empty(),

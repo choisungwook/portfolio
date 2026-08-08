@@ -20,7 +20,7 @@ project
 - `durationMs` on an asset is the one time left in milliseconds. It is what ffprobe measured about a file rather than a position on the timeline, and it becomes frames the moment a clip is made from it.
 - An asset's `id` is a hash of its path, so importing the same file twice updates one row instead of adding a second, and a project reopened next week still points its clips at the same assets.
 - Video tracks composite in array order: track 1 is the bottom layer. The timeline draws them reversed so V1 sits at the bottom of the screen, which is where every other editor puts it.
-- Visual items belong to video tracks. Their coordinates and size are project pixels, not Program Monitor pixels. Items on one track draw by ascending `zIndex`; track array order remains the primary layer order.
+- Visual items belong to video tracks. Their coordinates and size are project pixels, not Program Monitor pixels. Items on one track draw by ascending `zIndex`, then `id`; track array order remains the primary layer order.
 - `content.kind` is `text`, `shape`, `image` or `videoOverlay`. Image and video overlay content names an asset; content-specific fields stay inside `content`, not beside the shared transform.
 - Selection borders, transform handles and guides are editor state and never appear in `visualItems`.
 - `hidden` on a video track removes it from the preview, the render **and** the timeline length. `muted` silences a track but keeps its picture.

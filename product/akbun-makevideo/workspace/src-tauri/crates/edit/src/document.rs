@@ -1158,4 +1158,32 @@ mod tests {
         assert!(error.contains("no area"), "{error}");
         assert!(document.project().tracks[0].visual_items.is_empty());
     }
+
+    #[test]
+    fn duplicate_visual_item_ids_are_rejected_without_changing_the_project() {
+        let mut document = document();
+        let track_id = video_track(&document);
+        let command = Command::AddVisualItem {
+            track_id,
+            content: VisualContent::Shape,
+            start: 0,
+            duration: 30,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: Some("item".into()),
+        };
+        document.apply(command.clone()).unwrap();
+
+        let error = document.apply(command).unwrap_err();
+
+        assert!(error.contains("already in this project"), "{error}");
+        assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+    }
 }

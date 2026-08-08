@@ -1141,13 +1141,16 @@ fn add_visual_item(
     id: Option<String>,
 ) -> Result<Applied, String> {
     validate_visual_content(project, &content)?;
-    let track = project
-        .track_mut(&track_id)
+    let track_index = project
+        .track_index(&track_id)
         .ok_or("that track is not in this project")?;
-    if track.kind != TrackKind::Video {
+    if project.tracks[track_index].kind != TrackKind::Video {
         return Err("visual items belong on video tracks".into());
     }
     let id = id.unwrap_or_else(|| ids.make('i'));
+    if project.visual_item(&id).is_some() {
+        return Err("that visual item id is already in this project".into());
+    }
     let item = VisualItem {
         id: id.clone(),
         start,
@@ -1156,7 +1159,7 @@ fn add_visual_item(
         z_index,
         content: content.clone(),
     };
-    track.visual_items.push(item);
+    project.tracks[track_index].visual_items.push(item);
     Ok(Applied {
         resolved: Command::AddVisualItem {
             track_id,
