@@ -107,7 +107,12 @@ test('the router answers everything the page asks a preview for', () => {
   assert.deepStrictEqual(missing, []);
 });
 
-test('a ready proxy waits for playback to stop before replacing the native session', async () => {
+test('a ready proxy waits for playback to stop before replacing the native session', async (t) => {
+  const previousWindow = global.window;
+  t.after(() => {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  });
   global.window = { devicePixelRatio: 1 };
   const calls = [];
   const preview = {

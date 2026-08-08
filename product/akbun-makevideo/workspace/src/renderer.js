@@ -376,7 +376,9 @@ function onProxyStatus(statuses) {
     return status.state === 'ready' && (!before || before.state !== 'ready');
   });
   adoptProxyStatuses(statuses);
-  if (becameReady && preview) preview.refreshMedia();
+  if (becameReady && preview) {
+    void Promise.resolve(preview.refreshMedia()).catch((error) => reportError(error, 'proxy:refresh'));
+  }
 }
 
 function onWaveformStatus(statuses) {

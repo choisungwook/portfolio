@@ -217,7 +217,9 @@ function createMonitor(options) {
       await refreshingMedia;
     } finally {
       refreshingMedia = null;
-      if (mediaRefreshPending && !currentlyPlaying()) applyMediaRefresh();
+      if (mediaRefreshPending && !currentlyPlaying()) {
+        void applyMediaRefresh().catch(() => {});
+      }
     }
   }
 
