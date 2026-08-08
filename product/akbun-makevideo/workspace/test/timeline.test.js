@@ -135,6 +135,18 @@ test('what is under the playhead knows which frame of the asset it is', () => {
   assert.strictEqual(L.clipsAt(project, 329).length, 1);
 });
 
+test('only an internal empty track range is a ripple-delete gap', () => {
+  const lane = track('t1', 'video', 'V1', [
+    clip('c1', 'v', 0, 0, 300),
+    clip('c2', 'v', 600, 0, 300),
+  ]);
+  assert.deepStrictEqual(L.gapAt(lane, 450), { start: 300, end: 600 });
+  assert.deepStrictEqual(L.gapAt(lane, 300), { start: 300, end: 600 });
+  assert.strictEqual(L.gapAt(lane, 600), null, 'the next clip owns its start');
+  assert.strictEqual(L.gapAt(lane, 50), null, 'a clip is not a gap');
+  assert.strictEqual(L.gapAt(lane, 900), null, 'trailing space is not a gap');
+});
+
 test('the playhead snaps to the nearest edge inside the tolerance', () => {
   const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 120, 0, 300)])]);
   assert.strictEqual(L.snapTime(project, 122, 5), 120, 'to a clip start');

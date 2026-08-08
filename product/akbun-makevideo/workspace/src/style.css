@@ -835,6 +835,38 @@ button.icon.on {
   clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
+.timeline-context-menu {
+  position: fixed;
+  z-index: 350;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.timeline-context-menu[hidden] {
+  display: none;
+}
+
+.timeline-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+
+.timeline-context-menu button:hover,
+.timeline-context-menu button:focus-visible {
+  background: var(--select);
+  color: #201800;
+}
+
 /* --- overlays ------------------------------------------------------------ */
 
 .overlay {
