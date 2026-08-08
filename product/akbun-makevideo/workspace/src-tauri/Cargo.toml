@@ -7,6 +7,7 @@ members = [
   "crates/audio",
   "crates/present",
   "crates/proxy",
+  "crates/waveform",
 ]
 
 [package]
@@ -52,6 +53,7 @@ makevideo-present = { path = "crates/present" }
 # something reached through the present crate.
 makevideo-audio = { path = "crates/audio" }
 makevideo-proxy = { path = "crates/proxy" }
+makevideo-waveform = { path = "crates/waveform" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
 tauri = { version = "2", features = ["protocol-asset"] }

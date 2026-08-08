@@ -219,6 +219,14 @@ test('pixels and frames convert both ways', () => {
   assert.strictEqual(L.pxToFrames(100, rate, 50), 60);
 });
 
+test('a trimmed clip reads only its source interval from the waveform', () => {
+  const media = clip('c1', 'v', 900, 150, 450);
+  assert.deepStrictEqual(L.waveformBucketRange(media, T.fps(30), 100), {
+    first: 500,
+    last: 1500,
+  });
+});
+
 test('a clip with nothing left of it has no negative length', () => {
   assert.strictEqual(L.clipDuration(clip('c1', 'v', 0, 30, 10)), 0);
   assert.strictEqual(L.clipEnd(clip('c1', 'v', 100, 30, 10)), 100);

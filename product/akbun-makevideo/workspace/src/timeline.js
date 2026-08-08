@@ -202,6 +202,14 @@ function pxToFrames(px, rate, pxPerSecond) {
   return T.secondsToFrames(px / pxPerSecond, rate);
 }
 
+function waveformBucketRange(clip, rate, bucketsPerSecond) {
+  const secondsPerFrame = rate.den / rate.num;
+  return {
+    first: clip.in * secondsPerFrame * bucketsPerSecond,
+    last: clip.out * secondsPerFrame * bucketsPerSecond,
+  };
+}
+
 /** h:mm:ss:ff. The frames field is what makes a two frame trim visible, which
  *  a fraction of a second never was. */
 function formatTimecode(frames, rate) {
@@ -258,6 +266,7 @@ const exported = {
   snapClipStart,
   framesToPx,
   pxToFrames,
+  waveformBucketRange,
   formatTimecode,
   formatRulerLabel,
   tickStepFrames,

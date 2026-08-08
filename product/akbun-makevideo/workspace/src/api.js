@@ -135,6 +135,8 @@ if (!window.__TAURI__) {
     importAssets: async () => [],
     proxyStatus: async () => [],
     startProxies: async () => [],
+    waveformStatus: async () => [],
+    startWaveforms: async () => [],
     editState: async () => emptyDocument(),
     editApply: async () => emptyDocument(),
     editUndo: async () => emptyDocument(),
@@ -150,6 +152,7 @@ if (!window.__TAURI__) {
     onRenderDone: () => {},
     onRenderFallback: () => {},
     onProxyStatus: () => {},
+    onWaveformStatus: () => {},
     onFileDrop: () => {},
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
@@ -289,6 +292,8 @@ window.api = {
   importAssets: (paths) => invoke('import_assets', { paths }),
   proxyStatus: () => invoke('proxy_status'),
   startProxies: (projectPath) => invoke('start_proxies', { projectPath }),
+  waveformStatus: () => invoke('waveform_status'),
+  startWaveforms: (projectPath) => invoke('start_waveforms', { projectPath }),
 
   // The edit. Every one of these hands back the whole document state, and the
   // page draws that rather than its own idea of what just happened.
@@ -316,6 +321,7 @@ window.api = {
   // The hardware encoder failed on this file and the CPU is taking over.
   onRenderFallback: (handler) => listen('render:fallback', (event) => handler(event.payload)),
   onProxyStatus: (handler) => listen('proxy:status', (event) => handler(event.payload)),
+  onWaveformStatus: (handler) => listen('waveform:status', (event) => handler(event.payload)),
   onFileDrop: (handler) => getCurrentWebview().onDragDropEvent(dedupeDrops(handler)),
 
   message: (text, options) => message(text, options),

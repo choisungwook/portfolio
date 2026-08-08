@@ -27,6 +27,7 @@ dependencies = [
  "makevideo-present",
  "makevideo-proxy",
  "makevideo-render",
+ "makevideo-waveform",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -2135,6 +2136,15 @@ dependencies = [
 name = "makevideo-time"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "makevideo-waveform"
+version = "0.1.0"
+dependencies = [
+ "makevideo-edit",
  "serde",
  "serde_json",
 ]
