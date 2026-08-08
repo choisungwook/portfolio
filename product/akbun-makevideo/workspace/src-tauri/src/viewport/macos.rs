@@ -135,8 +135,8 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
         content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
-        let pointer = NonNull::new(Retained::into_raw(view))
-            .ok_or("the monitor view has no address")?;
+        let pointer =
+            NonNull::new(Retained::into_raw(view)).ok_or("the monitor view has no address")?;
         Ok(Handle(pointer))
     })?;
     Ok(Inner {

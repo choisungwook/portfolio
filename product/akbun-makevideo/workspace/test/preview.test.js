@@ -146,6 +146,7 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
     wrap: null,
     exactCanvas: null,
     getProject: () => project,
+    playbackPath: (asset) => asset.id === 'video' ? '/proxy/video.mp4' : asset.path,
     onTick: (position, playing) => ticks.push({ position, playing }),
   });
 
@@ -153,6 +154,8 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   await Promise.resolve();
   assert.strictEqual(ticks.at(-1).playing, true);
   assert.strictEqual(preview.position(), 0);
+  assert.strictEqual(elements[0].src, '/proxy/video.mp4');
+  assert.strictEqual(assets.video.path, '/video.mp4');
 
   startReference();
   await play;

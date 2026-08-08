@@ -53,6 +53,7 @@ use makevideo_present::surface::SurfaceSink;
 use makevideo_present::transport::{Setup, Transport};
 use makevideo_render::Project;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -143,6 +144,7 @@ pub struct Config {
     pub frame_buffering: FrameBuffering,
     pub audio_buffering: AudioBuffering,
     pub resync_after: i64,
+    pub proxy_paths: HashMap<String, String>,
 }
 
 impl Config {
@@ -155,7 +157,13 @@ impl Config {
             frame_buffering: FrameBuffering::default(),
             audio_buffering: AudioBuffering::new(AUDIO_DEPTH, AUDIO_LEAD),
             resync_after: DEFAULT_RESYNC,
+            proxy_paths: HashMap::new(),
         }
+    }
+
+    pub fn with_proxies(mut self, proxy_paths: HashMap<String, String>) -> Config {
+        self.proxy_paths = proxy_paths;
+        self
     }
 }
 
@@ -190,7 +198,10 @@ impl Session {
         let shared = Arc::new(Shared::default());
         let counters = Arc::new(Counters::default());
         let (control, commands) = channel();
-        let project = document.lock().unwrap().project().clone();
+        let project = makevideo_proxy::playback_project(
+            document.lock().unwrap().project(),
+            &config.proxy_paths,
+        );
 
         let thread = {
             let (shared, counters) = (Arc::clone(&shared), Arc::clone(&counters));
@@ -318,7 +329,10 @@ fn run(mut state: Loop) {
                 // the decoders and closes the output. The still is built from
                 // the timeline as it is now, so an edit made while playing is
                 // on screen the moment it stops.
-                state.project = state.document.lock().unwrap().project().clone();
+                state.project = makevideo_proxy::playback_project(
+                    state.document.lock().unwrap().project(),
+                    &state.config.proxy_paths,
+                );
                 stage = Stage::Still(still(&state, at));
                 state.shared.playing.store(false, Ordering::Relaxed);
                 continue;
@@ -339,7 +353,10 @@ fn run(mut state: Loop) {
             Ok(Command::Redraw) => {
                 if let Stage::Still(_) = stage {
                     let at = position(&stage);
-                    state.project = state.document.lock().unwrap().project().clone();
+                    state.project = makevideo_proxy::playback_project(
+                        state.document.lock().unwrap().project(),
+                        &state.config.proxy_paths,
+                    );
                     stage = Stage::Still(still(&state, at));
                 }
                 continue;
@@ -376,7 +393,10 @@ fn run(mut state: Loop) {
                 // to the top would lose the place somebody was working at.
                 if let Stage::Playing { .. } = stage {
                     let at = position(&stage);
-                    state.project = state.document.lock().unwrap().project().clone();
+                    state.project = makevideo_proxy::playback_project(
+                        state.document.lock().unwrap().project(),
+                        &state.config.proxy_paths,
+                    );
                     stage = Stage::Still(still(&state, at));
                     state.shared.playing.store(false, Ordering::Relaxed);
                 }
@@ -423,7 +443,10 @@ fn still(state: &Loop, frame: i64) -> Scheduler {
 }
 
 fn play(state: &mut Loop, frame: i64) -> Stage {
-    state.project = state.document.lock().unwrap().project().clone();
+    state.project = makevideo_proxy::playback_project(
+        state.document.lock().unwrap().project(),
+        &state.config.proxy_paths,
+    );
     let (mut transport, consumer) = Transport::start(Setup {
         project: &state.project,
         width: state.config.width,

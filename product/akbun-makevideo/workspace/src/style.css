@@ -916,6 +916,16 @@ button.icon.on {
   margin-top: 16px;
 }
 
+.sheet-actions.split-actions {
+  justify-content: flex-start;
+}
+
+.proxy-summary {
+  min-height: 18px;
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+
 .progress {
   height: 8px;
   margin-bottom: 10px;

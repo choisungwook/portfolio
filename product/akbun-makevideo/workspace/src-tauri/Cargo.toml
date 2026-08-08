@@ -6,6 +6,7 @@ members = [
   "crates/compositor",
   "crates/audio",
   "crates/present",
+  "crates/proxy",
 ]
 
 [package]
@@ -50,6 +51,7 @@ makevideo-present = { path = "crates/present" }
 # is only used here, which is why this is a direct dependency rather than
 # something reached through the present crate.
 makevideo-audio = { path = "crates/audio" }
+makevideo-proxy = { path = "crates/proxy" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
 tauri = { version = "2", features = ["protocol-asset"] }

@@ -16,8 +16,8 @@ use makevideo_compositor::{Backend, Compositor};
 // Aliased because this file also spawns processes, and two things called
 // Command in one file is one too many.
 use makevideo_edit::{Command as Edit, Document, DocumentState, ProjectSettings};
-use makevideo_render::accel::{self, Acceleration};
 use makevideo_present::fallback::{choose, Choice};
+use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -76,6 +76,9 @@ pub struct Settings {
     /// handle, a surface nobody can draw in — the app falls back on its own and
     /// says why.
     pub playback_engine: String,
+    /// Use ready proxy files for preview and playback. Proxy creation remains
+    /// automatic so disabling this changes only which media is read.
+    pub proxy_enabled: bool,
     /// Empty uses the operating system's application log directory.
     pub log_dir: String,
     /// Maximum size of errors.log before it becomes errors.log.1.
@@ -99,6 +102,7 @@ impl Default for Settings {
             render_acceleration: "auto".into(),
             compositor: "auto".into(),
             playback_engine: "native".into(),
+            proxy_enabled: true,
             log_dir: String::new(),
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
@@ -128,6 +132,43 @@ pub struct AppState {
     /// The native monitor, when one is running. `None` is either the media
     /// element preview or nothing open yet, and the page is told which.
     pub playback: Mutex<Option<Session>>,
+    pub proxies: Arc<Mutex<ProxyState>>,
+}
+
+#[derive(Debug, Default)]
+pub struct ProxyState {
+    project_path: String,
+    entries: HashMap<String, ProxyStatus>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyStatus {
+    asset_id: String,
+    state: String,
+    percent: u8,
+    path: String,
+    message: String,
+}
+
+fn proxy_statuses(proxies: &ProxyState) -> Vec<ProxyStatus> {
+    let mut statuses: Vec<ProxyStatus> = proxies.entries.values().cloned().collect();
+    statuses.sort_by(|a, b| a.asset_id.cmp(&b.asset_id));
+    statuses
+}
+
+fn emit_proxy_status(app: &AppHandle, proxies: &Arc<Mutex<ProxyState>>) {
+    let statuses = proxy_statuses(&proxies.lock().unwrap());
+    let _ = app.emit("proxy:status", statuses);
+}
+
+fn ready_proxy_paths(proxies: &ProxyState) -> HashMap<String, String> {
+    proxies
+        .entries
+        .iter()
+        .filter(|(_, status)| status.state == "ready")
+        .map(|(id, status)| (id.clone(), status.path.clone()))
+        .collect()
 }
 
 /// One candidate and what happened when it was actually tried. Kept so Settings
@@ -595,6 +636,227 @@ pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>)
     assets
 }
 
+fn set_proxy_status(
+    app: &AppHandle,
+    proxies: &Arc<Mutex<ProxyState>>,
+    project_path: &str,
+    status: ProxyStatus,
+) -> bool {
+    let mut current = proxies.lock().unwrap();
+    if current.project_path != project_path {
+        return false;
+    }
+    current.entries.insert(status.asset_id.clone(), status);
+    drop(current);
+    emit_proxy_status(app, proxies);
+    true
+}
+
+fn make_proxy(
+    app: &AppHandle,
+    proxies: &Arc<Mutex<ProxyState>>,
+    project_path: &str,
+    ffmpeg_path: &str,
+    asset: &Asset,
+) -> Result<String, String> {
+    let output = makevideo_proxy::media_path(project_path, &asset.id)?;
+    let temporary = output.with_extension("part.mp4");
+    let args = makevideo_proxy::ffmpeg_args(asset, &temporary);
+    let mut child = Command::new(ffmpeg_path)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| format!("cannot start ffmpeg: {error}"))?;
+    if let Some(stdout) = child.stdout.take() {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if let Some(ffmpeg::Progress::Position(position_ms)) =
+                ffmpeg::parse_progress_line(&line)
+            {
+                let percent = if asset.duration_ms > 0 {
+                    ((position_ms.min(asset.duration_ms) * 100) / asset.duration_ms) as u8
+                } else {
+                    0
+                };
+                if !set_proxy_status(
+                    app,
+                    proxies,
+                    project_path,
+                    ProxyStatus {
+                        asset_id: asset.id.clone(),
+                        state: "generating".into(),
+                        percent,
+                        path: String::new(),
+                        message: String::new(),
+                    },
+                ) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("the project changed".into());
+                }
+            }
+        }
+    }
+    let status = child.wait().map_err(|error| error.to_string())?;
+    if !status.success() {
+        let _ = std::fs::remove_file(&temporary);
+        return Err("ffmpeg could not create the proxy".into());
+    }
+    if output.exists() {
+        std::fs::remove_file(&output)
+            .map_err(|error| format!("cannot replace {output:?}: {error}"))?;
+    }
+    std::fs::rename(&temporary, &output)
+        .map_err(|error| format!("cannot move {temporary:?} to {output:?}: {error}"))?;
+    makevideo_proxy::write_manifest(project_path, asset)?;
+    Ok(output.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn proxy_status(state: State<AppState>) -> Vec<ProxyStatus> {
+    proxy_statuses(&state.proxies.lock().unwrap())
+}
+
+#[tauri::command]
+pub fn start_proxies(
+    app: AppHandle,
+    state: State<AppState>,
+    project_path: String,
+) -> Result<Vec<ProxyStatus>, String> {
+    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let ffmpeg_path = find_tool(&app, "ffmpeg", &configured)
+        .ok_or("ffmpeg was not found, so proxies cannot be created")?;
+    let project = state.document.lock().unwrap().project().clone();
+    let mut jobs = Vec::new();
+    {
+        let mut proxies = state.proxies.lock().unwrap();
+        if proxies.project_path != project_path {
+            proxies.project_path = project_path.clone();
+            proxies.entries.clear();
+        }
+        let wanted: HashSet<String> = project
+            .assets
+            .iter()
+            .filter(|asset| makevideo_proxy::needs_proxy(asset))
+            .map(|asset| asset.id.clone())
+            .collect();
+        proxies.entries.retain(|id, _| wanted.contains(id));
+        for asset in project
+            .assets
+            .iter()
+            .filter(|asset| wanted.contains(&asset.id))
+        {
+            if let Some(path) = makevideo_proxy::valid_proxy(&project_path, asset) {
+                allow_asset_file(&app, &path);
+                proxies.entries.insert(
+                    asset.id.clone(),
+                    ProxyStatus {
+                        asset_id: asset.id.clone(),
+                        state: "ready".into(),
+                        percent: 100,
+                        path,
+                        message: String::new(),
+                    },
+                );
+            } else if !matches!(
+                proxies
+                    .entries
+                    .get(&asset.id)
+                    .map(|status| status.state.as_str()),
+                Some("queued" | "generating")
+            ) {
+                proxies.entries.insert(
+                    asset.id.clone(),
+                    ProxyStatus {
+                        asset_id: asset.id.clone(),
+                        state: "queued".into(),
+                        percent: 0,
+                        path: String::new(),
+                        message: String::new(),
+                    },
+                );
+                jobs.push(asset.clone());
+            }
+        }
+    }
+    emit_proxy_status(&app, &state.proxies);
+
+    if !jobs.is_empty() {
+        let proxies = Arc::clone(&state.proxies);
+        std::thread::spawn(move || {
+            if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
+                if let Err(error) = std::fs::create_dir_all(&dir) {
+                    for asset in jobs {
+                        set_proxy_status(
+                            &app,
+                            &proxies,
+                            &project_path,
+                            ProxyStatus {
+                                asset_id: asset.id,
+                                state: "failed".into(),
+                                percent: 0,
+                                path: String::new(),
+                                message: error.to_string(),
+                            },
+                        );
+                    }
+                    return;
+                }
+            }
+            for asset in jobs {
+                if !set_proxy_status(
+                    &app,
+                    &proxies,
+                    &project_path,
+                    ProxyStatus {
+                        asset_id: asset.id.clone(),
+                        state: "generating".into(),
+                        percent: 0,
+                        path: String::new(),
+                        message: String::new(),
+                    },
+                ) {
+                    return;
+                }
+                match make_proxy(&app, &proxies, &project_path, &ffmpeg_path, &asset) {
+                    Ok(path) => {
+                        allow_asset_file(&app, &path);
+                        set_proxy_status(
+                            &app,
+                            &proxies,
+                            &project_path,
+                            ProxyStatus {
+                                asset_id: asset.id,
+                                state: "ready".into(),
+                                percent: 100,
+                                path,
+                                message: String::new(),
+                            },
+                        );
+                    }
+                    Err(message) if message == "the project changed" => return,
+                    Err(message) => {
+                        set_proxy_status(
+                            &app,
+                            &proxies,
+                            &project_path,
+                            ProxyStatus {
+                                asset_id: asset.id,
+                                state: "failed".into(),
+                                percent: 0,
+                                path: String::new(),
+                                message,
+                            },
+                        );
+                    }
+                }
+            }
+        });
+    }
+    Ok(proxy_statuses(&state.proxies.lock().unwrap()))
+}
+
 // --- the edit ---------------------------------------------------------------
 
 /// What the page redraws from, right now.
@@ -610,10 +872,7 @@ pub fn edit_state(state: State<AppState>) -> DocumentState {
 /// that should take one press. Either all of them land or none do, so there is
 /// no state where part of a drop happened.
 #[tauri::command]
-pub fn edit_apply(
-    state: State<AppState>,
-    commands: Vec<Edit>,
-) -> Result<DocumentState, String> {
+pub fn edit_apply(state: State<AppState>, commands: Vec<Edit>) -> Result<DocumentState, String> {
     let mut document = state.document.lock().unwrap();
     document.apply_all(commands)?;
     Ok(document.state())
@@ -1182,12 +1441,18 @@ fn start_session(
     // writes. What differs is only how big the view showing it is, which the
     // surface handles by scaling on presentation.
     let compositor = compositor(state, wanted_backend(&settings.compositor));
+    let proxy_paths = if settings.proxy_enabled {
+        ready_proxy_paths(&state.proxies.lock().unwrap())
+    } else {
+        HashMap::new()
+    };
     let config = PlaybackConfig::new(
         compositor,
         ffmpeg,
         project.settings.width.max(2),
         project.settings.height.max(2),
-    );
+    )
+    .with_proxies(proxy_paths);
     Session::start(
         window,
         Arc::clone(&state.document),
