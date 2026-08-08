@@ -5,28 +5,13 @@
 //! the wiring: a thread, a command channel, the output device, and the surface
 //! the frames land on.
 //!
-//! # Paused costs nothing
+//! # Pause keeps the pipeline alive
 //!
-//! There are two stages and they hold different things.
-//!
-//! | Stage | Holds | Runs |
-//! |---|---|---|
-//! | Still | a frame source and a dead clock | nothing, once the frame is drawn |
-//! | Playing | the transport, the decoders, the output device | the tick loop |
-//!
-//! Pressing play builds the second and pausing throws it away. That costs a few
-//! hundred milliseconds to the first frame — the soak measures it as the
-//! startup delay — and it buys something the media element preview never had:
-//! a paused editor with no decoder running and no audio device open. The old
-//! preview keeps a decoder per clip alive for as long as the project is, which
-//! is the caveat the wiki has carried since it was written.
-//!
-//! It also settles a question that has no good answer otherwise. The audio
-//! engine has no pause: the ring is drained by whatever holds the consumer, and
-//! the consumer is moved into the device. Stopping the sound therefore means
-//! dropping the device, and the device cannot be reopened without the consumer
-//! back. Building both together and dropping both together is the shape that
-//! has no half state in it.
+//! One monitor session owns one transport, its decoder processes and its audio
+//! output for its entire lifetime. Pause closes an atomic gate in the device
+//! callback and stops the scheduler clock; it does not drop either half. The
+//! callback writes silence while the gate is closed, so no samples leave the
+//! ring and the playhead cannot move.
 //!
 //! # The still is the same picture as the playback
 //!
@@ -38,16 +23,13 @@
 use crate::viewport::{Place, Viewport};
 use makevideo_audio::device::DeviceSink;
 use makevideo_audio::engine::Options as AudioOptions;
-use makevideo_audio::realtime::Clock;
 use makevideo_audio::source::{
     Buffering as AudioBuffering, FfmpegReaders as AudioReaders, DEFAULT_DEPTH as AUDIO_DEPTH,
     DEFAULT_LEAD as AUDIO_LEAD,
 };
-use makevideo_compositor::source::{
-    Buffering as FrameBuffering, FfmpegReaders as FrameReaders, FrameSource,
-};
+use makevideo_compositor::source::{Buffering as FrameBuffering, FfmpegReaders as FrameReaders};
 use makevideo_compositor::Compositor;
-use makevideo_present::player::{Scheduler, Tick, IDLE};
+use makevideo_present::player::{Tick, IDLE};
 use makevideo_present::schedule::DEFAULT_RESYNC;
 use makevideo_present::surface::SurfaceSink;
 use makevideo_present::transport::{Setup, Transport};
@@ -145,6 +127,7 @@ pub struct Config {
     pub audio_buffering: AudioBuffering,
     pub resync_after: i64,
     pub proxy_paths: HashMap<String, String>,
+    pub hwaccel: Option<String>,
 }
 
 impl Config {
@@ -158,11 +141,17 @@ impl Config {
             audio_buffering: AudioBuffering::new(AUDIO_DEPTH, AUDIO_LEAD),
             resync_after: DEFAULT_RESYNC,
             proxy_paths: HashMap::new(),
+            hwaccel: None,
         }
     }
 
     pub fn with_proxies(mut self, proxy_paths: HashMap<String, String>) -> Config {
         self.proxy_paths = proxy_paths;
+        self
+    }
+
+    pub fn with_hwaccel(mut self, hwaccel: Option<String>) -> Config {
+        self.hwaccel = hwaccel;
         self
     }
 }
@@ -299,49 +288,35 @@ struct Loop {
     frame: i64,
 }
 
-/// Paused holds a frame source and a clock nobody winds; playing holds the
-/// whole transport and the output device.
-enum Stage {
-    Still(Scheduler),
-    Playing {
-        transport: Transport,
-        /// Never read. Held because dropping it closes the output stream, and
-        /// the stream is what turns the ring into sound and the clock into
-        /// time. The whole of pausing is this field going out of scope.
-        _device: DeviceSink,
-    },
+/// Decoder, audio mixer and output device that survive play/pause toggles.
+struct Pipeline {
+    transport: Transport,
+    /// Held for the whole monitor lifetime. Its callback emits silence when
+    /// `active` is false instead of consuming the ring.
+    _device: DeviceSink,
+    active: Arc<AtomicBool>,
 }
 
 fn run(mut state: Loop) {
-    let mut stage = Stage::Still(still(&state, state.frame));
+    let frame = state.frame;
+    let mut current = pipeline(&mut state, frame);
     loop {
         match state.commands.try_recv() {
             Ok(Command::Stop) | Err(TryRecvError::Disconnected) => break,
             Ok(Command::Play) => {
-                let at = position(&stage);
-                stage = play(&mut state, at);
+                current.active.store(true, Ordering::Relaxed);
+                current.transport.play();
                 state.shared.playing.store(true, Ordering::Relaxed);
                 continue;
             }
             Ok(Command::Pause) => {
-                let at = position(&stage);
-                // The transport and the device are dropped here, which stops
-                // the decoders and closes the output. The still is built from
-                // the timeline as it is now, so an edit made while playing is
-                // on screen the moment it stops.
-                state.project = makevideo_proxy::playback_project(
-                    state.document.lock().unwrap().project(),
-                    &state.config.proxy_paths,
-                );
-                stage = Stage::Still(still(&state, at));
+                current.active.store(false, Ordering::Relaxed);
+                current.transport.pause();
                 state.shared.playing.store(false, Ordering::Relaxed);
                 continue;
             }
             Ok(Command::Seek(frame)) => {
-                match &mut stage {
-                    Stage::Still(scheduler) => scheduler.seek(frame),
-                    Stage::Playing { transport, .. } => transport.seek(frame),
-                }
+                current.transport.seek(frame);
                 state.shared.position.store(frame, Ordering::Relaxed);
                 continue;
             }
@@ -351,27 +326,25 @@ fn run(mut state: Loop) {
                 continue;
             }
             Ok(Command::Redraw) => {
-                if let Stage::Still(_) = stage {
-                    let at = position(&stage);
+                if !current.transport.is_playing() {
+                    let at = current.transport.position();
+                    current.active.store(false, Ordering::Relaxed);
                     state.project = makevideo_proxy::playback_project(
                         state.document.lock().unwrap().project(),
                         &state.config.proxy_paths,
                     );
-                    stage = Stage::Still(still(&state, at));
+                    current = pipeline(&mut state, at);
                 }
                 continue;
             }
             Err(TryRecvError::Empty) => {}
         }
 
-        let tick = match &mut stage {
-            Stage::Still(scheduler) => scheduler.tick(&mut state.sink),
-            Stage::Playing { transport, .. } => transport.tick(&mut state.sink),
-        };
+        let tick = current.transport.tick(&mut state.sink);
         state
             .shared
             .position
-            .store(position(&stage), Ordering::Relaxed);
+            .store(current.transport.position(), Ordering::Relaxed);
 
         match tick {
             Tick::Presented { .. } => {
@@ -391,13 +364,9 @@ fn run(mut state: Loop) {
                 // The timeline is over. Stop where it ended and leave the last
                 // frame up, which is what the transport does anyway; going back
                 // to the top would lose the place somebody was working at.
-                if let Stage::Playing { .. } = stage {
-                    let at = position(&stage);
-                    state.project = makevideo_proxy::playback_project(
-                        state.document.lock().unwrap().project(),
-                        &state.config.proxy_paths,
-                    );
-                    stage = Stage::Still(still(&state, at));
+                if current.transport.is_playing() {
+                    current.active.store(false, Ordering::Relaxed);
+                    current.transport.pause();
                     state.shared.playing.store(false, Ordering::Relaxed);
                 }
             }
@@ -416,43 +385,16 @@ fn run(mut state: Loop) {
     }
 }
 
-fn position(stage: &Stage) -> i64 {
-    match stage {
-        Stage::Still(scheduler) => scheduler.position(),
-        Stage::Playing { transport, .. } => transport.position(),
-    }
-}
-
-/// A paused monitor: the frames, and a clock that will never be wound.
-///
-/// The clock is real and it is never advanced, which is exactly right —
-/// `Scheduler` in its paused mode does not read it. Handing it one keeps the
-/// type honest without inventing a second kind of scheduler for the case where
-/// there is no sound.
-fn still(state: &Loop, frame: i64) -> Scheduler {
-    let source = FrameSource::new(
-        &state.project,
-        state.config.width,
-        state.config.height,
-        state.config.frame_buffering,
-        Arc::new(FrameReaders::new(&state.config.ffmpeg, None)),
-    );
-    let mut scheduler = Scheduler::new(source, Arc::new(Clock::new()), state.config.resync_after);
-    scheduler.pause(frame);
-    scheduler
-}
-
-fn play(state: &mut Loop, frame: i64) -> Stage {
-    state.project = makevideo_proxy::playback_project(
-        state.document.lock().unwrap().project(),
-        &state.config.proxy_paths,
-    );
+fn pipeline(state: &mut Loop, frame: i64) -> Pipeline {
     let (mut transport, consumer) = Transport::start(Setup {
         project: &state.project,
         width: state.config.width,
         height: state.config.height,
         frame_buffering: state.config.frame_buffering,
-        frame_readers: Arc::new(FrameReaders::new(&state.config.ffmpeg, None)),
+        frame_readers: Arc::new(FrameReaders::new(
+            &state.config.ffmpeg,
+            state.config.hwaccel.as_deref(),
+        )),
         audio_buffering: state.config.audio_buffering,
         audio_readers: Arc::new(AudioReaders::new(&state.config.ffmpeg)),
         audio: AudioOptions::default(),
@@ -464,11 +406,12 @@ fn play(state: &mut Loop, frame: i64) -> Stage {
     if frame > 0 {
         transport.seek(frame);
     }
-    let device = DeviceSink::open(consumer, clock);
-    transport.play();
-    Stage::Playing {
+    let active = Arc::new(AtomicBool::new(false));
+    let device = DeviceSink::open(consumer, clock, Arc::clone(&active));
+    Pipeline {
         transport,
         _device: device,
+        active,
     }
 }
 

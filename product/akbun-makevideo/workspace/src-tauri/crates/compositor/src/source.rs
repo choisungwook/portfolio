@@ -111,7 +111,7 @@ impl FfmpegReaders {
 
 impl Readers for FfmpegReaders {
     fn open(&self, request: &Open) -> Option<Box<dyn FrameReader>> {
-        let args = ffmpeg::decoder_args(&ffmpeg::Decode {
+        let decode = ffmpeg::Decode {
             path: &request.path,
             kind: request.kind,
             in_time: RationalTime::new(request.in_frame, request.rate),
@@ -125,9 +125,51 @@ impl Readers for FfmpegReaders {
             } else {
                 None
             },
+        };
+        let fallback = decode.hwaccel.map(|_| {
+            let software = ffmpeg::decoder_args(&ffmpeg::Decode {
+                path: &request.path,
+                kind: request.kind,
+                in_time: RationalTime::new(request.in_frame, request.rate),
+                duration: RationalTime::new(request.frames, request.rate),
+                width: request.width,
+                height: request.height,
+                rate: request.rate,
+                hwaccel: None,
+            });
+            (self.ffmpeg.clone(), software)
         });
-        let mut child = Command::new(&self.ffmpeg)
-            .args(&args)
+        let args = ffmpeg::decoder_args(&decode);
+        FfmpegReader::start(&self.ffmpeg, &args, fallback)
+            .map(|reader| Box::new(reader) as Box<dyn FrameReader>)
+    }
+}
+
+struct FfmpegReader {
+    child: Arc<Mutex<Child>>,
+    stdout: ChildStdout,
+    fallback: Option<(String, Vec<String>)>,
+    began: bool,
+}
+
+impl FfmpegReader {
+    fn start(
+        ffmpeg: &str,
+        args: &[String],
+        fallback: Option<(String, Vec<String>)>,
+    ) -> Option<FfmpegReader> {
+        let (child, stdout) = Self::spawn(ffmpeg, args)?;
+        Some(FfmpegReader {
+            child,
+            stdout,
+            fallback,
+            began: false,
+        })
+    }
+
+    fn spawn(ffmpeg: &str, args: &[String]) -> Option<(Arc<Mutex<Child>>, ChildStdout)> {
+        let mut child = Command::new(ffmpeg)
+            .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             // A decoder that cannot open its file stops drawing rather than
@@ -136,16 +178,25 @@ impl Readers for FfmpegReaders {
             .spawn()
             .ok()?;
         let stdout = child.stdout.take()?;
-        Some(Box::new(FfmpegReader {
-            child: Arc::new(Mutex::new(child)),
-            stdout,
-        }))
+        Some((Arc::new(Mutex::new(child)), stdout))
     }
-}
 
-struct FfmpegReader {
-    child: Arc<Mutex<Child>>,
-    stdout: ChildStdout,
+    fn retry_with_software(&mut self) -> bool {
+        let Some((ffmpeg, args)) = self.fallback.take() else {
+            return false;
+        };
+        {
+            let mut child = self.child.lock().unwrap();
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let Some((child, stdout)) = Self::spawn(&ffmpeg, &args) else {
+            return false;
+        };
+        self.child = child;
+        self.stdout = stdout;
+        true
+    }
 }
 
 struct FfmpegCancel {
@@ -160,7 +211,15 @@ impl CancelRead for FfmpegCancel {
 
 impl FrameReader for FfmpegReader {
     fn read(&mut self, buffer: &mut [u8]) -> bool {
-        self.stdout.read_exact(buffer).is_ok()
+        if self.stdout.read_exact(buffer).is_ok() {
+            self.began = true;
+            return true;
+        }
+        if self.began || !self.retry_with_software() || self.stdout.read_exact(buffer).is_err() {
+            return false;
+        }
+        self.began = true;
+        true
     }
 
     fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
