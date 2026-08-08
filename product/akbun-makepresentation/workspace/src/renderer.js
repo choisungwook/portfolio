@@ -804,19 +804,31 @@ function showContextMenu(x, y) {
   $('context-save-image').focus();
 }
 
+function contextMenuPoint(event, group) {
+  if (event.clientX || event.clientY) {
+    return { x: event.clientX, y: event.clientY };
+  }
+  const bounds = group.getBoundingClientRect();
+  return {
+    x: bounds.left + Math.min(16, bounds.width / 2),
+    y: bounds.top + Math.min(16, bounds.height / 2),
+  };
+}
+
 document.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   hideContextMenu();
   if (state.presenting || !(event.target instanceof Element)) return;
   const group = event.target.closest('#canvas [data-i]');
   if (!group) return;
+  const point = contextMenuPoint(event, group);
   const index = Number(group.dataset.i);
   if (!state.selection.includes(index)) {
     selectOnly(index);
     renderCanvas();
     renderProps();
   }
-  showContextMenu(event.clientX, event.clientY);
+  showContextMenu(point.x, point.y);
 });
 
 document.addEventListener('pointerdown', (event) => {
@@ -836,16 +848,23 @@ function rasterizeShapes(shapes) {
     const url = URL.createObjectURL(new Blob([imageSvg.svg], { type: 'image/svg+xml' }));
     const image = new Image();
     image.onload = () => {
-      const scale = Math.max(
-        0.01,
-        Math.min(2, 4096 / imageSvg.width, 4096 / imageSvg.height)
-      );
-      const raster = document.createElement('canvas');
-      raster.width = Math.max(1, Math.ceil(imageSvg.width * scale));
-      raster.height = Math.max(1, Math.ceil(imageSvg.height * scale));
-      raster.getContext('2d').drawImage(image, 0, 0, raster.width, raster.height);
-      URL.revokeObjectURL(url);
-      resolve(raster.toDataURL('image/png'));
+      try {
+        const scale = Math.max(
+          0.01,
+          Math.min(2, 4096 / imageSvg.width, 4096 / imageSvg.height)
+        );
+        const raster = document.createElement('canvas');
+        raster.width = Math.max(1, Math.ceil(imageSvg.width * scale));
+        raster.height = Math.max(1, Math.ceil(imageSvg.height * scale));
+        const context = raster.getContext('2d');
+        if (!context) throw new Error('cannot create image canvas');
+        context.drawImage(image, 0, 0, raster.width, raster.height);
+        resolve(raster.toDataURL('image/png'));
+      } catch (error) {
+        reject(error);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
