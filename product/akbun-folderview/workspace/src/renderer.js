@@ -16,8 +16,10 @@ let state = {
   settings: {},
   version: '',
   dataDir: '',
-  // Set by clicking a folder in the tree. Narrows the grid before the query.
+  // Set by clicking a folder in the tree. Shows its direct children, while a
+  // search still scans every descendant under it.
   folder: null,
+  lastOpenedPath: null,
   query: '',
   shown: 200,
 };
@@ -96,6 +98,22 @@ function fileIcon(entry) {
   return entry.kind === 'video' ? '🎬' : '🖼️';
 }
 
+function markLastOpened(element, path) {
+  element.classList.toggle('last-opened', state.lastOpenedPath === path);
+}
+
+function syncLastOpened() {
+  for (const element of document.querySelectorAll('.file-entry')) {
+    markLastOpened(element, element.dataset.path);
+  }
+}
+
+async function openEntry(entry) {
+  await window.api.openEntry(entry.path);
+  state.lastOpenedPath = entry.path;
+  syncLastOpened();
+}
+
 function derive() {
   if (!derived) {
     derived = {
@@ -136,7 +154,9 @@ function countIn(node) {
 // A file in the tree behaves like a file in the grid: it opens.
 function fileRow(entry) {
   const row = document.createElement('div');
-  row.className = 'row-item';
+  row.className = 'row-item file-entry';
+  row.dataset.path = entry.path;
+  markLastOpened(row, entry.path);
 
   const twisty = document.createElement('span');
   twisty.className = 'twisty';
@@ -148,7 +168,12 @@ function fileRow(entry) {
   label.title = entry.path;
   row.append(label);
 
-  row.addEventListener('click', () => window.api.openEntry(entry.path));
+  row.addEventListener('click', () => {
+    if (state.settings.openOnSingleClick) void openEntry(entry);
+  });
+  row.addEventListener('dblclick', () => {
+    if (!state.settings.openOnSingleClick) void openEntry(entry);
+  });
   row.addEventListener('contextmenu', async (event) => {
     event.preventDefault();
     await window.api.entryMenu((action) => void runAction(action, entry), tagMenu(entry));
@@ -425,13 +450,14 @@ function thumb(entry) {
 
 function card(entry) {
   const element = document.createElement('div');
-  element.className = 'card';
+  element.className = 'card file-entry';
   element.dataset.path = entry.path;
+  markLastOpened(element, entry.path);
   const videoOff = entry.kind === 'video' && !state.settings.showVideoThumbs;
   element.innerHTML = `
     <div class="thumb${videoOff ? ' off' : ''}">${thumb(entry)}</div>
     <div class="card-body">
-      <div class="card-name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</div>
+      <div class="card-name" title="${escapeHtml(entry.path)}"><span class="entry-icon">${fileIcon(entry)}</span>${escapeHtml(entry.name)}</div>
       <div class="card-meta">
         <span class="stars">${starsHtml(entry.rating)}</span>
         <span class="fav ${entry.favorite ? 'on' : ''}" data-fav="1">${entry.favorite ? '♥' : '♡'}</span>
@@ -449,15 +475,38 @@ function card(entry) {
 // the fast view for a disk with no thumbnails yet.
 function listRow(entry) {
   const element = document.createElement('div');
-  element.className = 'list-item';
+  element.className = 'list-item file-entry';
   element.dataset.path = entry.path;
+  markLastOpened(element, entry.path);
   element.innerHTML = `
+    <span class="entry-icon">${fileIcon(entry)}</span>
     <span class="list-name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</span>
     ${entry.kind === 'video' ? '<span class="badge">VIDEO</span>' : ''}
     <span class="stars">${starsHtml(entry.rating)}</span>
     <span class="fav ${entry.favorite ? 'on' : ''}" data-fav="1">${entry.favorite ? '♥' : '♡'}</span>
     <span class="list-size">${lib.formatSize(entry.size)}</span>
     <span class="list-date">${entry.mtime ? new Date(entry.mtime).toLocaleDateString() : ''}</span>`;
+  return element;
+}
+
+function openFolder(node) {
+  state.folder = node.path;
+  state.shown = PAGE;
+  expandedFolders.set(node.path, true);
+  render();
+}
+
+function folderCard(node) {
+  const element = document.createElement('div');
+  element.className = 'folder-card';
+  element.title = `${node.path}\nDouble click to open`;
+  element.innerHTML = `
+    <span class="folder-card-icon">📁</span>
+    <span class="folder-card-body">
+      <span class="folder-card-name">${escapeHtml(node.name)}</span>
+      <span class="folder-card-count">${countIn(node)} file${countIn(node) === 1 ? '' : 's'}</span>
+    </span>`;
+  element.addEventListener('dblclick', () => openFolder(node));
   return element;
 }
 
@@ -481,6 +530,14 @@ function syncViews() {
 }
 
 function renderGrid() {
+  const selectedFolder = state.folder
+    ? lib.findTreeNode(derive().tree, state.folder)
+    : null;
+  if (selectedFolder && state.query.trim() === '') {
+    renderFolderContents(selectedFolder);
+    return;
+  }
+
   let matches = visibleEntries();
   // Filter results come from anywhere in the library, so a flat list loses
   // where each file lives. Sorting by folder and putting a folder header over
@@ -518,6 +575,42 @@ function renderGrid() {
   syncTokens();
 }
 
+function renderFolderContents(node) {
+  const listMode = state.settings.view === 'list';
+  const folders = node.folders;
+  const files = node.files;
+  const visibleFolders = folders.slice(0, state.shown);
+  const fileSlots = Math.max(0, state.shown - visibleFolders.length);
+  const visibleFiles = files.slice(0, fileSlots);
+
+  const grid = $('grid');
+  grid.textContent = '';
+  grid.classList.toggle('list', listMode);
+
+  if (folders.length > 0) {
+    grid.append(groupTitle(`📁 Folders (${folders.length})`));
+    for (const folder of visibleFolders) grid.append(folderCard(folder));
+  }
+  if (files.length > 0 && fileSlots > 0) {
+    grid.append(groupTitle(`📄 Files (${files.length})`));
+    for (const entry of visibleFiles) grid.append(listMode ? listRow(entry) : card(entry));
+  }
+  if (folders.length === 0 && files.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = 'This folder has no indexed files.';
+    grid.append(empty);
+  }
+
+  syncViews();
+  syncTokens();
+  syncLastOpened();
+  $('status').textContent =
+    `${folders.length} folder${folders.length === 1 ? '' : 's'}, ` +
+    `${files.length} file${files.length === 1 ? '' : 's'} in ${node.path}`;
+  $('show-more').hidden = visibleFolders.length + visibleFiles.length >= folders.length + files.length;
+}
+
 function render() {
   renderTree();
   renderCatalog();
@@ -540,7 +633,7 @@ async function patch(entry, changes) {
 }
 
 async function runAction(action, entry) {
-  if (action === 'open') return window.api.openEntry(entry.path);
+  if (action === 'open') return openEntry(entry);
   if (action === 'reveal') return window.api.revealEntry(entry.path);
   if (action === 'copyPath') return window.api.copyPath(entry.path);
   if (action === 'delete') return window.api.deleteEntry(entry.path);
@@ -718,12 +811,12 @@ $('grid').addEventListener('click', async (event) => {
   }
   if (event.target.dataset.fav) return patch(entry, { favorite: !entry.favorite });
 
-  if (state.settings.openOnSingleClick) await window.api.openEntry(entry.path);
+  if (state.settings.openOnSingleClick) await openEntry(entry);
 });
 
 $('grid').addEventListener('dblclick', async (event) => {
   const entry = entryAt(event.target);
-  if (entry && !state.settings.openOnSingleClick) await window.api.openEntry(entry.path);
+  if (entry && !state.settings.openOnSingleClick) await openEntry(entry);
 });
 
 $('grid').addEventListener('contextmenu', async (event) => {

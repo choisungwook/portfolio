@@ -11,6 +11,7 @@ const assert = require('node:assert');
 const { test } = require('node:test');
 const {
   buildTree,
+  findTreeNode,
   formatSize,
   isUnder,
   normalizeTag,
@@ -129,6 +130,13 @@ test('a sibling folder with a shared prefix does not leak into the tree', () => 
   ]);
   assert.ok(!root.folders.some((folder) => folder.name.includes('backup')));
   assert.strictEqual(root.files.length, 1);
+});
+
+test('findTreeNode returns a nested folder without flattening the tree', () => {
+  const tree = buildTree([{ path: 'C:\\photos' }], LIBRARY);
+
+  assert.strictEqual(findTreeNode(tree, 'C:\\photos\\trip').name, 'trip');
+  assert.strictEqual(findTreeNode(tree, 'C:\\photos\\missing'), null);
 });
 
 test('tag counts are ordered by use', () => {
