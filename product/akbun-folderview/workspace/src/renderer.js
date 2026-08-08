@@ -498,13 +498,14 @@ function openFolder(node) {
 
 function folderCard(node) {
   const element = document.createElement('div');
+  const fileCount = countIn(node);
   element.className = 'folder-card';
   element.title = `${node.path}\nDouble click to open`;
   element.innerHTML = `
     <span class="folder-card-icon">📁</span>
     <span class="folder-card-body">
       <span class="folder-card-name">${escapeHtml(node.name)}</span>
-      <span class="folder-card-count">${countIn(node)} file${countIn(node) === 1 ? '' : 's'}</span>
+      <span class="folder-card-count">${fileCount} file${fileCount === 1 ? '' : 's'}</span>
     </span>`;
   element.addEventListener('dblclick', () => openFolder(node));
   return element;
