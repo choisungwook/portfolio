@@ -24,3 +24,4 @@
 | [2026-08-native-project-trash.md](./2026-08-native-project-trash.md) | Windows and macOS move validated project targets with native trash APIs |
 | [2026-08-common-visual-item-model.md](./2026-08-common-visual-item-model.md) | Text, shape, image and video overlays share one timed transform model |
 | [2026-08-edit-point-navigation.md](./2026-08-edit-point-navigation.md) | Visible clip boundaries drive previous and next edit navigation |
+| [2026-08-persistent-playback-pipeline.md](./2026-08-persistent-playback-pipeline.md) | Play and pause keep one decoder and audio pipeline alive |

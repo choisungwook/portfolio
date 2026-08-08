@@ -47,6 +47,16 @@ The stage box stays the same size on screen. `#stage-inner` is laid out at `scal
 - 생성 중 asset 행에 진행률 표시
 - 준비 전 원본 재생, 준비 후 프록시 재생
 - 재생 중 준비된 프록시는 현재 재생을 유지하고 정지 후 다음 세션부터 사용
+- 프록시 작업은 재생 중 새 인코딩을 시작하지 않고 정지 뒤 다음 작업부터 재개
+- 프록시 인코더는 2개 스레드로 제한
 - Playback → Proxy Media…에서 프록시 재생 사용 여부와 생성 상태 확인
 - 원본 경로·수정 시각 불일치 시 재생성
 - export와 정지 상태 exact frame은 원본 사용
+
+## Native monitor pause
+
+- Native monitor session은 attach 시 한 번만 decoder, audio mixer, output device를 생성
+- Pause는 output callback을 무음으로 전환하고 scheduler clock만 정지
+- Play는 같은 pipeline을 다시 열어 decoder process와 audio device 재생성 방지
+- 재생용 video decoder는 검증된 hardware acceleration hint를 사용
+- 정지 상태에서 편집한 timeline을 반영할 때만 pipeline 재구성

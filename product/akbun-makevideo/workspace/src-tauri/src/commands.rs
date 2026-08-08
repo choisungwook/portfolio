@@ -27,6 +27,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Application settings, as opposed to the project settings that live in the
@@ -620,9 +621,9 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
 /// decode for a given frame and one that can only work from whatever snapshot
 /// happened to come with the call.
 #[tauri::command]
-pub fn preview_frame(
+pub async fn preview_frame(
     app: AppHandle,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     frame: i64,
     max_width: u32,
 ) -> Result<tauri::ipc::Response, String> {
@@ -762,6 +763,7 @@ fn make_proxy(
     ffmpeg_path: &str,
     asset: &Asset,
 ) -> Result<String, String> {
+    wait_for_playback_pause(app);
     let output = makevideo_proxy::media_path(project_path, &asset.id)?;
     let temporary = output.with_extension("part.mp4");
     let args = makevideo_proxy::ffmpeg_args(asset, &temporary);
@@ -816,15 +818,34 @@ fn make_proxy(
     Ok(output.to_string_lossy().to_string())
 }
 
+/// Jobs queued for proxying wait until playback stops. A job already encoding
+/// finishes its current file: killing ffmpeg midway would leave partial media
+/// and does not make the current playback smoother.
+fn wait_for_playback_pause(app: &AppHandle) {
+    loop {
+        let playing = app
+            .state::<AppState>()
+            .playback
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|session| session.status().playing);
+        if !playing {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
 #[tauri::command]
 pub fn proxy_status(state: State<AppState>) -> Vec<ProxyStatus> {
     proxy_statuses(&state.proxies.lock().unwrap())
 }
 
 #[tauri::command]
-pub fn start_proxies(
+pub async fn start_proxies(
     app: AppHandle,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     project_path: String,
 ) -> Result<Vec<ProxyStatus>, String> {
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
@@ -1785,13 +1806,17 @@ fn start_session(
     } else {
         HashMap::new()
     };
+    let hwaccel = acceleration(state, Some(&ffmpeg))
+        .available
+        .and_then(|candidate| candidate.hwaccel);
     let config = PlaybackConfig::new(
         compositor,
         ffmpeg,
         project.settings.width.max(2),
         project.settings.height.max(2),
     )
-    .with_proxies(proxy_paths);
+    .with_proxies(proxy_paths)
+    .with_hwaccel(hwaccel);
     Session::start(
         window,
         Arc::clone(&state.document),

@@ -106,7 +106,7 @@ impl DeviceSink {
     /// is coming out, because a device that takes two seconds to open should
     /// not hold up the rest of playback starting. [`Status::silent`] says
     /// whether it got there.
-    pub fn open(consumer: Consumer, clock: Arc<Clock>) -> DeviceSink {
+    pub fn open(consumer: Consumer, clock: Arc<Clock>, active: Arc<AtomicBool>) -> DeviceSink {
         let stop = Arc::new(AtomicBool::new(false));
         let status = Arc::new(Status::default());
         // One Arc, and only the current callback ever holds a clone of it. The
@@ -135,6 +135,7 @@ impl DeviceSink {
                     match build(
                         Arc::clone(&consumer),
                         Arc::clone(&clock),
+                        Arc::clone(&active),
                         Arc::clone(&thread_status),
                     ) {
                         Ok(open) => {
@@ -217,6 +218,7 @@ fn choose(device: &cpal::Device) -> Result<SupportedStreamConfig, String> {
 fn build(
     consumer: Arc<Consumer>,
     clock: Arc<Clock>,
+    active: Arc<AtomicBool>,
     status: Arc<Status>,
 ) -> Result<Playing, String> {
     let device = cpal::default_host()
@@ -244,7 +246,7 @@ fn build(
     let lost = Arc::new(AtomicBool::new(false));
     let error_lost = Arc::clone(&lost);
     let error_status = Arc::clone(&status);
-    let mut playback = Playback::new(consumer, clock, &config);
+    let mut playback = Playback::new(consumer, clock, active, &config);
     let stream = device
         .build_output_stream::<f32, _, _>(
             config,
@@ -288,6 +290,7 @@ fn build(
 struct Playback {
     consumer: Arc<Consumer>,
     clock: Arc<Clock>,
+    active: Arc<AtomicBool>,
     /// Device channels, which is not always two.
     channels: usize,
     /// Engine frames per device frame. Exactly 1 when the device took 48 kHz,
@@ -310,11 +313,17 @@ struct Playback {
 }
 
 impl Playback {
-    fn new(consumer: Arc<Consumer>, clock: Arc<Clock>, config: &StreamConfig) -> Playback {
+    fn new(
+        consumer: Arc<Consumer>,
+        clock: Arc<Clock>,
+        active: Arc<AtomicBool>,
+        config: &StreamConfig,
+    ) -> Playback {
         let ratio = f64::from(ENGINE_HZ) / f64::from(config.sample_rate.max(1));
         Playback {
             consumer,
             clock,
+            active,
             channels: (config.channels as usize).max(1),
             ratio,
             // Two extra frames for priming the interpolation on the first
@@ -340,6 +349,10 @@ impl Playback {
         // A seek that arrives while the ring is empty still has to take effect,
         // and this callback may never reach a `pop`.
         self.consumer.take_flush();
+
+        if !self.active.load(Ordering::Relaxed) {
+            return;
+        }
 
         let frames = out.len() / self.channels;
         if frames == 0 {
@@ -482,7 +495,12 @@ mod tests {
     fn rig(rate: u32, channels: u16) -> (Playback, crate::realtime::Producer, Arc<Clock>) {
         let (producer, consumer) = Ring::new(1 << 15);
         let clock = Arc::new(Clock::new());
-        let playback = Playback::new(Arc::new(consumer), Arc::clone(&clock), &config(rate, channels));
+        let playback = Playback::new(
+            Arc::new(consumer),
+            Arc::clone(&clock),
+            Arc::new(AtomicBool::new(true)),
+            &config(rate, channels),
+        );
         (playback, producer, clock)
     }
 

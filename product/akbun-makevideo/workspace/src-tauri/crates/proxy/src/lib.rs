@@ -7,6 +7,7 @@ use std::time::UNIX_EPOCH;
 pub const FOLDER: &str = "proxies";
 pub const LONG_EDGE: u32 = 1280;
 pub const SOURCE_LONG_EDGE: u32 = 1920;
+pub const ENCODE_THREADS: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,6 +77,8 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path) -> Vec<String> {
         "-y".into(),
         "-i".into(),
         asset.path.clone(),
+        "-threads".into(),
+        ENCODE_THREADS.to_string(),
         "-map".into(),
         "0:v:0".into(),
         "-map".into(),
@@ -165,6 +168,9 @@ mod tests {
         let args = ffmpeg_args(&asset(AssetKind::Video, 3840, 2160), Path::new("proxy.mp4"));
         assert!(args.iter().any(|arg| arg.contains("1280")));
         assert!(args.windows(2).any(|pair| pair == ["-map", "0:a?"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "-threads" && pair[1] == ENCODE_THREADS.to_string()));
         assert_eq!(args.last().map(String::as_str), Some("proxy.mp4"));
     }
 
