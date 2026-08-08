@@ -19,6 +19,7 @@ const state = {
   presenting: false,
   presentIndex: 0,
   showNumbers: false,
+  showGuidelines: false,
   zoom: L.ZOOM_FIT,
 };
 
@@ -27,6 +28,7 @@ const canvas = $('canvas');
 const stageInner = $('stage-inner');
 const textEditor = $('text-editor');
 const present = $('present');
+const contextMenu = $('context-menu');
 
 const slide = () => state.deck.slides[state.current];
 const selectedShape = () =>
@@ -108,6 +110,18 @@ function slideNumberSvg(index) {
   return L.renderShapeSvg(L.slideNumberShape(index + 1));
 }
 
+function guidelinesSvg() {
+  if (!state.showGuidelines) return '';
+  return (
+    '<g class="guidelines" aria-hidden="true">' +
+    '<rect x="64" y="48" width="1152" height="112"/>' +
+    '<text x="76" y="72">TITLE</text>' +
+    '<rect x="64" y="192" width="1152" height="464"/>' +
+    '<text x="76" y="216">CONTENT</text>' +
+    '</g>'
+  );
+}
+
 function renderCanvas() {
   // The slide's own color, not the app theme: what the editor shows here is
   // what the pdf and the projector show.
@@ -129,6 +143,7 @@ function renderCanvas() {
   canvas.innerHTML =
     shapes +
     slideNumberSvg(state.current) +
+    guidelinesSvg() +
     (state.editingIndex < 0 ? selections : '') +
     marqueeSvg();
 }
@@ -560,6 +575,11 @@ textEditor.addEventListener('keydown', (event) => {
 const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
+  if (!contextMenu.hidden && event.key === 'Escape') {
+    hideContextMenu();
+    event.preventDefault();
+    return;
+  }
   if (state.presenting) {
     if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') presentStep(1);
     else if (event.key === 'ArrowLeft' || event.key === 'PageUp') presentStep(-1);
@@ -767,6 +787,97 @@ function duplicateSelection() {
   markDirty();
   renderAll();
 }
+
+// --- context menu and image export ------------------------------------------
+
+function hideContextMenu() {
+  contextMenu.hidden = true;
+}
+
+function showContextMenu(x, y) {
+  contextMenu.hidden = false;
+  contextMenu.style.left = `${x}px`;
+  contextMenu.style.top = `${y}px`;
+  const bounds = contextMenu.getBoundingClientRect();
+  contextMenu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
+  contextMenu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
+  $('context-save-image').focus();
+}
+
+document.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
+  hideContextMenu();
+  if (state.presenting || !(event.target instanceof Element)) return;
+  const group = event.target.closest('#canvas [data-i]');
+  if (!group) return;
+  const index = Number(group.dataset.i);
+  if (!state.selection.includes(index)) {
+    selectOnly(index);
+    renderCanvas();
+    renderProps();
+  }
+  showContextMenu(event.clientX, event.clientY);
+});
+
+document.addEventListener('pointerdown', (event) => {
+  if (!contextMenu.contains(event.target)) hideContextMenu();
+});
+window.addEventListener('blur', hideContextMenu);
+window.addEventListener('resize', hideContextMenu);
+$('stage-scroll').addEventListener('scroll', hideContextMenu);
+
+function rasterizeShapes(shapes) {
+  return new Promise((resolve, reject) => {
+    const imageSvg = L.renderShapesSvg(shapes);
+    if (!imageSvg) {
+      reject(new Error('no shape selected'));
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([imageSvg.svg], { type: 'image/svg+xml' }));
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.max(
+        0.01,
+        Math.min(2, 4096 / imageSvg.width, 4096 / imageSvg.height)
+      );
+      const raster = document.createElement('canvas');
+      raster.width = Math.max(1, Math.ceil(imageSvg.width * scale));
+      raster.height = Math.max(1, Math.ceil(imageSvg.height * scale));
+      raster.getContext('2d').drawImage(image, 0, 0, raster.width, raster.height);
+      URL.revokeObjectURL(url);
+      resolve(raster.toDataURL('image/png'));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('cannot render selected shape'));
+    };
+    image.src = url;
+  });
+}
+
+function suggestShapeImageName() {
+  if (!state.filePath) return `slide-${state.current + 1}-shape.png`;
+  const file = state.filePath.split('/').pop().split('\\').pop();
+  const deckName = file.replace(/\.pptx$/i, '');
+  return `${deckName}-slide-${state.current + 1}-shape.png`;
+}
+
+async function saveSelectionAsImage() {
+  hideContextMenu();
+  const shapes = selectedShapes().map((shape) => structuredClone(shape));
+  if (shapes.length === 0) return;
+  const path = await window.api.pickSave(suggestShapeImageName(), 'png');
+  if (!path) return;
+  try {
+    const dataUrl = await rasterizeShapes(shapes);
+    await window.api.savePng(path, dataUrl);
+    await window.api.message('Image saved.', { title: 'akbun-makepresentation' });
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Image export failed', kind: 'error' });
+  }
+}
+
+$('context-save-image').addEventListener('click', saveSelectionAsImage);
 
 // --- property panel -------------------------------------------------------------------
 
@@ -1040,18 +1151,38 @@ function renderPresent() {
   });
 }
 
-function enterPresent() {
+let presentationOwnsFullscreen = false;
+
+async function enterPresent() {
+  if (state.presenting) return;
   state.presenting = true;
   state.presentIndex = state.current;
   present.hidden = false;
   renderPresent();
-  if (present.requestFullscreen) present.requestFullscreen().catch(() => {});
+  try {
+    await window.api.setFullscreen(true);
+    presentationOwnsFullscreen = true;
+  } catch (error) {
+    state.presenting = false;
+    present.hidden = true;
+    await window.api.message(String(error), {
+      title: 'Cannot start presentation',
+      kind: 'error',
+    });
+  }
 }
 
-function exitPresent() {
+async function exitPresent(restoreWindow = true) {
+  if (!state.presenting) return;
   state.presenting = false;
   present.hidden = true;
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  const leaveFullscreen = presentationOwnsFullscreen;
+  presentationOwnsFullscreen = false;
+  if (restoreWindow && leaveFullscreen) {
+    try {
+      await window.api.setFullscreen(false);
+    } catch (_) {}
+  }
 }
 
 function presentStep(direction) {
@@ -1062,8 +1193,17 @@ function presentStep(direction) {
 }
 
 present.addEventListener('click', () => presentStep(1));
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && state.presenting) exitPresent();
+window.api.onFullscreenChanged((fullscreen) => {
+  if (fullscreen && state.presenting) {
+    presentationOwnsFullscreen = true;
+  } else if (!fullscreen && state.presenting && presentationOwnsFullscreen) {
+    exitPresent(false);
+  }
+});
+
+window.api.onGuidelinesChanged((enabled) => {
+  state.showGuidelines = enabled;
+  renderCanvas();
 });
 
 // --- toolbar ---------------------------------------------------------------------------------------

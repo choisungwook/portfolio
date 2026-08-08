@@ -22,19 +22,32 @@ if (!window.__TAURI__) {
     openDeck: async () => null,
     saveDeck: async () => {},
     exportPdf: async () => {},
+    savePng: async () => {},
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
     setTitle: (title) => {
       document.title = title;
     },
+    setFullscreen: async (enabled) => {
+      if (enabled) await document.documentElement.requestFullscreen();
+      else if (document.fullscreenElement) await document.exitFullscreen();
+    },
+    onFullscreenChanged: (handler) => {
+      const listener = () => handler(!!document.fullscreenElement);
+      document.addEventListener('fullscreenchange', listener);
+      return () => document.removeEventListener('fullscreenchange', listener);
+    },
+    onGuidelinesChanged: () => Promise.resolve(() => {}),
     checkUpdate: async () => {},
   };
   throw new Error('not running under Tauri; using the browser fallback api');
 }
 
 const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 const { open: openDialog, save: saveDialog, message, ask } = window.__TAURI__.dialog;
 const { getCurrentWindow } = window.__TAURI__.window;
+const currentWindow = getCurrentWindow();
 
 async function checkUpdate() {
   const { check } = window.__TAURI__.updater;
@@ -77,9 +90,15 @@ window.api = {
   openDeck: (path) => invoke('open_deck', { path }),
   saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
   exportPdf: (path, pages) => invoke('export_pdf', { path, pages }),
+  savePng: (path, dataUrl) => invoke('save_png', { path, dataUrl }),
 
   message: (text, opts) => message(text, opts),
   ask: (text, opts) => ask(text, opts),
-  setTitle: (title) => getCurrentWindow().setTitle(title),
+  setTitle: (title) => currentWindow.setTitle(title),
+  setFullscreen: (enabled) => currentWindow.setFullscreen(enabled),
+  onFullscreenChanged: (handler) =>
+    currentWindow.onResized(async () => handler(await currentWindow.isFullscreen())),
+  onGuidelinesChanged: (handler) =>
+    listen('guidelines-changed', (event) => handler(!!event.payload)),
   checkUpdate,
 };

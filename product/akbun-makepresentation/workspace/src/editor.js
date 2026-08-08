@@ -515,6 +515,51 @@ function renderSlideSvg(slide, options) {
   );
 }
 
+function rotatedBBox(box, degrees) {
+  if (!degrees) return box;
+  const radians = degrees * Math.PI / 180;
+  const width = Math.abs(box.w * Math.cos(radians)) + Math.abs(box.h * Math.sin(radians));
+  const height = Math.abs(box.w * Math.sin(radians)) + Math.abs(box.h * Math.cos(radians));
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  return { x: cx - width / 2, y: cy - height / 2, w: width, h: height };
+}
+
+function shapeImageBBox(shape) {
+  const stroke = shape.stroke === 'none' || shape.kind === 'text' || shape.kind === 'image'
+    ? 0
+    : Math.max(0, shape.strokeWidth || 0) / 2;
+  const arrow = shape.kind === 'arrow'
+    ? Math.max(10, Math.max(0, shape.strokeWidth || 0) * 4) * 0.5
+    : 0;
+  const padding = Math.max(2, stroke, arrow);
+  const box = shapeBBox(shape);
+  const padded = {
+    x: box.x - padding,
+    y: box.y - padding,
+    w: Math.max(1, box.w + padding * 2),
+    h: Math.max(1, box.h + padding * 2),
+  };
+  return rotatedBBox(padded, shape.rotation || 0);
+}
+
+function renderShapesSvg(shapes) {
+  if (!Array.isArray(shapes) || shapes.length === 0) return null;
+  const boxes = shapes.map(shapeImageBBox);
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.w));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  const width = Math.max(1, right - left);
+  const height = Math.max(1, bottom - top);
+  const markup = shapes.map((shape) => renderShapeSvg(shape)).join('');
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${left} ${top} ${width} ${height}">${markup}</svg>`,
+    width,
+    height,
+  };
+}
+
 // --- zoom ---------------------------------------------------------------------
 //
 // Fixed steps rather than a free factor: every stop is a round number the
@@ -563,6 +608,7 @@ const exported = {
   wrapTextLines,
   renderShapeSvg,
   renderSlideSvg,
+  renderShapesSvg,
 };
 
 // A script tag makes top level names globals, so everything stays behind one

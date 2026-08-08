@@ -264,6 +264,23 @@ main {
   pointer-events: none;
 }
 
+.guidelines {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 6;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.guidelines text {
+  fill: var(--accent);
+  stroke: none;
+  font-size: 15px;
+  font-family: Helvetica, Arial, sans-serif;
+  letter-spacing: 0.08em;
+}
+
 #text-editor {
   position: absolute;
   border: 1px dashed var(--accent);
@@ -423,6 +440,32 @@ input[type='color'] {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
+}
+
+/* --- context menu --- */
+
+#context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 170px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+#context-menu button {
+  width: 100%;
+  border: 0;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+#context-menu button:hover,
+#context-menu button:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
 }
 
 /* --- presentation mode --- */
