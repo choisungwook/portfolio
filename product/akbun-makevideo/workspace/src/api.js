@@ -67,6 +67,7 @@ if (!window.__TAURI__) {
         renderAcceleration: 'auto',
         compositor: 'auto',
         proxyEnabled: true,
+        deleteProjectFolder: true,
         logDir: '',
         logRotationSize: 5,
         logRotationUnit: 'mb',

@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = {
   // moment bootstrap lands.
   playbackEngine: 'media-element',
   proxyEnabled: true,
+  deleteProjectFolder: true,
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
@@ -1205,8 +1206,12 @@ async function closeProject() {
 async function deleteProject() {
   if (!state.path) return;
   const name = projectName();
+  const deleteFolder = state.settings.deleteProjectFolder;
+  const message = deleteFolder
+    ? `Move “${name}” project folder to Trash?\n\nThe project folder, project work file, generated proxies, and renders will be deleted. Imported source media will not be deleted.`
+    : `Move “${name}” project work file to Trash?\n\nOnly the project work file will be deleted. The project folder, generated proxies, renders, and imported source media will remain.`;
   const confirmed = await window.api.ask(
-    `Move “${name}” to Trash?\n\nEverything in its project folder, including generated proxies and renders, will move together. Imported source media will not be deleted.`,
+    message,
     { title: 'Delete Project', kind: 'warning' },
   );
   if (!confirmed) return;
@@ -1308,6 +1313,7 @@ function fillAppSheet() {
   el('as-snap').checked = state.settings.snap;
   el('as-theme').value = state.settings.theme;
   el('as-workspace').value = state.settings.workspaceDir;
+  el('as-delete-project-folder').checked = state.settings.deleteProjectFolder;
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
   el('as-compositor').value = state.settings.compositor;
   el('as-compositor-note').textContent = compositorNote();
@@ -1642,6 +1648,7 @@ function wireSheets() {
       proxyEnabled: state.settings.proxyEnabled,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
+      deleteProjectFolder: el('as-delete-project-folder').checked,
       ffmpegDir: el('as-ffmpeg').value.trim(),
       logDir: el('as-log-dir').value.trim(),
       logRotationSize: Math.min(

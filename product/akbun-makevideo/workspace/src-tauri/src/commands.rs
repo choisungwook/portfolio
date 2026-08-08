@@ -80,6 +80,9 @@ pub struct Settings {
     /// Use ready proxy files for preview and playback. Proxy creation remains
     /// automatic so disabling this changes only which media is read.
     pub proxy_enabled: bool,
+    /// Delete the managed project folder with its work file. When disabled,
+    /// only project.akbunvideo goes to Trash and derived files remain.
+    pub delete_project_folder: bool,
     /// Empty uses the operating system's application log directory.
     pub log_dir: String,
     /// Maximum size of errors.log before it becomes errors.log.1.
@@ -104,6 +107,7 @@ impl Default for Settings {
             compositor: "auto".into(),
             playback_engine: "native".into(),
             proxy_enabled: true,
+            delete_project_folder: true,
             log_dir: String::new(),
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
@@ -507,9 +511,8 @@ fn move_to_trash(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("cannot move {path:?} to Trash: {error}"))
 }
 
-/// Move one managed project directory to Trash. The directory is the unit of
-/// deletion because it owns the project file, generated proxies, and renders
-/// saved there. Imported source media stays outside it and is untouched.
+/// Move a managed project's configured deletion target to Trash. Imported
+/// source media stays outside it and is untouched.
 #[tauri::command]
 pub fn delete_project(
     app: AppHandle,
@@ -522,11 +525,16 @@ pub fn delete_project(
     let settings = state.settings.lock().unwrap().clone();
     let root = workspace_root(&app, &settings);
     let dir = workspace::managed_project_dir(&root, Path::new(&project_path))?;
+    let target = if settings.delete_project_folder {
+        dir
+    } else {
+        dir.join(workspace::PROJECT_FILE)
+    };
 
     let session = state.playback.lock().unwrap().take();
     drop(session);
     stop_proxy_workers(&app, &state);
-    move_to_trash(&dir)
+    move_to_trash(&target)
 }
 
 #[tauri::command]
@@ -1590,8 +1598,14 @@ where
 }
 
 #[cfg(test)]
-mod quality_tests {
-    use super::process_tree_rss_bytes;
+mod tests {
+    use super::{process_tree_rss_bytes, Settings};
+
+    #[test]
+    fn existing_settings_delete_the_project_folder_by_default() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert!(settings.delete_project_folder);
+    }
 
     #[test]
     fn memory_includes_descendants_but_not_neighbours() {
