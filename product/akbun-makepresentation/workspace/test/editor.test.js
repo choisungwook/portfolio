@@ -10,6 +10,31 @@ test('createDeck starts with one empty slide', () => {
   assert.deepStrictEqual(deck.slides[0].shapes, []);
 });
 
+test('parseClipboardShapes normalizes valid shapes with safe defaults', () => {
+  const rect = L.createShape('rect', 10, 20, { fill: '#abcdef' });
+  rect.w = 100;
+  rect.h = 80;
+  const [parsed] = L.parseClipboardShapes(JSON.stringify([rect]));
+  assert.deepStrictEqual(
+    { kind: parsed.kind, x: parsed.x, y: parsed.y, w: parsed.w, h: parsed.h, fill: parsed.fill },
+    { kind: 'rect', x: 10, y: 20, w: 100, h: 80, fill: '#abcdef' }
+  );
+});
+
+test('parseClipboardShapes rejects malformed geometry and pen points', () => {
+  const malformed = [
+    { kind: 'rect', x: '10', y: 20, w: 100, h: 80 },
+    { kind: 'pen', x: 0, y: 0, w: 10, h: 10 },
+    { kind: 'pen', x: 0, y: 0, w: 10, h: 10, points: [[0, 0], [NaN, 10]] },
+  ];
+  assert.deepStrictEqual(L.parseClipboardShapes(JSON.stringify(malformed)), []);
+});
+
+test('parseClipboardShapes rejects an excessive object count', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  assert.deepStrictEqual(L.parseClipboardShapes(JSON.stringify(Array(101).fill(shape))), []);
+});
+
 test('dragShape normalizes a rect dragged up and left', () => {
   const shape = L.createShape('rect', 100, 100, {});
   L.dragShape(shape, 100, 100, 40, 60);
@@ -87,6 +112,29 @@ test('shapeBBox normalizes negative line extents', () => {
   const shape = L.createShape('arrow', 100, 100, {});
   L.dragShape(shape, 100, 100, 40, 160);
   assert.deepStrictEqual(L.shapeBBox(shape), { x: 40, y: 100, w: 60, h: 60 });
+});
+
+test('normalizeRect accepts a drag in any direction', () => {
+  assert.deepStrictEqual(L.normalizeRect(100, 80, 20, 10), {
+    x: 20,
+    y: 10,
+    w: 80,
+    h: 70,
+  });
+});
+
+test('shapeIndicesInRect selects only fully enclosed shapes', () => {
+  const inside = L.createShape('rect', 20, 20, {});
+  L.dragShape(inside, 20, 20, 80, 80);
+  const crossing = L.createShape('ellipse', 90, 90, {});
+  L.dragShape(crossing, 90, 90, 130, 130);
+  const line = L.createShape('line', 30, 100, {});
+  L.dragShape(line, 30, 100, 70, 40);
+
+  assert.deepStrictEqual(
+    L.shapeIndicesInRect([inside, crossing, line], { x: 10, y: 10, w: 100, h: 100 }),
+    [0, 2]
+  );
 });
 
 test('moveShape shifts pen points', () => {

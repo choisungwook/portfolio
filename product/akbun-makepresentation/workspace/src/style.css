@@ -256,6 +256,14 @@ main {
   cursor: pointer;
 }
 
+.selection-marquee {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
 #text-editor {
   position: absolute;
   border: 1px dashed var(--accent);
