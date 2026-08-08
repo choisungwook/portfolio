@@ -29,6 +29,7 @@
 
 use crate::{min_clip_frames, Asset, Clip, Project, ProjectSettings, Rate, Track, TrackKind};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Which end of a clip a trim is dragging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,6 +106,8 @@ pub enum Command {
         start: i64,
         #[serde(default)]
         id: Option<String>,
+        #[serde(default)]
+        link_group: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
     MoveClip {
@@ -131,9 +134,19 @@ pub enum Command {
         /// produces the same clips rather than new ones.
         #[serde(default)]
         ids: Vec<String>,
+        #[serde(default)]
+        link_groups: Vec<Option<String>>,
     },
     #[serde(rename_all = "camelCase")]
     RemoveClip { clip_id: String },
+    #[serde(rename_all = "camelCase")]
+    LinkClips {
+        clip_ids: Vec<String>,
+        #[serde(default)]
+        link_group: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    UnlinkClips { clip_id: String },
     /// Delete and close the gap: everything after it on the same track moves
     /// left by its length. Destructive, and only reasonable now that there is
     /// an undo to take it back.
@@ -205,7 +218,12 @@ impl Ids {
     /// there.
     pub fn observe(&mut self, id: &str) {
         let digits: String = id.chars().skip_while(|c| !c.is_ascii_digit()).collect();
-        if !digits.is_empty() && id.chars().take_while(|c| !c.is_ascii_digit()).all(char::is_alphabetic) {
+        if !digits.is_empty()
+            && id
+                .chars()
+                .take_while(|c| !c.is_ascii_digit())
+                .all(char::is_alphabetic)
+        {
             if let Ok(value) = digits.parse::<u64>() {
                 self.next = self.next.max(value);
             }
@@ -248,6 +266,8 @@ impl Command {
             Command::TrimClip { .. } => "Trim clip",
             Command::SplitAt { .. } => "Split",
             Command::RemoveClip { .. } | Command::DropClips { .. } => "Delete clip",
+            Command::LinkClips { .. } => "Link clips",
+            Command::UnlinkClips { .. } => "Unlink clips",
             Command::RippleDelete { .. } => "Ripple delete",
             Command::SetClipGain { .. } => "Clip levels",
             Command::SetSettings { .. } => "Project settings",
@@ -284,7 +304,8 @@ impl Command {
                 asset_id,
                 start,
                 id,
-            } => add_clip(project, ids, track_id, asset_id, start, id),
+                link_group,
+            } => add_clip(project, ids, track_id, asset_id, start, id, link_group),
             Command::MoveClip {
                 clip_id,
                 track_id,
@@ -299,8 +320,14 @@ impl Command {
                 frame,
                 clip_id,
                 ids: given,
-            } => Ok(split_at(project, ids, frame, clip_id, given)),
+                link_groups,
+            } => Ok(split_at(project, ids, frame, clip_id, given, link_groups)),
             Command::RemoveClip { clip_id } => remove_clip(project, clip_id),
+            Command::LinkClips {
+                clip_ids,
+                link_group,
+            } => link_clips(project, ids, clip_ids, link_group),
+            Command::UnlinkClips { clip_id } => unlink_clips(project, clip_id),
             Command::RippleDelete { clip_id } => ripple_delete(project, clip_id),
             Command::SetClipGain {
                 clip_id,
@@ -508,6 +535,7 @@ fn add_clip(
     asset_id: String,
     start: i64,
     id: Option<String>,
+    link_group: Option<String>,
 ) -> Result<Applied, String> {
     let rate = project.rate();
     let asset = project
@@ -521,11 +549,16 @@ fn add_clip(
         return Err(format!("a {:?} track will not take that", track.kind).to_lowercase());
     }
     let duration = asset.initial_clip_frames(rate);
-    let start = track.free_start(start, duration, None);
+    let free_start = track.free_start(start, duration, None);
+    if link_group.is_some() && free_start != start {
+        return Err("there is no room to add every linked clip together".into());
+    }
+    let start = free_start;
     let id = id.unwrap_or_else(|| ids.make('c'));
     track.clips.push(Clip {
         id: id.clone(),
         asset_id: asset_id.clone(),
+        link_group: link_group.clone(),
         start,
         in_point: 0,
         out_point: duration,
@@ -539,10 +572,9 @@ fn add_clip(
             asset_id,
             start,
             id: Some(id.clone()),
+            link_group,
         },
-        inverse: Command::DropClips {
-            clip_ids: vec![id],
-        },
+        inverse: Command::DropClips { clip_ids: vec![id] },
     })
 }
 
@@ -555,6 +587,9 @@ fn move_clip(
     let was = project
         .placement(&clip_id)
         .ok_or("that clip is not on the timeline")?;
+    if was.clip.link_group.is_some() {
+        return move_linked_clips(project, clip_id, track_id, start);
+    }
     let asset = project.asset(&was.clip.asset_id).cloned();
     let target = project
         .track_index(&track_id)
@@ -563,8 +598,11 @@ fn move_clip(
         // A clip whose asset has gone is still draggable; there is nothing left
         // to say which tracks would take it, so it stays on the kind it is on.
         Some(asset) if !project.tracks[target].accepts(&asset) => {
-            return Err(format!("a {:?} track will not take that", project.tracks[target].kind)
-                .to_lowercase())
+            return Err(format!(
+                "a {:?} track will not take that",
+                project.tracks[target].kind
+            )
+            .to_lowercase())
         }
         None if project.tracks[target].kind != project.track(&was.track_id).unwrap().kind => {
             return Err("that clip has lost its file, so it can only move on its own kind".into())
@@ -591,21 +629,125 @@ fn move_clip(
     })
 }
 
+fn move_linked_clips(
+    project: &mut Project,
+    clip_id: String,
+    track_id: String,
+    start: i64,
+) -> Result<Applied, String> {
+    let selected = project
+        .placement(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let placements = project.linked_placements(&clip_id);
+    let delta = start - selected.clip.start;
+    let ignored: Vec<&str> = placements
+        .iter()
+        .map(|entry| entry.clip.id.as_str())
+        .collect();
+    let mut targets = Vec::with_capacity(placements.len());
+
+    for entry in &placements {
+        let destination = if entry.clip.id == clip_id {
+            track_id.as_str()
+        } else {
+            entry.track_id.as_str()
+        };
+        let target = project
+            .track(destination)
+            .ok_or("that track is not in this project")?;
+        let asset = project
+            .asset(&entry.clip.asset_id)
+            .ok_or("that linked clip has lost its file")?;
+        if !target.accepts(asset) {
+            return Err(format!("a {:?} track will not take that", target.kind).to_lowercase());
+        }
+        let wanted = entry.clip.start + delta;
+        if wanted < 0 {
+            return Err("linked clips would start before the timeline does".into());
+        }
+        let duration = entry.clip.duration_frames();
+        let occupied = target.clips.iter().any(|other| {
+            !ignored.contains(&other.id.as_str())
+                && wanted < other.end_frame()
+                && other.start < wanted + duration
+        });
+        if occupied {
+            return Err("there is no room to move every linked clip together".into());
+        }
+        targets.push((entry.clip.id.clone(), destination.to_string(), wanted));
+    }
+
+    for track in &mut project.tracks {
+        track
+            .clips
+            .retain(|clip| !ignored.contains(&clip.id.as_str()));
+    }
+    for (id, destination, wanted) in &targets {
+        let mut clip = placements
+            .iter()
+            .find(|entry| entry.clip.id == *id)
+            .expect("planned from this set")
+            .clip
+            .clone();
+        clip.start = *wanted;
+        project
+            .track_mut(destination)
+            .expect("destination was checked")
+            .clips
+            .push(clip);
+    }
+    for track in &mut project.tracks {
+        track.sort();
+    }
+    Ok(Applied {
+        resolved: Command::MoveClip {
+            clip_id,
+            track_id,
+            start,
+        },
+        inverse: Command::RestoreClips {
+            entries: placements,
+        },
+    })
+}
+
 fn trim_clip(
     project: &mut Project,
     clip_id: String,
     edge: Edge,
     frame: i64,
 ) -> Result<Applied, String> {
+    let entries = project.linked_placements(&clip_id);
+    if entries.is_empty() {
+        return Err("that clip is not on the timeline".into());
+    }
+    let mut selected_frame = frame;
+    for entry in &entries {
+        let at = trim_one(project, &entry.clip.id, edge, frame)?;
+        if entry.clip.id == clip_id {
+            selected_frame = at;
+        }
+    }
+    Ok(Applied {
+        resolved: Command::TrimClip {
+            clip_id,
+            edge,
+            frame: selected_frame,
+        },
+        inverse: Command::RestoreClips { entries },
+    })
+}
+
+fn trim_one(project: &mut Project, clip_id: &str, edge: Edge, frame: i64) -> Result<i64, String> {
     let rate = project.rate();
     let shortest = min_clip_frames(rate);
-    let was = project
-        .placement(&clip_id)
+    let clip = project
+        .clip(clip_id)
         .ok_or("that clip is not on the timeline")?;
     let limit = project
-        .asset(&was.clip.asset_id)
+        .asset(&clip.asset_id)
         .and_then(|asset| asset.source_limit_frames(rate));
-    let (track_index, clip_index) = project.locate(&clip_id).expect("just found it");
+    let (track_index, clip_index) = project.locate(clip_id).expect("just found it");
     let track = &project.tracks[track_index];
 
     // A trim may not run into the neighbour: overlapping clips are a state the
@@ -644,14 +786,7 @@ fn trim_clip(
         }
     };
     project.tracks[track_index].sort();
-    Ok(Applied {
-        resolved: Command::TrimClip {
-            clip_id,
-            edge,
-            frame: at,
-        },
-        inverse: Command::RestoreClips { entries: vec![was] },
-    })
+    Ok(at)
 }
 
 fn split_at(
@@ -660,18 +795,29 @@ fn split_at(
     frame: i64,
     clip_id: Option<String>,
     given: Vec<String>,
+    given_groups: Vec<Option<String>>,
 ) -> Applied {
     let shortest = min_clip_frames(project.rate());
     let mut made = Vec::new();
     let mut originals = Vec::new();
     let mut given = given.into_iter();
+    let mut given_groups = given_groups.into_iter();
+    let selected_group = clip_id
+        .as_deref()
+        .and_then(|id| project.clip(id))
+        .and_then(|clip| clip.link_group.clone());
+    let mut split_groups = HashMap::new();
+    let mut made_groups = Vec::new();
 
     for track in &mut project.tracks {
         let mut created = Vec::new();
         for clip in &mut track.clips {
             if let Some(only) = clip_id.as_deref() {
                 if clip.id != only {
-                    continue;
+                    match selected_group.as_deref() {
+                        Some(group) if clip.link_group.as_deref() == Some(group) => {}
+                        _ => continue,
+                    }
                 }
             }
             if frame <= clip.start || frame >= clip.end_frame() {
@@ -687,9 +833,18 @@ fn split_at(
                 clip: clip.clone(),
             });
             let id = given.next().unwrap_or_else(|| ids.make('c'));
+            let link_group = given_groups.next().unwrap_or_else(|| {
+                clip.link_group.as_ref().map(|group| {
+                    split_groups
+                        .entry(group.clone())
+                        .or_insert_with(|| ids.make('g'))
+                        .clone()
+                })
+            });
             created.push(Clip {
                 id: id.clone(),
                 asset_id: clip.asset_id.clone(),
+                link_group: link_group.clone(),
                 start: frame,
                 in_point: clip.in_point + offset,
                 out_point: clip.out_point,
@@ -697,6 +852,7 @@ fn split_at(
                 opacity: clip.opacity,
             });
             made.push(id);
+            made_groups.push(link_group);
             clip.out_point = clip.in_point + offset;
         }
         if !created.is_empty() {
@@ -716,6 +872,7 @@ fn split_at(
             frame,
             clip_id,
             ids: made.clone(),
+            link_groups: made_groups,
         },
         inverse: Command::Transaction {
             commands: vec![
@@ -727,15 +884,83 @@ fn split_at(
 }
 
 fn remove_clip(project: &mut Project, clip_id: String) -> Result<Applied, String> {
-    let was = project
-        .placement(&clip_id)
-        .ok_or("that clip is not on the timeline")?;
+    let entries = project.linked_placements(&clip_id);
+    if entries.is_empty() {
+        return Err("that clip is not on the timeline".into());
+    }
+    let ids: Vec<&str> = entries.iter().map(|entry| entry.clip.id.as_str()).collect();
     for track in &mut project.tracks {
-        track.clips.retain(|clip| clip.id != clip_id);
+        track.clips.retain(|clip| !ids.contains(&clip.id.as_str()));
     }
     Ok(Applied {
         resolved: Command::RemoveClip { clip_id },
-        inverse: Command::RestoreClips { entries: vec![was] },
+        inverse: Command::RestoreClips { entries },
+    })
+}
+
+fn link_clips(
+    project: &mut Project,
+    ids: &mut Ids,
+    clip_ids: Vec<String>,
+    link_group: Option<String>,
+) -> Result<Applied, String> {
+    if clip_ids.len() != 2 || clip_ids[0] == clip_ids[1] {
+        return Err("link exactly one video clip and one audio clip".into());
+    }
+    let entries: Vec<ClipAt> = clip_ids
+        .iter()
+        .map(|id| {
+            project
+                .placement(id)
+                .ok_or("that clip is not on the timeline")
+        })
+        .collect::<Result<_, _>>()?;
+    let first_track = project
+        .track(&entries[0].track_id)
+        .expect("placement has a track");
+    let second_track = project
+        .track(&entries[1].track_id)
+        .expect("placement has a track");
+    let first = &entries[0].clip;
+    let second = &entries[1].clip;
+    if first_track.kind == second_track.kind
+        || first.asset_id != second.asset_id
+        || first.start != second.start
+        || first.in_point != second.in_point
+        || first.out_point != second.out_point
+    {
+        return Err("only synchronized video and audio clips from one asset can be linked".into());
+    }
+    if first.link_group.is_some() || second.link_group.is_some() {
+        return Err("unlink those clips before linking them again".into());
+    }
+    let group = link_group.unwrap_or_else(|| ids.make('g'));
+    for id in &clip_ids {
+        let (track, clip) = project.locate(id).expect("just found it");
+        project.tracks[track].clips[clip].link_group = Some(group.clone());
+    }
+    Ok(Applied {
+        resolved: Command::LinkClips {
+            clip_ids,
+            link_group: Some(group),
+        },
+        inverse: Command::RestoreClips { entries },
+    })
+}
+
+fn unlink_clips(project: &mut Project, clip_id: String) -> Result<Applied, String> {
+    let entries = project.linked_placements(&clip_id);
+    if entries.len() < 2 {
+        return Err("that clip is not linked".into());
+    }
+    let ids: Vec<String> = entries.iter().map(|entry| entry.clip.id.clone()).collect();
+    for id in ids {
+        let (track, clip) = project.locate(&id).expect("just found it");
+        project.tracks[track].clips[clip].link_group = None;
+    }
+    Ok(Applied {
+        resolved: Command::UnlinkClips { clip_id },
+        inverse: Command::RestoreClips { entries },
     })
 }
 
@@ -743,27 +968,30 @@ fn remove_clip(project: &mut Project, clip_id: String) -> Result<Applied, String
 /// by exactly the length that went, so the order and the spacing of what is
 /// left are untouched and nothing can end up overlapping.
 fn ripple_delete(project: &mut Project, clip_id: String) -> Result<Applied, String> {
-    let was = project
-        .placement(&clip_id)
-        .ok_or("that clip is not on the timeline")?;
-    let (track_index, _) = project.locate(&clip_id).expect("just found it");
-    let gap = was.clip.duration_frames();
-    let after = was.clip.end_frame();
-    let track_id = project.tracks[track_index].id.clone();
-
-    let mut restore = vec![was];
-    let track = &mut project.tracks[track_index];
-    track.clips.retain(|clip| clip.id != clip_id);
-    for clip in &mut track.clips {
-        if clip.start >= after {
-            restore.push(ClipAt {
-                track_id: track_id.clone(),
-                clip: clip.clone(),
-            });
-            clip.start = (clip.start - gap).max(0);
-        }
+    let removed = project.linked_placements(&clip_id);
+    if removed.is_empty() {
+        return Err("that clip is not on the timeline".into());
     }
-    track.sort();
+    let removed_ids: Vec<&str> = removed.iter().map(|entry| entry.clip.id.as_str()).collect();
+    let mut restore = removed.clone();
+    for entry in &removed {
+        let track = project
+            .track_mut(&entry.track_id)
+            .expect("placement has a track");
+        track
+            .clips
+            .retain(|clip| !removed_ids.contains(&clip.id.as_str()));
+        for clip in &mut track.clips {
+            if clip.start >= entry.clip.end_frame() {
+                restore.push(ClipAt {
+                    track_id: entry.track_id.clone(),
+                    clip: clip.clone(),
+                });
+                clip.start = (clip.start - entry.clip.duration_frames()).max(0);
+            }
+        }
+        track.sort();
+    }
     Ok(Applied {
         resolved: Command::RippleDelete { clip_id },
         inverse: Command::RestoreClips { entries: restore },
@@ -872,9 +1100,7 @@ fn restore_clips(project: &mut Project, entries: Vec<ClipAt>) -> Applied {
         resolved: Command::RestoreClips { entries },
         inverse: Command::Transaction {
             commands: vec![
-                Command::DropClips {
-                    clip_ids: invented,
-                },
+                Command::DropClips { clip_ids: invented },
                 Command::RestoreClips { entries: previous },
             ],
         },
@@ -938,7 +1164,9 @@ fn drop_assets(project: &mut Project, asset_ids: Vec<String>) -> Applied {
             })
         })
         .collect();
-    project.assets.retain(|asset| !asset_ids.contains(&asset.id));
+    project
+        .assets
+        .retain(|asset| !asset_ids.contains(&asset.id));
     Applied {
         resolved: Command::DropAssets { asset_ids },
         inverse: Command::RestoreAssets { entries: previous },
@@ -970,7 +1198,9 @@ fn drop_tracks(project: &mut Project, track_ids: Vec<String>) -> Applied {
             })
         })
         .collect();
-    project.tracks.retain(|track| !track_ids.contains(&track.id));
+    project
+        .tracks
+        .retain(|track| !track_ids.contains(&track.id));
     Applied {
         resolved: Command::DropTracks { track_ids },
         inverse: Command::RestoreTracks { entries: previous },

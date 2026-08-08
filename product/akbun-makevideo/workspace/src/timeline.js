@@ -69,6 +69,36 @@ function findAsset(project, assetId) {
   return project.assets.find((asset) => asset.id === assetId) || null;
 }
 
+function linkedClips(project, clipId) {
+  const found = findClip(project, clipId);
+  if (!found || !found.clip.linkGroup) return found ? [found] : [];
+  const linked = [];
+  for (const track of project.tracks) {
+    for (const clip of track.clips) {
+      if (clip.linkGroup === found.clip.linkGroup) linked.push({ track, clip });
+    }
+  }
+  return linked;
+}
+
+function relinkCandidate(project, clipId) {
+  const found = findClip(project, clipId);
+  if (!found || found.clip.linkGroup) return null;
+  for (const track of project.tracks) {
+    if (track.kind === found.track.kind) continue;
+    const clip = track.clips.find(
+      (candidate) =>
+        !candidate.linkGroup &&
+        candidate.assetId === found.clip.assetId &&
+        candidate.start === found.clip.start &&
+        candidate.in === found.clip.in &&
+        candidate.out === found.clip.out
+    );
+    if (clip) return { track, clip };
+  }
+  return null;
+}
+
 /** What a track will take. A video with sound can go on an audio track, which
  *  is how you use the sound of a take without its picture. Asked while a clip
  *  is being dragged, to decide whether a lane lights up as a target. */
@@ -215,6 +245,8 @@ const exported = {
   findTrack,
   findClip,
   findAsset,
+  linkedClips,
+  relinkCandidate,
   canAccept,
   clipDuration,
   clipEnd,

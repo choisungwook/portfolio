@@ -79,6 +79,7 @@ const dom = {
   btnMagnet: el('btn-magnet'),
   btnDelete: el('btn-delete'),
   btnRipple: el('btn-ripple'),
+  btnLink: el('btn-link'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
   zoom: el('zoom'),
@@ -491,6 +492,10 @@ function clipElement(track, clip) {
   node.style.left = `${L.framesToPx(clip.start, rate(), state.pxPerSecond)}px`;
   node.style.width = `${Math.max(2, L.framesToPx(L.clipDuration(clip), rate(), state.pxPerSecond))}px`;
   if (clip.id === state.selectedClipId) node.classList.add('selected');
+  if (clip.linkGroup) {
+    node.classList.add('linked');
+    node.title = 'Linked audio and video clip';
+  }
 
   const label = document.createElement('span');
   label.className = 'clip-name';
@@ -557,6 +562,7 @@ function renderTimeline() {
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
   dom.btnAddVideo.disabled = L.tracksOf(state.project, 'video').length >= L.MAX_TRACKS_PER_KIND;
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
+  updateLinkUi();
   updateHistoryUi();
   scheduleExactFrame();
   if (preview) preview.redraw();
@@ -644,6 +650,14 @@ function selectClip(clipId) {
   for (const node of dom.lanes.querySelectorAll('.clip')) {
     node.classList.toggle('selected', node.dataset.clipId === clipId);
   }
+  updateLinkUi();
+}
+
+function updateLinkUi() {
+  const selected = liveSelection();
+  const found = selected && L.findClip(state.project, selected);
+  dom.btnLink.disabled = !found || (!found.clip.linkGroup && !L.relinkCandidate(state.project, selected));
+  dom.btnLink.textContent = found && found.clip.linkGroup ? 'Unlink Clips' : 'Link Clips';
 }
 
 function selectAsset(assetId) {
@@ -680,6 +694,20 @@ async function deleteSelected(ripple) {
   // gets back is a success that made no clips, and it is not null.
   const done = await edit({ op: ripple ? 'rippleDelete' : 'removeClip', clipId });
   if (done) state.selectedClipId = null;
+}
+
+async function toggleClipLink() {
+  const clipId = liveSelection();
+  if (!clipId) return;
+  const found = L.findClip(state.project, clipId);
+  if (!found) return;
+  if (found.clip.linkGroup) {
+    await edit({ op: 'unlinkClips', clipId });
+    return;
+  }
+  const candidate = L.relinkCandidate(state.project, clipId);
+  if (!candidate) return;
+  await edit({ op: 'linkClips', clipIds: [clipId, candidate.clip.id] });
 }
 
 /** Persist a setting changed from a toolbar or the transport, where there is no
@@ -850,9 +878,22 @@ function beginScrub(event) {
 function dropCommands(trackId, assets, atFrame) {
   const track = L.findTrack(state.project, trackId);
   if (!track) return [];
-  return assets
-    .filter((asset) => L.canAccept(track, asset))
-    .map((asset) => ({ op: 'addClip', trackId, assetId: asset.id, start: atFrame }));
+  const commands = [];
+  for (const asset of assets.filter((asset) => L.canAccept(track, asset))) {
+    if (track.kind === 'video' && asset.kind === 'video' && asset.hasAudio) {
+      const videoIndex = L.tracksOf(state.project, 'video').findIndex((item) => item.id === trackId);
+      const audio = L.tracksOf(state.project, 'audio')[videoIndex];
+      if (!audio) return null;
+      const linkGroup = `g${crypto.randomUUID()}`;
+      commands.push(
+        { op: 'addClip', trackId, assetId: asset.id, start: atFrame, linkGroup },
+        { op: 'addClip', trackId: audio.id, assetId: asset.id, start: atFrame, linkGroup }
+      );
+      continue;
+    }
+    commands.push({ op: 'addClip', trackId, assetId: asset.id, start: atFrame });
+  }
+  return commands;
 }
 
 function laneAtPoint(x, y) {
@@ -924,7 +965,14 @@ async function endAssetDrag(event) {
   const lane = laneAtPoint(event.clientX, event.clientY);
   if (!lane) return;
   const at = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
-  const made = await edit(...dropCommands(lane.dataset.trackId, [current.asset], at));
+  const commands = dropCommands(lane.dataset.trackId, [current.asset], at);
+  if (!commands) {
+    await window.api.message('Add the matching audio track before placing this video.', {
+      title: 'Linked clip needs an audio track',
+    });
+    return;
+  }
+  const made = await edit(...commands);
   if (made && made.length) selectClip(made[made.length - 1]);
 }
 
@@ -955,9 +1003,16 @@ async function handleOsDrop(payload) {
   // The import and the clips it turns into are one thing the user did, so they
   // go over as one transaction and come back on one press of undo.
   const at = L.snapTime(state.project, frameAtClientX(x), snapTolerance());
+  const commands = lane ? dropCommands(lane.dataset.trackId, found, at) : [];
+  if (lane && !commands) {
+    await window.api.message('Add the matching audio track before placing this video.', {
+      title: 'Linked clip needs an audio track',
+    });
+    return;
+  }
   const made = await edit(
     { op: 'addAssets', assets: found },
-    ...(lane ? dropCommands(lane.dataset.trackId, found, at) : [])
+    ...commands
   );
   if (made && made.length) selectClip(made[made.length - 1]);
   for (const asset of found) hydrateDuration(asset);
@@ -1554,6 +1609,7 @@ function wireTimeline() {
   dom.btnMagnet.addEventListener('click', toggleSnap);
   dom.btnDelete.addEventListener('click', () => deleteSelected(false));
   dom.btnRipple.addEventListener('click', () => deleteSelected(true));
+  dom.btnLink.addEventListener('click', toggleClipLink);
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
 

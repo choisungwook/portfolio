@@ -9,7 +9,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
-- Timeline: up to four video and four audio tracks, drag to move, drag an edge to trim
+- Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
 - Frame rates including the broadcast ones — 23.976, 29.97 and 59.94 are held as the exact ratios they are, so a camera file stays in step with itself. The clock reads in timecode and the arrow keys step a frame at a time
 - Split at the playhead, from the toolbar button or Cmd+B
 - Undo and redo across everything: moves, trims, splits, imports, track changes and the timebase. A drop that imports three files and lays down three clips comes back on one press

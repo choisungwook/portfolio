@@ -814,6 +814,7 @@ mod tests {
         Clip {
             id: id.into(),
             asset_id: asset_id.into(),
+            link_group: None,
             start,
             in_point,
             out_point,

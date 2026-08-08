@@ -664,6 +664,7 @@ mod tests {
                 clips: vec![Clip {
                     id: "c1".into(),
                     asset_id: "a1".into(),
+                    link_group: None,
                     start: 0,
                     in_point: 0,
                     out_point: 300,

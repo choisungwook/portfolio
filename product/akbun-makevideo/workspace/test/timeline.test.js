@@ -18,8 +18,8 @@ const SILENT = { id: 's', path: '/m/s.mp4', name: 's.mp4', kind: 'video', durati
 const SOUND = { id: 'm', path: '/m/m.mp3', name: 'm.mp3', kind: 'audio', durationMs: 30000, width: 0, height: 0, hasAudio: true };
 const STILL = { id: 'p', path: '/m/p.png', name: 'p.png', kind: 'image', durationMs: 0, width: 800, height: 600, hasAudio: false };
 
-function clip(id, assetId, start, inPoint, outPoint) {
-  return { id, assetId, start, in: inPoint, out: outPoint, volume: 1, opacity: 1 };
+function clip(id, assetId, start, inPoint, outPoint, linkGroup) {
+  return { id, assetId, start, in: inPoint, out: outPoint, volume: 1, opacity: 1, linkGroup: linkGroup || null };
 }
 
 function track(id, kind, name, clips) {
@@ -155,6 +155,22 @@ test('finding by id reaches into every track', () => {
   assert.strictEqual(L.findTrack(project, 't1').name, 'V1');
   assert.strictEqual(L.findAsset(project, 'm').kind, 'audio');
   assert.deepStrictEqual(L.tracksOf(project, 'video').map((each) => each.id), ['t1']);
+});
+
+test('linked clips and a relink candidate are found across track kinds', () => {
+  const video = clip('c1', 'v', 0, 0, 300, 'g1');
+  const audio = clip('c2', 'v', 0, 0, 300, 'g1');
+  const project = projectOf(
+    [VIDEO],
+    [track('t1', 'video', 'V1', [video]), track('t2', 'audio', 'A1', [audio])]
+  );
+  assert.deepStrictEqual(L.linkedClips(project, 'c1').map((entry) => entry.clip.id), ['c1', 'c2']);
+  assert.strictEqual(L.relinkCandidate(project, 'c1'), null, 'already linked');
+  video.linkGroup = null;
+  audio.linkGroup = null;
+  assert.strictEqual(L.relinkCandidate(project, 'c1').clip.id, 'c2');
+  audio.start = 1;
+  assert.strictEqual(L.relinkCandidate(project, 'c1'), null, 'out of sync');
 });
 
 test('a project on a broadcast rate counts its own frames', () => {
