@@ -26,6 +26,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Application settings, as opposed to the project settings that live in the
@@ -79,6 +80,9 @@ pub struct Settings {
     /// Use ready proxy files for preview and playback. Proxy creation remains
     /// automatic so disabling this changes only which media is read.
     pub proxy_enabled: bool,
+    /// Delete the managed project folder with its work file. When disabled,
+    /// only project.akbunvideo goes to Trash and derived files remain.
+    pub delete_project_folder: bool,
     /// Empty uses the operating system's application log directory.
     pub log_dir: String,
     /// Maximum size of errors.log before it becomes errors.log.1.
@@ -103,6 +107,7 @@ impl Default for Settings {
             compositor: "auto".into(),
             playback_engine: "native".into(),
             proxy_enabled: true,
+            delete_project_folder: true,
             log_dir: String::new(),
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
@@ -133,6 +138,7 @@ pub struct AppState {
     /// element preview or nothing open yet, and the page is told which.
     pub playback: Mutex<Option<Session>>,
     pub proxies: Arc<Mutex<ProxyState>>,
+    pub proxy_workers: Mutex<Vec<JoinHandle<()>>>,
 }
 
 #[derive(Debug, Default)]
@@ -480,6 +486,57 @@ pub fn create_project(
     })
 }
 
+fn stop_proxy_workers(app: &AppHandle, state: &State<AppState>) {
+    {
+        let mut proxies = state.proxies.lock().unwrap();
+        proxies.project_path.clear();
+        proxies.entries.clear();
+    }
+    emit_proxy_status(app, &state.proxies);
+    let workers = std::mem::take(&mut *state.proxy_workers.lock().unwrap());
+    for worker in workers {
+        let _ = worker.join();
+    }
+}
+
+fn move_to_trash(path: &Path) -> Result<(), String> {
+    let mut context = trash::TrashContext::default();
+    #[cfg(target_os = "macos")]
+    {
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        context.set_delete_method(DeleteMethod::NsFileManager);
+    }
+    context
+        .delete(path)
+        .map_err(|error| format!("cannot move {path:?} to Trash: {error}"))
+}
+
+/// Move a managed project's configured deletion target to Trash. Imported
+/// source media stays outside it and is untouched.
+#[tauri::command]
+pub fn delete_project(
+    app: AppHandle,
+    state: State<AppState>,
+    project_path: String,
+) -> Result<(), String> {
+    if state.render.lock().unwrap().is_some() {
+        return Err("wait for the active render to finish before deleting the project".into());
+    }
+    let settings = state.settings.lock().unwrap().clone();
+    let root = workspace_root(&app, &settings);
+    let dir = workspace::managed_project_dir(&root, Path::new(&project_path))?;
+    let target = if settings.delete_project_folder {
+        dir
+    } else {
+        dir.join(workspace::PROJECT_FILE)
+    };
+
+    let session = state.playback.lock().unwrap().take();
+    drop(session);
+    stop_proxy_workers(&app, &state);
+    move_to_trash(&target)
+}
+
 #[tauri::command]
 pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     let settings = state.settings.lock().unwrap().clone();
@@ -784,7 +841,7 @@ pub fn start_proxies(
 
     if !jobs.is_empty() {
         let proxies = Arc::clone(&state.proxies);
-        std::thread::spawn(move || {
+        let worker = std::thread::spawn(move || {
             if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
                 if let Err(error) = std::fs::create_dir_all(&dir) {
                     for asset in jobs {
@@ -853,6 +910,9 @@ pub fn start_proxies(
                 }
             }
         });
+        let mut workers = state.proxy_workers.lock().unwrap();
+        workers.retain(|worker| !worker.is_finished());
+        workers.push(worker);
     }
     Ok(proxy_statuses(&state.proxies.lock().unwrap()))
 }
@@ -1538,8 +1598,14 @@ where
 }
 
 #[cfg(test)]
-mod quality_tests {
-    use super::process_tree_rss_bytes;
+mod tests {
+    use super::{process_tree_rss_bytes, Settings};
+
+    #[test]
+    fn existing_settings_delete_the_project_folder_by_default() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert!(settings.delete_project_folder);
+    }
 
     #[test]
     fn memory_includes_descendants_but_not_neighbours() {

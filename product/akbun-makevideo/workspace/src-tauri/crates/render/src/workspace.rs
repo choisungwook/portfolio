@@ -8,12 +8,38 @@
 //! Only the naming rules live here, because a name typed by a user becomes a
 //! directory on disk and that is worth testing without a file system.
 
+use std::path::{Path, PathBuf};
+
 /// The one file inside a project directory.
 pub const PROJECT_FILE: &str = "project.akbunvideo";
 
 /// Under the user's Documents folder. Rust resolves the home part; this is the
 /// tail so the page and the tests can agree on it without one.
 pub const DEFAULT_FOLDER: &str = "akbun-makevideo";
+
+/// The managed project directory that owns `project_path`.
+///
+/// Deletion uses this instead of trusting a path from the page. Only an actual
+/// `project.akbunvideo` one directory below the configured workspace may make
+/// its parent a deletion target. Canonical paths also reject symlinks that
+/// point outside the workspace.
+pub fn managed_project_dir(root: &Path, project_path: &Path) -> Result<PathBuf, String> {
+    if project_path.file_name().and_then(|name| name.to_str()) != Some(PROJECT_FILE) {
+        return Err("only projects created in the workspace can be deleted".into());
+    }
+    let root = std::fs::canonicalize(root)
+        .map_err(|error| format!("cannot open the workspace folder: {error}"))?;
+    let project = std::fs::canonicalize(project_path)
+        .map_err(|error| format!("cannot open the project: {error}"))?;
+    let dir = project
+        .parent()
+        .ok_or("the project has no folder")?
+        .to_path_buf();
+    if dir.parent() != Some(root.as_path()) {
+        return Err("only projects created in the workspace can be deleted".into());
+    }
+    Ok(dir)
+}
 
 /// Expand a leading `~` against the home directory.
 ///
@@ -85,6 +111,48 @@ pub fn sanitize_project_name(raw: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temporary_workspace() -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "makevideo-workspace-{}-{unique}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn deletion_targets_the_folder_that_contains_project_and_proxies() {
+        let root = temporary_workspace();
+        let dir = root.join("summer trip");
+        let project = dir.join(PROJECT_FILE);
+        std::fs::create_dir_all(dir.join("proxies")).unwrap();
+        std::fs::write(&project, b"{}").unwrap();
+        std::fs::write(dir.join("proxies/as1.mp4"), b"proxy").unwrap();
+
+        assert_eq!(
+            managed_project_dir(&root, &project).unwrap(),
+            std::fs::canonicalize(&dir).unwrap()
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn deletion_rejects_projects_outside_the_workspace() {
+        let root = temporary_workspace();
+        let outside = temporary_workspace().with_extension("outside");
+        let project = outside.join(PROJECT_FILE);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(&project, b"{}").unwrap();
+
+        assert!(managed_project_dir(&root, &project).is_err());
+        let _ = std::fs::remove_dir_all(root);
+        let _ = std::fs::remove_dir_all(outside);
+    }
 
     #[test]
     fn an_ordinary_name_is_kept_as_typed() {

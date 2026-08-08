@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = {
   // moment bootstrap lands.
   playbackEngine: 'media-element',
   proxyEnabled: true,
+  deleteProjectFolder: true,
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
@@ -564,6 +565,7 @@ function renderTimeline() {
 function refresh() {
   renderAssets();
   renderTimeline();
+  el('menu-delete-project').disabled = !state.path;
   if (preview) {
     preview.prune();
     preview.layout();
@@ -1201,6 +1203,33 @@ async function closeProject() {
   loadDocument(await window.api.newDocument(), null);
 }
 
+async function deleteProject() {
+  if (!state.path) return;
+  const name = projectName();
+  const deleteFolder = state.settings.deleteProjectFolder;
+  const message = deleteFolder
+    ? `Move “${name}” project folder to Trash?\n\nThe project folder, project work file, generated proxies, and renders will be deleted. Imported source media will not be deleted.`
+    : `Move “${name}” project work file to Trash?\n\nOnly the project work file will be deleted. The project folder, generated proxies, renders, and imported source media will remain.`;
+  const confirmed = await window.api.ask(
+    message,
+    { title: 'Delete Project', kind: 'warning' },
+  );
+  if (!confirmed) return;
+
+  preview.clear();
+  await preview.release();
+  try {
+    await window.api.deleteProject(state.path);
+    loadDocument(await window.api.newDocument(), null);
+  } catch (error) {
+    reportError(error, 'project:delete');
+    preview.showTimeline();
+    refresh();
+    attachMonitor(true);
+    await window.api.message(String(error), { title: 'Cannot delete project', kind: 'error' });
+  }
+}
+
 // --- settings sheets -------------------------------------------------------
 
 function openSheet(id) {
@@ -1284,6 +1313,7 @@ function fillAppSheet() {
   el('as-snap').checked = state.settings.snap;
   el('as-theme').value = state.settings.theme;
   el('as-workspace').value = state.settings.workspaceDir;
+  el('as-delete-project-folder').checked = state.settings.deleteProjectFolder;
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
   el('as-compositor').value = state.settings.compositor;
   el('as-compositor-note').textContent = compositorNote();
@@ -1373,6 +1403,7 @@ const actions = {
   'save-project': () => saveProject(false),
   'save-project-as': () => saveProject(true),
   'import-assets': importViaDialog,
+  'delete-project': deleteProject,
   'close-project': closeProject,
   undo: undoEdit,
   redo: redoEdit,
@@ -1617,6 +1648,7 @@ function wireSheets() {
       proxyEnabled: state.settings.proxyEnabled,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
+      deleteProjectFolder: el('as-delete-project-folder').checked,
       ffmpegDir: el('as-ffmpeg').value.trim(),
       logDir: el('as-log-dir').value.trim(),
       logRotationSize: Math.min(
