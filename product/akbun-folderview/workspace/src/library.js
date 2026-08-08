@@ -158,6 +158,15 @@ function buildTree(roots, entries) {
   });
 }
 
+function findTreeNode(nodes, path) {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    const found = findTreeNode(node.folders, path);
+    if (found) return found;
+  }
+  return null;
+}
+
 // The thumbnail file name for an entry. Path, mtime and size together, so an
 // edited or replaced file gets a fresh thumbnail and the stale one is simply
 // never asked for again. FNV-1a, 64 bits so a large library will not collide.
@@ -185,6 +194,7 @@ function formatSize(bytes) {
 const exported = {
   baseName,
   buildTree,
+  findTreeNode,
   formatSize,
   isUnder,
   matchesEntry,

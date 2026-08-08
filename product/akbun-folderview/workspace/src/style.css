@@ -12,6 +12,8 @@
   --hover: #e2e4ea;
   --accent: #3b6ef5;
   --accent-fg: #ffffff;
+  --last-opened: #dcecff;
+  --last-opened-border: #83b8f2;
   --star: #e2a03f;
   --card-size: 180px;
 }
@@ -27,6 +29,8 @@
     --hover: #323238;
     --accent: #5b86f7;
     --accent-fg: #ffffff;
+    --last-opened: #294564;
+    --last-opened-border: #4f83b8;
     --star: #f0b95c;
   }
 }
@@ -40,6 +44,8 @@
   --border: #dedee1;
   --hover: #e2e4ea;
   --accent: #3b6ef5;
+  --last-opened: #dcecff;
+  --last-opened-border: #83b8f2;
   --star: #e2a03f;
 }
 
@@ -52,6 +58,8 @@
   --border: #343438;
   --hover: #323238;
   --accent: #5b86f7;
+  --last-opened: #294564;
+  --last-opened-border: #4f83b8;
   --star: #f0b95c;
 }
 
@@ -217,6 +225,10 @@ button.primary {
   color: var(--accent-fg);
 }
 
+.file-entry.last-opened {
+  background: var(--last-opened);
+}
+
 .twisty {
   /* Wide enough for the folder and file emoji icons. */
   width: 18px;
@@ -297,6 +309,11 @@ button.primary {
   border-color: var(--accent);
 }
 
+.card.file-entry.last-opened {
+  border-color: var(--last-opened-border);
+  box-shadow: inset 0 0 0 1px var(--last-opened-border);
+}
+
 .thumb {
   position: relative;
   aspect-ratio: 4 / 3;
@@ -343,9 +360,54 @@ button.primary {
 }
 
 .card-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.entry-icon {
+  flex-shrink: 0;
+}
+
+.folder-card {
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.folder-card:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.folder-card-icon {
+  font-size: 34px;
+}
+
+.folder-card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-card-count {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .card-meta {
@@ -410,6 +472,24 @@ button.primary {
    thumbnails at all, which also makes it the fast view for a slow disk. */
 .grid.list {
   display: block;
+}
+
+.grid.list .folder-card {
+  min-height: 0;
+  padding: 5px 8px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.grid.list .folder-card-icon {
+  width: 22px;
+  font-size: 16px;
+}
+
+.grid.list .folder-card-body {
+  flex: 1;
+  flex-direction: row;
+  justify-content: space-between;
 }
 
 .list-item {
