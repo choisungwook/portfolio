@@ -224,6 +224,28 @@ test('renderSlideSvg draws the number only when asked', () => {
   assert.ok(L.renderSlideSvg(slide, { number: 3 }).includes('>3<'));
 });
 
+test('renderShapesSvg crops selected shapes without a slide background', () => {
+  const shape = L.createShape('rect', 100, 200, { fill: '#abcdef', strokeWidth: 4 });
+  shape.w = 300;
+  shape.h = 100;
+  const image = L.renderShapesSvg([shape]);
+  assert.ok(image.svg.includes('viewBox="98 198 304 104"'));
+  assert.ok(image.svg.includes('fill="#abcdef"'));
+  assert.ok(!image.svg.includes(`width="${L.SLIDE_W}"`));
+  assert.strictEqual(image.width, 304);
+  assert.strictEqual(image.height, 104);
+});
+
+test('renderShapesSvg expands the crop for a rotated shape', () => {
+  const shape = L.createShape('text', 100, 100, {});
+  shape.w = 200;
+  shape.h = 50;
+  shape.text = 'title';
+  shape.rotation = 90;
+  const image = L.renderShapesSvg([shape]);
+  assert.ok(image.width < image.height);
+});
+
 test('renderShapeSvg uses the shape font family with a fallback', () => {
   const shape = L.createShape('text', 0, 0, { fontFamily: 'Georgia' });
   shape.text = 'hi';

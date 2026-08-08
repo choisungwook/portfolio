@@ -2,10 +2,10 @@
 //! command receives a path plus data, so nothing here blocks on UI.
 
 use base64::Engine;
-use serde::Deserialize;
 use makepresentation_deck::{pdf, pptx, Deck};
+use serde::Deserialize;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Write};
 
 #[tauri::command]
 pub fn open_deck(path: String) -> Result<Deck, String> {
@@ -48,4 +48,17 @@ pub fn export_pdf(path: String, pages: Vec<PageImage>) -> Result<(), String> {
     }
     let file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
     pdf::write(&jpegs, BufWriter::new(file))
+}
+
+#[tauri::command]
+pub fn save_png(path: String, data_url: String) -> Result<(), String> {
+    let b64 = data_url
+        .strip_prefix("data:image/png;base64,")
+        .ok_or("image is not a PNG data URL")?;
+    let data = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| format!("bad PNG image: {e}"))?;
+    let mut file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
+    file.write_all(&data)
+        .map_err(|e| format!("cannot write {path}: {e}"))
 }
