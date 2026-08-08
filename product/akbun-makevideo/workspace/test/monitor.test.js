@@ -3,7 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { createMonitor, placeOf, samePlace, readChoice } = require('../src/monitor.js');
+const {
+  createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice,
+  fittedViewport, clampViewport, zoomViewport,
+} = require('../src/monitor.js');
 
 // The page's half of the native viewport. Everything here is arithmetic over
 // plain objects on purpose: the rest of monitor.js needs a window, an IPC
@@ -43,6 +46,28 @@ test('a collapsed box never becomes a negative size', () => {
   const place = placeOf({ left: 0, top: 0, width: -10, height: -10 }, 2);
   assert.strictEqual(place.width, 0);
   assert.strictEqual(place.height, 0);
+});
+
+test('the native monitor keeps a clipped stage and a scaled picture separate', () => {
+  const box = { left: 100, top: 50, width: 640, height: 360 };
+  const place = monitorPlaceOf(box, { zoom: 2, x: -100, y: -40 }, 2);
+  assert.deepStrictEqual(place.stage, { x: 200, y: 100, width: 1280, height: 720 });
+  assert.deepStrictEqual(place.content, { x: 0, y: 20, width: 2560, height: 1440 });
+});
+
+test('zooming at the cursor keeps the source point under it', () => {
+  const box = { width: 640, height: 360 };
+  const cursor = { x: 480, y: 270 };
+  const viewport = zoomViewport(fittedViewport(), box, cursor, 2);
+  assert.deepStrictEqual(viewport, { zoom: 2, x: -480, y: -270 });
+});
+
+test('panning cannot expose space past an enlarged monitor edge', () => {
+  const box = { width: 640, height: 360 };
+  assert.deepStrictEqual(
+    clampViewport({ zoom: 2, x: 20, y: -999 }, box),
+    { zoom: 2, x: 0, y: -360 }
+  );
 });
 
 test('the same box twice is recognised, so a drag is not a command per frame', () => {

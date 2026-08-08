@@ -60,6 +60,28 @@ pub struct Place {
     pub height: f64,
 }
 
+/// The clipped monitor box and the larger picture inside it.
+///
+/// Both rectangles use physical window pixels. The page keeps the transform in
+/// CSS pixels so cursor math stays in one coordinate system, then converts the
+/// two rectangles together at the IPC boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorPlace {
+    pub stage: Place,
+    pub content: Place,
+}
+
+impl MonitorPlace {
+    pub fn surface_size(&self) -> (u32, u32) {
+        self.content.surface_size()
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.stage.is_visible() && self.content.is_visible()
+    }
+}
+
 impl Place {
     /// The size to configure a swapchain at, never zero. A surface configured
     /// at zero is a validation error on every backend, and a stage box can
@@ -80,13 +102,13 @@ impl Place {
 /// A native view, owned for as long as playback is.
 pub struct Viewport {
     inner: platform::Inner,
-    place: Place,
+    place: MonitorPlace,
     visible: bool,
 }
 
 impl Viewport {
     /// Attach a view to `window` and put it at `place`.
-    pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Viewport, String> {
+    pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Viewport, String> {
         let inner = platform::attach(window, place)?;
         Ok(Viewport {
             inner,
@@ -96,7 +118,7 @@ impl Viewport {
     }
 
     /// Move or resize it. Cheap, and safe to call with what it already is.
-    pub fn place(&mut self, place: Place) {
+    pub fn place(&mut self, place: MonitorPlace) {
         if place == self.place {
             return;
         }

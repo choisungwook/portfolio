@@ -11,15 +11,15 @@
 //! independent, and wgpu and ffmpeg both run there, so what is missing is a
 //! child HWND, its placement, and its resize.
 
-use super::Place;
+use super::MonitorPlace;
 
 pub struct Inner;
 
-pub fn attach(_window: &tauri::WebviewWindow, _place: Place) -> Result<Inner, String> {
+pub fn attach(_window: &tauri::WebviewWindow, _place: MonitorPlace) -> Result<Inner, String> {
     Err("the native monitor is macOS only so far; playback uses media elements here".into())
 }
 
-pub fn place(_inner: &Inner, _at: Place) {}
+pub fn place(_inner: &Inner, _at: MonitorPlace) {}
 
 pub fn set_visible(_inner: &Inner, _visible: bool) {}
 

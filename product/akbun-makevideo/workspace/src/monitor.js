@@ -46,10 +46,56 @@ function placeOf(box, ratio) {
   };
 }
 
+const FIT_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 1.25;
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function fittedViewport() {
+  return { zoom: FIT_ZOOM, x: 0, y: 0 };
+}
+
+function clampViewport(viewport, box) {
+  const zoom = clamp(viewport.zoom, FIT_ZOOM, MAX_ZOOM);
+  return {
+    zoom,
+    x: clamp(viewport.x, box.width - box.width * zoom, 0),
+    y: clamp(viewport.y, box.height - box.height * zoom, 0),
+  };
+}
+
+function zoomViewport(viewport, box, cursor, zoom) {
+  const nextZoom = clamp(zoom, FIT_ZOOM, MAX_ZOOM);
+  const sourceX = (cursor.x - viewport.x) / viewport.zoom;
+  const sourceY = (cursor.y - viewport.y) / viewport.zoom;
+  return clampViewport({
+    zoom: nextZoom,
+    x: cursor.x - sourceX * nextZoom,
+    y: cursor.y - sourceY * nextZoom,
+  }, box);
+}
+
+function monitorPlaceOf(box, viewport, ratio) {
+  const stage = placeOf(box, ratio);
+  const content = placeOf({
+    left: box.left + viewport.x,
+    top: box.top + viewport.y,
+    width: box.width * viewport.zoom,
+    height: box.height * viewport.zoom,
+  }, ratio);
+  return { stage, content };
+}
+
 /** Whether two placements are the same box, so a resize observer firing on
  *  every frame of a drag does not send a command for every one of them. */
 function samePlace(a, b) {
   if (!a || !b) return false;
+  if (a.stage || b.stage) {
+    return samePlace(a.stage, b.stage) && samePlace(a.content, b.content);
+  }
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
@@ -102,6 +148,7 @@ function createMonitor(options) {
   let attaching = null;
   let mediaRefreshPending = false;
   let refreshingMedia = null;
+  let viewport = fittedViewport();
 
   function timelineMode() {
     return preview.mode() === 'timeline';
@@ -144,7 +191,9 @@ function createMonitor(options) {
 
   function currentPlace() {
     if (!stage) return null;
-    return placeOf(stage.getBoundingClientRect(), window.devicePixelRatio);
+    const box = stage.getBoundingClientRect();
+    viewport = clampViewport(viewport, box);
+    return monitorPlaceOf(box, viewport, window.devicePixelRatio);
   }
 
   /** Ask Rust for a monitor, and take whatever it gives back.
@@ -155,7 +204,7 @@ function createMonitor(options) {
   async function attach() {
     if (!api || !api.available) return false;
     const place = currentPlace();
-    if (!place || place.width < 1 || place.height < 1) return native;
+    if (!place || place.stage.width < 1 || place.stage.height < 1) return native;
     // One at a time. The layout settles over several frames when a project
     // opens, and a second attach mid-flight would start a session the first one
     // is about to replace.
@@ -426,12 +475,47 @@ function createMonitor(options) {
     isExact() {
       return drivingNatively() ? false : preview.isExact();
     },
+
+    zoomIn(cursor) {
+      return this.zoomTo(viewport.zoom * ZOOM_STEP, cursor);
+    },
+
+    zoomOut(cursor) {
+      return this.zoomTo(viewport.zoom / ZOOM_STEP, cursor);
+    },
+
+    zoomTo(zoom, cursor) {
+      if (!drivingNatively() || !stage) return false;
+      const box = stage.getBoundingClientRect();
+      const at = cursor || { x: box.width / 2, y: box.height / 2 };
+      viewport = zoomViewport(viewport, box, at, zoom);
+      place();
+      return true;
+    },
+
+    fit() {
+      if (!drivingNatively()) return false;
+      viewport = fittedViewport();
+      place();
+      return true;
+    },
+
+    panBy(dx, dy) {
+      if (!drivingNatively() || !stage || viewport.zoom <= FIT_ZOOM) return false;
+      viewport = clampViewport({ ...viewport, x: viewport.x + dx, y: viewport.y + dy }, stage.getBoundingClientRect());
+      place();
+      return true;
+    },
+
+    zoomState() {
+      return { ...viewport, available: drivingNatively() };
+    },
   };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createMonitor, placeOf, samePlace, readChoice, shouldShowMonitor };
+  module.exports = { createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice, shouldShowMonitor, fittedViewport, clampViewport, zoomViewport };
 } else {
-  globalThis.monitorLib = { createMonitor, placeOf, samePlace, readChoice, shouldShowMonitor };
+  globalThis.monitorLib = { createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice, shouldShowMonitor, fittedViewport, clampViewport, zoomViewport };
 }
 })();
