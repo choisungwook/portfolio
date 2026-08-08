@@ -646,7 +646,6 @@ function deleteSelectedShape() {
 
 const PASTE_OFFSET = 20;
 const SHAPE_CLIPBOARD_TYPE = 'application/x-akbun-makepresentation-shapes';
-const SHAPE_KINDS = new Set(['rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image']);
 
 function insertShapes(shapes, offset) {
   const copies = shapes.map((shape) => structuredClone(shape));
@@ -665,16 +664,6 @@ function isFormField(target) {
   return target instanceof HTMLInputElement ||
     target instanceof HTMLSelectElement ||
     target instanceof HTMLTextAreaElement;
-}
-
-function parseClipboardShapes(value) {
-  try {
-    const shapes = JSON.parse(value);
-    if (!Array.isArray(shapes) || shapes.length === 0) return [];
-    return shapes.filter((shape) => shape && SHAPE_KINDS.has(shape.kind));
-  } catch (_) {
-    return [];
-  }
 }
 
 document.addEventListener('copy', (event) => {
@@ -734,7 +723,7 @@ document.addEventListener('paste', async (event) => {
   if (isFormField(event.target) || !event.clipboardData) return;
 
   const encoded = event.clipboardData.getData(SHAPE_CLIPBOARD_TYPE);
-  const copiedShapes = parseClipboardShapes(encoded);
+  const copiedShapes = L.parseClipboardShapes(encoded);
   if (copiedShapes.length) {
     event.preventDefault();
     insertShapes(copiedShapes, PASTE_OFFSET);

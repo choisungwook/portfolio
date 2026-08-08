@@ -25,7 +25,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 |---|---|
 | Cmd+Z / Shift+Cmd+Z | Undo / redo |
 | Cmd+C, Cmd+V | Copy selected objects, or paste the latest system clipboard text or image |
-| Cmd+D | Duplicate the selected shape, or the whole slide when nothing is selected |
+| Cmd+D | Duplicate the selected objects, or the whole slide when nothing is selected |
 | Cmd+S | Save |
 | Cmd+B, Cmd+I, Cmd+U | Bold, italic, underline the selected text box, or the style new ones start with |
 | Cmd++ / Cmd+- | Zoom in / out |

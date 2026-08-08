@@ -10,6 +10,31 @@ test('createDeck starts with one empty slide', () => {
   assert.deepStrictEqual(deck.slides[0].shapes, []);
 });
 
+test('parseClipboardShapes normalizes valid shapes with safe defaults', () => {
+  const rect = L.createShape('rect', 10, 20, { fill: '#abcdef' });
+  rect.w = 100;
+  rect.h = 80;
+  const [parsed] = L.parseClipboardShapes(JSON.stringify([rect]));
+  assert.deepStrictEqual(
+    { kind: parsed.kind, x: parsed.x, y: parsed.y, w: parsed.w, h: parsed.h, fill: parsed.fill },
+    { kind: 'rect', x: 10, y: 20, w: 100, h: 80, fill: '#abcdef' }
+  );
+});
+
+test('parseClipboardShapes rejects malformed geometry and pen points', () => {
+  const malformed = [
+    { kind: 'rect', x: '10', y: 20, w: 100, h: 80 },
+    { kind: 'pen', x: 0, y: 0, w: 10, h: 10 },
+    { kind: 'pen', x: 0, y: 0, w: 10, h: 10, points: [[0, 0], [NaN, 10]] },
+  ];
+  assert.deepStrictEqual(L.parseClipboardShapes(JSON.stringify(malformed)), []);
+});
+
+test('parseClipboardShapes rejects an excessive object count', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  assert.deepStrictEqual(L.parseClipboardShapes(JSON.stringify(Array(101).fill(shape))), []);
+});
+
 test('dragShape normalizes a rect dragged up and left', () => {
   const shape = L.createShape('rect', 100, 100, {});
   L.dragShape(shape, 100, 100, 40, 60);

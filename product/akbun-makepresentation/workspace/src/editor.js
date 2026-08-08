@@ -31,6 +31,9 @@ const DEFAULT_STYLE = {
 };
 
 const BOXY = new Set(['rect', 'ellipse', 'text', 'image']);
+const SHAPE_KINDS = new Set(['rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image']);
+const MAX_CLIPBOARD_SHAPES = 100;
+const MAX_GEOMETRY = 1_000_000;
 
 function createDeck() {
   return { slides: [createSlide()] };
@@ -76,6 +79,81 @@ function createShape(kind, x, y, style) {
     cropBottom: 0,
     rotation: 0,
   };
+}
+
+function isFiniteInRange(value, min, max) {
+  return Number.isFinite(value) && value >= min && value <= max;
+}
+
+function safeColor(value, fallback) {
+  const color = String(value || '');
+  return /^(none|#[0-9a-f]{3}|#[0-9a-f]{4}|#[0-9a-f]{6}|#[0-9a-f]{8})$/i.test(color)
+    ? color
+    : fallback;
+}
+
+function normalizeClipboardShape(value) {
+  if (!value || typeof value !== 'object' || !SHAPE_KINDS.has(value.kind)) return null;
+  if (![value.x, value.y, value.w, value.h].every(
+    (number) => isFiniteInRange(number, -MAX_GEOMETRY, MAX_GEOMETRY)
+  )) return null;
+
+  if (value.kind === 'pen') {
+    if (!Array.isArray(value.points) || value.points.length < 2 || value.points.length > 100_000) {
+      return null;
+    }
+    const validPoints = value.points.every(
+      (point) => Array.isArray(point) && point.length === 2 && point.every(
+        (number) => isFiniteInRange(number, -MAX_GEOMETRY, MAX_GEOMETRY)
+      )
+    );
+    if (!validPoints) return null;
+  }
+
+  const shape = createShape(value.kind, value.x, value.y, {});
+  shape.w = value.w;
+  shape.h = value.h;
+  if (value.kind === 'pen') shape.points = value.points.map((point) => [...point]);
+  shape.stroke = safeColor(value.stroke, shape.stroke);
+  shape.fill = safeColor(value.fill, shape.fill);
+  shape.textColor = safeColor(value.textColor, shape.textColor);
+  if (isFiniteInRange(value.strokeWidth, 0, 1_000)) shape.strokeWidth = value.strokeWidth;
+  if (['solid', 'dash', 'dot'].includes(value.dash)) shape.dash = value.dash;
+  if (typeof value.text === 'string' && value.text.length <= 1_000_000) shape.text = value.text;
+  if (isFiniteInRange(value.fontSize, 1, 1_000)) shape.fontSize = value.fontSize;
+  if (typeof value.fontFamily === 'string' && value.fontFamily.length <= 200) {
+    shape.fontFamily = value.fontFamily;
+  }
+  if (typeof value.src === 'string' && value.src.length <= 100_000_000 &&
+      /^data:image\/[a-z0-9.+-]+;base64,/i.test(value.src)) {
+    shape.src = value.src;
+  }
+  for (const name of ['bold', 'italic', 'underline']) {
+    if (typeof value[name] === 'boolean') shape[name] = value[name];
+  }
+  if (['left', 'center', 'right'].includes(value.textAlign)) {
+    shape.textAlign = value.textAlign;
+  }
+  if (['top', 'center', 'bottom'].includes(value.verticalAlign)) {
+    shape.verticalAlign = value.verticalAlign;
+  }
+  for (const name of ['cropLeft', 'cropTop', 'cropRight', 'cropBottom']) {
+    if (isFiniteInRange(value[name], 0, 1)) shape[name] = value[name];
+  }
+  if (isFiniteInRange(value.rotation, -360_000, 360_000)) shape.rotation = value.rotation;
+  return shape;
+}
+
+function parseClipboardShapes(value) {
+  try {
+    const shapes = JSON.parse(value);
+    if (!Array.isArray(shapes) || shapes.length === 0 || shapes.length > MAX_CLIPBOARD_SHAPES) {
+      return [];
+    }
+    return shapes.map(normalizeClipboardShape).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
 }
 
 // Update a shape while the pointer drags from (x0,y0) to (x,y) during
@@ -468,6 +546,7 @@ const exported = {
   createSlide,
   slideBackground,
   createShape,
+  parseClipboardShapes,
   dragShape,
   isDegenerate,
   shapeBBox,
