@@ -167,6 +167,7 @@
           <svg viewBox="0 0 20 20"><use href="#icon-ripple" /></svg>
         </button>
         <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
+        <button id="btn-add-marker" class="small" title="Add a marker at the playhead">+ Marker</button>
         <span class="sep-v"></span>
         <button id="btn-add-video" class="small">+ Video track</button>
         <button id="btn-add-audio" class="small">+ Audio track</button>
@@ -184,6 +185,10 @@
           </div>
         </div>
       </div>
+      <details id="marker-panel">
+        <summary>Markers</summary>
+        <div id="marker-list"></div>
+      </details>
     </section>
   </main>
 

@@ -12,8 +12,8 @@
 //! for the next format after this one.
 
 use crate::{
-    Asset, Clip, Project, ProjectSettings, Rate, RationalTime, Track, TrackKind, VisualItem,
-    FORMAT_VERSION,
+    Asset, Clip, Marker, Project, ProjectSettings, Rate, RationalTime, Track, TrackKind,
+    VisualItem, FORMAT_VERSION,
 };
 use serde::Deserialize;
 
@@ -32,6 +32,8 @@ pub struct WireProject {
     assets: Vec<Asset>,
     #[serde(default)]
     tracks: Vec<WireTrack>,
+    #[serde(default)]
+    markers: Vec<Marker>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -117,6 +119,7 @@ impl From<WireProject> for Project {
                 rate,
             },
             assets: wire.assets,
+            markers: wire.markers,
             tracks: wire
                 .tracks
                 .into_iter()

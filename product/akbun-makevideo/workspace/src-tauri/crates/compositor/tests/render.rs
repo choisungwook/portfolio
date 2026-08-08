@@ -237,6 +237,7 @@ fn two_tracks_composite_the_way_the_timeline_says() {
                 vec![clip("c2", "narrow", 30, 60)],
             ),
         ],
+        markers: Vec::new(),
     };
     let output = temp_dir()
         .join("composited.mp4")
@@ -288,6 +289,7 @@ fn the_output_is_the_length_the_timeline_says_with_the_sound_on_it() {
             TrackKind::Video,
             vec![clip("c1", "wide", 0, 90)],
         )],
+        markers: Vec::new(),
     };
     let output = temp_dir().join("length.mp4").to_string_lossy().to_string();
     render(&project, &output).expect("the render should succeed");
@@ -343,6 +345,7 @@ fn a_missing_source_leaves_a_hole_rather_than_an_error() {
             track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 60)]),
             track("V2", TrackKind::Video, vec![clip("c2", "gone", 0, 60)]),
         ],
+        markers: Vec::new(),
     };
     let output = temp_dir().join("missing.mp4").to_string_lossy().to_string();
     render(&project, &output).expect("a missing file must not fail the render");
@@ -380,6 +383,7 @@ fn the_preview_frame_matches_the_rendered_frame() {
                 vec![clip("c2", "narrow", 30, 60)],
             ),
         ],
+        markers: Vec::new(),
     };
     let output = temp_dir().join("match.mp4").to_string_lossy().to_string();
     render(&project, &output).expect("the render should succeed");

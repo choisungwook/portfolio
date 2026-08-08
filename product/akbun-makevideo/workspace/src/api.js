@@ -40,6 +40,7 @@ if (!window.__TAURI__) {
       version: 2,
       settings: { width: 1920, height: 1080, rate: { num: 30, den: 1 } },
       assets: [],
+      markers: [],
       tracks: [
         { id: 't1', kind: 'video', name: 'V1', clips: [], muted: false, hidden: false },
         { id: 't2', kind: 'audio', name: 'A1', clips: [], muted: false, hidden: false },

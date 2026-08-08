@@ -128,6 +128,7 @@ fn project(rate: Rate, a: &str, b: &str) -> Project {
             audio_track("A1", vec![clip("c1", "a1", 0, 15, 75, 0.333_5)]),
             audio_track("A2", vec![clip("c2", "a2", 23, 0, 60, 0.707_9)]),
         ],
+        markers: Vec::new(),
     }
 }
 

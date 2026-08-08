@@ -203,6 +203,13 @@ test('finding by id reaches into every track', () => {
   assert.deepStrictEqual(L.tracksOf(project, 'video').map((each) => each.id), ['t1']);
 });
 
+test('finding a marker reads the project marker list', () => {
+  const project = projectOf([], []);
+  project.markers = [{ id: 'm1', frame: 90, name: 'cut', color: '#e6a700' }];
+  assert.strictEqual(L.findMarker(project, 'm1').frame, 90);
+  assert.strictEqual(L.findMarker(project, 'gone'), null);
+});
+
 test('linked clips and a relink candidate are found across track kinds', () => {
   const video = clip('c1', 'v', 0, 0, 300, 'g1');
   const audio = clip('c2', 'v', 0, 0, 300, 'g1');

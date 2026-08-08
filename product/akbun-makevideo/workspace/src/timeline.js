@@ -69,6 +69,10 @@ function findAsset(project, assetId) {
   return project.assets.find((asset) => asset.id === assetId) || null;
 }
 
+function findMarker(project, markerId) {
+  return (project.markers || []).find((marker) => marker.id === markerId) || null;
+}
+
 function linkedClips(project, clipId) {
   const found = findClip(project, clipId);
   if (!found || !found.clip.linkGroup) return found ? [found] : [];
@@ -285,6 +289,7 @@ function blankProject() {
     settings: { width: 1920, height: 1080, rate: T.fps(30) },
     assets: [],
     tracks: [],
+    markers: [],
   };
 }
 
@@ -297,6 +302,7 @@ const exported = {
   findTrack,
   findClip,
   findAsset,
+  findMarker,
   linkedClips,
   relinkCandidate,
   canAccept,

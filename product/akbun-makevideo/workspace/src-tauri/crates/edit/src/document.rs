@@ -65,6 +65,9 @@ impl Document {
     pub fn opened(mut project: Project) -> Document {
         project.repair();
         let mut ids = Ids::default();
+        for marker in &project.markers {
+            ids.observe(&marker.id);
+        }
         for track in &project.tracks {
             ids.observe(&track.id);
             for clip in &track.clips {
@@ -1283,5 +1286,38 @@ mod tests {
 
         assert!(error.contains("already in this project"), "{error}");
         assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+    }
+
+    #[test]
+    fn markers_are_saved_edited_and_undone() {
+        let mut document = document();
+        document
+            .apply(Command::AddMarker {
+                frame: 90,
+                name: "cut here".into(),
+                color: "#ff0000".into(),
+                id: None,
+            })
+            .unwrap();
+        let marker = document.project().markers[0].clone();
+        assert_eq!((marker.frame, marker.name.as_str()), (90, "cut here"));
+
+        document
+            .apply(Command::SetMarker {
+                marker_id: marker.id.clone(),
+                frame: Some(120),
+                name: Some("review".into()),
+                color: None,
+            })
+            .unwrap();
+        assert_eq!(document.project().markers[0].frame, 120);
+        assert_eq!(document.project().markers[0].name, "review");
+
+        document.undo().unwrap();
+        assert_eq!(document.project().markers[0], marker);
+        document.undo().unwrap();
+        assert!(document.project().markers.is_empty());
+        document.redo().unwrap();
+        assert_eq!(document.project().markers[0].frame, 90);
     }
 }

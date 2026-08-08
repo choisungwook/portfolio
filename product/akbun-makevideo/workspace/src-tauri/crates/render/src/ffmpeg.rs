@@ -736,6 +736,7 @@ mod tests {
                 TrackKind::Video,
                 vec![clip("c1", "a1", 60, 30, 120)],
             )],
+            markers: Vec::new(),
         }
     }
 
@@ -758,6 +759,7 @@ mod tests {
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![track("V1", TrackKind::Video, vec![])],
+            markers: Vec::new(),
         };
         assert!(build_args(&project, "/out.mp4", Preset::Fhd, None).is_err());
     }
@@ -868,6 +870,7 @@ mod tests {
                 track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 120)]),
                 track("V2", TrackKind::Video, vec![clip("c2", "a2", 0, 0, 120)]),
             ],
+            markers: Vec::new(),
         };
         let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap());
         assert!(filter.contains("[base][v0]overlay"), "{filter}");
@@ -902,6 +905,7 @@ mod tests {
                 TrackKind::Audio,
                 vec![clip("c1", "a1", 15, 0, 90)],
             )],
+            markers: Vec::new(),
         };
         let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
         let filter = filter_of(&args);
@@ -1182,6 +1186,7 @@ mod tests {
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![],
+            markers: Vec::new(),
         };
         assert!(encoder_args(&project, "/o.mp4", Preset::Fhd, None).is_err());
     }
@@ -1243,6 +1248,7 @@ mod tests {
                 track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 60)]),
                 track("A1", TrackKind::Audio, vec![clip("c2", "a2", 30, 0, 60)]),
             ],
+            markers: Vec::new(),
         };
         let filter = filter_of(&mix_reference_args(&project, "/tmp/mix.f32").unwrap());
         assert!(filter.contains("[0:a]"), "{filter}");
