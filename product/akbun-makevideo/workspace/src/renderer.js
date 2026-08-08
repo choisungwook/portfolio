@@ -799,7 +799,7 @@ async function requestExactFrame() {
 function scheduleExactFrame() {
   if (!window.api.available) return;
   window.clearTimeout(exactTimer);
-  if (preview.usesNativeMonitor()) return;
+  if (preview.usesNativeMonitor() && !state.selectedVisualItemId) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   exactTimer = window.setTimeout(requestExactFrame, 180);
 }
@@ -845,11 +845,12 @@ function selectVisualItem(itemId) {
   state.selectedVisualItemId = itemId || null;
   const editing = Boolean(state.selectedVisualItemId);
   dom.stage.classList.toggle('editing', editing);
-  preview.setEditing(editing);
   if (!editing) {
     preview.clearExact();
+    preview.setEditing(false);
     preview.redraw();
   } else {
+    preview.setEditing(true);
     scheduleExactFrame();
   }
   renderStageOverlay();

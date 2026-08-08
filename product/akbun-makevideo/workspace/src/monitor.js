@@ -479,7 +479,7 @@ function createMonitor(options) {
       return drivingNatively() && !editing ? false : preview.showExact(drawn);
     },
     clearExact() {
-      if (!drivingNatively() || editing) preview.clearExact();
+      preview.clearExact();
     },
     isExact() {
       return drivingNatively() && !editing ? false : preview.isExact();

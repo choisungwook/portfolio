@@ -135,6 +135,38 @@ test('the native monitor yields to the editor-only selection pass', async (t) =>
   assert.deepStrictEqual(visibility, [true, false, true]);
 });
 
+test('leaving native editing clears the page exact frame', async (t) => {
+  const previousWindow = global.window;
+  t.after(() => {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  });
+  global.window = { devicePixelRatio: 1 };
+  let cleared = 0;
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => { cleared += 1; },
+    },
+    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  monitor.setEditing(true);
+  monitor.setEditing(false);
+  const beforeClear = cleared;
+  monitor.clearExact();
+  assert.strictEqual(cleared, beforeClear + 1);
+});
+
 test('the same box twice is recognised, so a drag is not a command per frame', () => {
   const box = { x: 1, y: 2, width: 3, height: 4 };
   assert.ok(samePlace(box, { ...box }));
