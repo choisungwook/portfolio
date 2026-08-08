@@ -54,6 +54,19 @@ struct Handle(NonNull<NSView>);
 unsafe impl Send for Handle {}
 unsafe impl Sync for Handle {}
 
+impl Handle {
+    /// The address, taken through the whole handle.
+    ///
+    /// Every closure below reaches the pointer through this rather than through
+    /// `.0`. A `move` closure that names the field captures the `NonNull`
+    /// alone, and a `NonNull` is not `Send` — the `unsafe impl` above is on
+    /// `Handle`, so the closure has to capture the `Handle`. Calling a method
+    /// that takes `self` is what makes it do that.
+    fn ptr(self) -> NonNull<NSView> {
+        self.0
+    }
+}
+
 /// What wgpu is given. Separate from [`Inner`] because a surface target has to
 /// be owned and `'static`, and because it must not carry the window with it.
 struct ViewTarget(NonNull<std::ffi::c_void>);
@@ -134,33 +147,35 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
 
 pub fn place(inner: &Inner, at: Place) {
     let handle = inner.window.clone();
-    let view = inner.view.0.as_ptr() as usize;
+    let view = inner.view;
     // Placement is best effort: a window that has gone during a resize is a
     // window nobody is looking at.
     let _ = on_main(&inner.window, move |_| {
         let content = content_view(&handle)?;
-        let view = unsafe { &*(view as *mut NSView) };
+        // SAFETY: messaged on the main thread, and the view is alive until
+        // `detach` releases it.
+        let view = unsafe { view.ptr().as_ref() };
         view.setFrame(rect(&content, at));
         Ok(())
     });
 }
 
 pub fn set_visible(inner: &Inner, visible: bool) {
-    let view = inner.view.0.as_ptr() as usize;
+    let view = inner.view;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: messaged on the main thread, and the view is alive until
         // `detach` releases it.
-        unsafe { (&*(view as *mut NSView)).setHidden(!visible) };
+        unsafe { view.ptr().as_ref().setHidden(!visible) };
         Ok(())
     });
 }
 
 pub fn detach(inner: &Inner) {
-    let view = inner.view.0.as_ptr() as usize;
+    let view = inner.view;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: the pointer came from `Retained::into_raw` in `attach` and is
         // released exactly once, here.
-        let view: Retained<NSView> = unsafe { Retained::from_raw(view as *mut NSView) }
+        let view: Retained<NSView> = unsafe { Retained::from_raw(view.ptr().as_ptr()) }
             .ok_or("the monitor view was already gone")?;
         view.removeFromSuperview();
         Ok(())
