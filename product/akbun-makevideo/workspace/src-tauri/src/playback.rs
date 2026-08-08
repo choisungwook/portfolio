@@ -20,7 +20,7 @@
 //! compositor. That is what let the live/exact split go: there is nothing left
 //! for a badge to tell apart.
 
-use crate::viewport::{Place, Viewport};
+use crate::viewport::{MonitorPlace, Viewport};
 use makevideo_audio::device::DeviceSink;
 use makevideo_audio::engine::Options as AudioOptions;
 use makevideo_audio::source::{
@@ -53,7 +53,7 @@ enum Command {
     /// The panel moved or the window resized. Carried to the loop rather than
     /// done where it was noticed, because only the thread drawing on a surface
     /// may reconfigure it.
-    Place(Place),
+    Place(MonitorPlace),
     /// The timeline changed under a paused playhead: redraw the still.
     Redraw,
     Stop,
@@ -167,7 +167,7 @@ impl Session {
         window: &tauri::WebviewWindow,
         document: Arc<Mutex<makevideo_edit::Document>>,
         config: Config,
-        place: Place,
+        place: MonitorPlace,
         frame: i64,
     ) -> Result<Session, String> {
         if config.compositor.gpu().is_none() {
@@ -239,7 +239,7 @@ impl Session {
     /// the main thread; the swapchain is resized by the loop at the top of its
     /// next frame, because only the thread drawing on a surface may reconfigure
     /// it. Doing the second one here would be a data race wgpu cannot see.
-    pub fn place(&self, place: Place) {
+    pub fn place(&self, place: MonitorPlace) {
         self.viewport.lock().unwrap().place(place);
         let _ = self.control.send(Command::Place(place));
     }

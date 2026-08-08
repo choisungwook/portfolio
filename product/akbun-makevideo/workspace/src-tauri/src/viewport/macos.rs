@@ -22,9 +22,9 @@
 //! the flip happens here, once, at the boundary — the same place the
 //! physical-pixel conversion happens.
 
-use super::Place;
+use super::{MonitorPlace, Place};
 use objc2::rc::Retained;
-use objc2::{MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use raw_window_handle::{
@@ -35,9 +35,34 @@ use std::ptr::NonNull;
 use std::sync::mpsc::channel;
 
 pub struct Inner {
+    /// Clips the enlarged Metal view to the monitor rectangle and lets pointer
+    /// events continue through to the WebView, which owns zoom gestures.
+    container: Handle,
     /// A retained `NSView`. Released in `detach`, on the main thread.
     view: Handle,
     window: tauri::WebviewWindow,
+}
+
+struct PassThroughIvars;
+
+define_class!(
+    #[unsafe(super(NSView))]
+    #[ivars = PassThroughIvars]
+    struct PassThroughView;
+
+    impl PassThroughView {
+        #[unsafe(method(hitTest:))]
+        fn hit_test(&self, _point: NSPoint) -> Option<&NSView> {
+            None
+        }
+    }
+);
+
+impl PassThroughView {
+    fn new(main: MainThreadMarker, frame: NSRect) -> Retained<Self> {
+        let view = Self::alloc(main).set_ivars(PassThroughIvars);
+        unsafe { msg_send![super(view), initWithFrame: frame] }
+    }
 }
 
 /// A retained view pointer that can be carried between threads.
@@ -120,11 +145,14 @@ where
         .map_err(|error| format!("the main thread never answered: {error}"))?
 }
 
-pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, String> {
+pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inner, String> {
     let handle = window.clone();
-    let view = on_main(window, move |main| {
+    let handles = on_main(window, move |main| {
         let content = content_view(&handle)?;
-        let view = NSView::initWithFrame(NSView::alloc(main), rect(&content, place));
+        let container = PassThroughView::new(main, rect(&content, place.stage));
+        container.setWantsLayer(true);
+        container.setClipsToBounds(true);
+        let view = NSView::initWithFrame(NSView::alloc(main), child_rect(&container, place));
         // Metal draws into this view's layer, so it has to have one. wgpu
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
@@ -132,52 +160,61 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
         // Over the webview. A `None` sibling with `Above` means "over all of
         // them", which is the front. The page hides it before drawing anything
         // on top; see the note in mod.rs for why it is not the other way round.
-        content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None);
+        container.addSubview(&view);
+        content.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
         let pointer =
             NonNull::new(Retained::into_raw(view)).ok_or("the monitor view has no address")?;
-        Ok(Handle(pointer))
+        let container = NonNull::new(Retained::into_raw(container))
+            .ok_or("the monitor container has no address")?;
+        Ok((Handle(container.cast()), Handle(pointer)))
     })?;
     Ok(Inner {
-        view,
+        container: handles.0,
+        view: handles.1,
         window: window.clone(),
     })
 }
 
-pub fn place(inner: &Inner, at: Place) {
+pub fn place(inner: &Inner, at: MonitorPlace) {
     let handle = inner.window.clone();
     let view = inner.view;
+    let container = inner.container;
     // Placement is best effort: a window that has gone during a resize is a
     // window nobody is looking at.
     let _ = on_main(&inner.window, move |_| {
         let content = content_view(&handle)?;
-        // SAFETY: messaged on the main thread, and the view is alive until
-        // `detach` releases it.
+        // SAFETY: both views are alive until `detach` releases the container.
+        let container = unsafe { container.ptr().as_ref() };
+        container.setFrame(rect(&content, at.stage));
         let view = unsafe { view.ptr().as_ref() };
-        view.setFrame(rect(&content, at));
+        view.setFrame(child_rect(container, at));
         Ok(())
     });
 }
 
 pub fn set_visible(inner: &Inner, visible: bool) {
-    let view = inner.view;
+    let container = inner.container;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: messaged on the main thread, and the view is alive until
         // `detach` releases it.
-        unsafe { view.ptr().as_ref().setHidden(!visible) };
+        unsafe { container.ptr().as_ref().setHidden(!visible) };
         Ok(())
     });
 }
 
 pub fn detach(inner: &Inner) {
     let view = inner.view;
+    let container = inner.container;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: the pointer came from `Retained::into_raw` in `attach` and is
         // released exactly once, here.
-        let view: Retained<NSView> = unsafe { Retained::from_raw(view.ptr().as_ptr()) }
+        let _view: Retained<NSView> = unsafe { Retained::from_raw(view.ptr().as_ptr()) }
             .ok_or("the monitor view was already gone")?;
-        view.removeFromSuperview();
+        let container: Retained<NSView> = unsafe { Retained::from_raw(container.ptr().as_ptr()) }
+            .ok_or("the monitor container was already gone")?;
+        container.removeFromSuperview();
         Ok(())
     });
 }
@@ -223,6 +260,19 @@ fn rect(content: &NSView, at: Place) -> NSRect {
     );
     NSRect::new(
         NSPoint::new(x, bounds.size.height - y - height),
+        NSSize::new(width, height),
+    )
+}
+
+fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
+    let scale = backing_scale(container);
+    let bounds = container.bounds();
+    let x = (at.content.x - at.stage.x) / scale;
+    let top = (at.content.y - at.stage.y) / scale;
+    let width = at.content.width.max(1.0) / scale;
+    let height = at.content.height.max(1.0) / scale;
+    NSRect::new(
+        NSPoint::new(x, bounds.size.height - top - height),
         NSSize::new(width, height),
     )
 }

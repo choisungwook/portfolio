@@ -166,6 +166,21 @@ invisible. So the badge is hidden and the exact frame is not asked for.
 
 On the media element fallback both are still there, unchanged.
 
+## Zoom changes the native picture, not the page
+
+The monitor has two native views. The outer view stays exactly on the stage and
+clips its child. The child is the Metal surface, and zoom changes only its size
+and origin inside that clip.
+
+- Cmd-wheel keeps the project point below the cursor fixed
+- Drag moves the enlarged child but cannot reveal outside its edges
+- Fit restores the child to the outer view's bounds
+- The outer view passes pointer input through to the WebView, which owns the
+  gesture arithmetic
+
+Changing CSS scale would enlarge an already rendered frame. Resizing the
+Metal surface instead gives the compositor the new pixel budget.
+
 ## Falling back is a supported answer
 
 `fallback::choose` takes the setting and whether the native engine actually

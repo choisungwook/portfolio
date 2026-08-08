@@ -11,7 +11,7 @@
 //! copy of the timeline along with the request.
 
 use crate::playback::{Config as PlaybackConfig, Session, Status as PlaybackStatus};
-use crate::viewport::Place;
+use crate::viewport::MonitorPlace;
 use makevideo_compositor::{Backend, Compositor};
 // Aliased because this file also spawns processes, and two things called
 // Command in one file is one too many.
@@ -1751,7 +1751,7 @@ impl PlaybackChoice {
 pub fn playback_attach(
     window: tauri::WebviewWindow,
     state: State<AppState>,
-    place: Place,
+    place: MonitorPlace,
     frame: i64,
 ) -> PlaybackChoice {
     let settings = state.settings.lock().unwrap().clone();
@@ -1788,7 +1788,7 @@ fn start_session(
     window: &tauri::WebviewWindow,
     state: &State<AppState>,
     settings: &Settings,
-    place: Place,
+    place: MonitorPlace,
     frame: i64,
 ) -> Result<Session, String> {
     if !place.is_visible() {
@@ -1860,7 +1860,7 @@ pub fn playback_redraw(state: State<AppState>) -> Option<PlaybackStatus> {
 }
 
 #[tauri::command]
-pub fn playback_place(state: State<AppState>, place: Place) -> Option<PlaybackStatus> {
+pub fn playback_place(state: State<AppState>, place: MonitorPlace) -> Option<PlaybackStatus> {
     with_session(&state, |session| session.place(place))
 }
 

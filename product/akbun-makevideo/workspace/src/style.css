@@ -447,6 +447,10 @@ select {
   background: #000;
 }
 
+#stage:active {
+  cursor: grabbing;
+}
+
 #stage-inner {
   position: absolute;
   top: 0;
