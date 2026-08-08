@@ -26,9 +26,10 @@ pub mod migrate;
 
 pub use command::{ClipAt, Command, Edge};
 pub use document::{Document, DocumentState};
-pub use makevideo_time::{RationalTime, Rate};
+pub use makevideo_time::{Rate, RationalTime};
 
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// What `version` a project file written today holds. Version 1 measured
 /// everything in whole milliseconds; `migrate` turns one of those into this on
@@ -284,6 +285,8 @@ impl Track {
 pub struct Clip {
     pub id: String,
     pub asset_id: String,
+    #[serde(default)]
+    pub link_group: Option<String>,
     /// Where the clip sits on the timeline, in frames of the project rate.
     pub start: i64,
     /// The span taken out of the source, in frames too. `out` is exclusive.
@@ -388,6 +391,26 @@ impl Project {
         Some(&self.tracks[track].clips[clip])
     }
 
+    pub fn linked_placements(&self, clip_id: &str) -> Vec<ClipAt> {
+        let Some(clip) = self.clip(clip_id) else {
+            return Vec::new();
+        };
+        let Some(group) = clip.link_group.as_deref() else {
+            return self.placement(clip_id).into_iter().collect();
+        };
+        self.tracks
+            .iter()
+            .flat_map(|track| {
+                track.clips.iter().filter_map(move |clip| {
+                    (clip.link_group.as_deref() == Some(group)).then(|| ClipAt {
+                        track_id: track.id.clone(),
+                        clip: clip.clone(),
+                    })
+                })
+            })
+            .collect()
+    }
+
     /// The track a clip is on, and a clone of the clip: what an inverse needs
     /// to put the thing back exactly where it was.
     pub fn placement(&self, clip_id: &str) -> Option<ClipAt> {
@@ -426,8 +449,7 @@ impl Project {
 
     /// How far into its source a clip may reach, when anything knows.
     fn source_limit(&self, clip: &Clip) -> Option<i64> {
-        self.asset(&clip.asset_id)?
-            .source_limit_frames(self.rate())
+        self.asset(&clip.asset_id)?.source_limit_frames(self.rate())
     }
 
     /// Everything a clip has to satisfy for the rest of the app to be able to
@@ -441,6 +463,7 @@ impl Project {
     /// out at the edit costs a rejected drag; finding out at the render costs
     /// the render.
     pub fn validate(&self) -> Result<(), String> {
+        let mut links: HashMap<&str, Vec<(&Track, &Clip)>> = HashMap::new();
         for track in &self.tracks {
             let mut previous_end = i64::MIN;
             for clip in &track.clips {
@@ -456,13 +479,35 @@ impl Project {
                 }
                 if let Some(limit) = self.source_limit(clip) {
                     if clip.out_point > limit {
-                        return Err(format!("clip {name} would reach past the end of its source"));
+                        return Err(format!(
+                            "clip {name} would reach past the end of its source"
+                        ));
                     }
                 }
                 if clip.start < previous_end {
                     return Err(format!("clip {name} would overlap the clip before it"));
                 }
+                if let Some(group) = clip.link_group.as_deref() {
+                    links.entry(group).or_default().push((track, clip));
+                }
                 previous_end = clip.end_frame();
+            }
+        }
+        for (group, entries) in links {
+            if entries.len() != 2 {
+                return Err(format!(
+                    "link group {group} must contain one video and one audio clip"
+                ));
+            }
+            let (first_track, first) = entries[0];
+            let (second_track, second) = entries[1];
+            if first_track.kind == second_track.kind
+                || first.asset_id != second.asset_id
+                || first.start != second.start
+                || first.in_point != second.in_point
+                || first.out_point != second.out_point
+            {
+                return Err(format!("link group {group} is out of sync"));
             }
         }
         Ok(())
@@ -503,6 +548,47 @@ impl Project {
                 end = clip.end_frame();
             }
         }
+        let mut groups: HashMap<String, Vec<(TrackKind, String, i64, i64, i64)>> = HashMap::new();
+        for track in &self.tracks {
+            for clip in &track.clips {
+                if let Some(group) = &clip.link_group {
+                    groups.entry(group.clone()).or_default().push((
+                        track.kind,
+                        clip.asset_id.clone(),
+                        clip.start,
+                        clip.in_point,
+                        clip.out_point,
+                    ));
+                }
+            }
+        }
+        let valid: HashSet<String> = groups
+            .into_iter()
+            .filter_map(|(group, entries)| {
+                if entries.len() != 2 {
+                    return None;
+                }
+                let first = &entries[0];
+                let second = &entries[1];
+                (first.0 != second.0
+                    && first.1 == second.1
+                    && first.2 == second.2
+                    && first.3 == second.3
+                    && first.4 == second.4)
+                    .then_some(group)
+            })
+            .collect();
+        for track in &mut self.tracks {
+            for clip in &mut track.clips {
+                if clip
+                    .link_group
+                    .as_ref()
+                    .is_some_and(|group| !valid.contains(group))
+                {
+                    clip.link_group = None;
+                }
+            }
+        }
     }
 }
 
@@ -527,6 +613,7 @@ mod tests {
         Clip {
             id: id.into(),
             asset_id: "v".into(),
+            link_group: None,
             start,
             in_point,
             out_point,
@@ -627,6 +714,9 @@ mod tests {
         project.repair();
         assert!(project.validate().is_ok(), "{:?}", project.tracks[0].clips);
         assert_eq!(project.tracks[0].clips[0].start, 0);
-        assert!(project.tracks[0].clips.iter().all(|clip| clip.out_point <= 300));
+        assert!(project.tracks[0]
+            .clips
+            .iter()
+            .all(|clip| clip.out_point <= 300));
     }
 }

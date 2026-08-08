@@ -28,10 +28,13 @@ Checked after every command, against the whole project:
 
 - a clip has a length, its in point is not negative, and it does not reach past the end of its source
 - clips on a track do not overlap, and none starts before the timeline does
+- a link group has one video clip and one audio clip from the same asset, with matching timeline and source ranges
 
 A broken one does not show on the timeline. A zero length clip draws as nothing and an out point past the end of a file draws as the last frame; both surface as an ffmpeg failure or a black stretch part way through a render that has been running for ten minutes.
 
 Opening a file is the exception: `Project::repair` pulls a clip back to the nearest state that keeps the rules rather than refusing to open. A project written by an older build, or one whose media has been re-encoded to a slightly different length since it was imported, has to keep opening.
+
+Moving, trimming, splitting, deleting, and ripple deleting one linked clip expands to its whole group. A linked move uses the same delta on both tracks and fails as one edit if either destination is occupied. Splitting keeps the left pair in its group and gives the right pair a new group, so the two halves can be edited independently.
 
 ## The revision
 

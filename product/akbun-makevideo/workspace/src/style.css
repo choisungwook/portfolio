@@ -736,6 +736,14 @@ button.icon.on {
   outline-offset: -2px;
 }
 
+.clip.linked::after {
+  content: "⌁";
+  position: absolute;
+  right: 8px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .clip.missing {
   background: repeating-linear-gradient(45deg, #b1443a, #b1443a 6px, #8f342c 6px, #8f342c 12px);
   color: #fff;

@@ -63,6 +63,8 @@ struct WireTrack {
 struct WireClip {
     id: String,
     asset_id: String,
+    #[serde(default)]
+    link_group: Option<String>,
     start: Option<i64>,
     #[serde(rename = "in")]
     in_point: Option<i64>,
@@ -125,6 +127,7 @@ impl From<WireProject> for Project {
                         .map(|clip| Clip {
                             id: clip.id,
                             asset_id: clip.asset_id,
+                            link_group: clip.link_group,
                             start: frames(clip.start, clip.start_ms, rate),
                             in_point: frames(clip.in_point, clip.in_ms, rate),
                             out_point: frames(clip.out_point, clip.out_ms, rate),
@@ -185,7 +188,7 @@ mod tests {
             "version": 2,
             "settings": {"width": 1080, "height": 1920, "rate": {"num": 24000, "den": 1001}},
             "tracks": [{"id": "V1", "kind": "video", "clips": [
-                {"id": "c1", "assetId": "a1", "start": 12, "in": 3, "out": 48, "volume": 0.5}
+                {"id": "c1", "assetId": "a1", "linkGroup": "g1", "start": 12, "in": 3, "out": 48, "volume": 0.5}
             ]}]
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();
@@ -193,6 +196,7 @@ mod tests {
         let clip = &project.tracks[0].clips[0];
         assert_eq!((clip.start, clip.in_point, clip.out_point), (12, 3, 48));
         assert_eq!(clip.volume, 0.5);
+        assert_eq!(clip.link_group.as_deref(), Some("g1"));
     }
 
     #[test]
