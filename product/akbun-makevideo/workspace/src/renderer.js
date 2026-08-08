@@ -1040,6 +1040,7 @@ function scrubTo(clientX) {
 }
 
 function beginScrub(event) {
+  if (event.target.closest('[data-marker-id]')) return;
   scrubbing = true;
   preview.setScrubbing(true);
   scrubTo(event.clientX);

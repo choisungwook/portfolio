@@ -684,6 +684,9 @@ button.icon.on {
   top: 0;
   width: 2px;
   height: 100%;
+  padding: 0;
+  border: 0;
+  background: currentColor;
   cursor: pointer;
   z-index: 10;
 }
