@@ -166,6 +166,16 @@ invisible. So the badge is hidden and the exact frame is not asked for.
 
 On the media element fallback both are still there, unchanged.
 
+## Transform handles are a separate pass
+
+Selection and transform handles belong to the page, not to the project picture.
+
+- Pointer positions convert from the fitted stage to project pixels before the hit test
+- A rotated item rotates the pointer back before its rectangle is tested
+- A drag changes only the page's temporary transform until pointer-up sends one edit command
+- The native view hides while the page draws handles and an exact compositor frame behind them
+- Export never reads the handle canvas
+
 ## Zoom changes the native picture, not the page
 
 The monitor has two native views. The outer view stays exactly on the stage and
