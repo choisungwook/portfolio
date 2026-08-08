@@ -43,6 +43,7 @@ Rust resolves it in `workspace_root()`: the setting if there is one, otherwise t
 - **Renders** default to the project folder, so an edit and what came out of it end up together. The save dialog still lets them go anywhere.
 - **Proxies** are derived files. Videos above 1920px get a 1280px long-edge H.264 copy in the background. A manifest binds each copy to the original absolute path and modification time, so replacing the original invalidates it.
 - **Exports** always read the original asset paths in `project.akbunvideo`. Proxy paths exist only in the playback copy held in memory.
+- **Delete Project** moves the whole managed project folder to Trash, including its generated proxies and renders. Imported source media remains where it is. A project opened through Browse cannot delete its parent folder because that folder may contain unrelated files.
 - The window title and the menu bar show the **folder** name, not the file name — every project file is called `project.akbunvideo`, so the file name carries no information. A `.akbunvideo` opened through Browse is named by its file instead, because its folder belongs to something else.
 
 ## Naming

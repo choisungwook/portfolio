@@ -564,6 +564,7 @@ function renderTimeline() {
 function refresh() {
   renderAssets();
   renderTimeline();
+  el('menu-delete-project').disabled = !state.path;
   if (preview) {
     preview.prune();
     preview.layout();
@@ -1201,6 +1202,29 @@ async function closeProject() {
   loadDocument(await window.api.newDocument(), null);
 }
 
+async function deleteProject() {
+  if (!state.path) return;
+  const name = projectName();
+  const confirmed = await window.api.ask(
+    `Move “${name}” to Trash?\n\nEverything in its project folder, including generated proxies and renders, will move together. Imported source media will not be deleted.`,
+    { title: 'Delete Project', kind: 'warning' },
+  );
+  if (!confirmed) return;
+
+  preview.clear();
+  await preview.release();
+  try {
+    await window.api.deleteProject(state.path);
+    loadDocument(await window.api.newDocument(), null);
+  } catch (error) {
+    reportError(error, 'project:delete');
+    preview.showTimeline();
+    refresh();
+    attachMonitor(true);
+    await window.api.message(String(error), { title: 'Cannot delete project', kind: 'error' });
+  }
+}
+
 // --- settings sheets -------------------------------------------------------
 
 function openSheet(id) {
@@ -1373,6 +1397,7 @@ const actions = {
   'save-project': () => saveProject(false),
   'save-project-as': () => saveProject(true),
   'import-assets': importViaDialog,
+  'delete-project': deleteProject,
   'close-project': closeProject,
   undo: undoEdit,
   redo: redoEdit,

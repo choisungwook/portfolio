@@ -130,6 +130,7 @@ if (!window.__TAURI__) {
       path: `/workspace/${name}/project.akbunvideo`,
       modifiedMs: 0,
     }),
+    deleteProject: unavailable,
     importAssets: async () => [],
     proxyStatus: async () => [],
     startProxies: async () => [],
@@ -279,6 +280,7 @@ window.api = {
   },
   writeQualityReport: (path, report) => invoke('save_quality_report', { path, report }),
   createProject: (name) => invoke('create_project', { name }),
+  deleteProject: (projectPath) => invoke('delete_project', { projectPath }),
 
   // Only paths cross this line. Nothing here copies a byte of media, and
   // importing does not change the project on its own: it reports what the

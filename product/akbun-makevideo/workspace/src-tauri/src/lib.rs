@@ -49,6 +49,7 @@ pub fn run() {
                 compositor: Mutex::new(Vec::new()),
                 playback: Mutex::new(None),
                 proxies: Arc::new(Mutex::new(commands::ProxyState::default())),
+                proxy_workers: Mutex::new(Vec::new()),
             });
             Ok(())
         })
@@ -58,6 +59,7 @@ pub fn run() {
             commands::report_error,
             commands::list_projects,
             commands::create_project,
+            commands::delete_project,
             commands::import_assets,
             commands::proxy_status,
             commands::start_proxies,
