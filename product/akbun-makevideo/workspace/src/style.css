@@ -231,6 +231,29 @@ select {
   color: var(--dim);
 }
 
+.shortcut-sheet {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.shortcut-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  padding: 2px;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(210px, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.shortcut-row input {
+  min-width: 0;
+}
+
 .menu-list button:hover kbd {
   color: inherit;
 }

@@ -18,6 +18,7 @@
 
 const L = globalThis.timelineLib;
 const T = globalThis.timeLib;
+const K = globalThis.shortcutLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
@@ -51,6 +52,7 @@ const DEFAULT_SETTINGS = {
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
+  shortcutOverrides: {},
 };
 
 const el = (id) => document.getElementById(id);
@@ -681,6 +683,10 @@ function seekTimelineStart() {
 
 function seekTimelineEnd() {
   preview.seek(L.projectDurationFrames(state.project));
+}
+
+function seekTimelineOffset(offset) {
+  preview.seek(Math.round(preview.position()) + offset);
 }
 
 /** Keep the playhead on screen while it runs, without fighting a user who is
@@ -1493,10 +1499,59 @@ function fillProxySheet() {
   el('proxy-generate').disabled = !state.path || !window.api.available;
 }
 
+function shortcutMap() {
+  return K.resolved(state.settings.shortcutOverrides);
+}
+
+function renderShortcutLabels() {
+  const byAction = new Map(shortcutMap().map((shortcut) => [shortcut.action, shortcut]));
+  for (const node of document.querySelectorAll('[data-shortcut]')) {
+    const shortcut = byAction.get(node.dataset.shortcut);
+    node.textContent = shortcut ? K.formatKeys(shortcut.keys) : '';
+  }
+}
+
+function fillShortcutSheet() {
+  const list = el('shortcut-list');
+  list.textContent = '';
+  for (const shortcut of shortcutMap()) {
+    const row = document.createElement('label');
+    row.className = 'shortcut-row';
+    row.textContent = shortcut.label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.dataset.shortcutAction = shortcut.action;
+    input.value = K.inputKeys(shortcut.keys);
+    input.setAttribute('aria-label', `${shortcut.label} shortcut`);
+    row.appendChild(input);
+    list.appendChild(row);
+  }
+  const error = el('shortcut-error');
+  error.hidden = true;
+  error.textContent = '';
+}
+
+function collectShortcutOverrides() {
+  const keysByAction = {};
+  for (const input of el('shortcut-list').querySelectorAll('[data-shortcut-action]')) {
+    const keys = K.parseKeys(input.value);
+    if (!keys) throw new Error(`Use a key such as Cmd+S for ${input.previousSibling.textContent}.`);
+    keysByAction[input.dataset.shortcutAction] = keys;
+  }
+  const updated = K.resolved(K.overridesFor(keysByAction));
+  const conflicts = K.conflicts(updated);
+  if (conflicts.length) {
+    const conflict = conflicts[0];
+    throw new Error(`${K.formatKeys([conflict.key])} is used by ${conflict.first.label} and ${conflict.second.label}.`);
+  }
+  return K.overridesFor(keysByAction);
+}
+
 function applySettings(next) {
   const was = state.settings.playbackEngine;
   const usedProxies = state.settings.proxyEnabled;
   state.settings = next;
+  renderShortcutLabels();
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
   dom.previewQuality.value = next.previewQuality;
@@ -1565,6 +1620,11 @@ const actions = {
   split: splitAtPlayhead,
   'delete-clip': () => deleteSelected(false),
   'ripple-delete': () => deleteSelected(true),
+  'toggle-playback': () => preview.toggle(),
+  'previous-frame': () => seekTimelineOffset(-1),
+  'next-frame': () => seekTimelineOffset(1),
+  'previous-second': () => seekTimelineOffset(-Math.round(T.rateToNumber(rate()))),
+  'next-second': () => seekTimelineOffset(Math.round(T.rateToNumber(rate()))),
   'previous-edit': seekPreviousEdit,
   'next-edit': seekNextEdit,
   'timeline-start': seekTimelineStart,
@@ -1583,6 +1643,10 @@ const actions = {
   'app-settings': () => {
     fillAppSheet();
     openSheet('app-settings');
+  },
+  'shortcut-settings': () => {
+    fillShortcutSheet();
+    openSheet('shortcut-settings');
   },
   'quality-soak': async () => {
     try {
@@ -1839,6 +1903,27 @@ function wireSheets() {
     applySettings(state.boot.settings);
     updateToolWarning();
   });
+  el('shortcut-save').addEventListener('click', async () => {
+    const error = el('shortcut-error');
+    let shortcutOverrides;
+    try {
+      shortcutOverrides = collectShortcutOverrides();
+    } catch (cause) {
+      error.textContent = cause.message;
+      error.hidden = false;
+      return;
+    }
+    try {
+      state.boot = await window.api.saveSettings(Object.assign({}, state.settings, { shortcutOverrides }));
+    } catch (cause) {
+      reportError(cause, 'settings:shortcuts');
+      error.textContent = `Those shortcuts could not be saved. ${cause}`;
+      error.hidden = false;
+      return;
+    }
+    closeSheet('shortcut-settings');
+    applySettings(state.boot.settings);
+  });
   el('proxy-generate').addEventListener('click', async () => {
     if (!state.path) return;
     try {
@@ -1904,8 +1989,6 @@ function wireKeyboard() {
     const typing =
       target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
     if (typing) return;
-    const meta = event.metaKey || event.ctrlKey;
-
     if (event.key === 'Escape') {
       closeMenus();
       for (const sheet of document.querySelectorAll('.overlay')) {
@@ -1913,78 +1996,11 @@ function wireKeyboard() {
       }
       return;
     }
-    if (meta && event.key.toLowerCase() === 'b') {
-      event.preventDefault();
-      splitAtPlayhead();
-      return;
-    }
-    if (meta && event.key.toLowerCase() === 's') {
-      event.preventDefault();
-      saveProject(event.shiftKey);
-      return;
-    }
-    if (meta && event.key.toLowerCase() === 'o') {
-      event.preventDefault();
-      openProject();
-      return;
-    }
-    if (meta && event.key.toLowerCase() === 'n') {
-      event.preventDefault();
-      newProject();
-      return;
-    }
-    if (meta && event.key.toLowerCase() === 'i') {
-      event.preventDefault();
-      importViaDialog();
-      return;
-    }
-    if (event.code === 'Space') {
-      event.preventDefault();
-      preview.toggle();
-      return;
-    }
-    if (meta && event.key.toLowerCase() === 'z') {
-      event.preventDefault();
-      if (event.shiftKey) redoEdit();
-      else undoEdit();
-      return;
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault();
-      // Shift closes the gap behind it, which is the destructive one and the
-      // reason it is not the plain key.
-      deleteSelected(event.shiftKey);
-      return;
-    }
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      event.preventDefault();
-      // One frame, or a second with shift. A frame is 1 now, which is the
-      // point of counting in them.
-      const step = event.shiftKey ? Math.round(T.rateToNumber(rate())) : 1;
-      const at = Math.round(preview.position());
-      preview.seek(at + (event.key === 'ArrowRight' ? step : -step));
-      return;
-    }
-    if (event.key === 'ArrowUp' || event.key === 'PageUp') {
-      event.preventDefault();
-      seekPreviousEdit();
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'PageDown') {
-      event.preventDefault();
-      seekNextEdit();
-      return;
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      seekTimelineStart();
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      seekTimelineEnd();
-      return;
-    }
+    const action = K.actionFor(event, shortcutMap());
+    if (!action) return;
+    event.preventDefault();
+    const run = actions[action];
+    if (run) Promise.resolve().then(run).catch((error) => reportError(error, `shortcut:${action}`));
   });
 }
 
