@@ -549,7 +549,11 @@ fn add_clip(
         return Err(format!("a {:?} track will not take that", track.kind).to_lowercase());
     }
     let duration = asset.initial_clip_frames(rate);
-    let start = track.free_start(start, duration, None);
+    let free_start = track.free_start(start, duration, None);
+    if link_group.is_some() && free_start != start {
+        return Err("there is no room to add every linked clip together".into());
+    }
+    let start = free_start;
     let id = id.unwrap_or_else(|| ids.make('c'));
     track.clips.push(Clip {
         id: id.clone(),

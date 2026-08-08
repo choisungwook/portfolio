@@ -825,6 +825,56 @@ mod tests {
     }
 
     #[test]
+    fn linked_add_fails_whole_when_either_track_is_occupied() {
+        let mut document = document();
+        document
+            .apply(Command::AddClip {
+                track_id: audio_track(&document),
+                asset_id: "v".into(),
+                start: 0,
+                id: None,
+                link_group: None,
+            })
+            .unwrap();
+
+        let error = document
+            .apply_all(vec![
+                Command::AddClip {
+                    track_id: video_track(&document),
+                    asset_id: "v".into(),
+                    start: 0,
+                    id: None,
+                    link_group: Some("g1".into()),
+                },
+                Command::AddClip {
+                    track_id: audio_track(&document),
+                    asset_id: "v".into(),
+                    start: 0,
+                    id: None,
+                    link_group: Some("g1".into()),
+                },
+            ])
+            .unwrap_err();
+
+        assert!(error.contains("no room"), "{error}");
+        assert!(document
+            .project()
+            .track(&video_track(&document))
+            .unwrap()
+            .clips
+            .is_empty());
+        assert_eq!(
+            document
+                .project()
+                .track(&audio_track(&document))
+                .unwrap()
+                .clips
+                .len(),
+            1
+        );
+    }
+
+    #[test]
     fn a_linked_move_fails_whole_when_either_track_is_occupied() {
         let mut document = document();
         let (video, audio) = add_linked(&mut document, 0);
