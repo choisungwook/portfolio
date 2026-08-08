@@ -143,6 +143,30 @@ function shapeBBox(shape) {
   return { x, y, w: Math.abs(shape.w), h: Math.abs(shape.h) };
 }
 
+function normalizeRect(x0, y0, x1, y1) {
+  return {
+    x: Math.min(x0, x1),
+    y: Math.min(y0, y1),
+    w: Math.abs(x1 - x0),
+    h: Math.abs(y1 - y0),
+  };
+}
+
+function shapeIndicesInRect(shapes, rect) {
+  const right = rect.x + rect.w;
+  const bottom = rect.y + rect.h;
+  return shapes.reduce((indices, shape, index) => {
+    const box = shapeBBox(shape);
+    const contained =
+      box.x >= rect.x &&
+      box.y >= rect.y &&
+      box.x + box.w <= right &&
+      box.y + box.h <= bottom;
+    if (contained) indices.push(index);
+    return indices;
+  }, []);
+}
+
 function moveShape(shape, dx, dy) {
   if (shape.kind === 'pen') {
     for (const p of shape.points) {
@@ -447,6 +471,8 @@ const exported = {
   dragShape,
   isDegenerate,
   shapeBBox,
+  normalizeRect,
+  shapeIndicesInRect,
   moveShape,
   handlesFor,
   resizeShape,

@@ -89,6 +89,29 @@ test('shapeBBox normalizes negative line extents', () => {
   assert.deepStrictEqual(L.shapeBBox(shape), { x: 40, y: 100, w: 60, h: 60 });
 });
 
+test('normalizeRect accepts a drag in any direction', () => {
+  assert.deepStrictEqual(L.normalizeRect(100, 80, 20, 10), {
+    x: 20,
+    y: 10,
+    w: 80,
+    h: 70,
+  });
+});
+
+test('shapeIndicesInRect selects only fully enclosed shapes', () => {
+  const inside = L.createShape('rect', 20, 20, {});
+  L.dragShape(inside, 20, 20, 80, 80);
+  const crossing = L.createShape('ellipse', 90, 90, {});
+  L.dragShape(crossing, 90, 90, 130, 130);
+  const line = L.createShape('line', 30, 100, {});
+  L.dragShape(line, 30, 100, 70, 40);
+
+  assert.deepStrictEqual(
+    L.shapeIndicesInRect([inside, crossing, line], { x: 10, y: 10, w: 100, h: 100 }),
+    [0, 2]
+  );
+});
+
 test('moveShape shifts pen points', () => {
   const shape = L.createShape('pen', 0, 0, {});
   L.dragShape(shape, 0, 0, 10, 10);

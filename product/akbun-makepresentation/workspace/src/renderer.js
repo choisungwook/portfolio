@@ -9,6 +9,7 @@ const state = {
   deck: L.createDeck(),
   current: 0,
   selected: -1,
+  selection: [],
   tool: 'select',
   filePath: null,
   dirty: false,
@@ -18,7 +19,6 @@ const state = {
   presenting: false,
   presentIndex: 0,
   showNumbers: false,
-  clipboard: null,
   zoom: L.ZOOM_FIT,
 };
 
@@ -31,6 +31,26 @@ const present = $('present');
 const slide = () => state.deck.slides[state.current];
 const selectedShape = () =>
   state.selected >= 0 ? slide().shapes[state.selected] : null;
+const selectedShapes = () =>
+  state.selection
+    .filter((index) => index >= 0 && index < slide().shapes.length)
+    .map((index) => slide().shapes[index]);
+
+function selectOnly(index) {
+  state.selected = index;
+  state.selection = index >= 0 ? [index] : [];
+}
+
+function selectMany(indices) {
+  state.selection = [...new Set(indices)].filter(
+    (index) => index >= 0 && index < slide().shapes.length
+  );
+  state.selected = state.selection.length ? state.selection[state.selection.length - 1] : -1;
+}
+
+function clearSelection() {
+  selectOnly(-1);
+}
 
 // --- rendering ---------------------------------------------------------------
 
@@ -56,20 +76,29 @@ function hitSvg(shape) {
   }
 }
 
-function selectionSvg(shape) {
+function selectionSvg(shape, handles) {
   const parts = [];
-  if (shape.kind !== 'line' && shape.kind !== 'arrow') {
+  if (!handles || (shape.kind !== 'line' && shape.kind !== 'arrow')) {
     const b = L.shapeBBox(shape);
     parts.push(
       `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" class="sel-box"/>`
     );
   }
-  for (const h of L.handlesFor(shape)) {
-    parts.push(
-      `<rect x="${h.x - HANDLE / 2}" y="${h.y - HANDLE / 2}" width="${HANDLE}" height="${HANDLE}" class="sel-handle" data-handle="${h.id}"/>`
-    );
+  if (handles) {
+    for (const h of L.handlesFor(shape)) {
+      parts.push(
+        `<rect x="${h.x - HANDLE / 2}" y="${h.y - HANDLE / 2}" width="${HANDLE}" height="${HANDLE}" class="sel-handle" data-handle="${h.id}"/>`
+      );
+    }
   }
   return parts.join('');
+}
+
+function marqueeSvg() {
+  const drag = state.drag;
+  if (!drag || drag.mode !== 'marquee') return '';
+  const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
+  return `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" class="selection-marquee"/>`;
 }
 
 // The slide number is not part of slide().shapes, so it draws after them and
@@ -91,11 +120,17 @@ function renderCanvas() {
         })}${hitSvg(shape)}</g>`
     )
     .join('');
-  const sel = selectedShape();
+  const showHandles = state.selection.length === 1 && state.editingIndex < 0;
+  const selections = state.selection
+    .map((index) => slide().shapes[index])
+    .filter(Boolean)
+    .map((shape) => selectionSvg(shape, showHandles))
+    .join('');
   canvas.innerHTML =
     shapes +
     slideNumberSvg(state.current) +
-    (sel && state.editingIndex < 0 ? selectionSvg(sel) : '');
+    (state.editingIndex < 0 ? selections : '') +
+    marqueeSvg();
 }
 
 function renderThumbs() {
@@ -122,7 +157,9 @@ function renderProps() {
   $('props-stroke').hidden = !showStroke;
   $('props-text').hidden = !showText;
   $('btn-delete-shape').hidden = !shape;
-  $('props-hint').textContent = shape
+  $('props-hint').textContent = state.selection.length > 1
+    ? `Selected: ${state.selection.length} objects`
+    : shape
     ? `Selected: ${kind}`
     : 'No selection — sets style for new shapes';
 
@@ -213,7 +250,7 @@ function markDirty() {
 function restore(deck) {
   state.deck = structuredClone(deck);
   state.current = Math.min(state.current, state.deck.slides.length - 1);
-  state.selected = -1;
+  clearSelection();
   state.dirty = true;
   renderAll();
 }
@@ -280,7 +317,7 @@ canvas.addEventListener('pointerdown', (event) => {
     shape.w = 320;
     shape.h = shape.fontSize * 1.4;
     slide().shapes.push(shape);
-    state.selected = slide().shapes.length - 1;
+    selectOnly(slide().shapes.length - 1);
     setTool('select');
     markDirty();
     renderAll();
@@ -297,7 +334,7 @@ canvas.addEventListener('pointerdown', (event) => {
   }
 
   const handleEl = event.target.closest('[data-handle]');
-  if (handleEl && selectedShape()) {
+  if (handleEl && state.selection.length === 1 && selectedShape()) {
     state.drag = {
       mode: 'resize',
       handle: handleEl.dataset.handle,
@@ -311,7 +348,7 @@ canvas.addEventListener('pointerdown', (event) => {
 
   const group = event.target.closest('g[data-i]');
   if (group) {
-    let index = Number(group.dataset.i);
+    const index = Number(group.dataset.i);
 
     // Opening a text box for editing is decided here rather than from a
     // dblclick event, because the browser never reports one: pointerup
@@ -323,34 +360,42 @@ canvas.addEventListener('pointerdown', (event) => {
     // deletes the box being typed into instead of a character.
     if (isSecondPress(index) && slide().shapes[index].kind === 'text') {
       event.preventDefault();
-      state.selected = index;
+      selectOnly(index);
       renderCanvas();
       renderProps();
       startTextEdit(index);
       return;
     }
 
-    const clicked = index;
+    if (!state.selection.includes(index)) selectOnly(index);
+
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
     const duplicated = event.metaKey || event.ctrlKey;
+    const originalSelection = [...state.selection];
     if (duplicated) {
-      slide().shapes.push(structuredClone(slide().shapes[index]));
-      index = slide().shapes.length - 1;
+      const copies = selectedShapes().map((shape) => structuredClone(shape));
+      const first = slide().shapes.length;
+      slide().shapes.push(...copies);
+      selectMany(copies.map((_, offset) => first + offset));
     }
-    state.selected = index;
     state.drag = {
       mode: 'move',
-      from: structuredClone(selectedShape()),
+      items: state.selection.map((selectedIndex) => ({
+        index: selectedIndex,
+        from: structuredClone(slide().shapes[selectedIndex]),
+      })),
       x0: p.x,
       y0: p.y,
       moved: false,
       duplicated,
-      clicked,
+      originalSelection,
     };
     canvas.setPointerCapture(event.pointerId);
   } else {
-    state.selected = -1;
+    clearSelection();
+    state.drag = { mode: 'marquee', x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    canvas.setPointerCapture(event.pointerId);
   }
   renderCanvas();
   renderProps();
@@ -365,20 +410,25 @@ canvas.addEventListener('pointermove', (event) => {
 
   if (drag.mode === 'draw') {
     L.dragShape(slide().shapes[drag.index], drag.x0, drag.y0, p.x, p.y, event.shiftKey);
-  } else {
+  } else if (drag.mode === 'marquee') {
+    drag.x1 = p.x;
+    drag.y1 = p.y;
+  } else if (drag.mode === 'resize') {
     const shape = selectedShape();
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
-    if (drag.mode === 'move') {
-      // Shift keeps the move on whichever axis has travelled further.
-      const straight = event.shiftKey;
-      const mx = straight && Math.abs(dx) <= Math.abs(dy) ? 0 : dx;
-      const my = straight && Math.abs(dx) > Math.abs(dy) ? 0 : dy;
+    L.resizeShape(shape, drag.from, drag.handle, dx, dy);
+  } else if (drag.mode === 'move') {
+    // Shift keeps the move on whichever axis has travelled further.
+    const straight = event.shiftKey;
+    const mx = straight && Math.abs(dx) <= Math.abs(dy) ? 0 : dx;
+    const my = straight && Math.abs(dx) > Math.abs(dy) ? 0 : dy;
+    for (const item of drag.items) {
+      const shape = slide().shapes[item.index];
+      Object.assign(shape, structuredClone(item.from));
       L.moveShape(shape, mx, my);
-      drag.moved = drag.moved || mx !== 0 || my !== 0;
-    } else {
-      L.resizeShape(shape, drag.from, drag.handle, dx, dy);
     }
+    drag.moved = drag.moved || mx !== 0 || my !== 0;
   }
   renderCanvas();
 });
@@ -393,18 +443,20 @@ canvas.addEventListener('pointerup', () => {
     if (L.isDegenerate(shapes[drag.index])) {
       shapes.splice(drag.index, 1);
     } else {
-      state.selected = drag.index;
+      selectOnly(drag.index);
       markDirty();
     }
     setTool('select');
+  } else if (drag.mode === 'marquee') {
+    const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
+    selectMany(L.shapeIndicesInRect(slide().shapes, rect));
   } else if (drag.mode === 'resize' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {
-    // A Cmd+click that never moved selects the shape it hit, the way a plain
-    // click does. The copy pointerdown made has nowhere useful to sit: on top
-    // of the original nobody can see it.
-    slide().shapes.pop();
-    state.selected = drag.clicked;
+    // A Cmd+click that never moved keeps the original selection. The copies
+    // made on pointerdown have nowhere useful to sit on top of the originals.
+    slide().shapes.splice(slide().shapes.length - drag.items.length, drag.items.length);
+    selectMany(drag.originalSelection);
   }
   renderAll();
 });
@@ -459,7 +511,7 @@ function commitTextEdit() {
   // while the overlay was open. There is nothing to commit into, and reading
   // through it would take the whole page down.
   if (!shape) {
-    state.selected = -1;
+    clearSelection();
     renderAll();
     return;
   }
@@ -473,7 +525,7 @@ function commitTextEdit() {
 
   if (removed) {
     slide().shapes.splice(index, 1);
-    state.selected = -1;
+    clearSelection();
   } else if (changed) {
     shape.text = text;
     const lines = text.split('\n').length;
@@ -546,8 +598,7 @@ document.addEventListener('keydown', (event) => {
     else if (key === 'z' && event.shiftKey) redo();
     else if (key === 'z') undo();
     else if (key === 'y') redo();
-    else if (key === 'c') copyShape();
-    else if (key === 'v') pasteShape();
+    else if (key === 'c' || key === 'v') return;
     else if (key === 'd') duplicateSelection();
     else if (TEXT_STYLE_KEYS[key]) toggleTextStyle(TEXT_STYLE_KEYS[key]);
     else return;
@@ -561,18 +612,18 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key === 'Escape') {
-    state.selected = -1;
+    clearSelection();
     renderCanvas();
     renderProps();
     return;
   }
   if (event.key.startsWith('Arrow')) {
-    const shape = selectedShape();
-    if (!shape) return;
+    const shapes = selectedShapes();
+    if (shapes.length === 0) return;
     const step = event.shiftKey ? 10 : 1;
     const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
     const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
-    L.moveShape(shape, dx, dy);
+    for (const shape of shapes) L.moveShape(shape, dx, dy);
     markDirty();
     renderCanvas();
     event.preventDefault();
@@ -583,9 +634,10 @@ document.addEventListener('keydown', (event) => {
 });
 
 function deleteSelectedShape() {
-  if (state.selected < 0) return;
-  slide().shapes.splice(state.selected, 1);
-  state.selected = -1;
+  if (state.selection.length === 0) return;
+  const descending = [...state.selection].sort((a, b) => b - a);
+  for (const index of descending) slide().shapes.splice(index, 1);
+  clearSelection();
   markDirty();
   renderAll();
 }
@@ -593,35 +645,133 @@ function deleteSelectedShape() {
 // --- copy, paste, duplicate ----------------------------------------------------
 
 const PASTE_OFFSET = 20;
+const SHAPE_CLIPBOARD_TYPE = 'application/x-akbun-makepresentation-shapes';
+const SHAPE_KINDS = new Set(['rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image']);
 
-function addCopy(shape) {
-  const copy = structuredClone(shape);
-  L.moveShape(copy, PASTE_OFFSET, PASTE_OFFSET);
-  slide().shapes.push(copy);
-  state.selected = slide().shapes.length - 1;
+function insertShapes(shapes, offset) {
+  const copies = shapes.map((shape) => structuredClone(shape));
+  if (offset) {
+    for (const copy of copies) L.moveShape(copy, offset, offset);
+  }
+  const first = slide().shapes.length;
+  slide().shapes.push(...copies);
+  selectMany(copies.map((_, index) => first + index));
   markDirty();
   renderAll();
-  return copy;
+  return copies;
 }
 
-function copyShape() {
-  const shape = selectedShape();
-  if (shape) state.clipboard = structuredClone(shape);
+function isFormField(target) {
+  return target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLTextAreaElement;
 }
 
-function pasteShape() {
-  if (!state.clipboard) return;
-  // The clipboard follows the last paste so a run of them walks down the
-  // slide instead of piling up on one spot.
-  state.clipboard = structuredClone(addCopy(state.clipboard));
+function parseClipboardShapes(value) {
+  try {
+    const shapes = JSON.parse(value);
+    if (!Array.isArray(shapes) || shapes.length === 0) return [];
+    return shapes.filter((shape) => shape && SHAPE_KINDS.has(shape.kind));
+  } catch (_) {
+    return [];
+  }
 }
+
+document.addEventListener('copy', (event) => {
+  if (isFormField(event.target)) return;
+  const shapes = selectedShapes();
+  if (shapes.length === 0 || !event.clipboardData) return;
+  event.clipboardData.setData(SHAPE_CLIPBOARD_TYPE, JSON.stringify(shapes));
+  const text = shapes
+    .filter((shape) => shape.kind === 'text')
+    .map((shape) => shape.text)
+    .join('\n');
+  if (text) event.clipboardData.setData('text/plain', text);
+  event.preventDefault();
+});
+
+function readFileDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('cannot read clipboard image'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readImageSize(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => reject(new Error('cannot decode clipboard image'));
+    image.src = src;
+  });
+}
+
+function pastedTextShape(text) {
+  const shape = L.createShape('text', 80, 80, state.defaults);
+  shape.w = 640;
+  shape.text = text.replace(/\r\n/g, '\n');
+  const lines = L.wrapTextLines(shape.text, shape.w, shape.fontSize).length;
+  shape.h = Math.max(shape.fontSize * 1.4, lines * shape.fontSize * 1.35);
+  return shape;
+}
+
+async function pastedImageShape(file, index) {
+  const src = await readFileDataUrl(file);
+  const size = await readImageSize(src);
+  const scale = Math.min(1, (L.SLIDE_W * 0.8) / size.width, (L.SLIDE_H * 0.8) / size.height);
+  const shape = L.createShape('image', 0, 0, state.defaults);
+  shape.w = Math.max(1, size.width * scale);
+  shape.h = Math.max(1, size.height * scale);
+  shape.x = (L.SLIDE_W - shape.w) / 2 + index * PASTE_OFFSET;
+  shape.y = (L.SLIDE_H - shape.h) / 2 + index * PASTE_OFFSET;
+  shape.src = src;
+  return shape;
+}
+
+document.addEventListener('paste', async (event) => {
+  if (isFormField(event.target) || !event.clipboardData) return;
+
+  const encoded = event.clipboardData.getData(SHAPE_CLIPBOARD_TYPE);
+  const copiedShapes = parseClipboardShapes(encoded);
+  if (copiedShapes.length) {
+    event.preventDefault();
+    insertShapes(copiedShapes, PASTE_OFFSET);
+    return;
+  }
+
+  const itemFiles = Array.from(event.clipboardData.items || [])
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  const directFiles = Array.from(event.clipboardData.files || [])
+    .filter((file) => file.type.startsWith('image/'));
+  const imageFiles = [...new Set([...itemFiles, ...directFiles])];
+  if (imageFiles.length) {
+    event.preventDefault();
+    try {
+      const shapes = await Promise.all(imageFiles.map(pastedImageShape));
+      insertShapes(shapes, 0);
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Cannot paste image', kind: 'error' });
+    }
+    return;
+  }
+
+  const text = event.clipboardData.getData('text/plain');
+  if (text) {
+    event.preventDefault();
+    insertShapes([pastedTextShape(text)], 0);
+  }
+});
 
 // Cmd+D duplicates the selected shape, or the whole slide when nothing on it
 // is selected. Same split PowerPoint makes.
 function duplicateSelection() {
-  const shape = selectedShape();
-  if (shape) {
-    addCopy(shape);
+  const shapes = selectedShapes();
+  if (shapes.length) {
+    insertShapes(shapes, PASTE_OFFSET);
     return;
   }
   state.current = L.duplicateSlide(state.deck, state.current);
@@ -632,9 +782,9 @@ function duplicateSelection() {
 // --- property panel -------------------------------------------------------------------
 
 function applyProp(patch) {
-  const shape = selectedShape();
-  if (shape) {
-    Object.assign(shape, patch);
+  const shapes = selectedShapes();
+  if (shapes.length) {
+    for (const shape of shapes) Object.assign(shape, patch);
     markDirty();
     renderCanvas();
     renderThumbs();
@@ -755,13 +905,13 @@ $('thumbs').addEventListener('click', (event) => {
   const thumb = event.target.closest('[data-slide]');
   if (!thumb) return;
   state.current = Number(thumb.dataset.slide);
-  state.selected = -1;
+  clearSelection();
   renderAll();
 });
 
 $('btn-add-slide').addEventListener('click', () => {
   state.current = L.addSlide(state.deck, state.current);
-  state.selected = -1;
+  clearSelection();
   markDirty();
   renderAll();
 });
@@ -776,7 +926,7 @@ $('btn-del-slide').addEventListener('click', async () => {
     if (!sure) return;
   }
   state.current = L.deleteSlide(state.deck, state.current);
-  state.selected = -1;
+  clearSelection();
   markDirty();
   renderAll();
 });
@@ -795,7 +945,7 @@ async function newDeck() {
   if (!(await confirmDiscard())) return;
   state.deck = L.createDeck();
   state.current = 0;
-  state.selected = -1;
+  clearSelection();
   state.filePath = null;
   state.dirty = false;
   resetHistory();
@@ -809,7 +959,7 @@ async function openFile() {
   try {
     state.deck = await window.api.openDeck(path);
     state.current = 0;
-    state.selected = -1;
+    clearSelection();
     state.filePath = path;
     state.dirty = false;
     // The number flag has nowhere to live in a .pptx, so an opened file
