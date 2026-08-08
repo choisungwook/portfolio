@@ -1999,7 +1999,8 @@ function wireTransport() {
     }
   }, { passive: false });
   dom.stage.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || !preview.zoomState().available) return;
+    const zoom = preview.zoomState();
+    if (event.button !== 0 || !zoom.available || zoom.zoom <= 1) return;
     monitorPan = { x: event.clientX, y: event.clientY };
     dom.stage.setPointerCapture(event.pointerId);
     event.preventDefault();

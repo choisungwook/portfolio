@@ -502,7 +502,12 @@ function createMonitor(options) {
 
     panBy(dx, dy) {
       if (!drivingNatively() || !stage || viewport.zoom <= FIT_ZOOM) return false;
-      viewport = clampViewport({ ...viewport, x: viewport.x + dx, y: viewport.y + dy }, stage.getBoundingClientRect());
+      const next = clampViewport(
+        { ...viewport, x: viewport.x + dx, y: viewport.y + dy },
+        stage.getBoundingClientRect()
+      );
+      if (next.x === viewport.x && next.y === viewport.y) return false;
+      viewport = next;
       place();
       return true;
     },

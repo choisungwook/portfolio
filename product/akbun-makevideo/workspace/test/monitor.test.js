@@ -70,6 +70,40 @@ test('panning cannot expose space past an enlarged monitor edge', () => {
   );
 });
 
+test('panning against an edge does not place the unchanged viewport', async (t) => {
+  const previousWindow = global.window;
+  t.after(() => {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  });
+  global.window = { devicePixelRatio: 1 };
+  const places = [];
+  const preview = {
+    mode: () => 'timeline',
+    total: () => 1,
+    pause: () => {},
+    clear: () => {},
+    clearExact: () => {},
+  };
+  const api = {
+    available: true,
+    playbackAttach: async () => ({ engine: 'native' }),
+    playbackVisible: async () => {},
+    playbackPlace: async (place) => places.push(place),
+  };
+  const stage = {
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }),
+  };
+  const monitor = createMonitor({ preview, stage, api });
+
+  await monitor.attach();
+  monitor.zoomTo(2);
+  assert.strictEqual(monitor.panBy(10_000, 10_000), true);
+  const placeCount = places.length;
+  assert.strictEqual(monitor.panBy(1, 1), false);
+  assert.strictEqual(places.length, placeCount);
+});
+
 test('the same box twice is recognised, so a drag is not a command per frame', () => {
   const box = { x: 1, y: 2, width: 3, height: 4 };
   assert.ok(samePlace(box, { ...box }));
