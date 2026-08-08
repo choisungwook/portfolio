@@ -215,7 +215,11 @@ impl FrameReader for FfmpegReader {
             self.began = true;
             return true;
         }
-        !self.began && self.retry_with_software() && self.stdout.read_exact(buffer).is_ok()
+        if self.began || !self.retry_with_software() || self.stdout.read_exact(buffer).is_err() {
+            return false;
+        }
+        self.began = true;
+        true
     }
 
     fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
