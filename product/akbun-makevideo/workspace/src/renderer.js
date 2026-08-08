@@ -382,7 +382,12 @@ function onProxyStatus(statuses) {
 }
 
 function onWaveformStatus(statuses) {
-  adoptWaveformStatuses(statuses);
+  if (!(statuses || []).length) {
+    state.waveforms = {};
+  } else {
+    for (const status of statuses) state.waveforms[status.assetId] = status;
+  }
+  renderLanes();
 }
 
 function renderAssets() {
@@ -550,6 +555,7 @@ function drawWaveform(canvas, clip, waveform, cssWidth) {
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
+  if (!context) return;
   const { first, last } = L.waveformBucketRange(clip, rate(), waveform.bucketsPerSecond);
   const span = Math.max(1, last - first);
   context.strokeStyle = getComputedStyle(document.documentElement)
@@ -558,14 +564,16 @@ function drawWaveform(canvas, clip, waveform, cssWidth) {
   context.lineWidth = Math.max(1, ratio);
   context.beginPath();
   for (let x = 0; x < width; x += 1) {
-    const from = Math.max(0, Math.floor(first + (x / width) * span));
+    const from = Math.min(
+      waveform.peaks.length - 1,
+      Math.max(0, Math.floor(first + (x / width) * span))
+    );
     const to = Math.min(
       waveform.peaks.length,
       Math.max(from + 1, Math.ceil(first + ((x + 1) / width) * span))
     );
-    let min = 0;
-    let max = 0;
-    for (let index = from; index < to; index += 1) {
+    let [min, max] = waveform.peaks[from];
+    for (let index = from + 1; index < to; index += 1) {
       min = Math.min(min, waveform.peaks[index][0]);
       max = Math.max(max, waveform.peaks[index][1]);
     }

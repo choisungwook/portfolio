@@ -192,9 +192,8 @@ fn waveform_statuses(waveforms: &WaveformState) -> Vec<WaveformStatus> {
     statuses
 }
 
-fn emit_waveform_status(app: &AppHandle, waveforms: &Arc<Mutex<WaveformState>>) {
-    let statuses = waveform_statuses(&waveforms.lock().unwrap());
-    let _ = app.emit("waveform:status", statuses);
+fn emit_waveform_status(app: &AppHandle, status: WaveformStatus) {
+    let _ = app.emit("waveform:status", vec![status]);
 }
 
 fn ready_proxy_paths(proxies: &ProxyState) -> HashMap<String, String> {
@@ -528,14 +527,17 @@ fn stop_proxy_workers(app: &AppHandle, state: &State<AppState>) {
     }
 }
 
-fn detach_waveform_workers(app: &AppHandle, state: &State<AppState>) {
+fn stop_waveform_workers(app: &AppHandle, state: &State<AppState>) {
     {
         let mut waveforms = state.waveforms.lock().unwrap();
         waveforms.project_path.clear();
         waveforms.entries.clear();
     }
-    emit_waveform_status(app, &state.waveforms);
-    state.waveform_workers.lock().unwrap().clear();
+    let _ = app.emit("waveform:status", Vec::<WaveformStatus>::new());
+    let workers = std::mem::take(&mut *state.waveform_workers.lock().unwrap());
+    for worker in workers {
+        let _ = worker.join();
+    }
 }
 
 fn move_to_trash(path: &Path) -> Result<(), String> {
@@ -573,7 +575,7 @@ pub fn delete_project(
     let session = state.playback.lock().unwrap().take();
     drop(session);
     stop_proxy_workers(&app, &state);
-    detach_waveform_workers(&app, &state);
+    stop_waveform_workers(&app, &state);
     move_to_trash(&target)
 }
 
@@ -967,9 +969,11 @@ fn set_waveform_status(
     if current.project_path != project_path {
         return false;
     }
-    current.entries.insert(status.asset_id.clone(), status);
+    current
+        .entries
+        .insert(status.asset_id.clone(), status.clone());
     drop(current);
-    emit_waveform_status(app, waveforms);
+    emit_waveform_status(app, status);
     true
 }
 
@@ -1086,8 +1090,6 @@ fn start_waveforms_inner(
             }
         }
     }
-    emit_waveform_status(&app, &state.waveforms);
-
     if !jobs.is_empty() {
         let waveforms = Arc::clone(&state.waveforms);
         let worker = std::thread::spawn(move || {

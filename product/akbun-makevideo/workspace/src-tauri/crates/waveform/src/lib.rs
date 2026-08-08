@@ -117,10 +117,8 @@ impl PeakBuilder {
         if self.samples == 0 {
             return;
         }
-        self.peaks.push([
-            self.min as f32 / i16::MAX as f32,
-            self.max as f32 / i16::MAX as f32,
-        ]);
+        self.peaks
+            .push([self.min as f32 / 32_768.0, self.max as f32 / 32_768.0]);
         self.samples = 0;
         self.min = i16::MAX;
         self.max = i16::MIN;
@@ -181,6 +179,15 @@ mod tests {
         assert_eq!(peaks.len(), 1);
         assert!((peaks[0][0] + 0.5).abs() < 0.001);
         assert!((peaks[0][1] - 0.25).abs() < 0.001);
+    }
+
+    #[test]
+    fn peak_builder_keeps_full_scale_samples_in_range() {
+        let mut builder = PeakBuilder::new();
+        builder.push(i16::MIN);
+        builder.push(i16::MAX);
+        let peaks = builder.finish();
+        assert_eq!(peaks, vec![[-1.0, 32_767.0 / 32_768.0]]);
     }
 
     #[test]
