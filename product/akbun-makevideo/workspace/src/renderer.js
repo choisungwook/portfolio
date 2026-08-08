@@ -376,10 +376,7 @@ function onProxyStatus(statuses) {
     return status.state === 'ready' && (!before || before.state !== 'ready');
   });
   adoptProxyStatuses(statuses);
-  if (becameReady && preview) {
-    preview.redraw();
-    if (preview.usesNativeMonitor()) attachMonitor(true);
-  }
+  if (becameReady && preview) preview.refreshMedia();
 }
 
 function onWaveformStatus(statuses) {

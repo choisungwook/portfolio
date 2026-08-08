@@ -100,6 +100,8 @@ function createMonitor(options) {
   let position = 0;
   let playing = false;
   let attaching = null;
+  let mediaRefreshPending = false;
+  let refreshingMedia = null;
 
   function timelineMode() {
     return preview.mode() === 'timeline';
@@ -200,6 +202,29 @@ function createMonitor(options) {
     }
   }
 
+  async function applyMediaRefresh() {
+    if (!mediaRefreshPending || refreshingMedia || currentlyPlaying()) return refreshingMedia;
+    mediaRefreshPending = false;
+    refreshingMedia = (async () => {
+      if (drivingNatively()) {
+        await release();
+        await attach();
+      } else {
+        preview.redraw();
+      }
+    })();
+    try {
+      await refreshingMedia;
+    } finally {
+      refreshingMedia = null;
+      if (mediaRefreshPending && !currentlyPlaying()) applyMediaRefresh();
+    }
+  }
+
+  function currentlyPlaying() {
+    return drivingNatively() ? playing : preview.isPlaying();
+  }
+
   /** Tell Rust where the box is now. Cheap enough to call on every layout, and
    *  it compares before sending so a drag is one command per pixel rather than
    *  one per frame. */
@@ -265,6 +290,17 @@ function createMonitor(options) {
     place,
     usesNativeMonitor: drivingNatively,
 
+    /** Use newly generated proxy paths without replacing a live decoder.
+     *
+     *  A native session captures its proxy map when it starts, while media
+     *  elements capture their paths when they are drawn. Replacing either
+     *  during playback stops the current stream, so defer the refresh until
+     *  playback is stopped. */
+    refreshMedia() {
+      mediaRefreshPending = true;
+      return applyMediaRefresh();
+    },
+
     /** The page is about to draw over the stage, or has stopped.
      *
      *  A sheet or an open menu is one of four reasons the view might have to
@@ -284,19 +320,31 @@ function createMonitor(options) {
     },
 
     play() {
-      if (!drivingNatively()) return preview.play();
-      if (total() <= 0) return;
-      if (position >= total()) position = 0;
-      playing = true;
-      if (onTick) onTick(position, true);
-      return api.playbackPlay().then(take).catch(() => {});
+      const start = () => {
+        if (!drivingNatively()) return preview.play();
+        if (total() <= 0) return;
+        if (position >= total()) position = 0;
+        playing = true;
+        if (onTick) onTick(position, true);
+        return api.playbackPlay().then(take).catch(() => {});
+      };
+      return mediaRefreshPending ? Promise.resolve(applyMediaRefresh()).then(start) : start();
     },
 
-    pause() {
-      if (!drivingNatively()) return preview.pause();
+    async pause() {
+      if (!drivingNatively()) {
+        await Promise.resolve(preview.pause());
+        await applyMediaRefresh();
+        return;
+      }
       playing = false;
       if (onTick) onTick(position, false);
-      return api.playbackPause().then(take).catch(() => {});
+      try {
+        take(await api.playbackPause());
+      } catch (_error) {
+        return;
+      }
+      await applyMediaRefresh();
     },
 
     toggle() {
@@ -304,7 +352,7 @@ function createMonitor(options) {
     },
 
     isPlaying() {
-      return drivingNatively() ? playing : preview.isPlaying();
+      return currentlyPlaying();
     },
 
     seek(frames) {
