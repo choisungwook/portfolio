@@ -89,6 +89,9 @@ pub struct Settings {
     pub log_rotation_size: u64,
     /// "kb" or "mb".
     pub log_rotation_unit: String,
+    /// User changes to the page's built-in keyboard shortcuts. Missing actions
+    /// keep their code-defined defaults, so new actions reach existing users.
+    pub shortcut_overrides: HashMap<String, Vec<String>>,
 }
 
 impl Default for Settings {
@@ -111,6 +114,7 @@ impl Default for Settings {
             log_dir: String::new(),
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
+            shortcut_overrides: HashMap::new(),
         }
     }
 }
