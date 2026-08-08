@@ -1984,6 +1984,7 @@ function wireKeyboard() {
     if (event.key === 'End') {
       event.preventDefault();
       seekTimelineEnd();
+      return;
     }
   });
 }

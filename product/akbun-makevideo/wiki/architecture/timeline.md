@@ -56,9 +56,9 @@ The one rule that follows: **nothing in `timeline.js` may touch the DOM or `wind
 
 ## Edit point navigation
 
-An edit point is the start or end frame of a clip on a visible track. Up and Page Up move to the previous point; Down and Page Down move to the next. The destination is always an integer frame even when playback left the playhead between frames.
+An edit point is the start or end frame of a clip on an enabled track. Up and Page Up move to the previous point; Down and Page Down move to the next. The destination is always an integer frame even when playback left the playhead between frames.
 
-With no target track, navigation combines and deduplicates the points from every visible track. A track header's target button narrows navigation to that track until the button is pressed again. Muting does not hide a track or remove its edit points; hiding does. Home and End remain independent jumps to the timeline boundaries.
+With no target track, navigation combines and deduplicates the points from every enabled track. A track header's target button narrows navigation to that track until the button is pressed again. Hidden tracks and muted audio tracks do not contribute edit points. Home and End remain independent jumps to the timeline boundaries.
 
 ## What a time is
 

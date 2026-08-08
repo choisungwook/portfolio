@@ -121,13 +121,12 @@ function projectDurationFrames(project) {
   return end;
 }
 
-/** Sorted, unique clip boundaries from the target track, or from every visible
- *  track when none is targeted. A muted track is still visible and therefore
- *  still contributes edit points. */
+/** Sorted, unique clip boundaries from the target track, or from every enabled
+ *  track when none is targeted. */
 function editPoints(project, targetTrackId) {
   const points = new Set();
   for (const track of project.tracks) {
-    if (track.hidden) continue;
+    if (track.hidden || (track.kind === 'audio' && track.muted)) continue;
     if (targetTrackId && track.id !== targetTrackId) continue;
     for (const clip of track.clips) {
       if (clipDuration(clip) <= 0) continue;

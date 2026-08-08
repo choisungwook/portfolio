@@ -89,7 +89,7 @@ test('a muted audio track drops out of the length too', () => {
   assert.strictEqual(L.projectDurationFrames(project), 0);
 });
 
-test('edit points combine visible track clip boundaries in order', () => {
+test('edit points combine enabled track clip boundaries in order', () => {
   const hidden = track('t3', 'video', 'V2', [clip('c3', 'v', 15, 0, 30)]);
   hidden.hidden = true;
   const audio = track('t2', 'audio', 'A1', [clip('c2', 'm', 60, 0, 60)]);
@@ -98,7 +98,7 @@ test('edit points combine visible track clip boundaries in order', () => {
     [VIDEO, SOUND],
     [track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 60)]), audio, hidden]
   );
-  assert.deepStrictEqual(L.editPoints(project), [0, 60, 120]);
+  assert.deepStrictEqual(L.editPoints(project), [0, 60]);
 });
 
 test('a target track limits previous and next edit navigation', () => {
