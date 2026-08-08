@@ -777,7 +777,7 @@ function openTimelineContextMenu(event, items) {
     button.textContent = item.label;
     button.addEventListener('click', () => {
       closeTimelineContextMenu();
-      Promise.resolve(item.run()).catch((error) => reportError(error, `timeline-menu:${item.label}`));
+      Promise.resolve().then(() => item.run()).catch((error) => reportError(error, `timeline-menu:${item.label}`));
     });
     menu.appendChild(button);
   }

@@ -1151,14 +1151,12 @@ fn ripple_delete_gap(
         }
     }
     let amount = end - start;
-    for track in &mut project.tracks {
-        for clip in &mut track.clips {
-            if moved_ids.contains(&clip.id) {
-                clip.start -= amount;
-            }
-        }
-        track.sort();
-    }
+    let mut after = project.clone();
+    shift_clips_left(&mut after, &moved_ids, amount);
+    after
+        .validate()
+        .map_err(|_| "closing that gap would overlap a linked clip".to_string())?;
+    shift_clips_left(project, &moved_ids, amount);
 
     Ok(Applied {
         resolved: Command::RippleDeleteGap {
@@ -1168,6 +1166,17 @@ fn ripple_delete_gap(
         },
         inverse: Command::RestoreClips { entries: moved },
     })
+}
+
+fn shift_clips_left(project: &mut Project, moved_ids: &HashSet<String>, amount: i64) {
+    for track in &mut project.tracks {
+        for clip in &mut track.clips {
+            if moved_ids.contains(&clip.id) {
+                clip.start -= amount;
+            }
+        }
+        track.sort();
+    }
 }
 
 fn set_clip_gain(

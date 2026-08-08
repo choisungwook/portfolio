@@ -602,6 +602,35 @@ mod tests {
     }
 
     #[test]
+    fn ripple_delete_gap_refuses_to_overlap_a_linked_counterpart() {
+        let mut document = document();
+        add(&mut document, 0);
+        add_linked(&mut document, 600);
+        let audio = audio_track(&document);
+        document
+            .apply(Command::AddClip {
+                track_id: audio,
+                asset_id: "v".into(),
+                start: 300,
+                id: None,
+                link_group: None,
+            })
+            .unwrap();
+        let before = serde_json::to_string(document.project()).unwrap();
+
+        let error = document
+            .apply(Command::RippleDeleteGap {
+                track_id: video_track(&document),
+                start: 300,
+                end: 600,
+            })
+            .unwrap_err();
+
+        assert!(error.contains("overlap a linked clip"), "{error}");
+        assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+    }
+
+    #[test]
     fn a_transaction_that_fails_half_way_changes_nothing() {
         let mut document = document();
         let clip = add(&mut document, 0);
