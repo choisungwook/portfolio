@@ -134,7 +134,10 @@
           </div>
         </header>
         <div id="stage-wrap">
-          <div id="stage"><div id="stage-inner"><canvas id="stage-exact"></canvas></div></div>
+          <div id="stage">
+            <div id="stage-inner"><canvas id="stage-exact"></canvas></div>
+            <canvas id="stage-overlay" aria-label="Program Monitor selection overlay"></canvas>
+          </div>
           <span id="stage-mode" hidden></span>
           <p id="stage-hint">Drop media on the timeline below to see it here.</p>
         </div>
@@ -401,6 +404,7 @@
   <script src="shortcuts.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>
+  <script src="transform.js"></script>
   <script src="monitor.js"></script>
   <script src="renderer.js"></script>
 </body>

@@ -140,6 +140,7 @@ function createMonitor(options) {
 
   let native = false;
   let covered = false;
+  let editing = false;
   let lastVisible = null;
   let lastPlace = null;
   let polling = false;
@@ -182,7 +183,7 @@ function createMonitor(options) {
       native,
       timeline: timelineMode(),
       hasContent: total() > 0,
-      covered,
+      covered: covered || editing,
     });
     if (wanted === lastVisible) return;
     lastVisible = wanted;
@@ -365,6 +366,14 @@ function createMonitor(options) {
       syncVisibility();
     },
 
+    /** The page owns the selection pass. It hides the native surface while an
+     *  item is being edited, then shows it again once the editor-only overlay
+     *  is gone. The pass never reaches the project or the renderer. */
+    setEditing(active) {
+      editing = Boolean(active);
+      syncVisibility();
+    },
+
     layout() {
       preview.layout();
       place();
@@ -467,13 +476,13 @@ function createMonitor(options) {
     // surface, as the frames during playback — there is nothing left for a
     // second path to show or for a badge to tell apart.
     showExact(drawn) {
-      return drivingNatively() ? false : preview.showExact(drawn);
+      return drivingNatively() && !editing ? false : preview.showExact(drawn);
     },
     clearExact() {
-      if (!drivingNatively()) preview.clearExact();
+      if (!drivingNatively() || editing) preview.clearExact();
     },
     isExact() {
-      return drivingNatively() ? false : preview.isExact();
+      return drivingNatively() && !editing ? false : preview.isExact();
     },
 
     zoomIn(cursor) {

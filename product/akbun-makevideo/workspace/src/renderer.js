@@ -19,6 +19,7 @@
 const L = globalThis.timelineLib;
 const T = globalThis.timeLib;
 const K = globalThis.shortcutLib;
+const X = globalThis.transformLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
@@ -71,6 +72,7 @@ const dom = {
   stage: el('stage'),
   stageInner: el('stage-inner'),
   stageExact: el('stage-exact'),
+  stageOverlay: el('stage-overlay'),
   stageMode: el('stage-mode'),
   stageHint: el('stage-hint'),
   btnPlay: el('btn-play'),
@@ -131,6 +133,7 @@ const state = {
   path: null,
   waveforms: {},
   selectedClipId: null,
+  selectedVisualItemId: null,
   selectedAssetId: null,
   targetTrackId: null,
   pxPerSecond: 30,
@@ -145,6 +148,7 @@ const state = {
 let preview = null;
 let mediaPreview = null;
 let qualityMonitor = null;
+let visualDrag = null;
 
 // --- helpers ---------------------------------------------------------------
 
@@ -684,6 +688,7 @@ function updateMonitorZoomUi() {
 }
 
 function renderTimeline() {
+  if (state.selectedVisualItemId && !selectedVisualItem()) selectVisualItem(null);
   renderHeads();
   renderRuler();
   renderLanes();
@@ -696,6 +701,7 @@ function renderTimeline() {
   updateLinkUi();
   updateHistoryUi();
   updateMonitorZoomUi();
+  renderStageOverlay();
   scheduleExactFrame();
   if (preview) preview.redraw();
 }
@@ -715,6 +721,7 @@ function updatePlayhead(frame) {
   dom.playhead.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
   dom.clock.textContent = L.formatTimecode(frame, rate());
   dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
+  renderStageOverlay();
 }
 
 function seekPreviousEdit() {
@@ -770,7 +777,7 @@ function setStageMode(mode) {
  *  stopped, and a newer request cancels an older one by token. */
 async function requestExactFrame() {
   if (!window.api.available) return;
-  if (preview.usesNativeMonitor()) return;
+  if (preview.usesNativeMonitor() && !state.selectedVisualItemId) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   if (L.projectDurationFrames(state.project) <= 0) return;
   if (state.settings.compositor === 'ffmpeg') return;
@@ -805,6 +812,162 @@ function selectClip(clipId) {
     node.classList.toggle('selected', node.dataset.clipId === clipId);
   }
   updateLinkUi();
+}
+
+function selectedVisualItem() {
+  if (!state.selectedVisualItemId) return null;
+  for (const track of state.project.tracks) {
+    const item = (track.visualItems || []).find((entry) => entry.id === state.selectedVisualItemId);
+    if (item) return item;
+  }
+  return null;
+}
+
+function projectPointAt(event) {
+  const box = dom.stage.getBoundingClientRect();
+  if (box.width < 1 || box.height < 1) return null;
+  return X.projectPoint(
+    { x: event.clientX - box.left, y: event.clientY - box.top },
+    box,
+    state.project.settings
+  );
+}
+
+function overlayScale() {
+  const box = dom.stage.getBoundingClientRect();
+  return Math.min(
+    box.width / Math.max(1, state.project.settings.width),
+    box.height / Math.max(1, state.project.settings.height)
+  );
+}
+
+function selectVisualItem(itemId) {
+  state.selectedVisualItemId = itemId || null;
+  const editing = Boolean(state.selectedVisualItemId);
+  dom.stage.classList.toggle('editing', editing);
+  preview.setEditing(editing);
+  if (!editing) {
+    preview.clearExact();
+    preview.redraw();
+  } else {
+    scheduleExactFrame();
+  }
+  renderStageOverlay();
+}
+
+function renderStageOverlay() {
+  const canvas = dom.stageOverlay;
+  const item = selectedVisualItem();
+  if (!canvas || !item) {
+    if (canvas) canvas.width = 0;
+    return;
+  }
+  const box = dom.stage.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(box.width * ratio));
+  const height = Math.max(1, Math.round(box.height * ratio));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, box.width, box.height);
+  const transform = item.transform;
+  const center = X.displayPoint(X.centre(transform), box, state.project.settings);
+  const size = {
+    x: (transform.width * box.width) / state.project.settings.width,
+    y: (transform.height * box.height) / state.project.settings.height,
+  };
+  const scale = overlayScale();
+  const handleRadius = 5;
+  context.save();
+  context.translate(center.x, center.y);
+  context.rotate((transform.rotation * Math.PI) / 180);
+  context.strokeStyle = '#4e9bff';
+  context.lineWidth = 1.5;
+  context.setLineDash([5, 3]);
+  context.strokeRect(-size.x / 2, -size.y / 2, size.x, size.y);
+  context.setLineDash([]);
+  context.beginPath();
+  context.moveTo(0, -size.y / 2);
+  context.lineTo(0, -size.y / 2 - 24);
+  context.stroke();
+  context.restore();
+  const handles = X.handlePoints(transform, 24 / scale);
+  for (const [name, point] of Object.entries(handles)) {
+    const at = X.displayPoint(point, box, state.project.settings);
+    context.beginPath();
+    context.arc(at.x, at.y, name === 'rotate' ? 6 : handleRadius, 0, Math.PI * 2);
+    context.fillStyle = name === 'rotate' ? '#4e9bff' : '#ffffff';
+    context.fill();
+    context.strokeStyle = '#4e9bff';
+    context.lineWidth = 1.5;
+    context.stroke();
+  }
+}
+
+function beginVisualDrag(event) {
+  if (event.button !== 0 || preview.isPlaying()) return false;
+  const point = projectPointAt(event);
+  if (!point) return false;
+  const scale = overlayScale();
+  const hit = X.hitItem(
+    state.project,
+    Math.round(preview.position()),
+    point,
+    state.selectedVisualItemId,
+    { handleRadius: 8 / scale, rotateOffset: 24 / scale }
+  );
+  if (!hit) {
+    selectVisualItem(null);
+    return false;
+  }
+  if (hit.item.id !== state.selectedVisualItemId) selectVisualItem(hit.item.id);
+  visualDrag = {
+    itemId: hit.item.id,
+    action: hit.action === 'resize' ? hit.handle : hit.action,
+    initial: { ...hit.item.transform },
+    start: point,
+    next: { ...hit.item.transform },
+  };
+  dom.stage.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+function updateVisualDrag(event) {
+  if (!visualDrag) return;
+  const point = projectPointAt(event);
+  if (!point) return;
+  visualDrag.next = X.transformForDrag(
+    visualDrag.initial,
+    visualDrag.action,
+    visualDrag.start,
+    point
+  );
+  const item = selectedVisualItem();
+  if (item) item.transform = visualDrag.next;
+  renderStageOverlay();
+}
+
+async function endVisualDrag(event) {
+  if (!visualDrag) return;
+  const finished = visualDrag;
+  visualDrag = null;
+  if (dom.stage.hasPointerCapture(event.pointerId)) dom.stage.releasePointerCapture(event.pointerId);
+  if (JSON.stringify(finished.initial) === JSON.stringify(finished.next)) return;
+  await edit({ op: 'setVisualTransform', itemId: finished.itemId, transform: finished.next });
+  selectVisualItem(finished.itemId);
+}
+
+function cancelVisualDrag() {
+  if (!visualDrag) return;
+  const item = selectedVisualItem();
+  if (item) item.transform = visualDrag.initial;
+  visualDrag = null;
+  renderStageOverlay();
 }
 
 function closeTimelineContextMenu() {
@@ -1316,10 +1479,14 @@ async function confirmDiscard(what) {
  *  page keeps alongside it. The history belongs to the document, so opening a
  *  project starts with nothing to undo. */
 function loadDocument(doc, path) {
+  if (preview) preview.setEditing(false);
+  dom.stage.classList.remove('editing');
+  visualDrag = null;
   adopt(doc);
   state.path = path || null;
   state.savedRevision = doc.revision;
   state.selectedClipId = null;
+  state.selectedVisualItemId = null;
   state.selectedAssetId = null;
   state.targetTrackId = null;
   state.proxies = {};
@@ -1999,6 +2166,7 @@ function wireTransport() {
     }
   }, { passive: false });
   dom.stage.addEventListener('pointerdown', (event) => {
+    if (beginVisualDrag(event)) return;
     const zoom = preview.zoomState();
     if (event.button !== 0 || !zoom.available || zoom.zoom <= 1) return;
     monitorPan = { x: event.clientX, y: event.clientY };
@@ -2006,16 +2174,25 @@ function wireTransport() {
     event.preventDefault();
   });
   dom.stage.addEventListener('pointermove', (event) => {
+    if (visualDrag) {
+      updateVisualDrag(event);
+      return;
+    }
     if (!monitorPan) return;
     preview.panBy(event.clientX - monitorPan.x, event.clientY - monitorPan.y);
     monitorPan = { x: event.clientX, y: event.clientY };
   });
   dom.stage.addEventListener('pointerup', (event) => {
+    if (visualDrag) {
+      endVisualDrag(event).catch((error) => reportError(error, 'visual-item:transform'));
+      return;
+    }
     if (!monitorPan) return;
     monitorPan = null;
     dom.stage.releasePointerCapture(event.pointerId);
   });
   dom.stage.addEventListener('pointercancel', () => {
+    cancelVisualDrag();
     monitorPan = null;
   });
 }
