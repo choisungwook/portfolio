@@ -540,7 +540,7 @@ audio.stage-media {
 
 #lower {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   background: var(--bg);
 }
@@ -677,6 +677,58 @@ button.icon.on {
   color: var(--dim);
   white-space: nowrap;
   pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.marker::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+#marker-panel {
+  max-height: 160px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+#marker-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#marker-list {
+  display: grid;
+  gap: 5px;
+  padding-top: 6px;
+}
+
+.marker-row {
+  display: grid;
+  grid-template-columns: 86px 28px minmax(80px, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.marker-row button {
+  padding: 2px 6px;
+  font-size: 11px;
 }
 
 #lanes {

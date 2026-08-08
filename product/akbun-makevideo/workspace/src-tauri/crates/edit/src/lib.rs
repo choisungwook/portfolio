@@ -24,7 +24,7 @@ pub mod command;
 pub mod document;
 pub mod migrate;
 
-pub use command::{ClipAt, Command, Edge, VisualItemAt};
+pub use command::{ClipAt, Command, Edge, MarkerAt, VisualItemAt};
 pub use document::{Document, DocumentState};
 pub use makevideo_time::{Rate, RationalTime};
 
@@ -84,6 +84,8 @@ pub struct Project {
     pub settings: ProjectSettings,
     pub assets: Vec<Asset>,
     pub tracks: Vec<Track>,
+    #[serde(default)]
+    pub markers: Vec<Marker>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -370,6 +372,21 @@ pub struct Clip {
     pub opacity: f32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Marker {
+    pub id: String,
+    pub frame: i64,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default = "default_marker_color")]
+    pub color: String,
+}
+
+fn default_marker_color() -> String {
+    "#e6a700".into()
+}
+
 impl Clip {
     pub fn duration_frames(&self) -> i64 {
         (self.out_point - self.in_point).max(0)
@@ -425,6 +442,7 @@ impl Project {
                     hidden: false,
                 },
             ],
+            markers: Vec::new(),
         }
     }
 
@@ -577,6 +595,10 @@ impl Project {
             .unwrap_or(0)
     }
 
+    pub fn marker(&self, marker_id: &str) -> Option<&Marker> {
+        self.markers.iter().find(|marker| marker.id == marker_id)
+    }
+
     pub fn duration(&self) -> RationalTime {
         RationalTime::new(self.duration_frames(), self.rate())
     }
@@ -597,6 +619,21 @@ impl Project {
     /// out at the edit costs a rejected drag; finding out at the render costs
     /// the render.
     pub fn validate(&self) -> Result<(), String> {
+        let mut marker_ids = HashSet::new();
+        for marker in &self.markers {
+            if marker.frame < 0 {
+                return Err(format!(
+                    "marker {} would start before the timeline does",
+                    marker.id
+                ));
+            }
+            if marker.color.trim().is_empty() {
+                return Err(format!("marker {} has no color", marker.id));
+            }
+            if !marker_ids.insert(marker.id.as_str()) {
+                return Err(format!("marker {} is duplicated", marker.id));
+            }
+        }
         let mut links: HashMap<&str, Vec<(&Track, &Clip)>> = HashMap::new();
         for track in &self.tracks {
             let mut previous_end = i64::MIN;
@@ -691,6 +728,21 @@ impl Project {
     /// all. So a clip that breaks a rule is pulled back to the nearest state
     /// that keeps it, and one that has nothing left is dropped.
     pub fn repair(&mut self) {
+        self.markers.retain(|marker| !marker.id.is_empty());
+        for marker in &mut self.markers {
+            marker.frame = marker.frame.max(0);
+            if marker.color.trim().is_empty() {
+                marker.color = default_marker_color();
+            }
+        }
+        self.markers.sort_by(|left, right| {
+            left.frame
+                .cmp(&right.frame)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        let mut marker_ids = HashSet::new();
+        self.markers
+            .retain(|marker| marker_ids.insert(marker.id.clone()));
         let limits: Vec<Option<i64>> = self
             .tracks
             .iter()

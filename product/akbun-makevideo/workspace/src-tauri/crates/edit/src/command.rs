@@ -28,8 +28,8 @@
 //! many times to press undo, and neither can the app.
 
 use crate::{
-    min_clip_frames, Asset, Clip, Project, ProjectSettings, Rate, Track, TrackKind, VisualContent,
-    VisualItem, VisualTransform,
+    min_clip_frames, Asset, Clip, Marker, Project, ProjectSettings, Rate, Track, TrackKind,
+    VisualContent, VisualItem, VisualTransform,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -58,6 +58,13 @@ pub struct VisualItemAt {
     pub item: VisualItem,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkerAt {
+    pub index: usize,
+    pub marker: Marker,
+}
+
 /// An asset and where it sat in the library, so undoing an import does not
 /// quietly reorder the list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,11 +91,15 @@ pub enum Command {
     /// Import. An asset already in the library is updated rather than added
     /// twice, because an asset's identity is its path.
     #[serde(rename_all = "camelCase")]
-    AddAssets { assets: Vec<Asset> },
+    AddAssets {
+        assets: Vec<Asset>,
+    },
     /// Removing an asset takes its clips with it, or the render fails on a clip
     /// pointing at nothing.
     #[serde(rename_all = "camelCase")]
-    RemoveAsset { asset_id: String },
+    RemoveAsset {
+        asset_id: String,
+    },
     #[serde(rename_all = "camelCase")]
     AddTrack {
         track_kind: TrackKind,
@@ -98,7 +109,9 @@ pub enum Command {
         id: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
-    RemoveTrack { track_id: String },
+    RemoveTrack {
+        track_id: String,
+    },
     #[serde(rename_all = "camelCase")]
     SetTrackFlags {
         track_id: String,
@@ -148,7 +161,9 @@ pub enum Command {
         link_groups: Vec<Option<String>>,
     },
     #[serde(rename_all = "camelCase")]
-    RemoveClip { clip_id: String },
+    RemoveClip {
+        clip_id: String,
+    },
     #[serde(rename_all = "camelCase")]
     LinkClips {
         clip_ids: Vec<String>,
@@ -156,12 +171,16 @@ pub enum Command {
         link_group: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
-    UnlinkClips { clip_id: String },
+    UnlinkClips {
+        clip_id: String,
+    },
     /// Delete and close the gap: everything after it on the same track moves
     /// left by its length. Destructive, and only reasonable now that there is
     /// an undo to take it back.
     #[serde(rename_all = "camelCase")]
-    RippleDelete { clip_id: String },
+    RippleDelete {
+        clip_id: String,
+    },
     /// Close the empty space between two clips on one track. The two edges are
     /// named rather than inferred again on redo, because after closing the gap
     /// the frame originally clicked can be inside a clip.
@@ -202,43 +221,97 @@ pub enum Command {
         duration: i64,
     },
     #[serde(rename_all = "camelCase")]
-    SetVisualZIndex { item_id: String, z_index: i32 },
+    SetVisualZIndex {
+        item_id: String,
+        z_index: i32,
+    },
     #[serde(rename_all = "camelCase")]
     SetVisualContent {
         item_id: String,
         content: VisualContent,
     },
     #[serde(rename_all = "camelCase")]
-    RemoveVisualItem { item_id: String },
+    RemoveVisualItem {
+        item_id: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    AddMarker {
+        frame: i64,
+        #[serde(default)]
+        name: String,
+        #[serde(default)]
+        color: String,
+        #[serde(default)]
+        id: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetMarker {
+        marker_id: String,
+        #[serde(default)]
+        frame: Option<i64>,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        color: Option<String>,
+    },
+    RemoveMarker {
+        marker_id: String,
+    },
     /// Resolution and timebase. Changing the rate carries the edit with it, so
     /// a cut stays where it was in time rather than where it was in frames.
     #[serde(rename_all = "camelCase")]
-    SetSettings { settings: ProjectSettings },
+    SetSettings {
+        settings: ProjectSettings,
+    },
 
     // --- primitives, which exist to be inverses ----------------------------
     /// Put these clips back exactly, on the tracks named. A clip with the same
     /// id anywhere else is taken out first, so this also undoes a move between
     /// tracks.
     #[serde(rename_all = "camelCase")]
-    RestoreClips { entries: Vec<ClipAt> },
+    RestoreClips {
+        entries: Vec<ClipAt>,
+    },
     #[serde(rename_all = "camelCase")]
-    DropClips { clip_ids: Vec<String> },
+    DropClips {
+        clip_ids: Vec<String>,
+    },
     #[serde(rename_all = "camelCase")]
-    RestoreAssets { entries: Vec<AssetAt> },
+    RestoreAssets {
+        entries: Vec<AssetAt>,
+    },
     #[serde(rename_all = "camelCase")]
-    DropAssets { asset_ids: Vec<String> },
+    DropAssets {
+        asset_ids: Vec<String>,
+    },
     #[serde(rename_all = "camelCase")]
-    RestoreTracks { entries: Vec<TrackAt> },
+    RestoreTracks {
+        entries: Vec<TrackAt>,
+    },
     #[serde(rename_all = "camelCase")]
-    DropTracks { track_ids: Vec<String> },
+    DropTracks {
+        track_ids: Vec<String>,
+    },
     #[serde(rename_all = "camelCase")]
-    RestoreVisualItems { entries: Vec<VisualItemAt> },
+    RestoreVisualItems {
+        entries: Vec<VisualItemAt>,
+    },
     #[serde(rename_all = "camelCase")]
-    DropVisualItems { item_ids: Vec<String> },
+    DropVisualItems {
+        item_ids: Vec<String>,
+    },
+    RestoreMarkers {
+        entries: Vec<MarkerAt>,
+    },
+    DropMarkers {
+        marker_ids: Vec<String>,
+    },
 
     /// One undo step made of several commands, all or nothing.
     #[serde(rename_all = "camelCase")]
-    Transaction { commands: Vec<Command> },
+    Transaction {
+        commands: Vec<Command>,
+    },
 }
 
 /// What applying a command produced: the command as it actually happened, and
@@ -333,11 +406,15 @@ impl Command {
             Command::RemoveVisualItem { .. } | Command::DropVisualItems { .. } => {
                 "Delete visual item"
             }
+            Command::AddMarker { .. } => "Add marker",
+            Command::SetMarker { .. } => "Edit marker",
+            Command::RemoveMarker { .. } | Command::DropMarkers { .. } => "Delete marker",
             Command::SetSettings { .. } => "Project settings",
             Command::RestoreClips { .. } => "Restore clips",
             Command::RestoreAssets { .. } | Command::DropAssets { .. } => "Assets",
             Command::RestoreTracks { .. } => "Restore track",
             Command::RestoreVisualItems { .. } => "Restore visual items",
+            Command::RestoreMarkers { .. } => "Restore markers",
             Command::Transaction { commands } => commands
                 .iter()
                 .find(|command| !command.is_nothing())
@@ -429,6 +506,19 @@ impl Command {
                 set_visual_content(project, item_id, content)
             }
             Command::RemoveVisualItem { item_id } => remove_visual_item(project, item_id),
+            Command::AddMarker {
+                frame,
+                name,
+                color,
+                id,
+            } => add_marker(project, ids, frame, name, color, id),
+            Command::SetMarker {
+                marker_id,
+                frame,
+                name,
+                color,
+            } => set_marker(project, marker_id, frame, name, color),
+            Command::RemoveMarker { marker_id } => remove_marker(project, marker_id),
             Command::SetSettings { settings } => Ok(set_settings(project, settings)),
             Command::RestoreClips { entries } => Ok(restore_clips(project, entries)),
             Command::DropClips { clip_ids } => Ok(drop_clips(project, clip_ids)),
@@ -438,6 +528,8 @@ impl Command {
             Command::DropTracks { track_ids } => Ok(drop_tracks(project, track_ids)),
             Command::RestoreVisualItems { entries } => Ok(restore_visual_items(project, entries)),
             Command::DropVisualItems { item_ids } => Ok(drop_visual_items(project, item_ids)),
+            Command::RestoreMarkers { entries } => Ok(restore_markers(project, entries)),
+            Command::DropMarkers { marker_ids } => Ok(drop_markers(project, marker_ids)),
             Command::Transaction { commands } => transaction(project, ids, commands),
         }
     }
@@ -1407,6 +1499,14 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
 
     let mut restore = Vec::new();
     let mut restore_items = Vec::new();
+    let mut restore_markers = Vec::new();
+    for (index, marker) in project.markers.iter_mut().enumerate() {
+        restore_markers.push(MarkerAt {
+            index,
+            marker: marker.clone(),
+        });
+        marker.frame = rescale(marker.frame, from, to);
+    }
     for track in &mut project.tracks {
         for clip in &mut track.clips {
             restore.push(ClipAt {
@@ -1438,6 +1538,9 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
                 Command::RestoreVisualItems {
                     entries: restore_items,
                 },
+                Command::RestoreMarkers {
+                    entries: restore_markers,
+                },
             ],
         },
     }
@@ -1445,6 +1548,112 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
 
 fn rescale(value: i64, from: Rate, to: Rate) -> i64 {
     crate::RationalTime::new(value, from).rescaled(to).value()
+}
+
+fn add_marker(
+    project: &mut Project,
+    ids: &mut Ids,
+    frame: i64,
+    name: String,
+    color: String,
+    id: Option<String>,
+) -> Result<Applied, String> {
+    if frame < 0 {
+        return Err("a marker cannot be before the timeline starts".into());
+    }
+    let id = id.unwrap_or_else(|| ids.make('m'));
+    if project.marker(&id).is_some() {
+        return Err("that marker already exists".into());
+    }
+    let marker = Marker {
+        id: id.clone(),
+        frame,
+        name,
+        color: if color.trim().is_empty() {
+            "#e6a700".into()
+        } else {
+            color
+        },
+    };
+    let index = project.markers.partition_point(|item| item.frame <= frame);
+    project.markers.insert(index, marker.clone());
+    Ok(Applied {
+        resolved: Command::AddMarker {
+            frame,
+            name: marker.name,
+            color: marker.color,
+            id: Some(id.clone()),
+        },
+        inverse: Command::DropMarkers {
+            marker_ids: vec![id],
+        },
+    })
+}
+
+fn set_marker(
+    project: &mut Project,
+    marker_id: String,
+    frame: Option<i64>,
+    name: Option<String>,
+    color: Option<String>,
+) -> Result<Applied, String> {
+    let index = project
+        .markers
+        .iter()
+        .position(|marker| marker.id == marker_id)
+        .ok_or("that marker is not in this project")?;
+    let previous = MarkerAt {
+        index,
+        marker: project.markers[index].clone(),
+    };
+    let marker = &mut project.markers[index];
+    if let Some(frame) = frame {
+        if frame < 0 {
+            return Err("a marker cannot be before the timeline starts".into());
+        }
+        marker.frame = frame;
+    }
+    if let Some(name) = name {
+        marker.name = name;
+    }
+    if let Some(color) = color {
+        if color.trim().is_empty() {
+            return Err("a marker needs a color".into());
+        }
+        marker.color = color;
+    }
+    project.markers.sort_by(|left, right| {
+        left.frame
+            .cmp(&right.frame)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let marker = project.marker(&marker_id).expect("marker was just updated");
+    Ok(Applied {
+        resolved: Command::SetMarker {
+            marker_id,
+            frame: Some(marker.frame),
+            name: Some(marker.name.clone()),
+            color: Some(marker.color.clone()),
+        },
+        inverse: Command::RestoreMarkers {
+            entries: vec![previous],
+        },
+    })
+}
+
+fn remove_marker(project: &mut Project, marker_id: String) -> Result<Applied, String> {
+    let index = project
+        .markers
+        .iter()
+        .position(|marker| marker.id == marker_id)
+        .ok_or("that marker is not in this project")?;
+    let marker = project.markers.remove(index);
+    Ok(Applied {
+        resolved: Command::RemoveMarker { marker_id },
+        inverse: Command::RestoreMarkers {
+            entries: vec![MarkerAt { index, marker }],
+        },
+    })
 }
 
 fn restore_clips(project: &mut Project, entries: Vec<ClipAt>) -> Applied {
@@ -1613,5 +1822,62 @@ fn drop_visual_items(project: &mut Project, item_ids: Vec<String>) -> Applied {
     Applied {
         resolved: Command::DropVisualItems { item_ids },
         inverse: Command::RestoreVisualItems { entries: previous },
+    }
+}
+
+fn restore_markers(project: &mut Project, entries: Vec<MarkerAt>) -> Applied {
+    let mut previous = Vec::new();
+    let mut invented = Vec::new();
+    for entry in &entries {
+        if let Some(index) = project
+            .markers
+            .iter()
+            .position(|marker| marker.id == entry.marker.id)
+        {
+            previous.push(MarkerAt {
+                index,
+                marker: project.markers[index].clone(),
+            });
+            project.markers.remove(index);
+        } else {
+            invented.push(entry.marker.id.clone());
+        }
+        project
+            .markers
+            .insert(entry.index.min(project.markers.len()), entry.marker.clone());
+    }
+    Applied {
+        resolved: Command::RestoreMarkers { entries },
+        inverse: Command::Transaction {
+            commands: vec![
+                Command::DropMarkers {
+                    marker_ids: invented,
+                },
+                Command::RestoreMarkers { entries: previous },
+            ],
+        },
+    }
+}
+
+fn drop_markers(project: &mut Project, marker_ids: Vec<String>) -> Applied {
+    let previous = marker_ids
+        .iter()
+        .filter_map(|id| {
+            project
+                .markers
+                .iter()
+                .position(|marker| marker.id == *id)
+                .map(|index| MarkerAt {
+                    index,
+                    marker: project.markers[index].clone(),
+                })
+        })
+        .collect();
+    project
+        .markers
+        .retain(|marker| !marker_ids.contains(&marker.id));
+    Applied {
+        resolved: Command::DropMarkers { marker_ids },
+        inverse: Command::RestoreMarkers { entries: previous },
     }
 }

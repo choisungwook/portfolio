@@ -255,6 +255,7 @@ mod tests {
                 muted: false,
                 hidden: false,
             }],
+            markers: Vec::new(),
         }
     }
 

@@ -82,6 +82,7 @@ const dom = {
   btnDelete: el('btn-delete'),
   btnRipple: el('btn-ripple'),
   btnLink: el('btn-link'),
+  btnAddMarker: el('btn-add-marker'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
   zoom: el('zoom'),
@@ -90,6 +91,7 @@ const dom = {
   scroll: el('timeline-scroll'),
   content: el('timeline-content'),
   ruler: el('ruler'),
+  markerList: el('marker-list'),
   lanes: el('lanes'),
   timelineContextMenu: el('timeline-context-menu'),
   playhead: el('playhead'),
@@ -289,7 +291,8 @@ function displayTracks() {
 function contentFrames() {
   const visible = L.pxToFrames(Math.max(dom.scroll.clientWidth, 320), rate(), state.pxPerSecond);
   const tail = Math.round(TAIL_SECONDS * T.rateToNumber(rate()));
-  return Math.max(L.projectDurationFrames(state.project) + tail, visible);
+  const markerEnd = (state.project.markers || []).reduce((end, marker) => Math.max(end, marker.frame), 0);
+  return Math.max(L.projectDurationFrames(state.project) + tail, markerEnd + tail, visible);
 }
 
 function frameAtClientX(clientX) {
@@ -621,6 +624,43 @@ function renderRuler() {
     fragment.appendChild(tick);
   }
   dom.ruler.appendChild(fragment);
+  for (const marker of state.project.markers || []) {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'marker';
+    node.dataset.markerId = marker.id;
+    node.style.left = `${L.framesToPx(marker.frame, rate(), state.pxPerSecond)}px`;
+    node.style.color = marker.color;
+    node.title = marker.name || L.formatTimecode(marker.frame, rate());
+    dom.ruler.appendChild(node);
+  }
+}
+
+function renderMarkerList() {
+  dom.markerList.textContent = '';
+  for (const marker of state.project.markers || []) {
+    const row = document.createElement('div');
+    row.className = 'marker-row';
+    const seek = document.createElement('button');
+    seek.type = 'button';
+    seek.dataset.markerSeek = marker.id;
+    seek.textContent = L.formatTimecode(marker.frame, rate());
+    const color = document.createElement('input');
+    color.type = 'color';
+    color.value = marker.color;
+    color.dataset.markerColor = marker.id;
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.value = marker.name;
+    name.placeholder = 'Marker name';
+    name.dataset.markerName = marker.id;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.markerRemove = marker.id;
+    remove.textContent = 'Delete';
+    row.append(seek, color, name, remove);
+    dom.markerList.appendChild(row);
+  }
 }
 
 /** The two menu items that are only sometimes there to press, and what they
@@ -640,6 +680,7 @@ function renderTimeline() {
   renderHeads();
   renderRuler();
   renderLanes();
+  renderMarkerList();
   updatePlayhead(preview ? preview.position() : 0);
   dom.duration.textContent = L.formatTimecode(L.projectDurationFrames(state.project), rate());
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
@@ -816,6 +857,10 @@ function splitAtPlayhead() {
     frame: Math.round(preview.position()),
     clipId: liveSelection(),
   });
+}
+
+function addMarker(frame = Math.round(preview.position())) {
+  return edit({ op: 'addMarker', frame, name: '', color: '#e6a700' });
 }
 
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
@@ -1809,6 +1854,7 @@ function wireTimeline() {
   dom.btnDelete.addEventListener('click', () => deleteSelected(false));
   dom.btnRipple.addEventListener('click', () => deleteSelected(true));
   dom.btnLink.addEventListener('click', toggleClipLink);
+  dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
 
@@ -1830,12 +1876,40 @@ function wireTimeline() {
   });
 
   dom.ruler.addEventListener('pointerdown', beginScrub);
+  dom.ruler.addEventListener('click', (event) => {
+    const marker = event.target.closest('[data-marker-id]');
+    const found = marker && L.findMarker(state.project, marker.dataset.markerId);
+    if (found) preview.seek(found.frame);
+  });
   dom.ruler.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     const frame = Math.round(frameAtClientX(event.clientX));
     openTimelineContextMenu(event, [
       { label: 'Move Playhead Here', run: () => preview.seek(frame) },
+      { label: 'Add Marker Here', run: () => addMarker(frame) },
     ]);
+  });
+  dom.markerList.addEventListener('click', (event) => {
+    const seek = event.target.closest('[data-marker-seek]');
+    if (seek) {
+      const marker = L.findMarker(state.project, seek.dataset.markerSeek);
+      if (marker) preview.seek(marker.frame);
+      return;
+    }
+    const remove = event.target.closest('[data-marker-remove]');
+    if (remove) edit({ op: 'removeMarker', markerId: remove.dataset.markerRemove });
+  });
+  dom.markerList.addEventListener('change', (event) => {
+    const color = event.target.closest('[data-marker-color]');
+    if (color) edit({ op: 'setMarker', markerId: color.dataset.markerColor, color: color.value });
+  });
+  dom.markerList.addEventListener('focusout', (event) => {
+    const name = event.target.closest('[data-marker-name]');
+    if (!name) return;
+    const marker = L.findMarker(state.project, name.dataset.markerName);
+    if (marker && marker.name !== name.value) {
+      edit({ op: 'setMarker', markerId: marker.id, name: name.value });
+    }
   });
   dom.lanes.addEventListener('pointerdown', (event) => {
     const clip = event.target.closest('.clip');
