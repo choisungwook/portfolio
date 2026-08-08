@@ -52,6 +52,7 @@ function clamp01(value) {
 
 function createPreview(options) {
   const { stage, inner, wrap, exactCanvas, getProject, onTick, qualityMonitor } = options;
+  const playbackPath = options.playbackPath || ((asset) => asset.path);
   const L = globalThis.timelineLib;
 
   const pool = new Map();
@@ -106,16 +107,17 @@ function createPreview(options) {
   }
 
   function makeElement(asset, wantsPicture) {
+    const path = playbackPath(asset);
     if (asset.kind === 'image') {
       const image = document.createElement('img');
-      image.src = window.api.fileUrl(asset.path);
+      image.src = window.api.fileUrl(path);
       image.className = 'stage-media';
       return { element: image, kind: 'image' };
     }
     // An audio element fed an mp4 plays its sound and nothing else, which is
     // what a video clip dropped on an audio track should do.
     const element = document.createElement(wantsPicture ? 'video' : 'audio');
-    element.src = window.api.fileUrl(asset.path);
+    element.src = window.api.fileUrl(path);
     element.preload = 'auto';
     element.className = 'stage-media';
     element.playsInline = true;
@@ -124,8 +126,9 @@ function createPreview(options) {
   }
 
   function entryFor(clip, asset, wantsPicture) {
+    const path = playbackPath(asset);
     let entry = pool.get(clip.id);
-    if (entry && entry.path === asset.path && entry.wantsPicture === wantsPicture) return entry;
+    if (entry && entry.path === path && entry.wantsPicture === wantsPicture) return entry;
     if (entry) {
       if (entry.kind === 'video' && qualityMonitor) qualityMonitor.unwatchVideo(entry.element);
       entry.element.remove();
@@ -134,7 +137,7 @@ function createPreview(options) {
     entry = {
       element: made.element,
       kind: made.kind,
-      path: asset.path,
+      path,
       wantsPicture,
     };
     pool.set(clip.id, entry);

@@ -40,3 +40,12 @@ Set in Settings and defaulted to **Half**. It changes the layout scale:
 | Quarter | 0.25 |
 
 The stage box stays the same size on screen. `#stage-inner` is laid out at `scale` and transformed back up, so the browser composites a smaller surface. Lowering the quality does **not** make the decoder do less work, because the element still decodes its source at full resolution.
+
+## Playback proxies
+
+- 동영상 장변이 1920px보다 크면 프로젝트의 `proxies/` 폴더에 1280px 프록시 생성
+- 생성 중 asset 행에 진행률 표시
+- 준비 전 원본 재생, 준비 후 프록시 재생
+- Playback → Proxy Media…에서 프록시 재생 사용 여부와 생성 상태 확인
+- 원본 경로·수정 시각 불일치 시 재생성
+- export와 정지 상태 exact frame은 원본 사용

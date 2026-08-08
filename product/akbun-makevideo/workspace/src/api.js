@@ -66,6 +66,7 @@ if (!window.__TAURI__) {
         ffmpegDir: '',
         renderAcceleration: 'auto',
         compositor: 'auto',
+        proxyEnabled: true,
         logDir: '',
         logRotationSize: 5,
         logRotationUnit: 'mb',
@@ -130,6 +131,8 @@ if (!window.__TAURI__) {
       modifiedMs: 0,
     }),
     importAssets: async () => [],
+    proxyStatus: async () => [],
+    startProxies: async () => [],
     editState: async () => emptyDocument(),
     editApply: async () => emptyDocument(),
     editUndo: async () => emptyDocument(),
@@ -144,6 +147,7 @@ if (!window.__TAURI__) {
     onRenderProgress: () => {},
     onRenderDone: () => {},
     onRenderFallback: () => {},
+    onProxyStatus: () => {},
     onFileDrop: () => {},
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
@@ -280,6 +284,8 @@ window.api = {
   // importing does not change the project on its own: it reports what the
   // files are, and the page decides what to do about it with a command.
   importAssets: (paths) => invoke('import_assets', { paths }),
+  proxyStatus: () => invoke('proxy_status'),
+  startProxies: (projectPath) => invoke('start_proxies', { projectPath }),
 
   // The edit. Every one of these hands back the whole document state, and the
   // page draws that rather than its own idea of what just happened.
@@ -306,6 +312,7 @@ window.api = {
   onRenderDone: (handler) => listen('render:done', (event) => handler(event.payload)),
   // The hardware encoder failed on this file and the CPU is taking over.
   onRenderFallback: (handler) => listen('render:fallback', (event) => handler(event.payload)),
+  onProxyStatus: (handler) => listen('proxy:status', (event) => handler(event.payload)),
   onFileDrop: (handler) => getCurrentWebview().onDragDropEvent(dedupeDrops(handler)),
 
   message: (text, options) => message(text, options),

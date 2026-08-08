@@ -32,6 +32,7 @@ Rust resolves it in `workspace_root()`: the setting if there is one, otherwise t
 ~/Documents/akbun-makevideo/
   summer trip/
     project.akbunvideo      the edit: settings, asset paths, tracks, clips
+    proxies/                generated playback media and validity manifests
     summer-trip-fhd.mp4     wherever the user pointed the render, defaulting here
   another edit/
     project.akbunvideo
@@ -40,6 +41,8 @@ Rust resolves it in `workspace_root()`: the setting if there is one, otherwise t
 - **New Project** asks for a name, not for a place to save a file. It makes the folder and writes the project file immediately, because a folder with nothing in it would not show up in Open and would look like the project was never created.
 - **Open Project** lists the folders under the workspace root that contain a `project.akbunvideo`, newest first. Anything else in the workspace folder is somebody else's and is left alone. **Browse…** is the escape hatch for a project file kept somewhere else.
 - **Renders** default to the project folder, so an edit and what came out of it end up together. The save dialog still lets them go anywhere.
+- **Proxies** are derived files. Videos above 1920px get a 1280px long-edge H.264 copy in the background. A manifest binds each copy to the original absolute path and modification time, so replacing the original invalidates it.
+- **Exports** always read the original asset paths in `project.akbunvideo`. Proxy paths exist only in the playback copy held in memory.
 - The window title and the menu bar show the **folder** name, not the file name — every project file is called `project.akbunvideo`, so the file name carries no information. A `.akbunvideo` opened through Browse is named by its file instead, because its folder belongs to something else.
 
 ## Naming

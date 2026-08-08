@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   // attach a monitor over. Rust's own default is native and overrides this the
   // moment bootstrap lands.
   playbackEngine: 'media-element',
+  proxyEnabled: true,
   logDir: '',
   logRotationSize: 5,
   logRotationUnit: 'mb',
@@ -125,6 +126,7 @@ const state = {
   selectedAssetId: null,
   pxPerSecond: 30,
   rendering: false,
+  proxies: {},
   /// Why the native monitor is not running, when the setting asked for it.
   /// Shown next to the ffmpeg warning, because both mean the same thing to
   /// somebody using the app: a part of this is not working and here is why.
@@ -246,6 +248,7 @@ async function edit(...commands) {
     for (const clip of track.clips) if (!before.has(clip.id)) made.push(clip.id);
   }
   refresh();
+  if (sent.some((command) => command.op === 'addAssets')) prepareProxies();
   return made;
 }
 
@@ -296,7 +299,64 @@ function assetSummary(asset) {
   }
   if (asset.width > 0) bits.push(`${asset.width}×${asset.height}`);
   if (asset.kind === 'video' && !asset.hasAudio) bits.push('silent');
+  const proxy = state.proxies[asset.id];
+  if (proxy) {
+    if (proxy.state === 'ready') bits.push('proxy ready');
+    else if (proxy.state === 'failed') bits.push('proxy failed');
+    else bits.push(`proxy ${proxy.percent || 0}%`);
+  }
   return bits.join(' · ');
+}
+
+function playbackPath(asset) {
+  if (!state.settings.proxyEnabled) return asset.path;
+  const proxy = state.proxies[asset.id];
+  return proxy && proxy.state === 'ready' && proxy.path ? proxy.path : asset.path;
+}
+
+function adoptProxyStatuses(statuses) {
+  state.proxies = Object.fromEntries((statuses || []).map((status) => [status.assetId, status]));
+  renderAssets();
+  renderProxySummary();
+}
+
+function proxySummary() {
+  const statuses = Object.values(state.proxies);
+  if (!state.path) return 'Save the project before creating proxies.';
+  if (!statuses.length) return 'No 4K media needs a proxy.';
+  const count = (name) => statuses.filter((status) => status.state === name).length;
+  const ready = count('ready');
+  const active = count('queued') + count('generating');
+  const failed = count('failed');
+  return [`${ready} ready`, active ? `${active} generating` : '', failed ? `${failed} failed` : '']
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function renderProxySummary() {
+  const summary = el('proxy-summary');
+  if (summary) summary.textContent = proxySummary();
+}
+
+async function prepareProxies() {
+  if (!state.path || !window.api.available) return;
+  try {
+    adoptProxyStatuses(await window.api.startProxies(state.path));
+  } catch (error) {
+    reportError(error, 'proxy:start');
+  }
+}
+
+function onProxyStatus(statuses) {
+  const becameReady = (statuses || []).some((status) => {
+    const before = state.proxies[status.assetId];
+    return status.state === 'ready' && (!before || before.state !== 'ready');
+  });
+  adoptProxyStatuses(statuses);
+  if (becameReady && preview) {
+    preview.redraw();
+    if (preview.usesNativeMonitor()) attachMonitor(true);
+  }
 }
 
 function renderAssets() {
@@ -1016,11 +1076,13 @@ function loadDocument(doc, path) {
   state.savedRevision = doc.revision;
   state.selectedClipId = null;
   state.selectedAssetId = null;
+  state.proxies = {};
   preview.clear();
   preview.showTimeline();
   setPreviewSource('timeline');
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
+  prepareProxies();
   // A monitor is built for the project it draws — the output size and the
   // clips are read when the frame source is made — so opening a different one
   // means a new session rather than a reused one.
@@ -1121,6 +1183,7 @@ async function saveProject(forcePicker) {
   try {
     await window.api.saveProject(path);
     state.path = path;
+    prepareProxies();
     // What is on disk is this revision, which is what makes the dot go away —
     // and come back the moment anything else is done.
     state.savedRevision = state.doc.revision;
@@ -1239,8 +1302,15 @@ function fillAppSheet() {
   el('as-log-note').textContent = `Only errors are written to ${logDir}/errors.log. The previous file is kept as errors.log.1.`;
 }
 
+function fillProxySheet() {
+  el('proxy-enabled').checked = state.settings.proxyEnabled;
+  renderProxySummary();
+  el('proxy-generate').disabled = !state.path || !window.api.available;
+}
+
 function applySettings(next) {
   const was = state.settings.playbackEngine;
+  const usedProxies = state.settings.proxyEnabled;
   state.settings = next;
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
@@ -1256,6 +1326,10 @@ function applySettings(next) {
   // A saved setting of media-element is no change and correctly attaches
   // nothing.
   if (was !== next.playbackEngine) attachMonitor(true);
+  else if (usedProxies !== next.proxyEnabled) {
+    preview.redraw();
+    if (preview.usesNativeMonitor()) attachMonitor(true);
+  }
 }
 
 /** Ask Rust for a monitor, or give the one that is running a new box.
@@ -1308,6 +1382,10 @@ const actions = {
   'render-fhd': () => startRender('fhd'),
   'render-4k': () => startRender('4k'),
   'cancel-render': () => window.api.cancelRender(),
+  'proxy-media': () => {
+    fillProxySheet();
+    openSheet('proxy-settings');
+  },
   'project-settings': () => {
     fillProjectSheet();
     openSheet('project-settings');
@@ -1536,6 +1614,7 @@ function wireSheets() {
       theme: el('as-theme').value,
       compositor: el('as-compositor').value,
       playbackEngine: el('as-playback').value,
+      proxyEnabled: state.settings.proxyEnabled,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),
       ffmpegDir: el('as-ffmpeg').value.trim(),
@@ -1559,6 +1638,27 @@ function wireSheets() {
     }
     applySettings(state.boot.settings);
     updateToolWarning();
+  });
+  el('proxy-generate').addEventListener('click', async () => {
+    if (!state.path) return;
+    adoptProxyStatuses(await window.api.startProxies(state.path));
+  });
+  el('proxy-save').addEventListener('click', async () => {
+    const next = Object.assign({}, state.settings, {
+      proxyEnabled: el('proxy-enabled').checked,
+    });
+    closeSheet('proxy-settings');
+    try {
+      state.boot = await window.api.saveSettings(next);
+    } catch (error) {
+      reportError(error, 'settings:proxy');
+      await window.api.message(`The proxy setting could not be saved.\n\n${error}`, {
+        title: 'Proxy Media',
+        kind: 'error',
+      });
+      return;
+    }
+    applySettings(state.boot.settings);
   });
   el('as-workspace-pick').addEventListener('click', async () => {
     const folder = await window.api.pickFolder('Workspace folder');
@@ -1691,6 +1791,7 @@ async function boot() {
     exactCanvas: dom.stageExact,
     wrap: dom.stageWrap,
     getProject: () => state.project,
+    playbackPath,
     qualityMonitor,
     onTick: (frame, playing) => {
       updatePlayhead(frame);
@@ -1753,6 +1854,7 @@ async function boot() {
   subscribe('events:render-progress', window.api.onRenderProgress, onRenderProgress);
   subscribe('events:render-done', window.api.onRenderDone, onRenderDone);
   subscribe('events:render-fallback', window.api.onRenderFallback, onRenderFallback);
+  subscribe('events:proxy-status', window.api.onProxyStatus, onProxyStatus);
   subscribe('events:file-drop', window.api.onFileDrop, (payload) => {
     Promise.resolve(handleOsDrop(payload)).catch((error) => reportError(error, 'file-drop'));
   });

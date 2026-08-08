@@ -76,6 +76,13 @@
       </div>
 
       <div class="menu">
+        <button class="menu-title" data-menu="playback">Playback</button>
+        <ul class="menu-list" data-list="playback">
+          <li><button data-action="proxy-media">Proxy Media…</button></li>
+        </ul>
+      </div>
+
+      <div class="menu">
         <button class="menu-title" data-menu="settings">Settings</button>
         <ul class="menu-list" data-list="settings">
           <li><button data-action="project-settings">Project Resolution…</button></li>
@@ -329,6 +336,24 @@
       <div class="sheet-actions">
         <button data-close="app-settings">Cancel</button>
         <button id="as-save" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="proxy-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Proxy Media</h3>
+      <label class="row check">
+        <input type="checkbox" id="proxy-enabled" />
+        Use proxy media for playback
+      </label>
+      <p class="dim small-text">Missing proxies are created automatically in the background at a 1280px long edge. Rendering always uses the original media.</p>
+      <p id="proxy-summary" class="proxy-summary"></p>
+      <div class="sheet-actions split-actions">
+        <button id="proxy-generate" type="button">Generate Missing</button>
+        <span class="menubar-gap"></span>
+        <button data-close="proxy-settings">Cancel</button>
+        <button id="proxy-save" class="primary">Apply</button>
       </div>
     </div>
   </div>

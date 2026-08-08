@@ -24,7 +24,7 @@
 
 use super::Place;
 use objc2::rc::Retained;
-use objc2::MainThreadMarker;
+use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use raw_window_handle::{
@@ -111,7 +111,7 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
     let handle = window.clone();
     let view = on_main(window, move |main| {
         let content = content_view(&handle)?;
-        let view = unsafe { NSView::initWithFrame(NSView::alloc(main), rect(&content, place)) };
+        let view = NSView::initWithFrame(NSView::alloc(main), rect(&content, place));
         // Metal draws into this view's layer, so it has to have one. wgpu
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
@@ -119,13 +119,11 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
         // Over the webview. A `None` sibling with `Above` means "over all of
         // them", which is the front. The page hides it before drawing anything
         // on top; see the note in mod.rs for why it is not the other way round.
-        unsafe {
-            content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None)
-        };
+        content.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
-        let pointer = NonNull::new(Retained::into_raw(view))
-            .ok_or("the monitor view has no address")?;
+        let pointer =
+            NonNull::new(Retained::into_raw(view)).ok_or("the monitor view has no address")?;
         Ok(Handle(pointer))
     })?;
     Ok(Inner {
@@ -136,35 +134,35 @@ pub fn attach(window: &tauri::WebviewWindow, place: Place) -> Result<Inner, Stri
 
 pub fn place(inner: &Inner, at: Place) {
     let handle = inner.window.clone();
-    let view = inner.view;
+    let view = inner.view.0.as_ptr() as usize;
     // Placement is best effort: a window that has gone during a resize is a
     // window nobody is looking at.
     let _ = on_main(&inner.window, move |_| {
         let content = content_view(&handle)?;
-        let view = unsafe { view.0.as_ref() };
-        unsafe { view.setFrame(rect(&content, at)) };
+        let view = unsafe { &*(view as *mut NSView) };
+        view.setFrame(rect(&content, at));
         Ok(())
     });
 }
 
 pub fn set_visible(inner: &Inner, visible: bool) {
-    let view = inner.view;
+    let view = inner.view.0.as_ptr() as usize;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: messaged on the main thread, and the view is alive until
         // `detach` releases it.
-        unsafe { view.0.as_ref().setHidden(!visible) };
+        unsafe { (&*(view as *mut NSView)).setHidden(!visible) };
         Ok(())
     });
 }
 
 pub fn detach(inner: &Inner) {
-    let view = inner.view;
+    let view = inner.view.0.as_ptr() as usize;
     let _ = on_main(&inner.window, move |_| {
         // SAFETY: the pointer came from `Retained::into_raw` in `attach` and is
         // released exactly once, here.
-        let view: Retained<NSView> = unsafe { Retained::from_raw(view.0.as_ptr()) }
+        let view: Retained<NSView> = unsafe { Retained::from_raw(view as *mut NSView) }
             .ok_or("the monitor view was already gone")?;
-        unsafe { view.removeFromSuperview() };
+        view.removeFromSuperview();
         Ok(())
     });
 }
@@ -187,7 +185,9 @@ fn content_view(window: &tauri::WebviewWindow) -> Result<Retained<NSView>, Strin
     let ns_window: Retained<NSWindow> = unsafe {
         Retained::retain(ns_window.cast::<NSWindow>()).ok_or("the native window went away")?
     };
-    unsafe { ns_window.contentView() }.ok_or_else(|| "the window has no content view".to_string())
+    ns_window
+        .contentView()
+        .ok_or_else(|| "the window has no content view".to_string())
 }
 
 /// The page's rectangle as AppKit's.
@@ -217,7 +217,7 @@ fn backing_scale(content: &NSView) -> f64 {
     if bounds.size.width <= 0.0 {
         return 1.0;
     }
-    let backing = unsafe { content.convertRectToBacking(bounds) };
+    let backing = content.convertRectToBacking(bounds);
     let scale = backing.size.width / bounds.size.width;
     if scale.is_finite() && scale > 0.0 {
         scale
