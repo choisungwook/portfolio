@@ -89,6 +89,40 @@ test('a muted audio track drops out of the length too', () => {
   assert.strictEqual(L.projectDurationFrames(project), 0);
 });
 
+test('edit points combine visible track clip boundaries in order', () => {
+  const hidden = track('t3', 'video', 'V2', [clip('c3', 'v', 15, 0, 30)]);
+  hidden.hidden = true;
+  const audio = track('t2', 'audio', 'A1', [clip('c2', 'm', 60, 0, 60)]);
+  audio.muted = true;
+  const project = projectOf(
+    [VIDEO, SOUND],
+    [track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 60)]), audio, hidden]
+  );
+  assert.deepStrictEqual(L.editPoints(project), [0, 60, 120]);
+});
+
+test('a target track limits previous and next edit navigation', () => {
+  const project = projectOf(
+    [VIDEO, SOUND],
+    [
+      track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 60)]),
+      track('t2', 'audio', 'A1', [clip('c2', 'm', 30, 0, 60)]),
+    ]
+  );
+  assert.strictEqual(L.previousEditPoint(project, 60.4, null), 60);
+  assert.strictEqual(L.nextEditPoint(project, 59.6, null), 60);
+  assert.strictEqual(L.previousEditPoint(project, 80, 't2'), 30);
+  assert.strictEqual(L.nextEditPoint(project, 30, 't2'), 90);
+  assert.strictEqual(L.nextEditPoint(project, 90, 't2'), null);
+});
+
+test('a hidden target track contributes no edit points', () => {
+  const hidden = track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 60)]);
+  hidden.hidden = true;
+  const project = projectOf([VIDEO], [hidden]);
+  assert.deepStrictEqual(L.editPoints(project, 't1'), []);
+});
+
 test('what is under the playhead knows which frame of the asset it is', () => {
   // A clip starting a second into the timeline and a second into the source.
   const project = projectOf([VIDEO], [track('t1', 'video', 'V1', [clip('c1', 'v', 60, 30, 300)])]);

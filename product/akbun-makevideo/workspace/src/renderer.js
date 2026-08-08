@@ -127,6 +127,7 @@ const state = {
   waveforms: {},
   selectedClipId: null,
   selectedAssetId: null,
+  targetTrackId: null,
   pxPerSecond: 30,
   rendering: false,
   proxies: {},
@@ -493,6 +494,12 @@ function renderHeads() {
 
     const buttons = document.createElement('span');
     buttons.className = 'head-buttons';
+    const target = document.createElement('button');
+    target.dataset.targetTrack = track.id;
+    target.textContent = 'target';
+    target.title = 'Use only this track for previous and next edit navigation';
+    target.className = track.id === state.targetTrackId ? 'target on' : 'target';
+    buttons.appendChild(target);
     if (track.kind === 'video') {
       const hide = document.createElement('button');
       hide.dataset.toggle = 'hidden';
@@ -657,6 +664,24 @@ function updatePlayhead(frame) {
   dom.playhead.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
   dom.clock.textContent = L.formatTimecode(frame, rate());
   dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
+}
+
+function seekPreviousEdit() {
+  const point = L.previousEditPoint(state.project, preview.position(), state.targetTrackId);
+  if (point !== null) preview.seek(point);
+}
+
+function seekNextEdit() {
+  const point = L.nextEditPoint(state.project, preview.position(), state.targetTrackId);
+  if (point !== null) preview.seek(point);
+}
+
+function seekTimelineStart() {
+  preview.seek(0);
+}
+
+function seekTimelineEnd() {
+  preview.seek(L.projectDurationFrames(state.project));
 }
 
 /** Keep the playhead on screen while it runs, without fighting a user who is
@@ -1207,6 +1232,7 @@ function loadDocument(doc, path) {
   state.savedRevision = doc.revision;
   state.selectedClipId = null;
   state.selectedAssetId = null;
+  state.targetTrackId = null;
   state.proxies = {};
   state.waveforms = {};
   preview.clear();
@@ -1540,6 +1566,10 @@ const actions = {
   split: splitAtPlayhead,
   'delete-clip': () => deleteSelected(false),
   'ripple-delete': () => deleteSelected(true),
+  'previous-edit': seekPreviousEdit,
+  'next-edit': seekNextEdit,
+  'timeline-start': seekTimelineStart,
+  'timeline-end': seekTimelineEnd,
   'render-fhd': () => startRender('fhd'),
   'render-4k': () => startRender('4k'),
   'cancel-render': () => window.api.cancelRender(),
@@ -1689,6 +1719,14 @@ function wireTimeline() {
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
 
   dom.heads.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-target-track]');
+    if (target) {
+      state.targetTrackId = state.targetTrackId === target.dataset.targetTrack
+        ? null
+        : target.dataset.targetTrack;
+      renderHeads();
+      return;
+    }
     const button = event.target.closest('[data-toggle]');
     if (!button) return;
     const track = L.findTrack(state.project, button.closest('.head').dataset.trackId);
@@ -1928,7 +1966,25 @@ function wireKeyboard() {
       preview.seek(at + (event.key === 'ArrowRight' ? step : -step));
       return;
     }
-    if (event.key === 'Home') preview.seek(0);
+    if (event.key === 'ArrowUp' || event.key === 'PageUp') {
+      event.preventDefault();
+      seekPreviousEdit();
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'PageDown') {
+      event.preventDefault();
+      seekNextEdit();
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      seekTimelineStart();
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      seekTimelineEnd();
+    }
   });
 }
 

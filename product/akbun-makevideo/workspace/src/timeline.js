@@ -121,6 +121,35 @@ function projectDurationFrames(project) {
   return end;
 }
 
+/** Sorted, unique clip boundaries from the target track, or from every visible
+ *  track when none is targeted. A muted track is still visible and therefore
+ *  still contributes edit points. */
+function editPoints(project, targetTrackId) {
+  const points = new Set();
+  for (const track of project.tracks) {
+    if (track.hidden) continue;
+    if (targetTrackId && track.id !== targetTrackId) continue;
+    for (const clip of track.clips) {
+      if (clipDuration(clip) <= 0) continue;
+      points.add(clip.start);
+      points.add(clipEnd(clip));
+    }
+  }
+  return [...points].sort((left, right) => left - right);
+}
+
+function previousEditPoint(project, frame, targetTrackId) {
+  const points = editPoints(project, targetTrackId);
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    if (points[index] < frame) return points[index];
+  }
+  return null;
+}
+
+function nextEditPoint(project, frame, targetTrackId) {
+  return editPoints(project, targetTrackId).find((point) => point > frame) ?? null;
+}
+
 /** What is under the playhead, bottom track first. `sourceFrame` is which frame
  *  of the asset that instant is, which is what the preview seeks to. */
 function clipsAt(project, frame) {
@@ -259,6 +288,9 @@ const exported = {
   clipDuration,
   clipEnd,
   projectDurationFrames,
+  editPoints,
+  previousEditPoint,
+  nextEditPoint,
   clipsAt,
   rateOf,
   snapTargets,
