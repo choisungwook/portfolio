@@ -533,6 +533,75 @@ mod tests {
     }
 
     #[test]
+    fn ripple_delete_gap_closes_only_the_selected_track_and_redoes() {
+        let mut document = document();
+        add(&mut document, 0);
+        add(&mut document, 600);
+        add(&mut document, 1_200);
+        let track_id = video_track(&document);
+
+        document
+            .apply(Command::RippleDeleteGap {
+                track_id,
+                start: 300,
+                end: 600,
+            })
+            .unwrap();
+        assert_eq!(
+            clips(&document)
+                .iter()
+                .map(|clip| clip.start)
+                .collect::<Vec<_>>(),
+            [0, 300, 900]
+        );
+        assert_eq!(document.state().undo_label, "Ripple delete gap");
+
+        document.undo().unwrap();
+        assert_eq!(
+            clips(&document)
+                .iter()
+                .map(|clip| clip.start)
+                .collect::<Vec<_>>(),
+            [0, 600, 1_200]
+        );
+        document.redo().unwrap();
+        assert_eq!(
+            clips(&document)
+                .iter()
+                .map(|clip| clip.start)
+                .collect::<Vec<_>>(),
+            [0, 300, 900]
+        );
+    }
+
+    #[test]
+    fn ripple_delete_gap_keeps_a_linked_clip_pair_together() {
+        let mut document = document();
+        add(&mut document, 0);
+        add_linked(&mut document, 600);
+        let track_id = video_track(&document);
+
+        document
+            .apply(Command::RippleDeleteGap {
+                track_id,
+                start: 300,
+                end: 600,
+            })
+            .unwrap();
+
+        assert_eq!(
+            document.project().tracks[0].clips[1].start,
+            300,
+            "the video clip moves into the gap"
+        );
+        assert_eq!(
+            document.project().tracks[1].clips[0].start,
+            300,
+            "its audio counterpart follows"
+        );
+    }
+
+    #[test]
     fn a_transaction_that_fails_half_way_changes_nothing() {
         let mut document = document();
         let clip = add(&mut document, 0);

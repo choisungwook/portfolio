@@ -167,6 +167,22 @@ function clipsAt(project, frame) {
   return active;
 }
 
+/** The internal empty range under a pointer, or null for a clip, leading
+ *  space, trailing space, and a track with fewer than two clips. The page uses
+ *  this to decide whether a gap can have a context-menu action; Rust checks
+ *  the same two edges before it changes the document. */
+function gapAt(track, frame) {
+  if (!track) return null;
+  const at = Math.max(0, Math.floor(frame));
+  const clips = [...track.clips].sort((left, right) => left.start - right.start);
+  for (let index = 0; index + 1 < clips.length; index += 1) {
+    const start = clipEnd(clips[index]);
+    const end = clips[index + 1].start;
+    if (start < end && start <= at && at < end) return { start, end };
+  }
+  return null;
+}
+
 /** Everything worth snapping to: zero, both edges of every other clip, and
  *  whatever extra frames the caller passes in (the playhead, usually). */
 function snapTargets(project, exceptClipId, extra) {
@@ -291,6 +307,7 @@ const exported = {
   previousEditPoint,
   nextEditPoint,
   clipsAt,
+  gapAt,
   rateOf,
   snapTargets,
   snapTime,

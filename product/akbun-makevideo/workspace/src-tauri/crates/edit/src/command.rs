@@ -32,7 +32,7 @@ use crate::{
     VisualItem, VisualTransform,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Which end of a clip a trim is dragging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +162,15 @@ pub enum Command {
     /// an undo to take it back.
     #[serde(rename_all = "camelCase")]
     RippleDelete { clip_id: String },
+    /// Close the empty space between two clips on one track. The two edges are
+    /// named rather than inferred again on redo, because after closing the gap
+    /// the frame originally clicked can be inside a clip.
+    #[serde(rename_all = "camelCase")]
+    RippleDeleteGap {
+        track_id: String,
+        start: i64,
+        end: i64,
+    },
     #[serde(rename_all = "camelCase")]
     SetClipGain {
         clip_id: String,
@@ -314,6 +323,7 @@ impl Command {
             Command::LinkClips { .. } => "Link clips",
             Command::UnlinkClips { .. } => "Unlink clips",
             Command::RippleDelete { .. } => "Ripple delete",
+            Command::RippleDeleteGap { .. } => "Ripple delete gap",
             Command::SetClipGain { .. } => "Clip levels",
             Command::AddVisualItem { .. } => "Add visual item",
             Command::SetVisualTransform { .. } => "Transform visual item",
@@ -383,6 +393,11 @@ impl Command {
             } => link_clips(project, ids, clip_ids, link_group),
             Command::UnlinkClips { clip_id } => unlink_clips(project, clip_id),
             Command::RippleDelete { clip_id } => ripple_delete(project, clip_id),
+            Command::RippleDeleteGap {
+                track_id,
+                start,
+                end,
+            } => ripple_delete_gap(project, track_id, start, end),
             Command::SetClipGain {
                 clip_id,
                 volume,
@@ -1093,6 +1108,65 @@ fn ripple_delete(project: &mut Project, clip_id: String) -> Result<Applied, Stri
     Ok(Applied {
         resolved: Command::RippleDelete { clip_id },
         inverse: Command::RestoreClips { entries: restore },
+    })
+}
+
+/// Close one of a track's internal gaps. Leading and trailing space is not a
+/// gap to ripple: there must be a clip on both sides for the range to have an
+/// unambiguous owner. A linked clip brings its counterpart with it, which is
+/// the same rule a direct move follows.
+fn ripple_delete_gap(
+    project: &mut Project,
+    track_id: String,
+    start: i64,
+    end: i64,
+) -> Result<Applied, String> {
+    if start < 0 || end <= start {
+        return Err("that is not a timeline gap".into());
+    }
+    let track = project
+        .track(&track_id)
+        .ok_or("that track is not in this project")?;
+    let is_gap = track
+        .clips
+        .windows(2)
+        .any(|clips| clips[0].end_frame() == start && clips[1].start == end);
+    if !is_gap {
+        return Err("that gap is no longer on the timeline".into());
+    }
+
+    let selected_ids: Vec<String> = track
+        .clips
+        .iter()
+        .filter(|clip| clip.start >= end)
+        .map(|clip| clip.id.clone())
+        .collect();
+    let mut moved_ids = HashSet::new();
+    let mut moved = Vec::new();
+    for clip_id in selected_ids {
+        for entry in project.linked_placements(&clip_id) {
+            if moved_ids.insert(entry.clip.id.clone()) {
+                moved.push(entry);
+            }
+        }
+    }
+    let amount = end - start;
+    for track in &mut project.tracks {
+        for clip in &mut track.clips {
+            if moved_ids.contains(&clip.id) {
+                clip.start -= amount;
+            }
+        }
+        track.sort();
+    }
+
+    Ok(Applied {
+        resolved: Command::RippleDeleteGap {
+            track_id,
+            start,
+            end,
+        },
+        inverse: Command::RestoreClips { entries: moved },
     })
 }
 

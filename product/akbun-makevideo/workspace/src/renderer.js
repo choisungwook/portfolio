@@ -91,6 +91,7 @@ const dom = {
   content: el('timeline-content'),
   ruler: el('ruler'),
   lanes: el('lanes'),
+  timelineContextMenu: el('timeline-context-menu'),
   playhead: el('playhead'),
   renderOverlay: el('render-overlay'),
   renderTitle: el('render-title'),
@@ -755,6 +756,35 @@ function selectClip(clipId) {
     node.classList.toggle('selected', node.dataset.clipId === clipId);
   }
   updateLinkUi();
+}
+
+function closeTimelineContextMenu() {
+  if (!dom.timelineContextMenu) return;
+  dom.timelineContextMenu.hidden = true;
+  dom.timelineContextMenu.textContent = '';
+}
+
+/** The desktop application's menu is part of the page, like the menu bar.
+ *  This keeps the target and the action in one event flow and never exposes
+ *  the webview's Reload menu over unsaved edits. */
+function openTimelineContextMenu(event, items) {
+  const menu = dom.timelineContextMenu;
+  if (!menu || !items.length) return;
+  menu.textContent = '';
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = item.label;
+    button.addEventListener('click', () => {
+      closeTimelineContextMenu();
+      Promise.resolve(item.run()).catch((error) => reportError(error, `timeline-menu:${item.label}`));
+    });
+    menu.appendChild(button);
+  }
+  menu.hidden = false;
+  const box = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - box.width - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - box.height - 4))}px`;
 }
 
 function updateLinkUi() {
@@ -1728,6 +1758,7 @@ function wireMenus() {
   });
   document.addEventListener('pointerdown', (event) => {
     if (!event.target.closest('#menus')) closeMenus();
+    if (!event.target.closest('#timeline-context-menu')) closeTimelineContextMenu();
   });
   // The webview brings its own right-click menu, and the first item on it is
   // Reload. The project lives in this page and nowhere else until it is saved,
@@ -1799,6 +1830,13 @@ function wireTimeline() {
   });
 
   dom.ruler.addEventListener('pointerdown', beginScrub);
+  dom.ruler.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    const frame = Math.round(frameAtClientX(event.clientX));
+    openTimelineContextMenu(event, [
+      { label: 'Move Playhead Here', run: () => preview.seek(frame) },
+    ]);
+  });
   dom.lanes.addEventListener('pointerdown', (event) => {
     const clip = event.target.closest('.clip');
     if (clip) {
@@ -1807,6 +1845,30 @@ function wireTimeline() {
     }
     selectClip(null);
     beginScrub(event);
+  });
+  dom.lanes.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    const clip = event.target.closest('.clip');
+    if (clip) {
+      selectClip(clip.dataset.clipId);
+      openTimelineContextMenu(event, [
+        { label: 'Delete Clip', run: () => deleteSelected(false) },
+        { label: 'Ripple Delete', run: () => deleteSelected(true) },
+      ]);
+      return;
+    }
+    const lane = event.target.closest('.lane');
+    if (!lane) return;
+    const track = L.findTrack(state.project, lane.dataset.trackId);
+    const gap = L.gapAt(track, frameAtClientX(event.clientX));
+    if (!gap) return;
+    selectClip(null);
+    openTimelineContextMenu(event, [
+      {
+        label: 'Ripple Delete Gap',
+        run: () => edit({ op: 'rippleDeleteGap', trackId: track.id, start: gap.start, end: gap.end }),
+      },
+    ]);
   });
 
   window.addEventListener('pointermove', (event) => {
@@ -1991,6 +2053,7 @@ function wireKeyboard() {
     if (typing) return;
     if (event.key === 'Escape') {
       closeMenus();
+      closeTimelineContextMenu();
       for (const sheet of document.querySelectorAll('.overlay')) {
         if (sheet.id !== 'render-overlay' || !state.rendering) sheet.hidden = true;
       }
