@@ -880,6 +880,7 @@ pub(crate) mod tests {
             kind: TrackKind::Audio,
             name: id.into(),
             clips,
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         }
@@ -1409,6 +1410,7 @@ pub(crate) mod tests {
             kind: TrackKind::Video,
             name: "V1".into(),
             clips: vec![clip("v1", "silent", 0, 0, 30)],
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         });

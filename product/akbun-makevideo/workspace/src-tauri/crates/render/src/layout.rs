@@ -335,6 +335,7 @@ mod tests {
             kind: TrackKind::Video,
             name: id.into(),
             clips,
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         }
@@ -510,6 +511,7 @@ mod tests {
             kind: TrackKind::Audio,
             name: id.into(),
             clips,
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         }

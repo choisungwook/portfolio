@@ -842,6 +842,7 @@ mod tests {
             kind: TrackKind::Video,
             name: id.into(),
             clips,
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         }

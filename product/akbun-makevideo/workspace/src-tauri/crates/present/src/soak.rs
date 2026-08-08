@@ -671,6 +671,7 @@ mod tests {
                     volume: 1.0,
                     opacity: 1.0,
                 }],
+                visual_items: Vec::new(),
                 muted: false,
                 hidden: false,
             }],

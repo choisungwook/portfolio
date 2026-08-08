@@ -73,6 +73,9 @@ impl Document {
                     ids.observe(group);
                 }
             }
+            for item in &track.visual_items {
+                ids.observe(&item.id);
+            }
         }
         Document {
             project,
@@ -249,7 +252,10 @@ impl Document {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Asset, AssetKind, Clip, Command, Edge, ProjectSettings, Rate, TrackKind};
+    use crate::{
+        Asset, AssetKind, Clip, Command, Edge, ProjectSettings, Rate, TrackKind, VisualContent,
+        VisualTransform,
+    };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
         Asset {
@@ -1068,5 +1074,88 @@ mod tests {
                 link_groups: Vec::new()
             }
         );
+    }
+
+    #[test]
+    fn visual_item_edits_are_commands_with_undo_and_stable_ids() {
+        let mut document = document();
+        let track_id = video_track(&document);
+        let initial = VisualTransform {
+            x: 100.0,
+            y: 80.0,
+            width: 640.0,
+            height: 360.0,
+            rotation: 0.0,
+            opacity: 1.0,
+        };
+        document
+            .apply(Command::AddVisualItem {
+                track_id: track_id.clone(),
+                content: VisualContent::Text {
+                    text: "title".into(),
+                },
+                start: 30,
+                duration: 90,
+                transform: initial,
+                z_index: 2,
+                id: None,
+            })
+            .unwrap();
+        let item_id = document.project().tracks[0].visual_items[0].id.clone();
+        assert_eq!(item_id, "i3");
+
+        let moved = VisualTransform {
+            x: 320.0,
+            y: 180.0,
+            width: 800.0,
+            height: 450.0,
+            rotation: 12.5,
+            opacity: 0.6,
+        };
+        document
+            .apply(Command::SetVisualTransform {
+                item_id: item_id.clone(),
+                transform: moved,
+            })
+            .unwrap();
+        assert_eq!(
+            document.project().visual_item(&item_id).unwrap().transform,
+            moved
+        );
+
+        document.undo().unwrap();
+        assert_eq!(
+            document.project().visual_item(&item_id).unwrap().transform,
+            initial
+        );
+        document.undo().unwrap();
+        assert!(document.project().visual_item(&item_id).is_none());
+        document.redo().unwrap();
+        assert_eq!(document.project().tracks[0].visual_items[0].id, item_id);
+    }
+
+    #[test]
+    fn invalid_visual_geometry_is_rejected_without_changing_the_project() {
+        let mut document = document();
+        let error = document
+            .apply(Command::AddVisualItem {
+                track_id: video_track(&document),
+                content: VisualContent::Shape,
+                start: 0,
+                duration: 30,
+                transform: VisualTransform {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 100.0,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                },
+                z_index: 0,
+                id: None,
+            })
+            .unwrap_err();
+        assert!(error.contains("no area"), "{error}");
+        assert!(document.project().tracks[0].visual_items.is_empty());
     }
 }

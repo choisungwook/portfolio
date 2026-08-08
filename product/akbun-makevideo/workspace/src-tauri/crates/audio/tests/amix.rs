@@ -103,6 +103,7 @@ fn audio_track(id: &str, clips: Vec<Clip>) -> Track {
         kind: TrackKind::Audio,
         name: id.into(),
         clips,
+        visual_items: Vec::new(),
         muted: false,
         hidden: false,
     }

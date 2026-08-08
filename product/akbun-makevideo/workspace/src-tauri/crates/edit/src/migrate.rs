@@ -11,7 +11,10 @@
 //! that has `start` is a version 2 one. `version` is there for a reader, and
 //! for the next format after this one.
 
-use crate::{Asset, Clip, FORMAT_VERSION, Project, ProjectSettings, Rate, RationalTime, Track, TrackKind};
+use crate::{
+    Asset, Clip, Project, ProjectSettings, Rate, RationalTime, Track, TrackKind, VisualItem,
+    FORMAT_VERSION,
+};
 use serde::Deserialize;
 
 fn one() -> f32 {
@@ -52,6 +55,8 @@ struct WireTrack {
     name: String,
     #[serde(default)]
     clips: Vec<WireClip>,
+    #[serde(default)]
+    visual_items: Vec<VisualItem>,
     #[serde(default)]
     muted: bool,
     #[serde(default)]
@@ -121,6 +126,7 @@ impl From<WireProject> for Project {
                     name: track.name,
                     muted: track.muted,
                     hidden: track.hidden,
+                    visual_items: track.visual_items,
                     clips: track
                         .clips
                         .into_iter()
@@ -160,7 +166,10 @@ mod tests {
         assert_eq!(project.rate(), Rate::fps(30));
         let clip = &project.tracks[0].clips[0];
         assert_eq!((clip.start, clip.in_point, clip.out_point), (60, 30, 120));
-        assert_eq!(clip.volume, 1.0, "a field that never existed still defaults");
+        assert_eq!(
+            clip.volume, 1.0,
+            "a field that never existed still defaults"
+        );
     }
 
     #[test]
@@ -209,6 +218,32 @@ mod tests {
     }
 
     #[test]
+    fn a_track_from_before_visual_items_gets_an_empty_list() {
+        let project: Project = serde_json::from_str(
+            r#"{
+                "version": 2,
+                "settings": {"rate": {"num": 30, "den": 1}},
+                "tracks": [{"id": "V1", "kind": "video", "clips": []}]
+            }"#,
+        )
+        .unwrap();
+        assert!(project.tracks[0].visual_items.is_empty());
+    }
+
+    #[test]
+    fn visual_content_uses_the_page_camel_case_shape() {
+        let text = r#"{"kind":"videoOverlay","assetId":"a1"}"#;
+        let content: crate::VisualContent = serde_json::from_str(text).unwrap();
+        assert_eq!(
+            content,
+            crate::VisualContent::VideoOverlay {
+                asset_id: "a1".into()
+            }
+        );
+        assert_eq!(serde_json::to_string(&content).unwrap(), text);
+    }
+
+    #[test]
     fn what_comes_back_out_is_todays_format_only() {
         let text = r#"{
             "version": 1,
@@ -220,7 +255,10 @@ mod tests {
         let project: Project = serde_json::from_str(text).unwrap();
         let written = serde_json::to_string(&project).unwrap();
         assert!(written.contains(r#""version":2"#), "{written}");
-        assert!(written.contains(r#""rate":{"num":60,"den":1}"#), "{written}");
+        assert!(
+            written.contains(r#""rate":{"num":60,"den":1}"#),
+            "{written}"
+        );
         assert!(written.contains(r#""start":30"#), "{written}");
         assert!(!written.contains("startMs"), "{written}");
         assert!(!written.contains("\"fps\""), "{written}");

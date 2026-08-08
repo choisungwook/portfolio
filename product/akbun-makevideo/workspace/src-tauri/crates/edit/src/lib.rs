@@ -24,7 +24,7 @@ pub mod command;
 pub mod document;
 pub mod migrate;
 
-pub use command::{ClipAt, Command, Edge};
+pub use command::{ClipAt, Command, Edge, VisualItemAt};
 pub use document::{Document, DocumentState};
 pub use makevideo_time::{Rate, RationalTime};
 
@@ -213,6 +213,10 @@ pub struct Track {
     pub name: String,
     #[serde(default)]
     pub clips: Vec<Clip>,
+    /// Elements drawn over the track's clips. They may overlap in time; their
+    /// `z_index` decides their order within this track.
+    #[serde(default)]
+    pub visual_items: Vec<VisualItem>,
     /// An audio track that contributes nothing, or the audio of a video track.
     #[serde(default)]
     pub muted: bool,
@@ -250,6 +254,10 @@ impl Track {
         self.clips.iter().find(|clip| clip.id == clip_id)
     }
 
+    pub fn visual_item(&self, item_id: &str) -> Option<&VisualItem> {
+        self.visual_items.iter().find(|item| item.id == item_id)
+    }
+
     /// Clips are kept in start order, which is what lets the ripple and the
     /// overlap check read the track once instead of sorting on every question.
     pub fn sort(&mut self) {
@@ -277,6 +285,68 @@ impl Track {
             }
         }
         start
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisualTransform {
+    /// Project pixels, independent of the monitor's display scale.
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    /// Clockwise degrees around the item's centre.
+    pub rotation: f32,
+    #[serde(default = "one")]
+    pub opacity: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum VisualContent {
+    Text { text: String },
+    Shape,
+    Image { asset_id: String },
+    VideoOverlay { asset_id: String },
+}
+
+impl VisualContent {
+    pub fn asset_id(&self) -> Option<&str> {
+        match self {
+            VisualContent::Image { asset_id } | VisualContent::VideoOverlay { asset_id } => {
+                Some(asset_id)
+            }
+            VisualContent::Text { .. } | VisualContent::Shape => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisualItem {
+    pub id: String,
+    /// Frame indexes on the project rate, like clip times.
+    pub start: i64,
+    pub duration: i64,
+    pub transform: VisualTransform,
+    /// Higher values draw later within the track. Track array order remains
+    /// the primary layer order.
+    pub z_index: i32,
+    pub content: VisualContent,
+}
+
+impl VisualItem {
+    pub fn end_frame(&self) -> i64 {
+        self.start.saturating_add(self.duration.max(0))
+    }
+
+    pub fn contains_frame(&self, frame: i64) -> bool {
+        self.start <= frame && frame < self.end_frame()
     }
 }
 
@@ -341,6 +411,7 @@ impl Project {
                     kind: TrackKind::Video,
                     name: "V1".into(),
                     clips: Vec::new(),
+                    visual_items: Vec::new(),
                     muted: false,
                     hidden: false,
                 },
@@ -349,6 +420,7 @@ impl Project {
                     kind: TrackKind::Audio,
                     name: "A1".into(),
                     clips: Vec::new(),
+                    visual_items: Vec::new(),
                     muted: false,
                     hidden: false,
                 },
@@ -389,6 +461,54 @@ impl Project {
     pub fn clip(&self, clip_id: &str) -> Option<&Clip> {
         let (track, clip) = self.locate(clip_id)?;
         Some(&self.tracks[track].clips[clip])
+    }
+
+    pub fn locate_visual_item(&self, item_id: &str) -> Option<(usize, usize)> {
+        for (track, entry) in self.tracks.iter().enumerate() {
+            if let Some(item) = entry
+                .visual_items
+                .iter()
+                .position(|item| item.id == item_id)
+            {
+                return Some((track, item));
+            }
+        }
+        None
+    }
+
+    pub fn visual_item(&self, item_id: &str) -> Option<&VisualItem> {
+        let (track, item) = self.locate_visual_item(item_id)?;
+        Some(&self.tracks[track].visual_items[item])
+    }
+
+    pub fn visual_item_placement(&self, item_id: &str) -> Option<VisualItemAt> {
+        let (track, item) = self.locate_visual_item(item_id)?;
+        Some(VisualItemAt {
+            track_id: self.tracks[track].id.clone(),
+            item: self.tracks[track].visual_items[item].clone(),
+        })
+    }
+
+    /// The compositor order at one frame. Track order is primary and z-index
+    /// only orders items that belong to the same track.
+    pub fn visual_items_at(&self, frame: i64) -> Vec<VisualItemAt> {
+        let mut visible = Vec::new();
+        for track in &self.tracks {
+            if track.kind != TrackKind::Video || track.hidden {
+                continue;
+            }
+            let mut items: Vec<&VisualItem> = track
+                .visual_items
+                .iter()
+                .filter(|item| item.contains_frame(frame))
+                .collect();
+            items.sort_by_key(|item| item.z_index);
+            visible.extend(items.into_iter().map(|item| VisualItemAt {
+                track_id: track.id.clone(),
+                item: item.clone(),
+            }));
+        }
+        visible
     }
 
     pub fn linked_placements(&self, clip_id: &str) -> Vec<ClipAt> {
@@ -436,9 +556,19 @@ impl Project {
         self.tracks
             .iter()
             .filter(|track| track.contributes())
-            .flat_map(|track| track.clips.iter())
-            .filter(|clip| clip.duration_frames() > 0)
-            .map(|clip| clip.end_frame())
+            .flat_map(|track| {
+                let clips = track
+                    .clips
+                    .iter()
+                    .filter(|clip| clip.duration_frames() > 0)
+                    .map(Clip::end_frame);
+                let items = track
+                    .visual_items
+                    .iter()
+                    .filter(|item| item.duration > 0)
+                    .map(VisualItem::end_frame);
+                clips.chain(items)
+            })
             .max()
             .unwrap_or(0)
     }
@@ -491,6 +621,42 @@ impl Project {
                     links.entry(group).or_default().push((track, clip));
                 }
                 previous_end = clip.end_frame();
+            }
+            if track.kind == TrackKind::Audio && !track.visual_items.is_empty() {
+                return Err("visual items belong on video tracks".into());
+            }
+            for item in &track.visual_items {
+                let name = &item.id;
+                if item.start < 0 {
+                    return Err(format!(
+                        "visual item {name} would start before the timeline does"
+                    ));
+                }
+                if item.duration <= 0 {
+                    return Err(format!("visual item {name} would have no length"));
+                }
+                let transform = item.transform;
+                if ![
+                    transform.x,
+                    transform.y,
+                    transform.width,
+                    transform.height,
+                    transform.rotation,
+                    transform.opacity,
+                ]
+                .into_iter()
+                .all(f32::is_finite)
+                {
+                    return Err(format!("visual item {name} has a non-finite transform"));
+                }
+                if transform.width <= 0.0 || transform.height <= 0.0 {
+                    return Err(format!("visual item {name} would have no area"));
+                }
+                if !(0.0..=1.0).contains(&transform.opacity) {
+                    return Err(format!(
+                        "visual item {name} has opacity outside 0 through 1"
+                    ));
+                }
             }
         }
         for (group, entries) in links {
@@ -547,6 +713,20 @@ impl Project {
                 clip.start = clip.start.max(end);
                 end = clip.end_frame();
             }
+            if track.kind == TrackKind::Audio {
+                track.visual_items.clear();
+            } else {
+                for item in &mut track.visual_items {
+                    item.start = item.start.max(0);
+                    item.duration = item.duration.max(1);
+                    item.transform.x = finite_or(item.transform.x, 0.0);
+                    item.transform.y = finite_or(item.transform.y, 0.0);
+                    item.transform.width = finite_or(item.transform.width, 1.0).max(1.0);
+                    item.transform.height = finite_or(item.transform.height, 1.0).max(1.0);
+                    item.transform.rotation = finite_or(item.transform.rotation, 0.0);
+                    item.transform.opacity = finite_or(item.transform.opacity, 1.0).clamp(0.0, 1.0);
+                }
+            }
         }
         let mut groups: HashMap<String, Vec<(TrackKind, String, i64, i64, i64)>> = HashMap::new();
         for track in &self.tracks {
@@ -592,6 +772,10 @@ impl Project {
     }
 }
 
+fn finite_or(value: f32, fallback: f32) -> f32 {
+    value.is_finite().then_some(value).unwrap_or(fallback)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,6 +811,24 @@ mod tests {
         project.assets.push(video(10_000));
         project.tracks[0].clips = clips;
         project
+    }
+
+    fn visual_item(id: &str, start: i64, duration: i64, z_index: i32) -> VisualItem {
+        VisualItem {
+            id: id.into(),
+            start,
+            duration,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 320.0,
+                height: 180.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index,
+            content: VisualContent::Shape,
+        }
     }
 
     #[test]
@@ -718,5 +920,44 @@ mod tests {
             .clips
             .iter()
             .all(|clip| clip.out_point <= 300));
+    }
+
+    #[test]
+    fn visual_items_overlap_and_draw_by_track_then_z_index() {
+        let mut project = Project::new(ProjectSettings::default());
+        project.tracks[0].visual_items = vec![
+            visual_item("front", 0, 60, 20),
+            visual_item("back", 0, 60, 10),
+        ];
+        project.tracks.push(Track {
+            id: "t3".into(),
+            kind: TrackKind::Video,
+            name: "V2".into(),
+            clips: Vec::new(),
+            visual_items: vec![visual_item("top-track", 0, 60, -100)],
+            muted: false,
+            hidden: false,
+        });
+
+        assert!(project.validate().is_ok());
+        assert_eq!(
+            project
+                .visual_items_at(30)
+                .iter()
+                .map(|entry| entry.item.id.as_str())
+                .collect::<Vec<_>>(),
+            ["back", "front", "top-track"]
+        );
+        assert!(
+            project.visual_items_at(60).is_empty(),
+            "the end is exclusive"
+        );
+    }
+
+    #[test]
+    fn a_visual_item_extends_the_timeline() {
+        let mut project = Project::new(ProjectSettings::default());
+        project.tracks[0].visual_items = vec![visual_item("title", 90, 60, 0)];
+        assert_eq!(project.duration_frames(), 150);
     }
 }
