@@ -27,7 +27,10 @@
 //! applied edit is the state nobody can reason about: the user cannot tell how
 //! many times to press undo, and neither can the app.
 
-use crate::{min_clip_frames, Asset, Clip, Project, ProjectSettings, Rate, Track, TrackKind};
+use crate::{
+    min_clip_frames, Asset, Clip, Project, ProjectSettings, Rate, Track, TrackKind, VisualContent,
+    VisualItem, VisualTransform,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -46,6 +49,13 @@ pub enum Edge {
 pub struct ClipAt {
     pub track_id: String,
     pub clip: Clip,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisualItemAt {
+    pub track_id: String,
+    pub item: VisualItem,
 }
 
 /// An asset and where it sat in the library, so undoing an import does not
@@ -160,6 +170,37 @@ pub enum Command {
         #[serde(default)]
         opacity: Option<f32>,
     },
+    #[serde(rename_all = "camelCase")]
+    AddVisualItem {
+        track_id: String,
+        content: VisualContent,
+        start: i64,
+        duration: i64,
+        transform: VisualTransform,
+        z_index: i32,
+        #[serde(default)]
+        id: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetVisualTransform {
+        item_id: String,
+        transform: VisualTransform,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetVisualTiming {
+        item_id: String,
+        start: i64,
+        duration: i64,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetVisualZIndex { item_id: String, z_index: i32 },
+    #[serde(rename_all = "camelCase")]
+    SetVisualContent {
+        item_id: String,
+        content: VisualContent,
+    },
+    #[serde(rename_all = "camelCase")]
+    RemoveVisualItem { item_id: String },
     /// Resolution and timebase. Changing the rate carries the edit with it, so
     /// a cut stays where it was in time rather than where it was in frames.
     #[serde(rename_all = "camelCase")]
@@ -181,6 +222,10 @@ pub enum Command {
     RestoreTracks { entries: Vec<TrackAt> },
     #[serde(rename_all = "camelCase")]
     DropTracks { track_ids: Vec<String> },
+    #[serde(rename_all = "camelCase")]
+    RestoreVisualItems { entries: Vec<VisualItemAt> },
+    #[serde(rename_all = "camelCase")]
+    DropVisualItems { item_ids: Vec<String> },
 
     /// One undo step made of several commands, all or nothing.
     #[serde(rename_all = "camelCase")]
@@ -270,10 +315,19 @@ impl Command {
             Command::UnlinkClips { .. } => "Unlink clips",
             Command::RippleDelete { .. } => "Ripple delete",
             Command::SetClipGain { .. } => "Clip levels",
+            Command::AddVisualItem { .. } => "Add visual item",
+            Command::SetVisualTransform { .. } => "Transform visual item",
+            Command::SetVisualTiming { .. } => "Time visual item",
+            Command::SetVisualZIndex { .. } => "Reorder visual item",
+            Command::SetVisualContent { .. } => "Edit visual item",
+            Command::RemoveVisualItem { .. } | Command::DropVisualItems { .. } => {
+                "Delete visual item"
+            }
             Command::SetSettings { .. } => "Project settings",
             Command::RestoreClips { .. } => "Restore clips",
             Command::RestoreAssets { .. } | Command::DropAssets { .. } => "Assets",
             Command::RestoreTracks { .. } => "Restore track",
+            Command::RestoreVisualItems { .. } => "Restore visual items",
             Command::Transaction { commands } => commands
                 .iter()
                 .find(|command| !command.is_nothing())
@@ -334,6 +388,32 @@ impl Command {
                 volume,
                 opacity,
             } => set_clip_gain(project, clip_id, volume, opacity),
+            Command::AddVisualItem {
+                track_id,
+                content,
+                start,
+                duration,
+                transform,
+                z_index,
+                id,
+            } => add_visual_item(
+                project, ids, track_id, content, start, duration, transform, z_index, id,
+            ),
+            Command::SetVisualTransform { item_id, transform } => {
+                set_visual_transform(project, item_id, transform)
+            }
+            Command::SetVisualTiming {
+                item_id,
+                start,
+                duration,
+            } => set_visual_timing(project, item_id, start, duration),
+            Command::SetVisualZIndex { item_id, z_index } => {
+                set_visual_z_index(project, item_id, z_index)
+            }
+            Command::SetVisualContent { item_id, content } => {
+                set_visual_content(project, item_id, content)
+            }
+            Command::RemoveVisualItem { item_id } => remove_visual_item(project, item_id),
             Command::SetSettings { settings } => Ok(set_settings(project, settings)),
             Command::RestoreClips { entries } => Ok(restore_clips(project, entries)),
             Command::DropClips { clip_ids } => Ok(drop_clips(project, clip_ids)),
@@ -341,6 +421,8 @@ impl Command {
             Command::DropAssets { asset_ids } => Ok(drop_assets(project, asset_ids)),
             Command::RestoreTracks { entries } => Ok(restore_tracks(project, entries)),
             Command::DropTracks { track_ids } => Ok(drop_tracks(project, track_ids)),
+            Command::RestoreVisualItems { entries } => Ok(restore_visual_items(project, entries)),
+            Command::DropVisualItems { item_ids } => Ok(drop_visual_items(project, item_ids)),
             Command::Transaction { commands } => transaction(project, ids, commands),
         }
     }
@@ -414,6 +496,7 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
         .ok_or("that asset is not in this project")?;
     let asset = project.assets.remove(index);
     let mut orphans = Vec::new();
+    let mut orphan_items = Vec::new();
     for track in &mut project.tracks {
         for clip in &track.clips {
             if clip.asset_id == asset_id {
@@ -424,6 +507,17 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
             }
         }
         track.clips.retain(|clip| clip.asset_id != asset_id);
+        for item in &track.visual_items {
+            if item.content.asset_id() == Some(asset_id.as_str()) {
+                orphan_items.push(VisualItemAt {
+                    track_id: track.id.clone(),
+                    item: item.clone(),
+                });
+            }
+        }
+        track
+            .visual_items
+            .retain(|item| item.content.asset_id() != Some(asset_id.as_str()));
     }
     Ok(Applied {
         resolved: Command::RemoveAsset { asset_id },
@@ -433,6 +527,9 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
                     entries: vec![AssetAt { index, asset }],
                 },
                 Command::RestoreClips { entries: orphans },
+                Command::RestoreVisualItems {
+                    entries: orphan_items,
+                },
             ],
         },
     })
@@ -457,6 +554,7 @@ fn add_track(
         kind,
         name: kind.name_for(existing),
         clips: Vec::new(),
+        visual_items: Vec::new(),
         muted: false,
         hidden: false,
     });
@@ -1030,6 +1128,180 @@ fn set_clip_gain(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+fn add_visual_item(
+    project: &mut Project,
+    ids: &mut Ids,
+    track_id: String,
+    content: VisualContent,
+    start: i64,
+    duration: i64,
+    transform: VisualTransform,
+    z_index: i32,
+    id: Option<String>,
+) -> Result<Applied, String> {
+    validate_visual_content(project, &content)?;
+    let track_index = project
+        .track_index(&track_id)
+        .ok_or("that track is not in this project")?;
+    if project.tracks[track_index].kind != TrackKind::Video {
+        return Err("visual items belong on video tracks".into());
+    }
+    let id = id.unwrap_or_else(|| ids.make('i'));
+    if project.visual_item(&id).is_some() {
+        return Err("that visual item id is already in this project".into());
+    }
+    let item = VisualItem {
+        id: id.clone(),
+        start,
+        duration,
+        transform,
+        z_index,
+        content: content.clone(),
+    };
+    project.tracks[track_index].visual_items.push(item);
+    Ok(Applied {
+        resolved: Command::AddVisualItem {
+            track_id,
+            content,
+            start,
+            duration,
+            transform,
+            z_index,
+            id: Some(id.clone()),
+        },
+        inverse: Command::DropVisualItems { item_ids: vec![id] },
+    })
+}
+
+fn set_visual_transform(
+    project: &mut Project,
+    item_id: String,
+    transform: VisualTransform,
+) -> Result<Applied, String> {
+    let (track, item) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let previous = project.tracks[track].visual_items[item].transform;
+    project.tracks[track].visual_items[item].transform = transform;
+    Ok(Applied {
+        resolved: Command::SetVisualTransform {
+            item_id: item_id.clone(),
+            transform,
+        },
+        inverse: Command::SetVisualTransform {
+            item_id,
+            transform: previous,
+        },
+    })
+}
+
+fn set_visual_timing(
+    project: &mut Project,
+    item_id: String,
+    start: i64,
+    duration: i64,
+) -> Result<Applied, String> {
+    let (track, item) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let previous = &project.tracks[track].visual_items[item];
+    let (was_start, was_duration) = (previous.start, previous.duration);
+    let item = &mut project.tracks[track].visual_items[item];
+    item.start = start;
+    item.duration = duration;
+    Ok(Applied {
+        resolved: Command::SetVisualTiming {
+            item_id: item_id.clone(),
+            start,
+            duration,
+        },
+        inverse: Command::SetVisualTiming {
+            item_id,
+            start: was_start,
+            duration: was_duration,
+        },
+    })
+}
+
+fn set_visual_z_index(
+    project: &mut Project,
+    item_id: String,
+    z_index: i32,
+) -> Result<Applied, String> {
+    let (track, item) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let previous = project.tracks[track].visual_items[item].z_index;
+    project.tracks[track].visual_items[item].z_index = z_index;
+    Ok(Applied {
+        resolved: Command::SetVisualZIndex {
+            item_id: item_id.clone(),
+            z_index,
+        },
+        inverse: Command::SetVisualZIndex {
+            item_id,
+            z_index: previous,
+        },
+    })
+}
+
+fn set_visual_content(
+    project: &mut Project,
+    item_id: String,
+    content: VisualContent,
+) -> Result<Applied, String> {
+    validate_visual_content(project, &content)?;
+    let (track, item) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let previous = project.tracks[track].visual_items[item].content.clone();
+    project.tracks[track].visual_items[item].content = content.clone();
+    Ok(Applied {
+        resolved: Command::SetVisualContent {
+            item_id: item_id.clone(),
+            content,
+        },
+        inverse: Command::SetVisualContent {
+            item_id,
+            content: previous,
+        },
+    })
+}
+
+fn validate_visual_content(project: &Project, content: &VisualContent) -> Result<(), String> {
+    let Some(asset_id) = content.asset_id() else {
+        return Ok(());
+    };
+    let asset = project
+        .asset(asset_id)
+        .ok_or("that visual item asset is not in this project")?;
+    match (content, asset.kind) {
+        (VisualContent::Image { .. }, crate::AssetKind::Image)
+        | (VisualContent::VideoOverlay { .. }, crate::AssetKind::Video) => Ok(()),
+        (VisualContent::Image { .. }, _) => Err("an image item needs an image asset".into()),
+        (VisualContent::VideoOverlay { .. }, _) => {
+            Err("a video overlay needs a video asset".into())
+        }
+        (VisualContent::Text { .. } | VisualContent::Shape, _) => Ok(()),
+    }
+}
+
+fn remove_visual_item(project: &mut Project, item_id: String) -> Result<Applied, String> {
+    let entry = project
+        .visual_item_placement(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    for track in &mut project.tracks {
+        track.visual_items.retain(|item| item.id != item_id);
+    }
+    Ok(Applied {
+        resolved: Command::RemoveVisualItem { item_id },
+        inverse: Command::RestoreVisualItems {
+            entries: vec![entry],
+        },
+    })
+}
+
 /// Changing the timebase carries the edit with it, so a project cut at 30 and
 /// then set to 29.97 keeps every clip where it was in time rather than where it
 /// was in frame numbers.
@@ -1051,6 +1323,7 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
     }
 
     let mut restore = Vec::new();
+    let mut restore_items = Vec::new();
     for track in &mut project.tracks {
         for clip in &mut track.clips {
             restore.push(ClipAt {
@@ -1063,6 +1336,14 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
             // frame that makes it a clip at all.
             clip.out_point = rescale(clip.out_point, from, to).max(clip.in_point + 1);
         }
+        for item in &mut track.visual_items {
+            restore_items.push(VisualItemAt {
+                track_id: track.id.clone(),
+                item: item.clone(),
+            });
+            item.start = rescale(item.start, from, to);
+            item.duration = rescale(item.duration, from, to).max(1);
+        }
         track.sort();
     }
     Applied {
@@ -1071,6 +1352,9 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
             commands: vec![
                 Command::SetSettings { settings: was },
                 Command::RestoreClips { entries: restore },
+                Command::RestoreVisualItems {
+                    entries: restore_items,
+                },
             ],
         },
     }
@@ -1204,5 +1488,47 @@ fn drop_tracks(project: &mut Project, track_ids: Vec<String>) -> Applied {
     Applied {
         resolved: Command::DropTracks { track_ids },
         inverse: Command::RestoreTracks { entries: previous },
+    }
+}
+
+fn restore_visual_items(project: &mut Project, entries: Vec<VisualItemAt>) -> Applied {
+    let mut previous = Vec::new();
+    let mut invented = Vec::new();
+    for entry in &entries {
+        match project.visual_item_placement(&entry.item.id) {
+            Some(placement) => previous.push(placement),
+            None => invented.push(entry.item.id.clone()),
+        }
+        for track in &mut project.tracks {
+            track.visual_items.retain(|item| item.id != entry.item.id);
+        }
+        if let Some(track) = project.track_mut(&entry.track_id) {
+            track.visual_items.push(entry.item.clone());
+        }
+    }
+    Applied {
+        resolved: Command::RestoreVisualItems { entries },
+        inverse: Command::Transaction {
+            commands: vec![
+                Command::DropVisualItems { item_ids: invented },
+                Command::RestoreVisualItems { entries: previous },
+            ],
+        },
+    }
+}
+
+fn drop_visual_items(project: &mut Project, item_ids: Vec<String>) -> Applied {
+    let previous: Vec<VisualItemAt> = item_ids
+        .iter()
+        .filter_map(|id| project.visual_item_placement(id))
+        .collect();
+    for track in &mut project.tracks {
+        track
+            .visual_items
+            .retain(|item| !item_ids.contains(&item.id));
+    }
+    Applied {
+        resolved: Command::DropVisualItems { item_ids },
+        inverse: Command::RestoreVisualItems { entries: previous },
     }
 }

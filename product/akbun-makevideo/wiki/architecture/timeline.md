@@ -22,6 +22,8 @@ Undo stores the inverse rather than a copy of the project. Trimming one clip sto
 
 Commands that create something — `addClip`, `splitAt` — arrive without ids and are stored in the history *with* the ids they were given, so redo reproduces the same clips rather than new ones that merely resemble them.
 
+Visual items follow the same command boundary. Add, transform, timing, order, content and remove commands each store an inverse; the page never edits `visualItems` directly.
+
 ## The invariants
 
 Checked after every command, against the whole project:
@@ -29,6 +31,7 @@ Checked after every command, against the whole project:
 - a clip has a length, its in point is not negative, and it does not reach past the end of its source
 - clips on a track do not overlap, and none starts before the timeline does
 - a link group has one video clip and one audio clip from the same asset, with matching timeline and source ranges
+- a visual item belongs to a video track, has positive time and area, finite project-space geometry and opacity from zero through one
 
 A broken one does not show on the timeline. A zero length clip draws as nothing and an out point past the end of a file draws as the last frame; both surface as an ffmpeg failure or a black stretch part way through a render that has been running for ten minutes.
 

@@ -718,6 +718,7 @@ mod tests {
             kind,
             name: id.into(),
             clips,
+            visual_items: Vec::new(),
             muted: false,
             hidden: false,
         }

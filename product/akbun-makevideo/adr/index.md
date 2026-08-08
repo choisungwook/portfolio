@@ -22,3 +22,4 @@
 | [2026-08-playback-proxies.md](./2026-08-playback-proxies.md) | 4K playback uses validated 1280px proxies while export keeps originals |
 | [2026-08-asset-waveform-cache.md](./2026-08-asset-waveform-cache.md) | Audio waveforms are cached per asset and clips draw only their source interval |
 | [2026-08-native-project-trash.md](./2026-08-native-project-trash.md) | Windows and macOS move validated project targets with native trash APIs |
+| [2026-08-common-visual-item-model.md](./2026-08-common-visual-item-model.md) | Text, shape, image and video overlays share one timed transform model |
