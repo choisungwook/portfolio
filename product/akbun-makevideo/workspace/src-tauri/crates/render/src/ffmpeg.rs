@@ -119,7 +119,7 @@ fn collect_items(project: &Project) -> Vec<Item<'_>> {
                 // of it, because the playback mixer asks the same question and
                 // two answers to it would be a clip that plays and does not
                 // render, or the other way round.
-                let audio = layout::carries_sound(asset, track);
+                let audio = layout::clip_carries_sound(project, asset, track, clip);
                 if !video && !audio {
                     continue;
                 }

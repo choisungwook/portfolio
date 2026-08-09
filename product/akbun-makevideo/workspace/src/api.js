@@ -57,7 +57,7 @@ if (!window.__TAURI__) {
     bootstrap: async () => ({
       settings: {
         theme: 'system',
-        previewQuality: 'half',
+        previewQuality: 'quarter',
         previewMuteWhileScrubbing: true,
         snap: true,
         defaultWidth: 1920,
@@ -127,6 +127,8 @@ if (!window.__TAURI__) {
       performance.memory && performance.memory.usedJSHeapSize
         ? performance.memory.usedJSHeapSize
         : null,
+    processMetrics: async () => ({ memoryBytes: null, cpuPercent: null }),
+    readErrorLog: async () => '',
     saveQualityReport: async () => null,
     writeQualityReport: async () => null,
     // Pretends the folder was made, the way saveProject below pretends the
@@ -279,6 +281,8 @@ window.api = {
   playbackVisible: (visible) => invoke('playback_visible', { visible }),
   playbackStatus: () => invoke('playback_status'),
   processMemoryBytes: () => invoke('process_memory_bytes'),
+  processMetrics: () => invoke('process_metrics'),
+  readErrorLog: () => invoke('read_error_log'),
   saveQualityReport: async (report) => {
     const path = await saveDialog({
       title: 'Save Playback Quality Report',

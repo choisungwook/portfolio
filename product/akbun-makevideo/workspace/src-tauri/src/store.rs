@@ -96,6 +96,28 @@ pub fn append_error(
         .map_err(|error| format!("cannot write error log {active:?}: {error}"))
 }
 
+pub fn recent_error_log(
+    app: &AppHandle,
+    settings: &Settings,
+    lines: usize,
+) -> Result<String, String> {
+    let path = log_dir(app, settings).join(ERROR_LOG);
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(error) => return Err(format!("cannot read error log {path:?}: {error}")),
+    };
+    Ok(text
+        .lines()
+        .rev()
+        .take(lines)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
 /// Write to a temp file and rename over the target. A crash halfway through a
 /// direct write would leave a truncated settings.json; rename is atomic, so the
 /// old file survives until the new one is complete.

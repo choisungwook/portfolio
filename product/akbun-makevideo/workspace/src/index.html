@@ -33,8 +33,6 @@
   </svg>
 
   <header id="menubar">
-    <span class="brand">akbun-makevideo</span>
-
     <nav id="menus">
       <div class="menu">
         <button class="menu-title" data-menu="project">Project</button>
@@ -128,10 +126,7 @@
       <section id="preview-panel">
         <header class="panel-head">
           <h2>Preview</h2>
-          <div class="segmented" id="preview-source">
-            <button data-source="timeline" class="on">Timeline</button>
-            <button data-source="asset">Asset</button>
-          </div>
+          <button id="btn-debug" class="small" type="button">Debug</button>
         </header>
         <div id="stage-wrap">
           <div id="stage">
@@ -180,6 +175,7 @@
         <button id="btn-add-video" class="small">+ Video track</button>
         <button id="btn-add-audio" class="small">+ Audio track</button>
         <span class="menubar-gap"></span>
+        <span id="proxy-progress" class="dim small-text" hidden></span>
         <label class="inline">Zoom <input type="range" id="zoom" min="0" max="100" value="45" /></label>
       </div>
 
@@ -212,6 +208,19 @@
       </details>
     </section>
   </main>
+
+  <aside id="debug-panel" hidden>
+    <header class="panel-head">
+      <h2>Debug</h2>
+      <button id="btn-close-debug" class="small" type="button">Close</button>
+    </header>
+    <div id="debug-metrics" class="debug-block"></div>
+    <div class="debug-actions">
+      <button id="btn-refresh-debug" class="small" type="button">Refresh</button>
+      <button id="btn-toggle-logs" class="small" type="button">Show error log</button>
+    </div>
+    <pre id="debug-log" class="debug-log" hidden></pre>
+  </aside>
 
   <div id="timeline-context-menu" class="timeline-context-menu" hidden></div>
 
@@ -301,8 +310,8 @@
       <label class="row">Preview quality
         <select id="as-quality">
           <option value="full">Full</option>
-          <option value="half">Half — default</option>
-          <option value="quarter">Quarter</option>
+          <option value="half">Half</option>
+          <option value="quarter">Quarter — default</option>
         </select>
       </label>
       <label class="row check">
@@ -371,10 +380,10 @@
         </select>
       </label>
       <p class="dim small-text" id="as-accel-note"></p>
-      <label class="row">ffmpeg folder
-        <input type="text" id="as-ffmpeg" placeholder="empty = look in the usual places" />
+      <label class="row">ffmpeg binaries folder
+        <input type="text" id="as-ffmpeg" placeholder="folder containing ffmpeg and ffprobe" />
       </label>
-      <p class="dim small-text" id="as-tools"></p>
+      <p class="dim small-text" id="as-tools">Optional. Select the folder containing ffmpeg and ffprobe executables, not project outputs.</p>
       <label class="row">Error log folder
         <span class="row-input">
           <input type="text" id="as-log-dir" placeholder="empty = operating system default" />

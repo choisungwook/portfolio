@@ -37,8 +37,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 pub struct Settings {
     /// "system", "light" or "dark".
     pub theme: String,
-    /// "full", "half" or "quarter". Half by default: the preview stacks real
-    /// media elements, and at full size a few tracks at once will not keep up.
+    /// "full", "half" or "quarter". Quarter by default: it leaves decoding
+    /// headroom when proxy generation and a multi-track preview overlap.
     pub preview_quality: String,
     /// Drop preview audio while the playhead is being dragged. Scrubbing with
     /// audio on means a seek per frame, which is what actually stalls playback.
@@ -104,7 +104,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             theme: "system".into(),
-            preview_quality: "half".into(),
+            preview_quality: "quarter".into(),
             preview_mute_while_scrubbing: true,
             snap: true,
             show_action_safe_area: false,
@@ -1775,6 +1775,70 @@ pub fn process_memory_bytes() -> Result<u64, String> {
         &String::from_utf8_lossy(&output.stdout),
         std::process::id(),
     ))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessMetrics {
+    pub memory_bytes: u64,
+    pub cpu_percent: f64,
+}
+
+/// Process-tree metrics include WebView and ffmpeg children, which hold most
+/// preview memory and CPU outside the Rust process itself.
+#[tauri::command]
+pub fn process_metrics() -> Result<ProcessMetrics, String> {
+    let output = Command::new("ps")
+        .args(["-axo", "pid=,ppid=,rss=,pcpu="])
+        .output()
+        .map_err(|error| format!("cannot read process metrics: {error}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let rows: Vec<(u32, u32, u64, f64)> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            Some((
+                fields.next()?.parse().ok()?,
+                fields.next()?.parse().ok()?,
+                fields.next()?.parse().ok()?,
+                fields.next()?.parse().ok()?,
+            ))
+        })
+        .collect();
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut values = HashMap::new();
+    for (pid, parent, rss_kib, cpu_percent) in rows {
+        children.entry(parent).or_default().push(pid);
+        values.insert(pid, (rss_kib, cpu_percent));
+    }
+    let mut pending = vec![std::process::id()];
+    let mut found = HashSet::new();
+    while let Some(pid) = pending.pop() {
+        if !found.insert(pid) {
+            continue;
+        }
+        if let Some(next) = children.get(&pid) {
+            pending.extend(next);
+        }
+    }
+    let (rss_kib, cpu_percent) = found.into_iter().fold((0, 0.0), |total, pid| {
+        let Some((rss, cpu)) = values.get(&pid) else {
+            return total;
+        };
+        (total.0 + rss, total.1 + cpu)
+    });
+    Ok(ProcessMetrics {
+        memory_bytes: rss_kib.saturating_mul(1024),
+        cpu_percent,
+    })
+}
+
+#[tauri::command]
+pub fn read_error_log(app: AppHandle, state: State<AppState>) -> Result<String, String> {
+    let settings = state.settings.lock().unwrap().clone();
+    crate::store::recent_error_log(&app, &settings, 200)
 }
 
 #[tauri::command]
