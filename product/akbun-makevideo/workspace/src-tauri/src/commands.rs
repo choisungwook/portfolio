@@ -775,6 +775,7 @@ fn make_proxy(
         .spawn()
         .map_err(|error| format!("cannot start ffmpeg: {error}"))?;
     if let Some(stdout) = child.stdout.take() {
+        let mut last_percent = 0;
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if let Some(ffmpeg::Progress::Position(position_ms)) =
                 ffmpeg::parse_progress_line(&line)
@@ -784,6 +785,9 @@ fn make_proxy(
                 } else {
                     0
                 };
+                if !makevideo_proxy::progress_percent_changed(&mut last_percent, percent) {
+                    continue;
+                }
                 if !set_proxy_status(
                     app,
                     proxies,

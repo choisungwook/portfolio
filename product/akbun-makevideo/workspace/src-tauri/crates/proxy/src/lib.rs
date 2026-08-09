@@ -71,6 +71,14 @@ pub fn write_manifest(project_path: &str, asset: &Asset) -> Result<(), String> {
     std::fs::write(&path, text).map_err(|error| format!("cannot write {path:?}: {error}"))
 }
 
+pub fn progress_percent_changed(previous: &mut u8, current: u8) -> bool {
+    if *previous == current {
+        return false;
+    }
+    *previous = current;
+    true
+}
+
 pub fn ffmpeg_args(asset: &Asset, output: &Path) -> Vec<String> {
     vec![
         "-hide_banner".into(),
@@ -173,6 +181,16 @@ mod tests {
             .windows(2)
             .any(|pair| pair[0] == "-threads" && pair[1] == ENCODE_THREADS.to_string()));
         assert_eq!(args.last().map(String::as_str), Some("proxy.mp4"));
+    }
+
+    #[test]
+    fn proxy_progress_reports_only_changed_percentages() {
+        let mut previous = 0;
+        let reported = [0, 0, 1, 1, 2, 2, 100]
+            .into_iter()
+            .filter(|percent| progress_percent_changed(&mut previous, *percent))
+            .collect::<Vec<_>>();
+        assert_eq!(reported, vec![1, 2, 100]);
     }
 
     #[test]
