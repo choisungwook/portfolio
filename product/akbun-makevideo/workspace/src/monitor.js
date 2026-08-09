@@ -208,7 +208,7 @@ function createMonitor(options) {
       native = false;
       lastPlace = null;
       lastVisible = null;
-      preview.redraw();
+      preview.seek(position);
       return false;
     }
     const place = currentPlace();

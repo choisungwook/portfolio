@@ -143,21 +143,36 @@ test('a page overlay keeps the preview in the webview', async (t) => {
   });
   global.window = { devicePixelRatio: 1 };
   let attached = 0;
-  let redrawn = 0;
+  const seeks = [];
+  let overlayActive = false;
   const monitor = createMonitor({
     preview: {
       mode: () => 'timeline',
       total: () => 1,
-      redraw: () => { redrawn += 1; },
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+      seek: (frame) => seeks.push(frame),
     },
     stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
-    api: { available: true, playbackAttach: async () => { attached += 1; } },
-    pageOverlayActive: () => true,
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attached += 1;
+        return { engine: 'native' };
+      },
+      playbackSeek: async () => {},
+      playbackVisible: async () => {},
+    },
+    pageOverlayActive: () => overlayActive,
   });
 
+  await monitor.attach();
+  monitor.seek(1);
+  overlayActive = true;
   assert.strictEqual(await monitor.attach(), false);
-  assert.strictEqual(attached, 0);
-  assert.strictEqual(redrawn, 1);
+  assert.strictEqual(attached, 1);
+  assert.deepStrictEqual(seeks, [1]);
 });
 
 test('leaving native editing clears the page exact frame', async (t) => {
