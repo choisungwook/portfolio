@@ -133,9 +133,10 @@ fn track(id: &str, kind: TrackKind, clips: Vec<Clip>) -> Track {
         id: id.into(),
         kind,
         name: id.into(),
-        clips,
-        visual_items: Vec::new(),
-        muted: false,
+            clips,
+            visual_items: Vec::new(),
+            subtitle_style: None,
+            muted: false,
         hidden: false,
     }
 }

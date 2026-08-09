@@ -130,6 +130,7 @@ impl From<WireProject> for Project {
                     muted: track.muted,
                     hidden: track.hidden,
                     visual_items: track.visual_items,
+                    subtitle_style: None,
                     clips: track
                         .clips
                         .into_iter()

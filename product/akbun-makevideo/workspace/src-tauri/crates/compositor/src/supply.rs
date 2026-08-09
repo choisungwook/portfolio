@@ -446,6 +446,7 @@ mod tests {
                     opacity: 1.0,
                 }],
                 visual_items: Vec::new(),
+                subtitle_style: None,
                 muted: false,
                 hidden: false,
             }],

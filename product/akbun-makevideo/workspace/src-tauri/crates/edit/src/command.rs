@@ -29,7 +29,7 @@
 
 use crate::{
     min_clip_frames, Asset, Clip, Marker, Project, ProjectSettings, Rate, Track, TrackKind,
-    VisualContent, VisualItem, VisualTransform,
+    TextStyle, VisualContent, VisualItem, VisualTransform,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -120,6 +120,8 @@ pub enum Command {
         #[serde(default)]
         hidden: Option<bool>,
     },
+    #[serde(rename_all = "camelCase")]
+    SetSubtitleStyle { track_id: String, style: TextStyle },
     /// Drop an asset onto a track. `start` is where it was asked for; where it
     /// lands is that or the first free frame after it.
     #[serde(rename_all = "camelCase")]
@@ -388,6 +390,7 @@ impl Command {
             Command::AddTrack { .. } => "Add track",
             Command::RemoveTrack { .. } | Command::DropTracks { .. } => "Remove track",
             Command::SetTrackFlags { .. } => "Track settings",
+            Command::SetSubtitleStyle { .. } => "Subtitle style",
             Command::AddClip { .. } => "Add clip",
             Command::MoveClip { .. } => "Move clip",
             Command::TrimClip { .. } => "Trim clip",
@@ -440,6 +443,7 @@ impl Command {
                 muted,
                 hidden,
             } => set_track_flags(project, track_id, muted, hidden),
+            Command::SetSubtitleStyle { track_id, style } => set_subtitle_style(project, track_id, style),
             Command::AddClip {
                 track_id,
                 asset_id,
@@ -662,6 +666,7 @@ fn add_track(
         name: kind.name_for(existing),
         clips: Vec::new(),
         visual_items: Vec::new(),
+        subtitle_style: (kind == TrackKind::Subtitle).then(TextStyle::default),
         muted: false,
         hidden: false,
     });
@@ -730,6 +735,19 @@ fn set_track_flags(
             muted,
             hidden,
         },
+    })
+}
+
+fn set_subtitle_style(project: &mut Project, track_id: String, style: TextStyle) -> Result<Applied, String> {
+    let track = project.track_mut(&track_id).ok_or("that track is not on the timeline")?;
+    if track.kind != TrackKind::Subtitle {
+        return Err("subtitle style belongs on a subtitle track".into());
+    }
+    let previous = track.subtitle_style.clone().unwrap_or_default();
+    track.subtitle_style = Some(style.clone());
+    Ok(Applied {
+        resolved: Command::SetSubtitleStyle { track_id: track_id.clone(), style },
+        inverse: Command::SetSubtitleStyle { track_id, style: previous },
     })
 }
 
@@ -1319,8 +1337,13 @@ fn add_visual_item(
     let track_index = project
         .track_index(&track_id)
         .ok_or("that track is not in this project")?;
-    if project.tracks[track_index].kind != TrackKind::Video {
-        return Err("visual items belong on video tracks".into());
+    if !matches!(project.tracks[track_index].kind, TrackKind::Video | TrackKind::Subtitle) {
+        return Err("visual items do not belong on audio tracks".into());
+    }
+    if project.tracks[track_index].kind == TrackKind::Subtitle
+        && !matches!(content, VisualContent::Text { .. })
+    {
+        return Err("subtitle tracks only hold text".into());
     }
     let id = id.unwrap_or_else(|| ids.make('i'));
     if project.visual_item(&id).is_some() {
