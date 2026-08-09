@@ -617,6 +617,11 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
     }
 }
 
+#[tauri::command]
+pub fn font_available(family: String) -> bool {
+    makevideo_compositor::text::font_available(&family)
+}
+
 /// One composited frame for the preview, drawn by the same shader the render
 /// uses. Returns eight bytes of width and height then RGBA rows, which the page
 /// blits straight onto a canvas.

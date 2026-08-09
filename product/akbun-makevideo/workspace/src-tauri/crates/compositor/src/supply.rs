@@ -514,7 +514,11 @@ mod tests {
     fn running_past_the_end_wraps_instead_of_stopping() {
         let mut source = source(Duration::from_millis(1));
         // The timeline is 60 frames; asking for 70 wraps once.
-        let report = measure(&mut source, &Scenario::new("continuous-supply", 70));
+        let mut scenario = Scenario::new("continuous-supply", 70);
+        // The test verifies wrapping, not the 2-second production stall bound.
+        // A busy parallel CI runner can delay the decoder thread beyond it.
+        scenario.stall_grace_ms = 5_000;
+        let report = measure(&mut source, &scenario);
         assert_eq!(report.metrics.total_frames, 70);
         assert_eq!(report.metrics.seeks, 1);
     }

@@ -24,6 +24,8 @@ makevideo-render = { path = "../render" }
 # tree through the render crate; only the writer is new.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+fontdb = "0.23"
+fontdue = "0.9"
 wgpu = { version = "30", optional = true }
 pollster = { version = "1", optional = true }
 

@@ -145,6 +145,7 @@ if (!window.__TAURI__) {
     startWaveforms: async () => [],
     editState: async () => emptyDocument(),
     editApply: async () => emptyDocument(),
+    fontAvailable: async () => true,
     editUndo: async () => emptyDocument(),
     editRedo: async () => emptyDocument(),
     describeAsset: async () => emptyDocument(),
@@ -307,6 +308,7 @@ window.api = {
   // A list, applied as one undo step: dropping three files is one thing the
   // user did, so it takes one press to take back.
   editApply: (commands) => invoke('edit_apply', { commands }),
+  fontAvailable: (family) => invoke('font_available', { family }),
   editUndo: () => invoke('edit_undo'),
   editRedo: () => invoke('edit_redo'),
   describeAsset: (assetId, durationMs, width, height) =>

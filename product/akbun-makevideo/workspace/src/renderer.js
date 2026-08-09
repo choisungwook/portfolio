@@ -89,6 +89,7 @@ const dom = {
   btnDelete: el('btn-delete'),
   btnRipple: el('btn-ripple'),
   btnLink: el('btn-link'),
+  btnAddText: el('btn-add-text'),
   btnAddMarker: el('btn-add-marker'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
@@ -99,6 +100,15 @@ const dom = {
   content: el('timeline-content'),
   ruler: el('ruler'),
   markerList: el('marker-list'),
+  textPanel: el('text-panel'),
+  textValue: el('text-value'),
+  textFont: el('text-font'),
+  textSize: el('text-size'),
+  textColor: el('text-color'),
+  textAlign: el('text-align'),
+  textStrokeColor: el('text-stroke-color'),
+  textStrokeWidth: el('text-stroke-width'),
+  textShadowColor: el('text-shadow-color'),
   lanes: el('lanes'),
   timelineContextMenu: el('timeline-context-menu'),
   playhead: el('playhead'),
@@ -699,6 +709,7 @@ function renderTimeline() {
   renderRuler();
   renderLanes();
   renderMarkerList();
+  renderTextInspector();
   updatePlayhead(preview ? preview.position() : 0);
   dom.duration.textContent = L.formatTimecode(L.projectDurationFrames(state.project), rate());
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
@@ -1056,6 +1067,96 @@ function splitAtPlayhead() {
 
 function addMarker(frame = Math.round(preview.position())) {
   return edit({ op: 'addMarker', frame, name: '', color: '#e6a700' });
+}
+
+async function addText() {
+  const target = state.targetTrackId && L.findTrack(state.project, state.targetTrackId);
+  const track = target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
+  if (!track) return;
+  const known = new Set((track.visualItems || []).map((item) => item.id));
+  await edit({
+    op: 'addVisualItem',
+    trackId: track.id,
+    content: {
+      kind: 'text',
+      text: 'Title',
+      style: {
+        fontFamily: 'sans-serif', fontSize: 64, color: '#ffffff', align: 'center',
+        strokeColor: '', strokeWidth: 0, shadowColor: '#00000080', shadowX: 2, shadowY: 2,
+      },
+    },
+    start: Math.round(preview.position()),
+    duration: Math.max(Math.round(T.rateToNumber(rate()) * 5), 1),
+    transform: {
+      x: state.project.settings.width * 0.1,
+      y: state.project.settings.height * 0.12,
+      width: state.project.settings.width * 0.8,
+      height: state.project.settings.height * 0.2,
+      rotation: 0,
+      opacity: 1,
+    },
+    zIndex: 0,
+  });
+  const liveTrack = L.findTrack(state.project, track.id);
+  const item = (liveTrack && liveTrack.visualItems || []).find((entry) => !known.has(entry.id));
+  if (item) selectVisualItem(item.id);
+}
+
+function hexColor(value, fallback) {
+  const match = /^#([0-9a-fA-F]{6})(?:[0-9a-fA-F]{2})?$/.exec(value || '');
+  return match ? `#${match[1]}` : fallback;
+}
+
+function preserveAlpha(color, previous) {
+  const alpha = /^#[0-9a-fA-F]{8}$/.test(previous || '') ? previous.slice(7) : '';
+  return `${color}${alpha}`;
+}
+
+function renderTextInspector() {
+  const item = selectedVisualItem();
+  const text = item && item.content && item.content.kind === 'text' ? item.content : null;
+  dom.textPanel.hidden = !text;
+  if (!text) return;
+  const style = text.style || {};
+  dom.textValue.value = text.text || '';
+  dom.textFont.value = style.fontFamily || 'sans-serif';
+  dom.textSize.value = style.fontSize || 64;
+  dom.textColor.value = hexColor(style.color, '#ffffff');
+  dom.textAlign.value = style.align || 'center';
+  dom.textStrokeColor.value = hexColor(style.strokeColor, '#000000');
+  dom.textStrokeWidth.value = style.strokeWidth || 0;
+  dom.textShadowColor.value = hexColor(style.shadowColor, '#000000');
+}
+
+function updateSelectedText() {
+  const item = selectedVisualItem();
+  if (!item || item.content.kind !== 'text') return;
+  const style = {
+    ...(item.content.style || {}),
+    fontFamily: dom.textFont.value || 'sans-serif',
+    fontSize: Math.max(8, Number(dom.textSize.value) || 64),
+    color: dom.textColor.value,
+    align: dom.textAlign.value,
+    strokeColor: Number(dom.textStrokeWidth.value) > 0 ? dom.textStrokeColor.value : '',
+    strokeWidth: Math.max(0, Number(dom.textStrokeWidth.value) || 0),
+    shadowColor: preserveAlpha(dom.textShadowColor.value, item.content.style && item.content.style.shadowColor),
+  };
+  Promise.resolve(window.api.fontAvailable(style.fontFamily))
+    .then((available) => {
+      if (!available) {
+        return window.api.message(
+          `"${style.fontFamily}" is not installed. A sans-serif fallback will be used.`,
+          { title: 'Font unavailable', kind: 'warning' },
+        );
+      }
+    })
+    .then(() => edit({
+      op: 'setVisualContent',
+      itemId: item.id,
+      content: { kind: 'text', text: dom.textValue.value, style },
+    }))
+    .then(() => selectVisualItem(item.id))
+    .catch((error) => reportError(error, 'text:edit'));
 }
 
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
@@ -2069,6 +2170,7 @@ function wireTimeline() {
   dom.btnDelete.addEventListener('click', () => deleteSelected(false));
   dom.btnRipple.addEventListener('click', () => deleteSelected(true));
   dom.btnLink.addEventListener('click', toggleClipLink);
+  dom.btnAddText.addEventListener('click', addText);
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
@@ -2126,6 +2228,12 @@ function wireTimeline() {
       edit({ op: 'setMarker', markerId: marker.id, name: name.value });
     }
   });
+  for (const input of [
+    dom.textValue, dom.textFont, dom.textSize, dom.textColor, dom.textAlign,
+    dom.textStrokeColor, dom.textStrokeWidth, dom.textShadowColor,
+  ]) {
+    input.addEventListener('change', updateSelectedText);
+  }
   dom.lanes.addEventListener('pointerdown', (event) => {
     const clip = event.target.closest('.clip');
     if (clip) {

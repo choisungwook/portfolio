@@ -57,6 +57,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::bootstrap,
+            commands::font_available,
             commands::save_settings,
             commands::report_error,
             commands::list_projects,
