@@ -76,6 +76,12 @@ pub struct Settings {
     /// same code and make the preview and the render agree; the third is
     /// faster because frames never leave ffmpeg.
     pub compositor: String,
+    /// Which graphics adapter to draw on, by the name `graphics_devices`
+    /// reports. Empty is whatever wgpu picks, which is the right answer on a
+    /// machine with one GPU. A name this machine does not have is also the
+    /// automatic pick, so a settings file survives being carried to another
+    /// machine or unplugging an eGPU.
+    pub gpu_device: String,
     /// "native" to play on a graphics surface with the audio clock deciding
     /// when each frame is shown, "media-element" to stack `<video>` elements in
     /// the page as the app always has.
@@ -121,6 +127,7 @@ impl Default for Settings {
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
             compositor: "auto".into(),
+            gpu_device: String::new(),
             playback_engine: "native".into(),
             proxy_enabled: true,
             delete_project_folder: true,
@@ -148,9 +155,10 @@ pub struct AppState {
     /// None means it has not been asked yet.
     pub accel: Mutex<Option<AccelProbe>>,
     /// Opening a graphics device costs a moment and the answer never changes,
-    /// so it is made once and shared. Keyed by backend, because asking for the
-    /// CPU after the GPU has been opened should not hand back the GPU.
-    pub compositor: Mutex<Vec<(Backend, Arc<Compositor>)>>,
+    /// so it is made once and shared. Keyed by backend and by the chosen
+    /// adapter: asking for the CPU after the GPU has been opened should not
+    /// hand back the GPU, and neither should asking for the other card.
+    pub compositor: Mutex<Vec<((Backend, String), Arc<Compositor>)>>,
     /// The native monitor, when one is running. `None` is either the media
     /// element preview or nothing open yet, and the page is told which.
     pub playback: Mutex<Option<Session>>,
@@ -411,35 +419,71 @@ fn wanted_backend(setting: &str) -> Backend {
     }
 }
 
+/// The adapter name a setting asks for, or `None` for whatever wgpu picks.
+fn wanted_device(setting: &str) -> Option<&str> {
+    let name = setting.trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
 /// The compositor for a backend, made once and shared. This never fails: with
 /// no graphics device the software compositor draws the same picture, only
 /// slower, so "no GPU" stopped being a reason to give up.
-fn compositor(state: &State<AppState>, backend: Backend) -> Arc<Compositor> {
+fn compositor(state: &State<AppState>, backend: Backend, device: Option<&str>) -> Arc<Compositor> {
+    let key = (backend, device.unwrap_or_default().to_string());
     let mut made = state.compositor.lock().unwrap();
-    if let Some((_, existing)) = made.iter().find(|(kind, _)| *kind == backend) {
+    if let Some((_, existing)) = made.iter().find(|(kind, _)| *kind == key) {
         return Arc::clone(existing);
     }
-    let built = Arc::new(Compositor::with_backend(backend).unwrap_or_else(|_| Compositor::new()));
-    made.push((backend, Arc::clone(&built)));
+    let built =
+        Arc::new(Compositor::with_device(backend, device).unwrap_or_else(|_| Compositor::new()));
+    made.push((key, Arc::clone(&built)));
     built
 }
 
-fn compositor_info(state: &State<AppState>, setting: &str) -> CompositorInfo {
+/// The compositor the settings ask for.
+fn settings_compositor(state: &State<AppState>, settings: &Settings) -> Arc<Compositor> {
+    compositor(
+        state,
+        wanted_backend(&settings.compositor),
+        wanted_device(&settings.gpu_device),
+    )
+}
+
+/// Every graphics adapter this machine offers, for the settings list.
+///
+/// Asked for by the page rather than sent with the bootstrap: enumerating
+/// adapters opens the graphics stack, and an app that never draws on a GPU
+/// should not do that on the way up.
+#[tauri::command]
+pub fn graphics_devices() -> Vec<makevideo_compositor::gpu::Device> {
+    makevideo_compositor::gpu::devices()
+}
+
+fn compositor_info(state: &State<AppState>, settings: &Settings) -> CompositorInfo {
+    let setting = settings.compositor.clone();
     if setting == "ffmpeg" {
         return CompositorInfo {
-            setting: setting.to_string(),
+            setting,
             device: "ffmpeg filter graph".into(),
             gpu: false,
             fell_back: false,
         };
     }
-    let backend = wanted_backend(setting);
-    let made = compositor(state, backend);
+    let backend = wanted_backend(&setting);
+    let made = settings_compositor(state, settings);
+    // A name that is not on this machine is drawn on the automatic pick, and
+    // the note has to say so rather than repeat the setting back.
+    let asked_for = wanted_device(&settings.gpu_device);
     CompositorInfo {
-        setting: setting.to_string(),
+        setting,
         device: made.adapter().to_string(),
         gpu: made.is_gpu(),
-        fell_back: backend == Backend::Auto && !made.is_gpu(),
+        fell_back: (backend == Backend::Auto && !made.is_gpu())
+            || asked_for.is_some_and(|name| name != made.adapter()),
     }
 }
 
@@ -610,7 +654,7 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
             .to_string_lossy()
             .to_string(),
         acceleration: acceleration(&state, ffmpeg.as_ref()),
-        compositor: compositor_info(&state, &settings.compositor),
+        compositor: compositor_info(&state, &settings),
         ffprobe: find_tool(&app, "ffprobe", &settings.ffmpeg_dir),
         ffmpeg,
         settings,
@@ -654,7 +698,7 @@ pub async fn preview_frame(
     // freeze every command the page sends in the meantime.
     let project = state.document.lock().unwrap().project().clone();
     let settings = state.settings.lock().unwrap().clone();
-    let gpu = compositor(&state, wanted_backend(&settings.compositor));
+    let gpu = settings_compositor(&state, &settings);
     let configured = settings.ffmpeg_dir.clone();
     let ffmpeg_path = find_tool(&app, "ffmpeg", &configured)
         .ok_or("ffmpeg was not found, so no frame can be decoded")?;
@@ -1756,7 +1800,7 @@ pub fn start_render(
     let gpu = if settings.compositor == "ffmpeg" {
         None
     } else {
-        Some(compositor(&state, wanted_backend(&settings.compositor)))
+        Some(settings_compositor(&state, &settings))
     };
 
     let mut routes: Vec<Route> = Vec::new();
@@ -2118,7 +2162,7 @@ fn start_session(
     // The monitor draws the project's own frame, the same one the render
     // writes. What differs is only how big the view showing it is, which the
     // surface handles by scaling on presentation.
-    let compositor = compositor(state, wanted_backend(&settings.compositor));
+    let compositor = settings_compositor(state, settings);
     let proxy_paths = if settings.proxy_enabled {
         ready_proxy_paths(&state.proxies.lock().unwrap())
     } else {
@@ -2223,9 +2267,16 @@ where
 mod tests {
     use super::{
         process_metrics_rows, process_tree_rss_bytes, srt_contents, srt_cues, srt_frame,
-        srt_timestamp, Settings,
+        srt_timestamp, wanted_device, Settings,
     };
     use makevideo_render::Rate;
+
+    #[test]
+    fn an_unset_graphics_device_is_the_automatic_pick() {
+        assert_eq!(wanted_device(""), None);
+        assert_eq!(wanted_device("   "), None);
+        assert_eq!(wanted_device("Apple M3 Pro"), Some("Apple M3 Pro"));
+    }
 
     #[test]
     fn srt_frame_accepts_comma_and_dot_milliseconds() {

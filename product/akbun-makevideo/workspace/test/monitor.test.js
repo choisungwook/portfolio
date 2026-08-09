@@ -316,28 +316,37 @@ test('a ready proxy waits for playback to stop before replacing the native sessi
   assert.deepStrictEqual(calls, ['attach', 'pause', 'release', 'attach']);
 });
 
-test('a ready proxy does not redraw playing media elements', async () => {
+// Every method createPreview actually returns, and nothing else. A stub that
+// answers any name at all is what let `preview.redraw()` — a method the media
+// element preview has never had — sit in the refresh path until it threw in
+// front of a user opening a project.
+const PREVIEW_API = [
+  'layout', 'play', 'pause', 'toggle', 'isPlaying', 'seek', 'position', 'total',
+  'mode', 'prune', 'clear', 'showAsset', 'showTimeline', 'setQuality',
+  'setScrubbing', 'setMuteWhileScrubbing', 'showExact', 'clearExact', 'isExact',
+];
+
+function strictPreviewStub(overrides) {
+  const stub = {};
+  for (const name of PREVIEW_API) stub[name] = () => undefined;
+  return Object.assign(stub, overrides);
+}
+
+test('a ready proxy refreshes media elements without calling anything they do not have', async () => {
   let playing = true;
-  let redraws = 0;
-  const preview = new Proxy(
-    {},
-    {
-      get: (_target, name) => {
-        if (name === 'mode') return () => 'timeline';
-        if (name === 'isPlaying') return () => playing;
-        if (name === 'pause') return () => { playing = false; };
-        if (name === 'redraw') return () => { redraws += 1; };
-        return () => undefined;
-      },
-    }
-  );
+  const preview = strictPreviewStub({
+    mode: () => 'timeline',
+    isPlaying: () => playing,
+    pause: () => {
+      playing = false;
+    },
+  });
   const monitor = createMonitor({ preview, stage: null, api: { available: false } });
 
+  // Playing: deferred. Stopped: taken. Neither may reach for a method that is
+  // not on the object, which on a real preview is a TypeError.
   await monitor.refreshMedia();
-  assert.strictEqual(redraws, 0);
-
   await monitor.pause();
-  assert.strictEqual(redraws, 1);
 });
 
 // With no monitor attached, every transport call has to reach the media element

@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS = {
   ffmpegDir: '',
   renderAcceleration: 'auto',
   compositor: 'auto',
+  gpuDevice: '',
   // The page's own default, and deliberately not Rust's. This value is what is
   // in force before bootstrap answers and in a plain browser, and in both of
   // those the media elements are what is really playing — there is no IPC to
@@ -2125,6 +2126,45 @@ function compositorNote() {
   return `Drawing with ${found.device || 'the software compositor'}. ${same}`;
 }
 
+/** Fill the graphics device list from what the machine actually has.
+ *
+ *  Asked for when the sheet opens rather than at boot: enumerating adapters
+ *  opens the graphics stack, and the answer is only ever looked at here. The
+ *  saved name is kept as an option even when it is missing, so a settings file
+ *  carried from another machine shows what it asked for instead of silently
+ *  reading as Auto. */
+async function fillGraphicsDevices() {
+  const select = el('as-gpu-device');
+  const note = el('as-gpu-device-note');
+  const chosen = state.settings.gpuDevice || '';
+  let devices = [];
+  try {
+    devices = (await window.api.graphicsDevices()) || [];
+  } catch (error) {
+    devices = [];
+  }
+  const names = devices.map((device) => device.name);
+  select.textContent = '';
+  select.appendChild(new Option('Auto — whichever the system picks', ''));
+  for (const device of devices) {
+    select.appendChild(new Option(`${device.name} — ${device.kind}, ${device.backend}`, device.name));
+  }
+  if (chosen && !names.includes(chosen)) {
+    select.appendChild(new Option(`${chosen} — not on this machine`, chosen));
+  }
+  select.value = chosen;
+  select.disabled = state.settings.compositor === 'cpu';
+  const drawing = (state.boot && state.boot.compositor && state.boot.compositor.device) || 'nothing yet';
+  if (!devices.length) {
+    note.textContent = 'No graphics device was found, so there is nothing to choose between.';
+    return;
+  }
+  note.textContent =
+    state.settings.compositor === 'cpu'
+      ? 'The CPU compositor never opens a graphics device, so this is not used.'
+      : `Drawing on ${drawing}. Changing this restarts the monitor.`;
+}
+
 function playbackNote() {
   if (state.settings.playbackEngine === 'media-element') {
     return 'Stacked <video> elements, the way the app played before the monitor existed. The picture is the browser\u2019s approximation of the render rather than the render itself, and there is no frame rate to hold it to.';
@@ -2149,6 +2189,7 @@ function fillAppSheet() {
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
   el('as-compositor').value = state.settings.compositor;
   el('as-compositor-note').textContent = compositorNote();
+  fillGraphicsDevices();
   el('as-playback').value = state.settings.playbackEngine;
   el('as-playback-note').textContent = playbackNote();
   el('as-accel').value = state.settings.renderAcceleration;
@@ -2220,6 +2261,8 @@ function collectShortcutOverrides() {
 
 function applySettings(next) {
   const was = state.settings.playbackEngine;
+  const wasCompositor = state.settings.compositor;
+  const wasDevice = state.settings.gpuDevice;
   const usedProxies = state.settings.proxyEnabled;
   const usedGuides = G.visible(state.settings);
   state.settings = next;
@@ -2240,6 +2283,10 @@ function applySettings(next) {
   // A saved setting of media-element is no change and correctly attaches
   // nothing.
   if (was !== next.playbackEngine) attachMonitor(true);
+  // The monitor captures its compositor when the session starts, so choosing
+  // another backend or another card is a restart too. Without this the setting
+  // reads as changed and the picture is still drawn by the old device.
+  else if (wasCompositor !== next.compositor || wasDevice !== next.gpuDevice) attachMonitor(true);
   else if (usedGuides !== G.visible(next)) attachMonitor(true);
   else if (usedProxies !== next.proxyEnabled) {
     if (preview.usesNativeMonitor()) attachMonitor(true);
@@ -2677,6 +2724,7 @@ function wireSheets() {
       showCenterLines: el('as-center-lines').checked,
       theme: el('as-theme').value,
       compositor: el('as-compositor').value,
+      gpuDevice: el('as-gpu-device').value,
       playbackEngine: el('as-playback').value,
       proxyEnabled: state.settings.proxyEnabled,
       renderAcceleration: el('as-accel').value,

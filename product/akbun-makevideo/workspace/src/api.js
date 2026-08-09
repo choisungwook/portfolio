@@ -69,6 +69,7 @@ if (!window.__TAURI__) {
         ffmpegDir: '',
         renderAcceleration: 'auto',
         compositor: 'auto',
+        gpuDevice: '',
         proxyEnabled: true,
         showActionSafeArea: false,
         showTitleSafeArea: false,
@@ -133,6 +134,7 @@ if (!window.__TAURI__) {
         ? performance.memory.usedJSHeapSize
         : null,
     processMetrics: async () => ({ memoryBytes: null, cpuPercent: null }),
+    graphicsDevices: async () => [],
     readErrorLog: async () => '',
     saveQualityReport: async () => null,
     writeQualityReport: async () => null,
@@ -243,6 +245,7 @@ window.api = {
   available: true,
 
   bootstrap: () => invoke('bootstrap'),
+  graphicsDevices: () => invoke('graphics_devices'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
   reportError: (source, message) => invoke('report_error', { source, message }),
 

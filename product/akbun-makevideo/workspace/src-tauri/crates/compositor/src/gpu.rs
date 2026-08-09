@@ -88,14 +88,61 @@ impl From<&Lut> for LutKey {
     }
 }
 
+/// One graphics adapter this machine offers, for the settings list.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Device {
+    /// What the driver calls it. This is also the key the setting stores, so
+    /// two identical cards are one entry and either of them will do.
+    pub name: String,
+    /// "DiscreteGpu", "IntegratedGpu", "Cpu" — what kind of thing it is.
+    pub kind: String,
+    /// Metal, Vulkan, Dx12. Two entries with the same name and different
+    /// backends are the same card reached two ways.
+    pub backend: String,
+}
+
+/// Every adapter wgpu can see. Empty on a machine with no graphics stack,
+/// which is the same answer as "there is nothing to choose from".
+pub fn devices() -> Vec<Device> {
+    pollster::block_on(wgpu::Instance::default().enumerate_adapters(wgpu::Backends::all()))
+        .into_iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            Device {
+                name: info.name,
+                kind: format!("{:?}", info.device_type),
+                backend: format!("{:?}", info.backend),
+            }
+        })
+        .collect()
+}
+
 impl GpuCompositor {
     /// Picks whatever device this machine has: Metal on a Mac, and a software
     /// rasteriser on a machine with no GPU, which is how the tests run.
     pub fn new() -> Result<GpuCompositor, String> {
+        GpuCompositor::with_device(None)
+    }
+
+    /// The named adapter, or whatever wgpu would have picked.
+    ///
+    /// A name that is not there falls back rather than failing: a settings file
+    /// travels between machines, and refusing to draw because last week's
+    /// eGPU is unplugged would be worse than drawing on the one that is.
+    pub fn with_device(wanted: Option<&str>) -> Result<GpuCompositor, String> {
         let instance = wgpu::Instance::default();
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-                .map_err(|error| format!("no graphics adapter: {error}"))?;
+        let named = wanted.and_then(|wanted| {
+            pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+                .into_iter()
+                .find(|adapter| adapter.get_info().name == wanted)
+        });
+        let adapter = match named {
+            Some(adapter) => adapter,
+            None => pollster::block_on(
+                instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
+            )
+            .map_err(|error| format!("no graphics adapter: {error}"))?,
+        };
         let name = adapter.get_info().name;
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
