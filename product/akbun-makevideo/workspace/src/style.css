@@ -674,6 +674,10 @@ button.icon.on {
   height: var(--lane-audio);
 }
 
+.head.subtitle, .lane.subtitle {
+  height: var(--lane-video);
+}
+
 .head-name {
   font-weight: 600;
   font-size: 12px;

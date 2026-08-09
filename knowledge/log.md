@@ -2,6 +2,7 @@
 
 ## 2026-08-09
 
+* **Creation**: [자막 트랙은 텍스트 래스터화 경로를 공유](decisions/2026-08-subtitle-track-shares-text-rasterization.md) 결정 기록. 자막을 텍스트 레이어의 위치·변형 모델에서 분리하고, compositor 래스터화 결과를 화면과 export가 공통으로 쓰는 경계를 남긴다.
 * **Creation**: [Program Monitor 가이드는 앱 설정과 편집용 pass에 둔다](decisions/2026-08-program-monitor-guides-are-editor-only.md) 결정 기록. akbun-makevideo의 네이티브 surface가 WebView 위에 놓이는 제약에서, export 경로와 분리된 정지 exact frame pass를 재사용해 가이드를 표시하는 판단을 남긴다.
 
 ## 2026-08-07

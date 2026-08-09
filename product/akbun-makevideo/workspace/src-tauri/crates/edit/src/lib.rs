@@ -191,6 +191,7 @@ impl Asset {
 pub enum TrackKind {
     Video,
     Audio,
+    Subtitle,
 }
 
 impl TrackKind {
@@ -201,6 +202,7 @@ impl TrackKind {
         let letter = match self {
             TrackKind::Video => 'V',
             TrackKind::Audio => 'A',
+            TrackKind::Subtitle => 'S',
         };
         format!("{letter}{}", index + 1)
     }
@@ -219,6 +221,10 @@ pub struct Track {
     /// `z_index` decides their order within this track.
     #[serde(default)]
     pub visual_items: Vec<VisualItem>,
+    /// One style for the whole subtitle track. Individual subtitle entries
+    /// keep only their timing and text.
+    #[serde(default)]
+    pub subtitle_style: Option<TextStyle>,
     /// An audio track that contributes nothing, or the audio of a video track.
     #[serde(default)]
     pub muted: bool,
@@ -249,6 +255,7 @@ impl Track {
                 asset.kind == AssetKind::Audio
                     || (asset.kind == AssetKind::Video && asset.has_audio)
             }
+            TrackKind::Subtitle => false,
         }
     }
 
@@ -498,6 +505,7 @@ impl Project {
                     name: "V1".into(),
                     clips: Vec::new(),
                     visual_items: Vec::new(),
+                    subtitle_style: None,
                     muted: false,
                     hidden: false,
                 },
@@ -507,6 +515,7 @@ impl Project {
                     name: "A1".into(),
                     clips: Vec::new(),
                     visual_items: Vec::new(),
+                    subtitle_style: None,
                     muted: false,
                     hidden: false,
                 },
@@ -581,7 +590,7 @@ impl Project {
     pub fn visual_items_at(&self, frame: i64) -> Vec<VisualItemAt> {
         let mut visible = Vec::new();
         for track in &self.tracks {
-            if track.kind != TrackKind::Video || track.hidden {
+            if !matches!(track.kind, TrackKind::Video | TrackKind::Subtitle) || track.hidden {
                 continue;
             }
             let mut items: Vec<&VisualItem> = track
@@ -733,7 +742,21 @@ impl Project {
                 previous_end = clip.end_frame();
             }
             if track.kind == TrackKind::Audio && !track.visual_items.is_empty() {
-                return Err("visual items belong on video tracks".into());
+                return Err("visual items do not belong on audio tracks".into());
+            }
+            if track.kind == TrackKind::Subtitle
+                && track.visual_items.iter().any(|item| !matches!(item.content, VisualContent::Text { .. }))
+            {
+                return Err("subtitle tracks only hold text".into());
+            }
+            if track.kind == TrackKind::Subtitle {
+                let mut items = track.visual_items.iter().collect::<Vec<_>>();
+                items.sort_by_key(|item| item.start);
+                for pair in items.windows(2) {
+                    if pair[0].end_frame() > pair[1].start {
+                        return Err("subtitle items cannot overlap".into());
+                    }
+                }
             }
             for item in &track.visual_items {
                 let name = &item.id;
@@ -1062,6 +1085,7 @@ mod tests {
             name: "V2".into(),
             clips: Vec::new(),
             visual_items: vec![visual_item("top-track", 0, 60, -100)],
+            subtitle_style: None,
             muted: false,
             hidden: false,
         });

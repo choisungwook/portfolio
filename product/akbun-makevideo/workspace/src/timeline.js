@@ -109,6 +109,7 @@ function relinkCandidate(project, clipId) {
 function canAccept(track, asset) {
   if (!asset) return false;
   if (track.kind === 'video') return asset.kind === 'video' || asset.kind === 'image';
+  if (track.kind === 'subtitle') return false;
   return asset.kind === 'audio' || (asset.kind === 'video' && asset.hasAudio);
 }
 
@@ -120,6 +121,9 @@ function projectDurationFrames(project) {
     if (track.hidden || (track.kind === 'audio' && track.muted)) continue;
     for (const clip of track.clips) {
       if (clipDuration(clip) > 0) end = Math.max(end, clipEnd(clip));
+    }
+    for (const item of track.visualItems || []) {
+      if (item.duration > 0) end = Math.max(end, item.start + item.duration);
     }
   }
   return end;

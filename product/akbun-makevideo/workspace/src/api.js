@@ -21,6 +21,7 @@ const MEDIA_FILTERS = [
 ];
 
 const PROJECT_FILTERS = [{ name: 'akbun-makevideo project', extensions: ['akbunvideo'] }];
+const SRT_FILTERS = [{ name: 'SubRip subtitle', extensions: ['srt'] }];
 
 // Opening src/index.html in a plain browser is handy for poking at the layout,
 // so without Tauri everything that needs the desktop app degrades to a no-op
@@ -108,6 +109,8 @@ if (!window.__TAURI__) {
     pickProjectOpen: unavailable,
     pickProjectSave: unavailable,
     pickRenderOutput: unavailable,
+    pickSrtOpen: unavailable,
+    pickSrtSave: unavailable,
     pickFolder: unavailable,
     listProjects: async () => [],
     previewFrame: unavailable,
@@ -152,6 +155,8 @@ if (!window.__TAURI__) {
     editRedo: async () => emptyDocument(),
     describeAsset: async () => emptyDocument(),
     newDocument: async () => emptyDocument(),
+    importSrt: unavailable,
+    exportSrt: unavailable,
     openProject: unavailable,
     saveProject: async () => {},
     startRender: unavailable,
@@ -250,6 +255,8 @@ window.api = {
       defaultPath: defaultName,
       filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
     }),
+  pickSrtOpen: () => openDialog({ title: 'Import SubRip', filters: SRT_FILTERS }),
+  pickSrtSave: (defaultName) => saveDialog({ title: 'Export SubRip', defaultPath: defaultName, filters: SRT_FILTERS }),
 
   pickFolder: (title) => openDialog({ title, directory: true, multiple: false }),
 
@@ -318,6 +325,8 @@ window.api = {
   describeAsset: (assetId, durationMs, width, height) =>
     invoke('describe_asset', { assetId, durationMs, width, height }),
   newDocument: () => invoke('new_document'),
+  importSrt: (trackId, path) => invoke('import_srt', { trackId, path }),
+  exportSrt: (trackId, path) => invoke('export_srt', { trackId, path }),
 
   openProject: (path) => invoke('open_project', { path }),
   saveProject: (path) => invoke('save_project', { path }),
