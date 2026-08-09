@@ -45,6 +45,11 @@ pub struct Settings {
     pub preview_mute_while_scrubbing: bool,
     /// Snap clips to nearby edges. Mirrors the magnet button in the timeline.
     pub snap: bool,
+    /// Editor-only overlays. These follow the app, not the project or render.
+    pub show_action_safe_area: bool,
+    pub show_title_safe_area: bool,
+    pub show_rule_of_thirds: bool,
+    pub show_center_lines: bool,
     /// The resolution a new project starts with.
     pub default_width: u32,
     pub default_height: u32,
@@ -102,6 +107,10 @@ impl Default for Settings {
             preview_quality: "half".into(),
             preview_mute_while_scrubbing: true,
             snap: true,
+            show_action_safe_area: false,
+            show_title_safe_area: false,
+            show_rule_of_thirds: false,
+            show_center_lines: false,
             default_width: 1920,
             default_height: 1080,
             default_rate: Rate::fps(30),
@@ -1913,6 +1922,15 @@ mod tests {
     fn existing_settings_delete_the_project_folder_by_default() {
         let settings: Settings = serde_json::from_str("{}").unwrap();
         assert!(settings.delete_project_folder);
+    }
+
+    #[test]
+    fn monitor_guides_are_off_by_default() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert!(!settings.show_action_safe_area);
+        assert!(!settings.show_title_safe_area);
+        assert!(!settings.show_rule_of_thirds);
+        assert!(!settings.show_center_lines);
     }
 
     #[test]

@@ -20,6 +20,7 @@ const L = globalThis.timelineLib;
 const T = globalThis.timeLib;
 const K = globalThis.shortcutLib;
 const X = globalThis.transformLib;
+const G = globalThis.guideLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
@@ -49,6 +50,10 @@ const DEFAULT_SETTINGS = {
   // moment bootstrap lands.
   playbackEngine: 'media-element',
   proxyEnabled: true,
+  showActionSafeArea: false,
+  showTitleSafeArea: false,
+  showRuleOfThirds: false,
+  showCenterLines: false,
   deleteProjectFolder: true,
   logDir: '',
   logRotationSize: 5,
@@ -149,6 +154,7 @@ let preview = null;
 let mediaPreview = null;
 let qualityMonitor = null;
 let visualDrag = null;
+let editorOverlayActive = false;
 
 // --- helpers ---------------------------------------------------------------
 
@@ -721,6 +727,7 @@ function updatePlayhead(frame) {
   dom.playhead.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
   dom.clock.textContent = L.formatTimecode(frame, rate());
   dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
+  syncEditorOverlay();
   renderStageOverlay();
 }
 
@@ -766,7 +773,8 @@ function setStageMode(mode) {
   // The badge exists to say which of two pictures is on screen. On the native
   // monitor there is only one — the same compositor draws the stopped frame and
   // the playing ones — so there is nothing to tell apart and nothing to show.
-  const known = (mode === 'exact' || mode === 'live') && !preview.usesNativeMonitor();
+  const known = (mode === 'exact' || mode === 'live') &&
+    (!preview.usesNativeMonitor() || editorOverlayActive);
   dom.stageMode.hidden = !known || L.projectDurationFrames(state.project) <= 0;
   dom.stageMode.textContent = mode === 'exact' ? 'exact frame' : 'live preview';
   dom.stageMode.classList.toggle('exact', mode === 'exact');
@@ -777,7 +785,7 @@ function setStageMode(mode) {
  *  stopped, and a newer request cancels an older one by token. */
 async function requestExactFrame() {
   if (!window.api.available) return;
-  if (preview.usesNativeMonitor() && !state.selectedVisualItemId) return;
+  if (preview.usesNativeMonitor() && !editorOverlayActive) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   if (L.projectDurationFrames(state.project) <= 0) return;
   if (state.settings.compositor === 'ffmpeg') return;
@@ -799,7 +807,7 @@ async function requestExactFrame() {
 function scheduleExactFrame() {
   if (!window.api.available) return;
   window.clearTimeout(exactTimer);
-  if (preview.usesNativeMonitor() && !state.selectedVisualItemId) return;
+  if (preview.usesNativeMonitor() && !editorOverlayActive) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   exactTimer = window.setTimeout(requestExactFrame, 180);
 }
@@ -843,23 +851,36 @@ function overlayScale() {
 
 function selectVisualItem(itemId) {
   state.selectedVisualItemId = itemId || null;
-  const editing = Boolean(state.selectedVisualItemId);
-  dom.stage.classList.toggle('editing', editing);
-  if (!editing) {
-    preview.clearExact();
-    preview.setEditing(false);
-    preview.redraw();
-  } else {
-    preview.setEditing(true);
-    scheduleExactFrame();
-  }
+  syncEditorOverlay();
   renderStageOverlay();
+}
+
+function editorOverlayWanted() {
+  return Boolean(
+    preview &&
+    preview.mode() === 'timeline' &&
+    (G.visible(state.settings) || (state.selectedVisualItemId && !preview.isPlaying()))
+  );
+}
+
+function syncEditorOverlay() {
+  const active = editorOverlayWanted();
+  dom.stage.classList.toggle('editing', Boolean(state.selectedVisualItemId));
+  if (active === editorOverlayActive) return;
+  editorOverlayActive = active;
+  preview.setEditing(active);
+  if (active) scheduleExactFrame();
+  else {
+    preview.clearExact();
+    preview.redraw();
+  }
 }
 
 function renderStageOverlay() {
   const canvas = dom.stageOverlay;
   const item = selectedVisualItem();
-  if (!canvas || !item) {
+  const showGuides = G.visible(state.settings);
+  if (!canvas || (!item && !showGuides)) {
     if (canvas) canvas.width = 0;
     return;
   }
@@ -875,6 +896,8 @@ function renderStageOverlay() {
   if (!context) return;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.clearRect(0, 0, box.width, box.height);
+  if (showGuides) G.draw(context, state.settings, box.width, box.height);
+  if (!item) return;
   const transform = item.transform;
   const center = X.displayPoint(X.centre(transform), box, state.project.settings);
   const size = {
@@ -1481,6 +1504,7 @@ async function confirmDiscard(what) {
  *  project starts with nothing to undo. */
 function loadDocument(doc, path) {
   if (preview) preview.setEditing(false);
+  editorOverlayActive = false;
   dom.stage.classList.remove('editing');
   visualDrag = null;
   adopt(doc);
@@ -1724,6 +1748,10 @@ function fillAppSheet() {
   el('as-quality').value = state.settings.previewQuality;
   el('as-scrub-mute').checked = state.settings.previewMuteWhileScrubbing;
   el('as-snap').checked = state.settings.snap;
+  el('as-action-safe-area').checked = state.settings.showActionSafeArea;
+  el('as-title-safe-area').checked = state.settings.showTitleSafeArea;
+  el('as-rule-of-thirds').checked = state.settings.showRuleOfThirds;
+  el('as-center-lines').checked = state.settings.showCenterLines;
   el('as-theme').value = state.settings.theme;
   el('as-workspace').value = state.settings.workspaceDir;
   el('as-delete-project-folder').checked = state.settings.deleteProjectFolder;
@@ -1802,12 +1830,15 @@ function collectShortcutOverrides() {
 function applySettings(next) {
   const was = state.settings.playbackEngine;
   const usedProxies = state.settings.proxyEnabled;
+  const usedGuides = G.visible(state.settings);
   state.settings = next;
   renderShortcutLabels();
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
   dom.previewQuality.value = next.previewQuality;
   dom.btnMagnet.classList.toggle('on', next.snap);
+  syncEditorOverlay();
+  renderStageOverlay();
   // The engine is picked once, when a monitor is asked for. Changing the
   // setting therefore means taking the running one down and asking again,
   // rather than hoping the next command notices.
@@ -1818,6 +1849,7 @@ function applySettings(next) {
   // A saved setting of media-element is no change and correctly attaches
   // nothing.
   if (was !== next.playbackEngine) attachMonitor(true);
+  else if (usedGuides !== G.visible(next)) attachMonitor(true);
   else if (usedProxies !== next.proxyEnabled) {
     if (preview.usesNativeMonitor()) attachMonitor(true);
     else preview.redraw();
@@ -1956,6 +1988,8 @@ function setPreviewSource(source) {
     preview.showTimeline();
     dom.stageHint.textContent = 'Drop media on the timeline below to see it here.';
   }
+  syncEditorOverlay();
+  renderStageOverlay();
   preview.layout();
   dom.duration.textContent = L.formatTimecode(preview.total(), rate());
 }
@@ -2232,6 +2266,10 @@ function wireSheets() {
       previewQuality: el('as-quality').value,
       previewMuteWhileScrubbing: el('as-scrub-mute').checked,
       snap: el('as-snap').checked,
+      showActionSafeArea: el('as-action-safe-area').checked,
+      showTitleSafeArea: el('as-title-safe-area').checked,
+      showRuleOfThirds: el('as-rule-of-thirds').checked,
+      showCenterLines: el('as-center-lines').checked,
       theme: el('as-theme').value,
       compositor: el('as-compositor').value,
       playbackEngine: el('as-playback').value,
@@ -2419,6 +2457,7 @@ async function boot() {
     stage: dom.stage,
     api: window.api,
     getProject: () => state.project,
+    pageOverlayActive: () => G.visible(state.settings),
     onNotice: (reason) => {
       state.playbackNotice = reason;
       updateToolWarning();

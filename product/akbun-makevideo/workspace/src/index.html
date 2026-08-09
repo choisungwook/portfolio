@@ -299,6 +299,23 @@
         <input type="checkbox" id="as-snap" />
         Snap clips to nearby edges
       </label>
+      <label class="row check">
+        <input type="checkbox" id="as-action-safe-area" />
+        Show 93% action safe area
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="as-title-safe-area" />
+        Show 90% title safe area
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="as-rule-of-thirds" />
+        Show rule of thirds
+      </label>
+      <label class="row check">
+        <input type="checkbox" id="as-center-lines" />
+        Show centre lines
+      </label>
+      <p class="dim small-text">Monitor-only guides never reach rendered video.</p>
       <label class="row">Theme
         <select id="as-theme">
           <option value="system">Follow the system</option>
@@ -405,6 +422,7 @@
   <script src="quality.js"></script>
   <script src="preview.js"></script>
   <script src="transform.js"></script>
+  <script src="guides.js"></script>
   <script src="monitor.js"></script>
   <script src="renderer.js"></script>
 </body>
