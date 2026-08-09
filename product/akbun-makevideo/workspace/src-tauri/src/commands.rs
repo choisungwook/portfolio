@@ -625,6 +625,11 @@ pub fn font_available(family: String) -> bool {
     makevideo_compositor::text::font_available(&family)
 }
 
+#[tauri::command]
+pub fn validate_lut(path: String) -> Result<(), String> {
+    makevideo_compositor::lut::Lut::from_cube_file(&path).map(|_| ())
+}
+
 /// One composited frame for the preview, drawn by the same shader the render
 /// uses. Returns eight bytes of width and height then RGBA rows, which the page
 /// blits straight onto a canvas.

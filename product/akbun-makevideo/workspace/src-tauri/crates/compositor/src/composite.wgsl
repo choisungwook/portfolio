@@ -13,12 +13,35 @@ struct Layer {
     // Output frame size, to turn those pixels into clip space.
     frame: vec2<f32>,
     opacity: f32,
-    _pad: f32,
+    lut_size: f32,
+    domain_min: vec4<f32>,
+    domain_max: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> layer: Layer;
 @group(0) @binding(1) var source: texture_2d<f32>;
 @group(0) @binding(2) var source_sampler: sampler;
+@group(0) @binding(3) var lut: texture_3d<f32>;
+
+fn sample_lut(colour: vec3<f32>) -> vec3<f32> {
+    let domain = clamp((colour - layer.domain_min.rgb) / (layer.domain_max.rgb - layer.domain_min.rgb), vec3<f32>(0.0), vec3<f32>(1.0));
+    let position = domain * (layer.lut_size - 1.0);
+    let low = vec3<i32>(floor(position));
+    let high = min(low + vec3<i32>(1), vec3<i32>(i32(layer.lut_size) - 1));
+    let amount = fract(position);
+
+    let z0 = mix(
+        mix(textureLoad(lut, vec3<i32>(low.x, low.y, low.z), 0).rgb, textureLoad(lut, vec3<i32>(high.x, low.y, low.z), 0).rgb, amount.x),
+        mix(textureLoad(lut, vec3<i32>(low.x, high.y, low.z), 0).rgb, textureLoad(lut, vec3<i32>(high.x, high.y, low.z), 0).rgb, amount.x),
+        amount.y,
+    );
+    let z1 = mix(
+        mix(textureLoad(lut, vec3<i32>(low.x, low.y, high.z), 0).rgb, textureLoad(lut, vec3<i32>(high.x, low.y, high.z), 0).rgb, amount.x),
+        mix(textureLoad(lut, vec3<i32>(low.x, high.y, high.z), 0).rgb, textureLoad(lut, vec3<i32>(high.x, high.y, high.z), 0).rgb, amount.x),
+        amount.y,
+    );
+    return mix(z0, z1, amount.z);
+}
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -51,5 +74,5 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let texel = textureSample(source, source_sampler, in.uv);
-    return vec4<f32>(texel.rgb, texel.a * layer.opacity);
+    return vec4<f32>(sample_lut(texel.rgb), texel.a * layer.opacity);
 }

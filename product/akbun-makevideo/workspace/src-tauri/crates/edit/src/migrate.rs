@@ -72,6 +72,8 @@ struct WireClip {
     asset_id: String,
     #[serde(default)]
     link_group: Option<String>,
+    #[serde(default)]
+    lut_path: Option<String>,
     start: Option<i64>,
     #[serde(rename = "in")]
     in_point: Option<i64>,
@@ -138,6 +140,7 @@ impl From<WireProject> for Project {
                             id: clip.id,
                             asset_id: clip.asset_id,
                             link_group: clip.link_group,
+                            lut_path: clip.lut_path,
                             start: frames(clip.start, clip.start_ms, rate),
                             in_point: frames(clip.in_point, clip.in_ms, rate),
                             out_point: frames(clip.out_point, clip.out_ms, rate),

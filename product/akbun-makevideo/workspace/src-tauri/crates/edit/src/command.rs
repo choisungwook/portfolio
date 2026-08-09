@@ -201,6 +201,11 @@ pub enum Command {
         opacity: Option<f32>,
     },
     #[serde(rename_all = "camelCase")]
+    SetClipLut {
+        clip_id: String,
+        lut_path: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
     AddVisualItem {
         track_id: String,
         content: VisualContent,
@@ -401,6 +406,7 @@ impl Command {
             Command::RippleDelete { .. } => "Ripple delete",
             Command::RippleDeleteGap { .. } => "Ripple delete gap",
             Command::SetClipGain { .. } => "Clip levels",
+            Command::SetClipLut { .. } => "Clip LUT",
             Command::AddVisualItem { .. } => "Add visual item",
             Command::SetVisualTransform { .. } => "Transform visual item",
             Command::SetVisualTiming { .. } => "Time visual item",
@@ -484,6 +490,7 @@ impl Command {
                 volume,
                 opacity,
             } => set_clip_gain(project, clip_id, volume, opacity),
+            Command::SetClipLut { clip_id, lut_path } => set_clip_lut(project, clip_id, lut_path),
             Command::AddVisualItem {
                 track_id,
                 content,
@@ -782,6 +789,7 @@ fn add_clip(
         id: id.clone(),
         asset_id: asset_id.clone(),
         link_group: link_group.clone(),
+        lut_path: None,
         start,
         in_point: 0,
         out_point: duration,
@@ -1068,6 +1076,7 @@ fn split_at(
                 id: id.clone(),
                 asset_id: clip.asset_id.clone(),
                 link_group: link_group.clone(),
+                lut_path: clip.lut_path.clone(),
                 start: frame,
                 in_point: clip.in_point + offset,
                 out_point: clip.out_point,
@@ -1317,6 +1326,29 @@ fn set_clip_gain(
             clip_id,
             volume,
             opacity,
+        },
+    })
+}
+
+fn set_clip_lut(
+    project: &mut Project,
+    clip_id: String,
+    lut_path: Option<String>,
+) -> Result<Applied, String> {
+    let (track_index, clip_index) = project
+        .locate(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let clip = &mut project.tracks[track_index].clips[clip_index];
+    let previous = clip.lut_path.clone();
+    clip.lut_path = lut_path.clone();
+    Ok(Applied {
+        resolved: Command::SetClipLut {
+            clip_id: clip_id.clone(),
+            lut_path,
+        },
+        inverse: Command::SetClipLut {
+            clip_id,
+            lut_path: previous,
         },
     })
 }

@@ -4,8 +4,10 @@
 //! it does, and there is a test asserting the two agree. If the shader changes,
 //! that test is what catches the other half being left behind.
 
-use crate::{Placement, Source};
+use crate::{lut::Lut, Placement, Source};
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 /// Uniform block, laid out to match `composite.wgsl`.
@@ -15,7 +17,9 @@ struct LayerUniform {
     rect: [f32; 4],
     frame: [f32; 2],
     opacity: f32,
-    _pad: f32,
+    lut_size: f32,
+    domain_min: [f32; 4],
+    domain_max: [f32; 4],
 }
 
 impl LayerUniform {
@@ -47,6 +51,8 @@ pub struct GpuCompositor {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    identity_lut: Lut,
+    lut_textures: Mutex<HashMap<LutKey, wgpu::Texture>>,
     adapter: String,
 }
 
@@ -61,6 +67,26 @@ const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 /// fallback filter graph for no benefit. A surface has to be asked for the same
 /// thing, which is what `Surface` picks its format for.
 pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+const LUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
+
+#[derive(Eq, Hash, PartialEq)]
+struct LutKey {
+    size: u32,
+    domain_min: [u32; 3],
+    domain_max: [u32; 3],
+    values: Vec<u8>,
+}
+
+impl From<&Lut> for LutKey {
+    fn from(lut: &Lut) -> LutKey {
+        LutKey {
+            size: lut.size(),
+            domain_min: lut.domain_min().map(f32::to_bits),
+            domain_max: lut.domain_max().map(f32::to_bits),
+            values: lut.texture_bytes().to_vec(),
+        }
+    }
+}
 
 impl GpuCompositor {
     /// Picks whatever device this machine has: Metal on a Mac, and a software
@@ -90,6 +116,16 @@ impl GpuCompositor {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -139,6 +175,8 @@ impl GpuCompositor {
             pipeline,
             layout,
             sampler,
+            identity_lut: Lut::identity(),
+            lut_textures: Mutex::new(HashMap::new()),
             adapter: name,
         })
     }
@@ -257,6 +295,7 @@ impl GpuCompositor {
                 wgpu::util::TextureDataOrder::LayerMajor,
                 &source.rgba[..expected],
             );
+            let lut = source.lut.unwrap_or(&self.identity_lut);
             let uniform = LayerUniform {
                 rect: [
                     placement.dst.x as f32,
@@ -266,7 +305,19 @@ impl GpuCompositor {
                 ],
                 frame: [width as f32, height as f32],
                 opacity: placement.opacity.clamp(0.0, 1.0),
-                _pad: 0.0,
+                lut_size: lut.size() as f32,
+                domain_min: [
+                    lut.domain_min()[0],
+                    lut.domain_min()[1],
+                    lut.domain_min()[2],
+                    0.0,
+                ],
+                domain_max: [
+                    lut.domain_max()[0],
+                    lut.domain_max()[1],
+                    lut.domain_max()[2],
+                    0.0,
+                ],
             };
             let buffer = self
                 .device
@@ -276,6 +327,7 @@ impl GpuCompositor {
                     usage: wgpu::BufferUsages::UNIFORM,
                 });
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let lut_view = self.lut_view(lut);
             bindings.push(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("layer"),
                 layout: &self.layout,
@@ -292,10 +344,41 @@ impl GpuCompositor {
                         binding: 2,
                         resource: wgpu::BindingResource::Sampler(&self.sampler),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(&lut_view),
+                    },
                 ],
             }));
         }
         Ok(bindings)
+    }
+
+    fn lut_view(&self, lut: &Lut) -> wgpu::TextureView {
+        let key = LutKey::from(lut);
+        let mut textures = self.lut_textures.lock().unwrap();
+        let texture = textures.entry(key).or_insert_with(|| {
+            self.device.create_texture_with_data(
+                &self.queue,
+                &wgpu::TextureDescriptor {
+                    label: Some("LUT"),
+                    size: wgpu::Extent3d {
+                        width: lut.size(),
+                        height: lut.size(),
+                        depth_or_array_layers: lut.size(),
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D3,
+                    format: LUT_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                },
+                wgpu::util::TextureDataOrder::LayerMajor,
+                lut.texture_bytes(),
+            )
+        });
+        texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     fn pass(

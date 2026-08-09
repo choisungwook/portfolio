@@ -19,7 +19,7 @@
 //! compositor next door turns them into a picture, so this is testable with no
 //! ffmpeg, no media and no graphics device.
 
-use crate::{Placement as Draw, Source};
+use crate::{lut::Lut, Placement as Draw, Source};
 use makevideo_render::layout::{self, Placement, Rect};
 use makevideo_render::{ffmpeg, AssetKind, Project, Rate, RationalTime};
 use std::io::Read;
@@ -270,6 +270,7 @@ pub struct Layer {
     pub pixels: Vec<u8>,
     pub dst: Rect,
     pub opacity: f32,
+    pub lut: Option<Arc<Lut>>,
 }
 
 /// Everything on screen at one instant, bottom layer first.
@@ -302,6 +303,7 @@ impl Frame {
                         rgba: &layer.pixels,
                         width: layer.dst.w,
                         height: layer.dst.h,
+                        lut: layer.lut.as_deref(),
                     },
                     Draw {
                         dst: layer.dst,
@@ -337,6 +339,7 @@ impl Supply {
 /// One clip and the thread filling its queue.
 struct Stream {
     placement: Placement,
+    lut: Option<Arc<Lut>>,
     frame_bytes: usize,
     receiver: Option<Receiver<Vec<u8>>>,
     /// The frame taken out of the queue but not yet handed over, because some
@@ -412,6 +415,10 @@ impl FrameSource {
             .into_iter()
             .map(|placement| Stream {
                 frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
+                lut: project.clip(&placement.clip_id)
+                    .and_then(|clip| clip.lut_path.as_deref())
+                    .and_then(|path| Lut::from_cube_file(path).ok())
+                    .map(Arc::new),
                 placement,
                 receiver: None,
                 pending: None,
@@ -584,6 +591,7 @@ impl FrameSource {
                     pixels,
                     dst: stream.placement.dst,
                     opacity: stream.placement.opacity,
+                    lut: stream.lut.clone(),
                 })
             })
             .collect();
@@ -874,6 +882,7 @@ mod tests {
             id: id.into(),
             asset_id: asset_id.into(),
             link_group: None,
+            lut_path: None,
             start,
             in_point,
             out_point,

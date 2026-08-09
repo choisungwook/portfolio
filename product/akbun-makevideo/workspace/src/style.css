@@ -896,7 +896,8 @@ button.icon.on {
   pointer-events: none;
 }
 
-.clip.missing {
+.clip.missing,
+.clip.lut-unavailable {
   background: repeating-linear-gradient(45deg, #b1443a, #b1443a 6px, #8f342c 6px, #8f342c 12px);
   color: #fff;
 }
