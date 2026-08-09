@@ -170,6 +170,7 @@
         </button>
         <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
         <button id="btn-add-text" class="small" title="Add a title at the playhead">+ Text</button>
+        <button id="btn-add-shape" class="small" title="Add a rectangle at the playhead">+ Shape</button>
         <button id="btn-add-marker" class="small" title="Add a marker at the playhead">+ Marker</button>
         <span class="sep-v"></span>
         <button id="btn-add-video" class="small">+ Video track</button>
@@ -207,6 +208,18 @@
           <label class="row">Outline <input id="text-stroke-color" type="color" /></label>
           <label class="row">Outline width <input id="text-stroke-width" type="number" min="0" max="32" step="1" /></label>
           <label class="row">Shadow <input id="text-shadow-color" type="color" /></label>
+        </div>
+      </details>
+      <details id="shape-panel" hidden>
+        <summary>Shape</summary>
+        <div id="shape-inspector">
+          <label class="row">Type <select id="shape-kind"><option value="rectangle">Rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line</option></select></label>
+          <label class="row">Fill <input id="shape-fill" type="color" /></label>
+          <label class="row">Outline <input id="shape-stroke" type="color" /></label>
+          <label class="row">Outline width <input id="shape-stroke-width" type="number" min="0" max="128" step="1" /></label>
+          <label class="row">Corner radius <input id="shape-corner-radius" type="number" min="0" max="2048" step="1" /></label>
+          <label class="row check"><input id="shape-start-arrow" type="checkbox" /> Start arrow</label>
+          <label class="row check"><input id="shape-end-arrow" type="checkbox" /> End arrow</label>
         </div>
       </details>
       <details id="subtitle-panel" hidden>

@@ -1243,7 +1243,15 @@ mod tests {
         let error = document
             .apply(Command::AddVisualItem {
                 track_id: video_track(&document),
-                content: VisualContent::Shape,
+                content: VisualContent::Shape {
+                    shape: Default::default(),
+                    fill: "#4f8cffcc".into(),
+                    stroke: "#ffffff".into(),
+                    stroke_width: 4.0,
+                    corner_radius: 0.0,
+                    start_arrow: false,
+                    end_arrow: false,
+                },
                 start: 0,
                 duration: 30,
                 transform: VisualTransform {
@@ -1268,7 +1276,15 @@ mod tests {
         let track_id = video_track(&document);
         let command = Command::AddVisualItem {
             track_id,
-            content: VisualContent::Shape,
+            content: VisualContent::Shape {
+                shape: Default::default(),
+                fill: "#4f8cffcc".into(),
+                stroke: "#ffffff".into(),
+                stroke_width: 4.0,
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
             start: 0,
             duration: 30,
             transform: VisualTransform {

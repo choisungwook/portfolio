@@ -6,7 +6,7 @@ use crate::Placement;
 use fontdb::{Database, Family, Query};
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle as LayoutTextStyle};
 use fontdue::{Font, FontSettings};
-use makevideo_render::{Project, TextAlign, TextStyle, VisualContent};
+use makevideo_render::{Project, ShapeKind, TextAlign, TextStyle, VisualContent};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -46,10 +46,6 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
             .collect();
         items.sort_by_key(|item| item.z_index);
         for item in items {
-            let VisualContent::Text { text, style } = &item.content else {
-                continue;
-            };
-            let style = track.subtitle_style.as_ref().unwrap_or(style);
             let transform = if track.kind == makevideo_render::TrackKind::Subtitle {
                 makevideo_render::VisualTransform {
                     x: 96.0,
@@ -64,10 +60,40 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
             };
             let item_width = (transform.width * scale_x).round().max(1.0) as u32;
             let item_height = (transform.height * scale_y).round().max(1.0) as u32;
-            let key = format!(
-                "{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
-            );
-            let pixels = cached(&key, || rasterize(text, style, item_width, item_height, scale));
+            let pixels = match &item.content {
+                VisualContent::Text { text, style } => {
+                    let style = track.subtitle_style.as_ref().unwrap_or(style);
+                    let key = format!(
+                        "text\u{0}{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
+                    );
+                    cached(&key, || rasterize(text, style, item_width, item_height, scale))
+                }
+                VisualContent::Shape {
+                    shape,
+                    fill,
+                    stroke,
+                    stroke_width,
+                    corner_radius,
+                    start_arrow,
+                    end_arrow,
+                } => {
+                    let key = format!(
+                        "shape\u{0}{shape:?}\u{0}{fill}\u{0}{stroke}\u{0}{stroke_width}\u{0}{corner_radius}\u{0}{start_arrow}\u{0}{end_arrow}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
+                    );
+                    cached(&key, || rasterize_shape(
+                        *shape,
+                        fill,
+                        stroke,
+                        *stroke_width * scale,
+                        *corner_radius * scale,
+                        *start_arrow,
+                        *end_arrow,
+                        item_width,
+                        item_height,
+                    ))
+                }
+                VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => continue,
+            };
             layers.push(RasterLayer {
                 pixels,
                 width: item_width,
@@ -85,6 +111,70 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
         }
     }
     layers
+}
+
+#[allow(clippy::too_many_arguments)]
+fn rasterize_shape(
+    shape: ShapeKind,
+    fill: &str,
+    stroke: &str,
+    stroke_width: f32,
+    corner_radius: f32,
+    start_arrow: bool,
+    end_arrow: bool,
+    width: u32,
+    height: u32,
+) -> Vec<u8> {
+    let mut pixels = vec![0; width as usize * height as usize * 4];
+    let fill = colour(fill, [79, 140, 255, 204]);
+    let stroke = colour(stroke, [255, 255, 255, 255]);
+    let edge = stroke_width.max(0.0) / 2.0;
+    for y in 0..height {
+        for x in 0..width {
+            let point = (x as f32 + 0.5, y as f32 + 0.5);
+            let (inside, outlined) = match shape {
+                ShapeKind::Rectangle => rounded_rectangle(point, width as f32, height as f32, corner_radius, edge),
+                ShapeKind::Ellipse => ellipse(point, width as f32, height as f32, edge),
+                ShapeKind::Line => line(point, width as f32, height as f32, edge.max(1.0), start_arrow, end_arrow),
+            };
+            if inside {
+                put_pixel(&mut pixels, width, x, y, if outlined { stroke } else { fill });
+            }
+        }
+    }
+    pixels
+}
+
+fn rounded_rectangle(point: (f32, f32), width: f32, height: f32, radius: f32, edge: f32) -> (bool, bool) {
+    let radius = radius.clamp(0.0, width.min(height) / 2.0);
+    let dx = (point.0 - width / 2.0).abs() - (width / 2.0 - radius);
+    let dy = (point.1 - height / 2.0).abs() - (height / 2.0 - radius);
+    let distance = dx.max(0.0).hypot(dy.max(0.0)) + dx.max(dy).min(0.0) - radius;
+    (distance <= 0.0, distance >= -edge)
+}
+
+fn ellipse(point: (f32, f32), width: f32, height: f32, edge: f32) -> (bool, bool) {
+    let nx = (point.0 - width / 2.0) / (width / 2.0).max(1.0);
+    let ny = (point.1 - height / 2.0) / (height / 2.0).max(1.0);
+    let distance = (nx * nx + ny * ny).sqrt();
+    let outline = edge / (width.min(height) / 2.0).max(1.0);
+    (distance <= 1.0, distance >= 1.0 - outline)
+}
+
+fn line(point: (f32, f32), width: f32, height: f32, radius: f32, start_arrow: bool, end_arrow: bool) -> (bool, bool) {
+    let centre = height / 2.0;
+    let body = (point.1 - centre).abs() <= radius && point.0 >= radius && point.0 <= width - radius;
+    let arrow_size = (radius * 3.0).max(8.0);
+    let arrow = |tip_x: f32, points_left: bool| {
+        let dx = if points_left { tip_x - point.0 } else { point.0 - tip_x };
+        dx >= 0.0 && dx <= arrow_size && (point.1 - centre).abs() <= dx * 0.65 + 0.5
+    };
+    (body || (start_arrow && arrow(0.0, false)) || (end_arrow && arrow(width, true)), true)
+}
+
+fn put_pixel(pixels: &mut [u8], width: u32, x: u32, y: u32, color: [u8; 4]) {
+    let index = ((y * width + x) * 4) as usize;
+    pixels[index..index + 4].copy_from_slice(&color);
 }
 
 fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Arc<[u8]> {
@@ -266,5 +356,36 @@ mod tests {
     #[test]
     fn colour_accepts_css_hex_with_alpha() {
         assert_eq!(colour("#11223344", [0; 4]), [0x11, 0x22, 0x33, 0x44]);
+    }
+
+    #[test]
+    fn shapes_rasterize_fill_outline_and_line_arrows() {
+        let rectangle = rasterize_shape(
+            ShapeKind::Rectangle,
+            "#112233",
+            "#ffffff",
+            2.0,
+            4.0,
+            false,
+            false,
+            20,
+            12,
+        );
+        assert_eq!(&rectangle[(6 * 20 + 10) * 4..(6 * 20 + 10) * 4 + 4], &[0x11, 0x22, 0x33, 255]);
+        assert_eq!(&rectangle[(10) * 4..(10) * 4 + 4], &[255, 255, 255, 255]);
+
+        let line = rasterize_shape(
+            ShapeKind::Line,
+            "#00000000",
+            "#ff0000",
+            3.0,
+            0.0,
+            true,
+            true,
+            30,
+            12,
+        );
+        assert_eq!(&line[(6 * 30) * 4..(6 * 30) * 4 + 4], &[255, 0, 0, 255]);
+        assert_eq!(&line[(6 * 30 + 29) * 4..(6 * 30 + 29) * 4 + 4], &[255, 0, 0, 255]);
     }
 }

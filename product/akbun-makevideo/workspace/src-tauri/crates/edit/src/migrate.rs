@@ -251,6 +251,16 @@ mod tests {
     }
 
     #[test]
+    fn an_early_shape_without_style_opens_with_editable_defaults() {
+        let content: crate::VisualContent = serde_json::from_str(r#"{"kind":"shape"}"#).unwrap();
+        assert!(matches!(content, crate::VisualContent::Shape {
+            shape: crate::ShapeKind::Rectangle,
+            stroke_width: 4.0,
+            ..
+        }));
+    }
+
+    #[test]
     fn what_comes_back_out_is_todays_format_only() {
         let text = r#"{
             "version": 1,
