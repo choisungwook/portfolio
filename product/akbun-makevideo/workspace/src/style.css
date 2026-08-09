@@ -1025,6 +1025,7 @@ button.icon.on {
 
 .sheet .row input[type='text'],
 .sheet .row input[type='number'],
+.sheet .row textarea,
 .sheet .row select {
   min-width: 190px;
 }

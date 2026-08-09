@@ -51,8 +51,17 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
             };
             let style = track.subtitle_style.as_ref().unwrap_or(style);
             let transform = if track.kind == makevideo_render::TrackKind::Subtitle {
-                makevideo_render::VisualTransform { x: 96.0, y: project.settings.height as f32 * 0.78, width: project.settings.width as f32 - 192.0, height: project.settings.height as f32 * 0.16, rotation: 0.0, opacity: 1.0 }
-            } else { item.transform };
+                makevideo_render::VisualTransform {
+                    x: 96.0,
+                    y: project.settings.height as f32 * 0.78,
+                    width: project.settings.width as f32 - 192.0,
+                    height: project.settings.height as f32 * 0.16,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                }
+            } else {
+                item.transform
+            };
             let item_width = (transform.width * scale_x).round().max(1.0) as u32;
             let item_height = (transform.height * scale_y).round().max(1.0) as u32;
             let key = format!(
@@ -65,8 +74,8 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
                 height: item_height,
                 placement: Placement {
                     dst: makevideo_render::layout::Rect {
-                    x: (transform.x * scale_x).round() as i32,
-                    y: (transform.y * scale_y).round() as i32,
+                        x: (transform.x * scale_x).round() as i32,
+                        y: (transform.y * scale_y).round() as i32,
                         w: item_width,
                         h: item_height,
                     },
