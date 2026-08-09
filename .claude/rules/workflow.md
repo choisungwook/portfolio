@@ -6,8 +6,6 @@ GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./p
 
 새 workspace에서 작업을 시작할 때, 가장 먼저 master를 최신화한다. 모든 작업이 최신 master 위에서 시작하도록 하기 위함이다.
 
-branch는 만들지 않는다. agent를 실행하는 도구가 이미 branch를 만들어 주므로, 그 위에서 바로 작업한다.
-
 master 최신화 절차:
 
 ```bash
