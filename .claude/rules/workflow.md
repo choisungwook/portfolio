@@ -4,7 +4,7 @@ GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./p
 
 ## Workspace 초기화
 
-worktree나 branch를 만드는 등 새 workspace에서 작업을 시작할 때, 가장 먼저 master를 최신화한다. 모든 작업이 최신 master 위에서 시작하도록 하기 위함이다.
+branch를 만드는 등 새 workspace에서 작업을 시작할 때, 가장 먼저 master를 최신화한다. 모든 작업이 최신 master 위에서 시작하도록 하기 위함이다.
 
 master 최신화 절차:
 
