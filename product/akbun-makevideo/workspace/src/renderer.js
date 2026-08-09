@@ -1819,8 +1819,8 @@ function applySettings(next) {
   // nothing.
   if (was !== next.playbackEngine) attachMonitor(true);
   else if (usedProxies !== next.proxyEnabled) {
-    preview.redraw();
     if (preview.usesNativeMonitor()) attachMonitor(true);
+    else preview.redraw();
   }
 }
 
