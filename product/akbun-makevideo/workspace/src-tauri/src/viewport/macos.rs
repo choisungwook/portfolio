@@ -220,7 +220,7 @@ pub fn detach(inner: &Inner) {
 }
 
 pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
-    Ok(wgpu::SurfaceTarget::Window(Box::new(ViewTarget(
+    Ok(wgpu::SurfaceTarget::DisplayAndWindow(Box::new(ViewTarget(
         inner.view.0.cast::<std::ffi::c_void>(),
     ))))
 }
