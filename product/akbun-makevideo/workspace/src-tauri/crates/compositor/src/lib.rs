@@ -25,9 +25,9 @@
 //! having a frame to draw are separate problems that look the same on screen.
 
 pub mod cpu;
-pub mod lut;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+pub mod lut;
 pub mod pipeline;
 pub mod source;
 pub mod supply;
@@ -92,18 +92,26 @@ impl Compositor {
     }
 
     pub fn with_backend(backend: Backend) -> Result<Compositor, String> {
+        Compositor::with_device(backend, None)
+    }
+
+    /// As `with_backend`, on a named adapter. `None` is whatever wgpu picks,
+    /// and so is a name this machine does not have — see
+    /// [`gpu::GpuCompositor::with_device`].
+    pub fn with_device(backend: Backend, device: Option<&str>) -> Result<Compositor, String> {
+        let _ = device;
         match backend {
             Backend::Cpu => Ok(Compositor {
                 inner: Inner::Cpu(cpu::CpuCompositor::new()),
             }),
             #[cfg(feature = "gpu")]
-            Backend::Gpu => gpu::GpuCompositor::new().map(|gpu| Compositor {
+            Backend::Gpu => gpu::GpuCompositor::with_device(device).map(|gpu| Compositor {
                 inner: Inner::Gpu(gpu),
             }),
             #[cfg(not(feature = "gpu"))]
             Backend::Gpu => Err("this build has no gpu support compiled in".into()),
             #[cfg(feature = "gpu")]
-            Backend::Auto => Ok(match gpu::GpuCompositor::new() {
+            Backend::Auto => Ok(match gpu::GpuCompositor::with_device(device) {
                 Ok(gpu) => Compositor {
                     inner: Inner::Gpu(gpu),
                 },

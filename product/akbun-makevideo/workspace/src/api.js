@@ -68,7 +68,8 @@ if (!window.__TAURI__) {
         workspaceDir: '',
         ffmpegDir: '',
         renderAcceleration: 'auto',
-        compositor: 'auto',
+        compositor: 'gpu',
+        gpuDevice: '',
         proxyEnabled: true,
         showActionSafeArea: false,
         showTitleSafeArea: false,
@@ -87,7 +88,7 @@ if (!window.__TAURI__) {
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
-      compositor: { setting: 'auto', device: 'software (CPU)', gpu: false, fellBack: true },
+      compositor: { setting: 'gpu', device: 'software (CPU)', gpu: false, fellBack: true },
       qualityProject: null,
       qualityReport: null,
       qualitySmoke: false,
@@ -101,7 +102,7 @@ if (!window.__TAURI__) {
       ffmpeg: null,
       ffprobe: null,
       acceleration: { available: null, tried: [] },
-      compositor: { setting: 'auto', device: 'software (CPU)', gpu: false, fellBack: true },
+      compositor: { setting: 'gpu', device: 'software (CPU)', gpu: false, fellBack: true },
       qualityProject: null,
       qualityReport: null,
       qualitySmoke: false,
@@ -133,6 +134,7 @@ if (!window.__TAURI__) {
         ? performance.memory.usedJSHeapSize
         : null,
     processMetrics: async () => ({ memoryBytes: null, cpuPercent: null }),
+    graphicsDevices: async () => [],
     readErrorLog: async () => '',
     saveQualityReport: async () => null,
     writeQualityReport: async () => null,
@@ -243,6 +245,7 @@ window.api = {
   available: true,
 
   bootstrap: () => invoke('bootstrap'),
+  graphicsDevices: () => invoke('graphics_devices'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
   reportError: (source, message) => invoke('report_error', { source, message }),
 

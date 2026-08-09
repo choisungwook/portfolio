@@ -42,13 +42,13 @@ const DEFAULT_SETTINGS = {
   workspaceDir: '',
   ffmpegDir: '',
   renderAcceleration: 'auto',
-  compositor: 'auto',
-  // The page's own default, and deliberately not Rust's. This value is what is
-  // in force before bootstrap answers and in a plain browser, and in both of
-  // those the media elements are what is really playing — there is no IPC to
-  // attach a monitor over. Rust's own default is native and overrides this the
-  // moment bootstrap lands.
-  playbackEngine: 'media-element',
+  // Deliberately not a value the setting can hold. Before bootstrap answers
+  // there is no IPC to attach a monitor over, and the first attach is triggered
+  // by this differing from whatever Rust sends back — which it always does.
+  // A real default here would mean a settings file holding that same value
+  // never attaches at all.
+  compositor: '',
+  gpuDevice: '',
   proxyEnabled: true,
   showActionSafeArea: false,
   showTitleSafeArea: false,
@@ -167,7 +167,7 @@ const state = {
     ffmpeg: null,
     ffprobe: null,
     acceleration: { available: null, tried: [] },
-    compositor: { setting: 'auto', device: 'initializing', gpu: false, fellBack: true },
+    compositor: { setting: 'gpu', device: 'initializing', gpu: false, fellBack: true },
     qualityProject: null,
     qualityReport: null,
     qualitySmoke: false,
@@ -446,7 +446,7 @@ async function refreshDebug() {
       `Process tree memory: ${byteText(metrics.memoryBytes)}`,
       `Timeline: ${state.project.tracks.length} tracks, ${state.project.assets.length} assets`,
       `Proxy jobs: ${active.length} active, ${Object.keys(state.proxies).length} known`,
-      `Playback engine: ${state.settings.playbackEngine}`,
+      `Compositor: ${state.settings.compositor || 'not read yet'}`,
       ...playbackDebugLines(playback),
       `IPC proxy updates: percentage-throttled`,
     ].join('\n');
@@ -951,7 +951,7 @@ async function requestExactFrame() {
   if (preview.usesNativeMonitor() && !editorOverlayActive) return;
   if (preview.isPlaying() || preview.mode() !== 'timeline') return;
   if (L.projectDurationFrames(state.project) <= 0) return;
-  if (state.settings.compositor === 'ffmpeg') return;
+  if (staysOnCpu()) return;
   const token = (exactToken += 1);
   const box = dom.stageInner.getBoundingClientRect();
   const maxWidth = Math.max(160, Math.round(box.width));
@@ -2111,28 +2111,79 @@ function accelerationNote() {
   return `No usable hardware encoder. ${reasons}`;
 }
 
-/** What is drawing, and what the choice costs. */
-function compositorNote() {
-  const found = (state.boot && state.boot.compositor) || {};
-  if (found.setting === 'ffmpeg') {
-    return 'The filter graph draws the render, and the preview is drawn separately by the browser, so the two can differ. Faster, because frames never leave ffmpeg.';
-  }
-  const same =
-    'The preview frame and the render come out of the same code, at the cost of every frame crossing a pipe.';
-  if (found.fellBack) {
-    return `No graphics device was found, so ${found.device} is drawing. Same picture, slower. ${same}`;
-  }
-  return `Drawing with ${found.device || 'the software compositor'}. ${same}`;
+/** Whether the setting says to stay off the graphics device.
+ *
+ *  Mirrors `stays_on_cpu` in Rust, and for the same reason: this one answer
+ *  decides the exact frame, the playback engine and the render, and asking the
+ *  question three different ways is how those three drift apart. Only "cpu" is
+ *  cpu — a settings file written before this was two choices can still hold
+ *  "auto" or "ffmpeg", and both of those meant the graphics device. */
+function staysOnCpu() {
+  return state.settings.compositor === 'cpu';
 }
 
-function playbackNote() {
-  if (state.settings.playbackEngine === 'media-element') {
-    return 'Stacked <video> elements, the way the app played before the monitor existed. The picture is the browser\u2019s approximation of the render rather than the render itself, and there is no frame rate to hold it to.';
+/** What the one setting decides, all three of them, in the order they matter.
+ *
+ *  Takes the setting rather than reading it, because the sheet has to describe
+ *  the choice being made and everywhere else has to describe the one in force. */
+function compositorNote(setting) {
+  const found = (state.boot && state.boot.compositor) || {};
+  if (setting === 'cpu') {
+    return 'Nothing opens the graphics device. Playback is stacked <video> elements, the exact frame is not asked for, and the render is drawn by the ffmpeg filter graph. ffmpeg is still what decodes and encodes either way.';
   }
+  const both =
+    'The stage and the render come out of the same shader, so what is on screen is what lands in the file. Playback draws straight onto a surface in the window with the audio clock deciding when.';
+  const drawing = found.device || 'the software compositor';
+  // Both of these are the GPU setting not getting what it asked for, so neither
+  // may claim the surface and the shared shader that only the working path has.
   if (state.playbackNotice) {
-    return `Asked for, and not running: ${state.playbackNotice}. The media element preview is playing instead.`;
+    return `Drawing with ${drawing}, but the monitor would not start: ${state.playbackNotice}. The older preview is playing instead.`;
   }
-  return 'The render\u2019s own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Frames never cross into the page.';
+  if (found.fellBack) {
+    return `No graphics device was found, so ${drawing} draws the exact frame and the older preview plays. The render still comes out of ffmpeg.`;
+  }
+  return `Drawing with ${drawing}. ${both}`;
+}
+
+/** Fill the graphics device list from what the machine actually has.
+ *
+ *  Asked for when the sheet opens rather than at boot: enumerating adapters
+ *  opens the graphics stack, and the answer is only ever looked at here. The
+ *  saved name is kept as an option even when it is missing, so a settings file
+ *  carried from another machine shows what it asked for instead of silently
+ *  reading as Auto. */
+async function fillGraphicsDevices() {
+  const select = el('as-gpu-device');
+  const note = el('as-gpu-device-note');
+  const chosen = state.settings.gpuDevice || '';
+  let devices = [];
+  try {
+    devices = (await window.api.graphicsDevices()) || [];
+  } catch (error) {
+    devices = [];
+  }
+  const names = devices.map((device) => device.name);
+  select.textContent = '';
+  select.appendChild(new Option('Auto — whichever the system picks', ''));
+  for (const device of devices) {
+    select.appendChild(new Option(`${device.name} — ${device.kind}, ${device.backend}`, device.name));
+  }
+  if (chosen && !names.includes(chosen)) {
+    select.appendChild(new Option(`${chosen} — not on this machine`, chosen));
+  }
+  select.value = chosen;
+  // The sheet's own pending choice, not the saved one. Picking CPU should grey
+  // this out at once rather than after Apply.
+  const onCpu = el('as-compositor').value === 'cpu';
+  select.disabled = onCpu;
+  const drawing = (state.boot && state.boot.compositor && state.boot.compositor.device) || 'nothing yet';
+  if (!devices.length) {
+    note.textContent = 'No graphics device was found, so there is nothing to choose between.';
+    return;
+  }
+  note.textContent = onCpu
+    ? 'The CPU setting never opens a graphics device, so this is not used.'
+    : `Drawing on ${drawing}. Changing this restarts the monitor.`;
 }
 
 function fillAppSheet() {
@@ -2147,10 +2198,12 @@ function fillAppSheet() {
   el('as-workspace').value = state.settings.workspaceDir;
   el('as-delete-project-folder').checked = state.settings.deleteProjectFolder;
   el('as-workspace-note').textContent = `Projects are folders in ${state.boot.workspace}. Imported media stays where it is — nothing is copied in here.`;
-  el('as-compositor').value = state.settings.compositor;
-  el('as-compositor-note').textContent = compositorNote();
-  el('as-playback').value = state.settings.playbackEngine;
-  el('as-playback-note').textContent = playbackNote();
+  // Rust's normalised answer rather than the stored string. A settings file
+  // written when this was three choices holds "auto" or "ffmpeg", and putting
+  // either into a two option select would show no selection at all.
+  el('as-compositor').value = state.boot.compositor.setting;
+  el('as-compositor-note').textContent = compositorNote(el('as-compositor').value);
+  fillGraphicsDevices();
   el('as-accel').value = state.settings.renderAcceleration;
   el('as-accel-note').textContent = accelerationNote();
   el('as-ffmpeg').value = state.settings.ffmpegDir;
@@ -2219,7 +2272,8 @@ function collectShortcutOverrides() {
 }
 
 function applySettings(next) {
-  const was = state.settings.playbackEngine;
+  const wasCompositor = state.settings.compositor;
+  const wasDevice = state.settings.gpuDevice;
   const usedProxies = state.settings.proxyEnabled;
   const usedGuides = G.visible(state.settings);
   state.settings = next;
@@ -2230,16 +2284,14 @@ function applySettings(next) {
   dom.btnMagnet.classList.toggle('on', next.snap);
   syncEditorOverlay();
   renderStageOverlay();
-  // The engine is picked once, when a monitor is asked for. Changing the
-  // setting therefore means taking the running one down and asking again,
-  // rather than hoping the next command notices.
+  // A session captures its compositor and its engine when it starts, so both of
+  // the things this setting decides need the running one taken down and asked
+  // for again rather than hoping the next command notices.
   //
-  // This is also what attaches the first time. The page starts on
-  // media-element and Rust's default is native, so bootstrap landing *is* a
-  // change and lands here — which is why there is no separate attach after it.
-  // A saved setting of media-element is no change and correctly attaches
-  // nothing.
-  if (was !== next.playbackEngine) attachMonitor(true);
+  // This is also what attaches the first time. The page's own compositor value
+  // is not one the setting can hold, so bootstrap landing *is* a change and
+  // lands here — which is why there is no separate attach after it.
+  if (wasCompositor !== next.compositor || wasDevice !== next.gpuDevice) attachMonitor(true);
   else if (usedGuides !== G.visible(next)) attachMonitor(true);
   else if (usedProxies !== next.proxyEnabled) {
     if (preview.usesNativeMonitor()) attachMonitor(true);
@@ -2261,7 +2313,9 @@ async function attachMonitor(restart) {
   await preview.attach();
   updateToolWarning();
   updateMonitorZoomUi();
-  el('as-playback-note').textContent = playbackNote();
+  // The note carries the fallback reason when a monitor refused to start, and
+  // that is only known once the attach has answered.
+  el('as-compositor-note').textContent = compositorNote(state.settings.compositor);
 }
 
 // --- menus -----------------------------------------------------------------
@@ -2356,7 +2410,7 @@ const actions = {
         `ffmpeg: ${state.boot.ffmpeg || 'not found'}`,
         `ffprobe: ${state.boot.ffprobe || 'not found'}`,
         accelerationNote(),
-        compositorNote(),
+        compositorNote(state.settings.compositor),
       ].join('\n'),
       { title: 'About' }
     ),
@@ -2666,6 +2720,12 @@ function wireSheets() {
     preview.seek(T.rescale(at, was, rate()));
     preview.layout();
   });
+  // The device list only means anything on the GPU setting, and the sheet says
+  // so as soon as the choice is made rather than after it is applied.
+  el('as-compositor').addEventListener('change', (event) => {
+    el('as-compositor-note').textContent = compositorNote(event.target.value);
+    void fillGraphicsDevices();
+  });
   el('as-save').addEventListener('click', async () => {
     const next = Object.assign({}, state.settings, {
       previewQuality: el('as-quality').value,
@@ -2677,7 +2737,7 @@ function wireSheets() {
       showCenterLines: el('as-center-lines').checked,
       theme: el('as-theme').value,
       compositor: el('as-compositor').value,
-      playbackEngine: el('as-playback').value,
+      gpuDevice: el('as-gpu-device').value,
       proxyEnabled: state.settings.proxyEnabled,
       renderAcceleration: el('as-accel').value,
       workspaceDir: el('as-workspace').value.trim(),

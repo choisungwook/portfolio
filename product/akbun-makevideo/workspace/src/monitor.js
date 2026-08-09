@@ -266,9 +266,12 @@ function createMonitor(options) {
       if (drivingNatively()) {
         await release();
         await attach();
-      } else {
-        preview.redraw();
       }
+      // Nothing for the media elements. Their pool is keyed by the path
+      // `playbackPath` hands back, and the animation frame compares it on every
+      // pass — paused as well as playing — so a ready proxy is picked up on the
+      // next frame without being told. There is no redraw to call here, and the
+      // one that used to be called did not exist.
     })();
     try {
       await refreshingMedia;
