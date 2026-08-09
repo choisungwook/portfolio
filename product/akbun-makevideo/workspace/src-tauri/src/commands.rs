@@ -840,8 +840,7 @@ fn make_proxy(
 }
 
 /// Jobs queued for proxying wait until playback stops. A job already encoding
-/// finishes its current file: killing ffmpeg midway would leave partial media
-/// and does not make the current playback smoother.
+/// pauses while playback runs, then resumes without leaving partial media.
 fn wait_for_playback_pause(app: &AppHandle) {
     loop {
         let playing = app
@@ -860,22 +859,22 @@ fn wait_for_playback_pause(app: &AppHandle) {
 
 fn monitor_proxy_playback(app: AppHandle, pid: u32, done: Arc<AtomicBool>) -> JoinHandle<()> {
     std::thread::spawn(move || {
-        let mut paused = false;
+        let mut proxy_paused = false;
         while !done.load(Ordering::Relaxed) {
-            let playing = app
+            let should_pause_proxy = app
                 .state::<AppState>()
                 .playback
                 .lock()
                 .unwrap()
                 .as_ref()
                 .is_some_and(|session| session.status().playing);
-            if playing != paused {
-                let _ = set_proxy_process_paused(pid, playing);
-                paused = playing;
+            if should_pause_proxy != proxy_paused {
+                let _ = set_proxy_process_paused(pid, should_pause_proxy);
+                proxy_paused = should_pause_proxy;
             }
             std::thread::sleep(Duration::from_millis(100));
         }
-        if paused {
+        if proxy_paused {
             let _ = set_proxy_process_paused(pid, false);
         }
     })
