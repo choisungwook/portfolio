@@ -99,6 +99,9 @@ const dom = {
   btnAddMarker: el('btn-add-marker'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
+  btnAddSubtitle: el('btn-add-subtitle'),
+  btnImportSrt: el('btn-import-srt'),
+  btnExportSrt: el('btn-export-srt'),
   zoom: el('zoom'),
   proxyProgress: el('proxy-progress'),
   timeline: el('timeline'),
@@ -116,6 +119,13 @@ const dom = {
   textStrokeColor: el('text-stroke-color'),
   textStrokeWidth: el('text-stroke-width'),
   textShadowColor: el('text-shadow-color'),
+  subtitlePanel: el('subtitle-panel'),
+  subtitleValue: el('subtitle-value'),
+  subtitleStart: el('subtitle-start'),
+  subtitleEnd: el('subtitle-end'),
+  subtitleFont: el('subtitle-font'),
+  subtitleSize: el('subtitle-size'),
+  subtitleColor: el('subtitle-color'),
   lanes: el('lanes'),
   timelineContextMenu: el('timeline-context-menu'),
   playhead: el('playhead'),
@@ -311,7 +321,8 @@ const redoEdit = () => stepHistory('redo');
 function displayTracks() {
   // Video tracks read top down, so V1 is the bottom layer both on screen and
   // in the render. Audio hangs below them in its own order.
-  return [...L.tracksOf(state.project, 'video')].reverse().concat(L.tracksOf(state.project, 'audio'));
+  return [...L.tracksOf(state.project, 'video')].reverse()
+    .concat(L.tracksOf(state.project, 'subtitle'), L.tracksOf(state.project, 'audio'));
 }
 
 /** How many frames of timeline the ruler and the lanes are drawn for. */
@@ -591,7 +602,7 @@ function renderHeads() {
     target.title = 'Use only this track for previous and next edit navigation';
     target.className = track.id === state.targetTrackId ? 'target on' : 'target';
     buttons.appendChild(target);
-    if (track.kind === 'video') {
+    if (track.kind === 'video' || track.kind === 'subtitle') {
       const hide = document.createElement('button');
       hide.dataset.toggle = 'hidden';
       hide.textContent = 'hide';
@@ -646,6 +657,20 @@ function clipElement(track, clip) {
   return node;
 }
 
+function subtitleElement(item) {
+  const node = document.createElement('div');
+  node.className = 'clip subtitle';
+  node.dataset.subtitleItemId = item.id;
+  node.style.left = `${L.framesToPx(item.start, rate(), state.pxPerSecond)}px`;
+  node.style.width = `${Math.max(2, L.framesToPx(item.duration, rate(), state.pxPerSecond))}px`;
+  if (item.id === state.selectedVisualItemId) node.classList.add('selected');
+  const label = document.createElement('span');
+  label.className = 'clip-name';
+  label.textContent = item.content.text || 'Subtitle';
+  node.appendChild(label);
+  return node;
+}
+
 function drawWaveform(canvas, clip, waveform, cssWidth) {
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
   const width = Math.max(1, Math.min(4096, Math.ceil(cssWidth * ratio)));
@@ -692,7 +717,11 @@ function renderLanes() {
     lane.dataset.trackId = track.id;
     if (track.hidden) lane.classList.add('off');
     if (track.muted) lane.classList.add('muted');
-    for (const clip of track.clips) lane.appendChild(clipElement(track, clip));
+    if (track.kind === 'subtitle') {
+      for (const item of track.visualItems || []) lane.appendChild(subtitleElement(item));
+    } else {
+      for (const clip of track.clips) lane.appendChild(clipElement(track, clip));
+    }
     dom.lanes.appendChild(lane);
   }
 }
@@ -781,6 +810,7 @@ function renderTimeline() {
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
   dom.btnAddVideo.disabled = L.tracksOf(state.project, 'video').length >= L.MAX_TRACKS_PER_KIND;
   dom.btnAddAudio.disabled = L.tracksOf(state.project, 'audio').length >= L.MAX_TRACKS_PER_KIND;
+  dom.btnAddSubtitle.disabled = L.tracksOf(state.project, 'subtitle').length >= 1;
   updateLinkUi();
   updateHistoryUi();
   updateMonitorZoomUi();
@@ -1168,6 +1198,42 @@ async function addText() {
   if (item) selectVisualItem(item.id);
 }
 
+async function addSubtitle() {
+  const track = L.tracksOf(state.project, 'subtitle')[0];
+  if (!track) return;
+  const start = Math.round(preview.position());
+  const duration = Math.max(1, Math.round(T.rateToNumber(rate()) * 2));
+  const known = new Set((track.visualItems || []).map((item) => item.id));
+  await edit({
+    op: 'addVisualItem',
+    trackId: track.id,
+    content: { kind: 'text', text: 'Subtitle', style: {} },
+    start,
+    duration,
+    transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0, opacity: 1 },
+    zIndex: 0,
+  });
+  const item = (L.findTrack(state.project, track.id).visualItems || []).find((entry) => !known.has(entry.id));
+  if (item) selectVisualItem(item.id);
+}
+
+async function importSrt() {
+  const track = L.tracksOf(state.project, 'subtitle')[0];
+  if (!track) return;
+  const path = await window.api.pickSrtOpen();
+  if (!path) return;
+  adopt(await window.api.importSrt(track.id, path));
+  refresh();
+}
+
+async function exportSrt() {
+  const track = L.tracksOf(state.project, 'subtitle')[0];
+  if (!track) return;
+  const path = await window.api.pickSrtSave('subtitles.srt');
+  if (!path) return;
+  await window.api.exportSrt(track.id, path);
+}
+
 function hexColor(value, fallback) {
   const match = /^#([0-9a-fA-F]{6})(?:[0-9a-fA-F]{2})?$/.exec(value || '');
   return match ? `#${match[1]}` : fallback;
@@ -1181,8 +1247,21 @@ function preserveAlpha(color, previous) {
 function renderTextInspector() {
   const item = selectedVisualItem();
   const text = item && item.content && item.content.kind === 'text' ? item.content : null;
-  dom.textPanel.hidden = !text;
+  const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
+  const subtitle = track && track.kind === 'subtitle';
+  dom.textPanel.hidden = !text || subtitle;
+  dom.subtitlePanel.hidden = !text || !subtitle;
   if (!text) return;
+  if (subtitle) {
+    dom.subtitleValue.value = text.text || '';
+    dom.subtitleStart.value = item.start;
+    dom.subtitleEnd.value = item.start + item.duration;
+    const subtitleStyle = track.subtitleStyle || {};
+    dom.subtitleFont.value = subtitleStyle.fontFamily || 'sans-serif';
+    dom.subtitleSize.value = subtitleStyle.fontSize || 64;
+    dom.subtitleColor.value = hexColor(subtitleStyle.color, '#ffffff');
+    return;
+  }
   const style = text.style || {};
   dom.textValue.value = text.text || '';
   dom.textFont.value = style.fontFamily || 'sans-serif';
@@ -1192,6 +1271,30 @@ function renderTextInspector() {
   dom.textStrokeColor.value = hexColor(style.strokeColor, '#000000');
   dom.textStrokeWidth.value = style.strokeWidth || 0;
   dom.textShadowColor.value = hexColor(style.shadowColor, '#000000');
+}
+
+function updateSelectedSubtitle() {
+  const item = selectedVisualItem();
+  if (!item || item.content.kind !== 'text') return;
+  const start = Math.max(0, Math.round(Number(dom.subtitleStart.value) || 0));
+  const end = Math.max(start + 1, Math.round(Number(dom.subtitleEnd.value) || start + 1));
+  edit(
+    { op: 'setVisualContent', itemId: item.id, content: { ...item.content, text: dom.subtitleValue.value } },
+    { op: 'setVisualTiming', itemId: item.id, start, duration: end - start },
+  ).catch((error) => reportError(error, 'subtitle:edit'));
+}
+
+function updateSubtitleStyle() {
+  const item = selectedVisualItem();
+  const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
+  if (!track || track.kind !== 'subtitle') return;
+  const style = {
+    ...(track.subtitleStyle || {}),
+    fontFamily: dom.subtitleFont.value || 'sans-serif',
+    fontSize: Math.max(8, Number(dom.subtitleSize.value) || 64),
+    color: dom.subtitleColor.value,
+  };
+  edit({ op: 'setSubtitleStyle', trackId: track.id, style }).catch((error) => reportError(error, 'subtitle:style'));
 }
 
 function updateSelectedText() {
@@ -2221,6 +2324,12 @@ function wireTimeline() {
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
+  dom.btnAddSubtitle.addEventListener('click', async () => {
+    await edit({ op: 'addTrack', trackKind: 'subtitle' });
+    await addSubtitle();
+  });
+  dom.btnImportSrt.addEventListener('click', () => importSrt().catch((error) => reportError(error, 'subtitle:import')));
+  dom.btnExportSrt.addEventListener('click', () => exportSrt().catch((error) => reportError(error, 'subtitle:export')));
 
   dom.heads.addEventListener('click', (event) => {
     const target = event.target.closest('[data-target-track]');
@@ -2281,7 +2390,19 @@ function wireTimeline() {
   ]) {
     input.addEventListener('change', updateSelectedText);
   }
+  for (const input of [dom.subtitleValue, dom.subtitleStart, dom.subtitleEnd]) {
+    input.addEventListener('change', updateSelectedSubtitle);
+  }
+  for (const input of [dom.subtitleFont, dom.subtitleSize, dom.subtitleColor]) {
+    input.addEventListener('change', updateSubtitleStyle);
+  }
   dom.lanes.addEventListener('pointerdown', (event) => {
+    const subtitle = event.target.closest('[data-subtitle-item-id]');
+    if (subtitle) {
+      selectVisualItem(subtitle.dataset.subtitleItemId);
+      event.preventDefault();
+      return;
+    }
     const clip = event.target.closest('.clip');
     if (clip) {
       beginClipDrag(event, clip);

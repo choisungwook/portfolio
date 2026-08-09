@@ -674,6 +674,7 @@ mod tests {
                 visual_items: Vec::new(),
                 muted: false,
                 hidden: false,
+                subtitle_style: None,
             }],
             markers: Vec::new(),
         }

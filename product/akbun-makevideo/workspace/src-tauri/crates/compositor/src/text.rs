@@ -36,7 +36,7 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
     let scale = scale_x.min(scale_y);
 
     for track in project.tracks.iter().filter(|track| track.contributes()) {
-        if track.kind != makevideo_render::TrackKind::Video {
+        if !matches!(track.kind, makevideo_render::TrackKind::Video | makevideo_render::TrackKind::Subtitle) {
             continue;
         }
         let mut items: Vec<_> = track
@@ -49,8 +49,21 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
             let VisualContent::Text { text, style } = &item.content else {
                 continue;
             };
-            let item_width = (item.transform.width * scale_x).round().max(1.0) as u32;
-            let item_height = (item.transform.height * scale_y).round().max(1.0) as u32;
+            let style = track.subtitle_style.as_ref().unwrap_or(style);
+            let transform = if track.kind == makevideo_render::TrackKind::Subtitle {
+                makevideo_render::VisualTransform {
+                    x: 96.0,
+                    y: project.settings.height as f32 * 0.78,
+                    width: project.settings.width as f32 - 192.0,
+                    height: project.settings.height as f32 * 0.16,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                }
+            } else {
+                item.transform
+            };
+            let item_width = (transform.width * scale_x).round().max(1.0) as u32;
+            let item_height = (transform.height * scale_y).round().max(1.0) as u32;
             let key = format!(
                 "{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
             );
@@ -61,12 +74,12 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
                 height: item_height,
                 placement: Placement {
                     dst: makevideo_render::layout::Rect {
-                        x: (item.transform.x * scale_x).round() as i32,
-                        y: (item.transform.y * scale_y).round() as i32,
+                        x: (transform.x * scale_x).round() as i32,
+                        y: (transform.y * scale_y).round() as i32,
                         w: item_width,
                         h: item_height,
                     },
-                    opacity: item.transform.opacity.clamp(0.0, 1.0),
+                    opacity: transform.opacity.clamp(0.0, 1.0),
                 },
             });
         }

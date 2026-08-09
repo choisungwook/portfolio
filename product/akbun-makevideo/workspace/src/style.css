@@ -674,6 +674,10 @@ button.icon.on {
   height: var(--lane-audio);
 }
 
+.head.subtitle, .lane.subtitle {
+  height: var(--lane-video);
+}
+
 .head-name {
   font-weight: 600;
   font-size: 12px;
@@ -1021,6 +1025,7 @@ button.icon.on {
 
 .sheet .row input[type='text'],
 .sheet .row input[type='number'],
+.sheet .row textarea,
 .sheet .row select {
   min-width: 190px;
 }

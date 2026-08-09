@@ -15,7 +15,10 @@ use crate::viewport::MonitorPlace;
 use makevideo_compositor::{Backend, Compositor};
 // Aliased because this file also spawns processes, and two things called
 // Command in one file is one too many.
-use makevideo_edit::{Command as Edit, Document, DocumentState, ProjectSettings};
+use makevideo_edit::{
+    Command as Edit, Document, DocumentState, ProjectSettings, TextStyle, TrackKind, VisualContent,
+    VisualTransform,
+};
 use makevideo_present::fallback::{choose, Choice};
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
@@ -1331,6 +1334,153 @@ pub fn describe_asset(
     Ok(document.state())
 }
 
+fn srt_frame(value: &str, rate: Rate) -> Result<i64, String> {
+    let parts: Vec<_> = value
+        .trim()
+        .replace(',', ".")
+        .split(':')
+        .map(str::to_string)
+        .collect();
+    if parts.len() != 3 {
+        return Err(format!("invalid SRT time: {value}"));
+    }
+    let seconds: f64 = parts[0]
+        .parse::<f64>()
+        .map_err(|_| format!("invalid SRT time: {value}"))?
+        * 3600.0
+        + parts[1]
+            .parse::<f64>()
+            .map_err(|_| format!("invalid SRT time: {value}"))?
+            * 60.0
+        + parts[2]
+            .parse::<f64>()
+            .map_err(|_| format!("invalid SRT time: {value}"))?;
+    Ok((seconds * rate.as_f64()).round().max(0.0) as i64)
+}
+
+fn srt_timestamp(frame: i64, rate: Rate) -> String {
+    let millis = ((frame.max(0) as f64 / rate.as_f64()) * 1000.0).round() as u64;
+    format!(
+        "{:02}:{:02}:{:02},{:03}",
+        millis / 3_600_000,
+        (millis / 60_000) % 60,
+        (millis / 1_000) % 60,
+        millis % 1_000
+    )
+}
+
+fn srt_cues(text: &str, rate: Rate) -> Result<Vec<(i64, i64, String)>, String> {
+    let mut cues = Vec::new();
+    for block in text.replace("\r\n", "\n").split("\n\n") {
+        let lines: Vec<_> = block
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .collect();
+        let Some(timing) = lines.iter().find(|line| line.contains(" --> ")) else {
+            continue;
+        };
+        let Some((start, end)) = timing.split_once(" --> ") else {
+            continue;
+        };
+        let start = srt_frame(start, rate)?;
+        let end = srt_frame(end, rate)?;
+        let text = lines
+            .iter()
+            .skip_while(|line| **line != *timing)
+            .skip(1)
+            .copied()
+            .collect::<Vec<_>>()
+            .join("\n");
+        if end > start && !text.is_empty() {
+            cues.push((start, end, text));
+        }
+    }
+    Ok(cues)
+}
+
+fn srt_contents(mut cues: Vec<(i64, i64, &str)>, rate: Rate) -> String {
+    cues.sort_by_key(|(start, _, _)| *start);
+    cues.into_iter()
+        .enumerate()
+        .map(|(index, (start, end, text))| {
+            format!(
+                "{}\n{} --> {}\n{}\n\n",
+                index + 1,
+                srt_timestamp(start, rate),
+                srt_timestamp(end, rate),
+                text
+            )
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn import_srt(
+    state: State<AppState>,
+    track_id: String,
+    path: String,
+) -> Result<DocumentState, String> {
+    let text =
+        std::fs::read_to_string(&path).map_err(|error| format!("cannot read {path}: {error}"))?;
+    let mut document = state.document.lock().unwrap();
+    let rate = document.project().rate();
+    let track = document
+        .project()
+        .track(&track_id)
+        .ok_or("subtitle track is not on the timeline")?;
+    if track.kind != TrackKind::Subtitle {
+        return Err("choose a subtitle track before importing SRT".into());
+    }
+    let mut commands = Vec::new();
+    for (start, end, text) in srt_cues(&text, rate)? {
+        commands.push(Edit::AddVisualItem {
+            track_id: track_id.clone(),
+            content: VisualContent::Text {
+                text,
+                style: TextStyle::default(),
+            },
+            start,
+            duration: end - start,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: None,
+        });
+    }
+    document.apply_all(commands)?;
+    Ok(document.state())
+}
+
+#[tauri::command]
+pub fn export_srt(state: State<AppState>, track_id: String, path: String) -> Result<(), String> {
+    let document = state.document.lock().unwrap();
+    let track = document
+        .project()
+        .track(&track_id)
+        .ok_or("subtitle track is not on the timeline")?;
+    if track.kind != TrackKind::Subtitle {
+        return Err("choose a subtitle track before exporting SRT".into());
+    }
+    let cues = track
+        .visual_items
+        .iter()
+        .filter_map(|item| {
+            let VisualContent::Text { text, .. } = &item.content else {
+                return None;
+            };
+            Some((item.start, item.end_frame(), text.as_str()))
+        })
+        .collect();
+    let output = srt_contents(cues, document.project().rate());
+    std::fs::write(&path, output).map_err(|error| format!("cannot write {path}: {error}"))
+}
+
 /// Start again on an empty timeline, at whatever shape new projects are set to.
 #[tauri::command]
 pub fn new_document(state: State<AppState>) -> DocumentState {
@@ -2066,7 +2216,47 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{process_metrics_rows, process_tree_rss_bytes, Settings};
+    use super::{
+        process_metrics_rows, process_tree_rss_bytes, srt_contents, srt_cues, srt_frame,
+        srt_timestamp, Settings,
+    };
+    use makevideo_render::Rate;
+
+    #[test]
+    fn srt_frame_accepts_comma_and_dot_milliseconds() {
+        let rate = Rate::fps(30);
+        assert_eq!(srt_frame("00:01:02,500", rate), Ok(1_875));
+        assert_eq!(srt_frame("00:01:02.500", rate), Ok(1_875));
+    }
+
+    #[test]
+    fn srt_timestamp_round_trips_within_one_frame() {
+        let rate = Rate::new(30_000, 1_001);
+        let frame = 12_345;
+        let parsed = srt_frame(&srt_timestamp(frame, rate), rate).unwrap();
+        assert!((parsed - frame).abs() <= 1);
+    }
+
+    #[test]
+    fn srt_cues_keep_multiline_text_and_export_in_start_order() {
+        let rate = Rate::fps(30);
+        let cues = srt_cues(
+            "2\n00:00:02,000 --> 00:00:03,000\nsecond\n\n1\n00:00:00,000 --> 00:00:01,000\nfirst\nline",
+            rate,
+        )
+        .unwrap();
+        let output = srt_contents(
+            cues.iter()
+                .map(|(start, end, text)| (*start, *end, text.as_str()))
+                .collect(),
+            rate,
+        );
+
+        assert_eq!(
+            output,
+            "1\n00:00:00,000 --> 00:00:01,000\nfirst\nline\n\n2\n00:00:02,000 --> 00:00:03,000\nsecond\n\n"
+        );
+    }
 
     #[test]
     fn existing_settings_delete_the_project_folder_by_default() {

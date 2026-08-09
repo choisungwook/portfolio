@@ -358,6 +358,7 @@ mod tests {
             name: id.into(),
             clips,
             visual_items: Vec::new(),
+            subtitle_style: None,
             muted: false,
             hidden: false,
         }
@@ -552,6 +553,7 @@ mod tests {
             name: id.into(),
             clips,
             visual_items: Vec::new(),
+            subtitle_style: None,
             muted: false,
             hidden: false,
         }

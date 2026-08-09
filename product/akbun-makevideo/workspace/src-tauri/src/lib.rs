@@ -73,6 +73,8 @@ pub fn run() {
             commands::edit_undo,
             commands::edit_redo,
             commands::describe_asset,
+            commands::import_srt,
+            commands::export_srt,
             commands::new_document,
             commands::open_project,
             commands::save_project,

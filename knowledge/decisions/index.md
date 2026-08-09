@@ -4,6 +4,7 @@
 
 ## 목록
 
+* [자막 트랙은 텍스트 래스터화 경로를 공유](2026-08-subtitle-track-shares-text-rasterization.md) - 자막의 시간·문구와 트랙 공통 스타일을 분리하고 화면과 export 합성을 같은 경로로 유지하는 결정.
 * [Program Monitor 가이드는 앱 설정과 편집용 pass에 둔다](2026-08-program-monitor-guides-are-editor-only.md) - 안전 영역과 구도 가이드를 렌더 결과가 아닌 정지 Program Monitor 위에만 표시하는 결정.
 * [OKF 기반 knowledge 번들 도입](2026-07-adopt-okf-knowledge-bundle.md) - agent 지식을 Open Knowledge Format 0.1로 기록하기로 한 결정.
 * [AGENTS.md 단일 진입점](2026-07-agents-md-single-entrypoint.md) - agent 환경 파일을 AGENTS.md 중심으로 재구성한 결정.
