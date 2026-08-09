@@ -2116,7 +2116,7 @@ function accelerationNote() {
 function compositorNote() {
   const found = (state.boot && state.boot.compositor) || {};
   if (found.setting === 'ffmpeg') {
-    return 'The filter graph draws the render, and the preview is drawn separately by the browser, so the two can differ. Faster, because frames never leave ffmpeg.';
+    return 'The filter graph draws the render and the exact frame is not asked for, so what is on the stage and what lands in the file can differ. Faster, because frames never leave ffmpeg. The monitor still draws on the graphics device; this setting does not reach it.';
   }
   const same =
     'The preview frame and the render come out of the same code, at the cost of every frame crossing a pipe.';

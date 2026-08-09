@@ -526,15 +526,22 @@ impl GpuCompositor {
                 depth_or_array_layers: 1,
             },
         );
-        self.queue.submit(Some(encoder.finish()));
+        let submission = self.queue.submit(Some(encoder.finish()));
 
         let slice = readback.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = sender.send(result);
         });
+        // This submission and no other. The default waits for whatever was
+        // submitted most recently, which on a machine with the monitor running
+        // means waiting on its frames as well — this call is the preview and it
+        // has no business holding the thread for playback's work.
         self.device
-            .poll(wgpu::PollType::wait_indefinitely())
+            .poll(wgpu::PollType::Wait {
+                submission_index: Some(submission),
+                timeout: None,
+            })
             .map_err(|error| format!("the device stopped: {error}"))?;
         receiver
             .recv()

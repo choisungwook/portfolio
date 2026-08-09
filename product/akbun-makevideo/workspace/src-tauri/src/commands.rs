@@ -686,6 +686,13 @@ pub fn validate_lut(path: String) -> Result<(), String> {
 /// That is the difference between an engine that can decide for itself what to
 /// decode for a given frame and one that can only work from whatever snapshot
 /// happened to come with the call.
+///
+/// The drawing runs on a blocking thread. Every part of it waits — an ffmpeg
+/// process per visible clip, then the readback — and doing that on the async
+/// runtime holds a worker for the whole job, which is long enough that the
+/// playhead the page polls every frame stops coming back and the app reads as
+/// hung. Nothing here is actually asynchronous; the command is `async` so that
+/// it can hand the work somewhere it may block.
 #[tauri::command]
 pub async fn preview_frame(
     app: AppHandle,
@@ -712,14 +719,18 @@ pub async fn preview_frame(
     let width = width - (width % 2);
     let height = height - (height % 2);
 
-    let pixels = makevideo_compositor::pipeline::preview_frame(
-        &gpu,
-        &ffmpeg_path,
-        &project,
-        frame,
-        width,
-        height,
-    )?;
+    let pixels = tauri::async_runtime::spawn_blocking(move || {
+        makevideo_compositor::pipeline::preview_frame(
+            &gpu,
+            &ffmpeg_path,
+            &project,
+            frame,
+            width,
+            height,
+        )
+    })
+    .await
+    .map_err(|error| format!("the preview frame job did not finish: {error}"))??;
     let mut payload = Vec::with_capacity(pixels.len() + 8);
     payload.extend_from_slice(&width.to_le_bytes());
     payload.extend_from_slice(&height.to_le_bytes());
