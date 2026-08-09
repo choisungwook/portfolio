@@ -89,6 +89,8 @@ pub fn run() {
             commands::playback_visible,
             commands::playback_status,
             commands::process_memory_bytes,
+            commands::process_metrics,
+            commands::read_error_log,
             commands::save_quality_report,
         ])
         .run(tauri::generate_context!())

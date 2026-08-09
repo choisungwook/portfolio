@@ -33,7 +33,7 @@ const TAIL_SECONDS = 10;
 
 const DEFAULT_SETTINGS = {
   theme: 'system',
-  previewQuality: 'half',
+  previewQuality: 'quarter',
   previewMuteWhileScrubbing: true,
   snap: true,
   defaultWidth: 1920,
@@ -72,7 +72,13 @@ const dom = {
   assetEmpty: el('asset-empty'),
   assetsPanel: el('assets-panel'),
   btnImport: el('btn-import'),
-  previewSource: el('preview-source'),
+  btnDebug: el('btn-debug'),
+  debugPanel: el('debug-panel'),
+  debugMetrics: el('debug-metrics'),
+  debugLog: el('debug-log'),
+  btnCloseDebug: el('btn-close-debug'),
+  btnRefreshDebug: el('btn-refresh-debug'),
+  btnToggleLogs: el('btn-toggle-logs'),
   stageWrap: el('stage-wrap'),
   stage: el('stage'),
   stageInner: el('stage-inner'),
@@ -94,6 +100,7 @@ const dom = {
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
   zoom: el('zoom'),
+  proxyProgress: el('proxy-progress'),
   timeline: el('timeline'),
   heads: el('timeline-heads'),
   scroll: el('timeline-scroll'),
@@ -348,6 +355,7 @@ function adoptProxyStatuses(statuses) {
   state.proxies = Object.fromEntries((statuses || []).map((status) => [status.assetId, status]));
   renderAssets();
   renderProxySummary();
+  renderProxyProgress();
 }
 
 function proxySummary() {
@@ -366,6 +374,64 @@ function proxySummary() {
 function renderProxySummary() {
   const summary = el('proxy-summary');
   if (summary) summary.textContent = proxySummary();
+}
+
+function renderProxyProgress() {
+  const statuses = Object.values(state.proxies);
+  const active = statuses.filter((status) => status.state === 'queued' || status.state === 'generating');
+  if (!active.length) {
+    dom.proxyProgress.hidden = true;
+    return;
+  }
+  const percent = Math.round(active.reduce((total, status) => total + (status.percent || 0), 0) / active.length);
+  dom.proxyProgress.textContent = `Proxy ${percent}% · ${active.length} processing`;
+  dom.proxyProgress.hidden = false;
+}
+
+let debugTimer = null;
+let debugRefreshInFlight = false;
+
+function byteText(value) {
+  if (!Number.isFinite(value)) return 'unavailable';
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+async function refreshDebug() {
+  if (dom.debugPanel.hidden || debugRefreshInFlight) return;
+  debugRefreshInFlight = true;
+  try {
+    const [metrics, logs] = await Promise.all([
+      window.api.processMetrics(),
+      dom.debugLog.hidden ? Promise.resolve(null) : window.api.readErrorLog(),
+    ]);
+    const active = Object.values(state.proxies).filter((status) => status.state === 'queued' || status.state === 'generating');
+    dom.debugMetrics.textContent = [
+      `Process tree CPU: ${Number.isFinite(metrics.cpuPercent) ? `${metrics.cpuPercent.toFixed(1)}%` : 'unavailable'}`,
+      `Process tree memory: ${byteText(metrics.memoryBytes)}`,
+      `Timeline: ${state.project.tracks.length} tracks, ${state.project.assets.length} assets`,
+      `Proxy jobs: ${active.length} active, ${Object.keys(state.proxies).length} known`,
+      `Playback engine: ${state.settings.playbackEngine}`,
+      `IPC proxy updates: percentage-throttled`,
+    ].join('\n');
+    if (logs !== null) dom.debugLog.textContent = logs || 'No error log entries.';
+  } catch (error) {
+    reportError(error, 'debug:refresh');
+    dom.debugMetrics.textContent = `Debug data unavailable\n${errorText(error)}`;
+  } finally {
+    debugRefreshInFlight = false;
+  }
+}
+
+function showDebug() {
+  dom.debugPanel.hidden = false;
+  void refreshDebug();
+  if (debugTimer === null) debugTimer = window.setInterval(() => void refreshDebug(), 1000);
+}
+
+function hideDebug() {
+  dom.debugPanel.hidden = true;
+  if (debugTimer !== null) window.clearInterval(debugTimer);
+  debugTimer = null;
 }
 
 async function prepareProxies() {
@@ -1619,7 +1685,6 @@ function loadDocument(doc, path) {
   state.waveforms = {};
   preview.clear();
   preview.showTimeline();
-  setPreviewSource('timeline');
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
   prepareDerivedMedia();
@@ -2072,29 +2137,6 @@ const actions = {
     ),
 };
 
-// --- preview source --------------------------------------------------------
-
-function setPreviewSource(source) {
-  for (const button of dom.previewSource.querySelectorAll('button')) {
-    button.classList.toggle('on', button.dataset.source === source);
-  }
-  if (source === 'asset') {
-    preview.clearExact();
-    setStageMode('');
-    const asset = state.selectedAssetId && L.findAsset(state.project, state.selectedAssetId);
-    preview.showAsset(asset || null);
-    dom.stageHint.hidden = Boolean(asset);
-    if (!asset) dom.stageHint.textContent = 'Select an asset on the left to preview it.';
-  } else {
-    preview.showTimeline();
-    dom.stageHint.textContent = 'Drop media on the timeline below to see it here.';
-  }
-  syncEditorOverlay();
-  renderStageOverlay();
-  preview.layout();
-  dom.duration.textContent = L.formatTimecode(preview.total(), rate());
-}
-
 // --- wiring ----------------------------------------------------------------
 
 function wireMenus() {
@@ -2132,6 +2174,17 @@ function wireMenus() {
 
 function wireAssets() {
   dom.btnImport.addEventListener('click', importViaDialog);
+  dom.btnDebug.addEventListener('click', () => {
+    if (dom.debugPanel.hidden) showDebug();
+    else hideDebug();
+  });
+  dom.btnCloseDebug.addEventListener('click', hideDebug);
+  dom.btnRefreshDebug.addEventListener('click', () => void refreshDebug());
+  dom.btnToggleLogs.addEventListener('click', () => {
+    dom.debugLog.hidden = !dom.debugLog.hidden;
+    dom.btnToggleLogs.textContent = dom.debugLog.hidden ? 'Show error log' : 'Hide error log';
+    void refreshDebug();
+  });
   dom.assetList.addEventListener('click', (event) => {
     const remove = event.target.closest('[data-remove]');
     if (remove) {
@@ -2142,12 +2195,6 @@ function wireAssets() {
     const item = event.target.closest('.asset');
     if (!item) return;
     selectAsset(item.dataset.id);
-    if (preview.mode() === 'asset') setPreviewSource('asset');
-  });
-  dom.assetList.addEventListener('dblclick', (event) => {
-    const item = event.target.closest('.asset');
-    if (!item) return;
-    setPreviewSource('asset');
   });
   dom.assetList.addEventListener('pointerdown', beginAssetDrag);
   window.addEventListener('pointermove', (event) => {
@@ -2293,10 +2340,6 @@ function wireTransport() {
       dom.previewQuality.value = previous;
       preview.setQuality(previous);
     });
-  });
-  dom.previewSource.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-source]');
-    if (button) setPreviewSource(button.dataset.source);
   });
   dom.stage.addEventListener('wheel', (event) => {
     if (!event.metaKey) return;
@@ -2623,7 +2666,6 @@ async function boot() {
   });
 
   refresh();
-  setPreviewSource('timeline');
 
   try {
     adopt(await window.api.editState());

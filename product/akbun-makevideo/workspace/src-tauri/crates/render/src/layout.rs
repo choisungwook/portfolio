@@ -10,7 +10,7 @@
 //! index on the project rate. Floats would let the two callers round
 //! differently, which is exactly the divergence this removes.
 
-use crate::{Asset, AssetKind, Project, Rate, RationalTime, Track, TrackKind};
+use crate::{Asset, AssetKind, Clip, Project, Rate, RationalTime, Track, TrackKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -115,6 +115,27 @@ pub fn carries_sound(asset: &Asset, track: &Track) -> bool {
     }
 }
 
+/// A linked video/audio pair has one source stream but two timeline clips.
+/// The audio-track clip is the mix source; keeping the video-track clip in the
+/// mix too would make the same samples play twice.
+pub fn linked_audio_track_has_group(project: &Project, clip: &Clip) -> bool {
+    let Some(group) = clip.link_group.as_deref() else {
+        return false;
+    };
+    project.tracks.iter().any(|track| {
+        track.kind == TrackKind::Audio
+            && track
+                .clips
+                .iter()
+                .any(|candidate| candidate.link_group.as_deref() == Some(group))
+    })
+}
+
+pub fn clip_carries_sound(project: &Project, asset: &Asset, track: &Track, clip: &Clip) -> bool {
+    carries_sound(asset, track)
+        && !(track.kind == TrackKind::Video && linked_audio_track_has_group(project, clip))
+}
+
 /// Every clip that is audible, video tracks first and then audio tracks, each
 /// in track order. The order does not change a sum, but keeping it the same as
 /// the render's input order means a report from either side lists the clips the
@@ -133,7 +154,7 @@ pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
                 let Some(asset) = project.asset(&clip.asset_id) else {
                     continue;
                 };
-                if !carries_sound(asset, track) {
+                if !clip_carries_sound(project, asset, track, clip) {
                     continue;
                 }
                 placements.push(AudioPlacement {
@@ -340,6 +361,24 @@ mod tests {
             muted: false,
             hidden: false,
         }
+    }
+
+    #[test]
+    fn linked_video_and_audio_mix_once() {
+        let mut video = clip("v", "a", 0, 0, 120);
+        video.link_group = Some("g1".into());
+        let mut audio = clip("a", "a", 0, 0, 120);
+        audio.link_group = Some("g1".into());
+        let mut source = asset("a", AssetKind::Video, 1920, 1080);
+        source.has_audio = true;
+        let project = project(
+            vec![video_track("V1", vec![video]), audio_track("A1", vec![audio])],
+            vec![source],
+        );
+
+        let placements = audio_placements(&project);
+        assert_eq!(placements.len(), 1);
+        assert_eq!(placements[0].clip_id, "a");
     }
 
     #[test]

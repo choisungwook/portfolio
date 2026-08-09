@@ -37,8 +37,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 pub struct Settings {
     /// "system", "light" or "dark".
     pub theme: String,
-    /// "full", "half" or "quarter". Half by default: the preview stacks real
-    /// media elements, and at full size a few tracks at once will not keep up.
+    /// "full", "half" or "quarter". Quarter by default: it leaves decoding
+    /// headroom when proxy generation and a multi-track preview overlap.
     pub preview_quality: String,
     /// Drop preview audio while the playhead is being dragged. Scrubbing with
     /// audio on means a seek per frame, which is what actually stalls playback.
@@ -104,7 +104,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             theme: "system".into(),
-            preview_quality: "half".into(),
+            preview_quality: "quarter".into(),
             preview_mute_while_scrubbing: true,
             snap: true,
             show_action_safe_area: false,
@@ -1777,6 +1777,99 @@ pub fn process_memory_bytes() -> Result<u64, String> {
     ))
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessMetrics {
+    pub memory_bytes: u64,
+    pub cpu_percent: f64,
+}
+
+fn process_metrics_rows(output: &str) -> Result<Vec<(u32, u32, u64, f64)>, String> {
+    output
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut fields = line.split_whitespace();
+            let pid = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let parent = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let rss_kib = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let cpu_percent = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            if fields.next().is_some() {
+                return Err(format!("cannot parse process metrics row: {line:?}"));
+            }
+            Ok((pid, parent, rss_kib, cpu_percent))
+        })
+        .collect()
+}
+
+/// Process-tree metrics include WebView and ffmpeg children, which hold most
+/// preview memory and CPU outside the Rust process itself.
+#[tauri::command]
+pub fn process_metrics() -> Result<ProcessMetrics, String> {
+    let output = Command::new("ps")
+        .args(["-axo", "pid=,ppid=,rss=,pcpu="])
+        .output()
+        .map_err(|error| format!("cannot read process metrics: {error}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let rows = process_metrics_rows(&String::from_utf8_lossy(&output.stdout))?;
+    let root = std::process::id();
+    if !rows.iter().any(|(pid, _, _, _)| *pid == root) {
+        return Err(format!(
+            "cannot find current process {root} in process metrics"
+        ));
+    }
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut values = HashMap::new();
+    for (pid, parent, rss_kib, cpu_percent) in rows {
+        children.entry(parent).or_default().push(pid);
+        values.insert(pid, (rss_kib, cpu_percent));
+    }
+    let mut pending = vec![root];
+    let mut found = HashSet::new();
+    while let Some(pid) = pending.pop() {
+        if !found.insert(pid) {
+            continue;
+        }
+        if let Some(next) = children.get(&pid) {
+            pending.extend(next);
+        }
+    }
+    let (rss_kib, cpu_percent) = found.into_iter().fold((0, 0.0), |total, pid| {
+        let Some((rss, cpu)) = values.get(&pid) else {
+            return total;
+        };
+        (total.0 + rss, total.1 + cpu)
+    });
+    Ok(ProcessMetrics {
+        memory_bytes: rss_kib.saturating_mul(1024),
+        cpu_percent,
+    })
+}
+
+#[tauri::command]
+pub fn read_error_log(app: AppHandle, state: State<AppState>) -> Result<String, String> {
+    let settings = state.settings.lock().unwrap().clone();
+    crate::store::recent_error_log(&app, &settings, 200)
+}
+
 #[tauri::command]
 pub fn save_quality_report(path: String, report: serde_json::Value) -> Result<(), String> {
     let text = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
@@ -1973,7 +2066,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{process_tree_rss_bytes, Settings};
+    use super::{process_metrics_rows, process_tree_rss_bytes, Settings};
 
     #[test]
     fn existing_settings_delete_the_project_folder_by_default() {
@@ -1994,5 +2087,10 @@ mod tests {
     fn memory_includes_descendants_but_not_neighbours() {
         let ps = "10 1 100\n11 10 20\n12 11 5\n20 1 900\n";
         assert_eq!(process_tree_rss_bytes(ps, 10), 125 * 1024);
+    }
+
+    #[test]
+    fn process_metrics_rejects_invalid_rows() {
+        assert!(process_metrics_rows("10 1 100 0.2\nbroken row\n").is_err());
     }
 }
