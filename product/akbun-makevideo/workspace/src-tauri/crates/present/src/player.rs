@@ -52,6 +52,7 @@ pub enum Tick {
     /// A frame reached the screen. `late_ms` is signed: what the clock said
     /// when the drawing was finished, less when the frame was due. Positive is
     /// the picture behind the sound, which is the direction that can happen.
+    /// `present_ms` is the elapsed time spent in the sink's `show` call.
     Presented {
         frame: i64,
         late_ms: f64,
