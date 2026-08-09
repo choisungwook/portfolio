@@ -52,7 +52,12 @@ pub enum Tick {
     /// A frame reached the screen. `late_ms` is signed: what the clock said
     /// when the drawing was finished, less when the frame was due. Positive is
     /// the picture behind the sound, which is the direction that can happen.
-    Presented { frame: i64, late_ms: f64 },
+    /// `present_ms` is the elapsed time spent in the sink's `show` call.
+    Presented {
+        frame: i64,
+        late_ms: f64,
+        present_ms: f64,
+    },
     /// A late frame was thrown away.
     Skipped { frame: i64 },
     /// Not this frame's turn yet. The driver sleeps for `wait`.
@@ -390,16 +395,19 @@ impl Scheduler {
     /// reported is when the frame *reached* the screen, not when it was picked,
     /// so compositing time counts against the drift the way a viewer sees it.
     fn draw(&mut self, sink: &mut dyn Sink, frame: &Frame, due: Option<i128>) -> Tick {
+        let started = std::time::Instant::now();
         if let Err(reason) = sink.show(frame) {
             return self.fail(reason);
         }
         self.counters.presented.fetch_add(1, Ordering::Relaxed);
+        let present_ms = started.elapsed().as_secs_f64() * 1000.0;
         let late_ms = due
             .map(|due| samples_to_millis(self.clock.position_samples() as i128 - due))
             .unwrap_or(0.0);
         Tick::Presented {
             frame: frame.frame,
             late_ms,
+            present_ms,
         }
     }
 

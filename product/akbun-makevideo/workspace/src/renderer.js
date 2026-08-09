@@ -407,12 +407,27 @@ function byteText(value) {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+function millisecondsText(value) {
+  return Number.isFinite(value) ? `${value.toFixed(1)} ms` : 'unavailable';
+}
+
+function playbackDebugLines(status) {
+  if (!status) return ['Native playback: not attached'];
+  return [
+    `Native frames: ${status.presented} presented, ${status.skipped} skipped, ${status.resynced} resynced`,
+    `Native source: ${status.starved} starved, ${status.failedFrames} display failures`,
+    `Native display call: ${millisecondsText(status.lastPresentMs)} last, ${millisecondsText(status.peakPresentMs)} peak`,
+    `Native A/V lateness: ${millisecondsText(status.lastLateMs)} last, ${millisecondsText(status.peakLateMs)} peak`,
+  ];
+}
+
 async function refreshDebug() {
   if (dom.debugPanel.hidden || debugRefreshInFlight) return;
   debugRefreshInFlight = true;
   try {
-    const [metrics, logs] = await Promise.all([
+    const [metrics, playback, logs] = await Promise.all([
       window.api.processMetrics(),
+      window.api.playbackStatus(),
       dom.debugLog.hidden ? Promise.resolve(null) : window.api.readErrorLog(),
     ]);
     const active = Object.values(state.proxies).filter((status) => status.state === 'queued' || status.state === 'generating');
@@ -422,6 +437,7 @@ async function refreshDebug() {
       `Timeline: ${state.project.tracks.length} tracks, ${state.project.assets.length} assets`,
       `Proxy jobs: ${active.length} active, ${Object.keys(state.proxies).length} known`,
       `Playback engine: ${state.settings.playbackEngine}`,
+      ...playbackDebugLines(playback),
       `IPC proxy updates: percentage-throttled`,
     ].join('\n');
     if (logs !== null) dom.debugLog.textContent = logs || 'No error log entries.';

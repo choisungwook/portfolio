@@ -36,7 +36,7 @@ use makevideo_present::transport::{Setup, Transport};
 use makevideo_render::Project;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -95,6 +95,13 @@ pub struct Status {
     /// Frames drawn and frames dropped since this session started.
     pub presented: u64,
     pub skipped: u64,
+    pub resynced: u64,
+    pub starved: u64,
+    pub failed_frames: u64,
+    pub last_present_ms: f64,
+    pub peak_present_ms: f64,
+    pub last_late_ms: f64,
+    pub peak_late_ms: f64,
     pub failure: Option<String>,
 }
 
@@ -113,8 +120,44 @@ pub struct Session {
 /// Totals that outlive a play, so pausing does not reset what the page shows.
 #[derive(Debug, Default)]
 struct Counters {
-    presented: std::sync::atomic::AtomicU64,
-    skipped: std::sync::atomic::AtomicU64,
+    presented: AtomicU64,
+    skipped: AtomicU64,
+    resynced: AtomicU64,
+    starved: AtomicU64,
+    failed_frames: AtomicU64,
+    last_present_us: AtomicU64,
+    peak_present_us: AtomicU64,
+    last_late_us: AtomicI64,
+    peak_late_us: AtomicI64,
+}
+
+impl Counters {
+    fn record_present(&self, present_ms: f64, late_ms: f64) {
+        let present_us = micros(present_ms);
+        let late_us = signed_micros(late_ms);
+        self.last_present_us.store(present_us, Ordering::Relaxed);
+        self.last_late_us.store(late_us, Ordering::Relaxed);
+        self.peak_present_us
+            .fetch_max(present_us, Ordering::Relaxed);
+        self.peak_late_us
+            .fetch_max(late_us.max(0), Ordering::Relaxed);
+    }
+}
+
+fn micros(milliseconds: f64) -> u64 {
+    (milliseconds.max(0.0) * 1000.0).round() as u64
+}
+
+fn signed_micros(milliseconds: f64) -> i64 {
+    (milliseconds * 1000.0).round() as i64
+}
+
+fn milliseconds(micros: u64) -> f64 {
+    micros as f64 / 1000.0
+}
+
+fn signed_milliseconds(micros: i64) -> f64 {
+    micros as f64 / 1000.0
 }
 
 /// Everything the loop needs that does not change while it runs.
@@ -260,6 +303,13 @@ impl Session {
             playing: self.shared.playing(),
             presented: self.counters.presented.load(Ordering::Relaxed),
             skipped: self.counters.skipped.load(Ordering::Relaxed),
+            resynced: self.counters.resynced.load(Ordering::Relaxed),
+            starved: self.counters.starved.load(Ordering::Relaxed),
+            failed_frames: self.counters.failed_frames.load(Ordering::Relaxed),
+            last_present_ms: milliseconds(self.counters.last_present_us.load(Ordering::Relaxed)),
+            peak_present_ms: milliseconds(self.counters.peak_present_us.load(Ordering::Relaxed)),
+            last_late_ms: signed_milliseconds(self.counters.last_late_us.load(Ordering::Relaxed)),
+            peak_late_ms: signed_milliseconds(self.counters.peak_late_us.load(Ordering::Relaxed)),
             failure: self.shared.failure(),
         }
     }
@@ -347,8 +397,13 @@ fn run(mut state: Loop) {
             .store(current.transport.position(), Ordering::Relaxed);
 
         match tick {
-            Tick::Presented { .. } => {
+            Tick::Presented {
+                present_ms,
+                late_ms,
+                ..
+            } => {
                 state.counters.presented.fetch_add(1, Ordering::Relaxed);
+                state.counters.record_present(present_ms, late_ms);
             }
             Tick::Skipped { .. } => {
                 state.counters.skipped.fetch_add(1, Ordering::Relaxed);
@@ -358,7 +413,10 @@ fn run(mut state: Loop) {
                     std::thread::sleep(wait);
                 }
             }
-            Tick::Starved => std::thread::sleep(Duration::from_millis(1)),
+            Tick::Starved => {
+                state.counters.starved.fetch_add(1, Ordering::Relaxed);
+                std::thread::sleep(Duration::from_millis(1));
+            }
             Tick::Idle => std::thread::sleep(REST),
             Tick::Ended => {
                 // The timeline is over. Stop where it ended and leave the last
@@ -371,6 +429,7 @@ fn run(mut state: Loop) {
                 }
             }
             Tick::Failed { reason } => {
+                state.counters.failed_frames.fetch_add(1, Ordering::Relaxed);
                 // Recorded once and then carried on with. A frame that could
                 // not be drawn is a frame missing from the screen, and stopping
                 // the sound as well would make a bad monitor into a broken app.
@@ -380,7 +439,9 @@ fn run(mut state: Loop) {
                 }
                 std::thread::sleep(REST);
             }
-            Tick::Resynced { .. } => {}
+            Tick::Resynced { .. } => {
+                state.counters.resynced.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 }
@@ -438,5 +499,17 @@ mod tests {
     fn shared_state_crosses_threads() {
         assert_send_sync::<Shared>();
         assert_send_sync::<Counters>();
+    }
+
+    #[test]
+    fn counters_keep_the_latest_and_peak_playback_measurements() {
+        let counters = Counters::default();
+        counters.record_present(4.25, -1.5);
+        counters.record_present(2.0, 8.75);
+
+        assert_eq!(counters.last_present_us.load(Ordering::Relaxed), 2_000);
+        assert_eq!(counters.peak_present_us.load(Ordering::Relaxed), 4_250);
+        assert_eq!(counters.last_late_us.load(Ordering::Relaxed), 8_750);
+        assert_eq!(counters.peak_late_us.load(Ordering::Relaxed), 8_750);
     }
 }
