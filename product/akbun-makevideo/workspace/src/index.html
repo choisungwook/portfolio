@@ -131,6 +131,7 @@
         <div id="stage-wrap">
           <div id="stage">
             <div id="stage-inner"><canvas id="stage-exact"></canvas></div>
+            <canvas id="stage-visuals" aria-label="Text and shape layers"></canvas>
             <canvas id="stage-overlay" aria-label="Program Monitor selection overlay"></canvas>
           </div>
           <span id="stage-mode" hidden></span>
@@ -152,6 +153,60 @@
           </label>
         </div>
       </section>
+
+      <aside id="inspector-panel">
+        <header class="panel-head">
+          <h2>Inspector</h2>
+        </header>
+        <div id="inspector-body">
+          <p id="inspector-empty" class="dim small-text">Select a clip or a layer to edit its properties.</p>
+          <div id="clip-panel" hidden>
+            <h3>Clip</h3>
+            <p id="clip-summary" class="dim small-text"></p>
+            <label class="row" id="clip-opacity-row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
+            <!-- 0..1 because that is what the edit model stores; a wider
+                 slider would snap back on release. -->
+            <label class="row" id="clip-volume-row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
+          </div>
+          <div id="text-panel" hidden>
+            <h3>Text</h3>
+            <div id="text-inspector">
+              <label class="row">Text <input id="text-value" type="text" /></label>
+              <label class="row">Font <input id="text-font" type="text" list="font-options" placeholder="sans-serif" /></label>
+              <label class="row">Size <input id="text-size" type="number" min="8" max="512" /></label>
+              <label class="row">Color <input id="text-color" type="color" /></label>
+              <label class="row">Align <select id="text-align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+              <label class="row">Outline <input id="text-stroke-color" type="color" /></label>
+              <label class="row">Outline width <input id="text-stroke-width" type="number" min="0" max="32" step="1" /></label>
+              <label class="row">Shadow <input id="text-shadow-color" type="color" /></label>
+            </div>
+          </div>
+          <div id="shape-panel" hidden>
+            <h3>Shape</h3>
+            <div id="shape-inspector">
+              <label class="row">Type <select id="shape-kind"><option value="rectangle">Rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line / Arrow</option></select></label>
+              <label class="row">Fill <input id="shape-fill" type="color" /></label>
+              <label class="row">Outline <input id="shape-stroke" type="color" /></label>
+              <label class="row">Outline width <input id="shape-stroke-width" type="number" min="0" max="128" step="1" /></label>
+              <label class="row">Corner radius <input id="shape-corner-radius" type="number" min="0" max="2048" step="1" /></label>
+              <label class="row check"><input id="shape-start-arrow" type="checkbox" /> Start arrow</label>
+              <label class="row check"><input id="shape-end-arrow" type="checkbox" /> End arrow</label>
+            </div>
+          </div>
+          <div id="subtitle-panel" hidden>
+            <h3>Subtitle</h3>
+            <div id="subtitle-inspector">
+              <label class="row">Text <textarea id="subtitle-value" rows="3"></textarea></label>
+              <label class="row">Start <input id="subtitle-start" type="number" min="0" /></label>
+              <label class="row">End <input id="subtitle-end" type="number" min="1" /></label>
+              <label class="row">Font <input id="subtitle-font" type="text" list="font-options" /></label>
+              <label class="row">Size <input id="subtitle-size" type="number" min="8" max="512" /></label>
+              <label class="row">Color <input id="subtitle-color" type="color" /></label>
+            </div>
+          </div>
+          <datalist id="font-options"></datalist>
+        </div>
+      </aside>
     </section>
 
     <section id="lower">
@@ -169,8 +224,8 @@
           <svg viewBox="0 0 20 20"><use href="#icon-ripple" /></svg>
         </button>
         <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
-        <button id="btn-add-text" class="small" title="Add a title at the playhead">+ Text</button>
-        <button id="btn-add-shape" class="small" title="Add a rectangle at the playhead">+ Shape</button>
+        <button id="btn-add-text" class="small" title="Add a 4 second title at the playhead — or drag onto a video track">+ Text</button>
+        <button id="btn-add-shape" class="small" title="Add a 4 second shape at the playhead — or drag onto a video track">+ Shape</button>
         <button id="btn-add-marker" class="small" title="Add a marker at the playhead">+ Marker</button>
         <span class="sep-v"></span>
         <button id="btn-add-video" class="small">+ Video track</button>
@@ -196,42 +251,6 @@
       <details id="marker-panel">
         <summary>Markers</summary>
         <div id="marker-list"></div>
-      </details>
-      <details id="text-panel" hidden>
-        <summary>Text</summary>
-        <div id="text-inspector">
-          <label class="row">Text <input id="text-value" type="text" /></label>
-          <label class="row">Font <input id="text-font" type="text" placeholder="sans-serif" /></label>
-          <label class="row">Size <input id="text-size" type="number" min="8" max="512" /></label>
-          <label class="row">Color <input id="text-color" type="color" /></label>
-          <label class="row">Align <select id="text-align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
-          <label class="row">Outline <input id="text-stroke-color" type="color" /></label>
-          <label class="row">Outline width <input id="text-stroke-width" type="number" min="0" max="32" step="1" /></label>
-          <label class="row">Shadow <input id="text-shadow-color" type="color" /></label>
-        </div>
-      </details>
-      <details id="shape-panel" hidden>
-        <summary>Shape</summary>
-        <div id="shape-inspector">
-          <label class="row">Type <select id="shape-kind"><option value="rectangle">Rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line</option></select></label>
-          <label class="row">Fill <input id="shape-fill" type="color" /></label>
-          <label class="row">Outline <input id="shape-stroke" type="color" /></label>
-          <label class="row">Outline width <input id="shape-stroke-width" type="number" min="0" max="128" step="1" /></label>
-          <label class="row">Corner radius <input id="shape-corner-radius" type="number" min="0" max="2048" step="1" /></label>
-          <label class="row check"><input id="shape-start-arrow" type="checkbox" /> Start arrow</label>
-          <label class="row check"><input id="shape-end-arrow" type="checkbox" /> End arrow</label>
-        </div>
-      </details>
-      <details id="subtitle-panel" hidden>
-        <summary>Subtitle</summary>
-        <div id="subtitle-inspector">
-          <label class="row">Text <textarea id="subtitle-value" rows="3"></textarea></label>
-          <label class="row">Start <input id="subtitle-start" type="number" min="0" /></label>
-          <label class="row">End <input id="subtitle-end" type="number" min="1" /></label>
-          <label class="row">Font <input id="subtitle-font" type="text" /></label>
-          <label class="row">Size <input id="subtitle-size" type="number" min="8" max="512" /></label>
-          <label class="row">Color <input id="subtitle-color" type="color" /></label>
-        </div>
       </details>
     </section>
   </main>

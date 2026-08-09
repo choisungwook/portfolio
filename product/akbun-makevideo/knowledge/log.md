@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-08-10
+
+* [native view 좌표는 superview에게 원점을 물어본다](decisions/2026-08-native-view-asks-its-superview-for-the-origin.md) 결정 기록. WKWebView의 isFlipped가 YES인 것을 실측으로 확인하고 viewport 변환을 superview 질의로 바꿈.
+* [filter graph 렌더는 rasterize한 still을 overlay로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 기록. CPU 렌더와 폴백이 text/shape를 조용히 떨어뜨리던 문제의 해법 선택을 남김.
+
 ## 2026-08-09
 
 * [그래픽 장치를 쓰는지 하나로 preview와 playback과 render를 함께 정한다](decisions/2026-08-one-axis-for-the-graphics-device.md) 결정 기록. 불가능한 설정 조합을 없애고 판정을 한 쌍의 함수로 모음.

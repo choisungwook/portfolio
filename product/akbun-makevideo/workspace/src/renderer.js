@@ -83,6 +83,7 @@ const dom = {
   stage: el('stage'),
   stageInner: el('stage-inner'),
   stageExact: el('stage-exact'),
+  stageVisuals: el('stage-visuals'),
   stageOverlay: el('stage-overlay'),
   stageMode: el('stage-mode'),
   stageHint: el('stage-hint'),
@@ -111,6 +112,14 @@ const dom = {
   content: el('timeline-content'),
   ruler: el('ruler'),
   markerList: el('marker-list'),
+  inspectorEmpty: el('inspector-empty'),
+  clipPanel: el('clip-panel'),
+  clipSummary: el('clip-summary'),
+  clipOpacityRow: el('clip-opacity-row'),
+  clipVolumeRow: el('clip-volume-row'),
+  clipOpacity: el('clip-opacity'),
+  clipVolume: el('clip-volume'),
+  fontOptions: el('font-options'),
   textPanel: el('text-panel'),
   textValue: el('text-value'),
   textFont: el('text-font'),
@@ -692,17 +701,27 @@ function clipElement(track, clip) {
   return node;
 }
 
-function subtitleElement(item) {
+/** A text, shape or subtitle layer as a timeline element. The same element
+ *  shape as a clip — left edge, name, trim handles — so a layer moves and
+ *  trims the way a clip does. */
+function visualElement(track, item) {
   const node = document.createElement('div');
-  node.className = 'clip subtitle';
-  node.dataset.subtitleItemId = item.id;
+  const kind = item.content && item.content.kind === 'shape' ? 'shape' : 'text';
+  node.className = track.kind === 'subtitle' ? 'clip subtitle' : `clip visual ${kind}`;
+  node.dataset.visualItemId = item.id;
   node.style.left = `${L.framesToPx(item.start, rate(), state.pxPerSecond)}px`;
   node.style.width = `${Math.max(2, L.framesToPx(item.duration, rate(), state.pxPerSecond))}px`;
   if (item.id === state.selectedVisualItemId) node.classList.add('selected');
   const label = document.createElement('span');
   label.className = 'clip-name';
-  label.textContent = item.content.text || 'Subtitle';
-  node.appendChild(label);
+  label.textContent = kind === 'shape'
+    ? `Shape — ${item.content.shape || 'rectangle'}`
+    : item.content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
+  const left = document.createElement('span');
+  left.className = 'handle left';
+  const right = document.createElement('span');
+  right.className = 'handle right';
+  node.append(left, label, right);
   return node;
 }
 
@@ -753,9 +772,13 @@ function renderLanes() {
     if (track.hidden) lane.classList.add('off');
     if (track.muted) lane.classList.add('muted');
     if (track.kind === 'subtitle') {
-      for (const item of track.visualItems || []) lane.appendChild(subtitleElement(item));
+      for (const item of track.visualItems || []) lane.appendChild(visualElement(track, item));
     } else {
       for (const clip of track.clips) lane.appendChild(clipElement(track, clip));
+      // Text and shape layers ride on video tracks beside the clips. Without
+      // an element here they exist only on the stage, which is how a layer
+      // ends up impossible to move, trim or delete.
+      for (const item of track.visualItems || []) lane.appendChild(visualElement(track, item));
     }
     dom.lanes.appendChild(lane);
   }
@@ -839,7 +862,7 @@ function renderTimeline() {
   renderRuler();
   renderLanes();
   renderMarkerList();
-  renderTextInspector();
+  renderInspector();
   updatePlayhead(preview ? preview.position() : 0);
   dom.duration.textContent = L.formatTimecode(L.projectDurationFrames(state.project), rate());
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
@@ -892,6 +915,7 @@ function updatePlayhead(frame) {
   dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
   syncEditorOverlay();
   renderStageOverlay();
+  drawStageVisuals();
 }
 
 function seekPreviousEdit() {
@@ -959,6 +983,9 @@ async function requestExactFrame() {
     const drawn = await window.api.previewFrame(Math.round(preview.position()), maxWidth);
     if (token !== exactToken || preview.isPlaying()) return;
     setStageMode(preview.showExact(drawn) ? 'exact' : 'live');
+    // The exact frame already contains the text and shape layers, drawn by
+    // the same Rust code the render uses; the page's copy comes off.
+    drawStageVisuals();
   } catch (error) {
     // No graphics device, no ffmpeg, or a source that will not decode. The
     // stacked elements are still showing something, so this is not worth a
@@ -979,10 +1006,14 @@ function scheduleExactFrame() {
 
 function selectClip(clipId) {
   state.selectedClipId = clipId;
+  // One selection at a time, so the inspector always shows the thing that was
+  // picked last rather than whichever kind happens to win a tie.
+  if (clipId && state.selectedVisualItemId) selectVisualItem(null);
   for (const node of dom.lanes.querySelectorAll('.clip')) {
     node.classList.toggle('selected', node.dataset.clipId === clipId);
   }
   updateLinkUi();
+  renderInspector();
 }
 
 function selectedVisualItem() {
@@ -1014,7 +1045,11 @@ function overlayScale() {
 
 function selectVisualItem(itemId) {
   state.selectedVisualItemId = itemId || null;
-  renderTextInspector();
+  if (itemId && state.selectedClipId) selectClip(null);
+  for (const node of dom.lanes.querySelectorAll('[data-visual-item-id]')) {
+    node.classList.toggle('selected', node.dataset.visualItemId === state.selectedVisualItemId);
+  }
+  renderInspector();
   syncEditorOverlay();
   renderStageOverlay();
 }
@@ -1096,6 +1131,190 @@ function renderStageOverlay() {
   }
 }
 
+// --- text and shape layers on the stage -------------------------------------
+
+/** Draw the text and shape layers over the stacked media elements.
+ *
+ *  This is the page's approximation of the Rust compositor, and it exists for
+ *  the one display the Rust picture cannot reach: the media element engine
+ *  while it is playing. The paused stage shows the exact frame — the Rust
+ *  picture, which already contains these layers — and the native monitor
+ *  composites them in Rust, so both of those clear this canvas instead.
+ *
+ *  Like the preview itself, this is an approximation of the render: line
+ *  breaks and glyph metrics come from the browser rather than from fontdue.
+ *  Rotation is deliberately not drawn, because the Rust compositor does not
+ *  draw it either, and the preview's job is to look like the render. */
+function drawStageVisuals() {
+  const canvas = dom.stageVisuals;
+  if (!canvas) return;
+  const clear = () => {
+    if (canvas.width > 0) canvas.width = 0;
+  };
+  if (!preview || preview.mode() !== 'timeline') return clear();
+  if (preview.usesNativeMonitor() && !editorOverlayActive) return clear();
+  if (preview.isExact()) return clear();
+  const box = dom.stage.getBoundingClientRect();
+  if (box.width < 1 || box.height < 1) return clear();
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(box.width * ratio));
+  const height = Math.max(1, Math.round(box.height * ratio));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const settings = state.project.settings;
+  const scales = {
+    x: box.width / Math.max(1, settings.width),
+    y: box.height / Math.max(1, settings.height),
+  };
+  scales.font = Math.min(scales.x, scales.y);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, box.width, box.height);
+  const frame = Math.floor(preview.position());
+  // Tracks in project order: V1 first, which is the bottom layer, the same
+  // order the Rust compositor takes them in.
+  for (const track of state.project.tracks) {
+    if (track.hidden) continue;
+    if (track.kind !== 'video' && track.kind !== 'subtitle') continue;
+    const items = (track.visualItems || [])
+      .filter((item) => item.start <= frame && frame < item.start + item.duration)
+      .sort((a, b) => a.zIndex - b.zIndex);
+    for (const item of items) drawVisualItem(context, track, item, scales);
+  }
+}
+
+function drawVisualItem(context, track, item, scales) {
+  const settings = state.project.settings;
+  // A subtitle ignores its own transform and sits in the lower third, exactly
+  // as compositor/text.rs places it.
+  const transform = track.kind === 'subtitle'
+    ? { x: 96, y: settings.height * 0.78, width: settings.width - 192, height: settings.height * 0.16, opacity: 1 }
+    : item.transform;
+  const x = transform.x * scales.x;
+  const y = transform.y * scales.y;
+  const width = Math.max(1, transform.width * scales.x);
+  const height = Math.max(1, transform.height * scales.y);
+  context.save();
+  context.globalAlpha = Math.max(0, Math.min(1, transform.opacity ?? 1));
+  context.translate(x, y);
+  context.beginPath();
+  context.rect(0, 0, width, height);
+  context.clip();
+  const content = item.content || {};
+  if (content.kind === 'shape') {
+    drawShapeContent(context, content, width, height, scales.font);
+  } else if (content.kind === 'text') {
+    const style = (track.kind === 'subtitle' && track.subtitleStyle) || content.style || {};
+    drawTextContent(context, content.text || '', style, width, height, scales.font);
+  }
+  context.restore();
+}
+
+function cssFontFamily(family) {
+  const generic = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'];
+  return generic.includes(family) ? family : `"${String(family).replace(/"/g, '')}"`;
+}
+
+function wrapVisualText(context, text, maxWidth) {
+  const lines = [];
+  for (const paragraph of String(text).split('\n')) {
+    let line = '';
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && context.measureText(candidate).width > maxWidth) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+function drawTextContent(context, text, style, width, height, scale) {
+  const size = Math.max(1, (style.fontSize || 64) * scale);
+  context.font = `${size}px ${cssFontFamily(style.fontFamily || 'sans-serif')}`;
+  const align = style.align || 'center';
+  context.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  context.textBaseline = 'alphabetic';
+  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
+  const strokeWidth = Math.max(0, (style.strokeWidth || 0) * scale);
+  const shadowColor = style.shadowColor || '';
+  const lines = wrapVisualText(context, text, width);
+  for (let index = 0; index < lines.length; index += 1) {
+    const baseline = index * size * 1.2 + size;
+    if (baseline - size > height) break;
+    if (shadowColor) {
+      context.shadowColor = shadowColor;
+      context.shadowOffsetX = (style.shadowX ?? 2) * scale;
+      context.shadowOffsetY = (style.shadowY ?? 2) * scale;
+    }
+    if (strokeWidth > 0 && style.strokeColor) {
+      // The Rust pass dilates by the radius, so the visible rim is the radius
+      // wide; a canvas stroke straddles the edge, so it is doubled to match.
+      context.lineWidth = strokeWidth * 2;
+      context.lineJoin = 'round';
+      context.strokeStyle = style.strokeColor;
+      context.strokeText(lines[index], anchorX, baseline);
+    }
+    context.fillStyle = style.color || '#ffffff';
+    context.fillText(lines[index], anchorX, baseline);
+    context.shadowColor = 'transparent';
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+  }
+}
+
+function drawShapeContent(context, content, width, height, scale) {
+  const stroke = content.stroke || '#ffffff';
+  const strokeWidth = Math.max(0, (content.strokeWidth ?? 4) * scale);
+  const kind = content.shape || 'rectangle';
+  if (kind === 'line') {
+    // A line is all stroke: a bar through the middle, plus the arrow heads.
+    // Nothing is drawn at width zero, the same rule the Rust rasterizer has.
+    if (strokeWidth <= 0) return;
+    const middle = height / 2;
+    const half = strokeWidth / 2;
+    const arrow = Math.max(strokeWidth * 1.5, 8);
+    context.fillStyle = stroke;
+    context.fillRect(half, middle - half, Math.max(0, width - strokeWidth), strokeWidth);
+    const head = (tipX, direction) => {
+      context.beginPath();
+      context.moveTo(tipX, middle);
+      context.lineTo(tipX + direction * arrow, middle - arrow * 0.65);
+      context.lineTo(tipX + direction * arrow, middle + arrow * 0.65);
+      context.closePath();
+      context.fill();
+    };
+    if (content.startArrow) head(0, 1);
+    if (content.endArrow) head(width, -1);
+    return;
+  }
+  context.beginPath();
+  if (kind === 'ellipse') {
+    context.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+  } else {
+    const radius = Math.min(Math.max(0, (content.cornerRadius ?? 0) * scale), Math.min(width, height) / 2);
+    context.roundRect(0, 0, width, height, radius);
+  }
+  context.fillStyle = content.fill || '#4f8cffcc';
+  context.fill();
+  if (strokeWidth > 0) {
+    // The Rust outline is a band half the width lying inside the edge, so the
+    // stroke is clipped to the shape — which throws away its outer half and
+    // leaves the same half-width rim.
+    context.save();
+    context.clip();
+    context.lineWidth = strokeWidth;
+    context.strokeStyle = stroke;
+    context.stroke();
+    context.restore();
+  }
+}
+
 function beginVisualDrag(event) {
   if (event.button !== 0 || preview.isPlaying()) return false;
   const point = projectPointAt(event);
@@ -1138,6 +1357,10 @@ function updateVisualDrag(event) {
   const item = selectedVisualItem();
   if (item) item.transform = visualDrag.next;
   renderStageOverlay();
+  // The page's own copy of the layer moves with the handles. Without this the
+  // dashed box slides away from the shape it is supposed to be around, until
+  // the drag ends and the redraw catches up.
+  drawStageVisuals();
 }
 
 async function endVisualDrag(event) {
@@ -1156,6 +1379,7 @@ function cancelVisualDrag() {
   if (item) item.transform = visualDrag.initial;
   visualDrag = null;
   renderStageOverlay();
+  drawStageVisuals();
 }
 
 function closeTimelineContextMenu() {
@@ -1222,32 +1446,31 @@ function addMarker(frame = Math.round(preview.position())) {
   return edit({ op: 'addMarker', frame, name: '', color: '#e6a700' });
 }
 
-async function addText() {
+/** The video track a new text or shape lands on: the one it was dropped on,
+ *  else the targeted track, else the first video track. */
+function visualTargetTrack(placement) {
+  if (placement) {
+    const track = L.findTrack(state.project, placement.trackId);
+    return track && track.kind === 'video' ? track : null;
+  }
   const target = state.targetTrackId && L.findTrack(state.project, state.targetTrackId);
-  const track = target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
+  return target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
+}
+
+/** Add a visual item and select what Rust made of it. `placement` is
+ *  `{ trackId, frame }` from a drop; without one the item lands on the
+ *  targeted track at the playhead. */
+async function addVisualItem(placement, content, transform) {
+  const track = visualTargetTrack(placement);
   if (!track) return;
   const known = new Set((track.visualItems || []).map((item) => item.id));
   await edit({
     op: 'addVisualItem',
     trackId: track.id,
-    content: {
-      kind: 'text',
-      text: 'Title',
-      style: {
-        fontFamily: 'sans-serif', fontSize: 64, color: '#ffffff', align: 'center',
-        strokeColor: '', strokeWidth: 0, shadowColor: '#00000080', shadowX: 2, shadowY: 2,
-      },
-    },
-    start: Math.round(preview.position()),
-    duration: Math.max(Math.round(T.rateToNumber(rate()) * 5), 1),
-    transform: {
-      x: state.project.settings.width * 0.1,
-      y: state.project.settings.height * 0.12,
-      width: state.project.settings.width * 0.8,
-      height: state.project.settings.height * 0.2,
-      rotation: 0,
-      opacity: 1,
-    },
+    content,
+    start: placement ? Math.round(placement.frame) : Math.round(preview.position()),
+    duration: L.defaultVisualItemFrames(rate()),
+    transform: { ...transform, rotation: 0, opacity: 1 },
     zIndex: 0,
   });
   const liveTrack = L.findTrack(state.project, track.id);
@@ -1255,33 +1478,32 @@ async function addText() {
   if (item) selectVisualItem(item.id);
 }
 
-async function addShape() {
-  const target = state.targetTrackId && L.findTrack(state.project, state.targetTrackId);
-  const track = target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
-  if (!track) return;
-  const known = new Set((track.visualItems || []).map((item) => item.id));
-  await edit({
-    op: 'addVisualItem',
-    trackId: track.id,
-    content: {
-      kind: 'shape', shape: 'rectangle', fill: '#4f8cffcc', stroke: '#ffffff',
-      strokeWidth: 4, cornerRadius: 20, startArrow: false, endArrow: false,
+function addText(placement) {
+  return addVisualItem(placement, {
+    kind: 'text',
+    text: 'Title',
+    style: {
+      fontFamily: 'sans-serif', fontSize: 64, color: '#ffffff', align: 'center',
+      strokeColor: '', strokeWidth: 0, shadowColor: '#00000080', shadowX: 2, shadowY: 2,
     },
-    start: Math.round(preview.position()),
-    duration: Math.max(Math.round(T.rateToNumber(rate()) * 5), 1),
-    transform: {
-      x: state.project.settings.width * 0.3,
-      y: state.project.settings.height * 0.3,
-      width: state.project.settings.width * 0.4,
-      height: state.project.settings.height * 0.25,
-      rotation: 0,
-      opacity: 1,
-    },
-    zIndex: 0,
+  }, {
+    x: state.project.settings.width * 0.1,
+    y: state.project.settings.height * 0.12,
+    width: state.project.settings.width * 0.8,
+    height: state.project.settings.height * 0.2,
   });
-  const liveTrack = L.findTrack(state.project, track.id);
-  const item = (liveTrack && liveTrack.visualItems || []).find((entry) => !known.has(entry.id));
-  if (item) selectVisualItem(item.id);
+}
+
+function addShape(placement) {
+  return addVisualItem(placement, {
+    kind: 'shape', shape: 'rectangle', fill: '#4f8cffcc', stroke: '#ffffff',
+    strokeWidth: 4, cornerRadius: 20, startArrow: false, endArrow: false,
+  }, {
+    x: state.project.settings.width * 0.3,
+    y: state.project.settings.height * 0.3,
+    width: state.project.settings.width * 0.4,
+    height: state.project.settings.height * 0.25,
+  });
 }
 
 async function addSubtitle() {
@@ -1330,15 +1552,28 @@ function preserveAlpha(color, previous) {
   return `${color}${alpha}`;
 }
 
-function renderTextInspector() {
+/** The inspector beside the preview. One switch over what is selected: a text,
+ *  shape or subtitle layer, else the selected clip, else the empty hint. */
+function renderInspector() {
   const item = selectedVisualItem();
   const text = item && item.content && item.content.kind === 'text' ? item.content : null;
   const shape = item && item.content && item.content.kind === 'shape' ? item.content : null;
   const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
   const subtitle = track && track.kind === 'subtitle';
+  const clip = !item && liveSelection() ? L.findClip(state.project, liveSelection()) : null;
   dom.textPanel.hidden = !text || subtitle;
   dom.subtitlePanel.hidden = !text || !subtitle;
   dom.shapePanel.hidden = !shape;
+  dom.clipPanel.hidden = !clip;
+  dom.inspectorEmpty.hidden = Boolean(item || clip);
+  if (clip) {
+    const asset = L.findAsset(state.project, clip.clip.assetId);
+    dom.clipSummary.textContent = `${asset ? asset.name || baseName(asset.path) : 'missing file'} · ${clip.track.name}`;
+    dom.clipOpacityRow.hidden = clip.track.kind !== 'video';
+    dom.clipVolumeRow.hidden = Boolean(asset) && asset.kind === 'image';
+    dom.clipOpacity.value = String(clip.clip.opacity ?? 1);
+    dom.clipVolume.value = String(clip.clip.volume ?? 1);
+  }
   if (shape) {
     dom.shapeKind.value = shape.shape || 'rectangle';
     dom.shapeFill.value = hexColor(shape.fill, '#4f8cff');
@@ -1443,10 +1678,33 @@ function updateSelectedText() {
     .catch((error) => reportError(error, 'text:edit'));
 }
 
+async function removeSelectedVisualItem() {
+  const item = selectedVisualItem();
+  if (!item) return;
+  const done = await edit({ op: 'removeVisualItem', itemId: item.id });
+  if (done) selectVisualItem(null);
+}
+
+/** The clip inspector's two sliders. One command with both values: Rust takes
+ *  either as optional, and sending both keeps this one function. */
+function updateSelectedClipGain() {
+  const clipId = liveSelection();
+  if (!clipId) return;
+  edit({
+    op: 'setClipGain',
+    clipId,
+    opacity: Math.max(0, Math.min(1, Number(dom.clipOpacity.value) || 0)),
+    volume: Math.max(0, Math.min(1, Number(dom.clipVolume.value) || 0)),
+  }).catch((error) => reportError(error, 'clip:gain'));
+}
+
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
  *  way the timeline used to avoid on purpose, because until now there was no
  *  way back from it. */
 async function deleteSelected(ripple) {
+  // Selections are exclusive, so a selected layer is the thing the user is
+  // looking at; a gap cannot ripple behind one, so both buttons remove it.
+  if (selectedVisualItem()) return removeSelectedVisualItem();
   const clipId = liveSelection();
   if (!clipId) return;
   // edit() answers null when the edit was refused. The empty array a delete
@@ -1615,6 +1873,149 @@ function endClipDrag() {
           frame: current.nextEdge,
         }
   );
+}
+
+// --- dragging text and shape layers on the timeline -------------------------
+
+let visualTimingDrag = null;
+
+function beginVisualItemDrag(event, node) {
+  if (event.button !== 0) return;
+  const found = L.findVisualItem(state.project, node.dataset.visualItemId);
+  if (!found) return;
+  selectVisualItem(found.item.id);
+  const box = node.getBoundingClientRect();
+  const offsetX = event.clientX - box.left;
+  const mode =
+    offsetX <= HANDLE_PX ? 'trim-start' : offsetX >= box.width - HANDLE_PX ? 'trim-end' : 'move';
+  visualTimingDrag = {
+    mode,
+    itemId: found.item.id,
+    node,
+    grabFrames: L.pxToFrames(offsetX, rate(), state.pxPerSecond),
+    nextStart: found.item.start,
+    nextEnd: found.item.start + found.item.duration,
+    moved: false,
+  };
+  document.body.classList.add(mode === 'move' ? 'dragging' : 'trimming');
+  event.preventDefault();
+}
+
+function updateVisualItemDrag(event) {
+  const current = visualTimingDrag;
+  const pointer = frameAtClientX(event.clientX);
+  const tolerance = snapTolerance();
+  const duration = current.nextEnd - current.nextStart;
+  if (current.mode === 'move') {
+    const wanted = Math.max(0, pointer - current.grabFrames);
+    current.nextStart = L.snapClipStart(state.project, wanted, duration, tolerance, {
+      extra: [preview.position()],
+    });
+    current.nextEnd = current.nextStart + duration;
+    current.node.style.left = `${L.framesToPx(current.nextStart, rate(), state.pxPerSecond)}px`;
+  } else {
+    const snapped = L.snapTime(state.project, pointer, tolerance, { extra: [preview.position()] });
+    if (current.mode === 'trim-start') {
+      current.nextStart = Math.max(0, Math.min(snapped, current.nextEnd - 1));
+      current.node.style.left = `${L.framesToPx(current.nextStart, rate(), state.pxPerSecond)}px`;
+    } else {
+      current.nextEnd = Math.max(current.nextStart + 1, snapped);
+    }
+    const width = L.framesToPx(current.nextEnd - current.nextStart, rate(), state.pxPerSecond);
+    current.node.style.width = `${Math.max(2, width)}px`;
+  }
+  current.moved = true;
+}
+
+function endVisualItemDrag() {
+  const current = visualTimingDrag;
+  visualTimingDrag = null;
+  document.body.classList.remove('dragging', 'trimming');
+  if (!current) return;
+  if (!current.moved) {
+    renderTimeline();
+    return;
+  }
+  return edit({
+    op: 'setVisualTiming',
+    itemId: current.itemId,
+    start: current.nextStart,
+    duration: current.nextEnd - current.nextStart,
+  });
+}
+
+// --- dragging the toolbar's Text and Shape buttons onto a track --------------
+
+let toolDrag = null;
+/** Set for the moment between a dragged release and the click the browser
+ *  sends after it. Read and reset by the buttons' own click handlers. */
+let toolDragJustEnded = false;
+
+function tookToolDragClick() {
+  const dragged = toolDragJustEnded;
+  toolDragJustEnded = false;
+  return dragged;
+}
+
+/** The + Text and + Shape buttons drag like assets do: pointer events, a
+ *  ghost, and a lane that lights up. A plain click never grows a ghost, ends
+ *  here doing nothing, and the button's own click handler adds the layer at
+ *  the playhead as before. */
+function beginToolDrag(event, kind) {
+  if (event.button !== 0) return;
+  toolDrag = { kind, startX: event.clientX, startY: event.clientY, ghost: null, dragged: false };
+}
+
+/** Put the page back and report the drag, if it had got as far as a ghost.
+ *
+ *  Every way a drag can end comes through here — the pointer coming up, the
+ *  sequence being cancelled, the window losing focus mid-drag — so a ghost is
+ *  never left stuck to a cursor with no button held. Without it the next
+ *  release over a lane would add a layer nobody asked for. */
+function clearToolDrag() {
+  const current = toolDrag;
+  toolDrag = null;
+  if (!current || !current.ghost) return null;
+  current.ghost.remove();
+  document.body.classList.remove('dragging');
+  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+  return current;
+}
+
+function updateToolDrag(event) {
+  if (!toolDrag.ghost) {
+    const travelled =
+      Math.abs(event.clientX - toolDrag.startX) + Math.abs(event.clientY - toolDrag.startY);
+    if (travelled < 4) return;
+    toolDrag.ghost = document.createElement('div');
+    toolDrag.ghost.className = 'drag-ghost';
+    toolDrag.ghost.textContent = toolDrag.kind === 'text' ? 'Text' : 'Shape';
+    document.body.appendChild(toolDrag.ghost);
+    document.body.classList.add('dragging');
+  }
+  toolDrag.ghost.style.left = `${event.clientX + 12}px`;
+  toolDrag.ghost.style.top = `${event.clientY + 12}px`;
+  const lane = laneAtPoint(event.clientX, event.clientY);
+  const track = lane && L.findTrack(state.project, lane.dataset.trackId);
+  const accepts = Boolean(track && track.kind === 'video');
+  for (const node of dom.lanes.querySelectorAll('.lane')) {
+    node.classList.toggle('drop-target', node === lane && accepts);
+  }
+}
+
+async function endToolDrag(event) {
+  const current = clearToolDrag();
+  if (!current) return;
+  // A drag that grew a ghost is never also a click, even when it ends back on
+  // the button — the browser fires one anyway, and without this the cancelled
+  // drag would add a layer at the playhead.
+  toolDragJustEnded = true;
+  const lane = laneAtPoint(event.clientX, event.clientY);
+  const track = lane && L.findTrack(state.project, lane.dataset.trackId);
+  if (!track || track.kind !== 'video') return;
+  const frame = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
+  const add = current.kind === 'text' ? addText : addShape;
+  await add({ trackId: track.id, frame });
 }
 
 // --- scrubbing -------------------------------------------------------------
@@ -2313,6 +2714,11 @@ async function attachMonitor(restart) {
   await preview.attach();
   updateToolWarning();
   updateMonitorZoomUi();
+  // Which engine is running decides who draws the text and shape layers, and
+  // the answer only arrives here. Switching to the media elements has to put
+  // the page's own copy back on the stage; switching away has to take it off.
+  drawStageVisuals();
+  scheduleExactFrame();
   // The note carries the fallback reason when a monitor refused to start, and
   // that is only known once the attach has answered.
   el('as-compositor-note').textContent = compositorNote(state.settings.compositor);
@@ -2480,8 +2886,14 @@ function wireAssets() {
     if (assetDrag) updateAssetDrag(event);
   });
   window.addEventListener('pointerup', endAssetDrag);
-  window.addEventListener('pointercancel', clearAssetDrag);
-  window.addEventListener('blur', clearAssetDrag);
+  window.addEventListener('pointercancel', () => {
+    clearAssetDrag();
+    clearToolDrag();
+  });
+  window.addEventListener('blur', () => {
+    clearAssetDrag();
+    clearToolDrag();
+  });
 }
 
 function wireTimeline() {
@@ -2496,8 +2908,16 @@ function wireTimeline() {
   dom.btnDelete.addEventListener('click', () => deleteSelected(false));
   dom.btnRipple.addEventListener('click', () => deleteSelected(true));
   dom.btnLink.addEventListener('click', toggleClipLink);
-  dom.btnAddText.addEventListener('click', addText);
-  dom.btnAddShape.addEventListener('click', addShape);
+  // Wrapped so the click event never arrives as a placement, and skipped
+  // entirely when it is the click that follows a drag.
+  dom.btnAddText.addEventListener('click', () => {
+    if (!tookToolDragClick()) addText();
+  });
+  dom.btnAddShape.addEventListener('click', () => {
+    if (!tookToolDragClick()) addShape();
+  });
+  dom.btnAddText.addEventListener('pointerdown', (event) => beginToolDrag(event, 'text'));
+  dom.btnAddShape.addEventListener('pointerdown', (event) => beginToolDrag(event, 'shape'));
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
@@ -2579,11 +2999,13 @@ function wireTimeline() {
   for (const input of [dom.subtitleFont, dom.subtitleSize, dom.subtitleColor]) {
     input.addEventListener('change', updateSubtitleStyle);
   }
+  for (const input of [dom.clipOpacity, dom.clipVolume]) {
+    input.addEventListener('change', updateSelectedClipGain);
+  }
   dom.lanes.addEventListener('pointerdown', (event) => {
-    const subtitle = event.target.closest('[data-subtitle-item-id]');
-    if (subtitle) {
-      selectVisualItem(subtitle.dataset.subtitleItemId);
-      event.preventDefault();
+    const visual = event.target.closest('[data-visual-item-id]');
+    if (visual) {
+      beginVisualItemDrag(event, visual);
       return;
     }
     const clip = event.target.closest('.clip');
@@ -2592,10 +3014,19 @@ function wireTimeline() {
       return;
     }
     selectClip(null);
+    selectVisualItem(null);
     beginScrub(event);
   });
   dom.lanes.addEventListener('contextmenu', (event) => {
     event.preventDefault();
+    const visual = event.target.closest('[data-visual-item-id]');
+    if (visual) {
+      selectVisualItem(visual.dataset.visualItemId);
+      openTimelineContextMenu(event, [
+        { label: 'Delete Layer', run: () => removeSelectedVisualItem() },
+      ]);
+      return;
+    }
     const clip = event.target.closest('.clip');
     if (clip) {
       selectClip(clip.dataset.clipId);
@@ -2625,10 +3056,16 @@ function wireTimeline() {
 
   window.addEventListener('pointermove', (event) => {
     if (drag) updateClipDrag(event);
+    else if (visualTimingDrag) updateVisualItemDrag(event);
+    else if (toolDrag) updateToolDrag(event);
     else if (scrubbing) scrubTo(event.clientX);
   });
-  window.addEventListener('pointerup', () => {
+  window.addEventListener('pointerup', (event) => {
     if (drag) endClipDrag();
+    if (visualTimingDrag) endVisualItemDrag();
+    if (toolDrag) {
+      endToolDrag(event).catch((error) => reportError(error, 'tool-drop'));
+    }
     if (scrubbing) {
       scrubbing = false;
       preview.setScrubbing(false);
@@ -3001,6 +3438,21 @@ async function boot() {
     dom.toolWarning.textContent = 'Initialization failed';
     dom.toolWarning.title = 'Open Settings to inspect the error log location';
   }
+
+  // The system's font families, for the text inspectors' pickers. Off the
+  // boot path on purpose: reading every font file's name takes long enough to
+  // notice, and nothing before the first font edit needs the list.
+  Promise.resolve(window.api.listFonts())
+    .then((families) => {
+      if (!dom.fontOptions || !Array.isArray(families)) return;
+      dom.fontOptions.textContent = '';
+      for (const family of families) {
+        const option = document.createElement('option');
+        option.value = family;
+        dom.fontOptions.appendChild(option);
+      }
+    })
+    .catch(() => {});
 
   if (state.boot.qualityProject && state.boot.qualityReport) {
     window.setTimeout(async () => {

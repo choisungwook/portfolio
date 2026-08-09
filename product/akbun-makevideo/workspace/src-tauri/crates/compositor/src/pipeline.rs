@@ -200,19 +200,9 @@ where
             }
         };
 
-        let visual = crate::text::layers_at(project, frame.frame, width, height);
-        let mut layers: Vec<(Source<'_>, Draw)> = frame.sources();
-        layers.extend(visual.iter().map(|layer| {
-            (
-                Source {
-                    rgba: &layer.pixels,
-                    width: layer.width,
-                    height: layer.height,
-                    lut: None,
-                },
-                layer.placement,
-            )
-        }));
+        // Text and shape items are already in the frame — FrameSource puts
+        // them there, so playback and this export composite the same picture.
+        let layers: Vec<(Source<'_>, Draw)> = frame.sources();
         let picture = match compositor.compose(width, height, &layers) {
             Ok(picture) => picture,
             Err(error) => {

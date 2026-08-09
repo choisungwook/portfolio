@@ -59,6 +59,7 @@ pub fn run() {
             commands::bootstrap,
             commands::graphics_devices,
             commands::font_available,
+            commands::list_fonts,
             commands::validate_lut,
             commands::save_settings,
             commands::report_error,

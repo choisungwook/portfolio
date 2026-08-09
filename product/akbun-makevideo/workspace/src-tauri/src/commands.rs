@@ -27,7 +27,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -683,6 +683,12 @@ pub fn bootstrap(app: AppHandle, state: State<AppState>) -> Bootstrap {
 #[tauri::command]
 pub fn font_available(family: String) -> bool {
     makevideo_compositor::text::font_available(&family)
+}
+
+/// Every installed font family, for the text inspector's picker.
+#[tauri::command]
+pub fn list_fonts() -> Vec<String> {
+    makevideo_compositor::text::font_families()
 }
 
 #[tauri::command]
@@ -1786,6 +1792,63 @@ impl Route {
 /// Starts a render and returns as soon as it is under way. Progress arrives as
 /// `render:progress` events and the outcome as one `render:done`.
 ///
+/// The rasterized text and shape stills for one render. The directory lives
+/// exactly as long as this value: dropping it — after the last route, or on
+/// the error path before any — removes the files.
+struct VisualStills {
+    dir: PathBuf,
+    inputs: Vec<ffmpeg::VisualInput>,
+}
+
+impl Drop for VisualStills {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// Rasterize every text and shape item at the output size and write each as a
+/// PAM still for the filter graph to overlay. None when the project has no
+/// visual items, which is also no temp directory.
+fn write_visual_stills(
+    project: &Project,
+    preset: ffmpeg::Preset,
+) -> Result<Option<VisualStills>, String> {
+    let (width, height) = ffmpeg::output_size(&project.settings, preset);
+    let rasters = makevideo_compositor::text::item_rasters(project, width, height);
+    if rasters.is_empty() {
+        return Ok(None);
+    }
+    // A counter beside the pid, because two renders from one app run must not
+    // share a directory the first one deletes.
+    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "akbun-makevideo-visuals-{}-{}",
+        std::process::id(),
+        SEQUENCE.fetch_add(1, Ordering::SeqCst)
+    ));
+    std::fs::create_dir_all(&dir)
+        .map_err(|error| format!("cannot prepare the text and shape overlays: {error}"))?;
+    // Built before the writes, so a failed write still removes the directory.
+    let mut stills = VisualStills {
+        dir,
+        inputs: Vec::new(),
+    };
+    for (index, raster) in rasters.iter().enumerate() {
+        let path = stills.dir.join(format!("visual-{index}.pam"));
+        makevideo_compositor::text::write_pam(&path, &raster.pixels, raster.width, raster.height)
+            .map_err(|error| format!("cannot write a text and shape overlay: {error}"))?;
+        stills.inputs.push(ffmpeg::VisualInput {
+            path: path.to_string_lossy().into_owned(),
+            x: raster.x,
+            y: raster.y,
+            opacity: raster.opacity,
+            start_frame: raster.start_frame,
+            end_frame: raster.end_frame,
+        });
+    }
+    Ok(Some(stills))
+}
+
 /// Everything that can fail on a bad project is built here, synchronously, so
 /// the dialog never opens on a render that was never going to start. Each route
 /// is then tried in turn: anything that fails without being cancelled falls
@@ -1834,25 +1897,43 @@ pub fn start_render(
         Some(settings_compositor(&state, &settings))
     };
 
+    // The graph routes cannot draw text, so each visual item is rasterized
+    // once — the same pixels the compositor composites — and handed to the
+    // graph as an overlay input. Written even when the composited route goes
+    // first: the fallback runs after a failure, which is the wrong moment to
+    // start writing files.
+    let visual_dir = write_visual_stills(&project, preset)?;
+    let visuals = visual_dir
+        .as_ref()
+        .map(|prepared| prepared.inputs.clone())
+        .unwrap_or_default();
+
     let mut routes: Vec<Route> = Vec::new();
-    if let Some(gpu) = gpu.as_ref() {
-        // Validated now so a broken project fails before the sheet opens.
-        ffmpeg::encoder_args(&project, &path, preset, chosen.as_ref())?;
-        routes.push(Route::Composited {
-            label: format!("{} compositor, {accel_label} encoder", gpu.adapter()),
-            accel: chosen.clone(),
-        });
-    } else if let Some(hardware) = chosen.as_ref() {
+    let built = (|| -> Result<(), String> {
+        if let Some(gpu) = gpu.as_ref() {
+            // Validated now so a broken project fails before the sheet opens.
+            ffmpeg::encoder_args(&project, &path, preset, chosen.as_ref())?;
+            routes.push(Route::Composited {
+                label: format!("{} compositor, {accel_label} encoder", gpu.adapter()),
+                accel: chosen.clone(),
+            });
+        } else if let Some(hardware) = chosen.as_ref() {
+            routes.push(Route::Graph {
+                label: format!("ffmpeg filter graph, {accel_label} encoder"),
+                args: ffmpeg::build_args(&project, &path, preset, Some(hardware), &visuals)?,
+            });
+        }
+        let plain = ffmpeg::build_args(&project, &path, preset, None, &visuals)?;
         routes.push(Route::Graph {
-            label: format!("ffmpeg filter graph, {accel_label} encoder"),
-            args: ffmpeg::build_args(&project, &path, preset, Some(hardware))?,
+            label: "ffmpeg filter graph, CPU encoder".into(),
+            args: plain,
         });
+        Ok(())
+    })();
+    if let Err(error) = built {
+        drop(visual_dir);
+        return Err(error);
     }
-    let plain = ffmpeg::build_args(&project, &path, preset, None)?;
-    routes.push(Route::Graph {
-        label: "ffmpeg filter graph, CPU encoder".into(),
-        args: plain,
-    });
 
     state.cancelled.store(false, Ordering::SeqCst);
     let shared = Arc::clone(&state.render);
@@ -1860,6 +1941,9 @@ pub fn start_render(
     let document = Arc::clone(&state.document);
 
     std::thread::spawn(move || {
+        // Holds the overlay stills on disk until the last route has run; the
+        // fallback route reads them minutes after the render started.
+        let _visual_dir = visual_dir;
         let mut fell_back = false;
         let mut used = String::new();
         let mut outcome = Attempt::Failed("no route was tried".into());

@@ -148,6 +148,22 @@ pub fn target_bitrate_kbps(width: u32, height: u32, rate: Rate) -> u32 {
     (raw.round() as u32).clamp(2_000, 80_000)
 }
 
+/// A rasterized text or shape layer as an extra graph input: a still image
+/// file, where it sits on the output frame, and the frames it covers.
+///
+/// The compositor rasterizes these — the same pixels the composited route
+/// composites — so the graph render burns the same picture in rather than
+/// approximating it with drawtext. The graph only overlays.
+#[derive(Debug, Clone)]
+pub struct VisualInput {
+    pub path: String,
+    pub x: i32,
+    pub y: i32,
+    pub opacity: f32,
+    pub start_frame: i64,
+    pub end_frame: i64,
+}
+
 /// The full argv after the program name.
 ///
 /// `accel` is the hardware path confirmed by `accel::candidates` plus a trial
@@ -159,6 +175,7 @@ pub fn build_args(
     output: &str,
     preset: Preset,
     accel: Option<&Acceleration>,
+    visuals: &[VisualInput],
 ) -> Result<Vec<String>, String> {
     let rate = project.rate();
     let duration = project.duration();
@@ -209,6 +226,17 @@ pub fn build_args(
         args.extend(["-i".into(), item.path.to_string()]);
     }
 
+    // The visual stills come after every clip input, so a clip's input index
+    // is unchanged whether or not the project has any text on it.
+    for visual in visuals {
+        args.extend(["-loop".into(), "1".into()]);
+        args.extend(["-framerate".into(), fps.clone()]);
+        // Frames until the item's own end: overlay stops drawing a secondary
+        // input that has ended, and enable= only hides, it does not feed.
+        args.extend(["-t".into(), secs(layout::frame_time(visual.end_frame, rate))]);
+        args.extend(["-i".into(), visual.path.clone()]);
+    }
+
     let mut chains: Vec<String> = Vec::new();
 
     // The base is what fixes the output length and the frame rate; every clip
@@ -249,6 +277,28 @@ pub fn build_args(
         ));
         last_video = format!("ov{layer}");
         layer += 1;
+    }
+
+    // Text and shape layers go over every clip, which is where the composited
+    // route puts them too. Each still is already at output resolution and at
+    // its own size, so the chain is placement and timing, no scaling.
+    for (offset, visual) in visuals.iter().enumerate() {
+        let input = items.len() + offset;
+        let start = secs(layout::frame_time(visual.start_frame, rate));
+        let end = secs(layout::frame_time(visual.end_frame, rate));
+        let opacity = if visual.opacity < 1.0 {
+            format!(",colorchannelmixer=aa={:.3}", visual.opacity.max(0.0))
+        } else {
+            String::new()
+        };
+        chains.push(format!(
+            "[{input}:v]format=yuva420p,fps={fps},setpts=PTS-STARTPTS{opacity}[g{offset}]"
+        ));
+        chains.push(format!(
+            "[{last_video}][g{offset}]overlay=x={}:y={}:eof_action=pass:enable='between(t,{start},{end})'[ovg{offset}]",
+            visual.x, visual.y
+        ));
+        last_video = format!("ovg{offset}");
     }
     chains.push(format!("[{last_video}]format=yuv420p[vout]"));
 
@@ -763,12 +813,12 @@ mod tests {
             tracks: vec![track("V1", TrackKind::Video, vec![])],
             markers: Vec::new(),
         };
-        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None).is_err());
+        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).is_err());
     }
 
     #[test]
     fn a_clip_seeks_its_in_point_and_takes_its_own_length() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let text = joined(&args);
         assert!(
             text.contains("-ss 1.000000 -t 3.000000 -i /media/a1.mp4"),
@@ -779,7 +829,7 @@ mod tests {
 
     #[test]
     fn the_clip_lands_at_its_timeline_position() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let filter = filter_of(&args);
         assert!(filter.contains("tpad=start_duration=2.000000"), "{filter}");
         assert!(
@@ -788,9 +838,63 @@ mod tests {
         );
     }
 
+    /// The graph route burns text and shapes in from rasterized stills. The
+    /// still is an extra input above every clip; without this the CPU render
+    /// and the fallback silently dropped every layer the preview showed.
+    #[test]
+    fn a_visual_still_is_overlaid_above_every_clip_for_its_frames() {
+        let visuals = [VisualInput {
+            path: "/tmp/title-0.pam".into(),
+            x: 96,
+            y: 54,
+            opacity: 1.0,
+            start_frame: 90,
+            end_frame: 120,
+        }];
+        let args =
+            build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &visuals).unwrap();
+        let text = joined(&args);
+        // A looped still that lives until its own end, like an image clip.
+        assert!(
+            text.contains("-loop 1 -framerate 30 -t 4.000000 -i /tmp/title-0.pam"),
+            "{text}"
+        );
+        let filter = filter_of(&args);
+        assert!(
+            filter.contains("overlay=x=96:y=54:eof_action=pass:enable='between(t,3.000000,4.000000)'"),
+            "{filter}"
+        );
+        // Above the clip layer, and the last thing before the output format.
+        assert!(filter.contains("[ov0][g0]"), "{filter}");
+        assert!(filter.contains("[ovg0]format=yuv420p[vout]"), "{filter}");
+        // Full opacity adds no mixer stage.
+        assert!(!filter.contains("colorchannelmixer"), "{filter}");
+    }
+
+    /// A translucent layer keeps its opacity through the same mixer stage a
+    /// translucent clip uses.
+    #[test]
+    fn a_translucent_visual_still_gets_an_alpha_mixer() {
+        let visuals = [VisualInput {
+            path: "/tmp/shape-0.pam".into(),
+            x: 0,
+            y: 0,
+            opacity: 0.5,
+            start_frame: 0,
+            end_frame: 30,
+        }];
+        let args =
+            build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &visuals).unwrap();
+        assert!(
+            filter_of(&args).contains("colorchannelmixer=aa=0.500"),
+            "{}",
+            filter_of(&args)
+        );
+    }
+
     #[test]
     fn the_base_runs_for_the_whole_timeline() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         assert!(filter_of(&args).contains("color=c=black:s=1920x1080:r=30:d=5.000000"));
         // The output is bounded too, so stray audio cannot run past the video.
         assert!(joined(&args).contains("-t 5.000000 -movflags"));
@@ -803,7 +907,7 @@ mod tests {
         // land on a slightly different frame than the timeline says.
         let mut project = one_video_project();
         project.settings.rate = Rate::ntsc(30);
-        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let filter = filter_of(&args);
         assert!(
             filter.contains("color=c=black:s=1920x1080:r=30000/1001"),
@@ -819,14 +923,14 @@ mod tests {
     fn a_silent_asset_produces_no_audio_output() {
         let mut project = one_video_project();
         project.assets[0].has_audio = false;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         assert!(!joined(&args).contains("[aout]"));
         assert!(!joined(&args).contains("-c:a"));
     }
 
     #[test]
     fn audio_is_delayed_by_a_sample_count_rather_than_a_millisecond_count() {
-        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let filter = filter_of(&args);
         // Two seconds at 48 kHz.
         assert!(filter.contains("adelay=96000S:all=1"), "{filter}");
@@ -838,7 +942,7 @@ mod tests {
     fn a_broadcast_rate_delays_audio_to_the_sample_the_picture_starts_on() {
         let mut project = one_video_project();
         project.settings.rate = Rate::ntsc(30);
-        let filter = filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
+        let filter = filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None, &[]).unwrap());
         // Frame 60 of 29.97 is 2.002 seconds, which is 96096 samples. In
         // milliseconds this was 2002 either way; the difference shows on the
         // frames whose time is not a whole number of them.
@@ -850,7 +954,7 @@ mod tests {
         let mut project = one_video_project();
         project.assets[0].kind = AssetKind::Image;
         project.assets[0].has_audio = false;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let text = joined(&args);
         assert!(
             text.contains("-loop 1 -framerate 30 -t 3.000000 -i"),
@@ -874,7 +978,7 @@ mod tests {
             ],
             markers: Vec::new(),
         };
-        let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap());
+        let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap());
         assert!(filter.contains("[base][v0]overlay"), "{filter}");
         assert!(filter.contains("[ov0][v1]overlay"), "{filter}");
         assert!(filter.contains("[ov1]format=yuv420p[vout]"), "{filter}");
@@ -884,14 +988,14 @@ mod tests {
     fn a_hidden_track_drops_out_of_the_render_entirely() {
         let mut project = one_video_project();
         project.tracks[0].hidden = true;
-        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None).is_err());
+        assert!(build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).is_err());
     }
 
     #[test]
     fn muting_a_video_track_keeps_its_picture() {
         let mut project = one_video_project();
         project.tracks[0].muted = true;
-        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         assert!(joined(&args).contains("-map [vout]"));
         assert!(!joined(&args).contains("[aout]"));
     }
@@ -909,7 +1013,7 @@ mod tests {
             )],
             markers: Vec::new(),
         };
-        let args = build_args(&project, "/out.mp4", Preset::Fhd, None).unwrap();
+        let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         let filter = filter_of(&args);
         assert!(!filter.contains("overlay"), "{filter}");
         assert!(filter.contains("[base]format=yuv420p[vout]"), "{filter}");
@@ -921,12 +1025,12 @@ mod tests {
     fn opacity_only_shows_up_when_it_is_not_full() {
         let mut project = one_video_project();
         assert!(
-            !filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap())
+            !filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None, &[]).unwrap())
                 .contains("colorchannelmixer")
         );
         project.tracks[0].clips[0].opacity = 0.5;
         assert!(
-            filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap())
+            filter_of(&build_args(&project, "/o.mp4", Preset::Fhd, None, &[]).unwrap())
                 .contains("colorchannelmixer=aa=0.500")
         );
     }
@@ -976,7 +1080,7 @@ mod tests {
     fn hardware_swaps_the_encoder_for_a_bitrate_target() {
         let hardware = videotoolbox();
         let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
         let text = joined(&args);
         assert!(text.contains("-c:v h264_videotoolbox"), "{text}");
         // -crf and -preset are libx264 options and would be silently ignored.
@@ -990,7 +1094,7 @@ mod tests {
     fn hardware_decode_is_asked_for_per_video_input() {
         let hardware = videotoolbox();
         let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
         assert!(joined(&args).contains("-hwaccel videotoolbox -ss 1.000000"));
     }
 
@@ -1000,7 +1104,7 @@ mod tests {
         project.assets[0].kind = AssetKind::Image;
         project.assets[0].has_audio = false;
         let hardware = videotoolbox();
-        let args = build_args(&project, "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        let args = build_args(&project, "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
         assert!(!joined(&args).contains("-hwaccel"), "{}", joined(&args));
     }
 
@@ -1012,7 +1116,7 @@ mod tests {
             label: "NVIDIA NVENC".into(),
         };
         let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
         let text = joined(&args);
         assert!(text.contains("-c:v h264_nvenc"), "{text}");
         assert!(!text.contains("-hwaccel"), "{text}");
@@ -1025,8 +1129,8 @@ mod tests {
         // This is what lets a failed hardware render be retried on the CPU by
         // re-running rather than by rebuilding the project.
         let hardware = videotoolbox();
-        let cpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None).unwrap();
-        let gpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware)).unwrap();
+        let cpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None, &[]).unwrap();
+        let gpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
         assert_eq!(filter_of(&cpu), filter_of(&gpu));
     }
 
@@ -1158,7 +1262,7 @@ mod tests {
     fn both_paths_encode_with_the_same_settings() {
         // The route the picture takes must not change what it is encoded as.
         let project = one_video_project();
-        let graph = joined(&build_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
+        let graph = joined(&build_args(&project, "/o.mp4", Preset::Fhd, None, &[]).unwrap());
         let piped = joined(&encoder_args(&project, "/o.mp4", Preset::Fhd, None).unwrap());
         for setting in [
             "-c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -r 30",
@@ -1226,7 +1330,7 @@ mod tests {
         let filter = filter_of(&args);
         // Character for character what build_args puts in the file, which is
         // what makes a difference in the samples a difference in the mixing.
-        let exported = filter_of(&build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None).unwrap());
+        let exported = filter_of(&build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None, &[]).unwrap());
         assert!(exported.contains("adelay=96000S:all=1"), "{exported}");
         assert!(filter.contains("adelay=96000S:all=1"), "{filter}");
         assert!(filter.contains("amix=inputs=1:normalize=0"), "{filter}");

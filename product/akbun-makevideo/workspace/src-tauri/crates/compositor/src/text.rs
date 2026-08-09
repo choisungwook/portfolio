@@ -29,7 +29,55 @@ static CACHE: OnceLock<Mutex<RasterCache>> = OnceLock::new();
 static FONT_DATABASE: OnceLock<Database> = OnceLock::new();
 static FONTS: OnceLock<Mutex<HashMap<String, Font>>> = OnceLock::new();
 
+/// One item's raster at the output size, with where it sits and the frames it
+/// covers. The pixels are the same ones `layers_at` composites — an item is
+/// static, so callers that composite over time (the filter-graph render) take
+/// one of these per item instead of one per frame.
+pub struct ItemRaster {
+    pub pixels: Arc<[u8]>,
+    pub width: u32,
+    pub height: u32,
+    pub x: i32,
+    pub y: i32,
+    pub opacity: f32,
+    pub start_frame: i64,
+    pub end_frame: i64,
+}
+
 pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<RasterLayer> {
+    each_visual_item(project, width, height, Some(frame))
+        .into_iter()
+        .map(|raster| RasterLayer {
+            pixels: raster.pixels,
+            width: raster.width,
+            height: raster.height,
+            placement: Placement {
+                dst: makevideo_render::layout::Rect {
+                    x: raster.x,
+                    y: raster.y,
+                    w: raster.width,
+                    h: raster.height,
+                },
+                opacity: raster.opacity,
+            },
+        })
+        .collect()
+}
+
+/// Every text and shape item in the project, rasterized once each.
+pub fn item_rasters(project: &Project, width: u32, height: u32) -> Vec<ItemRaster> {
+    each_visual_item(project, width, height, None)
+}
+
+/// The one walk both entry points share: tracks in project order, items in
+/// z order within a track, which is also the paint order. `at` narrows it to
+/// the items covering one frame.
+fn each_visual_item(
+    project: &Project,
+    width: u32,
+    height: u32,
+    at: Option<i64>,
+) -> Vec<ItemRaster> {
     let mut layers = Vec::new();
     let scale_x = width as f32 / project.settings.width.max(1) as f32;
     let scale_y = height as f32 / project.settings.height.max(1) as f32;
@@ -42,7 +90,7 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
         let mut items: Vec<_> = track
             .visual_items
             .iter()
-            .filter(|item| item.contains_frame(frame))
+            .filter(|item| at.is_none_or(|frame| item.contains_frame(frame)))
             .collect();
         items.sort_by_key(|item| item.z_index);
         for item in items {
@@ -94,23 +142,38 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
                 }
                 VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => continue,
             };
-            layers.push(RasterLayer {
+            layers.push(ItemRaster {
                 pixels,
                 width: item_width,
                 height: item_height,
-                placement: Placement {
-                    dst: makevideo_render::layout::Rect {
-                        x: (transform.x * scale_x).round() as i32,
-                        y: (transform.y * scale_y).round() as i32,
-                        w: item_width,
-                        h: item_height,
-                    },
-                    opacity: transform.opacity.clamp(0.0, 1.0),
-                },
+                x: (transform.x * scale_x).round() as i32,
+                y: (transform.y * scale_y).round() as i32,
+                opacity: transform.opacity.clamp(0.0, 1.0),
+                start_frame: item.start,
+                end_frame: item.end_frame(),
             });
         }
     }
     layers
+}
+
+/// Write an RGBA raster as a PAM still, for handing to ffmpeg as an overlay
+/// input. PAM because it is the alpha-capable still format that is a text
+/// header in front of the raw bytes — no encoder, no dependency.
+pub fn write_pam(
+    path: &std::path::Path,
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
+    write!(
+        file,
+        "P7\nWIDTH {width}\nHEIGHT {height}\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n"
+    )?;
+    file.write_all(pixels)?;
+    file.flush()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -196,6 +259,12 @@ fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Arc<[u8]> {
         return pixels;
     }
     let mut cache = cache.lock().unwrap();
+    // Checked again under the lock it inserts with. Playback and an export
+    // can miss the same key together, and inserting both would put the key in
+    // the eviction queue twice and count its bytes twice forever.
+    if let Some(existing) = cache.entries.get(key).cloned() {
+        return existing;
+    }
     while cache.bytes + pixels.len() > CACHE_LIMIT_BYTES {
         let Some(oldest) = cache.oldest.pop_front() else {
             break;
@@ -263,6 +332,20 @@ fn rasterize(text: &str, style: &TextStyle, width: u32, height: u32, scale: f32)
 pub fn font_available(family: &str) -> bool {
     let database = FONT_DATABASE.get_or_init(load_font_database);
     requested_font_id(database, family).is_some()
+}
+
+/// Every family the system offers, sorted and deduplicated, for the text
+/// inspector's font picker. Faces carry one entry per name variant; the first
+/// is the family name a CSS font stack and `requested_font_id` both accept.
+pub fn font_families() -> Vec<String> {
+    let database = FONT_DATABASE.get_or_init(load_font_database);
+    let mut families: Vec<String> = database
+        .faces()
+        .filter_map(|face| face.families.first().map(|(name, _)| name.clone()))
+        .collect();
+    families.sort();
+    families.dedup();
+    families
 }
 
 fn load_font(family: &str) -> Option<Font> {
@@ -355,6 +438,108 @@ fn draw_bitmap(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use makevideo_render::{
+        Project, ProjectSettings, Rate, ShapeKind as Shape, Track, TrackKind, VisualContent as Content,
+        VisualItem, VisualTransform, FORMAT_VERSION,
+    };
+
+    fn project_with_shape() -> Project {
+        Project {
+            version: FORMAT_VERSION,
+            settings: ProjectSettings {
+                width: 100,
+                height: 50,
+                rate: Rate::fps(30),
+            },
+            assets: Vec::new(),
+            markers: Vec::new(),
+            tracks: vec![Track {
+                id: "V1".into(),
+                kind: TrackKind::Video,
+                name: "V1".into(),
+                clips: Vec::new(),
+                visual_items: vec![VisualItem {
+                    id: "s1".into(),
+                    start: 30,
+                    duration: 60,
+                    z_index: 0,
+                    transform: VisualTransform {
+                        x: 10.0,
+                        y: 5.0,
+                        width: 40.0,
+                        height: 20.0,
+                        rotation: 0.0,
+                        opacity: 0.8,
+                    },
+                    content: Content::Shape {
+                        shape: Shape::Rectangle,
+                        fill: "#ff0000".into(),
+                        stroke: "#ffffff".into(),
+                        stroke_width: 1.0,
+                        corner_radius: 0.0,
+                        start_arrow: false,
+                        end_arrow: false,
+                    },
+                }],
+                subtitle_style: None,
+                muted: false,
+                hidden: false,
+            }],
+        }
+    }
+
+    /// One raster per item, scaled to the output, carrying its frame range —
+    /// what the filter-graph render overlays. The same walk answers
+    /// `layers_at`, so the per-frame and per-item views cannot disagree.
+    #[test]
+    fn an_item_rasterizes_once_with_its_place_and_frames() {
+        let project = project_with_shape();
+        let rasters = item_rasters(&project, 200, 100);
+        assert_eq!(rasters.len(), 1);
+        let raster = &rasters[0];
+        assert_eq!((raster.x, raster.y), (20, 10));
+        assert_eq!((raster.width, raster.height), (80, 40));
+        assert_eq!((raster.start_frame, raster.end_frame), (30, 90));
+        assert!((raster.opacity - 0.8).abs() < 1e-6);
+        assert_eq!(layers_at(&project, 30, 200, 100).len(), 1);
+        assert_eq!(layers_at(&project, 90, 200, 100).len(), 0);
+    }
+
+    #[test]
+    fn a_pam_still_is_the_header_and_the_raw_bytes() {
+        let dir = std::env::temp_dir().join(format!("makevideo-pam-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("still.pam");
+        write_pam(&path, &[1, 2, 3, 4, 5, 6, 7, 8], 2, 1).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let header = b"P7\nWIDTH 2\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n";
+        assert_eq!(&bytes[..header.len()], header);
+        assert_eq!(&bytes[header.len()..], &[1, 2, 3, 4, 5, 6, 7, 8]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The outline is a band **inside** the edge, half the stroke width wide.
+    /// The page's playback overlay draws the same rim by clipping a stroke of
+    /// the full width to the shape, and the two only match while this holds.
+    #[test]
+    fn a_shape_outline_is_a_band_half_the_stroke_width_inside_the_edge() {
+        let width = 40;
+        let pixels = rasterize_shape(
+            ShapeKind::Rectangle,
+            "#00000000",
+            "#ff0000",
+            8.0,
+            0.0,
+            false,
+            false,
+            width,
+            20,
+        );
+        let opaque_at = |x: u32| pixels[((10 * width + x) * 4 + 3) as usize] > 0;
+        assert!(opaque_at(0), "the edge itself is outlined");
+        assert!(opaque_at(3), "3px in is still inside a 4px rim");
+        assert!(!opaque_at(5), "5px in is past it, and the fill is transparent");
+    }
 
     #[test]
     fn colour_accepts_css_hex_with_alpha() {

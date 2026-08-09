@@ -155,6 +155,7 @@ if (!window.__TAURI__) {
     editState: async () => emptyDocument(),
     editApply: async () => emptyDocument(),
     fontAvailable: async () => true,
+    listFonts: async () => [],
     validateLut: unavailable,
     editUndo: async () => emptyDocument(),
     editRedo: async () => emptyDocument(),
@@ -327,6 +328,7 @@ window.api = {
   // user did, so it takes one press to take back.
   editApply: (commands) => invoke('edit_apply', { commands }),
   fontAvailable: (family) => invoke('font_available', { family }),
+  listFonts: () => invoke('list_fonts'),
   validateLut: (path) => invoke('validate_lut', { path }),
   editUndo: () => invoke('edit_undo'),
   editRedo: () => invoke('edit_redo'),
