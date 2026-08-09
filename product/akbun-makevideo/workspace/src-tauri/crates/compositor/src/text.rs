@@ -135,7 +135,7 @@ fn rasterize_shape(
             let (inside, outlined) = match shape {
                 ShapeKind::Rectangle => rounded_rectangle(point, width as f32, height as f32, corner_radius, edge),
                 ShapeKind::Ellipse => ellipse(point, width as f32, height as f32, edge),
-                ShapeKind::Line => line(point, width as f32, height as f32, edge.max(1.0), start_arrow, end_arrow),
+                ShapeKind::Line => line(point, width as f32, height as f32, edge, start_arrow, end_arrow),
             };
             if inside {
                 put_pixel(&mut pixels, width, x, y, if outlined { stroke } else { fill });
@@ -162,6 +162,9 @@ fn ellipse(point: (f32, f32), width: f32, height: f32, edge: f32) -> (bool, bool
 }
 
 fn line(point: (f32, f32), width: f32, height: f32, radius: f32, start_arrow: bool, end_arrow: bool) -> (bool, bool) {
+    if radius <= 0.0 {
+        return (false, false);
+    }
     let centre = height / 2.0;
     let body = (point.1 - centre).abs() <= radius && point.0 >= radius && point.0 <= width - radius;
     let arrow_size = (radius * 3.0).max(8.0);
@@ -387,5 +390,18 @@ mod tests {
         );
         assert_eq!(&line[(6 * 30) * 4..(6 * 30) * 4 + 4], &[255, 0, 0, 255]);
         assert_eq!(&line[(6 * 30 + 29) * 4..(6 * 30 + 29) * 4 + 4], &[255, 0, 0, 255]);
+
+        let no_stroke = rasterize_shape(
+            ShapeKind::Line,
+            "#00000000",
+            "#ff0000",
+            0.0,
+            0.0,
+            true,
+            true,
+            30,
+            12,
+        );
+        assert!(no_stroke.chunks_exact(4).all(|pixel| pixel[3] == 0));
     }
 }
