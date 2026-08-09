@@ -21,6 +21,7 @@ dependencies = [
 name = "akbun-makevideo"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "makevideo-audio",
  "makevideo-compositor",
  "makevideo-edit",
