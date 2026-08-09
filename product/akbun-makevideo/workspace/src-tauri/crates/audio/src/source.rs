@@ -883,6 +883,7 @@ pub(crate) mod tests {
             visual_items: Vec::new(),
             muted: false,
             hidden: false,
+            subtitle_style: None,
         }
     }
 
@@ -1414,6 +1415,7 @@ pub(crate) mod tests {
             visual_items: Vec::new(),
             muted: false,
             hidden: false,
+            subtitle_style: None,
         });
         project.assets.push(Asset {
             kind: AssetKind::Video,

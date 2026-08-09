@@ -106,6 +106,7 @@ fn audio_track(id: &str, clips: Vec<Clip>) -> Track {
         visual_items: Vec::new(),
         muted: false,
         hidden: false,
+        subtitle_style: None,
     }
 }
 
