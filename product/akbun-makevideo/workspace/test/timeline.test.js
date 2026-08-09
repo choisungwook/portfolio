@@ -284,3 +284,21 @@ test('a clip with nothing left of it has no negative length', () => {
   assert.strictEqual(L.clipDuration(clip('c1', 'v', 0, 30, 10)), 0);
   assert.strictEqual(L.clipEnd(clip('c1', 'v', 100, 30, 10)), 100);
 });
+
+test('a new text or shape layer runs four seconds of the project rate', () => {
+  assert.strictEqual(L.DEFAULT_VISUAL_ITEM_SECONDS, 4);
+  assert.strictEqual(L.defaultVisualItemFrames(T.fps(30)), 120);
+  // Rounded on a fractional rate, and never zero even on an absurd one.
+  assert.strictEqual(L.defaultVisualItemFrames({ num: 24000, den: 1001 }), 96);
+  assert.strictEqual(L.defaultVisualItemFrames({ num: 1, den: 100 }), 1);
+});
+
+test('a visual item is found with the track it rides on', () => {
+  const lane = track('t1', 'video', 'V1');
+  lane.visualItems = [{ id: 'title-1', start: 0, duration: 120, zIndex: 0, content: { kind: 'text', text: 'Hi' } }];
+  const project = projectOf([], [lane]);
+  const found = L.findVisualItem(project, 'title-1');
+  assert.strictEqual(found.track.id, 't1');
+  assert.strictEqual(found.item.id, 'title-1');
+  assert.strictEqual(L.findVisualItem(project, 'missing'), null);
+});

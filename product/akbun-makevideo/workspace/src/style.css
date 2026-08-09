@@ -18,6 +18,8 @@
   --clip-video-edge: #5b8def;
   --clip-audio: #d3efdd;
   --clip-audio-edge: #41a86a;
+  --clip-visual: #e4d8f8;
+  --clip-visual-edge: #9a79dd;
   --select: #f0a52f;
   --danger: #d0453b;
   --stage: #0b0b0d;
@@ -44,6 +46,8 @@
     --clip-video-edge: #5b8def;
     --clip-audio: #24412e;
     --clip-audio-edge: #4cb377;
+    --clip-visual: #3d3158;
+    --clip-visual-edge: #9a79dd;
     --select: #f0a52f;
     --danger: #e2695f;
     --stage: #000000;
@@ -293,6 +297,12 @@ select {
   min-height: 0;
 }
 
+/* `display: grid` below beats the `hidden` attribute's UA `display: none`,
+   so hidden has to win again explicitly or the panel is always on screen. */
+#debug-panel[hidden] {
+  display: none;
+}
+
 #debug-panel {
   position: fixed;
   z-index: 5;
@@ -332,7 +342,7 @@ select {
 
 #upper {
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 264px minmax(0, 1fr) 280px;
   min-height: 0;
   border-bottom: 1px solid var(--border);
 }
@@ -522,6 +532,18 @@ select {
 
 #stage-exact.on {
   display: block;
+}
+
+/* Text and shape layers during playback, drawn by the page. Under the exact
+   frame on purpose: the exact frame already contains them, composited by the
+   same Rust code the render uses. */
+#stage-visuals {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 55;
+  pointer-events: none;
 }
 
 #stage-overlay {
@@ -760,6 +782,55 @@ button.icon.on {
   clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
+/* --- inspector ----------------------------------------------------------- */
+
+#inspector-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+}
+
+#inspector-body {
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+#inspector-body h3 {
+  margin: 2px 0 10px;
+  font-size: 13px;
+}
+
+#inspector-body .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* The flex rule above beats the `hidden` attribute's UA display, the same trap
+   the debug panel fell into, so hidden has to win again explicitly. */
+#inspector-body .row[hidden] {
+  display: none;
+}
+
+#inspector-body .row.check {
+  justify-content: flex-start;
+}
+
+#inspector-body .row input[type='text'],
+#inspector-body .row input[type='number'],
+#inspector-body .row textarea,
+#inspector-body .row select,
+#inspector-body .row input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 168px;
+}
+
 #marker-panel {
   max-height: 160px;
   overflow: auto;
@@ -866,6 +937,23 @@ button.icon.on {
   color: #0f2a1a;
 }
 
+/* A text or shape layer on a video track: a band across the lower half of the
+   lane, so it never covers the clip underneath. Sharing the whole lane height
+   would put every layer over its clip's body and trim handles, and the clip
+   could then not be selected or trimmed at all where a layer sits. */
+.clip.visual {
+  top: 50%;
+  bottom: 3px;
+  background: var(--clip-visual);
+  border: 1px solid var(--clip-visual-edge);
+  color: #2a1c4e;
+  font-size: 10px;
+}
+
+.clip.visual .clip-name {
+  font-size: 10px;
+}
+
 .clip-waveform {
   position: absolute;
   inset: 50% 8px auto;
@@ -878,7 +966,8 @@ button.icon.on {
 
 @media (prefers-color-scheme: dark) {
   .clip.video,
-  .clip.audio {
+  .clip.audio,
+  .clip.visual {
     color: var(--fg);
   }
 }

@@ -29,6 +29,22 @@ const MAX_TRACKS_PER_KIND = 4;
 // the edit crate, which is the one that enforces it; this copy is what stops a
 // trim from *looking* as though it went further than it will be allowed to.
 const MIN_CLIP_SECONDS = 0.1;
+// How long a new text or shape layer runs before it is trimmed to taste.
+const DEFAULT_VISUAL_ITEM_SECONDS = 4;
+
+/** The default length of a new text or shape layer, in frames of `rate`. */
+function defaultVisualItemFrames(rate) {
+  return Math.max(1, Math.round(DEFAULT_VISUAL_ITEM_SECONDS * T.rateToNumber(rate)));
+}
+
+/** The visual item with this id, with its track, or null. */
+function findVisualItem(project, itemId) {
+  for (const track of project.tracks) {
+    const item = (track.visualItems || []).find((entry) => entry.id === itemId);
+    if (item) return { track, item };
+  }
+  return null;
+}
 
 /** Rounded up, so the constant above is a floor rather than an average: at
  *  23.976 a tenth of a second is 2.4 frames, and rounding to 2 would make the
@@ -300,6 +316,9 @@ function blankProject() {
 const exported = {
   MAX_TRACKS_PER_KIND,
   MIN_CLIP_SECONDS,
+  DEFAULT_VISUAL_ITEM_SECONDS,
+  defaultVisualItemFrames,
+  findVisualItem,
   minClipFrames,
   blankProject,
   tracksOf,

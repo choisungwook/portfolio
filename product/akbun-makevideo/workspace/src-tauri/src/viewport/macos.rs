@@ -15,12 +15,16 @@
 //! not an AppKit message: wgpu attaches a `CAMetalLayer` and then talks to
 //! Metal, which is safe from any thread.
 //!
-//! # Why the coordinates are flipped
+//! # Why the coordinates are (sometimes) flipped
 //!
-//! AppKit's origin is the **bottom** left of the content view and the page's is
-//! the top left. Everything else in the app speaks the page's coordinates, so
-//! the flip happens here, once, at the boundary — the same place the
-//! physical-pixel conversion happens.
+//! AppKit's default origin is the **bottom** left of a view and the page's is
+//! the top left — but `WKWebView` overrides `isFlipped` to `YES`, so frames of
+//! its subviews are already measured from the top. Everything else in the app
+//! speaks the page's coordinates, so the conversion happens here, once, at the
+//! boundary — the same place the physical-pixel conversion happens — and it
+//! asks the superview which origin it uses rather than assuming one. Assuming
+//! bottom-left is exactly what put the monitor at the vertically mirrored
+//! position when the container moved from the content view into the WebView.
 
 use super::{MonitorPlace, Place};
 use objc2::rc::Retained;
@@ -163,17 +167,22 @@ pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inne
         let container = PassThroughView::new(main, rect(host, place.stage));
         container.setWantsLayer(true);
         container.setClipsToBounds(true);
+        // Over the page, but *inside* its WebView. A `None` sibling with
+        // `Above` means "over all of them", which is the front. The page hides
+        // it before drawing anything on top; see the note in mod.rs for why it
+        // is not the other way round.
+        //
+        // Into the window *before* the child is measured: a view with no
+        // window answers `convertRectToBacking` with whatever the main screen
+        // happens to be, which is the wrong scale whenever this window is on
+        // another display.
+        host.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
         let view = NSView::initWithFrame(NSView::alloc(main), child_rect(&container, place));
         // Metal draws into this view's layer, so it has to have one. wgpu
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
         view.setWantsLayer(true);
-        // Over the page, but *inside* its WebView. A `None` sibling with
-        // `Above` means "over all of them", which is the front. The page hides
-        // it before drawing anything on top; see the note in mod.rs for why it
-        // is not the other way round.
         container.addSubview(&view);
-        host.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
         let pointer =
@@ -237,14 +246,14 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
 
 /// The page's rectangle as AppKit's inside the WebView.
 ///
-/// Two conversions in one place. The y axis is flipped against the content
-/// view's height, and the numbers arriving are physical pixels while AppKit
-/// wants points — the WebView's own bounds against its backing size is where
-/// that ratio comes from, rather than asking the screen, which can be the wrong
-/// one when the window straddles two displays.
+/// Two conversions in one place. The y origin is converted against the
+/// superview's own coordinate origin — `WKWebView` is flipped, so a top-left
+/// `y` passes through unchanged there — and the numbers arriving are physical
+/// pixels while AppKit wants points. The WebView's own bounds against its
+/// backing size is where that ratio comes from, rather than asking the screen,
+/// which can be the wrong one when the window straddles two displays.
 fn rect(host: &NSView, at: Place) -> NSRect {
     let scale = backing_scale(host);
-    let bounds = host.bounds();
     let (x, y, width, height) = (
         at.x / scale,
         at.y / scale,
@@ -252,22 +261,49 @@ fn rect(host: &NSView, at: Place) -> NSRect {
         at.height.max(1.0) / scale,
     );
     NSRect::new(
-        NSPoint::new(x, bounds.size.height - y - height),
+        NSPoint::new(x, origin_y(host.isFlipped(), host.bounds().size.height, y, height)),
         NSSize::new(width, height),
     )
 }
 
 fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
     let scale = backing_scale(container);
-    let bounds = container.bounds();
     let x = (at.content.x - at.stage.x) / scale;
     let top = (at.content.y - at.stage.y) / scale;
     let width = at.content.width.max(1.0) / scale;
     let height = at.content.height.max(1.0) / scale;
     NSRect::new(
-        NSPoint::new(x, bounds.size.height - top - height),
+        NSPoint::new(
+            x,
+            origin_y(container.isFlipped(), container.bounds().size.height, top, height),
+        ),
         NSSize::new(width, height),
     )
+}
+
+/// A frame origin for a box whose top edge is `top` points below the
+/// superview's top, in whichever coordinate origin that superview uses.
+fn origin_y(flipped: bool, superview_height: f64, top: f64, height: f64) -> f64 {
+    if flipped {
+        top
+    } else {
+        superview_height - top - height
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::origin_y;
+
+    /// WKWebView is flipped, so a top-left `y` passes through unchanged; the
+    /// plain container is not, so its children flip against its height. The
+    /// first case is the one the monitor actually lives in — getting it wrong
+    /// mirrors the picture to the far side of the window.
+    #[test]
+    fn origin_matches_the_superview_coordinate_origin() {
+        assert_eq!(origin_y(true, 800.0, 50.0, 200.0), 50.0);
+        assert_eq!(origin_y(false, 800.0, 50.0, 200.0), 550.0);
+    }
 }
 
 fn backing_scale(content: &NSView) -> f64 {

@@ -277,6 +277,10 @@ pub struct Layer {
 pub struct Frame {
     pub frame: i64,
     pub layers: Vec<Layer>,
+    /// Text and shape items over the clips, rasterized by `text::layers_at`.
+    /// Part of the frame rather than a second pass in each sink, so playback,
+    /// the paused still and the soak all composite the same picture.
+    pub visuals: Vec<crate::text::RasterLayer>,
 }
 
 /// Deliberately hand written: a derived one would print a megabyte of pixels
@@ -293,7 +297,8 @@ impl std::fmt::Debug for Frame {
 }
 
 impl Frame {
-    /// The layers as the compositor takes them.
+    /// The layers as the compositor takes them: clips bottom first, then the
+    /// text and shape items over all of them.
     pub fn sources(&self) -> Vec<(Source<'_>, Draw)> {
         self.layers
             .iter()
@@ -311,6 +316,17 @@ impl Frame {
                     },
                 )
             })
+            .chain(self.visuals.iter().map(|layer| {
+                (
+                    Source {
+                        rgba: &layer.pixels,
+                        width: layer.width,
+                        height: layer.height,
+                        lut: None,
+                    },
+                    layer.placement,
+                )
+            }))
             .collect()
     }
 }
@@ -398,6 +414,12 @@ pub struct FrameSource {
     rate: Rate,
     frames: i64,
     position: i64,
+    /// The edit this source was built from, kept for the text and shape items.
+    /// They are rasterized per frame (and cached by content) rather than
+    /// decoded, so they have no stream of their own.
+    project: Project,
+    width: u32,
+    height: u32,
 }
 
 impl FrameSource {
@@ -436,6 +458,9 @@ impl FrameSource {
             rate: project.rate(),
             frames: layout::frame_count(project),
             position: 0,
+            project: project.clone(),
+            width,
+            height,
         }
     }
 
@@ -596,7 +621,8 @@ impl FrameSource {
             })
             .collect();
         self.position += 1;
-        Supply::Ready(Frame { frame, layers })
+        let visuals = crate::text::layers_at(&self.project, frame, self.width, self.height);
+        Supply::Ready(Frame { frame, layers, visuals })
     }
 
     /// Poll until the frame is there or `deadline` passes. `Starved` coming
@@ -958,6 +984,43 @@ mod tests {
             .find(|layer| layer.clip_id == clip_id)
             .unwrap_or_else(|| panic!("{clip_id} is not on frame {}", frame.frame))
             .pixels[0]
+    }
+
+    /// A shape or a title is part of the frame the source hands over, so the
+    /// playback sinks show it without a pass of their own. This is what makes
+    /// text visible *during* playback rather than only on the paused still.
+    #[test]
+    fn a_visual_item_rides_on_the_frames_it_covers() {
+        use makevideo_render::{ShapeKind, VisualContent, VisualItem, VisualTransform};
+        let mut with_shape = one_clip();
+        with_shape.tracks[0].visual_items.push(VisualItem {
+            id: "s1".into(),
+            start: 0,
+            duration: 1,
+            z_index: 0,
+            transform: VisualTransform {
+                x: 2.0,
+                y: 2.0,
+                width: 8.0,
+                height: 8.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            content: VisualContent::Shape {
+                shape: ShapeKind::Rectangle,
+                fill: "#ff0000".into(),
+                stroke: "#ffffff".into(),
+                stroke_width: 1.0,
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
+        });
+        let mut source = source(&with_shape, Buffering::default(), Arc::new(Fakes::default()));
+        let covered = next(&mut source);
+        assert_eq!(covered.sources().len(), 2, "the clip and the shape");
+        let after = next(&mut source);
+        assert_eq!(after.sources().len(), 1, "the shape has ended");
     }
 
     #[test]
