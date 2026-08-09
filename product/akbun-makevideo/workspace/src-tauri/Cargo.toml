@@ -56,7 +56,10 @@ makevideo-proxy = { path = "crates/proxy" }
 makevideo-waveform = { path = "crates/waveform" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
-tauri = { version = "2", features = ["protocol-asset"] }
+# The native Program Monitor is added as a sibling of the WKWebView through
+# `WebviewWindow::with_webview`. Pin the Tauri minor so its platform bridge
+# stays compatible.
+tauri = { version = "~2.11.5", features = ["protocol-asset"] }
 # The swapchain the monitor draws on is made from the compositor's own device,
 # so the app names the same wgpu the compositor does.
 wgpu = "30"

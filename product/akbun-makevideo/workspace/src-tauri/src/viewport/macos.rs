@@ -25,7 +25,7 @@
 use super::{MonitorPlace, Place};
 use objc2::rc::Retained;
 use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
+use objc2_app_kit::{NSView, NSWindowOrderingMode};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use raw_window_handle::{
     AppKitDisplayHandle, AppKitWindowHandle, DisplayHandle, HandleError, HasDisplayHandle,
@@ -120,36 +120,47 @@ impl HasDisplayHandle for ViewTarget {
     }
 }
 
-/// Run `work` on the main thread and wait for what it returns.
+/// Run `work` against the actual WebKit view and wait for what it returns.
 ///
-/// Waiting is deliberate. Attaching and placing are rare — a project opening, a
-/// panel resizing — and a caller that carried on without knowing whether the
+/// The page measures the stage from the WebView's top-left corner. Its
+/// `getBoundingClientRect()` values therefore only describe this view, not the
+/// window content view: title bars, future toolbars and an inset WebView would
+/// otherwise shift the native monitor outside the Program Monitor. Keeping the
+/// native container in the same `WKWebView` makes the two coordinate systems
+/// identical.
+///
+/// Waiting is deliberate. Attaching and placing are rare — a project opening,
+/// a panel resizing — and a caller that carried on without knowing whether the
 /// view exists would go on to make a surface for nothing.
-fn on_main<T, F>(window: &tauri::WebviewWindow, work: F) -> Result<T, String>
+fn on_webview<T, F>(window: &tauri::WebviewWindow, work: F) -> Result<T, String>
 where
     T: Send + 'static,
-    F: FnOnce(MainThreadMarker) -> Result<T, String> + Send + 'static,
+    F: FnOnce(MainThreadMarker, &NSView) -> Result<T, String> + Send + 'static,
 {
     let (sender, receiver) = channel();
     window
-        .run_on_main_thread(move || {
+        .with_webview(move |webview| {
             let answer = match MainThreadMarker::new() {
-                Some(main) => work(main),
-                None => Err("run_on_main_thread did not run on the main thread".into()),
+                Some(main) => {
+                    // WKWebView inherits NSView. Tauri gives this callback the
+                    // WebKit pointer on the main thread, where AppKit permits
+                    // this cast and every message below.
+                    let host = unsafe { &*webview.inner().cast::<NSView>() };
+                    work(main, host)
+                }
+                None => Err("with_webview did not run on the main thread".into()),
             };
             let _ = sender.send(answer);
         })
-        .map_err(|error| format!("cannot reach the main thread: {error}"))?;
+        .map_err(|error| format!("cannot reach the WebView: {error}"))?;
     receiver
         .recv()
-        .map_err(|error| format!("the main thread never answered: {error}"))?
+        .map_err(|error| format!("the WebView never answered: {error}"))?
 }
 
 pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inner, String> {
-    let handle = window.clone();
-    let handles = on_main(window, move |main| {
-        let content = content_view(&handle)?;
-        let container = PassThroughView::new(main, rect(&content, place.stage));
+    let handles = on_webview(window, move |main, host| {
+        let container = PassThroughView::new(main, rect(host, place.stage));
         container.setWantsLayer(true);
         container.setClipsToBounds(true);
         let view = NSView::initWithFrame(NSView::alloc(main), child_rect(&container, place));
@@ -157,11 +168,12 @@ pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inne
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
         view.setWantsLayer(true);
-        // Over the webview. A `None` sibling with `Above` means "over all of
-        // them", which is the front. The page hides it before drawing anything
-        // on top; see the note in mod.rs for why it is not the other way round.
+        // Over the page, but *inside* its WebView. A `None` sibling with
+        // `Above` means "over all of them", which is the front. The page hides
+        // it before drawing anything on top; see the note in mod.rs for why it
+        // is not the other way round.
         container.addSubview(&view);
-        content.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
+        host.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
         let pointer =
@@ -178,16 +190,14 @@ pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inne
 }
 
 pub fn place(inner: &Inner, at: MonitorPlace) {
-    let handle = inner.window.clone();
     let view = inner.view;
     let container = inner.container;
     // Placement is best effort: a window that has gone during a resize is a
     // window nobody is looking at.
-    let _ = on_main(&inner.window, move |_| {
-        let content = content_view(&handle)?;
+    let _ = on_webview(&inner.window, move |_, host| {
         // SAFETY: both views are alive until `detach` releases the container.
         let container = unsafe { container.ptr().as_ref() };
-        container.setFrame(rect(&content, at.stage));
+        container.setFrame(rect(host, at.stage));
         let view = unsafe { view.ptr().as_ref() };
         view.setFrame(child_rect(container, at));
         Ok(())
@@ -196,7 +206,7 @@ pub fn place(inner: &Inner, at: MonitorPlace) {
 
 pub fn set_visible(inner: &Inner, visible: bool) {
     let container = inner.container;
-    let _ = on_main(&inner.window, move |_| {
+    let _ = on_webview(&inner.window, move |_, _| {
         // SAFETY: messaged on the main thread, and the view is alive until
         // `detach` releases it.
         unsafe { container.ptr().as_ref().setHidden(!visible) };
@@ -207,7 +217,7 @@ pub fn set_visible(inner: &Inner, visible: bool) {
 pub fn detach(inner: &Inner) {
     let view = inner.view;
     let container = inner.container;
-    let _ = on_main(&inner.window, move |_| {
+    let _ = on_webview(&inner.window, move |_, _| {
         // SAFETY: the pointer came from `Retained::into_raw` in `attach` and is
         // released exactly once, here.
         let _view: Retained<NSView> = unsafe { Retained::from_raw(view.ptr().as_ptr()) }
@@ -225,33 +235,16 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
     ))))
 }
 
-fn content_view(window: &tauri::WebviewWindow) -> Result<Retained<NSView>, String> {
-    let ns_window = window
-        .ns_window()
-        .map_err(|error| format!("no native window: {error}"))?;
-    if ns_window.is_null() {
-        return Err("the window has no native handle yet".into());
-    }
-    // SAFETY: tauri hands back the window's own `NSWindow`, which it keeps
-    // alive for as long as the window exists.
-    let ns_window: Retained<NSWindow> = unsafe {
-        Retained::retain(ns_window.cast::<NSWindow>()).ok_or("the native window went away")?
-    };
-    ns_window
-        .contentView()
-        .ok_or_else(|| "the window has no content view".to_string())
-}
-
-/// The page's rectangle as AppKit's.
+/// The page's rectangle as AppKit's inside the WebView.
 ///
 /// Two conversions in one place. The y axis is flipped against the content
 /// view's height, and the numbers arriving are physical pixels while AppKit
-/// wants points — the content view's own bounds against its backing size is
-/// where that ratio comes from, rather than asking the screen, which can be the
-/// wrong one when the window straddles two displays.
-fn rect(content: &NSView, at: Place) -> NSRect {
-    let scale = backing_scale(content);
-    let bounds = content.bounds();
+/// wants points — the WebView's own bounds against its backing size is where
+/// that ratio comes from, rather than asking the screen, which can be the wrong
+/// one when the window straddles two displays.
+fn rect(host: &NSView, at: Place) -> NSRect {
+    let scale = backing_scale(host);
+    let bounds = host.bounds();
     let (x, y, width, height) = (
         at.x / scale,
         at.y / scale,
