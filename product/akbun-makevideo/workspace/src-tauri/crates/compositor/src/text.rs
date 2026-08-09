@@ -7,17 +7,27 @@ use fontdb::{Database, Family, Query};
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle as LayoutTextStyle};
 use fontdue::{Font, FontSettings};
 use makevideo_render::{Project, TextAlign, TextStyle, VisualContent};
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, OnceLock};
+
+const CACHE_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
 pub struct RasterLayer {
-    pub pixels: Vec<u8>,
+    pub pixels: Arc<[u8]>,
     pub width: u32,
     pub height: u32,
     pub placement: Placement,
 }
 
-static CACHE: OnceLock<Mutex<HashMap<String, Vec<u8>>>> = OnceLock::new();
+struct RasterCache {
+    entries: HashMap<String, Arc<[u8]>>,
+    oldest: VecDeque<String>,
+    bytes: usize,
+}
+
+static CACHE: OnceLock<Mutex<RasterCache>> = OnceLock::new();
+static FONT_DATABASE: OnceLock<Database> = OnceLock::new();
+static FONTS: OnceLock<Mutex<HashMap<String, Font>>> = OnceLock::new();
 
 pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<RasterLayer> {
     let mut layers = Vec::new();
@@ -64,13 +74,33 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
     layers
 }
 
-fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Vec<u8> {
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Some(pixels) = cache.lock().unwrap().get(key).cloned() {
+fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Arc<[u8]> {
+    let cache = CACHE.get_or_init(|| {
+        Mutex::new(RasterCache {
+            entries: HashMap::new(),
+            oldest: VecDeque::new(),
+            bytes: 0,
+        })
+    });
+    if let Some(pixels) = cache.lock().unwrap().entries.get(key).cloned() {
         return pixels;
     }
-    let pixels = build();
-    cache.lock().unwrap().insert(key.to_string(), pixels.clone());
+    let pixels: Arc<[u8]> = build().into();
+    if pixels.len() > CACHE_LIMIT_BYTES {
+        return pixels;
+    }
+    let mut cache = cache.lock().unwrap();
+    while cache.bytes + pixels.len() > CACHE_LIMIT_BYTES {
+        let Some(oldest) = cache.oldest.pop_front() else {
+            break;
+        };
+        if let Some(removed) = cache.entries.remove(&oldest) {
+            cache.bytes -= removed.len();
+        }
+    }
+    cache.bytes += pixels.len();
+    cache.oldest.push_back(key.to_string());
+    cache.entries.insert(key.to_string(), Arc::clone(&pixels));
     pixels
 }
 
@@ -124,17 +154,42 @@ fn rasterize(text: &str, style: &TextStyle, width: u32, height: u32, scale: f32)
     pixels
 }
 
+pub fn font_available(family: &str) -> bool {
+    let database = FONT_DATABASE.get_or_init(load_font_database);
+    requested_font_id(database, family).is_some()
+}
+
 fn load_font(family: &str) -> Option<Font> {
+    let cache = FONTS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(font) = cache.lock().unwrap().get(family).cloned() {
+        return Some(font);
+    }
+    let database = FONT_DATABASE.get_or_init(load_font_database);
+    let id = requested_font_id(database, family)
+        .or_else(|| database.query(&Query { families: &[Family::SansSerif], ..Query::default() }))?;
+    let font = database
+        .with_face_data(id, |data, _index| Font::from_bytes(data, FontSettings::default()).ok())
+        .flatten()?;
+    cache.lock().unwrap().insert(family.into(), font.clone());
+    Some(font)
+}
+
+fn load_font_database() -> Database {
     let mut database = Database::new();
     database.load_system_fonts();
-    let query = Query {
-        families: &[Family::Name(family), Family::SansSerif],
-        ..Query::default()
-    };
-    let id = database.query(&query)?;
     database
-        .with_face_data(id, |data, _index| Font::from_bytes(data, FontSettings::default()).ok())
-        .flatten()
+}
+
+fn requested_font_id(database: &Database, family: &str) -> Option<fontdb::ID> {
+    let generic = match family {
+        "serif" => Family::Serif,
+        "sans-serif" => Family::SansSerif,
+        "cursive" => Family::Cursive,
+        "fantasy" => Family::Fantasy,
+        "monospace" => Family::Monospace,
+        _ => return database.query(&Query { families: &[Family::Name(family)], ..Query::default() }),
+    };
+    database.query(&Query { families: &[generic], ..Query::default() })
 }
 
 fn colour(value: &str, fallback: [u8; 4]) -> [u8; 4] {

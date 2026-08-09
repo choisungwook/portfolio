@@ -1103,7 +1103,13 @@ async function addText() {
 }
 
 function hexColor(value, fallback) {
-  return /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : fallback;
+  const match = /^#([0-9a-fA-F]{6})(?:[0-9a-fA-F]{2})?$/.exec(value || '');
+  return match ? `#${match[1]}` : fallback;
+}
+
+function preserveAlpha(color, previous) {
+  const alpha = /^#[0-9a-fA-F]{8}$/.test(previous || '') ? previous.slice(7) : '';
+  return `${color}${alpha}`;
 }
 
 function renderTextInspector() {
@@ -1133,13 +1139,24 @@ function updateSelectedText() {
     align: dom.textAlign.value,
     strokeColor: Number(dom.textStrokeWidth.value) > 0 ? dom.textStrokeColor.value : '',
     strokeWidth: Math.max(0, Number(dom.textStrokeWidth.value) || 0),
-    shadowColor: dom.textShadowColor.value,
+    shadowColor: preserveAlpha(dom.textShadowColor.value, item.content.style && item.content.style.shadowColor),
   };
-  edit({
-    op: 'setVisualContent',
-    itemId: item.id,
-    content: { kind: 'text', text: dom.textValue.value, style },
-  }).then(() => selectVisualItem(item.id)).catch((error) => reportError(error, 'text:edit'));
+  Promise.resolve(window.api.fontAvailable(style.fontFamily))
+    .then((available) => {
+      if (!available) {
+        return window.api.message(
+          `"${style.fontFamily}" is not installed. A sans-serif fallback will be used.`,
+          { title: 'Font unavailable', kind: 'warning' },
+        );
+      }
+    })
+    .then(() => edit({
+      op: 'setVisualContent',
+      itemId: item.id,
+      content: { kind: 'text', text: dom.textValue.value, style },
+    }))
+    .then(() => selectVisualItem(item.id))
+    .catch((error) => reportError(error, 'text:edit'));
 }
 
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
