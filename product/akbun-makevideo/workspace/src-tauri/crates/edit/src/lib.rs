@@ -304,6 +304,71 @@ pub struct VisualTransform {
     pub opacity: f32,
 }
 
+fn default_font_family() -> String {
+    "sans-serif".into()
+}
+
+fn default_font_size() -> f32 {
+    64.0
+}
+
+fn default_text_color() -> String {
+    "#ffffff".into()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TextAlign {
+    Left,
+    Center,
+    Right,
+}
+
+impl Default for TextAlign {
+    fn default() -> Self {
+        TextAlign::Center
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextStyle {
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: f32,
+    #[serde(default = "default_text_color")]
+    pub color: String,
+    #[serde(default)]
+    pub align: TextAlign,
+    #[serde(default)]
+    pub stroke_color: String,
+    #[serde(default)]
+    pub stroke_width: f32,
+    #[serde(default)]
+    pub shadow_color: String,
+    #[serde(default)]
+    pub shadow_x: f32,
+    #[serde(default)]
+    pub shadow_y: f32,
+}
+
+impl Default for TextStyle {
+    fn default() -> Self {
+        TextStyle {
+            font_family: default_font_family(),
+            font_size: default_font_size(),
+            color: default_text_color(),
+            align: TextAlign::default(),
+            stroke_color: String::new(),
+            stroke_width: 0.0,
+            shadow_color: "#00000080".into(),
+            shadow_x: 2.0,
+            shadow_y: 2.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
@@ -311,7 +376,11 @@ pub struct VisualTransform {
     rename_all_fields = "camelCase"
 )]
 pub enum VisualContent {
-    Text { text: String },
+    Text {
+        text: String,
+        #[serde(default)]
+        style: TextStyle,
+    },
     Shape,
     Image { asset_id: String },
     VideoOverlay { asset_id: String },

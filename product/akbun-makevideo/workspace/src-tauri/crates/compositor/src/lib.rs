@@ -30,6 +30,7 @@ pub mod gpu;
 pub mod pipeline;
 pub mod source;
 pub mod supply;
+pub mod text;
 
 use makevideo_render::layout::Rect;
 

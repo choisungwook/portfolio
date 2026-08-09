@@ -257,7 +257,7 @@ mod tests {
     use super::*;
     use crate::{
         Asset, AssetKind, Clip, Command, Edge, ProjectSettings, Rate, TrackKind, VisualContent,
-        VisualTransform,
+        TextStyle, VisualTransform,
     };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
@@ -1194,6 +1194,7 @@ mod tests {
                 track_id: track_id.clone(),
                 content: VisualContent::Text {
                     text: "title".into(),
+                    style: TextStyle::default(),
                 },
                 start: 30,
                 duration: 90,

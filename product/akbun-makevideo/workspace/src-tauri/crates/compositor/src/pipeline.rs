@@ -123,7 +123,18 @@ where
             }
         };
 
-        let layers: Vec<(Source<'_>, Draw)> = frame.sources();
+        let visual = crate::text::layers_at(project, frame.frame, width, height);
+        let mut layers: Vec<(Source<'_>, Draw)> = frame.sources();
+        layers.extend(visual.iter().map(|layer| {
+            (
+                Source {
+                    rgba: &layer.pixels,
+                    width: layer.width,
+                    height: layer.height,
+                },
+                layer.placement,
+            )
+        }));
         let picture = match compositor.compose(width, height, &layers) {
             Ok(picture) => picture,
             Err(error) => {
@@ -228,7 +239,7 @@ pub fn preview_frame(
         }
     }
 
-    let sources: Vec<(Source<'_>, Draw)> = layers
+    let mut sources: Vec<(Source<'_>, Draw)> = layers
         .iter()
         .zip(frames.iter())
         .filter_map(|(layer, pixels)| {
@@ -247,6 +258,18 @@ pub fn preview_frame(
             })
         })
         .collect();
+
+    let visual = crate::text::layers_at(project, frame, width, height);
+    sources.extend(visual.iter().map(|layer| {
+        (
+            Source {
+                rgba: &layer.pixels,
+                width: layer.width,
+                height: layer.height,
+            },
+            layer.placement,
+        )
+    }));
 
     compositor.compose(width, height, &sources)
 }
