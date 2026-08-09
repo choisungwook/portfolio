@@ -19,6 +19,7 @@ use crate::source::{Buffering, FfmpegReaders, FrameSource, Supply};
 use crate::{Compositor, Placement as Draw, Source};
 use makevideo_render::accel::Acceleration;
 use makevideo_render::{ffmpeg, layout, Project, RationalTime};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -240,24 +241,32 @@ pub fn preview_frame(
         }
     }
 
-    let luts: Vec<Option<crate::lut::Lut>> = layers
-        .iter()
-        .map(|layer| project.clip(&layer.clip_id)
+    let mut luts = HashMap::new();
+    for layer in &layers {
+        let Some(path) = project
+            .clip(&layer.clip_id)
             .and_then(|clip| clip.lut_path.as_deref())
-            .and_then(|path| crate::lut::Lut::from_cube_file(path).ok()))
-        .collect();
+        else {
+            continue;
+        };
+        luts.entry(path)
+            .or_insert_with(|| crate::lut::Lut::from_cube_file(path).ok());
+    }
     let mut sources: Vec<(Source<'_>, Draw)> = layers
         .iter()
         .zip(frames.iter())
-        .zip(luts.iter())
-        .filter_map(|((layer, pixels), lut)| {
+        .filter_map(|(layer, pixels)| {
             pixels.as_ref().map(|pixels| {
                 (
                     Source {
                         rgba: pixels,
                         width: layer.dst.w,
                         height: layer.dst.h,
-                        lut: lut.as_ref(),
+                        lut: project
+                            .clip(&layer.clip_id)
+                            .and_then(|clip| clip.lut_path.as_deref())
+                            .and_then(|path| luts.get(path))
+                            .and_then(Option::as_ref),
                     },
                     Draw {
                         dst: layer.dst,

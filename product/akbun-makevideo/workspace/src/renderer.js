@@ -143,7 +143,7 @@ const state = {
   // about the timeline and not about how many undo steps there are.
   doc: null,
   project: L.blankProject(),
-  lutStatus: {},
+  lutStatus: Object.create(null),
   // The revision the file on disk holds. Dirty is a comparison rather than a
   // flag, which means undoing back to where the last save was leaves the
   // project clean again instead of permanently modified.
@@ -656,9 +656,10 @@ function clipElement(track, clip) {
     const unavailable = state.lutStatus[clip.lutPath] === 'unavailable';
     node.classList.add('lut');
     node.classList.toggle('lut-unavailable', unavailable);
-    node.title = unavailable
+    const lutTitle = unavailable
       ? `3D LUT unavailable: ${baseName(clip.lutPath)}`
       : `3D LUT: ${baseName(clip.lutPath)}`;
+    node.title = node.title ? `${node.title}; ${lutTitle}` : lutTitle;
   }
 
   const label = document.createElement('span');
@@ -845,15 +846,22 @@ function renderTimeline() {
 }
 
 function checkLutFiles() {
+  const paths = new Set();
   for (const track of state.project.tracks) {
     for (const clip of track.clips) {
       const path = clip.lutPath;
-      if (!path || state.lutStatus[path]) continue;
+      if (path) paths.add(path);
+    }
+  }
+  for (const path of Object.keys(state.lutStatus)) {
+    if (!paths.has(path)) delete state.lutStatus[path];
+  }
+  for (const path of paths) {
+    if (state.lutStatus[path]) continue;
       state.lutStatus[path] = 'checking';
       window.api.validateLut(path)
         .then(() => { state.lutStatus[path] = 'ready'; renderTimeline(); })
         .catch(() => { state.lutStatus[path] = 'unavailable'; renderTimeline(); });
-    }
   }
 }
 

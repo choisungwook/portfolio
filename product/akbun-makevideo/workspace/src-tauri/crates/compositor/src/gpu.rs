@@ -6,6 +6,8 @@
 
 use crate::{lut::Lut, Placement, Source};
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 /// Uniform block, laid out to match `composite.wgsl`.
@@ -49,6 +51,8 @@ pub struct GpuCompositor {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    identity_lut: Lut,
+    lut_textures: Mutex<HashMap<LutKey, wgpu::Texture>>,
     adapter: String,
 }
 
@@ -64,6 +68,25 @@ const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 /// thing, which is what `Surface` picks its format for.
 pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const LUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
+
+#[derive(Eq, Hash, PartialEq)]
+struct LutKey {
+    size: u32,
+    domain_min: [u32; 3],
+    domain_max: [u32; 3],
+    values: Vec<u8>,
+}
+
+impl From<&Lut> for LutKey {
+    fn from(lut: &Lut) -> LutKey {
+        LutKey {
+            size: lut.size(),
+            domain_min: lut.domain_min().map(f32::to_bits),
+            domain_max: lut.domain_max().map(f32::to_bits),
+            values: lut.texture_bytes().to_vec(),
+        }
+    }
+}
 
 impl GpuCompositor {
     /// Picks whatever device this machine has: Metal on a Mac, and a software
@@ -152,6 +175,8 @@ impl GpuCompositor {
             pipeline,
             layout,
             sampler,
+            identity_lut: Lut::identity(),
+            lut_textures: Mutex::new(HashMap::new()),
             adapter: name,
         })
     }
@@ -270,33 +295,7 @@ impl GpuCompositor {
                 wgpu::util::TextureDataOrder::LayerMajor,
                 &source.rgba[..expected],
             );
-            let identity;
-            let lut = match source.lut {
-                Some(lut) => lut,
-                None => {
-                    identity = Lut::identity();
-                    &identity
-                }
-            };
-            let lut_texture = self.device.create_texture_with_data(
-                &self.queue,
-                &wgpu::TextureDescriptor {
-                    label: Some("LUT"),
-                    size: wgpu::Extent3d {
-                        width: lut.size(),
-                        height: lut.size(),
-                        depth_or_array_layers: lut.size(),
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D3,
-                    format: LUT_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
-                    view_formats: &[],
-                },
-                wgpu::util::TextureDataOrder::LayerMajor,
-                lut.texture_bytes(),
-            );
+            let lut = source.lut.unwrap_or(&self.identity_lut);
             let uniform = LayerUniform {
                 rect: [
                     placement.dst.x as f32,
@@ -328,7 +327,7 @@ impl GpuCompositor {
                     usage: wgpu::BufferUsages::UNIFORM,
                 });
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            let lut_view = lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let lut_view = self.lut_view(lut);
             bindings.push(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("layer"),
                 layout: &self.layout,
@@ -353,6 +352,33 @@ impl GpuCompositor {
             }));
         }
         Ok(bindings)
+    }
+
+    fn lut_view(&self, lut: &Lut) -> wgpu::TextureView {
+        let key = LutKey::from(lut);
+        let mut textures = self.lut_textures.lock().unwrap();
+        let texture = textures.entry(key).or_insert_with(|| {
+            self.device.create_texture_with_data(
+                &self.queue,
+                &wgpu::TextureDescriptor {
+                    label: Some("LUT"),
+                    size: wgpu::Extent3d {
+                        width: lut.size(),
+                        height: lut.size(),
+                        depth_or_array_layers: lut.size(),
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D3,
+                    format: LUT_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                },
+                wgpu::util::TextureDataOrder::LayerMajor,
+                lut.texture_bytes(),
+            )
+        });
+        texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     fn pass(
