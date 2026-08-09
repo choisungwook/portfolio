@@ -4,4 +4,4 @@
 
 ## 목록
 
-* [새 핸즈온 추가 절차](add-new-hands-on.md) - branch 생성부터 PR + Issue 작성까지의 표준 절차.
+* [새 핸즈온 추가 절차](add-new-hands-on.md) - 디렉터리 구성부터 PR + Issue 작성까지의 표준 절차.

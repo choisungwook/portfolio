@@ -4,7 +4,9 @@ GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./p
 
 ## Workspace 초기화
 
-branch를 만드는 등 새 workspace에서 작업을 시작할 때, 가장 먼저 master를 최신화한다. 모든 작업이 최신 master 위에서 시작하도록 하기 위함이다.
+새 workspace에서 작업을 시작할 때, 가장 먼저 master를 최신화한다. 모든 작업이 최신 master 위에서 시작하도록 하기 위함이다.
+
+branch는 만들지 않는다. agent를 실행하는 도구가 이미 branch를 만들어 주므로, 그 위에서 바로 작업한다.
 
 master 최신화 절차:
 
@@ -94,6 +96,7 @@ PR을 생성할 때 기록용 GitHub Issue를 함께 만들고 PR body에서 링
 body 형식의 기준은 [.github/pull_request_template.md](../../.github/pull_request_template.md) 하나다. 섹션 구성과 항목 형식은 이 규칙 파일에 중복해 적지 않고 템플릿에서 읽는다.
 
 - PR을 쓰기 전에 템플릿을 읽고 그 섹션과 형식을 그대로 따른다.
+- PR을 만들기 직전에 현재 branch 이름을 확인한다. `<type>/<short-description>` 형식이 아니면 그 형식으로 바꾸고 push한 뒤 PR을 만든다. 도구가 만든 이름은 작업 내용을 설명하지 않으므로 이 시점에만 손댄다.
 - 섹션마다 요약 한 줄과 근거 최대 1개다. 쓸 내용이 없는 섹션은 헤더째 지운다.
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
