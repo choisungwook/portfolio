@@ -25,9 +25,9 @@
 //! having a frame to draw are separate problems that look the same on screen.
 
 pub mod cpu;
-pub mod lut;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+pub mod lut;
 pub mod pipeline;
 pub mod source;
 pub mod supply;

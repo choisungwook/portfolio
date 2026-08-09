@@ -68,17 +68,23 @@ opinion: ffmpeg carries out a decision, it does not make one.
 
 ## The two render routes
 
-Settings → Compositor picks between them.
+Settings → Compositor picks between them, and it is the only switch: GPU takes
+the composited route, CPU takes the filter graph. Rendering a whole file
+through the software compositor is not offered — it exists so a preview frame
+can be drawn without a graphics device, not so an hour of encoding can be.
 
 ```text
-Auto or CPU (default is Auto)
+GPU (the default)
   ffmpeg decode per clip  ─┐
   ffmpeg decode per clip  ─┼─► compositor ─► ffmpeg encode ─► file
-  ffmpeg decode per clip  ─┘   (gpu or cpu)     (+ audio)
+  ffmpeg decode per clip  ─┘   (graphics device)   (+ audio)
 
-ffmpeg filter graph
+CPU
   every clip ─► scale, pad, overlay, amix inside one ffmpeg ─► file
 ```
+
+ffmpeg is needed either way. It decodes for both routes and encodes for both;
+what the setting changes is who puts the layers on top of each other.
 
 Audio never leaves ffmpeg on either route. `amix` is not worth reimplementing,
 and sound is not what was diverging.

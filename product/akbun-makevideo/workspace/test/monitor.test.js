@@ -420,13 +420,18 @@ test('one reason going away does not reveal the view while another holds', () =>
   assert.strictEqual(shouldShowMonitor({ ...both, timeline: true }), false);
 });
 
-test('the page defaults to the engine that is really playing before Rust answers', () => {
+test('the page default compositor is not a value the setting can hold', () => {
   // DEFAULT_SETTINGS in renderer.js is what is in force before bootstrap lands
   // and in a plain browser, and in both of those there is no IPC to attach a
-  // monitor over. Rust's own default is native and overrides it.
+  // monitor over. The first attach is triggered by this differing from whatever
+  // Rust sends back, so a real value here would mean a settings file holding
+  // that same value never attaches at all.
   const source = require('node:fs').readFileSync(`${__dirname}/../src/renderer.js`, 'utf8');
   const defaults = source.slice(source.indexOf('const DEFAULT_SETTINGS'));
-  const engine = defaults.match(/playbackEngine:\s*'([a-z-]+)'/);
-  assert.ok(engine, 'DEFAULT_SETTINGS should carry a playback engine');
-  assert.strictEqual(engine[1], 'media-element');
+  const compositor = defaults.match(/compositor:\s*'([a-z-]*)'/);
+  assert.ok(compositor, 'DEFAULT_SETTINGS should carry a compositor');
+  assert.ok(
+    !['gpu', 'cpu'].includes(compositor[1]),
+    `DEFAULT_SETTINGS.compositor is "${compositor[1]}", which Rust can send back`
+  );
 });

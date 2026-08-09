@@ -37,6 +37,82 @@ const RENDER_BUFFERING: Buffering = Buffering { depth: 3, lead: 8 };
 /// whole frame for.
 const CANCEL_POLL: Duration = Duration::from_millis(50);
 
+/// How many preview decoders may run at the same time.
+///
+/// A bound rather than "all of them". Each one is a whole ffmpeg process that
+/// spawns threads of its own, so a timeline with a dozen layers under the
+/// playhead would put more processes on the machine than it has cores and every
+/// one of them would finish later — including the ones playback is waiting on.
+/// Four covers the layer counts a stage actually holds.
+const DECODE_AT_ONCE: usize = 4;
+
+/// Run `work` over `items` `limit` at a time, answers in the order asked.
+///
+/// Order is the whole reason this is a function. The layers are drawn back to
+/// front and the pixels are zipped against them by position, so a result that
+/// arrives out of order does not fail — it silently paints the wrong layer.
+fn in_batches<T, R, F>(items: &[T], limit: usize, work: F) -> Vec<R>
+where
+    T: Sync,
+    R: Send,
+    F: Fn(&T) -> R + Sync,
+{
+    let mut answers = Vec::with_capacity(items.len());
+    for batch in items.chunks(limit.max(1)) {
+        std::thread::scope(|scope| {
+            let running: Vec<_> = batch
+                .iter()
+                .map(|item| scope.spawn(|| work(item)))
+                .collect();
+            for handle in running {
+                // A decoder thread only runs `work`, which returns its failures
+                // rather than panicking, so this join is not where a bad file
+                // shows up.
+                if let Ok(answer) = handle.join() {
+                    answers.push(answer);
+                }
+            }
+        });
+    }
+    answers
+}
+
+/// One layer's frame as raw RGBA, or `None` when it could not be decoded.
+///
+/// A clip whose media has moved draws nothing, exactly as in the render, rather
+/// than failing the whole preview.
+fn decode_layer(
+    ffmpeg_path: &str,
+    layer: &layout::Layer,
+    rate: makevideo_render::Rate,
+) -> Option<Vec<u8>> {
+    let args = ffmpeg::decoder_args(&ffmpeg::Decode {
+        path: &layer.path,
+        kind: layer.kind,
+        in_time: layer.source_time(rate),
+        // Two frames' worth, because a source that starts a fraction late can
+        // hand back nothing at all for one. Only the first is read.
+        duration: RationalTime::new(2, rate),
+        width: layer.dst.w,
+        height: layer.dst.h,
+        rate,
+        hwaccel: None,
+    });
+    let output = Command::new(ffmpeg_path)
+        .args(&args)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    let wanted = (layer.dst.w as usize) * (layer.dst.h as usize) * 4;
+    if output.stdout.len() < wanted {
+        return None;
+    }
+    let mut pixels = output.stdout;
+    pixels.truncate(wanted);
+    Some(pixels)
+}
+
 pub struct Options<'a> {
     pub ffmpeg: &'a str,
     pub project: &'a Project,
@@ -194,10 +270,11 @@ where
 /// One frame, for the preview. Same compositor, same shader, same geometry as
 /// the render — that is the entire point of it existing.
 ///
-/// Each visible clip is decoded with its own one frame ffmpeg call, so this
-/// costs roughly 50 ms a layer. Fast enough to answer when the playhead stops,
-/// nowhere near fast enough to play with, which is why the page only asks for
-/// it when it is not playing.
+/// Each visible clip is decoded with its own one frame ffmpeg call, which costs
+/// roughly 50 ms. They run [`DECODE_AT_ONCE`] at a time rather than one after
+/// another, so a stack of layers costs about what the deepest batch costs
+/// instead of the sum. Still nowhere near fast enough to play with, which is
+/// why the page only asks for it when it is not playing.
 pub fn preview_frame(
     compositor: &Compositor,
     ffmpeg_path: &str,
@@ -209,37 +286,9 @@ pub fn preview_frame(
     let rate = project.rate();
     let layers = layout::layers_at(project, frame, width, height);
 
-    let mut frames = Vec::new();
-    for layer in &layers {
-        let args = ffmpeg::decoder_args(&ffmpeg::Decode {
-            path: &layer.path,
-            kind: layer.kind,
-            in_time: layer.source_time(rate),
-            // Two frames' worth, because a source that starts a fraction late
-            // can hand back nothing at all for one. Only the first is read.
-            duration: RationalTime::new(2, rate),
-            width: layer.dst.w,
-            height: layer.dst.h,
-            rate,
-            hwaccel: None,
-        });
-        let output = Command::new(ffmpeg_path)
-            .args(&args)
-            .stdin(Stdio::null())
-            .stderr(Stdio::null())
-            .output();
-        let wanted = (layer.dst.w as usize) * (layer.dst.h as usize) * 4;
-        match output {
-            Ok(output) if output.stdout.len() >= wanted => {
-                let mut pixels = output.stdout;
-                pixels.truncate(wanted);
-                frames.push(Some(pixels));
-            }
-            // A clip whose media has moved draws nothing, exactly as in the
-            // render, rather than failing the whole preview.
-            _ => frames.push(None),
-        }
-    }
+    let frames = in_batches(&layers, DECODE_AT_ONCE, |layer| {
+        decode_layer(ffmpeg_path, layer, rate)
+    });
 
     let mut luts = HashMap::new();
     for layer in &layers {
@@ -291,4 +340,28 @@ pub fn preview_frame(
     }));
 
     compositor.compose(width, height, &sources)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::in_batches;
+
+    #[test]
+    fn batched_work_answers_in_the_order_it_was_asked() {
+        // Deliberately uneven: the last batch is short, and the slowest item is
+        // first so a racing implementation would hand its answer back last.
+        let items: Vec<u64> = vec![30, 1, 1, 1, 1];
+        let doubled = in_batches(&items, 2, |value| {
+            std::thread::sleep(std::time::Duration::from_millis(*value));
+            *value * 2
+        });
+
+        assert_eq!(doubled, vec![60, 2, 2, 2, 2]);
+    }
+
+    #[test]
+    fn a_batch_limit_of_zero_still_runs_everything_once() {
+        let items = vec!['a', 'b', 'c'];
+        assert_eq!(in_batches(&items, 0, |value| *value), items);
+    }
 }

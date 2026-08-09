@@ -387,9 +387,8 @@
       <p class="dim small-text">When disabled, only the project work file moves to Trash. Proxies and renders remain in the project folder.</p>
       <label class="row">Compositor
         <select id="as-compositor">
-          <option value="auto">Auto — GPU if there is one, CPU if not</option>
-          <option value="cpu">CPU only — never touch the GPU</option>
-          <option value="ffmpeg">ffmpeg filter graph — renders faster, stage may differ</option>
+          <option value="gpu">GPU — draws with the graphics device</option>
+          <option value="cpu">CPU — never touches the graphics device</option>
         </select>
       </label>
       <p class="dim small-text" id="as-compositor-note"></p>
@@ -399,13 +398,6 @@
         </select>
       </label>
       <p class="dim small-text" id="as-gpu-device-note"></p>
-      <label class="row">Playback
-        <select id="as-playback">
-          <option value="native">Native monitor — the render's own compositor, in sync with the sound</option>
-          <option value="media-element">Media elements — the older preview</option>
-        </select>
-      </label>
-      <p class="dim small-text" id="as-playback-note"></p>
       <label class="row">Render acceleration
         <select id="as-accel">
           <option value="auto">Auto — GPU when available</option>

@@ -70,11 +70,21 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
-    /// How a frame gets drawn: "auto" for the graphics device with the
-    /// software compositor behind it, "cpu" to stay off the GPU entirely, or
-    /// "ffmpeg" to let the filter graph draw instead. The first two are the
-    /// same code and make the preview and the render agree; the third is
-    /// faster because frames never leave ffmpeg.
+    /// Whether the graphics device is used at all: "gpu" or "cpu". This is the
+    /// only axis, and it decides three things at once — what draws the exact
+    /// frame, which engine plays, and what draws the render.
+    ///
+    /// | | exact frame | playback | render |
+    /// | --- | --- | --- | --- |
+    /// | gpu | the compositor | native monitor | the compositor, filter graph if it fails |
+    /// | cpu | not asked for | media elements | the filter graph |
+    ///
+    /// ffmpeg is needed either way: it decodes for both and encodes for both.
+    /// What changes is who puts the layers on top of each other.
+    ///
+    /// Only "cpu" means cpu. The old "auto" and "ffmpeg" values, and anything
+    /// else a settings file holds, are the graphics device — a machine with no
+    /// device quietly draws with the software compositor rather than refusing.
     pub compositor: String,
     /// Which graphics adapter to draw on, by the name `graphics_devices`
     /// reports. Empty is whatever wgpu picks, which is the right answer on a
@@ -82,16 +92,6 @@ pub struct Settings {
     /// automatic pick, so a settings file survives being carried to another
     /// machine or unplugging an eGPU.
     pub gpu_device: String,
-    /// "native" to play on a graphics surface with the audio clock deciding
-    /// when each frame is shown, "media-element" to stack `<video>` elements in
-    /// the page as the app always has.
-    ///
-    /// Anything unrecognised is native, so a settings file written before this
-    /// existed gets the new engine rather than being pinned to the old one.
-    /// When the native engine cannot start — no graphics device, no window
-    /// handle, a surface nobody can draw in — the app falls back on its own and
-    /// says why.
-    pub playback_engine: String,
     /// Use ready proxy files for preview and playback. Proxy creation remains
     /// automatic so disabling this changes only which media is read.
     pub proxy_enabled: bool,
@@ -126,9 +126,8 @@ impl Default for Settings {
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
-            compositor: "auto".into(),
+            compositor: "gpu".into(),
             gpu_device: String::new(),
-            playback_engine: "native".into(),
             proxy_enabled: true,
             delete_project_folder: true,
             log_dir: String::new(),
@@ -408,9 +407,32 @@ pub struct CompositorInfo {
     pub fell_back: bool,
 }
 
-/// Which backend a setting asks for. Anything that is not "cpu" means auto,
-/// including the "gpu" that older settings files hold: a machine with no
-/// device should quietly use the software path, not refuse to draw.
+/// Which playback engine the compositor setting implies.
+///
+/// Not a setting of its own any more. The native monitor draws on a graphics
+/// surface, so "stay off the graphics device" and "play on one" was a pair a
+/// user could ask for and never get — `Session::start` refused it and the app
+/// fell back, which is a choice that reads as broken rather than as declined.
+fn wanted_engine(settings: &Settings) -> &'static str {
+    if stays_on_cpu(settings) {
+        "media-element"
+    } else {
+        "native"
+    }
+}
+
+/// Whether the setting asks to stay off the graphics device.
+///
+/// One test, used everywhere the choice matters, so the three things the
+/// setting decides cannot drift apart. Only "cpu" is cpu; "gpu", the "auto" and
+/// "ffmpeg" older settings files hold, and anything unrecognised all mean the
+/// graphics device.
+fn stays_on_cpu(settings: &Settings) -> bool {
+    settings.compositor == "cpu"
+}
+
+/// Which backend a setting asks for. Auto rather than Gpu on purpose: a machine
+/// with no device should quietly use the software path, not refuse to draw.
 fn wanted_backend(setting: &str) -> Backend {
     if setting == "cpu" {
         Backend::Cpu
@@ -464,16 +486,10 @@ pub fn graphics_devices() -> Vec<makevideo_compositor::gpu::Device> {
 }
 
 fn compositor_info(state: &State<AppState>, settings: &Settings) -> CompositorInfo {
-    let setting = settings.compositor.clone();
-    if setting == "ffmpeg" {
-        return CompositorInfo {
-            setting,
-            device: "ffmpeg filter graph".into(),
-            gpu: false,
-            fell_back: false,
-        };
-    }
-    let backend = wanted_backend(&setting);
+    // Normalised, so the page never has to know that a settings file may still
+    // hold "auto" or "ffmpeg".
+    let setting = if stays_on_cpu(settings) { "cpu" } else { "gpu" }.to_string();
+    let backend = wanted_backend(&settings.compositor);
     let made = settings_compositor(state, settings);
     // A name that is not on this machine is drawn on the automatic pick, and
     // the note has to say so rather than repeat the setting back.
@@ -1808,7 +1824,11 @@ pub fn start_render(
         .as_ref()
         .map(|hardware| hardware.label.clone())
         .unwrap_or_else(|| "CPU".into());
-    let gpu = if settings.compositor == "ffmpeg" {
+    // On the CPU setting the filter graph draws. Not the software compositor:
+    // it is there so a preview frame can be drawn without a graphics device,
+    // and putting every frame of a whole render through it would take hours to
+    // produce what ffmpeg composites in minutes.
+    let gpu = if stays_on_cpu(&settings) {
         None
     } else {
         Some(settings_compositor(&state, &settings))
@@ -2140,10 +2160,9 @@ pub fn playback_attach(
     // then throwing it away because the setting said media elements would put a
     // native view on screen for as long as it took to notice, which is a flash
     // of the wrong picture over the stage.
-    if makevideo_present::Engine::parse(&settings.playback_engine)
-        == makevideo_present::Engine::MediaElement
-    {
-        return PlaybackChoice::from(choose(&settings.playback_engine, Ok(())), None);
+    let wanted = wanted_engine(&settings);
+    if makevideo_present::Engine::parse(wanted) == makevideo_present::Engine::MediaElement {
+        return PlaybackChoice::from(choose(wanted, Ok(())), None);
     }
 
     let started = start_session(&window, &state, &settings, place, frame);
@@ -2151,7 +2170,7 @@ pub fn playback_attach(
         Ok(session) => (Some(session), Ok(())),
         Err(reason) => (None, Err(reason)),
     };
-    let choice = choose(&settings.playback_engine, outcome);
+    let choice = choose(wanted, outcome);
     let status = session.as_ref().map(|session| session.status());
     *state.playback.lock().unwrap() = session;
     PlaybackChoice::from(choice, status)

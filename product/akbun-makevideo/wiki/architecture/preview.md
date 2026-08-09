@@ -1,9 +1,13 @@
 # The media element preview
 
 The fallback engine, and what the app played with before the [program
-monitor](./viewport.md) existed. It runs when Settings asks for it, when the
-native monitor cannot start on this machine, and — always — when a single
-imported asset is being previewed rather than the timeline.
+monitor](./viewport.md) existed. It runs when Settings → Compositor is CPU,
+when the native monitor cannot start on this machine, and — always — when a
+single imported asset is being previewed rather than the timeline.
+
+There is no separate playback setting. The monitor draws on a graphics surface,
+so "stay off the graphics device" and "play on one" was a pair a user could ask
+for and never get.
 
 `src/monitor.js` is what decides which of the two is driving. Everything below
 describes this one.
