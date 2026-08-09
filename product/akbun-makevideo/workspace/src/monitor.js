@@ -204,6 +204,13 @@ function createMonitor(options) {
    *  reason, which is the whole point of keeping that preview. */
   async function attach() {
     if (!api || !api.available) return false;
+    if (options.pageOverlayActive && options.pageOverlayActive()) {
+      native = false;
+      lastPlace = null;
+      lastVisible = null;
+      preview.redraw();
+      return false;
+    }
     const place = currentPlace();
     if (!place || place.stage.width < 1 || place.stage.height < 1) return native;
     // One at a time. The layout settles over several frames when a project

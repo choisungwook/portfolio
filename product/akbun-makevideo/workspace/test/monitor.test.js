@@ -135,6 +135,31 @@ test('the native monitor yields to the editor-only selection pass', async (t) =>
   assert.deepStrictEqual(visibility, [true, false, true]);
 });
 
+test('a page overlay keeps the preview in the webview', async (t) => {
+  const previousWindow = global.window;
+  t.after(() => {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  });
+  global.window = { devicePixelRatio: 1 };
+  let attached = 0;
+  let redrawn = 0;
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      redraw: () => { redrawn += 1; },
+    },
+    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    api: { available: true, playbackAttach: async () => { attached += 1; } },
+    pageOverlayActive: () => true,
+  });
+
+  assert.strictEqual(await monitor.attach(), false);
+  assert.strictEqual(attached, 0);
+  assert.strictEqual(redrawn, 1);
+});
+
 test('leaving native editing clears the page exact frame', async (t) => {
   const previousWindow = global.window;
   t.after(() => {

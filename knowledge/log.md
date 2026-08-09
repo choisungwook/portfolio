@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-09
+
+* **Creation**: [Program Monitor 가이드는 앱 설정과 편집용 pass에 둔다](decisions/2026-08-program-monitor-guides-are-editor-only.md) 결정 기록. akbun-makevideo의 네이티브 surface가 WebView 위에 놓이는 제약에서, export 경로와 분리된 정지 exact frame pass를 재사용해 가이드를 표시하는 판단을 남긴다.
+
 ## 2026-08-07
 
 * **Creation**: [move 클로저가 필드 이름을 대면 Send는 wrapper에 남고 클로저는 필드만 가져간다](topics/move-closure-captures-the-field-not-the-wrapper.md) topic 기록. akbun-makevideo의 release 빌드가 unsafe impl Send를 붙여 둔 wrapper를 두고 안쪽 NonNull을 지목하며 실패해, 원인이 wrapper가 아니라 edition 2021의 캡처 단위였다는 것을 남긴다.
