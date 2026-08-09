@@ -389,6 +389,7 @@ function renderProxyProgress() {
 }
 
 let debugTimer = null;
+let debugRefreshInFlight = false;
 
 function byteText(value) {
   if (!Number.isFinite(value)) return 'unavailable';
@@ -396,7 +397,8 @@ function byteText(value) {
 }
 
 async function refreshDebug() {
-  if (dom.debugPanel.hidden) return;
+  if (dom.debugPanel.hidden || debugRefreshInFlight) return;
+  debugRefreshInFlight = true;
   try {
     const [metrics, logs] = await Promise.all([
       window.api.processMetrics(),
@@ -415,6 +417,8 @@ async function refreshDebug() {
   } catch (error) {
     reportError(error, 'debug:refresh');
     dom.debugMetrics.textContent = `Debug data unavailable\n${errorText(error)}`;
+  } finally {
+    debugRefreshInFlight = false;
   }
 }
 

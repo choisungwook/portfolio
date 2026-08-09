@@ -5,7 +5,8 @@
 //! ~/Library/Application Support/io.akbun.makevideo on macOS.
 
 use crate::commands::Settings;
-use std::io::Write;
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
@@ -102,20 +103,26 @@ pub fn recent_error_log(
     lines: usize,
 ) -> Result<String, String> {
     let path = log_dir(app, settings).join(ERROR_LOG);
-    let text = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
+    let file = match std::fs::File::open(&path) {
+        Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
         Err(error) => return Err(format!("cannot read error log {path:?}: {error}")),
     };
-    Ok(text
-        .lines()
-        .rev()
-        .take(lines)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>()
-        .join("\n"))
+    recent_lines(BufReader::new(file), lines)
+}
+
+fn recent_lines<R: BufRead>(reader: R, lines: usize) -> Result<String, String> {
+    let mut recent = VecDeque::with_capacity(lines);
+    for line in reader.lines() {
+        let line = line.map_err(|error| format!("cannot read error log: {error}"))?;
+        if recent.len() == lines {
+            recent.pop_front();
+        }
+        if lines > 0 {
+            recent.push_back(line);
+        }
+    }
+    Ok(recent.into_iter().collect::<Vec<_>>().join("\n"))
 }
 
 /// Write to a temp file and rename over the target. A crash halfway through a

@@ -1784,6 +1784,40 @@ pub struct ProcessMetrics {
     pub cpu_percent: f64,
 }
 
+fn process_metrics_rows(output: &str) -> Result<Vec<(u32, u32, u64, f64)>, String> {
+    output
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut fields = line.split_whitespace();
+            let pid = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let parent = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let rss_kib = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            let cpu_percent = fields
+                .next()
+                .ok_or_else(|| format!("cannot parse process metrics row: {line:?}"))?
+                .parse()
+                .map_err(|error| format!("cannot parse process metrics row {line:?}: {error}"))?;
+            if fields.next().is_some() {
+                return Err(format!("cannot parse process metrics row: {line:?}"));
+            }
+            Ok((pid, parent, rss_kib, cpu_percent))
+        })
+        .collect()
+}
+
 /// Process-tree metrics include WebView and ffmpeg children, which hold most
 /// preview memory and CPU outside the Rust process itself.
 #[tauri::command]
@@ -1795,25 +1829,20 @@ pub fn process_metrics() -> Result<ProcessMetrics, String> {
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
-    let rows: Vec<(u32, u32, u64, f64)> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|line| {
-            let mut fields = line.split_whitespace();
-            Some((
-                fields.next()?.parse().ok()?,
-                fields.next()?.parse().ok()?,
-                fields.next()?.parse().ok()?,
-                fields.next()?.parse().ok()?,
-            ))
-        })
-        .collect();
+    let rows = process_metrics_rows(&String::from_utf8_lossy(&output.stdout))?;
+    let root = std::process::id();
+    if !rows.iter().any(|(pid, _, _, _)| *pid == root) {
+        return Err(format!(
+            "cannot find current process {root} in process metrics"
+        ));
+    }
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     let mut values = HashMap::new();
     for (pid, parent, rss_kib, cpu_percent) in rows {
         children.entry(parent).or_default().push(pid);
         values.insert(pid, (rss_kib, cpu_percent));
     }
-    let mut pending = vec![std::process::id()];
+    let mut pending = vec![root];
     let mut found = HashSet::new();
     while let Some(pid) = pending.pop() {
         if !found.insert(pid) {
@@ -2037,7 +2066,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{process_tree_rss_bytes, Settings};
+    use super::{process_metrics_rows, process_tree_rss_bytes, Settings};
 
     #[test]
     fn existing_settings_delete_the_project_folder_by_default() {
@@ -2058,5 +2087,10 @@ mod tests {
     fn memory_includes_descendants_but_not_neighbours() {
         let ps = "10 1 100\n11 10 20\n12 11 5\n20 1 900\n";
         assert_eq!(process_tree_rss_bytes(ps, 10), 125 * 1024);
+    }
+
+    #[test]
+    fn process_metrics_rejects_invalid_rows() {
+        assert!(process_metrics_rows("10 1 100 0.2\nbroken row\n").is_err());
     }
 }
