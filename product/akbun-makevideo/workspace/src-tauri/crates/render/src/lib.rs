@@ -19,6 +19,6 @@ pub mod workspace;
 
 pub use makevideo_edit::{
     asset_id, Asset, AssetKind, Clip, Project, ProjectSettings, TextAlign, TextStyle, Track,
-    TrackKind, VisualContent, VisualItem, VisualTransform, FORMAT_VERSION,
+    ShapeKind, TrackKind, VisualContent, VisualItem, VisualTransform, FORMAT_VERSION,
 };
 pub use makevideo_time::{RationalTime, Rate};

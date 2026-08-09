@@ -1513,7 +1513,7 @@ fn validate_visual_content(project: &Project, content: &VisualContent) -> Result
         (VisualContent::VideoOverlay { .. }, _) => {
             Err("a video overlay needs a video asset".into())
         }
-        (VisualContent::Text { .. } | VisualContent::Shape, _) => Ok(()),
+        (VisualContent::Text { .. } | VisualContent::Shape { .. }, _) => Ok(()),
     }
 }
 

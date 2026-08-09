@@ -96,6 +96,7 @@ const dom = {
   btnRipple: el('btn-ripple'),
   btnLink: el('btn-link'),
   btnAddText: el('btn-add-text'),
+  btnAddShape: el('btn-add-shape'),
   btnAddMarker: el('btn-add-marker'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
@@ -119,6 +120,14 @@ const dom = {
   textStrokeColor: el('text-stroke-color'),
   textStrokeWidth: el('text-stroke-width'),
   textShadowColor: el('text-shadow-color'),
+  shapePanel: el('shape-panel'),
+  shapeKind: el('shape-kind'),
+  shapeFill: el('shape-fill'),
+  shapeStroke: el('shape-stroke'),
+  shapeStrokeWidth: el('shape-stroke-width'),
+  shapeCornerRadius: el('shape-corner-radius'),
+  shapeStartArrow: el('shape-start-arrow'),
+  shapeEndArrow: el('shape-end-arrow'),
   subtitlePanel: el('subtitle-panel'),
   subtitleValue: el('subtitle-value'),
   subtitleStart: el('subtitle-start'),
@@ -1005,6 +1014,7 @@ function overlayScale() {
 
 function selectVisualItem(itemId) {
   state.selectedVisualItemId = itemId || null;
+  renderTextInspector();
   syncEditorOverlay();
   renderStageOverlay();
 }
@@ -1245,6 +1255,35 @@ async function addText() {
   if (item) selectVisualItem(item.id);
 }
 
+async function addShape() {
+  const target = state.targetTrackId && L.findTrack(state.project, state.targetTrackId);
+  const track = target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
+  if (!track) return;
+  const known = new Set((track.visualItems || []).map((item) => item.id));
+  await edit({
+    op: 'addVisualItem',
+    trackId: track.id,
+    content: {
+      kind: 'shape', shape: 'rectangle', fill: '#4f8cffcc', stroke: '#ffffff',
+      strokeWidth: 4, cornerRadius: 20, startArrow: false, endArrow: false,
+    },
+    start: Math.round(preview.position()),
+    duration: Math.max(Math.round(T.rateToNumber(rate()) * 5), 1),
+    transform: {
+      x: state.project.settings.width * 0.3,
+      y: state.project.settings.height * 0.3,
+      width: state.project.settings.width * 0.4,
+      height: state.project.settings.height * 0.25,
+      rotation: 0,
+      opacity: 1,
+    },
+    zIndex: 0,
+  });
+  const liveTrack = L.findTrack(state.project, track.id);
+  const item = (liveTrack && liveTrack.visualItems || []).find((entry) => !known.has(entry.id));
+  if (item) selectVisualItem(item.id);
+}
+
 async function addSubtitle() {
   const track = L.tracksOf(state.project, 'subtitle')[0];
   if (!track) return;
@@ -1294,10 +1333,21 @@ function preserveAlpha(color, previous) {
 function renderTextInspector() {
   const item = selectedVisualItem();
   const text = item && item.content && item.content.kind === 'text' ? item.content : null;
+  const shape = item && item.content && item.content.kind === 'shape' ? item.content : null;
   const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
   const subtitle = track && track.kind === 'subtitle';
   dom.textPanel.hidden = !text || subtitle;
   dom.subtitlePanel.hidden = !text || !subtitle;
+  dom.shapePanel.hidden = !shape;
+  if (shape) {
+    dom.shapeKind.value = shape.shape || 'rectangle';
+    dom.shapeFill.value = hexColor(shape.fill, '#4f8cff');
+    dom.shapeStroke.value = hexColor(shape.stroke, '#ffffff');
+    dom.shapeStrokeWidth.value = shape.strokeWidth ?? 4;
+    dom.shapeCornerRadius.value = shape.cornerRadius ?? 0;
+    dom.shapeStartArrow.checked = Boolean(shape.startArrow);
+    dom.shapeEndArrow.checked = Boolean(shape.endArrow);
+  }
   if (!text) return;
   if (subtitle) {
     dom.subtitleValue.value = text.text || '';
@@ -1318,6 +1368,24 @@ function renderTextInspector() {
   dom.textStrokeColor.value = hexColor(style.strokeColor, '#000000');
   dom.textStrokeWidth.value = style.strokeWidth || 0;
   dom.textShadowColor.value = hexColor(style.shadowColor, '#000000');
+}
+
+function updateSelectedShape() {
+  const item = selectedVisualItem();
+  if (!item || item.content.kind !== 'shape') return;
+  const content = {
+    kind: 'shape',
+    shape: dom.shapeKind.value,
+    fill: preserveAlpha(dom.shapeFill.value, item.content.fill),
+    stroke: preserveAlpha(dom.shapeStroke.value, item.content.stroke),
+    strokeWidth: Math.max(0, Number(dom.shapeStrokeWidth.value) || 0),
+    cornerRadius: Math.max(0, Number(dom.shapeCornerRadius.value) || 0),
+    startArrow: dom.shapeStartArrow.checked,
+    endArrow: dom.shapeEndArrow.checked,
+  };
+  edit({ op: 'setVisualContent', itemId: item.id, content })
+    .then(() => selectVisualItem(item.id))
+    .catch((error) => reportError(error, 'shape:edit'));
 }
 
 function updateSelectedSubtitle() {
@@ -2375,6 +2443,7 @@ function wireTimeline() {
   dom.btnRipple.addEventListener('click', () => deleteSelected(true));
   dom.btnLink.addEventListener('click', toggleClipLink);
   dom.btnAddText.addEventListener('click', addText);
+  dom.btnAddShape.addEventListener('click', addShape);
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
@@ -2443,6 +2512,12 @@ function wireTimeline() {
     dom.textStrokeColor, dom.textStrokeWidth, dom.textShadowColor,
   ]) {
     input.addEventListener('change', updateSelectedText);
+  }
+  for (const input of [
+    dom.shapeKind, dom.shapeFill, dom.shapeStroke, dom.shapeStrokeWidth,
+    dom.shapeCornerRadius, dom.shapeStartArrow, dom.shapeEndArrow,
+  ]) {
+    input.addEventListener('change', updateSelectedShape);
   }
   for (const input of [dom.subtitleValue, dom.subtitleStart, dom.subtitleEnd]) {
     input.addEventListener('change', updateSelectedSubtitle);

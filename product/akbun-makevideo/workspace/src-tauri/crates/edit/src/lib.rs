@@ -388,7 +388,22 @@ pub enum VisualContent {
         #[serde(default)]
         style: TextStyle,
     },
-    Shape,
+    Shape {
+        #[serde(default)]
+        shape: ShapeKind,
+        #[serde(default = "default_shape_fill")]
+        fill: String,
+        #[serde(default = "default_shape_stroke")]
+        stroke: String,
+        #[serde(default = "default_shape_stroke_width")]
+        stroke_width: f32,
+        #[serde(default)]
+        corner_radius: f32,
+        #[serde(default)]
+        start_arrow: bool,
+        #[serde(default)]
+        end_arrow: bool,
+    },
     Image { asset_id: String },
     VideoOverlay { asset_id: String },
 }
@@ -399,9 +414,36 @@ impl VisualContent {
             VisualContent::Image { asset_id } | VisualContent::VideoOverlay { asset_id } => {
                 Some(asset_id)
             }
-            VisualContent::Text { .. } | VisualContent::Shape => None,
+            VisualContent::Text { .. } | VisualContent::Shape { .. } => None,
         }
     }
+}
+
+/// The primitive drawn inside a shape item's shared transform rectangle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ShapeKind {
+    Rectangle,
+    Ellipse,
+    Line,
+}
+
+impl Default for ShapeKind {
+    fn default() -> Self {
+        ShapeKind::Rectangle
+    }
+}
+
+fn default_shape_fill() -> String {
+    "#4f8cffcc".into()
+}
+
+fn default_shape_stroke() -> String {
+    "#ffffff".into()
+}
+
+fn default_shape_stroke_width() -> f32 {
+    4.0
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -978,7 +1020,15 @@ mod tests {
                 opacity: 1.0,
             },
             z_index,
-            content: VisualContent::Shape,
+            content: VisualContent::Shape {
+                shape: ShapeKind::Rectangle,
+                fill: default_shape_fill(),
+                stroke: default_shape_stroke(),
+                stroke_width: default_shape_stroke_width(),
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
         }
     }
 
