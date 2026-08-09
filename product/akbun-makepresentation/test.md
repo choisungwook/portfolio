@@ -28,15 +28,26 @@ npm run test:rust
 DMG, updater 산출물, 서명 단계를 제외하고 현재 소스로 로컬 앱 번들을 빌드한다.
 
 ```bash
-npm run tauri -- build --bundles app --no-sign --config '{"bundle":{"createUpdaterArtifacts":false}}'
+qa_run_id="qa-$(date +%Y%m%d%H%M%S)-$$"
+qa_product_name="akbun-makepresentation-${qa_run_id}"
+qa_bundle_id="io.akbun.makepresentation.${qa_run_id}"
+
+npm run tauri -- build --bundles app --no-sign \
+  --config "{\"productName\":\"${qa_product_name}\",\"identifier\":\"${qa_bundle_id}\",\"bundle\":{\"createUpdaterArtifacts\":false}}"
+
+qa_app_path="$(pwd)/src-tauri/target/release/bundle/macos/${qa_product_name}.app"
+printf '%s\n' "$qa_app_path"
 ```
 
 - 빌드가 성공해야 한다.
-- 검증할 앱은 `workspace/src-tauri/target/release/bundle/macos/akbun-makepresentation.app`이다.
+- 실행 중인 실제 앱과 충돌하지 않도록 매 테스트마다 고유한 QA product name과 bundle identifier를 사용한다.
+- QA 설정은 Tauri CLI의 `--config`로만 덮어쓴다.
+- `tauri.conf.json`, `Cargo.toml`, `package.json` 등 저장소 파일을 QA 빌드를 위해 수정하지 않는다.
+- 검증할 앱은 명령이 출력한 `qa_app_path`의 `.app`이다.
 
 ## 3. UI 시나리오
 
-Computer Use로 방금 빌드한 `workspace/src-tauri/target/release/bundle/macos/akbun-makepresentation.app`을 직접 실행한다.
+Computer Use로 방금 출력한 `qa_app_path`의 `.app`을 직접 실행한다.
 
 항상 다음 기본 시나리오를 검증한다.
 
@@ -48,8 +59,13 @@ Computer Use로 방금 빌드한 `workspace/src-tauri/target/release/bundle/maco
 
 - 변경 기능의 정상 시나리오와 주요 실패 시나리오를 추가로 검증한다.
 - 파일 입출력 변경은 임시 파일로 저장, 다시 열기, 내보내기를 검증한다.
-- 실행 중인 프로세스가 현재 worktree의 `workspace/src-tauri/target/release/bundle/macos/akbun-makepresentation.app/Contents/MacOS/akbun-makepresentation`인지 확인한다.
-- 검증이 끝나면 이번 테스트에서 실행한 앱과 백그라운드 프로세스만 종료한다.
+- 실행 중인 프로세스의 실행 파일 경로가 현재 worktree의 `${qa_app_path}/Contents/MacOS/` 아래인지 확인한다.
+
+## 4. 정리
+
+- 검증이 끝나면 이번 테스트에서 실행한 앱, 개발 서버, 백그라운드 worker, 테스트 서비스를 종료한다.
+- 테스트 시작 전부터 실행 중이던 사용자 프로세스는 종료하지 않는다.
+- 이번 테스트에서 실행한 프로세스가 모두 종료됐는지 확인한다.
 
 ## 결과 보고
 
