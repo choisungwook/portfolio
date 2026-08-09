@@ -81,3 +81,6 @@ objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow", "NSGraphics", "NSResponder"] }
 objc2-foundation = "0.3"
 raw-window-handle = "0.6"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

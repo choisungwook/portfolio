@@ -771,11 +771,12 @@ fn make_proxy(
     project_path: &str,
     ffmpeg_path: &str,
     asset: &Asset,
+    encoder: Option<&str>,
 ) -> Result<String, String> {
     wait_for_playback_pause(app);
     let output = makevideo_proxy::media_path(project_path, &asset.id)?;
     let temporary = output.with_extension("part.mp4");
-    let args = makevideo_proxy::ffmpeg_args(asset, &temporary);
+    let args = makevideo_proxy::ffmpeg_args(asset, &temporary, encoder);
     let mut child = Command::new(ffmpeg_path)
         .args(args)
         .stdin(Stdio::null())
@@ -783,6 +784,8 @@ fn make_proxy(
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("cannot start ffmpeg: {error}"))?;
+    let done = Arc::new(AtomicBool::new(false));
+    let monitor = monitor_proxy_playback(app.clone(), child.id(), Arc::clone(&done));
     if let Some(stdout) = child.stdout.take() {
         let mut last_percent = 0;
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -811,12 +814,17 @@ fn make_proxy(
                 ) {
                     let _ = child.kill();
                     let _ = child.wait();
+                    done.store(true, Ordering::Relaxed);
+                    let _ = monitor.join();
                     return Err("the project changed".into());
                 }
             }
         }
     }
-    let status = child.wait().map_err(|error| error.to_string())?;
+    let status = child.wait();
+    done.store(true, Ordering::Relaxed);
+    let _ = monitor.join();
+    let status = status.map_err(|error| error.to_string())?;
     if !status.success() {
         let _ = std::fs::remove_file(&temporary);
         return Err("ffmpeg could not create the proxy".into());
@@ -832,8 +840,7 @@ fn make_proxy(
 }
 
 /// Jobs queued for proxying wait until playback stops. A job already encoding
-/// finishes its current file: killing ffmpeg midway would leave partial media
-/// and does not make the current playback smoother.
+/// pauses while playback runs, then resumes without leaving partial media.
 fn wait_for_playback_pause(app: &AppHandle) {
     loop {
         let playing = app
@@ -850,6 +857,43 @@ fn wait_for_playback_pause(app: &AppHandle) {
     }
 }
 
+fn monitor_proxy_playback(app: AppHandle, pid: u32, done: Arc<AtomicBool>) -> JoinHandle<()> {
+    std::thread::spawn(move || {
+        let mut proxy_paused = false;
+        while !done.load(Ordering::Relaxed) {
+            let should_pause_proxy = app
+                .state::<AppState>()
+                .playback
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|session| session.status().playing);
+            if should_pause_proxy != proxy_paused {
+                let _ = set_proxy_process_paused(pid, should_pause_proxy);
+                proxy_paused = should_pause_proxy;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if proxy_paused {
+            let _ = set_proxy_process_paused(pid, false);
+        }
+    })
+}
+
+#[cfg(unix)]
+fn set_proxy_process_paused(pid: u32, paused: bool) -> Result<(), String> {
+    let signal = if paused { libc::SIGSTOP } else { libc::SIGCONT };
+    let result = unsafe { libc::kill(pid as libc::pid_t, signal) };
+    (result == 0)
+        .then_some(())
+        .ok_or_else(|| std::io::Error::last_os_error().to_string())
+}
+
+#[cfg(not(unix))]
+fn set_proxy_process_paused(_: u32, _: bool) -> Result<(), String> {
+    Ok(())
+}
+
 #[tauri::command]
 pub fn proxy_status(state: State<AppState>) -> Vec<ProxyStatus> {
     proxy_statuses(&state.proxies.lock().unwrap())
@@ -864,6 +908,7 @@ pub async fn start_proxies(
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
     let ffmpeg_path = find_tool(&app, "ffmpeg", &configured)
         .ok_or("ffmpeg was not found, so proxies cannot be created")?;
+    let acceleration = acceleration(&state, Some(&ffmpeg_path)).available;
     let project = state.document.lock().unwrap().project().clone();
     let mut jobs = Vec::new();
     {
@@ -956,7 +1001,14 @@ pub async fn start_proxies(
                 ) {
                     return;
                 }
-                match make_proxy(&app, &proxies, &project_path, &ffmpeg_path, &asset) {
+                match make_proxy(
+                    &app,
+                    &proxies,
+                    &project_path,
+                    &ffmpeg_path,
+                    &asset,
+                    acceleration.as_ref().map(|item| item.encoder.as_str()),
+                ) {
                     Ok(path) => {
                         allow_asset_file(&app, &path);
                         set_proxy_status(

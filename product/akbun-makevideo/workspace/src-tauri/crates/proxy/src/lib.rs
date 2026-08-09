@@ -7,7 +7,7 @@ use std::time::UNIX_EPOCH;
 pub const FOLDER: &str = "proxies";
 pub const LONG_EDGE: u32 = 1280;
 pub const SOURCE_LONG_EDGE: u32 = 1920;
-pub const ENCODE_THREADS: u32 = 2;
+pub const DECODE_THREADS: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,14 +79,14 @@ pub fn progress_percent_changed(previous: &mut u8, current: u8) -> bool {
     true
 }
 
-pub fn ffmpeg_args(asset: &Asset, output: &Path) -> Vec<String> {
-    vec![
+pub fn ffmpeg_args(asset: &Asset, output: &Path, encoder: Option<&str>) -> Vec<String> {
+    let mut args = vec![
         "-hide_banner".into(),
         "-y".into(),
+        "-threads".into(),
+        DECODE_THREADS.to_string(),
         "-i".into(),
         asset.path.clone(),
-        "-threads".into(),
-        ENCODE_THREADS.to_string(),
         "-map".into(),
         "0:v:0".into(),
         "-map".into(),
@@ -96,12 +96,25 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path) -> Vec<String> {
             "scale='if(gte(iw,ih),{},-2)':'if(gte(iw,ih),-2,{})'",
             LONG_EDGE, LONG_EDGE
         ),
-        "-c:v".into(),
-        "libx264".into(),
-        "-preset".into(),
-        "veryfast".into(),
-        "-crf".into(),
-        "23".into(),
+    ];
+    if let Some(encoder) = encoder {
+        args.extend([
+            "-c:v".into(),
+            encoder.into(),
+            "-b:v".into(),
+            "4M".into(),
+        ]);
+    } else {
+        args.extend([
+            "-c:v".into(),
+            "libx264".into(),
+            "-preset".into(),
+            "veryfast".into(),
+            "-crf".into(),
+            "23".into(),
+        ]);
+    }
+    args.extend([
         "-pix_fmt".into(),
         "yuv420p".into(),
         "-c:a".into(),
@@ -114,7 +127,8 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path) -> Vec<String> {
         "pipe:1".into(),
         "-nostats".into(),
         output.to_string_lossy().to_string(),
-    ]
+    ]);
+    args
 }
 
 pub fn playback_project(project: &Project, ready: &HashMap<String, String>) -> Project {
@@ -174,13 +188,33 @@ mod tests {
 
     #[test]
     fn ffmpeg_scales_the_long_edge_and_keeps_optional_audio() {
-        let args = ffmpeg_args(&asset(AssetKind::Video, 3840, 2160), Path::new("proxy.mp4"));
+        let args = ffmpeg_args(
+            &asset(AssetKind::Video, 3840, 2160),
+            Path::new("proxy.mp4"),
+            None,
+        );
         assert!(args.iter().any(|arg| arg.contains("1280")));
         assert!(args.windows(2).any(|pair| pair == ["-map", "0:a?"]));
         assert!(args
             .windows(2)
-            .any(|pair| pair[0] == "-threads" && pair[1] == ENCODE_THREADS.to_string()));
+            .any(|pair| pair[0] == "-threads" && pair[1] == DECODE_THREADS.to_string()));
+        assert!(args.windows(2).any(|pair| pair == ["-threads", "2"]));
+        assert!(args.windows(2).any(|pair| pair == ["-i", "/media/original.mov"]));
         assert_eq!(args.last().map(String::as_str), Some("proxy.mp4"));
+    }
+
+    #[test]
+    fn ffmpeg_uses_a_confirmed_hardware_encoder() {
+        let args = ffmpeg_args(
+            &asset(AssetKind::Video, 3840, 2160),
+            Path::new("proxy.mp4"),
+            Some("h264_videotoolbox"),
+        );
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["-c:v", "h264_videotoolbox"]));
+        assert!(args.windows(2).any(|pair| pair == ["-b:v", "4M"]));
+        assert!(!args.iter().any(|arg| arg == "libx264"));
     }
 
     #[test]
