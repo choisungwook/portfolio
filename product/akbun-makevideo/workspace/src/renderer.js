@@ -143,6 +143,7 @@ const state = {
   // about the timeline and not about how many undo steps there are.
   doc: null,
   project: L.blankProject(),
+  lutStatus: {},
   // The revision the file on disk holds. Dirty is a comparison rather than a
   // flag, which means undoing back to where the last save was leaves the
   // project clean again instead of permanently modified.
@@ -651,6 +652,14 @@ function clipElement(track, clip) {
     node.classList.add('linked');
     node.title = 'Linked audio and video clip';
   }
+  if (clip.lutPath) {
+    const unavailable = state.lutStatus[clip.lutPath] === 'unavailable';
+    node.classList.add('lut');
+    node.classList.toggle('lut-unavailable', unavailable);
+    node.title = unavailable
+      ? `3D LUT unavailable: ${baseName(clip.lutPath)}`
+      : `3D LUT: ${baseName(clip.lutPath)}`;
+  }
 
   const label = document.createElement('span');
   label.className = 'clip-name';
@@ -835,9 +844,23 @@ function renderTimeline() {
   if (preview) preview.redraw();
 }
 
+function checkLutFiles() {
+  for (const track of state.project.tracks) {
+    for (const clip of track.clips) {
+      const path = clip.lutPath;
+      if (!path || state.lutStatus[path]) continue;
+      state.lutStatus[path] = 'checking';
+      window.api.validateLut(path)
+        .then(() => { state.lutStatus[path] = 'ready'; renderTimeline(); })
+        .catch(() => { state.lutStatus[path] = 'unavailable'; renderTimeline(); });
+    }
+  }
+}
+
 function refresh() {
   renderAssets();
   renderTimeline();
+  checkLutFiles();
   el('menu-delete-project').disabled = !state.path;
   if (preview) {
     preview.prune();
@@ -1368,6 +1391,13 @@ async function toggleClipLink() {
   const candidate = L.relinkCandidate(state.project, clipId);
   if (!candidate) return;
   await edit({ op: 'linkClips', clipIds: [clipId, candidate.clip.id] });
+}
+
+async function setClipLut(clipId) {
+  const path = await window.api.pickLut();
+  if (!path) return;
+  await window.api.validateLut(path);
+  await edit({ op: 'setClipLut', clipId, lutPath: path });
 }
 
 /** Persist a setting changed from a toolbar or the transport, where there is no
@@ -2433,6 +2463,10 @@ function wireTimeline() {
     if (clip) {
       selectClip(clip.dataset.clipId);
       openTimelineContextMenu(event, [
+        { label: 'Apply 3D LUT…', run: () => setClipLut(clip.dataset.clipId) },
+        ...(L.findClip(state.project, clip.dataset.clipId).clip.lutPath
+          ? [{ label: 'Remove 3D LUT', run: () => edit({ op: 'setClipLut', clipId: clip.dataset.clipId, lutPath: null }) }]
+          : []),
         { label: 'Delete Clip', run: () => deleteSelected(false) },
         { label: 'Ripple Delete', run: () => deleteSelected(true) },
       ]);

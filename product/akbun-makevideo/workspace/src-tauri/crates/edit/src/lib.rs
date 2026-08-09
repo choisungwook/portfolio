@@ -435,6 +435,8 @@ pub struct Clip {
     pub asset_id: String,
     #[serde(default)]
     pub link_group: Option<String>,
+    #[serde(default)]
+    pub lut_path: Option<String>,
     /// Where the clip sits on the timeline, in frames of the project rate.
     pub start: i64,
     /// The span taken out of the source, in frames too. `out` is exclusive.
@@ -946,6 +948,7 @@ mod tests {
             id: id.into(),
             asset_id: "v".into(),
             link_group: None,
+            lut_path: None,
             start,
             in_point,
             out_point,

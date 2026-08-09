@@ -4,7 +4,7 @@
 //! it does, and there is a test asserting the two agree. If the shader changes,
 //! that test is what catches the other half being left behind.
 
-use crate::{Placement, Source};
+use crate::{lut::Lut, Placement, Source};
 use std::borrow::Cow;
 use wgpu::util::DeviceExt;
 
@@ -15,7 +15,9 @@ struct LayerUniform {
     rect: [f32; 4],
     frame: [f32; 2],
     opacity: f32,
-    _pad: f32,
+    lut_size: f32,
+    domain_min: [f32; 4],
+    domain_max: [f32; 4],
 }
 
 impl LayerUniform {
@@ -61,6 +63,7 @@ const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 /// fallback filter graph for no benefit. A surface has to be asked for the same
 /// thing, which is what `Surface` picks its format for.
 pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+const LUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 
 impl GpuCompositor {
     /// Picks whatever device this machine has: Metal on a Mac, and a software
@@ -90,6 +93,16 @@ impl GpuCompositor {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -257,6 +270,33 @@ impl GpuCompositor {
                 wgpu::util::TextureDataOrder::LayerMajor,
                 &source.rgba[..expected],
             );
+            let identity;
+            let lut = match source.lut {
+                Some(lut) => lut,
+                None => {
+                    identity = Lut::identity();
+                    &identity
+                }
+            };
+            let lut_texture = self.device.create_texture_with_data(
+                &self.queue,
+                &wgpu::TextureDescriptor {
+                    label: Some("LUT"),
+                    size: wgpu::Extent3d {
+                        width: lut.size(),
+                        height: lut.size(),
+                        depth_or_array_layers: lut.size(),
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D3,
+                    format: LUT_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                },
+                wgpu::util::TextureDataOrder::LayerMajor,
+                lut.texture_bytes(),
+            );
             let uniform = LayerUniform {
                 rect: [
                     placement.dst.x as f32,
@@ -266,7 +306,19 @@ impl GpuCompositor {
                 ],
                 frame: [width as f32, height as f32],
                 opacity: placement.opacity.clamp(0.0, 1.0),
-                _pad: 0.0,
+                lut_size: lut.size() as f32,
+                domain_min: [
+                    lut.domain_min()[0],
+                    lut.domain_min()[1],
+                    lut.domain_min()[2],
+                    0.0,
+                ],
+                domain_max: [
+                    lut.domain_max()[0],
+                    lut.domain_max()[1],
+                    lut.domain_max()[2],
+                    0.0,
+                ],
             };
             let buffer = self
                 .device
@@ -276,6 +328,7 @@ impl GpuCompositor {
                     usage: wgpu::BufferUsages::UNIFORM,
                 });
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let lut_view = lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
             bindings.push(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("layer"),
                 layout: &self.layout,
@@ -291,6 +344,10 @@ impl GpuCompositor {
                     wgpu::BindGroupEntry {
                         binding: 2,
                         resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(&lut_view),
                     },
                 ],
             }));

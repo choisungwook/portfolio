@@ -866,6 +866,7 @@ pub(crate) mod tests {
             id: id.into(),
             asset_id: asset_id.into(),
             link_group: None,
+            lut_path: None,
             start,
             in_point,
             out_point,

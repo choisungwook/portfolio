@@ -104,12 +104,22 @@ fn draw(frame: &mut [u8], width: u32, height: u32, source: &Source<'_>, placemen
             };
             let source_index = source_row + (source_x.min(source.width - 1) as usize) * 4;
             let frame_index = frame_row + (x as usize) * 4;
-            let texel = [
+            let mut texel = [
                 source.rgba[source_index],
                 source.rgba[source_index + 1],
                 source.rgba[source_index + 2],
                 source.rgba[source_index + 3],
             ];
+            if let Some(lut) = source.lut {
+                let corrected = lut.sample([
+                    texel[0] as f32 / 255.0,
+                    texel[1] as f32 / 255.0,
+                    texel[2] as f32 / 255.0,
+                ]);
+                for channel in 0..3 {
+                    texel[channel] = round_unorm(corrected[channel] * 255.0);
+                }
+            }
             blend_pixel(&mut frame[frame_index..frame_index + 4], texel, opacity);
         }
     }

@@ -22,6 +22,7 @@ const MEDIA_FILTERS = [
 
 const PROJECT_FILTERS = [{ name: 'akbun-makevideo project', extensions: ['akbunvideo'] }];
 const SRT_FILTERS = [{ name: 'SubRip subtitle', extensions: ['srt'] }];
+const LUT_FILTERS = [{ name: 'cube 3D LUT', extensions: ['cube'] }];
 
 // Opening src/index.html in a plain browser is handy for poking at the layout,
 // so without Tauri everything that needs the desktop app degrades to a no-op
@@ -106,6 +107,7 @@ if (!window.__TAURI__) {
       qualitySmoke: false,
     }),
     pickMedia: unavailable,
+    pickLut: unavailable,
     pickProjectOpen: unavailable,
     pickProjectSave: unavailable,
     pickRenderOutput: unavailable,
@@ -151,6 +153,7 @@ if (!window.__TAURI__) {
     editState: async () => emptyDocument(),
     editApply: async () => emptyDocument(),
     fontAvailable: async () => true,
+    validateLut: unavailable,
     editUndo: async () => emptyDocument(),
     editRedo: async () => emptyDocument(),
     describeAsset: async () => emptyDocument(),
@@ -257,6 +260,7 @@ window.api = {
     }),
   pickSrtOpen: () => openDialog({ title: 'Import SubRip', filters: SRT_FILTERS }),
   pickSrtSave: (defaultName) => saveDialog({ title: 'Export SubRip', defaultPath: defaultName, filters: SRT_FILTERS }),
+  pickLut: () => openDialog({ title: 'Apply 3D LUT', filters: LUT_FILTERS }),
 
   pickFolder: (title) => openDialog({ title, directory: true, multiple: false }),
 
@@ -320,6 +324,7 @@ window.api = {
   // user did, so it takes one press to take back.
   editApply: (commands) => invoke('edit_apply', { commands }),
   fontAvailable: (family) => invoke('font_available', { family }),
+  validateLut: (path) => invoke('validate_lut', { path }),
   editUndo: () => invoke('edit_undo'),
   editRedo: () => invoke('edit_redo'),
   describeAsset: (assetId, durationMs, width, height) =>

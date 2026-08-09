@@ -120,6 +120,7 @@ fn clip(id: &str, asset_id: &str, start: i64, out_point: i64) -> Clip {
         id: id.into(),
         asset_id: asset_id.into(),
         link_group: None,
+        lut_path: None,
         start,
         in_point: 0,
         out_point,

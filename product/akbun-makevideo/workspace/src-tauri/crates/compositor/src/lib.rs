@@ -25,6 +25,7 @@
 //! having a frame to draw are separate problems that look the same on screen.
 
 pub mod cpu;
+pub mod lut;
 #[cfg(feature = "gpu")]
 pub mod gpu;
 pub mod pipeline;
@@ -39,6 +40,7 @@ pub struct Source<'a> {
     pub rgba: &'a [u8],
     pub width: u32,
     pub height: u32,
+    pub lut: Option<&'a lut::Lut>,
 }
 
 /// Where that frame goes and how much of it shows.
@@ -247,6 +249,7 @@ mod tests {
                             rgba: &red,
                             width: 16,
                             height: 16,
+                            lut: None,
                         },
                         Placement {
                             dst: full(16),
@@ -257,6 +260,41 @@ mod tests {
                 .unwrap();
             assert_eq!(pixel(&frame, 16, 0, 0), [255, 0, 0, 255], "{name}");
             assert_eq!(pixel(&frame, 16, 15, 15), [255, 0, 0, 255], "{name}");
+        }
+    }
+
+    #[test]
+    fn a_lut_changes_the_source_before_both_backends_blend_it() {
+        let source = solid(1, 1, [128, 64, 192, 255]);
+        let lut = lut::Lut::from_cube(
+            "LUT_3D_SIZE 2\n0.1 0.2 0.3\n0.4 0.2 0.3\n0.1 0.6 0.3\n0.4 0.6 0.3\n0.1 0.2 0.9\n0.4 0.2 0.9\n0.1 0.6 0.9\n0.4 0.6 0.9\n",
+        )
+        .unwrap();
+        let mut frames = Vec::new();
+        for (name, compositor) in backends() {
+            let frame = compositor
+                .compose(
+                    1,
+                    1,
+                    &[(
+                        Source {
+                            rgba: &source,
+                            width: 1,
+                            height: 1,
+                            lut: Some(&lut),
+                        },
+                        Placement {
+                            dst: full(1),
+                            opacity: 1.0,
+                        },
+                    )],
+                )
+                .unwrap();
+            assert_ne!(pixel(&frame, 1, 0, 0), [128, 64, 192, 255], "{name}");
+            frames.push((name, frame));
+        }
+        if frames.len() == 2 {
+            assert_eq!(frames[0].1, frames[1].1, "CPU and GPU LUT output");
         }
     }
 
@@ -283,6 +321,7 @@ mod tests {
                                 rgba: &red,
                                 width: bottom.w,
                                 height: bottom.h,
+                                lut: None,
                             },
                             Placement {
                                 dst: bottom,
@@ -294,6 +333,7 @@ mod tests {
                                 rgba: &green,
                                 width: top.w,
                                 height: top.h,
+                                lut: None,
                             },
                             Placement {
                                 dst: top,
@@ -332,6 +372,7 @@ mod tests {
                                 rgba: &red,
                                 width: 8,
                                 height: 8,
+                                lut: None,
                             },
                             Placement {
                                 dst: full(8),
@@ -343,6 +384,7 @@ mod tests {
                                 rgba: &green,
                                 width: 8,
                                 height: 8,
+                                lut: None,
                             },
                             Placement {
                                 dst: full(8),
@@ -371,6 +413,7 @@ mod tests {
                                 rgba: &red,
                                 width: 8,
                                 height: 8,
+                                lut: None,
                             },
                             Placement {
                                 dst: full(8),
@@ -382,6 +425,7 @@ mod tests {
                                 rgba: &white,
                                 width: 8,
                                 height: 8,
+                                lut: None,
                             },
                             Placement {
                                 dst: full(8),
@@ -412,6 +456,7 @@ mod tests {
                             rgba: &blue,
                             width: 4,
                             height: 4,
+                            lut: None,
                         },
                         Placement {
                             dst: Rect {
@@ -443,6 +488,7 @@ mod tests {
                         rgba: &tiny,
                         width: 8,
                         height: 8,
+                        lut: None,
                     },
                     Placement {
                         dst: full(8),
@@ -480,6 +526,7 @@ mod tests {
                             rgba: &red,
                             width: 8,
                             height: 8,
+                            lut: None,
                         },
                         Placement {
                             dst: Rect {
@@ -527,6 +574,7 @@ mod tests {
                         rgba: &red,
                         width: bottom.w,
                         height: bottom.h,
+                        lut: None,
                     },
                     Placement {
                         dst: bottom,
@@ -538,6 +586,7 @@ mod tests {
                         rgba: &green,
                         width: top.w,
                         height: top.h,
+                        lut: None,
                     },
                     Placement {
                         dst: top,
@@ -549,6 +598,7 @@ mod tests {
                         rgba: &blue,
                         width: small.w,
                         height: small.h,
+                        lut: None,
                     },
                     Placement {
                         dst: small,

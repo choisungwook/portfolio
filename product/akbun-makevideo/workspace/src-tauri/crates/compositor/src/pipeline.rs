@@ -131,6 +131,7 @@ where
                     rgba: &layer.pixels,
                     width: layer.width,
                     height: layer.height,
+                    lut: None,
                 },
                 layer.placement,
             )
@@ -239,16 +240,24 @@ pub fn preview_frame(
         }
     }
 
+    let luts: Vec<Option<crate::lut::Lut>> = layers
+        .iter()
+        .map(|layer| project.clip(&layer.clip_id)
+            .and_then(|clip| clip.lut_path.as_deref())
+            .and_then(|path| crate::lut::Lut::from_cube_file(path).ok()))
+        .collect();
     let mut sources: Vec<(Source<'_>, Draw)> = layers
         .iter()
         .zip(frames.iter())
-        .filter_map(|(layer, pixels)| {
+        .zip(luts.iter())
+        .filter_map(|((layer, pixels), lut)| {
             pixels.as_ref().map(|pixels| {
                 (
                     Source {
                         rgba: pixels,
                         width: layer.dst.w,
                         height: layer.dst.h,
+                        lut: lut.as_ref(),
                     },
                     Draw {
                         dst: layer.dst,
@@ -266,6 +275,7 @@ pub fn preview_frame(
                 rgba: &layer.pixels,
                 width: layer.width,
                 height: layer.height,
+                lut: None,
             },
             layer.placement,
         )
