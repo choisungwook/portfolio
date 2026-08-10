@@ -2053,7 +2053,16 @@ function dropCommands(trackId, assets, atFrame) {
   const track = L.findTrack(state.project, trackId);
   if (!track) return [];
   const commands = [];
-  for (const asset of assets.filter((asset) => L.canAccept(track, asset))) {
+  const accepted = assets.filter((asset) => L.canAccept(track, asset));
+  if (track.kind === 'video') {
+    const firstVideo = accepted.find((asset) => asset.kind === 'video');
+    const settings = L.settingsForFirstVideo(state.project, firstVideo, {
+      width: state.settings.defaultWidth,
+      height: state.settings.defaultHeight,
+    });
+    if (settings) commands.push({ op: 'setSettings', settings });
+  }
+  for (const asset of accepted) {
     if (track.kind === 'video' && asset.kind === 'video' && asset.hasAudio) {
       const videoIndex = L.tracksOf(state.project, 'video').findIndex((item) => item.id === trackId);
       const audio = L.tracksOf(state.project, 'audio')[videoIndex];

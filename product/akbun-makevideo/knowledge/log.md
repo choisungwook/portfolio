@@ -2,6 +2,7 @@
 
 ## 2026-08-10
 
+* [첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다](decisions/2026-08-first-video-defines-default-canvas-shape.md) 결정 기록. 9:16 영상이 기본 16:9 preview에서 과도하게 축소된 사례를 바탕으로 비율 자동 채택 범위를 정함.
 * [native view 좌표는 superview에게 원점을 물어본다](decisions/2026-08-native-view-asks-its-superview-for-the-origin.md) 결정 기록. WKWebView의 isFlipped가 YES인 것을 실측으로 확인하고 viewport 변환을 superview 질의로 바꿈.
 * [filter graph 렌더는 rasterize한 still을 overlay로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 기록. CPU 렌더와 폴백이 text/shape를 조용히 떨어뜨리던 문제의 해법 선택을 남김.
 
