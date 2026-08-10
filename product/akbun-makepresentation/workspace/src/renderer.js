@@ -365,6 +365,16 @@ canvas.addEventListener('pointerdown', (event) => {
   if (group) {
     const index = Number(group.dataset.i);
 
+    // Shift-click changes only this object's membership. It does not begin a
+    // drag, so repeated Shift-clicks can build or shrink a selection without
+    // moving an object by a pixel.
+    if (event.shiftKey && !(event.metaKey || event.ctrlKey)) {
+      selectMany(L.toggleSelection(state.selection, index, slide().shapes.length));
+      renderCanvas();
+      renderProps();
+      return;
+    }
+
     // Opening a text box for editing is decided here rather than from a
     // dblclick event, because the browser never reports one: pointerup
     // redraws the canvas, so mouseup lands on a freshly built element and
