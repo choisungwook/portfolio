@@ -122,6 +122,7 @@
 - [OpenAPI 스펙을 탐색하는 API 뷰어 웹 페이지 (akbun-openapiviewer)](./product/akbun-openapiviewer/) (26.8.5)
 - [AWS profile로 로그인해 EC2를 조회하는 macOS 데스크톱 앱 (akbun-awsviewer)](./product/akbun-awsviewer/) (26.8.6)
 - [HTTP 요청, 북마크, 공통 변수, curl 변환, 시나리오 실행 데스크톱 앱 (akbun-requesthttp)](./product/akbun-requesthttp/) (26.8.6)
+- [제품 목록을 모아 저장소로 보내는 카탈로그 웹 페이지 (products.akbun.com)](./product/akbun-productcatalog/) (26.8.10)
 
 ## Dockerfile
 
