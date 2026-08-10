@@ -13,11 +13,13 @@ export const LOCAL_CATALOG_URL = '/data/products.json';
 export const DEFAULT_REPO_BASE = 'https://github.com/choisungwook/portfolio/tree/master/product';
 
 // The filter row. `all` is first and is the state the page opens in.
+// A product either runs in a browser or it is installed, so `web` and
+// `desktop` carry everything that is a product; `reference` is the shelf for
+// the two layout libraries, which are neither.
 export const KINDS = [
   { id: 'all', label: 'All' },
   { id: 'web', label: 'Web' },
   { id: 'desktop', label: 'Desktop' },
-  { id: 'server', label: 'Server' },
   { id: 'reference', label: 'Reference' },
 ];
 

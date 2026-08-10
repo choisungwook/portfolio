@@ -88,7 +88,7 @@
       "id": "akbun-terraform-apply-remote",
       "name": "akbun-terraform-apply-remote",
       "description": "GitHub PR comment로 terraform plan/apply를 실행하는 자동화 서버",
-      "kind": "server",
+      "kind": "web",
       "tags": ["rust", "terraform", "github"],
       "released": "2026-07-29"
     },

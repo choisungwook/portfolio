@@ -150,7 +150,7 @@ test('kindCounts counts every chip, empty ones included', () => {
   assert.equal(counts.all, 3);
   assert.equal(counts.web, 2);
   assert.equal(counts.desktop, 1);
-  assert.equal(counts.server, 0, 'a chip with nothing behind it still reports zero');
+  assert.equal(counts.reference, 0, 'a chip with nothing behind it still reports zero');
 });
 
 test('shortDate reads as the README does', () => {

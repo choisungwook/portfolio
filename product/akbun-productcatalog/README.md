@@ -16,7 +16,7 @@ Deployed as a static Astro build on Cloudflare at [products.akbun.com](https://p
 | Repository button | Each card links to `product/<id>` on GitHub. The link is derived from the id, so an entry is four fields and no long URL. An entry that lives elsewhere sets `repo` and overrides it |
 | Site button | Shown only for the products that have a deployed page of their own |
 | Search | Filters live on every keystroke, no Enter needed. Ctrl/Cmd + K focuses it, Escape clears it. Every word must match, over name, id, description, kind and tags |
-| Kind filter | Chips for web, desktop, server and reference, each carrying the count it would show. A chip with nothing behind it reads 0 and is disabled |
+| Kind filter | Chips for web, desktop and reference, each carrying the count it would show. A chip with nothing behind it reads 0 and is disabled |
 | Failure | A fetch that fails on both sources shows the reason and a Retry button, not an empty grid |
 | Theme | Light and dark from the system setting, with no toggle to get out of sync |
 
@@ -36,7 +36,7 @@ Deployed as a static Astro build on Cloudflare at [products.akbun.com](https://p
 }
 ```
 
-`id` is the only required field, and it is the directory name under `product/`. `kind` is one of `web`, `desktop`, `server`, `reference`. `site` and `released` are optional. The document's `repoBase` is the GitHub tree URL the id is appended to.
+`id` is the only required field, and it is the directory name under `product/`. `kind` is one of `web`, `desktop`, `reference`. A product either runs in a browser or is installed, so those two carry everything that is a product; `reference` is for the layout libraries, which are neither. `site` and `released` are optional. The document's `repoBase` is the GitHub tree URL the id is appended to.
 
 The description is the same sentence as the row in [product/README.md](../README.md), so the two move together when a product is added or renamed.
 

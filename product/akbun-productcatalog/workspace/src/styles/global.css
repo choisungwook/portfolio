@@ -19,7 +19,6 @@
   --danger-border: #F3C7C2;
   --k-web: #2F6FDD;
   --k-desktop: #1E8E5A;
-  --k-server: #B7791F;
   --k-reference: #7C5CD6;
   --font-title: 'Sora', sans-serif;
   --font-body: 'Outfit', sans-serif;
@@ -42,7 +41,6 @@
     --danger-border: #5C302C;
     --k-web: #7FB0FF;
     --k-desktop: #6FD3A3;
-    --k-server: #E7BE72;
     --k-reference: #BCA5F5;
   }
 }
@@ -248,7 +246,6 @@ a { color: inherit; }
 
 .kind-web { color: var(--k-web); }
 .kind-desktop { color: var(--k-desktop); }
-.kind-server { color: var(--k-server); }
 .kind-reference { color: var(--k-reference); }
 
 .card-desc {
