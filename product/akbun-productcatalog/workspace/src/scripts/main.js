@@ -9,11 +9,10 @@ import {
   shortDate,
   KINDS,
   REMOTE_CATALOG_URL,
-  LOCAL_CATALOG_URL,
 } from '../lib/catalog.js';
 
-// GitHub raw is the source of truth; the copy published with the site is only
-// there so a blocked or slow raw does not leave an empty page.
+// GitHub raw is the source of truth; the copy inlined into the page at build
+// time is only there so a blocked or slow raw does not leave an empty page.
 const FETCH_TIMEOUT_MS = 6000;
 
 const searchInput = document.getElementById('search');
@@ -50,10 +49,10 @@ async function loadCatalog() {
     return { ...catalog, source: 'GitHub raw' };
   } catch (remoteError) {
     try {
-      const catalog = await fetchCatalog(LOCAL_CATALOG_URL);
+      const catalog = parseCatalog(document.getElementById('catalog-fallback').textContent);
       return { ...catalog, source: '배포본 사본' };
     } catch {
-      // The remote failure is the one worth reporting: the local copy only
+      // The remote failure is the one worth reporting: the inlined copy only
       // fails too when the whole page failed to load.
       throw remoteError;
     }

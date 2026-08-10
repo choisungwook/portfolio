@@ -1,4 +1,10 @@
 ---
+// The catalog lives at product/products.json, outside this workspace, so it is
+// imported here and inlined below as the fallback the page uses when GitHub raw
+// is unreachable. Vite resolves the path at build time, which is why this is an
+// import and not a readFileSync: import.meta.url points at the bundled chunk
+// once the build has run, and process.cwd() depends on where npm was invoked.
+import catalogFallback from '../../../../products.json';
 import '../styles/global.css';
 ---
 
@@ -41,9 +47,11 @@ import '../styles/global.css';
 
   <footer class="app-footer">
     <span id="source" class="source"></span>
-    <a href="https://raw.githubusercontent.com/choisungwook/portfolio/master/product/akbun-productcatalog/workspace/public/data/products.json"
+    <a href="https://raw.githubusercontent.com/choisungwook/portfolio/master/product/products.json"
        target="_blank" rel="noopener noreferrer">products.json</a>
   </footer>
+
+  <script id="catalog-fallback" type="application/json" set:html={JSON.stringify(catalogFallback)}></script>
 
   <script>
     import '../scripts/main.js';

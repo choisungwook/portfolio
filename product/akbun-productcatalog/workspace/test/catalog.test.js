@@ -160,10 +160,10 @@ test('shortDate reads as the README does', () => {
   assert.equal(shortDate('nonsense'), '');
 });
 
-// The published copy is the fallback the page loads when GitHub raw is
-// unreachable, so a typo in it has to fail here rather than on the site.
+// product/products.json is what GitHub raw serves and what the page inlines as
+// its fallback, so a typo in it has to fail here rather than on the site.
 test('the published catalog parses', () => {
-  const raw = readFileSync(new URL('../public/data/products.json', import.meta.url), 'utf8');
+  const raw = readFileSync(new URL('../../../products.json', import.meta.url), 'utf8');
   const { products } = parseCatalog(raw);
 
   assert.ok(products.length >= 20);

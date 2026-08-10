@@ -1,13 +1,13 @@
 // Pure helpers over the catalog document. Nothing here touches the DOM or the
 // network, so `node --test` runs them without a browser.
 
-// The catalog is read from GitHub raw at page load, so editing the JSON on
-// GitHub changes the live page without waiting for a Cloudflare build. The
-// same file is also published with the site, and is the fallback below.
+// The catalog lives at product/products.json, next to the products it lists,
+// and is read from GitHub raw at page load, so editing the JSON on GitHub
+// changes the live page without waiting for a Cloudflare build. The file sits
+// outside this workspace, so the fallback copy is inlined into the page at
+// build time instead of being published as an asset.
 export const REMOTE_CATALOG_URL =
-  'https://raw.githubusercontent.com/choisungwook/portfolio/master/product/akbun-productcatalog/workspace/public/data/products.json';
-
-export const LOCAL_CATALOG_URL = '/data/products.json';
+  'https://raw.githubusercontent.com/choisungwook/portfolio/master/product/products.json';
 
 // Used when a product carries no repoBase of its own and the document omits it.
 export const DEFAULT_REPO_BASE = 'https://github.com/choisungwook/portfolio/tree/master/product';

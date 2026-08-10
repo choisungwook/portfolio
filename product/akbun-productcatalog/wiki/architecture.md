@@ -15,12 +15,12 @@ There are two JavaScript files and the line between them is the main structural 
 
 ## Where the catalog comes from
 
-`products.json` has one home, `workspace/public/data/products.json`, and reaches the page by two routes.
+`products.json` has one home, `product/products.json`, next to the products it lists rather than inside this workspace. It sits there because every PR that touches `product/` has to update it, and a path that does not run through one product's build directory is the one people find. It reaches the page by two routes.
 
 1. `REMOTE_CATALOG_URL`, the GitHub raw URL of that file on master. This is the source of truth at runtime.
-2. `LOCAL_CATALOG_URL`, `/data/products.json`, the copy Astro publishes with the site because the file sits in `public/`.
+2. The `#catalog-fallback` script element, which `index.astro` fills at build time by reading the file off disk. The file is outside the workspace, so `public/` cannot publish it as an asset.
 
-`loadCatalog` tries the remote first and falls back to the local copy. The footer names whichever one answered, so a stale page is visible rather than silent. Both requests carry `AbortSignal.timeout`, because a hung request is worse than a failed one here: without the ceiling, the fallback never gets its turn.
+`loadCatalog` tries the remote first and falls back to the inlined copy. The footer names whichever one answered, so a stale page is visible rather than silent. The remote request carries `AbortSignal.timeout`, because a hung request is worse than a failed one here: without the ceiling, the fallback never gets its turn.
 
 The failure the fallback exists for is a raw URL that is unreachable, blocked by a network, or answering 404 because the file is not on master yet. When both fail the page shows the remote error and a Retry button; the local error is not worth reporting, since it only fails when the whole page failed to load.
 

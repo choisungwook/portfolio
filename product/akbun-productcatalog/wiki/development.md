@@ -33,11 +33,12 @@ npm run preview
 
 ## Adding a product
 
-1. Add an object to `workspace/public/data/products.json`. `id` is the directory name under `product/`; everything else is optional.
-2. Bump the version in `package.json`, because the data file is under `workspace/`. A data-only edit is a patch.
-3. Keep the description the same sentence as the row in `product/README.md`. The two are written by hand and drift apart otherwise.
+1. Add an object to `product/products.json`. `id` is the directory name under `product/`; everything else is optional.
+2. Keep the description the same sentence as the row in `product/README.md`. The two are written by hand and drift apart otherwise.
 
-The live page picks the change up from GitHub raw once master has it, without waiting for the Cloudflare build. The build still runs, and it is what refreshes the published fallback copy.
+No version bump for a data-only edit any more: the file is outside `workspace/`, so nothing about the site changed.
+
+The live page picks the change up from GitHub raw once master has it, without waiting for the Cloudflare build. The next build is what refreshes the inlined fallback copy.
 
 ## Deploy
 
