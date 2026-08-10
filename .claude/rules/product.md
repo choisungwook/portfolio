@@ -4,12 +4,15 @@
 
 ## 인덱스 갱신
 
-`product/` 아래에 새 디렉터리를 만들면 같은 commit에서 두 인덱스를 갱신한다.
+`product/` 아래에 새 디렉터리를 만들면 같은 commit에서 세 인덱스를 갱신한다.
 
 1. `product/README.md`의 인덱스 테이블에 항목을 추가한다.
 2. 루트 `README.md`의 "직접 만든 제품" 섹션 목록에 항목을 추가한다. 형식은 `- [설명](./product/<디렉터리>/) (작성날짜)`를 따른다.
+3. `product/products.json`의 `products` 배열에 항목을 추가하고 `updated`를 오늘 날짜로 바꾼다. 항목 형식은 [.claude/commands/repo-pr-create.md](../commands/repo-pr-create.md)의 "제품 카탈로그 갱신"에 있다.
 
-인덱스 항목은 디렉터리 링크와 한 문장 설명으로 구성한다. 디렉터리를 삭제하거나 이름을 바꿀 때도 두 인덱스를 함께 갱신한다.
+인덱스 항목은 디렉터리 링크와 한 문장 설명으로 구성한다. 디렉터리를 삭제하거나 이름을 바꿀 때도 세 인덱스를 함께 갱신한다.
+
+`products.json`은 <https://products.akbun.com>m> 이 GitHub raw로 직접 읽는다. master에 들어가는 순간 사이트가 바뀌므로, 이 파일만은 배포를 기다리지 않는다. 반대로 빼먹으면 사이트가 그 자리에서 낡는다.
 
 ## 버전 올리기
 

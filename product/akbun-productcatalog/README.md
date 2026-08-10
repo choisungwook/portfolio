@@ -22,7 +22,7 @@ Deployed as a static Astro build on Cloudflare at [products.akbun.com](https://p
 
 ## The data file
 
-`workspace/public/data/products.json`. One object per product:
+`product/products.json`, one level above this directory, next to the products it lists. One object per product:
 
 ```json
 {
@@ -48,8 +48,8 @@ The description is the same sentence as the row in [product/README.md](../README
 | `workspace/src/scripts/` | The DOM side. Fetching, rendering, event wiring |
 | `workspace/src/lib/` | Parsing, validation, sorting and filtering, none of which touch the DOM or the network |
 | `workspace/src/styles/` | The stylesheet |
-| `workspace/public/data/` | `products.json`, both the source of truth and the published fallback |
-| `workspace/test/` | Tests over `src/lib` and over the published `products.json`, run on plain node with no browser |
+| `../products.json` | The catalog itself, one level up in `product/`, both the source of truth and the inlined fallback |
+| `workspace/test/` | Tests over `src/lib` and over `product/products.json`, run on plain node with no browser |
 | `wiki/` | Project notes the next agent reads before taking over |
 | `adr/` | Architecture decision records |
 
