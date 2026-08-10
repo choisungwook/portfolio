@@ -141,6 +141,8 @@ test('toggleSelection adds and removes one valid object without disturbing other
   assert.deepStrictEqual(L.toggleSelection([0], 2, 3), [0, 2]);
   assert.deepStrictEqual(L.toggleSelection([0, 2], 0, 3), [2]);
   assert.deepStrictEqual(L.toggleSelection([0, 2], 3, 3), [0, 2]);
+  assert.deepStrictEqual(L.toggleSelection([0, 0, 2, -1, 3, 1.5], 1, 3), [0, 2, 1]);
+  assert.deepStrictEqual(L.toggleSelection([0, 0, 2, -1, 3, 1.5], 3, 3), [0, 2]);
 });
 
 test('moveShape shifts pen points', () => {
