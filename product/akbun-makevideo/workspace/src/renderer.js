@@ -706,7 +706,10 @@ function clipElement(track, clip) {
  *  trims the way a clip does. */
 function visualElement(track, item) {
   const node = document.createElement('div');
-  const kind = item.content && item.content.kind === 'shape' ? 'shape' : 'text';
+  // A project should always contain content, but keep an incomplete saved
+  // visual item from taking down the whole timeline while it is repaired.
+  const content = item.content || {};
+  const kind = content.kind === 'shape' ? 'shape' : 'text';
   node.className = track.kind === 'subtitle' ? 'clip subtitle' : `clip visual ${kind}`;
   node.dataset.visualItemId = item.id;
   node.style.left = `${L.framesToPx(item.start, rate(), state.pxPerSecond)}px`;
@@ -715,8 +718,8 @@ function visualElement(track, item) {
   const label = document.createElement('span');
   label.className = 'clip-name';
   label.textContent = kind === 'shape'
-    ? `Shape — ${item.content.shape || 'rectangle'}`
-    : item.content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
+    ? `Shape — ${content.shape || 'rectangle'}`
+    : content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
   const left = document.createElement('span');
   left.className = 'handle left';
   const right = document.createElement('span');
@@ -1149,7 +1152,10 @@ function drawStageVisuals() {
   const canvas = dom.stageVisuals;
   if (!canvas) return;
   const clear = () => {
-    if (canvas.width > 0) canvas.width = 0;
+    if (canvas.width > 0 || canvas.height > 0) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   };
   if (!preview || preview.mode() !== 'timeline') return clear();
   if (preview.usesNativeMonitor() && !editorOverlayActive) return clear();
