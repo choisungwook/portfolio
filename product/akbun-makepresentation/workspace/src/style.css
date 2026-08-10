@@ -250,6 +250,8 @@ main {
 }
 
 .sel-handle {
+  /* Geometry stays in the slide SVG coordinate space. A CSS-pixel transform
+     here would make the grip ignore the slide zoom. */
   fill: #ffffff;
   stroke: var(--accent);
   stroke-width: 1.5;

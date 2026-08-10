@@ -56,7 +56,10 @@ function clearSelection() {
 
 // --- rendering ---------------------------------------------------------------
 
-const HANDLE = 12;
+// The selection overlay shares the slide SVG viewBox. Keep its geometry in
+// slide units rather than CSS pixels so the browser scales handles with the
+// slide at every zoom level.
+const HANDLE_SLIDE_UNITS = 12;
 
 function hitSvg(shape) {
   // An invisible, fatter twin so thin strokes are still clickable. Filled
@@ -89,7 +92,7 @@ function selectionSvg(shape, handles) {
   if (handles) {
     for (const h of L.handlesFor(shape)) {
       parts.push(
-        `<rect x="${h.x - HANDLE / 2}" y="${h.y - HANDLE / 2}" width="${HANDLE}" height="${HANDLE}" class="sel-handle" data-handle="${h.id}"/>`
+        `<rect x="${h.x - HANDLE_SLIDE_UNITS / 2}" y="${h.y - HANDLE_SLIDE_UNITS / 2}" width="${HANDLE_SLIDE_UNITS}" height="${HANDLE_SLIDE_UNITS}" class="sel-handle" data-handle="${h.id}"/>`
       );
     }
   }
