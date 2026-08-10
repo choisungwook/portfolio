@@ -245,6 +245,19 @@ function shapeIndicesInRect(shapes, rect) {
   }, []);
 }
 
+// Add an unselected item to a selection, or remove it when it is already
+// present. Keeping this independent of the page makes modifier-click
+// selection use the same valid-index rules as every other selection path.
+function toggleSelection(selection, index, length) {
+  const current = [...new Set(selection)].filter(
+    (selected) => Number.isInteger(selected) && selected >= 0 && selected < length
+  );
+  if (!Number.isInteger(index) || index < 0 || index >= length) return current;
+  return current.includes(index)
+    ? current.filter((selected) => selected !== index)
+    : [...current, index];
+}
+
 function moveShape(shape, dx, dy) {
   if (shape.kind === 'pen') {
     for (const p of shape.points) {
@@ -597,6 +610,7 @@ const exported = {
   shapeBBox,
   normalizeRect,
   shapeIndicesInRect,
+  toggleSelection,
   moveShape,
   handlesFor,
   resizeShape,
