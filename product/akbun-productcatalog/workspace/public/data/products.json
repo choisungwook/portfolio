@@ -1,0 +1,170 @@
+{
+  "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
+  "updated": "2026-08-10",
+  "products": [
+    {
+      "id": "akbun-productcatalog",
+      "name": "akbun-productcatalog",
+      "description": "product 디렉터리의 제품을 카드로 모아 저장소로 보내는 카탈로그 웹 페이지",
+      "kind": "web",
+      "tags": ["astro", "cloudflare"],
+      "site": "https://products.akbun.com",
+      "released": "2026-08-10"
+    },
+    {
+      "id": "akbun-requesthttp",
+      "name": "akbun-requesthttp",
+      "description": "HTTP(S) 요청, 응답 확인, 북마크, 공통 변수, curl 변환, 시나리오 실행을 갖춘 데스크톱 HTTP 클라이언트",
+      "kind": "desktop",
+      "tags": ["tauri", "http"],
+      "released": "2026-08-06"
+    },
+    {
+      "id": "akbun-awsviewer",
+      "name": "akbun-awsviewer",
+      "description": "AWS profile을 골라 IAM Identity Center로 로그인하고 EC2를 조회 전용으로 보는 macOS 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "aws", "macos"],
+      "released": "2026-08-06"
+    },
+    {
+      "id": "akbun-openapiviewer",
+      "name": "akbun-openapiviewer",
+      "description": "OpenAPI 스펙을 붙여넣거나 파일로 열어 API 목록과 상세를 탐색하는 웹 페이지",
+      "kind": "web",
+      "tags": ["astro", "openapi"],
+      "released": "2026-08-05"
+    },
+    {
+      "id": "akbun-rendermermaid",
+      "name": "akbun-rendermermaid",
+      "description": "mermaid 코드를 왼쪽에 쓰면 오른쪽에 렌더링하고 PNG로 저장하는 웹 페이지",
+      "kind": "web",
+      "tags": ["astro", "mermaid"],
+      "site": "https://mermaid.akbun.com",
+      "released": "2026-08-04"
+    },
+    {
+      "id": "akbun-makevideo",
+      "name": "akbun-makevideo",
+      "description": "멀티 트랙 타임라인, 미리보기, ffmpeg FHD/4K 렌더링을 갖춘 영상 편집 macOS 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "macos", "ffmpeg"],
+      "released": "2026-08-02"
+    },
+    {
+      "id": "akbun-makepresentation",
+      "name": "akbun-makepresentation",
+      "description": "도형, 텍스트, pptx 열기/저장, pdf 내보내기, 발표 모드를 갖춘 슬라이드 편집 macOS 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "macos"],
+      "released": "2026-08-02"
+    },
+    {
+      "id": "akbun-folderview",
+      "name": "akbun-folderview",
+      "description": "직접 추가한 사진과 영상을 태그, 등급, 검색으로 찾는 Windows 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "windows"],
+      "released": "2026-08-01"
+    },
+    {
+      "id": "akbun-mactaskbar",
+      "name": "akbun-mactaskbar",
+      "description": "메뉴바 아이콘을 구간으로 나눠 숨기고 목록으로 보는 macOS 메뉴바 관리 앱",
+      "kind": "desktop",
+      "tags": ["swift", "macos"],
+      "released": "2026-07-31"
+    },
+    {
+      "id": "akbun-screenshot",
+      "name": "akbun-screenshot",
+      "description": "영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 macOS 메뉴바 스크린샷 앱",
+      "kind": "desktop",
+      "tags": ["electron", "macos"],
+      "released": "2026-07-31"
+    },
+    {
+      "id": "akbun-terraform-apply-remote",
+      "name": "akbun-terraform-apply-remote",
+      "description": "GitHub PR comment로 terraform plan/apply를 실행하는 자동화 서버",
+      "kind": "server",
+      "tags": ["rust", "terraform", "github"],
+      "released": "2026-07-29"
+    },
+    {
+      "id": "akbun-k8supgradeview",
+      "name": "akbun-k8supgradeview",
+      "description": "EKS 업그레이드 작업용 노드/파드 조회 Electron 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["electron", "kubernetes", "eks"],
+      "released": "2026-07-26"
+    },
+    {
+      "id": "akbun-gitdesktop",
+      "name": "akbun-gitdesktop",
+      "description": "git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["electron", "git", "github"],
+      "released": "2026-07-25"
+    },
+    {
+      "id": "akbun-shadowing-player",
+      "name": "akbun-shadowing-player",
+      "description": "언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 Electron 앱",
+      "kind": "desktop",
+      "tags": ["electron", "audio"],
+      "released": "2026-07-25"
+    },
+    {
+      "id": "hprof-oom-analyzer",
+      "name": "hprof-oom-analyzer",
+      "description": "JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구",
+      "kind": "desktop",
+      "tags": ["electron", "jvm"],
+      "released": "2026-07-18"
+    },
+    {
+      "id": "tistory-skin",
+      "name": "tistory-skin",
+      "description": "Tistory 블로그 스킨",
+      "kind": "web",
+      "tags": ["blog", "css"],
+      "released": "2026-04-04"
+    },
+    {
+      "id": "slide-reference",
+      "name": "slide-reference",
+      "description": "AI agent용 슬라이드 레이아웃 레퍼런스",
+      "kind": "reference",
+      "tags": ["astro", "reference"],
+      "site": "https://slideref.akbun.com",
+      "released": "2026-03-28"
+    },
+    {
+      "id": "envelope_encryption_simulator",
+      "name": "envelope_encryption_simulator",
+      "description": "KMS 봉투암호화 암복호화 과정을 보여주는 시뮬레이터",
+      "kind": "web",
+      "tags": ["astro", "aws", "kms"],
+      "site": "https://envelopelab.akbun.com",
+      "released": "2026-03-02"
+    },
+    {
+      "id": "cardnews-reference",
+      "name": "cardnews-reference",
+      "description": "AI agent용 카드뉴스 레이아웃 레퍼런스",
+      "kind": "reference",
+      "tags": ["astro", "reference"],
+      "site": "https://cardref.akbun.com"
+    },
+    {
+      "id": "slo",
+      "name": "slo",
+      "description": "SLO 가용성을 입력하면 허용 다운타임을 계산하는 웹 도구",
+      "kind": "web",
+      "tags": ["sre", "aws"],
+      "site": "https://slo.akbun.com"
+    }
+  ]
+}

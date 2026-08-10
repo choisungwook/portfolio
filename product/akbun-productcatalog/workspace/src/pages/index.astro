@@ -1,0 +1,52 @@
+---
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>akbun products</title>
+  <meta name="description" content="악분이 만든 제품 목록. 카드를 검색하고 종류로 거르고, 버튼을 누르면 그 제품의 저장소로 간다.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- The catalog is fetched from here on load, so the handshake is worth
+       starting before the script runs. -->
+  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-title">
+      <h1>akbun products</h1>
+      <p>만든 제품을 모아 둔 곳. 카드의 버튼이 그 제품의 저장소로 간다.</p>
+    </div>
+    <a class="button ghost" href="https://github.com/choisungwook/portfolio"
+       target="_blank" rel="noopener noreferrer">Portfolio repo</a>
+  </header>
+
+  <main class="page">
+    <div class="controls">
+      <div class="search-box">
+        <input id="search" type="search" placeholder="이름, 설명, 태그로 검색 (Ctrl/Cmd + K)"
+               autocomplete="off" spellcheck="false" aria-label="제품 검색">
+      </div>
+      <div id="kinds" class="chips" role="group" aria-label="종류로 거르기"></div>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite">불러오는 중…</div>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <footer class="app-footer">
+    <span id="source" class="source"></span>
+    <a href="https://raw.githubusercontent.com/choisungwook/portfolio/master/product/akbun-productcatalog/workspace/public/data/products.json"
+       target="_blank" rel="noopener noreferrer">products.json</a>
+  </footer>
+
+  <script>
+    import '../scripts/main.js';
+  </script>
+</body>
+</html>
