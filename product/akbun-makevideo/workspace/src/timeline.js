@@ -145,6 +145,32 @@ function projectDurationFrames(project) {
   return end;
 }
 
+/** Match a new default project's canvas to its first video.
+ *
+ *  The long edge stays at the chosen default, so a 4K phone recording does
+ *  not silently turn a FHD project into a 4K project. A project whose size was
+ *  already changed is left alone. */
+function settingsForFirstVideo(project, asset, defaults) {
+  if (!project || !project.settings || !asset || asset.kind !== 'video') return null;
+  const hasItems = project.tracks.some(
+    (track) => track.clips.length > 0 || (track.visualItems || []).length > 0
+  );
+  if (hasItems || asset.width <= 0 || asset.height <= 0) return null;
+
+  const defaultWidth = Math.max(16, Number(defaults && defaults.width) || 1920);
+  const defaultHeight = Math.max(16, Number(defaults && defaults.height) || 1080);
+  const { width, height, rate } = project.settings;
+  if (width !== defaultWidth || height !== defaultHeight) return null;
+  if (width * asset.height === height * asset.width) return null;
+
+  const longEdge = Math.max(width, height);
+  const even = (value) => Math.max(16, Math.round(value / 2) * 2);
+  const next = asset.width >= asset.height
+    ? { width: longEdge, height: even((longEdge * asset.height) / asset.width) }
+    : { width: even((longEdge * asset.width) / asset.height), height: longEdge };
+  return { ...next, rate };
+}
+
 /** Sorted, unique clip boundaries from the target track, or from every enabled
  *  track when none is targeted. */
 function editPoints(project, targetTrackId) {
@@ -332,6 +358,7 @@ const exported = {
   clipDuration,
   clipEnd,
   projectDurationFrames,
+  settingsForFirstVideo,
   editPoints,
   previousEditPoint,
   nextEditPoint,

@@ -81,6 +81,44 @@ test('a hidden track does not stretch the timeline', () => {
   assert.strictEqual(L.projectDurationFrames(project), 300);
 });
 
+test('the first vertical video turns a default FHD project vertical', () => {
+  const project = projectOf([], [track('t1', 'video', 'V1')]);
+  const vertical = { ...VIDEO, width: 2160, height: 3840 };
+  assert.deepStrictEqual(
+    L.settingsForFirstVideo(project, vertical, { width: 1920, height: 1080 }),
+    { width: 1080, height: 1920, rate: T.fps(30) }
+  );
+});
+
+test('first-video sizing preserves an explicit project shape and an active edit', () => {
+  const vertical = { ...VIDEO, width: 2160, height: 3840 };
+  const custom = projectOf([], [track('t1', 'video', 'V1')]);
+  custom.settings.width = 1080;
+  custom.settings.height = 1080;
+  assert.strictEqual(
+    L.settingsForFirstVideo(custom, vertical, { width: 1920, height: 1080 }),
+    null
+  );
+
+  const active = projectOf(
+    [VIDEO],
+    [track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 300)])]
+  );
+  assert.strictEqual(
+    L.settingsForFirstVideo(active, vertical, { width: 1920, height: 1080 }),
+    null
+  );
+});
+
+test('first-video sizing keeps the default long edge and uses even dimensions', () => {
+  const project = projectOf([], [track('t1', 'video', 'V1')]);
+  const oddAspect = { ...VIDEO, width: 1001, height: 1999 };
+  const settings = L.settingsForFirstVideo(project, oddAspect, { width: 1920, height: 1080 });
+  assert.strictEqual(settings.height, 1920);
+  assert.strictEqual(settings.width % 2, 0);
+  assert.ok(settings.width < settings.height);
+});
+
 test('a muted audio track drops out of the length too', () => {
   const audio = track('t2', 'audio', 'A1', [clip('c1', 'm', 0, 0, 900)]);
   const project = projectOf([SOUND], [audio]);
