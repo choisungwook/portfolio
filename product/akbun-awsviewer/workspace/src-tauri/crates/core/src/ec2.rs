@@ -22,6 +22,27 @@ pub struct InstanceSummary {
     pub launch_time: Option<String>,
     /// "spot" for spot instances; the API omits it for on-demand.
     pub lifecycle: Option<String>,
+    /// "spot" or "on-demand", the Capacity column. Derived from `lifecycle`
+    /// here rather than in the page so the filter and the column cannot
+    /// disagree about what an absent lifecycle means.
+    pub capacity: String,
+    /// The Karpenter NodePool that owns this instance, from its tags. None
+    /// for anything Karpenter did not create.
+    pub karpenter_node_pool: Option<String>,
+}
+
+/// The tag Karpenter puts on the instances it launches. The second name is
+/// what pre-v1beta1 Karpenter used and still exists on long-lived nodes.
+const KARPENTER_POOL_TAGS: [&str; 2] = ["karpenter.sh/nodepool", "karpenter.sh/provisioner-name"];
+
+/// The EC2 API omits `instanceLifecycle` for on-demand instances, so absence
+/// is the answer rather than missing data. Values other than spot (scheduled,
+/// capacity-block) are shown as they come.
+fn capacity_of(lifecycle: Option<&str>) -> String {
+    match lifecycle {
+        None => "on-demand".to_string(),
+        Some(value) => value.to_string(),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -216,15 +237,22 @@ pub async fn instance_detail(
     Ok(map_detail(&instance, &volumes, &groups))
 }
 
+fn tag_value(instance: &Instance, key: &str) -> Option<String> {
+    instance
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == Some(key))
+        .and_then(|tag| tag.value())
+        .map(str::to_string)
+}
+
 pub fn map_summary(instance: &Instance) -> InstanceSummary {
+    let lifecycle = instance
+        .instance_lifecycle()
+        .map(|l| l.as_str().to_string());
     InstanceSummary {
         instance_id: instance.instance_id().unwrap_or_default().to_string(),
-        name: instance
-            .tags()
-            .iter()
-            .find(|t| t.key() == Some("Name"))
-            .and_then(|t| t.value())
-            .map(str::to_string),
+        name: tag_value(instance, "Name"),
         state: instance
             .state()
             .and_then(|s| s.name())
@@ -241,9 +269,11 @@ pub fn map_summary(instance: &Instance) -> InstanceSummary {
         launch_time: instance.launch_time().and_then(|t| {
             t.fmt(aws_smithy_types::date_time::Format::DateTime).ok()
         }),
-        lifecycle: instance
-            .instance_lifecycle()
-            .map(|l| l.as_str().to_string()),
+        capacity: capacity_of(lifecycle.as_deref()),
+        karpenter_node_pool: KARPENTER_POOL_TAGS
+            .iter()
+            .find_map(|tag| tag_value(instance, tag)),
+        lifecycle,
     }
 }
 
@@ -469,6 +499,50 @@ mod tests {
             .build();
         let summary = map_summary(&instance);
         assert_eq!(summary.lifecycle.as_deref(), Some("spot"));
+        assert_eq!(summary.capacity, "spot");
+    }
+
+    // An absent lifecycle is the API saying on-demand, not missing data, so
+    // the Capacity column says so instead of showing a dash.
+    #[test]
+    fn missing_lifecycle_reads_as_on_demand() {
+        assert_eq!(map_summary(&sample_instance()).capacity, "on-demand");
+        assert_eq!(capacity_of(None), "on-demand");
+        assert_eq!(capacity_of(Some("capacity-block")), "capacity-block");
+    }
+
+    #[test]
+    fn karpenter_node_pool_comes_from_the_tag() {
+        let instance = Instance::builder()
+            .instance_id("i-karpenter")
+            .tags(Tag::builder().key("karpenter.sh/nodepool").value("default").build())
+            .build();
+        assert_eq!(
+            map_summary(&instance).karpenter_node_pool.as_deref(),
+            Some("default")
+        );
+    }
+
+    #[test]
+    fn legacy_provisioner_tag_still_counts_as_karpenter() {
+        let instance = Instance::builder()
+            .instance_id("i-old")
+            .tags(
+                Tag::builder()
+                    .key("karpenter.sh/provisioner-name")
+                    .value("legacy")
+                    .build(),
+            )
+            .build();
+        assert_eq!(
+            map_summary(&instance).karpenter_node_pool.as_deref(),
+            Some("legacy")
+        );
+    }
+
+    #[test]
+    fn instances_without_the_tag_have_no_node_pool() {
+        assert_eq!(map_summary(&sample_instance()).karpenter_node_pool, None);
     }
 
     #[test]

@@ -11,6 +11,7 @@ const {
   formatPortRange,
   formatAge,
   stateClass,
+  capacityClass,
   sessionLabel,
 } = require('../src/lib.js');
 
@@ -66,9 +67,23 @@ test('page scripts share one global scope without redeclaring names', () => {
 });
 
 const instances = [
-  { instanceId: 'i-0aaa', name: 'web-1', state: 'running', privateIp: '10.0.1.10' },
-  { instanceId: 'i-0bbb', name: 'batch', state: 'stopped', privateIp: '10.0.1.2', lifecycle: 'spot' },
-  { instanceId: 'i-0ccc', name: null, state: 'running', privateIp: null },
+  {
+    instanceId: 'i-0aaa',
+    name: 'web-1',
+    state: 'running',
+    privateIp: '10.0.1.10',
+    capacity: 'on-demand',
+  },
+  {
+    instanceId: 'i-0bbb',
+    name: 'batch',
+    state: 'stopped',
+    privateIp: '10.0.1.2',
+    lifecycle: 'spot',
+    capacity: 'spot',
+    karpenterNodePool: 'default',
+  },
+  { instanceId: 'i-0ccc', name: null, state: 'running', privateIp: null, capacity: 'on-demand' },
 ];
 
 test('filter matches instance id', () => {
@@ -141,6 +156,16 @@ test('state colors: green running, red end states, amber transitions', () => {
   assert.strictEqual(stateClass('shutting-down'), 'state-transition');
   assert.strictEqual(stateClass(null), '');
   assert.strictEqual(stateClass('weird'), '');
+});
+
+// The Capacity column and the Spot only filter must agree, so both read the
+// backend's capacity field rather than each deciding what an absent
+// lifecycle means.
+test('only spot capacity gets a color', () => {
+  assert.strictEqual(capacityClass('spot'), 'capacity-spot');
+  assert.strictEqual(capacityClass('on-demand'), '');
+  assert.strictEqual(capacityClass('capacity-block'), '');
+  assert.strictEqual(capacityClass(undefined), '');
 });
 
 test('session label states', () => {

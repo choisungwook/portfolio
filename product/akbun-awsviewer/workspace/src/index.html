@@ -93,6 +93,12 @@
               <th class="sortable" data-sort-key="instanceType" tabindex="0" role="button" aria-sort="none">
                 Type<span class="sort-arrow"></span>
               </th>
+              <th class="sortable" data-sort-key="capacity" tabindex="0" role="button" aria-sort="none">
+                Capacity<span class="sort-arrow"></span>
+              </th>
+              <th class="sortable" data-sort-key="karpenterNodePool" tabindex="0" role="button" aria-sort="none">
+                Karpenter<span class="sort-arrow"></span>
+              </th>
               <th class="sortable" data-sort-key="availabilityZone" tabindex="0" role="button" aria-sort="none">
                 AZ<span class="sort-arrow"></span>
               </th>
@@ -118,10 +124,11 @@
       <!-- AWS Profile tab -->
       <section id="tab-profile" class="tab">
         <p class="help">
-          Profiles come from ~/.aws/config, read-only. This app signs in
-          through IAM Identity Center only; profiles without SSO configuration
-          are listed but cannot be signed in to. Sign in and switch profiles
-          with AWS login in the top right.
+          Profiles come from ~/.aws/config, read-only. Signing in runs
+          aws sso login with the profile you pick, so the session is the same
+          one the AWS CLI uses. Profiles without SSO configuration are listed
+          but cannot be signed in to. Sign in and switch profiles with AWS
+          login in the top right.
         </p>
         <table id="profile-table">
           <thead>
@@ -208,6 +215,32 @@
     <p id="login-profile-empty" class="empty hidden">
       No IAM Identity Center profiles in ~/.aws/config.
     </p>
+  </dialog>
+
+  <!-- Opens once `aws sso login` prints its verification page. The app also
+       opens that page in its own window; this modal is what explains the
+       window, carries the code, and takes the cancel. -->
+  <dialog id="relay-dialog" aria-labelledby="relay-title">
+    <div class="login-dialog-header">
+      <h2 id="relay-title">Approve the sign-in</h2>
+    </div>
+    <p class="help">
+      The sign-in page for <span id="relay-profile" class="relay-profile">-</span>
+      is open in a separate window. Approve it there and this window continues
+      on its own.
+    </p>
+    <div id="relay-code-box" class="relay-code-box hidden">
+      <span class="relay-code-label">Code</span>
+      <span id="relay-code" class="relay-code"></span>
+    </div>
+    <p class="help">
+      If the page asks for a code, enter the one above.
+      <span id="relay-url" class="relay-url"></span>
+    </p>
+    <div class="error-dialog-actions">
+      <button id="relay-reopen">Open sign-in window again</button>
+      <button id="relay-cancel">Cancel</button>
+    </div>
   </dialog>
 
   <dialog id="error-dialog" aria-labelledby="error-title" aria-describedby="error-message">

@@ -1,6 +1,8 @@
 # akbun-awsviewer
 
-macOS desktop viewer for AWS resources. Pick a profile from ~/.aws/config in the AWS login dialog, sign in with IAM Identity Center, and browse EC2 instances read-only — list with an Age column, filter by id, Name tag, or spot only, and open console-style Details / Network / Storage / Security tabs.
+macOS desktop viewer for AWS resources. Pick a profile from ~/.aws/config in the AWS login dialog, sign in with IAM Identity Center — the app runs `aws sso login` for that profile and relays its browser step into an app window — and browse EC2 instances read-only: list with Capacity (spot / on-demand), Karpenter NodePool and Age columns, filter by id, Name tag, or spot only, and open console-style Details / Network / Storage / Security tabs.
+
+Login needs AWS CLI v2 (2.9 or newer) installed.
 
 No access keys: the app reads no ~/.aws/credentials and calls only list/describe APIs through the official AWS SDK for Rust.
 

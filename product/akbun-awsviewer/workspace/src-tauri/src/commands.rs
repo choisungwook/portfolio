@@ -3,17 +3,22 @@
 // the selected profile's role credentials. Nothing here mutates anything on
 // AWS — the core crate only exposes list/describe calls.
 
-use awsviewer_core::{creds, ec2, login, profiles, ssocache, CoreError, Profile, RoleCredentials};
+use awsviewer_core::{creds, ec2, profiles, ssocache, CoreError, Profile, RoleCredentials};
+use crate::clilogin;
 use crate::store::{self, Settings};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// The label is fixed so a second login attempt replaces the first window
 /// instead of stacking a new one.
 const LOGIN_WINDOW: &str = "sso-login";
+
+/// The page listens for this to open its modal. The payload is the sign-in
+/// URL and code the AWS CLI printed.
+const VERIFICATION_EVENT: &str = "aws-login-verification";
 
 /// Role credentials are cached per profile until shortly before they expire,
 /// so switching tabs does not call GetRoleCredentials again every time.
@@ -22,6 +27,10 @@ const CREDS_SKEW_MS: i64 = 60_000;
 pub struct AppState {
     pub settings: Mutex<Settings>,
     pub creds_cache: Mutex<HashMap<String, RoleCredentials>>,
+    /// The sign-in URL of the login attempt in flight. Kept here so the
+    /// modal's "Open sign-in window again" button needs no URL of its own —
+    /// the page never gets to name a URL for the app to open in a window.
+    pub login_url: Mutex<Option<String>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -165,60 +174,162 @@ pub fn set_insecure_tls(
     snapshot(&app, &state)
 }
 
-/// Runs the whole device authorization flow: opens the Identity Center page
-/// in its own window, waits for approval there, writes the token cache and
-/// resolves. Closing the window cancels the wait.
+/// What the page's login modal shows while the CLI waits.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Verification {
+    pub profile: String,
+    pub url: String,
+    pub user_code: Option<String>,
+}
+
+/// Signs in by running `aws sso login --profile <selected>` and relaying its
+/// browser step: the URL the CLI prints opens in an app window, the page shows
+/// the same URL and code in a modal, and this resolves when the CLI exits.
+/// Closing the sign-in window kills the CLI, which cancels the flow.
+///
+/// The CLI writes ~/.aws/sso/cache, which is the same cache this app reads, so
+/// there is nothing to save here — the session is read back the way any other
+/// session is.
 #[tauri::command]
-pub async fn sso_login(
+pub async fn cli_login(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SessionStatus, CoreError> {
-    let (profile, insecure) = selected_profile(&state)?;
-    let sso = profile.sso.clone().ok_or_else(|| CoreError::NoSso {
-        message: format!(
-            "profile {} has no IAM Identity Center configuration; this app does not use access keys",
-            profile.name
-        ),
-    })?;
+    let (profile, _) = selected_profile(&state)?;
+    // A profile with no sso block cannot be signed in to at all, and saying so
+    // here is clearer than the CLI's own message about a missing key.
+    if profile.sso.is_none() {
+        return Err(CoreError::NoSso {
+            message: format!(
+                "profile {} has no IAM Identity Center configuration; this app does not use access keys",
+                profile.name
+            ),
+        });
+    }
 
-    let auth = login::request_device_authorization(&sso, insecure).await?;
-    open_login_window(&app, &auth.verification_uri_complete)?;
-
+    *state.login_url.lock().unwrap() = None;
+    let name = profile.name.clone();
+    let relay = app.clone();
     let watcher = app.clone();
-    let result = login::wait_for_token(&sso, &auth, insecure, move || {
-        watcher.get_webview_window(LOGIN_WINDOW).is_some()
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        clilogin::run_login(
+            &name.clone(),
+            |found| {
+                if let Err(error) = start_relay(&relay, &name, &found) {
+                    log::error!("cannot open the sign-in window: {error}");
+                }
+            },
+            login_window_watcher(watcher),
+        )
     })
-    .await;
+    .await
+    .map_err(|error| io_error(format!("login task failed: {error}")))?;
 
+    close_login_window(&app);
+    *state.login_url.lock().unwrap() = None;
+    result?;
+
+    state.creds_cache.lock().unwrap().clear();
+    // The CLI reported success, so a session that still reads as logged out
+    // means it wrote a cache file this app looks for elsewhere. Say that
+    // rather than leaving the page claiming a login that buys nothing.
+    session_for(&profile)
+        .filter(|session| session.logged_in)
+        .ok_or_else(|| CoreError::LoginRequired {
+            message: format!(
+                "aws sso login finished but no valid session was found for profile {}",
+                profile.name
+            ),
+        })
+}
+
+/// Answers "is the user still in the sign-in window?" for the login task.
+///
+/// Window creation is queued onto the main thread, so the window does not
+/// exist the instant the relay starts and a plain is_some() check would read
+/// that gap as a cancelled login. Absence only means cancelled after the
+/// window has been seen once; before that it means "not open yet", bounded so
+/// a window that never opens does not wait out the whole flow.
+fn login_window_watcher(app: AppHandle) -> impl Fn() -> bool + Send + 'static {
+    let seen = std::cell::Cell::new(false);
+    let since = std::time::Instant::now();
+    move || {
+        if app.get_webview_window(LOGIN_WINDOW).is_some() {
+            seen.set(true);
+            return true;
+        }
+        !seen.get() && since.elapsed() < std::time::Duration::from_secs(90)
+    }
+}
+
+/// Opens the relay window and tells the page, in that order: the window is the
+/// thing the user needs, the modal only explains it.
+fn start_relay(app: &AppHandle, profile: &str, found: &awsviewer_core::awscli::Verification) -> Result<(), CoreError> {
+    open_login_window(app, &found.url)?;
+    let payload = Verification {
+        profile: profile.to_string(),
+        url: found.url.clone(),
+        user_code: found.user_code.clone(),
+    };
+    if let Some(state) = app.try_state::<AppState>() {
+        *state.login_url.lock().unwrap() = Some(found.url.clone());
+    }
+    app.emit(VERIFICATION_EVENT, payload)
+        .map_err(|error| io_error(format!("cannot notify the page: {error}")))
+}
+
+/// Reopens the sign-in window for the login in flight. Closing that window is
+/// how the flow is cancelled, so a user who closes it by accident needs a way
+/// back in that does not restart the CLI.
+#[tauri::command]
+pub fn reopen_login_window(app: AppHandle, state: State<'_, AppState>) -> Result<(), CoreError> {
+    let url = state
+        .login_url
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| io_error("no sign-in is in progress".to_string()))?;
+    open_login_window(&app, &url)
+}
+
+/// Cancels the login in flight by closing the sign-in window, which is the
+/// one signal the login task polls.
+#[tauri::command]
+pub fn cancel_login(app: AppHandle) {
+    close_login_window(&app);
+}
+
+fn close_login_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LOGIN_WINDOW) {
         let _ = window.close();
     }
-
-    let token = result?;
-    let path = ssocache::cache_path(&home_dir()?, &sso);
-    ssocache::save_token(&path, &token)
-        .map_err(|error| io_error(format!("cannot write token cache: {error}")))?;
-    state.creds_cache.lock().unwrap().clear();
-
-    Ok(SessionStatus {
-        logged_in: true,
-        expires_at: Some(token.expires_at),
-    })
 }
 
+/// Windows must be built on the main thread on macOS, and this is called from
+/// the blocking login task, so the build is handed back to the main thread.
 fn open_login_window(app: &AppHandle, url: &str) -> Result<(), CoreError> {
-    if let Some(previous) = app.get_webview_window(LOGIN_WINDOW) {
-        let _ = previous.destroy();
-    }
     let parsed: tauri::Url = url
         .parse()
         .map_err(|error| io_error(format!("bad verification url: {error}")))?;
-    tauri::WebviewWindowBuilder::new(app, LOGIN_WINDOW, tauri::WebviewUrl::External(parsed))
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(previous) = handle.get_webview_window(LOGIN_WINDOW) {
+            let _ = previous.destroy();
+        }
+        let built = tauri::WebviewWindowBuilder::new(
+            &handle,
+            LOGIN_WINDOW,
+            tauri::WebviewUrl::External(parsed),
+        )
         .title("AWS sign-in")
         .inner_size(520.0, 720.0)
-        .build()
-        .map_err(|error| io_error(format!("cannot open login window: {error}")))?;
-    Ok(())
+        .build();
+        if let Err(error) = built {
+            log::error!("cannot open login window: {error}");
+        }
+    })
+    .map_err(|error| io_error(format!("cannot open login window: {error}")))
 }
 
 /// A valid cached token exchanged for role credentials, memoized per profile.

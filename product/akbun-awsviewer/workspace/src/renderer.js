@@ -118,6 +118,8 @@ function renderInstances() {
       el('td', null, instance.instanceId),
       el('td', lib.stateClass(instance.state) || null, dash(instance.state)),
       el('td', null, dash(instance.instanceType)),
+      el('td', lib.capacityClass(instance.capacity) || null, dash(instance.capacity)),
+      el('td', null, dash(instance.karpenterNodePool)),
       el('td', null, dash(instance.availabilityZone)),
       el('td', null, dash(instance.privateIp)),
       el('td', null, dash(instance.publicIp)),
@@ -193,6 +195,8 @@ function renderDetailBody() {
         ['Name', detail.summary.name],
         ['State', detail.summary.state],
         ['Type', detail.summary.instanceType],
+        ['Capacity', detail.summary.capacity],
+        ['Karpenter NodePool', detail.summary.karpenterNodePool],
         ['Launch time', detail.summary.launchTime],
         ['AMI', detail.details.imageId],
         ['Architecture', detail.details.architecture],
@@ -407,17 +411,52 @@ async function loginWithProfile(name) {
   await login();
 }
 
+// ------------------------------------------------------------ login relay
+
+// The backend runs `aws sso login` and opens the page it prints in its own
+// window. This modal is the page's half of that: it names the profile, carries
+// the code the window may ask for, and owns cancel. It is opened by the
+// verification event, never by a click.
+function showRelayDialog(verification) {
+  $('#relay-profile').textContent = verification.profile || '-';
+  const code = verification.userCode || '';
+  $('#relay-code').textContent = code;
+  $('#relay-code-box').classList.toggle('hidden', !code);
+  $('#relay-url').textContent = verification.url || '';
+  const dialog = $('#relay-dialog');
+  if (!dialog.open) dialog.showModal();
+}
+
+function closeRelayDialog() {
+  const dialog = $('#relay-dialog');
+  if (dialog.open) dialog.close();
+}
+
+// Cancel means closing the sign-in window: that window's absence is what the
+// login task polls, so there is one way to cancel rather than two states to
+// keep in step.
+async function cancelLogin() {
+  closeRelayDialog();
+  try {
+    await api.cancelLogin();
+  } catch (error) {
+    reportError(`cancel login: ${error?.message || error}`);
+  }
+}
+
 async function login() {
   const button = $('#login-button');
   button.disabled = true;
   button.textContent = 'Waiting for sign-in…';
   try {
-    await api.ssoLogin();
+    await api.cliLogin();
+    closeRelayDialog();
     applySnapshot(await api.getSnapshot());
     clearError();
     setLoginHint(false);
     await loadInstances();
   } catch (error) {
+    closeRelayDialog();
     handleError(error);
   } finally {
     button.disabled = false;
@@ -454,6 +493,18 @@ function wire() {
   $('#close-login-dialog').addEventListener('click', closeLoginDialog);
   loginDialog.addEventListener('click', (event) => {
     if (event.target === loginDialog) closeLoginDialog();
+  });
+
+  const relayDialog = $('#relay-dialog');
+  $('#relay-cancel').addEventListener('click', () => void cancelLogin());
+  $('#relay-reopen').addEventListener('click', () => {
+    api.reopenLoginWindow().catch(handleError);
+  });
+  // Esc closes a dialog on its own. Without this the modal would vanish while
+  // the CLI kept waiting, leaving no way to cancel or get the window back.
+  relayDialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    void cancelLogin();
   });
 
   $('#login-button').addEventListener('click', openLoginDialog);
@@ -531,6 +582,13 @@ function wire() {
 
 async function init() {
   wire();
+  try {
+    await api.onLoginVerification(showRelayDialog);
+  } catch (error) {
+    // Without the listener the sign-in window still opens and the flow still
+    // works; only the modal is missing. Log it and carry on.
+    reportError(`cannot listen for login verification: ${error?.message || error}`);
+  }
   try {
     applySnapshot(await api.getSnapshot());
     if (state.snapshot.session?.loggedIn) {

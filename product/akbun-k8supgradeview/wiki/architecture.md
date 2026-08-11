@@ -194,6 +194,20 @@ Nodes, Pods, 노드 상세의 파드 표 Name 칼럼에서 이름 오른쪽에 �
 | Karpenter 노드 | `karpenter.sh/nodepool` 또는 구버전 `karpenter.sh/provisioner-name` label 존재 |
 | Managed NodeGroup 노드 | `eks.amazonaws.com/nodegroup` label 존재 |
 | Cordoned 노드 | `spec.unschedulable == true`, 상태에 SchedulingDisabled로 표시 |
+| Spot 노드 | capacity type label 값이 `spot` |
+| On-Demand 노드 | capacity type label 값이 `on-demand` |
+
+노드 필터 버튼은 이 분류를 그대로 쓰고 하나만 켜지는 라디오다. Karpenter와 Managed NodeGroup은 노드를 만든 주체를, Spot과 On-Demand는 그 노드를 산 방식을 가르는 서로 다른 축이라 버튼을 각각 둔다. "Karpenter의 spot 노드"처럼 두 축의 교집합은 Capacity 칼럼으로 정렬해 본다. 축마다 버튼을 곱해 두면 버튼이 네 개 더 늘어나는데, 업그레이드 중에 실제로 필요한 것은 spot 노드 전체를 한 번에 보는 쪽이었다.
+
+필터 규칙은 `nodeMatchesFilter(node, filter)` 하나이고 표시 상태를 건드리지 않는 순수 함수다. 버튼의 `data-filter`가 그대로 이 함수의 인자가 되므로, 화면에만 버튼을 늘리면 아무것도 걸러지지 않는 버튼이 생긴다. 두 곳이 맞는지는 `test/node-capacity-type.test.js`가 확인한다.
+
+## Capacity 칼럼
+
+Nodes 탭의 Capacity 칼럼은 노드가 spot인지 on-demand인지 보여준다. label 이름이 노드를 만든 주체마다 달라 `karpenter.sh/capacity-type`, `eks.amazonaws.com/capacityType`, 직접 붙이는 `node.kubernetes.io/capacity-type` 셋을 이 순서로 본다.
+
+값의 표기도 label마다 다르다. Karpenter는 `on-demand`, Managed NodeGroup은 `ON_DEMAND`로 적으므로 소문자로 내리고 `_`를 `-`로 바꿔 `spot`과 `on-demand` 두 값으로 맞춘다. 정규화를 main에서 해 두는 이유는 필터와 색 두 곳에서 같은 파싱을 반복하지 않기 위함이다. 아는 두 값이 아니면 읽은 값을 그대로 두어, 새 표기를 만나도 화면에 무엇이 붙어 있는지는 보이게 한다.
+
+label이 하나도 없으면 빈 문자열로 두고 아무것도 적지 않는다. Instance Type과 같은 이유이며, spot 필터와 on-demand 필터 어느 쪽에도 걸리지 않는다.
 
 ## Instance Type 칼럼
 

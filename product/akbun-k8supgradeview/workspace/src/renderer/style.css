@@ -334,6 +334,16 @@ th.sortable.sorted {
   font-weight: 600;
 }
 
+/* Capacity 칼럼. spot은 회수될 수 있는 노드라 경고색으로, on-demand는 흐리게 둔다. */
+.capacity-spot {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.capacity-ondemand {
+  color: var(--muted);
+}
+
 /* event와 로그에서 error 낱말만 눈에 띄게 칠한다. 배경까지 줘야 긴 본문에서도 먼저 보인다. */
 .error-keyword {
   color: var(--danger);

@@ -6,6 +6,8 @@ export interface NodeInfo {
   internalIp: string;
   // EC2 인스턴스 타입(t3.medium 등). label이 없는 노드도 있어 그때는 빈 문자열이다.
   instanceType: string;
+  // spot 또는 on-demand. label이 없는 노드도 있어 그때는 빈 문자열이다.
+  capacityType: string;
   version: string;
   status: string;
   creationTimestamp: string;
@@ -91,6 +93,13 @@ const KARPENTER_LABELS = ["karpenter.sh/nodepool", "karpenter.sh/provisioner-nam
 const MANAGED_NODEGROUP_LABEL = "eks.amazonaws.com/nodegroup";
 // beta.는 예전 이름이다. 오래된 노드에도 값이 보이도록 둘 다 본다.
 const INSTANCE_TYPE_LABELS = ["node.kubernetes.io/instance-type", "beta.kubernetes.io/instance-type"];
+// spot인지 on-demand인지를 알려주는 label. Karpenter와 Managed NodeGroup이 각자
+// 다른 이름을 쓰고, 클러스터에 따라 세 번째 이름을 직접 붙여 두기도 한다.
+const CAPACITY_TYPE_LABELS = [
+  "karpenter.sh/capacity-type",
+  "eks.amazonaws.com/capacityType",
+  "node.kubernetes.io/capacity-type",
+];
 
 // 설정된 kubectl 명령("tsh kubectl" 등)을 공백으로 나눠 shell 없이 실행한다.
 function runKubectl(args: string[]): Promise<string> {
@@ -141,12 +150,29 @@ function instanceType(labels: Record<string, string>): string {
   return "";
 }
 
+/**
+ * spot과 on-demand 두 값으로 정규화한다. label 이름마다 표기가 달라
+ * Karpenter는 `on-demand`, Managed NodeGroup은 `ON_DEMAND`로 적는다. label이
+ * 없으면 빈 문자열이고, 아는 두 값이 아니면 읽은 값을 그대로 둔다. 새 표기를
+ * 만나도 화면에 무엇이 붙어 있는지는 보이게 하기 위함이다.
+ */
+function capacityType(labels: Record<string, string>): string {
+  for (const label of CAPACITY_TYPE_LABELS) {
+    const raw = labels[label];
+    if (!raw) continue;
+    const normalized = raw.trim().toLowerCase().replace(/_/g, "-");
+    return normalized === "ondemand" ? "on-demand" : normalized;
+  }
+  return "";
+}
+
 function toNodeInfo(node: any): NodeInfo {
   const labels: Record<string, string> = node.metadata?.labels ?? {};
   return {
     name: node.metadata?.name ?? "",
     internalIp: internalIp(node),
     instanceType: instanceType(labels),
+    capacityType: capacityType(labels),
     version: node.status?.nodeInfo?.kubeletVersion ?? "",
     status: nodeStatus(node),
     creationTimestamp: node.metadata?.creationTimestamp ?? "",

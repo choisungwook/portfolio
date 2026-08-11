@@ -15,11 +15,11 @@ serde_json = "1"
 sha1 = "0.10"
 tokio = { version = "1", features = ["time"] }
 
-# Official AWS SDK for Rust. ssooidc runs the device authorization flow, sso
-# exchanges the token for role credentials, ec2 is the only data plane.
+# Official AWS SDK for Rust. sso exchanges the cached token for role
+# credentials, ec2 is the only data plane. The device authorization flow is not
+# here: `aws sso login` runs it and writes the token cache this app reads.
 aws-sdk-ec2 = "1"
 aws-sdk-sso = "1"
-aws-sdk-ssooidc = "1"
 aws-credential-types = "1"
 aws-smithy-types = "1"
 aws-smithy-runtime-api = "1"
