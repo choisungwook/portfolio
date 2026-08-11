@@ -2,7 +2,7 @@
 
 A web page that shows an OpenAPI spec as a browsable API reference. Import a file or paste the document as JSON or YAML, read the API list on the left and each operation's detail on the right. No account, no upload, no server: the spec is parsed in the browser that opened the page.
 
-Deployed as a static Astro build on Cloudflare.
+Deployed as a static Astro build on Cloudflare at [openapiviewer.akbun.com](https://openapiviewer.akbun.com).
 
 ## What it does
 

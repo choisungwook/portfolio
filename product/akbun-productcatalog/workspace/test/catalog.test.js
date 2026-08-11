@@ -63,7 +63,24 @@ test('parseCatalog fills the optional fields', () => {
   assert.equal(slo.description, '');
   assert.deepEqual(slo.tags, []);
   assert.equal(slo.released, '');
+  assert.equal(slo.download, '', 'a product with no release carries no download link');
   assert.equal(products[1].name, 'screenshot', 'an explicit name wins');
+});
+
+// The download link is written out rather than derived from the id, because
+// the release tags do not all start with the directory name.
+test('parseCatalog keeps the download link', () => {
+  const { products } = parseCatalog(doc({
+    products: [{ id: 'akbun-gitdesktop', download: 'https://github.com/choisungwook/portfolio/releases?q=gitdesktop' }],
+  }));
+  assert.match(products[0].download, /releases\?q=gitdesktop$/);
+});
+
+test('parseCatalog rejects a download link that is not http or https', () => {
+  assert.throws(
+    () => parseCatalog(doc({ products: [{ id: 'x', download: 'javascript:alert(1)' }] })),
+    /must be http or https/,
+  );
 });
 
 test('parseCatalog keeps an explicit repo override', () => {
@@ -151,6 +168,8 @@ test('kindCounts counts every chip, empty ones included', () => {
   assert.equal(counts.web, 2);
   assert.equal(counts.desktop, 1);
   assert.equal(counts.reference, 0, 'a chip with nothing behind it still reports zero');
+  assert.equal(counts.backend, 0);
+  assert.equal(counts.skin, 0);
 });
 
 test('shortDate reads as the README does', () => {
@@ -172,5 +191,18 @@ test('the published catalog parses', () => {
     assert.ok(product.description, `${product.id} has no description`);
     assert.ok(product.repo.startsWith('https://github.com/choisungwook/portfolio/'), product.id);
     assert.ok(KINDS.some((kind) => kind.id === product.kind), `${product.id} has kind ${product.kind}`);
+  }
+});
+
+// A web product is one whose whole delivery is a URL, so an entry marked web
+// with nothing to open is either mis-classified or missing its domain. Both
+// show up on the site as a card nobody can act on.
+test('every web product in the published catalog has a deployed domain', () => {
+  const raw = readFileSync(new URL('../../../products.json', import.meta.url), 'utf8');
+  const { products } = parseCatalog(raw);
+
+  for (const product of products) {
+    if (product.kind !== 'web') continue;
+    assert.ok(product.site, `${product.id} is kind web but has no site`);
   }
 });

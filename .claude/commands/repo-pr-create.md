@@ -22,7 +22,7 @@ allowed-tools: Bash, Read, Glob, Grep
 
 [product/products.json](../../product/products.json)은 <https://products.akbun.com> 이 GitHub raw로 읽는 제품 목록이다. master에 들어가는 순간 사이트에 반영되므로, product를 건드린 PR이 이 파일을 빼먹으면 사이트가 그 자리에서 낡는다.
 
-- 새 product 디렉터리를 만들었으면 `products` 배열 맨 앞에 항목을 추가한다. `id`는 디렉터리 이름, `released`는 오늘 날짜(YYYY-MM-DD), `kind`는 web, desktop, reference 중 하나다.
+- 새 product 디렉터리를 만들었으면 `products` 배열 맨 앞에 항목을 추가한다. `id`는 디렉터리 이름, `released`는 오늘 날짜(YYYY-MM-DD), `kind`는 web, desktop, backend, skin, reference 중 하나다. kind가 web이면 배포 도메인을 `site`에 반드시 적는다.
 - 기존 product의 설명이 바뀌었으면 그 항목의 `description`을 [product/README.md](../../product/README.md)의 같은 행과 같은 문장으로 맞춘다.
 - 배포 URL이 새로 생겼거나 바뀌었으면 `site`를 고친다.
 - 어느 쪽이든 문서 최상단의 `updated`를 오늘 날짜로 바꾼다.
