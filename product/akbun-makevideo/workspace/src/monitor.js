@@ -26,84 +26,22 @@
 const T =
   typeof module !== 'undefined' && module.exports ? require('./time.js') : globalThis.timeLib;
 
-/** The stage box as physical pixels inside the window.
- *
- *  Physical, because that is what a native view is placed in and what a
- *  swapchain is sized in. CSS pixels and physical pixels are the same number
- *  only on a display nobody at this desk has, and the difference is invisible
- *  until the picture is a quarter of the size of its box.
- *
- *  This is the page's half of the platform layer, and it is the half most
- *  likely to be wrong, so it is a function over two plain objects rather than
- *  something that needs a window to test. */
-function placeOf(box, ratio) {
-  const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-  return {
-    x: Math.round(box.left * scale),
-    y: Math.round(box.top * scale),
-    width: Math.max(0, Math.round(box.width * scale)),
-    height: Math.max(0, Math.round(box.height * scale)),
-  };
-}
+// Every rectangle this module sends comes out of `geometry.js`. Placing a
+// native view is the half of the platform layer most likely to be silently
+// wrong, so the arithmetic lives in a file with no window in it and this one
+// only decides *when* to ask.
+const GEO =
+  typeof module !== 'undefined' && module.exports
+    ? require('./geometry.js')
+    : globalThis.geometryLib;
 
-const FIT_ZOOM = 1;
-const MAX_ZOOM = 4;
-const ZOOM_STEP = 1.25;
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(value, max));
-}
-
-function fittedViewport() {
-  return { zoom: FIT_ZOOM, x: 0, y: 0 };
-}
-
-function clampViewport(viewport, box) {
-  const zoom = clamp(viewport.zoom, FIT_ZOOM, MAX_ZOOM);
-  return {
-    zoom,
-    x: clamp(viewport.x, box.width - box.width * zoom, 0),
-    y: clamp(viewport.y, box.height - box.height * zoom, 0),
-  };
-}
-
-function zoomViewport(viewport, box, cursor, zoom) {
-  const nextZoom = clamp(zoom, FIT_ZOOM, MAX_ZOOM);
-  const sourceX = (cursor.x - viewport.x) / viewport.zoom;
-  const sourceY = (cursor.y - viewport.y) / viewport.zoom;
-  return clampViewport({
-    zoom: nextZoom,
-    x: cursor.x - sourceX * nextZoom,
-    y: cursor.y - sourceY * nextZoom,
-  }, box);
-}
-
-function monitorPlaceOf(box, viewport, ratio) {
-  const stage = placeOf(box, ratio);
-  const content = placeOf({
-    left: box.left + viewport.x,
-    top: box.top + viewport.y,
-    width: box.width * viewport.zoom,
-    height: box.height * viewport.zoom,
-  }, ratio);
-  return { stage, content };
-}
-
-/** Whether two placements are the same box, so a resize observer firing on
- *  every frame of a drag does not send a command for every one of them. */
-function samePlace(a, b) {
-  if (!a || !b) return false;
-  if (a.stage || b.stage) {
-    return samePlace(a.stage, b.stage) && samePlace(a.content, b.content);
-  }
-  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
-}
+const { samePlace } = GEO;
 
 /** Whether the native view should be on screen right now.
  *
  *  The view sits **over** the webview and is not in the page's stacking order,
  *  so anything the page draws on the stage would be behind it. That makes
- *  visibility one rule with four inputs rather than a call at each of the
+ *  visibility one rule with five inputs rather than a call at each of the
  *  places that happens to cover it — which is how the asset preview ended up
  *  hidden behind a paused monitor.
  *
@@ -113,9 +51,14 @@ function samePlace(a, b) {
  *    its way.
  *  - `hasContent`: the timeline has something on it. An empty one puts the
  *    "drop media here" hint on the stage, and that is drawn by the page too.
- *  - `covered`: a sheet or an open menu is over the stage. */
+ *  - `covered`: a sheet or an open menu is over the stage.
+ *  - `roomy`: the panel is big enough to fit a picture in. A panel dragged
+ *    shut has no box, and a view cannot be placed at nothing — it would be a
+ *    pixel of black in the corner rather than an absence. */
 function shouldShowMonitor(state) {
-  return Boolean(state.native && state.timeline && state.hasContent && !state.covered);
+  return Boolean(
+    state.native && state.timeline && state.hasContent && state.roomy && !state.covered
+  );
 }
 
 /** What the page should do with the answer to `playbackAttach`.
@@ -136,6 +79,10 @@ function readChoice(answer) {
 
 function createMonitor(options) {
   const { preview, stage, api, onTick, onNotice } = options;
+  // The panel, not the stage element. The box is computed from the room
+  // available rather than read back off the element the page laid out, so the
+  // native view is never a frame behind what the page did — see `layout()`.
+  const panel = options.wrap || stage;
   const L = globalThis.timelineLib;
 
   let native = false;
@@ -147,9 +94,10 @@ function createMonitor(options) {
   let position = 0;
   let playing = false;
   let attaching = null;
+  let attachWanted = false;
   let mediaRefreshPending = false;
   let refreshingMedia = null;
-  let viewport = fittedViewport();
+  let viewport = GEO.fittedViewport();
 
   function timelineMode() {
     return preview.mode() === 'timeline';
@@ -176,13 +124,18 @@ function createMonitor(options) {
 
   /** Send the view's visibility only when it actually changes. The renderer
    *  asks on every timeline redraw, and one command per redraw would be a
-   *  round trip for every keystroke that moves a clip. */
-  function syncVisibility() {
+   *  round trip for every keystroke that moves a clip.
+   *
+   *  `box` is passed in by the callers that have just measured one, so a frame
+   *  that both places the view and checks whether it should be on screen is one
+   *  layout read rather than two. */
+  function syncVisibility(box) {
     if (!native) return;
     const wanted = shouldShowMonitor({
       native,
       timeline: timelineMode(),
       hasContent: total() > 0,
+      roomy: GEO.isDrawable(box === undefined ? stageBox() : box),
       covered: covered || editing,
     });
     if (wanted === lastVisible) return;
@@ -190,11 +143,27 @@ function createMonitor(options) {
     api.playbackVisible(wanted).catch(() => {});
   }
 
+  /** The stage box as it is right now, from the panel and the project.
+   *
+   *  Measuring the panel rather than the stage element is what makes this
+   *  independent of whether the page has laid out yet: the same inputs go into
+   *  `preview.layout()`, so both answers describe the same moment even on the
+   *  frame a project's resolution changes. */
+  function stageBox() {
+    return panel ? GEO.stageBoxOf(panel.getBoundingClientRect(), getProject()) : null;
+  }
+
   function currentPlace() {
-    if (!stage) return null;
-    const box = stage.getBoundingClientRect();
-    viewport = clampViewport(viewport, box);
-    return monitorPlaceOf(box, viewport, window.devicePixelRatio);
+    const box = stageBox();
+    if (!box) return null;
+    // Held here rather than inside the measurement. A panel shrinking has to
+    // pull an enlarged picture back against its edges, and a getter that
+    // quietly rewrites the pan state is a measurement with a side effect.
+    viewport = GEO.clampViewport(viewport, box);
+    return {
+      stage: GEO.placeOf(box),
+      content: GEO.placeOf(GEO.contentBoxOf(box, viewport)),
+    };
   }
 
   /** Ask Rust for a monitor, and take whatever it gives back.
@@ -204,7 +173,9 @@ function createMonitor(options) {
    *  reason, which is the whole point of keeping that preview. */
   async function attach() {
     if (!api || !api.available) return false;
+    attachWanted = true;
     if (options.pageOverlayActive && options.pageOverlayActive()) {
+      attachWanted = false;
       native = false;
       lastPlace = null;
       lastVisible = null;
@@ -212,7 +183,12 @@ function createMonitor(options) {
       return false;
     }
     const place = currentPlace();
+    // No room yet. The window is still being laid out, or the panel is dragged
+    // shut. Giving up here permanently was a silent fallback to the media
+    // elements for the whole session, so the want is remembered and the
+    // animation frame asks again once there is a box to attach to.
     if (!place || place.stage.width < 1 || place.stage.height < 1) return native;
+    attachWanted = false;
     // One at a time. The layout settles over several frames when a project
     // opens, and a second attach mid-flight would start a session the first one
     // is about to replace.
@@ -248,6 +224,10 @@ function createMonitor(options) {
   async function release() {
     if (!api || !api.available) return;
     native = false;
+    // Including a want that was still waiting for room. Releasing is the page
+    // saying it does not have a monitor any more, and the retry would hand it
+    // one back on the next frame.
+    attachWanted = false;
     lastPlace = null;
     lastVisible = null;
     covered = false;
@@ -287,15 +267,23 @@ function createMonitor(options) {
     return drivingNatively() ? playing : preview.isPlaying();
   }
 
-  /** Tell Rust where the box is now. Cheap enough to call on every layout, and
-   *  it compares before sending so a drag is one command per pixel rather than
-   *  one per frame. */
+  /** Tell Rust where the box is now, and whether there is still room for it.
+   *
+   *  Called on every animation frame, so it compares before sending: a drag is
+   *  one command per pixel the box actually moved rather than one per frame.
+   *  Returns the box it measured, so the frame loop can use it again without a
+   *  second layout read. */
   function place() {
-    if (!drivingNatively()) return;
+    const box = stageBox();
+    if (!drivingNatively()) return box;
+    // A panel dragged shut is a reason to get out of the way, and it is the one
+    // reason that is a measurement rather than a flag somebody set.
+    syncVisibility(box);
     const next = currentPlace();
-    if (!next || samePlace(next, lastPlace)) return;
+    if (!next || samePlace(next, lastPlace)) return box;
     lastPlace = next;
     api.playbackPlace(next).catch(() => {});
+    return box;
   }
 
   /** Read the playhead back.
@@ -332,19 +320,29 @@ function createMonitor(options) {
     if (wasPlaying && !playing && onTick) onTick(position, false);
   }
 
+  /** The box is re-measured on every animation frame, and `place()` compares
+   *  before it sends.
+   *
+   *  This replaced a `ResizeObserver` on the stage element, which only fires
+   *  when the box changes *size*. Everything that moves the stage without
+   *  resizing it — a sibling panel widening, the timeline growing, a scrollbar
+   *  appearing, the inspector opening — left the native view at the previous
+   *  position, and a native view is over the webview and clipped by nothing, so
+   *  it sat over the timeline until something happened to resize it. Listing
+   *  the reasons a box can move is a list nobody finishes; measuring is one
+   *  layout read per frame in a loop that already runs every frame.
+   *
+   *  The retry beside it is the other half: an attach that found no room is
+   *  finished here rather than being a fallback for the rest of the session. */
   function frame() {
+    const box = place();
+    if (attachWanted && !attaching && GEO.isDrawable(box)) {
+      void Promise.resolve(attach()).catch(() => {});
+    }
     poll();
     requestAnimationFrame(frame);
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);
-
-  // The stage box moves for reasons the page never sends a command about: a
-  // panel being dragged, the preview quality changing the layout, the window
-  // being zoomed. The native view is placed in the window and not laid out by
-  // the page, so something has to notice.
-  if (stage && typeof ResizeObserver === 'function') {
-    new ResizeObserver(() => place()).observe(stage);
-  }
 
   return {
     attach,
@@ -496,35 +494,37 @@ function createMonitor(options) {
     },
 
     zoomIn(cursor) {
-      return this.zoomTo(viewport.zoom * ZOOM_STEP, cursor);
+      return this.zoomTo(viewport.zoom * GEO.ZOOM_STEP, cursor);
     },
 
     zoomOut(cursor) {
-      return this.zoomTo(viewport.zoom / ZOOM_STEP, cursor);
+      return this.zoomTo(viewport.zoom / GEO.ZOOM_STEP, cursor);
     },
 
+    /** `cursor` is a point inside the stage box, which is what the page's
+     *  wheel handler measures against the stage element. */
     zoomTo(zoom, cursor) {
-      if (!drivingNatively() || !stage) return false;
-      const box = stage.getBoundingClientRect();
+      if (!drivingNatively()) return false;
+      const box = stageBox();
+      if (!GEO.isDrawable(box)) return false;
       const at = cursor || { x: box.width / 2, y: box.height / 2 };
-      viewport = zoomViewport(viewport, box, at, zoom);
+      viewport = GEO.zoomViewport(viewport, box, at, zoom);
       place();
       return true;
     },
 
     fit() {
       if (!drivingNatively()) return false;
-      viewport = fittedViewport();
+      viewport = GEO.fittedViewport();
       place();
       return true;
     },
 
     panBy(dx, dy) {
-      if (!drivingNatively() || !stage || viewport.zoom <= FIT_ZOOM) return false;
-      const next = clampViewport(
-        { ...viewport, x: viewport.x + dx, y: viewport.y + dy },
-        stage.getBoundingClientRect()
-      );
+      if (!drivingNatively() || viewport.zoom <= GEO.FIT_ZOOM) return false;
+      const box = stageBox();
+      if (!GEO.isDrawable(box)) return false;
+      const next = GEO.clampViewport({ ...viewport, x: viewport.x + dx, y: viewport.y + dy }, box);
       if (next.x === viewport.x && next.y === viewport.y) return false;
       viewport = next;
       place();
@@ -538,8 +538,8 @@ function createMonitor(options) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice, shouldShowMonitor, fittedViewport, clampViewport, zoomViewport };
+  module.exports = { createMonitor, readChoice, shouldShowMonitor };
 } else {
-  globalThis.monitorLib = { createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice, shouldShowMonitor, fittedViewport, clampViewport, zoomViewport };
+  globalThis.monitorLib = { createMonitor, readChoice, shouldShowMonitor };
 }
 })();

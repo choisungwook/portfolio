@@ -33,6 +33,17 @@ That exact frame is the other half of this engine: when the playhead stops, the 
 
 **Neither half runs on the native monitor.** There the frame under a stopped playhead and the frames during playback come out of one compositor onto one surface, so there is nothing for a second path to draw and nothing for a badge to tell apart. The exact frame is not asked for and the badge stays hidden.
 
+## Where the stage goes
+
+`src/geometry.js`, and not here. The project's shape is fitted into the preview
+panel and centred, with no minimum size in either direction — a floor on one
+axis and not the other stretches the picture, and a box larger than its panel is
+not clipped at all on the [native monitor](./viewport.md). An unfittable panel
+is an empty box rather than a small one.
+
+The same function places the native view, so the two engines cannot disagree
+about where the picture is or what shape it is.
+
 ## Preview quality
 
 Set in Settings and defaulted to **Half**. It changes the layout scale:

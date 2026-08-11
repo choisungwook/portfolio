@@ -3,80 +3,24 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const {
-  createMonitor, placeOf, monitorPlaceOf, samePlace, readChoice,
-  fittedViewport, clampViewport, zoomViewport,
-} = require('../src/monitor.js');
+const { createMonitor, readChoice } = require('../src/monitor.js');
 
-// The page's half of the native viewport. Everything here is arithmetic over
-// plain objects on purpose: the rest of monitor.js needs a window, an IPC
-// bridge and a graphics device, and the parts that can be got wrong silently —
-// a box in the wrong units, a fallback reported as a failure — are all in here.
+// The page's half of the native viewport: *when* to place a view, not where.
+// Where is geometry.js, and it is tested there.
+//
+// Everything below drives the router itself. The rest of monitor.js needs a
+// window, an IPC bridge and a graphics device, so what is exercised here is the
+// part that can be got wrong silently — a command sent for a box that did not
+// move, an attach that gave up on a panel that had not been laid out yet, a
+// fallback reported as a failure.
 
-test('a box is converted to physical pixels', () => {
-  const box = { left: 100, top: 50, width: 640, height: 360 };
-  assert.deepStrictEqual(placeOf(box, 1), { x: 100, y: 50, width: 640, height: 360 });
-});
+/** A panel big enough to fit a picture in, which is all the monitor needs from
+ *  the page to place a view over it. */
+function panelStub(width = 640, height = 360, left = 0, top = 0) {
+  return { getBoundingClientRect: () => ({ left, top, width, height }) };
+}
 
-test('a retina display doubles every number, not only the size', () => {
-  // The offset matters as much as the size. A view sized for the display and
-  // positioned for CSS pixels lands in the top left quarter of where it should
-  // be, which is the shape of this mistake when it happens.
-  const box = { left: 100, top: 50, width: 640, height: 360 };
-  assert.deepStrictEqual(placeOf(box, 2), { x: 200, y: 100, width: 1280, height: 720 });
-});
-
-test('a fractional layout lands on whole pixels', () => {
-  const box = { left: 10.4, top: 20.6, width: 100.5, height: 50.2 };
-  const place = placeOf(box, 1.5);
-  for (const value of Object.values(place)) {
-    assert.strictEqual(value, Math.round(value));
-  }
-});
-
-test('a missing or nonsense ratio is treated as one', () => {
-  const box = { left: 4, top: 8, width: 16, height: 32 };
-  const expected = { x: 4, y: 8, width: 16, height: 32 };
-  for (const ratio of [undefined, null, 0, -2, NaN, Infinity]) {
-    assert.deepStrictEqual(placeOf(box, ratio), expected, String(ratio));
-  }
-});
-
-test('a collapsed box never becomes a negative size', () => {
-  const place = placeOf({ left: 0, top: 0, width: -10, height: -10 }, 2);
-  assert.strictEqual(place.width, 0);
-  assert.strictEqual(place.height, 0);
-});
-
-test('the native monitor keeps a clipped stage and a scaled picture separate', () => {
-  const box = { left: 100, top: 50, width: 640, height: 360 };
-  const place = monitorPlaceOf(box, { zoom: 2, x: -100, y: -40 }, 2);
-  assert.deepStrictEqual(place.stage, { x: 200, y: 100, width: 1280, height: 720 });
-  assert.deepStrictEqual(place.content, { x: 0, y: 20, width: 2560, height: 1440 });
-});
-
-test('zooming at the cursor keeps the source point under it', () => {
-  const box = { width: 640, height: 360 };
-  const cursor = { x: 480, y: 270 };
-  const viewport = zoomViewport(fittedViewport(), box, cursor, 2);
-  assert.deepStrictEqual(viewport, { zoom: 2, x: -480, y: -270 });
-});
-
-test('panning cannot expose space past an enlarged monitor edge', () => {
-  const box = { width: 640, height: 360 };
-  assert.deepStrictEqual(
-    clampViewport({ zoom: 2, x: 20, y: -999 }, box),
-    { zoom: 2, x: 0, y: -360 }
-  );
-});
-
-test('panning against an edge does not place the unchanged viewport', async (t) => {
-  const previousWindow = global.window;
-  t.after(() => {
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  });
-  global.window = { devicePixelRatio: 1 };
+test('panning against an edge does not place the unchanged viewport', async () => {
   const places = [];
   const preview = {
     mode: () => 'timeline',
@@ -91,10 +35,7 @@ test('panning against an edge does not place the unchanged viewport', async (t) 
     playbackVisible: async () => {},
     playbackPlace: async (place) => places.push(place),
   };
-  const stage = {
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }),
-  };
-  const monitor = createMonitor({ preview, stage, api });
+  const monitor = createMonitor({ preview, wrap: panelStub(), api });
 
   await monitor.attach();
   monitor.zoomTo(2);
@@ -104,13 +45,7 @@ test('panning against an edge does not place the unchanged viewport', async (t) 
   assert.strictEqual(places.length, placeCount);
 });
 
-test('the native monitor yields to the editor-only selection pass', async (t) => {
-  const previousWindow = global.window;
-  t.after(() => {
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  });
-  global.window = { devicePixelRatio: 1 };
+test('the native monitor yields to the editor-only selection pass', async () => {
   const visibility = [];
   const monitor = createMonitor({
     preview: {
@@ -120,7 +55,7 @@ test('the native monitor yields to the editor-only selection pass', async (t) =>
       clear: () => {},
       clearExact: () => {},
     },
-    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    wrap: panelStub(),
     api: {
       available: true,
       playbackAttach: async () => ({ engine: 'native' }),
@@ -135,13 +70,7 @@ test('the native monitor yields to the editor-only selection pass', async (t) =>
   assert.deepStrictEqual(visibility, [true, false, true]);
 });
 
-test('a page overlay keeps the preview in the webview', async (t) => {
-  const previousWindow = global.window;
-  t.after(() => {
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  });
-  global.window = { devicePixelRatio: 1 };
+test('a page overlay keeps the preview in the webview', async () => {
   let attached = 0;
   const seeks = [];
   let overlayActive = false;
@@ -154,7 +83,7 @@ test('a page overlay keeps the preview in the webview', async (t) => {
       clearExact: () => {},
       seek: (frame) => seeks.push(frame),
     },
-    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    wrap: panelStub(),
     api: {
       available: true,
       playbackAttach: async () => {
@@ -175,13 +104,7 @@ test('a page overlay keeps the preview in the webview', async (t) => {
   assert.deepStrictEqual(seeks, [1]);
 });
 
-test('leaving native editing clears the page exact frame', async (t) => {
-  const previousWindow = global.window;
-  t.after(() => {
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  });
-  global.window = { devicePixelRatio: 1 };
+test('leaving native editing clears the page exact frame', async () => {
   let cleared = 0;
   const monitor = createMonitor({
     preview: {
@@ -191,7 +114,7 @@ test('leaving native editing clears the page exact frame', async (t) => {
       clear: () => {},
       clearExact: () => { cleared += 1; },
     },
-    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    wrap: panelStub(),
     api: {
       available: true,
       playbackAttach: async () => ({ engine: 'native' }),
@@ -207,13 +130,182 @@ test('leaving native editing clears the page exact frame', async (t) => {
   assert.strictEqual(cleared, beforeClear + 1);
 });
 
-test('the same box twice is recognised, so a drag is not a command per frame', () => {
-  const box = { x: 1, y: 2, width: 3, height: 4 };
-  assert.ok(samePlace(box, { ...box }));
-  assert.ok(!samePlace(box, { ...box, x: 2 }));
-  assert.ok(!samePlace(box, { ...box, width: 5 }));
-  assert.ok(!samePlace(null, box));
-  assert.ok(!samePlace(box, null));
+// --- the box moving without changing size ----------------------------------
+//
+// This is the failure the placement was rewritten for. A `ResizeObserver` on
+// the stage fires on size and not on position, so a panel widening beside the
+// preview, the inspector opening, or a scrollbar appearing left the native view
+// where it was. It is over the webview and clipped by nothing, so it stayed on
+// top of the timeline until something happened to resize it.
+
+/** A panel whose box the test can move between calls, standing in for every
+ *  reason a page can move a box without resizing it. */
+function movablePanel(box) {
+  const state = { ...box };
+  return {
+    element: { getBoundingClientRect: () => ({ ...state }) },
+    moveTo(left, top) {
+      state.left = left;
+      state.top = top;
+    },
+    resizeTo(width, height) {
+      state.width = width;
+      state.height = height;
+    },
+  };
+}
+
+async function nativeMonitorOn(panel) {
+  const places = [];
+  let attachedAt = null;
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+    },
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async (place) => {
+        attachedAt = place;
+        return { engine: 'native' };
+      },
+      playbackVisible: async () => {},
+      playbackPlace: async (place) => places.push(place),
+    },
+  });
+  await monitor.attach();
+  return { monitor, places, attachedAt: () => attachedAt };
+}
+
+test('a stage that moves without resizing is placed again', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const { monitor, places, attachedAt } = await nativeMonitorOn(panel);
+  const before = attachedAt().stage;
+
+  panel.moveTo(240, 80);
+  monitor.place();
+  assert.strictEqual(places.length, 1);
+  const after = places[0].stage;
+  assert.deepStrictEqual(
+    { dx: after.x - before.x, dy: after.y - before.y },
+    { dx: 240, dy: 80 }
+  );
+  assert.strictEqual(after.width, before.width);
+  assert.strictEqual(after.height, before.height);
+});
+
+test('the same box twice is one command, so a drag is not a command per frame', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const { monitor, places } = await nativeMonitorOn(panel);
+
+  panel.resizeTo(600, 360);
+  monitor.place();
+  monitor.place();
+  monitor.place();
+  assert.strictEqual(places.length, 1);
+});
+
+test('the placement keeps the project shape as the panel changes', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+    },
+    wrap: panel.element,
+    getProject: () => ({ settings: { width: 1000, height: 1000 } }),
+    api: {
+      available: true,
+      playbackAttach: async (place) => {
+        assert.strictEqual(place.stage.width, place.stage.height);
+        return { engine: 'native' };
+      },
+      playbackVisible: async () => {},
+      playbackPlace: async (place) => {
+        assert.strictEqual(place.stage.width, place.stage.height);
+      },
+    },
+  });
+
+  await monitor.attach();
+  for (const [width, height] of [[900, 360], [200, 700], [1200, 1200]]) {
+    panel.resizeTo(width, height);
+    monitor.place();
+  }
+});
+
+test('a panel dragged shut takes the view off screen, and reopening puts it back', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const visibility = [];
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+    },
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async (visible) => visibility.push(visible),
+      playbackPlace: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  assert.deepStrictEqual(visibility, [true]);
+
+  panel.resizeTo(0, 0);
+  monitor.place();
+  assert.deepStrictEqual(visibility, [true, false]);
+
+  panel.resizeTo(640, 360);
+  monitor.place();
+  assert.deepStrictEqual(visibility, [true, false, true]);
+});
+
+// A panel with no room in it used to be a permanent fallback to the media
+// elements: attach gave up and nothing asked again. The layout genuinely does
+// settle over several frames when a project opens.
+test('an attach with no room to draw in is finished once there is', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 0, height: 0 });
+  let attached = 0;
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+    },
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attached += 1;
+        return { engine: 'native' };
+      },
+      playbackVisible: async () => {},
+      playbackPlace: async () => {},
+    },
+  });
+
+  assert.strictEqual(await monitor.attach(), false);
+  assert.strictEqual(attached, 0);
+  assert.strictEqual(monitor.usesNativeMonitor(), false);
+
+  panel.resizeTo(640, 360);
+  assert.strictEqual(await monitor.attach(), true);
+  assert.strictEqual(attached, 1);
 });
 
 test('a native monitor is used and reports nothing', () => {
@@ -269,13 +361,7 @@ test('the router answers everything the page asks a preview for', () => {
   assert.deepStrictEqual(missing, []);
 });
 
-test('a ready proxy waits for playback to stop before replacing the native session', async (t) => {
-  const previousWindow = global.window;
-  t.after(() => {
-    if (previousWindow === undefined) delete global.window;
-    else global.window = previousWindow;
-  });
-  global.window = { devicePixelRatio: 1 };
+test('a ready proxy waits for playback to stop before replacing the native session', async () => {
   const calls = [];
   const preview = {
     mode: () => 'timeline',
@@ -302,7 +388,7 @@ test('a ready proxy waits for playback to stop before replacing the native sessi
   };
   const monitor = createMonitor({
     preview,
-    stage: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) },
+    wrap: panelStub(),
     api,
     getProject: () => ({ settings: { rate: { numerator: 30, denominator: 1 } } }),
   });
@@ -388,7 +474,9 @@ test('with no monitor attached the transport reaches the media elements', () => 
 
 const { shouldShowMonitor } = require('../src/monitor.js');
 
-const showing = { native: true, timeline: true, hasContent: true, covered: false };
+const showing = {
+  native: true, timeline: true, hasContent: true, roomy: true, covered: false,
+};
 
 test('a native monitor showing a timeline with clips on it is visible', () => {
   assert.strictEqual(shouldShowMonitor(showing), true);
@@ -404,6 +492,12 @@ test('an empty timeline hides the view, or it covers the drop hint', () => {
 
 test('a sheet or an open menu hides the view', () => {
   assert.strictEqual(shouldShowMonitor({ ...showing, covered: true }), false);
+});
+
+// A panel dragged shut has no box to place a view at, and a view placed at
+// nothing is a pixel of black in the corner rather than an absence.
+test('a panel with no room in it hides the view', () => {
+  assert.strictEqual(shouldShowMonitor({ ...showing, roomy: false }), false);
 });
 
 test('with no native session there is nothing to show', () => {

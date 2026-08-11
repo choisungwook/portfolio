@@ -50,10 +50,13 @@ enum Command {
     Play,
     Pause,
     Seek(i64),
-    /// The panel moved or the window resized. Carried to the loop rather than
-    /// done where it was noticed, because only the thread drawing on a surface
-    /// may reconfigure it.
-    Place(MonitorPlace),
+    /// The panel moved or the window resized, and the surface is now this many
+    /// physical pixels. Carried to the loop rather than done where it was
+    /// noticed, because only the thread drawing on a surface may reconfigure
+    /// it — and it carries the size rather than the placement, because the size
+    /// is what the view answered *after* it was moved, which is the only
+    /// reading that accounts for the display it ended up on.
+    Resize(u32, u32),
     /// The timeline changed under a paused playhead: redraw the still.
     Redraw,
     Stop,
@@ -217,7 +220,7 @@ impl Session {
             return Err("this machine has no graphics device, so the monitor cannot draw".into());
         }
         let viewport = Viewport::attach(window, place)?;
-        let (surface_width, surface_height) = place.surface_size();
+        let (surface_width, surface_height) = viewport.surface_size();
         let sink = SurfaceSink::new(
             Arc::clone(&config.compositor),
             viewport.target()?,
@@ -283,8 +286,10 @@ impl Session {
     /// next frame, because only the thread drawing on a surface may reconfigure
     /// it. Doing the second one here would be a data race wgpu cannot see.
     pub fn place(&self, place: MonitorPlace) {
-        self.viewport.lock().unwrap().place(place);
-        let _ = self.control.send(Command::Place(place));
+        let resized = self.viewport.lock().unwrap().place(place);
+        if let Some((width, height)) = resized {
+            let _ = self.control.send(Command::Resize(width, height));
+        }
     }
 
     /// Show or hide the view. The page hides it before drawing anything over
@@ -370,8 +375,7 @@ fn run(mut state: Loop) {
                 state.shared.position.store(frame, Ordering::Relaxed);
                 continue;
             }
-            Ok(Command::Place(place)) => {
-                let (width, height) = place.surface_size();
+            Ok(Command::Resize(width, height)) => {
                 state.sink.resize(width, height);
                 continue;
             }

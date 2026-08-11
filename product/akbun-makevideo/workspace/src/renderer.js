@@ -3372,6 +3372,9 @@ async function boot() {
   preview = globalThis.monitorLib.createMonitor({
     preview: mediaPreview,
     stage: dom.stage,
+    // The panel is what the native place is computed from, so the view and the
+    // page's own stage come out of one calculation rather than two.
+    wrap: dom.stageWrap,
     api: window.api,
     getProject: () => state.project,
     pageOverlayActive: () => G.visible(state.settings),

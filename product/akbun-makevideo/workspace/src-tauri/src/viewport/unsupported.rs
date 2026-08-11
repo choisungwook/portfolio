@@ -19,7 +19,13 @@ pub fn attach(_window: &tauri::WebviewWindow, _place: MonitorPlace) -> Result<In
     Err("the native monitor is macOS only so far; playback uses media elements here".into())
 }
 
-pub fn place(_inner: &Inner, _at: MonitorPlace) {}
+pub fn place(_inner: &Inner, _at: MonitorPlace) -> (u32, u32) {
+    (1, 1)
+}
+
+pub fn surface_size(_inner: &Inner) -> (u32, u32) {
+    (1, 1)
+}
 
 pub fn set_visible(_inner: &Inner, _visible: bool) {}
 

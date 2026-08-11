@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-11
+
+* [preview 배치는 한 곳에서 계산하고 point 단위로 넘긴다](decisions/2026-08-one-geometry-in-points-for-the-monitor.md) 결정 기록. native monitor가 preview 밖에 그려지고 비율이 어긋나던 원인을 좌표 왕복과 크기만 보는 관찰자로 좁히고 geometry.js로 계산을 모음.
+
 ## 2026-08-10
 
 * [첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다](decisions/2026-08-first-video-defines-default-canvas-shape.md) 결정 기록. 9:16 영상이 기본 16:9 preview에서 과도하게 축소된 사례를 바탕으로 비율 자동 채택 범위를 정함.

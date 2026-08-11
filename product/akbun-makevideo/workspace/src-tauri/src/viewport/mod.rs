@@ -45,12 +45,24 @@ mod unsupported;
 #[cfg(not(target_os = "macos"))]
 use unsupported as platform;
 
-/// Where the monitor sits inside the window, in **physical** pixels.
+/// Where the monitor sits inside the WebView, in **points**.
 ///
-/// Physical because that is what a native view is placed in and what a
-/// swapchain is sized in. The page measures in CSS pixels and multiplies by
-/// `devicePixelRatio` before sending, which is the same conversion the drag and
-/// drop handler already does in the other direction.
+/// Points, because that is the one unit both sides already have without
+/// converting: a CSS pixel in the page and an AppKit point in a view inside
+/// that page's `WKWebView` are the same length, so `getBoundingClientRect()`
+/// values are an `NSRect` with the y origin flipped and nothing else done to
+/// them.
+///
+/// It used to be physical pixels, which meant the page multiplied by
+/// `devicePixelRatio` and this side divided by the view's backing scale. Those
+/// two cancel, so the whole conversion was a round trip that only landed where
+/// it started while the page's cached ratio and the window's real one agreed —
+/// and when they did not, every coordinate was scaled at once and the monitor
+/// was drawn outside the panel.
+///
+/// Physical pixels are still what a swapchain is sized in. That number is asked
+/// of the view itself, in [`Viewport::surface_size`], on the side that can know
+/// which display the window is on.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Place {
@@ -62,9 +74,9 @@ pub struct Place {
 
 /// The clipped monitor box and the larger picture inside it.
 ///
-/// Both rectangles use physical window pixels. The page keeps the transform in
-/// CSS pixels so cursor math stays in one coordinate system, then converts the
-/// two rectangles together at the IPC boundary.
+/// Both in points, both measured from the WebView's top left, and both computed
+/// from one measurement in `geometry.js` so they cannot describe two different
+/// moments.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MonitorPlace {
@@ -73,26 +85,12 @@ pub struct MonitorPlace {
 }
 
 impl MonitorPlace {
-    pub fn surface_size(&self) -> (u32, u32) {
-        self.content.surface_size()
-    }
-
     pub fn is_visible(&self) -> bool {
         self.stage.is_visible() && self.content.is_visible()
     }
 }
 
 impl Place {
-    /// The size to configure a swapchain at, never zero. A surface configured
-    /// at zero is a validation error on every backend, and a stage box can
-    /// genuinely be zero for a moment while the window is being laid out.
-    pub fn surface_size(&self) -> (u32, u32) {
-        (
-            (self.width.max(1.0).round() as u32).max(1),
-            (self.height.max(1.0).round() as u32).max(1),
-        )
-    }
-
     /// Whether this is worth drawing on at all.
     pub fn is_visible(&self) -> bool {
         self.width >= 1.0 && self.height >= 1.0
@@ -117,13 +115,35 @@ impl Viewport {
         })
     }
 
-    /// Move or resize it. Cheap, and safe to call with what it already is.
-    pub fn place(&mut self, place: MonitorPlace) {
+    /// Move or resize it, and answer the size the surface on it should now be.
+    ///
+    /// `None` when the box is what it already was. Both halves of this are main
+    /// thread calls that the caller waits on, and the page re-measures its
+    /// panel on every animation frame, so a placement that changes nothing has
+    /// to cost nothing.
+    pub fn place(&mut self, place: MonitorPlace) -> Option<(u32, u32)> {
         if place == self.place {
-            return;
+            return None;
         }
         self.place = place;
-        platform::place(&self.inner, place);
+        let (width, height) = platform::place(&self.inner, place);
+        Some((width.max(1), height.max(1)))
+    }
+
+    /// The picture view's size in **physical** pixels, which is what a
+    /// swapchain is configured at.
+    ///
+    /// Asked of the view rather than worked out from a ratio the page sent,
+    /// because the view is the only thing that knows which display it is on.
+    /// Read *after* the view has been moved, so a window dragged onto a display
+    /// with a different scale factor is a size that already accounts for it.
+    ///
+    /// Never zero: a surface configured at zero is a validation error on every
+    /// backend, and the box genuinely is zero for a moment while a window is
+    /// being laid out.
+    pub fn surface_size(&self) -> (u32, u32) {
+        let (width, height) = platform::surface_size(&self.inner);
+        (width.max(1), height.max(1))
     }
 
     /// Show or hide it. The page hides it before drawing anything over the
@@ -159,42 +179,47 @@ impl Drop for Viewport {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_surface_is_never_configured_at_zero() {
-        let place = Place {
+    fn place(width: f64, height: f64) -> Place {
+        Place {
             x: 0.0,
             y: 0.0,
-            width: 0.0,
-            height: 0.0,
-        };
-        assert_eq!(place.surface_size(), (1, 1));
-        assert!(!place.is_visible());
-    }
-
-    #[test]
-    fn a_fractional_box_rounds_to_whole_pixels() {
-        let place = Place {
-            x: 10.5,
-            y: 20.25,
-            width: 640.4,
-            height: 360.6,
-        };
-        assert_eq!(place.surface_size(), (640, 361));
-        assert!(place.is_visible());
+            width,
+            height,
+        }
     }
 
     /// A collapsed panel is a real state — the window can be dragged small
-    /// enough — and it has to read as "nothing to draw" rather than as a size.
+    /// enough, and the page answers an unfittable panel with an empty box on
+    /// purpose — and it has to read as "nothing to draw" rather than as a size.
     #[test]
     fn a_collapsed_stage_is_not_visible() {
         for (width, height) in [(0.0, 100.0), (100.0, 0.0), (0.5, 0.5)] {
-            let place = Place {
-                x: 0.0,
-                y: 0.0,
-                width,
-                height,
-            };
-            assert!(!place.is_visible(), "{width}x{height}");
+            assert!(!place(width, height).is_visible(), "{width}x{height}");
         }
+        assert!(place(640.0, 360.0).is_visible());
+    }
+
+    /// Both rectangles have to be worth drawing on. The picture is the one a
+    /// surface is made for and the stage is the one that clips it, so a zero
+    /// either side is a session with nothing on screen.
+    #[test]
+    fn a_monitor_needs_both_of_its_boxes() {
+        let good = place(640.0, 360.0);
+        let empty = place(0.0, 0.0);
+        assert!(MonitorPlace {
+            stage: good,
+            content: good
+        }
+        .is_visible());
+        assert!(!MonitorPlace {
+            stage: empty,
+            content: good
+        }
+        .is_visible());
+        assert!(!MonitorPlace {
+            stage: good,
+            content: empty
+        }
+        .is_visible());
     }
 }
