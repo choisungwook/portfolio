@@ -1,7 +1,7 @@
 [package]
 name = "awsviewer-core"
 version = "0.1.0"
-description = "AWS profiles, IAM Identity Center sessions and the EC2 view model for akbun-awsviewer"
+description = "AWS profiles, CLI credentials, EC2 and CloudTrail view models for akbun-awsviewer"
 edition = "2021"
 license = "MIT"
 
@@ -12,14 +12,11 @@ license = "MIT"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha1 = "0.10"
 tokio = { version = "1", features = ["time"] }
 
-# Official AWS SDK for Rust. sso exchanges the cached token for role
-# credentials, ec2 is the only data plane. The device authorization flow is not
-# here: `aws sso login` runs it and writes the token cache this app reads.
+# Official AWS SDK for Rust. Credentials are exported by the AWS CLI.
+aws-sdk-cloudtrail = "1"
 aws-sdk-ec2 = "1"
-aws-sdk-sso = "1"
 aws-credential-types = "1"
 aws-smithy-types = "1"
 aws-smithy-runtime-api = "1"

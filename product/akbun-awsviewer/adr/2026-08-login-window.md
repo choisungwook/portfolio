@@ -1,6 +1,6 @@
 # Device authorization in an app window
 
-> The flow this describes is superseded by [2026-08-cli-login-relay.md](./2026-08-cli-login-relay.md): `aws sso login` runs the device flow now. The window decision below still holds — the relay opens the CLI's verification URL in that same window.
+> Superseded by [2026-08-aws-cli-login.md](./2026-08-aws-cli-login.md). The app no longer owns a login window.
 
 ## Decision
 

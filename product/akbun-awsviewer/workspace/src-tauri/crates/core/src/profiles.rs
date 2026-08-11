@@ -1,8 +1,7 @@
 //! Parses ~/.aws/config into the profile list the app shows.
 //!
-//! Only ~/.aws/config is read. ~/.aws/credentials holds long-lived access
-//! keys, and this app deliberately does not use them: authentication is IAM
-//! Identity Center only.
+//! Only ~/.aws/config is parsed here. Credential resolution is delegated to
+//! `aws configure export-credentials` for the selected profile.
 
 use serde::Serialize;
 use std::collections::HashMap;
@@ -15,8 +14,7 @@ pub const DEFAULT_SCOPE: &str = "sso:account:access";
 pub struct Profile {
     pub name: String,
     pub region: Option<String>,
-    /// None means the profile has no usable Identity Center configuration.
-    /// It is still listed, but login and API calls refuse it with a message.
+    /// Optional Identity Center metadata used for Account and Role columns.
     pub sso: Option<SsoConfig>,
 }
 
@@ -227,7 +225,12 @@ sso_session = missing
     #[test]
     fn profile_without_sso_is_listed_but_unmarked() {
         let profiles = parse_config(SAMPLE);
-        assert!(profiles.iter().find(|p| p.name == "keys-only").unwrap().sso.is_none());
+        assert!(profiles
+            .iter()
+            .find(|p| p.name == "keys-only")
+            .unwrap()
+            .sso
+            .is_none());
         assert!(profiles
             .iter()
             .find(|p| p.name == "broken-session")
@@ -312,6 +315,9 @@ region = ap-northeast-2
         let profiles = parse_config(text);
         let dev = profiles.iter().find(|p| p.name == "dev").unwrap();
         assert_eq!(dev.region.as_deref(), Some("ap-northeast-2"));
-        assert_eq!(dev.sso.as_ref().unwrap().start_url, "https://d-90000000.awsapps.com/start");
+        assert_eq!(
+            dev.sso.as_ref().unwrap().start_url,
+            "https://d-90000000.awsapps.com/start"
+        );
     }
 }

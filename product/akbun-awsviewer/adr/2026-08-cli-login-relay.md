@@ -1,5 +1,7 @@
 # Sign in by relaying `aws sso login`
 
+> Superseded by [2026-08-aws-cli-login.md](./2026-08-aws-cli-login.md).
+
 ## Decision
 
 The app no longer runs the SSO OIDC device authorization flow itself. `cli_login` spawns `aws sso login --profile <selected> --no-browser`, reads the verification URL and code out of the CLI's output, opens that URL in the same `sso-login` window as before, shows the URL and code in a modal on the page, and resolves when the CLI exits. Closing the sign-in window kills the CLI, which is still how the flow is cancelled. login.rs and the aws-sdk-ssooidc dependency are gone.
