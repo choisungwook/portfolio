@@ -59,10 +59,19 @@ async function loadCatalog() {
   }
 }
 
+function link(href, label, ghost) {
+  return `<a class="button${ghost ? ' ghost' : ''}" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+}
+
 function productCard(product) {
-  const site = product.site
-    ? `<a class="button ghost" href="${esc(product.site)}" target="_blank" rel="noopener noreferrer">사이트 열기</a>`
-    : '';
+  // The primary button is whatever gets the product in front of the reader:
+  // its page if it has one, its installer if it is installed. The repository
+  // stays reachable, but source is not what most people came for.
+  const actions = [];
+  if (product.site) actions.push(link(product.site, '사이트 열기', false));
+  if (product.download) actions.push(link(product.download, '다운로드', Boolean(product.site)));
+  actions.push(link(product.repo, '저장소', actions.length > 0));
+
   const tags = product.tags
     .map((tag) => `<li>${esc(tag)}</li>`)
     .join('');
@@ -79,8 +88,7 @@ function productCard(product) {
       <div class="card-foot">
         <span class="date">${esc(date)}</span>
         <div class="card-actions">
-          ${site}
-          <a class="button" href="${esc(product.repo)}" target="_blank" rel="noopener noreferrer">저장소</a>
+          ${actions.join('\n          ')}
         </div>
       </div>
     </article>

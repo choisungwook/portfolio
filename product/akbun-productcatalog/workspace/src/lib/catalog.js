@@ -13,13 +13,16 @@ export const REMOTE_CATALOG_URL =
 export const DEFAULT_REPO_BASE = 'https://github.com/choisungwook/portfolio/tree/master/product';
 
 // The filter row. `all` is first and is the state the page opens in.
-// A product either runs in a browser or it is installed, so `web` and
-// `desktop` carry everything that is a product; `reference` is the shelf for
-// the two layout libraries, which are neither.
+// The split is by how the product reaches its user: `web` is opened at a URL,
+// `desktop` is installed on a machine, `backend` is a server someone runs
+// themselves, and `skin` is pasted into another service's admin page.
+// `reference` is the shelf for the layout libraries, which are none of those.
 export const KINDS = [
   { id: 'all', label: 'All' },
   { id: 'web', label: 'Web' },
   { id: 'desktop', label: 'Desktop' },
+  { id: 'backend', label: 'Backend' },
+  { id: 'skin', label: 'Skin' },
   { id: 'reference', label: 'Reference' },
 ];
 
@@ -74,6 +77,10 @@ function normalizeProduct(entry, index, repoBase) {
     released: String(entry.released ?? '').trim(),
     repo,
     site: safeUrl(entry.site, 'site', index),
+    // Someone who wants an installed product wants the installer, not the
+    // source. The release tag prefixes are not all the id (gitdesktop-v*,
+    // tistory-*), so this is a written URL rather than one derived like `repo`.
+    download: safeUrl(entry.download, 'download', index),
   };
 }
 
