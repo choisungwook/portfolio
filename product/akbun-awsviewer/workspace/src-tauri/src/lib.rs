@@ -1,10 +1,9 @@
-mod clilogin;
+mod awscli;
 mod commands;
 
 mod store;
 
 use commands::AppState;
-use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -59,8 +58,6 @@ pub fn run() {
             let handle = app.handle();
             app.manage(AppState {
                 settings: Mutex::new(store::load_settings(handle)),
-                creds_cache: Mutex::new(HashMap::new()),
-                login_url: Mutex::new(None),
             });
             Ok(())
         })
@@ -68,11 +65,9 @@ pub fn run() {
             commands::get_snapshot,
             commands::select_profile,
             commands::set_insecure_tls,
-            commands::cli_login,
-            commands::reopen_login_window,
-            commands::cancel_login,
             commands::list_instances,
             commands::instance_detail,
+            commands::list_cloudtrail_events,
             commands::open_log_dir,
         ])
         .run(tauri::generate_context!())

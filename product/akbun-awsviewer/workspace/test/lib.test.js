@@ -102,10 +102,12 @@ test('empty filter returns a copy of everything', () => {
   assert.notStrictEqual(found, instances);
 });
 
-test('spot only keeps spot instances and composes with the query', () => {
-  const spot = filterInstances(instances, '', true);
+test('capacity filters compose with the query', () => {
+  const spot = filterInstances(instances, '', 'spot');
   assert.deepStrictEqual(spot.map((i) => i.instanceId), ['i-0bbb']);
-  assert.deepStrictEqual(filterInstances(instances, 'web', true), []);
+  assert.deepStrictEqual(filterInstances(instances, 'web', 'spot'), []);
+  const onDemand = filterInstances(instances, '', 'on-demand');
+  assert.deepStrictEqual(onDemand.map((i) => i.instanceId), ['i-0aaa', 'i-0ccc']);
 });
 
 test('age renders the single largest unit', () => {
@@ -171,8 +173,5 @@ test('only spot capacity gets a color', () => {
 test('session label states', () => {
   assert.strictEqual(sessionLabel(null), 'Not logged in');
   assert.strictEqual(sessionLabel({ loggedIn: false }), 'Not logged in');
-  assert.strictEqual(
-    sessionLabel({ loggedIn: true, expiresAt: '2026-08-06T12:00:00Z' }),
-    'Session until 2026-08-06T12:00:00Z',
-  );
+  assert.strictEqual(sessionLabel({ loggedIn: true }), 'Logged in');
 });

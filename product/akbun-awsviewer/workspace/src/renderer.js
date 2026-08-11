@@ -2,7 +2,7 @@
 
 // Page state and rendering. The page owns the instance array; filtering and
 // sorting run over it locally (lib.js) so typing in the filter never causes
-// an AWS call. Data changes only on Refresh, profile switch, and login.
+// an AWS call. CloudTrail filtering is handled by LookupEvents.
 
 const api = globalThis.awsviewerApi;
 // Accessed through the namespace only. Classic scripts share one global
@@ -16,11 +16,13 @@ const state = {
   instances: [],
   loaded: false,
   filter: '',
-  spotOnly: false,
+  capacity: 'all',
   sort: { key: 'name', direction: 'asc' },
   selectedId: null,
   detail: null,
   detailTab: 'details',
+  cloudtrailEvents: [],
+  cloudtrailLoaded: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -64,9 +66,7 @@ function handleError(error) {
   reportError(`${info.kind}: ${info.message}`);
   if (info.kind === 'login_required') {
     setLoginHint(true);
-    showError('The session for this profile is missing or expired. Use AWS login in the top right.');
-  } else if (info.kind === 'cancelled') {
-    clearError();
+    showError(info.message);
   } else {
     showError(info.message);
   }
@@ -93,7 +93,7 @@ function setLoginHint(visible) {
 
 function renderInstances() {
   const rows = lib.sortInstances(
-    lib.filterInstances(state.instances, state.filter, state.spotOnly),
+    lib.filterInstances(state.instances, state.filter, state.capacity),
     state.sort.key,
     state.sort.direction,
   );
@@ -137,11 +137,17 @@ async function loadInstances() {
   try {
     state.instances = await api.listInstances();
     state.loaded = true;
+    state.snapshot.session = { loggedIn: true };
+    renderTopbar();
     clearError();
     setLoginHint(false);
   } catch (error) {
     state.instances = [];
     state.loaded = false;
+    if (errorInfo(error).kind === 'login_required') {
+      state.snapshot.session = { loggedIn: false };
+      renderTopbar();
+    }
     handleError(error);
   } finally {
     button.disabled = false;
@@ -299,10 +305,61 @@ function closeDetail() {
   renderInstances();
 }
 
+// ---------------------------------------------------------------- CloudTrail
+
+function setCloudTrailLoginHint(visible) {
+  $('#cloudtrail-login-hint').classList.toggle('hidden', !visible);
+}
+
+function renderCloudTrail() {
+  const body = $('#cloudtrail-table tbody');
+  body.replaceChildren();
+  for (const event of state.cloudtrailEvents) {
+    const tr = document.createElement('tr');
+    tr.append(
+      el('td', null, dash(event.eventTime)),
+      el('td', null, dash(event.eventName)),
+      el('td', null, dash(event.eventSource)),
+      el('td', null, dash(event.username)),
+      el('td', null, event.resources?.length ? event.resources.join(', ') : '-'),
+      el('td', null, dash(event.eventId)),
+    );
+    body.append(tr);
+  }
+  $('#cloudtrail-empty').classList.toggle(
+    'hidden',
+    !(state.cloudtrailLoaded && state.cloudtrailEvents.length === 0),
+  );
+}
+
+async function loadCloudTrail() {
+  const button = $('#refresh-cloudtrail');
+  button.disabled = true;
+  try {
+    const eventName = $('#cloudtrail-event-name').value.trim();
+    state.cloudtrailEvents = await api.listCloudTrailEvents(eventName || null);
+    state.cloudtrailLoaded = true;
+    state.snapshot.session = { loggedIn: true };
+    renderTopbar();
+    setCloudTrailLoginHint(false);
+    clearError();
+  } catch (error) {
+    state.cloudtrailEvents = [];
+    state.cloudtrailLoaded = false;
+    if (errorInfo(error).kind === 'login_required') {
+      state.snapshot.session = { loggedIn: false };
+      renderTopbar();
+      setCloudTrailLoginHint(true);
+    }
+    handleError(error);
+  } finally {
+    button.disabled = false;
+    renderCloudTrail();
+  }
+}
+
 // ---------------------------------------------------------------- profiles
 
-// Read-only listing; signing in to a profile happens in the AWS login
-// dialog, not here.
 function renderProfiles() {
   const profiles = state.snapshot?.profiles || [];
   const current = state.snapshot?.settings?.profile || null;
@@ -314,11 +371,14 @@ function renderProfiles() {
     const action = el('td');
     if (profile.name === current) {
       action.append(el('span', 'badge current', 'current'));
+    } else {
+      const button = el('button', null, 'Use');
+      button.addEventListener('click', () => useProfile(profile.name));
+      action.append(button);
     }
     tr.append(
       el('td', null, profile.name),
       el('td', null, dash(profile.region)),
-      el('td', null, sso ? sso.sessionName || sso.startUrl : 'not configured'),
       el('td', null, dash(sso?.accountId)),
       el('td', null, dash(sso?.roleName)),
       action,
@@ -342,6 +402,8 @@ async function useProfile(name) {
     applySnapshot(await api.selectProfile(name));
     state.instances = [];
     state.loaded = false;
+    state.cloudtrailEvents = [];
+    state.cloudtrailLoaded = false;
     closeDetail();
     clearError();
     if (state.snapshot.session?.loggedIn) {
@@ -350,118 +412,10 @@ async function useProfile(name) {
     } else {
       renderInstances();
       setLoginHint(true);
+      setCloudTrailLoginHint(true);
     }
   } catch (error) {
     handleError(error);
-  }
-}
-
-// ---------------------------------------------------------------- login
-
-// The dialog lists only profiles the SSO flow can use; the AWS Profile tab
-// keeps showing everything.
-function renderLoginDialog() {
-  const profiles = (state.snapshot?.profiles || []).filter((profile) => profile.sso);
-  const current = state.snapshot?.settings?.profile || null;
-  const list = $('#login-profile-list');
-  list.replaceChildren();
-  for (const profile of profiles) {
-    const item = document.createElement('li');
-    const button = el('button', 'login-profile-row');
-    button.type = 'button';
-    const name = el('span', null, profile.name);
-    if (profile.name === current) {
-      name.append(' ', el('span', 'badge current', 'current'));
-    }
-    const meta = [profile.region, profile.sso.accountId, profile.sso.roleName]
-      .filter(Boolean)
-      .join(' · ');
-    button.append(name, el('span', 'login-profile-meta', meta));
-    button.addEventListener('click', () => loginWithProfile(profile.name));
-    item.append(button);
-    list.append(item);
-  }
-  $('#login-profile-empty').classList.toggle('hidden', profiles.length > 0);
-}
-
-async function openLoginDialog() {
-  // Re-read ~/.aws/config on every open so a profile added while the app is
-  // running shows up without a restart.
-  try {
-    applySnapshot(await api.getSnapshot());
-  } catch (error) {
-    handleError(error);
-    return;
-  }
-  renderLoginDialog();
-  $('#login-dialog').showModal();
-}
-
-function closeLoginDialog() {
-  const dialog = $('#login-dialog');
-  if (dialog.open) dialog.close();
-}
-
-async function loginWithProfile(name) {
-  closeLoginDialog();
-  await useProfile(name);
-  // Selection failed (already reported) — do not sign in to the old profile.
-  if (state.snapshot?.settings?.profile !== name) return;
-  if (state.snapshot?.session?.loggedIn) return;
-  await login();
-}
-
-// ------------------------------------------------------------ login relay
-
-// The backend runs `aws sso login` and opens the page it prints in its own
-// window. This modal is the page's half of that: it names the profile, carries
-// the code the window may ask for, and owns cancel. It is opened by the
-// verification event, never by a click.
-function showRelayDialog(verification) {
-  $('#relay-profile').textContent = verification.profile || '-';
-  const code = verification.userCode || '';
-  $('#relay-code').textContent = code;
-  $('#relay-code-box').classList.toggle('hidden', !code);
-  $('#relay-url').textContent = verification.url || '';
-  const dialog = $('#relay-dialog');
-  if (!dialog.open) dialog.showModal();
-}
-
-function closeRelayDialog() {
-  const dialog = $('#relay-dialog');
-  if (dialog.open) dialog.close();
-}
-
-// Cancel means closing the sign-in window: that window's absence is what the
-// login task polls, so there is one way to cancel rather than two states to
-// keep in step.
-async function cancelLogin() {
-  closeRelayDialog();
-  try {
-    await api.cancelLogin();
-  } catch (error) {
-    reportError(`cancel login: ${error?.message || error}`);
-  }
-}
-
-async function login() {
-  const button = $('#login-button');
-  button.disabled = true;
-  button.textContent = 'Waiting for sign-in…';
-  try {
-    await api.cliLogin();
-    closeRelayDialog();
-    applySnapshot(await api.getSnapshot());
-    clearError();
-    setLoginHint(false);
-    await loadInstances();
-  } catch (error) {
-    closeRelayDialog();
-    handleError(error);
-  } finally {
-    button.disabled = false;
-    button.textContent = 'AWS login';
-    renderTopbar();
   }
 }
 
@@ -473,6 +427,9 @@ function switchTab(name) {
   }
   for (const tab of document.querySelectorAll('main .tab')) {
     tab.classList.toggle('active', tab.id === `tab-${name}`);
+  }
+  if (name === 'cloudtrail' && state.snapshot?.session?.loggedIn && !state.cloudtrailLoaded) {
+    void loadCloudTrail();
   }
 }
 
@@ -489,34 +446,25 @@ function wire() {
     tabButton.addEventListener('click', () => switchTab(tabButton.dataset.tab));
   }
 
-  const loginDialog = $('#login-dialog');
-  $('#close-login-dialog').addEventListener('click', closeLoginDialog);
-  loginDialog.addEventListener('click', (event) => {
-    if (event.target === loginDialog) closeLoginDialog();
-  });
-
-  const relayDialog = $('#relay-dialog');
-  $('#relay-cancel').addEventListener('click', () => void cancelLogin());
-  $('#relay-reopen').addEventListener('click', () => {
-    api.reopenLoginWindow().catch(handleError);
-  });
-  // Esc closes a dialog on its own. Without this the modal would vanish while
-  // the CLI kept waiting, leaving no way to cancel or get the window back.
-  relayDialog.addEventListener('cancel', (event) => {
-    event.preventDefault();
-    void cancelLogin();
-  });
-
-  $('#login-button').addEventListener('click', openLoginDialog);
   $('#refresh-instances').addEventListener('click', loadInstances);
   $('#instance-filter').addEventListener('input', (event) => {
     state.filter = event.target.value;
     renderInstances();
   });
-  $('#spot-only').addEventListener('change', (event) => {
-    state.spotOnly = event.target.checked;
+  $('#capacity-filter').addEventListener('change', (event) => {
+    state.capacity = event.target.value;
     renderInstances();
   });
+  $('#refresh-cloudtrail').addEventListener('click', loadCloudTrail);
+  $('#cloudtrail-event-name').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') void loadCloudTrail();
+  });
+  for (const button of document.querySelectorAll('.event-preset')) {
+    button.addEventListener('click', () => {
+      $('#cloudtrail-event-name').value = button.dataset.eventName;
+      void loadCloudTrail();
+    });
+  }
 
   for (const th of document.querySelectorAll('#instance-table th.sortable')) {
     const activate = () => {
@@ -583,18 +531,12 @@ function wire() {
 async function init() {
   wire();
   try {
-    await api.onLoginVerification(showRelayDialog);
-  } catch (error) {
-    // Without the listener the sign-in window still opens and the flow still
-    // works; only the modal is missing. Log it and carry on.
-    reportError(`cannot listen for login verification: ${error?.message || error}`);
-  }
-  try {
     applySnapshot(await api.getSnapshot());
     if (state.snapshot.session?.loggedIn) {
       await loadInstances();
     } else if (state.snapshot.settings.profile) {
       setLoginHint(true);
+      setCloudTrailLoginHint(true);
     }
   } catch (error) {
     handleError(error);

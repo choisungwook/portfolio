@@ -30,6 +30,18 @@
         </span>
         <span class="tab-label">Instances</span>
       </button>
+      <button class="tab-button" data-tab="cloudtrail">
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5h16M4 12h16M4 19h16" />
+            <circle cx="7" cy="5" r="1" fill="currentColor" />
+            <circle cx="12" cy="12" r="1" fill="currentColor" />
+            <circle cx="17" cy="19" r="1" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="tab-label">CloudTrail</span>
+      </button>
       <button class="tab-button" data-tab="profile">
         <span class="tab-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
@@ -54,7 +66,7 @@
   </aside>
 
   <div id="content">
-    <!-- Top bar: the current profile on the left, login on the right. -->
+    <!-- Top bar: current profile and AWS CLI session status. -->
     <header id="topbar">
       <div id="topbar-profile">
         <span class="topbar-label">Profile</span>
@@ -62,7 +74,6 @@
         <span id="session-badge" class="session-badge logged-out">Not logged in</span>
       </div>
       <button id="update-button" title="Check for a newer version">Updates</button>
-      <button id="login-button">AWS login</button>
     </header>
 
     <main>
@@ -71,10 +82,11 @@
         <div class="toolbar">
           <input id="instance-filter" type="text"
             placeholder="Filter by instance id or Name tag" />
-          <label class="toolbar-check">
-            <input id="spot-only" type="checkbox" />
-            Spot only
-          </label>
+          <select id="capacity-filter" aria-label="Capacity filter">
+            <option value="all">All capacity</option>
+            <option value="spot">Spot only</option>
+            <option value="on-demand">On-demand only</option>
+          </select>
           <button id="refresh-instances">Refresh</button>
         </div>
         <p class="help">Click a header to sort by that column; click it again to flip the direction. Click a row for details.</p>
@@ -117,25 +129,49 @@
         </table>
         <p id="instance-empty" class="empty hidden">No instances.</p>
         <p id="instance-login-hint" class="empty hidden">
-          Use AWS login in the top right to list instances.
+          Run <code>aws login --profile &lt;profile&gt;</code> in a terminal, then refresh.
+        </p>
+      </section>
+
+      <!-- CloudTrail tab -->
+      <section id="tab-cloudtrail" class="tab">
+        <div class="toolbar">
+          <input id="cloudtrail-event-name" type="text" placeholder="Filter by EventName" />
+          <button class="event-preset" data-event-name="GetParameter">GetParameter</button>
+          <button id="refresh-cloudtrail">Refresh</button>
+        </div>
+        <p class="help">Latest 20 events, newest first. EventName filters are applied by CloudTrail.</p>
+        <table id="cloudtrail-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>EventName</th>
+              <th>Event source</th>
+              <th>User</th>
+              <th>Resources</th>
+              <th>Event ID</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="cloudtrail-empty" class="empty hidden">No CloudTrail events.</p>
+        <p id="cloudtrail-login-hint" class="empty hidden">
+          Run <code>aws login --profile &lt;profile&gt;</code> in a terminal, then refresh.
         </p>
       </section>
 
       <!-- AWS Profile tab -->
       <section id="tab-profile" class="tab">
         <p class="help">
-          Profiles come from ~/.aws/config, read-only. Signing in runs
-          aws sso login with the profile you pick, so the session is the same
-          one the AWS CLI uses. Profiles without SSO configuration are listed
-          but cannot be signed in to. Sign in and switch profiles with AWS
-          login in the top right.
+          Profiles come from ~/.aws/config, read-only. Select a profile here.
+          Authentication uses the same credentials as the AWS CLI; run aws login
+          in a terminal when the selected profile is not logged in.
         </p>
         <table id="profile-table">
           <thead>
             <tr>
               <th>Profile</th>
               <th>Region</th>
-              <th>SSO</th>
               <th>Account</th>
               <th>Role</th>
               <th></th>
@@ -200,48 +236,6 @@
     </div>
     <div id="detail-body"></div>
   </aside>
-
-  <!-- AWS login: pick the profile first, then the SSO flow starts. -->
-  <dialog id="login-dialog" aria-labelledby="login-dialog-title">
-    <div class="login-dialog-header">
-      <h2 id="login-dialog-title">AWS login</h2>
-      <button id="close-login-dialog" aria-label="Close login">✕</button>
-    </div>
-    <p class="help">
-      Pick the profile to sign in with. Only IAM Identity Center profiles
-      from ~/.aws/config are listed.
-    </p>
-    <ul id="login-profile-list"></ul>
-    <p id="login-profile-empty" class="empty hidden">
-      No IAM Identity Center profiles in ~/.aws/config.
-    </p>
-  </dialog>
-
-  <!-- Opens once `aws sso login` prints its verification page. The app also
-       opens that page in its own window; this modal is what explains the
-       window, carries the code, and takes the cancel. -->
-  <dialog id="relay-dialog" aria-labelledby="relay-title">
-    <div class="login-dialog-header">
-      <h2 id="relay-title">Approve the sign-in</h2>
-    </div>
-    <p class="help">
-      The sign-in page for <span id="relay-profile" class="relay-profile">-</span>
-      is open in a separate window. Approve it there and this window continues
-      on its own.
-    </p>
-    <div id="relay-code-box" class="relay-code-box hidden">
-      <span class="relay-code-label">Code</span>
-      <span id="relay-code" class="relay-code"></span>
-    </div>
-    <p class="help">
-      If the page asks for a code, enter the one above.
-      <span id="relay-url" class="relay-url"></span>
-    </p>
-    <div class="error-dialog-actions">
-      <button id="relay-reopen">Open sign-in window again</button>
-      <button id="relay-cancel">Cancel</button>
-    </div>
-  </dialog>
 
   <dialog id="error-dialog" aria-labelledby="error-title" aria-describedby="error-message">
     <div class="error-dialog-header">

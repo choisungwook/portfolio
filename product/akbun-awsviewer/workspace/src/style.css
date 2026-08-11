@@ -146,7 +146,7 @@ body {
   min-width: 0;
 }
 
-/* Top bar: current profile on the left, the login button pinned right. */
+/* Top bar: current profile on the left, update action pinned right. */
 #topbar {
   display: flex;
   align-items: center;
@@ -191,7 +191,6 @@ body {
   background: var(--surface-muted);
 }
 
-/* Pushes itself and the login button to the right edge. */
 #update-button {
   margin-left: auto;
 }
@@ -249,24 +248,18 @@ button:disabled {
   cursor: default;
 }
 
-#login-button {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-#login-button:hover {
-  filter: brightness(1.08);
-  background: var(--accent);
-}
-
-input[type="text"] {
+input[type="text"],
+select {
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
   color: var(--fg);
   font: inherit;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .help {
@@ -389,120 +382,8 @@ th[aria-sort="descending"] .sort-arrow::after {
   color: var(--fg);
 }
 
-#error-dialog::backdrop,
-#relay-dialog::backdrop,
-#login-dialog::backdrop {
+#error-dialog::backdrop {
   background: rgb(15 23 42 / 45%);
-}
-
-#login-dialog {
-  width: min(520px, calc(100vw - 40px));
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
-  color: var(--fg);
-}
-
-.login-dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--surface-muted);
-}
-
-.login-dialog-header h2 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.login-dialog-header button {
-  padding: 3px 7px;
-  border: none;
-  background: transparent;
-  color: inherit;
-}
-
-#login-dialog .help,
-#login-dialog .empty,
-#relay-dialog .help {
-  margin: 10px 16px;
-}
-
-/* The sign-in relay modal borrows the login dialog's frame; only the code
-   block and the URL line are its own. */
-#relay-dialog {
-  width: min(520px, calc(100vw - 40px));
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
-  color: var(--fg);
-}
-
-.relay-profile {
-  font-weight: 600;
-}
-
-.relay-code-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-
-.relay-code-label {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* The code is read off the screen and typed into the sign-in page, so it is
-   set large and monospaced: O and 0 have to be distinguishable. */
-.relay-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 18px;
-  letter-spacing: 2px;
-}
-
-.relay-url {
-  display: block;
-  margin-top: 4px;
-  overflow-wrap: anywhere;
-  color: var(--muted);
-}
-
-#login-profile-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 8px 16px 16px;
-  max-height: 380px;
-  overflow-y: auto;
-}
-
-.login-profile-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-}
-
-.login-profile-meta {
-  color: var(--muted);
-  overflow-wrap: anywhere;
-  text-align: right;
 }
 
 .error-dialog-header {

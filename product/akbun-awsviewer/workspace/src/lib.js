@@ -4,9 +4,9 @@
 // DOM, so node --test runs this file as is. Search never asks the backend —
 // it runs over the array the page already has, on every keystroke.
 
-function filterInstances(instances, query, spotOnly) {
-  const pool = spotOnly
-    ? instances.filter((instance) => instance.capacity === 'spot')
+function filterInstances(instances, query, capacity) {
+  const pool = capacity && capacity !== 'all'
+    ? instances.filter((instance) => instance.capacity === capacity)
     : instances;
   const q = (query || '').trim().toLowerCase();
   if (!q) {
@@ -105,9 +105,6 @@ function formatAge(launchTime, nowMs = Date.now()) {
 function sessionLabel(session) {
   if (!session || !session.loggedIn) {
     return 'Not logged in';
-  }
-  if (session.expiresAt) {
-    return `Session until ${session.expiresAt}`;
   }
   return 'Logged in';
 }

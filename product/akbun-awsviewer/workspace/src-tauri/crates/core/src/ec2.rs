@@ -133,17 +133,13 @@ pub struct RuleView {
     pub sources: Vec<String>,
 }
 
-fn ec2_client(
-    region: &str,
-    creds: &RoleCredentials,
-    insecure: bool,
-) -> aws_sdk_ec2::Client {
+fn ec2_client(region: &str, creds: &RoleCredentials, insecure: bool) -> aws_sdk_ec2::Client {
     let credentials = aws_credential_types::Credentials::new(
         creds.access_key_id.clone(),
         creds.secret_access_key.clone(),
-        Some(creds.session_token.clone()),
+        creds.session_token.clone(),
         None,
-        "akbun-awsviewer-sso",
+        "akbun-awsviewer-cli",
     );
     let mut builder = aws_sdk_ec2::Config::builder()
         .behavior_version(aws_sdk_ec2::config::BehaviorVersion::latest())
@@ -257,18 +253,16 @@ pub fn map_summary(instance: &Instance) -> InstanceSummary {
             .state()
             .and_then(|s| s.name())
             .map(|n| n.as_str().to_string()),
-        instance_type: instance
-            .instance_type()
-            .map(|t| t.as_str().to_string()),
+        instance_type: instance.instance_type().map(|t| t.as_str().to_string()),
         availability_zone: instance
             .placement()
             .and_then(|p| p.availability_zone())
             .map(str::to_string),
         private_ip: instance.private_ip_address().map(str::to_string),
         public_ip: instance.public_ip_address().map(str::to_string),
-        launch_time: instance.launch_time().and_then(|t| {
-            t.fmt(aws_smithy_types::date_time::Format::DateTime).ok()
-        }),
+        launch_time: instance
+            .launch_time()
+            .and_then(|t| t.fmt(aws_smithy_types::date_time::Format::DateTime).ok()),
         capacity: capacity_of(lifecycle.as_deref()),
         karpenter_node_pool: KARPENTER_POOL_TAGS
             .iter()
@@ -313,9 +307,7 @@ pub fn map_detail(
         summary: map_summary(instance),
         details: Details {
             image_id: instance.image_id().map(str::to_string),
-            architecture: instance
-                .architecture()
-                .map(|a| a.as_str().to_string()),
+            architecture: instance.architecture().map(|a| a.as_str().to_string()),
             platform: instance.platform_details().map(str::to_string),
             key_name: instance.key_name().map(str::to_string),
             iam_instance_profile: instance
@@ -381,11 +373,7 @@ pub fn map_detail(
                 group_name: group.group_name().map(str::to_string),
                 description: group.description().map(str::to_string),
                 ingress: group.ip_permissions().iter().map(map_rule).collect(),
-                egress: group
-                    .ip_permissions_egress()
-                    .iter()
-                    .map(map_rule)
-                    .collect(),
+                egress: group.ip_permissions_egress().iter().map(map_rule).collect(),
             })
             .collect(),
     }
@@ -439,7 +427,11 @@ mod tests {
                     .name(InstanceStateName::Running)
                     .build(),
             )
-            .placement(Placement::builder().availability_zone("ap-northeast-2a").build())
+            .placement(
+                Placement::builder()
+                    .availability_zone("ap-northeast-2a")
+                    .build(),
+            )
             .private_ip_address("10.0.1.10")
             .public_ip_address("54.180.1.2")
             .vpc_id("vpc-11112222")
@@ -487,7 +479,10 @@ mod tests {
         assert_eq!(summary.name.as_deref(), Some("web-1"));
         assert_eq!(summary.state.as_deref(), Some("running"));
         assert_eq!(summary.instance_type.as_deref(), Some("t4g.small"));
-        assert_eq!(summary.availability_zone.as_deref(), Some("ap-northeast-2a"));
+        assert_eq!(
+            summary.availability_zone.as_deref(),
+            Some("ap-northeast-2a")
+        );
         assert_eq!(summary.lifecycle, None);
     }
 
@@ -515,7 +510,12 @@ mod tests {
     fn karpenter_node_pool_comes_from_the_tag() {
         let instance = Instance::builder()
             .instance_id("i-karpenter")
-            .tags(Tag::builder().key("karpenter.sh/nodepool").value("default").build())
+            .tags(
+                Tag::builder()
+                    .key("karpenter.sh/nodepool")
+                    .value("default")
+                    .build(),
+            )
             .build();
         assert_eq!(
             map_summary(&instance).karpenter_node_pool.as_deref(),
@@ -577,14 +577,10 @@ mod tests {
                     .from_port(443)
                     .to_port(443)
                     .ip_ranges(IpRange::builder().cidr_ip("0.0.0.0/0").build())
-                    .user_id_group_pairs(
-                        UserIdGroupPair::builder().group_id("sg-111").build(),
-                    )
+                    .user_id_group_pairs(UserIdGroupPair::builder().group_id("sg-111").build())
                     .build(),
             )
-            .ip_permissions_egress(
-                IpPermission::builder().ip_protocol("-1").build(),
-            )
+            .ip_permissions_egress(IpPermission::builder().ip_protocol("-1").build())
             .build();
         let detail = map_detail(&sample_instance(), &[], &[group]);
         assert_eq!(detail.security.len(), 1);

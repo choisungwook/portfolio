@@ -1,5 +1,7 @@
 # IAM Identity Center only, no access keys
 
+> Superseded by [2026-08-aws-cli-login.md](./2026-08-aws-cli-login.md).
+
 ## Decision
 
 The app authenticates through IAM Identity Center (SSO) exclusively: it parses ~/.aws/config for profiles, runs the OIDC device authorization flow itself, and shares the token cache with the AWS CLI. ~/.aws/credentials is never read and long-lived access keys are unsupported.

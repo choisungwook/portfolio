@@ -60,15 +60,9 @@ globalThis.awsviewerApi = {
   getSnapshot: () => invoke('get_snapshot'),
   selectProfile: (name) => invoke('select_profile', { name }),
   setInsecureTls: (enabled) => invoke('set_insecure_tls', { enabled }),
-  cliLogin: () => invoke('cli_login'),
-  reopenLoginWindow: () => invoke('reopen_login_window'),
-  cancelLogin: () => invoke('cancel_login'),
-  // Fires once per login attempt, when the AWS CLI has printed the page to
-  // approve on. The relay window is already opening by then.
-  onLoginVerification: (handler) =>
-    window.__TAURI__.event.listen('aws-login-verification', (event) => handler(event.payload)),
   listInstances: () => invoke('list_instances'),
   instanceDetail: (instanceId) => invoke('instance_detail', { instanceId }),
+  listCloudTrailEvents: (eventName) => invoke('list_cloudtrail_events', { eventName }),
   openLogDir: () => invoke('open_log_dir'),
   checkUpdate,
 };
