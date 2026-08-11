@@ -65,7 +65,8 @@ What is covered:
 - `crates/present/src/transport.rs` — the two halves of a seek moving together, including that the second seek of a session is waited for as carefully as the first
 - `crates/present/src/fallback.rs` — which engine runs, and that choosing the media elements is not reported as a failure
 - `crates/present/src/soak.rs` — the scheduler meter, including that a source slower than the frame rate makes the run fail and that the run gives up inside its own budget
-- `test/monitor.test.js` — the page's half of the viewport: a stage box converted to physical pixels, and a fallback told apart from a preference
+- `test/geometry.test.js` — where the picture goes: a box that keeps the project's shape, never reaches past the panel it was fitted into, and is empty rather than small when there is no room
+- `test/monitor.test.js` — *when* the page places a view: a stage that moved without resizing, a panel dragged shut, an attach finished once there is room, and a fallback told apart from a preference
 - `crates/compositor/tests/render.rs` — a real render end to end, and that the preview frame matches the frame the render wrote at the same instant
 
 ### What the tests cannot tell you

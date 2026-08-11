@@ -147,10 +147,55 @@ over it — a sheet, an open menu. One rule, and it costs nothing at the moment
 that matters: nobody has the settings sheet open while they are watching
 playback.
 
-Everything platform specific is `src-tauri/src/viewport/`, and it is three
-functions: make a view, place it, hide it. The swapchain, the compositing and
-every decision about when to draw are the same code everywhere, so a Windows
-build replaces that directory and nothing else.
+Everything platform specific is `src-tauri/src/viewport/`, and it is four
+functions: make a view, place it, hide it, and say how big its backing store
+is. The swapchain, the compositing and every decision about when to draw are
+the same code everywhere, so a Windows build replaces that directory and
+nothing else.
+
+## Where the view goes is one calculation, in points
+
+`src/geometry.js` answers "where is the stage" and nothing else does. The media
+element stack and the native view are laid out from the same call on the same
+inputs — the preview panel's box and the project's shape — rather than one of
+them measuring what the other one drew.
+
+Two things follow from that, and both were bugs before it:
+
+- **Units are points**, all the way across the IPC boundary. A CSS pixel in the
+  page and an AppKit point inside that page's WebView are the same length, so
+  `setFrame` takes the numbers as they arrive. The page used to multiply by
+  `devicePixelRatio` and Rust used to divide by the view's backing scale, which
+  is a round trip that lands where it started only while the two agree. When
+  they did not — a window moved to a display with a different scale factor,
+  with no resize to trigger a re-send — every coordinate was scaled at once and
+  the monitor was drawn outside the panel.
+- **Physical pixels are asked of the view**, in the same main thread hop that
+  moved it and after the move rather than before. That is the only reading that
+  knows which display the window ended up on, and it is all a swapchain needs.
+
+There are no minimum sizes in the fit. A stage held up to a floor is wider than
+the panel holding it, and a native view is not in the page's stacking order, so
+the panel's `overflow: hidden` does not clip what hangs over — it is drawn on
+top of the timeline. A floor on the width but not the height also stretches the
+picture. A panel with no room in it gets an empty box and the view is hidden,
+which is the fifth input to the visibility rule below.
+
+## The box is re-measured every frame
+
+The monitor already runs an animation frame to poll the playhead, so the panel
+is measured there and `samePlace` decides whether anything needs sending. A
+drag is one command per pixel the box actually moved.
+
+This replaced a `ResizeObserver` on the stage, which fires on size and not on
+position. A sibling panel widening, the inspector opening, the timeline growing,
+a scrollbar appearing: each moves the stage without resizing it, and each left
+the native view at its previous position with nothing to clip it. Enumerating
+the reasons a box can move is a list nobody finishes.
+
+The same loop finishes an attach that found no room. A window lays out over
+several frames when a project opens, and giving up there used to be a silent
+fallback to the media element preview for the rest of the session.
 
 ## The live and exact split is gone
 

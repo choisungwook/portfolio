@@ -198,19 +198,27 @@ pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inne
     })
 }
 
-pub fn place(inner: &Inner, at: MonitorPlace) {
+/// Move both views and answer what the picture's size in physical pixels now
+/// is.
+///
+/// The size is read in the same main thread hop that moved the view, and after
+/// the move rather than before. A window dragged onto a display with a
+/// different scale factor changes that number without changing the box, so a
+/// reading taken anywhere else is a reading of the display it used to be on.
+pub fn place(inner: &Inner, at: MonitorPlace) -> (u32, u32) {
     let view = inner.view;
     let container = inner.container;
-    // Placement is best effort: a window that has gone during a resize is a
-    // window nobody is looking at.
-    let _ = on_webview(&inner.window, move |_, host| {
+    on_webview(&inner.window, move |_, host| {
         // SAFETY: both views are alive until `detach` releases the container.
         let container = unsafe { container.ptr().as_ref() };
         container.setFrame(rect(host, at.stage));
         let view = unsafe { view.ptr().as_ref() };
         view.setFrame(child_rect(container, at));
-        Ok(())
-    });
+        Ok(backing_size(view))
+    })
+    // Placement is best effort: a window that has gone during a resize is a
+    // window nobody is looking at. A surface still may not be sized at zero.
+    .unwrap_or((1, 1))
 }
 
 pub fn set_visible(inner: &Inner, visible: bool) {
@@ -246,36 +254,43 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
 
 /// The page's rectangle as AppKit's inside the WebView.
 ///
-/// Two conversions in one place. The y origin is converted against the
-/// superview's own coordinate origin — `WKWebView` is flipped, so a top-left
-/// `y` passes through unchanged there — and the numbers arriving are physical
-/// pixels while AppKit wants points. The WebView's own bounds against its
-/// backing size is where that ratio comes from, rather than asking the screen,
-/// which can be the wrong one when the window straddles two displays.
+/// One conversion, and it is the y origin: the superview is asked which corner
+/// it measures from — `WKWebView` is flipped, so a top-left `y` passes through
+/// unchanged there — and nothing else is touched. The numbers arriving are
+/// points, which is what `setFrame` takes, because a CSS pixel in the page and
+/// an AppKit point in a view inside that page's WebView are the same length.
+///
+/// There used to be a second conversion here, dividing by the view's backing
+/// scale to undo a multiplication the page had done by `devicePixelRatio`.
+/// Two conversions that cancel are not a conversion; they are an agreement
+/// between two numbers measured in different places, and the frames where they
+/// disagreed put the monitor at twice its offset and twice its size.
 fn rect(host: &NSView, at: Place) -> NSRect {
-    let scale = backing_scale(host);
-    let (x, y, width, height) = (
-        at.x / scale,
-        at.y / scale,
-        at.width.max(1.0) / scale,
-        at.height.max(1.0) / scale,
-    );
+    let width = at.width.max(1.0);
+    let height = at.height.max(1.0);
     NSRect::new(
-        NSPoint::new(x, origin_y(host.isFlipped(), host.bounds().size.height, y, height)),
+        NSPoint::new(
+            at.x,
+            origin_y(host.isFlipped(), host.bounds().size.height, at.y, height),
+        ),
         NSSize::new(width, height),
     )
 }
 
+/// The picture inside the container that clips it, so its origin is relative to
+/// the stage rather than to the WebView.
 fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
-    let scale = backing_scale(container);
-    let x = (at.content.x - at.stage.x) / scale;
-    let top = (at.content.y - at.stage.y) / scale;
-    let width = at.content.width.max(1.0) / scale;
-    let height = at.content.height.max(1.0) / scale;
+    let width = at.content.width.max(1.0);
+    let height = at.content.height.max(1.0);
     NSRect::new(
         NSPoint::new(
-            x,
-            origin_y(container.isFlipped(), container.bounds().size.height, top, height),
+            at.content.x - at.stage.x,
+            origin_y(
+                container.isFlipped(),
+                container.bounds().size.height,
+                at.content.y - at.stage.y,
+                height,
+            ),
         ),
         NSSize::new(width, height),
     )
@@ -306,16 +321,29 @@ mod tests {
     }
 }
 
-fn backing_scale(content: &NSView) -> f64 {
-    let bounds = content.bounds();
-    if bounds.size.width <= 0.0 {
-        return 1.0;
-    }
-    let backing = content.convertRectToBacking(bounds);
-    let scale = backing.size.width / bounds.size.width;
-    if scale.is_finite() && scale > 0.0 {
-        scale
-    } else {
-        1.0
-    }
+/// The picture view's own size in physical pixels.
+///
+/// `convertRectToBacking` answers for the display the view is on, which is the
+/// whole reason the swapchain size is asked of the view rather than computed
+/// from a ratio the page carried across. The view has been in the window since
+/// `attach` put it there, because a view with no window answers with whatever
+/// the main screen happens to be.
+fn backing_size(view: &NSView) -> (u32, u32) {
+    let backing = view.convertRectToBacking(view.bounds());
+    (
+        backing.size.width.max(1.0).round() as u32,
+        backing.size.height.max(1.0).round() as u32,
+    )
+}
+
+/// The same reading without moving anything, for the one caller that has just
+/// attached a view and not placed it yet.
+pub fn surface_size(inner: &Inner) -> (u32, u32) {
+    let view = inner.view;
+    on_webview(&inner.window, move |_, _| {
+        // SAFETY: messaged on the main thread, and the view is alive until
+        // `detach` releases it.
+        Ok(backing_size(unsafe { view.ptr().as_ref() }))
+    })
+    .unwrap_or((1, 1))
 }

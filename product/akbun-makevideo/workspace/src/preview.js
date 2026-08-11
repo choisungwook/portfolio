@@ -26,6 +26,11 @@ const QUALITY = {
 const T =
   typeof module !== 'undefined' && module.exports ? require('./time.js') : globalThis.timeLib;
 
+const GEO =
+  typeof module !== 'undefined' && module.exports
+    ? require('./geometry.js')
+    : globalThis.geometryLib;
+
 const RATE_SYNC_THRESHOLD = 0.04;
 const HARD_SYNC_THRESHOLD = 1;
 const MAX_RATE_ADJUSTMENT = 0.05;
@@ -87,23 +92,36 @@ function createPreview(options) {
     return T.framesToSeconds(positionFrames, rate());
   }
 
-  /** Fit the project shape into the panel, then lay the media out at the
-   *  quality scale and scale it back up so it still fills that box. */
+  /** Size the stage to the fitted box, then lay the media out at the quality
+   *  scale and scale it back up so it still fills that box.
+   *
+   *  The box itself comes from `geometry.js` and not from here, because the
+   *  native monitor places a view on the same box and the two must not be two
+   *  different calculations. The panel centres the stage in CSS, which is the
+   *  same centring `stageBoxOf` did in arithmetic, so only the size is written
+   *  and the position follows.
+   *
+   *  Scaling back up uses the ratio the rounded inner box actually is rather
+   *  than `1 / factor`. Rounding 641 at half quality gives 321, and doubling
+   *  that is 642 — a pixel of the stack hanging past the stage on every odd
+   *  width. */
   function layout() {
     if (!wrap) return;
-    const { width, height } = settings();
-    const box = wrap.getBoundingClientRect();
-    const availableWidth = Math.max(80, box.width - 28);
-    const availableHeight = Math.max(45, box.height - 28);
-    const fit = Math.min(availableWidth / width, availableHeight / height);
-    const displayWidth = Math.max(80, Math.round(width * fit));
-    const displayHeight = Math.max(45, Math.round(height * fit));
-    stage.style.width = `${displayWidth}px`;
-    stage.style.height = `${displayHeight}px`;
+    const box = GEO.stageBoxOf(wrap.getBoundingClientRect(), getProject());
+    stage.style.width = `${box.width}px`;
+    stage.style.height = `${box.height}px`;
+    if (!GEO.isDrawable(box)) {
+      inner.style.width = '0px';
+      inner.style.height = '0px';
+      inner.style.transform = 'none';
+      return;
+    }
     const factor = QUALITY[quality].scale;
-    inner.style.width = `${Math.max(2, Math.round(displayWidth * factor))}px`;
-    inner.style.height = `${Math.max(2, Math.round(displayHeight * factor))}px`;
-    inner.style.transform = `scale(${1 / factor})`;
+    const innerWidth = Math.max(1, Math.round(box.width * factor));
+    const innerHeight = Math.max(1, Math.round(box.height * factor));
+    inner.style.width = `${innerWidth}px`;
+    inner.style.height = `${innerHeight}px`;
+    inner.style.transform = `scale(${box.width / innerWidth}, ${box.height / innerHeight})`;
   }
 
   function makeElement(asset, wantsPicture) {
