@@ -97,6 +97,8 @@
           <button class="filter-button active" data-filter="all">전체</button>
           <button class="filter-button" data-filter="karpenter">Karpenter</button>
           <button class="filter-button" data-filter="managed">Managed NodeGroup</button>
+          <button class="filter-button" data-filter="spot">Spot</button>
+          <button class="filter-button" data-filter="on-demand">On-Demand</button>
           <button class="filter-button" data-filter="cordoned">Cordoned / NotSchedulable</button>
         </div>
         <button id="refresh-nodes">새로고침</button>
@@ -113,6 +115,9 @@
             </th>
             <th class="sortable" data-sort-key="instanceType" tabindex="0" role="button" aria-sort="none">
               Instance Type<span class="sort-arrow"></span>
+            </th>
+            <th class="sortable" data-sort-key="capacityType" tabindex="0" role="button" aria-sort="none">
+              Capacity<span class="sort-arrow"></span>
             </th>
             <th class="sortable" data-sort-key="version" tabindex="0" role="button" aria-sort="none">
               Version<span class="sort-arrow"></span>

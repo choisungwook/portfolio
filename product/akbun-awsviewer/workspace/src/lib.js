@@ -6,7 +6,7 @@
 
 function filterInstances(instances, query, spotOnly) {
   const pool = spotOnly
-    ? instances.filter((instance) => instance.lifecycle === 'spot')
+    ? instances.filter((instance) => instance.capacity === 'spot')
     : instances;
   const q = (query || '').trim().toLowerCase();
   if (!q) {
@@ -72,6 +72,14 @@ function stateClass(state) {
   return '';
 }
 
+// Spot instances can be reclaimed by AWS at any time, which is the one thing
+// about a row worth a color of its own. on-demand is the normal case and gets
+// no emphasis; anything else (capacity-block) gets no color rather than
+// borrowing spot's warning.
+function capacityClass(capacity) {
+  return capacity === 'spot' ? 'capacity-spot' : '';
+}
+
 // The single largest unit is enough for a glance; sorting uses the raw
 // launchTime, not this label. Months and years are calendar approximations
 // (30 and 365 days), fine for a viewer.
@@ -111,6 +119,7 @@ const exported = {
   formatPortRange,
   formatAge,
   stateClass,
+  capacityClass,
   sessionLabel,
 };
 

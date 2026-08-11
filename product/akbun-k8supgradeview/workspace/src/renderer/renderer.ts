@@ -2,6 +2,7 @@ interface NodeInfo {
   name: string;
   internalIp: string;
   instanceType: string;
+  capacityType: string;
   version: string;
   status: string;
   creationTimestamp: string;
@@ -109,7 +110,13 @@ interface Api {
 
 declare const api: Api;
 
-type NodeFilterKind = "all" | "karpenter" | "managed" | "cordoned";
+type NodeFilterKind =
+  | "all"
+  | "karpenter"
+  | "managed"
+  | "spot"
+  | "on-demand"
+  | "cordoned";
 
 let allNodes: NodeInfo[] = [];
 let allPods: PodInfo[] = [];
@@ -252,11 +259,29 @@ function createSortController<T>(
   };
 }
 
+/**
+ * 노드 필터는 하나만 켜지는 라디오다. karpenter와 managed는 노드를 만든 주체를,
+ * spot과 on-demand는 그 노드를 산 방식을 가른다. 두 축이 섞이지 않게 버튼을
+ * 하나씩 두고, 교집합(Karpenter의 spot 노드)은 Capacity 칼럼으로 정렬해서 본다.
+ *
+ * 순수 함수로 떼어 둔 이유는 표시 상태를 들고 있는 renderer 없이 테스트에서
+ * 규칙만 확인하기 위함이다.
+ */
+function nodeMatchesFilter(node: NodeInfo, filter: NodeFilterKind): boolean {
+  if (filter === "karpenter") return node.isKarpenter;
+  if (filter === "managed") return node.isManagedNodeGroup;
+  if (filter === "spot") return node.capacityType === "spot";
+  if (filter === "on-demand") return node.capacityType === "on-demand";
+  if (filter === "cordoned") return node.unschedulable;
+  return true;
+}
+
 const NODE_SORT: SortSpec<NodeInfo> = {
   columns: {
     name: { kind: "text", value: (node) => node.name },
     internalIp: { kind: "ip", value: (node) => node.internalIp },
     instanceType: { kind: "text", value: (node) => node.instanceType },
+    capacityType: { kind: "text", value: (node) => node.capacityType },
     version: { kind: "natural", value: (node) => node.version },
     status: { kind: "text", value: (node) => node.status },
     age: { kind: "age", value: (node) => node.creationTimestamp },
@@ -370,6 +395,17 @@ function statusClass(status: string): string {
     return "status-warning";
   }
   return "status-error";
+}
+
+/**
+ * spot 노드는 AWS가 언제든 회수할 수 있어, 노드를 비우는 순서를 정할 때
+ * on-demand와 다르게 다뤄야 한다. 그 구분을 색으로도 읽히게 한다. 모르는
+ * 표기에는 색을 주지 않는다.
+ */
+function capacityClass(capacityType: string): string {
+  if (capacityType === "spot") return "capacity-spot";
+  if (capacityType === "on-demand") return "capacity-ondemand";
+  return "";
 }
 
 function appendCell(row: HTMLTableRowElement, text: string, className?: string): void {
@@ -514,10 +550,7 @@ async function openDetail(kind: "pod" | "node", namespace: string, name: string)
 }
 
 function matchesFilter(node: NodeInfo): boolean {
-  if (nodeFilter === "karpenter") return node.isKarpenter;
-  if (nodeFilter === "managed") return node.isManagedNodeGroup;
-  if (nodeFilter === "cordoned") return node.unschedulable;
-  return true;
+  return nodeMatchesFilter(node, nodeFilter);
 }
 
 /**
@@ -565,6 +598,7 @@ function renderNodes(): void {
     appendNameCell(row, node.name, () => void openDetail("node", "", node.name));
     appendCell(row, node.internalIp);
     appendCell(row, node.instanceType);
+    appendCell(row, node.capacityType, capacityClass(node.capacityType));
     appendCell(row, node.version);
     appendCell(row, node.status, statusClass(node.status));
     appendCell(row, formatAge(node.creationTimestamp));

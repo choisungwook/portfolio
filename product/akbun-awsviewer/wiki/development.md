@@ -62,7 +62,10 @@ Keep ~/.tauri/akbun-awsviewer.key somewhere that outlives this laptop. A reposit
 
 ## Caveats
 
-- The SSO login window label is fixed (`sso-login`); a second login replaces it. Closing that window is the cancel path — the poll loop checks the window handle.
+- Login requires AWS CLI v2 on the machine, found in /usr/local/bin, /opt/homebrew/bin, or on PATH. A bundled macOS app has neither install directory on its PATH, which is why the fixed paths are tried first.
+- `--no-browser` needs AWS CLI v2.9 or newer. An older CLI opens the OS browser instead and prints no URL, and the login fails after a minute with the CLI's own output attached.
+- The sign-in window label is fixed (`sso-login`); a second login replaces it. Closing that window is the cancel path — the login task kills the CLI when the window is gone.
+- Reproducing a login failure is easiest outside the app: run the same command in a terminal (`aws sso login --profile <name> --no-browser`) and compare its output with what the modal showed.
 - The token cache is shared with the AWS CLI. If login works in the app but the CLI disagrees (or the other way around), compare the file under ~/.aws/sso/cache before suspecting the flow.
 - Profiles without SSO configuration are listed but refuse login and API calls by design. Access keys are not supported and must stay unsupported.
 - The insecure TLS client lives on the SDK's legacy hyper 0.14 path. When the SDK gains first-class skip-verify support, replace http.rs and drop the rustls 0.21 / hyper-rustls 0.24 pins.

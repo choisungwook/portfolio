@@ -43,6 +43,7 @@ function node(name, fields) {
   return {
     name,
     internalIp: "",
+    capacityType: "",
     version: "",
     status: "Ready",
     creationTimestamp: "",
