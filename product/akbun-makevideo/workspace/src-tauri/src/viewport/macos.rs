@@ -15,16 +15,12 @@
 //! not an AppKit message: wgpu attaches a `CAMetalLayer` and then talks to
 //! Metal, which is safe from any thread.
 //!
-//! # Why the coordinates are (sometimes) flipped
+//! # One AppKit conversion owns the coordinate boundary
 //!
-//! AppKit's default origin is the **bottom** left of a view and the page's is
-//! the top left — but `WKWebView` overrides `isFlipped` to `YES`, so frames of
-//! its subviews are already measured from the top. Everything else in the app
-//! speaks the page's coordinates, so the conversion happens here, once, at the
-//! boundary — the same place the physical-pixel conversion happens — and it
-//! asks the superview which origin it uses rather than assuming one. Assuming
-//! bottom-left is exactly what put the monitor at the vertically mirrored
-//! position when the container moved from the content view into the WebView.
+//! The page measures from the visible viewport's top-left in `WKWebView`. The
+//! monitor is a sibling overlay in the window content view, so AppKit converts
+//! the rectangle between those two views. No title-bar offset or ancestor
+//! transform is reconstructed by hand.
 
 use super::{MonitorPlace, Place};
 use objc2::rc::Retained;
@@ -36,7 +32,7 @@ use raw_window_handle::{
     HasWindowHandle, RawDisplayHandle, RawWindowHandle, WindowHandle,
 };
 use std::ptr::NonNull;
-use std::sync::mpsc::channel;
+use std::sync::{mpsc::channel, Arc, Mutex};
 
 pub struct Inner {
     /// Clips the enlarged Metal view to the monitor rectangle and lets pointer
@@ -45,6 +41,7 @@ pub struct Inner {
     /// A retained `NSView`. Released in `detach`, on the main thread.
     view: Handle,
     window: tauri::WebviewWindow,
+    geometry: Arc<Mutex<String>>,
 }
 
 struct PassThroughIvars;
@@ -55,6 +52,11 @@ define_class!(
     struct PassThroughView;
 
     impl PassThroughView {
+        #[unsafe(method(isFlipped))]
+        fn is_flipped(&self) -> bool {
+            true
+        }
+
         #[unsafe(method(hitTest:))]
         fn hit_test(&self, _point: NSPoint) -> Option<&NSView> {
             None
@@ -126,12 +128,9 @@ impl HasDisplayHandle for ViewTarget {
 
 /// Run `work` against the actual WebKit view and wait for what it returns.
 ///
-/// The page measures the stage from the WebView's top-left corner. Its
-/// `getBoundingClientRect()` values therefore only describe this view, not the
-/// window content view: title bars, future toolbars and an inset WebView would
-/// otherwise shift the native monitor outside the Program Monitor. Keeping the
-/// native container in the same `WKWebView` makes the two coordinate systems
-/// identical.
+/// The callback supplies the source coordinate system for AppKit's conversion
+/// into the window overlay. This keeps WebKit's private subview hierarchy out
+/// of the placement arithmetic.
 ///
 /// Waiting is deliberate. Attaching and placing are rare — a project opening,
 /// a panel resizing — and a caller that carried on without knowing whether the
@@ -162,39 +161,43 @@ where
         .map_err(|error| format!("the WebView never answered: {error}"))?
 }
 
+fn overlay_host(host: &NSView) -> Result<Retained<NSView>, String> {
+    host.window()
+        .and_then(|window| window.contentView())
+        .ok_or_else(|| "the WebView window has no content view".to_string())
+}
+
 pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inner, String> {
-    let handles = on_webview(window, move |main, host| {
-        let container = PassThroughView::new(main, rect(host, place.stage));
+    let ((container, view), report) = on_webview(window, move |main, host| {
+        let overlay = overlay_host(host)?;
+        let container = PassThroughView::new(main, overlay_rect(host, &overlay, place.stage));
         container.setWantsLayer(true);
         container.setClipsToBounds(true);
-        // Over the page, but *inside* its WebView. A `None` sibling with
-        // `Above` means "over all of them", which is the front. The page hides
-        // it before drawing anything on top; see the note in mod.rs for why it
-        // is not the other way round.
-        //
-        // Into the window *before* the child is measured: a view with no
-        // window answers `convertRectToBacking` with whatever the main screen
-        // happens to be, which is the wrong scale whenever this window is on
-        // another display.
-        host.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
-        let view = NSView::initWithFrame(NSView::alloc(main), child_rect(&container, place));
+        // The overlay is outside WebKit's private view hierarchy. AppKit owns
+        // the conversion into this coordinate system, and `None` places it at
+        // the front of the window content view.
+        overlay.addSubview_positioned_relativeTo(&container, NSWindowOrderingMode::Above, None);
+        let view = NSView::initWithFrame(NSView::alloc(main), child_rect(place));
         // Metal draws into this view's layer, so it has to have one. wgpu
         // replaces it with a CAMetalLayer when it makes the surface; without
         // this the view is not layer backed and there is nothing to replace.
         view.setWantsLayer(true);
         container.addSubview(&view);
+        let report = geometry_report(host, &overlay, &container, &view, place);
         // Retained past the end of this block on purpose: the `Viewport` owns
         // it now and `detach` is what releases it.
         let pointer =
             NonNull::new(Retained::into_raw(view)).ok_or("the monitor view has no address")?;
         let container = NonNull::new(Retained::into_raw(container))
             .ok_or("the monitor container has no address")?;
-        Ok((Handle(container.cast()), Handle(pointer)))
+        let handles = (Handle(container.cast()), Handle(pointer));
+        Ok((handles, report))
     })?;
     Ok(Inner {
-        container: handles.0,
-        view: handles.1,
+        container,
+        view,
         window: window.clone(),
+        geometry: Arc::new(Mutex::new(report)),
     })
 }
 
@@ -208,17 +211,70 @@ pub fn attach(window: &tauri::WebviewWindow, place: MonitorPlace) -> Result<Inne
 pub fn place(inner: &Inner, at: MonitorPlace) -> (u32, u32) {
     let view = inner.view;
     let container = inner.container;
+    let geometry = Arc::clone(&inner.geometry);
     on_webview(&inner.window, move |_, host| {
+        let overlay = overlay_host(host)?;
         // SAFETY: both views are alive until `detach` releases the container.
         let container = unsafe { container.ptr().as_ref() };
-        container.setFrame(rect(host, at.stage));
+        container.setFrame(overlay_rect(host, &overlay, at.stage));
         let view = unsafe { view.ptr().as_ref() };
-        view.setFrame(child_rect(container, at));
+        view.setFrame(child_rect(at));
+        *geometry.lock().unwrap() = geometry_report(host, &overlay, container, view, at);
         Ok(backing_size(view))
     })
     // Placement is best effort: a window that has gone during a resize is a
     // window nobody is looking at. A surface still may not be sized at zero.
     .unwrap_or((1, 1))
+}
+
+pub fn debug_geometry(inner: &Inner) -> String {
+    inner.geometry.lock().unwrap().clone()
+}
+
+fn rect_text(rect: NSRect) -> String {
+    format!(
+        "({:.1},{:.1} {:.1}x{:.1})",
+        rect.origin.x, rect.origin.y, rect.size.width, rect.size.height
+    )
+}
+
+fn geometry_report(
+    host: &NSView,
+    overlay: &NSView,
+    container: &NSView,
+    view: &NSView,
+    requested: MonitorPlace,
+) -> String {
+    let content_layout = host
+        .window()
+        .map(|window| rect_text(window.contentLayoutRect()))
+        .unwrap_or_else(|| "unavailable".into());
+    format!(
+        "requested stage=({:.1},{:.1} {:.1}x{:.1}) content=({:.1},{:.1} {:.1}x{:.1}); host frame={} bounds={} visible={} safe={} flipped={}; overlay frame={} bounds={} flipped={}; contentLayout={}; container frame={} bounds={} flipped={}; view frame={} bounds={} flipped={}",
+        requested.stage.x,
+        requested.stage.y,
+        requested.stage.width,
+        requested.stage.height,
+        requested.content.x,
+        requested.content.y,
+        requested.content.width,
+        requested.content.height,
+        rect_text(host.frame()),
+        rect_text(host.bounds()),
+        rect_text(host.visibleRect()),
+        rect_text(host.safeAreaRect()),
+        host.isFlipped(),
+        rect_text(overlay.frame()),
+        rect_text(overlay.bounds()),
+        overlay.isFlipped(),
+        content_layout,
+        rect_text(container.frame()),
+        rect_text(container.bounds()),
+        container.isFlipped(),
+        rect_text(view.frame()),
+        rect_text(view.bounds()),
+        view.isFlipped(),
+    )
 }
 
 pub fn set_visible(inner: &Inner, visible: bool) {
@@ -252,80 +308,58 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
     ))))
 }
 
-/// The page's rectangle as AppKit's inside the WebView.
+/// The page's rectangle converted into the window overlay's coordinates.
 ///
-/// One conversion, and it is the coordinate origin: the page starts at the
-/// visible top-left of the WebView, which is `bounds.origin` rather than zero.
-/// The superview is also asked which corner it measures from — `WKWebView` is
-/// flipped, so a top-left `y` grows down from that bounds origin. The numbers
-/// arriving are points, which is what `setFrame` takes, because a CSS pixel in
-/// the page and an AppKit point in a view inside that page's WebView are the
-/// same length.
-///
-/// There used to be a second conversion here, dividing by the view's backing
-/// scale to undo a multiplication the page had done by `devicePixelRatio`.
-/// Two conversions that cancel are not a conversion; they are an agreement
-/// between two numbers measured in different places, and the frames where they
-/// disagreed put the monitor at twice its offset and twice its size.
-fn rect(host: &NSView, at: Place) -> NSRect {
-    let bounds = host.bounds();
+/// DOM viewport coordinates start at the WebView's safe content area. Tauri's
+/// macOS window uses a full-size content view, so the AppKit view can extend
+/// under the title bar while the page begins below it. `visibleRect` and
+/// `bounds` both start at zero in that state; `safeAreaRect` carries the title
+/// bar inset. Once the rectangle exists in that coordinate system,
+/// `convertRect_toView` carries every ancestor offset, flip and transform into
+/// the overlay. Physical pixels do not participate in placement.
+fn overlay_rect(host: &NSView, overlay: &NSView, at: Place) -> NSRect {
+    let viewport = host.safeAreaRect();
     let width = at.width.max(1.0);
     let height = at.height.max(1.0);
-    NSRect::new(
+    let inside_webview = NSRect::new(
         NSPoint::new(
-            bounds.origin.x + at.x,
-            origin_y(
-                host.isFlipped(),
-                bounds.origin.y,
-                bounds.size.height,
-                at.y,
-                height,
-            ),
+            viewport.origin.x + at.x,
+            top_origin(host.isFlipped(), viewport, at.y, height),
         ),
         NSSize::new(width, height),
-    )
+    );
+    host.convertRect_toView(inside_webview, Some(overlay))
 }
 
 /// The picture inside the container that clips it, so its origin is relative to
 /// the stage rather than to the WebView.
-fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
-    let bounds = container.bounds();
+fn child_rect(at: MonitorPlace) -> NSRect {
     let width = at.content.width.max(1.0);
     let height = at.content.height.max(1.0);
     NSRect::new(
-        NSPoint::new(
-            bounds.origin.x + at.content.x - at.stage.x,
-            origin_y(
-                container.isFlipped(),
-                bounds.origin.y,
-                bounds.size.height,
-                at.content.y - at.stage.y,
-                height,
-            ),
-        ),
+        NSPoint::new(at.content.x - at.stage.x, at.content.y - at.stage.y),
         NSSize::new(width, height),
     )
 }
 
 /// A frame origin for a box whose top edge is `top` points below the visible
-/// bounds, in whichever coordinate origin that superview uses.
-fn origin_y(
-    flipped: bool,
-    bounds_origin: f64,
-    superview_height: f64,
-    top: f64,
-    height: f64,
-) -> f64 {
+/// viewport, in whichever coordinate origin that superview uses.
+fn top_origin(flipped: bool, visible: NSRect, top: f64, height: f64) -> f64 {
     if flipped {
-        bounds_origin + top
+        visible.origin.y + top
     } else {
-        bounds_origin + superview_height - top - height
+        visible.origin.y + visible.size.height - top - height
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::origin_y;
+    use super::top_origin;
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+
+    fn visible(x: f64, y: f64, width: f64, height: f64) -> NSRect {
+        NSRect::new(NSPoint::new(x, y), NSSize::new(width, height))
+    }
 
     /// WKWebView is flipped, so a top-left `y` grows down from its bounds
     /// origin; the plain container is not, so its children flip against its
@@ -333,14 +367,16 @@ mod tests {
     /// getting it wrong mirrors the picture to the far side of the window.
     #[test]
     fn origin_matches_the_superview_coordinate_origin() {
-        assert_eq!(origin_y(true, 0.0, 800.0, 50.0, 200.0), 50.0);
-        assert_eq!(origin_y(false, 0.0, 800.0, 50.0, 200.0), 550.0);
+        let rect = visible(0.0, 0.0, 1000.0, 800.0);
+        assert_eq!(top_origin(true, rect, 50.0, 200.0), 50.0);
+        assert_eq!(top_origin(false, rect, 50.0, 200.0), 550.0);
     }
 
     #[test]
-    fn origin_starts_at_the_visible_bounds() {
-        assert_eq!(origin_y(true, 32.0, 800.0, 50.0, 200.0), 82.0);
-        assert_eq!(origin_y(false, 32.0, 800.0, 50.0, 200.0), 582.0);
+    fn css_origin_starts_at_the_safe_content_origin() {
+        let rect = visible(12.0, 32.0, 1000.0, 800.0);
+        assert_eq!(top_origin(true, rect, 50.0, 200.0), 82.0);
+        assert_eq!(top_origin(false, rect, 50.0, 200.0), 582.0);
     }
 }
 

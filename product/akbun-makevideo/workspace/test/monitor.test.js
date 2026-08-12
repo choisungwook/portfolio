@@ -209,6 +209,67 @@ test('the same box twice is one command, so a drag is not a command per frame', 
   assert.strictEqual(places.length, 1);
 });
 
+test('a backing scale change places the unchanged viewport again', async () => {
+  const previousWindow = global.window;
+  global.window = { devicePixelRatio: 1 };
+  try {
+    const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+    const { monitor, places } = await nativeMonitorOn(panel);
+
+    global.window.devicePixelRatio = 2;
+    monitor.place();
+    assert.strictEqual(places.length, 1);
+    assert.strictEqual(places[0].backingScale, 2);
+  } finally {
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+});
+
+test('slow native placement keeps only the newest measured box', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const places = [];
+  let attachedAt;
+  let finishFirst;
+  const firstPlace = new Promise((resolve) => { finishFirst = resolve; });
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => {},
+      clear: () => {},
+      clearExact: () => {},
+    },
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async (place) => {
+        attachedAt = place;
+        return { engine: 'native' };
+      },
+      playbackVisible: async () => {},
+      playbackPlace: async (place) => {
+        places.push(place);
+        if (places.length === 1) await firstPlace;
+      },
+    },
+  });
+
+  await monitor.attach();
+  panel.moveTo(100, 0);
+  monitor.place();
+  panel.moveTo(200, 0);
+  monitor.place();
+  panel.moveTo(300, 0);
+  monitor.place();
+  assert.strictEqual(places.length, 1);
+
+  finishFirst();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(places.length, 2);
+  assert.strictEqual(places[1].stage.x - attachedAt.stage.x, 300);
+});
+
 test('the placement keeps the project shape as the panel changes', async () => {
   const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
   const monitor = createMonitor({

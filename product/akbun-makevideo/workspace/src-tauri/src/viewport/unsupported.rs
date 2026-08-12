@@ -34,3 +34,7 @@ pub fn detach(_inner: &Inner) {}
 pub fn target(_inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
     Err("there is no native view on this platform".into())
 }
+
+pub fn debug_geometry(_inner: &Inner) -> String {
+    "unsupported platform".into()
+}

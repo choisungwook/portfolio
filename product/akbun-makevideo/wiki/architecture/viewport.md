@@ -160,16 +160,17 @@ element stack and the native view are laid out from the same call on the same
 inputs — the preview panel's box and the project's shape — rather than one of
 them measuring what the other one drew.
 
-The page's zero is the visible WebView bounds, not necessarily coordinate zero
-inside its `NSView`. The native side adds `bounds.origin` before placing the
-subview; omitting it moves only the native picture while the page stage remains
-centred.
+The page's zero is the visible WebView bounds. The Metal view is a sibling
+overlay in the window content view, outside WebKit's private view hierarchy.
+The native side forms a rectangle in visible WebView coordinates and asks
+AppKit to convert it into the overlay; it does not guess `bounds.origin`, title
+bar offsets, flipped axes or ancestor transforms.
 
 Two things follow from that, and both were bugs before it:
 
 - **Units are points**, all the way across the IPC boundary. A CSS pixel in the
-  page and an AppKit point inside that page's WebView are the same length, so
-  `setFrame` takes the numbers as they arrive. The page used to multiply by
+  page and an AppKit point are the same length, so only the coordinate space is
+  converted. The page used to multiply by
   `devicePixelRatio` and Rust used to divide by the view's backing scale, which
   is a round trip that lands where it started only while the two agree. When
   they did not — a window moved to a display with a different scale factor,
@@ -178,6 +179,9 @@ Two things follow from that, and both were bugs before it:
 - **Physical pixels are asked of the view**, in the same main thread hop that
   moved it and after the move rather than before. That is the only reading that
   knows which display the window ended up on, and it is all a swapchain needs.
+- **Scale changes are placement events**, even when the CSS rectangle is
+  unchanged. `devicePixelRatio` is sent only as a change signal; AppKit remains
+  the authority for the Metal backing size.
 
 There are no minimum sizes in the fit. A stage held up to a floor is wider than
 the panel holding it, and a native view is not in the page's stacking order, so
@@ -189,8 +193,9 @@ which is the fifth input to the visibility rule below.
 ## The box is re-measured every frame
 
 The monitor already runs an animation frame to poll the playhead, so the panel
-is measured there and `samePlace` decides whether anything needs sending. A
-drag is one command per pixel the box actually moved.
+is measured there and `samePlace` decides whether anything needs sending.
+Placement IPC is serialized and collapses waiting measurements to the newest
+box, so a slow native call cannot finish with an older frame.
 
 This replaced a `ResizeObserver` on the stage, which fires on size and not on
 position. A sibling panel widening, the inspector opening, the timeline growing,

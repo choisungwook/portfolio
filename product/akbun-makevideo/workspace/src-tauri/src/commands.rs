@@ -1584,8 +1584,23 @@ pub fn open_project(
 ) -> Result<DocumentState, String> {
     let text =
         std::fs::read_to_string(&path).map_err(|error| format!("cannot open {path}: {error}"))?;
-    let project: Project =
+    let mut project: Project =
         serde_json::from_str(&text).map_err(|error| format!("{path} is not a project: {error}"))?;
+    let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let ffprobe = find_tool(&app, "ffprobe", &configured);
+    if ffprobe.is_some() {
+        for asset in &mut project.assets {
+            let measured = probe_asset(ffprobe.as_ref(), &asset.path);
+            if measured.width > 0 && measured.height > 0 {
+                asset.width = measured.width;
+                asset.height = measured.height;
+            }
+            if measured.duration_ms > 0 {
+                asset.duration_ms = measured.duration_ms;
+            }
+            asset.has_audio = measured.has_audio;
+        }
+    }
     // The scope grant is in memory only, so a project opened in a new run has
     // to grant its media again or every preview is blank.
     for asset in &project.assets {
@@ -2285,14 +2300,14 @@ fn start_session(
     let hwaccel = acceleration(state, Some(&ffmpeg))
         .available
         .and_then(|candidate| candidate.hwaccel);
-    let config = PlaybackConfig::new(
-        compositor,
-        ffmpeg,
-        project.settings.width.max(2),
-        project.settings.height.max(2),
-    )
-    .with_proxies(proxy_paths)
-    .with_hwaccel(hwaccel);
+    let (preview_width, preview_height) = native_preview_dimensions(
+        project.settings.width,
+        project.settings.height,
+        &settings.preview_quality,
+    );
+    let config = PlaybackConfig::new(compositor, ffmpeg, preview_width, preview_height)
+        .with_proxies(proxy_paths)
+        .with_hwaccel(hwaccel);
     Session::start(
         window,
         Arc::clone(&state.document),
@@ -2300,6 +2315,19 @@ fn start_session(
         place,
         frame.max(0),
     )
+}
+
+fn native_preview_dimensions(width: u32, height: u32, quality: &str) -> (u32, u32) {
+    let divisor = match quality {
+        "full" => 1,
+        "half" => 2,
+        _ => 4,
+    };
+    let scaled = |value: u32| {
+        let value = (value / divisor).max(2);
+        value - value % 2
+    };
+    (scaled(width), scaled(height))
 }
 
 /// Stop the native monitor and take its view down. The page falls back to its
@@ -2380,8 +2408,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        process_metrics_rows, process_tree_rss_bytes, srt_contents, srt_cues, srt_frame,
-        srt_timestamp, wanted_device, Settings,
+        native_preview_dimensions, process_metrics_rows, process_tree_rss_bytes, srt_contents,
+        srt_cues, srt_frame, srt_timestamp, wanted_device, Settings,
     };
     use makevideo_render::Rate;
 
@@ -2441,6 +2469,14 @@ mod tests {
         assert!(!settings.show_title_safe_area);
         assert!(!settings.show_rule_of_thirds);
         assert!(!settings.show_center_lines);
+    }
+
+    #[test]
+    fn native_monitor_honours_preview_quality() {
+        assert_eq!(native_preview_dimensions(1920, 1080, "full"), (1920, 1080));
+        assert_eq!(native_preview_dimensions(1920, 1080, "half"), (960, 540));
+        assert_eq!(native_preview_dimensions(1920, 1080, "quarter"), (480, 270));
+        assert_eq!(native_preview_dimensions(1080, 1920, "quarter"), (270, 480));
     }
 
     #[test]

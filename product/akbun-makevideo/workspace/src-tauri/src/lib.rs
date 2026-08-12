@@ -20,13 +20,6 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            // The window is the whole app, so the webview console is where
-            // almost every bug shows up first. Debug builds only.
-            #[cfg(debug_assertions)]
-            if let Some(window) = app.get_webview_window("main") {
-                window.open_devtools();
-            }
-
             let handle = app.handle();
             let settings = store::load_settings(handle);
             commands::apply_theme(handle, &settings.theme);

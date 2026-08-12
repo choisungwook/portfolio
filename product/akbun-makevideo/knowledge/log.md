@@ -2,6 +2,7 @@
 
 ## 2026-08-12
 
+* [native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다](decisions/2026-08-native-monitor-is-a-window-overlay.md) 결정 기록. GPU preview 오프셋을 WebKit 내부 layer 문제가 아닌 window overlay 좌표 변환 문제로 분리함.
 * [CSS viewport 원점은 native bounds origin에서 시작한다](decisions/2026-08-css-viewport-starts-at-native-bounds-origin.md) 결정 기록. 같은 크기의 media element와 native surface가 세로로 어긋난 원인을 WKWebView bounds origin 누락으로 좁힘.
 
 ## 2026-08-11
