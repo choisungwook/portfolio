@@ -9,3 +9,4 @@
 * [재생 끊김은 경로별 계측으로 원인을 분리](2026-08-playback-stutter-is-measured-by-stage.md) - 공급과 표시와 A/V 지연을 따로 보고 구조 교체를 미룬 결정.
 * [경계 stub은 실제 API 이름만 가진다](2026-08-seam-stubs-carry-only-real-api-names.md) - 무엇에나 답하는 Proxy stub이 없는 메서드 호출을 숨긴 뒤 정한 규칙.
 * [preview 배치는 한 곳에서 계산하고 point 단위로 넘긴다](2026-08-one-geometry-in-points-for-the-monitor.md) - devicePixelRatio 왕복과 크기만 보는 ResizeObserver를 없애고 배치 계산을 한 곳에 모은 결정.
+* [CSS viewport 원점은 native bounds origin에서 시작한다](2026-08-css-viewport-starts-at-native-bounds-origin.md) - page 좌표를 native frame으로 옮길 때 NSView bounds origin을 반영하는 결정.

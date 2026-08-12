@@ -160,6 +160,11 @@ element stack and the native view are laid out from the same call on the same
 inputs — the preview panel's box and the project's shape — rather than one of
 them measuring what the other one drew.
 
+The page's zero is the visible WebView bounds, not necessarily coordinate zero
+inside its `NSView`. The native side adds `bounds.origin` before placing the
+subview; omitting it moves only the native picture while the page stage remains
+centred.
+
 Two things follow from that, and both were bugs before it:
 
 - **Units are points**, all the way across the IPC boundary. A CSS pixel in the
