@@ -254,11 +254,13 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
 
 /// The page's rectangle as AppKit's inside the WebView.
 ///
-/// One conversion, and it is the y origin: the superview is asked which corner
-/// it measures from — `WKWebView` is flipped, so a top-left `y` passes through
-/// unchanged there — and nothing else is touched. The numbers arriving are
-/// points, which is what `setFrame` takes, because a CSS pixel in the page and
-/// an AppKit point in a view inside that page's WebView are the same length.
+/// One conversion, and it is the coordinate origin: the page starts at the
+/// visible top-left of the WebView, which is `bounds.origin` rather than zero.
+/// The superview is also asked which corner it measures from — `WKWebView` is
+/// flipped, so a top-left `y` grows down from that bounds origin. The numbers
+/// arriving are points, which is what `setFrame` takes, because a CSS pixel in
+/// the page and an AppKit point in a view inside that page's WebView are the
+/// same length.
 ///
 /// There used to be a second conversion here, dividing by the view's backing
 /// scale to undo a multiplication the page had done by `devicePixelRatio`.
@@ -266,12 +268,19 @@ pub fn target(inner: &Inner) -> Result<wgpu::SurfaceTarget<'static>, String> {
 /// between two numbers measured in different places, and the frames where they
 /// disagreed put the monitor at twice its offset and twice its size.
 fn rect(host: &NSView, at: Place) -> NSRect {
+    let bounds = host.bounds();
     let width = at.width.max(1.0);
     let height = at.height.max(1.0);
     NSRect::new(
         NSPoint::new(
-            at.x,
-            origin_y(host.isFlipped(), host.bounds().size.height, at.y, height),
+            bounds.origin.x + at.x,
+            origin_y(
+                host.isFlipped(),
+                bounds.origin.y,
+                bounds.size.height,
+                at.y,
+                height,
+            ),
         ),
         NSSize::new(width, height),
     )
@@ -280,14 +289,16 @@ fn rect(host: &NSView, at: Place) -> NSRect {
 /// The picture inside the container that clips it, so its origin is relative to
 /// the stage rather than to the WebView.
 fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
+    let bounds = container.bounds();
     let width = at.content.width.max(1.0);
     let height = at.content.height.max(1.0);
     NSRect::new(
         NSPoint::new(
-            at.content.x - at.stage.x,
+            bounds.origin.x + at.content.x - at.stage.x,
             origin_y(
                 container.isFlipped(),
-                container.bounds().size.height,
+                bounds.origin.y,
+                bounds.size.height,
                 at.content.y - at.stage.y,
                 height,
             ),
@@ -296,13 +307,19 @@ fn child_rect(container: &NSView, at: MonitorPlace) -> NSRect {
     )
 }
 
-/// A frame origin for a box whose top edge is `top` points below the
-/// superview's top, in whichever coordinate origin that superview uses.
-fn origin_y(flipped: bool, superview_height: f64, top: f64, height: f64) -> f64 {
+/// A frame origin for a box whose top edge is `top` points below the visible
+/// bounds, in whichever coordinate origin that superview uses.
+fn origin_y(
+    flipped: bool,
+    bounds_origin: f64,
+    superview_height: f64,
+    top: f64,
+    height: f64,
+) -> f64 {
     if flipped {
-        top
+        bounds_origin + top
     } else {
-        superview_height - top - height
+        bounds_origin + superview_height - top - height
     }
 }
 
@@ -310,14 +327,20 @@ fn origin_y(flipped: bool, superview_height: f64, top: f64, height: f64) -> f64 
 mod tests {
     use super::origin_y;
 
-    /// WKWebView is flipped, so a top-left `y` passes through unchanged; the
-    /// plain container is not, so its children flip against its height. The
-    /// first case is the one the monitor actually lives in — getting it wrong
-    /// mirrors the picture to the far side of the window.
+    /// WKWebView is flipped, so a top-left `y` grows down from its bounds
+    /// origin; the plain container is not, so its children flip against its
+    /// height. The first case is the one the monitor actually lives in —
+    /// getting it wrong mirrors the picture to the far side of the window.
     #[test]
     fn origin_matches_the_superview_coordinate_origin() {
-        assert_eq!(origin_y(true, 800.0, 50.0, 200.0), 50.0);
-        assert_eq!(origin_y(false, 800.0, 50.0, 200.0), 550.0);
+        assert_eq!(origin_y(true, 0.0, 800.0, 50.0, 200.0), 50.0);
+        assert_eq!(origin_y(false, 0.0, 800.0, 50.0, 200.0), 550.0);
+    }
+
+    #[test]
+    fn origin_starts_at_the_visible_bounds() {
+        assert_eq!(origin_y(true, 32.0, 800.0, 50.0, 200.0), 82.0);
+        assert_eq!(origin_y(false, 32.0, 800.0, 50.0, 200.0), 582.0);
     }
 }
 

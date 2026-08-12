@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-12
+
+* [CSS viewport 원점은 native bounds origin에서 시작한다](decisions/2026-08-css-viewport-starts-at-native-bounds-origin.md) 결정 기록. 같은 크기의 media element와 native surface가 세로로 어긋난 원인을 WKWebView bounds origin 누락으로 좁힘.
+
 ## 2026-08-11
 
 * [preview 배치는 한 곳에서 계산하고 point 단위로 넘긴다](decisions/2026-08-one-geometry-in-points-for-the-monitor.md) 결정 기록. native monitor가 preview 밖에 그려지고 비율이 어긋나던 원인을 좌표 왕복과 크기만 보는 관찰자로 좁히고 geometry.js로 계산을 모음.
