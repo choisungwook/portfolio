@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다](2026-08-native-monitor-is-a-window-overlay.md) - GPU surface를 WebKit hierarchy에서 분리하고 실제 view 사이 좌표 변환을 AppKit에 맡긴 결정.
 * [첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다](2026-08-first-video-defines-default-canvas-shape.md) - 첫 영상 비율을 채택하되 기본 긴 변 해상도를 유지하는 결정.
 * [native view 좌표는 superview에게 원점을 물어본다](2026-08-native-view-asks-its-superview-for-the-origin.md) - WKWebView가 flipped view라 bottom-left 가정이 monitor를 뒤집힌 위치에 놓은 뒤 정한 규칙.
 * [filter graph 렌더는 rasterize한 still을 overlay로 굽는다](2026-08-graph-render-overlays-rasterized-stills.md) - CPU 렌더와 폴백에서 text/shape가 빠지던 것을 자체 raster + overlay로 해결한 결정.

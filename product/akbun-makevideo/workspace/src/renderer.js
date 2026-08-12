@@ -201,6 +201,7 @@ let mediaPreview = null;
 let qualityMonitor = null;
 let visualDrag = null;
 let editorOverlayActive = false;
+let stageResizeObserver = null;
 
 // --- helpers ---------------------------------------------------------------
 
@@ -437,6 +438,7 @@ function playbackDebugLines(status) {
     `Native source: ${status.starved} starved, ${status.failedFrames} display failures`,
     `Native display call: ${millisecondsText(status.lastPresentMs)} last, ${millisecondsText(status.peakPresentMs)} peak`,
     `Native A/V lateness: ${millisecondsText(status.lastLateMs)} last, ${millisecondsText(status.peakLateMs)} peak`,
+    `Native viewport: ${status.viewportGeometry || 'unavailable'}`,
   ];
 }
 
@@ -2690,6 +2692,7 @@ function collectShortcutOverrides() {
 function applySettings(next) {
   const wasCompositor = state.settings.compositor;
   const wasDevice = state.settings.gpuDevice;
+  const wasPreviewQuality = state.settings.previewQuality;
   const usedProxies = state.settings.proxyEnabled;
   const usedGuides = G.visible(state.settings);
   state.settings = next;
@@ -2707,12 +2710,20 @@ function applySettings(next) {
   // This is also what attaches the first time. The page's own compositor value
   // is not one the setting can hold, so bootstrap landing *is* a change and
   // lands here — which is why there is no separate attach after it.
-  if (wasCompositor !== next.compositor || wasDevice !== next.gpuDevice) attachMonitor(true);
-  else if (usedGuides !== G.visible(next)) attachMonitor(true);
-  else if (usedProxies !== next.proxyEnabled) {
-    if (preview.usesNativeMonitor()) attachMonitor(true);
+  let monitorUpdate = null;
+  if (
+    wasCompositor !== next.compositor ||
+    wasDevice !== next.gpuDevice ||
+    wasPreviewQuality !== next.previewQuality
+  ) {
+    monitorUpdate = attachMonitor(true);
+  } else if (usedGuides !== G.visible(next)) {
+    monitorUpdate = attachMonitor(true);
+  } else if (usedProxies !== next.proxyEnabled) {
+    if (preview.usesNativeMonitor()) monitorUpdate = attachMonitor(true);
     else preview.redraw();
   }
+  return monitorUpdate || Promise.resolve();
 }
 
 /** Ask Rust for a monitor, or give the one that is running a new box.
@@ -3095,10 +3106,12 @@ function wireTransport() {
     const previous = state.settings.previewQuality;
     state.settings.previewQuality = dom.previewQuality.value;
     preview.setQuality(state.settings.previewQuality);
-    persistSettings(() => {
+    void persistSettings(() => {
       state.settings.previewQuality = previous;
       dom.previewQuality.value = previous;
       preview.setQuality(previous);
+    }).then(() => {
+      if (preview.usesNativeMonitor()) return attachMonitor(true);
     });
   });
   dom.stage.addEventListener('wheel', (event) => {
@@ -3392,7 +3405,16 @@ async function boot() {
     },
   });
 
-  applySettings(state.settings);
+  if (typeof ResizeObserver === 'function') {
+    stageResizeObserver = new ResizeObserver(() => {
+      renderStageOverlay();
+      drawStageVisuals();
+      preview.place();
+    });
+    stageResizeObserver.observe(dom.stage);
+  }
+
+  await applySettings(state.settings);
   globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
     monitor: qualityMonitor,
     preview,
@@ -3447,7 +3469,7 @@ async function boot() {
   try {
     state.boot = await window.api.bootstrap();
     state.settings = { ...DEFAULT_SETTINGS, ...state.boot.settings };
-    applySettings(state.settings);
+    await applySettings(state.settings);
     updateToolWarning();
     refresh();
   } catch (error) {
@@ -3483,9 +3505,7 @@ async function boot() {
   }
 }
 
-// lib.rs opens the devtools in debug builds because the window is the whole
-// app, and nearly every question asked there is a question about this state.
-// One name, so nothing else on the page is shadowed.
+// One name, so diagnostics in Web Inspector do not shadow anything else on the page.
 globalThis.makevideo = {
   state,
   refresh,

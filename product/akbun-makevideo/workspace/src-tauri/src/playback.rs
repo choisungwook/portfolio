@@ -105,6 +105,7 @@ pub struct Status {
     pub peak_present_ms: f64,
     pub last_late_ms: f64,
     pub peak_late_ms: f64,
+    pub viewport_geometry: String,
     pub failure: Option<String>,
 }
 
@@ -315,6 +316,7 @@ impl Session {
             peak_present_ms: milliseconds(self.counters.peak_present_us.load(Ordering::Relaxed)),
             last_late_ms: signed_milliseconds(self.counters.last_late_us.load(Ordering::Relaxed)),
             peak_late_ms: signed_milliseconds(self.counters.peak_late_us.load(Ordering::Relaxed)),
+            viewport_geometry: self.viewport.lock().unwrap().debug_geometry(),
             failure: self.shared.failure(),
         }
     }

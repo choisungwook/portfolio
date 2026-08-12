@@ -200,7 +200,11 @@ function monitorPlaceOf(panel, project, viewport) {
 function samePlace(a, b) {
   if (!a || !b) return false;
   if (a.stage || b.stage) {
-    return samePlace(a.stage, b.stage) && samePlace(a.content, b.content);
+    return (
+      samePlace(a.stage, b.stage) &&
+      samePlace(a.content, b.content) &&
+      a.backingScale === b.backingScale
+    );
   }
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }

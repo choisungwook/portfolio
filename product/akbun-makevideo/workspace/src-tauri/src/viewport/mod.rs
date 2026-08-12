@@ -45,13 +45,13 @@ mod unsupported;
 #[cfg(not(target_os = "macos"))]
 use unsupported as platform;
 
-/// Where the monitor sits inside the WebView, in **points**.
+/// Where the monitor sits in the visible WebView viewport, in **points**.
 ///
 /// Points, because that is the one unit both sides already have without
-/// converting: a CSS pixel in the page and an AppKit point in a view inside
-/// that page's `WKWebView` are the same length, so `getBoundingClientRect()`
-/// values are an `NSRect` with the y origin flipped and nothing else done to
-/// them.
+/// converting: a CSS pixel in the page and an AppKit point are the same length.
+/// The platform layer converts the rectangle from the `WKWebView` into the
+/// window overlay with AppKit's view conversion API; it does not reconstruct
+/// title-bar offsets, bounds origins or ancestor transforms.
 ///
 /// It used to be physical pixels, which meant the page multiplied by
 /// `devicePixelRatio` and this side divided by the view's backing scale. Those
@@ -74,7 +74,7 @@ pub struct Place {
 
 /// The clipped monitor box and the larger picture inside it.
 ///
-/// Both in points, both measured from the WebView's top left, and both computed
+/// Both in points, both measured from the visible WebView's top left, and both computed
 /// from one measurement in `geometry.js` so they cannot describe two different
 /// moments.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -82,6 +82,14 @@ pub struct Place {
 pub struct MonitorPlace {
     pub stage: Place,
     pub content: Place,
+    /// A page-side change signal, not a placement conversion. When it changes,
+    /// the native view is placed again and its real backing size is re-read.
+    #[serde(default = "default_backing_scale")]
+    pub backing_scale: f64,
+}
+
+fn default_backing_scale() -> f64 {
+    1.0
 }
 
 impl MonitorPlace {
@@ -167,6 +175,10 @@ impl Viewport {
     pub fn target(&self) -> Result<wgpu::SurfaceTarget<'static>, String> {
         platform::target(&self.inner)
     }
+
+    pub fn debug_geometry(&self) -> String {
+        platform::debug_geometry(&self.inner)
+    }
 }
 
 impl Drop for Viewport {
@@ -208,17 +220,20 @@ mod tests {
         let empty = place(0.0, 0.0);
         assert!(MonitorPlace {
             stage: good,
-            content: good
+            content: good,
+            backing_scale: 2.0,
         }
         .is_visible());
         assert!(!MonitorPlace {
             stage: empty,
-            content: good
+            content: good,
+            backing_scale: 2.0,
         }
         .is_visible());
         assert!(!MonitorPlace {
             stage: good,
-            content: empty
+            content: empty,
+            backing_scale: 2.0,
         }
         .is_visible());
     }

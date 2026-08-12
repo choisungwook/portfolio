@@ -19,7 +19,7 @@ pub fn args(path: &str) -> Vec<String> {
         "-v".into(),
         "error".into(),
         "-show_entries".into(),
-        "stream=codec_type,width,height:format=duration".into(),
+        "stream=codec_type,width,height:stream_side_data=rotation:format=duration".into(),
         "-of".into(),
         "default=noprint_wrappers=1".into(),
         path.into(),
@@ -35,6 +35,7 @@ pub fn parse(text: &str) -> Probed {
     let mut current_type = "";
     let mut pending_width = 0u32;
     let mut pending_height = 0u32;
+    let mut pending_rotation = 0i32;
     let mut have_video = false;
 
     for line in text.lines() {
@@ -45,8 +46,8 @@ pub fn parse(text: &str) -> Probed {
             "codec_type" => {
                 // The previous block is finished, so commit what it carried.
                 if current_type == "video" && !have_video && pending_width > 0 {
-                    probed.width = pending_width;
-                    probed.height = pending_height;
+                    (probed.width, probed.height) =
+                        display_size(pending_width, pending_height, pending_rotation);
                     have_video = true;
                 }
                 current_type = match value {
@@ -59,9 +60,11 @@ pub fn parse(text: &str) -> Probed {
                 };
                 pending_width = 0;
                 pending_height = 0;
+                pending_rotation = 0;
             }
             "width" => pending_width = value.parse().unwrap_or(0),
             "height" => pending_height = value.parse().unwrap_or(0),
+            "rotation" => pending_rotation = value.parse().unwrap_or(0),
             // N/A for a still image, and for a stream with no known length.
             "duration" => {
                 if let Ok(seconds) = value.parse::<f64>() {
@@ -74,10 +77,18 @@ pub fn parse(text: &str) -> Probed {
         }
     }
     if current_type == "video" && !have_video && pending_width > 0 {
-        probed.width = pending_width;
-        probed.height = pending_height;
+        (probed.width, probed.height) =
+            display_size(pending_width, pending_height, pending_rotation);
     }
     probed
+}
+
+fn display_size(width: u32, height: u32, rotation: i32) -> (u32, u32) {
+    if rotation.rem_euclid(180) == 90 {
+        (height, width)
+    } else {
+        (width, height)
+    }
 }
 
 #[cfg(test)]
@@ -104,6 +115,24 @@ mod tests {
     fn a_silent_video_is_not_given_an_audio_stream_it_does_not_have() {
         let probed = parse("codec_type=video\nwidth=640\nheight=360\nduration=2.0\n");
         assert!(!probed.has_audio);
+    }
+
+    #[test]
+    fn display_rotation_swaps_the_stored_video_dimensions() {
+        for rotation in [-90, 90, 270] {
+            let probed = parse(&format!(
+                "codec_type=video\nwidth=1920\nheight=1080\nrotation={rotation}\nduration=3.0\n"
+            ));
+            assert_eq!((probed.width, probed.height), (1080, 1920));
+        }
+    }
+
+    #[test]
+    fn a_half_turn_keeps_the_stored_video_dimensions() {
+        let probed = parse(
+            "codec_type=video\nwidth=1920\nheight=1080\nrotation=180\nduration=3.0\n",
+        );
+        assert_eq!((probed.width, probed.height), (1920, 1080));
     }
 
     #[test]

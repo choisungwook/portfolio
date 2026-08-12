@@ -95,6 +95,8 @@ function createMonitor(options) {
   let playing = false;
   let attaching = null;
   let attachWanted = false;
+  let placing = null;
+  let pendingPlace = null;
   let mediaRefreshPending = false;
   let refreshingMedia = null;
   let viewport = GEO.fittedViewport();
@@ -163,6 +165,12 @@ function createMonitor(options) {
     return {
       stage: GEO.placeOf(box),
       content: GEO.placeOf(GEO.contentBoxOf(box, viewport)),
+      // A change here makes Rust re-read the real backing size from the view.
+      // It is a notification only; placement remains in CSS pixels/points.
+      backingScale:
+        typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio)
+          ? window.devicePixelRatio
+          : 1,
     };
   }
 
@@ -273,6 +281,28 @@ function createMonitor(options) {
    *  one command per pixel the box actually moved rather than one per frame.
    *  Returns the box it measured, so the frame loop can use it again without a
    *  second layout read. */
+  async function flushPlace() {
+    while (pendingPlace) {
+      const next = pendingPlace;
+      pendingPlace = null;
+      try {
+        await api.playbackPlace(next);
+      } catch (_error) {
+        // A later frame will measure again. Placement failure must not stop
+        // playback or leave an unhandled rejection in the page.
+      }
+    }
+  }
+
+  function queuePlace(next) {
+    pendingPlace = next;
+    if (placing) return;
+    placing = flushPlace().finally(() => {
+      placing = null;
+      if (pendingPlace) queuePlace(pendingPlace);
+    });
+  }
+
   function place() {
     const box = stageBox();
     if (!drivingNatively()) return box;
@@ -282,7 +312,10 @@ function createMonitor(options) {
     const next = currentPlace();
     if (!next || samePlace(next, lastPlace)) return box;
     lastPlace = next;
-    api.playbackPlace(next).catch(() => {});
+    // One IPC call at a time. Resize can measure several boxes before Rust has
+    // placed the first one; keeping only the latest pending box prevents an
+    // older reply from becoming the final native frame.
+    queuePlace(next);
     return box;
   }
 
