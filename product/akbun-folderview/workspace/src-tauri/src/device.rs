@@ -1,5 +1,4 @@
 use folderview_library::DeviceLocation;
-use std::path::Path;
 
 #[cfg(windows)]
 pub fn locate(path: &str) -> Result<DeviceLocation, String> {
@@ -45,6 +44,45 @@ pub fn locate(path: &str) -> Result<DeviceLocation, String> {
 }
 
 #[cfg(windows)]
+pub fn locate_id(id: &str) -> Result<DeviceLocation, String> {
+    use std::ffi::OsStr;
+    use std::iter;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::GetVolumePathNamesForVolumeNameW;
+
+    let volume_name = format!("{}\\", id.trim_end_matches('\\'));
+    let wide_name: Vec<u16> = OsStr::new(&volume_name)
+        .encode_wide()
+        .chain(iter::once(0))
+        .collect();
+    let mut paths = vec![0_u16; 32_768];
+    let mut required = 0_u32;
+    let found = unsafe {
+        GetVolumePathNamesForVolumeNameW(
+            wide_name.as_ptr(),
+            paths.as_mut_ptr(),
+            paths.len() as u32,
+            &mut required,
+        )
+    };
+    if found == 0 {
+        return Err(format!(
+            "cannot find a mount path for {id}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mount_path = from_wide(&paths);
+    if mount_path.is_empty() {
+        return Err(format!("volume {id} has no mount path"));
+    }
+
+    Ok(DeviceLocation {
+        id: id.to_string(),
+        mount_path,
+    })
+}
+
+#[cfg(windows)]
 fn from_wide(value: &[u16]) -> String {
     let length = value
         .iter()
@@ -56,6 +94,7 @@ fn from_wide(value: &[u16]) -> String {
 #[cfg(unix)]
 pub fn locate(path: &str) -> Result<DeviceLocation, String> {
     use std::os::unix::fs::MetadataExt;
+    use std::path::Path;
 
     let canonical = Path::new(path)
         .canonicalize()
@@ -85,6 +124,11 @@ pub fn locate(path: &str) -> Result<DeviceLocation, String> {
     })
 }
 
+#[cfg(not(windows))]
+pub fn locate_id(id: &str) -> Result<DeviceLocation, String> {
+    Err(format!("cannot resolve device {id} without its mount path"))
+}
+
 #[cfg(not(any(windows, unix)))]
 pub fn locate(path: &str) -> Result<DeviceLocation, String> {
     let canonical = std::path::PathBuf::from(path)
@@ -98,4 +142,13 @@ pub fn locate(path: &str) -> Result<DeviceLocation, String> {
 
 pub fn matches(location: &DeviceLocation, expected_id: &str) -> bool {
     location.id == expected_id
+}
+
+pub fn resolve(id: &str, mount_path: &str) -> Result<DeviceLocation, String> {
+    if let Ok(location) = locate(mount_path) {
+        if matches(&location, id) {
+            return Ok(location);
+        }
+    }
+    locate_id(id)
 }

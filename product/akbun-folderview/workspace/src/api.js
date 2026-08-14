@@ -69,6 +69,7 @@ window.api = {
   },
 
   getLibrary: () => invoke('get_library'),
+  getDeviceSignature: () => invoke('get_device_signature'),
 
   // The picker runs in the page rather than in Rust. A blocking native dialog
   // inside a command is a threading hazard, and this way the command receives

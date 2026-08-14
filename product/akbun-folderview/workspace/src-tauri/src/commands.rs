@@ -43,6 +43,7 @@ pub struct SnapshotRoot {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub device_ids: Vec<String>,
+    pub device_signature: Vec<String>,
     pub roots: Vec<SnapshotRoot>,
     pub entries: Vec<SnapshotEntry>,
     pub settings: Settings,
@@ -67,14 +68,22 @@ pub fn allow_asset_file(app: &AppHandle, path: &str) {
     let _ = app.asset_protocol_scope().allow_file(path);
 }
 
-fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
-    let stored = state.library.lock().unwrap();
+fn snapshot(app: &AppHandle, state: &State<AppState>) -> Result<Snapshot, String> {
+    let mut stored = state.library.lock().unwrap();
+    if refresh_devices(&mut stored) {
+        store::save_library(app, &stored)?;
+        allow_active_assets(app, &stored);
+    }
     let mut roots = Vec::new();
     let mut entries = Vec::new();
     let active = active_devices(&stored);
     let device_ids = active
         .iter()
         .map(|(device_id, _)| device_id.to_string())
+        .collect();
+    let device_signature = active
+        .iter()
+        .map(|(device_id, library)| format!("{device_id}|{}", library.mount_path))
         .collect();
     for (device_id, library) in active {
         roots.extend(library.roots.iter().cloned().map(|root| SnapshotRoot {
@@ -86,8 +95,9 @@ fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
             entry,
         }));
     }
-    Snapshot {
+    Ok(Snapshot {
         device_ids,
+        device_signature,
         roots,
         entries,
         settings: state.settings.lock().unwrap().clone(),
@@ -96,7 +106,7 @@ fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
         thumbs_dir: store::thumbs_dir(app)
             .map(|dir| dir.to_string_lossy().to_string())
             .unwrap_or_default(),
-    }
+    })
 }
 
 /// The page holds the whole library, so every mutation answers with the whole
@@ -104,7 +114,20 @@ fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
 /// bug where the two copies drift apart.
 fn persist(app: &AppHandle, state: &State<AppState>) -> Result<Snapshot, String> {
     store::save_library(app, &state.library.lock().unwrap())?;
-    Ok(snapshot(app, state))
+    snapshot(app, state)
+}
+
+pub fn refresh_devices(stored: &mut StoredLibrary) -> bool {
+    let mut changed = false;
+    for (device_id, library) in &mut stored.devices {
+        if let Ok(location) = device::resolve(device_id, &library.mount_path) {
+            if location.mount_path != library.mount_path {
+                library.rebase(&location.mount_path);
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 pub fn active_devices(stored: &StoredLibrary) -> Vec<(&str, &DeviceLibrary)> {
@@ -119,6 +142,17 @@ pub fn active_devices(stored: &StoredLibrary) -> Vec<(&str, &DeviceLibrary)> {
         .collect()
 }
 
+pub fn allow_active_assets(app: &AppHandle, stored: &StoredLibrary) {
+    for (_, library) in active_devices(stored) {
+        for root in &library.roots {
+            allow_asset_dir(app, &root.path);
+        }
+        for entry in &library.entries {
+            allow_asset_file(app, &entry.path);
+        }
+    }
+}
+
 fn current_device(path: &str, expected_id: &str) -> Result<DeviceLocation, String> {
     let location = device::locate(path)?;
     if !device::matches(&location, expected_id) {
@@ -128,8 +162,21 @@ fn current_device(path: &str, expected_id: &str) -> Result<DeviceLocation, Strin
 }
 
 #[tauri::command]
-pub fn get_library(app: AppHandle, state: State<AppState>) -> Snapshot {
+pub fn get_library(app: AppHandle, state: State<AppState>) -> Result<Snapshot, String> {
     snapshot(&app, &state)
+}
+
+#[tauri::command]
+pub fn get_device_signature(app: AppHandle, state: State<AppState>) -> Result<Vec<String>, String> {
+    let mut stored = state.library.lock().unwrap();
+    if refresh_devices(&mut stored) {
+        store::save_library(&app, &stored)?;
+        allow_active_assets(&app, &stored);
+    }
+    Ok(active_devices(&stored)
+        .into_iter()
+        .map(|(device_id, library)| format!("{device_id}|{}", library.mount_path))
+        .collect())
 }
 
 #[tauri::command]

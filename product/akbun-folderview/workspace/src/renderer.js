@@ -12,6 +12,7 @@ const $ = (id) => document.getElementById(id);
 
 let state = {
   deviceIds: [],
+  deviceSignature: [],
   roots: [],
   entries: [],
   settings: {},
@@ -110,9 +111,13 @@ function syncLastOpened() {
 }
 
 async function openEntry(entry) {
-  await window.api.openEntry(entry.path, entry.deviceId);
-  state.lastOpenedPath = entry.path;
-  syncLastOpened();
+  try {
+    await window.api.openEntry(entry.path, entry.deviceId);
+    state.lastOpenedPath = entry.path;
+    syncLastOpened();
+  } catch (error) {
+    $('status').textContent = `Open failed: ${error}`;
+  }
 }
 
 function derive() {
@@ -430,13 +435,16 @@ function pumpThumbs() {
     withTimeout(makeThumb(entry, generation), 30)
       .then((blob) => showThumb(entry, blob))
       .catch(() => {
+        if (generation !== thumbGeneration) return;
         thumbFailed.add(key);
         const img = thumbWaiting.get(key);
         if (img && img.isConnected) markMissing(img);
       })
       .finally(() => {
-        thumbQueued.delete(key);
-        thumbWaiting.delete(key);
+        if (generation === thumbGeneration) {
+          thumbQueued.delete(key);
+          thumbWaiting.delete(key);
+        }
         thumbActive -= 1;
         pumpThumbs();
       });
@@ -877,13 +885,15 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-function deviceSignature(deviceIds) {
-  return [...deviceIds].sort().join('|');
+function signatureValue(signature) {
+  return [...signature].sort().join('|');
 }
 
 function applyLibrarySnapshot(snapshot) {
-  const deviceChanged = deviceSignature(state.deviceIds) !== deviceSignature(snapshot.deviceIds);
+  const deviceChanged =
+    signatureValue(state.deviceSignature) !== signatureValue(snapshot.deviceSignature);
   state.deviceIds = snapshot.deviceIds;
+  state.deviceSignature = snapshot.deviceSignature;
   state.roots = snapshot.roots;
   state.entries = snapshot.entries;
   if (deviceChanged) {
@@ -915,8 +925,13 @@ window.api.getLibrary().then((snapshot) => {
 // drive letter. Polling the cheap UUID snapshot prevents paths from the old
 // drive being used against the new one.
 setInterval(async () => {
-  const snapshot = await window.api.getLibrary();
-  if (deviceSignature(snapshot.deviceIds) !== deviceSignature(state.deviceIds)) {
-    applyLibrarySnapshot(snapshot);
+  try {
+    const signature = await window.api.getDeviceSignature();
+    if (signatureValue(signature) !== signatureValue(state.deviceSignature)) {
+      const snapshot = await window.api.getLibrary();
+      applyLibrarySnapshot(snapshot);
+    }
+  } catch (error) {
+    $('status').textContent = `Device check failed: ${error}`;
   }
 }, 2000);

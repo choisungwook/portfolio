@@ -141,7 +141,7 @@ impl StoredLibrary {
             remaining_entries = outside_root;
 
             let location = locate(&root.path);
-            let same_device = under_root.is_empty() || under_root.iter().any(&matches_entry);
+            let same_device = under_root.iter().any(&matches_entry);
             if let Some(location) = location.filter(|_| same_device) {
                 let device = self.device_mut(&location);
                 push_root(device, root);
@@ -427,6 +427,33 @@ mod tests {
         assert!(!stored.migrate_legacy(|_| None, |_| false));
         assert_eq!(stored.legacy.roots.len(), 1);
         assert_eq!(stored.legacy.entries[0].tags, original.tags);
+        assert!(stored.devices.is_empty());
+    }
+
+    #[test]
+    fn an_empty_legacy_root_is_not_assigned_to_a_reused_mount_path() {
+        let mut stored = StoredLibrary {
+            legacy: Library {
+                roots: vec![Root {
+                    path: "E:\\photos".to_string(),
+                }],
+                entries: Vec::new(),
+            },
+            ..StoredLibrary::default()
+        };
+
+        let changed = stored.migrate_legacy(
+            |_| {
+                Some(DeviceLocation {
+                    id: "different-volume".to_string(),
+                    mount_path: "E:\\".to_string(),
+                })
+            },
+            |_| false,
+        );
+
+        assert!(!changed);
+        assert_eq!(stored.legacy.roots.len(), 1);
         assert!(stored.devices.is_empty());
     }
 

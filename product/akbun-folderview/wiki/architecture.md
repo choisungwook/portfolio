@@ -61,6 +61,7 @@ Every mutating command returns the whole library. `api.js` routes it to one chan
 | Command | What it does |
 |---|---|
 | `get_library` | The initial load: roots, entries, settings, version, data directory |
+| `get_device_signature` | The lightweight poll: active Volume GUIDs and mount paths, without cloning entries |
 | `add_folder` | Grants the folder to the asset protocol, walks it, appends the new files |
 | `add_files` | Grants each file, appends the ones that are not already known |
 | `rescan` | Walks every root again, keeps tags and ratings, drops files that are gone |
@@ -98,6 +99,8 @@ The list is short because of the split above. On top of `core:default` the page 
 `store.rs` keeps `library.json` and `settings.json` under the app config directory, which on Windows is `%APPDATA%\io.akbun.folderview`. Not Program Files: that tree is read only for a normal user, so a write there either fails or lands in a per-user shadow copy the app never finds again. See [Settings and library in the user data folder](../adr/2026-08-settings-in-appdata.md).
 
 The first version 2 start reads the old `{ roots, entries }` file, writes its exact bytes once to `library.v1.json`, and groups reachable data by Volume GUID. A populated root is assigned only when at least one stored entry still matches its size, modification time and kind on disk. Unreachable or mismatched data stays in `legacy` and is retried on later starts, so an update cannot silently discard data from an unplugged drive.
+
+On Windows, a stored Volume GUID is also resolved back to its current mount path. A drive-letter change rebases only that device's roots and entries. The page polls the small GUID and mount-path signature every two seconds and requests a full snapshot only when that signature changes.
 
 `write_json` writes to a temp file and renames it over the target:
 
