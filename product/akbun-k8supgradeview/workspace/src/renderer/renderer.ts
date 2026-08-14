@@ -91,6 +91,7 @@ interface OverprovisionOptions {
 }
 
 interface Api {
+  getCurrentCluster(): Promise<string>;
   getNodes(): Promise<NodeInfo[]>;
   getPods(nodeName?: string): Promise<PodInfo[]>;
   describePod(namespace: string, name: string): Promise<string>;
@@ -354,6 +355,22 @@ function clearError(): void {
   $("#error-banner").classList.add("hidden");
 }
 
+function renderClusterStatus(clusterName: string): void {
+  const status = $("#cluster-status");
+  const connected = Boolean(clusterName);
+  status.textContent = connected ? `Cluster: ${clusterName}` : "Cluster: Disconnected";
+  status.classList.toggle("disconnected", !connected);
+  status.title = connected ? clusterName : "현재 Kubernetes 클러스터에 연결할 수 없습니다.";
+}
+
+async function refreshClusterStatus(): Promise<void> {
+  try {
+    renderClusterStatus(await api.getCurrentCluster());
+  } catch {
+    renderClusterStatus("");
+  }
+}
+
 // kubectl과 비슷한 형식으로 age를 표시한다. 예: 45s, 30m, 12h, 5d
 function formatAge(creationTimestamp: string): string {
   if (!creationTimestamp) return "";
@@ -605,6 +622,7 @@ function renderNodePods(): void {
 }
 
 async function refreshNodes(): Promise<void> {
+  void refreshClusterStatus();
   try {
     clearError();
     allNodes = await api.getNodes();
@@ -1028,6 +1046,7 @@ async function submitSettings(): Promise<void> {
   try {
     const saved = await api.saveSettings(readSettingsForm());
     fillSettingsForm(saved);
+    void refreshClusterStatus();
     // 조회 대상이 바뀌었을 수 있으므로 karpenter 탭들을 다시 열 때 새로 불러오게 한다.
     karpenterLoaded = false;
     nodePoolsLoaded = false;

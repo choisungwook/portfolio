@@ -9,6 +9,7 @@ import {
   getKarpenterLogs,
   getKarpenterResources,
   getKarpenterVersions,
+  getCurrentCluster,
   getNamespaces,
   getNodes,
   getPods,
@@ -65,6 +66,7 @@ async function confirmCordon(nodeName: string, cordon: boolean): Promise<boolean
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.handle("kubectl:current-cluster", () => getCurrentCluster());
   ipcMain.handle("kubectl:nodes", () => getNodes());
   // 취소를 눌렀는지 renderer가 알아야 새로고침 여부를 정할 수 있어 boolean을 돌려준다.
   ipcMain.handle("kubectl:set-node-cordon", async (_event, nodeName: unknown, cordon: unknown) => {

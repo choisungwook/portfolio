@@ -156,8 +156,29 @@ body {
   overflow-y: auto;
 }
 
+#app-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px 0;
+}
+
+.cluster-status {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cluster-status.disconnected {
+  color: var(--danger);
+}
+
 main {
-  padding: 16px 20px;
+  padding: 12px 20px 16px;
 }
 
 .tab {
