@@ -20,6 +20,7 @@ const state = {
   presentIndex: 0,
   showNumbers: false,
   showGuidelines: false,
+  cropping: null,
   zoom: L.ZOOM_FIT,
 };
 
@@ -148,7 +149,36 @@ function renderCanvas() {
     slideNumberSvg(state.current) +
     guidelinesSvg() +
     (state.editingIndex < 0 ? selections : '') +
-    marqueeSvg();
+    marqueeSvg() +
+    (state.cropping ? cropOverlaySvg() : '');
+}
+
+function cropOverlaySvg() {
+  const shape = selectedShape();
+  if (!shape || shape.kind !== 'image') return '';
+  const left = shape.cropLeft || 0;
+  const top = shape.cropTop || 0;
+  const right = shape.cropRight || 0;
+  const bottom = shape.cropBottom || 0;
+  const x = shape.x + shape.w * left;
+  const y = shape.y + shape.h * top;
+  const w = shape.w * (1 - left - right);
+  const h = shape.h * (1 - top - bottom);
+  const handles = [
+    ['left', x, y + h / 2], ['right', x + w, y + h / 2],
+    ['top', x + w / 2, y], ['bottom', x + w / 2, y + h],
+  ].map(([side, hx, hy]) =>
+    `<rect x="${hx - 6}" y="${hy - 6}" width="12" height="12" class="crop-handle" data-crop-handle="${side}"/>`
+  ).join('');
+  const shades = [
+    [shape.x, shape.y, x - shape.x, shape.h],
+    [x + w, shape.y, shape.x + shape.w - (x + w), shape.h],
+    [x, shape.y, w, y - shape.y],
+    [x, y + h, w, shape.y + shape.h - (y + h)],
+  ].map(([sx, sy, sw, sh]) =>
+    `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" class="crop-shade"/>`
+  ).join('');
+  return `<g class="crop-overlay">${shades}<rect x="${x}" y="${y}" width="${w}" height="${h}" class="crop-window"/>${handles}</g>`;
 }
 
 function renderThumbs() {
@@ -168,13 +198,19 @@ function renderProps() {
   const kind = shape ? shape.kind : 'defaults';
 
   const showFill = kind === 'rect' || kind === 'ellipse' || kind === 'defaults';
-  const showStroke = kind !== 'text' && kind !== 'image';
+  const showStroke = kind !== 'text';
   const showText = kind === 'text' || kind === 'defaults';
 
   $('props-fill').hidden = !showFill;
   $('props-stroke').hidden = !showStroke;
   $('props-text').hidden = !showText;
   $('btn-delete-shape').hidden = !shape;
+  $('btn-group').hidden = state.selection.length < 2;
+  $('btn-ungroup').hidden = !state.selection.some((index) => slide().shapes[index]?.groupId);
+  $('props-pen-arrow').hidden = kind !== 'pen';
+  $('props-image-crop').hidden = kind !== 'image';
+  $('btn-crop').classList.toggle('active', !!state.cropping);
+  $('prop-pen-arrow').checked = !!source.penArrow;
   $('props-hint').textContent = state.selection.length > 1
     ? `Selected: ${state.selection.length} objects`
     : shape
@@ -364,6 +400,19 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
+  const cropHandle = event.target.closest('[data-crop-handle]');
+  if (cropHandle && state.cropping && selectedShape()) {
+    state.drag = {
+      mode: 'crop',
+      side: cropHandle.dataset.cropHandle,
+      from: structuredClone(selectedShape()),
+      x0: p.x,
+      y0: p.y,
+    };
+    canvas.setPointerCapture(event.pointerId);
+    return;
+  }
+
   const group = event.target.closest('g[data-i]');
   if (group) {
     const index = Number(group.dataset.i);
@@ -395,14 +444,14 @@ canvas.addEventListener('pointerdown', (event) => {
       return;
     }
 
-    if (!state.selection.includes(index)) selectOnly(index);
+    if (!state.selection.includes(index)) selectMany(L.groupIndicesFor(slide().shapes, index));
 
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
     const duplicated = event.metaKey || event.ctrlKey;
     const originalSelection = [...state.selection];
     if (duplicated) {
-      const copies = selectedShapes().map((shape) => structuredClone(shape));
+      const copies = L.cloneShapes(selectedShapes());
       const first = slide().shapes.length;
       slide().shapes.push(...copies);
       selectMany(copies.map((_, offset) => first + offset));
@@ -446,6 +495,14 @@ canvas.addEventListener('pointermove', (event) => {
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
     L.resizeShape(shape, drag.from, drag.handle, dx, dy);
+  } else if (drag.mode === 'crop') {
+    const shape = selectedShape();
+    if (!shape) return;
+    Object.assign(shape, structuredClone(drag.from));
+    const fraction = drag.side === 'left' || drag.side === 'right' ? dx / shape.w : dy / shape.h;
+    const base = drag.side === 'left' ? drag.from.cropLeft : drag.side === 'right' ? drag.from.cropRight :
+      drag.side === 'top' ? drag.from.cropTop : drag.from.cropBottom;
+    L.setCrop(shape, drag.side, base + ((drag.side === 'left' || drag.side === 'top') ? fraction : -fraction));
   } else if (drag.mode === 'move') {
     // Shift keeps the move on whichever axis has travelled further.
     const straight = event.shiftKey;
@@ -478,7 +535,7 @@ canvas.addEventListener('pointerup', () => {
   } else if (drag.mode === 'marquee') {
     const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
     selectMany(L.shapeIndicesInRect(slide().shapes, rect));
-  } else if (drag.mode === 'resize' || drag.moved) {
+  } else if (drag.mode === 'resize' || drag.mode === 'crop' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {
     // A Cmd+click that never moved keeps the original selection. The copies
@@ -681,7 +738,7 @@ const PASTE_OFFSET = 20;
 const SHAPE_CLIPBOARD_TYPE = 'application/x-akbun-makepresentation-shapes';
 
 function insertShapes(shapes, offset) {
-  const copies = shapes.map((shape) => structuredClone(shape));
+  const copies = L.cloneShapes(shapes);
   if (offset) {
     for (const copy of copies) L.moveShape(copy, offset, offset);
   }
@@ -926,6 +983,25 @@ function applyProp(patch) {
   renderProps();
 }
 
+function groupSelection() {
+  if (!L.groupShapes(slide().shapes, state.selection)) return;
+  markDirty();
+  renderAll();
+}
+
+function ungroupSelection() {
+  if (!L.ungroupShapes(slide().shapes, state.selection)) return;
+  markDirty();
+  renderAll();
+}
+
+function toggleCrop() {
+  const shape = selectedShape();
+  if (!shape || shape.kind !== 'image') return;
+  state.cropping = state.cropping ? null : { index: state.selected };
+  renderAll();
+}
+
 // --- slide background --------------------------------------------------------
 //
 // Deliberately not part of applyProp: it writes to the slide, never to a
@@ -985,6 +1061,10 @@ $('prop-width').addEventListener('input', (e) =>
   applyProp({ strokeWidth: Math.max(1, Number(e.target.value) || 1) })
 );
 $('prop-dash').addEventListener('change', (e) => applyProp({ dash: e.target.value }));
+$('prop-pen-arrow').addEventListener('change', (e) => applyProp({ penArrow: e.target.checked }));
+$('btn-group').addEventListener('click', groupSelection);
+$('btn-ungroup').addEventListener('click', ungroupSelection);
+$('btn-crop').addEventListener('click', toggleCrop);
 $('prop-font-size').addEventListener('input', (e) =>
   applyProp({ fontSize: Math.max(6, Number(e.target.value) || 24) })
 );

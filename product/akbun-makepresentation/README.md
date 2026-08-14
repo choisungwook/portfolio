@@ -9,6 +9,9 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Shapes: rectangle, ellipse, line, arrow, freehand pen
 - Text boxes with font family, size, color, bold, italic, underline and alignment
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
+- Multi-object group and ungroup, with grouped move and duplicate
+- Image borders and interactive crop handles with a shaded outside area
+- Optional arrowhead at the end of a freehand stroke
 - Zoom from 50% to 400%, from the status bar or the keyboard
 - Slide numbers, toggled from the status bar
 - Undo and redo, multi-object selection, copy and paste, duplicate

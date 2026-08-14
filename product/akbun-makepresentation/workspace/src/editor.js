@@ -12,7 +12,7 @@ const SLIDE_H = 720;
 const DEFAULT_BACKGROUND = '#ffffff';
 
 const DEFAULT_STYLE = {
-  stroke: '#1a1a1a',
+  stroke: '#e03131',
   strokeWidth: 2,
   dash: 'solid',
   fill: 'none',
@@ -78,6 +78,8 @@ function createShape(kind, x, y, style) {
     cropRight: 0,
     cropBottom: 0,
     rotation: 0,
+    groupId: '',
+    penArrow: false,
   };
 }
 
@@ -131,6 +133,10 @@ function normalizeClipboardShape(value) {
   for (const name of ['bold', 'italic', 'underline']) {
     if (typeof value[name] === 'boolean') shape[name] = value[name];
   }
+  if (typeof value.groupId === 'string' && value.groupId.length <= 100) {
+    shape.groupId = value.groupId;
+  }
+  if (typeof value.penArrow === 'boolean') shape.penArrow = value.penArrow;
   if (['left', 'center', 'right'].includes(value.textAlign)) {
     shape.textAlign = value.textAlign;
   }
@@ -268,6 +274,61 @@ function moveShape(shape, dx, dy) {
     shape.x += dx;
     shape.y += dy;
   }
+}
+
+let groupSequence = 0;
+
+function nextGroupId() {
+  groupSequence += 1;
+  return `group-${Date.now()}-${groupSequence}`;
+}
+
+function groupShapes(shapes, indices) {
+  const valid = [...new Set(indices)].filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < shapes.length
+  );
+  if (valid.length < 2) return '';
+  const id = nextGroupId();
+  for (const index of valid) shapes[index].groupId = id;
+  return id;
+}
+
+function ungroupShapes(shapes, indices) {
+  const ids = new Set(indices.map((index) => shapes[index] && shapes[index].groupId).filter(Boolean));
+  if (ids.size === 0) return false;
+  for (const shape of shapes) {
+    if (ids.has(shape.groupId)) shape.groupId = '';
+  }
+  return true;
+}
+
+function groupIndicesFor(shapes, index) {
+  const shape = shapes[index];
+  if (!shape || !shape.groupId) return Number.isInteger(index) ? [index] : [];
+  return shapes.reduce((indices, candidate, candidateIndex) => {
+    if (candidate.groupId === shape.groupId) indices.push(candidateIndex);
+    return indices;
+  }, []);
+}
+
+function cloneShapes(shapes) {
+  const groupIds = new Map();
+  return shapes.map((shape) => {
+    const copy = structuredClone(shape);
+    if (copy.groupId) {
+      if (!groupIds.has(copy.groupId)) groupIds.set(copy.groupId, nextGroupId());
+      copy.groupId = groupIds.get(copy.groupId);
+    }
+    return copy;
+  });
+}
+
+function setCrop(shape, side, fraction) {
+  const value = Math.max(0, Math.min(0.95, fraction));
+  const opposite = side === 'left' ? 'cropRight' : side === 'right' ? 'cropLeft' :
+    side === 'top' ? 'cropBottom' : 'cropTop';
+  const property = `crop${side[0].toUpperCase()}${side.slice(1)}`;
+  shape[property] = Math.round(Math.min(value, 0.95 - (shape[opposite] || 0)) * 1_000_000) / 1_000_000;
 }
 
 // Which resize handles a shape offers, with their positions.
@@ -439,7 +500,7 @@ function renderShapeSvg(shape, options) {
       return arrowSvg(shape);
     case 'pen': {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
-      return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>`;
+      return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>${shape.penArrow ? penArrowSvg(shape) : ''}`;
     }
     case 'text': {
       if (hideText) return '';
@@ -471,12 +532,37 @@ function renderShapeSvg(shape, options) {
       const top = Math.max(0, Math.min(0.999, shape.cropTop || 0));
       const width = Math.max(0.001, 1 - left - Math.max(0, shape.cropRight || 0));
       const height = Math.max(0.001, 1 - top - Math.max(0, shape.cropBottom || 0));
-      const markup = `<svg x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" viewBox="${left} ${top} ${width} ${height}" preserveAspectRatio="none" overflow="hidden"><image x="0" y="0" width="1" height="1" preserveAspectRatio="none" href="${href}"/></svg>`;
+      const markup = `<svg x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" viewBox="${left} ${top} ${width} ${height}" preserveAspectRatio="none" overflow="hidden"><image x="0" y="0" width="1" height="1" preserveAspectRatio="none" href="${href}"/></svg><rect x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" fill="none" ${strokeAttrs(shape)}/>`;
       return rotateSvg(shape, markup);
     }
     default:
       return '';
   }
+}
+
+function penArrowSvg(shape) {
+  if (shape.points.length < 2 || shape.stroke === 'none') return '';
+  const end = shape.points[shape.points.length - 1];
+  let start = shape.points[shape.points.length - 2];
+  for (let index = shape.points.length - 2; index >= 0; index -= 1) {
+    if (shape.points[index][0] !== end[0] || shape.points[index][1] !== end[1]) {
+      start = shape.points[index];
+      break;
+    }
+  }
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const length = Math.hypot(dx, dy);
+  if (!length) return '';
+  const ux = dx / length;
+  const uy = dy / length;
+  const head = Math.min(length / 2, Math.max(10, shape.strokeWidth * 4));
+  const half = Math.max(head * 0.45, shape.strokeWidth);
+  const bx = end[0] - ux * head;
+  const by = end[1] - uy * head;
+  const p1 = `${bx - uy * half},${by + ux * half}`;
+  const p2 = `${bx + uy * half},${by - ux * half}`;
+  return `<polygon points="${end[0]},${end[1]} ${p1} ${p2}" fill="${shape.stroke}"/>`;
 }
 
 function arrowSvg(shape) {
@@ -612,6 +698,11 @@ const exported = {
   shapeIndicesInRect,
   toggleSelection,
   moveShape,
+  groupShapes,
+  ungroupShapes,
+  groupIndicesFor,
+  cloneShapes,
+  setCrop,
   handlesFor,
   resizeShape,
   addSlide,

@@ -266,6 +266,28 @@ main {
   pointer-events: none;
 }
 
+.crop-overlay {
+  pointer-events: none;
+}
+
+.crop-shade {
+  fill: rgba(0, 0, 0, 0.5);
+}
+
+.crop-window {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.crop-handle {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
 .guidelines {
   fill: none;
   stroke: var(--accent);
