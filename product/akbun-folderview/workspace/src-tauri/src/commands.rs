@@ -6,8 +6,10 @@
 // happens here, because the user's photos live anywhere on the disk and the
 // alternative would be granting the webview an unrestricted open-path scope.
 
-use folderview_library::{self as library, Entry, Library, Root, Settings};
-use crate::store;
+use crate::{device, store};
+use folderview_library::{
+    self as library, DeviceLibrary, DeviceLocation, Entry, Root, Settings, StoredLibrary,
+};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -16,16 +18,34 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_opener::OpenerExt;
 
 pub struct AppState {
-    pub library: Mutex<Library>,
+    pub library: Mutex<StoredLibrary>,
     pub settings: Mutex<Settings>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotEntry {
+    pub device_id: String,
+    #[serde(flatten)]
+    pub entry: Entry,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotRoot {
+    pub device_id: String,
+    #[serde(flatten)]
+    pub root: Root,
 }
 
 /// Everything the page needs on load, in one round trip.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-    pub roots: Vec<Root>,
-    pub entries: Vec<Entry>,
+    pub device_ids: Vec<String>,
+    pub device_signature: Vec<String>,
+    pub roots: Vec<SnapshotRoot>,
+    pub entries: Vec<SnapshotEntry>,
     pub settings: Settings,
     pub version: String,
     pub data_dir: String,
@@ -48,18 +68,45 @@ pub fn allow_asset_file(app: &AppHandle, path: &str) {
     let _ = app.asset_protocol_scope().allow_file(path);
 }
 
-fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
-    let library = state.library.lock().unwrap();
-    Snapshot {
-        roots: library.roots.clone(),
-        entries: library.entries.clone(),
+fn snapshot(app: &AppHandle, state: &State<AppState>) -> Result<Snapshot, String> {
+    let mut stored = state.library.lock().unwrap();
+    if refresh_devices(&mut stored) {
+        store::save_library(app, &stored)?;
+        allow_active_assets(app, &stored);
+    }
+    let mut roots = Vec::new();
+    let mut entries = Vec::new();
+    let active = active_devices(&stored);
+    let device_ids = active
+        .iter()
+        .map(|(device_id, _)| device_id.to_string())
+        .collect();
+    let device_signature = active
+        .iter()
+        .map(|(device_id, library)| format!("{device_id}|{}", library.mount_path))
+        .collect();
+    for (device_id, library) in active {
+        roots.extend(library.roots.iter().cloned().map(|root| SnapshotRoot {
+            device_id: device_id.to_string(),
+            root,
+        }));
+        entries.extend(library.entries.iter().cloned().map(|entry| SnapshotEntry {
+            device_id: device_id.to_string(),
+            entry,
+        }));
+    }
+    Ok(Snapshot {
+        device_ids,
+        device_signature,
+        roots,
+        entries,
         settings: state.settings.lock().unwrap().clone(),
         version: app.package_info().version.to_string(),
         data_dir: store::data_dir(app),
         thumbs_dir: store::thumbs_dir(app)
             .map(|dir| dir.to_string_lossy().to_string())
             .unwrap_or_default(),
-    }
+    })
 }
 
 /// The page holds the whole library, so every mutation answers with the whole
@@ -67,20 +114,83 @@ fn snapshot(app: &AppHandle, state: &State<AppState>) -> Snapshot {
 /// bug where the two copies drift apart.
 fn persist(app: &AppHandle, state: &State<AppState>) -> Result<Snapshot, String> {
     store::save_library(app, &state.library.lock().unwrap())?;
-    Ok(snapshot(app, state))
+    snapshot(app, state)
+}
+
+pub fn refresh_devices(stored: &mut StoredLibrary) -> bool {
+    let mut changed = false;
+    for (device_id, library) in &mut stored.devices {
+        if let Ok(location) = device::resolve(device_id, &library.mount_path) {
+            if location.mount_path != library.mount_path {
+                library.rebase(&location.mount_path);
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
+pub fn active_devices(stored: &StoredLibrary) -> Vec<(&str, &DeviceLibrary)> {
+    stored
+        .devices
+        .iter()
+        .filter(|(device_id, library)| {
+            device::locate(&library.mount_path)
+                .is_ok_and(|location| device::matches(&location, device_id))
+        })
+        .map(|(device_id, library)| (device_id.as_str(), library))
+        .collect()
+}
+
+pub fn allow_active_assets(app: &AppHandle, stored: &StoredLibrary) {
+    for (_, library) in active_devices(stored) {
+        for root in &library.roots {
+            allow_asset_dir(app, &root.path);
+        }
+        for entry in &library.entries {
+            allow_asset_file(app, &entry.path);
+        }
+    }
+}
+
+fn current_device(path: &str, expected_id: &str) -> Result<DeviceLocation, String> {
+    let location = device::locate(path)?;
+    if !device::matches(&location, expected_id) {
+        return Err("the device at this path has changed".to_string());
+    }
+    Ok(location)
 }
 
 #[tauri::command]
-pub fn get_library(app: AppHandle, state: State<AppState>) -> Snapshot {
+pub fn get_library(app: AppHandle, state: State<AppState>) -> Result<Snapshot, String> {
     snapshot(&app, &state)
 }
 
 #[tauri::command]
-pub fn add_folder(app: AppHandle, state: State<AppState>, path: String) -> Result<Snapshot, String> {
+pub fn get_device_signature(app: AppHandle, state: State<AppState>) -> Result<Vec<String>, String> {
+    let mut stored = state.library.lock().unwrap();
+    if refresh_devices(&mut stored) {
+        store::save_library(&app, &stored)?;
+        allow_active_assets(&app, &stored);
+    }
+    Ok(active_devices(&stored)
+        .into_iter()
+        .map(|(device_id, library)| format!("{device_id}|{}", library.mount_path))
+        .collect())
+}
+
+#[tauri::command]
+pub fn add_folder(
+    app: AppHandle,
+    state: State<AppState>,
+    path: String,
+) -> Result<Snapshot, String> {
+    let location = device::locate(&path)?;
     allow_asset_dir(&app, &path);
     let scanned = library::scan_folder(Path::new(&path));
     {
-        let mut lib = state.library.lock().unwrap();
+        let mut stored = state.library.lock().unwrap();
+        let lib = stored.device_mut(&location);
         if !lib.roots.iter().any(|root| root.path == path) {
             lib.roots.push(Root { path });
         }
@@ -89,8 +199,11 @@ pub fn add_folder(app: AppHandle, state: State<AppState>, path: String) -> Resul
         // mergeScan carries over the rating and tags of anything already known,
         // which matters when a folder is added a second time after a removal.
         let merged = library::merge_scan(&lib.entries, scanned);
-        lib.entries
-            .extend(merged.into_iter().filter(|entry| !known.contains(&entry.path)));
+        lib.entries.extend(
+            merged
+                .into_iter()
+                .filter(|entry| !known.contains(&entry.path)),
+        );
     }
     persist(&app, &state)
 }
@@ -105,15 +218,17 @@ pub fn add_files(
         allow_asset_file(&app, path);
     }
     {
-        let mut lib = state.library.lock().unwrap();
-        let known: std::collections::HashSet<String> =
-            lib.entries.iter().map(|entry| entry.path.clone()).collect();
-        let fresh: Vec<Entry> = paths
-            .iter()
-            .filter(|path| !known.contains(*path))
-            .filter_map(|path| library::make_entry(Path::new(path)))
-            .collect();
-        lib.entries.extend(fresh);
+        let mut stored = state.library.lock().unwrap();
+        for path in paths {
+            let location = device::locate(&path)?;
+            let lib = stored.device_mut(&location);
+            if lib.entries.iter().any(|entry| entry.path == path) {
+                continue;
+            }
+            if let Some(entry) = library::make_entry(Path::new(&path)) {
+                lib.entries.push(entry);
+            }
+        }
     }
     persist(&app, &state)
 }
@@ -123,33 +238,48 @@ pub fn add_files(
 /// rather than by rescan.
 #[tauri::command]
 pub fn rescan(app: AppHandle, state: State<AppState>) -> Result<Snapshot, String> {
-    let roots: Vec<String> = state
-        .library
-        .lock()
-        .unwrap()
-        .roots
-        .iter()
-        .map(|root| root.path.clone())
-        .collect();
+    let targets: Vec<(String, DeviceLibrary)> = {
+        let stored = state.library.lock().unwrap();
+        active_devices(&stored)
+            .into_iter()
+            .map(|(device_id, library)| (device_id.to_string(), library.clone()))
+            .collect()
+    };
 
-    let mut scanned = Vec::new();
-    for root in &roots {
-        scanned.extend(library::scan_folder(Path::new(root)));
-    }
-
-    {
-        let mut lib = state.library.lock().unwrap();
-        let loose: Vec<Entry> = lib
+    let mut rescanned = Vec::new();
+    for (device_id, library_for_device) in targets {
+        let roots: Vec<String> = library_for_device
+            .roots
+            .iter()
+            .map(|root| root.path.clone())
+            .collect();
+        let mut scanned = Vec::new();
+        for root in &roots {
+            scanned.extend(library::scan_folder(Path::new(root)));
+        }
+        let loose: Vec<Entry> = library_for_device
             .entries
             .iter()
-            .filter(|entry| !roots.iter().any(|root| library::is_under(&entry.path, root)))
+            .filter(|entry| {
+                !roots
+                    .iter()
+                    .any(|root| library::is_under(&entry.path, root))
+            })
             .filter(|entry| Path::new(&entry.path).exists())
             .cloned()
             .collect();
-
-        let mut merged = library::merge_scan(&lib.entries, scanned);
+        let mut merged = library::merge_scan(&library_for_device.entries, scanned);
         merged.extend(loose);
-        lib.entries = merged;
+        rescanned.push((device_id, merged));
+    }
+
+    {
+        let mut stored = state.library.lock().unwrap();
+        for (device_id, entries) in rescanned {
+            if let Some(library) = stored.devices.get_mut(&device_id) {
+                library.entries = entries;
+            }
+        }
     }
     persist(&app, &state)
 }
@@ -161,11 +291,15 @@ pub fn remove_root(
     app: AppHandle,
     state: State<AppState>,
     path: String,
+    device_id: String,
 ) -> Result<Snapshot, String> {
+    let location = current_device(&path, &device_id)?;
     {
-        let mut lib = state.library.lock().unwrap();
+        let mut stored = state.library.lock().unwrap();
+        let lib = stored.device_mut(&location);
         lib.roots.retain(|root| root.path != path);
-        lib.entries.retain(|entry| !library::is_under(&entry.path, &path));
+        lib.entries
+            .retain(|entry| !library::is_under(&entry.path, &path));
     }
     persist(&app, &state)
 }
@@ -183,10 +317,13 @@ pub fn update_entry(
     app: AppHandle,
     state: State<AppState>,
     path: String,
+    device_id: String,
     patch: EntryPatch,
 ) -> Result<Snapshot, String> {
+    let location = current_device(&path, &device_id)?;
     {
-        let mut lib = state.library.lock().unwrap();
+        let mut stored = state.library.lock().unwrap();
+        let lib = stored.device_mut(&location);
         let entry = lib
             .entries
             .iter_mut()
@@ -210,8 +347,10 @@ pub fn rename_entry(
     app: AppHandle,
     state: State<AppState>,
     path: String,
+    device_id: String,
     new_name: String,
 ) -> Result<Snapshot, String> {
+    let location = current_device(&path, &device_id)?;
     let source = PathBuf::from(&path);
     let parent = source.parent().ok_or("file has no folder")?;
 
@@ -229,7 +368,8 @@ pub fn rename_entry(
     std::fs::rename(&source, &target).map_err(|error| error.to_string())?;
 
     {
-        let mut lib = state.library.lock().unwrap();
+        let mut stored = state.library.lock().unwrap();
+        let lib = stored.device_mut(&location);
         if let Some(entry) = lib.entries.iter_mut().find(|entry| entry.path == path) {
             entry.path = target.to_string_lossy().to_string();
             entry.name = new_name;
@@ -246,26 +386,30 @@ pub fn delete_entry(
     app: AppHandle,
     state: State<AppState>,
     path: String,
+    device_id: String,
 ) -> Result<Snapshot, String> {
+    let location = current_device(&path, &device_id)?;
     trash::delete(&path).map_err(|error| error.to_string())?;
-    state
-        .library
-        .lock()
-        .unwrap()
+    let mut stored = state.library.lock().unwrap();
+    stored
+        .device_mut(&location)
         .entries
         .retain(|entry| entry.path != path);
+    drop(stored);
     persist(&app, &state)
 }
 
 #[tauri::command]
-pub fn open_entry(app: AppHandle, path: String) -> Result<(), String> {
+pub fn open_entry(app: AppHandle, path: String, device_id: String) -> Result<(), String> {
+    current_device(&path, &device_id)?;
     app.opener()
         .open_path(path, None::<&str>)
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub fn reveal_entry(app: AppHandle, path: String) -> Result<(), String> {
+pub fn reveal_entry(app: AppHandle, path: String, device_id: String) -> Result<(), String> {
+    current_device(&path, &device_id)?;
     app.opener()
         .reveal_item_in_dir(path)
         .map_err(|error| error.to_string())
@@ -290,7 +434,14 @@ pub fn open_data_dir(app: AppHandle) -> Result<(), String> {
 /// here, so Rust needs no image library and the formats that display are
 /// exactly the formats that thumbnail.
 #[tauri::command]
-pub fn save_thumb(app: AppHandle, name: String, bytes: Vec<u8>) -> Result<(), String> {
+pub fn save_thumb(
+    app: AppHandle,
+    name: String,
+    bytes: Vec<u8>,
+    path: String,
+    device_id: String,
+) -> Result<(), String> {
+    current_device(&path, &device_id)?;
     // The name comes from the page, so it is held to exactly what thumbName
     // produces: sixteen hex digits and .jpg. Nothing else can land in the
     // thumbs folder, and nothing can step out of it.

@@ -34,6 +34,7 @@ dependencies = [
  "tauri-plugin-updater",
  "trash",
  "walkdir",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

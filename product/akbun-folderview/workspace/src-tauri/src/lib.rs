@@ -1,4 +1,5 @@
 mod commands;
+mod device;
 
 mod store;
 
@@ -49,16 +50,11 @@ pub fn run() {
 
             // The asset protocol grant is in-memory, so last run's folders have
             // to be granted again or every thumbnail is a broken image.
-            let library = store::load_library(handle);
-            for root in &library.roots {
-                commands::allow_asset_dir(handle, &root.path);
+            let mut library = store::load_library(handle).map_err(std::io::Error::other)?;
+            if commands::refresh_devices(&mut library) {
+                store::save_library(handle, &library).map_err(std::io::Error::other)?;
             }
-            // Files added one at a time sit under no root and need their own
-            // grant. Granting the file rather than its folder keeps the reach
-            // to what the user actually picked.
-            for entry in &library.entries {
-                commands::allow_asset_file(handle, &entry.path);
-            }
+            commands::allow_active_assets(handle, &library);
             // The grid reads cached thumbnails instead of the originals, so
             // this local folder is the only thing a normal start touches.
             if let Ok(thumbs) = store::thumbs_dir(handle) {
@@ -73,6 +69,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_library,
+            commands::get_device_signature,
             commands::add_folder,
             commands::add_files,
             commands::rescan,

@@ -7,8 +7,11 @@
 // src/library.js and adr/2026-08-library-is-what-you-add.md.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
+
+pub const LIBRARY_SCHEMA_VERSION: u32 = 2;
 
 const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "avif", "heic", "tif", "tiff",
@@ -44,6 +47,164 @@ pub struct Root {
 pub struct Library {
     pub roots: Vec<Root>,
     pub entries: Vec<Entry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceLocation {
+    pub id: String,
+    pub mount_path: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceLibrary {
+    pub mount_path: String,
+    pub roots: Vec<Root>,
+    pub entries: Vec<Entry>,
+}
+
+impl DeviceLibrary {
+    pub fn rebase(&mut self, mount_path: &str) {
+        if self.mount_path == mount_path {
+            return;
+        }
+        for root in &mut self.roots {
+            root.path = rebase_path(&root.path, &self.mount_path, mount_path);
+        }
+        for entry in &mut self.entries {
+            entry.path = rebase_path(&entry.path, &self.mount_path, mount_path);
+            entry.dir = parent_path(&entry.path);
+        }
+        self.mount_path = mount_path.to_string();
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredLibrary {
+    pub schema_version: u32,
+    pub devices: BTreeMap<String, DeviceLibrary>,
+    #[serde(default, skip_serializing_if = "Library::is_empty")]
+    pub legacy: Library,
+}
+
+impl Default for StoredLibrary {
+    fn default() -> Self {
+        Self {
+            schema_version: LIBRARY_SCHEMA_VERSION,
+            devices: BTreeMap::new(),
+            legacy: Library::default(),
+        }
+    }
+}
+
+impl Library {
+    pub fn is_empty(&self) -> bool {
+        self.roots.is_empty() && self.entries.is_empty()
+    }
+}
+
+impl StoredLibrary {
+    pub fn device_mut(&mut self, location: &DeviceLocation) -> &mut DeviceLibrary {
+        let device = self
+            .devices
+            .entry(location.id.clone())
+            .or_insert_with(|| DeviceLibrary {
+                mount_path: location.mount_path.clone(),
+                ..DeviceLibrary::default()
+            });
+        device.rebase(&location.mount_path);
+        device
+    }
+
+    pub fn migrate_legacy<Locate, Matches>(
+        &mut self,
+        locate: Locate,
+        matches_entry: Matches,
+    ) -> bool
+    where
+        Locate: Fn(&str) -> Option<DeviceLocation>,
+        Matches: Fn(&Entry) -> bool,
+    {
+        if self.legacy.is_empty() {
+            return false;
+        }
+
+        let mut changed = false;
+        let mut remaining_entries = std::mem::take(&mut self.legacy.entries);
+        let mut remaining_roots = Vec::new();
+
+        for root in std::mem::take(&mut self.legacy.roots) {
+            let (under_root, outside_root): (Vec<_>, Vec<_>) = remaining_entries
+                .into_iter()
+                .partition(|entry| is_under(&entry.path, &root.path));
+            remaining_entries = outside_root;
+
+            let location = locate(&root.path);
+            let same_device = under_root.iter().any(&matches_entry);
+            if let Some(location) = location.filter(|_| same_device) {
+                let device = self.device_mut(&location);
+                push_root(device, root);
+                merge_entries(device, under_root);
+                changed = true;
+            } else {
+                remaining_roots.push(root);
+                remaining_entries.extend(under_root);
+            }
+        }
+
+        let mut unresolved = Vec::new();
+        for entry in remaining_entries {
+            if matches_entry(&entry) {
+                if let Some(location) = locate(&entry.path) {
+                    merge_entries(self.device_mut(&location), vec![entry]);
+                    changed = true;
+                    continue;
+                }
+            }
+            unresolved.push(entry);
+        }
+
+        self.legacy.roots = remaining_roots;
+        self.legacy.entries = unresolved;
+        changed
+    }
+}
+
+fn push_root(device: &mut DeviceLibrary, root: Root) {
+    if !device.roots.iter().any(|known| known.path == root.path) {
+        device.roots.push(root);
+    }
+}
+
+fn merge_entries(device: &mut DeviceLibrary, entries: Vec<Entry>) {
+    let known: std::collections::HashSet<String> = device
+        .entries
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect();
+    device
+        .entries
+        .extend(entries.into_iter().filter(|entry| !known.contains(&entry.path)));
+}
+
+fn rebase_path(path: &str, old_mount: &str, new_mount: &str) -> String {
+    let Some(relative) = path.strip_prefix(old_mount) else {
+        return path.to_string();
+    };
+    let relative = relative.trim_start_matches(['/', '\\']);
+    if new_mount.ends_with(['/', '\\']) {
+        format!("{new_mount}{relative}")
+    } else {
+        let separator = if new_mount.contains('\\') { '\\' } else { '/' };
+        format!("{new_mount}{separator}{relative}")
+    }
+}
+
+fn parent_path(path: &str) -> String {
+    path.rfind(['/', '\\'])
+        .map(|index| path[..index].to_string())
+        .unwrap_or_default()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,5 +379,106 @@ mod tests {
         assert!(!parsed.open_on_single_click);
         assert_eq!(parsed.view, "grid");
         assert!(parsed.show_video_thumbs);
+    }
+
+    #[test]
+    fn legacy_data_is_grouped_by_device_id_without_losing_metadata() {
+        let mut stored = StoredLibrary {
+            legacy: Library {
+                roots: vec![Root {
+                    path: "E:\\photos".to_string(),
+                }],
+                entries: vec![entry("E:\\photos\\a.jpg", 5, &["family"])],
+            },
+            ..StoredLibrary::default()
+        };
+
+        let changed = stored.migrate_legacy(
+            |_| {
+                Some(DeviceLocation {
+                    id: "volume-a".to_string(),
+                    mount_path: "E:\\".to_string(),
+                })
+            },
+            |_| true,
+        );
+
+        assert!(changed);
+        assert!(stored.legacy.is_empty());
+        let device = &stored.devices["volume-a"];
+        assert_eq!(device.roots[0].path, "E:\\photos");
+        assert_eq!(device.entries[0].rating, 5);
+        assert_eq!(device.entries[0].tags, ["family"]);
+    }
+
+    #[test]
+    fn disconnected_legacy_data_stays_pending_for_a_later_start() {
+        let original = entry("E:\\photos\\a.jpg", 4, &["keep"]);
+        let mut stored = StoredLibrary {
+            legacy: Library {
+                roots: vec![Root {
+                    path: "E:\\photos".to_string(),
+                }],
+                entries: vec![original.clone()],
+            },
+            ..StoredLibrary::default()
+        };
+
+        assert!(!stored.migrate_legacy(|_| None, |_| false));
+        assert_eq!(stored.legacy.roots.len(), 1);
+        assert_eq!(stored.legacy.entries[0].tags, original.tags);
+        assert!(stored.devices.is_empty());
+    }
+
+    #[test]
+    fn an_empty_legacy_root_is_not_assigned_to_a_reused_mount_path() {
+        let mut stored = StoredLibrary {
+            legacy: Library {
+                roots: vec![Root {
+                    path: "E:\\photos".to_string(),
+                }],
+                entries: Vec::new(),
+            },
+            ..StoredLibrary::default()
+        };
+
+        let changed = stored.migrate_legacy(
+            |_| {
+                Some(DeviceLocation {
+                    id: "different-volume".to_string(),
+                    mount_path: "E:\\".to_string(),
+                })
+            },
+            |_| false,
+        );
+
+        assert!(!changed);
+        assert_eq!(stored.legacy.roots.len(), 1);
+        assert!(stored.devices.is_empty());
+    }
+
+    #[test]
+    fn a_device_keeps_its_library_when_its_mount_path_changes() {
+        let mut stored = StoredLibrary::default();
+        let first = DeviceLocation {
+            id: "volume-a".to_string(),
+            mount_path: "E:\\".to_string(),
+        };
+        let device = stored.device_mut(&first);
+        device.roots.push(Root {
+            path: "E:\\photos".to_string(),
+        });
+        device.entries.push(entry("E:\\photos\\a.jpg", 5, &[]));
+
+        let second = DeviceLocation {
+            id: "volume-a".to_string(),
+            mount_path: "F:\\".to_string(),
+        };
+        let rebased = stored.device_mut(&second);
+
+        assert_eq!(rebased.roots[0].path, "F:\\photos");
+        assert_eq!(rebased.entries[0].path, "F:\\photos\\a.jpg");
+        assert_eq!(rebased.entries[0].dir, "F:\\photos");
+        assert_eq!(rebased.entries[0].rating, 5);
     }
 }
