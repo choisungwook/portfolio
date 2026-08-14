@@ -5,7 +5,12 @@
 // normal user, so a write there fails or lands in a per-user shadow copy the
 // app cannot find again. See adr/2026-08-settings-in-appdata.md.
 
-use folderview_library::{Library, Settings};
+use crate::device;
+use folderview_library::{
+    self as library, Library, Settings, StoredLibrary, LIBRARY_SCHEMA_VERSION,
+};
+use serde::Deserialize;
+use std::io::Write;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -46,11 +51,76 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(app: &AppHandle, name: &s
         .unwrap_or_default()
 }
 
-pub fn load_library(app: &AppHandle) -> Library {
-    read_json(app, "library.json")
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LibraryFile {
+    Current(StoredLibrary),
+    Legacy(Library),
 }
 
-pub fn save_library(app: &AppHandle, library: &Library) -> Result<(), String> {
+pub fn load_library(app: &AppHandle) -> Result<StoredLibrary, String> {
+    let path = file_path(app, "library.json")?;
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(StoredLibrary::default());
+        }
+        Err(error) => return Err(format!("cannot read {path:?}: {error}")),
+    };
+    let parsed: LibraryFile =
+        serde_json::from_str(&text).map_err(|error| format!("cannot read {path:?}: {error}"))?;
+    let (mut stored, from_legacy) = match parsed {
+        LibraryFile::Current(stored) => (stored, false),
+        LibraryFile::Legacy(legacy) => {
+            backup_legacy(app, text.as_bytes())?;
+            (
+                StoredLibrary {
+                    legacy,
+                    ..StoredLibrary::default()
+                },
+                true,
+            )
+        }
+    };
+    if stored.schema_version != LIBRARY_SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported library schema version {}",
+            stored.schema_version
+        ));
+    }
+
+    let migrated = stored.migrate_legacy(
+        |path| device::locate(path).ok(),
+        |entry| entry_matches_disk(entry),
+    );
+    if from_legacy || migrated {
+        save_library(app, &stored)?;
+    }
+    Ok(stored)
+}
+
+fn backup_legacy(app: &AppHandle, bytes: &[u8]) -> Result<(), String> {
+    let path = file_path(app, "library.v1.json")?;
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path);
+    let mut file = match file {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(error) => return Err(format!("cannot back up {path:?}: {error}")),
+    };
+    file.write_all(bytes)
+        .map_err(|error| format!("cannot back up {path:?}: {error}"))
+}
+
+fn entry_matches_disk(entry: &library::Entry) -> bool {
+    library::make_entry(std::path::Path::new(&entry.path)).is_some_and(|current| {
+        current.size == entry.size && current.mtime == entry.mtime && current.kind == entry.kind
+    })
+}
+
+pub fn save_library(app: &AppHandle, library: &StoredLibrary) -> Result<(), String> {
     write_json(app, "library.json", library)
 }
 

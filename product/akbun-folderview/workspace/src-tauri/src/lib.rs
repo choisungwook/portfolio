@@ -1,4 +1,5 @@
 mod commands;
+mod device;
 
 mod store;
 
@@ -49,15 +50,17 @@ pub fn run() {
 
             // The asset protocol grant is in-memory, so last run's folders have
             // to be granted again or every thumbnail is a broken image.
-            let library = store::load_library(handle);
-            for root in &library.roots {
-                commands::allow_asset_dir(handle, &root.path);
-            }
-            // Files added one at a time sit under no root and need their own
-            // grant. Granting the file rather than its folder keeps the reach
-            // to what the user actually picked.
-            for entry in &library.entries {
-                commands::allow_asset_file(handle, &entry.path);
+            let library = store::load_library(handle).map_err(std::io::Error::other)?;
+            for (_, device) in commands::active_devices(&library) {
+                for root in &device.roots {
+                    commands::allow_asset_dir(handle, &root.path);
+                }
+                // Files added one at a time sit under no root and need their own
+                // grant. Granting the file rather than its folder keeps the reach
+                // to what the user actually picked.
+                for entry in &device.entries {
+                    commands::allow_asset_file(handle, &entry.path);
+                }
             }
             // The grid reads cached thumbnails instead of the originals, so
             // this local folder is the only thing a normal start touches.

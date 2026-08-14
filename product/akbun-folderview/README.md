@@ -11,6 +11,7 @@ The page is plain HTML and JavaScript with no build step. Scanning the disk, sav
 | Feature | How it works |
 |---|---|
 | Add to the library | Add Folder indexes every photo and video under a folder. Add Files takes single files. Nothing else is ever scanned |
+| Removable drives | Roots, files, tags, ratings and thumbnail keys are separated by the Windows Volume GUID. Reusing a USB port or drive letter never reuses another drive's library |
 | Folder tree | Built from the indexed files, so the tree and the search results can never disagree. Clicking a folder narrows the grid to it. Right clicking a root drops that folder from the library with no confirmation; the files stay on disk |
 | Catalog | Favorites, the five rating levels, and every tag with its count. Clicking one filters the grid |
 | Tags | A file carries as many tags as you want. Edit them in Properties |

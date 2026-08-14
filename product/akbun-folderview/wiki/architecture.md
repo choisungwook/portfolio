@@ -10,8 +10,9 @@ The Rust side is `workspace/src-tauri/src/`:
 
 - `lib.rs`: the builder. Registers the plugins, opens the devtools in a debug build, loads the settings and the library, re-applies the asset protocol grants, puts both into `AppState`, and lists every command in `generate_handler!`.
 - `commands.rs`: every command the page can invoke, plus `AppState`, the `Snapshot` returned to the page, and the two grant helpers `allow_asset_dir` and `allow_asset_file`.
-- `crates/library/`: the model, its own crate with no tauri dependency. `Entry`, `Root`, `Library`, `Settings`, and the functions `file_kind`, `make_entry`, `scan_folder`, `merge_scan`, `is_under`. No Tauri types, so the Rust suite, `npm run test:rust`, needs no webview.
-- `store.rs`: `library.json` and `settings.json` under the app config directory.
+- `crates/library/`: the model, its own crate with no tauri dependency. It owns entries, roots, device libraries, schema migration and scan merging. No Tauri types, so the Rust suite, `npm run test:rust`, needs no webview.
+- `device.rs`: resolves a path to its stable Windows Volume GUID and current mount path.
+- `store.rs`: versioned `library.json`, its version 1 backup and `settings.json` under the app config directory.
 
 The page is `workspace/src/`:
 
@@ -30,12 +31,16 @@ The model crate serialises an entry in camelCase, and those field names are what
 The object the page receives for one photo or video:
 
 ```js
-{ path, name, dir, kind, size, mtime, rating, favorite, tags }
+{ deviceId, path, name, dir, kind, size, mtime, rating, favorite, tags }
 ```
 
 `kind` is `"photo"` or `"video"`, never null: `file_kind` decides by extension alone and `make_entry` returns `None` for anything else, so a file that is neither is not indexed at all. `mtime` is milliseconds since the epoch, so the page can hand it to `Date` directly. `size` is bytes. `rating` is 0 to 5, clamped in `update_entry`.
 
-A `Library` is `{ roots, entries }`, and `Settings` is `{ theme, openOnSingleClick, cardSize }` with `serde(default)` on the struct so a hand-edited or older `settings.json` still loads field by field instead of failing the whole parse.
+The stored library is `{ schemaVersion, devices, legacy }`. `devices` maps each Volume GUID to its own `{ mountPath, roots, entries }`; `legacy` retains version 1 data that cannot be assigned while its device is disconnected. The snapshot sent to the page contains only devices whose current UUID still matches the stored UUID.
+
+Roots also carry `deviceId`. Commands validate both the path and device ID before touching a file, and thumbnail hashes include both values.
+
+`Settings` remains global and uses `serde(default)` so a hand-edited or older `settings.json` still loads field by field instead of failing the whole parse.
 
 `add_folder` walks the folder with `scan_folder` and appends the files that are not already known. `rescan` walks every root again, hands the result to `merge_scan`, which carries the rating, favorite flag and tags over by path, and then re-adds the loose files by existence check, because files added one at a time sit under no root. `is_under` requires a separator after the root, so `C:\photos-backup` is not under `C:\photos`.
 
@@ -92,6 +97,8 @@ The list is short because of the split above. On top of `core:default` the page 
 
 `store.rs` keeps `library.json` and `settings.json` under the app config directory, which on Windows is `%APPDATA%\io.akbun.folderview`. Not Program Files: that tree is read only for a normal user, so a write there either fails or lands in a per-user shadow copy the app never finds again. See [Settings and library in the user data folder](../adr/2026-08-settings-in-appdata.md).
 
+The first version 2 start reads the old `{ roots, entries }` file, writes its exact bytes once to `library.v1.json`, and groups reachable data by Volume GUID. A populated root is assigned only when at least one stored entry still matches its size, modification time and kind on disk. Unreachable or mismatched data stays in `legacy` and is retried on later starts, so an update cannot silently discard data from an unplugged drive.
+
 `write_json` writes to a temp file and renames it over the target:
 
 ```rust
@@ -102,7 +109,7 @@ std::fs::rename(&temp, &target)?;
 
 The rename is what matters. A crash halfway through a direct write leaves a truncated `library.json`, which fails to parse on the next start, which falls back to an empty library, and every tag and rating the user ever set is gone. The rename is atomic, so the old file survives until the new one is complete.
 
-`read_json` treats a missing or broken file as first run and returns defaults either way.
+`read_json` applies that fallback only to settings. A missing library is first run, but a broken or unsupported library stops startup instead of exposing an empty state that a later save could overwrite.
 
 ## The asset protocol
 

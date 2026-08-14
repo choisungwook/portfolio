@@ -118,14 +118,14 @@ function isUnder(filePath, rootPath) {
   return filePath.startsWith(rootPath) && SEPARATOR.test(filePath.slice(rootPath.length, rootPath.length + 1));
 }
 
-function makeNode(name, nodePath) {
-  return { name, path: nodePath, folders: [], files: [] };
+function makeNode(name, nodePath, deviceId) {
+  return { name, path: nodePath, deviceId, folders: [], files: [] };
 }
 
 function childFolder(node, name, separator) {
   const found = node.folders.find((folder) => folder.name === name);
   if (found) return found;
-  const created = makeNode(name, node.path + separator + name);
+  const created = makeNode(name, node.path + separator + name, node.deviceId);
   node.folders.push(created);
   return created;
 }
@@ -141,7 +141,7 @@ function sortNode(node) {
 function buildTree(roots, entries) {
   return roots.map((root) => {
     const separator = root.path.includes('\\') ? '\\' : '/';
-    const node = makeNode(baseName(root.path) || root.path, root.path);
+    const node = makeNode(baseName(root.path) || root.path, root.path, root.deviceId);
 
     for (const entry of entries) {
       if (!isUnder(entry.path, root.path)) continue;
@@ -167,11 +167,11 @@ function findTreeNode(nodes, path) {
   return null;
 }
 
-// The thumbnail file name for an entry. Path, mtime and size together, so an
+// The thumbnail file name for an entry. Device, path, mtime and size together, so an
 // edited or replaced file gets a fresh thumbnail and the stale one is simply
 // never asked for again. FNV-1a, 64 bits so a large library will not collide.
-function thumbName(filePath, mtime, size) {
-  const text = `${filePath}|${mtime}|${size}`;
+function thumbName(deviceId, filePath, mtime, size) {
+  const text = `${deviceId}|${filePath}|${mtime}|${size}`;
   let hash = 0xcbf29ce484222325n;
   for (let i = 0; i < text.length; i += 1) {
     hash ^= BigInt(text.charCodeAt(i));

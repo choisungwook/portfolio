@@ -27,6 +27,7 @@ const {
 function entry(path, extra = {}) {
   const name = path.split(/[\\/]/).pop();
   return {
+    deviceId: 'volume-a',
     path,
     name,
     dir: path.slice(0, path.length - name.length - 1),
@@ -112,10 +113,12 @@ test('rating:12 and type:audio are ignored rather than matching nothing', () => 
 });
 
 test('the tree keeps folders and files apart and sorts both', () => {
-  const [root] = buildTree([{ path: 'C:\\photos' }], LIBRARY);
+  const [root] = buildTree([{ path: 'C:\\photos', deviceId: 'volume-a' }], LIBRARY);
 
   assert.strictEqual(root.name, 'photos');
+  assert.strictEqual(root.deviceId, 'volume-a');
   assert.deepStrictEqual(root.folders.map((folder) => folder.name), ['clips', 'trip']);
+  assert.strictEqual(root.folders[0].deviceId, 'volume-a');
   assert.deepStrictEqual(root.files.map((file) => file.name), ['notes.jpg']);
   assert.deepStrictEqual(
     root.folders[1].files.map((file) => file.name),
@@ -124,7 +127,7 @@ test('the tree keeps folders and files apart and sorts both', () => {
 });
 
 test('a sibling folder with a shared prefix does not leak into the tree', () => {
-  const [root] = buildTree([{ path: 'C:\\photos' }], [
+  const [root] = buildTree([{ path: 'C:\\photos', deviceId: 'volume-a' }], [
     ...LIBRARY,
     entry('C:\\photos-backup\\other.jpg'),
   ]);
@@ -133,7 +136,7 @@ test('a sibling folder with a shared prefix does not leak into the tree', () => 
 });
 
 test('findTreeNode returns a nested folder without flattening the tree', () => {
-  const tree = buildTree([{ path: 'C:\\photos' }], LIBRARY);
+  const tree = buildTree([{ path: 'C:\\photos', deviceId: 'volume-a' }], LIBRARY);
 
   assert.strictEqual(findTreeNode(tree, 'C:\\photos\\trip').name, 'trip');
   assert.strictEqual(findTreeNode(tree, 'C:\\photos\\missing'), null);
@@ -150,11 +153,12 @@ test('tag counts are ordered by use', () => {
 // The name is the cache key: stable for the same file, different the moment
 // the file changes, safe to hand to the file system.
 test('thumbName is stable and changes with the file', () => {
-  const name = thumbName('C:\\photos\\여행\\a.jpg', 100, 5);
-  assert.strictEqual(name, thumbName('C:\\photos\\여행\\a.jpg', 100, 5));
+  const name = thumbName('volume-a', 'C:\\photos\\여행\\a.jpg', 100, 5);
+  assert.strictEqual(name, thumbName('volume-a', 'C:\\photos\\여행\\a.jpg', 100, 5));
   assert.match(name, /^[0-9a-f]{16}\.jpg$/);
-  assert.notStrictEqual(name, thumbName('C:\\photos\\여행\\a.jpg', 101, 5));
-  assert.notStrictEqual(name, thumbName('C:\\photos\\여행\\b.jpg', 100, 5));
+  assert.notStrictEqual(name, thumbName('volume-a', 'C:\\photos\\여행\\a.jpg', 101, 5));
+  assert.notStrictEqual(name, thumbName('volume-a', 'C:\\photos\\여행\\b.jpg', 100, 5));
+  assert.notStrictEqual(name, thumbName('volume-b', 'C:\\photos\\여행\\a.jpg', 100, 5));
 });
 
 test('formatSize picks the unit', () => {

@@ -34,7 +34,7 @@ The page suite covers `src/library.js`: query token parsing, the folder tree, ta
 npm test
 ```
 
-The Rust suite covers `src-tauri/crates/library/`: which extensions count as a photo or a video, the rescan merge that carries a user's rating and tags across a scan, the prefix check that keeps `C:\photos-backup` out of `C:\photos`, and the per-field settings fallback when `settings.json` is partial.
+The Rust suite covers `src-tauri/crates/library/`: file kinds, rescan metadata merging, root containment, per-field settings fallback, version 1 migration, disconnected-device retention and mount-path rebasing.
 
 ```bash
 npm run test:rust

@@ -11,6 +11,7 @@ const lib = globalThis.folderviewLib;
 const $ = (id) => document.getElementById(id);
 
 let state = {
+  deviceIds: [],
   roots: [],
   entries: [],
   settings: {},
@@ -109,7 +110,7 @@ function syncLastOpened() {
 }
 
 async function openEntry(entry) {
-  await window.api.openEntry(entry.path);
+  await window.api.openEntry(entry.path, entry.deviceId);
   state.lastOpenedPath = entry.path;
   syncLastOpened();
 }
@@ -244,7 +245,7 @@ function folderNode(node, isRoot) {
   if (isRoot) {
     row.addEventListener('contextmenu', async (event) => {
       event.preventDefault();
-      await window.api.removeRoot(node.path);
+      await window.api.removeRoot(node.path, node.deviceId);
     });
     row.title = `${node.path}\nRight click to remove this folder from the library`;
   }
@@ -318,10 +319,16 @@ const thumbFailed = new Set();
 const thumbBuilt = new Set();
 const thumbWaiting = new Map();
 let thumbActive = 0;
+let thumbGeneration = 0;
+
+function entryKey(entry) {
+  return `${entry.deviceId}|${entry.path}`;
+}
 
 function thumbUrl(entry) {
-  const url = fileUrl(`${state.thumbsDir}/${lib.thumbName(entry.path, entry.mtime, entry.size)}`);
-  return thumbBuilt.has(entry.path) ? `${url}?fresh` : url;
+  const name = lib.thumbName(entry.deviceId, entry.path, entry.mtime, entry.size);
+  const url = fileUrl(`${state.thumbsDir}/${name}`);
+  return thumbBuilt.has(entryKey(entry)) ? `${url}?fresh` : url;
 }
 
 function markMissing(img) {
@@ -391,17 +398,20 @@ function loadVideoFrame(path) {
   });
 }
 
-async function makeThumb(entry) {
+async function makeThumb(entry, generation) {
   const blob =
     entry.kind === 'video' ? await loadVideoFrame(entry.path) : await loadPhoto(entry.path);
+  if (generation !== thumbGeneration) throw new Error('device changed');
   const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
-  await window.api.saveThumb(lib.thumbName(entry.path, entry.mtime, entry.size), bytes);
+  const name = lib.thumbName(entry.deviceId, entry.path, entry.mtime, entry.size);
+  await window.api.saveThumb(name, bytes, entry.path, entry.deviceId);
   return blob;
 }
 
-function showThumb(path, blob) {
-  thumbBuilt.add(path);
-  const img = thumbWaiting.get(path);
+function showThumb(entry, blob) {
+  const key = entryKey(entry);
+  thumbBuilt.add(key);
+  const img = thumbWaiting.get(key);
   if (!img || !img.isConnected) return;
   // The blob that was just drawn is shown directly; the saved file serves the
   // next run. Re-pointing at the cache here could hit the 404 the browser
@@ -414,17 +424,19 @@ function showThumb(path, blob) {
 function pumpThumbs() {
   while (thumbActive < THUMB_JOBS && thumbQueue.length > 0) {
     const entry = thumbQueue.shift();
+    const key = entryKey(entry);
+    const generation = thumbGeneration;
     thumbActive += 1;
-    withTimeout(makeThumb(entry), 30)
-      .then((blob) => showThumb(entry.path, blob))
+    withTimeout(makeThumb(entry, generation), 30)
+      .then((blob) => showThumb(entry, blob))
       .catch(() => {
-        thumbFailed.add(entry.path);
-        const img = thumbWaiting.get(entry.path);
+        thumbFailed.add(key);
+        const img = thumbWaiting.get(key);
         if (img && img.isConnected) markMissing(img);
       })
       .finally(() => {
-        thumbQueued.delete(entry.path);
-        thumbWaiting.delete(entry.path);
+        thumbQueued.delete(key);
+        thumbWaiting.delete(key);
         thumbActive -= 1;
         pumpThumbs();
       });
@@ -432,13 +444,14 @@ function pumpThumbs() {
 }
 
 function requestThumb(entry, img) {
-  if (thumbFailed.has(entry.path)) return markMissing(img);
-  if (!thumbQueued.has(entry.path)) {
-    thumbQueued.add(entry.path);
+  const key = entryKey(entry);
+  if (thumbFailed.has(key)) return markMissing(img);
+  if (!thumbQueued.has(key)) {
+    thumbQueued.add(key);
     thumbQueue.push(entry);
   }
   // The latest rendered card wins; an older one is disconnected by now.
-  thumbWaiting.set(entry.path, img);
+  thumbWaiting.set(key, img);
   pumpThumbs();
 }
 
@@ -629,15 +642,15 @@ async function patch(entry, changes) {
   Object.assign(entry, changes);
   // Tag and rating counts in the catalog just changed.
   derived = null;
-  await window.api.updateEntry(entry.path, changes);
+  await window.api.updateEntry(entry.path, entry.deviceId, changes);
   render();
 }
 
 async function runAction(action, entry) {
   if (action === 'open') return openEntry(entry);
-  if (action === 'reveal') return window.api.revealEntry(entry.path);
+  if (action === 'reveal') return window.api.revealEntry(entry.path, entry.deviceId);
   if (action === 'copyPath') return window.api.copyPath(entry.path);
-  if (action === 'delete') return window.api.deleteEntry(entry.path);
+  if (action === 'delete') return window.api.deleteEntry(entry.path, entry.deviceId);
   // Rename shares the Properties dialog, so there is one place that edits a
   // file's name, tags and rating. A brand-new tag lands there too, because it
   // needs typing and a native menu cannot take text.
@@ -701,7 +714,7 @@ async function saveProperties() {
 
   const newName = $('prop-name').value.trim();
   if (newName && newName !== entry.name) {
-    const result = await window.api.renameEntry(entry.path, newName);
+    const result = await window.api.renameEntry(entry.path, entry.deviceId, newName);
     if (!result.ok && result.error) $('status').textContent = `Rename failed: ${result.error}`;
   }
   $('properties').hidden = true;
@@ -864,13 +877,32 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+function deviceSignature(deviceIds) {
+  return [...deviceIds].sort().join('|');
+}
+
+function applyLibrarySnapshot(snapshot) {
+  const deviceChanged = deviceSignature(state.deviceIds) !== deviceSignature(snapshot.deviceIds);
+  state.deviceIds = snapshot.deviceIds;
+  state.roots = snapshot.roots;
+  state.entries = snapshot.entries;
+  if (deviceChanged) {
+    state.folder = null;
+    state.lastOpenedPath = null;
+    thumbGeneration += 1;
+    thumbQueue.length = 0;
+    thumbQueued.clear();
+    thumbWaiting.clear();
+    thumbFailed.clear();
+  }
+  derived = null;
+  render();
+}
+
 // Every mutating command answers with the whole library, and api.js routes it
 // here. The page therefore never merges a partial update into its own copy.
 window.api.onLibraryChanged((snapshot) => {
-  state.roots = snapshot.roots;
-  state.entries = snapshot.entries;
-  derived = null;
-  render();
+  applyLibrarySnapshot(snapshot);
 });
 
 window.api.getLibrary().then((snapshot) => {
@@ -878,3 +910,13 @@ window.api.getLibrary().then((snapshot) => {
   applySettings();
   render();
 });
+
+// A removable drive can be swapped while the app stays open and keep the same
+// drive letter. Polling the cheap UUID snapshot prevents paths from the old
+// drive being used against the new one.
+setInterval(async () => {
+  const snapshot = await window.api.getLibrary();
+  if (deviceSignature(snapshot.deviceIds) !== deviceSignature(state.deviceIds)) {
+    applyLibrarySnapshot(snapshot);
+  }
+}, 2000);

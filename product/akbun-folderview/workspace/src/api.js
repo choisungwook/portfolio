@@ -90,17 +90,19 @@ window.api = {
   },
 
   rescan: async () => changed(await invoke('rescan')),
-  removeRoot: async (path) => changed(await invoke('remove_root', { path })),
-  updateEntry: async (path, patch) => changed(await invoke('update_entry', { path, patch })),
+  removeRoot: async (path, deviceId) =>
+    changed(await invoke('remove_root', { path, deviceId })),
+  updateEntry: async (path, deviceId, patch) =>
+    changed(await invoke('update_entry', { path, deviceId, patch })),
 
-  openEntry: (path) => invoke('open_entry', { path }),
-  revealEntry: (path) => invoke('reveal_entry', { path }),
+  openEntry: (path, deviceId) => invoke('open_entry', { path, deviceId }),
+  revealEntry: (path, deviceId) => invoke('reveal_entry', { path, deviceId }),
   copyPath: (path) => invoke('copy_path', { path }),
   openDataDir: () => invoke('open_data_dir'),
 
-  renameEntry: async (path, newName) => {
+  renameEntry: async (path, deviceId, newName) => {
     try {
-      changed(await invoke('rename_entry', { path, newName }));
+      changed(await invoke('rename_entry', { path, deviceId, newName }));
       return { ok: true };
     } catch (error) {
       return { ok: false, error: String(error) };
@@ -109,14 +111,14 @@ window.api = {
 
   // Confirm before a delete, because the alternative is a mis-click that the
   // user only notices later. The file goes to the Recycle Bin either way.
-  deleteEntry: async (path) => {
+  deleteEntry: async (path, deviceId) => {
     const confirmed = await ask(`Move this file to the Recycle Bin?\n\n${path}`, {
       title: 'Delete',
       kind: 'warning',
     });
     if (!confirmed) return { ok: false };
     try {
-      changed(await invoke('delete_entry', { path }));
+      changed(await invoke('delete_entry', { path, deviceId }));
       return { ok: true };
     } catch (error) {
       await message(String(error), { title: 'Delete failed', kind: 'error' });
@@ -163,7 +165,8 @@ window.api = {
   },
 
   // The page draws the thumbnail on a canvas and hands the JPEG bytes over.
-  saveThumb: (name, bytes) => invoke('save_thumb', { name, bytes }),
+  saveThumb: (name, bytes, path, deviceId) =>
+    invoke('save_thumb', { name, bytes, path, deviceId }),
 
   // Distinct from Rescan on purpose: Rescan walks the disk for file changes,
   // this throws away the cached thumbnails so they are rebuilt from originals.
