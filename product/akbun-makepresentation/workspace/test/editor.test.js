@@ -10,6 +10,13 @@ test('createDeck starts with one empty slide', () => {
   assert.deepStrictEqual(deck.slides[0].shapes, []);
 });
 
+test('new shapes use a red stroke and text keeps a dark text color', () => {
+  const rect = L.createShape('rect', 0, 0, {});
+  const text = L.createShape('text', 0, 0, {});
+  assert.strictEqual(rect.stroke, '#e03131');
+  assert.strictEqual(text.textColor, '#1a1a1a');
+});
+
 test('parseClipboardShapes normalizes valid shapes with safe defaults', () => {
   const rect = L.createShape('rect', 10, 20, { fill: '#abcdef' });
   rect.w = 100;
@@ -143,6 +150,28 @@ test('toggleSelection adds and removes one valid object without disturbing other
   assert.deepStrictEqual(L.toggleSelection([0, 2], 3, 3), [0, 2]);
   assert.deepStrictEqual(L.toggleSelection([0, 0, 2, -1, 3, 1.5], 1, 3), [0, 2, 1]);
   assert.deepStrictEqual(L.toggleSelection([0, 0, 2, -1, 3, 1.5], 3, 3), [0, 2]);
+});
+
+test('grouped objects select, ungroup, and clone independently', () => {
+  const shapes = [L.createShape('rect', 0, 0, {}), L.createShape('ellipse', 20, 20, {})];
+  const group = L.groupShapes(shapes, [0, 1]);
+  assert.ok(group);
+  assert.deepStrictEqual(L.groupIndicesFor(shapes, 1), [0, 1]);
+
+  const copies = L.cloneShapes(shapes);
+  assert.notStrictEqual(copies[0].groupId, group);
+  assert.strictEqual(copies[0].groupId, copies[1].groupId);
+
+  assert.strictEqual(L.ungroupShapes(shapes, [0]), true);
+  assert.strictEqual(shapes[0].groupId, '');
+  assert.strictEqual(shapes[1].groupId, '');
+});
+
+test('setCrop keeps opposing crop values inside the image', () => {
+  const image = L.createShape('image', 0, 0, {});
+  image.cropRight = 0.4;
+  L.setCrop(image, 'left', 0.9);
+  assert.strictEqual(image.cropLeft, 0.55);
 });
 
 test('moveShape shifts pen points', () => {
@@ -353,6 +382,18 @@ test('renderShapeSvg embeds and crops imported images', () => {
   assert.ok(svg.includes('<image'));
   assert.ok(svg.includes('href="data:image/png;base64,abc"'));
   assert.ok(svg.includes('viewBox="0.1 0 0.9 1"'));
+});
+
+test('renderShapeSvg draws an image border and a freehand end arrow', () => {
+  const image = L.createShape('image', 10, 20, { stroke: '#1971c2', strokeWidth: 3 });
+  image.w = 300;
+  image.h = 200;
+  assert.ok(L.renderShapeSvg(image).includes('stroke="#1971c2"'));
+
+  const pen = L.createShape('pen', 0, 0, {});
+  L.dragShape(pen, 0, 0, 100, 20);
+  pen.penArrow = true;
+  assert.ok(L.renderShapeSvg(pen).includes('<polygon'));
 });
 
 test('wrapTextLines wraps at word boundaries', () => {

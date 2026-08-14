@@ -301,9 +301,22 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
     let mut rels = String::from(SLIDE_REL_LAYOUT);
     // rId1 is the layout; image relationships follow it.
     let mut next_rid = 2u64;
-    for (i, shape) in slide.shapes.iter().enumerate() {
+    let mut next_id = 2u64;
+    let mut open_group = String::new();
+    for shape in &slide.shapes {
+        if shape.group_id != open_group {
+            if !open_group.is_empty() {
+                shapes.push_str("</p:grpSp>");
+            }
+            if !shape.group_id.is_empty() {
+                shapes.push_str(&group_xml(next_id, &shape.group_id));
+                next_id += 1;
+            }
+            open_group = shape.group_id.clone();
+        }
         // id 1 (tree) is taken; shape ids start at 2.
-        let id = i as u64 + 2;
+        let id = next_id;
+        next_id += 1;
         if shape.kind == "image" {
             // An image whose data URL cannot be decoded is dropped rather
             // than written as a broken relationship.
@@ -318,6 +331,9 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
             shapes.push_str(&shape_xml(shape, id));
         }
     }
+    if !open_group.is_empty() {
+        shapes.push_str("</p:grpSp>");
+    }
     let xml = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
 <p:sld{NS}><p:cSld>{}<p:spTree>{EMPTY_TREE_HEADER}{shapes}</p:spTree></p:cSld>\
@@ -329,6 +345,18 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
 <Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">{rels}</Relationships>"
     );
     (xml, rels)
+}
+
+fn group_xml(id: u64, name: &str) -> String {
+    format!(
+        "<p:grpSp><p:nvGrpSpPr><p:cNvPr id=\"{id}\" name=\"{}\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>\
+<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{}\" cy=\"{}\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"{}\" cy=\"{}\"/></a:xfrm></p:grpSpPr>",
+        xml_escape(name),
+        emu(SLIDE_W),
+        emu(SLIDE_H),
+        emu(SLIDE_W),
+        emu(SLIDE_H),
+    )
 }
 
 /// The slide's `p:bg` element, empty for white. The master this writer emits
@@ -372,16 +400,20 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
     format!(
         "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"Picture {id}\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
 <p:blipFill><a:blip r:embed=\"rId{rid}\"/>{crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>\
-<p:spPr><a:xfrm{rotation}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr></p:pic>",
+<p:spPr><a:xfrm{rotation}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>{}</p:spPr></p:pic>",
         emu(shape.x),
         emu(shape.y),
         emu(shape.w).max(1),
         emu(shape.h).max(1),
+        line_xml(shape, false),
     )
 }
 
 fn line_xml(shape: &Shape, arrow: bool) -> String {
     let w = emu(shape.stroke_width).max(1);
+    if shape.stroke == "none" {
+        return format!("<a:ln w=\"{w}\"><a:noFill/></a:ln>");
+    }
     let dash = match shape.dash.as_str() {
         "dash" => "<a:prstDash val=\"dash\"/>",
         "dot" => "<a:prstDash val=\"sysDot\"/>",
@@ -493,7 +525,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
 <a:pathLst><a:path w=\"{path_w}\" h=\"{path_h}\">{path}</a:path></a:pathLst></a:custGeom>\
 <a:noFill/>{}</p:spPr></p:sp>",
                 xfrm(bx, by, bw, bh, false, false),
-                line_xml(shape, false)
+                line_xml(shape, shape.pen_arrow)
             )
         }
         "text" => {
@@ -1077,6 +1109,7 @@ struct Pending {
 
 #[derive(Clone, Default)]
 struct GroupTransform {
+    id: String,
     x: i64,
     y: i64,
     cx: i64,
@@ -1111,6 +1144,7 @@ fn parse_part(
     let mut stack: Vec<String> = Vec::new();
     let mut pending: Option<Pending> = None;
     let mut groups: Vec<GroupTransform> = Vec::new();
+    let mut group_sequence = 0u64;
 
     loop {
         let event = reader.read_event().map_err(|e| e.to_string())?;
@@ -1120,7 +1154,11 @@ fn parse_part(
                 let empty = matches!(event, Event::Empty(_));
 
                 if local == "grpSp" && !empty {
-                    groups.push(GroupTransform::default());
+                    group_sequence += 1;
+                    groups.push(GroupTransform {
+                        id: format!("group-{group_sequence}"),
+                        ..GroupTransform::default()
+                    });
                 } else if (local == "sp" || local == "cxnSp" || local == "pic") && !empty
                 {
                     pending = Some(Pending {
@@ -1130,6 +1168,12 @@ fn parse_part(
                     });
                 } else if let Some(p) = pending.as_mut() {
                     handle_element(p, &local, e, &stack, ctx);
+                } else if local == "cNvPr" && in_ctx(&stack, "grpSp") {
+                    if let Some(name) = attr(e, b"name") {
+                        if let Some(group) = groups.last_mut() {
+                            group.id = name;
+                        }
+                    }
                 } else if in_ctx(&stack, "grpSpPr") {
                     handle_group_element(groups.last_mut(), &local, e, &stack);
                 }
@@ -1180,6 +1224,9 @@ fn parse_part(
                         let default = placeholder_default(&p, ctx.defaults);
                         if let Some(mut shape) = finish(p, ctx, default) {
                             apply_group_transforms(&mut shape, &groups);
+                            if let Some(group) = groups.last() {
+                                shape.group_id = group.id.clone();
+                            }
                             if placeholders_are_visible || keys.is_empty() {
                                 if keys.is_empty()
                                     || shape.kind == "image"
@@ -1613,6 +1660,7 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
 
     if !p.is_pic && p.has_custgeom {
         shape.kind = "pen".into();
+        shape.pen_arrow = p.arrow;
         shape.points = p
             .path_pts
             .iter()
@@ -1750,6 +1798,7 @@ mod tests {
                             stroke: "#e03131".into(),
                             stroke_width: 3.0,
                             dash: "dash".into(),
+                            group_id: "diagram".into(),
                             ..Shape::default()
                         },
                         Shape {
@@ -1758,6 +1807,7 @@ mod tests {
                             y: 200.0,
                             w: 180.0,
                             h: 180.0,
+                            group_id: "diagram".into(),
                             ..Shape::default()
                         },
                         Shape {
@@ -1810,6 +1860,7 @@ mod tests {
                         stroke: "#862e9c".into(),
                         stroke_width: 4.0,
                         dash: "dot".into(),
+                        pen_arrow: true,
                         ..Shape::default()
                     }],
                     ..Slide::default()
@@ -1837,8 +1888,10 @@ mod tests {
                 assert_eq!(a.dash, b.dash);
                 assert_eq!(a.fill, b.fill);
                 assert_eq!(a.text, b.text);
+                assert_eq!(a.group_id, b.group_id);
                 assert!(close(a.stroke_width, b.stroke_width));
                 if a.kind == "pen" {
+                    assert_eq!(a.pen_arrow, b.pen_arrow);
                     assert_eq!(a.points.len(), b.points.len());
                     for (pa, pb) in a.points.iter().zip(&b.points) {
                         assert!(close(pa[0], pb[0]) && close(pa[1], pb[1]));

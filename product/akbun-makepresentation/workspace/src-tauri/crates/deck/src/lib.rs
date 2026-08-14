@@ -43,7 +43,7 @@ pub fn default_background() -> String {
     "#ffffff".into()
 }
 
-/// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text.
+/// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text | image.
 ///
 /// rect/ellipse/text use x,y,w,h. line/arrow run from (x,y) to (x+w,y+h), so
 /// w and h may be negative. pen keeps absolute points and ignores x,y,w,h.
@@ -75,7 +75,7 @@ pub struct Shape {
     pub text: String,
     #[serde(default = "default_font_size")]
     pub font_size: f64,
-    #[serde(default = "default_stroke")]
+    #[serde(default = "default_text_color")]
     pub text_color: String,
     /// One family name, not a CSS stack, so it maps straight onto the pptx
     /// `a:latin` typeface.
@@ -104,10 +104,14 @@ pub struct Shape {
     pub crop_bottom: f64,
     #[serde(default)]
     pub rotation: f64,
+    #[serde(default)]
+    pub pen_arrow: bool,
+    #[serde(default)]
+    pub group_id: String,
 }
 
 fn default_stroke() -> String {
-    "#1a1a1a".into()
+    "#e03131".into()
 }
 fn default_stroke_width() -> f64 {
     2.0
@@ -120,6 +124,9 @@ fn default_none() -> String {
 }
 fn default_font_size() -> f64 {
     24.0
+}
+fn default_text_color() -> String {
+    "#1a1a1a".into()
 }
 fn default_font_family() -> String {
     "Helvetica".into()
@@ -148,7 +155,7 @@ impl Default for Shape {
             fill: default_none(),
             text: String::new(),
             font_size: default_font_size(),
-            text_color: default_stroke(),
+            text_color: default_text_color(),
             font_family: default_font_family(),
             src: String::new(),
             bold: false,
@@ -161,6 +168,8 @@ impl Default for Shape {
             crop_right: 0.0,
             crop_bottom: 0.0,
             rotation: 0.0,
+            pen_arrow: false,
+            group_id: String::new(),
         }
     }
 }
