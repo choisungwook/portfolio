@@ -221,6 +221,18 @@ export async function getNodes(): Promise<NodeInfo[]> {
   return items.map(toNodeInfo);
 }
 
+/** 현재 context가 가리키는 cluster 이름. context 이름과 달라질 수 있어 cluster를 직접 읽는다. */
+export async function getCurrentCluster(): Promise<string> {
+  const stdout = await runKubectl([
+    "config",
+    "view",
+    "--minify",
+    "--output",
+    "jsonpath={.contexts[0].context.cluster}",
+  ]);
+  return stdout.trim();
+}
+
 /**
  * 노드의 schedule 가능 여부를 바꾼다. cordon과 uncordon은 반대 동작이라
  * 하나의 함수로 두고 boolean으로 가른다. 화면의 버튼도 같은 이유로 하나다.

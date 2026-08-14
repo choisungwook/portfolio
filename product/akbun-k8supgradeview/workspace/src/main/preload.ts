@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("api", {
+  getCurrentCluster: () => ipcRenderer.invoke("kubectl:current-cluster"),
   getNodes: () => ipcRenderer.invoke("kubectl:nodes"),
   getPods: (nodeName?: string) => ipcRenderer.invoke("kubectl:pods", nodeName),
   describePod: (namespace: string, name: string) =>
