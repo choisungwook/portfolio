@@ -130,18 +130,26 @@ test('normalizeRect accepts a drag in any direction', () => {
   });
 });
 
-test('shapeIndicesInRect selects only fully enclosed shapes', () => {
-  const inside = L.createShape('rect', 20, 20, {});
-  L.dragShape(inside, 20, 20, 80, 80);
-  const crossing = L.createShape('ellipse', 90, 90, {});
-  L.dragShape(crossing, 90, 90, 130, 130);
-  const line = L.createShape('line', 30, 100, {});
-  L.dragShape(line, 30, 100, 70, 40);
+test('shapeIndicesInRect selects every shape the area touches', () => {
+  const box = L.createShape('rect', 20, 20, {});
+  L.dragShape(box, 20, 20, 120, 120);
+  const label = L.createShape('text', 40, 60, {});
+  L.dragShape(label, 40, 60, 100, 80);
+  const far = L.createShape('ellipse', 300, 300, {});
+  L.dragShape(far, 300, 300, 340, 340);
+  const shapes = [box, label, far];
 
+  // The reported bug. Shapes default to no fill, so a drag begun in the empty
+  // middle of the box starts a marquee, and that marquee can never enclose
+  // the box it started inside. Under the old containment rule it came back
+  // holding the label alone.
   assert.deepStrictEqual(
-    L.shapeIndicesInRect([inside, crossing, line], { x: 10, y: 10, w: 100, h: 100 }),
-    [0, 2]
+    L.shapeIndicesInRect(shapes, { x: 30, y: 50, w: 200, h: 200 }),
+    [0, 1]
   );
+
+  // Touching is the whole rule. An area that reaches nothing stays empty.
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, { x: 200, y: 200, w: 10, h: 10 }), []);
 });
 
 test('toggleSelection adds and removes one valid object without disturbing others', () => {

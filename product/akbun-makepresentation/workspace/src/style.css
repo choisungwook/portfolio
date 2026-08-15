@@ -253,6 +253,42 @@ main {
   cursor: text;
 }
 
+/* Caps and joins are part of a stroke's shape, so both twins declare them
+   here. Split between the two rules, the clickable area and the glow would
+   stop being the same geometry at every line end and corner. */
+.hit,
+.halo {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hit {
+  stroke: transparent;
+}
+
+.hit.fill {
+  fill: transparent;
+  stroke: none;
+}
+
+/* Wide, soft and behind the shape, so a black hairline sits on a coloured
+   cushion instead of relying on a dashed box that can be far from the line
+   it belongs to. Translucent to leave the shape's own colour readable, and
+   deaf to the pointer so it never steals a click or a drag. */
+.halo {
+  stroke: var(--accent);
+  stroke-opacity: 0.35;
+  pointer-events: none;
+}
+
+.halo.fill {
+  fill: var(--accent);
+  fill-opacity: 0.18;
+  stroke: none;
+  pointer-events: none;
+}
+
 .sel-box {
   fill: none;
   stroke: var(--accent);
