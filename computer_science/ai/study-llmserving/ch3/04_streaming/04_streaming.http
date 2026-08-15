@@ -1,0 +1,18 @@
+@baseUrl = http://localhost:8000
+
+### Health check
+GET {{baseUrl}}/healthz
+Accept: application/json
+
+### Stream generated tokens
+POST {{baseUrl}}/generate_stream
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "prompt": "Hello, I am"
+}
+
+### Active batch state
+GET {{baseUrl}}/batch_state
+Accept: application/json

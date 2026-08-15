@@ -44,10 +44,6 @@ python -c "import torch, transformers, fastapi; print('deps ok')"
 
 `VIRTUAL_ENV does not match the project environment path .venv` 경고는 다른 가상환경이 활성화된 상태라는 의미다. `--active`를 사용하지 않고 기존 환경을 해제한 뒤 프로젝트 `.venv`를 활성화한다.
 
-## VS Code Notebook 환경
-
-[VS Code Notebook 설정](./vscode_notebook.md)을 따른다.
-
 ## kind 클러스터
 
 클러스터를 생성한다.

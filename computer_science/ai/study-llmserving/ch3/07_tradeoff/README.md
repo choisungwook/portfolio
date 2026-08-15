@@ -122,7 +122,7 @@ uv run python 07_tradeoff/bench_designs.py --cost-url "" --latency-url http://lo
 
 ## 관찰 포인트
 
-노트북에서는 [07_tradeoff.ipynb](./07_tradeoff.ipynb)의 dynamic routing map과 static routing 코드를 직접 실행한다.
+HTTP 요청은 [07_tradeoff.http](./07_tradeoff.http)에서 실행한다.
 
 1. **cold start는 cost 쪽에서만 발생**. `p95`와 `max`에서 티가 남 (p50은 비슷함 — 평균만 보면 속는다)
 2. cost 라우터의 map은 **트래픽이 흐른 뒤에야** 채워짐 = reactive

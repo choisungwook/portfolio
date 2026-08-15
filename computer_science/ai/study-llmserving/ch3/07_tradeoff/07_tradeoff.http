@@ -1,0 +1,40 @@
+@costUrl = http://localhost:30080
+@latencyUrl = http://localhost:30081
+@sentimentModelId = 550e8400-e29b-41d4-a716-446655440000
+@spamModelId = 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+
+### Cost-optimized health check
+GET {{costUrl}}/healthz
+Accept: application/json
+
+### Cost-optimized routing map
+GET {{costUrl}}/routing_map
+Accept: application/json
+
+### Cost-optimized sentiment prediction
+POST {{costUrl}}/predict
+Content-Type: application/json
+Accept: application/json
+
+{
+  "model_id": "{{sentimentModelId}}",
+  "input_data": "This movie was great! I really enjoyed it."
+}
+
+### Latency-optimized health check
+GET {{latencyUrl}}/healthz
+Accept: application/json
+
+### Latency-optimized routing map
+GET {{latencyUrl}}/routing_map
+Accept: application/json
+
+### Latency-optimized spam prediction
+POST {{latencyUrl}}/predict
+Content-Type: application/json
+Accept: application/json
+
+{
+  "model_id": "{{spamModelId}}",
+  "input_data": "Congratulations! You won a free prize."
+}

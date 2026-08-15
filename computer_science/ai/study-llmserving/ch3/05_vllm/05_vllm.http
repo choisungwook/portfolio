@@ -1,0 +1,34 @@
+@libraryUrl = http://localhost:8000
+@serverUrl = http://localhost:8100
+
+### Library mode health check
+GET {{libraryUrl}}/healthz
+Accept: application/json
+
+### Library mode generation
+POST {{libraryUrl}}/generate_vllm
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompts": [
+    "Hello, I am",
+    "The weather is",
+    "I want to"
+  ]
+}
+
+### Standalone server models
+GET {{serverUrl}}/v1/models
+Accept: application/json
+
+### Standalone server completion
+POST {{serverUrl}}/v1/completions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "model": "facebook/opt-125m",
+  "prompt": "Hello, I am",
+  "max_tokens": 20
+}
