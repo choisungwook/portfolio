@@ -15,8 +15,8 @@ The page owns one state object and both shells persist it as an opaque JSON stri
 
 ```json
 {
-  "requests": [{ "id": "", "name": "", "method": "GET", "url": "", "headers": [], "body": "" }],
-  "variables": [{ "key": "", "value": "" }],
+  "requests": [{ "id": "", "name": "", "method": "GET", "url": "", "headers": [], "body": "", "localVariables": [] }],
+  "globalVariables": [{ "key": "", "value": "" }],
   "scenarios": [{ "id": "", "name": "", "steps": [] }],
   "settings": { "verifySsl": true, "timeoutSecs": 30, "followRedirects": true }
 }
@@ -43,7 +43,7 @@ The IPC surface is three commands: `send_request`, `load_state`, `save_state`.
 
 ## Key flows
 
-- Send: `app.js` resolves `{{variables}}` through `lib.js` (`resolveRequest`), hands the spec to `api.send`, renders the response. Unknown variables stay visible as `{{name}}`.
+- Send: `app.js` resolves `{{variables}}` through `lib.js` (`resolveRequest`), hands the spec to `api.send`, renders the response. Request-local values override globals with the same name. Unknown variables stay visible as `{{name}}`.
 - Scenario run: steps run sequentially. Each step re-resolves its request so extracts from earlier steps apply, then `runAssertions` (status, body substring) and `applyExtracts` (JSON dot path into variables, persisted) run. Failures do not stop the run; each step shows PASS/FAIL/ERROR.
 - curl: `toCurl` renders the resolved request (adds `-k` when verification is off); `parseCurl` reads the common flag subset (`-X`, `-H`, `-d/--data*`, `--url`, `-A`) and imports into a fresh scratch request, never over a bookmark.
 

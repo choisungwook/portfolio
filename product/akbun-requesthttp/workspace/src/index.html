@@ -10,9 +10,8 @@
   <header id="toolbar">
     <span id="app-title">akbun-requesthttp</span>
     <div class="group">
-      <button id="btn-variables" title="Shared variables usable as {{name}}">Variables</button>
+      <button id="btn-global-variables" title="Variables shared by every request">Global Variables</button>
       <button id="btn-settings" title="TLS verification, timeout, redirects">Settings</button>
-      <button id="btn-update" title="Check for a newer version">Updates</button>
     </div>
   </header>
 
@@ -62,6 +61,12 @@
           <summary>Body</summary>
           <textarea id="body" rows="6" placeholder='{"raw": "body, sent as typed"}'></textarea>
         </details>
+        <details>
+          <summary>Local Variables</summary>
+          <p class="hint">Used only by this request. A local value overrides a global value with the same name.</p>
+          <div id="local-variables-rows" class="kv-rows"></div>
+          <button id="btn-add-local-variable" class="small">+ Local Variable</button>
+        </details>
 
         <section id="response" hidden>
           <div class="row">
@@ -87,7 +92,7 @@
         </div>
         <p class="hint">
           Steps run top to bottom against saved requests. A step can assert the
-          status and a body substring, and extract JSON values into variables
+          status and a body substring, and extract JSON values into global variables
           for the steps after it.
         </p>
         <ol id="steps"></ol>
@@ -95,14 +100,14 @@
     </main>
   </div>
 
-  <dialog id="variables-dialog">
-    <h2>Variables</h2>
-    <p class="hint">Use anywhere as {{name}} — URL, headers and body.</p>
-    <div id="variables-rows" class="kv-rows"></div>
+  <dialog id="global-variables-dialog">
+    <h2>Global Variables</h2>
+    <p class="hint">Shared by every request. Use as {{name}} in URL, headers and body.</p>
+    <div id="global-variables-rows" class="kv-rows"></div>
     <div class="row">
-      <button id="btn-add-variable" class="small">+ Variable</button>
+      <button id="btn-add-global-variable" class="small">+ Global Variable</button>
       <span class="spacer"></span>
-      <button id="btn-close-variables">Close</button>
+      <button id="btn-close-global-variables">Close</button>
     </div>
   </dialog>
 
@@ -128,6 +133,7 @@
       Follow redirects
     </label>
     <div class="row">
+      <button id="btn-update" title="Check for a newer version">Check for Updates…</button>
       <span class="spacer"></span>
       <button id="btn-close-settings">Close</button>
     </div>

@@ -1,6 +1,6 @@
 {
   "name": "akbun-requesthttp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Desktop HTTP client: send requests, inspect responses, bookmarks, variables, curl import/export, scenario runs",
   "author": "akbun",
