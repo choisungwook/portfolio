@@ -8,15 +8,12 @@ const $ = (id) => document.getElementById(id);
 
 // The page owns the whole state; engines and storage are dumb.
 let state = L.createState();
-// The editor works on currentRequest. It is either a scratch request not in
-// state.requests yet, or a direct reference to a saved one (edits then
-// persist automatically).
+// The editor works on currentRequest. It is either a scratch request or a
+// direct reference to a request nested in one folder.
 let currentRequest = L.createRequest('');
-let currentScenarioId = null;
+let selectedFolderId = L.DEFAULT_FOLDER_ID;
 let lastResponse = null;
 let requestInFlight = false;
-// scenarioId -> per-step results of the last run, display only.
-const scenarioResults = {};
 
 // ------------------------------------------------------------- persistence
 
@@ -33,6 +30,7 @@ async function loadPersisted() {
     const raw = await api.loadState();
     if (!raw) return;
     state = L.normalizeState(JSON.parse(raw));
+    selectedFolderId = L.DEFAULT_FOLDER_ID;
   } catch (error) {
     console.error('load failed', error);
   }
@@ -50,122 +48,128 @@ function engineSettings() {
 
 // ---------------------------------------------------------------- sidebar
 
+function findRequestFolder(request) {
+  return state.folders.find((folder) => folder.requests.includes(request));
+}
+
+function findFolder(id) {
+  return state.folders.find((folder) => folder.id === id) || state.folders[0];
+}
+
+function selectRequest(request, folder) {
+  currentRequest = request;
+  selectedFolderId = folder.id;
+  lastResponse = null;
+  renderSidebar();
+  renderEditor();
+  renderResponse();
+}
+
 function renderSidebar() {
-  const requestList = $('request-list');
-  requestList.textContent = '';
-  for (const request of state.requests) {
-    const item = document.createElement('li');
-    if (request === currentRequest) item.className = 'active';
-    const method = document.createElement('span');
-    method.className = 'item-method';
-    method.textContent = request.method;
+  const root = $('folder-list');
+  root.textContent = '';
+  for (const folder of state.folders) {
+    const group = document.createElement('section');
+    group.className = 'folder-group';
+    const heading = document.createElement('div');
+    heading.className = 'folder-heading';
     const name = document.createElement('span');
-    name.className = 'item-name';
-    name.textContent = request.name;
-    const actions = document.createElement('details');
-    actions.className = 'item-actions';
-    const actionsToggle = document.createElement('summary');
-    actionsToggle.textContent = '⋯';
-    actionsToggle.title = 'Request actions';
-    actionsToggle.setAttribute('aria-label', `Actions for ${request.name}`);
-    const actionsMenu = document.createElement('div');
-    actionsMenu.className = 'item-actions-menu';
-    const duplicate = document.createElement('button');
-    duplicate.textContent = 'Duplicate Request';
-    duplicate.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const copy = L.duplicateRequest(request);
-      const index = state.requests.indexOf(request);
-      state.requests.splice(index + 1, 0, copy);
-      currentRequest = copy;
-      persist();
-      showRequestView();
-      renderSidebar();
-      renderEditor();
-    });
-    const remove = document.createElement('button');
-    remove.textContent = 'Delete Request';
-    remove.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (!(await api.ask(`Delete "${request.name}"?`))) return;
-      state.requests = state.requests.filter((r) => r !== request);
-      if (currentRequest === request) currentRequest = L.createRequest('');
-      persist();
-      renderSidebar();
-      renderEditor();
-    });
-    actionsMenu.append(duplicate, remove);
-    actions.append(actionsToggle, actionsMenu);
-    actions.addEventListener('click', (event) => event.stopPropagation());
-    actions.addEventListener('toggle', () => {
-      if (!actions.open) return;
-      requestList.querySelectorAll('.item-actions[open]').forEach((menu) => {
-        if (menu !== actions) menu.open = false;
+    name.className = 'folder-name';
+    name.textContent = folder.name;
+    const count = document.createElement('span');
+    count.className = 'folder-count';
+    count.textContent = String(folder.requests.length);
+    heading.append(name, count);
+    if (!folder.isDefault) {
+      const removeFolder = document.createElement('button');
+      removeFolder.className = 'folder-delete';
+      removeFolder.textContent = '✕';
+      removeFolder.title = `Delete ${folder.name}`;
+      removeFolder.addEventListener('click', async () => {
+        if (!(await api.ask(`Delete folder "${folder.name}" and its requests?`))) return;
+        if (folder.requests.includes(currentRequest)) {
+          currentRequest = L.createRequest('');
+          selectedFolderId = L.DEFAULT_FOLDER_ID;
+          lastResponse = null;
+        }
+        state.folders = state.folders.filter((item) => item !== folder);
+        persist();
+        renderSidebar();
+        renderEditor();
+        renderResponse();
       });
-    });
-    item.append(method, name, actions);
-    item.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      actions.open = true;
-    });
-    item.addEventListener('click', () => {
-      currentRequest = request;
-      showRequestView();
-      renderSidebar();
-      renderEditor();
-    });
-    requestList.append(item);
-  }
+      heading.append(removeFolder);
+    }
 
-  const scenarioList = $('scenario-list');
-  scenarioList.textContent = '';
-  for (const scenario of state.scenarios) {
-    const item = document.createElement('li');
-    if (scenario.id === currentScenarioId) item.className = 'active';
-    const name = document.createElement('span');
-    name.className = 'item-name';
-    name.textContent = scenario.name;
-    const remove = document.createElement('button');
-    remove.className = 'item-delete';
-    remove.textContent = '✕';
-    remove.title = 'Delete';
-    remove.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (!(await api.ask(`Delete "${scenario.name}"?`))) return;
-      state.scenarios = state.scenarios.filter((s) => s !== scenario);
-      if (currentScenarioId === scenario.id) {
-        currentScenarioId = null;
-        showRequestView();
-      }
-      persist();
-      renderSidebar();
-    });
-    item.append(name, remove);
-    item.addEventListener('click', () => {
-      currentScenarioId = scenario.id;
-      showScenarioView();
-      renderSidebar();
-      renderScenario();
-    });
-    scenarioList.append(item);
+    const requestList = document.createElement('ul');
+    requestList.className = 'request-list';
+    for (const request of folder.requests) {
+      requestList.append(renderRequestItem(folder, request, requestList));
+    }
+    group.append(heading, requestList);
+    root.append(group);
   }
 }
 
-function selectSidebarTab(tab) {
-  $('tab-requests').classList.toggle('active', tab === 'requests');
-  $('tab-scenarios').classList.toggle('active', tab === 'scenarios');
-  $('requests-pane').hidden = tab !== 'requests';
-  $('scenarios-pane').hidden = tab !== 'scenarios';
-}
-
-function showRequestView() {
-  $('request-view').hidden = false;
-  $('scenario-view').hidden = true;
-}
-
-function showScenarioView() {
-  $('request-view').hidden = true;
-  $('scenario-view').hidden = false;
+function renderRequestItem(folder, request, requestList) {
+  const item = document.createElement('li');
+  if (request === currentRequest) item.className = 'active';
+  const method = document.createElement('span');
+  method.className = 'item-method';
+  method.textContent = request.method;
+  const name = document.createElement('span');
+  name.className = 'item-name';
+  name.textContent = request.name;
+  const actions = document.createElement('details');
+  actions.className = 'item-actions';
+  const actionsToggle = document.createElement('summary');
+  actionsToggle.textContent = '⋯';
+  actionsToggle.title = 'Request actions';
+  actionsToggle.setAttribute('aria-label', `Actions for ${request.name}`);
+  const actionsMenu = document.createElement('div');
+  actionsMenu.className = 'item-actions-menu';
+  const duplicate = document.createElement('button');
+  duplicate.textContent = 'Duplicate Request';
+  duplicate.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const copy = L.duplicateRequest(request);
+    const index = folder.requests.indexOf(request);
+    folder.requests.splice(index + 1, 0, copy);
+    selectRequest(copy, folder);
+    persist();
+  });
+  const remove = document.createElement('button');
+  remove.textContent = 'Delete Request';
+  remove.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (!(await api.ask(`Delete "${request.name}"?`))) return;
+    folder.requests = folder.requests.filter((item) => item !== request);
+    if (currentRequest === request) {
+      currentRequest = L.createRequest('');
+      selectedFolderId = L.DEFAULT_FOLDER_ID;
+      lastResponse = null;
+    }
+    persist();
+    renderSidebar();
+    renderEditor();
+    renderResponse();
+  });
+  actionsMenu.append(duplicate, remove);
+  actions.append(actionsToggle, actionsMenu);
+  actions.addEventListener('click', (event) => event.stopPropagation());
+  actions.addEventListener('toggle', () => {
+    if (!actions.open) return;
+    requestList.querySelectorAll('.item-actions[open]').forEach((menu) => {
+      if (menu !== actions) menu.open = false;
+    });
+  });
+  item.append(method, name, actions);
+  item.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    actions.open = true;
+  });
+  item.addEventListener('click', () => selectRequest(request, folder));
+  return item;
 }
 
 // ------------------------------------------------------------------ editor
@@ -205,6 +209,16 @@ function renderKvRows(container, list, onChange) {
 }
 
 function renderEditor() {
+  const savedFolder = findRequestFolder(currentRequest);
+  const folderSelect = $('request-folder');
+  folderSelect.textContent = '';
+  for (const folder of state.folders) {
+    const option = document.createElement('option');
+    option.value = folder.id;
+    option.textContent = folder.name;
+    folderSelect.append(option);
+  }
+  folderSelect.value = savedFolder ? savedFolder.id : selectedFolderId;
   $('request-name').value = currentRequest.name;
   $('method').value = currentRequest.method;
   $('url').value = currentRequest.url;
@@ -214,6 +228,17 @@ function renderEditor() {
 }
 
 function bindEditor() {
+  $('request-folder').addEventListener('change', (event) => {
+    const targetFolder = findFolder(event.target.value);
+    const savedFolder = findRequestFolder(currentRequest);
+    selectedFolderId = targetFolder.id;
+    if (savedFolder && savedFolder !== targetFolder) {
+      savedFolder.requests = savedFolder.requests.filter((request) => request !== currentRequest);
+      targetFolder.requests.push(currentRequest);
+      persist();
+      renderSidebar();
+    }
+  });
   $('request-name').addEventListener('input', (event) => {
     currentRequest.name = event.target.value;
     persist();
@@ -242,9 +267,8 @@ function bindEditor() {
   });
   $('btn-save-request').addEventListener('click', () => {
     if (!currentRequest.name) currentRequest.name = currentRequest.url || 'Untitled';
-    if (!state.requests.includes(currentRequest)) state.requests.push(currentRequest);
+    if (!findRequestFolder(currentRequest)) findFolder(selectedFolderId).requests.push(currentRequest);
     persist();
-    selectSidebarTab('requests');
     renderSidebar();
     renderEditor();
   });
@@ -353,215 +377,59 @@ function bindCurl() {
   $('btn-do-import-curl').addEventListener('click', () => {
     const parsed = L.parseCurl($('curl-input').value);
     if (!parsed.url) return;
-    // Imports always land in a fresh scratch request, never over a bookmark.
     currentRequest = Object.assign(L.createRequest(parsed.url), parsed);
+    selectedFolderId = L.DEFAULT_FOLDER_ID;
     $('curl-dialog').close();
-    showRequestView();
     renderSidebar();
     renderEditor();
   });
 }
 
-// --------------------------------------------------------------- scenarios
+// -------------------------------------------------------------------- .http
 
-function findScenario(id) {
-  return state.scenarios.find((s) => s.id === id);
-}
-
-function renderScenario() {
-  const scenario = findScenario(currentScenarioId);
-  if (!scenario) return;
-  $('scenario-name').value = scenario.name;
-  const stepsRoot = $('steps');
-  stepsRoot.textContent = '';
-  const results = scenarioResults[scenario.id] || [];
-  scenario.steps.forEach((step, index) => {
-    stepsRoot.append(renderStep(scenario, step, index, results[index]));
-  });
-}
-
-function renderStep(scenario, step, index, result) {
-  const item = document.createElement('li');
-  item.className = 'step';
-
-  const head = document.createElement('div');
-  head.className = 'row';
-  const select = document.createElement('select');
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = '— saved request —';
-  select.append(placeholder);
-  for (const request of state.requests) {
-    const option = document.createElement('option');
-    option.value = request.id;
-    option.textContent = `${request.method} ${request.name}`;
-    select.append(option);
-  }
-  select.value = step.requestId || '';
-  select.addEventListener('change', () => {
-    step.requestId = select.value;
-    persist();
-  });
-  const badge = document.createElement('span');
-  badge.className = 'badge';
-  if (result) {
-    if (result.error) {
-      badge.textContent = 'ERROR';
-      badge.classList.add('fail');
-    } else {
-      badge.textContent = result.passed ? `PASS ${result.status}` : `FAIL ${result.status}`;
-      badge.classList.add(result.passed ? 'pass' : 'fail');
-    }
-  }
-  const spacer = document.createElement('span');
-  spacer.className = 'spacer';
-  const remove = document.createElement('button');
-  remove.className = 'small';
-  remove.textContent = '✕';
-  remove.addEventListener('click', () => {
-    scenario.steps.splice(index, 1);
-    persist();
-    renderScenario();
-  });
-  head.append(select, badge, spacer, remove);
-
-  const asserts = document.createElement('div');
-  asserts.className = 'row';
-  const expectStatus = document.createElement('input');
-  expectStatus.placeholder = 'expected status (e.g. 200)';
-  expectStatus.value = step.expectStatus;
-  expectStatus.addEventListener('input', () => {
-    step.expectStatus = expectStatus.value.trim();
-    persist();
-  });
-  const bodyContains = document.createElement('input');
-  bodyContains.placeholder = 'body contains…';
-  bodyContains.value = step.bodyContains;
-  bodyContains.addEventListener('input', () => {
-    step.bodyContains = bodyContains.value;
-    persist();
-  });
-  asserts.append(expectStatus, bodyContains);
-
-  const extracts = document.createElement('div');
-  extracts.className = 'kv-rows';
-  step.extracts.forEach((rule, ruleIndex) => {
-    const row = document.createElement('div');
-    row.className = 'kv-row';
-    const path = document.createElement('input');
-    path.placeholder = 'json path, e.g. data.token';
-    path.value = rule.path || '';
-    path.addEventListener('input', () => {
-      rule.path = path.value.trim();
-      persist();
-    });
-    const name = document.createElement('input');
-    name.placeholder = 'to variable';
-    name.value = rule.var || '';
-    name.addEventListener('input', () => {
-      rule.var = name.value.trim();
-      persist();
-    });
-    const drop = document.createElement('button');
-    drop.className = 'small';
-    drop.textContent = '✕';
-    drop.addEventListener('click', () => {
-      step.extracts.splice(ruleIndex, 1);
-      persist();
-      renderScenario();
-    });
-    row.append(path, name, drop);
-    extracts.append(row);
-  });
-  const addExtract = document.createElement('button');
-  addExtract.className = 'small';
-  addExtract.textContent = '+ Extract';
-  addExtract.addEventListener('click', () => {
-    step.extracts.push({ path: '', var: '' });
-    persist();
-    renderScenario();
-  });
-
-  item.append(head, asserts, extracts, addExtract);
-
-  if (result) {
-    if (result.error) {
-      const error = document.createElement('p');
-      error.className = 'failures';
-      error.textContent = result.error;
-      item.append(error);
-    }
-    if (result.failures && result.failures.length) {
-      const failures = document.createElement('p');
-      failures.className = 'failures';
-      failures.textContent = result.failures.join(' · ');
-      item.append(failures);
-    }
-    if (result.extracted && result.extracted.length) {
-      const extracted = document.createElement('p');
-      extracted.className = 'extracted';
-      extracted.textContent =
-        'extracted ' + result.extracted.map((e) => `${e.key}=${e.value}`).join(', ');
-      item.append(extracted);
-    }
-  }
-  return item;
-}
-
-async function runScenario() {
-  const scenario = findScenario(currentScenarioId);
-  if (!scenario || scenario.steps.length === 0) return;
-  const results = [];
-  scenarioResults[scenario.id] = results;
-  renderScenario();
-  for (const step of scenario.steps) {
-    const request = state.requests.find((r) => r.id === step.requestId);
-    if (!request) {
-      results.push({ error: 'no request selected for this step' });
-      renderScenario();
-      continue;
-    }
-    // Resolved fresh per step, so extracts from earlier steps apply.
-    const resolved = L.resolveRequest(request, state.globalVariables);
+function bindHttpImport() {
+  $('btn-import-http').addEventListener('click', () => $('http-file-input').click());
+  $('http-file-input').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
     try {
-      const response = await api.send(resolved, engineSettings());
-      const verdict = L.runAssertions(step, response);
-      const extracted = L.applyExtracts(step, response, state.globalVariables);
-      results.push({
-        passed: verdict.passed,
-        failures: verdict.failures,
-        extracted,
-        status: response.status,
-      });
-      if (extracted.length) persist();
+      const requests = L.parseHttpFile(await file.text());
+      if (requests.length === 0) {
+        await api.message('No HTTP requests found in this file.');
+        return;
+      }
+      const folder = L.createFolder(L.httpFolderName(file.name));
+      folder.requests.push(...requests);
+      state.folders.push(folder);
+      selectRequest(requests[0], folder);
+      persist();
     } catch (error) {
-      results.push({ error: String(error) });
+      await api.message(`Cannot import the HTTP file.\n\n${error}`);
     }
-    renderScenario();
-  }
-}
-
-function bindScenario() {
-  $('scenario-name').addEventListener('input', (event) => {
-    const scenario = findScenario(currentScenarioId);
-    if (!scenario) return;
-    scenario.name = event.target.value;
-    persist();
-    renderSidebar();
   });
-  $('btn-add-step').addEventListener('click', () => {
-    const scenario = findScenario(currentScenarioId);
-    if (!scenario) return;
-    scenario.steps.push(L.createStep(''));
-    persist();
-    renderScenario();
-  });
-  $('btn-run-scenario').addEventListener('click', runScenario);
 }
 
 // ----------------------------------------------------------------- dialogs
 
 function bindDialogs() {
+  $('btn-new-folder').addEventListener('click', () => {
+    $('folder-name').value = '';
+    $('folder-dialog').showModal();
+    $('folder-name').focus();
+  });
+  $('btn-close-folder').addEventListener('click', () => $('folder-dialog').close());
+  $('btn-create-folder').addEventListener('click', () => {
+    const name = $('folder-name').value.trim();
+    if (!name) return;
+    const folder = L.createFolder(name);
+    state.folders.push(folder);
+    selectedFolderId = folder.id;
+    persist();
+    $('folder-dialog').close();
+    renderSidebar();
+    renderEditor();
+  });
   $('btn-global-variables').addEventListener('click', () => {
     renderKvRows($('global-variables-rows'), state.globalVariables, persist);
     $('global-variables-dialog').showModal();
@@ -602,8 +470,6 @@ function bindDialogs() {
 
 (async function init() {
   await loadPersisted();
-  $('tab-requests').addEventListener('click', () => selectSidebarTab('requests'));
-  $('tab-scenarios').addEventListener('click', () => selectSidebarTab('scenarios'));
   document.addEventListener('click', () => {
     document.querySelectorAll('.item-actions[open]').forEach((menu) => {
       menu.open = false;
@@ -611,25 +477,18 @@ function bindDialogs() {
   });
   $('btn-new-request').addEventListener('click', () => {
     currentRequest = L.createRequest('');
-    showRequestView();
+    selectedFolderId = L.DEFAULT_FOLDER_ID;
+    lastResponse = null;
     renderSidebar();
     renderEditor();
-  });
-  $('btn-new-scenario').addEventListener('click', () => {
-    const scenario = L.createScenario('');
-    state.scenarios.push(scenario);
-    currentScenarioId = scenario.id;
-    persist();
-    showScenarioView();
-    renderSidebar();
-    renderScenario();
+    renderResponse();
   });
   $('btn-update').addEventListener('click', () => api.checkUpdate());
   if (api.platform === 'web') $('btn-update').hidden = true;
   bindEditor();
   bindResponse();
   bindCurl();
-  bindScenario();
+  bindHttpImport();
   bindDialogs();
   renderSidebar();
   renderEditor();

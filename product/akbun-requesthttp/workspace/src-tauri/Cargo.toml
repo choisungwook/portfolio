@@ -1,7 +1,7 @@
 [package]
 name = "akbun-requesthttp"
 version = "0.1.0"
-description = "Desktop HTTP client: requests, bookmarks, variables, curl, scenarios"
+description = "Desktop HTTP client: requests, folders, variables, curl, and .http import"
 authors = ["akbun"]
 license = "MIT"
 edition = "2021"

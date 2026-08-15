@@ -2,7 +2,7 @@
 
 ## Decision
 
-Bookmarked requests, variables, scenarios and settings live in one JSON object owned by the page. Persistence is two commands (`load_state`, `save_state`) that move the serialized string to `state.json` in the app data directory on desktop, and to localStorage on web. Neither shell parses the blob.
+Request folders, variables and settings live in one JSON object owned by the page. Persistence is two commands (`load_state`, `save_state`) that move the serialized string to `state.json` in the app data directory on desktop, and to localStorage on web. Neither shell parses the blob.
 
 ## Reason
 

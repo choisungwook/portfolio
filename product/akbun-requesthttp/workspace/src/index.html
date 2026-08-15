@@ -17,25 +17,21 @@
 
   <div id="layout">
     <aside id="sidebar">
-      <nav id="sidebar-tabs">
-        <button id="tab-requests" class="active">Requests</button>
-        <button id="tab-scenarios">Scenarios</button>
-      </nav>
-      <div id="requests-pane">
+      <div class="sidebar-actions">
         <button id="btn-new-request" class="new-item">+ New request</button>
-        <ul id="request-list"></ul>
+        <button id="btn-new-folder" class="new-item">+ Folder</button>
+        <button id="btn-import-http" class="new-item">Import .http</button>
+        <input id="http-file-input" type="file" accept=".http,text/plain" hidden />
       </div>
-      <div id="scenarios-pane" hidden>
-        <button id="btn-new-scenario" class="new-item">+ New scenario</button>
-        <ul id="scenario-list"></ul>
-      </div>
+      <div id="folder-list"></div>
     </aside>
 
     <main id="main">
       <section id="request-view">
         <div class="row name-row">
+          <select id="request-folder" title="Request folder"></select>
           <input id="request-name" placeholder="Request name" />
-          <button id="btn-save-request" title="Bookmark this request in the sidebar">Save</button>
+          <button id="btn-save-request" title="Save this request in the selected folder">Save</button>
           <button id="btn-copy-curl" title="Copy the resolved request as a curl command">Copy as curl</button>
           <button id="btn-import-curl" title="Fill the editor from a pasted curl command">Import curl</button>
         </div>
@@ -84,21 +80,18 @@
         </section>
       </section>
 
-      <section id="scenario-view" hidden>
-        <div class="row name-row">
-          <input id="scenario-name" placeholder="Scenario name" />
-          <button id="btn-run-scenario">Run</button>
-          <button id="btn-add-step" class="small">+ Step</button>
-        </div>
-        <p class="hint">
-          Steps run top to bottom against saved requests. A step can assert the
-          status and a body substring, and extract JSON values into global variables
-          for the steps after it.
-        </p>
-        <ol id="steps"></ol>
-      </section>
     </main>
   </div>
+
+  <dialog id="folder-dialog">
+    <h2>New Folder</h2>
+    <input id="folder-name" placeholder="Folder name" />
+    <div class="row dialog-actions">
+      <span class="spacer"></span>
+      <button id="btn-close-folder">Cancel</button>
+      <button id="btn-create-folder">Create</button>
+    </div>
+  </dialog>
 
   <dialog id="global-variables-dialog">
     <h2>Global Variables</h2>
