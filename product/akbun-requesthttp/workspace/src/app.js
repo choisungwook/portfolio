@@ -37,13 +37,7 @@ async function loadPersisted() {
 }
 
 function engineSettings() {
-  return {
-    // The web engine cannot skip verification; keep the desktop toggle from
-    // leaking into a persisted state the web build then displays as active.
-    verifySsl: api.canToggleSsl ? state.settings.verifySsl : true,
-    timeoutSecs: state.settings.timeoutSecs,
-    followRedirects: state.settings.followRedirects,
-  };
+  return L.createEngineSettings(state.settings, api.canToggleSsl);
 }
 
 // ---------------------------------------------------------------- sidebar

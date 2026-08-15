@@ -30,6 +30,11 @@ export function specToInit(spec, settings) {
   return init;
 }
 
+export function requestTimeoutMs(settings) {
+  const seconds = Number(settings && settings.timeoutSecs);
+  return 1000 * (Number.isFinite(seconds) && seconds >= 1 ? seconds : 60);
+}
+
 // The same response shape the desktop Rust engine returns.
 export function resultFrom(response, bodyText, elapsedMs, sizeBytes) {
   return {
