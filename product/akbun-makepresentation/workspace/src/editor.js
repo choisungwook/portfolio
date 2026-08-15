@@ -377,19 +377,84 @@ function handlesFor(shape) {
 
 const MIN_SIZE = 8;
 
-// Resize by dragging a handle. `from` is the shape as it was when the drag
-// started, so repeated calls with a growing delta do not compound.
-function resizeShape(shape, from, handle, dx, dy) {
+function resizeLineEndpoint(shape, from, handle, dx, dy) {
+  const endX = from.x + from.w;
+  const endY = from.y + from.h;
   if (handle === 'start') {
     shape.x = from.x + dx;
     shape.y = from.y + dy;
-    shape.w = from.w - dx;
-    shape.h = from.h - dy;
-    return;
-  }
-  if (handle === 'end') {
+    shape.w = endX - shape.x;
+    shape.h = endY - shape.y;
+  } else {
+    shape.x = from.x;
+    shape.y = from.y;
     shape.w = from.w + dx;
     shape.h = from.h + dy;
+  }
+}
+
+function projectOnAxis(x, y, fixedX, fixedY, axisX, axisY) {
+  const lengthSquared = axisX * axisX + axisY * axisY;
+  if (lengthSquared === 0) return { x, y };
+  const scale = ((x - fixedX) * axisX + (y - fixedY) * axisY) / lengthSquared;
+  return {
+    x: fixedX + axisX * scale,
+    y: fixedY + axisY * scale,
+  };
+}
+
+function resizeLineOnAxis(shape, from, handle, dx, dy) {
+  const endX = from.x + from.w;
+  const endY = from.y + from.h;
+  if (handle === 'start') {
+    const point = projectOnAxis(
+      from.x + dx,
+      from.y + dy,
+      endX,
+      endY,
+      -from.w,
+      -from.h
+    );
+    shape.x = point.x;
+    shape.y = point.y;
+    shape.w = endX - point.x;
+    shape.h = endY - point.y;
+  } else {
+    const point = projectOnAxis(
+      endX + dx,
+      endY + dy,
+      from.x,
+      from.y,
+      from.w,
+      from.h
+    );
+    shape.x = from.x;
+    shape.y = from.y;
+    shape.w = point.x - from.x;
+    shape.h = point.y - from.y;
+  }
+}
+
+function resizeSquare(shape, from, handle, dx, dy) {
+  const b = shapeBBox(from);
+  const fixedX = handle.includes('w') ? b.x + b.w : b.x;
+  const fixedY = handle.includes('n') ? b.y + b.h : b.y;
+  const movingX = (handle.includes('w') ? b.x : b.x + b.w) + dx;
+  const movingY = (handle.includes('n') ? b.y : b.y + b.h) + dy;
+  const width = handle.includes('w') ? fixedX - movingX : movingX - fixedX;
+  const height = handle.includes('n') ? fixedY - movingY : movingY - fixedY;
+  const size = Math.max(MIN_SIZE, width, height);
+  shape.x = handle.includes('w') ? fixedX - size : fixedX;
+  shape.y = handle.includes('n') ? fixedY - size : fixedY;
+  shape.w = size;
+  shape.h = size;
+}
+
+// Resize by dragging a handle. `from` is the shape as it was when the drag
+// started, so repeated calls with a growing delta do not compound.
+function resizeShape(shape, from, handle, dx, dy) {
+  if (handle === 'start' || handle === 'end') {
+    resizeLineEndpoint(shape, from, handle, dx, dy);
     return;
   }
 
@@ -413,6 +478,22 @@ function resizeShape(shape, from, handle, dx, dy) {
   shape.y = y0;
   shape.w = x1 - x0;
   shape.h = y1 - y0;
+}
+
+// Shift-resizing a box makes geometry rather than merely preserving its old
+// aspect ratio: a rectangle becomes a square and an ellipse becomes a circle.
+// A line keeps its original axis, including the opposite direction after the
+// moving endpoint crosses the fixed one.
+function resizeShapeConstrained(shape, from, handle, dx, dy) {
+  if (shape.kind === 'line' || shape.kind === 'arrow') {
+    resizeLineOnAxis(shape, from, handle, dx, dy);
+    return;
+  }
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+    resizeSquare(shape, from, handle, dx, dy);
+    return;
+  }
+  resizeShape(shape, from, handle, dx, dy);
 }
 
 // --- slide operations -------------------------------------------------------
@@ -837,6 +918,7 @@ const exported = {
   setCrop,
   handlesFor,
   resizeShape,
+  resizeShapeConstrained,
   addSlide,
   deleteSlide,
   moveSlide,

@@ -222,6 +222,61 @@ test('resizeShape moves a line endpoint', () => {
   );
 });
 
+test('resizeShapeConstrained makes a rectangle square from the opposite corner', () => {
+  const shape = L.createShape('rect', 10, 20, {});
+  L.dragShape(shape, 10, 20, 110, 70);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'se', 20, 80);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 10, y: 20, w: 130, h: 130 }
+  );
+});
+
+test('resizeShapeConstrained makes an ellipse circular from every corner', () => {
+  const shape = L.createShape('ellipse', 10, 20, {});
+  L.dragShape(shape, 10, 20, 110, 70);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'nw', 40, 0);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 50, y: 10, w: 60, h: 60 }
+  );
+});
+
+test('resizeShapeConstrained keeps a line on its original axis', () => {
+  const shape = L.createShape('line', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 50);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'end', -40, 70);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 0, y: 0, w: 96, h: 48 }
+  );
+});
+
+test('resizeShapeConstrained reverses a one-way arrow across its fixed endpoint', () => {
+  const shape = L.createShape('arrow', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 0);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'end', -220, 15);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h, arrowEnd: shape.arrowEnd },
+    { x: 0, y: 0, w: -120, h: 0, arrowEnd: 'triangle' }
+  );
+});
+
+test('resizeShapeConstrained reverses a line dragged past its end from the start handle', () => {
+  const shape = L.createShape('line', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 0);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'start', 150, 20);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 150, y: 0, w: -50, h: 0 }
+  );
+});
+
 test('resizeShape scales pen points with the box', () => {
   const shape = L.createShape('pen', 0, 0, {});
   L.dragShape(shape, 0, 0, 100, 100);

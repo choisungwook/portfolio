@@ -39,6 +39,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Cmd++ / Cmd+- | Zoom in / out |
 | Cmd+0 | Fit the slide to the window |
 | Shift while drawing | Square or circle; lines and arrows snap to 45 degrees |
+| Shift while resizing | Rectangle to square, ellipse to circle; line and arrow stay on their original axis |
 | Shift while dragging | Move on one axis only |
 | Shift+click | Add an object to the selection, or drop it out. Over empty space it keeps the selection |
 | Drag on an empty slide | Select every object fully enclosed by the dragged area |
@@ -46,7 +47,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Cmd+Shift+drag | Same, with the copy kept on one axis |
 | V R O L A P T | Select, rectangle, ellipse, line, arrow, pen, text |
 | Arrows | Nudge the selection by 1px, or 10px with Shift |
-| Delete, Backspace | Delete the selection, or the current slide when the slide panel has focus. Inside a text box being edited they delete a character instead |
+| Delete, Backspace | Delete the selection when the editor has focus; otherwise delete the current slide. Inside a text box being edited they delete a character instead |
 | Double click on a shape | Edit its text |
 | Typing over a selected shape | Starts writing in it. The tool letters come back once nothing is selected |
 
