@@ -5,10 +5,7 @@ on:
     branches:
       - master
     paths:
-      - 'product/tistory-skin/akbun/src/skin.html'
-      - 'product/tistory-skin/akbun/src/style.css'
-      - 'product/tistory-skin/akbun/src/index.xml'
-      - 'product/tistory-skin/akbun/src/images/**'
+      - 'product/tistory-skin/akbun/src/**'
 
 permissions:
   contents: write
@@ -17,7 +14,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Read skin version
         id: version

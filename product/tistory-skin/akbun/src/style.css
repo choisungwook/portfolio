@@ -287,7 +287,8 @@ img {
 }
 
 .page-home-link-anchor,
-.copy-markdown-btn {
+.copy-markdown-btn,
+.presentation-mode-btn {
   display: inline-flex;
   align-items: center;
   padding: 0.625rem 0.875rem;
@@ -301,13 +302,16 @@ img {
   transition: color var(--transition), border-color var(--transition);
 }
 
-.copy-markdown-btn {
+.copy-markdown-btn,
+.presentation-mode-btn {
   cursor: pointer;
 }
 
 .page-home-link-anchor:hover,
 .copy-markdown-btn:hover,
-.copy-markdown-btn.is-copied {
+.copy-markdown-btn.is-copied,
+.presentation-mode-btn:hover,
+.presentation-mode-btn[aria-pressed="true"] {
   color: var(--color-accent);
   border-color: var(--color-accent);
 }
@@ -1325,6 +1329,69 @@ img {
 @media (max-width: 1400px) {
   .floating-toc {
     display: none !important;
+  }
+}
+
+/* ===================================================================
+   Presentation Mode
+   =================================================================== */
+#tt-body-page.presentation-mode .main-layout {
+  width: 100%;
+  max-width: 1440px;
+  padding: 3rem 3rem 6rem 20rem;
+}
+
+#tt-body-page.presentation-mode .post-full {
+  width: 100%;
+  max-width: none;
+}
+
+#tt-body-page.presentation-mode .comments-section,
+#tt-body-page.presentation-mode .site-footer {
+  display: none;
+}
+
+#tt-body-page.presentation-mode .presentation-mode-btn {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 200;
+  background-color: var(--color-bg);
+  box-shadow: 0 0.5rem 1.5rem rgba(20, 20, 19, 0.14);
+}
+
+#tt-body-page.presentation-mode .floating-toc.visible {
+  display: block !important;
+  top: 6.5rem;
+  right: auto;
+  left: max(1.5rem, calc((100vw - 1440px) / 2 + 3rem));
+  width: 240px;
+  max-height: calc(100vh - 8rem);
+}
+
+#tt-body-page.presentation-mode .toc-link {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 1024px) {
+  #tt-body-page.presentation-mode .main-layout {
+    padding: 2.5rem 1.5rem 6rem;
+  }
+
+  #tt-body-page.presentation-mode .floating-toc.visible {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #tt-body-page.presentation-mode .main-layout {
+    padding: 1.5rem 1rem 5rem;
+  }
+
+  #tt-body-page.presentation-mode .presentation-mode-btn {
+    right: 1rem;
+    bottom: 1rem;
   }
 }
 
