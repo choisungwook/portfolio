@@ -253,8 +253,17 @@ main {
   cursor: text;
 }
 
-.hit {
+/* Caps and joins are part of a stroke's shape, so both twins declare them
+   here. Split between the two rules, the clickable area and the glow would
+   stop being the same geometry at every line end and corner. */
+.hit,
+.halo {
   fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hit {
   stroke: transparent;
 }
 
@@ -268,11 +277,8 @@ main {
    it belongs to. Translucent to leave the shape's own colour readable, and
    deaf to the pointer so it never steals a click or a drag. */
 .halo {
-  fill: none;
   stroke: var(--accent);
   stroke-opacity: 0.35;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   pointer-events: none;
 }
 

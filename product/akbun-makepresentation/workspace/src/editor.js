@@ -728,6 +728,7 @@ const exported = {
   slideNumberShape,
   escapeXml,
   wrapTextLines,
+  rotateSvg,
   renderShapeSvg,
   renderSlideSvg,
   renderShapesSvg,

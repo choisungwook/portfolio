@@ -78,19 +78,29 @@ function outlineSvg(shape, kind) {
   const width = Math.max(16, shape.strokeWidth + 12);
   const b = L.shapeBBox(shape);
   const attrs = `class="${kind}" stroke-width="${width}"`;
-  switch (shape.kind) {
-    case 'line':
-    case 'arrow':
-      return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" ${attrs}/>`;
-    case 'pen': {
-      const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
-      return `<polyline points="${pts}" ${attrs}/>`;
+  // The same rotation the visible shape gets. Without it a rotated shape
+  // answers the pointer in one place and lights up in another, and only the
+  // glow makes that visible.
+  return L.rotateSvg(shape, (() => {
+    switch (shape.kind) {
+      case 'line':
+      case 'arrow':
+        return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" ${attrs}/>`;
+      case 'pen': {
+        const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
+        return `<polyline points="${pts}" ${attrs}/>`;
+      }
+      case 'ellipse': {
+        const rx = b.w / 2;
+        const ry = b.h / 2;
+        return `<ellipse cx="${b.x + rx}" cy="${b.y + ry}" rx="${rx}" ry="${ry}" ${attrs}/>`;
+      }
+      case 'text':
+        return `<rect x="${b.x}" y="${b.y}" width="${Math.max(b.w, 20)}" height="${Math.max(b.h, shape.fontSize * 1.3)}" class="${kind} fill"/>`;
+      default:
+        return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" ${attrs}/>`;
     }
-    case 'text':
-      return `<rect x="${b.x}" y="${b.y}" width="${Math.max(b.w, 20)}" height="${Math.max(b.h, shape.fontSize * 1.3)}" class="${kind} fill"/>`;
-    default:
-      return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" ${attrs}/>`;
-  }
+  })());
 }
 
 function selectionSvg(shape, handles) {
