@@ -32,9 +32,7 @@ async function loadPersisted() {
   try {
     const raw = await api.loadState();
     if (!raw) return;
-    const loaded = JSON.parse(raw);
-    state = Object.assign(L.createState(), loaded);
-    state.settings = Object.assign(L.createState().settings, loaded.settings || {});
+    state = L.normalizeState(JSON.parse(raw));
   } catch (error) {
     console.error('load failed', error);
   }
@@ -64,10 +62,29 @@ function renderSidebar() {
     const name = document.createElement('span');
     name.className = 'item-name';
     name.textContent = request.name;
+    const actions = document.createElement('details');
+    actions.className = 'item-actions';
+    const actionsToggle = document.createElement('summary');
+    actionsToggle.textContent = '⋯';
+    actionsToggle.title = 'Request actions';
+    actionsToggle.setAttribute('aria-label', `Actions for ${request.name}`);
+    const actionsMenu = document.createElement('div');
+    actionsMenu.className = 'item-actions-menu';
+    const duplicate = document.createElement('button');
+    duplicate.textContent = 'Duplicate Request';
+    duplicate.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const copy = L.duplicateRequest(request);
+      const index = state.requests.indexOf(request);
+      state.requests.splice(index + 1, 0, copy);
+      currentRequest = copy;
+      persist();
+      showRequestView();
+      renderSidebar();
+      renderEditor();
+    });
     const remove = document.createElement('button');
-    remove.className = 'item-delete';
-    remove.textContent = '✕';
-    remove.title = 'Delete';
+    remove.textContent = 'Delete Request';
     remove.addEventListener('click', async (event) => {
       event.stopPropagation();
       if (!(await api.ask(`Delete "${request.name}"?`))) return;
@@ -77,7 +94,20 @@ function renderSidebar() {
       renderSidebar();
       renderEditor();
     });
-    item.append(method, name, remove);
+    actionsMenu.append(duplicate, remove);
+    actions.append(actionsToggle, actionsMenu);
+    actions.addEventListener('click', (event) => event.stopPropagation());
+    actions.addEventListener('toggle', () => {
+      if (!actions.open) return;
+      requestList.querySelectorAll('.item-actions[open]').forEach((menu) => {
+        if (menu !== actions) menu.open = false;
+      });
+    });
+    item.append(method, name, actions);
+    item.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      actions.open = true;
+    });
     item.addEventListener('click', () => {
       currentRequest = request;
       showRequestView();
@@ -180,6 +210,7 @@ function renderEditor() {
   $('url').value = currentRequest.url;
   $('body').value = currentRequest.body;
   renderKvRows($('headers-rows'), currentRequest.headers, persist);
+  renderKvRows($('local-variables-rows'), currentRequest.localVariables, persist);
 }
 
 function bindEditor() {
@@ -204,6 +235,10 @@ function bindEditor() {
   $('btn-add-header').addEventListener('click', () => {
     currentRequest.headers.push({ key: '', value: '' });
     renderKvRows($('headers-rows'), currentRequest.headers, persist);
+  });
+  $('btn-add-local-variable').addEventListener('click', () => {
+    currentRequest.localVariables.push({ key: '', value: '' });
+    renderKvRows($('local-variables-rows'), currentRequest.localVariables, persist);
   });
   $('btn-save-request').addEventListener('click', () => {
     if (!currentRequest.name) currentRequest.name = currentRequest.url || 'Untitled';
@@ -231,7 +266,7 @@ function setRequestLoading(loading) {
 
 async function sendRequest() {
   if (requestInFlight) return;
-  const resolved = L.resolveRequest(currentRequest, state.variables);
+  const resolved = L.resolveRequest(currentRequest, state.globalVariables);
   if (!resolved.url) {
     await api.message('URL is empty.');
     return;
@@ -296,7 +331,10 @@ function bindResponse() {
 
 function bindCurl() {
   $('btn-copy-curl').addEventListener('click', async () => {
-    const command = L.toCurl(L.resolveRequest(currentRequest, state.variables), engineSettings());
+    const command = L.toCurl(
+      L.resolveRequest(currentRequest, state.globalVariables),
+      engineSettings()
+    );
     try {
       await navigator.clipboard.writeText(command);
       await api.message('curl command copied.');
@@ -484,11 +522,11 @@ async function runScenario() {
       continue;
     }
     // Resolved fresh per step, so extracts from earlier steps apply.
-    const resolved = L.resolveRequest(request, state.variables);
+    const resolved = L.resolveRequest(request, state.globalVariables);
     try {
       const response = await api.send(resolved, engineSettings());
       const verdict = L.runAssertions(step, response);
-      const extracted = L.applyExtracts(step, response, state.variables);
+      const extracted = L.applyExtracts(step, response, state.globalVariables);
       results.push({
         passed: verdict.passed,
         failures: verdict.failures,
@@ -524,15 +562,17 @@ function bindScenario() {
 // ----------------------------------------------------------------- dialogs
 
 function bindDialogs() {
-  $('btn-variables').addEventListener('click', () => {
-    renderKvRows($('variables-rows'), state.variables, persist);
-    $('variables-dialog').showModal();
+  $('btn-global-variables').addEventListener('click', () => {
+    renderKvRows($('global-variables-rows'), state.globalVariables, persist);
+    $('global-variables-dialog').showModal();
   });
-  $('btn-add-variable').addEventListener('click', () => {
-    state.variables.push({ key: '', value: '' });
-    renderKvRows($('variables-rows'), state.variables, persist);
+  $('btn-add-global-variable').addEventListener('click', () => {
+    state.globalVariables.push({ key: '', value: '' });
+    renderKvRows($('global-variables-rows'), state.globalVariables, persist);
   });
-  $('btn-close-variables').addEventListener('click', () => $('variables-dialog').close());
+  $('btn-close-global-variables').addEventListener('click', () => {
+    $('global-variables-dialog').close();
+  });
 
   $('btn-settings').addEventListener('click', () => {
     $('setting-verify-ssl').checked = state.settings.verifySsl;
@@ -564,6 +604,11 @@ function bindDialogs() {
   await loadPersisted();
   $('tab-requests').addEventListener('click', () => selectSidebarTab('requests'));
   $('tab-scenarios').addEventListener('click', () => selectSidebarTab('scenarios'));
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.item-actions[open]').forEach((menu) => {
+      menu.open = false;
+    });
+  });
   $('btn-new-request').addEventListener('click', () => {
     currentRequest = L.createRequest('');
     showRequestView();

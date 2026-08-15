@@ -12,7 +12,7 @@ function newId() {
 function createState() {
   return {
     requests: [],
-    variables: [],
+    globalVariables: [],
     scenarios: [],
     settings: { verifySsl: true, timeoutSecs: 30, followRedirects: true },
   };
@@ -26,7 +26,33 @@ function createRequest(name) {
     url: '',
     headers: [],
     body: '',
+    localVariables: [],
   };
+}
+
+function normalizeState(loaded) {
+  const source = loaded || {};
+  const state = createState();
+  state.requests = Array.isArray(source.requests)
+    ? source.requests.map((request) => Object.assign(createRequest(''), request, {
+      localVariables: Array.isArray(request.localVariables) ? request.localVariables : [],
+    }))
+    : [];
+  state.globalVariables = Array.isArray(source.globalVariables)
+    ? source.globalVariables
+    : Array.isArray(source.variables) ? source.variables : [];
+  state.scenarios = Array.isArray(source.scenarios) ? source.scenarios : [];
+  state.settings = Object.assign(state.settings, source.settings || {});
+  return state;
+}
+
+function duplicateRequest(request) {
+  return Object.assign({}, request, {
+    id: newId(),
+    name: `${request.name} copy`,
+    headers: request.headers.map((header) => Object.assign({}, header)),
+    localVariables: (request.localVariables || []).map((variable) => Object.assign({}, variable)),
+  });
 }
 
 function createScenario(name) {
@@ -58,8 +84,11 @@ function substitute(text, map) {
 
 // A request ready to hand to an engine: every field substituted, empty
 // header rows dropped.
-function resolveRequest(request, variables) {
-  const map = varsToMap(variables);
+function resolveRequest(request, globalVariables) {
+  const map = Object.assign(
+    varsToMap(globalVariables),
+    varsToMap(request.localVariables || [])
+  );
   return {
     method: request.method,
     url: substitute(request.url, map),
@@ -249,6 +278,8 @@ const exported = {
   newId,
   createState,
   createRequest,
+  normalizeState,
+  duplicateRequest,
   createScenario,
   createStep,
   varsToMap,

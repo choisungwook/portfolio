@@ -14,6 +14,31 @@ test('substitute replaces known variables and leaves unknown ones visible', () =
   );
 });
 
+test('normalizeState migrates variables to global variables and initializes request locals', () => {
+  const state = L.normalizeState({
+    requests: [{ id: 'r1', name: 'One', method: 'GET', url: '', headers: [], body: '' }],
+    variables: [{ key: 'host', value: 'https://old.example.com' }],
+  });
+  assert.deepStrictEqual(state.globalVariables, [
+    { key: 'host', value: 'https://old.example.com' },
+  ]);
+  assert.deepStrictEqual(state.requests[0].localVariables, []);
+  assert.strictEqual(Object.hasOwn(state, 'variables'), false);
+});
+
+test('duplicateRequest copies mutable fields and appends copy to the name', () => {
+  const source = L.createRequest('List users');
+  source.headers.push({ key: 'X-One', value: '1' });
+  source.localVariables.push({ key: 'user', value: '7' });
+  const copy = L.duplicateRequest(source);
+  assert.strictEqual(copy.name, 'List users copy');
+  assert.notStrictEqual(copy.id, source.id);
+  assert.deepStrictEqual(copy.headers, source.headers);
+  assert.deepStrictEqual(copy.localVariables, source.localVariables);
+  assert.notStrictEqual(copy.headers, source.headers);
+  assert.notStrictEqual(copy.localVariables, source.localVariables);
+});
+
 test('resolveRequest substitutes url, headers and body, and drops empty header rows', () => {
   const request = {
     method: 'POST',
@@ -35,6 +60,20 @@ test('resolveRequest substitutes url, headers and body, and drops empty header r
     headers: [{ key: 'Authorization', value: 'Bearer t1' }],
     body: '{"user": "akbun"}',
   });
+});
+
+test('resolveRequest uses local variables before globals', () => {
+  const request = L.createRequest('Local override');
+  request.url = '{{host}}/{{user}}';
+  request.localVariables = [{ key: 'user', value: 'local-user' }];
+  const globals = [
+    { key: 'host', value: 'https://api.example.com' },
+    { key: 'user', value: 'global-user' },
+  ];
+  assert.strictEqual(
+    L.resolveRequest(request, globals).url,
+    'https://api.example.com/local-user'
+  );
 });
 
 test('upsertVariable updates in place or appends', () => {
