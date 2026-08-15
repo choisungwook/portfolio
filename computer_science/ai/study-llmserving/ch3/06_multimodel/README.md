@@ -132,9 +132,13 @@ HTTP 요청은 [06_multimodel.http](./06_multimodel.http)에서 실행한다.
 4. Triton wrapper 패턴: 내 서비스는 cache·metadata·web만, 추론은 통째로 위임
 5. `config.pbtxt`의 input/output 이름(`data_0`, `fc6_1`)이 클라이언트 코드에 그대로 나타남 → 계약(contract)
 
-## 스스로 답해보기
+## 퀴즈
 
-- q6(퀴즈): LRU eviction이 왜 필요한가?
-- q7(퀴즈): Triton의 두 API 종류와 각각의 역할
-- q9(질문): `max_models=2`에 3개 model 균등 트래픽 → 무슨 일이? (직접 확인했음)
-- q12(퀴즈): 고객사 1,000곳 model, 동시 200개. 첫 요청 UX 문제를 어떻게 완화하나?
+- q6. LRU eviction이 왜 필요한가?
+  - 정답: 제한된 메모리에 모든 model을 올릴 수 없으므로 오래 사용하지 않은 model을 내려 새 model의 공간을 확보해야 한다.
+- q7. Triton의 두 API 종류와 각각의 역할은 무엇인가?
+  - 정답: management API는 model을 load·unload하고 상태를 관리한다. inference API는 입력을 전달하고 추론 결과를 받는다.
+- q9. `max_models=2`에 3개 model의 균등 트래픽이 들어오면 무슨 일이 생기는가?
+  - 정답: 매 요청마다 필요한 model이 직전에 축출된 상태가 되어 miss와 재로딩이 반복된다. hit rate가 0에 수렴하고 cold start latency가 계속 발생한다.
+- q12. 고객사 1,000곳의 model 중 200개가 동시에 사용될 때 첫 요청 UX를 어떻게 완화하는가?
+  - 정답: 최근 사용량이나 예약·예측 정보를 기준으로 활성 model을 미리 load한다. 나머지는 비동기 load 상태와 재시도 안내를 제공하고, 자주 쓰는 model은 eviction 대상에서 보호한다.

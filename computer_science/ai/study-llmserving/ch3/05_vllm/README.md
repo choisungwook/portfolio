@@ -92,7 +92,9 @@ HTTP 요청은 [05_vllm.http](./05_vllm.http)에서 실행한다.
 3. `max_num_seqs`를 1로 낮추면 vLLM도 우리 구현 수준으로 내려감 → **framework가 마법이 아니라 설정이 일한다는 증거**
 4. server mode는 `/v1/completions`, `/v1/chat/completions` 같은 OpenAI 호환 API를 그냥 제공 → k8s Deployment로 바로 뜰 수 있는 형태
 
-## 스스로 답해보기
+## 퀴즈
 
-- q9: "vLLM 쓰면 되니까 내부는 몰라도 된다"에 근거 2개로 반박
-- library mode vs server mode 중 우리 조직 상황에 맞는 건? (언어 다양성 / 독립 스케일링 / 실행 흐름 제어)
+- q9. "vLLM 쓰면 되니까 내부는 몰라도 된다"에 근거 2개로 반박하라.
+  - 정답: `max_num_seqs` 같은 동시 처리 설정은 batching 원리를 알아야 조정할 수 있다. 성능과 메모리 문제도 continuous batching, PagedAttention, KV cache의 동작을 알아야 원인을 분석할 수 있다.
+- library mode와 server mode 중 조직 상황에 맞는 방식을 고르는 기준은 무엇인가?
+  - 정답: 여러 언어에서 사용하거나 model server를 독립적으로 배포·스케일링하려면 server mode가 적합하다. Python 애플리케이션에서 생성 실행 흐름을 직접 제어하려면 library mode가 적합하다.

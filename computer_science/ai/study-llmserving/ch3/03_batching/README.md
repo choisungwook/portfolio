@@ -60,8 +60,11 @@ HTTP 요청은 [03_batching.http](./03_batching.http)에서 실행한다.
 3. batch 안에서 짧은 prompt가 긴 prompt를 **기다림** (padding + 동기화). 이게 latency 대가
 4. `bench_batching.py`에 길이가 크게 다른 prompt를 섞어보면 padding 낭비가 커지는 걸 볼 수 있음
 
-## 스스로 답해보기
+## 퀴즈
 
-- q4: 다른 사용자의 prompt를 한 batch에 섞으려면 최소한 무엇을 더 들고 있어야 하나?
-- q5: batching은 **누구의** latency를 희생해 전체 throughput을 사는가?
-- q10: `batch_size=4`, prompt 5개 → 최소 몇 번의 batch 실행인가?
+- q4. 다른 사용자의 prompt를 한 batch에 섞으려면 최소한 무엇을 더 들고 있어야 하나?
+  - 정답: 각 prompt와 결과를 원래 요청에 연결할 `request_id`가 필요하다.
+- q5. batching은 **누구의** latency를 희생해 전체 throughput을 사는가?
+  - 정답: batch가 채워지길 기다리는 요청과 같은 batch에서 긴 prompt의 처리를 기다리는 짧은 요청의 latency를 희생한다.
+- q10. `batch_size=4`, prompt 5개를 처리하려면 최소 몇 번의 batch 실행이 필요한가?
+  - 정답: 2번이다. 첫 batch에서 4개, 두 번째 batch에서 1개를 처리한다.

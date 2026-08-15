@@ -140,8 +140,11 @@ kind delete cluster --name ch03        # Mac
 # /usr/local/bin/k3s-uninstall.sh      # Ubuntu
 ```
 
-## 스스로 답해보기
+## 퀴즈
 
-- q10: cost-optimized가 reactive라서 생기는 근본 한계는? latency-optimized는 대신 무엇을 포기하나?
-- q13(퀴즈): cost에서 특정 model latency가 튄다. 원인 2개와 완화책 각각 1개
-- EKS 경험과 대응: cost ≒ bin-packing + cluster-autoscaler / latency ≒ 워크로드별 노드그룹 + 최소 replica 고정. 실제로 같은 trade-off인가?
+- q10. cost-optimized가 reactive라서 생기는 근본 한계는 무엇인가? latency-optimized는 대신 무엇을 포기하는가?
+  - 정답: cost-optimized는 요청이 온 뒤 model 위치를 학습하고 load하므로 첫 요청의 cold start를 피할 수 없다. latency-optimized는 model을 미리 띄워 이 지연을 없애는 대신 유휴 리소스와 운영 대상 수를 늘린다.
+- q13. cost-optimized에서 특정 model의 latency가 튀는 원인 2개와 완화책을 각각 1개씩 제시하라.
+  - 정답: LRU 축출 후 재로딩이 원인이면 cache를 늘리거나 hot model을 보호한다. 라우팅 map 갱신 전 잘못된 backend로 가는 것이 원인이면 polling 주기를 줄이거나 load·unload 이벤트로 map을 갱신한다.
+- EKS의 cost 설계와 latency 설계도 같은 trade-off인가?
+  - 정답: 같은 비용과 지연의 trade-off다. bin-packing과 cluster autoscaler는 유휴 비용을 줄이는 대신 scale-out 대기와 자원 경합을 만들고, 워크로드별 노드 그룹과 최소 replica 고정은 빠르고 예측 가능한 응답을 위해 유휴 비용을 부담한다.

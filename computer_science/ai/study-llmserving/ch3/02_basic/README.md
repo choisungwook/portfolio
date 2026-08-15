@@ -186,7 +186,9 @@ docker compose logs -f serving
 3. Ubuntu에서 `nvidia-smi` → GPU 사용률이 **띄엄띄엄 튐**. 사이사이가 tokenize/HTTP 처리 시간
 4. worker 프로세스만 `kill -9` → API는 살아 있지만 요청이 영원히 멈춤 (격리의 양면)
 
-## 스스로 답해보기
+## 퀴즈
 
-- q2: process 격리의 **주된** 이유는 장애 격리인가 GPU 활용률인가?
-- q3: 동시 100 요청에서 GPU가 노는 이유를 연산 관점에서 설명할 수 있나?
+- q2. process 격리의 **주된** 이유는 장애 격리인가 GPU 활용률인가?
+  - 정답: GPU 활용률이다. model 실행을 웹·tokenize 같은 CPU 작업과 분리해 GPU의 대기 시간을 줄인다.
+- q3. 동시 100 요청에서 GPU가 노는 이유를 연산 관점에서 설명할 수 있나?
+  - 정답: 단일 worker가 요청을 하나씩 실행해 동시 요청이 batch 연산으로 합쳐지지 않는다. 요청 사이의 tokenize·큐·HTTP 처리 중에는 GPU가 기다린다.
