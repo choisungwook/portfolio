@@ -1,0 +1,69 @@
+[project]
+name = "study-llmserving-ch3"
+version = "0.1.0"
+description = "Chapter 3 hands-on for understanding LLM serving internals"
+requires-python = "==3.13.*"
+dependencies = [
+  "fastapi>=0.115",
+  "httpx>=0.28",
+  "numpy>=2.1",
+  "pillow>=11",
+  "pydantic>=2.11",
+  "requests>=2.32",
+  "torch>=2.7",
+  "torchvision>=0.22",
+  "transformers>=4.52",
+  "uvicorn>=0.34",
+]
+
+[project.optional-dependencies]
+gpu = [
+  "tritonclient[http]>=2.53; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "vllm>=0.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[dependency-groups]
+dev = [
+  "ipykernel>=6.29",
+  "jupyterlab>=4.4",
+  "matplotlib>=3.10",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.0",
+  "ruff>=0.12",
+]
+
+[tool.ruff]
+line-length = 100
+indent-width = 2
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "UP"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["E402", "F811"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ch03-cost
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multimodel-serving
+  namespace: ch03-cost
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: multimodel-serving
+  template:
+    metadata:
+      labels:
+        app: multimodel-serving
+    spec:
+      nodeSelector:
+        role: serving
+      containers:
+        - name: serving
+          image: ch03-serving:local
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/venv/bin/python", "06_multimodel/serve.py"]
+          env:
+            - name: MAX_MODELS
+              value: "2"
+            - name: PORT
+              value: "8001"
+            - name: HF_HOME
+              value: /hf-cache
+          ports:
+            - containerPort: 8001
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 5
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /hf-cache
+      volumes:
+        - name: hf-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: multimodel-serving-0
+  namespace: ch03-cost
+spec:
+  selector:
+    app: multimodel-serving
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router
+  namespace: ch03-cost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router
+  template:
+    metadata:
+      labels:
+        app: router
+    spec:
+      containers:
+        - name: router
+          image: ch03-serving:local
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/venv/bin/python", "07_tradeoff/router.py"]
+          env:
+            - name: BACKENDS
+              value: "http://multimodel-serving-0.ch03-cost.svc.cluster.local:8001"
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router
+  namespace: ch03-cost
+spec:
+  type: NodePort
+  selector:
+    app: router
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
