@@ -15,9 +15,8 @@ The page owns one state object and both shells persist it as an opaque JSON stri
 
 ```json
 {
-  "requests": [{ "id": "", "name": "", "method": "GET", "url": "", "headers": [], "body": "", "localVariables": [] }],
+  "folders": [{ "id": "", "name": "", "isDefault": false, "requests": [{ "id": "", "name": "", "method": "GET", "url": "", "headers": [], "body": "", "localVariables": [] }] }],
   "globalVariables": [{ "key": "", "value": "" }],
-  "scenarios": [{ "id": "", "name": "", "steps": [] }],
   "settings": { "verifySsl": true, "timeoutSecs": 30, "followRedirects": true }
 }
 ```
@@ -25,8 +24,7 @@ The page owns one state object and both shells persist it as an opaque JSON stri
 - Desktop storage: `state.json` in the app data directory, written write-then-rename so a crash cannot destroy bookmarks.
 - Web storage: localStorage under `akbun-requesthttp-state`.
 - Saves are debounced 300 ms in `app.js`; Rust and the worker never interpret the blob.
-
-A scenario step is `{ requestId, expectStatus, bodyContains, extracts: [{ path, var }] }`. Assertions left empty are skipped.
+- `Default` always exists, cannot be deleted, and receives migrated flat requests and new requests with no chosen folder.
 
 ## The engine surface
 
@@ -44,14 +42,14 @@ The IPC surface is three commands: `send_request`, `load_state`, `save_state`.
 ## Key flows
 
 - Send: `app.js` resolves `{{variables}}` through `lib.js` (`resolveRequest`), hands the spec to `api.send`, renders the response. Request-local values override globals with the same name. Unknown variables stay visible as `{{name}}`.
-- Scenario run: steps run sequentially. Each step re-resolves its request so extracts from earlier steps apply, then `runAssertions` (status, body substring) and `applyExtracts` (JSON dot path into variables, persisted) run. Failures do not stop the run; each step shows PASS/FAIL/ERROR.
 - curl: `toCurl` renders the resolved request (adds `-k` when verification is off); `parseCurl` reads the common flag subset (`-X`, `-H`, `-d/--data*`, `--url`, `-A`) and imports into a fresh scratch request, never over a bookmark.
+- `.http` import: the page reads the selected file, `parseHttpFile` splits requests at `###`, and the imported folder uses the full filename. File variables become request-local variables.
 
 ## Where logic lives
 
 | File | Role | Tested by |
 |---|---|---|
-| `src/lib.js` | Variables, curl, extraction, assertions, formatting | `test/lib.test.js` |
+| `src/lib.js` | Folder migration, variables, curl/.http parsing, formatting | `test/lib.test.js` |
 | `worker/proxy.js` | Spec validation and fetch mapping for the web engine | `test/proxy.test.js` |
 | `src/app.js` | DOM glue only | Running the app |
 | `src/api.js` | Shell detection, engine and storage bindings, updater | Running the app |

@@ -92,4 +92,5 @@ Two warnings that are easy to learn the hard way:
 - Response bodies are treated as text; binary responses display as lossy text. The size and status are still right.
 - `/api/proxy` on the web build is an origin-checked but otherwise open fetch endpoint — anyone scripting against the deployed URL can use it. Cloudflare rate limiting is the backstop; see the ADR before hardening further.
 - curl import covers the common flag subset (`-X`, `-H`, `-d`/`--data*`, `--url`, `-A`); form uploads (`-F`) and `@file` bodies are not represented.
+- `.http` import recognizes `###` separators, `# @name`/`// @name`, request lines, headers, bodies, and `@name = value` variables. Response-handler scripts and multipart file bodies are not represented.
 - The macOS build is unsigned: first launch needs `xattr -cr /Applications/akbun-requesthttp.app`, which the release notes state.

@@ -14,16 +14,40 @@ test('substitute replaces known variables and leaves unknown ones visible', () =
   );
 });
 
-test('normalizeState migrates variables to global variables and initializes request locals', () => {
+test('createState always includes an empty default folder', () => {
+  const state = L.createState();
+  assert.strictEqual(state.folders.length, 1);
+  assert.deepStrictEqual(state.folders[0], {
+    id: L.DEFAULT_FOLDER_ID,
+    name: 'Default',
+    isDefault: true,
+    requests: [],
+  });
+});
+
+test('normalizeState migrates flat requests into the default folder', () => {
   const state = L.normalizeState({
     requests: [{ id: 'r1', name: 'One', method: 'GET', url: '', headers: [], body: '' }],
     variables: [{ key: 'host', value: 'https://old.example.com' }],
+    scenarios: [{ id: 'removed' }],
   });
   assert.deepStrictEqual(state.globalVariables, [
     { key: 'host', value: 'https://old.example.com' },
   ]);
-  assert.deepStrictEqual(state.requests[0].localVariables, []);
+  assert.strictEqual(state.folders[0].id, L.DEFAULT_FOLDER_ID);
+  assert.strictEqual(state.folders[0].name, 'Default');
+  assert.deepStrictEqual(state.folders[0].requests[0].localVariables, []);
+  assert.strictEqual(Object.hasOwn(state, 'requests'), false);
+  assert.strictEqual(Object.hasOwn(state, 'scenarios'), false);
   assert.strictEqual(Object.hasOwn(state, 'variables'), false);
+});
+
+test('normalizeState restores the default folder when only named folders were saved', () => {
+  const state = L.normalizeState({
+    folders: [{ id: 'team', name: 'Team API', requests: [] }],
+  });
+  assert.strictEqual(state.folders[0].id, L.DEFAULT_FOLDER_ID);
+  assert.strictEqual(state.folders[1].name, 'Team API');
 });
 
 test('duplicateRequest copies mutable fields and appends copy to the name', () => {
@@ -132,63 +156,58 @@ test('parseCurl skips unknown flags without losing the url', () => {
   assert.strictEqual(parsed.method, 'GET');
 });
 
-// ---------------------------------------------------------------- scenario
+// -------------------------------------------------------------------- .http
 
-test('getByPath walks objects and arrays', () => {
-  const data = { items: [{ id: 7, tags: ['a', 'b'] }] };
-  assert.strictEqual(L.getByPath(data, 'items.0.id'), 7);
-  assert.strictEqual(L.getByPath(data, 'items.0.tags.1'), 'b');
-  assert.strictEqual(L.getByPath(data, 'items.9.id'), undefined);
+test('httpFolderName keeps the imported file name', () => {
+  assert.strictEqual(L.httpFolderName('/tmp/github.http'), 'github.http');
+  assert.strictEqual(L.httpFolderName('service.HTTP'), 'service.HTTP');
 });
 
-test('runAssertions checks status and body substring only when filled in', () => {
-  const response = { status: 201, body: '{"ok":true}' };
+test('parseHttpFile creates a request for each separator section', () => {
+  const requests = L.parseHttpFile(`
+@host = https://api.example.com
+@token = secret
+
+### List users
+GET {{host}}/users HTTP/1.1
+Authorization: Bearer {{token}}
+
+### Create user
+# @name create-user
+POST {{host}}/users
+Content-Type: application/json
+
+{"name":"akbun"}
+`);
+  assert.strictEqual(requests.length, 2);
   assert.deepStrictEqual(
-    L.runAssertions({ expectStatus: '201', bodyContains: '"ok"' }, response),
-    { passed: true, failures: [] }
+    {
+      name: requests[0].name,
+      method: requests[0].method,
+      url: requests[0].url,
+      headers: requests[0].headers,
+      body: requests[0].body,
+      localVariables: requests[0].localVariables,
+    },
+    {
+      name: 'List users',
+      method: 'GET',
+      url: '{{host}}/users',
+      headers: [{ key: 'Authorization', value: 'Bearer {{token}}' }],
+      body: '',
+      localVariables: [
+        { key: 'host', value: 'https://api.example.com' },
+        { key: 'token', value: 'secret' },
+      ],
+    }
   );
-  const failed = L.runAssertions({ expectStatus: '200', bodyContains: 'nope' }, response);
-  assert.strictEqual(failed.passed, false);
-  assert.strictEqual(failed.failures.length, 2);
-  assert.deepStrictEqual(L.runAssertions({ expectStatus: '', bodyContains: '' }, response), {
-    passed: true,
-    failures: [],
-  });
+  assert.strictEqual(requests[1].name, 'create-user');
+  assert.strictEqual(requests[1].method, 'POST');
+  assert.strictEqual(requests[1].body, '{"name":"akbun"}');
 });
 
-test('runAssertions reports a non-numeric expected status instead of comparing NaN', () => {
-  const verdict = L.runAssertions({ expectStatus: 'ok', bodyContains: '' }, { status: 200, body: '' });
-  assert.strictEqual(verdict.passed, false);
-  assert.deepStrictEqual(verdict.failures, ['expected status "ok" is not a number']);
-});
-
-test('applyExtracts pulls JSON values into variables', () => {
-  const variables = [];
-  const step = {
-    extracts: [
-      { path: 'data.token', var: 'token' },
-      { path: 'data.count', var: 'count' },
-      { path: 'data.missing', var: 'nope' },
-    ],
-  };
-  const response = { body: '{"data":{"token":"t9","count":3}}' };
-  const extracted = L.applyExtracts(step, response, variables);
-  assert.deepStrictEqual(variables, [
-    { key: 'token', value: 't9' },
-    { key: 'count', value: '3' },
-  ]);
-  assert.strictEqual(extracted.length, 2);
-});
-
-test('applyExtracts does nothing on a non-JSON body', () => {
-  const variables = [];
-  const extracted = L.applyExtracts(
-    { extracts: [{ path: 'a', var: 'a' }] },
-    { body: '<html>' },
-    variables
-  );
-  assert.deepStrictEqual(extracted, []);
-  assert.deepStrictEqual(variables, []);
+test('parseHttpFile ignores sections without a request', () => {
+  assert.deepStrictEqual(L.parseHttpFile('### Notes\n# nothing here'), []);
 });
 
 // ------------------------------------------------------------- formatting

@@ -1,6 +1,6 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-11",
+  "updated": "2026-08-15",
   "products": [
     {
       "id": "akbun-productcatalog",
@@ -14,7 +14,7 @@
     {
       "id": "akbun-requesthttp",
       "name": "akbun-requesthttp",
-      "description": "HTTP(S) 요청, 응답 확인, 북마크, 공통 변수, curl 변환, 시나리오 실행을 갖춘 데스크톱 HTTP 클라이언트",
+      "description": "HTTP(S) 요청, 응답 확인, 폴더 관리, 공통 변수, curl 변환, .http 가져오기를 갖춘 데스크톱 HTTP 클라이언트",
       "kind": "desktop",
       "tags": ["tauri", "http"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-requesthttp",

@@ -1,8 +1,10 @@
 'use strict';
 
-// Pure logic shared by the desktop app and the web build: variable
-// substitution, curl import/export, response value extraction and scenario
-// assertions. No DOM, no Tauri, no fetch — node tests this file directly.
+// Pure logic shared by the desktop app and the web build: state migration,
+// variable substitution, and curl/.http import. No DOM, no Tauri, no fetch —
+// node tests this file directly.
+
+const DEFAULT_FOLDER_ID = 'default';
 
 function newId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -11,10 +13,18 @@ function newId() {
 // One state object owns everything the app persists.
 function createState() {
   return {
-    requests: [],
+    folders: [createFolder('Default', true)],
     globalVariables: [],
-    scenarios: [],
     settings: { verifySsl: true, timeoutSecs: 30, followRedirects: true },
+  };
+}
+
+function createFolder(name, isDefault = false) {
+  return {
+    id: isDefault ? DEFAULT_FOLDER_ID : newId(),
+    name: name || 'Untitled folder',
+    isDefault,
+    requests: [],
   };
 }
 
@@ -33,17 +43,37 @@ function createRequest(name) {
 function normalizeState(loaded) {
   const source = loaded || {};
   const state = createState();
-  state.requests = Array.isArray(source.requests)
-    ? source.requests.map((request) => Object.assign(createRequest(''), request, {
-      localVariables: Array.isArray(request.localVariables) ? request.localVariables : [],
+  const folders = Array.isArray(source.folders)
+    ? source.folders.map((folder) => Object.assign(createFolder(folder.name), folder, {
+      isDefault: folder.id === DEFAULT_FOLDER_ID || folder.isDefault === true,
+      requests: Array.isArray(folder.requests) ? folder.requests.map(normalizeRequest) : [],
     }))
     : [];
+  const loadedDefault = folders.find((folder) => folder.isDefault);
+  const defaultFolder = loadedDefault || state.folders[0];
+  defaultFolder.id = DEFAULT_FOLDER_ID;
+  defaultFolder.name = 'Default';
+  defaultFolder.isDefault = true;
+  const oldRequests = Array.isArray(source.requests) ? source.requests.map(normalizeRequest) : [];
+  defaultFolder.requests.push(...oldRequests);
+  const namedFolders = folders.filter((folder) => folder !== loadedDefault);
+  for (const folder of namedFolders) {
+    if (folder.id === DEFAULT_FOLDER_ID) folder.id = newId();
+    folder.isDefault = false;
+  }
+  state.folders = [defaultFolder, ...namedFolders];
   state.globalVariables = Array.isArray(source.globalVariables)
     ? source.globalVariables
     : Array.isArray(source.variables) ? source.variables : [];
-  state.scenarios = Array.isArray(source.scenarios) ? source.scenarios : [];
   state.settings = Object.assign(state.settings, source.settings || {});
   return state;
+}
+
+function normalizeRequest(request) {
+  return Object.assign(createRequest(''), request, {
+    headers: Array.isArray(request.headers) ? request.headers : [],
+    localVariables: Array.isArray(request.localVariables) ? request.localVariables : [],
+  });
 }
 
 function duplicateRequest(request) {
@@ -53,14 +83,6 @@ function duplicateRequest(request) {
     headers: request.headers.map((header) => Object.assign({}, header)),
     localVariables: (request.localVariables || []).map((variable) => Object.assign({}, variable)),
   });
-}
-
-function createScenario(name) {
-  return { id: newId(), name: name || 'Untitled scenario', steps: [] };
-}
-
-function createStep(requestId) {
-  return { requestId, expectStatus: '', bodyContains: '', extracts: [] };
 }
 
 // ---------------------------------------------------------------- variables
@@ -202,58 +224,77 @@ function parseCurl(command) {
   return request;
 }
 
-// ---------------------------------------------------- scenario run helpers
+// -------------------------------------------------------------------- .http
 
-// "a.b.0.c" walks objects and arrays. Returns undefined when the path
-// leaves the data.
-function getByPath(value, path) {
-  let current = value;
-  for (const key of String(path).split('.')) {
-    if (current == null) return undefined;
-    current = current[key];
-  }
-  return current;
+function httpFolderName(fileName) {
+  const base = String(fileName || '').split(/[\\/]/).pop() || '';
+  return base || 'Imported';
 }
 
-// A step passes when every filled-in assertion holds.
-function runAssertions(step, response) {
-  const failures = [];
-  if (step.expectStatus !== '' && step.expectStatus != null) {
-    const expected = Number(step.expectStatus);
-    if (!Number.isFinite(expected)) {
-      failures.push(`expected status "${step.expectStatus}" is not a number`);
-    } else if (response.status !== expected) {
-      failures.push(`status ${response.status}, expected ${expected}`);
+function parseHttpFile(content) {
+  const text = String(content || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const variables = [];
+  for (const line of text.split('\n')) {
+    const match = line.match(/^\s*@([\w.-]+)\s*=\s*(.*?)\s*$/);
+    if (match) upsertVariable(variables, match[1], match[2]);
+  }
+
+  const sections = [];
+  let label = '';
+  let lines = [];
+  for (const line of text.split('\n')) {
+    const separator = line.match(/^\s*###(?:\s+(.*?))?\s*$/);
+    if (separator) {
+      sections.push({ label, lines });
+      label = separator[1] || '';
+      lines = [];
+    } else {
+      lines.push(line);
     }
   }
-  if (step.bodyContains) {
-    if (!String(response.body).includes(step.bodyContains)) {
-      failures.push(`body does not contain "${step.bodyContains}"`);
-    }
-  }
-  return { passed: failures.length === 0, failures };
+  sections.push({ label, lines });
+
+  return sections
+    .map((section) => parseHttpSection(section, variables))
+    .filter(Boolean);
 }
 
-// Pulls values out of a JSON response body into variables, so later steps
-// can use them as {{name}}. Returns what was extracted.
-function applyExtracts(step, response, variables) {
-  const extracted = [];
-  if (!step.extracts || step.extracts.length === 0) return extracted;
-  let parsed;
-  try {
-    parsed = JSON.parse(response.body);
-  } catch {
-    return extracted;
+function parseHttpSection(section, variables) {
+  const methodPattern = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)\s+(\S+?)(?:\s+HTTP\/\d(?:\.\d+)?)?\s*$/i;
+  let name = '';
+  let requestLineIndex = -1;
+  let method = '';
+  let url = '';
+
+  section.lines.forEach((line, index) => {
+    if (requestLineIndex !== -1) return;
+    const nameMatch = line.match(/^\s*(?:#|\/{2})\s*@name\s+(.+?)\s*$/i);
+    if (nameMatch) name = nameMatch[1];
+    const requestMatch = line.trim().match(methodPattern);
+    if (requestMatch) {
+      requestLineIndex = index;
+      method = requestMatch[1].toUpperCase();
+      url = requestMatch[2];
+    }
+  });
+  if (requestLineIndex === -1) return null;
+
+  const headers = [];
+  let cursor = requestLineIndex + 1;
+  while (cursor < section.lines.length && section.lines[cursor].trim() !== '') {
+    const header = section.lines[cursor].match(/^\s*([^:#][^:]*):\s*(.*)$/);
+    if (header) headers.push({ key: header[1].trim(), value: header[2].trim() });
+    cursor += 1;
   }
-  for (const rule of step.extracts) {
-    if (!rule.path || !rule.var) continue;
-    const value = getByPath(parsed, rule.path);
-    if (value === undefined) continue;
-    const text = typeof value === 'string' ? value : JSON.stringify(value);
-    upsertVariable(variables, rule.var, text);
-    extracted.push({ key: rule.var, value: text });
-  }
-  return extracted;
+  while (cursor < section.lines.length && section.lines[cursor].trim() === '') cursor += 1;
+  const body = section.lines.slice(cursor).join('\n').trimEnd();
+  const request = createRequest(name || section.label || `${method} ${url}`);
+  request.method = method;
+  request.url = url;
+  request.headers = headers;
+  request.body = body;
+  request.localVariables = variables.map((variable) => Object.assign({}, variable));
+  return request;
 }
 
 // ------------------------------------------------------------- formatting
@@ -275,13 +316,13 @@ function prettyBody(body, headers) {
 }
 
 const exported = {
+  DEFAULT_FOLDER_ID,
   newId,
   createState,
+  createFolder,
   createRequest,
   normalizeState,
   duplicateRequest,
-  createScenario,
-  createStep,
   varsToMap,
   substitute,
   resolveRequest,
@@ -290,9 +331,8 @@ const exported = {
   toCurl,
   tokenize,
   parseCurl,
-  getByPath,
-  runAssertions,
-  applyExtracts,
+  httpFolderName,
+  parseHttpFile,
   formatSize,
   prettyBody,
 };
