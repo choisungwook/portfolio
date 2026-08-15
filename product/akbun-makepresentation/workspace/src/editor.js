@@ -236,17 +236,27 @@ function normalizeRect(x0, y0, x1, y1) {
   };
 }
 
+// Touching is enough, the way Figma and Illustrator drag-select. Requiring
+// full containment looked like a bug that swallowed objects: shapes default
+// to no fill, so a drag started in the empty middle of a rectangle begins a
+// marquee, and that marquee can never contain the rectangle it started
+// inside. The text sitting in the rectangle was caught and the rectangle
+// itself was not.
+//
+// Lines keep being tested by their bounding box, so a diagonal one answers to
+// a marquee that only crosses the empty corner of that box. Under a touch
+// rule that errs the forgiving way.
 function shapeIndicesInRect(shapes, rect) {
   const right = rect.x + rect.w;
   const bottom = rect.y + rect.h;
   return shapes.reduce((indices, shape, index) => {
     const box = shapeBBox(shape);
-    const contained =
-      box.x >= rect.x &&
-      box.y >= rect.y &&
-      box.x + box.w <= right &&
-      box.y + box.h <= bottom;
-    if (contained) indices.push(index);
+    const overlaps =
+      box.x <= right &&
+      box.x + box.w >= rect.x &&
+      box.y <= bottom &&
+      box.y + box.h >= rect.y;
+    if (overlaps) indices.push(index);
     return indices;
   }, []);
 }

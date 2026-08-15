@@ -67,23 +67,29 @@ function clearSelection() {
 // slide at every zoom level.
 const HANDLE_SLIDE_UNITS = 12;
 
-function hitSvg(shape) {
-  // An invisible, fatter twin so thin strokes are still clickable. Filled
-  // interiors are already clickable through the visible element.
+// A fatter twin that follows the shape's own geometry. As `hit` it is
+// invisible and makes a hairline as easy to click as a slab; as `halo` it is
+// the glow that marks the shape selected. One geometry, so the thing that
+// lights up is exactly the thing the pointer answers to.
+//
+// Text is caught by its filled box and everything else by a wide stroke, so
+// the class carries `fill` to tell the two paints apart in css.
+function outlineSvg(shape, kind) {
   const width = Math.max(16, shape.strokeWidth + 12);
   const b = L.shapeBBox(shape);
+  const attrs = `class="${kind}" stroke-width="${width}"`;
   switch (shape.kind) {
     case 'line':
     case 'arrow':
-      return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" stroke="transparent" stroke-width="${width}"/>`;
+      return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" ${attrs}/>`;
     case 'pen': {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
-      return `<polyline points="${pts}" fill="none" stroke="transparent" stroke-width="${width}"/>`;
+      return `<polyline points="${pts}" ${attrs}/>`;
     }
     case 'text':
-      return `<rect x="${b.x}" y="${b.y}" width="${Math.max(b.w, 20)}" height="${Math.max(b.h, shape.fontSize * 1.3)}" fill="transparent"/>`;
+      return `<rect x="${b.x}" y="${b.y}" width="${Math.max(b.w, 20)}" height="${Math.max(b.h, shape.fontSize * 1.3)}" class="${kind} fill"/>`;
     default:
-      return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="transparent" stroke-width="${width}"/>`;
+      return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" ${attrs}/>`;
   }
 }
 
@@ -140,16 +146,20 @@ function renderCanvas() {
       (shape, i) =>
         `<g data-i="${i}">${L.renderShapeSvg(shape, {
           hideText: i === state.editingIndex,
-        })}${hitSvg(shape)}</g>`
+        })}${outlineSvg(shape, 'hit')}</g>`
     )
     .join('');
   const showHandles = state.selection.length === 1 && state.editingIndex < 0;
-  const selections = state.selection
-    .map((index) => slide().shapes[index])
-    .filter(Boolean)
-    .map((shape) => selectionSvg(shape, showHandles))
-    .join('');
+  const selected = state.selection.map((index) => slide().shapes[index]).filter(Boolean);
+  // The glow draws before the shapes so it reads as a backlight. Over them it
+  // would tint a black line towards the accent and change the colour the user
+  // picked.
+  const halos = state.editingIndex < 0
+    ? selected.map((shape) => outlineSvg(shape, 'halo')).join('')
+    : '';
+  const selections = selected.map((shape) => selectionSvg(shape, showHandles)).join('');
   canvas.innerHTML =
+    halos +
     shapes +
     slideNumberSvg(state.current) +
     guidelinesSvg() +
@@ -537,7 +547,11 @@ canvas.addEventListener('pointerup', () => {
     setTool('select');
   } else if (drag.mode === 'marquee') {
     const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
-    selectMany(L.shapeIndicesInRect(slide().shapes, rect));
+    // A press that never travelled is a click on empty space, not an area of
+    // no size. Handing it to the touch rule would select whichever unfilled
+    // shape the pointer happened to be standing inside, so a click meant to
+    // deselect would select instead.
+    if (rect.w > 2 || rect.h > 2) selectMany(L.shapeIndicesInRect(slide().shapes, rect));
   } else if (drag.mode === 'resize' || drag.mode === 'crop' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {

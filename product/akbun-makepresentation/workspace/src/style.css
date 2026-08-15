@@ -253,6 +253,36 @@ main {
   cursor: text;
 }
 
+.hit {
+  fill: none;
+  stroke: transparent;
+}
+
+.hit.fill {
+  fill: transparent;
+  stroke: none;
+}
+
+/* Wide, soft and behind the shape, so a black hairline sits on a coloured
+   cushion instead of relying on a dashed box that can be far from the line
+   it belongs to. Translucent to leave the shape's own colour readable, and
+   deaf to the pointer so it never steals a click or a drag. */
+.halo {
+  fill: none;
+  stroke: var(--accent);
+  stroke-opacity: 0.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.halo.fill {
+  fill: var(--accent);
+  fill-opacity: 0.18;
+  stroke: none;
+  pointer-events: none;
+}
+
 .sel-box {
   fill: none;
   stroke: var(--accent);
