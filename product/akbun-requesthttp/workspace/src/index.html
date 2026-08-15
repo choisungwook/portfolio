@@ -48,6 +48,10 @@
           </select>
           <input id="url" placeholder="https://api.example.com/path?query=1 — {{variables}} allowed" />
           <button id="btn-send">Send</button>
+          <span id="request-progress" class="request-progress" role="status" aria-live="polite" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            Waiting for response…
+          </span>
         </div>
         <details open>
           <summary>Headers</summary>
