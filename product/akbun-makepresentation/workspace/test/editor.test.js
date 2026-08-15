@@ -476,3 +476,132 @@ test('filterFonts searches installed family names without case sensitivity', () 
   ]);
   assert.deepStrictEqual(L.filterFonts(fonts, ''), fonts);
 });
+
+// --- arrow ends ---------------------------------------------------------
+
+test('an arrow starts with a head and a line starts bare', () => {
+  assert.strictEqual(L.createShape('arrow', 0, 0, {}).arrowEnd, 'triangle');
+  assert.strictEqual(L.createShape('arrow', 0, 0, {}).arrowStart, 'none');
+  assert.strictEqual(L.createShape('line', 0, 0, {}).arrowEnd, 'none');
+});
+
+test('renderShapeSvg draws the end each side asks for', () => {
+  const shape = L.createShape('line', 0, 0, {});
+  L.dragShape(shape, 0, 0, 200, 0);
+  shape.arrowStart = 'oval';
+  shape.arrowEnd = 'diamond';
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('<circle'), 'the circle end');
+  // The diamond is the only polygon here, and it has four corners.
+  const diamond = svg.match(/<polygon points="([^"]+)"/);
+  assert.ok(diamond, 'the diamond end');
+  assert.strictEqual(diamond[1].trim().split(/\s+/).length, 4);
+});
+
+test('an open arrow end is stroked, not filled', () => {
+  const shape = L.createShape('arrow', 0, 0, {});
+  L.dragShape(shape, 0, 0, 200, 0);
+  shape.arrowEnd = 'arrow';
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('<polyline'));
+  assert.ok(!svg.includes('<polygon'));
+});
+
+test('an unknown end name draws nothing rather than throwing', () => {
+  const shape = L.createShape('arrow', 0, 0, {});
+  L.dragShape(shape, 0, 0, 200, 0);
+  shape.arrowEnd = 'javascript:alert(1)';
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(!svg.includes('alert'));
+  assert.ok(svg.includes('<line'));
+});
+
+// Two ends both clamped to half the line would meet in the middle and the
+// shaft would be drawn backwards.
+test('two ends together never take more than half a short line', () => {
+  const shape = L.createShape('arrow', 0, 0, { strokeWidth: 20 });
+  L.dragShape(shape, 0, 0, 40, 0);
+  shape.arrowStart = 'triangle';
+  const [, x1, x2] = L.renderShapeSvg(shape).match(/<line x1="([\d.]+)"[^>]*x2="([\d.]+)"/);
+  assert.ok(Number(x2) - Number(x1) >= 20 - 0.001, `shaft ${x1}..${x2}`);
+});
+
+test('parseClipboardShapes keeps known arrow ends and drops the rest', () => {
+  const [good] = L.parseClipboardShapes(JSON.stringify([
+    { kind: 'arrow', x: 0, y: 0, w: 10, h: 10, arrowStart: 'diamond', arrowEnd: 'nope' },
+  ]));
+  assert.strictEqual(good.arrowStart, 'diamond');
+  assert.strictEqual(good.arrowEnd, 'triangle');
+});
+
+// --- text inside a shape ------------------------------------------------
+
+test('a rect and an ellipse center the text they are given', () => {
+  const rect = L.createShape('rect', 0, 0, {});
+  assert.strictEqual(rect.textAlign, 'center');
+  assert.strictEqual(rect.verticalAlign, 'center');
+  // A text box is its own box and keeps the top-left start.
+  const text = L.createShape('text', 0, 0, {});
+  assert.strictEqual(text.textAlign, 'left');
+  assert.strictEqual(text.verticalAlign, 'top');
+});
+
+test('renderShapeSvg draws a rect and its text, and the outline alone when hidden', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 200, 100);
+  shape.text = 'in the box';
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('<rect'));
+  assert.ok(svg.includes('in the box'));
+  assert.ok(!L.renderShapeSvg(shape, { hideText: true }).includes('in the box'));
+});
+
+test('an empty rect draws no text element at all', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 200, 100);
+  assert.ok(!L.renderShapeSvg(shape).includes('<text'));
+});
+
+test('text inside a shape keeps off the outline, a text box does not', () => {
+  const rect = L.createShape('rect', 0, 0, {});
+  L.dragShape(rect, 0, 0, 200, 100);
+  const box = L.textBox(rect);
+  assert.strictEqual(box.x, 8);
+  assert.strictEqual(box.w, 184);
+
+  const text = L.createShape('text', 0, 0, {});
+  L.dragShape(text, 0, 0, 200, 100);
+  assert.strictEqual(L.textBox(text).x, 0);
+});
+
+// A shape too small to hold the padding would otherwise get a negative box.
+test('the text box of a tiny shape never goes negative', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 10, 6);
+  const box = L.textBox(shape);
+  assert.ok(box.w >= 0 && box.h >= 0, JSON.stringify(box));
+});
+
+// --- slide order ---------------------------------------------------------
+
+test('moveSlide moves a slide and answers where it landed', () => {
+  const deck = { slides: [{ id: 0 }, { id: 1 }, { id: 2 }] };
+  assert.strictEqual(L.moveSlide(deck, 0, 2), 2);
+  assert.deepStrictEqual(deck.slides.map((s) => s.id), [1, 2, 0]);
+  assert.strictEqual(L.moveSlide(deck, 2, 0), 0);
+  assert.deepStrictEqual(deck.slides.map((s) => s.id), [0, 1, 2]);
+});
+
+test('moveSlide clamps past either end instead of losing a slide', () => {
+  const deck = { slides: [{ id: 0 }, { id: 1 }] };
+  assert.strictEqual(L.moveSlide(deck, 0, -5), 0);
+  assert.strictEqual(L.moveSlide(deck, 0, 99), 1);
+  assert.deepStrictEqual(deck.slides.map((s) => s.id), [1, 0]);
+  assert.strictEqual(deck.slides.length, 2);
+});
+
+test('moveSlide refuses an index that is not on the deck', () => {
+  const deck = { slides: [{ id: 0 }, { id: 1 }] };
+  assert.strictEqual(L.moveSlide(deck, 7, 0), 7);
+  assert.strictEqual(deck.slides.length, 2);
+});
