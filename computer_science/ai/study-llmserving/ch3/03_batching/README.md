@@ -51,7 +51,7 @@ BATCH_SIZE=1 ENTRY=03_batching/serving_v2.py docker compose --profile cpu up -d 
 uv run python 02_basic/client_v1.py --url http://localhost:8000 --concurrency 8
 ```
 
-노트북에서는 [03_batching.ipynb](./03_batching.ipynb)의 `WorkloadManager`와 `ModelWorker`를 직접 실행한다.
+HTTP 요청은 [03_batching.http](./03_batching.http)에서 실행한다.
 
 ## 관찰 포인트
 

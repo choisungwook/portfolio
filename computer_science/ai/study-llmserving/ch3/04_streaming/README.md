@@ -38,7 +38,7 @@ chmod +x 04_streaming/watch_batch.sh
 uv run python 04_streaming/client_stream.py --count 4 --stagger 1.0 --verbose
 ```
 
-노트북에서는 [04_streaming.ipynb](./04_streaming.ipynb)의 토큰 단위 forward 코드를 직접 실행한다.
+HTTP 요청은 [04_streaming.http](./04_streaming.http)에서 실행한다.
 
 출력 예:
 

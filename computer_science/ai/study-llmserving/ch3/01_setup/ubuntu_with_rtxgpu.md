@@ -53,10 +53,6 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available(), tor
 
 정상 결과의 핵심 값은 `True`와 `(12, 0)`이다.
 
-## VS Code Notebook 환경
-
-[VS Code Notebook 설정](./vscode_notebook.md)을 따른다.
-
 ## Docker와 NVIDIA Container Toolkit
 
 Docker를 설치한다.

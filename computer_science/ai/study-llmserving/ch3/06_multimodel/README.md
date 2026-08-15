@@ -124,7 +124,7 @@ watch -n 1 'curl -s -X POST http://localhost:8009/v2/repository/index | python3 
 
 ## 관찰 포인트
 
-노트북에서는 [06_multimodel.ipynb](./06_multimodel.ipynb)의 worker factory와 가짜 worker 기반 LRU 실험을 직접 실행한다.
+HTTP 요청은 [06_multimodel.http](./06_multimodel.http)에서 실행한다.
 
 1. `max_models`가 동시 사용 model 수보다 작으면 hit_rate가 0에 수렴 = **thrashing**
 2. cold start 시간이 model마다 다름 (distilbert ≫ bert-tiny). 모델 크기가 곧 cold start 비용

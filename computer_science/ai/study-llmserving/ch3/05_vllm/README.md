@@ -83,7 +83,7 @@ for n in 1 4 16 64; do
 done
 ```
 
-Ubuntu 노트북에서는 [05_vllm.ipynb](./05_vllm.ipynb)의 vLLM engine 코드를 직접 실행한다.
+HTTP 요청은 [05_vllm.http](./05_vllm.http)에서 실행한다.
 
 ## 관찰 포인트
 

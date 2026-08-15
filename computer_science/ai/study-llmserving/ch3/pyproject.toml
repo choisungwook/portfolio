@@ -24,9 +24,6 @@ gpu = [
 
 [dependency-groups]
 dev = [
-  "ipykernel>=6.29",
-  "jupyterlab>=4.4",
-  "matplotlib>=3.10",
   "pytest>=8.4",
   "pytest-asyncio>=1.0",
   "ruff>=0.12",
@@ -40,9 +37,6 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "UP"]
 ignore = ["B008"]
-
-[tool.ruff.lint.per-file-ignores]
-"*.ipynb" = ["E402", "F811"]
 
 [tool.ruff.format]
 indent-style = "space"

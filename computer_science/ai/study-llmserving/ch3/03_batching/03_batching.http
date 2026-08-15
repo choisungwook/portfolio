@@ -1,0 +1,20 @@
+@baseUrl = http://localhost:8000
+
+### Generate a batch
+POST {{baseUrl}}/generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompts": [
+    "Hello, I am",
+    "The weather is",
+    "I want to",
+    "The best way to",
+    "The most efficient way to"
+  ]
+}
+
+### Batching stats
+GET {{baseUrl}}/stats
+Accept: application/json

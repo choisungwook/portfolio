@@ -1,10 +1,7 @@
-.PHONY: sync notebook lint format create_kind delete_kind up watch down
+.PHONY: sync lint format create_kind delete_kind up watch down
 
 sync:
 	uv sync --dev
-
-notebook:
-	uv run jupyter lab
 
 lint:
 	uv run ruff format --check .
