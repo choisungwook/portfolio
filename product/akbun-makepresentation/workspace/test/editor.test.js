@@ -459,3 +459,12 @@ test('zoomIn and zoomOut walk the steps and stop at the ends', () => {
   assert.strictEqual(L.zoomIn(1.1), 1.25);
   assert.strictEqual(L.zoomOut(1.1), 1);
 });
+
+test('filterFonts searches installed family names without case sensitivity', () => {
+  const fonts = ['Apple SD Gothic Neo', 'Helvetica', 'Nanum Gothic'];
+  assert.deepStrictEqual(L.filterFonts(fonts, 'GOTHIC'), [
+    'Apple SD Gothic Neo',
+    'Nanum Gothic',
+  ]);
+  assert.deepStrictEqual(L.filterFonts(fonts, ''), fonts);
+});

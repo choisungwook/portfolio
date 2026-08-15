@@ -30,6 +30,11 @@ const stageInner = $('stage-inner');
 const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
+const fontPicker = $('font-picker');
+const fontMenu = $('font-menu');
+const fontSearch = $('font-search');
+const fontOptions = $('font-options');
+let fontFamilies = ['Arial', 'Helvetica'];
 
 const slide = () => state.deck.slides[state.current];
 const selectedShape = () =>
@@ -238,15 +243,10 @@ function renderProps() {
     );
   }
 
-  // A pptx from another editor can name a font this list does not offer.
-  // Adding it keeps the select honest instead of silently showing the wrong
-  // family.
-  const fonts = $('prop-font-family');
   const family = source.fontFamily || 'Helvetica';
-  if (!Array.from(fonts.options).some((o) => o.value === family)) {
-    fonts.add(new Option(family, family));
-  }
-  fonts.value = family;
+  rememberFontFamily(family);
+  $('font-family-label').textContent = family;
+  $('font-family-label').style.fontFamily = `"${family}", sans-serif`;
 }
 
 function renderBackground() {
@@ -645,6 +645,11 @@ textEditor.addEventListener('keydown', (event) => {
 const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
+  if (!fontMenu.hidden && event.key === 'Escape') {
+    hideFontMenu();
+    event.preventDefault();
+    return;
+  }
   if (!contextMenu.hidden && event.key === 'Escape') {
     hideContextMenu();
     event.preventDefault();
@@ -684,7 +689,7 @@ document.addEventListener('keydown', (event) => {
   // for these, so Shift only picks the redo branch.
   if (event.metaKey || event.ctrlKey) {
     const key = event.key.toLowerCase();
-    if (key === 's') saveFile(false);
+    if (key === 's') saveFile(event.shiftKey);
     else if (key === 'z' && event.shiftKey) redo();
     else if (key === 'z') undo();
     else if (key === 'y') redo();
@@ -864,6 +869,80 @@ function hideContextMenu() {
   contextMenu.hidden = true;
 }
 
+function rememberFontFamily(family) {
+  if (!fontFamilies.includes(family)) {
+    fontFamilies.push(family);
+    fontFamilies.sort((left, right) => left.localeCompare(right));
+  }
+}
+
+function renderFontOptions() {
+  const selected = selectedShape()?.fontFamily || state.defaults.fontFamily;
+  const matching = L.filterFonts(fontFamilies, fontSearch.value);
+  fontOptions.textContent = '';
+  const fragment = document.createDocumentFragment();
+  for (const family of matching) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.dataset.font = family;
+    option.textContent = family;
+    option.style.fontFamily = `"${family}", sans-serif`;
+    option.classList.toggle('active', family === selected);
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(family === selected));
+    fragment.append(option);
+  }
+  if (!matching.length) {
+    const empty = document.createElement('p');
+    empty.className = 'font-empty';
+    empty.textContent = 'No fonts found';
+    fragment.append(empty);
+  }
+  fontOptions.append(fragment);
+}
+
+function positionFontMenu() {
+  const trigger = $('prop-font-family').getBoundingClientRect();
+  const bounds = fontMenu.getBoundingClientRect();
+  const left = Math.max(
+    4,
+    Math.min(trigger.right - bounds.width, window.innerWidth - bounds.width - 4)
+  );
+  const below = trigger.bottom + 4;
+  const top = below + bounds.height <= window.innerHeight
+    ? below
+    : Math.max(4, trigger.top - bounds.height - 4);
+  fontMenu.style.left = `${left}px`;
+  fontMenu.style.top = `${top}px`;
+}
+
+function showFontMenu() {
+  fontMenu.hidden = false;
+  $('prop-font-family').setAttribute('aria-expanded', 'true');
+  fontSearch.value = '';
+  renderFontOptions();
+  positionFontMenu();
+  fontSearch.focus();
+}
+
+function hideFontMenu() {
+  fontMenu.hidden = true;
+  $('prop-font-family').setAttribute('aria-expanded', 'false');
+}
+
+async function loadSystemFonts() {
+  try {
+    const installed = await window.api.listSystemFonts();
+    fontFamilies = [...new Set(installed.filter(
+      (font) => typeof font === 'string' && font.trim()
+    ))].sort((left, right) => left.localeCompare(right));
+    rememberFontFamily(state.defaults.fontFamily);
+    renderProps();
+  } catch (error) {
+    console.error('Cannot load system fonts', error);
+  }
+}
+
 function showContextMenu(x, y) {
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;
@@ -903,10 +982,21 @@ document.addEventListener('contextmenu', (event) => {
 
 document.addEventListener('pointerdown', (event) => {
   if (!contextMenu.contains(event.target)) hideContextMenu();
+  if (!fontPicker.contains(event.target)) hideFontMenu();
 });
-window.addEventListener('blur', hideContextMenu);
-window.addEventListener('resize', hideContextMenu);
-$('stage-scroll').addEventListener('scroll', hideContextMenu);
+window.addEventListener('blur', () => {
+  hideContextMenu();
+  hideFontMenu();
+});
+window.addEventListener('resize', () => {
+  hideContextMenu();
+  hideFontMenu();
+});
+$('stage-scroll').addEventListener('scroll', () => {
+  hideContextMenu();
+  hideFontMenu();
+});
+$('props').addEventListener('scroll', hideFontMenu);
 
 function rasterizeShapes(shapes) {
   return new Promise((resolve, reject) => {
@@ -967,6 +1057,29 @@ async function saveSelectionAsImage() {
 }
 
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
+
+$('prop-font-family').addEventListener('click', () => {
+  if (fontMenu.hidden) showFontMenu();
+  else hideFontMenu();
+});
+fontSearch.addEventListener('input', renderFontOptions);
+fontSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    hideFontMenu();
+    $('prop-font-family').focus();
+  } else if (event.key === 'Enter') {
+    fontOptions.querySelector('[data-font]')?.click();
+  } else if (event.key === 'ArrowDown') {
+    fontOptions.querySelector('[data-font]')?.focus();
+  }
+});
+fontOptions.addEventListener('click', (event) => {
+  const option = event.target.closest('[data-font]');
+  if (!option) return;
+  applyProp({ fontFamily: option.dataset.font });
+  hideFontMenu();
+  $('prop-font-family').focus();
+});
 
 // --- property panel -------------------------------------------------------------------
 
@@ -1069,9 +1182,6 @@ $('prop-font-size').addEventListener('input', (e) =>
   applyProp({ fontSize: Math.max(6, Number(e.target.value) || 24) })
 );
 $('prop-text-color').addEventListener('input', (e) => applyProp({ textColor: e.target.value }));
-$('prop-font-family').addEventListener('change', (e) =>
-  applyProp({ fontFamily: e.target.value })
-);
 $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
 
 // --- text formatting -----------------------------------------------------------
@@ -1217,9 +1327,9 @@ async function saveFile(alwaysAsk) {
   }
 }
 
-// Rasterize one slide for the pdf: SVG markup into an image, image onto a
-// canvas, canvas to JPEG. 1920x1080 is plenty for print at this slide size.
-function rasterizeSlide(s, number) {
+// Rasterize one slide at 1920x1080, which is enough for PDF pages and PNG
+// exports at this slide size.
+function rasterizeSlideCanvas(s, number) {
   return new Promise((resolve, reject) => {
     const svg = L.renderSlideSvg(s, { number });
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
@@ -1228,9 +1338,15 @@ function rasterizeSlide(s, number) {
       const raster = document.createElement('canvas');
       raster.width = 1920;
       raster.height = 1080;
-      raster.getContext('2d').drawImage(image, 0, 0, 1920, 1080);
+      const context = raster.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(url);
+        reject(new Error('cannot create slide canvas'));
+        return;
+      }
+      context.drawImage(image, 0, 0, 1920, 1080);
       URL.revokeObjectURL(url);
-      resolve({ dataUrl: raster.toDataURL('image/jpeg', 0.92), width: 1920, height: 1080 });
+      resolve(raster);
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -1240,16 +1356,41 @@ function rasterizeSlide(s, number) {
   });
 }
 
+async function rasterizeSlideForPdf(s, number) {
+  const raster = await rasterizeSlideCanvas(s, number);
+  return { dataUrl: raster.toDataURL('image/jpeg', 0.92), width: 1920, height: 1080 };
+}
+
 async function exportPdf() {
   const path = await window.api.pickSave(suggestName('pdf'), 'pdf');
   if (!path) return;
   try {
     const pages = [];
     for (const [i, s] of state.deck.slides.entries()) {
-      pages.push(await rasterizeSlide(s, state.showNumbers ? i + 1 : 0));
+      pages.push(await rasterizeSlideForPdf(s, state.showNumbers ? i + 1 : 0));
     }
     await window.api.exportPdf(path, pages);
     await window.api.message('PDF saved.', { title: 'akbun-makepresentation' });
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Export failed', kind: 'error' });
+  }
+}
+
+function suggestSlideImageName() {
+  const base = suggestName('pptx').replace(/\.pptx$/i, '');
+  return `${base}-slide-${state.current + 1}.png`;
+}
+
+async function exportPng() {
+  const path = await window.api.pickSave(suggestSlideImageName(), 'png');
+  if (!path) return;
+  try {
+    const raster = await rasterizeSlideCanvas(
+      slide(),
+      state.showNumbers ? state.current + 1 : 0
+    );
+    await window.api.savePng(path, raster.toDataURL('image/png'));
+    await window.api.message('PNG saved.', { title: 'akbun-makepresentation' });
   } catch (error) {
     await window.api.message(String(error), { title: 'Export failed', kind: 'error' });
   }
@@ -1318,13 +1459,19 @@ window.api.onGuidelinesChanged((enabled) => {
   renderCanvas();
 });
 
-// --- toolbar ---------------------------------------------------------------------------------------
+// --- toolbar and application menu ------------------------------------------------------------------
 
-$('btn-new').addEventListener('click', newDeck);
-$('btn-open').addEventListener('click', openFile);
-$('btn-save').addEventListener('click', () => saveFile(false));
-$('btn-save-as').addEventListener('click', () => saveFile(true));
-$('btn-pdf').addEventListener('click', exportPdf);
+window.api.onFileCommand((command) => {
+  const actions = {
+    new: newDeck,
+    open: openFile,
+    save: () => saveFile(false),
+    'save-as': () => saveFile(true),
+    'export-pdf': exportPdf,
+    'export-png': exportPng,
+  };
+  if (actions[command]) actions[command]();
+});
 $('btn-present').addEventListener('click', enterPresent);
 
 function setNumbersButton() {
@@ -1344,3 +1491,4 @@ for (const button of document.querySelectorAll('[data-tool]')) {
 setTool('select');
 setZoom(state.zoom);
 renderAll();
+loadSystemFonts();

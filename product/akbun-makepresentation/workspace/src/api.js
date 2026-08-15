@@ -23,6 +23,7 @@ if (!window.__TAURI__) {
     saveDeck: async () => {},
     exportPdf: async () => {},
     savePng: async () => {},
+    listSystemFonts: async () => ['Arial', 'Helvetica'],
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
     setTitle: (title) => {
@@ -38,6 +39,7 @@ if (!window.__TAURI__) {
       return () => document.removeEventListener('fullscreenchange', listener);
     },
     onGuidelinesChanged: () => Promise.resolve(() => {}),
+    onFileCommand: () => Promise.resolve(() => {}),
     checkUpdate: async () => {},
   };
   throw new Error('not running under Tauri; using the browser fallback api');
@@ -91,6 +93,7 @@ window.api = {
   saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
   exportPdf: (path, pages) => invoke('export_pdf', { path, pages }),
   savePng: (path, dataUrl) => invoke('save_png', { path, dataUrl }),
+  listSystemFonts: () => invoke('list_system_fonts'),
 
   message: (text, opts) => message(text, opts),
   ask: (text, opts) => ask(text, opts),
@@ -100,5 +103,7 @@ window.api = {
     currentWindow.onResized(async () => handler(await currentWindow.isFullscreen())),
   onGuidelinesChanged: (handler) =>
     listen('guidelines-changed', (event) => handler(!!event.payload)),
+  onFileCommand: (handler) =>
+    listen('file-command', (event) => handler(event.payload)),
   checkUpdate,
 };
