@@ -207,14 +207,22 @@ function cropOverlaySvg() {
 }
 
 function renderThumbs() {
-  $('thumbs').innerHTML = state.deck.slides
+  const thumbs = $('thumbs');
+  // The panel takes focus so Backspace can mean "delete this slide" there and
+  // keep meaning "delete this object" on the canvas.
+  const focused = document.activeElement && thumbs.contains(document.activeElement);
+  thumbs.innerHTML = state.deck.slides
     .map(
       (s, i) =>
-        `<div class="thumb${i === state.current ? ' active' : ''}" data-slide="${i}">` +
+        `<div class="thumb${i === state.current ? ' active' : ''}" data-slide="${i}" draggable="true" tabindex="${i === state.current ? '0' : '-1'}">` +
         `${L.renderSlideSvg(s, { number: state.showNumbers ? i + 1 : 0 })}` +
         `<span class="num">${i + 1}</span></div>`
     )
     .join('');
+  // innerHTML threw away the element that had focus, so hand it back to the
+  // thumb that replaced it. Without this a Cmd+Arrow reorder moves focus to
+  // the body and the next press does nothing.
+  if (focused) thumbs.querySelector(`[data-slide="${state.current}"]`)?.focus();
 }
 
 function renderProps() {
@@ -224,11 +232,14 @@ function renderProps() {
 
   const showFill = kind === 'rect' || kind === 'ellipse' || kind === 'defaults';
   const showStroke = kind !== 'text';
-  const showText = kind === 'text' || kind === 'defaults';
+  const showText = kind === 'text' || L.TEXTUAL.has(kind) || kind === 'defaults';
 
   $('props-fill').hidden = !showFill;
   $('props-stroke').hidden = !showStroke;
   $('props-text').hidden = !showText;
+  $('props-arrow-ends').hidden = !(kind === 'line' || kind === 'arrow');
+  $('prop-arrow-start').value = L.ARROW_ENDS.includes(source.arrowStart) ? source.arrowStart : 'none';
+  $('prop-arrow-end').value = L.ARROW_ENDS.includes(source.arrowEnd) ? source.arrowEnd : 'none';
   $('btn-delete-shape').hidden = !shape;
   $('btn-group').hidden = state.selection.length < 2;
   $('btn-ungroup').hidden = !state.selection.some((index) => slide().shapes[index]?.groupId);
@@ -438,17 +449,8 @@ canvas.addEventListener('pointerdown', (event) => {
   }
 
   const index = hitShape ? slide().shapes.indexOf(hitShape) : -1;
+  const additive = event.shiftKey && !(event.metaKey || event.ctrlKey);
   if (index >= 0) {
-
-    // Shift-click changes only this object's membership. It does not begin a
-    // drag, so repeated Shift-clicks can build or shrink a selection without
-    // moving an object by a pixel.
-    if (event.shiftKey && !(event.metaKey || event.ctrlKey)) {
-      selectMany(L.toggleSelection(state.selection, index, slide().shapes.length));
-      renderCanvas();
-      renderProps();
-      return;
-    }
 
     // Opening a text box for editing is decided here rather than from a
     // dblclick event, because the browser never reports one: pointerup
@@ -458,7 +460,7 @@ canvas.addEventListener('pointerdown', (event) => {
     // preventDefault keeps the focus the overlay is about to take. Without
     // it the press moves focus back to the page, and from there Backspace
     // deletes the box being typed into instead of a character.
-    if (isSecondPress(index) && slide().shapes[index].kind === 'text') {
+    if (isSecondPress(index) && canEditText(slide().shapes[index])) {
       event.preventDefault();
       selectOnly(index);
       renderCanvas();
@@ -467,7 +469,16 @@ canvas.addEventListener('pointerdown', (event) => {
       return;
     }
 
-    if (!state.selection.includes(index)) selectMany(L.groupIndicesFor(slide().shapes, index));
+    // Shift changes this object's membership, but only on a press that never
+    // travels. Deciding that on pointerup instead of here is what lets Shift
+    // do both jobs at once: a Shift-drag of a selected line moves it on one
+    // axis, and a Shift-click of it still drops it out of the selection.
+    const wasSelected = state.selection.includes(index);
+    if (additive) {
+      if (!wasSelected) selectMany([...state.selection, ...L.groupIndicesFor(slide().shapes, index)]);
+    } else if (!wasSelected) {
+      selectMany(L.groupIndicesFor(slide().shapes, index));
+    }
 
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
@@ -490,11 +501,23 @@ canvas.addEventListener('pointerdown', (event) => {
       moved: false,
       duplicated,
       originalSelection,
+      // Only an already-selected object can be dropped by a Shift-click. One
+      // that was just added by the same press has to stay.
+      toggleIndex: additive && wasSelected ? index : -1,
     };
     canvas.setPointerCapture(event.pointerId);
   } else {
-    clearSelection();
-    state.drag = { mode: 'marquee', x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    // Shift over empty space keeps what is selected and adds to it. Clearing
+    // instead is what made a missed Shift-click throw the selection away.
+    if (!additive) clearSelection();
+    state.drag = {
+      mode: 'marquee',
+      x0: p.x,
+      y0: p.y,
+      x1: p.x,
+      y1: p.y,
+      baseSelection: additive ? [...state.selection] : [],
+    };
     canvas.setPointerCapture(event.pointerId);
   }
   renderCanvas();
@@ -561,7 +584,15 @@ canvas.addEventListener('pointerup', () => {
     // no size. Handing it to the touch rule would select whichever unfilled
     // shape the pointer happened to be standing inside, so a click meant to
     // deselect would select instead.
-    if (rect.w > 2 || rect.h > 2) selectMany(L.shapeIndicesInRect(slide().shapes, rect));
+    if (rect.w > 2 || rect.h > 2) {
+      selectMany([
+        ...drag.baseSelection,
+        ...L.shapeIndicesInRect(slide().shapes, rect),
+      ]);
+    }
+  } else if (drag.mode === 'move' && !drag.moved && drag.toggleIndex >= 0) {
+    // A Shift-press that never moved: the click half of Shift-click.
+    selectMany(L.toggleSelection(state.selection, drag.toggleIndex, slide().shapes.length));
   } else if (drag.mode === 'resize' || drag.mode === 'crop' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {
@@ -579,14 +610,22 @@ canvas.addEventListener('pointerup', () => {
 // The overlay has to look like the glyphs it hides, or every text box jumps
 // the moment editing starts or ends. A missing shape means the box being
 // edited is already gone, the same case commitTextEdit guards against.
+// A text box, and any shape that draws text inside its own outline.
+function canEditText(shape) {
+  return !!shape && (shape.kind === 'text' || L.TEXTUAL.has(shape.kind));
+}
+
 function styleTextEditor(shape) {
   if (!shape) return;
   const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
   const lines = (shape.text || '').split('\n').length;
-  textEditor.style.left = `${shape.x * scale}px`;
-  textEditor.style.top = `${shape.y * scale}px`;
-  textEditor.style.width = `${Math.max(shape.w, 120) * scale}px`;
-  textEditor.style.height = `${Math.max(shape.h, shape.fontSize * 1.3 * lines) * scale}px`;
+  // The same inset the glyphs are drawn at, so text does not jump sideways
+  // when editing starts inside a rect or an ellipse.
+  const box = L.textBox(shape);
+  textEditor.style.left = `${box.x * scale}px`;
+  textEditor.style.top = `${box.y * scale}px`;
+  textEditor.style.width = `${Math.max(box.w, 120) * scale}px`;
+  textEditor.style.height = `${Math.max(box.h, shape.fontSize * 1.3 * lines) * scale}px`;
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
   textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
   textEditor.style.color = shape.textColor;
@@ -596,12 +635,15 @@ function styleTextEditor(shape) {
   textEditor.style.textAlign = shape.textAlign || 'left';
 }
 
-function startTextEdit(index) {
+// `seed` is the character that opened the box by being typed while the shape
+// was selected. It is the first thing in the box, not a replacement for what
+// is already there.
+function startTextEdit(index, seed) {
   const shape = slide().shapes[index];
   state.editingIndex = index;
   renderCanvas();
 
-  textEditor.value = shape.text;
+  textEditor.value = seed ? shape.text + seed : shape.text;
   styleTextEditor(shape);
   textEditor.hidden = false;
   // Deferred so it wins over whatever focus change the triggering click
@@ -632,12 +674,17 @@ function commitTextEdit() {
   // compares the new text with itself, which is never a change, and then an
   // edit reaches neither the undo history nor the dirty marker.
   const text = textEditor.value.replace(/\s+$/, '');
-  const removed = text === '';
+  // Emptying a text box removes it, because the box is nothing but its text.
+  // Emptying the text in a rect leaves the rect: the outline is the object
+  // and the text was only something written on it.
+  const removed = text === '' && shape.kind === 'text';
   const changed = !removed && text !== shape.text;
 
   if (removed) {
     slide().shapes.splice(index, 1);
     clearSelection();
+  } else if (changed && L.TEXTUAL.has(shape.kind)) {
+    shape.text = text;
   } else if (changed) {
     shape.text = text;
     const lines = text.split('\n').length;
@@ -682,6 +729,11 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     return;
   }
+  if (event.key === 'Escape' && [...document.querySelectorAll('.menu-panel')].some((panel) => !panel.hidden)) {
+    hideMenus();
+    event.preventDefault();
+    return;
+  }
   if (state.presenting) {
     if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') presentStep(1);
     else if (event.key === 'ArrowLeft' || event.key === 'PageUp') presentStep(-1);
@@ -716,12 +768,18 @@ document.addEventListener('keydown', (event) => {
   // for these, so Shift only picks the redo branch.
   if (event.metaKey || event.ctrlKey) {
     const key = event.key.toLowerCase();
-    if (key === 's') saveFile(event.shiftKey);
+    // New and Open used to reach the page as system menu accelerators. With
+    // the menus in the window there is no accelerator, so the keys land here.
+    if (key === 'n') newDeck();
+    else if (key === 'o') openFile();
+    else if (key === 's') saveFile(event.shiftKey);
     else if (key === 'z' && event.shiftKey) redo();
     else if (key === 'z') undo();
     else if (key === 'y') redo();
     else if (key === 'c' || key === 'v') return;
     else if (key === 'd') duplicateSelection();
+    else if (key === 'arrowup') moveCurrentSlide(state.current - 1);
+    else if (key === 'arrowdown') moveCurrentSlide(state.current + 1);
     else if (TEXT_STYLE_KEYS[key]) toggleTextStyle(TEXT_STYLE_KEYS[key]);
     else return;
     event.preventDefault();
@@ -729,7 +787,10 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
-    deleteSelectedShape();
+    // Which thing the key deletes is decided by where the focus is, so the
+    // two meanings never have to guess at each other.
+    if ($('slides').contains(target)) deleteCurrentSlide();
+    else deleteSelectedShape();
     event.preventDefault();
     return;
   }
@@ -751,6 +812,20 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     return;
   }
+  // Typing over a selected shape starts writing in it, the way it does in
+  // PowerPoint. That costs the tool shortcuts while such a shape is selected;
+  // Escape drops the selection and gives them back.
+  if (
+    state.selection.length === 1 &&
+    canEditText(selectedShape()) &&
+    event.key.length === 1 &&
+    event.key !== ' '
+  ) {
+    event.preventDefault();
+    startTextEdit(state.selected, event.key);
+    return;
+  }
+
   const tool = TOOL_KEYS[event.key.toLowerCase()];
   if (tool) setTool(tool);
 });
@@ -971,6 +1046,12 @@ async function loadSystemFonts() {
 }
 
 function showContextMenu(x, y) {
+  // Group needs more than one object; ungroup needs one that is in a group.
+  // Hiding rather than disabling keeps the menu as short as the moment allows.
+  $('context-group').hidden = state.selection.length < 2;
+  $('context-ungroup').hidden = !state.selection.some(
+    (index) => slide().shapes[index]?.groupId
+  );
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
@@ -1010,18 +1091,22 @@ document.addEventListener('contextmenu', (event) => {
 document.addEventListener('pointerdown', (event) => {
   if (!contextMenu.contains(event.target)) hideContextMenu();
   if (!fontPicker.contains(event.target)) hideFontMenu();
+  if (!$('menubar').contains(event.target)) hideMenus();
 });
 window.addEventListener('blur', () => {
   hideContextMenu();
   hideFontMenu();
+  hideMenus();
 });
 window.addEventListener('resize', () => {
   hideContextMenu();
   hideFontMenu();
+  hideMenus();
 });
 $('stage-scroll').addEventListener('scroll', () => {
   hideContextMenu();
   hideFontMenu();
+  hideMenus();
 });
 $('props').addEventListener('scroll', hideFontMenu);
 
@@ -1084,6 +1169,14 @@ async function saveSelectionAsImage() {
 }
 
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
+$('context-group').addEventListener('click', () => {
+  hideContextMenu();
+  groupSelection();
+});
+$('context-ungroup').addEventListener('click', () => {
+  hideContextMenu();
+  ungroupSelection();
+});
 
 $('prop-font-family').addEventListener('click', () => {
   if (fontMenu.hidden) showFontMenu();
@@ -1202,6 +1295,8 @@ $('prop-width').addEventListener('input', (e) =>
 );
 $('prop-dash').addEventListener('change', (e) => applyProp({ dash: e.target.value }));
 $('prop-pen-arrow').addEventListener('change', (e) => applyProp({ penArrow: e.target.checked }));
+$('prop-arrow-start').addEventListener('change', (e) => applyProp({ arrowStart: e.target.value }));
+$('prop-arrow-end').addEventListener('change', (e) => applyProp({ arrowEnd: e.target.value }));
 $('btn-group').addEventListener('click', groupSelection);
 $('btn-ungroup').addEventListener('click', ungroupSelection);
 $('btn-crop').addEventListener('click', toggleCrop);
@@ -1219,7 +1314,7 @@ $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
 
 function textStyleTarget() {
   const shape = selectedShape();
-  if (shape) return shape.kind === 'text' ? shape : null;
+  if (shape) return canEditText(shape) ? shape : null;
   return state.defaults;
 }
 
@@ -1256,7 +1351,68 @@ $('thumbs').addEventListener('click', (event) => {
   state.current = Number(thumb.dataset.slide);
   clearSelection();
   renderAll();
+  $('thumbs').querySelector(`[data-slide="${state.current}"]`)?.focus();
 });
+
+// --- slide reorder -------------------------------------------------------
+//
+// Drag and drop in the panel, and Cmd+Up/Down for the same move from the
+// keyboard. Both land in moveSlide, so the two cannot disagree about where a
+// slide ends up.
+
+function moveCurrentSlide(to) {
+  const at = L.moveSlide(state.deck, state.current, to);
+  if (at === state.current) return;
+  state.current = at;
+  clearSelection();
+  markDirty();
+  renderAll();
+}
+
+let dragSlideFrom = -1;
+
+$('thumbs').addEventListener('dragstart', (event) => {
+  const thumb = event.target.closest('[data-slide]');
+  if (!thumb) return;
+  dragSlideFrom = Number(thumb.dataset.slide);
+  event.dataTransfer.effectAllowed = 'move';
+  // Firefox refuses to start a drag without payload, and the index is already
+  // in dragSlideFrom, so this is only there to make the drag legal.
+  event.dataTransfer.setData('text/plain', String(dragSlideFrom));
+});
+
+$('thumbs').addEventListener('dragover', (event) => {
+  if (dragSlideFrom < 0) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  const thumb = event.target.closest('[data-slide]');
+  for (const element of $('thumbs').querySelectorAll('.thumb')) {
+    element.classList.toggle('drop-target', element === thumb);
+  }
+});
+
+$('thumbs').addEventListener('dragleave', (event) => {
+  event.target.closest('[data-slide]')?.classList.remove('drop-target');
+});
+
+$('thumbs').addEventListener('drop', (event) => {
+  const thumb = event.target.closest('[data-slide]');
+  event.preventDefault();
+  const from = dragSlideFrom;
+  endSlideDrag();
+  if (from < 0 || !thumb) return;
+  state.current = from;
+  moveCurrentSlide(Number(thumb.dataset.slide));
+});
+
+function endSlideDrag() {
+  dragSlideFrom = -1;
+  for (const element of $('thumbs').querySelectorAll('.drop-target')) {
+    element.classList.remove('drop-target');
+  }
+}
+
+$('thumbs').addEventListener('dragend', endSlideDrag);
 
 $('btn-add-slide').addEventListener('click', () => {
   state.current = L.addSlide(state.deck, state.current);
@@ -1265,7 +1421,10 @@ $('btn-add-slide').addEventListener('click', () => {
   renderAll();
 });
 
-$('btn-del-slide').addEventListener('click', async () => {
+// An empty slide goes without asking; one with work on it does not. Same
+// answer whether the delete came from the button or from Backspace in the
+// panel.
+async function deleteCurrentSlide() {
   const empty = slide().shapes.length === 0;
   if (!empty) {
     const sure = await window.api.ask(`Delete slide ${state.current + 1}?`, {
@@ -1278,7 +1437,9 @@ $('btn-del-slide').addEventListener('click', async () => {
   clearSelection();
   markDirty();
   renderAll();
-});
+}
+
+$('btn-del-slide').addEventListener('click', deleteCurrentSlide);
 
 // --- file operations -----------------------------------------------------------------------
 
@@ -1488,28 +1649,99 @@ window.api.onGuidelinesChanged((enabled) => {
 
 // --- toolbar and application menu ------------------------------------------------------------------
 
-window.api.onFileCommand((command) => {
-  const actions = {
-    new: newDeck,
-    open: openFile,
-    save: () => saveFile(false),
-    'save-as': () => saveFile(true),
-    'export-pdf': exportPdf,
-    'export-png': exportPng,
-  };
-  if (actions[command]) actions[command]();
+// Every menu item, by the data-command in the markup. The keyboard shortcuts
+// call the same functions, so a command cannot behave one way from the menu
+// and another from the key.
+const MENU_COMMANDS = {
+  new: newDeck,
+  open: openFile,
+  save: () => saveFile(false),
+  'save-as': () => saveFile(true),
+  'export-pdf': exportPdf,
+  'export-png': exportPng,
+  undo,
+  redo,
+  duplicate: duplicateSelection,
+  delete: deleteSelectedShape,
+  group: groupSelection,
+  ungroup: ungroupSelection,
+  guidelines: toggleGuidelines,
+  numbers: toggleNumbers,
+  'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
+  'zoom-out': () => setZoom(L.zoomOut(state.zoom)),
+  'zoom-fit': () => setZoom(L.ZOOM_FIT),
+};
+
+// The name is not always ours: this also runs whatever the shell sends over
+// the file-command event. A plain lookup would find inherited keys, and
+// `constructor` would be called as if it were a command.
+function runCommand(command) {
+  if (Object.hasOwn(MENU_COMMANDS, command)) MENU_COMMANDS[command]();
+}
+
+function hideMenus() {
+  for (const panel of document.querySelectorAll('.menu-panel')) panel.hidden = true;
+  for (const title of document.querySelectorAll('.menu-title')) {
+    title.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function openMenu(name) {
+  hideMenus();
+  $('menubar').querySelector(`[data-menu-panel="${name}"]`).hidden = false;
+  $('menubar').querySelector(`[data-menu="${name}"]`).setAttribute('aria-expanded', 'true');
+  // The two toggles are the only items whose state is worth showing, and it
+  // only has to be right at the moment the menu opens.
+  $('menubar').querySelector('[data-command="guidelines"]')
+    .classList.toggle('checked', state.showGuidelines);
+  $('menubar').querySelector('[data-command="numbers"]')
+    .classList.toggle('checked', state.showNumbers);
+}
+
+$('menubar').addEventListener('click', (event) => {
+  const title = event.target.closest('.menu-title');
+  if (title) {
+    const open = title.getAttribute('aria-expanded') === 'true';
+    if (open) hideMenus();
+    else openMenu(title.dataset.menu);
+    return;
+  }
+  const item = event.target.closest('[data-command]');
+  if (!item) return;
+  hideMenus();
+  runCommand(item.dataset.command);
 });
+
+// Sliding along the bar with one menu already open switches menus, the way a
+// menu bar does everywhere else.
+$('menubar').addEventListener('pointerover', (event) => {
+  const title = event.target.closest('.menu-title');
+  if (!title) return;
+  const anyOpen = [...document.querySelectorAll('.menu-panel')].some((panel) => !panel.hidden);
+  if (anyOpen) openMenu(title.dataset.menu);
+});
+
+// The app no longer has a system menu bar, so the events it used to send now
+// come from these items. The handler stays for anything the shell still emits.
+window.api.onFileCommand(runCommand);
 $('btn-present').addEventListener('click', enterPresent);
 
 function setNumbersButton() {
   $('btn-numbers').classList.toggle('active', state.showNumbers);
 }
 
-$('btn-numbers').addEventListener('click', () => {
+function toggleNumbers() {
   state.showNumbers = !state.showNumbers;
   setNumbersButton();
   renderAll();
-});
+}
+
+function toggleGuidelines() {
+  state.showGuidelines = !state.showGuidelines;
+  renderCanvas();
+}
+
+$('btn-numbers').addEventListener('click', toggleNumbers);
 $('btn-update').addEventListener('click', () => window.api.checkUpdate());
 for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => setTool(button.dataset.tool));

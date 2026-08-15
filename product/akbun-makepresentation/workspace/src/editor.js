@@ -32,6 +32,14 @@ const DEFAULT_STYLE = {
 
 const BOXY = new Set(['rect', 'ellipse', 'text', 'image']);
 const SHAPE_KINDS = new Set(['rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image']);
+
+// A shape that can hold text of its own. A text box is the whole shape; a
+// rect or an ellipse draws its text inside the outline.
+const TEXTUAL = new Set(['rect', 'ellipse']);
+
+// The five pptx line ends, under their pptx names, so a round trip through
+// `a:headEnd`/`a:tailEnd` is a rename and nothing else.
+const ARROW_ENDS = ['none', 'triangle', 'arrow', 'oval', 'diamond'];
 const MAX_CLIPBOARD_SHAPES = 100;
 const MAX_GEOMETRY = 1_000_000;
 
@@ -52,6 +60,10 @@ function slideBackground(slide) {
 
 function createShape(kind, x, y, style) {
   const s = Object.assign({}, DEFAULT_STYLE, style);
+  // Text inside a box wants to sit in the middle of it. A text box is its own
+  // box, so it keeps the top-left start every other editor gives it.
+  const align = TEXTUAL.has(kind) ? 'center' : s.textAlign;
+  const verticalAlign = TEXTUAL.has(kind) ? 'center' : s.verticalAlign;
   return {
     kind,
     x,
@@ -71,8 +83,8 @@ function createShape(kind, x, y, style) {
     bold: s.bold,
     italic: s.italic,
     underline: s.underline,
-    textAlign: s.textAlign,
-    verticalAlign: s.verticalAlign,
+    textAlign: align,
+    verticalAlign,
     cropLeft: 0,
     cropTop: 0,
     cropRight: 0,
@@ -80,6 +92,8 @@ function createShape(kind, x, y, style) {
     rotation: 0,
     groupId: '',
     penArrow: false,
+    arrowStart: 'none',
+    arrowEnd: kind === 'arrow' ? 'triangle' : 'none',
   };
 }
 
@@ -137,6 +151,9 @@ function normalizeClipboardShape(value) {
     shape.groupId = value.groupId;
   }
   if (typeof value.penArrow === 'boolean') shape.penArrow = value.penArrow;
+  for (const name of ['arrowStart', 'arrowEnd']) {
+    if (ARROW_ENDS.includes(value[name])) shape[name] = value[name];
+  }
   if (['left', 'center', 'right'].includes(value.textAlign)) {
     shape.textAlign = value.textAlign;
   }
@@ -412,6 +429,19 @@ function deleteSlide(deck, index) {
   return Math.min(index, deck.slides.length - 1);
 }
 
+// Move one slide to another position and answer where it landed. An index
+// outside the deck clamps rather than throwing, so a drag past either end of
+// the panel and a Cmd+Arrow at the last slide both do the obvious thing.
+function moveSlide(deck, from, to) {
+  const last = deck.slides.length - 1;
+  if (!Number.isInteger(from) || from < 0 || from > last) return from;
+  const at = Math.max(0, Math.min(Math.round(to), last));
+  if (at === from) return from;
+  const [slide] = deck.slides.splice(from, 1);
+  deck.slides.splice(at, 0, slide);
+  return at;
+}
+
 function duplicateSlide(deck, index) {
   deck.slides.splice(index + 1, 0, structuredClone(deck.slides[index]));
   return index + 1;
@@ -491,6 +521,46 @@ function rotateSvg(shape, markup) {
   return `<g transform="rotate(${shape.rotation} ${cx} ${cy})">${markup}</g>`;
 }
 
+// How far the text inside a rect or an ellipse keeps off its outline. A text
+// box has no outline to keep off, so it gets none.
+const TEXT_PADDING = 8;
+
+// The box a shape lays its own text out in. Same one the overlay textarea
+// uses, so glyphs do not jump when editing starts or ends.
+function textBox(shape) {
+  const b = shapeBBox(shape);
+  if (!TEXTUAL.has(shape.kind)) return { x: b.x, y: b.y, w: b.w, h: b.h };
+  const pad = Math.min(TEXT_PADDING, b.w / 4, b.h / 4);
+  return { x: b.x + pad, y: b.y + pad, w: Math.max(0, b.w - pad * 2), h: Math.max(0, b.h - pad * 2) };
+}
+
+// Glyphs for whatever text a shape carries, laid out in `box`. Shared by the
+// text box and by the text a rect or an ellipse holds inside its outline, so
+// the two wrap, align and anchor the same way.
+function shapeTextSvg(shape) {
+  if (!String(shape.text || '')) return '';
+  const inner = textBox(shape);
+  const lines = wrapTextLines(shape.text, inner.w, shape.fontSize);
+  const lineHeight = shape.fontSize * 1.3;
+  const blockHeight = lines.length * lineHeight;
+  let y = inner.y + shape.fontSize;
+  if (shape.verticalAlign === 'center') y += Math.max(0, (inner.h - blockHeight) / 2);
+  if (shape.verticalAlign === 'bottom') y += Math.max(0, inner.h - blockHeight);
+  const align = shape.textAlign || 'left';
+  const x = align === 'center'
+    ? inner.x + inner.w / 2
+    : align === 'right' ? inner.x + inner.w : inner.x;
+  const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
+  const spans = lines
+    .map(
+      (line, i) =>
+        `<tspan x="${x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
+    )
+    .join('');
+  const decoration = shape.underline ? ' text-decoration="underline"' : '';
+  return `<text x="${x}" y="${y}" font-size="${shape.fontSize}" fill="${shape.textColor}" text-anchor="${anchor}" font-weight="${shape.bold ? '700' : '400'}" font-style="${shape.italic ? 'italic' : 'normal'}"${decoration} ${fontAttr(shape)}>${spans}</text>`;
+}
+
 // Markup for one shape. `options.hideText` suppresses the glyphs while the
 // overlay textarea is editing that shape.
 function renderShapeSvg(shape, options) {
@@ -498,14 +568,15 @@ function renderShapeSvg(shape, options) {
   switch (shape.kind) {
     case 'rect': {
       const b = shapeBBox(shape);
-      return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      const outline = `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      return rotateSvg(shape, outline + (hideText ? '' : shapeTextSvg(shape)));
     }
     case 'ellipse': {
       const b = shapeBBox(shape);
-      return `<ellipse cx="${b.x + b.w / 2}" cy="${b.y + b.h / 2}" rx="${b.w / 2}" ry="${b.h / 2}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      const outline = `<ellipse cx="${b.x + b.w / 2}" cy="${b.y + b.h / 2}" rx="${b.w / 2}" ry="${b.h / 2}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      return rotateSvg(shape, outline + (hideText ? '' : shapeTextSvg(shape)));
     }
     case 'line':
-      return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" ${strokeAttrs(shape)} stroke-linecap="round"/>`;
     case 'arrow':
       return arrowSvg(shape);
     case 'pen': {
@@ -514,26 +585,7 @@ function renderShapeSvg(shape, options) {
     }
     case 'text': {
       if (hideText) return '';
-      const lines = wrapTextLines(shape.text, shape.w, shape.fontSize);
-      const lineHeight = shape.fontSize * 1.3;
-      const blockHeight = lines.length * lineHeight;
-      let y = shape.y + shape.fontSize;
-      if (shape.verticalAlign === 'center') y += Math.max(0, (shape.h - blockHeight) / 2);
-      if (shape.verticalAlign === 'bottom') y += Math.max(0, shape.h - blockHeight);
-      const align = shape.textAlign || 'left';
-      const x = align === 'center'
-        ? shape.x + shape.w / 2
-        : align === 'right' ? shape.x + shape.w : shape.x;
-      const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
-      const spans = lines
-        .map(
-          (line, i) =>
-            `<tspan x="${x}" dy="${i === 0 ? 0 : '1.3em'}">${escapeXml(line) || ' '}</tspan>`
-        )
-        .join('');
-      const decoration = shape.underline ? ' text-decoration="underline"' : '';
-      const markup = `<text x="${x}" y="${y}" font-size="${shape.fontSize}" fill="${shape.textColor}" text-anchor="${anchor}" font-weight="${shape.bold ? '700' : '400'}" font-style="${shape.italic ? 'italic' : 'normal'}"${decoration} ${fontAttr(shape)}>${spans}</text>`;
-      return rotateSvg(shape, markup);
+      return rotateSvg(shape, shapeTextSvg(shape));
     }
     case 'image': {
       const src = String(shape.src || '');
@@ -575,33 +627,93 @@ function penArrowSvg(shape) {
   return `<polygon points="${end[0]},${end[1]} ${p1} ${p2}" fill="${shape.stroke}"/>`;
 }
 
+// The end a shape draws at a given tip, and how far back along the shaft that
+// end reaches. The shaft is shortened by that much so it never pokes out
+// through a filled tip.
+//
+// (ux,uy) points outward, away from the shaft and towards the tip.
+function arrowEndSvg(end, x, y, ux, uy, size, shape) {
+  const color = shape.stroke === 'none' ? '#1a1a1a' : shape.stroke;
+  const back = (distance) => [x - ux * distance, y - uy * distance];
+  switch (end) {
+    case 'triangle': {
+      const [bx, by] = back(size);
+      // Widening a shortened head keeps it visible on a stubby arrow, where a
+      // head proportional to its own length would be narrower than the shaft
+      // it sits on. An unclamped head is already wider, so nothing moves.
+      const half = Math.max(size * 0.45, shape.strokeWidth);
+      return {
+        markup: `<polygon points="${x},${y} ${bx - uy * half},${by + ux * half} ${bx + uy * half},${by - ux * half}" fill="${color}"/>`,
+        inset: size,
+      };
+    }
+    case 'arrow': {
+      // Two open barbs. They meet at the tip, so the shaft can run the whole
+      // way and nothing has to be shortened.
+      const [bx, by] = back(size);
+      const half = Math.max(size * 0.5, shape.strokeWidth);
+      return {
+        markup:
+          `<polyline points="${bx - uy * half},${by + ux * half} ${x},${y} ${bx + uy * half},${by - ux * half}"` +
+          ` fill="none" stroke="${color}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        inset: 0,
+      };
+    }
+    case 'oval': {
+      const r = Math.max(size * 0.35, shape.strokeWidth);
+      const [cx, cy] = back(r);
+      return {
+        markup: `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>`,
+        inset: r * 2,
+      };
+    }
+    case 'diamond': {
+      const [cx, cy] = back(size / 2);
+      const [bx, by] = back(size);
+      const half = Math.max(size * 0.35, shape.strokeWidth);
+      return {
+        markup: `<polygon points="${x},${y} ${cx - uy * half},${cy + ux * half} ${bx},${by} ${cx + uy * half},${cy - ux * half}" fill="${color}"/>`,
+        inset: size,
+      };
+    }
+    default:
+      return { markup: '', inset: 0 };
+  }
+}
+
+// One renderer for line and arrow. The two differ only in the end they start
+// life with, so a line given an end draws it and an arrow given none stops
+// drawing one.
 function arrowSvg(shape) {
   const x1 = shape.x, y1 = shape.y;
   const x2 = shape.x + shape.w, y2 = shape.y + shape.h;
   const length = Math.hypot(shape.w, shape.h);
-  // A zero length arrow has no direction to point in. Drawing nothing beats
+  // A zero length line has no direction to point in. Drawing nothing beats
   // drawing the dot a round cap would leave behind; the handles still select it.
   if (!length) return '';
   const ux = shape.w / length, uy = shape.h / length;
-  // Never more than half the arrow, so the base of the head stays in front of
-  // the tail. Past that the shaft is drawn backwards and its far end shows up
-  // as a dot sitting behind the arrow.
-  const head = Math.min(length / 2, Math.max(10, shape.strokeWidth * 4));
-  // Shorten the line so it does not poke through the head tip.
-  const bx = x2 - ux * head, by = y2 - uy * head;
-  // Widening a shortened head keeps it visible on a stubby arrow, where a head
-  // proportional to its own length would be narrower than the shaft it sits on.
-  // A head that is not clamped is already wider than this, so nothing moves.
-  const half = Math.max(head * 0.45, shape.strokeWidth);
-  const p1 = `${bx - uy * half},${by + ux * half}`;
-  const p2 = `${bx + uy * half},${by - ux * half}`;
-  // Both ends of the shaft take the default butt cap, which stops exactly on
-  // the endpoint. The other two both overshoot it by half a stroke, and that
-  // overshoot reads as a bead stuck on the end of the arrow: round leaves a
-  // semicircle, square a rectangle.
+  const start = ARROW_ENDS.includes(shape.arrowStart) ? shape.arrowStart : 'none';
+  const end = ARROW_ENDS.includes(shape.arrowEnd) ? shape.arrowEnd : 'none';
+  const decorated = (start !== 'none' ? 1 : 0) + (end !== 'none' ? 1 : 0);
+  // Never more than half the line for both ends together, so the two bases
+  // stay clear of each other. Past that the shaft is drawn backwards and its
+  // far end shows up as a stray dot behind the head.
+  const size = Math.min(
+    length / 2 / Math.max(1, decorated),
+    Math.max(10, shape.strokeWidth * 4)
+  );
+  const head = arrowEndSvg(end, x2, y2, ux, uy, size, shape);
+  const tail = arrowEndSvg(start, x1, y1, -ux, -uy, size, shape);
+  // A bare line keeps the round cap it always had; a decorated end takes the
+  // default butt cap, which stops exactly on the endpoint. Round and square
+  // both overshoot by half a stroke, and that overshoot reads as a bead stuck
+  // on the end of the arrow.
+  const cap = decorated ? '' : ' stroke-linecap="round"';
   return (
-    `<line x1="${x1}" y1="${y1}" x2="${bx}" y2="${by}" ${strokeAttrs(shape)}/>` +
-    `<polygon points="${x2},${y2} ${p1} ${p2}" fill="${shape.stroke === 'none' ? '#1a1a1a' : shape.stroke}"/>`
+    `<line x1="${x1 + ux * tail.inset}" y1="${y1 + uy * tail.inset}"` +
+    ` x2="${x2 - ux * head.inset}" y2="${y2 - uy * head.inset}" ${strokeAttrs(shape)}${cap}/>` +
+    tail.markup +
+    head.markup
   );
 }
 
@@ -698,6 +810,9 @@ const exported = {
   SLIDE_H,
   DEFAULT_STYLE,
   DEFAULT_BACKGROUND,
+  ARROW_ENDS,
+  TEXTUAL,
+  textBox,
   ZOOM_STEPS,
   ZOOM_FIT,
   zoomIn,
@@ -724,6 +839,7 @@ const exported = {
   resizeShape,
   addSlide,
   deleteSlide,
+  moveSlide,
   duplicateSlide,
   slideNumberShape,
   escapeXml,

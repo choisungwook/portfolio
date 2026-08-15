@@ -409,7 +409,9 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
     )
 }
 
-fn line_xml(shape: &Shape, arrow: bool) -> String {
+/// `pen_arrow` is the pen's single "head at the far end" flag. Every other
+/// shape names its two ends itself.
+fn line_xml(shape: &Shape, pen_arrow: bool) -> String {
     let w = emu(shape.stroke_width).max(1);
     if shape.stroke == "none" {
         return format!("<a:ln w=\"{w}\"><a:noFill/></a:ln>");
@@ -419,15 +421,41 @@ fn line_xml(shape: &Shape, arrow: bool) -> String {
         "dot" => "<a:prstDash val=\"sysDot\"/>",
         _ => "",
     };
-    let head = if arrow {
-        "<a:tailEnd type=\"triangle\"/>"
+    // An unknown end name is written as no end at all.
+    let ends = if pen_arrow {
+        "<a:tailEnd type=\"triangle\"/>".to_string()
     } else {
-        ""
+        format!(
+            "{}{}",
+            end_xml("headEnd", &shape.arrow_start),
+            end_xml("tailEnd", &shape.arrow_end)
+        )
     };
     format!(
-        "<a:ln w=\"{w}\"><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>{dash}{head}</a:ln>",
+        "<a:ln w=\"{w}\"><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>{dash}{ends}</a:ln>",
         hex(&shape.stroke)
     )
+}
+
+const ARROW_ENDS: [&str; 4] = ["triangle", "arrow", "oval", "diamond"];
+
+/// The five ends this editor draws. `stealth` is PowerPoint's other filled
+/// head and reads as a triangle here; anything else it might write is dropped
+/// rather than guessed at.
+fn read_arrow_end(end: &Option<String>) -> String {
+    match end.as_deref() {
+        Some("stealth") => "triangle".into(),
+        Some(name) if ARROW_ENDS.contains(&name) => name.into(),
+        _ => "none".into(),
+    }
+}
+
+fn end_xml(tag: &str, end: &str) -> String {
+    if ARROW_ENDS.contains(&end) {
+        format!("<a:{tag} type=\"{end}\"/>")
+    } else {
+        String::new()
+    }
 }
 
 fn fill_xml(fill: &str) -> String {
@@ -480,15 +508,22 @@ fn text_body(shape: &Shape) -> String {
             xml_escape(line)
         ));
     }
+    // A text box is nothing but its text, so it gets no inset. Text inside a
+    // rect or an ellipse keeps the same 8px off the outline that the editor
+    // draws it at, or the two disagree by that much on every round trip.
+    let inset = if shape.kind == "text" {
+        0
+    } else {
+        (8.0 * crate::EMU_PER_PX) as i64
+    };
     format!(
-        "<p:txBody><a:bodyPr wrap=\"square\" anchor=\"{anchor}\" lIns=\"0\" tIns=\"0\" rIns=\"0\" bIns=\"0\"><a:noAutofit/></a:bodyPr><a:lstStyle/>{paragraphs}</p:txBody>"
+        "<p:txBody><a:bodyPr wrap=\"square\" anchor=\"{anchor}\" lIns=\"{inset}\" tIns=\"{inset}\" rIns=\"{inset}\" bIns=\"{inset}\"><a:noAutofit/></a:bodyPr><a:lstStyle/>{paragraphs}</p:txBody>"
     )
 }
 
 fn shape_xml(shape: &Shape, id: u64) -> String {
     match shape.kind.as_str() {
         "line" | "arrow" => {
-            let arrow = shape.kind == "arrow";
             let (x, w) = if shape.w < 0.0 {
                 (shape.x + shape.w, -shape.w)
             } else {
@@ -503,7 +538,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
                 "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"{id}\" name=\"Line {id}\"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"line\"><a:avLst/></a:prstGeom>{}</p:spPr></p:cxnSp>",
                 xfrm(x, y, w, h, shape.w < 0.0, shape.h < 0.0),
-                line_xml(shape, arrow)
+                line_xml(shape, false)
             )
         }
         "pen" => {
@@ -539,9 +574,17 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
         // rect and ellipse
         _ => {
             let prst = if shape.kind == "ellipse" { "ellipse" } else { "rect" };
+            // Text written inside the outline goes in the shape's own txBody,
+            // which is what PowerPoint puts there too, so it stays attached to
+            // the shape instead of becoming a box sitting on top of it.
+            let text = if shape.text.is_empty() {
+                String::new()
+            } else {
+                text_body(shape)
+            };
             format!(
                 "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Shape {id}\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
-<p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{}{}</p:spPr></p:sp>",
+<p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{}{}</p:spPr>{text}</p:sp>",
                 xfrm(shape.x, shape.y, shape.w, shape.h, false, false),
                 fill_xml(&shape.fill),
                 line_xml(shape, false)
@@ -1084,6 +1127,8 @@ struct Pending {
     stroke_w: Option<i64>,
     dash: Option<String>,
     arrow: bool,
+    head_end: Option<String>,
+    tail_end: Option<String>,
     fill: Option<String>,
     text: String,
     font_size: Option<f64>,
@@ -1404,8 +1449,14 @@ fn handle_element(
         }
         "prstDash" => p.dash = get(b"val"),
         "tailEnd" | "headEnd" => {
-            if get(b"type").map(|t| t != "none").unwrap_or(false) {
+            let end = get(b"type");
+            if end.as_deref().map(|t| t != "none").unwrap_or(false) {
                 p.arrow = true;
+            }
+            if local == "headEnd" {
+                p.head_end = end;
+            } else {
+                p.tail_end = end;
             }
         }
         "rPr" => {
@@ -1671,13 +1722,22 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
         }
     } else if !p.is_pic && is_line {
         shape.kind = if p.arrow { "arrow" } else { "line" }.into();
+        // headEnd sits at the start of the geometry and tailEnd at its end.
+        // The flips below move the start point, not which end is which.
+        shape.arrow_start = read_arrow_end(&p.head_end);
+        shape.arrow_end = read_arrow_end(&p.tail_end);
         // Stored as start -> end; flips say which corner of the box starts.
         shape.x = px(if p.flip_h { p.x + p.cx } else { p.x });
         shape.y = px(if p.flip_v { p.y + p.cy } else { p.y });
         shape.w = px(if p.flip_h { -p.cx } else { p.cx });
         shape.h = px(if p.flip_v { -p.cy } else { p.cy });
     } else if !p.is_pic {
-        shape.kind = if p.tx_box || (!p.text.trim().is_empty() && p.stroke.is_none()) {
+        // Text alone on the slide is a text box. Text on something that also
+        // draws an outline or a fill is that shape's own text, now that a rect
+        // and an ellipse can carry text of their own.
+        shape.kind = if p.tx_box
+            || (!p.text.trim().is_empty() && p.stroke.is_none() && p.fill.is_none())
+        {
             "text".into()
         } else if p.prst.as_deref() == Some("ellipse") {
             "ellipse".into()
@@ -1799,6 +1859,9 @@ mod tests {
                             stroke_width: 3.0,
                             dash: "dash".into(),
                             group_id: "diagram".into(),
+                            text: "inside the box".into(),
+                            text_align: "center".into(),
+                            vertical_align: "center".into(),
                             ..Shape::default()
                         },
                         Shape {
@@ -1817,6 +1880,8 @@ mod tests {
                             w: -200.0,
                             h: 120.0,
                             stroke: "#1971c2".into(),
+                            arrow_start: "oval".into(),
+                            arrow_end: "diamond".into(),
                             ..Shape::default()
                         },
                         Shape {
@@ -1900,7 +1965,11 @@ mod tests {
                     assert!(close(a.x, b.x) && close(a.y, b.y));
                     assert!(close(a.w, b.w) && close(a.h, b.h));
                 }
-                if a.kind == "text" {
+                if a.kind == "line" || a.kind == "arrow" {
+                    assert_eq!(a.arrow_start, b.arrow_start);
+                    assert_eq!(a.arrow_end, b.arrow_end);
+                }
+                if a.kind == "text" || !a.text.is_empty() {
                     assert!(close(a.font_size, b.font_size));
                     assert_eq!(a.text_color, b.text_color);
                     assert_eq!(a.font_family, b.font_family);

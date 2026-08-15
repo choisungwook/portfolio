@@ -44,6 +44,92 @@ body {
   user-select: none;
 }
 
+/* --- menu bar ---
+   The app's own File/Edit/View, in the window rather than in the system menu
+   bar. A panel is anchored to its title and floats over the canvas. */
+
+#menubar {
+  display: flex;
+  gap: 2px;
+  padding: 2px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.menu {
+  position: relative;
+}
+
+.menu-title {
+  border: 0;
+  background: transparent;
+  padding: 3px 10px;
+  border-radius: 5px;
+}
+
+.menu-title:hover,
+.menu-title[aria-expanded='true'] {
+  background: var(--accent-soft);
+}
+
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 30;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.menu-panel[hidden] {
+  display: none;
+}
+
+/* The left padding is the checkmark's seat. Reserving it on every item
+   rather than only on the checked one is what keeps a label from jumping
+   sideways when its toggle flips. */
+.menu-panel button {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  border: 0;
+  padding: 5px 10px 5px 24px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-panel button[hidden] {
+  display: none;
+}
+
+.menu-panel button:hover,
+.menu-panel button:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.menu-panel button.checked::before {
+  content: '✓';
+  position: absolute;
+  left: 9px;
+}
+
+.menu-panel hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 4px 6px;
+}
+
+.accel {
+  color: var(--muted);
+}
+
 /* --- toolbar --- */
 
 #toolbar {
@@ -137,6 +223,19 @@ main {
 
 .thumb.active {
   border-color: var(--accent);
+}
+
+/* Focus is what tells Backspace to delete the slide rather than the selected
+   object, so it has to be visible. */
+.thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Where a dragged slide would land. */
+.thumb.drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .thumb .num {
