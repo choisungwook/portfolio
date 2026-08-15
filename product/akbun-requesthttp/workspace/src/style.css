@@ -87,9 +87,14 @@ textarea, pre, code, #url { font-family: ui-monospace, 'SF Mono', Menlo, monospa
   border-bottom: 1px solid var(--border);
 }
 .sidebar-actions #btn-new-request { grid-column: 1 / -1; }
+.sidebar-actions #btn-collapse-all { grid-column: 1 / -1; }
 .new-item { margin: 0; }
 
-.folder-group { padding: 6px 8px 0; }
+.folder-group {
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.folder-group:last-child { border-bottom: none; }
 .folder-heading {
   display: flex;
   align-items: center;
@@ -98,6 +103,15 @@ textarea, pre, code, #url { font-family: ui-monospace, 'SF Mono', Menlo, monospa
   padding: 2px 4px;
   color: var(--fg-dim);
 }
+.folder-toggle {
+  width: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  line-height: 1;
+}
+.folder-toggle:hover { background: var(--code-bg); }
 .folder-name {
   flex: 1;
   min-width: 0;
@@ -110,6 +124,7 @@ textarea, pre, code, #url { font-family: ui-monospace, 'SF Mono', Menlo, monospa
 .folder-count { font-size: 11px; }
 .folder-delete { border: none; background: none; padding: 0 2px; color: inherit; }
 .request-list { list-style: none; margin: 0; padding: 2px 0 4px 8px; }
+.request-list[hidden] { display: none; }
 .request-list li {
   display: flex;
   align-items: center;

@@ -14,6 +14,7 @@ let currentRequest = L.createRequest('');
 let selectedFolderId = L.DEFAULT_FOLDER_ID;
 let lastResponse = null;
 let requestInFlight = false;
+const collapsedFolderIds = new Set();
 
 // ------------------------------------------------------------- persistence
 
@@ -63,17 +64,32 @@ function renderSidebar() {
   const root = $('folder-list');
   root.textContent = '';
   for (const folder of state.folders) {
+    const isCollapsed = collapsedFolderIds.has(folder.id);
     const group = document.createElement('section');
     group.className = 'folder-group';
     const heading = document.createElement('div');
     heading.className = 'folder-heading';
+    const requestListId = `folder-requests-${folder.id}`;
+    const toggle = document.createElement('button');
+    toggle.className = 'folder-toggle';
+    toggle.type = 'button';
+    toggle.textContent = isCollapsed ? '▸' : '▾';
+    toggle.title = isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`;
+    toggle.setAttribute('aria-label', toggle.title);
+    toggle.setAttribute('aria-controls', requestListId);
+    toggle.setAttribute('aria-expanded', String(!isCollapsed));
+    toggle.addEventListener('click', () => {
+      if (isCollapsed) collapsedFolderIds.delete(folder.id);
+      else collapsedFolderIds.add(folder.id);
+      renderSidebar();
+    });
     const name = document.createElement('span');
     name.className = 'folder-name';
     name.textContent = folder.name;
     const count = document.createElement('span');
     count.className = 'folder-count';
     count.textContent = String(folder.requests.length);
-    heading.append(name, count);
+    heading.append(toggle, name, count);
     if (!folder.isDefault) {
       const removeFolder = document.createElement('button');
       removeFolder.className = 'folder-delete';
@@ -96,7 +112,9 @@ function renderSidebar() {
     }
 
     const requestList = document.createElement('ul');
+    requestList.id = requestListId;
     requestList.className = 'request-list';
+    requestList.hidden = isCollapsed;
     for (const request of folder.requests) {
       requestList.append(renderRequestItem(folder, request, requestList));
     }
@@ -476,6 +494,10 @@ function bindDialogs() {
     renderSidebar();
     renderEditor();
     renderResponse();
+  });
+  $('btn-collapse-all').addEventListener('click', () => {
+    state.folders.forEach((folder) => collapsedFolderIds.add(folder.id));
+    renderSidebar();
   });
   $('btn-update').addEventListener('click', () => api.checkUpdate());
   if (api.platform === 'web') $('btn-update').hidden = true;
