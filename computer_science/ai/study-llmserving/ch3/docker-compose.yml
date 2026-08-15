@@ -1,0 +1,72 @@
+services:
+  serving:
+    profiles: ["cpu"]
+    build:
+      context: .
+    image: ch03-serving:local
+    command: /opt/venv/bin/python ${ENTRY:-02_basic/serving_v1.py}
+    environment:
+      DEVICE: cpu
+      MODEL_NAME: facebook/opt-125m
+      BATCH_SIZE: "4"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    volumes:
+      - hf-cache:/hf-cache
+
+  serving-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+    image: ch03-serving:local
+    command: /opt/venv/bin/python ${ENTRY:-02_basic/serving_v1.py}
+    environment:
+      DEVICE: cuda
+      MODEL_NAME: facebook/opt-125m
+      BATCH_SIZE: "4"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    volumes:
+      - hf-cache:/hf-cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+
+  triton:
+    profiles: ["triton"]
+    image: nvcr.io/nvidia/tritonserver:25.02-py3
+    command: >
+      tritonserver
+      --model-repository=/models
+      --model-control-mode=explicit
+    ports:
+      - "8009:8000"
+      - "8010:8001"
+      - "8011:8002"
+    volumes:
+      - ./06_multimodel/model_dir:/models
+
+  vllm:
+    profiles: ["vllm"]
+    image: vllm/vllm-openai:v0.22.1
+    command: ["--model", "facebook/opt-125m", "--max-num-seqs", "16"]
+    ports:
+      - "8100:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+
+volumes:
+  hf-cache:

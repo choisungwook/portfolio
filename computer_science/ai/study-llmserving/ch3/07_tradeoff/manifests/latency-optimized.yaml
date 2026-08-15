@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ch03-latency
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment
+  namespace: ch03-latency
+  labels:
+    model: sentiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model: sentiment
+  template:
+    metadata:
+      labels:
+        model: sentiment
+    spec:
+      nodeSelector:
+        role: serving
+      containers:
+        - name: serving
+          image: ch03-serving:local
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/venv/bin/python", "06_multimodel/serve.py"]
+          env:
+            - name: MAX_MODELS
+              value: "1"
+            - name: PRELOAD_MODEL_ID
+              value: "550e8400-e29b-41d4-a716-446655440000"
+            - name: PORT
+              value: "8001"
+            - name: HF_HOME
+              value: /hf-cache
+          ports:
+            - containerPort: 8001
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 5
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /hf-cache
+      volumes:
+        - name: hf-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment
+  namespace: ch03-latency
+spec:
+  selector:
+    model: sentiment
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spam
+  namespace: ch03-latency
+  labels:
+    model: spam
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model: spam
+  template:
+    metadata:
+      labels:
+        model: spam
+    spec:
+      nodeSelector:
+        role: serving
+      containers:
+        - name: serving
+          image: ch03-serving:local
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/venv/bin/python", "06_multimodel/serve.py"]
+          env:
+            - name: MAX_MODELS
+              value: "1"
+            - name: PRELOAD_MODEL_ID
+              value: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            - name: PORT
+              value: "8001"
+            - name: HF_HOME
+              value: /hf-cache
+          ports:
+            - containerPort: 8001
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 5
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /hf-cache
+      volumes:
+        - name: hf-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spam
+  namespace: ch03-latency
+spec:
+  selector:
+    model: spam
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: routing-map
+  namespace: ch03-latency
+data:
+  routing.json: |
+    {
+      "550e8400-e29b-41d4-a716-446655440000": "http://sentiment.ch03-latency.svc.cluster.local:8001",
+      "6ba7b810-9dad-11d1-80b4-00c04fd430c8": "http://spam.ch03-latency.svc.cluster.local:8001"
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router
+  namespace: ch03-latency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router
+  template:
+    metadata:
+      labels:
+        app: router
+    spec:
+      containers:
+        - name: router
+          image: ch03-serving:local
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/venv/bin/python", "07_tradeoff/static_router.py"]
+          env:
+            - name: ROUTING_MAP_PATH
+              value: /etc/routing/routing.json
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: routing
+              mountPath: /etc/routing
+      volumes:
+        - name: routing
+          configMap:
+            name: routing-map
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router
+  namespace: ch03-latency
+spec:
+  type: NodePort
+  selector:
+    app: router
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30081
