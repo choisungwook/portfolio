@@ -3,7 +3,7 @@
 // cannot call arbitrary origins itself. TLS verification cannot be disabled
 // here — that is a desktop-only setting.
 
-import { validateSpec, specToInit, resultFrom } from './proxy.js';
+import { validateSpec, specToInit, requestTimeoutMs, resultFrom } from './proxy.js';
 
 export default {
   async fetch(request, env) {
@@ -40,7 +40,7 @@ async function proxy(request) {
   try {
     response = await fetch(spec.url, {
       ...specToInit(spec, settings),
-      signal: AbortSignal.timeout(1000 * (settings.timeoutSecs || 30)),
+      signal: AbortSignal.timeout(requestTimeoutMs(settings)),
     });
   } catch (error) {
     return json({ error: String(error) }, 502);

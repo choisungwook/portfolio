@@ -15,7 +15,7 @@ function createState() {
   return {
     folders: [createFolder('Default', true)],
     globalVariables: [],
-    settings: { verifySsl: true, timeoutSecs: 30, followRedirects: true },
+    settings: { verifySsl: true, timeoutSecs: 60, followRedirects: true },
   };
 }
 
@@ -74,6 +74,14 @@ function normalizeRequest(request) {
     headers: Array.isArray(request.headers) ? request.headers : [],
     localVariables: Array.isArray(request.localVariables) ? request.localVariables : [],
   });
+}
+
+function createEngineSettings(settings, canToggleSsl) {
+  return {
+    verifySsl: canToggleSsl ? settings.verifySsl : true,
+    timeoutSecs: settings.timeoutSecs,
+    followRedirects: settings.followRedirects,
+  };
 }
 
 function duplicateRequest(request) {
@@ -322,6 +330,7 @@ const exported = {
   createFolder,
   createRequest,
   normalizeState,
+  createEngineSettings,
   duplicateRequest,
   varsToMap,
   substitute,

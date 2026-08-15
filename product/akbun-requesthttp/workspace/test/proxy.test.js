@@ -41,6 +41,12 @@ test('specToInit drops the body for GET and follows redirects by default', async
   assert.strictEqual(init.redirect, 'follow');
 });
 
+test('requestTimeoutMs uses the global timeout and defaults to 60 seconds', async () => {
+  const { requestTimeoutMs } = await proxyModule;
+  assert.strictEqual(requestTimeoutMs({ timeoutSecs: 90 }), 90_000);
+  assert.strictEqual(requestTimeoutMs({}), 60_000);
+});
+
 test('resultFrom matches the desktop engine response shape', async () => {
   const { resultFrom } = await proxyModule;
   // A string body would make Response add its own content-type header.

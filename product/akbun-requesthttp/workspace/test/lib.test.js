@@ -23,6 +23,17 @@ test('createState always includes an empty default folder', () => {
     isDefault: true,
     requests: [],
   });
+  assert.strictEqual(state.settings.timeoutSecs, 60);
+});
+
+test('createEngineSettings applies the global timeout to every request', () => {
+  const settings = { verifySsl: false, timeoutSecs: 90, followRedirects: false };
+  assert.deepStrictEqual(L.createEngineSettings(settings, true), settings);
+  assert.deepStrictEqual(L.createEngineSettings(settings, false), {
+    verifySsl: true,
+    timeoutSecs: 90,
+    followRedirects: false,
+  });
 });
 
 test('normalizeState migrates flat requests into the default folder', () => {
