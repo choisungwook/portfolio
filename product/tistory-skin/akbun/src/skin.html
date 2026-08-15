@@ -69,6 +69,7 @@
       <div class="page-home-link">
         <a href="[##_blog_link_##]" class="page-home-link-anchor">글 목록으로 돌아가기</a>
         <button type="button" class="copy-markdown-btn" id="copy-markdown-btn">markdown으로 복사하기</button>
+        <button type="button" class="presentation-mode-btn" id="presentation-mode-btn" aria-pressed="false">프리젠테이션 모드로 보기</button>
       </div>
 
       <!-- ===== Ad: List Upper ===== -->
@@ -720,6 +721,93 @@
 
         fallbackCopy(md);
       });
+    });
+  </script>
+
+  <!-- Presentation Mode -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var btn = document.getElementById("presentation-mode-btn");
+      var postBody = document.querySelector(".post-body");
+      if (!btn || !postBody) {
+        if (btn) btn.style.display = "none";
+        return;
+      }
+
+      var enterLabel = "프리젠테이션 모드로 보기";
+      var exitLabel = "프리젠테이션 모드 종료";
+      var fullscreenActive = false;
+
+      function getFullscreenElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement;
+      }
+
+      function showPresentationMode() {
+        document.body.classList.add("presentation-mode");
+        btn.textContent = exitLabel;
+        btn.setAttribute("aria-pressed", "true");
+      }
+
+      function hidePresentationMode() {
+        document.body.classList.remove("presentation-mode");
+        btn.textContent = enterLabel;
+        btn.setAttribute("aria-pressed", "false");
+      }
+
+      function enterPresentationMode() {
+        showPresentationMode();
+        var requestFullscreen = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+        if (!requestFullscreen) return;
+
+        var request;
+        try {
+          request = requestFullscreen.call(document.documentElement);
+        } catch (e) {
+          return;
+        }
+        if (request && request.catch) {
+          request.catch(function () {});
+        }
+      }
+
+      function exitPresentationMode() {
+        hidePresentationMode();
+        if (!getFullscreenElement()) return;
+
+        var exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+        if (!exitFullscreen) return;
+
+        var exit;
+        try {
+          exit = exitFullscreen.call(document);
+        } catch (e) {
+          return;
+        }
+        if (exit && exit.catch) {
+          exit.catch(function () {});
+        }
+      }
+
+      function handleFullscreenChange() {
+        if (getFullscreenElement()) {
+          fullscreenActive = true;
+          return;
+        }
+        if (!fullscreenActive) return;
+
+        fullscreenActive = false;
+        hidePresentationMode();
+      }
+
+      btn.addEventListener("click", function () {
+        if (document.body.classList.contains("presentation-mode")) {
+          exitPresentationMode();
+          return;
+        }
+        enterPresentationMode();
+      });
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     });
   </script>
 

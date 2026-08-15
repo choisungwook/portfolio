@@ -81,6 +81,13 @@
 
 - "글 목록으로 돌아가기" 링크가 존재하는지
 - "markdown으로 복사하기" 버튼이 링크 오른쪽에 존재하는지
+- "프리젠테이션 모드로 보기" 버튼이 Markdown 복사 버튼 오른쪽에 존재하는지
+- 프리젠테이션 모드에서 브라우저 전체화면으로 전환되는지
+- 프리젠테이션 모드에서 글 헤더와 본문을 유지하고 댓글과 푸터를 숨기는지
+- 프리젠테이션 모드에서 목차가 본문 왼쪽에 표시되는지
+- 긴 목차 항목이 목차 영역 안에서 줄바꿈되고 본문을 침범하지 않는지
+- 프리젠테이션 모드에서 본문이 목차 오른쪽부터 콘텐츠 영역 끝까지 채우는지
+- 프리젠테이션 모드 종료 버튼 또는 `Esc`로 원래 화면으로 복귀하는지
 - 버튼 클릭 시 클립보드에 글 제목, 본문 Markdown, 출처 URL이 복사되는지
 - 복사 결과에서 본문 헤딩 depth가 원본 그대로 유지되는지. 티스토리 본문 `h1`은 `#`, `h2`는 `##`로 변환하며 강등하지 않는다
 - 표, 코드블록, 리스트, blockquote가 Markdown으로 보존되는지. 리스트 marker 뒤 공백은 1개만 둔다. 예: `- 목록`
@@ -97,6 +104,7 @@
 <div class="page-home-link">
   <a href="preview.html" class="page-home-link-anchor">글 목록으로 돌아가기</a>
   <button type="button" class="copy-markdown-btn" id="copy-markdown-btn">markdown으로 복사하기</button>
+  <button type="button" class="presentation-mode-btn" id="presentation-mode-btn" aria-pressed="false">프리젠테이션 모드로 보기</button>
 </div>
 <div id="floating-toc" class="floating-toc">
 <nav id="toc-nav"></nav>
@@ -169,6 +177,26 @@ document.querySelectorAll(".post-body h1, .post-body h2")
 .copy-markdown-btn.is-copied {
   color: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+#tt-body-page.presentation-mode .comments-section,
+#tt-body-page.presentation-mode .site-footer {
+  display: none;
+}
+
+#tt-body-page.presentation-mode .post-full {
+  width: 100%;
+  max-width: none;
+}
+
+#tt-body-page.presentation-mode .floating-toc.visible {
+  display: block !important;
+  width: 240px;
+}
+
+#tt-body-page.presentation-mode .toc-link {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .floating-toc-header {
