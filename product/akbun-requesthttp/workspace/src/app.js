@@ -14,6 +14,7 @@ let state = L.createState();
 let currentRequest = L.createRequest('');
 let currentScenarioId = null;
 let lastResponse = null;
+let requestInFlight = false;
 // scenarioId -> per-step results of the last run, display only.
 const scenarioResults = {};
 
@@ -220,22 +221,30 @@ function bindEditor() {
 
 // -------------------------------------------------------------- send flow
 
+function setRequestLoading(loading) {
+  const button = $('btn-send');
+  button.disabled = loading;
+  button.textContent = loading ? 'Sending…' : 'Send';
+  button.setAttribute('aria-busy', String(loading));
+  $('request-progress').hidden = !loading;
+}
+
 async function sendRequest() {
+  if (requestInFlight) return;
   const resolved = L.resolveRequest(currentRequest, state.variables);
   if (!resolved.url) {
     await api.message('URL is empty.');
     return;
   }
-  const button = $('btn-send');
-  button.disabled = true;
-  button.textContent = '…';
+  requestInFlight = true;
+  setRequestLoading(true);
   try {
     lastResponse = await api.send(resolved, engineSettings());
   } catch (error) {
     lastResponse = { status: 0, statusText: '', headers: [], body: String(error), elapsedMs: 0, sizeBytes: 0 };
   } finally {
-    button.disabled = false;
-    button.textContent = 'Send';
+    requestInFlight = false;
+    setRequestLoading(false);
   }
   renderResponse();
 }

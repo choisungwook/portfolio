@@ -51,6 +51,7 @@ button, input, select, textarea {
 
 button { background: var(--bg-panel); cursor: pointer; }
 button:hover { border-color: var(--accent); }
+button:disabled { cursor: not-allowed; opacity: 0.65; }
 button.small { padding: 2px 8px; font-size: 12px; }
 
 textarea, pre, code, #url { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
@@ -115,6 +116,29 @@ li.active .item-method { color: var(--accent-fg); }
 .name-row input { flex: 1; min-width: 120px; }
 .send-row #url { flex: 1; min-width: 200px; }
 #btn-send { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.request-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.5s; }
+}
 
 details { margin-bottom: 8px; }
 summary { cursor: pointer; color: var(--fg-dim); margin-bottom: 4px; }
