@@ -789,8 +789,13 @@
       }
 
       function handleFullscreenChange() {
-        if (getFullscreenElement()) {
+        var fullscreenElement = getFullscreenElement();
+        if (fullscreenElement === document.documentElement) {
           fullscreenActive = true;
+          return;
+        }
+        if (fullscreenElement) {
+          fullscreenActive = false;
           return;
         }
         if (!fullscreenActive) return;

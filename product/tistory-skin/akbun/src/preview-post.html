@@ -664,8 +664,13 @@ redis-pod   1/1     Running   0          12m</code></pre>
     }
 
     function handleFullscreenChange() {
-      if (getFullscreenElement()) {
+      var fullscreenElement = getFullscreenElement();
+      if (fullscreenElement === document.documentElement) {
         fullscreenActive = true;
+        return;
+      }
+      if (fullscreenElement) {
+        fullscreenActive = false;
         return;
       }
       if (!fullscreenActive) return;
