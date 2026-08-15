@@ -1,0 +1,19 @@
+@baseUrl = http://localhost:8000
+
+### Health check
+GET {{baseUrl}}/healthz
+Accept: application/json
+
+### Queue state
+GET {{baseUrl}}/queue_state
+Accept: application/json
+
+### Generate text
+POST {{baseUrl}}/basic_generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "Explain why client concurrency may not improve model throughput.",
+  "min_processing_seconds": 15
+}
