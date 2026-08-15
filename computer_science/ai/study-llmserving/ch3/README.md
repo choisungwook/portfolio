@@ -18,5 +18,6 @@
 - Python 3.13 사용
 - uv로 Python·가상환경·패키지 관리
 - Ruff formatter로 Python 2칸 들여쓰기 검증
-- 노트북 코드 셀에서 구현 코드를 직접 정의하고 실행
+- 03~07 실습은 노트북 코드 셀에서 구현 코드를 직접 정의하고 실행
+- 02 실습은 실행 중인 API를 `.http` 또는 akbun-requesthttp로 호출
 - macOS는 CPU 또는 MPS, RTX 5060 Ubuntu는 CUDA 사용

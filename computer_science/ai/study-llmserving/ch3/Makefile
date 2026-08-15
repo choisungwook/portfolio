@@ -1,4 +1,4 @@
-.PHONY: sync notebook lint format create_kind delete_kind up down
+.PHONY: sync notebook lint format create_kind delete_kind up watch down
 
 sync:
 	uv sync --dev
@@ -21,7 +21,10 @@ delete_kind:
 	kind delete cluster --name ch03
 
 up:
-	docker compose --profile cpu up -d serving
+	docker compose --profile cpu up -d --build --force-recreate serving
+
+watch:
+	docker compose --profile cpu watch serving
 
 down:
 	docker compose down

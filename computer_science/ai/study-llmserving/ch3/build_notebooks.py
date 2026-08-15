@@ -70,39 +70,6 @@ def lesson(title: str, goals: str, cells: list[dict[str, Any]]) -> dict[str, Any
   }
 
 
-def basic_notebook() -> dict[str, Any]:
-  return lesson(
-    "02. 단일 요청 처리",
-    "- API와 model worker의 역할 구분\n- 별도 process와 queue 기반 IPC 이해",
-    [
-      markdown_cell("## 구현 코드\n\n셀을 실행해 class와 FastAPI endpoint를 직접 정의한다."),
-      code_cell(module_source("02_basic/serving_v1.py")),
-      markdown_cell(
-        "## Model worker 직접 실행\n\nIPC를 붙이기 전에 model worker의 입력과 출력을 확인한다."
-      ),
-      code_cell(
-        "worker = ModelWorker(MODEL_NAME, DEVICE)\n"
-        'requests = [{"request_id": "notebook-1", "prompt": "Hello, I am"}]\n'
-        "worker.generate(requests)"
-      ),
-      quiz_cell(
-        [
-          (
-            "ModelExecutor가 task queue와 result queue를 분리한 이유는 무엇인가?",
-            "task queue는 추론 요청을 worker로 전달하고 result queue는 완료 결과를 "
-            "API 쪽으로 돌려준다. 양방향 IPC의 역할과 흐름을 분리한다.",
-          ),
-          (
-            "batching 없이 동시 요청 수만 늘리면 model worker throughput이 증가하는가?",
-            "증가하지 않는다. 단일 worker가 요청을 하나씩 처리하므로 요청은 task queue에서 "
-            "대기하고 model 호출 횟수는 그대로다.",
-          ),
-        ]
-      ),
-    ],
-  )
-
-
 def batching_notebook() -> dict[str, Any]:
   return lesson(
     "03. Batching과 Sequence 추적",
@@ -322,7 +289,6 @@ def tradeoff_notebook() -> dict[str, Any]:
 
 
 NOTEBOOKS = {
-  "02_basic/02_basic.ipynb": basic_notebook,
   "03_batching/03_batching.ipynb": batching_notebook,
   "04_streaming/04_streaming.ipynb": streaming_notebook,
   "05_vllm/05_vllm.ipynb": vllm_notebook,
