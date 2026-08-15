@@ -60,7 +60,8 @@ body {
   position: relative;
 }
 
-.menu-title {
+.menu-title,
+.menubar-command {
   border: 0;
   background: transparent;
   padding: 3px 10px;
@@ -68,7 +69,8 @@ body {
 }
 
 .menu-title:hover,
-.menu-title[aria-expanded='true'] {
+.menu-title[aria-expanded='true'],
+.menubar-command:hover {
   background: var(--accent-soft);
 }
 
@@ -181,6 +183,16 @@ button.active {
   min-width: 34px;
 }
 
+.toolbar-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
 /* --- layout --- */
 
 main {
@@ -221,8 +233,13 @@ main {
   border-radius: 2px;
 }
 
-.thumb.active {
+.thumb.active,
+.thumb.selected {
   border-color: var(--accent);
+}
+
+.thumb.selected {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* Focus is what tells Backspace to delete the slide rather than the selected
@@ -268,6 +285,14 @@ main {
 
 .slide-actions button {
   flex: 1;
+  min-width: 0;
+  padding-inline: 6px;
+}
+
+.slide-actions .icon-action {
+  flex: 0 0 30px;
+  font-size: 16px;
+  padding: 3px;
 }
 
 /* --- stage --- */
@@ -541,7 +566,6 @@ main {
   height: 26px;
   padding: 0;
   border-radius: 5px;
-  background: var(--swatch);
   /* The swatch is the color, so its own border must not read as part of it. */
   border: 1px solid var(--border);
 }
@@ -712,6 +736,186 @@ input[type='color'] {
 #context-menu button:focus-visible {
   background: var(--accent-soft);
   outline: none;
+}
+
+/* --- preset palette --- */
+
+#preset-menu {
+  position: fixed;
+  z-index: 35;
+  width: min(560px, calc(100vw - 16px));
+  max-height: min(520px, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+#preset-menu section + section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+#preset-menu h2 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(78px, 1fr));
+  gap: 6px;
+}
+
+.preset-item {
+  min-width: 0;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.preset-item svg {
+  width: 100%;
+  height: 48px;
+}
+
+.preset-item span {
+  width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- settings dialog --- */
+
+#settings-dialog {
+  width: min(720px, calc(100vw - 32px));
+  height: min(480px, calc(100vh - 32px));
+  padding: 0;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+#settings-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.settings-shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  grid-template-rows: auto 1fr auto;
+}
+
+.settings-shell > header {
+  grid-column: 1 / -1;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-shell h1,
+.settings-content h2 {
+  margin: 0;
+}
+
+.settings-shell h1 {
+  font-size: 17px;
+}
+
+.settings-shell > nav {
+  padding: 10px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+
+.settings-shell > nav button {
+  width: 100%;
+  border: 0;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.settings-content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.settings-content h2 {
+  font-size: 15px;
+}
+
+.settings-content p {
+  color: var(--muted);
+}
+
+.preset-form {
+  display: grid;
+  grid-template-columns: 100px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+#preset-name {
+  min-width: 0;
+  padding: 5px 8px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  font: inherit;
+}
+
+.settings-status {
+  min-height: 1.2em;
+}
+
+.settings-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-preset-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.settings-preset-row svg {
+  width: 64px;
+  height: 36px;
+}
+
+.settings-shell > footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+
+button.primary {
+  color: #ffffff;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 /* --- presentation mode --- */

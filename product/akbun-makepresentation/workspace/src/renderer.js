@@ -8,6 +8,7 @@ const L = globalThis.slidesLib;
 const state = {
   deck: L.createDeck(),
   current: 0,
+  slideSelection: [0],
   selected: -1,
   selection: [],
   tool: 'select',
@@ -30,11 +31,16 @@ const stageInner = $('stage-inner');
 const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
+const presetMenu = $('preset-menu');
+const settingsDialog = $('settings-dialog');
 const fontPicker = $('font-picker');
 const fontMenu = $('font-menu');
 const fontSearch = $('font-search');
 const fontOptions = $('font-options');
 let fontFamilies = ['Arial', 'Helvetica'];
+let textEditBefore = null;
+let customPresets = [];
+let settingsPresetDraft = [];
 
 const slide = () => state.deck.slides[state.current];
 const selectedShape = () =>
@@ -58,6 +64,21 @@ function selectMany(indices) {
 
 function clearSelection() {
   selectOnly(-1);
+}
+
+function setSlideSelection(indices) {
+  state.slideSelection = [...new Set(indices)].filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < state.deck.slides.length
+  );
+  if (state.slideSelection.length === 0) state.slideSelection = [state.current];
+}
+
+function selectedSlideIndices() {
+  return [...state.slideSelection].sort((left, right) => left - right);
+}
+
+function slidesHaveFocus() {
+  return $('slides').contains(document.activeElement);
 }
 
 function editorHasFocus() {
@@ -219,7 +240,7 @@ function renderThumbs() {
   thumbs.innerHTML = state.deck.slides
     .map(
       (s, i) =>
-        `<div class="thumb${i === state.current ? ' active' : ''}" data-slide="${i}" draggable="true" tabindex="${i === state.current ? '0' : '-1'}">` +
+        `<div class="thumb${i === state.current ? ' active' : ''}${state.slideSelection.includes(i) ? ' selected' : ''}" data-slide="${i}" draggable="true" tabindex="${i === state.current ? '0' : '-1'}">` +
         `${L.renderSlideSvg(s, { number: state.showNumbers ? i + 1 : 0 })}` +
         `<span class="num">${i + 1}</span></div>`
     )
@@ -340,6 +361,7 @@ function markDirty() {
 function restore(deck) {
   state.deck = structuredClone(deck);
   state.current = Math.min(state.current, state.deck.slides.length - 1);
+  setSlideSelection([state.current]);
   clearSelection();
   state.dirty = true;
   renderAll();
@@ -411,7 +433,7 @@ canvas.addEventListener('pointerdown', (event) => {
 
   if (state.tool === 'text') {
     const shape = L.createShape('text', p.x, p.y, state.defaults);
-    shape.w = 320;
+    shape.w = 120;
     shape.h = shape.fontSize * 1.4;
     slide().shapes.push(shape);
     selectOnly(slide().shapes.length - 1);
@@ -625,7 +647,7 @@ function canEditText(shape) {
 function styleTextEditor(shape) {
   if (!shape) return;
   const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
-  const lines = (shape.text || '').split('\n').length;
+  const lines = textEditor.value.split('\n').length;
   // The same inset the glyphs are drawn at, so text does not jump sideways
   // when editing starts inside a rect or an ellipse.
   const box = L.textBox(shape);
@@ -647,10 +669,12 @@ function styleTextEditor(shape) {
 // is already there.
 function startTextEdit(index, seed) {
   const shape = slide().shapes[index];
+  textEditBefore = structuredClone(shape);
   state.editingIndex = index;
   renderCanvas();
 
   textEditor.value = seed ? shape.text + seed : shape.text;
+  if (seed && shape.kind === 'text') L.fitTextBox(shape, textEditor.value);
   styleTextEditor(shape);
   textEditor.hidden = false;
   // Deferred so it wins over whatever focus change the triggering click
@@ -665,6 +689,8 @@ function commitTextEdit() {
   if (state.editingIndex < 0) return;
   const index = state.editingIndex;
   const shape = slide().shapes[index];
+  const before = textEditBefore;
+  textEditBefore = null;
   state.editingIndex = -1;
   textEditor.hidden = true;
 
@@ -694,14 +720,23 @@ function commitTextEdit() {
     shape.text = text;
   } else if (changed) {
     shape.text = text;
-    const lines = text.split('\n').length;
-    shape.h = Math.max(shape.h, lines * shape.fontSize * 1.35);
+    L.fitTextBox(shape, text);
+  } else if (before && shape.kind === 'text') {
+    shape.w = before.w;
+    shape.h = before.h;
   }
   if (removed || changed) markDirty();
   renderAll();
 }
 
 textEditor.addEventListener('blur', commitTextEdit);
+textEditor.addEventListener('input', () => {
+  const shape = slide().shapes[state.editingIndex];
+  if (!shape || shape.kind !== 'text') return;
+  L.fitTextBox(shape, textEditor.value);
+  styleTextEditor(shape);
+  renderCanvas();
+});
 textEditor.addEventListener('keydown', (event) => {
   // The document handler must not see plain typing: every letter is a tool
   // shortcut out there. Formatting and zoom are the exceptions, handled here
@@ -726,6 +761,12 @@ textEditor.addEventListener('keydown', (event) => {
 const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
+  if (settingsDialog.open) return;
+  if (!presetMenu.hidden && event.key === 'Escape') {
+    hidePresetMenu();
+    event.preventDefault();
+    return;
+  }
   if (!fontMenu.hidden && event.key === 'Escape') {
     hideFontMenu();
     event.preventDefault();
@@ -777,7 +818,14 @@ document.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
     // New and Open used to reach the page as system menu accelerators. With
     // the menus in the window there is no accelerator, so the keys land here.
-    if (key === 'n') newDeck();
+    if (key === 'a' && slidesHaveFocus()) {
+      setSlideSelection(state.deck.slides.map((_, index) => index));
+      renderThumbs();
+    } else if (key === 'a' && editorHasFocus()) {
+      selectMany(slide().shapes.map((_, index) => index));
+      renderCanvas();
+      renderProps();
+    } else if (key === 'n') newDeck();
     else if (key === 'o') openFile();
     else if (key === 's') saveFile(event.shiftKey);
     else if (key === 'z' && event.shiftKey) redo();
@@ -785,6 +833,8 @@ document.addEventListener('keydown', (event) => {
     else if (key === 'y') redo();
     else if (key === 'c' || key === 'v') return;
     else if (key === 'd') duplicateSelection();
+    else if (key === 'arrowup' && slidesHaveFocus()) moveSelectedSlides(-1);
+    else if (key === 'arrowdown' && slidesHaveFocus()) moveSelectedSlides(1);
     else if (key === 'arrowup') moveCurrentSlide(state.current - 1);
     else if (key === 'arrowdown') moveCurrentSlide(state.current + 1);
     else if (TEXT_STYLE_KEYS[key]) toggleTextStyle(TEXT_STYLE_KEYS[key]);
@@ -862,6 +912,235 @@ function insertShapes(shapes, offset) {
   return copies;
 }
 
+const PRESET_STORAGE_KEY = 'akbun-makepresentation.custom-presets';
+const DEFAULT_PRESET_LABELS = {
+  'red-filled-rectangle': 'Filled rectangle',
+  'red-outline-rectangle': 'Outline rectangle',
+  'numbered-circle': 'Numbered circle',
+  'right-open-arrow': 'Right open arrow',
+  'left-open-arrow': 'Left open arrow',
+};
+
+function shapeBounds(shapes) {
+  const boxes = shapes.map(L.shapeBBox);
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.w));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+function normalizedPresetShapes(shapes) {
+  const copies = L.cloneShapes(shapes);
+  const bounds = shapeBounds(copies);
+  for (const shape of copies) L.moveShape(shape, -bounds.x, -bounds.y);
+  return copies;
+}
+
+function centeredPresetShapes(shapes) {
+  const copies = L.cloneShapes(shapes);
+  const bounds = shapeBounds(copies);
+  const dx = (L.SLIDE_W - bounds.w) / 2 - bounds.x;
+  const dy = (L.SLIDE_H - bounds.h) / 2 - bounds.y;
+  for (const shape of copies) L.moveShape(shape, dx, dy);
+  return copies;
+}
+
+function readCustomPresets() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((preset) => {
+      if (!preset || typeof preset !== 'object') return [];
+      const shapes = L.parseClipboardShapes(JSON.stringify(preset.shapes || []))
+        .filter((shape) => shape.kind !== 'image');
+      if (!shapes.length) return [];
+      return [{
+        id: String(preset.id || '').slice(0, 100),
+        name: String(preset.name || 'Preset').slice(0, 60),
+        shapes,
+      }];
+    });
+  } catch (_) {
+    return [];
+  }
+}
+
+function presetButton(preset, source) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'preset-item';
+  button.dataset.presetSource = source;
+  button.dataset.presetId = preset.id;
+  button.setAttribute('role', 'menuitem');
+  button.title = preset.name;
+  const preview = L.renderShapesSvg(preset.shapes);
+  if (preview) button.insertAdjacentHTML('beforeend', preview.svg);
+  const label = document.createElement('span');
+  label.textContent = preset.name;
+  button.append(label);
+  return button;
+}
+
+function defaultPresets() {
+  return L.DEFAULT_PRESET_IDS.map((id) => ({
+    id,
+    name: DEFAULT_PRESET_LABELS[id],
+    shapes: L.defaultPresetShapes(id),
+  }));
+}
+
+function renderPresetGrid(container, presets, source) {
+  container.textContent = '';
+  for (const preset of presets) container.append(presetButton(preset, source));
+}
+
+function renderPresetMenu() {
+  renderPresetGrid($('default-presets'), defaultPresets(), 'default');
+  renderPresetGrid($('custom-presets'), customPresets, 'custom');
+  $('custom-presets-section').hidden = customPresets.length === 0;
+}
+
+function positionPresetMenu() {
+  const trigger = $('btn-preset').getBoundingClientRect();
+  const bounds = presetMenu.getBoundingClientRect();
+  presetMenu.style.left = `${Math.max(8, Math.min(
+    trigger.left,
+    window.innerWidth - bounds.width - 8
+  ))}px`;
+  const below = trigger.bottom + 6;
+  presetMenu.style.top = `${below + bounds.height <= window.innerHeight
+    ? below
+    : Math.max(8, trigger.top - bounds.height - 6)}px`;
+}
+
+function showPresetMenu() {
+  renderPresetMenu();
+  presetMenu.hidden = false;
+  $('btn-preset').setAttribute('aria-expanded', 'true');
+  positionPresetMenu();
+  presetMenu.querySelector('.preset-item')?.focus();
+}
+
+function hidePresetMenu() {
+  presetMenu.hidden = true;
+  $('btn-preset').setAttribute('aria-expanded', 'false');
+}
+
+$('btn-preset').addEventListener('click', () => {
+  if (presetMenu.hidden) showPresetMenu();
+  else hidePresetMenu();
+});
+
+presetMenu.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-preset-id]');
+  if (!button) return;
+  const preset = button.dataset.presetSource === 'default'
+    ? defaultPresets().find((candidate) => candidate.id === button.dataset.presetId)
+    : customPresets.find((candidate) => candidate.id === button.dataset.presetId);
+  if (!preset) return;
+  insertShapes(centeredPresetShapes(preset.shapes), 0);
+  hidePresetMenu();
+  canvas.focus({ preventScroll: true });
+});
+
+function setSettingsPage(name) {
+  for (const button of settingsDialog.querySelectorAll('[data-settings-page]')) {
+    button.classList.toggle('active', button.dataset.settingsPage === name);
+  }
+  for (const panel of settingsDialog.querySelectorAll('[data-settings-panel]')) {
+    panel.hidden = panel.dataset.settingsPanel !== name;
+  }
+}
+
+function renderSettingsPresets() {
+  const container = $('settings-presets');
+  container.textContent = '';
+  if (!settingsPresetDraft.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No custom presets saved.';
+    container.append(empty);
+    return;
+  }
+  for (const preset of settingsPresetDraft) {
+    const row = document.createElement('div');
+    row.className = 'settings-preset-row';
+    const preview = L.renderShapesSvg(preset.shapes);
+    if (preview) row.insertAdjacentHTML('beforeend', preview.svg);
+    const name = document.createElement('span');
+    name.textContent = preset.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.removePreset = preset.id;
+    remove.textContent = 'Delete';
+    row.append(name, remove);
+    container.append(row);
+  }
+}
+
+function openSettings() {
+  hideMenus();
+  hidePresetMenu();
+  settingsPresetDraft = structuredClone(customPresets);
+  $('preset-name').value = '';
+  $('preset-settings-status').textContent = '';
+  setSettingsPage('general');
+  renderSettingsPresets();
+  settingsDialog.showModal();
+  settingsDialog.querySelector('[data-settings-page="general"]')?.focus();
+}
+
+settingsDialog.querySelector('nav').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-settings-page]');
+  if (button) setSettingsPage(button.dataset.settingsPage);
+});
+
+$('btn-save-preset').addEventListener('click', () => {
+  const shapes = selectedShapes().filter((shape) => shape.kind !== 'image');
+  if (!shapes.length) {
+    $('preset-settings-status').textContent = 'Select one or more shapes before opening Settings.';
+    return;
+  }
+  const preset = {
+    id: globalThis.crypto?.randomUUID?.() || `preset-${Date.now()}`,
+    name: $('preset-name').value.trim() || `Preset ${settingsPresetDraft.length + 1}`,
+    shapes: normalizedPresetShapes(shapes),
+  };
+  if (JSON.stringify(preset).length > 500_000) {
+    $('preset-settings-status').textContent = 'This selection is too large to save as a preset.';
+    return;
+  }
+  settingsPresetDraft.push(preset);
+  $('preset-name').value = '';
+  $('preset-settings-status').textContent = `Saved “${preset.name}” to this settings draft.`;
+  renderSettingsPresets();
+});
+
+$('settings-presets').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove-preset]');
+  if (!button) return;
+  settingsPresetDraft = settingsPresetDraft.filter(
+    (preset) => preset.id !== button.dataset.removePreset
+  );
+  renderSettingsPresets();
+});
+
+$('btn-settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
+$('btn-settings-ok').addEventListener('click', () => {
+  try {
+    localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(settingsPresetDraft));
+    customPresets = structuredClone(settingsPresetDraft);
+    renderPresetMenu();
+    settingsDialog.close('ok');
+  } catch (_) {
+    $('preset-settings-status').textContent = 'Could not save presets on this device.';
+    setSettingsPage('presets');
+  }
+});
+settingsDialog.addEventListener('cancel', () => {
+  settingsPresetDraft = [];
+});
+
 function isFormField(target) {
   return target instanceof HTMLInputElement ||
     target instanceof HTMLSelectElement ||
@@ -901,10 +1180,8 @@ function readImageSize(src) {
 
 function pastedTextShape(text) {
   const shape = L.createShape('text', 80, 80, state.defaults);
-  shape.w = 640;
   shape.text = text.replace(/\r\n/g, '\n');
-  const lines = L.wrapTextLines(shape.text, shape.w, shape.fontSize).length;
-  shape.h = Math.max(shape.fontSize * 1.4, lines * shape.fontSize * 1.35);
+  L.fitTextBox(shape, shape.text);
   return shape;
 }
 
@@ -966,6 +1243,7 @@ function duplicateSelection() {
     return;
   }
   state.current = L.duplicateSlide(state.deck, state.current);
+  setSlideSelection([state.current]);
   markDirty();
   renderAll();
 }
@@ -1095,21 +1373,25 @@ document.addEventListener('contextmenu', (event) => {
 
 document.addEventListener('pointerdown', (event) => {
   if (!contextMenu.contains(event.target)) hideContextMenu();
+  if (!presetMenu.contains(event.target) && !$('btn-preset').contains(event.target)) hidePresetMenu();
   if (!fontPicker.contains(event.target)) hideFontMenu();
   if (!$('menubar').contains(event.target)) hideMenus();
 });
 window.addEventListener('blur', () => {
   hideContextMenu();
+  hidePresetMenu();
   hideFontMenu();
   hideMenus();
 });
 window.addEventListener('resize', () => {
   hideContextMenu();
+  hidePresetMenu();
   hideFontMenu();
   hideMenus();
 });
 $('stage-scroll').addEventListener('scroll', () => {
   hideContextMenu();
+  hidePresetMenu();
   hideFontMenu();
   hideMenus();
 });
@@ -1211,7 +1493,15 @@ fontOptions.addEventListener('click', (event) => {
 function applyProp(patch) {
   const shapes = selectedShapes();
   if (shapes.length) {
-    for (const shape of shapes) Object.assign(shape, patch);
+    for (const shape of shapes) {
+      Object.assign(shape, patch);
+      if (
+        shape.kind === 'text' &&
+        ['fontSize', 'fontFamily', 'bold', 'italic'].some((name) => Object.hasOwn(patch, name))
+      ) {
+        L.fitTextBox(shape, shape.text);
+      }
+    }
     markDirty();
     renderCanvas();
     renderThumbs();
@@ -1353,7 +1643,24 @@ const TEXT_STYLE_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 $('thumbs').addEventListener('click', (event) => {
   const thumb = event.target.closest('[data-slide]');
   if (!thumb) return;
-  state.current = Number(thumb.dataset.slide);
+  const index = Number(thumb.dataset.slide);
+  if (event.shiftKey) {
+    const from = Math.min(state.current, index);
+    const to = Math.max(state.current, index);
+    setSlideSelection(Array.from({ length: to - from + 1 }, (_, offset) => from + offset));
+    state.current = index;
+  } else if (event.metaKey || event.ctrlKey) {
+    const selected = new Set(state.slideSelection);
+    if (selected.has(index) && selected.size > 1) selected.delete(index);
+    else selected.add(index);
+    setSlideSelection([...selected]);
+    state.current = state.slideSelection.includes(index)
+      ? index
+      : state.slideSelection[state.slideSelection.length - 1];
+  } else {
+    state.current = index;
+    setSlideSelection([index]);
+  }
   clearSelection();
   renderAll();
   $('thumbs').querySelector(`[data-slide="${state.current}"]`)?.focus();
@@ -1384,6 +1691,19 @@ function moveCurrentSlide(to) {
   const at = L.moveSlide(state.deck, state.current, to);
   if (at === state.current) return;
   state.current = at;
+  setSlideSelection([at]);
+  clearSelection();
+  markDirty();
+  renderAll();
+}
+
+function moveSelectedSlides(direction) {
+  const currentSlide = slide();
+  const before = selectedSlideIndices();
+  const moved = L.moveSlideSelection(state.deck, before, direction);
+  if (moved.every((index, offset) => index === before[offset])) return;
+  state.current = state.deck.slides.indexOf(currentSlide);
+  setSlideSelection(moved);
   clearSelection();
   markDirty();
   renderAll();
@@ -1395,6 +1715,8 @@ $('thumbs').addEventListener('dragstart', (event) => {
   const thumb = event.target.closest('[data-slide]');
   if (!thumb) return;
   dragSlideFrom = Number(thumb.dataset.slide);
+  state.current = dragSlideFrom;
+  setSlideSelection([dragSlideFrom]);
   event.dataTransfer.effectAllowed = 'move';
   // Firefox refuses to start a drag without payload, and the index is already
   // in dragSlideFrom, so this is only there to make the drag legal.
@@ -1436,6 +1758,7 @@ $('thumbs').addEventListener('dragend', endSlideDrag);
 
 $('btn-add-slide').addEventListener('click', () => {
   state.current = L.addSlide(state.deck, state.current);
+  setSlideSelection([state.current]);
   clearSelection();
   markDirty();
   renderAll();
@@ -1445,21 +1768,32 @@ $('btn-add-slide').addEventListener('click', () => {
 // answer whether the delete came from the button or from Backspace in the
 // panel.
 async function deleteCurrentSlide() {
-  const empty = slide().shapes.length === 0;
-  if (!empty) {
-    const sure = await window.api.ask(`Delete slide ${state.current + 1}?`, {
+  const indices = selectedSlideIndices();
+  const hasContent = indices.some((index) => state.deck.slides[index]?.shapes.length);
+  if (hasContent) {
+    const message = indices.length === 1
+      ? `Delete slide ${indices[0] + 1}?`
+      : `Delete ${indices.length} selected slides?`;
+    const sure = await window.api.ask(message, {
       title: 'Delete Slide',
       kind: 'warning',
     });
     if (!sure) return;
   }
-  state.current = L.deleteSlide(state.deck, state.current);
+  for (const index of [...indices].sort((left, right) => right - left)) {
+    state.deck.slides.splice(index, 1);
+  }
+  if (state.deck.slides.length === 0) state.deck.slides.push(L.createSlide());
+  state.current = Math.min(indices[0] || 0, state.deck.slides.length - 1);
+  setSlideSelection([state.current]);
   clearSelection();
   markDirty();
   renderAll();
 }
 
 $('btn-del-slide').addEventListener('click', deleteCurrentSlide);
+$('btn-slide-up').addEventListener('click', () => moveSelectedSlides(-1));
+$('btn-slide-down').addEventListener('click', () => moveSelectedSlides(1));
 
 // --- file operations -----------------------------------------------------------------------
 
@@ -1475,6 +1809,7 @@ async function newDeck() {
   if (!(await confirmDiscard())) return;
   state.deck = L.createDeck();
   state.current = 0;
+  setSlideSelection([0]);
   clearSelection();
   state.filePath = null;
   state.dirty = false;
@@ -1489,6 +1824,7 @@ async function openFile() {
   try {
     state.deck = await window.api.openDeck(path);
     state.current = 0;
+    setSlideSelection([0]);
     clearSelection();
     state.filePath = path;
     state.dirty = false;
@@ -1685,6 +2021,7 @@ const MENU_COMMANDS = {
   delete: deleteSelectedShape,
   group: groupSelection,
   ungroup: ungroupSelection,
+  settings: openSettings,
   guidelines: toggleGuidelines,
   numbers: toggleNumbers,
   'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
@@ -1769,5 +2106,6 @@ for (const button of document.querySelectorAll('[data-tool]')) {
 
 setTool('select');
 setZoom(state.zoom);
+customPresets = readCustomPresets();
 renderAll();
 loadSystemFonts();
