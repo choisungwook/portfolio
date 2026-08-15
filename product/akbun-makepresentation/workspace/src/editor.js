@@ -677,6 +677,12 @@ function zoomOut(zoom) {
   return smaller.length ? smaller[smaller.length - 1] : ZOOM_STEPS[0];
 }
 
+function filterFonts(fonts, query) {
+  const needle = String(query || '').trim().toLocaleLowerCase();
+  if (!needle) return [...fonts];
+  return fonts.filter((font) => font.toLocaleLowerCase().includes(needle));
+}
+
 const exported = {
   SLIDE_W,
   SLIDE_H,
@@ -686,6 +692,7 @@ const exported = {
   ZOOM_FIT,
   zoomIn,
   zoomOut,
+  filterFonts,
   createDeck,
   createSlide,
   slideBackground,

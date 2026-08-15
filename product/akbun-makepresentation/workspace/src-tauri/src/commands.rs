@@ -4,8 +4,21 @@
 use base64::Engine;
 use makepresentation_deck::{pdf, pptx, Deck};
 use serde::Deserialize;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+
+#[tauri::command]
+pub fn list_system_fonts() -> Vec<String> {
+    let mut database = fontdb::Database::new();
+    database.load_system_fonts();
+    database
+        .faces()
+        .flat_map(|face| face.families.iter().map(|(name, _)| name.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
 
 #[tauri::command]
 pub fn open_deck(path: String) -> Result<Deck, String> {

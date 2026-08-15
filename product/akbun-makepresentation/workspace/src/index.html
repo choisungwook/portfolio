@@ -8,13 +8,6 @@
 </head>
 <body>
   <header id="toolbar">
-    <div class="group">
-      <button id="btn-new" title="New deck">New</button>
-      <button id="btn-open" title="Open a .pptx file">Open</button>
-      <button id="btn-save" title="Save (Cmd+S)">Save</button>
-      <button id="btn-save-as" title="Save under a new name">Save As</button>
-      <button id="btn-pdf" title="Export every slide as a PDF">PDF</button>
-    </div>
     <div class="group tools">
       <button data-tool="select" title="Select (V)">Select</button>
       <button data-tool="rect" title="Rectangle (R)">▭</button>
@@ -102,18 +95,17 @@
       </div>
       <div id="props-text">
         <div class="prop-row">
-          <label>Font</label>
-          <select id="prop-font-family">
-            <option value="Helvetica">Helvetica</option>
-            <option value="Arial">Arial</option>
-            <option value="Verdana">Verdana</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Courier New">Courier New</option>
-            <option value="Apple SD Gothic Neo">애플 SD 산돌고딕</option>
-            <option value="Malgun Gothic">맑은 고딕</option>
-            <option value="Batang">바탕</option>
-          </select>
+          <label for="prop-font-family">Font</label>
+          <div id="font-picker" class="font-picker">
+            <button id="prop-font-family" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="font-family-label">Helvetica</span>
+              <span aria-hidden="true">⌄</span>
+            </button>
+            <div id="font-menu" hidden>
+              <input id="font-search" type="search" placeholder="Search fonts" autocomplete="off" />
+              <div id="font-options" role="listbox"></div>
+            </div>
+          </div>
         </div>
         <div class="prop-row">
           <label>Font size</label>
