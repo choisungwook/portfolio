@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-16
+
+* **Creation**: [검증 도구는 화면을 뺏지 않는 순서로 고르고, 그 순서는 AGENTS.md 본문에 둔다](decisions/2026-08-verification-tool-order.md) 결정 기록. 테스트 섹션이 저장소에 없는 test.md를 가리키고 있어 UI 검증 규칙이 사실상 비어 있었고, 그 자리를 화면을 잡지 않는 순서로 채운 판단과, 그것을 도구 중립 원칙의 예외로 AGENTS.md 본문에 둔 이유를 남긴다.
+
 ## 2026-08-09
 
 * **Creation**: [crate마다 step을 나눈 verify job은 첫 실패에서 멈추므로 파손 범위를 보여주지 않는다](topics/verify-job-stops-at-the-first-failing-step.md) topic 기록. Track에 필드를 추가한 뒤 CI가 알려준 세 곳만 고쳐서는 끝나지 않았고, 실제 파손이 일곱 곳이었다는 것을 남긴다.

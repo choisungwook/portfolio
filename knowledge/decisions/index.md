@@ -31,3 +31,4 @@
 * [멀티 제품 저장소의 What's Changed는 제품 접두사로 이전 tag를 고정한다](2026-08-whats-changed-previous-tag-scoped.md) - generate-notes의 자동 이전 tag 선택이 다른 제품 릴리스를 가리키는 문제를 접두사 필터로 막는 결정.
 * [늦은 프레임은 그리지 않고 건너뛰며, 디코더를 되돌리지 않는다](2026-08-late-frames-are-skipped-not-drawn.md) - 프레임 표시 시각을 오디오 클럭에 맞추고, 판정을 계측 하네스에만 맡기는 결정.
 * [재생 시각의 기준은 오디오 출력이고 영상이 그것을 따라간다](2026-08-audio-is-the-master-clock.md) - 영상 편집 도구의 재생 클럭을 오디오 출력 진행량으로 삼고, 실시간 콜백에서 할당·잠금·파일 접근을 금지한 결정.
+* [검증 도구는 화면을 뺏지 않는 순서로 고르고, 그 순서는 AGENTS.md 본문에 둔다](2026-08-verification-tool-order.md) - 내장 브라우저, workspace 테스트 명령, computer use 순으로 우선순위를 고정하고 도구 중립 원칙의 예외로 인라인 배치한 결정.
