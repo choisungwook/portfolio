@@ -69,8 +69,11 @@ outputs = self.model(input_ids=..., attention_mask=..., use_cache=False)
 - 즉 토큰이 늘수록 step 비용이 커짐. `--count 1`로 `MAX_TOKENS=60`을 주면 뒤로 갈수록 느려지는 게 보임
 - **여기가 5·7장(KV cache 관리)이 들어올 자리**
 
-## 스스로 답해보기
+## 퀴즈
 
-- q6: "전체 생성"과 "토큰 1개 생성"의 차이가 시스템 전체에 어떻게 파급되나?
-- q7: background thread와 async event loop를 잇는 다리는 무엇인가? 왜 공유 변수로는 안 되나?
-- q14: 완료 sequence 제거 코드가 왜 `get_next_batch()` 밖에 있나?
+- q6. "전체 생성"과 "토큰 1개 생성"의 차이가 시스템 전체에 어떻게 파급되나?
+  - 정답: 전체 생성은 한 요청이 완료될 때까지 batch 자리를 점유한다. 토큰 1개씩 생성하면 매 step마다 완료 요청을 제거하고 대기 요청을 채울 수 있어 streaming과 continuous batching이 가능하다.
+- q7. background thread와 async event loop를 잇는 다리는 무엇인가? 왜 공유 변수로는 안 되나?
+  - 정답: `asyncio.run_coroutine_threadsafe()`와 요청별 `asyncio.Queue`다. 공유 변수만 쓰면 thread-safe한 전달과 event loop 깨우기, 요청별 순서 보장을 처리할 수 없다.
+- q14. 완료 sequence 제거 코드가 왜 `get_next_batch()` 밖에 있나?
+  - 정답: `get_next_batch()`는 빈 batch 자리를 채우는 함수이고, 완료 여부는 토큰 생성 step 뒤에 결정된다. 실행 결과를 처리하는 쪽에서 완료 sequence를 제거해야 역할과 변경 시점이 맞다.
