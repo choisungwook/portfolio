@@ -361,12 +361,14 @@ function toPoint(event) {
 
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
+  if (state.editingIndex >= 0) textEditor.blur();
+  // WebKit otherwise starts a native text selection alongside marquee and
+  // Shift-click selection. That highlight can extend outside the marquee and
+  // makes the editor selection look as if it contains only the last object.
+  event.preventDefault();
   const p = toPoint(event);
 
   if (state.tool === 'text') {
-    // Without this the default focus action of the click lands after
-    // startTextEdit and blurs the textarea straight back to an empty commit.
-    event.preventDefault();
     const shape = L.createShape('text', p.x, p.y, state.defaults);
     shape.w = 320;
     shape.h = shape.fontSize * 1.4;
