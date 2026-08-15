@@ -232,6 +232,15 @@ main {
   outline-offset: 1px;
 }
 
+#slides:focus {
+  outline: none;
+}
+
+#slides:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* Where a dragged slide would land. */
 .thumb.drop-target {
   border-color: var(--accent);
@@ -338,6 +347,16 @@ main {
   box-shadow: 0 0 0 1px var(--border), 0 2px 12px rgba(0, 0, 0, 0.25);
   user-select: none;
   -webkit-user-select: none;
+}
+
+#stage:focus,
+#canvas:focus {
+  outline: none;
+}
+
+#stage:focus-visible,
+#canvas:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent), 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
 #canvas[data-tool='rect'],

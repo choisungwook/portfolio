@@ -60,6 +60,11 @@ function clearSelection() {
   selectOnly(-1);
 }
 
+function editorHasFocus() {
+  const active = document.activeElement;
+  return $('stage').contains(active) || $('props').contains(active);
+}
+
 // --- rendering ---------------------------------------------------------------
 
 // The selection overlay shares the slide SVG viewBox. Keep its geometry in
@@ -401,6 +406,7 @@ canvas.addEventListener('pointerdown', (event) => {
   // Shift-click selection. That highlight can extend outside the marquee and
   // makes the editor selection look as if it contains only the last object.
   event.preventDefault();
+  canvas.focus({ preventScroll: true });
   const p = toPoint(event);
 
   if (state.tool === 'text') {
@@ -540,7 +546,8 @@ canvas.addEventListener('pointermove', (event) => {
     const shape = selectedShape();
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
-    L.resizeShape(shape, drag.from, drag.handle, dx, dy);
+    const resize = event.shiftKey ? L.resizeShapeConstrained : L.resizeShape;
+    resize(shape, drag.from, drag.handle, dx, dy);
   } else if (drag.mode === 'crop') {
     const shape = selectedShape();
     if (!shape) return;
@@ -787,10 +794,8 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
-    // Which thing the key deletes is decided by where the focus is, so the
-    // two meanings never have to guess at each other.
-    if ($('slides').contains(target)) deleteCurrentSlide();
-    else deleteSelectedShape();
+    if (editorHasFocus()) deleteSelectedShape();
+    else deleteCurrentSlide();
     event.preventDefault();
     return;
   }
@@ -1352,6 +1357,21 @@ $('thumbs').addEventListener('click', (event) => {
   clearSelection();
   renderAll();
   $('thumbs').querySelector(`[data-slide="${state.current}"]`)?.focus();
+});
+
+$('slides').addEventListener('pointerdown', (event) => {
+  if (event.target.closest('button, [data-slide]')) return;
+  $('slides').focus({ preventScroll: true });
+});
+
+$('stage').addEventListener('pointerdown', (event) => {
+  if (event.target === textEditor || event.target === canvas || canvas.contains(event.target)) return;
+  $('stage').focus({ preventScroll: true });
+});
+
+$('props').addEventListener('pointerdown', (event) => {
+  if (event.target.closest('button, input, select, textarea')) return;
+  $('props').focus({ preventScroll: true });
 });
 
 // --- slide reorder -------------------------------------------------------

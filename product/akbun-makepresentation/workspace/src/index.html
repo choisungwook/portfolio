@@ -67,7 +67,7 @@
   </header>
 
   <main>
-    <aside id="slides">
+    <aside id="slides" tabindex="0" aria-label="Slides">
       <div id="thumbs"></div>
       <div class="slide-actions">
         <button id="btn-add-slide" title="Add a slide after this one">+ Slide</button>
@@ -75,16 +75,16 @@
       </div>
     </aside>
 
-    <section id="stage">
+    <section id="stage" tabindex="0" aria-label="Slide editor">
       <div id="stage-scroll">
         <div id="stage-inner">
-          <svg id="canvas" viewBox="0 0 1280 720"></svg>
+          <svg id="canvas" viewBox="0 0 1280 720" tabindex="0" aria-label="Current slide"></svg>
           <textarea id="text-editor" hidden spellcheck="false"></textarea>
         </div>
       </div>
     </section>
 
-    <aside id="props">
+    <aside id="props" tabindex="-1">
       <!-- The background belongs to the slide, not to any shape, so it sits
            in its own card above the selection properties. Sharing the Fill
            row with shapes is what made people recolor a rectangle while
