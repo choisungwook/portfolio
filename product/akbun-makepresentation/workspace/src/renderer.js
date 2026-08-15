@@ -1672,8 +1672,11 @@ const MENU_COMMANDS = {
   'zoom-fit': () => setZoom(L.ZOOM_FIT),
 };
 
+// The name is not always ours: this also runs whatever the shell sends over
+// the file-command event. A plain lookup would find inherited keys, and
+// `constructor` would be called as if it were a command.
 function runCommand(command) {
-  if (MENU_COMMANDS[command]) MENU_COMMANDS[command]();
+  if (Object.hasOwn(MENU_COMMANDS, command)) MENU_COMMANDS[command]();
 }
 
 function hideMenus() {

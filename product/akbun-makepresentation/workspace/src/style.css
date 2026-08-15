@@ -89,13 +89,17 @@ body {
   display: none;
 }
 
+/* The left padding is the checkmark's seat. Reserving it on every item
+   rather than only on the checked one is what keeps a label from jumping
+   sideways when its toggle flips. */
 .menu-panel button {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 24px;
   width: 100%;
   border: 0;
-  padding: 5px 10px;
+  padding: 5px 10px 5px 24px;
   text-align: left;
   white-space: nowrap;
 }
@@ -113,7 +117,7 @@ body {
 .menu-panel button.checked::before {
   content: '✓';
   position: absolute;
-  margin-left: -14px;
+  left: 9px;
 }
 
 .menu-panel hr {
