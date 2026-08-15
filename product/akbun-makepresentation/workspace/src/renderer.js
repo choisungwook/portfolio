@@ -361,12 +361,18 @@ function toPoint(event) {
 
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
+  const handleEl = event.target.closest('[data-handle]');
+  const cropHandle = event.target.closest('[data-crop-handle]');
+  const group = event.target.closest('g[data-i]');
+  const hitShape = group ? slide().shapes[Number(group.dataset.i)] : null;
+  if (state.editingIndex >= 0) textEditor.blur();
+  // WebKit otherwise starts a native text selection alongside marquee and
+  // Shift-click selection. That highlight can extend outside the marquee and
+  // makes the editor selection look as if it contains only the last object.
+  event.preventDefault();
   const p = toPoint(event);
 
   if (state.tool === 'text') {
-    // Without this the default focus action of the click lands after
-    // startTextEdit and blurs the textarea straight back to an empty commit.
-    event.preventDefault();
     const shape = L.createShape('text', p.x, p.y, state.defaults);
     shape.w = 320;
     shape.h = shape.fontSize * 1.4;
@@ -387,7 +393,6 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  const handleEl = event.target.closest('[data-handle]');
   if (handleEl && state.selection.length === 1 && selectedShape()) {
     state.drag = {
       mode: 'resize',
@@ -400,7 +405,6 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  const cropHandle = event.target.closest('[data-crop-handle]');
   if (cropHandle && state.cropping && selectedShape()) {
     state.drag = {
       mode: 'crop',
@@ -413,9 +417,8 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  const group = event.target.closest('g[data-i]');
-  if (group) {
-    const index = Number(group.dataset.i);
+  const index = hitShape ? slide().shapes.indexOf(hitShape) : -1;
+  if (index >= 0) {
 
     // Shift-click changes only this object's membership. It does not begin a
     // drag, so repeated Shift-clicks can build or shrink a selection without
