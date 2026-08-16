@@ -722,6 +722,8 @@ canvas.addEventListener('pointermove', (event) => {
     const snapped = appSettings.snapping.enabled
       ? L.snapMove(slide().shapes, drag.items.map((item) => item.index), mx, my, threshold)
       : { dx: mx, dy: my, vertical: null, horizontal: null };
+    if (straight && mx === 0) Object.assign(snapped, { dx: 0, vertical: null });
+    if (straight && my === 0) Object.assign(snapped, { dy: 0, horizontal: null });
     drag.snap = snapped;
     for (const item of drag.items) L.moveShape(slide().shapes[item.index], snapped.dx, snapped.dy);
     drag.moved = drag.moved || mx !== 0 || my !== 0;
