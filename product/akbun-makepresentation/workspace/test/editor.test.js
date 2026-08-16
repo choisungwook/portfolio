@@ -222,26 +222,45 @@ test('resizeShape moves a line endpoint', () => {
   );
 });
 
-test('resizeShapeConstrained makes a rectangle square from the opposite corner', () => {
+test('resizeShapeConstrained keeps the proportions of a wide rectangle', () => {
   const shape = L.createShape('rect', 10, 20, {});
-  L.dragShape(shape, 10, 20, 110, 70);
+  L.dragShape(shape, 10, 20, 410, 120); // 400x100, four times as wide as tall
   const from = structuredClone(shape);
-  L.resizeShapeConstrained(shape, from, 'se', 20, 80);
+  L.resizeShapeConstrained(shape, from, 'se', -200, -20);
   assert.deepStrictEqual(
     { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
-    { x: 10, y: 20, w: 130, h: 130 }
+    { x: 10, y: 20, w: 200, h: 50 }
   );
 });
 
-test('resizeShapeConstrained makes an ellipse circular from every corner', () => {
-  const shape = L.createShape('ellipse', 10, 20, {});
-  L.dragShape(shape, 10, 20, 110, 70);
+// The bug this replaces: Shift used to turn the box into a square, so
+// shrinking a 400x100 rectangle by 200px grew it to 200x200.
+test('resizeShapeConstrained shrinking a wide box never makes it taller', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 400, 100);
   const from = structuredClone(shape);
-  L.resizeShapeConstrained(shape, from, 'nw', 40, 0);
+  L.resizeShapeConstrained(shape, from, 'se', -200, -50);
+  assert.ok(shape.h < from.h, `height ${shape.h} should be under ${from.h}`);
+});
+
+test('resizeShapeConstrained keeps an ellipse proportional from the far corner', () => {
+  const shape = L.createShape('ellipse', 10, 20, {});
+  L.dragShape(shape, 10, 20, 110, 70); // 100x50
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'nw', -40, 0);
+  // The south east corner stays put, so growing 40 wider grows 20 taller.
   assert.deepStrictEqual(
     { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
-    { x: 50, y: 10, w: 60, h: 60 }
+    { x: -30, y: 0, w: 140, h: 70 }
   );
+});
+
+test('resizeShapeConstrained scales pen points proportionally', () => {
+  const shape = L.createShape('pen', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 50);
+  const from = structuredClone(shape);
+  L.resizeShapeConstrained(shape, from, 'se', 100, 0);
+  assert.deepStrictEqual(shape.points[1], [200, 100]);
 });
 
 test('resizeShapeConstrained keeps a line on its original axis', () => {
@@ -455,8 +474,55 @@ test('renderShapeSvg draws an image border and a freehand end arrow', () => {
 
   const pen = L.createShape('pen', 0, 0, {});
   L.dragShape(pen, 0, 0, 100, 20);
-  pen.penArrow = true;
+  pen.arrowEnd = 'triangle';
   assert.ok(L.renderShapeSvg(pen).includes('<polygon'));
+});
+
+test('renderShapeSvg gives a freehand stroke the same five ends a line has', () => {
+  const pen = L.createShape('pen', 0, 0, {});
+  L.dragShape(pen, 0, 0, 100, 0);
+  assert.ok(!L.renderShapeSvg(pen).includes('<circle'));
+  pen.arrowStart = 'oval';
+  pen.arrowEnd = 'diamond';
+  const svg = L.renderShapeSvg(pen);
+  assert.ok(svg.includes('<circle'), 'start oval');
+  assert.ok(svg.includes('<polygon'), 'end diamond');
+});
+
+test('parseClipboardShapes reads the old freehand arrow flag as an end', () => {
+  const [pen] = L.parseClipboardShapes(
+    JSON.stringify([{ kind: 'pen', x: 0, y: 0, w: 0, h: 0, points: [[0, 0], [10, 0]], penArrow: true }])
+  );
+  assert.strictEqual(pen.arrowEnd, 'triangle');
+});
+
+test('rotationTowards answers the angle from the box centre, snapping with Shift', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 100);
+  // Straight up from the centre is the grip at rest.
+  assert.strictEqual(L.rotationTowards(shape, 50, -50, false), 0);
+  assert.strictEqual(L.rotationTowards(shape, 150, 50, false), 90);
+  assert.strictEqual(L.rotationTowards(shape, 50, 150, false), 180);
+  // Just off a quarter turn, snapped to it.
+  assert.strictEqual(L.rotationTowards(shape, 150, 60, true), 90);
+  assert.strictEqual(L.rotationTowards(shape, 60, -50, true), 0);
+});
+
+test('rotationHandleFor sits above the middle of the box', () => {
+  const shape = L.createShape('rect', 40, 80, {});
+  L.dragShape(shape, 40, 80, 140, 180);
+  const grip = L.rotationHandleFor(shape);
+  assert.strictEqual(grip.x, 90);
+  assert.ok(grip.y < 80, 'above the top edge');
+});
+
+test('renderShapeSvg rotates a line, an arrow and a freehand stroke', () => {
+  for (const kind of ['line', 'arrow', 'pen']) {
+    const shape = L.createShape(kind, 0, 0, {});
+    L.dragShape(shape, 0, 0, 100, 40);
+    shape.rotation = 30;
+    assert.ok(L.renderShapeSvg(shape).includes('rotate(30'), kind);
+  }
 });
 
 test('wrapTextLines wraps words and splits one wider than the box', () => {

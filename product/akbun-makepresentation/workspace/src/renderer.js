@@ -129,6 +129,25 @@ function outlineSvg(shape, kind) {
   })());
 }
 
+// The rotate grip: the round handle plus the three-quarter arc rotation
+// carries as its icon everywhere else, so it does not read as one more resize
+// handle that happens to sit further out.
+function rotateHandleSvg(point) {
+  const r = HANDLE_SLIDE_UNITS / 2;
+  const a = r * 0.55;
+  const { x, y } = point;
+  return (
+    `<g data-handle="rotate" class="rot-handle">` +
+    `<circle cx="${x}" cy="${y}" r="${r}"/>` +
+    `<path d="M ${x - a} ${y + a * 0.6} A ${a} ${a} 0 1 1 ${x + a} ${y + a * 0.6}" class="rot-glyph"/>` +
+    `<path d="M ${x + a * 0.3} ${y + a * 0.5} L ${x + a * 1.6} ${y + a * 0.5} L ${x + a * 0.95} ${y + a * 1.5} Z" class="rot-head"/>` +
+    `</g>`
+  );
+}
+
+// Rotated with the shape, so the box and every grip sit on the outline the
+// user can see. Without it a rotated shape lights up in one place and offers
+// its handles in another.
 function selectionSvg(shape, handles) {
   const parts = [];
   if (!handles || (shape.kind !== 'line' && shape.kind !== 'arrow')) {
@@ -143,8 +162,14 @@ function selectionSvg(shape, handles) {
         `<rect x="${h.x - HANDLE_SLIDE_UNITS / 2}" y="${h.y - HANDLE_SLIDE_UNITS / 2}" width="${HANDLE_SLIDE_UNITS}" height="${HANDLE_SLIDE_UNITS}" class="sel-handle" data-handle="${h.id}"/>`
       );
     }
+    const b = L.shapeBBox(shape);
+    const grip = L.rotationHandleFor(shape);
+    parts.push(
+      `<line x1="${b.x + b.w / 2}" y1="${b.y}" x2="${grip.x}" y2="${grip.y}" class="rot-stem"/>`
+    );
+    parts.push(rotateHandleSvg(grip));
   }
-  return parts.join('');
+  return L.rotateSvg(shape, parts.join(''));
 }
 
 function marqueeSvg() {
@@ -263,16 +288,15 @@ function renderProps() {
   $('props-fill').hidden = !showFill;
   $('props-stroke').hidden = !showStroke;
   $('props-text').hidden = !showText;
-  $('props-arrow-ends').hidden = !(kind === 'line' || kind === 'arrow');
+  // A freehand stroke names its two ends the same way a line does.
+  $('props-arrow-ends').hidden = !(kind === 'line' || kind === 'arrow' || kind === 'pen');
   $('prop-arrow-start').value = L.ARROW_ENDS.includes(source.arrowStart) ? source.arrowStart : 'none';
   $('prop-arrow-end').value = L.ARROW_ENDS.includes(source.arrowEnd) ? source.arrowEnd : 'none';
   $('btn-delete-shape').hidden = !shape;
   $('btn-group').hidden = state.selection.length < 2;
   $('btn-ungroup').hidden = !state.selection.some((index) => slide().shapes[index]?.groupId);
-  $('props-pen-arrow').hidden = kind !== 'pen';
   $('props-image-crop').hidden = kind !== 'image';
   $('btn-crop').classList.toggle('active', !!state.cropping);
-  $('prop-pen-arrow').checked = !!source.penArrow;
   $('props-hint').textContent = state.selection.length > 1
     ? `Selected: ${state.selection.length} objects`
     : shape
@@ -452,6 +476,17 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
+  if (handleEl && handleEl.dataset.handle === 'rotate' && selectedShape()) {
+    state.drag = {
+      mode: 'rotate',
+      from: structuredClone(selectedShape()),
+      x0: p.x,
+      y0: p.y,
+    };
+    canvas.setPointerCapture(event.pointerId);
+    return;
+  }
+
   if (handleEl && state.selection.length === 1 && selectedShape()) {
     state.drag = {
       mode: 'resize',
@@ -570,6 +605,10 @@ canvas.addEventListener('pointermove', (event) => {
     Object.assign(shape, structuredClone(drag.from));
     const resize = event.shiftKey ? L.resizeShapeConstrained : L.resizeShape;
     resize(shape, drag.from, drag.handle, dx, dy);
+  } else if (drag.mode === 'rotate') {
+    const shape = selectedShape();
+    if (!shape) return;
+    shape.rotation = L.rotationTowards(drag.from, p.x, p.y, event.shiftKey);
   } else if (drag.mode === 'crop') {
     const shape = selectedShape();
     if (!shape) return;
@@ -622,7 +661,7 @@ canvas.addEventListener('pointerup', () => {
   } else if (drag.mode === 'move' && !drag.moved && drag.toggleIndex >= 0) {
     // A Shift-press that never moved: the click half of Shift-click.
     selectMany(L.toggleSelection(state.selection, drag.toggleIndex, slide().shapes.length));
-  } else if (drag.mode === 'resize' || drag.mode === 'crop' || drag.moved) {
+  } else if (drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'crop' || drag.moved) {
     markDirty();
   } else if (drag.duplicated) {
     // A Cmd+click that never moved keeps the original selection. The copies
@@ -651,10 +690,20 @@ function styleTextEditor(shape) {
   // when editing starts inside a rect or an ellipse.
   const box = L.textBox(shape);
   const lines = L.wrapTextLines(textEditor.value, box.w, shape.fontSize).length;
+  // The overlay has to be anchored the way the glyphs it hides are, or text
+  // inside a shape is typed at the top of the box and jumps to the middle the
+  // moment editing ends. A textarea cannot anchor its own content, so the box
+  // is shrunk to the text and placed where that text belongs.
+  const block = Math.max(1, lines) * shape.fontSize * 1.3;
+  const anchored = shape.verticalAlign === 'center'
+    ? Math.max(0, (box.h - block) / 2)
+    : shape.verticalAlign === 'bottom'
+    ? Math.max(0, box.h - block)
+    : 0;
   textEditor.style.left = `${box.x * scale}px`;
-  textEditor.style.top = `${box.y * scale}px`;
+  textEditor.style.top = `${(box.y + anchored) * scale}px`;
   textEditor.style.width = `${Math.max(box.w, 1) * scale}px`;
-  textEditor.style.height = `${Math.max(box.h, shape.fontSize * 1.3 * lines) * scale}px`;
+  textEditor.style.height = `${(shape.verticalAlign === 'top' ? Math.max(box.h, block) : block) * scale}px`;
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
   textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
   textEditor.style.color = shape.textColor;
@@ -930,11 +979,18 @@ function shapeBounds(shapes) {
   return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
-function centeredPresetShapes(shapes) {
+// A preset lands in the top right corner rather than in the middle. The
+// middle is where the slide's own content already is, so a preset dropped
+// there had to be dragged off the content before it could be placed at all.
+// The margins are the ones the content guideline uses.
+const PRESET_MARGIN_X = 64;
+const PRESET_MARGIN_Y = 48;
+
+function cornerPresetShapes(shapes) {
   const copies = L.cloneShapes(shapes);
   const bounds = shapeBounds(copies);
-  const dx = (L.SLIDE_W - bounds.w) / 2 - bounds.x;
-  const dy = (L.SLIDE_H - bounds.h) / 2 - bounds.y;
+  const dx = L.SLIDE_W - PRESET_MARGIN_X - bounds.w - bounds.x;
+  const dy = PRESET_MARGIN_Y - bounds.y;
   for (const shape of copies) L.moveShape(shape, dx, dy);
   return copies;
 }
@@ -1040,7 +1096,7 @@ presetMenu.addEventListener('click', (event) => {
     ? defaultPresets().find((candidate) => candidate.id === button.dataset.presetId)
     : customPresets.find((candidate) => candidate.id === button.dataset.presetId);
   if (!preset) return;
-  insertShapes(centeredPresetShapes(preset.shapes), 0);
+  insertShapes(cornerPresetShapes(preset.shapes), 0);
   hidePresetMenu();
   canvas.focus({ preventScroll: true });
 });
@@ -1591,7 +1647,6 @@ $('prop-width').addEventListener('input', (e) =>
   applyProp({ strokeWidth: Math.max(1, Number(e.target.value) || 1) })
 );
 $('prop-dash').addEventListener('change', (e) => applyProp({ dash: e.target.value }));
-$('prop-pen-arrow').addEventListener('change', (e) => applyProp({ penArrow: e.target.checked }));
 $('prop-arrow-start').addEventListener('change', (e) => applyProp({ arrowStart: e.target.value }));
 $('prop-arrow-end').addEventListener('change', (e) => applyProp({ arrowEnd: e.target.value }));
 $('btn-group').addEventListener('click', groupSelection);
