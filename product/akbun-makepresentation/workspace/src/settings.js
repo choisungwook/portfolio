@@ -5,7 +5,18 @@
     ? require('./editor.js')
     : globalThis.slidesLib;
 
-  const SETTINGS_VERSION = 1;
+  const SETTINGS_VERSION = 2;
+  const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
+  const DEFAULT_SHAPE_BORDER = Object.freeze({
+    color: '#e03131',
+    width: 2,
+    dash: 'solid',
+  });
+  const DEFAULT_IMAGE_BORDER = Object.freeze({
+    color: '#000000',
+    width: 2,
+    dash: 'solid',
+  });
   const DEFAULT_GUIDELINES = Object.freeze({
     visible: false,
     unit: 'px',
@@ -19,6 +30,11 @@
     return {
       version: SETTINGS_VERSION,
       guidelines: { ...DEFAULT_GUIDELINES },
+      editorDefaults: {
+        fontFamily: DEFAULT_FONT_FAMILY,
+        shapeBorder: { ...DEFAULT_SHAPE_BORDER },
+        imageBorder: { ...DEFAULT_IMAGE_BORDER },
+      },
       customPresets: [],
     };
   }
@@ -61,11 +77,35 @@
     });
   }
 
+  function normalizeBorder(value, fallback) {
+    const source = value && typeof value === 'object' ? value : {};
+    const color = String(source.color || '');
+    const width = Number(source.width);
+    return {
+      color: /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : fallback.color,
+      width: Number.isFinite(width) && width >= 1 && width <= 30
+        ? Math.round(width * 100) / 100
+        : fallback.width,
+      dash: ['solid', 'dash', 'dot'].includes(source.dash) ? source.dash : fallback.dash,
+    };
+  }
+
+  function normalizeEditorDefaults(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const fontFamily = String(source.fontFamily || '').trim().slice(0, 200);
+    return {
+      fontFamily: fontFamily || DEFAULT_FONT_FAMILY,
+      shapeBorder: normalizeBorder(source.shapeBorder, DEFAULT_SHAPE_BORDER),
+      imageBorder: normalizeBorder(source.imageBorder, DEFAULT_IMAGE_BORDER),
+    };
+  }
+
   function normalizeAppSettings(value) {
     const source = value && typeof value === 'object' ? value : {};
     return {
       version: SETTINGS_VERSION,
       guidelines: normalizeGuidelines(source.guidelines),
+      editorDefaults: normalizeEditorDefaults(source.editorDefaults),
       customPresets: normalizeCustomPresets(source.customPresets),
     };
   }
@@ -121,8 +161,13 @@
   const exported = {
     SETTINGS_VERSION,
     DEFAULT_GUIDELINES,
+    DEFAULT_FONT_FAMILY,
+    DEFAULT_SHAPE_BORDER,
+    DEFAULT_IMAGE_BORDER,
     defaultAppSettings,
     normalizeGuidelines,
+    normalizeBorder,
+    normalizeEditorDefaults,
     normalizeCustomPresets,
     normalizeAppSettings,
     settingsEqual,

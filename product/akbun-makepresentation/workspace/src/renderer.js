@@ -34,6 +34,7 @@ const stageInner = $('stage-inner');
 const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
+const slideContextMenu = $('slide-context-menu');
 const presetMenu = $('preset-menu');
 const backgroundMenu = $('background-menu');
 const codeBlockMenu = $('code-block-menu');
@@ -45,7 +46,7 @@ const fontPicker = $('font-picker');
 const fontMenu = $('font-menu');
 const fontSearch = $('font-search');
 const fontOptions = $('font-options');
-let fontFamilies = ['Arial', 'Helvetica'];
+let fontFamilies = ['Noto Sans KR', 'Arial', 'Helvetica'];
 let textEditBefore = null;
 let customPresets = [];
 let settingsPresetDraft = [];
@@ -63,20 +64,51 @@ const selectedShapes = () =>
     .filter((index) => index >= 0 && index < slide().shapes.length)
     .map((index) => slide().shapes[index]);
 
+function borderStyle(border) {
+  return {
+    stroke: border.color,
+    strokeWidth: border.width,
+    dash: border.dash,
+  };
+}
+
+function syncConfiguredDefaults() {
+  Object.assign(state.defaults, {
+    ...borderStyle(appSettings.editorDefaults.shapeBorder),
+    fontFamily: appSettings.editorDefaults.fontFamily,
+  });
+}
+
+function newShapeStyle(kind) {
+  if (kind === 'image') {
+    return {
+      ...state.defaults,
+      ...borderStyle(appSettings.editorDefaults.imageBorder),
+    };
+  }
+  return state.defaults;
+}
+
 function fitTextBoxForSlide(shape, text) {
   const available = deckSize().width - Math.max(0, Number(shape.x) || 0);
   return L.fitTextBox(shape, text, available);
 }
 
 function selectOnly(index) {
+  if (state.cropping && state.cropping.index !== index) state.cropping = null;
   state.selected = index;
   state.selection = index >= 0 ? [index] : [];
 }
 
 function selectMany(indices) {
-  state.selection = [...new Set(indices)].filter(
+  const selection = [...new Set(indices)].filter(
     (index) => index >= 0 && index < slide().shapes.length
   );
+  if (
+    state.cropping &&
+    (selection.length !== 1 || selection[0] !== state.cropping.index)
+  ) state.cropping = null;
+  state.selection = selection;
   state.selected = state.selection.length ? state.selection[state.selection.length - 1] : -1;
 }
 
@@ -244,14 +276,15 @@ function renderCanvas() {
     ? selected.map((shape) => outlineSvg(shape, 'halo')).join('')
     : '';
   const selections = selected.map((shape) => selectionSvg(shape, showHandles)).join('');
+  const cropOverlay = state.cropping ? cropOverlaySvg() : '';
   canvas.innerHTML =
     halos +
     shapes +
     slideNumberSvg(state.current) +
     guidelinesSvg() +
+    cropOverlay +
     (state.editingIndex < 0 ? selections : '') +
-    marqueeSvg() +
-    (state.cropping ? cropOverlaySvg() : '');
+    marqueeSvg();
 }
 
 function cropOverlaySvg() {
@@ -279,7 +312,10 @@ function cropOverlaySvg() {
   ].map(([sx, sy, sw, sh]) =>
     `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" class="crop-shade"/>`
   ).join('');
-  return `<g class="crop-overlay">${shades}<rect x="${x}" y="${y}" width="${w}" height="${h}" class="crop-window"/>${handles}</g>`;
+  return L.rotateSvg(
+    shape,
+    `<g class="crop-overlay">${shades}<rect x="${x}" y="${y}" width="${w}" height="${h}" class="crop-window"/>${handles}</g>`
+  );
 }
 
 function renderThumbs() {
@@ -355,7 +391,7 @@ function renderProps() {
     );
   }
 
-  const family = source.fontFamily || 'Helvetica';
+  const family = source.fontFamily || S.DEFAULT_FONT_FAMILY;
   rememberFontFamily(family);
   $('font-family-label').textContent = family;
   $('font-family-label').style.fontFamily = `"${family}", sans-serif`;
@@ -499,7 +535,7 @@ canvas.addEventListener('pointerdown', (event) => {
   const p = toPoint(event);
 
   if (state.tool === 'text') {
-    const shape = L.createShape('text', p.x, p.y, state.defaults);
+    const shape = L.createShape('text', p.x, p.y, newShapeStyle('text'));
     shape.w = 120;
     shape.h = shape.fontSize * 1.4;
     slide().shapes.push(shape);
@@ -512,7 +548,7 @@ canvas.addEventListener('pointerdown', (event) => {
   }
 
   if (state.tool !== 'select') {
-    const shape = L.createShape(state.tool, p.x, p.y, state.defaults);
+    const shape = L.createShape(state.tool, p.x, p.y, newShapeStyle(state.tool));
     slide().shapes.push(shape);
     state.drag = { mode: 'draw', x0: p.x, y0: p.y, index: slide().shapes.length - 1 };
     canvas.setPointerCapture(event.pointerId);
@@ -639,7 +675,8 @@ canvas.addEventListener('pointermove', (event) => {
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
     const resize = event.shiftKey ? L.resizeShapeConstrained : L.resizeShape;
-    resize(shape, drag.from, drag.handle, dx, dy);
+    const delta = L.unrotateDelta(dx, dy, drag.from.rotation);
+    resize(shape, drag.from, drag.handle, delta.x, delta.y);
   } else if (drag.mode === 'rotate') {
     const shape = selectedShape();
     if (!shape) return;
@@ -648,7 +685,10 @@ canvas.addEventListener('pointermove', (event) => {
     const shape = selectedShape();
     if (!shape) return;
     Object.assign(shape, structuredClone(drag.from));
-    const fraction = drag.side === 'left' || drag.side === 'right' ? dx / shape.w : dy / shape.h;
+    const delta = L.unrotateDelta(dx, dy, drag.from.rotation);
+    const fraction = drag.side === 'left' || drag.side === 'right'
+      ? delta.x / shape.w
+      : delta.y / shape.h;
     const base = drag.side === 'left' ? drag.from.cropLeft : drag.side === 'right' ? drag.from.cropRight :
       drag.side === 'top' ? drag.from.cropTop : drag.from.cropBottom;
     L.setCrop(shape, drag.side, base + ((drag.side === 'left' || drag.side === 'top') ? fraction : -fraction));
@@ -747,7 +787,7 @@ function styleTextEditor(shape) {
   textEditor.style.width = `${Math.max(box.w, 1) * scale}px`;
   textEditor.style.height = `${(shape.verticalAlign === 'top' ? Math.max(box.h, block) : block) * scale}px`;
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
-  textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
+  textEditor.style.fontFamily = `"${shape.fontFamily || S.DEFAULT_FONT_FAMILY}", sans-serif`;
   textEditor.style.color = shape.textColor;
   textEditor.style.fontWeight = shape.bold ? '700' : '400';
   textEditor.style.fontStyle = shape.italic ? 'italic' : 'normal';
@@ -1063,6 +1103,7 @@ async function loadPersistentSettings() {
   appSettings = S.normalizeAppSettings(
     hasSettingsFile ? stored : { customPresets: legacyPresets }
   );
+  syncConfiguredDefaults();
   customPresets = structuredClone(appSettings.customPresets);
   state.showGuidelines = appSettings.guidelines.visible;
   if (!hasSettingsFile || !S.settingsEqual(stored, appSettings)) {
@@ -1077,6 +1118,7 @@ async function persistAppSettings(settings) {
   const normalized = S.normalizeAppSettings(settings);
   await window.api.saveSettings(normalized);
   appSettings = normalized;
+  syncConfiguredDefaults();
 }
 
 function presetButton(preset, source) {
@@ -1265,7 +1307,7 @@ function defaultCode(language) {
 
 function insertCodeBlock(format, language) {
   const { width, height } = deckSize();
-  const shape = L.createShape('code', width * 0.11, height * 0.14, state.defaults);
+  const shape = L.createShape('code', width * 0.11, height * 0.14, newShapeStyle('code'));
   shape.w = width * 0.78;
   shape.h = height * 0.7;
   shape.fontSize = Math.max(16, Math.round(Math.min(width / 75, height / 42)));
@@ -1585,12 +1627,58 @@ function renderSettingsPresets() {
   }
 }
 
+function setBorderSettingsFields(prefix, border) {
+  $(`settings-${prefix}-border-color`).value = border.color;
+  $(`settings-${prefix}-border-width`).value = String(border.width);
+  $(`settings-${prefix}-border-dash`).value = border.dash;
+}
+
+function renderGeneralSettings() {
+  const defaults = appSettings.editorDefaults;
+  const select = $('settings-default-font');
+  const families = [...new Set([defaults.fontFamily, S.DEFAULT_FONT_FAMILY, ...fontFamilies])];
+  select.textContent = '';
+  for (const family of families) {
+    const option = document.createElement('option');
+    option.value = family;
+    option.textContent = family;
+    option.style.fontFamily = `"${family}", sans-serif`;
+    select.append(option);
+  }
+  select.value = defaults.fontFamily;
+  setBorderSettingsFields('shape', defaults.shapeBorder);
+  setBorderSettingsFields('image', defaults.imageBorder);
+  $('general-settings-status').textContent = '';
+}
+
+function borderSettingsFromFields(prefix) {
+  const width = Number($(`settings-${prefix}-border-width`).value);
+  if (!Number.isFinite(width) || width < 1 || width > 30) return null;
+  return {
+    color: $(`settings-${prefix}-border-color`).value,
+    width,
+    dash: $(`settings-${prefix}-border-dash`).value,
+  };
+}
+
+function editorDefaultsFromFields() {
+  const shapeBorder = borderSettingsFromFields('shape');
+  const imageBorder = borderSettingsFromFields('image');
+  if (!shapeBorder || !imageBorder) return null;
+  return {
+    fontFamily: $('settings-default-font').value,
+    shapeBorder,
+    imageBorder,
+  };
+}
+
 function openSettings() {
   hideMenus();
   hidePresetMenu();
   settingsPresetDraft = structuredClone(customPresets);
   $('preset-settings-status').textContent = '';
   setSettingsPage('general');
+  renderGeneralSettings();
   renderSettingsPresets();
   settingsDialog.showModal();
   settingsDialog.querySelector('[data-settings-page="general"]')?.focus();
@@ -1616,12 +1704,25 @@ $('settings-presets').addEventListener('click', (event) => {
 
 $('btn-settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
 $('btn-settings-ok').addEventListener('click', async () => {
+  const editorDefaults = editorDefaultsFromFields();
+  if (!editorDefaults) {
+    $('general-settings-status').textContent = 'Border width must be from 1 to 30.';
+    setSettingsPage('general');
+    return;
+  }
   try {
-    await persistCustomPresets(settingsPresetDraft);
+    await persistAppSettings({
+      ...appSettings,
+      editorDefaults,
+      customPresets: settingsPresetDraft,
+    });
+    customPresets = structuredClone(appSettings.customPresets);
+    renderPresetMenu();
+    renderProps();
     settingsDialog.close('ok');
   } catch (_) {
-    $('preset-settings-status').textContent = 'Could not save presets on this device.';
-    setSettingsPage('presets');
+    $('general-settings-status').textContent = 'Could not save settings on this device.';
+    setSettingsPage('general');
   }
 });
 settingsDialog.addEventListener('cancel', () => {
@@ -1666,7 +1767,7 @@ function readImageSize(src) {
 }
 
 function pastedTextShape(text) {
-  const shape = L.createShape('text', 80, 80, state.defaults);
+  const shape = L.createShape('text', 80, 80, newShapeStyle('text'));
   shape.text = text.replace(/\r\n/g, '\n');
   fitTextBoxForSlide(shape, shape.text);
   return shape;
@@ -1681,7 +1782,7 @@ async function pastedImageShape(file, index) {
     (slideDimensions.width * 0.8) / size.width,
     (slideDimensions.height * 0.8) / size.height
   );
-  const shape = L.createShape('image', 0, 0, state.defaults);
+  const shape = L.createShape('image', 0, 0, newShapeStyle('image'));
   shape.w = Math.max(1, size.width * scale);
   shape.h = Math.max(1, size.height * scale);
   shape.x = (slideDimensions.width - shape.w) / 2 + index * PASTE_OFFSET;
@@ -1744,6 +1845,7 @@ function duplicateSelection() {
 
 function hideContextMenu() {
   contextMenu.hidden = true;
+  slideContextMenu.hidden = true;
 }
 
 function rememberFontFamily(family) {
@@ -1810,9 +1912,9 @@ function hideFontMenu() {
 async function loadSystemFonts() {
   try {
     const installed = await window.api.listSystemFonts();
-    fontFamilies = [...new Set(installed.filter(
+    fontFamilies = [...new Set([S.DEFAULT_FONT_FAMILY, ...installed.filter(
       (font) => typeof font === 'string' && font.trim()
-    ))].sort((left, right) => left.localeCompare(right));
+    )])].sort((left, right) => left.localeCompare(right));
     rememberFontFamily(state.defaults.fontFamily);
     renderProps();
   } catch (error) {
@@ -1838,6 +1940,16 @@ function showContextMenu(x, y) {
   contextMenu.querySelector('button:not([hidden])')?.focus();
 }
 
+function showSlideContextMenu(x, y) {
+  slideContextMenu.hidden = false;
+  slideContextMenu.style.left = `${x}px`;
+  slideContextMenu.style.top = `${y}px`;
+  const bounds = slideContextMenu.getBoundingClientRect();
+  slideContextMenu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
+  slideContextMenu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
+  $('context-new-slide').focus();
+}
+
 function contextMenuPoint(event, group) {
   if (event.clientX || event.clientY) {
     return { x: event.clientX, y: event.clientY };
@@ -1854,7 +1966,12 @@ document.addEventListener('contextmenu', (event) => {
   hideContextMenu();
   if (state.presenting || !(event.target instanceof Element)) return;
   const group = event.target.closest('#canvas [data-i]');
-  if (!group) return;
+  if (!group) {
+    const slidePanel = event.target.closest('#slides');
+    const isEmptyArea = slidePanel && !event.target.closest('[data-slide], button');
+    if (isEmptyArea) showSlideContextMenu(event.clientX, event.clientY);
+    return;
+  }
   const point = contextMenuPoint(event, group);
   const index = Number(group.dataset.i);
   if (!state.selection.includes(index)) {
@@ -1866,7 +1983,9 @@ document.addEventListener('contextmenu', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-  if (!contextMenu.contains(event.target)) hideContextMenu();
+  if (!contextMenu.contains(event.target) && !slideContextMenu.contains(event.target)) {
+    hideContextMenu();
+  }
   if (!presetMenu.contains(event.target) && !$('btn-preset').contains(event.target)) hidePresetMenu();
   if (!backgroundMenu.contains(event.target) && !$('btn-background').contains(event.target)) {
     hideBackgroundMenu();
@@ -1989,6 +2108,10 @@ $('context-group').addEventListener('click', () => {
 $('context-ungroup').addEventListener('click', () => {
   hideContextMenu();
   ungroupSelection();
+});
+$('context-new-slide').addEventListener('click', () => {
+  hideContextMenu();
+  addSlideAtEnd();
 });
 
 $('prop-font-family').addEventListener('click', () => {
@@ -2239,6 +2362,16 @@ function moveCurrentSlide(to) {
   renderAll();
 }
 
+function moveCurrentSlideAtEdge(target, edge) {
+  const at = L.moveSlideAtEdge(state.deck, state.current, target, edge);
+  if (at === state.current) return;
+  state.current = at;
+  setSlideSelection([at]);
+  clearSelection();
+  markDirty();
+  renderAll();
+}
+
 function moveSelectedSlides(direction) {
   const currentSlide = slide();
   const before = selectedSlideIndices();
@@ -2252,6 +2385,7 @@ function moveSelectedSlides(direction) {
 }
 
 let dragSlideFrom = -1;
+let dragSlideEdge = 'before';
 
 $('thumbs').addEventListener('dragstart', (event) => {
   const thumb = event.target.closest('[data-slide]');
@@ -2271,12 +2405,17 @@ $('thumbs').addEventListener('dragover', (event) => {
   event.dataTransfer.dropEffect = 'move';
   const thumb = event.target.closest('[data-slide]');
   for (const element of $('thumbs').querySelectorAll('.thumb')) {
-    element.classList.toggle('drop-target', element === thumb);
+    element.classList.remove('drop-before', 'drop-after');
+  }
+  if (thumb) {
+    const bounds = thumb.getBoundingClientRect();
+    dragSlideEdge = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+    thumb.classList.add(`drop-${dragSlideEdge}`);
   }
 });
 
 $('thumbs').addEventListener('dragleave', (event) => {
-  event.target.closest('[data-slide]')?.classList.remove('drop-target');
+  event.target.closest('[data-slide]')?.classList.remove('drop-before', 'drop-after');
 });
 
 $('thumbs').addEventListener('drop', (event) => {
@@ -2286,17 +2425,26 @@ $('thumbs').addEventListener('drop', (event) => {
   endSlideDrag();
   if (from < 0 || !thumb) return;
   state.current = from;
-  moveCurrentSlide(Number(thumb.dataset.slide));
+  moveCurrentSlideAtEdge(Number(thumb.dataset.slide), dragSlideEdge);
 });
 
 function endSlideDrag() {
   dragSlideFrom = -1;
-  for (const element of $('thumbs').querySelectorAll('.drop-target')) {
-    element.classList.remove('drop-target');
+  for (const element of $('thumbs').querySelectorAll('.drop-before, .drop-after')) {
+    element.classList.remove('drop-before', 'drop-after');
   }
 }
 
 $('thumbs').addEventListener('dragend', endSlideDrag);
+
+function addSlideAtEnd() {
+  state.current = L.addSlide(state.deck, state.deck.slides.length - 1);
+  setSlideSelection([state.current]);
+  clearSelection();
+  markDirty();
+  renderAll();
+  $('thumbs').querySelector(`[data-slide="${state.current}"]`)?.scrollIntoView({ block: 'nearest' });
+}
 
 $('btn-add-slide').addEventListener('click', () => {
   state.current = L.addSlide(state.deck, state.current);

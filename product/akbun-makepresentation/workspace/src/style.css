@@ -3,6 +3,14 @@
    itself ignores the theme: it shows the background the deck stores, so the
    editor and the projector agree. */
 
+@font-face {
+  font-family: 'Noto Sans KR';
+  src: url('assets/fonts/NotoSansKR-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #f1f3f5;
   --panel: #ffffff;
@@ -281,9 +289,24 @@ main {
 }
 
 /* Where a dragged slide would land. */
-.thumb.drop-target {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+.thumb.drop-before::before,
+.thumb.drop-after::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: -4px;
+  right: -4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.thumb.drop-before::before {
+  top: -7px;
+}
+
+.thumb.drop-after::after {
+  bottom: -7px;
 }
 
 .thumb .num {
@@ -1076,7 +1099,8 @@ input[type='color'] {
 
 /* --- context menu --- */
 
-#context-menu {
+#context-menu,
+#slide-context-menu {
   position: fixed;
   z-index: 20;
   min-width: 170px;
@@ -1087,7 +1111,8 @@ input[type='color'] {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 }
 
-#context-menu button {
+#context-menu button,
+#slide-context-menu button {
   width: 100%;
   border: 0;
   padding: 6px 10px;
@@ -1095,7 +1120,9 @@ input[type='color'] {
 }
 
 #context-menu button:hover,
-#context-menu button:focus-visible {
+#context-menu button:focus-visible,
+#slide-context-menu button:hover,
+#slide-context-menu button:focus-visible {
   background: var(--accent-soft);
   outline: none;
 }
@@ -1529,6 +1556,32 @@ input[type='color'] {
 
 .settings-status {
   min-height: 1.2em;
+}
+
+.settings-general-fields,
+.settings-border-fields {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr);
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 16px;
+}
+
+.settings-border-fields {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-border-fields legend {
+  padding: 0 5px;
+  font-weight: 600;
+}
+
+.settings-border-fields p {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 12px;
 }
 
 .settings-preset-list {

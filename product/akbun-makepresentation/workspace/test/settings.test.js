@@ -7,6 +7,11 @@ const S = require('../src/settings.js');
 
 test('settings use the smaller guideline margins by default', () => {
   const settings = S.defaultAppSettings();
+  assert.deepStrictEqual(settings.editorDefaults, {
+    fontFamily: 'Noto Sans KR',
+    shapeBorder: { color: '#e03131', width: 2, dash: 'solid' },
+    imageBorder: { color: '#000000', width: 2, dash: 'solid' },
+  });
   assert.deepStrictEqual(settings.guidelines, {
     visible: false,
     unit: 'px',
@@ -36,6 +41,11 @@ test('settings normalize guidelines and custom presets', () => {
       left: 20,
       right: 'bad',
     },
+    editorDefaults: {
+      fontFamily: '  Noto Sans KR  ',
+      shapeBorder: { color: '#ABCDEF', width: 3.5, dash: 'dot' },
+      imageBorder: { color: 'bad', width: 0, dash: 'bad' },
+    },
     customPresets: [
       { id: 'rectangle', name: 'Rectangle', shapes: [shape] },
       { id: 'rectangle', name: 'Duplicate', shapes: [shape] },
@@ -52,6 +62,11 @@ test('settings normalize guidelines and custom presets', () => {
   });
   assert.strictEqual(settings.customPresets.length, 1);
   assert.strictEqual(settings.customPresets[0].id, 'rectangle');
+  assert.deepStrictEqual(settings.editorDefaults, {
+    fontFamily: 'Noto Sans KR',
+    shapeBorder: { color: '#abcdef', width: 3.5, dash: 'dot' },
+    imageBorder: { color: '#000000', width: 2, dash: 'solid' },
+  });
 });
 
 test('guideline margins must leave drawable slide space', () => {
@@ -71,14 +86,16 @@ test('guideline margins must leave drawable slide space', () => {
 
 test('settings comparison ignores object key order', () => {
   const left = {
-    version: 1,
+    version: 2,
     guidelines: { visible: false, unit: 'px', top: 36, bottom: 48, left: 48, right: 48 },
+    editorDefaults: S.normalizeEditorDefaults(),
     customPresets: [],
   };
   const right = {
     customPresets: [],
     guidelines: { right: 48, left: 48, bottom: 48, top: 36, unit: 'px', visible: false },
-    version: 1,
+    editorDefaults: S.normalizeEditorDefaults(),
+    version: 2,
   };
   assert.ok(S.settingsEqual(left, right));
   right.guidelines.top = 40;
