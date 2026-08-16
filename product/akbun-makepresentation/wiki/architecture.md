@@ -20,13 +20,20 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
   "fill": "none | #rrggbb",
   "text": "", "fontSize": 24, "textColor": "#1a1a1a", "fontFamily": "Helvetica",
   "bold": false, "italic": false, "underline": false,
-  "textAlign": "left | center | right", "verticalAlign": "top | center | bottom"
+  "textAlign": "left | center | right", "verticalAlign": "top | center | bottom",
+  "rotation": 0,
+  "arrowStart": "none | triangle | arrow | oval | diamond",
+  "arrowEnd": "none | triangle | arrow | oval | diamond"
 } ] } ] }
 ```
 
 `background` belongs to the slide rather than to a page-sized shape, so the one control that changes it cannot touch a shape and the background cannot be selected or dragged ([ADR](../adr/2026-08-background-is-a-slide-field.md)). A slide with no `background` is white, which is what a deck saved before the field existed deserializes to.
 
 `fontFamily` is one plain family name, not a CSS stack, so it maps straight onto the pptx `a:latin` typeface and survives a round trip unchanged. A generic fallback is appended when the SVG is drawn.
+
+`arrowStart` and `arrowEnd` use the pptx `a:headEnd`/`a:tailEnd` type names, so a round trip is a rename. Every linear shape names its ends this way, the freehand pen included; there is no separate boolean for the pen ([decision](../knowledge/decisions/2026-08-one-end-model-for-every-stroke.md)).
+
+`rotation` is degrees about the centre of the shape's box, applied as a render transform so x/y/w/h never move. pptx stores the same angle in `a:xfrm rot` at 1/60000 degree ([decision](../knowledge/decisions/2026-08-rotation-is-a-render-transform.md)).
 
 Coordinates are pixels on a fixed 1280x720 slide. Boxy shapes use x/y/w/h; lines run from (x,y) to (x+w,y+h) so w and h may be negative; the pen keeps absolute points and ignores the box. pptx EMU is exactly 9525 per pixel at this slide size, so conversion is one multiply.
 
@@ -50,7 +57,7 @@ Three commands, each takes a path the page picked with a native dialog:
 
 **Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates.
 
-**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas. Picture crop and rotation plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. Other presets become their bounding rectangle; unsupported tables are skipped.
+**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas. Rotation on any shape, picture crop, plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. A rect or an ellipse that names no `algn` or `anchor` is read as centred, because that is where this editor writes text inside a shape, and the alternative was that text typed into an opened shape landed somewhere no shape drawn here would put it. Other presets become their bounding rectangle; unsupported tables are skipped.
 
 **PDF export**: the page rasterizes each slide (SVG string → blob URL → Image → 1920x1080 canvas → JPEG data URL) and `export_pdf` wraps the JPEGs into PDF pages by hand — JPEG is a native PDF filter, so no PDF library is involved.
 

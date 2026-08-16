@@ -106,7 +106,6 @@ function createShape(kind, x, y, style) {
     cropBottom: 0,
     rotation: 0,
     groupId: '',
-    penArrow: false,
     arrowStart: 'none',
     arrowEnd: kind === 'arrow' ? 'triangle' : 'none',
   };
@@ -165,7 +164,8 @@ function normalizeClipboardShape(value) {
   if (typeof value.groupId === 'string' && value.groupId.length <= 100) {
     shape.groupId = value.groupId;
   }
-  if (typeof value.penArrow === 'boolean') shape.penArrow = value.penArrow;
+  // A pen saved before it had two named ends carried one boolean instead.
+  if (value.penArrow === true) shape.arrowEnd = 'triangle';
   for (const name of ['arrowStart', 'arrowEnd']) {
     if (ARROW_ENDS.includes(value[name])) shape[name] = value[name];
   }
@@ -514,19 +514,25 @@ function resizeLineOnAxis(shape, from, handle, dx, dy) {
   }
 }
 
-function resizeSquare(shape, from, handle, dx, dy) {
-  const b = shapeBBox(from);
-  const fixedX = handle.includes('w') ? b.x + b.w : b.x;
-  const fixedY = handle.includes('n') ? b.y + b.h : b.y;
-  const movingX = (handle.includes('w') ? b.x : b.x + b.w) + dx;
-  const movingY = (handle.includes('n') ? b.y : b.y + b.h) + dy;
-  const width = handle.includes('w') ? fixedX - movingX : movingX - fixedX;
-  const height = handle.includes('n') ? fixedY - movingY : movingY - fixedY;
-  const size = Math.max(MIN_SIZE, width, height);
-  shape.x = handle.includes('w') ? fixedX - size : fixedX;
-  shape.y = handle.includes('n') ? fixedY - size : fixedY;
-  shape.w = size;
-  shape.h = size;
+// Put a shape into the box (x0,y0)-(x1,y1). A pen has no box of its own, so
+// its points are scaled out of the box it started in; everything else stores
+// the box directly. One place, so a constrained resize and a free one cannot
+// disagree about what a target box means.
+function setShapeBox(shape, from, x0, y0, x1, y1) {
+  if (shape.kind === 'pen') {
+    const b = shapeBBox(from);
+    const sx = b.w > 0 ? (x1 - x0) / b.w : 1;
+    const sy = b.h > 0 ? (y1 - y0) / b.h : 1;
+    shape.points = from.points.map(([px, py]) => [
+      x0 + (px - b.x) * sx,
+      y0 + (py - b.y) * sy,
+    ]);
+    return;
+  }
+  shape.x = x0;
+  shape.y = y0;
+  shape.w = x1 - x0;
+  shape.h = y1 - y0;
 }
 
 // Resize by dragging a handle. `from` is the shape as it was when the drag
@@ -543,36 +549,76 @@ function resizeShape(shape, from, handle, dx, dy) {
   if (handle.includes('e')) x1 = Math.max(x1 + dx, x0 + MIN_SIZE);
   if (handle.includes('n')) y0 = Math.min(y0 + dy, y1 - MIN_SIZE);
   if (handle.includes('s')) y1 = Math.max(y1 + dy, y0 + MIN_SIZE);
-
-  if (shape.kind === 'pen') {
-    const sx = b.w > 0 ? (x1 - x0) / b.w : 1;
-    const sy = b.h > 0 ? (y1 - y0) / b.h : 1;
-    shape.points = from.points.map(([px, py]) => [
-      x0 + (px - b.x) * sx,
-      y0 + (py - b.y) * sy,
-    ]);
-    return;
-  }
-  shape.x = x0;
-  shape.y = y0;
-  shape.w = x1 - x0;
-  shape.h = y1 - y0;
+  setShapeBox(shape, from, x0, y0, x1, y1);
 }
 
-// Shift-resizing a box makes geometry rather than merely preserving its old
-// aspect ratio: a rectangle becomes a square and an ellipse becomes a circle.
+// Shift-resizing keeps the proportions the shape already has, so a 400x100
+// box stays four times as wide as it is tall at every size. It used to turn a
+// rectangle into a square instead, which made shrinking a wide shape grow it
+// to the length of its longer side.
+function resizeProportional(shape, from, handle, dx, dy) {
+  const b = shapeBBox(from);
+  // A flat box has no proportion to keep, and scaling it would multiply the
+  // zero side by whatever the other one did.
+  if (!(b.w > 0) || !(b.h > 0)) {
+    resizeShape(shape, from, handle, dx, dy);
+    return;
+  }
+  const fixedX = handle.includes('w') ? b.x + b.w : b.x;
+  const fixedY = handle.includes('n') ? b.y + b.h : b.y;
+  const scaleW = Math.abs((handle.includes('w') ? b.x + dx : b.x + b.w + dx) - fixedX) / b.w;
+  const scaleH = Math.abs((handle.includes('n') ? b.y + dy : b.y + b.h + dy) - fixedY) / b.h;
+  // The pointer almost never lands on the diagonal, so the axis it moved
+  // furthest from where it started decides the size. Both sides then take that
+  // one factor, which is what keeps the proportion.
+  const wanted = Math.abs(scaleW - 1) >= Math.abs(scaleH - 1) ? scaleW : scaleH;
+  const scale = Math.max(MIN_SIZE / b.w, MIN_SIZE / b.h, wanted);
+  const width = b.w * scale;
+  const height = b.h * scale;
+  const x0 = handle.includes('w') ? fixedX - width : fixedX;
+  const y0 = handle.includes('n') ? fixedY - height : fixedY;
+  setShapeBox(shape, from, x0, y0, x0 + width, y0 + height);
+}
+
 // A line keeps its original axis, including the opposite direction after the
-// moving endpoint crosses the fixed one.
+// moving endpoint crosses the fixed one. Every other shape keeps its
+// proportions.
 function resizeShapeConstrained(shape, from, handle, dx, dy) {
   if (shape.kind === 'line' || shape.kind === 'arrow') {
     resizeLineOnAxis(shape, from, handle, dx, dy);
     return;
   }
-  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
-    resizeSquare(shape, from, handle, dx, dy);
-    return;
-  }
-  resizeShape(shape, from, handle, dx, dy);
+  resizeProportional(shape, from, handle, dx, dy);
+}
+
+// --- rotation ------------------------------------------------------------------
+//
+// Rotation is a render transform about the centre of the shape's box, so x, y,
+// w and h never move and the box stays a stable thing to rotate around.
+
+// How far above the box the rotate grip sits, in slide units.
+const ROTATE_HANDLE_GAP = 30;
+
+function rotationHandleFor(shape) {
+  const b = shapeBBox(shape);
+  return { x: b.x + b.w / 2, y: b.y - ROTATE_HANDLE_GAP };
+}
+
+function normalizeAngle(degrees) {
+  const wrapped = degrees % 360;
+  if (wrapped > 180) return wrapped - 360;
+  if (wrapped <= -180) return wrapped + 360;
+  return wrapped;
+}
+
+// The rotation that points a shape's top at (x,y). The grip sits above the
+// box, so a shape at rest reads as -90 degrees here and the +90 brings that
+// back to zero. `constrain` is the Shift key: quarter turns only.
+function rotationTowards(shape, x, y, constrain) {
+  const b = shapeBBox(shape);
+  const degrees =
+    (Math.atan2(y - (b.y + b.h / 2), x - (b.x + b.w / 2)) * 180) / Math.PI + 90;
+  return normalizeAngle(constrain ? Math.round(degrees / 90) * 90 : Math.round(degrees));
 }
 
 // --- slide operations -------------------------------------------------------
@@ -793,10 +839,13 @@ function renderShapeSvg(shape, options) {
     }
     case 'line':
     case 'arrow':
-      return arrowSvg(shape);
+      return rotateSvg(shape, arrowSvg(shape));
     case 'pen': {
       const pts = shape.points.map((p) => `${p[0]},${p[1]}`).join(' ');
-      return `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>${shape.penArrow ? penArrowSvg(shape) : ''}`;
+      return rotateSvg(
+        shape,
+        `<polyline points="${pts}" fill="none" ${strokeAttrs(shape)} stroke-linecap="round" stroke-linejoin="round"/>${penEndsSvg(shape)}`
+      );
     }
     case 'text': {
       if (hideText) return '';
@@ -817,29 +866,41 @@ function renderShapeSvg(shape, options) {
   }
 }
 
-function penArrowSvg(shape) {
-  if (shape.points.length < 2 || shape.stroke === 'none') return '';
-  const end = shape.points[shape.points.length - 1];
-  let start = shape.points[shape.points.length - 2];
-  for (let index = shape.points.length - 2; index >= 0; index -= 1) {
-    if (shape.points[index][0] !== end[0] || shape.points[index][1] !== end[1]) {
-      start = shape.points[index];
-      break;
-    }
+// Which way a freehand stroke leaves one of its two tips, pointing outward.
+// A stroke can end on a run of identical points, and those carry no direction,
+// so walk inward until the points differ.
+function penTipDirection(points, atEnd) {
+  const tip = atEnd ? points[points.length - 1] : points[0];
+  const step = atEnd ? -1 : 1;
+  for (
+    let index = atEnd ? points.length - 2 : 1;
+    index >= 0 && index < points.length;
+    index += step
+  ) {
+    const dx = tip[0] - points[index][0];
+    const dy = tip[1] - points[index][1];
+    const length = Math.hypot(dx, dy);
+    if (length) return { x: dx / length, y: dy / length };
   }
-  const dx = end[0] - start[0];
-  const dy = end[1] - start[1];
-  const length = Math.hypot(dx, dy);
-  if (!length) return '';
-  const ux = dx / length;
-  const uy = dy / length;
-  const head = Math.min(length / 2, Math.max(10, shape.strokeWidth * 4));
-  const half = Math.max(head * 0.45, shape.strokeWidth);
-  const bx = end[0] - ux * head;
-  const by = end[1] - uy * head;
-  const p1 = `${bx - uy * half},${by + ux * half}`;
-  const p2 = `${bx + uy * half},${by - ux * half}`;
-  return `<polygon points="${end[0]},${end[1]} ${p1} ${p2}" fill="${shape.stroke}"/>`;
+  return null;
+}
+
+// A freehand stroke names its two ends the same way a line does, so the five
+// pptx ends are on offer there too. The shaft is not shortened: a polyline has
+// no single axis to shorten along, and the head covers its own last segment.
+function penEndsSvg(shape) {
+  if (shape.points.length < 2 || shape.stroke === 'none') return '';
+  const size = Math.max(10, shape.strokeWidth * 4);
+  return [['arrowStart', false], ['arrowEnd', true]]
+    .map(([name, atEnd]) => {
+      const end = ARROW_ENDS.includes(shape[name]) ? shape[name] : 'none';
+      if (end === 'none') return '';
+      const direction = penTipDirection(shape.points, atEnd);
+      if (!direction) return '';
+      const tip = atEnd ? shape.points[shape.points.length - 1] : shape.points[0];
+      return arrowEndSvg(end, tip[0], tip[1], direction.x, direction.y, size, shape).markup;
+    })
+    .join('');
 }
 
 // The end a shape draws at a given tip, and how far back along the shaft that
@@ -965,7 +1026,9 @@ function shapeImageBBox(shape) {
   const stroke = shape.stroke === 'none' || shape.kind === 'text' || shape.kind === 'image'
     ? 0
     : Math.max(0, shape.strokeWidth || 0) / 2;
-  const arrow = shape.kind === 'arrow'
+  const decorated = shape.kind === 'arrow' ||
+    (shape.kind === 'pen' && (shape.arrowStart !== 'none' || shape.arrowEnd !== 'none'));
+  const arrow = decorated
     ? Math.max(10, Math.max(0, shape.strokeWidth || 0) * 4) * 0.5
     : 0;
   const padding = Math.max(2, stroke, arrow);
@@ -1056,6 +1119,8 @@ const exported = {
   handlesFor,
   resizeShape,
   resizeShapeConstrained,
+  rotationHandleFor,
+  rotationTowards,
   addSlide,
   deleteSlide,
   moveSlide,

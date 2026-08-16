@@ -449,6 +449,37 @@ main {
   cursor: pointer;
 }
 
+/* The rotate grip and the stem that ties it to the top of the box. Geometry is
+   in slide units like the resize handles, so both scale with the zoom. */
+.rot-handle {
+  cursor: grab;
+}
+
+.rot-handle circle {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.rot-handle .rot-glyph {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.rot-handle .rot-head {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.rot-stem {
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
 .selection-marquee {
   fill: color-mix(in srgb, var(--accent) 12%, transparent);
   stroke: var(--accent);

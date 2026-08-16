@@ -392,26 +392,16 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
     } else {
         String::new()
     };
-    let rotation = if shape.rotation == 0.0 {
-        String::new()
-    } else {
-        format!(" rot=\"{}\"", (shape.rotation * 60000.0).round() as i64)
-    };
     format!(
         "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"Picture {id}\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
 <p:blipFill><a:blip r:embed=\"rId{rid}\"/>{crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>\
-<p:spPr><a:xfrm{rotation}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>{}</p:spPr></p:pic>",
-        emu(shape.x),
-        emu(shape.y),
-        emu(shape.w).max(1),
-        emu(shape.h).max(1),
-        line_xml(shape, false),
+<p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>{}</p:spPr></p:pic>",
+        xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
+        line_xml(shape),
     )
 }
 
-/// `pen_arrow` is the pen's single "head at the far end" flag. Every other
-/// shape names its two ends itself.
-fn line_xml(shape: &Shape, pen_arrow: bool) -> String {
+fn line_xml(shape: &Shape) -> String {
     let w = emu(shape.stroke_width).max(1);
     if shape.stroke == "none" {
         return format!("<a:ln w=\"{w}\"><a:noFill/></a:ln>");
@@ -422,15 +412,11 @@ fn line_xml(shape: &Shape, pen_arrow: bool) -> String {
         _ => "",
     };
     // An unknown end name is written as no end at all.
-    let ends = if pen_arrow {
-        "<a:tailEnd type=\"triangle\"/>".to_string()
-    } else {
-        format!(
-            "{}{}",
-            end_xml("headEnd", &shape.arrow_start),
-            end_xml("tailEnd", &shape.arrow_end)
-        )
-    };
+    let ends = format!(
+        "{}{}",
+        end_xml("headEnd", &shape.arrow_start),
+        end_xml("tailEnd", &shape.arrow_end)
+    );
     format!(
         "<a:ln w=\"{w}\"><a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>{dash}{ends}</a:ln>",
         hex(&shape.stroke)
@@ -466,14 +452,25 @@ fn fill_xml(fill: &str) -> String {
     }
 }
 
-fn xfrm(x: f64, y: f64, w: f64, h: f64, flip_h: bool, flip_v: bool) -> String {
+/// pptx measures rotation in sixtieths of a degree about the centre of the
+/// box, which is the same centre the editor rotates about.
+fn rot_attr(rotation: f64) -> String {
+    if rotation == 0.0 {
+        String::new()
+    } else {
+        format!(" rot=\"{}\"", (rotation * 60000.0).round() as i64)
+    }
+}
+
+fn xfrm(x: f64, y: f64, w: f64, h: f64, flip_h: bool, flip_v: bool, rotation: f64) -> String {
     let flips = format!(
         "{}{}",
         if flip_h { " flipH=\"1\"" } else { "" },
         if flip_v { " flipV=\"1\"" } else { "" }
     );
     format!(
-        "<a:xfrm{flips}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm>",
+        "<a:xfrm{}{flips}><a:off x=\"{}\" y=\"{}\"/><a:ext cx=\"{}\" cy=\"{}\"/></a:xfrm>",
+        rot_attr(rotation),
         emu(x),
         emu(y),
         emu(w).max(1),
@@ -537,8 +534,8 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
             format!(
                 "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"{id}\" name=\"Line {id}\"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"line\"><a:avLst/></a:prstGeom>{}</p:spPr></p:cxnSp>",
-                xfrm(x, y, w, h, shape.w < 0.0, shape.h < 0.0),
-                line_xml(shape, false)
+                xfrm(x, y, w, h, shape.w < 0.0, shape.h < 0.0, shape.rotation),
+                line_xml(shape)
             )
         }
         "pen" => {
@@ -559,15 +556,15 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
 <p:spPr>{}<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l=\"0\" t=\"0\" r=\"{path_w}\" b=\"{path_h}\"/>\
 <a:pathLst><a:path w=\"{path_w}\" h=\"{path_h}\">{path}</a:path></a:pathLst></a:custGeom>\
 <a:noFill/>{}</p:spPr></p:sp>",
-                xfrm(bx, by, bw, bh, false, false),
-                line_xml(shape, shape.pen_arrow)
+                xfrm(bx, by, bw, bh, false, false, shape.rotation),
+                line_xml(shape)
             )
         }
         "text" => {
             format!(
                 "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Text {id}\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>{}</p:sp>",
-                xfrm(shape.x, shape.y, shape.w, shape.h, false, false),
+                xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
                 text_body(shape)
             )
         }
@@ -585,9 +582,9 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
             format!(
                 "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Shape {id}\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{}{}</p:spPr>{text}</p:sp>",
-                xfrm(shape.x, shape.y, shape.w, shape.h, false, false),
+                xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
                 fill_xml(&shape.fill),
-                line_xml(shape, false)
+                line_xml(shape)
             )
         }
     }
@@ -1126,7 +1123,9 @@ struct Pending {
     stroke_none: bool,
     stroke_w: Option<i64>,
     dash: Option<String>,
-    arrow: bool,
+    /// True when either end names something, which is what tells a plain line
+    /// from an arrow.
+    has_end: bool,
     head_end: Option<String>,
     tail_end: Option<String>,
     fill: Option<String>,
@@ -1451,7 +1450,7 @@ fn handle_element(
         "tailEnd" | "headEnd" => {
             let end = get(b"type");
             if end.as_deref().map(|t| t != "none").unwrap_or(false) {
-                p.arrow = true;
+                p.has_end = true;
             }
             if local == "headEnd" {
                 p.head_end = end;
@@ -1711,7 +1710,9 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
 
     if !p.is_pic && p.has_custgeom {
         shape.kind = "pen".into();
-        shape.pen_arrow = p.arrow;
+        // A freehand stroke names its two ends the same way a line does.
+        shape.arrow_start = read_arrow_end(&p.head_end);
+        shape.arrow_end = read_arrow_end(&p.tail_end);
         shape.points = p
             .path_pts
             .iter()
@@ -1721,7 +1722,7 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
             return None;
         }
     } else if !p.is_pic && is_line {
-        shape.kind = if p.arrow { "arrow" } else { "line" }.into();
+        shape.kind = if p.has_end { "arrow" } else { "line" }.into();
         // headEnd sits at the start of the geometry and tailEnd at its end.
         // The flips below move the start point, not which end is which.
         shape.arrow_start = read_arrow_end(&p.head_end);
@@ -1776,6 +1777,19 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
         _ => "solid".into(),
     };
     shape.rotation = p.rotation;
+    // Text written inside a rect or an ellipse belongs in the middle of it,
+    // which is where this editor puts it when the shape is drawn here. A file
+    // that names no algn or anchor used to come back anchored top left, so the
+    // next line typed into that shape landed somewhere the same shape drawn
+    // here never would.
+    if shape.kind == "rect" || shape.kind == "ellipse" {
+        if p.text_align.is_none() {
+            shape.text_align = "center".into();
+        }
+        if p.vertical_align.is_none() {
+            shape.vertical_align = "center".into();
+        }
+    }
     let text = p.text.trim_end_matches('\n');
     if !text.is_empty() {
         shape.text = text.to_string();
@@ -1862,6 +1876,7 @@ mod tests {
                             text: "inside the box".into(),
                             text_align: "center".into(),
                             vertical_align: "center".into(),
+                            rotation: -20.0,
                             ..Shape::default()
                         },
                         Shape {
@@ -1925,7 +1940,9 @@ mod tests {
                         stroke: "#862e9c".into(),
                         stroke_width: 4.0,
                         dash: "dot".into(),
-                        pen_arrow: true,
+                        arrow_start: "oval".into(),
+                        arrow_end: "triangle".into(),
+                        rotation: 45.0,
                         ..Shape::default()
                     }],
                     ..Slide::default()
@@ -1956,7 +1973,6 @@ mod tests {
                 assert_eq!(a.group_id, b.group_id);
                 assert!(close(a.stroke_width, b.stroke_width));
                 if a.kind == "pen" {
-                    assert_eq!(a.pen_arrow, b.pen_arrow);
                     assert_eq!(a.points.len(), b.points.len());
                     for (pa, pb) in a.points.iter().zip(&b.points) {
                         assert!(close(pa[0], pb[0]) && close(pa[1], pb[1]));
@@ -1965,10 +1981,11 @@ mod tests {
                     assert!(close(a.x, b.x) && close(a.y, b.y));
                     assert!(close(a.w, b.w) && close(a.h, b.h));
                 }
-                if a.kind == "line" || a.kind == "arrow" {
+                if a.kind == "line" || a.kind == "arrow" || a.kind == "pen" {
                     assert_eq!(a.arrow_start, b.arrow_start);
                     assert_eq!(a.arrow_end, b.arrow_end);
                 }
+                assert!(close(a.rotation, b.rotation), "{} rotation", a.kind);
                 if a.kind == "text" || !a.text.is_empty() {
                     assert!(close(a.font_size, b.font_size));
                     assert_eq!(a.text_color, b.text_color);
@@ -1983,7 +2000,6 @@ mod tests {
                     assert_eq!(a.src, b.src);
                     assert!(close(a.crop_left, b.crop_left));
                     assert!(close(a.crop_top, b.crop_top));
-                    assert!(close(a.rotation, b.rotation));
                 }
             }
         }
@@ -2103,6 +2119,12 @@ mod tests {
         let master_band = &shapes[0];
         assert_eq!(master_band.kind, "rect");
         assert_eq!(master_band.fill, "#037f0c");
+        // The file names no algn or anchor on this rect, and text typed into a
+        // rect here sits in the middle of it. Read as top left, the first line
+        // typed into an opened shape landed where no shape drawn here would
+        // put it.
+        assert_eq!(master_band.text_align, "center");
+        assert_eq!(master_band.vertical_align, "center");
 
         let layout_logo = &shapes[1];
         assert_eq!(layout_logo.kind, "image");

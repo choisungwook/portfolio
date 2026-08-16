@@ -64,16 +64,12 @@
       <button data-tool="arrow" title="Arrow (A)">➔</button>
       <button data-tool="pen" title="Freehand (P)">✎</button>
       <button data-tool="text" title="Text (T)">T</button>
-      <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">
-        <svg viewBox="0 0 18 18" class="toolbar-icon" aria-hidden="true">
-          <rect x="2.5" y="2.5" width="5.5" height="5.5" />
-          <circle cx="12.5" cy="12.5" r="3" />
-        </svg>
-      </button>
+      <!-- Named rather than drawn: two overlapping shapes look like one more
+           drawing tool, and nothing about that icon says the word preset. -->
+      <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">Preset</button>
     </div>
     <div class="group">
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
-      <button id="btn-update" title="Check for a newer version">Updates</button>
     </div>
   </header>
 
@@ -144,12 +140,9 @@
             <option value="dot">Dotted</option>
           </select>
         </div>
-        <div class="prop-row" id="props-pen-arrow">
-          <label for="prop-pen-arrow">End arrow</label>
-          <input type="checkbox" id="prop-pen-arrow" />
-        </div>
         <!-- The values are the pptx names for the same five ends, so what is
-             picked here is what is written to the file. -->
+             picked here is what is written to the file. A freehand stroke uses
+             this row too, in place of the one on/off arrow it used to get. -->
         <div id="props-arrow-ends">
           <div class="prop-row">
             <label for="prop-arrow-start">Start end</label>
@@ -286,11 +279,19 @@
       <nav aria-label="Settings sections">
         <button class="active" data-settings-page="general">General</button>
         <button data-settings-page="presets">Presets</button>
+        <button data-settings-page="updates">Updates</button>
       </nav>
       <div class="settings-content">
         <section data-settings-panel="general">
           <h2>General</h2>
           <p>Settings are stored on this device.</p>
+        </section>
+        <!-- Checking for a version is something you do now and then, not while
+             drawing, so it sits here rather than next to the tools. -->
+        <section data-settings-panel="updates" hidden>
+          <h2>Updates</h2>
+          <p>Look for a newer version of akbun-makepresentation.</p>
+          <button id="btn-update" type="button">Check for Updates…</button>
         </section>
         <section data-settings-panel="presets" hidden>
           <h2>My presets</h2>
