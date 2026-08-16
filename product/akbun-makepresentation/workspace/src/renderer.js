@@ -140,6 +140,7 @@ async function initialize() {
     applySlidePatch: applyAiSlidePatch,
     insertImage: insertAiImage,
     deckSize,
+    systemPrompts: () => appSettings.aiSystemPrompts,
   });
 }
 

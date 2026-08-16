@@ -5,8 +5,14 @@
     ? require('./editor.js')
     : globalThis.slidesLib;
 
-  const SETTINGS_VERSION = 3;
+  const SETTINGS_VERSION = 4;
   const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
+  const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
+  const DEFAULT_AI_SYSTEM_PROMPTS = Object.freeze({
+    text: 'You are a presentation writing assistant. Produce concise, audience-ready wording with a clear hierarchy. Preserve the user\'s language and return only the requested text.',
+    image: 'You are a presentation visual designer. Generate one clean, presentation-ready image that communicates the requested idea. Avoid embedded text unless the user explicitly asks for it.',
+    slide: 'You are a presentation slide editor. Improve the selected slide\'s clarity, hierarchy, spacing, alignment, and visual consistency while preserving its core meaning. Prefer focused edits over unnecessary additions.',
+  });
   const DEFAULT_SHAPE_BORDER = Object.freeze({
     color: '#e03131',
     width: 2,
@@ -36,6 +42,7 @@
         shapeBorder: { ...DEFAULT_SHAPE_BORDER },
         imageBorder: { ...DEFAULT_IMAGE_BORDER },
       },
+      aiSystemPrompts: { ...DEFAULT_AI_SYSTEM_PROMPTS },
       customPresets: [],
     };
   }
@@ -106,6 +113,21 @@
     return { enabled: source.enabled !== false };
   }
 
+  function normalizeSystemPrompt(value, fallback) {
+    const prompt = typeof value === 'string' ? value.trim() : '';
+    return prompt ? prompt.slice(0, MAX_SYSTEM_PROMPT_LENGTH) : fallback;
+  }
+
+  function normalizeAiSystemPrompts(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return Object.fromEntries(
+      Object.entries(DEFAULT_AI_SYSTEM_PROMPTS).map(([mode, fallback]) => [
+        mode,
+        normalizeSystemPrompt(source[mode], fallback),
+      ])
+    );
+  }
+
   function normalizeAppSettings(value) {
     const source = value && typeof value === 'object' ? value : {};
     return {
@@ -113,6 +135,7 @@
       snapping: normalizeSnapping(source.snapping),
       guidelines: normalizeGuidelines(source.guidelines),
       editorDefaults: normalizeEditorDefaults(source.editorDefaults),
+      aiSystemPrompts: normalizeAiSystemPrompts(source.aiSystemPrompts),
       customPresets: normalizeCustomPresets(source.customPresets),
     };
   }
@@ -171,11 +194,14 @@
     DEFAULT_FONT_FAMILY,
     DEFAULT_SHAPE_BORDER,
     DEFAULT_IMAGE_BORDER,
+    DEFAULT_AI_SYSTEM_PROMPTS,
+    MAX_SYSTEM_PROMPT_LENGTH,
     defaultAppSettings,
     normalizeGuidelines,
     normalizeBorder,
     normalizeEditorDefaults,
     normalizeSnapping,
+    normalizeAiSystemPrompts,
     normalizeCustomPresets,
     normalizeAppSettings,
     settingsEqual,

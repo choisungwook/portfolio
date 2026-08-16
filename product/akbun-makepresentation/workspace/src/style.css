@@ -949,6 +949,22 @@ main {
   margin: 4px 0 0;
 }
 
+.settings-ai-prompts {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.settings-ai-prompts label {
+  font-weight: 600;
+}
+
+.settings-ai-prompts textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+}
+
 #props-hint {
   margin: 0;
   color: var(--muted);
