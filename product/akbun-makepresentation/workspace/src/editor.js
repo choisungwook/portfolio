@@ -6,6 +6,16 @@
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
+const PX_PER_INCH = 96;
+const CM_PER_INCH = 2.54;
+const MIN_SLIDE_SIZE = 64;
+const MAX_SLIDE_SIZE = 10000;
+const SLIDE_SIZE_PRESETS = Object.freeze({
+  '16:9': Object.freeze({ width: 1280, height: 720 }),
+  '4:3': Object.freeze({ width: 960, height: 720 }),
+  '3:4': Object.freeze({ width: 720, height: 960 }),
+  '9:16': Object.freeze({ width: 720, height: 1280 }),
+});
 
 // Paper white. A slide keeps its own background so changing it touches that
 // one field and nothing else on the slide.
@@ -59,11 +69,57 @@ const MAX_CLIPBOARD_SHAPES = 100;
 const MAX_GEOMETRY = 1_000_000;
 
 function createDeck() {
-  return { slides: [createSlide()] };
+  return { slideWidth: SLIDE_W, slideHeight: SLIDE_H, slides: [createSlide()] };
 }
 
 function createSlide() {
   return { shapes: [], background: DEFAULT_BACKGROUND };
+}
+
+function slideSize(deck) {
+  const width = Number(deck && deck.slideWidth);
+  const height = Number(deck && deck.slideHeight);
+  return {
+    width: Number.isFinite(width) && width >= MIN_SLIDE_SIZE && width <= MAX_SLIDE_SIZE
+      ? width
+      : SLIDE_W,
+    height: Number.isFinite(height) && height >= MIN_SLIDE_SIZE && height <= MAX_SLIDE_SIZE
+      ? height
+      : SLIDE_H,
+  };
+}
+
+function setSlideSize(deck, width, height) {
+  const nextWidth = Number(width);
+  const nextHeight = Number(height);
+  if (
+    !deck ||
+    !Number.isFinite(nextWidth) ||
+    !Number.isFinite(nextHeight) ||
+    nextWidth < MIN_SLIDE_SIZE ||
+    nextHeight < MIN_SLIDE_SIZE ||
+    nextWidth > MAX_SLIDE_SIZE ||
+    nextHeight > MAX_SLIDE_SIZE
+  ) return false;
+  deck.slideWidth = Math.round(nextWidth * 100) / 100;
+  deck.slideHeight = Math.round(nextHeight * 100) / 100;
+  return true;
+}
+
+function slideSizePreset(ratio) {
+  const preset = SLIDE_SIZE_PRESETS[ratio];
+  return preset ? { ...preset } : null;
+}
+
+function pixelsToCentimeters(value) {
+  return Math.round((Number(value) * CM_PER_INCH / PX_PER_INCH) * 1000) / 1000;
+}
+
+function centimetersToPixels(value) {
+  const pixels = Number(value) * PX_PER_INCH / CM_PER_INCH;
+  const nearestInteger = Math.round(pixels);
+  if (Math.abs(pixels - nearestInteger) < 0.05) return nearestInteger;
+  return Math.round(pixels * 100) / 100;
 }
 
 // A deck saved before slides carried a background, or a slide read from a
@@ -678,8 +734,8 @@ function duplicateSlide(deck, index) {
 
 // The page number as an ordinary text shape rather than a special case, so it
 // draws, rasterizes and exports to pptx through the paths that already exist.
-function slideNumberShape(number) {
-  const shape = createShape('text', SLIDE_W - 110, SLIDE_H - 52, {
+function slideNumberShape(number, width = SLIDE_W, height = SLIDE_H) {
+  const shape = createShape('text', width - 110, height - 52, {
     fontSize: 18,
     textColor: '#868e96',
   });
@@ -996,6 +1052,8 @@ function arrowSvg(shape) {
 // A whole slide as standalone SVG markup, used for thumbnails, the
 // presentation view, and rasterizing pages for the pdf export.
 function renderSlideSvg(slide, options) {
+  const width = Number(options && options.width) || SLIDE_W;
+  const height = Number(options && options.height) || SLIDE_H;
   let shapes = slide.shapes
     .map((shape, i) =>
       renderShapeSvg(shape, {
@@ -1004,11 +1062,11 @@ function renderSlideSvg(slide, options) {
     )
     .join('');
   if (options && options.number) {
-    shapes += renderShapeSvg(slideNumberShape(options.number));
+    shapes += renderShapeSvg(slideNumberShape(options.number, width, height));
   }
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SLIDE_W} ${SLIDE_H}">` +
-    `<rect width="${SLIDE_W}" height="${SLIDE_H}" fill="${slideBackground(slide)}"/>${shapes}</svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">` +
+    `<rect width="${width}" height="${height}" fill="${slideBackground(slide)}"/>${shapes}</svg>`
   );
 }
 
@@ -1086,6 +1144,7 @@ function filterFonts(fonts, query) {
 const exported = {
   SLIDE_W,
   SLIDE_H,
+  SLIDE_SIZE_PRESETS,
   DEFAULT_STYLE,
   DEFAULT_BACKGROUND,
   ARROW_ENDS,
@@ -1099,6 +1158,11 @@ const exported = {
   filterFonts,
   createDeck,
   createSlide,
+  slideSize,
+  setSlideSize,
+  slideSizePreset,
+  pixelsToCentimeters,
+  centimetersToPixels,
   slideBackground,
   createShape,
   defaultPresetShapes,

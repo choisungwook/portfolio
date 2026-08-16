@@ -8,6 +8,28 @@ test('createDeck starts with one empty slide', () => {
   const deck = L.createDeck();
   assert.strictEqual(deck.slides.length, 1);
   assert.deepStrictEqual(deck.slides[0].shapes, []);
+  assert.deepStrictEqual(L.slideSize(deck), { width: 1280, height: 720 });
+});
+
+test('slide size supports presets, custom pixels, and centimeters', () => {
+  const deck = L.createDeck();
+  assert.deepStrictEqual(L.slideSizePreset('4:3'), { width: 960, height: 720 });
+  assert.deepStrictEqual(L.slideSizePreset('9:16'), { width: 720, height: 1280 });
+  assert.strictEqual(L.slideSizePreset('custom'), null);
+  assert.strictEqual(L.pixelsToCentimeters(960), 25.4);
+  assert.strictEqual(L.centimetersToPixels(25.4), 960);
+  assert.strictEqual(L.centimetersToPixels(33.867), 1280);
+  assert.ok(L.setSlideSize(deck, 1000, 1000));
+  assert.deepStrictEqual(L.slideSize(deck), { width: 1000, height: 1000 });
+  assert.ok(!L.setSlideSize(deck, 0, 1000));
+  assert.deepStrictEqual(L.slideSize({ slides: [] }), { width: 1280, height: 720 });
+});
+
+test('renderSlideSvg uses the requested slide dimensions', () => {
+  const svg = L.renderSlideSvg(L.createSlide(), { width: 720, height: 1280, number: 2 });
+  assert.ok(svg.includes('viewBox="0 0 720 1280"'));
+  assert.ok(svg.includes('<rect width="720" height="1280"'));
+  assert.ok(svg.includes('>2<'));
 });
 
 test('new shapes use a red stroke and text keeps a dark text color', () => {

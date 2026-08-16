@@ -38,10 +38,18 @@
       </div>
     </div>
     <div class="menu">
+      <button class="menu-title" data-menu="slides" aria-haspopup="true" aria-expanded="false">Slides</button>
+      <div class="menu-panel" data-menu-panel="slides" hidden>
+        <button data-command="present">Presentation</button>
+        <button data-command="numbers">Slide numbers</button>
+        <hr />
+        <button data-command="slide-size">Slide size…</button>
+      </div>
+    </div>
+    <div class="menu">
       <button class="menu-title" data-menu="view" aria-haspopup="true" aria-expanded="false">View</button>
       <div class="menu-panel" data-menu-panel="view" hidden>
         <button data-command="guidelines">Guidelines</button>
-        <button data-command="numbers">Slide numbers</button>
         <hr />
         <button data-command="zoom-in">Zoom in<span class="accel">⌘+</span></button>
         <button data-command="zoom-out">Zoom out<span class="accel">⌘-</span></button>
@@ -272,6 +280,41 @@
       <div id="custom-presets" class="preset-grid"></div>
     </section>
   </div>
+
+  <dialog id="slide-size-dialog" aria-labelledby="slide-size-title">
+    <form id="slide-size-form" method="dialog">
+      <header>
+        <h1 id="slide-size-title">Slide size</h1>
+      </header>
+      <div class="slide-size-content">
+        <fieldset>
+          <legend>Ratio</legend>
+          <div class="ratio-options">
+            <button type="button" data-slide-ratio="16:9">16:9</button>
+            <button type="button" data-slide-ratio="4:3">4:3</button>
+            <button type="button" data-slide-ratio="3:4">3:4</button>
+            <button type="button" data-slide-ratio="9:16">9:16</button>
+          </div>
+        </fieldset>
+        <div class="slide-size-fields">
+          <label for="slide-size-unit">Unit</label>
+          <select id="slide-size-unit">
+            <option value="px">Pixels (px)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+          <label for="slide-size-width">Width</label>
+          <input id="slide-size-width" type="number" min="64" max="10000" step="0.01" required />
+          <label for="slide-size-height">Height</label>
+          <input id="slide-size-height" type="number" min="64" max="10000" step="0.01" required />
+        </div>
+        <p id="slide-size-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-slide-size-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <div class="settings-shell">

@@ -32,6 +32,7 @@ const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
 const presetMenu = $('preset-menu');
+const slideSizeDialog = $('slide-size-dialog');
 const settingsDialog = $('settings-dialog');
 const fontPicker = $('font-picker');
 const fontMenu = $('font-menu');
@@ -43,12 +44,18 @@ let customPresets = [];
 let settingsPresetDraft = [];
 
 const slide = () => state.deck.slides[state.current];
+const deckSize = () => L.slideSize(state.deck);
 const selectedShape = () =>
   state.selected >= 0 ? slide().shapes[state.selected] : null;
 const selectedShapes = () =>
   state.selection
     .filter((index) => index >= 0 && index < slide().shapes.length)
     .map((index) => slide().shapes[index]);
+
+function fitTextBoxForSlide(shape, text) {
+  const available = deckSize().width - Math.max(0, Number(shape.x) || 0);
+  return L.fitTextBox(shape, text, available);
+}
 
 function selectOnly(index) {
   state.selected = index;
@@ -183,22 +190,33 @@ function marqueeSvg() {
 // outside the g[data-i] groups that make shapes selectable.
 function slideNumberSvg(index) {
   if (!state.showNumbers) return '';
-  return L.renderShapeSvg(L.slideNumberShape(index + 1));
+  const { width, height } = deckSize();
+  return L.renderShapeSvg(L.slideNumberShape(index + 1, width, height));
 }
 
 function guidelinesSvg() {
   if (!state.showGuidelines) return '';
+  const { width, height } = deckSize();
+  const marginX = width * 0.05;
+  const titleY = height * 0.067;
+  const titleHeight = height * 0.156;
+  const contentY = height * 0.267;
+  const contentHeight = height * 0.644;
   return (
     '<g class="guidelines" aria-hidden="true">' +
-    '<rect x="64" y="48" width="1152" height="112"/>' +
-    '<text x="76" y="72">TITLE</text>' +
-    '<rect x="64" y="192" width="1152" height="464"/>' +
-    '<text x="76" y="216">CONTENT</text>' +
+    `<rect x="${marginX}" y="${titleY}" width="${width - marginX * 2}" height="${titleHeight}"/>` +
+    `<text x="${marginX + 12}" y="${titleY + 24}">TITLE</text>` +
+    `<rect x="${marginX}" y="${contentY}" width="${width - marginX * 2}" height="${contentHeight}"/>` +
+    `<text x="${marginX + 12}" y="${contentY + 24}">CONTENT</text>` +
     '</g>'
   );
 }
 
 function renderCanvas() {
+  const { width, height } = deckSize();
+  canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  stageInner.style.setProperty('--slide-ratio', String(width / height));
+  stageInner.style.setProperty('--slide-aspect', `${width} / ${height}`);
   // The slide's own color, not the app theme: what the editor shows here is
   // what the pdf and the projector show.
   canvas.style.background = L.slideBackground(slide());
@@ -259,6 +277,7 @@ function cropOverlaySvg() {
 
 function renderThumbs() {
   const thumbs = $('thumbs');
+  const { width, height } = deckSize();
   // The panel takes focus so Backspace can mean "delete this slide" there and
   // keep meaning "delete this object" on the canvas.
   const focused = document.activeElement && thumbs.contains(document.activeElement);
@@ -266,7 +285,7 @@ function renderThumbs() {
     .map(
       (s, i) =>
         `<div class="thumb${i === state.current ? ' active' : ''}${state.slideSelection.includes(i) ? ' selected' : ''}" data-slide="${i}" draggable="true" tabindex="${i === state.current ? '0' : '-1'}">` +
-        `${L.renderSlideSvg(s, { number: state.showNumbers ? i + 1 : 0 })}` +
+        `${L.renderSlideSvg(s, { width, height, number: state.showNumbers ? i + 1 : 0 })}` +
         `<span class="num">${i + 1}</span></div>`
     )
     .join('');
@@ -435,9 +454,10 @@ function isSecondPress(index) {
 
 function toPoint(event) {
   const rect = canvas.getBoundingClientRect();
+  const { width, height } = deckSize();
   return {
-    x: (event.clientX - rect.left) * (L.SLIDE_W / rect.width),
-    y: (event.clientY - rect.top) * (L.SLIDE_H / rect.height),
+    x: (event.clientX - rect.left) * (width / rect.width),
+    y: (event.clientY - rect.top) * (height / rect.height),
   };
 }
 
@@ -685,7 +705,7 @@ function canEditText(shape) {
 
 function styleTextEditor(shape) {
   if (!shape) return;
-  const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
+  const scale = canvas.getBoundingClientRect().width / deckSize().width;
   // The same inset the glyphs are drawn at, so text does not jump sideways
   // when editing starts inside a rect or an ellipse.
   const box = L.textBox(shape);
@@ -723,7 +743,7 @@ function startTextEdit(index, seed) {
   renderCanvas();
 
   textEditor.value = seed ? shape.text + seed : shape.text;
-  if (seed && shape.kind === 'text') L.fitTextBox(shape, textEditor.value);
+  if (seed && shape.kind === 'text') fitTextBoxForSlide(shape, textEditor.value);
   styleTextEditor(shape);
   textEditor.hidden = false;
   // Deferred so it wins over whatever focus change the triggering click
@@ -769,7 +789,7 @@ function commitTextEdit() {
     shape.text = text;
   } else if (changed) {
     shape.text = text;
-    L.fitTextBox(shape, text);
+    fitTextBoxForSlide(shape, text);
   } else if (before && shape.kind === 'text') {
     shape.w = before.w;
     shape.h = before.h;
@@ -782,7 +802,7 @@ textEditor.addEventListener('blur', commitTextEdit);
 textEditor.addEventListener('input', () => {
   const shape = slide().shapes[state.editingIndex];
   if (!shape || shape.kind !== 'text') return;
-  L.fitTextBox(shape, textEditor.value);
+  fitTextBoxForSlide(shape, textEditor.value);
   styleTextEditor(shape);
   renderCanvas();
 });
@@ -810,7 +830,7 @@ textEditor.addEventListener('keydown', (event) => {
 const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
-  if (settingsDialog.open) return;
+  if (settingsDialog.open || slideSizeDialog.open) return;
   if (!presetMenu.hidden && event.key === 'Escape') {
     hidePresetMenu();
     event.preventDefault();
@@ -904,6 +924,11 @@ document.addEventListener('keydown', (event) => {
     renderProps();
     return;
   }
+  if (slidesHaveFocus() && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+    selectAdjacentSlide(event.key === 'ArrowUp' ? -1 : 1);
+    event.preventDefault();
+    return;
+  }
   if (event.key.startsWith('Arrow')) {
     const shapes = selectedShapes();
     if (shapes.length === 0) return;
@@ -989,7 +1014,7 @@ const PRESET_MARGIN_Y = 48;
 function cornerPresetShapes(shapes) {
   const copies = L.cloneShapes(shapes);
   const bounds = shapeBounds(copies);
-  const dx = L.SLIDE_W - PRESET_MARGIN_X - bounds.w - bounds.x;
+  const dx = deckSize().width - PRESET_MARGIN_X - bounds.w - bounds.x;
   const dy = PRESET_MARGIN_Y - bounds.y;
   for (const shape of copies) L.moveShape(shape, dx, dy);
   return copies;
@@ -1098,6 +1123,95 @@ presetMenu.addEventListener('click', (event) => {
   if (!preset) return;
   insertShapes(cornerPresetShapes(preset.shapes), 0);
   hidePresetMenu();
+  canvas.focus({ preventScroll: true });
+});
+
+let slideSizeUnit = 'px';
+
+function slideSizeValue(value, unit) {
+  if (unit === 'cm') return String(L.pixelsToCentimeters(value));
+  return String(Math.round(value * 100) / 100);
+}
+
+function setSlideSizeFields(size, unit) {
+  $('slide-size-width').value = slideSizeValue(size.width, unit);
+  $('slide-size-height').value = slideSizeValue(size.height, unit);
+  syncSlideRatioButtons(size);
+}
+
+function slideSizeFromFields(unit = slideSizeUnit) {
+  const width = Number($('slide-size-width').value);
+  const height = Number($('slide-size-height').value);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  return unit === 'cm'
+    ? {
+        width: L.centimetersToPixels(width),
+        height: L.centimetersToPixels(height),
+      }
+    : { width, height };
+}
+
+function syncSlideRatioButtons(size) {
+  const ratio = size && size.height ? size.width / size.height : 0;
+  for (const button of slideSizeDialog.querySelectorAll('[data-slide-ratio]')) {
+    const preset = L.slideSizePreset(button.dataset.slideRatio);
+    const selected = preset && Math.abs(ratio - preset.width / preset.height) < 0.0001;
+    button.setAttribute('aria-pressed', String(!!selected));
+  }
+}
+
+function setSlideSizeUnit(unit, size) {
+  slideSizeUnit = unit;
+  $('slide-size-unit').value = unit;
+  for (const input of [$('slide-size-width'), $('slide-size-height')]) {
+    input.min = unit === 'cm' ? '1.693' : '64';
+    input.max = unit === 'cm' ? '264.583' : '10000';
+    input.step = unit === 'cm' ? '0.001' : '0.01';
+  }
+  setSlideSizeFields(size, unit);
+}
+
+function openSlideSizeDialog() {
+  hideMenus();
+  hidePresetMenu();
+  $('slide-size-status').textContent = '';
+  setSlideSizeUnit(slideSizeUnit, deckSize());
+  slideSizeDialog.showModal();
+  slideSizeDialog.querySelector('[data-slide-ratio][aria-pressed="true"]')?.focus();
+}
+
+slideSizeDialog.querySelector('.ratio-options').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-slide-ratio]');
+  if (!button) return;
+  const preset = L.slideSizePreset(button.dataset.slideRatio);
+  if (preset) setSlideSizeFields(preset, slideSizeUnit);
+});
+
+$('slide-size-unit').addEventListener('change', (event) => {
+  const size = slideSizeFromFields(slideSizeUnit) || deckSize();
+  setSlideSizeUnit(event.target.value, size);
+});
+
+for (const input of [$('slide-size-width'), $('slide-size-height')]) {
+  input.addEventListener('input', () => syncSlideRatioButtons(slideSizeFromFields()));
+}
+
+$('btn-slide-size-cancel').addEventListener('click', () => slideSizeDialog.close('cancel'));
+$('slide-size-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const size = slideSizeFromFields();
+  const before = deckSize();
+  if (!size || !L.setSlideSize(state.deck, size.width, size.height)) {
+    $('slide-size-status').textContent = slideSizeUnit === 'cm'
+      ? 'Enter width and height from 1.693 to 264.583 cm.'
+      : 'Enter width and height from 64 to 10,000 px.';
+    return;
+  }
+  if (before.width !== state.deck.slideWidth || before.height !== state.deck.slideHeight) {
+    markDirty();
+    renderAll();
+  }
+  slideSizeDialog.close('apply');
   canvas.focus({ preventScroll: true });
 });
 
@@ -1214,19 +1328,24 @@ function readImageSize(src) {
 function pastedTextShape(text) {
   const shape = L.createShape('text', 80, 80, state.defaults);
   shape.text = text.replace(/\r\n/g, '\n');
-  L.fitTextBox(shape, shape.text);
+  fitTextBoxForSlide(shape, shape.text);
   return shape;
 }
 
 async function pastedImageShape(file, index) {
   const src = await readFileDataUrl(file);
   const size = await readImageSize(src);
-  const scale = Math.min(1, (L.SLIDE_W * 0.8) / size.width, (L.SLIDE_H * 0.8) / size.height);
+  const slideDimensions = deckSize();
+  const scale = Math.min(
+    1,
+    (slideDimensions.width * 0.8) / size.width,
+    (slideDimensions.height * 0.8) / size.height
+  );
   const shape = L.createShape('image', 0, 0, state.defaults);
   shape.w = Math.max(1, size.width * scale);
   shape.h = Math.max(1, size.height * scale);
-  shape.x = (L.SLIDE_W - shape.w) / 2 + index * PASTE_OFFSET;
-  shape.y = (L.SLIDE_H - shape.h) / 2 + index * PASTE_OFFSET;
+  shape.x = (slideDimensions.width - shape.w) / 2 + index * PASTE_OFFSET;
+  shape.y = (slideDimensions.height - shape.h) / 2 + index * PASTE_OFFSET;
   shape.src = src;
   return shape;
 }
@@ -1557,7 +1676,7 @@ function applyProp(patch) {
         shape.kind === 'text' &&
         ['fontSize', 'fontFamily', 'bold', 'italic'].some((name) => Object.hasOwn(patch, name))
       ) {
-        L.fitTextBox(shape, shape.text);
+        fitTextBoxForSlide(shape, shape.text);
       }
     }
     markDirty();
@@ -1696,6 +1815,17 @@ $('prop-vertical-align').addEventListener('click', (event) => {
 const TEXT_STYLE_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 
 // --- slide panel ------------------------------------------------------------------------
+
+function selectAdjacentSlide(direction) {
+  const next = Math.max(0, Math.min(state.current + direction, state.deck.slides.length - 1));
+  if (next !== state.current) {
+    state.current = next;
+    setSlideSelection([next]);
+    clearSelection();
+    renderAll();
+  }
+  $('thumbs').querySelector(`[data-slide="${state.current}"]`)?.focus();
+}
 
 $('thumbs').addEventListener('click', (event) => {
   const thumb = event.target.closest('[data-slide]');
@@ -1908,7 +2038,8 @@ function suggestName(extension) {
 function deckForSave() {
   if (!state.showNumbers) return state.deck;
   const copy = structuredClone(state.deck);
-  copy.slides.forEach((s, i) => s.shapes.push(L.slideNumberShape(i + 1)));
+  const { width, height } = deckSize();
+  copy.slides.forEach((s, i) => s.shapes.push(L.slideNumberShape(i + 1, width, height)));
   return copy;
 }
 
@@ -1928,24 +2059,33 @@ async function saveFile(alwaysAsk) {
   }
 }
 
-// Rasterize one slide at 1920x1080, which is enough for PDF pages and PNG
-// exports at this slide size.
+function slideRasterSize() {
+  const { width, height } = deckSize();
+  const scale = Math.min(1.5, 4096 / width, 4096 / height);
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
 function rasterizeSlideCanvas(s, number) {
   return new Promise((resolve, reject) => {
-    const svg = L.renderSlideSvg(s, { number });
+    const slideDimensions = deckSize();
+    const rasterSize = slideRasterSize();
+    const svg = L.renderSlideSvg(s, { ...slideDimensions, number });
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const image = new Image();
     image.onload = () => {
       const raster = document.createElement('canvas');
-      raster.width = 1920;
-      raster.height = 1080;
+      raster.width = rasterSize.width;
+      raster.height = rasterSize.height;
       const context = raster.getContext('2d');
       if (!context) {
         URL.revokeObjectURL(url);
         reject(new Error('cannot create slide canvas'));
         return;
       }
-      context.drawImage(image, 0, 0, 1920, 1080);
+      context.drawImage(image, 0, 0, raster.width, raster.height);
       URL.revokeObjectURL(url);
       resolve(raster);
     };
@@ -1959,7 +2099,11 @@ function rasterizeSlideCanvas(s, number) {
 
 async function rasterizeSlideForPdf(s, number) {
   const raster = await rasterizeSlideCanvas(s, number);
-  return { dataUrl: raster.toDataURL('image/jpeg', 0.92), width: 1920, height: 1080 };
+  return {
+    dataUrl: raster.toDataURL('image/jpeg', 0.92),
+    width: raster.width,
+    height: raster.height,
+  };
 }
 
 async function exportPdf() {
@@ -2000,7 +2144,10 @@ async function exportPng() {
 // --- presentation mode ------------------------------------------------------------------------
 
 function renderPresent() {
+  const { width, height } = deckSize();
   present.innerHTML = L.renderSlideSvg(state.deck.slides[state.presentIndex], {
+    width,
+    height,
     number: state.showNumbers ? state.presentIndex + 1 : 0,
   });
 }
@@ -2078,9 +2225,11 @@ const MENU_COMMANDS = {
   delete: deleteSelectedShape,
   group: groupSelection,
   ungroup: ungroupSelection,
+  present: enterPresent,
   settings: openSettings,
   guidelines: toggleGuidelines,
   numbers: toggleNumbers,
+  'slide-size': openSlideSizeDialog,
   'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
   'zoom-out': () => setZoom(L.zoomOut(state.zoom)),
   'zoom-fit': () => setZoom(L.ZOOM_FIT),
