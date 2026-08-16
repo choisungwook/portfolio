@@ -62,7 +62,19 @@ test('slide output schema makes every object field required', () => {
 test('slide prompt explains nullable strict fields', () => {
   const prompt = A.slidePrompt('Polish this slide.', L.createSlide(), { width: 1280, height: 720 }, 4);
   assert.match(prompt, /unchanged field in changes to null/);
+  assert.match(prompt, /fields unused by the shape kind to null/);
   assert.match(prompt, /background to null unless/);
+});
+
+test('add shape schema keeps core geometry required and allows unused fields to be null', () => {
+  const shapeSchema = A.SLIDE_OUTPUT_SCHEMA.properties.operations.items.anyOf[2]
+    .properties.shape;
+  for (const name of ['kind', 'x', 'y', 'w', 'h']) {
+    assert.equal(shapeSchema.properties[name].anyOf, undefined);
+  }
+  for (const name of ['points', 'stroke', 'text', 'bold', 'arrowEnd']) {
+    assert.deepEqual(shapeSchema.properties[name].anyOf.at(-1), { type: 'null' });
+  }
 });
 
 test('AI base instructions carry each configured system prompt', () => {

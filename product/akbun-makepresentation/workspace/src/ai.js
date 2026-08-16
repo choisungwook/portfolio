@@ -145,6 +145,7 @@
       'Use zero-based shape indices from the supplied slide.',
       'Do not add image shapes. Existing image shapes may be repositioned with update operations.',
       'For update operations, set every unchanged field in changes to null.',
+      'For add operations, set fields unused by the shape kind to null. Pen shapes still require points.',
       'Set background to null unless the slide background should change.',
       '',
       `Request: ${prompt}`,
@@ -208,6 +209,11 @@
       .filter(([name]) => CHANGE_FIELDS.has(name))
       .map(([name, schema]) => [name, nullable(schema)])
   );
+  const requiredAddFields = new Set(['kind', 'x', 'y', 'w', 'h']);
+  const addShapeProperties = Object.fromEntries(
+    Object.entries(shapeProperties)
+      .map(([name, schema]) => [name, requiredAddFields.has(name) ? schema : nullable(schema)])
+  );
 
   const SLIDE_OUTPUT_SCHEMA = Object.freeze(strictObject({
     summary: { type: 'string', maxLength: 500 },
@@ -228,7 +234,7 @@
           }),
           strictObject({
             op: { type: 'string', enum: ['add'] },
-            shape: strictObject(shapeProperties),
+            shape: strictObject(addShapeProperties),
           }),
         ],
       },
