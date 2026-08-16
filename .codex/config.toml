@@ -1,4 +1,32 @@
-sandbox_mode = "workspace-write"
+default_permissions = "workspace"
 
-[sandbox_workspace_write]
-network_access = true
+[permissions.workspace]
+description = "Project workspace permissions."
+extends = ":workspace"
+
+[permissions.workspace.filesystem.":workspace_roots"]
+"**/*.avif" = "deny"
+"**/*.AVIF" = "deny"
+"**/*.bmp" = "deny"
+"**/*.BMP" = "deny"
+"**/*.gif" = "deny"
+"**/*.GIF" = "deny"
+"**/*.ico" = "deny"
+"**/*.ICO" = "deny"
+"**/*.jpeg" = "deny"
+"**/*.JPEG" = "deny"
+"**/*.jpg" = "deny"
+"**/*.JPG" = "deny"
+"**/*.png" = "deny"
+"**/*.PNG" = "deny"
+"**/*.svg" = "deny"
+"**/*.SVG" = "deny"
+"**/*.tif" = "deny"
+"**/*.TIF" = "deny"
+"**/*.tiff" = "deny"
+"**/*.TIFF" = "deny"
+"**/*.webp" = "deny"
+"**/*.WEBP" = "deny"
+
+[permissions.workspace.network]
+enabled = true
