@@ -1,0 +1,10 @@
+[project]
+name = "multi-turn-conversation"
+version = "0.1.0"
+description = "Hands-on: why LLM APIs forget, and where the conversation actually lives"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.70",
+    "openai>=1.60",
+    "redis>=5.0",
+]

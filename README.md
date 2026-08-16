@@ -99,6 +99,7 @@
 89. git credential helper 원리와 CodeBuild connection 핸즈온 (26.7.26) - [링크](./computer_science/git/git_credential_helper/)
 90. ECS quickstart (26.8.2) - [링크](./aws/ecs/quickstart/)
 91. LLM 서빙 시스템 설계 Chapter 3 핸즈온 (26.8.15) - [링크](./computer_science/ai/study-llmserving/ch3/)
+92. 멀티턴 대화 핸즈온 (LLM API는 왜 잊는가, OpenAI/Claude 비교) (26.8.16) - [링크](./computer_science/ai/multi-turn-conversation/)
 
 ## 직접 만든 제품
 

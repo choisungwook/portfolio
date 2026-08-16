@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>멀티턴 대화 — 모델은 왜 잊는가</title>
+<style>
+:root{
+  --dark:#212022;
+  --ink:#000000;
+  --point:#FFC000;
+  --hl:#FFE066;
+  --prob:#FF0000;
+  --wl:#FFF2CC;
+  --rs:#E2EFDA;
+  --grp:#F2F2F2;
+  --code-bg:#1E1E1E; --code-ink:#D4D4D4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{
+  background:#F2F2F2;color:var(--ink);
+  font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  line-height:1.75;
+}
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;
+  background:#fff;border:1px solid #E2E2E2;border-radius:10px;
+  aspect-ratio:16/9;overflow-y:auto;padding:6% 8%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.page.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.page.cover h1{font-size:2.2rem;font-weight:800;line-height:1.4;margin-bottom:10px}
+.page.cover .sub{color:#555;margin-bottom:34px}
+.page.cover .glance p{margin:10px 0}
+.p-prob{color:var(--prob);font-weight:700}
+.p-point{background:var(--point);font-weight:700;padding:0 4px}
+
+.sec{font-size:.95rem;font-weight:800;color:var(--ink);letter-spacing:.02em}
+h2.page-title{font-size:1.55rem;font-weight:800;margin:6px 0 20px;letter-spacing:-.01em}
+p{margin:10px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}
+.prob-text,mark.prob{background:none;color:var(--prob);font-weight:700}
+.xmark{color:var(--prob);font-weight:900}
+.dim{color:#666;font-size:.9rem}
+
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:8px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:20px 8px;margin:12px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 16px;background:#fff;
+  font-weight:600;font-size:.92rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.75rem}
+.dbox.wl{background:var(--wl)}
+.dbox.rs{background:var(--rs)}
+.dbox.hot{background:var(--point);border-color:var(--ink);font-weight:800}
+.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.dbox.dim{opacity:.3}
+.darrow{font-weight:900;color:var(--ink);font-size:1.1rem}
+.darrow.bad{color:var(--prob)}
+.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);
+  padding:22px 14px 12px;position:relative;margin-top:12px}
+.dgroup>b{position:absolute;top:4px;left:12px;font-size:.75rem;font-weight:700}
+.marker{display:inline-flex;width:24px;height:24px;border-radius:50%;background:#fff;
+  border:1.6px solid var(--ink);font-weight:800;font-size:.8rem;
+  align-items:center;justify-content:center;flex:none}
+.marker.bad{border-color:var(--prob);color:var(--prob)}
+.caption{text-align:center;font-size:.82rem;color:#555;margin-top:4px}
+
+.stepper{margin:12px 0}
+.step{display:none}
+.step.on{display:block;animation:fade .25s ease}
+.step .exp{margin-top:8px}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+  padding-top:12px;border-top:1px solid #E5E5E5}
+.step-nav button{border:1.4px solid var(--ink);background:#fff;color:var(--ink);
+  border-radius:999px;padding:6px 18px;font-weight:700;font-size:.9rem;cursor:pointer}
+.step-nav button:disabled{opacity:.25;cursor:default}
+.step-count{font-weight:800;color:#777;font-size:.9rem;min-width:52px;text-align:center}
+
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;
+  padding:16px 18px;overflow-x:auto;font-size:.86rem;line-height:1.6;margin:12px 0;
+  font-family:Consolas,ui-monospace,Menlo,monospace}
+pre.code .k{color:#569CD6}
+pre.code .s{color:#CE9178}
+pre.code .c{color:#6A9955}
+pre.code .hot{color:var(--point);font-weight:700}
+pre.code .bad{color:#FF6B6B;font-weight:700}
+.codedesc{font-size:.9rem;color:#444;margin:14px 0 0;font-weight:700}
+
+.quiz{margin:18px 0 26px}
+.quiz .q{font-weight:700}
+.quiz .opts{list-style:none;margin:10px 0}
+.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;
+  padding:8px 14px;margin:8px 0;font-size:.95rem;cursor:pointer;user-select:none}
+.quiz .opts li:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+.quiz.done .opts li{cursor:default}
+.quiz .opts li.correct{background:var(--point);font-weight:700}
+.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;margin-top:8px;padding-left:14px;border-left:3px solid var(--point)}
+.quiz.done .fb{display:block;animation:fade .25s ease}
+.quiz .fb .verdict{font-weight:800}
+.quiz .fb.no{border-left-color:var(--prob)}
+.quiz .fb.no .verdict{color:var(--prob)}
+
+.tradeoff{display:flex;gap:30px;flex-wrap:wrap;margin:14px 0}
+.tradeoff>div{flex:1;min-width:240px}
+.tradeoff h3{font-size:1rem;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}
+.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:9px}
+
+.foot{font-size:.82rem;color:#555;margin-top:22px}
+.foot a{color:#555}
+
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 20px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;
+  padding:9px 22px;font-weight:700;font-size:15px;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;border:none;padding:0;border-radius:50%;background:#DDD;cursor:pointer}
+#dots button.on{background:var(--point);transform:scale(1.25)}
+#dots button:focus-visible{outline:2px solid var(--point);outline-offset:2px}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:64px;text-align:right}
+
+@media print{
+  body{background:#fff}
+  #book{width:auto;padding:0}
+  .page,.step{display:block !important}
+  .page{aspect-ratio:auto;border:none;overflow:visible}
+  #nav,.step-nav,#dots{display:none !important}
+  .page{page-break-after:always}
+}
+@media (max-width:640px){
+  html{font-size:17px}
+  #book,#nav .in{width:auto;max-width:100%}
+  #book{padding:10px 8px 86px}
+  .page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}
+  .tradeoff{gap:16px}
+}
+</style>
+</head>
+<body>
+<main id="book">
+
+<!-- ════════ 1장. 표지 ════════ -->
+<section class="page cover">
+  <div class="bar">
+    <h1>멀티턴 대화 — 모델은 왜 <mark>잊는가</mark></h1>
+    <p class="sub">LLM API로 챗봇을 만드는 사람을 위한, 대화가 실제로 어디에 쌓이는지 확인하는 학습지</p>
+  </div>
+  <div class="glance">
+    <p><b class="p-prob">이런 상황이 있다면</b> — 사용자가 "내 이름은 악분이야"라고 말한 바로 다음 턴에 "내 이름이 뭐야?"를 물었는데, 챗봇이 모른다고 답함. 에러 로그도 없음</p>
+    <p><b class="p-point">어떻게 풀까?</b></p>
+  </div>
+</section>
+
+<!-- ════════ 2장. 문제 상황 ════════ -->
+<section class="page">
+  <p class="sec">1. 문제 상황</p>
+  <h2 class="page-title">한 턴 만에 이름을 잊는 챗봇</h2>
+  <p class="dim">이런 상황을 가정함</p>
+  <p>같은 프롬프트를 채팅 UI에 붙여넣으면 잘 동작함. 코드로 부르면 안 됨.</p>
+  <ul class="bullets">
+    <li><span class="xmark">✕</span> 턴 2에서 이전 턴 내용을 전혀 모름</li>
+    <li><span class="xmark">✕</span> 예외도 에러 코드도 없음. HTTP 200에 정상 응답</li>
+    <li><span class="xmark">✕</span> 프롬프트를 고쳐도 그대로임 — 프롬프트 문제가 아님</li>
+  </ul>
+  <p>임시방편으로 "이전 대화를 기억해"를 프롬프트에 넣어도 소용없음. 기억할 대상이 요청 본문에 없기 때문.</p>
+  <p><b class="p-point">푸는 방법 중 하나</b> — 모델을 고치지 않고, 애플리케이션이 지난 메시지를 모아 매 호출마다 다시 보냄</p>
+</section>
+
+<!-- ════════ 3장. 원리 ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">API는 상태를 갖지 않도록 설계됨</h2>
+  <p><code>POST /v1/messages</code>와 <code>POST /v1/chat/completions</code>는 평범한 <mark>stateless HTTP 엔드포인트</mark>임. 요청 본문이 입력 전부, 응답이 출력 전부.</p>
+  <ul class="bullets">
+    <li>세션 쿠키 없음, connection affinity 없음, 서버 측 버퍼 없음
+      <ul><li>턴 2 요청이 도착할 때 턴 1을 붙들고 있는 주체가 없음</li></ul>
+    </li>
+    <li>왜 이렇게 설계했나 — 서버가 대화를 들고 있으면 요청을 아무 인스턴스에나 보낼 수 없음
+      <ul><li>상태를 버리면 수평 확장·재시도·장애 격리가 전부 단순해짐</li></ul>
+    </li>
+  </ul>
+  <p><b>다른 곳에도 적용됨.</b> HTTP 자체, REST, JWT 인증, stateless pod — 상태를 호출자나 외부 저장소로 밀어내는 같은 설계.</p>
+</section>
+
+<!-- ════════ 4장. 원리 (계속) ════════ -->
+<section class="page">
+  <p class="sec">2. 원리</p>
+  <h2 class="page-title">멀티턴은 모델의 성질이 아니라 배열의 길이</h2>
+  <p>섞이기 쉬운 두 정의를 나눠야 함.</p>
+  <ul class="bullets">
+    <li><b>사용자 관점</b> — 여러 번 주고받고, 뒤 질문이 앞 대화에 기댈 수 있는 경험</li>
+    <li><b>API 관점</b> — <mark>messages 배열이 커지는 것</mark>. 턴 3은 턴 1·2를 그대로 다시 실어 보냄</li>
+  </ul>
+  <p>뒤가 앞을 만들어 냄. 제3의 무언가는 없음. "멀티턴 모델"이라는 것도 없고, 입력을 더 보내는 호출자만 있음.</p>
+  <p class="codedesc">턴 3에서 실제로 나가는 요청 본문 (앞 두 턴이 전부 다시 실림)</p>
+  <pre class="code">messages = [
+  {<span class="k">"role"</span>: <span class="s">"user"</span>,      <span class="k">"content"</span>: <span class="s">"내 이름은 악분이야"</span>},   <span class="c"># 턴 1</span>
+  {<span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: <span class="s">"네, 기억하겠습니다"</span>},  <span class="c"># 턴 1 답</span>
+  {<span class="k">"role"</span>: <span class="s">"user"</span>,      <span class="k">"content"</span>: <span class="s">"내 이름이 뭐야?"</span>},     <span class="c"># 턴 2</span>
+  {<span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: <span class="s">"악분이라고 하셨습니다"</span>},
+  {<span class="k">"role"</span>: <span class="s">"user"</span>,      <span class="k">"content"</span>: <span class="hot">"몇 번 물어봤지?"</span>},     <span class="c"># 턴 3 ← 새 질문은 이것뿐</span>
+]</pre>
+</section>
+
+<!-- ════════ 5장. 구조 이해하기 ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">턴이 늘 때 무엇이 커지는가</h2>
+  <p>같은 구도를 세 번 반복함. 서버 쪽은 매번 동일하고, 왼쪽 배열만 자람.</p>
+  <div class="stepper">
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">1</span>
+        <div class="dbox hot">messages<small>1개</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">API<small>기억 없음</small></div>
+      </div>
+      <p class="exp"><b>1단계.</b> 질문 1개만 전송. 응답 후 서버는 이 요청을 버림</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">2</span>
+        <div class="dbox hot">messages<small>3개</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">API<small>기억 없음</small></div>
+      </div>
+      <p class="exp"><b>2단계.</b> 앱이 턴 1의 질문·답을 다시 실어 3개 전송. 답변 가능해짐</p>
+    </div>
+    <div class="step">
+      <div class="diagram">
+        <span class="marker">3</span>
+        <div class="dbox hot">messages<small>5개</small></div>
+        <div class="darrow">→</div>
+        <div class="dbox rs">API<small>기억 없음</small></div>
+      </div>
+      <p class="exp"><b>3단계.</b> 5개 전송. <span class="prob-text">턴 1 토큰이 세 번째 과금됨</span> — 비용이 턴 수에 비례해 누적</p>
+    </div>
+    <div class="step-nav">
+      <button class="step-prev">← 이전</button>
+      <span class="step-count"></span>
+      <button class="step-next">다음 →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ 6장. 구조 이해하기 (저장소) ════════ -->
+<section class="page">
+  <p class="sec">3. 구조 이해하기</p>
+  <h2 class="page-title">그 배열은 어디에 사는가</h2>
+  <p>배열을 프로세스 안에 두면 재시작·다중 pod에서 사라짐. 저장소는 API 호출 바깥에 붙음.</p>
+  <div class="dgroup"><b>애플리케이션 경계</b>
+    <div class="diagram" style="padding:6px">
+      <div class="dbox rs">저장소<small>memory / jsonl / redis</small></div>
+      <div class="darrow">↔</div>
+      <div class="dbox wl">앱<small>load → append → 전송</small></div>
+      <div class="darrow">→</div>
+      <div class="dbox">Claude API<small>stateless</small></div>
+    </div>
+  </div>
+  <p class="caption">[ 저장소를 바꿔도 오른쪽 화살표의 요청 본문은 동일 ]</p>
+  <ul class="bullets">
+    <li>memory — 프로세스와 함께 소멸. 스크립트·노트북용</li>
+    <li>jsonl — 파일에 한 줄씩 append. <mark>Claude Code가 쓰는 방식</mark></li>
+    <li>redis — 프로세스 여러 개가 한 세션 공유, TTL로 만료</li>
+  </ul>
+</section>
+
+<!-- ════════ 7장. 핸즈온 1 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">1단계 — 잊는 것을 눈으로 확인</h2>
+  <p class="codedesc">호출 2번. 두 번째는 첫 번째만 아는 것을 물음</p>
+  <pre class="code"><span class="c"># openai/01_stateless.py — 매 호출 messages 길이 1</span>
+client.chat.completions.create(model=MODEL,
+    messages=[SYSTEM, {<span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: <span class="s">"내 이름은 악분이야"</span>}])
+client.chat.completions.create(model=MODEL,
+    messages=[SYSTEM, {<span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: <span class="s">"내 이름이 뭐야?"</span>}])  <span class="c"># 앞 호출과 무관</span></pre>
+  <p class="codedesc">기대 결과</p>
+  <pre class="code">turn 1 &gt; 네, 악분님. 기억하겠습니다.
+turn 2 &gt; <span class="bad">죄송하지만 이전에 이름을 알려주신 적이 없습니다.</span></pre>
+  <p><b>체크포인트.</b> 모델 실패가 아님. 주어진 입력에 대해서는 정확한 답이며, 그 입력에 히스토리가 없었을 뿐임.</p>
+</section>
+
+<!-- ════════ 8장. 핸즈온 2 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">2단계 — 히스토리를 다시 보냄</h2>
+  <p class="codedesc">모델 설정은 그대로. history만 누적</p>
+  <pre class="code"><span class="c"># openai/02_multi_turn.py</span>
+history.append({<span class="k">"role"</span>: <span class="s">"user"</span>, <span class="k">"content"</span>: question})
+response = client.chat.completions.create(model=MODEL,
+    messages=[SYSTEM] + <span class="hot">history</span>)                              <span class="c"># 전부 재전송</span>
+history.append({<span class="k">"role"</span>: <span class="s">"assistant"</span>, <span class="k">"content"</span>: answer})  <span class="c"># 답도 누적</span></pre>
+  <p class="codedesc">기대 결과 — prompt token이 함께 오름</p>
+  <pre class="code">  [1 messages sent, 31 prompt tokens]
+turn 1 &gt; 네, 악분님. 기억하겠습니다.
+  [3 messages sent, <span class="hot">68</span> prompt tokens]
+turn 2 &gt; 악분이라고 하셨습니다.</pre>
+  <p><b>체크포인트.</b> 기억은 호출자가 만든 것. 1단계와 2단계 사이에 바뀐 모델 설정은 하나도 없음.</p>
+</section>
+
+<!-- ════════ 9장. 핸즈온 3 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">2단계 확인 — provider를 바꿔도 루프는 같음</h2>
+  <p><code>openai/</code>(gpt-5.6-luna)와 <code>claude/</code>(claude-sonnet-5)는 파일 이름·순서가 같고, 같은 번호는 같은 개념임. <mark>append → 전송 → append 루프도 동일</mark>함. 규격 차이는 세 군데뿐.</p>
+  <ul class="bullets">
+    <li>system 프롬프트 — OpenAI는 <code>messages[0]</code>, Anthropic은 별도 <code>system</code> 필드</li>
+    <li>응답 본문 — OpenAI는 <code>choices[0].message.content</code> 문자열, Anthropic은 block 리스트에서 <code>type == "text"</code>만 추림</li>
+    <li>출력 상한 — GPT-5 계열은 <code>max_completion_tokens</code>, Anthropic은 <code>max_tokens</code></li>
+  </ul>
+  <p class="codedesc">같은 자리, 다른 규격</p>
+  <pre class="code"><span class="c"># openai/02</span>  messages=[SYSTEM] + history
+<span class="c"># claude/02</span>  system=SYSTEM, messages=history</pre>
+  <p><b>체크포인트.</b> 바뀐 것은 요청 모양뿐이고, 누적 로직은 provider와 무관함.</p>
+</section>
+
+<!-- ════════ 10장. 핸즈온 4 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">3단계 — 저장소만 바꿔 보기</h2>
+  <p class="codedesc">플래그 하나만 다름. 대화 후 Ctrl-D로 나갔다가 다시 실행해 이름을 물음</p>
+  <pre class="code">uv run openai/03_store.py --store <span class="hot">memory</span> --session demo  <span class="c"># 재실행 → 잊음</span>
+uv run openai/03_store.py --store <span class="hot">jsonl</span>  --session demo  <span class="c"># 재실행 → 기억</span>
+uv run openai/03_store.py --store <span class="hot">redis</span>  --session demo  <span class="c"># 터미널 2개가 공유</span></pre>
+  <p class="codedesc">저장된 내용 직접 확인</p>
+  <pre class="code">cat sessions/demo.jsonl
+docker compose exec redis redis-cli lrange chat:demo 0 -1</pre>
+  <p><b>체크포인트.</b> 내구성은 모델 호출 바깥의 저장 결정임. 세 번 모두 <code>create()</code> 인자는 동일.</p>
+  <p class="foot">github 링크: computer_science/ai/multi-turn-conversation/</p>
+</section>
+
+<!-- ════════ 11장. 핸즈온 5 ════════ -->
+<section class="page">
+  <p class="sec">4. 핸즈온</p>
+  <h2 class="page-title">4단계 — 서버는 캐시하지만 기억하지는 않음</h2>
+  <p>"LLM 서버단에서도 캐시한다"가 사실인 지점이자, 오해가 생기는 지점. 캐시 API가 provider마다 달라 <code>04</code>만 두 디렉터리에서 다름.</p>
+  <p class="codedesc">기대 결과 — <code>claude/04_prompt_cache.py</code>, 같은 1000+ 토큰 system 프롬프트를 두 번 보냄</p>
+  <pre class="code">call 1  uncached=14 cache_write=1543 cache_read=<span class="bad">0</span>
+call 2  uncached=14 cache_write=0    cache_read=<span class="hot">1543</span></pre>
+  <ul class="bullets">
+    <li>맞는 해석 — 서버가 그 prefix의 내부 연산 결과를 이미 갖고 있어 재계산을 건너뜀. 값이 약 1/10로 떨어짐</li>
+    <li>틀린 해석 — 서버가 대화를 들고 있음. <mark>call 2도 prefix 전체를 다시 전송했음</mark>. 캐시 키가 보낸 바이트 자체이며 prefix 일치라, 한 글자만 달라도 뒤가 전부 무효화됨</li>
+  </ul>
+  <p>OpenAI는 <b>자동 캐시</b>라 선언 없이 <code>usage.prompt_tokens_details.cached_tokens</code>로 확인함. Anthropic은 <b>명시적 캐시</b>라 <code>cache_control</code>로 prefix 끝을 표시해야 함.</p>
+  <p><b>체크포인트.</b> prompt caching은 히스토리를 다시 보내는 <b>비용</b>을 줄이는 것이지, 다시 보내는 <b>일</b>을 없애는 것이 아님.</p>
+</section>
+
+<!-- ════════ 12장. 실제 제품이 푸는 방식 ════════ -->
+<section class="page">
+  <p class="sec">5. 실제 제품이 푸는 방식</p>
+  <h2 class="page-title">stateless가 항상은 아님</h2>
+  <ul class="bullets">
+    <li><b>Claude Code</b> — 로컬 append-only JSONL. <code>~/.claude/projects/&lt;cwd-slug&gt;/&lt;session-uuid&gt;.jsonl</code>
+      <ul><li>한 줄에 JSON 객체 하나, 각 항목이 <code>parentUuid</code>로 앞 항목에 연결됨. <code>--resume</code>이 이 파일을 다시 읽어 재생. 4단계의 jsonl 저장소와 같은 구조</li></ul>
+    </li>
+    <li><b>OpenAI</b> — 두 가지를 다 제공
+      <ul><li>Chat Completions: stateless. 위 실습과 동일</li>
+      <li>Responses API: <mark>stateful</mark>. <code>store: true</code>로 보내고 응답 <code>id</code>를 다음 호출의 <code>previous_response_id</code>로 넘기면 히스토리를 다시 안 보내도 됨</li></ul>
+    </li>
+    <li><b>Anthropic</b> — Messages API는 stateless로 유지하고, 서버 측 상태는 Managed Agents라는 별도 제품에 둠(세션이 서버에 살고 message 배열 대신 event를 주고받음)</li>
+  </ul>
+  <p>정확한 규칙은 "LLM API는 stateless"보다 좁음 — <b>Chat Completions·Messages는 호출자가 누적, Responses·Managed Agents는 서버가 누적.</b></p>
+</section>
+
+<!-- ════════ 13장. 확인해 보기 ════════ -->
+<section class="page">
+  <p class="sec">6. 확인해 보기</p>
+  <h2 class="page-title">스스로 점검</h2>
+  <div class="quiz">
+    <p class="q">Q1. 20턴째 대화 중이고 각 턴이 약 500 토큰임. 20턴째 요청의 input token은 대략 얼마인가?</p>
+    <ul class="opts">
+      <li>약 500 — 새 질문만 과금됨</li>
+      <li data-answer>약 10,000 — 앞 19턴이 전부 다시 실림</li>
+      <li>약 1,000 — 직전 턴까지만 실림</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 매 턴이 전체 히스토리를 재전송하므로 input이 턴 수에 비례해 누적됨. 컨텍스트 한계와 비용이 같은 이유에서 생김.</p>
+  </div>
+  <div class="quiz">
+    <p class="q">Q2. system 프롬프트에 <code>datetime.now()</code>를 넣었더니 <code>cache_read</code>가 계속 0임. 이유는?</p>
+    <ul class="opts">
+      <li>토큰 수가 최소 캐시 길이에 못 미침</li>
+      <li>캐시 TTL이 만료됨</li>
+      <li data-answer>prefix 바이트가 매 요청 달라져 prefix 일치가 안 됨</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> 캐시 키는 보낸 바이트이고 prefix 일치임. 앞쪽이 한 글자만 바뀌어도 그 뒤 전체가 무효화됨. 변하는 값은 마지막 breakpoint 뒤로 옮겨야 함.</p>
+  </div>
+</section>
+
+<!-- ════════ 14장. 트레이드오프 ════════ -->
+<section class="page">
+  <p class="sec">7. 트레이드오프</p>
+  <h2 class="page-title">누적-재전송 방식이 주고받는 것</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>얻는 것</h3><ul>
+      <li>전체 transcript를 직접 열람·수정 가능</li>
+      <li>provider 간 이식 가능. 벤더 종속 없음</li>
+      <li>구현이 리스트 하나. 디버깅이 쉬움</li>
+    </ul></div>
+    <div class="con"><h3>잃는 것</h3><ul>
+      <li>input 토큰이 세션 길이의 제곱에 가깝게 증가</li>
+      <li>컨텍스트 한계에서 요약·절삭 필요. 무손실 아님</li>
+      <li>보관·삭제·접근제어가 전부 앱 책임</li>
+    </ul></div>
+  </div>
+  <p><b>언제 쓰는가.</b> 대부분의 시스템에서 기본값. transcript 감사·수정·이전이 필요하면 필수.</p>
+  <p><b>언제 쓰지 않는가.</b> 대화가 매우 길고 클라이언트가 얇으며 벤더 종속을 감수할 수 있으면 서버 측 상태(<code>previous_response_id</code>, Managed Agents)가 나음.</p>
+</section>
+
+<!-- ════════ 15장. 결론 ════════ -->
+<section class="page">
+  <p class="sec">8. 결론</p>
+  <h2 class="page-title">이름을 잊던 챗봇으로 돌아가서</h2>
+  <p>버그는 프롬프트가 아니라 <b>두 번째 요청의 본문</b>에 있었음. 엔드포인트가 stateless라 턴 1을 붙들고 있는 주체가 없었고, 앱이 히스토리를 실어 보내자 그대로 해결됨.</p>
+  <p>기억할 원리 한 문장 — <mark>대화는 모델이 가진 것이 아니라 호출자가 매번 다시 만드는 것</mark>.</p>
+  <ul class="bullets">
+    <li>다음에 응용할 지점
+      <ul><li>컨텍스트가 찼을 때의 요약·compaction 전략</li>
+      <li>prompt caching을 깨지 않는 프롬프트 배치(변하는 값을 뒤로)</li>
+      <li>세션 저장소를 파일에서 DB로 옮길 때의 보관·삭제 정책</li></ul>
+    </li>
+  </ul>
+</section>
+
+</main>
+
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button>
+  <div id="dots"></div>
+  <span id="counter"></span>
+  <button id="next">다음 →</button>
+  <button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){
+    var d=document.createElement('button');
+    d.setAttribute('aria-label',(j+1)+'페이지로 이동');
+    d.onclick=function(){i=j;show();};
+    dots.appendChild(d);
+  });
+  function show(){
+    pages.forEach(function(p,j){p.classList.toggle('on',j===i);});
+    [].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});
+    counter.textContent=(i+1)+' / '+pages.length;
+    prev.disabled=i===0; next.disabled=i===pages.length-1;
+    window.scrollTo(0,0);
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')prev.onclick();
+    if(e.key==='ArrowRight')next.onclick();
+  });
+  show();
+})();
+
+(function(){
+  var fs=document.getElementById('fs'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  fs.onclick=function(){
+    var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();
+    if(p&&p.catch)p.catch(function(){});
+  };
+  document.addEventListener('fullscreenchange',function(){
+    fs.textContent=document.fullscreenElement?'창 모드':'전체 화면';
+  });
+})();
+
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){
+    o.setAttribute('role','button');
+    o.tabIndex=0;
+    o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};
+    o.onclick=function(){
+      if(qz.classList.contains('done'))return;
+      qz.classList.add('done');
+      var ok=o.hasAttribute('data-answer');
+      opts.forEach(function(x){
+        if(x.hasAttribute('data-answer'))x.classList.add('correct');
+      });
+      var fb=qz.querySelector('.fb');
+      if(!ok){o.classList.add('wrong');fb.classList.add('no');}
+      fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';
+    };
+  });
+});
+
+document.querySelectorAll('.stepper').forEach(function(st){
+  var steps=[].slice.call(st.querySelectorAll('.step')),i=0;
+  var prev=st.querySelector('.step-prev'),next=st.querySelector('.step-next');
+  var count=st.querySelector('.step-count');
+  function show(){
+    steps.forEach(function(s,j){s.classList.toggle('on',j===i);});
+    count.textContent=(i+1)+' / '+steps.length;
+    prev.disabled=i===0; next.disabled=i===steps.length-1;
+  }
+  prev.onclick=function(){if(i>0){i--;show();}};
+  next.onclick=function(){if(i<steps.length-1){i++;show();}};
+  show();
+});
+</script>
+</body>
+</html>
