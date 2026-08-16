@@ -2406,6 +2406,10 @@ function codeShapeDataUrl(shape) {
 }
 
 function deckForSave() {
+  const hasCode = state.deck.slides.some(
+    (target) => target.shapes.some((shape) => shape.kind === 'code')
+  );
+  if (!state.showNumbers && !hasCode) return state.deck;
   const copy = structuredClone(state.deck);
   for (const target of copy.slides) {
     for (const shape of target.shapes) {

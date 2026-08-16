@@ -72,8 +72,8 @@
       <button data-tool="arrow" title="Arrow (A)">➔</button>
       <button data-tool="pen" title="Freehand (P)">✎</button>
       <button data-tool="text" title="Text (T)">T</button>
-      <button id="btn-code-block" title="Insert an editable code block" aria-haspopup="menu" aria-expanded="false">Code Block</button>
-      <button id="btn-background" title="Change the slide background" aria-haspopup="menu" aria-expanded="false">
+      <button id="btn-code-block" title="Insert an editable code block" aria-haspopup="true" aria-expanded="false">Code Block</button>
+      <button id="btn-background" title="Change the slide background" aria-haspopup="true" aria-expanded="false">
         <span id="current-background" aria-hidden="true"></span>Background
       </button>
       <!-- Named rather than drawn: two overlapping shapes look like one more
@@ -318,7 +318,7 @@
     </section>
   </div>
 
-  <div id="background-menu" class="toolbar-popover" role="menu" aria-label="Slide background" hidden>
+  <div id="background-menu" class="toolbar-popover" role="group" aria-label="Slide background" hidden>
     <div class="popover-heading">
       <strong>Slide background</strong>
       <span id="background-value">#ffffff</span>
@@ -340,7 +340,7 @@
     <button id="btn-bg-all" type="button">Apply to all slides…</button>
   </div>
 
-  <div id="code-block-menu" class="toolbar-popover" role="menu" aria-label="Code block formats" hidden>
+  <div id="code-block-menu" class="toolbar-popover" role="group" aria-label="Code block formats" hidden>
     <div class="code-menu-heading">
       <label for="code-menu-language">Language</label>
       <select id="code-menu-language"></select>
