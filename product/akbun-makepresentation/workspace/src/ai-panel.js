@@ -53,7 +53,7 @@
     }
     if (!window.api.isDesktop) return 'Desktop app required';
     if (connection.detail.includes('codex_cli_not_found')) return 'Codex CLI not found';
-    if (['apiKey', 'apikey'].includes(connection.account?.type)) {
+    if (isApiKeyAuth(connection.account?.type)) {
       return 'API key authentication is disabled';
     }
     if (connection.account && connection.account.type !== 'chatgpt') {
@@ -61,6 +61,10 @@
     }
     if (connection.state === 'checking') return 'Checking Codex…';
     return 'ChatGPT login required';
+  }
+
+  function isApiKeyAuth(type) {
+    return type === 'apiKey' || type === 'apikey';
   }
 
   function renderConnection() {
@@ -151,11 +155,14 @@
 
   function handleNotification(method, params) {
     if (method === 'account/updated') {
-      if (params.authMode !== 'chatgpt') {
+      if (params.authMode === 'chatgpt') {
+        void refreshStatus();
+      } else {
+        const account = params.authMode ? { type: params.authMode } : null;
         setConnection({
           state: 'unavailable',
-          account: params.authMode ? { type: params.authMode } : null,
-          detail: params.authMode === 'apikey'
+          account,
+          detail: isApiKeyAuth(account?.type)
             ? 'API key authentication is disabled for this app.'
             : 'Run codex login with a ChatGPT account.',
         });
@@ -212,7 +219,7 @@
         server,
         detail: available
           ? ''
-          : account?.type === 'apiKey'
+          : isApiKeyAuth(account?.type)
             ? 'API key authentication is disabled for this app.'
             : 'Run codex login with a ChatGPT account.',
       });
@@ -241,7 +248,7 @@
         capabilities,
         detail: account?.type === 'chatgpt'
           ? ''
-          : account?.type === 'apiKey'
+          : isApiKeyAuth(account?.type)
             ? 'API key authentication is disabled for this app.'
             : 'Run codex login with a ChatGPT account.',
       });
@@ -409,6 +416,7 @@
     const article = document.createElement('article');
     article.className = 'ai-message';
     article.dataset.role = message.role;
+    article.dataset.messageId = message.id;
     const label = document.createElement('div');
     label.className = 'ai-message-label';
     const speaker = document.createElement('span');
@@ -484,7 +492,16 @@
       $('ai-readonly-notice').textContent =
         'This conversation is read-only. Start a new conversation to continue.';
     }
+    bindPendingMessageBody();
     container.scrollTop = container.scrollHeight;
+  }
+
+  function bindPendingMessageBody() {
+    if (!pendingTurn) return;
+    const message = currentSession?.messages[pendingTurn.messageIndex];
+    const article = Array.from($('ai-messages').children)
+      .find((node) => node.dataset.messageId === message?.id);
+    pendingTurn.bodyNode = article?.querySelector('.ai-message-body') || null;
   }
 
   function selectMode(mode) {
@@ -540,6 +557,7 @@
       const size = await window.api.aiSaveSession(session.id, snapshot);
       session.sizeBytes = size;
       if (session === currentSession) {
+        if (pendingTurn) pendingTurn.capacityBytes = Math.max(pendingTurn.capacityBytes, size);
         $('ai-chat-meta').textContent = session.status === 'readonly'
           ? `Read-only · ${formatSize(size)}`
           : `Active · ${formatSize(size)}`;
@@ -653,7 +671,11 @@
         error: null,
         stopRequested: false,
         slideTarget,
+        capacityBytes: 0,
+        bodyNode: null,
       };
+      pendingTurn.capacityBytes = A.byteLength(snapshotForSave(currentSession)) +
+        currentSession.assetBytes;
       $('ai-prompt').value = '';
       setStreaming(true);
       renderMessages();
@@ -730,12 +752,17 @@
     pendingTurn.finalText = text;
     if (pendingTurn.mode === 'slide') return;
     const message = currentSession.messages[pendingTurn.messageIndex];
-    if (!A.canAppendText(currentSession, pendingTurn.messageIndex, params.delta || '')) {
+    const delta = params.delta || '';
+    if (!A.canAppendText(pendingTurn.capacityBytes, delta)) {
       void reachSessionLimit('Conversation reached 128 MiB.');
       return;
     }
-    message.text += params.delta || '';
-    renderMessages();
+    pendingTurn.capacityBytes += A.encodedJsonTextBytes(delta);
+    message.text += delta;
+    if (!pendingTurn.bodyNode?.isConnected) bindPendingMessageBody();
+    if (pendingTurn.bodyNode) pendingTurn.bodyNode.textContent = message.text;
+    const container = $('ai-messages');
+    container.scrollTop = container.scrollHeight;
     schedulePersist();
   }
 
@@ -764,6 +791,7 @@
       const message = session.messages[turn.messageIndex];
       message.images.push(image);
       session.assetBytes += image.sizeBytes;
+      turn.capacityBytes += image.sizeBytes;
       if (currentSession === session) renderMessages();
       await persist(session);
     } catch (error) {

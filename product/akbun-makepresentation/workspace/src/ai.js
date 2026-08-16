@@ -114,12 +114,13 @@
     return new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`).byteLength;
   }
 
-  function canAppendText(session, messageIndex, delta) {
-    const candidate = structuredClone(session);
-    const message = candidate.messages[messageIndex];
-    if (!message) return false;
-    message.text += String(delta || '');
-    return byteLength(candidate) + candidate.assetBytes + SESSION_RESERVE_BYTES <= SESSION_LIMIT_BYTES;
+  function encodedJsonTextBytes(value) {
+    const encoded = JSON.stringify(String(value || '')).slice(1, -1);
+    return new TextEncoder().encode(encoded).byteLength;
+  }
+
+  function canAppendText(currentBytes, delta) {
+    return currentBytes + encodedJsonTextBytes(delta) + SESSION_RESERVE_BYTES <= SESSION_LIMIT_BYTES;
   }
 
   function cryptoId() {
@@ -297,6 +298,7 @@
     createSession,
     normalizeSession,
     byteLength,
+    encodedJsonTextBytes,
     canAppendText,
     cryptoId,
     slideSnapshot,

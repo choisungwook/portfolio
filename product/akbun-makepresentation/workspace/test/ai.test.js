@@ -32,11 +32,11 @@ test('session normalizer accepts only stored image file names', () => {
 });
 
 test('text capacity reserves room for the stopped and readonly state', () => {
-  const session = A.createSession('session-1', 'hello', 'text');
-  session.messages.push(A.createMessage('assistant', 'text', '', 'streaming'));
-  assert.equal(A.canAppendText(session, 1, 'answer'), true);
-  session.assetBytes = A.SESSION_LIMIT_BYTES;
-  assert.equal(A.canAppendText(session, 1, 'answer'), false);
+  const answerBytes = A.encodedJsonTextBytes('answer');
+  const available = A.SESSION_LIMIT_BYTES - A.SESSION_RESERVE_BYTES - answerBytes;
+  assert.equal(A.canAppendText(available, 'answer'), true);
+  assert.equal(A.canAppendText(available + 1, 'answer'), false);
+  assert.equal(A.encodedJsonTextBytes('a\n"💡'), 9);
 });
 
 test('slide patch changes a clone and preserves the source slide', () => {
