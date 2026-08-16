@@ -1166,7 +1166,7 @@ function setSlideSizeUnit(unit, size) {
   for (const input of [$('slide-size-width'), $('slide-size-height')]) {
     input.min = unit === 'cm' ? '1.693' : '64';
     input.max = unit === 'cm' ? '264.583' : '10000';
-    input.step = unit === 'cm' ? '0.001' : '1';
+    input.step = unit === 'cm' ? '0.001' : '0.01';
   }
   setSlideSizeFields(size, unit);
 }
@@ -1202,7 +1202,9 @@ $('slide-size-form').addEventListener('submit', (event) => {
   const size = slideSizeFromFields();
   const before = deckSize();
   if (!size || !L.setSlideSize(state.deck, size.width, size.height)) {
-    $('slide-size-status').textContent = 'Enter a size from 64 to 10,000 pixels.';
+    $('slide-size-status').textContent = slideSizeUnit === 'cm'
+      ? 'Enter width and height from 1.693 to 264.583 cm.'
+      : 'Enter width and height from 64 to 10,000 px.';
     return;
   }
   if (before.width !== state.deck.slideWidth || before.height !== state.deck.slideHeight) {
