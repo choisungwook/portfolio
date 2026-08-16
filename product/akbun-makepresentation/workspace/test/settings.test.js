@@ -13,6 +13,7 @@ test('settings use the smaller guideline margins by default', () => {
     imageBorder: { color: '#000000', width: 2, dash: 'solid' },
   });
   assert.deepStrictEqual(settings.snapping, { enabled: true });
+  assert.deepStrictEqual(settings.aiSystemPrompts, S.DEFAULT_AI_SYSTEM_PROMPTS);
   assert.deepStrictEqual(settings.guidelines, {
     visible: false,
     unit: 'px',
@@ -47,6 +48,11 @@ test('settings normalize guidelines and custom presets', () => {
       shapeBorder: { color: '#ABCDEF', width: 3.5, dash: 'dot' },
       imageBorder: { color: 'bad', width: 0, dash: 'bad' },
     },
+    aiSystemPrompts: {
+      text: '  Custom text prompt  ',
+      image: '',
+      slide: 'Custom slide prompt',
+    },
     customPresets: [
       { id: 'rectangle', name: 'Rectangle', shapes: [shape] },
       { id: 'rectangle', name: 'Duplicate', shapes: [shape] },
@@ -68,6 +74,11 @@ test('settings normalize guidelines and custom presets', () => {
     shapeBorder: { color: '#abcdef', width: 3.5, dash: 'dot' },
     imageBorder: { color: '#000000', width: 2, dash: 'solid' },
   });
+  assert.deepStrictEqual(settings.aiSystemPrompts, {
+    text: 'Custom text prompt',
+    image: S.DEFAULT_AI_SYSTEM_PROMPTS.image,
+    slide: 'Custom slide prompt',
+  });
 });
 
 test('guideline margins must leave drawable slide space', () => {
@@ -87,18 +98,20 @@ test('guideline margins must leave drawable slide space', () => {
 
 test('settings comparison ignores object key order', () => {
   const left = {
-    version: 3,
+    version: S.SETTINGS_VERSION,
     snapping: { enabled: true },
     guidelines: { visible: false, unit: 'px', top: 36, bottom: 48, left: 48, right: 48 },
     editorDefaults: S.normalizeEditorDefaults(),
+    aiSystemPrompts: S.normalizeAiSystemPrompts(),
     customPresets: [],
   };
   const right = {
     customPresets: [],
     guidelines: { right: 48, left: 48, bottom: 48, top: 36, unit: 'px', visible: false },
     editorDefaults: S.normalizeEditorDefaults(),
+    aiSystemPrompts: S.normalizeAiSystemPrompts(),
     snapping: { enabled: true },
-    version: 3,
+    version: S.SETTINGS_VERSION,
   };
   assert.ok(S.settingsEqual(left, right));
   right.guidelines.top = 40;

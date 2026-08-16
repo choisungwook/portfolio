@@ -59,6 +59,20 @@ function renderGeneralSettings() {
   $('general-settings-status').textContent = '';
 }
 
+function renderAiSettings() {
+  for (const mode of ['text', 'image', 'slide']) {
+    $(`settings-ai-${mode}-prompt`).value = appSettings.aiSystemPrompts[mode];
+  }
+}
+
+function aiSystemPromptsFromFields() {
+  return {
+    text: $('settings-ai-text-prompt').value,
+    image: $('settings-ai-image-prompt').value,
+    slide: $('settings-ai-slide-prompt').value,
+  };
+}
+
 function borderSettingsFromFields(prefix) {
   const width = Number($(`settings-${prefix}-border-width`).value);
   if (!Number.isFinite(width) || width < 1 || width > 30) return null;
@@ -87,6 +101,7 @@ function openSettings() {
   $('preset-settings-status').textContent = '';
   setSettingsPage('general');
   renderGeneralSettings();
+  renderAiSettings();
   renderSettingsPresets();
   settingsDialog.showModal();
   settingsDialog.querySelector('[data-settings-page="general"]')?.focus();
@@ -123,6 +138,7 @@ $('btn-settings-ok').addEventListener('click', async () => {
       ...appSettings,
       snapping: { enabled: $('settings-snapping').checked },
       editorDefaults,
+      aiSystemPrompts: aiSystemPromptsFromFields(),
       customPresets: settingsPresetDraft,
     });
     customPresets = structuredClone(appSettings.customPresets);

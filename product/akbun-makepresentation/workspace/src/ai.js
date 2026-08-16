@@ -144,6 +144,9 @@
       'Return only the JSON object required by the output schema.',
       'Use zero-based shape indices from the supplied slide.',
       'Do not add image shapes. Existing image shapes may be repositioned with update operations.',
+      'For update operations, set every unchanged field in changes to null.',
+      'For add operations, set fields unused by the shape kind to null. Pen shapes still require points.',
+      'Set background to null unless the slide background should change.',
       '',
       `Request: ${prompt}`,
       `Slide size: ${JSON.stringify(size)}`,
@@ -151,7 +154,28 @@
     ].join('\n');
   }
 
+  function baseInstructions(systemPrompts) {
+    const prompts = systemPrompts && typeof systemPrompts === 'object' ? systemPrompts : {};
+    return [
+      'You are the AI assistant inside akbun-makepresentation.',
+      'Help with presentation text, generated images, and structured slide edits.',
+      'Follow the developer instructions and return only the requested result.',
+      '',
+      'App-configured system prompts follow. Apply the prompt matching the request mode.',
+      `<TEXT_MODE_SYSTEM_PROMPT>${safeText(prompts.text, 20_000)}</TEXT_MODE_SYSTEM_PROMPT>`,
+      `<IMAGE_MODE_SYSTEM_PROMPT>${safeText(prompts.image, 20_000)}</IMAGE_MODE_SYSTEM_PROMPT>`,
+      `<SLIDE_MODE_SYSTEM_PROMPT>${safeText(prompts.slide, 20_000)}</SLIDE_MODE_SYSTEM_PROMPT>`,
+    ].join('\n');
+  }
+
   const colorSchema = { type: 'string', pattern: '^(none|#[0-9a-fA-F]{6})$' };
+  const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
+  const strictObject = (properties) => ({
+    type: 'object',
+    additionalProperties: false,
+    required: Object.keys(properties),
+    properties,
+  });
   const shapeProperties = {
     kind: { type: 'string', enum: ['rect', 'ellipse', 'line', 'arrow', 'pen', 'text'] },
     x: { type: 'number' },
@@ -180,40 +204,42 @@
     arrowStart: { type: 'string', enum: L.ARROW_ENDS },
     arrowEnd: { type: 'string', enum: L.ARROW_ENDS },
   };
+  const nullableChangeProperties = Object.fromEntries(
+    Object.entries(shapeProperties)
+      .filter(([name]) => CHANGE_FIELDS.has(name))
+      .map(([name, schema]) => [name, nullable(schema)])
+  );
+  const requiredAddFields = new Set(['kind', 'x', 'y', 'w', 'h']);
+  const addShapeProperties = Object.fromEntries(
+    Object.entries(shapeProperties)
+      .map(([name, schema]) => [name, requiredAddFields.has(name) ? schema : nullable(schema)])
+  );
 
-  const SLIDE_OUTPUT_SCHEMA = Object.freeze({
-    type: 'object',
-    additionalProperties: false,
-    required: ['summary', 'operations'],
-    properties: {
-      summary: { type: 'string', maxLength: 500 },
-      background: colorSchema,
-      operations: {
-        type: 'array',
-        maxItems: 100,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['op'],
-          properties: {
-            op: { type: 'string', enum: ['update', 'remove', 'add'] },
+  const SLIDE_OUTPUT_SCHEMA = Object.freeze(strictObject({
+    summary: { type: 'string', maxLength: 500 },
+    background: nullable(colorSchema),
+    operations: {
+      type: 'array',
+      maxItems: 100,
+      items: {
+        anyOf: [
+          strictObject({
+            op: { type: 'string', enum: ['update'] },
             index: { type: 'integer', minimum: 0 },
-            changes: {
-              type: 'object',
-              additionalProperties: false,
-              properties: shapeProperties,
-            },
-            shape: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['kind', 'x', 'y', 'w', 'h'],
-              properties: shapeProperties,
-            },
-          },
-        },
+            changes: strictObject(nullableChangeProperties),
+          }),
+          strictObject({
+            op: { type: 'string', enum: ['remove'] },
+            index: { type: 'integer', minimum: 0 },
+          }),
+          strictObject({
+            op: { type: 'string', enum: ['add'] },
+            shape: strictObject(addShapeProperties),
+          }),
+        ],
       },
     },
-  });
+  }));
 
   function jsonObject(text) {
     const source = String(text || '').trim();
@@ -230,7 +256,7 @@
   function cleanChanges(value) {
     const source = value && typeof value === 'object' ? value : {};
     return Object.fromEntries(
-      Object.entries(source).filter(([name]) => CHANGE_FIELDS.has(name))
+      Object.entries(source).filter(([name, field]) => CHANGE_FIELDS.has(name) && field !== null)
     );
   }
 
@@ -303,6 +329,7 @@
     cryptoId,
     slideSnapshot,
     slidePrompt,
+    baseInstructions,
     parseSlidePatch,
     applySlidePatch,
   };

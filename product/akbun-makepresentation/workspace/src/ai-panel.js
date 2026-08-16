@@ -35,12 +35,6 @@
     'In SLIDE MODE, return only the JSON required by the supplied output schema.',
   ].join(' ');
 
-  const BASE_INSTRUCTIONS = [
-    'You are the AI assistant inside akbun-makepresentation.',
-    'Help with presentation text, generated images, and structured slide edits.',
-    'Follow the developer instructions and return only the requested result.',
-  ].join(' ');
-
   function setConnection(next) {
     connection = { ...connection, ...next };
     renderConnection();
@@ -595,7 +589,7 @@
       sandbox: 'workspace-write',
       personality: 'friendly',
       serviceName: 'akbun_makepresentation',
-      baseInstructions: BASE_INSTRUCTIONS,
+      baseInstructions: A.baseInstructions(callbacks.systemPrompts?.()),
       developerInstructions: DEVELOPER_INSTRUCTIONS,
       ephemeral: true,
       config,
