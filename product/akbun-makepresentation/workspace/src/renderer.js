@@ -930,13 +930,6 @@ function shapeBounds(shapes) {
   return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
-function normalizedPresetShapes(shapes) {
-  const copies = L.cloneShapes(shapes);
-  const bounds = shapeBounds(copies);
-  for (const shape of copies) L.moveShape(shape, -bounds.x, -bounds.y);
-  return copies;
-}
-
 function centeredPresetShapes(shapes) {
   const copies = L.cloneShapes(shapes);
   const bounds = shapeBounds(copies);
@@ -1001,6 +994,12 @@ function renderPresetMenu() {
   renderPresetGrid($('default-presets'), defaultPresets(), 'default');
   renderPresetGrid($('custom-presets'), customPresets, 'custom');
   $('custom-presets-section').hidden = customPresets.length === 0;
+}
+
+function persistCustomPresets(presets) {
+  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
+  customPresets = structuredClone(presets);
+  renderPresetMenu();
 }
 
 function positionPresetMenu() {
@@ -1084,7 +1083,6 @@ function openSettings() {
   hideMenus();
   hidePresetMenu();
   settingsPresetDraft = structuredClone(customPresets);
-  $('preset-name').value = '';
   $('preset-settings-status').textContent = '';
   setSettingsPage('general');
   renderSettingsPresets();
@@ -1095,27 +1093,6 @@ function openSettings() {
 settingsDialog.querySelector('nav').addEventListener('click', (event) => {
   const button = event.target.closest('[data-settings-page]');
   if (button) setSettingsPage(button.dataset.settingsPage);
-});
-
-$('btn-save-preset').addEventListener('click', () => {
-  const shapes = selectedShapes().filter((shape) => shape.kind !== 'image');
-  if (!shapes.length) {
-    $('preset-settings-status').textContent = 'Select one or more shapes before saving a preset.';
-    return;
-  }
-  const preset = {
-    id: globalThis.crypto?.randomUUID?.() || `preset-${Date.now()}`,
-    name: $('preset-name').value.trim() || `Preset ${settingsPresetDraft.length + 1}`,
-    shapes: normalizedPresetShapes(shapes),
-  };
-  if (JSON.stringify(preset).length > 500_000) {
-    $('preset-settings-status').textContent = 'This selection is too large to save as a preset.';
-    return;
-  }
-  settingsPresetDraft.push(preset);
-  $('preset-name').value = '';
-  $('preset-settings-status').textContent = `Saved “${preset.name}” to this settings draft.`;
-  renderSettingsPresets();
 });
 
 $('settings-presets').addEventListener('click', (event) => {
@@ -1130,9 +1107,7 @@ $('settings-presets').addEventListener('click', (event) => {
 $('btn-settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
 $('btn-settings-ok').addEventListener('click', () => {
   try {
-    localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(settingsPresetDraft));
-    customPresets = structuredClone(settingsPresetDraft);
-    renderPresetMenu();
+    persistCustomPresets(settingsPresetDraft);
     settingsDialog.close('ok');
   } catch (_) {
     $('preset-settings-status').textContent = 'Could not save presets on this device.';
@@ -1337,13 +1312,15 @@ function showContextMenu(x, y) {
   $('context-ungroup').hidden = !state.selection.some(
     (index) => slide().shapes[index]?.groupId
   );
+  const shapes = selectedShapes();
+  $('context-save-preset').hidden = shapes.length !== 1 || shapes[0].kind === 'image';
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
   const bounds = contextMenu.getBoundingClientRect();
   contextMenu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - bounds.width - 4))}px`;
   contextMenu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - bounds.height - 4))}px`;
-  $('context-save-image').focus();
+  contextMenu.querySelector('button:not([hidden])')?.focus();
 }
 
 function contextMenuPoint(event, group) {
@@ -1457,7 +1434,30 @@ async function saveSelectionAsImage() {
   }
 }
 
+async function saveSelectionAsPreset() {
+  hideContextMenu();
+  const id = globalThis.crypto?.randomUUID?.() || `preset-${Date.now()}`;
+  const preset = L.customPresetFromSelection(selectedShapes(), customPresets, id);
+  if (!preset) return;
+  if (JSON.stringify(preset).length > 500_000) {
+    await window.api.message('This shape is too large to save as a preset.', {
+      title: 'Preset save failed',
+      kind: 'error',
+    });
+    return;
+  }
+  try {
+    persistCustomPresets([...customPresets, preset]);
+  } catch (_) {
+    await window.api.message('Could not save the preset on this device.', {
+      title: 'Preset save failed',
+      kind: 'error',
+    });
+  }
+}
+
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
+$('context-save-preset').addEventListener('click', saveSelectionAsPreset);
 $('context-group').addEventListener('click', () => {
   hideContextMenu();
   groupSelection();
