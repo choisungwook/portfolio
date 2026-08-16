@@ -145,6 +145,21 @@ test('shapeBBox normalizes negative line extents', () => {
   assert.deepStrictEqual(L.shapeBBox(shape), { x: 40, y: 100, w: 60, h: 60 });
 });
 
+test('shapeSelectionContainsPoint follows rotated rectangles', () => {
+  const shape = L.createShape('rect', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 20);
+  shape.rotation = 90;
+  assert.ok(L.shapeSelectionContainsPoint(shape, 50, 40));
+  assert.ok(!L.shapeSelectionContainsPoint(shape, 90, 10));
+});
+
+test('shapeSelectionContainsPoint excludes ellipse corners', () => {
+  const shape = L.createShape('ellipse', 0, 0, {});
+  L.dragShape(shape, 0, 0, 100, 50);
+  assert.ok(L.shapeSelectionContainsPoint(shape, 50, 25));
+  assert.ok(!L.shapeSelectionContainsPoint(shape, 0, 0));
+});
+
 test('normalizeRect accepts a drag in any direction', () => {
   assert.deepStrictEqual(L.normalizeRect(100, 80, 20, 10), {
     x: 20,

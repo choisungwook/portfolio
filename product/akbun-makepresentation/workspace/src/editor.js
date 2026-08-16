@@ -387,6 +387,28 @@ function shapeBBox(shape) {
   return { x, y, w: Math.abs(shape.w), h: Math.abs(shape.h) };
 }
 
+function shapeSelectionContainsPoint(shape, x, y) {
+  const box = shapeBBox(shape);
+  if (!(box.w > 0) || !(box.h > 0)) return false;
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  const angle = -(Number(shape.rotation) || 0) * Math.PI / 180;
+  const dx = x - cx;
+  const dy = y - cy;
+  const localX = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
+  const localY = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
+
+  if (shape.kind === 'ellipse') {
+    const nx = (localX - cx) / (box.w / 2);
+    const ny = (localY - cy) / (box.h / 2);
+    return nx * nx + ny * ny <= 1;
+  }
+  return (
+    localX >= box.x && localX <= box.x + box.w &&
+    localY >= box.y && localY <= box.y + box.h
+  );
+}
+
 function defaultPresetShapes(id) {
   const red = '#e03131';
   if (id === 'red-filled-rectangle' || id === 'red-outline-rectangle') {
@@ -1366,6 +1388,7 @@ const exported = {
   dragShape,
   isDegenerate,
   shapeBBox,
+  shapeSelectionContainsPoint,
   normalizeRect,
   shapeIndicesInRect,
   toggleSelection,

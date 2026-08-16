@@ -479,11 +479,7 @@ function selectedShapeIndexAtPoint(point) {
   for (const index of [...state.selection].reverse()) {
     const shape = slide().shapes[index];
     if (!canEditText(shape)) continue;
-    const box = L.shapeBBox(shape);
-    if (
-      point.x >= box.x && point.x <= box.x + box.w &&
-      point.y >= box.y && point.y <= box.y + box.h
-    ) return index;
+    if (L.shapeSelectionContainsPoint(shape, point.x, point.y)) return index;
   }
   return -1;
 }
