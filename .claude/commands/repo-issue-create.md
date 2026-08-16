@@ -12,7 +12,7 @@ allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 2. 탐색으로 답이 안 나오는 결정은 사용자와 인터뷰해 확정한다. 아래 인터뷰 규칙을 따른다.
 3. root issue를 정한다. `product/<이름>`에 관한 것이면 그 product, `.claude`나 `.github`면 저장소 규칙과 도구, 나머지는 핸즈온이다. `gh issue list --label root --state open`으로 찾고 없으면 만든다. 디렉터리가 아직 없는 새 product도 root issue를 먼저 만들고, 골격 생성은 1번 Issue의 Goal에 넣는다.
 4. 기록용 Issue를 만든다. 아래 Issue 구성을 따른다.
-5. 각 Issue를 root issue 하위로 건다. sub-issue API 호출 형식은 [.claude/rules/workflow.md](../rules/workflow.md)에 있다.
+5. 각 Issue를 root issue 하위로 건다. sub-issue 등록 형식은 [.claude/rules/github-tools.md](../rules/github-tools.md)에 있다.
 6. root issue와 새 Issue를 project에 담는다. scope 부족이나 gh 부재로 실패하면 사용자가 실행할 명령을 안내하고 넘어간다.
 7. Issue에 작업 유형 label(feat, fix, docs 등)과 기술 label을 함께 붙인다.
 
@@ -43,4 +43,4 @@ allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 
 - 이 command를 호출한 것이 Issue 생성에 대한 명시적 지시다. [.claude/rules/workflow.md](../rules/workflow.md)의 실행 승인 규칙은 이 범위 안에서 충족된다.
 - commit, push, PR 생성은 하지 않는다. 그것은 /repo-pr-create의 일이다.
-- gh CLI가 없는 환경(원격 세션)에서는 GitHub MCP 도구로 대체한다. sub-issue 등록에는 issue number가 아니라 생성 응답의 id를 넘긴다.
+- GitHub 조작 도구는 [.claude/rules/github-tools.md](../rules/github-tools.md)를 따른다. gh CLI가 없는 MCP 환경에서는 project 담기가 안 되므로 안내로 대체한다.

@@ -1,6 +1,6 @@
 # Workflow 규칙
 
-GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./philosophy.md)를 따른다.
+GitHub 생태계 안에서 작업한다. 글쓰기 원칙은 [philosophy.md](./philosophy.md)를 따르고, GitHub 조작 도구는 [github-tools.md](./github-tools.md)를 따른다.
 
 ## Workspace 초기화
 
@@ -52,12 +52,7 @@ PR에는 목표와 의사결정을 다시 쓰지 않고 issue 링크로 대체�
 - root issue가 없으면 만든다. body는 그 그룹이 무엇인지 한 줄이면 된다. 하위 issue 목록은 GitHub가 자동으로 렌더링하므로 직접 적지 않는다.
 - root issue는 닫지 않는다. 그룹이 살아 있는 한 열어 둔다.
 
-하위 issue 등록은 GitHub sub-issue API로 한다. 하위 issue의 번호가 아니라 database id를 넘겨야 한다.
-
-```bash
-CHILD_ID=$(gh api repos/choisungwook/portfolio/issues/<하위번호> --jq .id)
-gh api --method POST repos/choisungwook/portfolio/issues/<root번호>/sub_issues -F sub_issue_id=$CHILD_ID
-```
+하위 issue 등록은 GitHub sub-issue API로 한다. 호출 형식과 gh CLI가 없는 환경의 대체 도구는 [github-tools.md](./github-tools.md)에 있다.
 
 ## GitHub Project
 
