@@ -35,6 +35,9 @@ const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
 const presetMenu = $('preset-menu');
+const backgroundMenu = $('background-menu');
+const codeBlockMenu = $('code-block-menu');
+const codeDialog = $('code-dialog');
 const guidelinesDialog = $('guidelines-dialog');
 const slideSizeDialog = $('slide-size-dialog');
 const settingsDialog = $('settings-dialog');
@@ -47,6 +50,9 @@ let textEditBefore = null;
 let customPresets = [];
 let settingsPresetDraft = [];
 let appSettings = S.defaultAppSettings();
+let codeEditBefore = null;
+let codeEditIndex = -1;
+let codeEditIsNew = false;
 
 const slide = () => state.deck.slides[state.current];
 const deckSize = () => L.slideSize(state.deck);
@@ -306,8 +312,13 @@ function renderProps() {
   const showText = kind === 'text' || L.TEXTUAL.has(kind) || kind === 'defaults';
 
   $('props-fill').hidden = !showFill;
-  $('props-stroke').hidden = !showStroke;
+  $('props-stroke').hidden = !showStroke || kind === 'code';
   $('props-text').hidden = !showText;
+  $('props-code').hidden = kind !== 'code';
+  if (kind === 'code') {
+    $('props-code-format').textContent = L.CODE_FORMATS[source.codeFormat]?.label || 'Editor Dark';
+    $('props-code-language').textContent = source.codeLanguage || 'plaintext';
+  }
   // A freehand stroke names its two ends the same way a line does.
   $('props-arrow-ends').hidden = !(kind === 'line' || kind === 'arrow' || kind === 'pen');
   $('prop-arrow-start').value = L.ARROW_ENDS.includes(source.arrowStart) ? source.arrowStart : 'none';
@@ -353,6 +364,8 @@ function renderProps() {
 function renderBackground() {
   const color = L.slideBackground(slide());
   $('prop-background').value = color;
+  $('current-background').style.backgroundColor = color;
+  $('background-value').textContent = color.toUpperCase();
   for (const button of document.querySelectorAll('[data-bg]')) {
     button.classList.toggle('active', button.dataset.bg.toLowerCase() === color.toLowerCase());
   }
@@ -544,6 +557,13 @@ canvas.addEventListener('pointerdown', (event) => {
     // preventDefault keeps the focus the overlay is about to take. Without
     // it the press moves focus back to the page, and from there Backspace
     // deletes the box being typed into instead of a character.
+    if (isSecondPress(index) && slide().shapes[index].kind === 'code') {
+      selectOnly(index);
+      renderCanvas();
+      renderProps();
+      openCodeDialog(index, false);
+      return;
+    }
     if (isSecondPress(index) && canEditText(slide().shapes[index])) {
       event.preventDefault();
       selectOnly(index);
@@ -831,7 +851,12 @@ textEditor.addEventListener('keydown', (event) => {
 const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
-  if (settingsDialog.open || slideSizeDialog.open) return;
+  if (settingsDialog.open || slideSizeDialog.open || codeDialog.open || guidelinesDialog.open) return;
+  if (event.key === 'Escape' && (!backgroundMenu.hidden || !codeBlockMenu.hidden)) {
+    hideToolbarPopovers();
+    event.preventDefault();
+    return;
+  }
   if (!presetMenu.hidden && event.key === 'Escape') {
     hidePresetMenu();
     event.preventDefault();
@@ -1108,6 +1133,7 @@ function positionPresetMenu() {
 }
 
 function showPresetMenu() {
+  hideToolbarPopovers();
   renderPresetMenu();
   presetMenu.hidden = false;
   $('btn-preset').setAttribute('aria-expanded', 'true');
@@ -1136,6 +1162,228 @@ presetMenu.addEventListener('click', (event) => {
   hidePresetMenu();
   canvas.focus({ preventScroll: true });
 });
+
+function positionToolbarPopover(popover, trigger) {
+  const anchor = trigger.getBoundingClientRect();
+  const bounds = popover.getBoundingClientRect();
+  popover.style.left = `${Math.max(8, Math.min(
+    anchor.left,
+    window.innerWidth - bounds.width - 8
+  ))}px`;
+  const below = anchor.bottom + 6;
+  popover.style.top = `${below + bounds.height <= window.innerHeight
+    ? below
+    : Math.max(8, anchor.top - bounds.height - 6)}px`;
+}
+
+function hideBackgroundMenu() {
+  backgroundMenu.hidden = true;
+  $('btn-background').setAttribute('aria-expanded', 'false');
+}
+
+function hideCodeBlockMenu() {
+  codeBlockMenu.hidden = true;
+  $('btn-code-block').setAttribute('aria-expanded', 'false');
+}
+
+function hideToolbarPopovers() {
+  hideBackgroundMenu();
+  hideCodeBlockMenu();
+}
+
+function showBackgroundMenu() {
+  hidePresetMenu();
+  hideCodeBlockMenu();
+  renderBackground();
+  backgroundMenu.hidden = false;
+  $('btn-background').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(backgroundMenu, $('btn-background'));
+}
+
+function showCodeBlockMenu() {
+  hidePresetMenu();
+  hideBackgroundMenu();
+  codeBlockMenu.hidden = false;
+  $('btn-code-block').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(codeBlockMenu, $('btn-code-block'));
+  codeBlockMenu.querySelector('[data-code-format]')?.focus();
+}
+
+$('btn-background').addEventListener('click', () => {
+  if (backgroundMenu.hidden) showBackgroundMenu();
+  else hideBackgroundMenu();
+});
+
+$('btn-code-block').addEventListener('click', () => {
+  if (codeBlockMenu.hidden) showCodeBlockMenu();
+  else hideCodeBlockMenu();
+});
+
+function codeLanguageLabel(language) {
+  const labels = {
+    plaintext: 'Plain text', javascript: 'JavaScript', typescript: 'TypeScript',
+    html: 'HTML', css: 'CSS', rust: 'Rust', hcl: 'HCL / Terraform', bash: 'Bash',
+    json: 'JSON', yaml: 'YAML', sql: 'SQL', java: 'Java', go: 'Go', c: 'C',
+    cpp: 'C++', kotlin: 'Kotlin', swift: 'Swift', python: 'Python',
+  };
+  return labels[language] || language;
+}
+
+function populateCodeOptions() {
+  const languageOptions = L.CODE_LANGUAGES.map(
+    (language) => `<option value="${language}">${codeLanguageLabel(language)}</option>`
+  ).join('');
+  $('code-menu-language').innerHTML = languageOptions;
+  $('code-language').innerHTML = languageOptions;
+  $('code-menu-language').value = 'python';
+  $('code-format').innerHTML = Object.entries(L.CODE_FORMATS).map(
+    ([value, format]) => `<option value="${value}">${format.label}</option>`
+  ).join('');
+}
+
+function defaultCode(language) {
+  const examples = {
+    python: 'def greet(name: str) -> str:\n  return f"Hello, {name}!"\n\nprint(greet("world"))',
+    javascript: 'function greet(name) {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet("world"));',
+    typescript: 'function greet(name: string): string {\n  return `Hello, ${name}!`;\n}',
+    html: '<main class="hero">\n  <h1>Hello, world!</h1>\n</main>',
+    css: '.hero {\n  display: grid;\n  place-items: center;\n}',
+    rust: 'fn main() {\n  println!("Hello, world!");\n}',
+    hcl: 'resource "aws_s3_bucket" "example" {\n  bucket = "example-bucket"\n}',
+    bash: '#!/usr/bin/env bash\nset -euo pipefail\necho "Hello, world!"',
+    json: '{\n  "message": "Hello, world!"\n}',
+    yaml: 'message: Hello, world!\nenabled: true',
+    sql: 'SELECT id, name\nFROM users\nWHERE active = true;',
+    java: 'class Main {\n  public static void main(String[] args) {\n    System.out.println("Hello, world!");\n  }\n}',
+    go: 'func main() {\n  fmt.Println("Hello, world!")\n}',
+    c: 'int main(void) {\n  printf("Hello, world!\\n");\n  return 0;\n}',
+    cpp: 'int main() {\n  std::cout << "Hello, world!\\n";\n}',
+  };
+  return examples[language] || '// Paste code here';
+}
+
+function insertCodeBlock(format, language) {
+  const { width, height } = deckSize();
+  const shape = L.createShape('code', width * 0.11, height * 0.14, state.defaults);
+  shape.w = width * 0.78;
+  shape.h = height * 0.7;
+  shape.fontSize = Math.max(16, Math.round(Math.min(width / 75, height / 42)));
+  shape.codeFormat = format;
+  shape.codeLanguage = language;
+  shape.text = defaultCode(language);
+  slide().shapes.push(shape);
+  selectOnly(slide().shapes.length - 1);
+  renderAll();
+  openCodeDialog(state.selected, true);
+}
+
+codeBlockMenu.addEventListener('click', (event) => {
+  const card = event.target.closest('[data-code-format]');
+  if (!card) return;
+  const language = $('code-menu-language').value;
+  hideCodeBlockMenu();
+  insertCodeBlock(card.dataset.codeFormat, language);
+});
+
+function lineNumberValue(lines) {
+  return L.normalizeLineNumbers(lines).join(', ');
+}
+
+function openCodeDialog(index, isNew) {
+  const shape = slide().shapes[index];
+  if (!shape || shape.kind !== 'code') return;
+  hideToolbarPopovers();
+  codeEditIndex = index;
+  codeEditIsNew = isNew;
+  codeEditBefore = isNew ? null : structuredClone(shape);
+  $('code-language').value = shape.codeLanguage || 'plaintext';
+  $('code-format').value = shape.codeFormat || 'editor-dark';
+  $('code-highlights').value = lineNumberValue(shape.codeHighlights);
+  $('code-callouts').value = lineNumberValue(shape.codeCallouts);
+  $('code-line-numbers').checked = shape.showLineNumbers !== false;
+  $('code-source').value = shape.text || '';
+  $('code-status').textContent = 'Use comma-separated lines or ranges, for example 2, 4-6.';
+  codeDialog.showModal();
+  $('code-source').focus();
+  $('code-source').setSelectionRange(0, $('code-source').value.length);
+}
+
+function resetCodeEdit() {
+  codeEditBefore = null;
+  codeEditIndex = -1;
+  codeEditIsNew = false;
+}
+
+function cancelCodeEdit(closeDialog = true) {
+  if (codeEditIsNew && codeEditIndex >= 0) {
+    slide().shapes.splice(codeEditIndex, 1);
+    clearSelection();
+    renderAll();
+  }
+  resetCodeEdit();
+  if (closeDialog && codeDialog.open) codeDialog.close('cancel');
+}
+
+$('btn-code-cancel').addEventListener('click', () => cancelCodeEdit());
+codeDialog.addEventListener('cancel', () => cancelCodeEdit(false));
+
+$('code-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const shape = slide().shapes[codeEditIndex];
+  if (!shape || shape.kind !== 'code') {
+    resetCodeEdit();
+    codeDialog.close('cancel');
+    return;
+  }
+  shape.text = $('code-source').value.replace(/\r\n/g, '\n');
+  shape.codeLanguage = $('code-language').value;
+  shape.codeFormat = $('code-format').value;
+  shape.codeHighlights = L.normalizeLineNumbers($('code-highlights').value);
+  shape.codeCallouts = L.normalizeLineNumbers($('code-callouts').value);
+  shape.showLineNumbers = $('code-line-numbers').checked;
+  const changed = codeEditIsNew || JSON.stringify(shape) !== JSON.stringify(codeEditBefore);
+  resetCodeEdit();
+  codeDialog.close('apply');
+  if (changed) markDirty();
+  renderAll();
+  canvas.focus({ preventScroll: true });
+});
+
+$('code-source').addEventListener('keydown', (event) => {
+  event.stopPropagation();
+  if (event.key !== 'Tab') return;
+  event.preventDefault();
+  const source = event.target;
+  const start = source.selectionStart;
+  const end = source.selectionEnd;
+  source.setRangeText('  ', start, end, 'end');
+});
+
+$('btn-copy-code').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('code-source').value);
+    $('code-status').textContent = 'Code copied.';
+  } catch (_) {
+    $('code-source').select();
+    document.execCommand('copy');
+    $('code-status').textContent = 'Code copied.';
+  }
+});
+
+$('btn-paste-code').addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    const source = $('code-source');
+    source.setRangeText(text, source.selectionStart, source.selectionEnd, 'end');
+    source.focus();
+    $('code-status').textContent = 'Code pasted.';
+  } catch (_) {
+    $('code-source').focus();
+    $('code-status').textContent = 'Clipboard access was blocked. Press Cmd+V or Ctrl+V.';
+  }
+});
+
+$('btn-edit-code').addEventListener('click', () => openCodeDialog(state.selected, false));
 
 let guidelineUnit = 'px';
 
@@ -1174,6 +1422,7 @@ function setGuidelineUnit(unit, guidelines) {
 function openGuidelinesDialog() {
   hideMenus();
   hidePresetMenu();
+  hideToolbarPopovers();
   const guidelines = appSettings.guidelines;
   $('guidelines-status').textContent = '';
   $('guidelines-visible').checked = guidelines.visible;
@@ -1390,7 +1639,7 @@ document.addEventListener('copy', (event) => {
   if (shapes.length === 0 || !event.clipboardData) return;
   event.clipboardData.setData(SHAPE_CLIPBOARD_TYPE, JSON.stringify(shapes));
   const text = shapes
-    .filter((shape) => shape.kind === 'text')
+    .filter((shape) => shape.kind === 'text' || shape.kind === 'code')
     .map((shape) => shape.text)
     .join('\n');
   if (text) event.clipboardData.setData('text/plain', text);
@@ -1618,24 +1867,33 @@ document.addEventListener('contextmenu', (event) => {
 document.addEventListener('pointerdown', (event) => {
   if (!contextMenu.contains(event.target)) hideContextMenu();
   if (!presetMenu.contains(event.target) && !$('btn-preset').contains(event.target)) hidePresetMenu();
+  if (!backgroundMenu.contains(event.target) && !$('btn-background').contains(event.target)) {
+    hideBackgroundMenu();
+  }
+  if (!codeBlockMenu.contains(event.target) && !$('btn-code-block').contains(event.target)) {
+    hideCodeBlockMenu();
+  }
   if (!fontPicker.contains(event.target)) hideFontMenu();
   if (!$('menubar').contains(event.target)) hideMenus();
 });
 window.addEventListener('blur', () => {
   hideContextMenu();
   hidePresetMenu();
+  hideToolbarPopovers();
   hideFontMenu();
   hideMenus();
 });
 window.addEventListener('resize', () => {
   hideContextMenu();
   hidePresetMenu();
+  hideToolbarPopovers();
   hideFontMenu();
   hideMenus();
 });
 $('stage-scroll').addEventListener('scroll', () => {
   hideContextMenu();
   hidePresetMenu();
+  hideToolbarPopovers();
   hideFontMenu();
   hideMenus();
 });
@@ -1816,9 +2074,15 @@ $('bg-swatches').addEventListener('click', (event) => {
   if (swatch) setBackground(swatch.dataset.bg, false);
 });
 $('prop-background').addEventListener('input', (e) => setBackground(e.target.value, false));
-$('btn-bg-all').addEventListener('click', () =>
-  setBackground(L.slideBackground(slide()), true)
-);
+$('btn-bg-all').addEventListener('click', async () => {
+  const confirmed = await window.api.ask(
+    'Apply this background to every slide?',
+    { title: 'Apply background', kind: 'warning' }
+  );
+  if (!confirmed) return;
+  setBackground(L.slideBackground(slide()), true);
+  hideBackgroundMenu();
+});
 
 // --- zoom ---------------------------------------------------------------------
 
@@ -2124,11 +2388,38 @@ function suggestName(extension) {
 // pptx has no field for "show slide numbers", so the number goes into the
 // file as a real text box on each slide, which is what PowerPoint would show
 // anyway.
+function utf8Base64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function codeShapeDataUrl(shape) {
+  const box = L.shapeBBox(shape);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box.x} ${box.y} ${Math.max(1, box.w)} ${Math.max(1, box.h)}">` +
+    `${L.renderShapeSvg(shape)}</svg>`;
+  return `data:image/svg+xml;base64,${utf8Base64(svg)}`;
+}
+
 function deckForSave() {
-  if (!state.showNumbers) return state.deck;
+  const hasCode = state.deck.slides.some(
+    (target) => target.shapes.some((shape) => shape.kind === 'code')
+  );
+  if (!state.showNumbers && !hasCode) return state.deck;
   const copy = structuredClone(state.deck);
+  for (const target of copy.slides) {
+    for (const shape of target.shapes) {
+      if (shape.kind === 'code') shape.src = codeShapeDataUrl(shape);
+    }
+  }
   const { width, height } = deckSize();
-  copy.slides.forEach((s, i) => s.shapes.push(L.slideNumberShape(i + 1, width, height)));
+  if (state.showNumbers) {
+    copy.slides.forEach((s, i) => s.shapes.push(L.slideNumberShape(i + 1, width, height)));
+  }
   return copy;
 }
 
@@ -2418,6 +2709,7 @@ async function insertAiImage(_path, assetUrl) {
 }
 
 async function initialize() {
+  populateCodeOptions();
   try {
     await loadPersistentSettings();
   } catch (error) {

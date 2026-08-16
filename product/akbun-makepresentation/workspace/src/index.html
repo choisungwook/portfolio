@@ -72,6 +72,10 @@
       <button data-tool="arrow" title="Arrow (A)">➔</button>
       <button data-tool="pen" title="Freehand (P)">✎</button>
       <button data-tool="text" title="Text (T)">T</button>
+      <button id="btn-code-block" title="Insert an editable code block" aria-haspopup="true" aria-expanded="false">Code Block</button>
+      <button id="btn-background" title="Change the slide background" aria-haspopup="true" aria-expanded="false">
+        <span id="current-background" aria-hidden="true"></span>Background
+      </button>
       <!-- Named rather than drawn: two overlapping shapes look like one more
            drawing tool, and nothing about that icon says the word preset. -->
       <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">Preset</button>
@@ -107,30 +111,11 @@
         <button id="right-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-right-panel="ai">AI</button>
       </div>
       <section id="props" class="right-panel-page" tabindex="-1" role="tabpanel" aria-labelledby="right-tab-inspector">
-      <!-- The background belongs to the slide, not to any shape, so it sits
-           in its own card above the selection properties. Sharing the Fill
-           row with shapes is what made people recolor a rectangle while
-           trying to recolor the slide. -->
-      <section id="props-background">
-        <h2>Slide background</h2>
-        <div class="swatches" id="bg-swatches">
-          <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
-          <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
-          <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
-          <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
-          <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
-          <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
-          <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
-          <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
-        </div>
-        <div class="prop-row">
-          <label for="prop-background">Custom</label>
-          <input type="color" id="prop-background" />
-        </div>
-        <button id="btn-bg-all" title="Give every slide this background">Apply to all slides</button>
-      </section>
-
       <p id="props-hint"></p>
+      <section id="props-code" hidden>
+        <div><span id="props-code-format"></span> · <span id="props-code-language"></span></div>
+        <button id="btn-edit-code" type="button">Edit code block…</button>
+      </section>
       <div id="props-fill" class="prop-row">
         <label>Shape fill</label>
         <span><input type="checkbox" id="prop-fill-none" /> none</span>
@@ -333,6 +318,41 @@
     </section>
   </div>
 
+  <div id="background-menu" class="toolbar-popover" role="group" aria-label="Slide background" hidden>
+    <div class="popover-heading">
+      <strong>Slide background</strong>
+      <span id="background-value">#ffffff</span>
+    </div>
+    <div class="background-grid" id="bg-swatches">
+      <label class="background-picker" title="Custom color">
+        <input type="color" id="prop-background" aria-label="Custom background color" />
+        <span aria-hidden="true">＋</span>
+      </label>
+      <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
+      <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
+      <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
+      <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
+      <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
+      <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
+      <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
+      <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
+    </div>
+    <button id="btn-bg-all" type="button">Apply to all slides…</button>
+  </div>
+
+  <div id="code-block-menu" class="toolbar-popover" role="group" aria-label="Code block formats" hidden>
+    <div class="code-menu-heading">
+      <label for="code-menu-language">Language</label>
+      <select id="code-menu-language"></select>
+    </div>
+    <div class="code-format-grid">
+      <button class="code-format-card editor-dark" data-code-format="editor-dark"><span class="code-preview">● ● ●<br />const answer = 42</span><strong>Editor Dark</strong></button>
+      <button class="code-format-card editor-light" data-code-format="editor-light"><span class="code-preview">● ● ●<br />const answer = 42</span><strong>Editor Light</strong></button>
+      <button class="code-format-card terminal" data-code-format="terminal"><span class="code-preview">›_ bash<br />$ make up</span><strong>Terminal</strong></button>
+      <button class="code-format-card minimal" data-code-format="minimal"><span class="code-preview">1  fn main() {<br />2    println!();</span><strong>Minimal</strong></button>
+    </div>
+  </div>
+
   <dialog id="guidelines-dialog" aria-labelledby="guidelines-title">
     <form id="guidelines-form" method="dialog">
       <header>
@@ -397,6 +417,42 @@
       </div>
       <footer>
         <button id="btn-slide-size-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="code-dialog" aria-labelledby="code-dialog-title">
+    <form id="code-form" method="dialog">
+      <header>
+        <h1 id="code-dialog-title">Edit code block</h1>
+      </header>
+      <div class="code-dialog-content">
+        <div class="code-settings">
+          <label for="code-language">Language</label>
+          <select id="code-language"></select>
+          <label for="code-format">Format</label>
+          <select id="code-format"></select>
+          <label for="code-highlights">Highlighted lines</label>
+          <input id="code-highlights" type="text" placeholder="2, 4-6" />
+          <label for="code-callouts">Number callouts</label>
+          <input id="code-callouts" type="text" placeholder="3, 7" />
+          <label class="code-line-number-option">
+            <input id="code-line-numbers" type="checkbox" /> Show line numbers
+          </label>
+        </div>
+        <div class="code-editor-heading">
+          <label for="code-source">Code</label>
+          <span>
+            <button id="btn-paste-code" type="button">Paste</button>
+            <button id="btn-copy-code" type="button">Copy</button>
+          </span>
+        </div>
+        <textarea id="code-source" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="code-status"></textarea>
+        <p id="code-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-code-cancel" type="button">Cancel</button>
         <button type="submit" class="primary">Apply</button>
       </footer>
     </form>

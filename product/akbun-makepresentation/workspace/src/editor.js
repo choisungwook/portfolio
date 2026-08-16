@@ -40,8 +40,54 @@ const DEFAULT_STYLE = {
   verticalAlign: 'top',
 };
 
-const BOXY = new Set(['rect', 'ellipse', 'text', 'image']);
-const SHAPE_KINDS = new Set(['rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image']);
+const BOXY = new Set(['rect', 'ellipse', 'text', 'image', 'code']);
+const SHAPE_KINDS = new Set([
+  'rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image', 'code',
+]);
+
+const CODE_FORMATS = Object.freeze({
+  'editor-dark': Object.freeze({
+    label: 'Editor Dark', background: '#1e1f22', chrome: '#2b2d30', text: '#f8f8f2',
+    muted: '#8b949e', keyword: '#ff79c6', string: '#f1fa8c', number: '#bd93f9',
+    comment: '#7f8c98', operator: '#8be9fd', highlight: '#343746', callout: '#ff922b',
+  }),
+  'editor-light': Object.freeze({
+    label: 'Editor Light', background: '#ffffff', chrome: '#f1f3f5', text: '#24292f',
+    muted: '#8c959f', keyword: '#cf222e', string: '#0a7b3e', number: '#8250df',
+    comment: '#6e7781', operator: '#0550ae', highlight: '#fff3bf', callout: '#e8590c',
+  }),
+  terminal: Object.freeze({
+    label: 'Terminal', background: '#111827', chrome: '#1f2937', text: '#e5e7eb',
+    muted: '#9ca3af', keyword: '#5eead4', string: '#fde68a', number: '#c4b5fd',
+    comment: '#94a3b8', operator: '#7dd3fc', highlight: '#263449', callout: '#fb923c',
+  }),
+  minimal: Object.freeze({
+    label: 'Minimal', background: '#f8f9fa', chrome: '#f8f9fa', text: '#212529',
+    muted: '#868e96', keyword: '#c92a2a', string: '#2b8a3e', number: '#6741d9',
+    comment: '#868e96', operator: '#1864ab', highlight: '#fff3bf', callout: '#e8590c',
+  }),
+});
+
+const CODE_LANGUAGES = Object.freeze([
+  'plaintext', 'python', 'javascript', 'typescript', 'html', 'css', 'rust', 'hcl',
+  'bash', 'json', 'yaml', 'sql', 'java', 'go', 'c', 'cpp', 'kotlin', 'swift',
+]);
+
+const CODE_KEYWORDS = Object.freeze({
+  python: new Set('and as assert async await break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return True try while with yield'.split(' ')),
+  javascript: new Set('async await break case catch class const continue debugger default delete do else export extends false finally for from function get if import in instanceof let new null of return set static super switch this throw true try typeof undefined var void while with yield'.split(' ')),
+  typescript: new Set('abstract any as async await boolean break case catch class const constructor continue declare default delete do else enum export extends false finally for from function get if implements import in infer instanceof interface keyof let module namespace never new null number object of private protected public readonly return set static string super switch symbol this throw true try type typeof undefined unknown var void while with yield'.split(' ')),
+  rust: new Set('as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while'.split(' ')),
+  hcl: new Set('data dynamic for_each locals module output provider resource terraform variable'.split(' ')),
+  bash: new Set('case do done elif else esac export fi for function if in local readonly return set then unset while'.split(' ')),
+  sql: new Set('all alter and as asc begin between by case create delete desc distinct drop else end exists from group having in index inner insert into is join left like limit not null on or order outer primary right select set table then union unique update values when where'.split(' ')),
+  java: new Set('abstract assert boolean break byte case catch char class const continue default do double else enum extends false final finally float for goto if implements import instanceof int interface long native new null package private protected public return short static strictfp super switch synchronized this throw throws transient true try void volatile while'.split(' ')),
+  go: new Set('break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var'.split(' ')),
+  c: new Set('auto break case char const continue default do double else enum extern float for goto if inline int long register restrict return short signed sizeof static struct switch typedef union unsigned void volatile while'.split(' ')),
+  cpp: new Set('alignas alignof and asm auto bool break case catch char class const constexpr continue default delete do double else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept nullptr operator private protected public register reinterpret_cast return short signed sizeof static struct switch template this throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while'.split(' ')),
+  kotlin: new Set('as break class continue do else false for fun if in interface is null object package return super this throw true try typealias typeof val var when while'.split(' ')),
+  swift: new Set('as associatedtype break case catch class continue default defer deinit do else enum extension fallthrough false fileprivate for func guard if import in init inout internal is let nil open operator private protocol public repeat rethrows return self Self static struct subscript super switch throw throws true try typealias var where while'.split(' ')),
+});
 
 // A shape that can hold text of its own. A text box is the whole shape; a
 // rect or an ellipse draws its text inside the outline.
@@ -164,6 +210,11 @@ function createShape(kind, x, y, style) {
     groupId: '',
     arrowStart: 'none',
     arrowEnd: kind === 'arrow' ? 'triangle' : 'none',
+    codeFormat: 'editor-dark',
+    codeLanguage: 'python',
+    codeHighlights: [],
+    codeCallouts: [],
+    showLineNumbers: true,
   };
 }
 
@@ -176,6 +227,22 @@ function safeColor(value, fallback) {
   return /^(none|#[0-9a-f]{3}|#[0-9a-f]{4}|#[0-9a-f]{6}|#[0-9a-f]{8})$/i.test(color)
     ? color
     : fallback;
+}
+
+function normalizeLineNumbers(value) {
+  const numbers = Array.isArray(value)
+    ? value
+    : String(value || '').split(',').flatMap((part) => {
+      const match = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!match) return [Number(part.trim())];
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      if (end < start || end - start > 1_000) return [];
+      return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    });
+  return [...new Set(numbers.map(Number).filter(
+    (number) => Number.isInteger(number) && number > 0 && number <= 100_000
+  ))].sort((left, right) => left - right);
 }
 
 function normalizeClipboardShape(value) {
@@ -235,6 +302,11 @@ function normalizeClipboardShape(value) {
     if (isFiniteInRange(value[name], 0, 1)) shape[name] = value[name];
   }
   if (isFiniteInRange(value.rotation, -360_000, 360_000)) shape.rotation = value.rotation;
+  if (CODE_FORMATS[value.codeFormat]) shape.codeFormat = value.codeFormat;
+  if (CODE_LANGUAGES.includes(value.codeLanguage)) shape.codeLanguage = value.codeLanguage;
+  shape.codeHighlights = normalizeLineNumbers(value.codeHighlights);
+  shape.codeCallouts = normalizeLineNumbers(value.codeCallouts);
+  if (typeof value.showLineNumbers === 'boolean') shape.showLineNumbers = value.showLineNumbers;
   return shape;
 }
 
@@ -755,6 +827,123 @@ function escapeXml(text) {
     .replace(/"/g, '&quot;');
 }
 
+function codeCommentMarkers(language) {
+  if (['python', 'hcl', 'bash', 'yaml'].includes(language)) return ['#'];
+  if (language === 'html') return ['<!--'];
+  if (language === 'sql') return ['--'];
+  return ['//', '/*'];
+}
+
+function tokenizeCodeLine(line, language) {
+  const text = String(line || '');
+  const keywords = CODE_KEYWORDS[language] || new Set();
+  const markers = codeCommentMarkers(language);
+  const tokens = [];
+  let index = 0;
+  while (index < text.length) {
+    const marker = markers.find((candidate) => text.startsWith(candidate, index));
+    if (marker) {
+      tokens.push({ text: text.slice(index), type: 'comment' });
+      break;
+    }
+    const char = text[index];
+    if (char === '"' || char === "'" || char === '`') {
+      let end = index + 1;
+      while (end < text.length) {
+        if (text[end] === '\\') end += 2;
+        else if (text[end] === char) {
+          end += 1;
+          break;
+        } else end += 1;
+      }
+      tokens.push({ text: text.slice(index, end), type: 'string' });
+      index = end;
+      continue;
+    }
+    const number = text.slice(index).match(/^(?:0x[\da-f]+|\d+(?:\.\d+)?)/i);
+    if (number) {
+      tokens.push({ text: number[0], type: 'number' });
+      index += number[0].length;
+      continue;
+    }
+    const word = text.slice(index).match(/^[A-Za-z_$][\w$-]*/);
+    if (word) {
+      tokens.push({
+        text: word[0],
+        type: keywords.has(word[0]) || keywords.has(word[0].toLowerCase())
+          ? 'keyword'
+          : 'text',
+      });
+      index += word[0].length;
+      continue;
+    }
+    const type = /[{}()[\].,:;=+*/<>!&|?-]/.test(char) ? 'operator' : 'text';
+    const previous = tokens[tokens.length - 1];
+    if (previous && previous.type === type) previous.text += char;
+    else tokens.push({ text: char, type });
+    index += 1;
+  }
+  return tokens;
+}
+
+function codeShapeSvg(shape) {
+  const box = shapeBBox(shape);
+  if (!(box.w > 0) || !(box.h > 0)) return '';
+  const theme = CODE_FORMATS[shape.codeFormat] || CODE_FORMATS['editor-dark'];
+  const format = CODE_FORMATS[shape.codeFormat] ? shape.codeFormat : 'editor-dark';
+  const language = CODE_LANGUAGES.includes(shape.codeLanguage) ? shape.codeLanguage : 'plaintext';
+  const fontSize = Math.max(10, Number(shape.fontSize) || 24);
+  const lineHeight = fontSize * 1.48;
+  const chromeHeight = format === 'minimal' ? 0 : Math.max(42, fontSize * 1.8);
+  const top = chromeHeight + Math.max(18, fontSize * 0.8);
+  const lines = String(shape.text || '').replace(/\r/g, '').split('\n');
+  const showNumbers = shape.showLineNumbers !== false;
+  const digits = String(Math.max(1, lines.length)).length;
+  const gutter = showNumbers ? fontSize * (digits * 0.62 + 1.4) : 0;
+  const left = Math.max(24, fontSize * 1.05) + gutter;
+  const right = Math.max(42, fontSize * 1.8);
+  const highlights = new Set(normalizeLineNumbers(shape.codeHighlights));
+  const callouts = normalizeLineNumbers(shape.codeCallouts);
+  const calloutNumbers = new Map(callouts.map((line, index) => [line, index + 1]));
+  const visible = Math.max(1, Math.floor((box.h - top - fontSize * 0.5) / lineHeight));
+  const radius = Math.min(18, box.w / 8, box.h / 8);
+  const header = format === 'minimal'
+    ? ''
+    : `<rect width="${box.w}" height="${chromeHeight}" fill="${theme.chrome}"/>` +
+      (format === 'terminal'
+        ? `<text x="${fontSize}" y="${chromeHeight / 2 + fontSize * 0.34}" font-size="${fontSize * 0.78}" fill="${theme.muted}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">›_ ${escapeXml(language)}</text>`
+        : `<circle cx="${fontSize}" cy="${chromeHeight / 2}" r="${fontSize * 0.2}" fill="#ff5f57"/><circle cx="${fontSize * 1.7}" cy="${chromeHeight / 2}" r="${fontSize * 0.2}" fill="#febc2e"/><circle cx="${fontSize * 2.4}" cy="${chromeHeight / 2}" r="${fontSize * 0.2}" fill="#28c840"/><text x="${box.w / 2}" y="${chromeHeight / 2 + fontSize * 0.27}" text-anchor="middle" font-size="${fontSize * 0.68}" fill="${theme.muted}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">${escapeXml(language)}</text>`);
+  let body = '';
+  for (let index = 0; index < Math.min(lines.length, visible); index += 1) {
+    const number = index + 1;
+    const baseline = top + index * lineHeight + fontSize;
+    if (highlights.has(number)) {
+      body += `<rect x="${fontSize * 0.45}" y="${baseline - fontSize * 1.05}" width="${box.w - fontSize * 0.9}" height="${lineHeight}" rx="${fontSize * 0.18}" fill="${theme.highlight}"/>`;
+    }
+    if (showNumbers) {
+      body += `<text x="${left - fontSize * 0.85}" y="${baseline}" text-anchor="end" font-size="${fontSize}" fill="${theme.muted}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">${number}</text>`;
+    }
+    const spans = tokenizeCodeLine(lines[index], language).map((token) => {
+      const color = theme[token.type] || theme.text;
+      return `<tspan fill="${color}">${escapeXml(token.text)}</tspan>`;
+    }).join('');
+    body += `<text x="${left}" y="${baseline}" font-size="${fontSize}" fill="${theme.text}" xml:space="preserve" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">${spans || ' '}</text>`;
+    if (calloutNumbers.has(number)) {
+      const cx = box.w - right / 2;
+      const cy = baseline - fontSize * 0.34;
+      const callout = calloutNumbers.get(number);
+      body += `<circle cx="${cx}" cy="${cy}" r="${fontSize * 0.52}" fill="${theme.callout}"/><text x="${cx}" y="${cy + fontSize * 0.28}" text-anchor="middle" font-size="${fontSize * 0.72}" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">${callout}</text>`;
+    }
+  }
+  const overflow = lines.length > visible
+    ? `<text x="${box.w - fontSize}" y="${box.h - fontSize * 0.55}" text-anchor="end" font-size="${fontSize * 0.7}" fill="${theme.muted}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">+${lines.length - visible} lines</text>`
+    : '';
+  return rotateSvg(
+    shape,
+    `<svg x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" viewBox="0 0 ${box.w} ${box.h}" overflow="hidden"><rect width="${box.w}" height="${box.h}" rx="${radius}" fill="${theme.background}"/>${header}${body}${overflow}</svg>`
+  );
+}
+
 function dashArray(shape) {
   const w = shape.strokeWidth;
   if (shape.dash === 'dash') return `${w * 3} ${w * 2}`;
@@ -917,6 +1106,8 @@ function renderShapeSvg(shape, options) {
       const markup = `<svg x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" viewBox="${left} ${top} ${width} ${height}" preserveAspectRatio="none" overflow="hidden"><image x="0" y="0" width="1" height="1" preserveAspectRatio="none" href="${href}"/></svg><rect x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" fill="none" ${strokeAttrs(shape)}/>`;
       return rotateSvg(shape, markup);
     }
+    case 'code':
+      return codeShapeSvg(shape);
     default:
       return '';
   }
@@ -1081,7 +1272,7 @@ function rotatedBBox(box, degrees) {
 }
 
 function shapeImageBBox(shape) {
-  const stroke = shape.stroke === 'none' || shape.kind === 'text' || shape.kind === 'image'
+  const stroke = shape.stroke === 'none' || shape.kind === 'text' || shape.kind === 'image' || shape.kind === 'code'
     ? 0
     : Math.max(0, shape.strokeWidth || 0) / 2;
   const decorated = shape.kind === 'arrow' ||
@@ -1149,6 +1340,8 @@ const exported = {
   DEFAULT_BACKGROUND,
   ARROW_ENDS,
   DEFAULT_PRESET_IDS,
+  CODE_FORMATS,
+  CODE_LANGUAGES,
   TEXTUAL,
   textBox,
   ZOOM_STEPS,
@@ -1164,6 +1357,8 @@ const exported = {
   pixelsToCentimeters,
   centimetersToPixels,
   slideBackground,
+  normalizeLineNumbers,
+  tokenizeCodeLine,
   createShape,
   defaultPresetShapes,
   customPresetFromSelection,

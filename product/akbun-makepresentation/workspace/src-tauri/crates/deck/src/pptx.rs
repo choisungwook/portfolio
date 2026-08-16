@@ -332,7 +332,7 @@ fn slide_xml(
         // id 1 (tree) is taken; shape ids start at 2.
         let id = next_id;
         next_id += 1;
-        if shape.kind == "image" {
+        if shape.kind == "image" || shape.kind == "code" {
             // An image whose data URL cannot be decoded is dropped rather
             // than written as a broken relationship.
             if let Some(name) = media.intern(&shape.src) {
@@ -407,8 +407,19 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
     } else {
         String::new()
     };
+    let (name, description) = if shape.kind == "code" {
+        let mut source = shape.clone();
+        source.src.clear();
+        let encoded = serde_json::to_vec(&source)
+            .ok()
+            .map(|json| base64::engine::general_purpose::STANDARD.encode(json))
+            .unwrap_or_default();
+        (format!("Code block {id}"), format!(" descr=\"akbun-code:{encoded}\""))
+    } else {
+        (format!("Picture {id}"), String::new())
+    };
     format!(
-        "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"Picture {id}\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
+        "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"{name}\"{description}/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
 <p:blipFill><a:blip r:embed=\"rId{rid}\"/>{crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>\
 <p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>{}</p:spPr></p:pic>",
         xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
@@ -754,7 +765,7 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         // stay a shape, since a slide holds one color and not an image.
         let mut background = crate::default_background();
         if let Some(shape) = bg {
-            if shape.kind == "image" {
+            if shape.kind == "image" || shape.kind == "code" {
                 shapes.push(shape);
             } else {
                 background = shape.fill;
@@ -768,7 +779,7 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         // it for a data URL, dropping shapes whose bytes cannot be shown.
         let mut i = 0;
         while i < shapes.len() {
-            if shapes[i].kind == "image" {
+            if shapes[i].kind == "image" || shapes[i].kind == "code" {
                 match media_data_url(&mut archive, &mut media_cache, &shapes[i].src) {
                     Some(url) => {
                         shapes[i].src = url;
@@ -1142,6 +1153,7 @@ struct Pending {
     is_ph: bool,
     ph_type: Option<String>,
     ph_idx: Option<String>,
+    code_shape: Option<Shape>,
 }
 
 #[derive(Clone, Default)]
@@ -1267,6 +1279,7 @@ fn parse_part(
                             if placeholders_are_visible || keys.is_empty() {
                                 if keys.is_empty()
                                     || shape.kind == "image"
+                                    || shape.kind == "code"
                                     || !shape.text.trim().is_empty()
                                     || shape.fill != Shape::default().fill
                                 {
@@ -1365,6 +1378,12 @@ fn handle_element(
 ) {
     let get = |name: &[u8]| attr(e, name);
     match local {
+        "cNvPr" if p.is_pic => {
+            p.code_shape = get(b"descr")
+                .and_then(|description| description.strip_prefix("akbun-code:").map(str::to_string))
+                .and_then(|encoded| base64::engine::general_purpose::STANDARD.decode(encoded).ok())
+                .and_then(|json| serde_json::from_slice::<Shape>(&json).ok());
+        }
         "cNvSpPr" => {
             if get(b"txBox").as_deref() == Some("1") {
                 p.tx_box = true;
@@ -1678,6 +1697,7 @@ fn apply_text_properties(shape: &mut Shape, p: &Pending) {
 }
 
 fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> {
+    let code_shape = p.code_shape.clone();
     let mut shape = default.cloned().unwrap_or_default();
     shape.text.clear();
     shape.src.clear();
@@ -1810,6 +1830,16 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
         if let Some(value) = p.vertical_align {
             shape.vertical_align = value;
         }
+    }
+    if let Some(mut code) = code_shape {
+        code.kind = "code".into();
+        code.x = shape.x;
+        code.y = shape.y;
+        code.w = shape.w;
+        code.h = shape.h;
+        code.rotation = shape.rotation;
+        code.src = shape.src;
+        return Some(code);
     }
     Some(shape)
 }
@@ -2010,6 +2040,50 @@ mod tests {
         let back = read(buffer).unwrap();
         assert_eq!(back.slide_width, 720.0);
         assert_eq!(back.slide_height, 1280.0);
+    }
+
+    #[test]
+    fn round_trip_restores_an_editable_code_block_from_its_picture() {
+        let svg = base64::engine::general_purpose::STANDARD.encode(
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>"#,
+        );
+        let code = Shape {
+            kind: "code".into(),
+            x: 120.0,
+            y: 90.0,
+            w: 960.0,
+            h: 540.0,
+            text: "fn main() {\n  println!(\"hello\");\n}".into(),
+            src: format!("data:image/svg+xml;base64,{svg}"),
+            font_size: 22.0,
+            code_format: "terminal".into(),
+            code_language: "rust".into(),
+            code_highlights: vec![2],
+            code_callouts: vec![1, 3],
+            show_line_numbers: false,
+            ..Shape::default()
+        };
+        let deck = Deck {
+            slides: vec![Slide {
+                shapes: vec![code.clone()],
+                ..Slide::default()
+            }],
+            ..Deck::default()
+        };
+        let mut buffer = Cursor::new(Vec::new());
+        write(&deck, &mut buffer).unwrap();
+        buffer.set_position(0);
+        let back = read(buffer).unwrap();
+        let restored = &back.slides[0].shapes[0];
+
+        assert_eq!(restored.kind, "code");
+        assert_eq!(restored.text, code.text);
+        assert_eq!(restored.code_format, "terminal");
+        assert_eq!(restored.code_language, "rust");
+        assert_eq!(restored.code_highlights, vec![2]);
+        assert_eq!(restored.code_callouts, vec![1, 3]);
+        assert!(!restored.show_line_numbers);
+        assert!(restored.src.starts_with("data:image/svg+xml;base64,"));
     }
 
     /// A minimal package shaped the way PowerPoint writes one: theme colors
