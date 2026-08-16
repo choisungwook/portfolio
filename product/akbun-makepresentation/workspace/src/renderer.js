@@ -229,6 +229,19 @@ function marqueeSvg() {
   return `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" class="selection-marquee"/>`;
 }
 
+function snapGuideSvg() {
+  const snap = state.drag?.mode === 'move' ? state.drag.snap : null;
+  if (!snap) return '';
+  const { width, height } = deckSize();
+  const vertical = snap.vertical === null
+    ? ''
+    : `<line x1="${snap.vertical}" y1="0" x2="${snap.vertical}" y2="${height}"/>`;
+  const horizontal = snap.horizontal === null
+    ? ''
+    : `<line x1="0" y1="${snap.horizontal}" x2="${width}" y2="${snap.horizontal}"/>`;
+  return `<g class="snap-guides" aria-hidden="true">${vertical}${horizontal}</g>`;
+}
+
 // The slide number is not part of slide().shapes, so it draws after them and
 // outside the g[data-i] groups that make shapes selectable.
 function slideNumberSvg(index) {
@@ -282,6 +295,7 @@ function renderCanvas() {
     shapes +
     slideNumberSvg(state.current) +
     guidelinesSvg() +
+    snapGuideSvg() +
     cropOverlay +
     (state.editingIndex < 0 ? selections : '') +
     marqueeSvg();
@@ -289,7 +303,7 @@ function renderCanvas() {
 
 function cropOverlaySvg() {
   const shape = selectedShape();
-  if (!shape || shape.kind !== 'image') return '';
+  if (!shape || (shape.kind !== 'image' && shape.kind !== 'code')) return '';
   const left = shape.cropLeft || 0;
   const top = shape.cropTop || 0;
   const right = shape.cropRight || 0;
@@ -362,8 +376,10 @@ function renderProps() {
   $('btn-delete-shape').hidden = !shape;
   $('btn-group').hidden = state.selection.length < 2;
   $('btn-ungroup').hidden = !state.selection.some((index) => slide().shapes[index]?.groupId);
-  $('props-image-crop').hidden = kind !== 'image';
+  $('props-crop').hidden = kind !== 'image' && kind !== 'code';
+  $('props-crop-label').textContent = kind === 'code' ? 'Code block crop' : 'Image crop';
   $('btn-crop').classList.toggle('active', !!state.cropping);
+  $('props-shape-align').hidden = state.selection.length < 2;
   $('props-hint').textContent = state.selection.length > 1
     ? `Selected: ${state.selection.length} objects`
     : shape
@@ -700,8 +716,14 @@ canvas.addEventListener('pointermove', (event) => {
     for (const item of drag.items) {
       const shape = slide().shapes[item.index];
       Object.assign(shape, structuredClone(item.from));
-      L.moveShape(shape, mx, my);
     }
+    const rect = canvas.getBoundingClientRect();
+    const threshold = rect.width > 0 ? 8 * deckSize().width / rect.width : 0;
+    const snapped = appSettings.snapping.enabled
+      ? L.snapMove(slide().shapes, drag.items.map((item) => item.index), mx, my, threshold)
+      : { dx: mx, dy: my, vertical: null, horizontal: null };
+    drag.snap = snapped;
+    for (const item of drag.items) L.moveShape(slide().shapes[item.index], snapped.dx, snapped.dy);
     drag.moved = drag.moved || mx !== 0 || my !== 0;
   }
   renderCanvas();
@@ -1646,6 +1668,7 @@ function renderGeneralSettings() {
     select.append(option);
   }
   select.value = defaults.fontFamily;
+  $('settings-snapping').checked = appSettings.snapping.enabled;
   setBorderSettingsFields('shape', defaults.shapeBorder);
   setBorderSettingsFields('image', defaults.imageBorder);
   $('general-settings-status').textContent = '';
@@ -1713,6 +1736,7 @@ $('btn-settings-ok').addEventListener('click', async () => {
   try {
     await persistAppSettings({
       ...appSettings,
+      snapping: { enabled: $('settings-snapping').checked },
       editorDefaults,
       customPresets: settingsPresetDraft,
     });
@@ -2174,10 +2198,22 @@ function ungroupSelection() {
 
 function toggleCrop() {
   const shape = selectedShape();
-  if (!shape || shape.kind !== 'image') return;
+  if (!shape || (shape.kind !== 'image' && shape.kind !== 'code')) return;
   state.cropping = state.cropping ? null : { index: state.selected };
   renderAll();
 }
+
+function alignSelection(edge) {
+  if (!L.alignShapes(slide().shapes, state.selection, edge)) return;
+  markDirty();
+  renderAll();
+  canvas.focus({ preventScroll: true });
+}
+
+$('props-shape-align').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-shape-align]');
+  if (button) alignSelection(button.dataset.shapeAlign);
+});
 
 // --- slide background --------------------------------------------------------
 //

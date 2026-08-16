@@ -12,6 +12,7 @@ test('settings use the smaller guideline margins by default', () => {
     shapeBorder: { color: '#e03131', width: 2, dash: 'solid' },
     imageBorder: { color: '#000000', width: 2, dash: 'solid' },
   });
+  assert.deepStrictEqual(settings.snapping, { enabled: true });
   assert.deepStrictEqual(settings.guidelines, {
     visible: false,
     unit: 'px',
@@ -86,7 +87,8 @@ test('guideline margins must leave drawable slide space', () => {
 
 test('settings comparison ignores object key order', () => {
   const left = {
-    version: 2,
+    version: 3,
+    snapping: { enabled: true },
     guidelines: { visible: false, unit: 'px', top: 36, bottom: 48, left: 48, right: 48 },
     editorDefaults: S.normalizeEditorDefaults(),
     customPresets: [],
@@ -95,9 +97,18 @@ test('settings comparison ignores object key order', () => {
     customPresets: [],
     guidelines: { right: 48, left: 48, bottom: 48, top: 36, unit: 'px', visible: false },
     editorDefaults: S.normalizeEditorDefaults(),
-    version: 2,
+    snapping: { enabled: true },
+    version: 3,
   };
   assert.ok(S.settingsEqual(left, right));
   right.guidelines.top = 40;
   assert.ok(!S.settingsEqual(left, right));
+});
+
+test('settings keep snapping enabled unless the user turns it off', () => {
+  assert.deepStrictEqual(S.normalizeAppSettings({}).snapping, { enabled: true });
+  assert.deepStrictEqual(
+    S.normalizeAppSettings({ snapping: { enabled: false } }).snapping,
+    { enabled: false }
+  );
 });

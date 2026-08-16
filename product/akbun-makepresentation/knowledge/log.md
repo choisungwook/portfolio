@@ -2,6 +2,8 @@
 
 ## 2026-08-16
 
+* **Creation**: [도형 정렬과 자석은 보이는 바깥 경계를 사용](decisions/2026-08-shape-alignment-uses-visual-bounds.md) 결정 기록.
+* **Update**: [코드 블록은 편집 모델과 PPTX 표현을 분리](decisions/2026-08-code-blocks-keep-source-metadata.md)에 리사이즈와 Crop 분리 원칙 추가.
 * **Creation**: [편집 기본값은 객체 종류별 로컬 설정으로 관리](decisions/2026-08-editor-defaults-are-local-settings.md) 결정 기록.
 * **Creation**: [드래그는 더블클릭 편집보다 우선](decisions/2026-08-drag-wins-over-double-click-edit.md) 결정 기록.
 * **Creation**: [코드 블록은 편집 모델과 PPTX 표현을 분리](decisions/2026-08-code-blocks-keep-source-metadata.md) 결정 기록.

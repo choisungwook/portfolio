@@ -223,9 +223,18 @@
           </span>
         </div>
       </div>
-      <div class="prop-row" id="props-image-crop">
-        <label>Image crop</label>
+      <div class="prop-row" id="props-crop">
+        <label id="props-crop-label">Image crop</label>
         <button id="btn-crop">Crop</button>
+      </div>
+      <div class="prop-row" id="props-shape-align" hidden>
+        <label>Align objects</label>
+        <span class="btn-set shape-align-buttons">
+          <button type="button" data-shape-align="top" title="Align selected objects to the top edge">Top</button>
+          <button type="button" data-shape-align="bottom" title="Align selected objects to the bottom edge">Bottom</button>
+          <button type="button" data-shape-align="left" title="Align selected objects to the left edge">Left</button>
+          <button type="button" data-shape-align="right" title="Align selected objects to the right edge">Right</button>
+        </span>
       </div>
       <div class="btn-set">
         <button id="btn-group">Group</button>
@@ -478,6 +487,10 @@
           <div class="settings-general-fields">
             <label for="settings-default-font">Default font</label>
             <select id="settings-default-font"></select>
+            <label for="settings-snapping">Shape snapping</label>
+            <label class="settings-checkbox">
+              <input id="settings-snapping" type="checkbox" /> Snap matching object edges while dragging
+            </label>
           </div>
           <fieldset class="settings-border-fields">
             <legend>Shape border</legend>
