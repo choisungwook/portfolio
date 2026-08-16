@@ -637,9 +637,11 @@ function fontAttr(shape) {
   return `font-family="${escapeXml(shape.fontFamily || 'Helvetica')}, sans-serif"`;
 }
 
+const TEXT_CHAR_WIDTH = 0.52;
+
 function wrapTextLines(text, width, fontSize) {
   if (!(width > 0)) return String(text || '').split('\n');
-  const max = Math.max(1, Math.floor(width / Math.max(fontSize * 0.52, 1)));
+  const max = Math.max(1, Math.floor(width / Math.max(fontSize * TEXT_CHAR_WIDTH, 1)));
   const lines = [];
   for (const paragraph of String(text || '').split('\n')) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -647,16 +649,27 @@ function wrapTextLines(text, width, fontSize) {
       lines.push('');
       continue;
     }
-    let line = words.shift();
-    for (const word of words) {
-      if (`${line} ${word}`.length <= max) {
+    let line = '';
+    for (let word of words) {
+      while (word.length > max) {
+        if (line) {
+          lines.push(line);
+          line = '';
+        }
+        lines.push(word.slice(0, max));
+        word = word.slice(max);
+      }
+      if (!word) continue;
+      if (!line) {
+        line = word;
+      } else if (`${line} ${word}`.length <= max) {
         line += ` ${word}`;
       } else {
         lines.push(line);
         line = word;
       }
     }
-    lines.push(line);
+    if (line) lines.push(line);
   }
   return lines;
 }
@@ -668,10 +681,13 @@ function fitTextBox(shape, text, maxWidth) {
   const available = Number.isFinite(maxWidth)
     ? maxWidth
     : SLIDE_W - Math.max(0, Number(shape.x) || 0);
-  const widthLimit = Math.max(120, available);
+  const widthLimit = Math.max(1, available);
+  const minWidth = Math.min(120, widthLimit);
   const longest = Math.max(1, ...content.split('\n').map((line) => line.length));
-  const weight = shape.bold ? 0.58 : 0.54;
-  shape.w = Math.min(widthLimit, Math.max(120, longest * fontSize * weight + 4));
+  shape.w = Math.min(
+    widthLimit,
+    Math.max(minWidth, longest * fontSize * TEXT_CHAR_WIDTH + 4)
+  );
   const lines = wrapTextLines(content, shape.w, fontSize);
   shape.h = Math.max(fontSize * 1.4, lines.length * fontSize * 1.35);
   return shape;

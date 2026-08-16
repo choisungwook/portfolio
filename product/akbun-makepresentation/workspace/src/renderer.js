@@ -647,13 +647,13 @@ function canEditText(shape) {
 function styleTextEditor(shape) {
   if (!shape) return;
   const scale = canvas.getBoundingClientRect().width / L.SLIDE_W;
-  const lines = textEditor.value.split('\n').length;
   // The same inset the glyphs are drawn at, so text does not jump sideways
   // when editing starts inside a rect or an ellipse.
   const box = L.textBox(shape);
+  const lines = L.wrapTextLines(textEditor.value, box.w, shape.fontSize).length;
   textEditor.style.left = `${box.x * scale}px`;
   textEditor.style.top = `${box.y * scale}px`;
-  textEditor.style.width = `${Math.max(box.w, 120) * scale}px`;
+  textEditor.style.width = `${Math.max(box.w, 1) * scale}px`;
   textEditor.style.height = `${Math.max(box.h, shape.fontSize * 1.3 * lines) * scale}px`;
   textEditor.style.fontSize = `${shape.fontSize * scale}px`;
   textEditor.style.fontFamily = `${shape.fontFamily || 'Helvetica'}, sans-serif`;
@@ -952,11 +952,13 @@ function readCustomPresets() {
     if (!Array.isArray(parsed)) return [];
     return parsed.flatMap((preset) => {
       if (!preset || typeof preset !== 'object') return [];
+      const id = String(preset.id || '').trim().slice(0, 100);
+      if (!id) return [];
       const shapes = L.parseClipboardShapes(JSON.stringify(preset.shapes || []))
         .filter((shape) => shape.kind !== 'image');
       if (!shapes.length) return [];
       return [{
-        id: String(preset.id || '').slice(0, 100),
+        id,
         name: String(preset.name || 'Preset').slice(0, 60),
         shapes,
       }];
@@ -1098,7 +1100,7 @@ settingsDialog.querySelector('nav').addEventListener('click', (event) => {
 $('btn-save-preset').addEventListener('click', () => {
   const shapes = selectedShapes().filter((shape) => shape.kind !== 'image');
   if (!shapes.length) {
-    $('preset-settings-status').textContent = 'Select one or more shapes before opening Settings.';
+    $('preset-settings-status').textContent = 'Select one or more shapes before saving a preset.';
     return;
   }
   const preset = {

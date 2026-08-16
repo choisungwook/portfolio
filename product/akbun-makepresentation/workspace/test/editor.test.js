@@ -459,11 +459,12 @@ test('renderShapeSvg draws an image border and a freehand end arrow', () => {
   assert.ok(L.renderShapeSvg(pen).includes('<polygon'));
 });
 
-test('wrapTextLines wraps at word boundaries', () => {
+test('wrapTextLines wraps words and splits one wider than the box', () => {
   assert.deepStrictEqual(L.wrapTextLines('one two three', 45, 20), [
     'one',
     'two',
-    'three',
+    'thre',
+    'e',
   ]);
 });
 
@@ -622,6 +623,9 @@ test('fitTextBox grows with text and wraps after its width limit', () => {
   L.fitTextBox(shape, 'word '.repeat(40), 160);
   assert.strictEqual(shape.w, 160);
   assert.ok(shape.h > shape.fontSize * 1.4);
+
+  L.fitTextBox(shape, 'near the edge', 50);
+  assert.strictEqual(shape.w, 50);
 });
 
 test('default presets provide the requested red shapes and directions', () => {
