@@ -68,3 +68,19 @@ test('guideline margins must leave drawable slide space', () => {
     right: 0,
   }));
 });
+
+test('settings comparison ignores object key order', () => {
+  const left = {
+    version: 1,
+    guidelines: { visible: false, unit: 'px', top: 36, bottom: 48, left: 48, right: 48 },
+    customPresets: [],
+  };
+  const right = {
+    customPresets: [],
+    guidelines: { right: 48, left: 48, bottom: 48, top: 36, unit: 'px', visible: false },
+    version: 1,
+  };
+  assert.ok(S.settingsEqual(left, right));
+  right.guidelines.top = 40;
+  assert.ok(!S.settingsEqual(left, right));
+});

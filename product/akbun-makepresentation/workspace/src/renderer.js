@@ -1037,7 +1037,7 @@ async function loadPersistentSettings() {
   );
   customPresets = structuredClone(appSettings.customPresets);
   state.showGuidelines = appSettings.guidelines.visible;
-  if (!hasSettingsFile || JSON.stringify(stored) !== JSON.stringify(appSettings)) {
+  if (!hasSettingsFile || !S.settingsEqual(stored, appSettings)) {
     await window.api.saveSettings(appSettings);
   }
   if (!hasSettingsFile && legacyPresets.length) {

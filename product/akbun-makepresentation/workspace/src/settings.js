@@ -70,6 +70,18 @@
     };
   }
 
+  function sortedValue(value) {
+    if (Array.isArray(value)) return value.map(sortedValue);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, sortedValue(value[key])])
+    );
+  }
+
+  function settingsEqual(left, right) {
+    return JSON.stringify(sortedValue(left)) === JSON.stringify(sortedValue(right));
+  }
+
   function guidelineMarginsFit(width, height, guidelines) {
     const sizeWidth = Number(width);
     const sizeHeight = Number(height);
@@ -113,6 +125,7 @@
     normalizeGuidelines,
     normalizeCustomPresets,
     normalizeAppSettings,
+    settingsEqual,
     guidelineMarginsFit,
     guidelineGeometry,
   };
