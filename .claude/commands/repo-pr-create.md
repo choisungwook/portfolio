@@ -12,11 +12,15 @@ allowed-tools: Bash, Read, Glob, Grep
 3. commit할 변경이 남아 있으면 commit한다. commit message에 claude session 링크(claude.ai/code 링크, Co-Authored-By 아래 붙는 세션 URL)가 있으면 제거한다.
 4. push한다.
 5. 이번 작업의 root issue를 정한다. `product/<이름>`을 건드렸으면 그 product, `.claude`나 `.github`면 저장소 규칙과 도구, 나머지는 핸즈온이다. `gh issue list --label root --state open`으로 찾고 없으면 만든다.
-6. 기록용 Issue를 만든다. [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 Goal과 ADR을 채운다.
-7. 6의 Issue를 5의 root issue 하위로 건다. sub-issue API 호출 형식은 [.claude/rules/workflow.md](../rules/workflow.md)에 있다.
+6. 기록용 Issue를 만든다. [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 Goal과 ADR을 채운다. 변경에 목표가 다른 기능이 여럿이면 기능마다 Issue를 하나씩 만든다. 목표가 하나면 Issue도 하나다.
+7. 6의 Issue를 모두 5의 root issue 하위로 건다. sub-issue 등록 형식은 [.claude/rules/github-tools.md](../rules/github-tools.md)에 있다.
 8. root issue와 새 Issue를 project에 담는다. scope 부족으로 실패하면 안내만 하고 넘어간다.
-9. PR을 만든다. [.github/pull_request_template.md](../../.github/pull_request_template.md)를 읽고 그 섹션과 형식을 그대로 따른다. 본문 끝에 Issue #<number> 형식으로 6의 Issue를 링크한다. target branch는 master다.
+9. PR을 만든다. [.github/pull_request_template.md](../../.github/pull_request_template.md)를 읽고 그 섹션과 형식을 그대로 따른다. Issue가 여럿이어도 PR은 하나다. 본문 끝에 Issue #<number> 형식으로 6의 Issue를 모두 링크한다. target branch는 master다.
 10. Issue와 PR에 작업 유형 label(feat, docs, fix 등)과 기술 label을 함께 붙인다.
+
+## 환경
+
+GitHub 조작 도구는 [.claude/rules/github-tools.md](../rules/github-tools.md)를 따른다. shell이 없는 MCP 환경에서는 2~4단계(commit과 push)를 할 수 없으므로, 커밋되지 않은 변경이 남아 있으면 시작하지 말고 알린다.
 
 ## 제품 카탈로그 갱신
 

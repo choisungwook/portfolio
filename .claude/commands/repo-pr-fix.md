@@ -13,7 +13,7 @@ PR `$1`(없으면 현재 branch의 PR)의 리뷰 comment를 처리한다.
 3. commit하고 push한다. commit message에 claude session 링크가 있으면 제거한다.
 4. 처리한 review thread에 답글을 남기고 resolve한다.
 
-GitHub 조회와 조작은 gh CLI로 한다.
+GitHub 조회와 조작 도구는 [.claude/rules/github-tools.md](../rules/github-tools.md)를 따른다. shell이 없는 MCP 환경에서는 코드 수정과 push를 할 수 없으므로, 읽은 comment를 요약해 알리고 수정은 하지 않는다.
 
 ## 답글 형식
 
