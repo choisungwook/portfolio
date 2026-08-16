@@ -475,6 +475,19 @@ function toPoint(event) {
   };
 }
 
+function selectedShapeIndexAtPoint(point) {
+  for (const index of [...state.selection].reverse()) {
+    const shape = slide().shapes[index];
+    if (!canEditText(shape)) continue;
+    const box = L.shapeBBox(shape);
+    if (
+      point.x >= box.x && point.x <= box.x + box.w &&
+      point.y >= box.y && point.y <= box.y + box.h
+    ) return index;
+  }
+  return -1;
+}
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
   const handleEl = event.target.closest('[data-handle]');
@@ -545,32 +558,15 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  const index = hitShape ? slide().shapes.indexOf(hitShape) : -1;
+  const index = hitShape ? slide().shapes.indexOf(hitShape) : selectedShapeIndexAtPoint(p);
   const additive = event.shiftKey && !(event.metaKey || event.ctrlKey);
   if (index >= 0) {
 
-    // Opening a text box for editing is decided here rather than from a
-    // dblclick event, because the browser never reports one: pointerup
-    // redraws the canvas, so mouseup lands on a freshly built element and
-    // not the one that took mousedown, and a click needs both.
-    //
-    // preventDefault keeps the focus the overlay is about to take. Without
-    // it the press moves focus back to the page, and from there Backspace
-    // deletes the box being typed into instead of a character.
-    if (isSecondPress(index) && slide().shapes[index].kind === 'code') {
-      selectOnly(index);
-      renderCanvas();
-      renderProps();
-      openCodeDialog(index, false);
-      return;
-    }
-    if (isSecondPress(index) && canEditText(slide().shapes[index])) {
-      event.preventDefault();
-      selectOnly(index);
-      renderCanvas();
-      renderProps();
-      startTextEdit(index);
-      return;
+    const secondPress = isSecondPress(index);
+    let editOnClick = '';
+    if (secondPress && !(event.shiftKey || event.metaKey || event.ctrlKey)) {
+      if (slide().shapes[index].kind === 'code') editOnClick = 'code';
+      else if (canEditText(slide().shapes[index])) editOnClick = 'text';
     }
 
     // Shift changes this object's membership, but only on a press that never
@@ -605,6 +601,8 @@ canvas.addEventListener('pointerdown', (event) => {
       moved: false,
       duplicated,
       originalSelection,
+      editOnClick,
+      editIndex: index,
       // Only an already-selected object can be dropped by a Shift-click. One
       // that was just added by the same press has to stay.
       toggleIndex: additive && wasSelected ? index : -1,
@@ -699,6 +697,13 @@ canvas.addEventListener('pointerup', () => {
         ...L.shapeIndicesInRect(slide().shapes, rect),
       ]);
     }
+  } else if (drag.mode === 'move' && !drag.moved && drag.editOnClick) {
+    selectOnly(drag.editIndex);
+    renderCanvas();
+    renderProps();
+    if (drag.editOnClick === 'code') openCodeDialog(drag.editIndex, false);
+    else startTextEdit(drag.editIndex);
+    return;
   } else if (drag.mode === 'move' && !drag.moved && drag.toggleIndex >= 0) {
     // A Shift-press that never moved: the click half of Shift-click.
     selectMany(L.toggleSelection(state.selection, drag.toggleIndex, slide().shapes.length));
