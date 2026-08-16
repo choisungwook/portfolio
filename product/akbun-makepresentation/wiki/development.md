@@ -32,6 +32,8 @@ npm run test:rust
 
 Opening `src/index.html` in a plain browser also works for poking at the editor; file operations degrade to no-ops there.
 
+AI protocol testing requires a separately installed Codex CLI logged in with ChatGPT. Do not add Codex to the app bundle. The page's plain-browser fallback is sufficient for panel layout and unavailable-state QA; App Server streaming requires the Tauri bridge or a direct stdio smoke test.
+
 ## Release
 
 Push to master with changes under `product/akbun-makepresentation/` and the `release-akbun-makepresentation` workflow builds a macOS dmg, creates the `akbun-makepresentation-v<version>` release, and copies `latest.json` to the fixed `akbun-makepresentation-updater` tag the installed app polls.

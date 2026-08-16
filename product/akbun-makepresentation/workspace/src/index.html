@@ -101,7 +101,12 @@
       </div>
     </section>
 
-    <aside id="props" tabindex="-1">
+    <aside id="right-panel">
+      <div id="right-panel-tabs" role="tablist" aria-label="Right panel">
+        <button id="right-tab-inspector" class="active" type="button" role="tab" aria-selected="true" aria-controls="props" data-right-panel="inspector">Inspector</button>
+        <button id="right-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-right-panel="ai">AI</button>
+      </div>
+      <section id="props" class="right-panel-page" tabindex="-1" role="tabpanel" aria-labelledby="right-tab-inspector">
       <!-- The background belongs to the slide, not to any shape, so it sits
            in its own card above the selection properties. Sharing the Fill
            row with shapes is what made people recolor a rectangle while
@@ -241,7 +246,57 @@
         <button id="btn-group">Group</button>
         <button id="btn-ungroup">Ungroup</button>
       </div>
-      <button id="btn-delete-shape">Delete shape</button>
+        <button id="btn-delete-shape">Delete shape</button>
+      </section>
+
+      <section id="ai-panel" class="right-panel-page" role="tabpanel" aria-labelledby="right-tab-ai" hidden>
+        <div id="ai-list-view" class="ai-view">
+          <header class="ai-panel-header">
+            <div>
+              <h2>AI conversations</h2>
+              <p>Saved on this device</p>
+            </div>
+            <button id="btn-ai-new" type="button" class="primary">New</button>
+          </header>
+          <div id="ai-connection-banner" class="ai-connection-banner" data-state="checking">
+            <span class="ai-status-dot" aria-hidden="true"></span>
+            <span id="ai-connection-text">Checking Codex…</span>
+          </div>
+          <p id="ai-list-status" class="ai-panel-status" aria-live="polite"></p>
+          <div id="ai-session-list" class="ai-session-list"></div>
+        </div>
+
+        <div id="ai-chat-view" class="ai-view ai-chat-view" hidden>
+          <header class="ai-chat-header">
+            <button id="btn-ai-back" type="button">Back</button>
+            <div>
+              <h2 id="ai-chat-title">New conversation</h2>
+              <p id="ai-chat-meta"></p>
+            </div>
+          </header>
+          <div id="ai-messages" class="ai-messages" aria-live="polite"></div>
+          <div id="ai-readonly-notice" class="ai-readonly-notice" hidden>
+            This conversation is read-only. Start a new conversation to continue.
+          </div>
+          <div id="ai-composer" class="ai-composer">
+            <div id="ai-mode-picker" class="ai-mode-picker" role="tablist" aria-label="AI output">
+              <button type="button" class="active" role="tab" data-ai-mode="text" aria-selected="true">Text</button>
+              <button type="button" role="tab" data-ai-mode="image" aria-selected="false">Image</button>
+              <button type="button" role="tab" data-ai-mode="slide" aria-selected="false">Slide</button>
+            </div>
+            <label id="ai-slide-target-row" class="ai-slide-target" for="ai-slide-target" hidden>
+              Based on
+              <select id="ai-slide-target"></select>
+            </label>
+            <textarea id="ai-prompt" rows="4" maxlength="100000" placeholder="Ask AI…"></textarea>
+            <div class="ai-composer-actions">
+              <span id="ai-turn-status" aria-live="polite"></span>
+              <button id="btn-ai-stop" type="button" hidden>Stop</button>
+              <button id="btn-ai-send" type="button" class="primary">Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </aside>
   </main>
 
@@ -352,6 +407,7 @@
       <header><h1 id="settings-title">Settings</h1></header>
       <nav aria-label="Settings sections">
         <button class="active" data-settings-page="general">General</button>
+        <button data-settings-page="ai">AI</button>
         <button data-settings-page="presets">Presets</button>
         <button data-settings-page="updates">Updates</button>
       </nav>
@@ -359,6 +415,18 @@
         <section data-settings-panel="general">
           <h2>General</h2>
           <p>Guidelines and custom presets are stored in settings.json in the app data directory.</p>
+        </section>
+        <section data-settings-panel="ai" hidden>
+          <h2>AI</h2>
+          <p>Uses the ChatGPT subscription connected through the installed Codex CLI. API key authentication is not supported.</p>
+          <div id="settings-ai-status" class="settings-ai-status" data-state="checking">
+            <span class="ai-status-dot" aria-hidden="true"></span>
+            <div>
+              <strong id="settings-ai-status-title">Checking Codex…</strong>
+              <p id="settings-ai-status-detail">Looking for Codex CLI and ChatGPT authentication.</p>
+            </div>
+          </div>
+          <button id="btn-ai-refresh" type="button">Refresh status</button>
         </section>
         <!-- Checking for a version is something you do now and then, not while
              drawing, so it sits here rather than next to the tools. -->
@@ -383,7 +451,9 @@
 
   <script src="editor.js"></script>
   <script src="settings.js"></script>
+  <script src="ai.js"></script>
   <script src="api.js"></script>
+  <script src="ai-panel.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

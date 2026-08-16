@@ -8,3 +8,4 @@
 | [2026-08-updater-fixed-tag-endpoint.md](./2026-08-updater-fixed-tag-endpoint.md) | The updater polls a fixed per-product tag, not releases/latest |
 | [2026-08-background-is-a-slide-field.md](./2026-08-background-is-a-slide-field.md) | The slide background is a field on the slide, not a page-sized shape |
 | [2026-08-menus-in-the-window.md](./2026-08-menus-in-the-window.md) | The menus live in the window; only the clipboard items macOS needs stay in the menu bar |
+| [2026-08-codex-app-server-ai.md](./2026-08-codex-app-server-ai.md) | Reuse Codex ChatGPT authentication but keep AI conversations app-owned |

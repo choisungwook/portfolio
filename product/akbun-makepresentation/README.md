@@ -23,6 +23,9 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Open and save .pptx, export every slide as a .pdf
 - Presentation mode (fullscreen, arrow keys)
 - Self update from Settings, Updates
+- AI panel backed by a separately installed Codex CLI and its ChatGPT subscription login
+- Streaming text, generated images, and non-destructive slide edits from an app-owned conversation
+- Up to three local, read-only conversation archives; each archive including images is capped at 128 MiB
 
 ## Shortcuts
 
@@ -70,6 +73,8 @@ cd workspace
 npm install
 npm start
 ```
+
+AI features additionally require Codex CLI on `PATH` and a ChatGPT login made with `codex login`. The app does not bundle Codex, copy its credentials, or support API key authentication. Settings, AI only reports whether that existing subscription login is available.
 
 Run the tests, which need no app binary:
 

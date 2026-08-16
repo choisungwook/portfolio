@@ -5,6 +5,8 @@
 
 const L = globalThis.slidesLib;
 const S = globalThis.makepresentationSettings;
+const AI = globalThis.makepresentationAi;
+const AiPanel = globalThis.makepresentationAiPanel;
 
 const state = {
   deck: L.createDeck(),
@@ -1342,11 +1344,15 @@ function openSettings() {
   renderSettingsPresets();
   settingsDialog.showModal();
   settingsDialog.querySelector('[data-settings-page="general"]')?.focus();
+  void AiPanel.refreshStatus();
 }
 
 settingsDialog.querySelector('nav').addEventListener('click', (event) => {
   const button = event.target.closest('[data-settings-page]');
-  if (button) setSettingsPage(button.dataset.settingsPage);
+  if (button) {
+    setSettingsPage(button.dataset.settingsPage);
+    if (button.dataset.settingsPage === 'ai') void AiPanel.refreshStatus();
+  }
 });
 
 $('settings-presets').addEventListener('click', (event) => {
@@ -2381,6 +2387,36 @@ for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => setTool(button.dataset.tool));
 }
 
+function captureAiSlide(index) {
+  const reference = state.deck.slides[index];
+  if (!reference) return null;
+  return {
+    index,
+    reference,
+    slide: structuredClone(reference),
+  };
+}
+
+function applyAiSlidePatch(target, patch) {
+  const index = state.deck.slides.indexOf(target.reference);
+  if (index < 0) throw new Error('The source slide was removed before AI finished.');
+  const newSlide = AI.applySlidePatch(target.slide, patch);
+  state.deck.slides.splice(index + 1, 0, newSlide);
+  state.current = index + 1;
+  setSlideSelection([state.current]);
+  clearSelection();
+  markDirty();
+  renderAll();
+  return state.current + 1;
+}
+
+async function insertAiImage(_path, assetUrl) {
+  const response = await fetch(assetUrl);
+  if (!response.ok) throw new Error(`cannot read saved image (${response.status})`);
+  const shape = await pastedImageShape(await response.blob(), 0);
+  insertShapes([shape], 0);
+}
+
 async function initialize() {
   try {
     await loadPersistentSettings();
@@ -2394,6 +2430,17 @@ async function initialize() {
   setZoom(state.zoom);
   renderAll();
   loadSystemFonts();
+  await AiPanel.initialize({
+    currentSlideIndex: () => state.current,
+    listSlides: () => state.deck.slides.map((_, index) => ({
+      index,
+      label: `Slide ${index + 1}`,
+    })),
+    captureSlide: captureAiSlide,
+    applySlidePatch: applyAiSlidePatch,
+    insertImage: insertAiImage,
+    deckSize,
+  });
 }
 
 void initialize();
