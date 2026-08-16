@@ -48,17 +48,28 @@
         <button data-command="zoom-fit">Fit to window<span class="accel">⌘0</span></button>
       </div>
     </div>
+    <button class="menubar-command" data-command="settings">Settings</button>
   </nav>
 
   <header id="toolbar">
     <div class="group tools">
-      <button data-tool="select" title="Select (V)">Select</button>
+      <button data-tool="select" title="Select (V)" aria-label="Select">
+        <svg viewBox="0 0 18 18" class="toolbar-icon" aria-hidden="true">
+          <path d="M3 2.5 14 10l-4.7.8 2.6 4.4-2.4 1.3-2.6-4.4-3.2 3z" />
+        </svg>
+      </button>
       <button data-tool="rect" title="Rectangle (R)">▭</button>
       <button data-tool="ellipse" title="Ellipse (O)">◯</button>
       <button data-tool="line" title="Line (L)">╱</button>
       <button data-tool="arrow" title="Arrow (A)">➔</button>
       <button data-tool="pen" title="Freehand (P)">✎</button>
       <button data-tool="text" title="Text (T)">T</button>
+      <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 18 18" class="toolbar-icon" aria-hidden="true">
+          <rect x="2.5" y="2.5" width="5.5" height="5.5" />
+          <circle cx="12.5" cy="12.5" r="3" />
+        </svg>
+      </button>
     </div>
     <div class="group">
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
@@ -72,6 +83,8 @@
       <div class="slide-actions">
         <button id="btn-add-slide" title="Add a slide after this one">+ Slide</button>
         <button id="btn-del-slide" title="Delete this slide">Delete</button>
+        <button id="btn-slide-up" class="icon-action" title="Move selected slides up" aria-label="Move selected slides up">↑</button>
+        <button id="btn-slide-down" class="icon-action" title="Move selected slides down" aria-label="Move selected slides down">↓</button>
       </div>
     </aside>
 
@@ -92,14 +105,14 @@
       <section id="props-background">
         <h2>Slide background</h2>
         <div class="swatches" id="bg-swatches">
-          <button class="swatch" data-bg="#ffffff" title="White" style="--swatch: #ffffff"></button>
-          <button class="swatch" data-bg="#f8f9fa" title="Paper" style="--swatch: #f8f9fa"></button>
-          <button class="swatch" data-bg="#fff9db" title="Cream" style="--swatch: #fff9db"></button>
-          <button class="swatch" data-bg="#e7f5ff" title="Sky" style="--swatch: #e7f5ff"></button>
-          <button class="swatch" data-bg="#e6fcf5" title="Mint" style="--swatch: #e6fcf5"></button>
-          <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="--swatch: #f3f0ff"></button>
-          <button class="swatch" data-bg="#343a40" title="Charcoal" style="--swatch: #343a40"></button>
-          <button class="swatch" data-bg="#212022" title="Ink" style="--swatch: #212022"></button>
+          <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
+          <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
+          <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
+          <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
+          <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
+          <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
+          <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
+          <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
         </div>
         <div class="prop-row">
           <label for="prop-background">Custom</label>
@@ -141,21 +154,21 @@
           <div class="prop-row">
             <label for="prop-arrow-start">Start end</label>
             <select id="prop-arrow-start">
-              <option value="none">None</option>
-              <option value="triangle">Triangle</option>
-              <option value="arrow">Open arrow</option>
-              <option value="oval">Circle</option>
-              <option value="diamond">Diamond</option>
+              <option value="none">None  ─</option>
+              <option value="triangle">Triangle  ◀─</option>
+              <option value="arrow">Open arrow  &lt;─</option>
+              <option value="oval">Circle  ●─</option>
+              <option value="diamond">Diamond  ◆─</option>
             </select>
           </div>
           <div class="prop-row">
             <label for="prop-arrow-end">Finish end</label>
             <select id="prop-arrow-end">
-              <option value="none">None</option>
-              <option value="triangle">Triangle</option>
-              <option value="arrow">Open arrow</option>
-              <option value="oval">Circle</option>
-              <option value="diamond">Diamond</option>
+              <option value="none">None  ─</option>
+              <option value="triangle">Triangle  ─▶</option>
+              <option value="arrow">Open arrow  ─&gt;</option>
+              <option value="oval">Circle  ─●</option>
+              <option value="diamond">Diamond  ─◆</option>
             </select>
           </div>
         </div>
@@ -254,6 +267,48 @@
     <button id="context-ungroup">Ungroup</button>
     <button id="context-save-image">Save as Image</button>
   </div>
+
+  <div id="preset-menu" role="menu" aria-label="Shape presets" hidden>
+    <section>
+      <h2>Default presets</h2>
+      <div id="default-presets" class="preset-grid"></div>
+    </section>
+    <section id="custom-presets-section">
+      <h2>My presets</h2>
+      <div id="custom-presets" class="preset-grid"></div>
+    </section>
+  </div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-shell">
+      <header><h1 id="settings-title">Settings</h1></header>
+      <nav aria-label="Settings sections">
+        <button class="active" data-settings-page="general">General</button>
+        <button data-settings-page="presets">Presets</button>
+      </nav>
+      <div class="settings-content">
+        <section data-settings-panel="general">
+          <h2>General</h2>
+          <p>Settings are stored on this device.</p>
+        </section>
+        <section data-settings-panel="presets" hidden>
+          <h2>My presets</h2>
+          <p>Save the objects selected on the current slide as a reusable preset.</p>
+          <div class="preset-form">
+            <label for="preset-name">Preset name</label>
+            <input id="preset-name" maxlength="60" placeholder="My preset" />
+            <button id="btn-save-preset" type="button">Save selected objects</button>
+          </div>
+          <p id="preset-settings-status" class="settings-status" aria-live="polite"></p>
+          <div id="settings-presets" class="settings-preset-list"></div>
+        </section>
+      </div>
+      <footer>
+        <button id="btn-settings-cancel" type="button">Cancel</button>
+        <button id="btn-settings-ok" type="button" class="primary">OK</button>
+      </footer>
+    </div>
+  </dialog>
 
   <script src="editor.js"></script>
   <script src="api.js"></script>

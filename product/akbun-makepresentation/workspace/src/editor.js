@@ -40,6 +40,13 @@ const TEXTUAL = new Set(['rect', 'ellipse']);
 // The five pptx line ends, under their pptx names, so a round trip through
 // `a:headEnd`/`a:tailEnd` is a rename and nothing else.
 const ARROW_ENDS = ['none', 'triangle', 'arrow', 'oval', 'diamond'];
+const DEFAULT_PRESET_IDS = [
+  'red-filled-rectangle',
+  'red-outline-rectangle',
+  'numbered-circle',
+  'right-open-arrow',
+  'left-open-arrow',
+];
 const MAX_CLIPBOARD_SHAPES = 100;
 const MAX_GEOMETRY = 1_000_000;
 
@@ -242,6 +249,43 @@ function shapeBBox(shape) {
   const x = Math.min(shape.x, shape.x + shape.w);
   const y = Math.min(shape.y, shape.y + shape.h);
   return { x, y, w: Math.abs(shape.w), h: Math.abs(shape.h) };
+}
+
+function defaultPresetShapes(id) {
+  const red = '#e03131';
+  if (id === 'red-filled-rectangle' || id === 'red-outline-rectangle') {
+    const shape = createShape('rect', 0, 0, {
+      stroke: red,
+      fill: id === 'red-filled-rectangle' ? red : 'none',
+    });
+    shape.w = 160;
+    shape.h = 90;
+    return [shape];
+  }
+  if (id === 'numbered-circle') {
+    const shape = createShape('ellipse', 0, 0, {
+      stroke: red,
+      fill: 'none',
+      fontSize: 30,
+      textColor: red,
+    });
+    shape.w = 90;
+    shape.h = 90;
+    shape.text = '1';
+    return [shape];
+  }
+  if (id === 'right-open-arrow' || id === 'left-open-arrow') {
+    const pointsRight = id === 'right-open-arrow';
+    const shape = createShape('arrow', pointsRight ? 0 : 180, 45, {
+      stroke: red,
+      strokeWidth: 3,
+    });
+    shape.w = pointsRight ? 180 : -180;
+    shape.h = 0;
+    shape.arrowEnd = 'arrow';
+    return [shape];
+  }
+  return [];
 }
 
 function normalizeRect(x0, y0, x1, y1) {
@@ -523,6 +567,29 @@ function moveSlide(deck, from, to) {
   return at;
 }
 
+function moveSlideSelection(deck, indices, direction) {
+  if (direction !== -1 && direction !== 1) return [];
+  const selected = new Set(indices.filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < deck.slides.length
+  ));
+  if (direction < 0) {
+    for (let index = 1; index < deck.slides.length; index += 1) {
+      if (!selected.has(index) || selected.has(index - 1)) continue;
+      [deck.slides[index - 1], deck.slides[index]] = [deck.slides[index], deck.slides[index - 1]];
+      selected.delete(index);
+      selected.add(index - 1);
+    }
+  } else {
+    for (let index = deck.slides.length - 2; index >= 0; index -= 1) {
+      if (!selected.has(index) || selected.has(index + 1)) continue;
+      [deck.slides[index], deck.slides[index + 1]] = [deck.slides[index + 1], deck.slides[index]];
+      selected.delete(index);
+      selected.add(index + 1);
+    }
+  }
+  return [...selected].sort((left, right) => left - right);
+}
+
 function duplicateSlide(deck, index) {
   deck.slides.splice(index + 1, 0, structuredClone(deck.slides[index]));
   return index + 1;
@@ -570,9 +637,11 @@ function fontAttr(shape) {
   return `font-family="${escapeXml(shape.fontFamily || 'Helvetica')}, sans-serif"`;
 }
 
+const TEXT_CHAR_WIDTH = 0.52;
+
 function wrapTextLines(text, width, fontSize) {
   if (!(width > 0)) return String(text || '').split('\n');
-  const max = Math.max(1, Math.floor(width / Math.max(fontSize * 0.52, 1)));
+  const max = Math.max(1, Math.floor(width / Math.max(fontSize * TEXT_CHAR_WIDTH, 1)));
   const lines = [];
   for (const paragraph of String(text || '').split('\n')) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -580,18 +649,48 @@ function wrapTextLines(text, width, fontSize) {
       lines.push('');
       continue;
     }
-    let line = words.shift();
-    for (const word of words) {
-      if (`${line} ${word}`.length <= max) {
+    let line = '';
+    for (let word of words) {
+      while (word.length > max) {
+        if (line) {
+          lines.push(line);
+          line = '';
+        }
+        lines.push(word.slice(0, max));
+        word = word.slice(max);
+      }
+      if (!word) continue;
+      if (!line) {
+        line = word;
+      } else if (`${line} ${word}`.length <= max) {
         line += ` ${word}`;
       } else {
         lines.push(line);
         line = word;
       }
     }
-    lines.push(line);
+    if (line) lines.push(line);
   }
   return lines;
+}
+
+function fitTextBox(shape, text, maxWidth) {
+  if (!shape || shape.kind !== 'text') return shape;
+  const content = String(text || '');
+  const fontSize = Math.max(1, Number(shape.fontSize) || DEFAULT_STYLE.fontSize);
+  const available = Number.isFinite(maxWidth)
+    ? maxWidth
+    : SLIDE_W - Math.max(0, Number(shape.x) || 0);
+  const widthLimit = Math.max(1, available);
+  const minWidth = Math.min(120, widthLimit);
+  const longest = Math.max(1, ...content.split('\n').map((line) => line.length));
+  shape.w = Math.min(
+    widthLimit,
+    Math.max(minWidth, longest * fontSize * TEXT_CHAR_WIDTH + 4)
+  );
+  const lines = wrapTextLines(content, shape.w, fontSize);
+  shape.h = Math.max(fontSize * 1.4, lines.length * fontSize * 1.35);
+  return shape;
 }
 
 function rotateSvg(shape, markup) {
@@ -892,6 +991,7 @@ const exported = {
   DEFAULT_STYLE,
   DEFAULT_BACKGROUND,
   ARROW_ENDS,
+  DEFAULT_PRESET_IDS,
   TEXTUAL,
   textBox,
   ZOOM_STEPS,
@@ -903,6 +1003,7 @@ const exported = {
   createSlide,
   slideBackground,
   createShape,
+  defaultPresetShapes,
   parseClipboardShapes,
   dragShape,
   isDegenerate,
@@ -922,10 +1023,12 @@ const exported = {
   addSlide,
   deleteSlide,
   moveSlide,
+  moveSlideSelection,
   duplicateSlide,
   slideNumberShape,
   escapeXml,
   wrapTextLines,
+  fitTextBox,
   rotateSvg,
   renderShapeSvg,
   renderSlideSvg,

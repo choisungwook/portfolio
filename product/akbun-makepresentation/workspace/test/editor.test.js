@@ -459,11 +459,12 @@ test('renderShapeSvg draws an image border and a freehand end arrow', () => {
   assert.ok(L.renderShapeSvg(pen).includes('<polygon'));
 });
 
-test('wrapTextLines wraps at word boundaries', () => {
+test('wrapTextLines wraps words and splits one wider than the box', () => {
   assert.deepStrictEqual(L.wrapTextLines('one two three', 45, 20), [
     'one',
     'two',
-    'three',
+    'thre',
+    'e',
   ]);
 });
 
@@ -611,6 +612,38 @@ test('renderShapeSvg draws a rect and its text, and the outline alone when hidde
   assert.ok(!L.renderShapeSvg(shape, { hideText: true }).includes('in the box'));
 });
 
+test('fitTextBox grows with text and wraps after its width limit', () => {
+  const shape = L.createShape('text', 0, 0, {});
+  L.fitTextBox(shape, 'short');
+  const shortWidth = shape.w;
+
+  L.fitTextBox(shape, 'a longer line of text');
+  assert.ok(shape.w > shortWidth);
+
+  L.fitTextBox(shape, 'word '.repeat(40), 160);
+  assert.strictEqual(shape.w, 160);
+  assert.ok(shape.h > shape.fontSize * 1.4);
+
+  L.fitTextBox(shape, 'near the edge', 50);
+  assert.strictEqual(shape.w, 50);
+});
+
+test('default presets provide the requested red shapes and directions', () => {
+  const filled = L.defaultPresetShapes('red-filled-rectangle')[0];
+  const outline = L.defaultPresetShapes('red-outline-rectangle')[0];
+  const numbered = L.defaultPresetShapes('numbered-circle')[0];
+  const right = L.defaultPresetShapes('right-open-arrow')[0];
+  const left = L.defaultPresetShapes('left-open-arrow')[0];
+
+  assert.strictEqual(filled.fill, '#e03131');
+  assert.strictEqual(outline.fill, 'none');
+  assert.strictEqual(numbered.text, '1');
+  assert.strictEqual(numbered.w, numbered.h);
+  assert.strictEqual(right.arrowEnd, 'arrow');
+  assert.ok(right.w > 0);
+  assert.ok(left.w < 0);
+});
+
 test('an empty rect draws no text element at all', () => {
   const shape = L.createShape('rect', 0, 0, {});
   L.dragShape(shape, 0, 0, 200, 100);
@@ -653,6 +686,18 @@ test('moveSlide clamps past either end instead of losing a slide', () => {
   assert.strictEqual(L.moveSlide(deck, 0, 99), 1);
   assert.deepStrictEqual(deck.slides.map((s) => s.id), [1, 0]);
   assert.strictEqual(deck.slides.length, 2);
+});
+
+test('moveSlideSelection moves adjacent selected slides as one block', () => {
+  const deck = { slides: [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }] };
+  const moved = L.moveSlideSelection(deck, [1, 2], -1);
+
+  assert.deepStrictEqual(deck.slides.map((slide) => slide.id), [1, 2, 0, 3]);
+  assert.deepStrictEqual(moved, [0, 1]);
+
+  const restored = L.moveSlideSelection(deck, moved, 1);
+  assert.deepStrictEqual(deck.slides.map((slide) => slide.id), [0, 1, 2, 3]);
+  assert.deepStrictEqual(restored, [1, 2]);
 });
 
 test('moveSlide refuses an index that is not on the deck', () => {
