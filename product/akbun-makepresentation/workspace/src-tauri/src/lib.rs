@@ -1,3 +1,4 @@
+mod ai;
 mod commands;
 
 // The app carries its own File/Edit/View menus in the window, so the system
@@ -52,6 +53,8 @@ pub fn run() {
             #[cfg(desktop)]
             install_menu(app)?;
 
+            ai::setup(app)?;
+
             // The window is the whole app, so the webview console is where
             // almost every bug shows up first. Debug builds only.
             #[cfg(debug_assertions)]
@@ -65,6 +68,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ai::ai_start_server,
+            ai::ai_send_rpc,
+            ai::ai_stop_server,
+            ai::ai_runtime_directory,
+            ai::ai_list_sessions,
+            ai::ai_load_session,
+            ai::ai_save_session,
+            ai::ai_delete_session,
+            ai::ai_attach_image,
+            ai::ai_copy_image,
             commands::open_deck,
             commands::save_deck,
             commands::export_pdf,
@@ -73,6 +86,7 @@ pub fn run() {
             commands::load_settings,
             commands::save_settings,
         ])
+        .manage(ai::AiRuntime::default())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

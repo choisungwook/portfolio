@@ -161,7 +161,8 @@ body {
 button,
 select,
 input[type='number'],
-input[type='search'] {
+input[type='search'],
+textarea {
   font: inherit;
   color: var(--fg);
   background: var(--panel);
@@ -172,6 +173,11 @@ input[type='search'] {
 
 button:hover {
   border-color: var(--accent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 button.active {
@@ -542,10 +548,42 @@ main {
 
 /* --- property panel --- */
 
-#props {
-  width: 210px;
+#right-panel {
+  width: 320px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border-left: 1px solid var(--border);
+}
+
+#right-panel-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+#right-panel-tabs button {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+#right-panel-tabs button.active {
+  color: var(--fg);
+  border-color: var(--border);
+  background: var(--accent-soft);
+}
+
+.right-panel-page {
+  flex: 1;
+  min-height: 0;
+}
+
+#props {
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -558,6 +596,311 @@ main {
 /* Rows must keep their height when the panel scrolls, not be squeezed. */
 #props > * {
   flex: none;
+}
+
+/* --- AI panel --- */
+
+#ai-panel {
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.ai-view {
+  height: 100%;
+  min-height: 0;
+}
+
+.ai-panel-header,
+.ai-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-panel-header {
+  justify-content: space-between;
+}
+
+.ai-panel-header h2,
+.ai-chat-header h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ai-panel-header p,
+.ai-chat-header p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-chat-header > div {
+  min-width: 0;
+}
+
+.ai-chat-header h2,
+.ai-chat-header p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-connection-banner,
+.settings-ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.ai-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+[data-state='available'] .ai-status-dot {
+  background: #2f9e44;
+}
+
+[data-state='unavailable'] .ai-status-dot {
+  background: #e03131;
+}
+
+.ai-panel-status {
+  min-height: 1.2em;
+  margin: 0 12px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-session-list {
+  height: calc(100% - 114px);
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+
+.ai-session-empty {
+  display: flex;
+  height: 100%;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ai-session-empty strong {
+  color: var(--fg);
+}
+
+.ai-session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-session-open {
+  min-width: 0;
+  border-color: transparent;
+  text-align: left;
+  background: transparent;
+}
+
+.ai-session-open strong,
+.ai-session-open span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-session-open span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-session-delete {
+  align-self: center;
+  color: #e03131;
+}
+
+.ai-chat-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+}
+
+.ai-message {
+  margin-bottom: 14px;
+}
+
+.ai-message-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.ai-message-body {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.ai-message[data-role='user'] .ai-message-body {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--accent-soft);
+}
+
+.ai-message-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.ai-message-actions button,
+.ai-image-actions button {
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-image-card {
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.ai-image-card img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 5px;
+  object-fit: contain;
+  background: var(--panel);
+  user-select: none;
+}
+
+.ai-image-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.ai-readonly-notice {
+  margin: 0 12px 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--bg);
+  line-height: 1.4;
+}
+
+.ai-composer {
+  flex: none;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-mode-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ai-mode-picker button {
+  padding: 4px 6px;
+  color: var(--muted);
+}
+
+.ai-mode-picker button.active {
+  color: var(--fg);
+}
+
+.ai-slide-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-slide-target select {
+  max-width: 160px;
+}
+
+#ai-prompt {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  user-select: text;
+}
+
+.ai-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+#ai-turn-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-ai-status {
+  margin: 16px 0 12px;
+  align-items: flex-start;
+}
+
+.settings-ai-status strong {
+  display: block;
+}
+
+.settings-ai-status p {
+  margin: 4px 0 0;
 }
 
 #props-hint {

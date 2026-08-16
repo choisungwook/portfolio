@@ -51,71 +51,104 @@ if (!window.__TAURI__) {
     onGuidelinesChanged: () => Promise.resolve(() => {}),
     onFileCommand: () => Promise.resolve(() => {}),
     checkUpdate: async () => {},
+    aiStartServer: async () => ({ running: false, reason: 'desktop_required' }),
+    aiSendRpc: async () => {
+      throw new Error('AI integration needs the desktop app.');
+    },
+    aiStopServer: async () => {},
+    aiRuntimeDirectory: async () => '',
+    aiListSessions: async () => [],
+    aiLoadSession: async () => null,
+    aiSaveSession: async () => 0,
+    aiDeleteSession: async () => {},
+    aiAttachImage: async () => null,
+    aiCopyImage: async () => {},
+    aiImageUrl: (path) => path,
+    onAiServerMessage: () => Promise.resolve(() => {}),
+    onAiServerState: () => Promise.resolve(() => {}),
+    isDesktop: false,
   };
-  throw new Error('not running under Tauri; using the browser fallback api');
-}
+} else {
+  const { invoke, convertFileSrc } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const { open: openDialog, save: saveDialog, message, ask } = window.__TAURI__.dialog;
+  const { getCurrentWindow } = window.__TAURI__.window;
+  const currentWindow = getCurrentWindow();
 
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
-const { open: openDialog, save: saveDialog, message, ask } = window.__TAURI__.dialog;
-const { getCurrentWindow } = window.__TAURI__.window;
-const currentWindow = getCurrentWindow();
-
-async function checkUpdate() {
-  const { check } = window.__TAURI__.updater;
-  const { relaunch } = window.__TAURI__.process;
-  try {
-    const update = await check();
-    if (!update) {
-      await message('You are on the latest version.', { title: 'akbun-makepresentation' });
-      return;
+  async function checkUpdate() {
+    const { check } = window.__TAURI__.updater;
+    const { relaunch } = window.__TAURI__.process;
+    try {
+      const update = await check();
+      if (!update) {
+        await message('You are on the latest version.', { title: 'akbun-makepresentation' });
+        return;
+      }
+      const install = await ask(
+        `Version ${update.version} is available. Download and install it now?`,
+        { title: 'Update available', kind: 'info' }
+      );
+      if (!install) return;
+      await update.downloadAndInstall();
+      await relaunch();
+    } catch (error) {
+      await message(`Cannot check for updates.\n\n${error}`, {
+        title: 'Update failed',
+        kind: 'error',
+      });
     }
-    const install = await ask(
-      `Version ${update.version} is available. Download and install it now?`,
-      { title: 'Update available', kind: 'info' }
-    );
-    if (!install) return;
-    await update.downloadAndInstall();
-    await relaunch();
-  } catch (error) {
-    await message(`Cannot check for updates.\n\n${error}`, {
-      title: 'Update failed',
-      kind: 'error',
-    });
   }
+
+  window.api = {
+    pickOpen: () =>
+      openDialog({
+        title: 'Open Deck',
+        filters: [{ name: 'Slide Deck', extensions: ['pptx'] }],
+      }),
+
+    pickSave: (defaultName, extension) =>
+      saveDialog({
+        title: 'Save',
+        defaultPath: defaultName,
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+      }),
+
+    openDeck: (path) => invoke('open_deck', { path }),
+    saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
+    exportPdf: (path, pages) => invoke('export_pdf', { path, pages }),
+    savePng: (path, dataUrl) => invoke('save_png', { path, dataUrl }),
+    loadSettings: () => invoke('load_settings'),
+    saveSettings: (settings) => invoke('save_settings', { settings }),
+    listSystemFonts: () => invoke('list_system_fonts'),
+
+    message: (text, opts) => message(text, opts),
+    ask: (text, opts) => ask(text, opts),
+    setTitle: (title) => currentWindow.setTitle(title),
+    setFullscreen: (enabled) => currentWindow.setFullscreen(enabled),
+    onFullscreenChanged: (handler) =>
+      currentWindow.onResized(async () => handler(await currentWindow.isFullscreen())),
+    onGuidelinesChanged: (handler) =>
+      listen('guidelines-changed', (event) => handler(!!event.payload)),
+    onFileCommand: (handler) =>
+      listen('file-command', (event) => handler(event.payload)),
+    checkUpdate,
+    aiStartServer: () => invoke('ai_start_server'),
+    aiSendRpc: (message) => invoke('ai_send_rpc', { message }),
+    aiStopServer: () => invoke('ai_stop_server'),
+    aiRuntimeDirectory: () => invoke('ai_runtime_directory'),
+    aiListSessions: () => invoke('ai_list_sessions'),
+    aiLoadSession: (sessionId) => invoke('ai_load_session', { sessionId }),
+    aiSaveSession: (sessionId, session) => invoke('ai_save_session', { sessionId, session }),
+    aiDeleteSession: (sessionId) => invoke('ai_delete_session', { sessionId }),
+    aiAttachImage: (sessionId, sourcePath, imageId) =>
+      invoke('ai_attach_image', { sessionId, sourcePath, imageId }),
+    aiCopyImage: (sourcePath, destinationPath) =>
+      invoke('ai_copy_image', { sourcePath, destinationPath }),
+    aiImageUrl: (path) => convertFileSrc(path),
+    onAiServerMessage: (handler) =>
+      listen('ai-server-message', (event) => handler(event.payload)),
+    onAiServerState: (handler) =>
+      listen('ai-server-state', (event) => handler(event.payload)),
+    isDesktop: true,
+  };
 }
-
-window.api = {
-  pickOpen: () =>
-    openDialog({
-      title: 'Open Deck',
-      filters: [{ name: 'Slide Deck', extensions: ['pptx'] }],
-    }),
-
-  pickSave: (defaultName, extension) =>
-    saveDialog({
-      title: 'Save',
-      defaultPath: defaultName,
-      filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
-    }),
-
-  openDeck: (path) => invoke('open_deck', { path }),
-  saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
-  exportPdf: (path, pages) => invoke('export_pdf', { path, pages }),
-  savePng: (path, dataUrl) => invoke('save_png', { path, dataUrl }),
-  loadSettings: () => invoke('load_settings'),
-  saveSettings: (settings) => invoke('save_settings', { settings }),
-  listSystemFonts: () => invoke('list_system_fonts'),
-
-  message: (text, opts) => message(text, opts),
-  ask: (text, opts) => ask(text, opts),
-  setTitle: (title) => currentWindow.setTitle(title),
-  setFullscreen: (enabled) => currentWindow.setFullscreen(enabled),
-  onFullscreenChanged: (handler) =>
-    currentWindow.onResized(async () => handler(await currentWindow.isFullscreen())),
-  onGuidelinesChanged: (handler) =>
-    listen('guidelines-changed', (event) => handler(!!event.payload)),
-  onFileCommand: (handler) =>
-    listen('file-command', (event) => handler(event.payload)),
-  checkUpdate,
-};
