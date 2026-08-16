@@ -1,10 +1,10 @@
-default_permissions = "workspace-no-images"
+default_permissions = "workspace"
 
-[permissions.workspace-no-images]
-description = "Workspace editing without image file access."
+[permissions.workspace]
+description = "Project workspace permissions."
 extends = ":workspace"
 
-[permissions.workspace-no-images.filesystem.":workspace_roots"]
+[permissions.workspace.filesystem.":workspace_roots"]
 "**/*.avif" = "deny"
 "**/*.AVIF" = "deny"
 "**/*.bmp" = "deny"
@@ -28,5 +28,5 @@ extends = ":workspace"
 "**/*.webp" = "deny"
 "**/*.WEBP" = "deny"
 
-[permissions.workspace-no-images.network]
+[permissions.workspace.network]
 enabled = true
