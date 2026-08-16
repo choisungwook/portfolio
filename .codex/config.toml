@@ -1,10 +1,10 @@
-default_permissions = "workspace"
+default_permissions = "portfolio"
 
-[permissions.workspace]
-description = "Project workspace permissions."
+[permissions.portfolio]
+description = "Portfolio project permissions."
 extends = ":workspace"
 
-[permissions.workspace.filesystem.":workspace_roots"]
+[permissions.portfolio.filesystem.":workspace_roots"]
 "**/*.avif" = "deny"
 "**/*.AVIF" = "deny"
 "**/*.bmp" = "deny"
@@ -28,5 +28,5 @@ extends = ":workspace"
 "**/*.webp" = "deny"
 "**/*.WEBP" = "deny"
 
-[permissions.workspace.network]
+[permissions.portfolio.network]
 enabled = true
