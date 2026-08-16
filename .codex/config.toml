@@ -1,4 +1,32 @@
-sandbox_mode = "workspace-write"
+default_permissions = "workspace-no-images"
 
-[sandbox_workspace_write]
-network_access = true
+[permissions.workspace-no-images]
+description = "Workspace editing without image file access."
+extends = ":workspace"
+
+[permissions.workspace-no-images.filesystem.":workspace_roots"]
+"**/*.avif" = "deny"
+"**/*.AVIF" = "deny"
+"**/*.bmp" = "deny"
+"**/*.BMP" = "deny"
+"**/*.gif" = "deny"
+"**/*.GIF" = "deny"
+"**/*.ico" = "deny"
+"**/*.ICO" = "deny"
+"**/*.jpeg" = "deny"
+"**/*.JPEG" = "deny"
+"**/*.jpg" = "deny"
+"**/*.JPG" = "deny"
+"**/*.png" = "deny"
+"**/*.PNG" = "deny"
+"**/*.svg" = "deny"
+"**/*.SVG" = "deny"
+"**/*.tif" = "deny"
+"**/*.TIF" = "deny"
+"**/*.tiff" = "deny"
+"**/*.TIFF" = "deny"
+"**/*.webp" = "deny"
+"**/*.WEBP" = "deny"
+
+[permissions.workspace-no-images.network]
+enabled = true

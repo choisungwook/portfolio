@@ -1,9 +1,5 @@
 # AI right panel design QA
 
-- source visual truth: [design-qa-source.png](./design-qa-source.png)
-- implementation screenshot: [design-qa-implementation.png](./design-qa-implementation.png)
-- focused source panel: [design-qa-source-panel.png](./design-qa-source-panel.png)
-- focused implementation panel: [design-qa-panel.png](./design-qa-panel.png)
 - viewport: 1440 x 900 CSS px; minimum-window check at 1000 x 640 CSS px
 - pixels and density: source 2808 x 2494 px, rendered attachment reference approximately 1694 x 1512 CSS px; implementation 1440 x 900 px at device scale 1
 - normalization: full views were fit to frame because the source is a taller reference product, not a clone target. Focused panels were cropped to 626 x 2494 source pixels and 320 x 803 implementation pixels, then compared fit-to-height.
