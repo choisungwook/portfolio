@@ -5,6 +5,7 @@ description = "Portfolio project permissions."
 extends = ":workspace"
 
 [permissions.portfolio.filesystem.":workspace_roots"]
+".git" = "write"
 "**/*.avif" = "deny"
 "**/*.AVIF" = "deny"
 "**/*.bmp" = "deny"
