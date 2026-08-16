@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 pub mod pdf;
 pub mod pptx;
 
-pub const SLIDE_W: f64 = 1280.0;
-pub const SLIDE_H: f64 = 720.0;
+pub const SLIDE_W: f64 = 1920.0;
+pub const SLIDE_H: f64 = 1080.0;
 pub const EMU_PER_PX: f64 = 9525.0;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

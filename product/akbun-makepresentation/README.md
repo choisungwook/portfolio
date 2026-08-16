@@ -12,11 +12,12 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
 - Multi-object group and ungroup from the right-click menu or the panel, with grouped move and duplicate
 - Its own File, Edit and View menus in the window rather than in the system menu bar
+- Configurable TITLE and CONTENT guideline margins, stored per device in px or cm
 - Image borders and interactive crop handles with a shaded outside area
 - Line, arrow and freehand ends chosen per side: none, triangle, open arrow, circle, diamond
 - Rotate any object from the grip above its resize handles, in quarter turns with Shift
 - Zoom from 50% to 400%, from the status bar or the keyboard
-- Slide numbers, toggled from the status bar
+- Slide numbers, toggled from the Slides menu
 - Undo and redo, multi-object selection, copy and paste, duplicate
 - Paste text and images from the system clipboard
 - Open and save .pptx, export every slide as a .pdf

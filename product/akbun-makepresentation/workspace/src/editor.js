@@ -4,17 +4,17 @@
 // shape. No DOM access, so node can test all of it without an app binary.
 // renderer.js owns the DOM and calls into here.
 
-const SLIDE_W = 1280;
-const SLIDE_H = 720;
+const SLIDE_W = 1920;
+const SLIDE_H = 1080;
 const PX_PER_INCH = 96;
 const CM_PER_INCH = 2.54;
 const MIN_SLIDE_SIZE = 64;
 const MAX_SLIDE_SIZE = 10000;
 const SLIDE_SIZE_PRESETS = Object.freeze({
-  '16:9': Object.freeze({ width: 1280, height: 720 }),
-  '4:3': Object.freeze({ width: 960, height: 720 }),
-  '3:4': Object.freeze({ width: 720, height: 960 }),
-  '9:16': Object.freeze({ width: 720, height: 1280 }),
+  '16:9': Object.freeze({ width: 1920, height: 1080 }),
+  '4:3': Object.freeze({ width: 1440, height: 1080 }),
+  '3:4': Object.freeze({ width: 1080, height: 1440 }),
+  '9:16': Object.freeze({ width: 1080, height: 1920 }),
 });
 
 // Paper white. A slide keeps its own background so changing it touches that

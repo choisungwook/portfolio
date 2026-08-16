@@ -4,6 +4,7 @@
 // panel, text editing, and presentation mode. Model math lives in editor.js.
 
 const L = globalThis.slidesLib;
+const S = globalThis.makepresentationSettings;
 
 const state = {
   deck: L.createDeck(),
@@ -32,6 +33,7 @@ const textEditor = $('text-editor');
 const present = $('present');
 const contextMenu = $('context-menu');
 const presetMenu = $('preset-menu');
+const guidelinesDialog = $('guidelines-dialog');
 const slideSizeDialog = $('slide-size-dialog');
 const settingsDialog = $('settings-dialog');
 const fontPicker = $('font-picker');
@@ -42,6 +44,7 @@ let fontFamilies = ['Arial', 'Helvetica'];
 let textEditBefore = null;
 let customPresets = [];
 let settingsPresetDraft = [];
+let appSettings = S.defaultAppSettings();
 
 const slide = () => state.deck.slides[state.current];
 const deckSize = () => L.slideSize(state.deck);
@@ -197,17 +200,13 @@ function slideNumberSvg(index) {
 function guidelinesSvg() {
   if (!state.showGuidelines) return '';
   const { width, height } = deckSize();
-  const marginX = width * 0.05;
-  const titleY = height * 0.067;
-  const titleHeight = height * 0.156;
-  const contentY = height * 0.267;
-  const contentHeight = height * 0.644;
+  const geometry = S.guidelineGeometry(width, height, appSettings.guidelines);
   return (
     '<g class="guidelines" aria-hidden="true">' +
-    `<rect x="${marginX}" y="${titleY}" width="${width - marginX * 2}" height="${titleHeight}"/>` +
-    `<text x="${marginX + 12}" y="${titleY + 24}">TITLE</text>` +
-    `<rect x="${marginX}" y="${contentY}" width="${width - marginX * 2}" height="${contentHeight}"/>` +
-    `<text x="${marginX + 12}" y="${contentY + 24}">CONTENT</text>` +
+    `<rect x="${geometry.x}" y="${geometry.titleY}" width="${geometry.width}" height="${geometry.titleHeight}"/>` +
+    `<text x="${geometry.x + 12}" y="${geometry.titleY + 24}">TITLE</text>` +
+    `<rect x="${geometry.x}" y="${geometry.contentY}" width="${geometry.width}" height="${geometry.contentHeight}"/>` +
+    `<text x="${geometry.x + 12}" y="${geometry.contentY + 24}">CONTENT</text>` +
     '</g>'
   );
 }
@@ -1008,8 +1007,8 @@ function shapeBounds(shapes) {
 // middle is where the slide's own content already is, so a preset dropped
 // there had to be dragged off the content before it could be placed at all.
 // The margins are the ones the content guideline uses.
-const PRESET_MARGIN_X = 64;
-const PRESET_MARGIN_Y = 48;
+const PRESET_MARGIN_X = 48;
+const PRESET_MARGIN_Y = 36;
 
 function cornerPresetShapes(shapes) {
   const copies = L.cloneShapes(shapes);
@@ -1020,26 +1019,36 @@ function cornerPresetShapes(shapes) {
   return copies;
 }
 
-function readCustomPresets() {
+function readLegacyCustomPresets() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((preset) => {
-      if (!preset || typeof preset !== 'object') return [];
-      const id = String(preset.id || '').trim().slice(0, 100);
-      if (!id) return [];
-      const shapes = L.parseClipboardShapes(JSON.stringify(preset.shapes || []))
-        .filter((shape) => shape.kind !== 'image');
-      if (!shapes.length) return [];
-      return [{
-        id,
-        name: String(preset.name || 'Preset').slice(0, 60),
-        shapes,
-      }];
-    });
+    return S.normalizeCustomPresets(parsed);
   } catch (_) {
     return [];
   }
+}
+
+async function loadPersistentSettings() {
+  const stored = await window.api.loadSettings();
+  const hasSettingsFile = !!stored && typeof stored === 'object';
+  const legacyPresets = hasSettingsFile ? [] : readLegacyCustomPresets();
+  appSettings = S.normalizeAppSettings(
+    hasSettingsFile ? stored : { customPresets: legacyPresets }
+  );
+  customPresets = structuredClone(appSettings.customPresets);
+  state.showGuidelines = appSettings.guidelines.visible;
+  if (!hasSettingsFile || !S.settingsEqual(stored, appSettings)) {
+    await window.api.saveSettings(appSettings);
+  }
+  if (!hasSettingsFile && legacyPresets.length) {
+    localStorage.removeItem(PRESET_STORAGE_KEY);
+  }
+}
+
+async function persistAppSettings(settings) {
+  const normalized = S.normalizeAppSettings(settings);
+  await window.api.saveSettings(normalized);
+  appSettings = normalized;
 }
 
 function presetButton(preset, source) {
@@ -1077,9 +1086,9 @@ function renderPresetMenu() {
   $('custom-presets-section').hidden = customPresets.length === 0;
 }
 
-function persistCustomPresets(presets) {
-  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
-  customPresets = structuredClone(presets);
+async function persistCustomPresets(presets) {
+  await persistAppSettings({ ...appSettings, customPresets: presets });
+  customPresets = structuredClone(appSettings.customPresets);
   renderPresetMenu();
 }
 
@@ -1124,6 +1133,81 @@ presetMenu.addEventListener('click', (event) => {
   insertShapes(cornerPresetShapes(preset.shapes), 0);
   hidePresetMenu();
   canvas.focus({ preventScroll: true });
+});
+
+let guidelineUnit = 'px';
+
+function guidelineValue(value, unit) {
+  if (unit === 'cm') return String(L.pixelsToCentimeters(value));
+  return String(Math.round(value * 100) / 100);
+}
+
+function setGuidelineFields(guidelines, unit) {
+  for (const side of ['top', 'bottom', 'left', 'right']) {
+    $(`guidelines-${side}`).value = guidelineValue(guidelines[side], unit);
+  }
+}
+
+function guidelinesFromFields(unit = guidelineUnit) {
+  const values = {};
+  for (const side of ['top', 'bottom', 'left', 'right']) {
+    const value = Number($(`guidelines-${side}`).value);
+    if (!Number.isFinite(value) || value < 0) return null;
+    values[side] = unit === 'cm' ? L.centimetersToPixels(value) : value;
+  }
+  return values;
+}
+
+function setGuidelineUnit(unit, guidelines) {
+  guidelineUnit = unit;
+  $('guidelines-unit').value = unit;
+  for (const side of ['top', 'bottom', 'left', 'right']) {
+    const input = $(`guidelines-${side}`);
+    input.max = unit === 'cm' ? '264.583' : '10000';
+    input.step = unit === 'cm' ? '0.001' : '0.01';
+  }
+  setGuidelineFields(guidelines, unit);
+}
+
+function openGuidelinesDialog() {
+  hideMenus();
+  hidePresetMenu();
+  const guidelines = appSettings.guidelines;
+  $('guidelines-status').textContent = '';
+  $('guidelines-visible').checked = guidelines.visible;
+  setGuidelineUnit(guidelines.unit, guidelines);
+  guidelinesDialog.showModal();
+  $('guidelines-visible').focus();
+}
+
+$('guidelines-unit').addEventListener('change', (event) => {
+  const guidelines = guidelinesFromFields(guidelineUnit) || appSettings.guidelines;
+  setGuidelineUnit(event.target.value, guidelines);
+});
+
+$('btn-guidelines-cancel').addEventListener('click', () => guidelinesDialog.close('cancel'));
+$('guidelines-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const margins = guidelinesFromFields();
+  const { width, height } = deckSize();
+  if (!margins || !S.guidelineMarginsFit(width, height, margins)) {
+    $('guidelines-status').textContent = 'Margins must leave space inside the slide.';
+    return;
+  }
+  const guidelines = {
+    visible: $('guidelines-visible').checked,
+    unit: guidelineUnit,
+    ...margins,
+  };
+  try {
+    await persistAppSettings({ ...appSettings, guidelines });
+    state.showGuidelines = appSettings.guidelines.visible;
+    renderCanvas();
+    guidelinesDialog.close('apply');
+    canvas.focus({ preventScroll: true });
+  } catch (_) {
+    $('guidelines-status').textContent = 'Could not save guidelines on this device.';
+  }
 });
 
 let slideSizeUnit = 'px';
@@ -1275,9 +1359,9 @@ $('settings-presets').addEventListener('click', (event) => {
 });
 
 $('btn-settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
-$('btn-settings-ok').addEventListener('click', () => {
+$('btn-settings-ok').addEventListener('click', async () => {
   try {
-    persistCustomPresets(settingsPresetDraft);
+    await persistCustomPresets(settingsPresetDraft);
     settingsDialog.close('ok');
   } catch (_) {
     $('preset-settings-status').textContent = 'Could not save presets on this device.';
@@ -1622,7 +1706,7 @@ async function saveSelectionAsPreset() {
     return;
   }
   try {
-    persistCustomPresets([...customPresets, preset]);
+    await persistCustomPresets([...customPresets, preset]);
   } catch (_) {
     await window.api.message('Could not save the preset on this device.', {
       title: 'Preset save failed',
@@ -2018,7 +2102,6 @@ async function openFile() {
     // The number flag has nowhere to live in a .pptx, so an opened file
     // starts with it off; any numbers baked in on save are plain text boxes.
     state.showNumbers = false;
-    setNumbersButton();
     resetHistory();
     renderAll();
   } catch (error) {
@@ -2227,7 +2310,7 @@ const MENU_COMMANDS = {
   ungroup: ungroupSelection,
   present: enterPresent,
   settings: openSettings,
-  guidelines: toggleGuidelines,
+  guidelines: openGuidelinesDialog,
   numbers: toggleNumbers,
   'slide-size': openSlideSizeDialog,
   'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
@@ -2289,29 +2372,28 @@ $('menubar').addEventListener('pointerover', (event) => {
 window.api.onFileCommand(runCommand);
 $('btn-present').addEventListener('click', enterPresent);
 
-function setNumbersButton() {
-  $('btn-numbers').classList.toggle('active', state.showNumbers);
-}
-
 function toggleNumbers() {
   state.showNumbers = !state.showNumbers;
-  setNumbersButton();
   renderAll();
 }
-
-function toggleGuidelines() {
-  state.showGuidelines = !state.showGuidelines;
-  renderCanvas();
-}
-
-$('btn-numbers').addEventListener('click', toggleNumbers);
 $('btn-update').addEventListener('click', () => window.api.checkUpdate());
 for (const button of document.querySelectorAll('[data-tool]')) {
   button.addEventListener('click', () => setTool(button.dataset.tool));
 }
 
-setTool('select');
-setZoom(state.zoom);
-customPresets = readCustomPresets();
-renderAll();
-loadSystemFonts();
+async function initialize() {
+  try {
+    await loadPersistentSettings();
+  } catch (error) {
+    await window.api.message(`Could not load settings.\n\n${error}`, {
+      title: 'Settings unavailable',
+      kind: 'error',
+    });
+  }
+  setTool('select');
+  setZoom(state.zoom);
+  renderAll();
+  loadSystemFonts();
+}
+
+void initialize();
