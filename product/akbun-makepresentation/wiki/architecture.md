@@ -22,7 +22,8 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
   "bold": false, "italic": false, "underline": false,
   "textAlign": "left | center | right", "verticalAlign": "top | center | bottom",
   "rotation": 0,
-  "arrowStart": "none | triangle | arrow | oval | diamond", "arrowEnd": "none"
+  "arrowStart": "none | triangle | arrow | oval | diamond",
+  "arrowEnd": "none | triangle | arrow | oval | diamond"
 } ] } ] }
 ```
 
