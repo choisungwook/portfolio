@@ -533,6 +533,13 @@ main {
   pointer-events: none;
 }
 
+.snap-guides {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 6;
+  pointer-events: none;
+}
+
 .crop-overlay {
   pointer-events: none;
 }
@@ -977,6 +984,14 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.shape-align-buttons {
+  flex-wrap: wrap;
+}
+
+.shape-align-buttons button {
+  flex: 1 1 calc(50% - 3px);
 }
 
 .icon {
@@ -1565,6 +1580,12 @@ input[type='color'] {
   align-items: center;
   gap: 8px 12px;
   margin-top: 16px;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .settings-border-fields {

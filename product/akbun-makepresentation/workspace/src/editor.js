@@ -542,6 +542,86 @@ function moveShape(shape, dx, dy) {
   }
 }
 
+function visualShapeBBox(shape) {
+  return rotatedBBox(shapeBBox(shape), Number(shape.rotation) || 0);
+}
+
+function boundsForShapes(shapes) {
+  if (!shapes.length) return null;
+  const boxes = shapes.map(visualShapeBBox);
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.w));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+function validShapeIndices(shapes, indices) {
+  return [...new Set(indices)].filter(
+    (index) => Number.isInteger(index) && index >= 0 && index < shapes.length
+  );
+}
+
+function alignShapes(shapes, indices, edge) {
+  const selected = validShapeIndices(shapes, indices);
+  if (selected.length < 2 || !['top', 'bottom', 'left', 'right'].includes(edge)) return false;
+  const boxes = selected.map((index) => visualShapeBBox(shapes[index]));
+  const target = edge === 'top'
+    ? Math.min(...boxes.map((box) => box.y))
+    : edge === 'bottom'
+    ? Math.max(...boxes.map((box) => box.y + box.h))
+    : edge === 'left'
+    ? Math.min(...boxes.map((box) => box.x))
+    : Math.max(...boxes.map((box) => box.x + box.w));
+  selected.forEach((index, offset) => {
+    const box = boxes[offset];
+    const current = edge === 'top' ? box.y
+      : edge === 'bottom' ? box.y + box.h
+      : edge === 'left' ? box.x
+      : box.x + box.w;
+    const dx = edge === 'left' || edge === 'right' ? target - current : 0;
+    const dy = edge === 'top' || edge === 'bottom' ? target - current : 0;
+    moveShape(shapes[index], dx, dy);
+  });
+  return true;
+}
+
+function closestSnap(candidates, threshold) {
+  return candidates.reduce((closest, candidate) => {
+    if (Math.abs(candidate.offset) > threshold) return closest;
+    if (!closest || Math.abs(candidate.offset) < Math.abs(closest.offset)) return candidate;
+    return closest;
+  }, null);
+}
+
+function snapMove(shapes, indices, dx, dy, threshold) {
+  const selected = validShapeIndices(shapes, indices);
+  const selectedSet = new Set(selected);
+  const moving = boundsForShapes(selected.map((index) => shapes[index]));
+  const targets = shapes.filter((_, index) => !selectedSet.has(index)).map(visualShapeBBox);
+  if (!moving || targets.length === 0 || !(threshold >= 0)) {
+    return { dx, dy, vertical: null, horizontal: null };
+  }
+  const left = moving.x + dx;
+  const right = left + moving.w;
+  const top = moving.y + dy;
+  const bottom = top + moving.h;
+  const vertical = closestSnap(targets.flatMap((box) => [
+    { offset: box.x - left, line: box.x },
+    { offset: box.x + box.w - right, line: box.x + box.w },
+  ]), threshold);
+  const horizontal = closestSnap(targets.flatMap((box) => [
+    { offset: box.y - top, line: box.y },
+    { offset: box.y + box.h - bottom, line: box.y + box.h },
+  ]), threshold);
+  return {
+    dx: dx + (vertical ? vertical.offset : 0),
+    dy: dy + (horizontal ? horizontal.offset : 0),
+    vertical: vertical ? vertical.line : null,
+    horizontal: horizontal ? horizontal.line : null,
+  };
+}
+
 let groupSequence = 0;
 
 function nextGroupId() {
@@ -693,6 +773,15 @@ function setShapeBox(shape, from, x0, y0, x1, y1) {
   shape.y = y0;
   shape.w = x1 - x0;
   shape.h = y1 - y0;
+  if (shape.kind === 'code') {
+    const before = shapeBBox(from);
+    const after = shapeBBox(shape);
+    const scale = Math.min(
+      before.w > 0 ? after.w / before.w : 1,
+      before.h > 0 ? after.h / before.h : 1
+    );
+    shape.fontSize = Math.max(1, (Number(from.fontSize) || DEFAULT_STYLE.fontSize) * scale);
+  }
 }
 
 // Resize by dragging a handle. `from` is the shape as it was when the drag
@@ -939,21 +1028,21 @@ function codeShapeSvg(shape) {
   const theme = CODE_FORMATS[shape.codeFormat] || CODE_FORMATS['editor-dark'];
   const format = CODE_FORMATS[shape.codeFormat] ? shape.codeFormat : 'editor-dark';
   const language = CODE_LANGUAGES.includes(shape.codeLanguage) ? shape.codeLanguage : 'plaintext';
-  const fontSize = Math.max(10, Number(shape.fontSize) || 24);
+  const fontSize = Math.max(1, Number(shape.fontSize) || 24);
   const lineHeight = fontSize * 1.48;
-  const chromeHeight = format === 'minimal' ? 0 : Math.max(42, fontSize * 1.8);
-  const top = chromeHeight + Math.max(18, fontSize * 0.8);
+  const chromeHeight = format === 'minimal' ? 0 : fontSize * 1.8;
+  const top = chromeHeight + fontSize * 0.8;
   const lines = String(shape.text || '').replace(/\r/g, '').split('\n');
   const showNumbers = shape.showLineNumbers !== false;
   const digits = String(Math.max(1, lines.length)).length;
   const gutter = showNumbers ? fontSize * (digits * 0.62 + 1.4) : 0;
-  const left = Math.max(24, fontSize * 1.05) + gutter;
-  const right = Math.max(42, fontSize * 1.8);
+  const left = fontSize * 1.05 + gutter;
+  const right = fontSize * 1.8;
   const highlights = new Set(normalizeLineNumbers(shape.codeHighlights));
   const callouts = normalizeLineNumbers(shape.codeCallouts);
   const calloutNumbers = new Map(callouts.map((line, index) => [line, index + 1]));
   const visible = Math.max(1, Math.floor((box.h - top - fontSize * 0.5) / lineHeight));
-  const radius = Math.min(18, box.w / 8, box.h / 8);
+  const radius = Math.min(fontSize * 0.75, box.w / 8, box.h / 8);
   const header = format === 'minimal'
     ? ''
     : `<rect width="${box.w}" height="${chromeHeight}" fill="${theme.chrome}"/>` +
@@ -985,9 +1074,14 @@ function codeShapeSvg(shape) {
   const overflow = lines.length > visible
     ? `<text x="${box.w - fontSize}" y="${box.h - fontSize * 0.55}" text-anchor="end" font-size="${fontSize * 0.7}" fill="${theme.muted}" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">+${lines.length - visible} lines</text>`
     : '';
+  const leftCrop = Math.max(0, Math.min(0.95, Number(shape.cropLeft) || 0));
+  const topCrop = Math.max(0, Math.min(0.95, Number(shape.cropTop) || 0));
+  const width = Math.max(0.05, 1 - leftCrop - Math.max(0, Number(shape.cropRight) || 0));
+  const height = Math.max(0.05, 1 - topCrop - Math.max(0, Number(shape.cropBottom) || 0));
+  const viewBox = `${box.w * leftCrop} ${box.h * topCrop} ${box.w * width} ${box.h * height}`;
   return rotateSvg(
     shape,
-    `<svg x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" viewBox="0 0 ${box.w} ${box.h}" overflow="hidden"><rect width="${box.w}" height="${box.h}" rx="${radius}" fill="${theme.background}"/>${header}${body}${overflow}</svg>`
+    `<svg x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" viewBox="${viewBox}" overflow="hidden"><rect width="${box.w}" height="${box.h}" rx="${radius}" fill="${theme.background}"/>${header}${body}${overflow}</svg>`
   );
 }
 
@@ -1419,6 +1513,10 @@ const exported = {
   shapeIndicesInRect,
   toggleSelection,
   moveShape,
+  visualShapeBBox,
+  boundsForShapes,
+  alignShapes,
+  snapMove,
   groupShapes,
   ungroupShapes,
   groupIndicesFor,

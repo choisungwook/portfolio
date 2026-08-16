@@ -5,7 +5,7 @@
     ? require('./editor.js')
     : globalThis.slidesLib;
 
-  const SETTINGS_VERSION = 2;
+  const SETTINGS_VERSION = 3;
   const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
   const DEFAULT_SHAPE_BORDER = Object.freeze({
     color: '#e03131',
@@ -29,6 +29,7 @@
   function defaultAppSettings() {
     return {
       version: SETTINGS_VERSION,
+      snapping: { enabled: true },
       guidelines: { ...DEFAULT_GUIDELINES },
       editorDefaults: {
         fontFamily: DEFAULT_FONT_FAMILY,
@@ -100,10 +101,16 @@
     };
   }
 
+  function normalizeSnapping(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return { enabled: source.enabled !== false };
+  }
+
   function normalizeAppSettings(value) {
     const source = value && typeof value === 'object' ? value : {};
     return {
       version: SETTINGS_VERSION,
+      snapping: normalizeSnapping(source.snapping),
       guidelines: normalizeGuidelines(source.guidelines),
       editorDefaults: normalizeEditorDefaults(source.editorDefaults),
       customPresets: normalizeCustomPresets(source.customPresets),
@@ -168,6 +175,7 @@
     normalizeGuidelines,
     normalizeBorder,
     normalizeEditorDefaults,
+    normalizeSnapping,
     normalizeCustomPresets,
     normalizeAppSettings,
     settingsEqual,

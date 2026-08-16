@@ -13,3 +13,4 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [AI 인증은 Codex를 재사용하고 대화는 앱이 소유](2026-08-ai-sessions-are-app-owned.md)
 * [코드 블록은 편집 모델과 PPTX 표현을 분리](2026-08-code-blocks-keep-source-metadata.md)
 * [편집 기본값은 객체 종류별 로컬 설정으로 관리](2026-08-editor-defaults-are-local-settings.md)
+* [도형 정렬과 자석은 보이는 바깥 경계를 사용](2026-08-shape-alignment-uses-visual-bounds.md)

@@ -234,6 +234,58 @@ test('moveShape shifts pen points', () => {
   ]);
 });
 
+test('alignShapes uses the outside edge of the complete selection', () => {
+  const first = L.createShape('rect', 40, 80, {});
+  const second = L.createShape('rect', 120, 20, {});
+  first.w = 100;
+  first.h = 40;
+  second.w = 60;
+  second.h = 80;
+  const shapes = [first, second];
+
+  assert.ok(L.alignShapes(shapes, [0, 1], 'top'));
+  assert.deepStrictEqual(shapes.map((shape) => shape.y), [20, 20]);
+  assert.ok(L.alignShapes(shapes, [0, 1], 'right'));
+  assert.deepStrictEqual(shapes.map((shape) => shape.x + shape.w), [180, 180]);
+});
+
+test('alignShapes follows the visible outside edge of rotated shapes', () => {
+  const rotated = L.createShape('rect', 0, 0, {});
+  rotated.w = 100;
+  rotated.h = 20;
+  rotated.rotation = 90;
+  const plain = L.createShape('rect', 80, 0, {});
+  plain.w = 20;
+  plain.h = 20;
+
+  L.alignShapes([rotated, plain], [0, 1], 'left');
+  assert.strictEqual(L.visualShapeBBox(rotated).x, L.visualShapeBBox(plain).x);
+});
+
+test('snapMove matches selection edges to unselected shape edges', () => {
+  const moving = L.createShape('rect', 10, 10, {});
+  moving.w = 50;
+  moving.h = 40;
+  const target = L.createShape('rect', 103, 98, {});
+  target.w = 80;
+  target.h = 60;
+
+  const snapped = L.snapMove([moving, target], [0], 90, 85, 8);
+  assert.deepStrictEqual(snapped, {
+    dx: 93,
+    dy: 88,
+    vertical: 103,
+    horizontal: 98,
+  });
+  const outside = L.snapMove([moving, target], [0], 70, 60, 8);
+  assert.deepStrictEqual(outside, {
+    dx: 70,
+    dy: 60,
+    vertical: null,
+    horizontal: null,
+  });
+});
+
 test('resizeShape se handle grows the box from a frozen start', () => {
   const shape = L.createShape('rect', 10, 10, {});
   L.dragShape(shape, 10, 10, 110, 60);
@@ -251,6 +303,19 @@ test('resizeShape clamps below the minimum size', () => {
   const from = structuredClone(shape);
   L.resizeShape(shape, from, 'se', -500, -500);
   assert.ok(shape.w >= 8 && shape.h >= 8);
+});
+
+test('resizing a code block scales its type instead of cropping it', () => {
+  const shape = L.createShape('code', 10, 10, { fontSize: 20 });
+  shape.w = 400;
+  shape.h = 200;
+  const from = structuredClone(shape);
+
+  L.resizeShape(shape, from, 'se', -200, -100);
+  assert.strictEqual(shape.w, 200);
+  assert.strictEqual(shape.h, 100);
+  assert.strictEqual(shape.fontSize, 10);
+  assert.ok(L.renderShapeSvg(shape).includes('height="18" fill="#2b2d30"'));
 });
 
 test('resizeShape moves a line endpoint', () => {
@@ -889,4 +954,17 @@ test('code block clipboard data keeps only supported settings and line numbers',
   assert.deepEqual(shape.codeCallouts, [4, 6, 7]);
   assert.equal(shape.showLineNumbers, false);
   assert.ok(L.renderShapeSvg(shape).includes('&lt;'));
+});
+
+test('code block crop changes its source view without changing its frame', () => {
+  const shape = L.createShape('code', 20, 30, { fontSize: 20 });
+  shape.w = 700;
+  shape.h = 360;
+  shape.text = 'const answer = 42;';
+  L.setCrop(shape, 'left', 0.25);
+  const svg = L.renderShapeSvg(shape);
+
+  assert.ok(svg.includes('viewBox="175 0 525 360"'));
+  assert.strictEqual(shape.w, 700);
+  assert.strictEqual(shape.h, 360);
 });
