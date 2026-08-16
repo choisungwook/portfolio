@@ -822,3 +822,39 @@ test('moveSlide refuses an index that is not on the deck', () => {
   assert.strictEqual(L.moveSlide(deck, 7, 0), 7);
   assert.strictEqual(deck.slides.length, 2);
 });
+
+test('code blocks render syntax colors, highlighted lines, and numbered callouts', () => {
+  const shape = L.createShape('code', 20, 30, { fontSize: 20 });
+  shape.w = 700;
+  shape.h = 360;
+  shape.text = 'def greet(name):\n  return f"Hello, {name}"';
+  shape.codeLanguage = 'python';
+  shape.codeHighlights = [2];
+  shape.codeCallouts = [1, 2];
+  const svg = L.renderShapeSvg(shape);
+  assert.ok(svg.includes('fill="#ff79c6">def</tspan>'));
+  assert.ok(svg.includes('fill="#343746"'));
+  assert.ok(svg.includes('>1</text>'));
+  assert.ok(svg.includes('>2</text>'));
+});
+
+test('code block clipboard data keeps only supported settings and line numbers', () => {
+  const [shape] = L.parseClipboardShapes(JSON.stringify([{
+    ...L.createShape('code', 10, 20, {}),
+    w: 500,
+    h: 300,
+    text: '<script>alert(1)</script>',
+    codeFormat: 'terminal',
+    codeLanguage: 'html',
+    codeHighlights: [3, -1, 3, 2],
+    codeCallouts: '4, 6-7',
+    showLineNumbers: false,
+  }]));
+  assert.equal(shape.kind, 'code');
+  assert.equal(shape.codeFormat, 'terminal');
+  assert.equal(shape.codeLanguage, 'html');
+  assert.deepEqual(shape.codeHighlights, [2, 3]);
+  assert.deepEqual(shape.codeCallouts, [4, 6, 7]);
+  assert.equal(shape.showLineNumbers, false);
+  assert.ok(L.renderShapeSvg(shape).includes('&lt;'));
+});

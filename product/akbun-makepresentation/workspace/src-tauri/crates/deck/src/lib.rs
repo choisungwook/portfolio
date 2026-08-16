@@ -64,7 +64,7 @@ pub fn default_background() -> String {
     "#ffffff".into()
 }
 
-/// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text | image.
+/// One drawable thing. `kind` is rect | ellipse | line | arrow | pen | text | image | code.
 ///
 /// rect/ellipse/text use x,y,w,h. line/arrow run from (x,y) to (x+w,y+h), so
 /// w and h may be negative. pen keeps absolute points and ignores x,y,w,h.
@@ -133,6 +133,16 @@ pub struct Shape {
     pub arrow_end: String,
     #[serde(default)]
     pub group_id: String,
+    #[serde(default = "default_code_format")]
+    pub code_format: String,
+    #[serde(default = "default_code_language")]
+    pub code_language: String,
+    #[serde(default)]
+    pub code_highlights: Vec<u32>,
+    #[serde(default)]
+    pub code_callouts: Vec<u32>,
+    #[serde(default = "default_true")]
+    pub show_line_numbers: bool,
 }
 
 pub fn default_arrow_end() -> String {
@@ -169,6 +179,18 @@ fn default_vertical_align() -> String {
     "top".into()
 }
 
+fn default_code_format() -> String {
+    "editor-dark".into()
+}
+
+fn default_code_language() -> String {
+    "python".into()
+}
+
+fn default_true() -> bool {
+    true
+}
+
 impl Default for Shape {
     fn default() -> Self {
         Shape {
@@ -200,6 +222,11 @@ impl Default for Shape {
             arrow_start: default_arrow_end(),
             arrow_end: default_arrow_end(),
             group_id: String::new(),
+            code_format: default_code_format(),
+            code_language: default_code_language(),
+            code_highlights: Vec::new(),
+            code_callouts: Vec::new(),
+            show_line_numbers: true,
         }
     }
 }
