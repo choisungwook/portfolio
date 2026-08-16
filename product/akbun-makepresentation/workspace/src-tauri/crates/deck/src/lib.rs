@@ -1,8 +1,7 @@
 //! The deck model shared with the page as JSON, plus pptx and pdf writers.
 //!
-//! Coordinates are pixels on a 1280x720 slide. pptx uses EMU with a slide of
-//! 12192000x6858000, which is exactly 9525 EMU per pixel, so the conversion
-//! is a single multiply with no rounding drift worth caring about.
+//! Coordinates are pixels. pptx uses 9525 EMU per pixel, so custom pixel and
+//! centimetre dimensions share one conversion without changing shape units.
 
 use serde::{Deserialize, Serialize};
 
@@ -13,10 +12,32 @@ pub const SLIDE_W: f64 = 1280.0;
 pub const SLIDE_H: f64 = 720.0;
 pub const EMU_PER_PX: f64 = 9525.0;
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Deck {
+    #[serde(default = "default_slide_width")]
+    pub slide_width: f64,
+    #[serde(default = "default_slide_height")]
+    pub slide_height: f64,
     pub slides: Vec<Slide>,
+}
+
+pub fn default_slide_width() -> f64 {
+    SLIDE_W
+}
+
+pub fn default_slide_height() -> f64 {
+    SLIDE_H
+}
+
+impl Default for Deck {
+    fn default() -> Self {
+        Deck {
+            slide_width: SLIDE_W,
+            slide_height: SLIDE_H,
+            slides: Vec::new(),
+        }
+    }
 }
 
 /// One slide: its own background color plus the shapes drawn on it. The

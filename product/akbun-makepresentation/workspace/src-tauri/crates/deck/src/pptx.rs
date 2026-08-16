@@ -62,7 +62,10 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     let n = deck.slides.len().max(1);
     add("[Content_Types].xml", content_types(n).as_bytes())?;
     add("_rels/.rels", ROOT_RELS.as_bytes())?;
-    add("ppt/presentation.xml", presentation(n).as_bytes())?;
+    add(
+        "ppt/presentation.xml",
+        presentation(n, deck.slide_width, deck.slide_height).as_bytes(),
+    )?;
     add("ppt/_rels/presentation.xml.rels", presentation_rels(n).as_bytes())?;
     add("ppt/slideMasters/slideMaster1.xml", MASTER.as_bytes())?;
     add(
@@ -80,7 +83,7 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     let mut media = MediaStore::default();
     for i in 0..n {
         let slide = deck.slides.get(i).unwrap_or(&empty);
-        let (xml, rels) = slide_xml(slide, &mut media);
+        let (xml, rels) = slide_xml(slide, &mut media, deck.slide_width, deck.slide_height);
         add(&format!("ppt/slides/slide{}.xml", i + 1), xml.as_bytes())?;
         add(
             &format!("ppt/slides/_rels/slide{}.xml.rels", i + 1),
@@ -194,7 +197,7 @@ const ROOT_RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"y
 <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"ppt/presentation.xml\"/>\
 </Relationships>";
 
-fn presentation(slides: usize) -> String {
+fn presentation(slides: usize, width: f64, height: f64) -> String {
     let mut ids = String::new();
     for i in 0..slides {
         ids.push_str(&format!(
@@ -208,9 +211,11 @@ fn presentation(slides: usize) -> String {
 <p:presentation{NS}>\
 <p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>\
 <p:sldIdLst>{ids}</p:sldIdLst>\
-<p:sldSz cx=\"12192000\" cy=\"6858000\"/>\
+<p:sldSz cx=\"{}\" cy=\"{}\"/>\
 <p:notesSz cx=\"6858000\" cy=\"9144000\"/>\
-</p:presentation>"
+</p:presentation>",
+        emu(width),
+        emu(height)
     )
 }
 
@@ -296,7 +301,12 @@ const THEME: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"
 </a:themeElements>\
 </a:theme>";
 
-fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
+fn slide_xml(
+    slide: &Slide,
+    media: &mut MediaStore,
+    slide_width: f64,
+    slide_height: f64,
+) -> (String, String) {
     let mut shapes = String::new();
     let mut rels = String::from(SLIDE_REL_LAYOUT);
     // rId1 is the layout; image relationships follow it.
@@ -309,7 +319,12 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
                 shapes.push_str("</p:grpSp>");
             }
             if !shape.group_id.is_empty() {
-                shapes.push_str(&group_xml(next_id, &shape.group_id));
+                shapes.push_str(&group_xml(
+                    next_id,
+                    &shape.group_id,
+                    slide_width,
+                    slide_height,
+                ));
                 next_id += 1;
             }
             open_group = shape.group_id.clone();
@@ -347,15 +362,15 @@ fn slide_xml(slide: &Slide, media: &mut MediaStore) -> (String, String) {
     (xml, rels)
 }
 
-fn group_xml(id: u64, name: &str) -> String {
+fn group_xml(id: u64, name: &str, slide_width: f64, slide_height: f64) -> String {
     format!(
         "<p:grpSp><p:nvGrpSpPr><p:cNvPr id=\"{id}\" name=\"{}\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>\
 <p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{}\" cy=\"{}\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"{}\" cy=\"{}\"/></a:xfrm></p:grpSpPr>",
         xml_escape(name),
-        emu(SLIDE_W),
-        emu(SLIDE_H),
-        emu(SLIDE_W),
-        emu(SLIDE_H),
+        emu(slide_width),
+        emu(slide_height),
+        emu(slide_width),
+        emu(slide_height),
     )
 }
 
@@ -634,7 +649,8 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         return Err("no slides found in file".into());
     }
 
-    // The declared page size, for fitting foreign canvases onto 1280x720.
+    // The page and shapes use the same pixel-to-EMU scale, so imported decks
+    // keep their original dimensions without remapping shape coordinates.
     let sld_sz = part(&mut archive, "ppt/presentation.xml").and_then(|xml| parse_sld_sz(&xml));
     let (page_w, page_h) = sld_sz
         .map(|(cx, cy)| (cx / EMU_PER_PX, cy / EMU_PER_PX))
@@ -642,7 +658,11 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
 
     let mut media_cache: HashMap<String, String> = HashMap::new();
 
-    let mut deck = Deck::default();
+    let mut deck = Deck {
+        slide_width: page_w,
+        slide_height: page_h,
+        ..Deck::default()
+    };
     for (_, name) in names {
         let xml = part(&mut archive, &name).ok_or(format!("cannot read {name}"))?;
         let rels = rels_for_part(&mut archive, &name);
@@ -765,19 +785,6 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         deck.slides.push(Slide { shapes, background });
     }
 
-    // Other editors use other canvases: 4:3, Google Slides' smaller 16:9,
-    // portrait one-offs. Fit whatever size the file declares onto this
-    // editor's 1280x720 while keeping the aspect ratio.
-    if let Some((cx, cy)) = sld_sz {
-        let scale = (SLIDE_W * EMU_PER_PX / cx).min(SLIDE_H * EMU_PER_PX / cy);
-        if (scale - 1.0).abs() > 0.001 {
-            for slide in &mut deck.slides {
-                for shape in &mut slide.shapes {
-                    scale_shape(shape, scale);
-                }
-            }
-        }
-    }
     Ok(deck)
 }
 
@@ -798,20 +805,6 @@ fn parse_sld_sz(xml: &str) -> Option<(f64, f64)> {
         }
     }
     None
-}
-
-fn scale_shape(shape: &mut Shape, scale: f64) {
-    let s = |v: f64| (v * scale * 100.0).round() / 100.0;
-    shape.x = s(shape.x);
-    shape.y = s(shape.y);
-    shape.w = s(shape.w);
-    shape.h = s(shape.h);
-    for p in &mut shape.points {
-        p[0] = s(p[0]);
-        p[1] = s(p[1]);
-    }
-    shape.font_size = s(shape.font_size).max(1.0);
-    shape.stroke_width = s(shape.stroke_width);
 }
 
 /// One zip entry as text, or None when missing or unreadable.
@@ -1948,6 +1941,7 @@ mod tests {
                     ..Slide::default()
                 },
             ],
+            ..Deck::default()
         }
     }
 
@@ -2003,6 +1997,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn round_trip_preserves_custom_slide_size() {
+        let mut deck = sample_deck();
+        deck.slide_width = 720.0;
+        deck.slide_height = 1280.0;
+        let mut buffer = Cursor::new(Vec::new());
+        write(&deck, &mut buffer).unwrap();
+        buffer.set_position(0);
+        let back = read(buffer).unwrap();
+        assert_eq!(back.slide_width, 720.0);
+        assert_eq!(back.slide_height, 1280.0);
     }
 
     /// A minimal package shaped the way PowerPoint writes one: theme colors
@@ -2241,34 +2248,15 @@ mod tests {
     }
 
     #[test]
-    fn foreign_slide_sizes_fit_the_canvas() {
-        // A portrait 4:3 flipped on its side: 6858000 x 12192000 EMU.
+    fn foreign_slide_sizes_keep_their_declared_canvas() {
         let sz = parse_sld_sz(
             "<p:presentation xmlns:p=\"x\"><p:sldSz cx=\"6858000\" cy=\"12192000\"/>\
 <p:notesSz cx=\"1\" cy=\"1\"/></p:presentation>",
         )
         .unwrap();
         assert_eq!(sz, (6858000.0, 12192000.0));
-        let scale = (SLIDE_W * EMU_PER_PX / sz.0).min(SLIDE_H * EMU_PER_PX / sz.1);
-        // Height is the binding side: 720 / 1280 of the declared height.
-        assert!((scale - 0.5625).abs() < 1e-9);
-
-        let mut shape = Shape {
-            kind: "pen".into(),
-            x: 100.0,
-            y: 200.0,
-            w: 400.0,
-            h: 80.0,
-            points: vec![[100.0, 200.0]],
-            font_size: 24.0,
-            stroke_width: 2.0,
-            ..Shape::default()
-        };
-        scale_shape(&mut shape, scale);
-        assert_eq!(shape.x, 56.25);
-        assert_eq!(shape.w, 225.0);
-        assert_eq!(shape.points[0], [56.25, 112.5]);
-        assert_eq!(shape.font_size, 13.5);
+        assert_eq!(sz.0 / EMU_PER_PX, 720.0);
+        assert_eq!(sz.1 / EMU_PER_PX, 1280.0);
     }
 
     #[test]
