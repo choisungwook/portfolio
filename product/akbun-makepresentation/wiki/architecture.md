@@ -12,7 +12,7 @@ Two sides, one JSON model between them.
 One JSON object, identical on both sides (serde mirrors it in Rust):
 
 ```json
-{ "slides": [ { "background": "#ffffff", "shapes": [ {
+{ "slideWidth": 1920, "slideHeight": 1080, "slides": [ { "background": "#ffffff", "shapes": [ {
   "kind": "rect | ellipse | line | arrow | pen | text | image",
   "x": 0, "y": 0, "w": 0, "h": 0,
   "points": [[0, 0]],
@@ -35,29 +35,34 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
 
 `rotation` is degrees about the centre of the shape's box, applied as a render transform so x/y/w/h never move. pptx stores the same angle in `a:xfrm rot` at 1/60000 degree ([decision](../knowledge/decisions/2026-08-rotation-is-a-render-transform.md)).
 
-Coordinates are pixels on a fixed 1280x720 slide. Boxy shapes use x/y/w/h; lines run from (x,y) to (x+w,y+h) so w and h may be negative; the pen keeps absolute points and ignores the box. pptx EMU is exactly 9525 per pixel at this slide size, so conversion is one multiply.
+Coordinates are pixels in the deck's slideWidth and slideHeight coordinate space, which defaults to 1920x1080. Boxy shapes use x/y/w/h; lines run from (x,y) to (x+w,y+h) so w and h may be negative; the pen keeps absolute points and ignores the box. pptx EMU is exactly 9525 per pixel, so conversion is one multiply.
 
 ## Page files
 
 - `editor.js` — the pure part: shape creation, drag/move/resize math, slide operations, and the SVG markup for shapes and slides. Exported behind one global (`slidesLib`) and through `module.exports`, so `node --test` runs it as-is.
-- `api.js` — the only bridge to the OS: native dialogs, the three commands, the updater. Falls back to no-ops in a plain browser so the editor can be poked at without Tauri.
+- `settings.js` — settings defaults, validation, legacy preset migration normalization, and guideline geometry. It is pure and runs under the same node test suite.
+- `api.js` — the only bridge to the OS: native dialogs, filesystem commands, the updater. Falls back to no-ops in a plain browser so the editor can be poked at without Tauri.
 - `renderer.js` — DOM state and events: tools, pointer interaction, the overlay textarea for text editing, property panel, thumbnails, presentation mode.
 
 ## IPC surface
 
-Three commands, each takes a path the page picked with a native dialog:
+Filesystem access stays behind narrow commands. Deck and export paths come from native dialogs; the settings commands resolve the app data directory inside Tauri.
 
 | Command | In | Out |
 |---|---|---|
 | `open_deck` | path | Deck |
 | `save_deck` | path, Deck | — |
 | `export_pdf` | path, pages `[{dataUrl, width, height}]` | — |
+| `save_png` | path, PNG data URL | — |
+| `list_system_fonts` | — | font family names |
+| `load_settings` | — | settings JSON or null |
+| `save_settings` | settings JSON | — |
 
 ## Key flows
 
 **Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates.
 
-**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) are scaled to fit the 1280x720 canvas. Rotation on any shape, picture crop, plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. A rect or an ellipse that names no `algn` or `anchor` is read as centred, because that is where this editor writes text inside a shape, and the alternative was that text typed into an opened shape landed somewhere no shape drawn here would put it. Other presets become their bounding rectangle; unsupported tables are skipped.
+**Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) keep their own pixel coordinate space. Rotation on any shape, picture crop, plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. A rect or an ellipse that names no `algn` or `anchor` is read as centred, because that is where this editor writes text inside a shape, and the alternative was that text typed into an opened shape landed somewhere no shape drawn here would put it. Other presets become their bounding rectangle; unsupported tables are skipped.
 
 **PDF export**: the page rasterizes each slide (SVG string → blob URL → Image → 1920x1080 canvas → JPEG data URL) and `export_pdf` wraps the JPEGs into PDF pages by hand — JPEG is a native PDF filter, so no PDF library is involved.
 
@@ -85,7 +90,7 @@ Opening a file or starting a new deck clears both stacks, because a history that
 
 Zoom is a view setting: it lives in `state`, not in the deck, and nothing about the model changes with it. The stage is a scroller wrapping the slide, and zoom is one CSS variable multiplying the fitted width, so the browser does the scaling and scrollbars appear on their own once the slide outgrows the window.
 
-Its control lives in the status bar along the bottom, next to the slide-number toggle. Both answer the same question — how the deck is shown, not what it contains — which is why they sit together and away from the toolbar.
+Its control lives in the status bar along the bottom. Slide numbers are toggled from the Slides menu, away from the drawing tools.
 
 Nothing else has to know. Pointer positions come from `getBoundingClientRect`, which already reports the zoomed box, so clicks map onto slide coordinates at any zoom. The one exception is the overlay textarea, placed in screen pixels: zooming while a text box is open would strand it, so a zoom commits the edit first.
 
@@ -94,3 +99,9 @@ Nothing else has to know. Pointer positions come from `getBoundingClientRect`, w
 The number is an ordinary text shape from `slideNumberShape`, not a special case in the renderer. That way it draws, rasterizes for the pdf, and exports to pptx through the paths that already exist.
 
 It lives outside `slide().shapes` while editing, so it cannot be selected or dragged. A .pptx has nowhere to record "show slide numbers", so saving bakes a real text box into each slide and opening a file starts with the toggle off.
+
+## App settings
+
+The Tauri shell reads and writes `settings.json` in the app data directory. The page validates the JSON and keeps guideline visibility, guideline margins and custom presets there. Guideline margins are stored as pixels while the last px/cm display unit is stored alongside them.
+
+Older versions stored custom presets in localStorage. When no settings file exists, the page imports that list, writes `settings.json`, and removes the old key only after the new file is saved.

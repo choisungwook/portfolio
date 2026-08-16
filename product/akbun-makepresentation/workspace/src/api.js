@@ -23,6 +23,16 @@ if (!window.__TAURI__) {
     saveDeck: async () => {},
     exportPdf: async () => {},
     savePng: async () => {},
+    loadSettings: async () => {
+      try {
+        return JSON.parse(localStorage.getItem('akbun-makepresentation.settings') || 'null');
+      } catch (_) {
+        return null;
+      }
+    },
+    saveSettings: async (settings) => {
+      localStorage.setItem('akbun-makepresentation.settings', JSON.stringify(settings));
+    },
     listSystemFonts: async () => ['Arial', 'Helvetica'],
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
@@ -93,6 +103,8 @@ window.api = {
   saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
   exportPdf: (path, pages) => invoke('export_pdf', { path, pages }),
   savePng: (path, dataUrl) => invoke('save_png', { path, dataUrl }),
+  loadSettings: () => invoke('load_settings'),
+  saveSettings: (settings) => invoke('save_settings', { settings }),
   listSystemFonts: () => invoke('list_system_fonts'),
 
   message: (text, opts) => message(text, opts),

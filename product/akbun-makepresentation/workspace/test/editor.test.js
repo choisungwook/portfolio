@@ -8,13 +8,15 @@ test('createDeck starts with one empty slide', () => {
   const deck = L.createDeck();
   assert.strictEqual(deck.slides.length, 1);
   assert.deepStrictEqual(deck.slides[0].shapes, []);
-  assert.deepStrictEqual(L.slideSize(deck), { width: 1280, height: 720 });
+  assert.deepStrictEqual(L.slideSize(deck), { width: 1920, height: 1080 });
 });
 
 test('slide size supports presets, custom pixels, and centimeters', () => {
   const deck = L.createDeck();
-  assert.deepStrictEqual(L.slideSizePreset('4:3'), { width: 960, height: 720 });
-  assert.deepStrictEqual(L.slideSizePreset('9:16'), { width: 720, height: 1280 });
+  assert.deepStrictEqual(L.slideSizePreset('16:9'), { width: 1920, height: 1080 });
+  assert.deepStrictEqual(L.slideSizePreset('4:3'), { width: 1440, height: 1080 });
+  assert.deepStrictEqual(L.slideSizePreset('3:4'), { width: 1080, height: 1440 });
+  assert.deepStrictEqual(L.slideSizePreset('9:16'), { width: 1080, height: 1920 });
   assert.strictEqual(L.slideSizePreset('custom'), null);
   assert.strictEqual(L.pixelsToCentimeters(960), 25.4);
   assert.strictEqual(L.centimetersToPixels(25.4), 960);
@@ -22,7 +24,7 @@ test('slide size supports presets, custom pixels, and centimeters', () => {
   assert.ok(L.setSlideSize(deck, 1000, 1000));
   assert.deepStrictEqual(L.slideSize(deck), { width: 1000, height: 1000 });
   assert.ok(!L.setSlideSize(deck, 0, 1000));
-  assert.deepStrictEqual(L.slideSize({ slides: [] }), { width: 1280, height: 720 });
+  assert.deepStrictEqual(L.slideSize({ slides: [] }), { width: 1920, height: 1080 });
 });
 
 test('renderSlideSvg uses the requested slide dimensions', () => {
@@ -571,7 +573,7 @@ test('renderSlideSvg paints the slide background and leaves shapes alone', () =>
   slide.background = '#212022';
 
   const svg = L.renderSlideSvg(slide);
-  assert.ok(svg.includes(`<rect width="1280" height="720" fill="#212022"/>`));
+  assert.ok(svg.includes(`<rect width="1920" height="1080" fill="#212022"/>`));
   assert.ok(svg.includes('fill="#ffd43b"'));
 });
 

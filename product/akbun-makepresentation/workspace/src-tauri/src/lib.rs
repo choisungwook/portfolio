@@ -70,6 +70,8 @@ pub fn run() {
             commands::export_pdf,
             commands::save_png,
             commands::list_system_fonts,
+            commands::load_settings,
+            commands::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

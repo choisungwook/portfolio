@@ -49,7 +49,7 @@
     <div class="menu">
       <button class="menu-title" data-menu="view" aria-haspopup="true" aria-expanded="false">View</button>
       <div class="menu-panel" data-menu-panel="view" hidden>
-        <button data-command="guidelines">Guidelines</button>
+        <button data-command="guidelines">Guidelines…</button>
         <hr />
         <button data-command="zoom-in">Zoom in<span class="accel">⌘+</span></button>
         <button data-command="zoom-out">Zoom out<span class="accel">⌘-</span></button>
@@ -95,7 +95,7 @@
     <section id="stage" tabindex="0" aria-label="Slide editor">
       <div id="stage-scroll">
         <div id="stage-inner">
-          <svg id="canvas" viewBox="0 0 1280 720" tabindex="0" aria-label="Current slide"></svg>
+          <svg id="canvas" viewBox="0 0 1920 1080" tabindex="0" aria-label="Current slide"></svg>
           <textarea id="text-editor" hidden spellcheck="false"></textarea>
         </div>
       </div>
@@ -245,11 +245,8 @@
     </aside>
   </main>
 
-  <!-- The view controls: what the deck looks like on screen, not what it
-       contains. They sit together at the bottom, away from the tools that
-       change the slide. -->
+  <!-- Zoom changes only the view, so it stays away from slide-editing tools. -->
   <footer id="statusbar">
-    <button id="btn-numbers" title="Show a slide number on every slide">№ Slide numbers</button>
     <div id="zoom">
       <button id="btn-zoom-out" title="Zoom out (Cmd+-)" aria-label="Zoom out (Cmd+-)">
         <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4" /></svg>
@@ -280,6 +277,40 @@
       <div id="custom-presets" class="preset-grid"></div>
     </section>
   </div>
+
+  <dialog id="guidelines-dialog" aria-labelledby="guidelines-title">
+    <form id="guidelines-form" method="dialog">
+      <header>
+        <h1 id="guidelines-title">Guidelines</h1>
+      </header>
+      <div class="guidelines-content">
+        <label class="guidelines-visible">
+          <input id="guidelines-visible" type="checkbox" />
+          Show guidelines
+        </label>
+        <div class="guidelines-fields">
+          <label for="guidelines-unit">Unit</label>
+          <select id="guidelines-unit">
+            <option value="px">Pixels (px)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+          <label for="guidelines-top">Top</label>
+          <input id="guidelines-top" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-bottom">Bottom</label>
+          <input id="guidelines-bottom" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-left">Left</label>
+          <input id="guidelines-left" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-right">Right</label>
+          <input id="guidelines-right" type="number" min="0" max="10000" step="0.01" required />
+        </div>
+        <p id="guidelines-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-guidelines-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
 
   <dialog id="slide-size-dialog" aria-labelledby="slide-size-title">
     <form id="slide-size-form" method="dialog">
@@ -327,7 +358,7 @@
       <div class="settings-content">
         <section data-settings-panel="general">
           <h2>General</h2>
-          <p>Settings are stored on this device.</p>
+          <p>Guidelines and custom presets are stored in settings.json in the app data directory.</p>
         </section>
         <!-- Checking for a version is something you do now and then, not while
              drawing, so it sits here rather than next to the tools. -->
@@ -351,6 +382,7 @@
   </dialog>
 
   <script src="editor.js"></script>
+  <script src="settings.js"></script>
   <script src="api.js"></script>
   <script src="renderer.js"></script>
 </body>
