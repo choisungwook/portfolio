@@ -265,6 +265,7 @@
   <div id="context-menu" hidden>
     <button id="context-group">Group</button>
     <button id="context-ungroup">Ungroup</button>
+    <button id="context-save-preset">Save as Preset</button>
     <button id="context-save-image">Save as Image</button>
   </div>
 
@@ -293,12 +294,7 @@
         </section>
         <section data-settings-panel="presets" hidden>
           <h2>My presets</h2>
-          <p>Save the objects selected on the current slide as a reusable preset.</p>
-          <div class="preset-form">
-            <label for="preset-name">Preset name</label>
-            <input id="preset-name" maxlength="60" placeholder="My preset" />
-            <button id="btn-save-preset" type="button">Save selected objects</button>
-          </div>
+          <p>Delete saved presets here. Changes apply when you choose OK.</p>
           <p id="preset-settings-status" class="settings-status" aria-live="polite"></p>
           <div id="settings-presets" class="settings-preset-list"></div>
         </section>

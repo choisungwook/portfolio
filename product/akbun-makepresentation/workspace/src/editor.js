@@ -47,6 +47,14 @@ const DEFAULT_PRESET_IDS = [
   'right-open-arrow',
   'left-open-arrow',
 ];
+const PRESET_KIND_LABELS = {
+  rect: 'Rectangle',
+  ellipse: 'Ellipse',
+  line: 'Line',
+  arrow: 'Arrow',
+  pen: 'Drawing',
+  text: 'Text',
+};
 const MAX_CLIPBOARD_SHAPES = 100;
 const MAX_GEOMETRY = 1_000_000;
 
@@ -286,6 +294,33 @@ function defaultPresetShapes(id) {
     return [shape];
   }
   return [];
+}
+
+function customPresetFromSelection(shapes, existingPresets, id) {
+  if (!Array.isArray(shapes) || shapes.length !== 1) return null;
+  const shape = shapes[0];
+  if (!shape || !SHAPE_KINDS.has(shape.kind) || shape.kind === 'image') return null;
+  const presetId = String(id || '').trim();
+  if (!presetId) return null;
+
+  const [copy] = cloneShapes(shapes);
+  const bounds = shapeBBox(copy);
+  moveShape(copy, -bounds.x, -bounds.y);
+  delete copy.groupId;
+
+  const baseName = PRESET_KIND_LABELS[shape.kind] || 'Preset';
+  const usedNames = new Set(
+    (Array.isArray(existingPresets) ? existingPresets : [])
+      .map((preset) => String(preset?.name || ''))
+  );
+  let number = 1;
+  while (usedNames.has(`${baseName} ${number}`)) number += 1;
+
+  return {
+    id: presetId.slice(0, 100),
+    name: `${baseName} ${number}`,
+    shapes: [copy],
+  };
 }
 
 function normalizeRect(x0, y0, x1, y1) {
@@ -1004,6 +1039,7 @@ const exported = {
   slideBackground,
   createShape,
   defaultPresetShapes,
+  customPresetFromSelection,
   parseClipboardShapes,
   dragShape,
   isDegenerate,

@@ -644,6 +644,33 @@ test('default presets provide the requested red shapes and directions', () => {
   assert.ok(left.w < 0);
 });
 
+test('custom presets accept one non-image shape and normalize its position', () => {
+  const shape = L.createShape('rect', 120, 80, {});
+  L.dragShape(shape, 120, 80, 280, 170);
+  shape.groupId = 'old-group';
+  const preset = L.customPresetFromSelection(
+    [shape],
+    [{ name: 'Rectangle 1' }],
+    'custom-1'
+  );
+
+  assert.strictEqual(preset.name, 'Rectangle 2');
+  assert.strictEqual(preset.shapes.length, 1);
+  assert.strictEqual(preset.shapes[0].x, 0);
+  assert.strictEqual(preset.shapes[0].y, 0);
+  assert.ok(!('groupId' in preset.shapes[0]));
+  assert.strictEqual(shape.x, 120);
+});
+
+test('custom presets reject multiple shapes and images', () => {
+  const first = L.createShape('rect', 0, 0, {});
+  const second = L.createShape('ellipse', 0, 0, {});
+  const image = L.createShape('image', 0, 0, {});
+
+  assert.strictEqual(L.customPresetFromSelection([first, second], [], 'many'), null);
+  assert.strictEqual(L.customPresetFromSelection([image], [], 'image'), null);
+});
+
 test('an empty rect draws no text element at all', () => {
   const shape = L.createShape('rect', 0, 0, {});
   L.dragShape(shape, 0, 0, 200, 100);

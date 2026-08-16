@@ -861,23 +861,6 @@ input[type='color'] {
   color: var(--muted);
 }
 
-.preset-form {
-  display: grid;
-  grid-template-columns: 100px minmax(120px, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-}
-
-#preset-name {
-  min-width: 0;
-  padding: 5px 8px;
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--panel);
-  font: inherit;
-}
-
 .settings-status {
   min-height: 1.2em;
 }
