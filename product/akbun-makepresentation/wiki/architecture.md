@@ -40,12 +40,51 @@ Coordinates are pixels in the deck's slideWidth and slideHeight coordinate space
 
 ## Page files
 
-- `editor.js` — the pure part: shape creation, drag/move/resize math, slide operations, and the SVG markup for shapes and slides. Exported behind one global (`slidesLib`) and through `module.exports`, so `node --test` runs it as-is.
-- `settings.js` — settings defaults, validation, legacy preset migration normalization, and guideline geometry. It is pure and runs under the same node test suite.
-- `api.js` — the only bridge to the OS: native dialogs, filesystem commands, the updater. Falls back to no-ops in a plain browser so the editor can be poked at without Tauri.
+`workspace/src/` keeps stable entry points at the top level and groups the large editor and page-controller implementations by change reason. There is no bundler, so `index.html` loads these files in dependency order.
+
+```text
+src/
+  editor.js
+  editor/
+    constants.js
+    shapes.js
+    geometry.js
+    deck.js
+    presets.js
+    svg.js
+    utils.js
+  renderer.js
+  renderer/
+    render.js
+    history.js
+    canvas.js
+    text.js
+    presets.js
+    code.js
+    guidelines.js
+    slide-size.js
+    settings.js
+    clipboard.js
+    context-menu.js
+    properties.js
+    slides.js
+    files.js
+    presentation.js
+  settings.js
+  api.js
+  ai.js
+  ai-panel.js
+```
+
+- `editor.js` — facade that preserves the `slidesLib` browser and CommonJS API.
+- `editor/` — pure model code split into constants, shape data, geometry, deck operations, presets, SVG output, and small UI-independent utilities. Each file registers one browser namespace and also supports `require`, so Node tests use the same implementation.
+- `renderer/render.js` — page state, DOM references, selection overlays, canvas, thumbnails, and property-panel rendering.
+- `renderer/` — interactions and workflows split by feature. The files intentionally share the existing page scope and run in the order declared by `index.html`.
+- `renderer.js` — menu commands, AI panel integration, and application initialization.
+- `settings.js` — settings defaults, validation, legacy preset migration normalization, and guideline geometry.
+- `api.js` — the only bridge to the OS: native dialogs, filesystem commands, and the updater. Falls back to no-ops in a plain browser.
 - `ai.js` — pure AI session normalization, capacity checks, and validated slide patch application.
 - `ai-panel.js` — App Server JSON-RPC, streaming turns, the Inspector/AI panel switch, and the local conversation UI.
-- `renderer.js` — DOM state and events: tools, pointer interaction, the overlay textarea for text editing, property panel, thumbnails, presentation mode.
 
 ## IPC surface
 
