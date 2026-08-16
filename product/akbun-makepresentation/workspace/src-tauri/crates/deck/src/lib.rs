@@ -168,7 +168,7 @@ fn default_text_color() -> String {
     "#1a1a1a".into()
 }
 fn default_font_family() -> String {
-    "Helvetica".into()
+    "Noto Sans KR".into()
 }
 
 fn default_text_align() -> String {

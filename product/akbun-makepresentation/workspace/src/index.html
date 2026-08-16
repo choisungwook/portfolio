@@ -169,7 +169,7 @@
           <label for="prop-font-family">Font</label>
           <div id="font-picker" class="font-picker">
             <button id="prop-font-family" type="button" aria-haspopup="listbox" aria-expanded="false">
-              <span id="font-family-label">Helvetica</span>
+              <span id="font-family-label">Noto Sans KR</span>
               <span aria-hidden="true">⌄</span>
             </button>
             <div id="font-menu" hidden>
@@ -305,6 +305,10 @@
     <button id="context-ungroup">Ungroup</button>
     <button id="context-save-preset">Save as Preset</button>
     <button id="context-save-image">Save as Image</button>
+  </div>
+
+  <div id="slide-context-menu" hidden>
+    <button id="context-new-slide" type="button">New Slide</button>
   </div>
 
   <div id="preset-menu" role="menu" aria-label="Shape presets" hidden>
@@ -470,7 +474,39 @@
       <div class="settings-content">
         <section data-settings-panel="general">
           <h2>General</h2>
-          <p>Guidelines and custom presets are stored in settings.json in the app data directory.</p>
+          <p>Defaults apply to objects created after you save these settings.</p>
+          <div class="settings-general-fields">
+            <label for="settings-default-font">Default font</label>
+            <select id="settings-default-font"></select>
+          </div>
+          <fieldset class="settings-border-fields">
+            <legend>Shape border</legend>
+            <p>Rectangle, ellipse, line, arrow, and freehand.</p>
+            <label for="settings-shape-border-color">Color</label>
+            <input id="settings-shape-border-color" type="color" />
+            <label for="settings-shape-border-width">Width</label>
+            <input id="settings-shape-border-width" type="number" min="1" max="30" step="0.5" />
+            <label for="settings-shape-border-dash">Style</label>
+            <select id="settings-shape-border-dash">
+              <option value="solid">Solid</option>
+              <option value="dash">Dashed</option>
+              <option value="dot">Dotted</option>
+            </select>
+          </fieldset>
+          <fieldset class="settings-border-fields">
+            <legend>Image border</legend>
+            <label for="settings-image-border-color">Color</label>
+            <input id="settings-image-border-color" type="color" />
+            <label for="settings-image-border-width">Width</label>
+            <input id="settings-image-border-width" type="number" min="1" max="30" step="0.5" />
+            <label for="settings-image-border-dash">Style</label>
+            <select id="settings-image-border-dash">
+              <option value="solid">Solid</option>
+              <option value="dash">Dashed</option>
+              <option value="dot">Dotted</option>
+            </select>
+          </fieldset>
+          <p id="general-settings-status" class="settings-status" aria-live="polite"></p>
         </section>
         <section data-settings-panel="ai" hidden>
           <h2>AI</h2>

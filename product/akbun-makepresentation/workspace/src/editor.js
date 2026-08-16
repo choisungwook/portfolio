@@ -32,13 +32,18 @@ const DEFAULT_STYLE = {
   // unchanged. A generic fallback is appended at render time. The list on
   // offer lives in the markup of #prop-font-family, which is also where the
   // display labels belong; anything outside it still opens and renders.
-  fontFamily: 'Helvetica',
+  fontFamily: 'Noto Sans KR',
   bold: false,
   italic: false,
   underline: false,
   textAlign: 'left',
   verticalAlign: 'top',
 };
+const DEFAULT_IMAGE_STYLE = Object.freeze({
+  stroke: '#000000',
+  strokeWidth: 2,
+  dash: 'solid',
+});
 
 const BOXY = new Set(['rect', 'ellipse', 'text', 'image', 'code']);
 const SHAPE_KINDS = new Set([
@@ -176,7 +181,12 @@ function slideBackground(slide) {
 }
 
 function createShape(kind, x, y, style) {
-  const s = Object.assign({}, DEFAULT_STYLE, style);
+  const s = Object.assign(
+    {},
+    DEFAULT_STYLE,
+    kind === 'image' ? DEFAULT_IMAGE_STYLE : null,
+    style
+  );
   // Text inside a box wants to sit in the middle of it. A text box is its own
   // box, so it keeps the top-left start every other editor gives it.
   const align = TEXTUAL.has(kind) ? 'center' : s.textAlign;
@@ -761,6 +771,14 @@ function normalizeAngle(degrees) {
   return wrapped;
 }
 
+function unrotateDelta(dx, dy, degrees) {
+  const radians = -(Number(degrees) || 0) * Math.PI / 180;
+  return {
+    x: dx * Math.cos(radians) - dy * Math.sin(radians),
+    y: dx * Math.sin(radians) + dy * Math.cos(radians),
+  };
+}
+
 // The rotation that points a shape's top at (x,y). The grip sits above the
 // box, so a shape at rest reads as -90 degrees here and the +90 brings that
 // back to zero. `constrain` is the Shift key: quarter turns only.
@@ -796,6 +814,13 @@ function moveSlide(deck, from, to) {
   const [slide] = deck.slides.splice(from, 1);
   deck.slides.splice(at, 0, slide);
   return at;
+}
+
+function moveSlideAtEdge(deck, from, target, edge) {
+  if (!Number.isInteger(target) || target < 0 || target >= deck.slides.length) return from;
+  let insertion = target + (edge === 'after' ? 1 : 0);
+  if (from < insertion) insertion -= 1;
+  return moveSlide(deck, from, insertion);
 }
 
 function moveSlideSelection(deck, indices, direction) {
@@ -982,7 +1007,7 @@ function strokeAttrs(shape) {
 }
 
 function fontAttr(shape) {
-  return `font-family="${escapeXml(shape.fontFamily || 'Helvetica')}, sans-serif"`;
+  return `font-family="${escapeXml(shape.fontFamily || DEFAULT_STYLE.fontFamily)}, sans-serif"`;
 }
 
 const TEXT_CHAR_WIDTH = 0.52;
@@ -1359,6 +1384,7 @@ const exported = {
   SLIDE_H,
   SLIDE_SIZE_PRESETS,
   DEFAULT_STYLE,
+  DEFAULT_IMAGE_STYLE,
   DEFAULT_BACKGROUND,
   ARROW_ENDS,
   DEFAULT_PRESET_IDS,
@@ -1403,9 +1429,11 @@ const exported = {
   resizeShapeConstrained,
   rotationHandleFor,
   rotationTowards,
+  unrotateDelta,
   addSlide,
   deleteSlide,
   moveSlide,
+  moveSlideAtEdge,
   moveSlideSelection,
   duplicateSlide,
   slideNumberShape,

@@ -34,11 +34,14 @@ test('renderSlideSvg uses the requested slide dimensions', () => {
   assert.ok(svg.includes('>2<'));
 });
 
-test('new shapes use a red stroke and text keeps a dark text color', () => {
+test('new shapes use a red stroke, Noto Sans KR, and dark text', () => {
   const rect = L.createShape('rect', 0, 0, {});
   const text = L.createShape('text', 0, 0, {});
+  const image = L.createShape('image', 0, 0, {});
   assert.strictEqual(rect.stroke, '#e03131');
+  assert.strictEqual(image.stroke, '#000000');
   assert.strictEqual(text.textColor, '#1a1a1a');
+  assert.strictEqual(text.fontFamily, 'Noto Sans KR');
 });
 
 test('parseClipboardShapes normalizes valid shapes with safe defaults', () => {
@@ -411,7 +414,7 @@ test('renderShapeSvg uses the shape font family with a fallback', () => {
 
   const fallback = L.createShape('text', 0, 0, {});
   fallback.text = 'hi';
-  assert.ok(L.renderShapeSvg(fallback).includes('font-family="Helvetica, sans-serif"'));
+  assert.ok(L.renderShapeSvg(fallback).includes('font-family="Noto Sans KR, sans-serif"'));
 });
 
 test('renderShapeSvg draws an imported picture as an image element', () => {
@@ -553,6 +556,12 @@ test('rotationHandleFor sits above the middle of the box', () => {
   const grip = L.rotationHandleFor(shape);
   assert.strictEqual(grip.x, 90);
   assert.ok(grip.y < 80, 'above the top edge');
+});
+
+test('unrotateDelta converts screen movement to rotated shape axes', () => {
+  const delta = L.unrotateDelta(0, 100, 90);
+  assert.ok(Math.abs(delta.x - 100) < 0.0001);
+  assert.ok(Math.abs(delta.y) < 0.0001);
 });
 
 test('renderShapeSvg rotates a line, an arrow and a freehand stroke', () => {
@@ -836,6 +845,14 @@ test('moveSlide refuses an index that is not on the deck', () => {
   const deck = { slides: [{ id: 0 }, { id: 1 }] };
   assert.strictEqual(L.moveSlide(deck, 7, 0), 7);
   assert.strictEqual(deck.slides.length, 2);
+});
+
+test('moveSlideAtEdge inserts before or after the pointed slide', () => {
+  const deck = { slides: [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }] };
+  assert.strictEqual(L.moveSlideAtEdge(deck, 0, 2, 'before'), 1);
+  assert.deepStrictEqual(deck.slides.map((slide) => slide.id), [1, 0, 2, 3]);
+  assert.strictEqual(L.moveSlideAtEdge(deck, 1, 2, 'after'), 2);
+  assert.deepStrictEqual(deck.slides.map((slide) => slide.id), [1, 2, 0, 3]);
 });
 
 test('code blocks render syntax colors, highlighted lines, and numbered callouts', () => {

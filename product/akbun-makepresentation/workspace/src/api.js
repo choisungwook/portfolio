@@ -33,7 +33,7 @@ if (!window.__TAURI__) {
     saveSettings: async (settings) => {
       localStorage.setItem('akbun-makepresentation.settings', JSON.stringify(settings));
     },
-    listSystemFonts: async () => ['Arial', 'Helvetica'],
+    listSystemFonts: async () => ['Noto Sans KR', 'Arial', 'Helvetica'],
     message: async (text) => alert(text),
     ask: async (text) => confirm(text),
     setTitle: (title) => {
