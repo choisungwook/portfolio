@@ -84,7 +84,7 @@
 74. kubernetes 1.36 릴리즈노트와 핸즈온 (26.5.4) - [링크](./kubernetes/1_36_releasenotes/)
 75. 스터디 - RAG with FAISS vector DB (26.5.17) - [링크](./computer_science/ai/RAG/notebooks/02_rag_vector_search.ipynb)
 76. 스터디 - mlx.lora 파인튜닝 (26.5.17) - [링크](./computer_science/ai/RAG/notebooks/03_fine_tuning_lora.ipynb)
-77. 스터디 - AWS Knowledge Bases (26.5.18) - [링크](./aws/bedrock/)
+77. 스터디 - AWS Knowledge Bases (26.5.18) - [링크](./aws/bedrock/knowledge-base-s3-vectors/)
 78. 스터디 - kubernetes로 genAI시스템 구축(실험환경, AI모델 빌드, AI모델 배포) (26.5.24) - [링크](./computer_science/ai/genai-on-kubernetes/chapter5-chatbot/k3s/)
 79. 스터디 - kubernetes로 genAI시스템을 EKS에 구축(실험환경, AI모델 빌드, AI모델 배포) (26.5.25) - [링크](./computer_science/ai/genai-on-kubernetes/chapter5-chatbot/eks/)
 80. client -> HAProxy or EnvoyProxy -> server pod구조에서 TCP통신 끊기는지 확인 (26.6.3) - [링크](./computer_science/k8s_haproxy_tcp/)
@@ -100,6 +100,7 @@
 90. ECS quickstart (26.8.2) - [링크](./aws/ecs/quickstart/)
 91. LLM 서빙 시스템 설계 Chapter 3 핸즈온 (26.8.15) - [링크](./computer_science/ai/study-llmserving/ch3/)
 92. 멀티턴 대화 핸즈온 (LLM API는 왜 잊는가, OpenAI/Claude 비교) (26.8.16) - [링크](./computer_science/ai/multi-turn-conversation/)
+93. Amazon Bedrock 모델 호출(Runtime, Mantle, Playground) (26.8.16) - [링크](./aws/bedrock/model-inference/)
 
 ## 직접 만든 제품
 
