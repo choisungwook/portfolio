@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bedrock 모델 호출의 두 입구</title>
+<style>
+:root{
+  --dark:#212022;--ink:#000;--point:#FFC000;--hl:#FFE066;--prob:#FF0000;
+  --wl:#FFF2CC;--rs:#E2EFDA;--grp:#F2F2F2;--code-bg:#1E1E1E;--code-ink:#D4D4D4
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{background:#F2F2F2;color:var(--ink);font-family:"NanumBarunGothic","나눔바른고딕","Pretendard","Apple SD Gothic Neo",sans-serif;line-height:1.7}
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;background:#fff;border:1px solid #E2E2E2;border-radius:10px;aspect-ratio:16/9;overflow-y:auto;padding:5% 7%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.cover .bar{border-left:8px solid var(--point);padding-left:22px}
+.cover h1{font-size:2.2rem;line-height:1.35;margin-bottom:10px}
+.cover .sub{color:#555;margin-bottom:28px}
+.sec{font-size:.92rem;font-weight:800;letter-spacing:.02em}
+h2{font-size:1.5rem;line-height:1.35;margin:6px 0 18px}
+h3{font-size:1rem;margin:8px 0}
+p{margin:9px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}
+.prob{color:var(--prob);font-weight:700}.dim{color:#666;font-size:.88rem}
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:7px 0}
+ul.bullets>li::before{content:"■";font-size:.7em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:4px 0 4px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+.diagram{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 8px;margin:10px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 15px;background:#fff;font-weight:600;font-size:.88rem;text-align:center}
+.dbox small{display:block;font-weight:400;color:#555;font-size:.72rem}.dbox.wl{background:var(--wl)}.dbox.rs{background:var(--rs)}.dbox.hot{background:var(--point);font-weight:800}.dbox.bad{border-color:var(--prob);color:var(--prob)}
+.darrow{font-weight:900;font-size:1.1rem}.dgroup{border:1.2px solid var(--ink);border-radius:10px;background:var(--grp);padding:20px 12px 10px;position:relative;margin-top:12px}.dgroup>b{position:absolute;top:3px;left:12px;font-size:.72rem}.caption{text-align:center;font-size:.78rem;color:#555}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:14px 0}.grid>div{min-width:0}.grid h3{border-bottom:2px solid var(--ink);padding-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:.79rem;margin:12px 0}th,td{border-bottom:1px solid #CCC;padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--grp)}
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:.72rem;line-height:1.5;margin:10px 0;font-family:Consolas,ui-monospace,Menlo,monospace;white-space:pre-wrap}
+.codedesc{font-size:.86rem;color:#444;margin-top:12px;font-weight:700}.foot{font-size:.74rem;color:#555;margin-top:16px}.foot a{color:#555}
+.quiz{margin:14px 0}.quiz .q{font-weight:700}.quiz .opts{list-style:none;margin:8px 0}.quiz .opts li{border:1.4px solid var(--ink);border-radius:8px;background:#fff;padding:7px 12px;margin:7px 0;font-size:.86rem;cursor:pointer}.quiz.done .opts li{cursor:default}.quiz .opts li.correct{background:var(--point);font-weight:700}.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}.quiz .fb{display:none;margin-top:8px;padding-left:12px;border-left:3px solid var(--point)}.quiz.done .fb{display:block}.quiz .fb.no{border-left-color:var(--prob)}
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:12px;padding:11px 18px}
+#nav button{border:none;background:var(--dark);color:#fff;border-radius:999px;padding:8px 19px;font-weight:700;font-size:14px;cursor:pointer}#nav button:disabled{opacity:.25}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}#dots button{width:9px;height:9px;padding:0;border-radius:50%;background:#DDD}#dots button.on{background:var(--point);transform:scale(1.25)}#counter{font-weight:800;color:#777;font-size:13px;min-width:58px;text-align:right}
+body.fs #book{width:min(97vw,calc((100vh - 24px) * 16 / 9));padding:12px 0}body.fs #nav{left:50%;right:auto;bottom:16px;width:auto;border:1px solid #E2E2E2;border-radius:999px;box-shadow:0 8px 26px rgba(0,0,0,.18);transform:translate(-50%,calc(100% + 26px));opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}body.fs #nav .in{width:auto;padding:8px 14px}body.fs #dots{flex:0 0 auto}body.fs.dock-on #nav{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+#dockhint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(33,32,34,.92);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .4s ease}#dockhint.on{opacity:1}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media print{body{background:#fff}#book{width:auto;padding:0}.page{display:block!important;aspect-ratio:auto;border:none;overflow:visible;page-break-after:always}#nav{display:none!important}}
+@media(max-width:640px){html{font-size:17px}#book,#nav .in{width:auto;max-width:100%}#book{padding:10px 8px 86px}.page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}.grid{grid-template-columns:1fr;gap:12px}#dots{display:none}#counter{flex:1;text-align:center}body.fs #book{width:auto;padding:10px 8px 24px}}
+</style>
+</head>
+<body>
+<main id="book">
+
+<section class="page cover">
+  <div class="bar">
+    <p class="sec">Amazon Bedrock quickstart</p>
+    <h1>모델은 같아도<br>들어가는 문은 두 개입니다</h1>
+    <p class="sub">Playground, boto3 Runtime, OpenAI SDK Mantle을 직접 비교합니다.</p>
+  </div>
+  <p>완주하면 <mark>어떤 endpoint와 routing scope를 선택해야 하는지</mark> 자기 말로 설명하고, 두 API 경로를 각각 호출할 수 있습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">먼저 잡을 관점</p>
+  <h2>SDK 이름이 아니라 실제 목적지를 봅니다</h2>
+  <div class="diagram">
+    <div class="dbox">Playground<small>AWS Console</small></div><div class="darrow">→</div>
+    <div class="dbox">boto3<small>AWS SDK</small></div><div class="darrow">→</div>
+    <div class="dbox">OpenAI SDK<small>호환 client</small></div><div class="darrow">→</div>
+    <div class="dbox hot">Amazon Bedrock<small>AWS account에 사용량 기록</small></div>
+  </div>
+  <p>OpenAI SDK를 사용해도 `base_url`이 Mantle이면 요청과 비용은 AWS로 갑니다. <span class="prob">OpenAI API key를 넣는 실습이 아닙니다.</span></p>
+</section>
+
+<section class="page">
+  <p class="sec">두 입구</p>
+  <h2>Runtime과 Mantle은 API 표면이 다릅니다</h2>
+  <div class="grid">
+    <div>
+      <h3>bedrock-runtime</h3>
+      <ul class="bullets">
+        <li>InvokeModel, Converse</li>
+        <li>직접적인 model payload 제어</li>
+        <li>Nova Canvas 이미지 생성</li>
+      </ul>
+    </div>
+    <div>
+      <h3>bedrock-mantle</h3>
+      <ul class="bullets">
+        <li>Responses, Chat Completions</li>
+        <li>OpenAI·Anthropic SDK 호환</li>
+        <li>stateful response와 별도 quota</li>
+      </ul>
+    </div>
+  </div>
+  <p><mark>새 앱은 Mantle 우선</mark>, 모델·기능이 Mantle에 없거나 native API가 필요하면 Runtime을 선택합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Mantle의 정체</p>
+  <h2>Mantle은 Bedrock의 새 이름이 아닙니다</h2>
+  <p>Mantle은 `bedrock-mantle` endpoint 뒤의 분산 inference engine입니다. 기존 `bedrock-runtime`도 계속 지원됩니다.</p>
+  <table>
+    <thead><tr><th>판단</th><th>선택</th></tr></thead>
+    <tbody>
+      <tr><td>기존 OpenAI SDK 코드를 옮김</td><td>Mantle + Responses API</td></tr>
+      <tr><td>모델 공통 AWS-native chat interface</td><td>Runtime + Converse</td></tr>
+      <tr><td>이미지 생성 또는 native payload</td><td>Runtime + InvokeModel</td></tr>
+      <tr><td>Mantle에 아직 없는 모델</td><td>Runtime</td></tr>
+    </tbody>
+  </table>
+  <p class="foot"><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html">출처: Endpoints supported by Amazon Bedrock</a></p>
+</section>
+
+<section class="page">
+  <p class="sec">리전 선택</p>
+  <h2>서울에서 Runtime은 되지만 Mantle은 안 됩니다</h2>
+  <div class="diagram">
+    <div class="dbox rs">ap-northeast-2<small>bedrock-runtime 지원</small></div>
+    <div class="darrow">→</div>
+    <div class="dbox bad">bedrock-mantle<small>현재 미지원</small></div>
+    <div class="darrow">／</div>
+    <div class="dbox hot">us-east-1<small>두 endpoint 비교 가능</small></div>
+  </div>
+  <p>이 실습은 비교 조건을 맞추기 위해 둘 다 `us-east-1`을 사용합니다. endpoint와 model availability는 바뀌므로 실행 전 공식 표를 다시 확인합니다.</p>
+  <p class="foot"><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints-region-availability.html">출처: Regional availability by endpoints</a></p>
+</section>
+
+<section class="page">
+  <p class="sec">가장 흔한 혼동</p>
+  <h2>Endpoint Region과 inference scope는 별개입니다</h2>
+  <div class="dgroup"><b>source endpoint</b>
+    <div class="diagram">
+      <div class="dbox hot">bedrock-runtime.us-east-1.amazonaws.com</div>
+      <div class="darrow">+</div>
+      <div class="dbox wl">global.* modelId</div>
+      <div class="darrow">→</div>
+      <div class="dbox rs">eligible destination Region</div>
+    </div>
+  </div>
+  <p><span class="prob">`bedrock-runtime.global` URL을 만드는 것이 아닙니다.</span> 호출은 regional endpoint로 보내고, published inference profile ID가 처리 범위를 정합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">라우팅 범위</p>
+  <h2>In-Region, Geographic, Global은 경계가 다릅니다</h2>
+  <table>
+    <thead><tr><th>Scope</th><th>modelId 예</th><th>처리 가능 범위</th></tr></thead>
+    <tbody>
+      <tr><td>In-Region</td><td>`anthropic...`</td><td>source Region 하나</td></tr>
+      <tr><td>Geographic</td><td>`us.anthropic...`</td><td>US 같은 지정 geography 내부</td></tr>
+      <tr><td>Global</td><td>`global.anthropic...`</td><td>eligible commercial Regions</td></tr>
+    </tbody>
+  </table>
+  <p>처리 범위가 넓을수록 throughput 선택지는 커집니다. 데이터 residency가 엄격하면 그만큼 범위를 좁힙니다.</p>
+  <p class="prob">모든 모델이 세 ID를 전부 제공하지는 않습니다. model card에 공개된 ID만 사용합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">비용</p>
+  <h2>청구 기준은 호출을 승인한 AWS 계정입니다</h2>
+  <ul class="bullets">
+    <li>Playground: 로그인한 AWS 계정의 Bedrock usage</li>
+    <li>boto3: credential chain이 가리키는 AWS 계정의 usage</li>
+    <li>OpenAI SDK + Bedrock API key: key를 발급한 AWS 계정의 usage</li>
+    <li>Runtime과 Mantle: 같은 모델의 per-token 가격은 동일</li>
+    <li>Global/Geo: 별도 routing fee 없이 source Region 기준 가격</li>
+  </ul>
+  <p>텍스트는 주로 input/output token, 이미지는 생성 수와 설정으로 과금됩니다. <mark>가격 숫자는 실행 직전 pricing page에서 확인</mark>합니다.</p>
+  <p class="foot"><a href="https://aws.amazon.com/bedrock/pricing/">출처: Amazon Bedrock pricing</a></p>
+</section>
+
+<section class="page">
+  <p class="sec">첫 성공 경험</p>
+  <h2>Playground에서 text와 image를 한 번씩 확인합니다</h2>
+  <div class="grid">
+    <div><h3>Chat/Text</h3><p>짧은 질문 하나를 실행하고 input/output usage를 확인합니다.</p></div>
+    <div><h3>Image</h3><p>Nova Canvas, image 1개, 짧은 English prompt로 실행합니다.</p></div>
+  </div>
+  <p class="codedesc">테스트 prompt</p>
+  <pre class="code">Explain the difference between an API endpoint and a model ID in two sentences.</pre>
+  <p><b>성공 판정.</b> text response와 image가 각각 출력됩니다. 둘 다 AWS 비용이 발생합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">로컬 준비</p>
+  <h2>코드는 uv 환경 하나에서 실행합니다</h2>
+  <p class="codedesc">dependency 설치</p>
+  <pre class="code">cd aws/bedrock/model-inference
+make up</pre>
+  <p class="codedesc">AWS 인증 후 Mantle 환경 변수 설정</p>
+  <pre class="code">export OPENAI_BASE_URL="https://bedrock-mantle.us-east-1.api.aws/v1"
+export OPENAI_API_KEY="&lt;BEDROCK_API_KEY&gt;"</pre>
+  <p><b>성공 판정.</b> `uv run python -c "import boto3, openai"`가 오류 없이 끝납니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Mantle 미사용 테스트</p>
+  <h2>boto3로 catalog와 text response를 확인합니다</h2>
+  <p class="codedesc">Runtime 계열 model discovery</p>
+  <pre class="code">uv run python -m scripts.list_runtime_models --region us-east-1</pre>
+  <p class="codedesc">Converse text generation</p>
+  <pre class="code">uv run python -m scripts.complete_runtime \
+  --region us-east-1 \
+  --model-id amazon.nova-micro-v1:0 \
+  "Explain Amazon Bedrock in one sentence."</pre>
+  <p><b>성공 판정.</b> model ID 목록과 한 문장 응답이 출력됩니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Global 비교</p>
+  <h2>URL은 그대로 두고 modelId만 바꿉니다</h2>
+  <p class="codedesc">Global inference profile 호출</p>
+  <pre class="code">uv run python -m scripts.complete_runtime \
+  --region us-east-1 \
+  --model-id global.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  "Reply with the word global."</pre>
+  <p>`--region us-east-1`은 source endpoint를 선택합니다. `global.*`은 Bedrock이 선택할 수 있는 destination 범위를 넓힙니다.</p>
+  <p><b>성공 판정.</b> `global` 응답이 출력되고, source Region의 CloudTrail·CloudWatch 관찰 지점을 유지합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">이미지 API</p>
+  <h2>Nova Canvas는 Runtime의 InvokeModel로 호출합니다</h2>
+  <p class="codedesc">이미지 한 개 생성</p>
+  <pre class="code">uv run python -m scripts.generate_image_runtime \
+  --region us-east-1 \
+  --model-id amazon.nova-canvas-v1:0 \
+  --output output.png \
+  "A small yellow submarine, technical cutaway, white background."</pre>
+  <p><b>성공 판정.</b> 1024×1024 `output.png`가 생성됩니다.</p>
+  <p>이 성공은 “OpenAI-compatible API로 모든 Bedrock modality를 호출할 수 있다”는 뜻이 아닙니다. model/API compatibility가 우선입니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Mantle 테스트</p>
+  <h2>같은 Python에서 OpenAI client의 목적지만 바꿉니다</h2>
+  <p class="codedesc">Mantle model discovery와 Responses API</p>
+  <pre class="code">uv run python -m scripts.list_mantle_models
+
+uv run python -m scripts.complete_mantle \
+  --model-id openai.gpt-oss-20b \
+  "Explain Amazon Bedrock Mantle in one sentence."</pre>
+  <p>예제는 `store=False`를 보내 conversation state를 저장하지 않습니다.</p>
+  <p><b>성공 판정.</b> Mantle model ID 목록과 한 문장 응답이 출력됩니다. 비용은 AWS 계정에 기록됩니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">호출 없는 검증</p>
+  <h2>offline test는 두 API payload를 모두 고정합니다</h2>
+  <p class="codedesc">fake client 기반 전체 테스트</p>
+  <pre class="code">make test</pre>
+  <p class="codedesc">기대 결과</p>
+  <pre class="code">5 passed</pre>
+  <ul class="bullets">
+    <li>Runtime: list, Converse, InvokeModel payload</li>
+    <li>Mantle: Models, Responses, `store=False`</li>
+  </ul>
+  <p><b>성공 판정.</b> AWS credential 없이 통과합니다. 이 테스트 자체에는 Bedrock 비용이 없습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Teach-back</p>
+  <h2>어떤 설명이 정확할까요?</h2>
+  <div class="quiz">
+    <p class="q">`global.*` modelId를 Runtime에서 사용하면 무엇이 바뀝니까?</p>
+    <ul class="opts">
+      <li>`bedrock-runtime.global` endpoint로 접속합니다.</li>
+      <li data-answer>regional source endpoint는 유지하고 처리 가능한 destination 범위가 넓어집니다.</li>
+      <li>비용이 OpenAI 계정으로 이동합니다.</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> Endpoint Region과 inference routing scope는 서로 다른 선택입니다.</p>
+  </div>
+  <p>마지막으로 자신의 말로 설명해 보세요. <mark>“Mantle을 선택하는 조건, Runtime을 선택하는 조건, 비용이 귀속되는 곳”</mark>을 각각 한 문장으로 말할 수 있으면 완주입니다.</p>
+  <p class="foot">github 링크: <a href="https://github.com/choisungwook/portfolio/tree/master/aws/bedrock/model-inference">portfolio/aws/bedrock/model-inference</a></p>
+</section>
+
+</main>
+
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button><div id="dots"></div><span id="counter"></span>
+  <button id="next">다음 →</button><button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){var d=document.createElement('button');d.setAttribute('aria-label',(j+1)+'페이지로 이동');d.onclick=function(){i=j;show();};dots.appendChild(d);});
+  function show(){pages.forEach(function(p,j){p.classList.toggle('on',j===i);});[].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});counter.textContent=(i+1)+' / '+pages.length;prev.disabled=i===0;next.disabled=i===pages.length-1;window.scrollTo(0,0);}
+  prev.onclick=function(){if(i>0){i--;show();}};next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowLeft')prev.onclick();if(e.key==='ArrowRight')next.onclick();});show();
+})();
+(function(){
+  var fs=document.getElementById('fs'),nav=document.getElementById('nav'),el=document.documentElement;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  var over=false,hintTimer,hint=document.createElement('div');hint.id='dockhint';hint.textContent='마우스를 화면 아래로 내리면 메뉴 표시 · Esc로 창 모드';document.body.appendChild(hint);
+  function dock(on){if(on&&!document.body.classList.contains('fs'))return;document.body.classList.toggle('dock-on',on);if(on)hint.classList.remove('on');}
+  function track(e){if(!over)dock(e.clientY>=window.innerHeight-72);}
+  function watch(on){document[on?'addEventListener':'removeEventListener']('pointermove',track,{passive:true});}
+  nav.addEventListener('pointerenter',function(){over=true;dock(true);});nav.addEventListener('pointerleave',function(){over=false;dock(false);});
+  fs.onclick=function(){var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();if(p&&p.catch)p.catch(function(){});};
+  document.addEventListener('fullscreenchange',function(){var on=!!document.fullscreenElement;fs.textContent=on?'창 모드':'전체 화면';document.body.classList.toggle('fs',on);over=false;dock(false);watch(on);clearTimeout(hintTimer);hint.classList.toggle('on',on);if(on)hintTimer=setTimeout(function(){hint.classList.remove('on');},2600);});
+})();
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){o.setAttribute('role','button');o.tabIndex=0;o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};o.onclick=function(){if(qz.classList.contains('done'))return;qz.classList.add('done');var ok=o.hasAttribute('data-answer');opts.forEach(function(x){if(x.hasAttribute('data-answer'))x.classList.add('correct');});var fb=qz.querySelector('.fb');if(!ok){o.classList.add('wrong');fb.classList.add('no');}fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';};});
+});
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 ## 목적
 
 - 로컬 FAISS RAG 실습을 AWS 관리형 구성으로 옮긴다.
-  - 로컬 실습 경로: ![바로가기](../../../computer_science/ai/RAG/notebooks/02_rag_vector_search.ipynb)
+  - 로컬 실습 경로: ![바로가기](../../../../computer_science/ai/RAG/notebooks/02_rag_vector_search.ipynb)
 - Bedrock Knowledge Bases가 S3 문서를 어떻게 chunking, embedding, retrieval하는지 확인한다.
 - S3 Vectors가 vector store로 동작하는지 Bedrock console과 AWS CLI로 테스트한다.
 
@@ -24,7 +24,7 @@ AWS CLI 로그인이 필요하다. Bedrock model access에서 Titan Text Embeddi
 Terraform 디렉터리로 이동한다.
 
 ```bash
-cd aws/bedrock/terraform
+cd aws/bedrock/knowledge-base-s3-vectors/terraform
 ```
 
 예제 변수 파일을 복사한다.

@@ -1,0 +1,18 @@
+[project]
+name = "bedrock-model-inference"
+version = "0.1.0"
+description = "Amazon Bedrock Runtime and Mantle hands-on"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3",
+  "openai",
+]
+
+[dependency-groups]
+dev = [
+  "pytest",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
