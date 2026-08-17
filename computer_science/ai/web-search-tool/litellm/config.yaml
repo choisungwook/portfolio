@@ -1,0 +1,35 @@
+model_list:
+  - model_name: local-tool-model
+    litellm_params:
+      model: openai/Qwen/Qwen2.5-1.5B-Instruct
+      api_base: os.environ/VLLM_API_BASE
+      api_key: os.environ/VLLM_API_KEY
+  - model_name: bedrock-nova-micro
+    litellm_params:
+      model: bedrock/amazon.nova-micro-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      drop_params: true
+  - model_name: bedrock-provider-search
+    litellm_params:
+      model: bedrock/us.amazon.nova-2-lite-v1:0
+      aws_region_name: os.environ/AWS_REGION
+  - model_name: vllm-provider-search
+    litellm_params:
+      model: hosted_vllm/Qwen/Qwen2.5-1.5B-Instruct
+      api_base: os.environ/VLLM_API_BASE
+      api_key: os.environ/VLLM_API_KEY
+
+search_tools:
+  - search_tool_name: local-search
+    litellm_params:
+      search_provider: searxng
+      api_base: os.environ/SEARXNG_URL
+
+litellm_settings:
+  callbacks: ["websearch_interception"]
+  websearch_interception_params:
+    enabled_providers: ["openai", "bedrock"]
+    search_tool_name: local-search
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

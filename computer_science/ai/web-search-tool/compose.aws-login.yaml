@@ -1,0 +1,8 @@
+services:
+  litellm:
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SDK_LOAD_CONFIG: "1"
+    volumes:
+      - ${HOME}/.aws/config:/root/.aws/config:ro
+      - ${HOME}/.aws/login/cache:/root/.aws/login/cache

@@ -1,0 +1,26 @@
+[project]
+name = "web-search-tool-handson"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3[crt]>=1.41",
+  "fastmcp>=3",
+  "httpx>=0.28",
+  "openai>=1.100",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4",
+  "ruff>=0.12",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+indent-width = 2
+line-length = 100
+
+[tool.ruff.format]
+indent-style = "space"

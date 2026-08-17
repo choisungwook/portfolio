@@ -1,0 +1,178 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/config"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-litellm-local-db-password}
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  litellm:
+    build:
+      context: .
+      dockerfile: litellm/Dockerfile
+      args:
+        LITELLM_BASE_IMAGE: ${LITELLM_IMAGE:-ghcr.io/berriai/litellm:main-latest}
+    image: web-search-tool-litellm:local
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-web-search}
+      UI_USERNAME: ${UI_USERNAME:-admin}
+      UI_PASSWORD: ${UI_PASSWORD:-sk-local-web-search}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm-local-db-password}@postgres:5432/${POSTGRES_DB:-litellm}
+      VLLM_API_BASE: ${VLLM_API_BASE:-http://vllm:8000/v1}
+      VLLM_API_KEY: ${VLLM_API_KEY:-local-vllm-key}
+      VLLM_MODEL: ${VLLM_MODEL:-Qwen/Qwen2.5-1.5B-Instruct}
+      SEARXNG_URL: http://searxng:8080
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
+
+  client-search:
+    profiles: ["client"]
+    build: .
+    entrypoint: ["python", "-m", "client.app"]
+    command: ["--model", "qwen"]
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-web-search}
+      SEARXNG_URL: http://searxng:8080
+      QUESTION: ${QUESTION:-오늘은 몇 월 며칠이고 서울 날씨는 어때요? 출처 URL과 함께 답하세요.}
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  gateway-search:
+    profiles: ["client"]
+    build: .
+    entrypoint: ["python", "litellm/app.py"]
+    command: ["--model", "qwen"]
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-web-search}
+      QUESTION: ${QUESTION:-오늘은 몇 월 며칠이고 서울 날씨는 어때요? 출처 URL과 함께 답하세요.}
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  bedrock-provider-search:
+    profiles: ["bedrock"]
+    build: .
+    command: ["python", "ai-provider/bedrock/app.py"]
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-web-search}
+      QUESTION: ${QUESTION:-오늘은 몇 월 며칠이고 서울 날씨는 어때요? 출처 URL과 함께 답하세요.}
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  vllm-provider-search:
+    profiles: ["client"]
+    build: .
+    command: ["python", "ai-provider/vllm/app.py"]
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000/v1
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-web-search}
+      QUESTION: ${QUESTION:-오늘은 몇 월 며칠이고 서울 날씨는 어때요? 출처 URL과 함께 답하세요.}
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  searxng-mcp:
+    profiles: ["cpu"]
+    build: .
+    command: ["python", "ai-provider/vllm/mcp_server.py"]
+    environment:
+      SEARXNG_URL: http://searxng:8080
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import socket; connection = socket.create_connection(('localhost', 8888), 3); connection.close()
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      searxng:
+        condition: service_healthy
+
+  vllm:
+    profiles: ["cpu"]
+    build:
+      context: .
+      dockerfile: ai-provider/vllm/Dockerfile
+      args:
+        VLLM_BASE_IMAGE: ${VLLM_IMAGE:-vllm/vllm-openai-cpu:latest}
+    image: web-search-tool-vllm:local
+    environment:
+      VLLM_API_KEY: ${VLLM_API_KEY:-local-vllm-key}
+      VLLM_CPU_KVCACHE_SPACE: ${VLLM_CPU_KVCACHE_SPACE:-2}
+      VLLM_CPU_NUM_OF_RESERVED_CPU: ${VLLM_CPU_NUM_OF_RESERVED_CPU:-1}
+      VLLM_ENABLE_RESPONSES_API_STORE: "1"
+      VLLM_USE_EXPERIMENTAL_PARSER_CONTEXT: "1"
+    command:
+      - ${VLLM_MODEL:-Qwen/Qwen2.5-1.5B-Instruct}
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - hermes
+      - --dtype
+      - float16
+      - --max-model-len
+      - "4096"
+      - --tool-server
+      - searxng-mcp:8888
+    ports:
+      - "8000:8000"
+    shm_size: 4gb
+    cap_add:
+      - SYS_NICE
+    security_opt:
+      - seccomp=unconfined
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    depends_on:
+      searxng-mcp:
+        condition: service_healthy
+
+volumes:
+  huggingface-cache:
+  postgres-data:
