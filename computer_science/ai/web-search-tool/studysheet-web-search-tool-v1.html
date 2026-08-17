@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>web_search는 누가 실행하는가</title>
+<style>
+:root{
+  --dark:#212022;--ink:#000;--point:#FFC000;--hl:#FFE066;--prob:#F00;
+  --wl:#FFF2CC;--rs:#E2EFDA;--grp:#F2F2F2;--code-bg:#1E1E1E;--code-ink:#D4D4D4
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:clamp(17px,min(2vw,3.4vh),40px)}
+body{background:#F2F2F2;color:var(--ink);font-family:"NanumBarunGothic","Apple SD Gothic Neo",sans-serif;line-height:1.7}
+#book{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;padding:12px 0 86px}
+.page{display:none;animation:fade .25s ease;background:#fff;border:1px solid #E2E2E2;border-radius:10px;aspect-ratio:16/9;overflow-y:auto;padding:5% 7%}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.page.cover{padding:5% 9%}
+.page.cover.on{display:flex;flex-direction:column;justify-content:center}
+.bar{border-left:8px solid var(--point);padding-left:22px}
+.cover h1{font-size:2.15rem;line-height:1.35;margin-bottom:10px}
+.sub{color:#555;margin-bottom:28px}
+.sec{font-size:.92rem;font-weight:800;letter-spacing:.02em}
+h2{font-size:1.55rem;line-height:1.35;margin:6px 0 18px}
+h3{font-size:1rem;margin:10px 0 4px}
+p{margin:9px 0}
+mark{background:var(--hl);color:var(--ink);padding:0 2px}
+.prob{color:var(--prob);font-weight:800}
+.dim{color:#666;font-size:.88rem}
+ul.bullets{list-style:none;margin:10px 0}
+ul.bullets>li{margin:7px 0}
+ul.bullets>li::before{content:"■";font-size:.65em;margin-right:9px;vertical-align:.15em}
+ul.bullets ul{list-style:none;margin:3px 0 3px 22px}
+ul.bullets ul>li::before{content:"-";margin-right:8px}
+.diagram{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px 6px;margin:10px 0}
+.dbox{border:1.2px solid var(--ink);border-radius:6px;padding:10px 15px;background:#fff;font-weight:650;font-size:.9rem;text-align:center}
+.dbox small{display:block;color:#555;font-weight:400;font-size:.72rem}
+.dbox.wl{background:var(--wl)}.dbox.rs{background:var(--rs)}.dbox.hot{background:var(--point);font-weight:800}.dbox.dim{opacity:.3}
+.darrow{font-size:1.1rem;font-weight:900}.darrow.bad{color:var(--prob)}
+.caption{text-align:center;font-size:.8rem;color:#555}
+.compare{width:100%;border-collapse:collapse;margin:12px 0;font-size:.78rem}
+.compare th,.compare td{border-bottom:1px solid #CCC;padding:8px;text-align:left;vertical-align:top}
+.compare th{background:var(--grp)}
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:.76rem;line-height:1.55;margin:10px 0;font-family:Consolas,monospace}
+.codedesc{font-size:.88rem;color:#444;margin-top:12px;font-weight:700}
+.tradeoff{display:flex;gap:26px;flex-wrap:wrap;margin:12px 0}
+.tradeoff>div{flex:1;min-width:240px}.tradeoff h3{border-bottom:2px solid var(--ink);padding-bottom:4px}
+.tradeoff .con h3{border-color:var(--prob);color:var(--prob)}
+.tradeoff ul{list-style:none}.tradeoff li{margin:6px 0}
+.tradeoff .pro li::before{content:"■";font-size:.65em;margin-right:8px}.tradeoff .con li::before{content:"✕";color:var(--prob);font-weight:900;margin-right:8px}
+.quiz{margin:14px 0}.quiz .q{font-weight:700}.quiz .opts{list-style:none;margin:8px 0}
+.quiz .opts li{border:1.3px solid var(--ink);border-radius:8px;padding:7px 12px;margin:7px 0;font-size:.9rem;cursor:pointer}
+.quiz.done .opts li{cursor:default}.quiz .opts li.correct{background:var(--point);font-weight:700}.quiz .opts li.wrong{border-color:var(--prob);color:var(--prob)}
+.quiz .fb{display:none;border-left:3px solid var(--point);padding-left:12px}.quiz.done .fb{display:block}.quiz .fb.no{border-color:var(--prob)}
+.foot{font-size:.76rem;color:#555;margin-top:18px}.foot a{color:#555}
+#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid #E2E2E2;backdrop-filter:blur(4px)}
+#nav .in{width:min(97vw,calc((100vh - 104px) * 16 / 9));margin:0 auto;display:flex;align-items:center;gap:12px;padding:11px 18px}
+#nav button{border:0;background:var(--dark);color:#fff;border-radius:999px;padding:8px 18px;font-weight:700;cursor:pointer}
+#nav button:disabled{opacity:.25;cursor:default}
+#dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+#dots button{width:9px;height:9px;padding:0;border-radius:50%;background:#DDD}#dots button.on{background:var(--point);transform:scale(1.25)}
+#counter{font-weight:800;color:#777;font-size:14px;min-width:58px;text-align:right}
+body.fs #book{width:min(97vw,calc((100vh - 24px) * 16 / 9));padding:12px 0}
+body.fs #nav{left:50%;right:auto;bottom:16px;width:auto;border:1px solid #DDD;border-radius:999px;box-shadow:0 8px 26px rgba(0,0,0,.18);transform:translate(-50%,calc(100% + 26px));opacity:0;pointer-events:none;transition:.22s}
+body.fs #nav .in{width:auto;padding:8px 14px}body.fs #dots{flex:0 0 auto}body.fs.dock-on #nav{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+#dockhint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(33,32,34,.92);color:#fff;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .4s}#dockhint.on{opacity:1}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media print{body{background:#fff}#book{width:auto;padding:0}.page{display:block!important;aspect-ratio:auto;border:0;overflow:visible;page-break-after:always}#nav{display:none}}
+@media(max-width:640px){html{font-size:17px}#book,#nav .in{width:auto;max-width:100%}#book{padding:10px 8px 86px}.page,.page.cover{aspect-ratio:auto;min-height:70vh;padding:26px 20px}.tradeoff{gap:12px}.compare{font-size:.62rem;line-height:1.35}.compare th,.compare td{padding:5px 3px}#dots{display:none}#nav .in{gap:8px;padding:10px 12px}#nav button{padding:8px 13px}body.fs #book{width:auto}}
+</style>
+</head>
+<body>
+<main id="book">
+<section class="page cover">
+  <div class="bar">
+    <p class="sec">CLIENT → LITELLM → AI PROVIDER</p>
+    <h1>web_search는<br>누가 실행하는가</h1>
+    <p class="sub">tool call과 tool execution을 분리하고, 책임 경계를 직접 바꿔 봅니다.</p>
+  </div>
+  <p><span class="prob">오해:</span> 모델에 tool을 주면 모델이 인터넷에 접속합니다.</p>
+  <p><mark>완주:</mark> 같은 vLLM에서 client 소유와 LiteLLM 소유를 비교합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">먼저 예측</p>
+  <h2>이 JSON 다음에 누가 움직여야 할까요?</h2>
+  <pre class="code">{
+  "name": "web_search",
+  "arguments": "{\"query\":\"오늘 날짜 서울 날씨\"}"
+}</pre>
+  <p>이 출력은 검색 결과가 아닙니다. 모델이 만든 <mark>실행 요청</mark>입니다.</p>
+  <div class="quiz">
+    <p class="q">검색 서버에 실제 HTTP 요청을 보내는 주체는?</p>
+    <ul class="opts">
+      <li>항상 모델 프로세스</li>
+      <li data-answer>설계가 지정한 client·gateway·provider runtime</li>
+      <li>OpenAI SDK가 자동 결정</li>
+    </ul>
+    <p class="fb"><b class="verdict"></b> tool call의 구조화와 tool의 실행은 서로 다른 책임입니다.</p>
+  </div>
+</section>
+
+<section class="page">
+  <p class="sec">핵심 원리</p>
+  <h2>한 번의 답변에는 최소 두 번의 모델 호출이 있습니다</h2>
+  <div class="diagram">
+    <div class="dbox wl">① 질문</div><div class="darrow">→</div>
+    <div class="dbox hot">② tool call</div><div class="darrow">→</div>
+    <div class="dbox rs">③ 검색 실행</div><div class="darrow">→</div>
+    <div class="dbox wl">④ tool result</div><div class="darrow">→</div>
+    <div class="dbox hot">⑤ 최종 답변</div>
+  </div>
+  <p class="caption">[ 모델 호출: ①→②, ④→⑤ · 도구 호출: ②→③→④ ]</p>
+  <p>책임 위치를 바꿔도 이 상태 전이는 사라지지 않습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 A</p>
+  <h2>client가 loop를 소유하면 gateway는 트래픽만 봅니다</h2>
+  <div class="diagram">
+    <div class="dbox hot">Client<small>tool loop + search HTTP</small></div>
+    <div class="darrow">⇄</div><div class="dbox wl">LiteLLM<small>route · auth · log</small></div>
+    <div class="darrow">⇄</div><div class="dbox rs">vLLM<small>tool_calls 생성</small></div>
+  </div>
+  <ul class="bullets">
+    <li>검색 query, timeout, 최대 round를 애플리케이션이 통제</li>
+    <li>LiteLLM 장애 범위에 search provider를 넣지 않음</li>
+    <li>client가 많으면 같은 loop가 반복됨</li>
+  </ul>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 A · 핸즈온</p>
+  <h2>OpenAI SDK가 LiteLLM을 통과해 vLLM을 부릅니다</h2>
+  <p class="codedesc">macOS Docker Desktop에서 CPU vLLM과 로컬 서비스를 올린 뒤 client-owned loop를 실행합니다.</p>
+  <pre class="code">docker compose --progress quiet up -d searxng
+docker compose --progress quiet up -d vllm
+docker compose --progress quiet up -d litellm
+docker compose --profile client run --rm client-search</pre>
+  <p class="codedesc">기대 결과</p>
+  <pre class="code">오늘 날짜와 서울 날씨 설명 ...
+Sources: https://www.weather.go.kr/...</pre>
+  <p><b>성공 판정.</b> LiteLLM에는 두 model call이 보이고, 검색 HTTP 코드는 `client/app.py`에 있습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 B</p>
+  <h2>LiteLLM interception은 gateway를 agent runtime으로 바꿉니다</h2>
+  <div class="diagram">
+    <div class="dbox dim">Client<small>한 번만 호출</small></div>
+    <div class="darrow">→</div><div class="dbox hot">LiteLLM<small>tool loop + SearXNG</small></div>
+    <div class="darrow">⇄</div><div class="dbox rs">vLLM<small>tool_calls + answer</small></div>
+  </div>
+  <p>client는 최종 응답만 받습니다. 검색 key와 정책은 중앙화되지만, 검색 장애가 gateway 장애가 됩니다.</p>
+  <p><mark>한 API call</mark>은 한 번의 upstream model call을 뜻하지 않습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 B · 핸즈온</p>
+  <h2>같은 vLLM, 다른 실행 주체</h2>
+  <p class="codedesc">thin client는 `litellm_web_search`만 선언합니다.</p>
+  <pre class="code">docker compose --profile client run --rm gateway-search
+docker compose logs --since=2m litellm</pre>
+  <p class="codedesc">로그에서 찾을 흐름</p>
+  <pre class="code">vLLM → litellm_web_search(query)
+LiteLLM → SearXNG
+LiteLLM → vLLM(tool result)
+LiteLLM → client(final answer)</pre>
+  <p><b>성공 판정.</b> client 코드에 SearXNG 호출이 없고 LiteLLM 로그에 interception이 있습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 C</p>
+  <h2>Nova Web Grounding은 Bedrock 안에서 검색을 끝냅니다</h2>
+  <div class="diagram">
+    <div class="dbox dim">Client<small>한 번만 호출</small></div>
+    <div class="darrow">→</div><div class="dbox wl">LiteLLM<small>형식 변환 + routing</small></div>
+    <div class="darrow">→</div><div class="dbox rs">Nova 2 Lite<small>검색 + 최종 답변</small></div>
+  </div>
+  <p>LiteLLM이 `web_search_options`를 `nova_grounding` system tool로 변환합니다. Bedrock이 검색과 재추론을 실행합니다.</p>
+  <p>응답에 grounding trace가 남아도 Client가 실행하거나 재호출할 대상은 아닙니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 C · 핸즈온</p>
+  <h2>Client는 최종 답변과 citation만 사용합니다</h2>
+  <p class="codedesc">로컬 AWS login session을 LiteLLM에 연결해 실행합니다.</p>
+  <pre class="code">make provider-bedrock</pre>
+  <p class="codedesc">관찰할 흐름</p>
+  <pre class="code">Client → LiteLLM(web_search_options)
+LiteLLM → Nova 2 Lite(nova_grounding)
+Nova 2 Lite → Client(final answer + citations)</pre>
+  <p><b>성공 판정.</b> Client와 LiteLLM이 SearXNG를 호출하지 않고 최종 답변을 받습니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">시나리오 D</p>
+  <h2>vLLM Tool Server도 검색 loop를 소유할 수 있습니다</h2>
+  <div class="diagram">
+    <div class="dbox dim">Client</div><div class="darrow">→</div>
+    <div class="dbox wl">LiteLLM</div><div class="darrow">→</div>
+    <div class="dbox hot">vLLM + Qwen</div><div class="darrow">⇄</div>
+    <div class="dbox rs">SearXNG MCP</div>
+  </div>
+  <ul class="bullets">
+    <li>vLLM Responses API와 `--tool-server`가 MCP browser를 실행</li>
+    <li>Qwen이 검색 결과를 받아 재추론하고 최종 답변 생성</li>
+    <li>LiteLLM은 interception 없이 인증과 routing만 담당</li>
+  </ul>
+  <pre class="code">docker compose --profile client run --rm vllm-provider-search
+docker compose logs --since=5m vllm searxng-mcp</pre>
+  <p class="prob">Qwen2.5 non-Harmony MCP는 실험적이며 SearXNG upstream 상태가 답변 품질에 영향을 줍니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">비교</p>
+  <h2>같은 loop를 어디에 둘 것인가</h2>
+  <table class="compare">
+    <thead><tr><th>기준</th><th>Client</th><th>LiteLLM</th><th>AI provider/runtime</th></tr></thead>
+    <tbody>
+      <tr><td>이식성</td><td>높음</td><td>중간</td><td>낮음</td></tr>
+      <tr><td>정책 중앙화</td><td>낮음</td><td>높음</td><td>높음</td></tr>
+      <tr><td>gateway 단순성</td><td>높음</td><td>낮음</td><td>해당 없음</td></tr>
+      <tr><td>debug 경계</td><td>명시적</td><td>중간 응답 숨김</td><td>provider telemetry 의존</td></tr>
+      <tr><td>지원 범위</td><td>모든 tool-capable 모델</td><td>interceptor 호환 provider</td><td>지원 API·모델만</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="page">
+  <p class="sec">판단</p>
+  <h2>LiteLLM은 트래픽만 관리해야 할까요?</h2>
+  <div class="tradeoff">
+    <div class="pro"><h3>기본값: 그렇습니다</h3><ul>
+      <li>route·auth·quota·logging에 집중</li>
+      <li>서로 다른 client 정책을 강제하지 않음</li>
+      <li>검색 장애의 blast radius 제한</li>
+    </ul></div>
+    <div class="con"><h3>예외: 중앙 실행</h3><ul>
+      <li>많은 client가 같은 search key 사용</li>
+      <li>domain 정책을 한 곳에서 강제</li>
+      <li>중복 loop보다 중앙 복잡도가 저렴</li>
+    </ul></div>
+  </div>
+  <p>gateway 소유는 기능 추가가 아니라 <mark>책임 이전</mark>으로 결정합니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">운영 체크</p>
+  <h2>실행 위치보다 먼저 고정할 안전장치</h2>
+  <ul class="bullets">
+    <li>최대 tool round와 전체 deadline</li>
+    <li>검색 query·domain allowlist와 egress policy</li>
+    <li>검색 결과의 prompt injection 취급</li>
+    <li>본문 인용 URL 보존과 사용자 출력 검증</li>
+    <li>model call과 search call의 공통 trace ID</li>
+    <li>검색 결과 크기 제한과 민감 query logging 정책</li>
+  </ul>
+  <p>어느 레이어든 이 목록을 소유하지 않으면, 책임은 분산된 것이 아니라 비어 있는 것입니다.</p>
+</section>
+
+<section class="page">
+  <p class="sec">Teach-back</p>
+  <h2>한 문장으로 경계를 설명해 보세요</h2>
+  <p>다음 빈칸을 자기 말로 채우면 핵심을 이해한 것입니다.</p>
+  <p style="font-size:1.15rem;margin:24px 0;border-bottom:2px solid #000;padding-bottom:12px">
+    모델의 tool call은 <mark>________</mark>이고, 실제 web search는 <mark>________</mark>가 실행합니다.
+  </p>
+  <div class="quiz">
+    <p class="q">LiteLLM을 traffic-only로 유지하면서 provider 종속성을 최소화하려면 search loop는 어디에 있어야 할까요?</p>
+    <ul class="opts"><li data-answer>client</li><li>vLLM 내부</li><li>항상 AgentCore</li></ul>
+    <p class="fb"><b class="verdict"></b> gateway는 model request를 전달하고 client가 tool result를 다시 보냅니다.</p>
+  </div>
+</section>
+
+<section class="page">
+  <p class="sec">완주</p>
+  <h2>두 로그를 비교하면 설계가 보입니다</h2>
+  <ul class="bullets">
+    <li>Client 시나리오: tool 상태가 client 로그에 남음</li>
+    <li>LiteLLM 시나리오: interception과 두 upstream call이 gateway 로그에 남음</li>
+    <li>Bedrock 시나리오: Nova Grounding trace와 citation이 provider 응답에 남음</li>
+    <li>vLLM 시나리오: MCP search query가 serving runtime 로그에 남음</li>
+  </ul>
+  <p><mark>추천 시작점:</mark> client-owned loop + traffic-only LiteLLM.</p>
+  <p class="foot">github 링크: <a href="https://github.com/choisungwook/portfolio/tree/master/computer_science/ai/web-search-tool">portfolio/web-search-tool</a></p>
+  <p class="foot">출처: <a href="https://docs.litellm.ai/docs/integrations/websearch_interception">LiteLLM</a> · <a href="https://docs.vllm.ai/en/latest/serving/online_serving/">vLLM</a> · <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use.html">Bedrock</a> · <a href="https://docs.aws.amazon.com/nova/latest/nova2-userguide/web-grounding.html">Nova Web Grounding</a></p>
+</section>
+</main>
+
+<nav id="nav"><div class="in">
+  <button id="prev">← 이전</button><div id="dots"></div><span id="counter"></span>
+  <button id="next">다음 →</button><button id="fs">전체 화면</button>
+</div></nav>
+
+<script>
+(function(){
+  var pages=[].slice.call(document.querySelectorAll('.page')),i=0;
+  var prev=document.getElementById('prev'),next=document.getElementById('next');
+  var dots=document.getElementById('dots'),counter=document.getElementById('counter');
+  pages.forEach(function(_,j){var d=document.createElement('button');d.setAttribute('aria-label',(j+1)+'페이지로 이동');d.onclick=function(){i=j;show();};dots.appendChild(d);});
+  function show(){pages.forEach(function(p,j){p.classList.toggle('on',j===i);});[].forEach.call(dots.children,function(d,j){d.classList.toggle('on',j===i);});counter.textContent=(i+1)+' / '+pages.length;prev.disabled=i===0;next.disabled=i===pages.length-1;window.scrollTo(0,0);}
+  prev.onclick=function(){if(i>0){i--;show();}};next.onclick=function(){if(i<pages.length-1){i++;show();}};
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowLeft')prev.onclick();if(e.key==='ArrowRight')next.onclick();});show();
+})();
+(function(){
+  var fs=document.getElementById('fs'),nav=document.getElementById('nav'),el=document.documentElement,over=false,hintTimer;
+  if(!el.requestFullscreen||!document.fullscreenEnabled){fs.style.display='none';return;}
+  var hint=document.createElement('div');hint.id='dockhint';hint.textContent='마우스를 아래로 내리면 메뉴 표시 · Esc로 창 모드';document.body.appendChild(hint);
+  function dock(on){document.body.classList.toggle('dock-on',on);if(on)hint.classList.remove('on');}
+  function track(e){if(!over)dock(e.clientY>=window.innerHeight-72);}
+  nav.addEventListener('pointerenter',function(){over=true;dock(true);});nav.addEventListener('pointerleave',function(){over=false;dock(false);});
+  fs.onclick=function(){var p=document.fullscreenElement?document.exitFullscreen():el.requestFullscreen();if(p&&p.catch)p.catch(function(){});};
+  document.addEventListener('fullscreenchange',function(){var on=!!document.fullscreenElement;fs.textContent=on?'창 모드':'전체 화면';document.body.classList.toggle('fs',on);document[on?'addEventListener':'removeEventListener']('pointermove',track);clearTimeout(hintTimer);hint.classList.toggle('on',on);if(on)hintTimer=setTimeout(function(){hint.classList.remove('on');},2600);});
+})();
+document.querySelectorAll('.quiz').forEach(function(qz){
+  var opts=[].slice.call(qz.querySelectorAll('.opts li'));
+  opts.forEach(function(o){o.setAttribute('role','button');o.tabIndex=0;o.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();o.onclick();}};o.onclick=function(){if(qz.classList.contains('done'))return;qz.classList.add('done');var ok=o.hasAttribute('data-answer');opts.forEach(function(x){if(x.hasAttribute('data-answer'))x.classList.add('correct');});var fb=qz.querySelector('.fb');if(!ok){o.classList.add('wrong');fb.classList.add('no');}fb.querySelector('.verdict').textContent=ok?'정답.':'오답. 정답은 노란 보기.';};});
+});
+</script>
+</body>
+</html>
