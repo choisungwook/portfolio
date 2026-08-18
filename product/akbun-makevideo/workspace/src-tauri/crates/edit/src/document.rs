@@ -1307,6 +1307,119 @@ mod tests {
     }
 
     #[test]
+    fn source_insert_splits_at_a_frame_boundary_and_is_one_undo_step() {
+        let mut document = document();
+        add(&mut document, 0);
+        let original = clips(&document)[0].clone();
+
+        document
+            .apply(Command::InsertSource {
+                asset_id: "v".into(),
+                video_track_id: Some(video_track(&document)),
+                audio_track_id: None,
+                start: 150,
+                in_point: 30,
+                out_point: 90,
+                ripple_all_tracks: false,
+            })
+            .unwrap();
+
+        let placed = clips(&document);
+        assert_eq!(placed.len(), 3);
+        assert_eq!(
+            placed
+                .iter()
+                .map(|clip| (clip.start, clip.in_point, clip.out_point))
+                .collect::<Vec<_>>(),
+            vec![(0, 0, 150), (150, 30, 90), (210, 150, 300)]
+        );
+        let ids: Vec<String> = placed.iter().map(|clip| clip.id.clone()).collect();
+
+        document.undo().unwrap();
+        assert_eq!(clips(&document), vec![original]);
+        document.redo().unwrap();
+        assert_eq!(
+            clips(&document)
+                .iter()
+                .map(|clip| clip.id.clone())
+                .collect::<Vec<_>>(),
+            ids
+        );
+    }
+
+    #[test]
+    fn source_overwrite_carves_the_range_and_undo_restores_the_clip() {
+        let mut document = document();
+        add(&mut document, 0);
+        let original = clips(&document)[0].clone();
+
+        document
+            .apply(Command::OverwriteSource {
+                asset_id: "v".into(),
+                video_track_id: Some(video_track(&document)),
+                audio_track_id: None,
+                start: 90,
+                in_point: 30,
+                out_point: 90,
+            })
+            .unwrap();
+
+        assert_eq!(
+            clips(&document)
+                .iter()
+                .map(|clip| (clip.start, clip.in_point, clip.out_point))
+                .collect::<Vec<_>>(),
+            vec![(0, 0, 90), (90, 30, 90), (150, 150, 300)]
+        );
+        document.undo().unwrap();
+        assert_eq!(clips(&document), vec![original]);
+    }
+
+    #[test]
+    fn source_video_only_overwrite_preserves_linked_audio() {
+        let mut document = document();
+        add_linked(&mut document, 0);
+        let mut expected_audio = document.project().tracks[1].clips.clone();
+        expected_audio[0].link_group = None;
+
+        document
+            .apply(Command::OverwriteSource {
+                asset_id: "v".into(),
+                video_track_id: Some(video_track(&document)),
+                audio_track_id: None,
+                start: 90,
+                in_point: 30,
+                out_point: 90,
+            })
+            .unwrap();
+
+        assert_eq!(clips(&document).len(), 3);
+        assert_eq!(document.project().tracks[1].clips, expected_audio);
+    }
+
+    #[test]
+    fn source_video_and_audio_are_linked_and_append_uses_the_sequence_end() {
+        let mut document = document();
+        add(&mut document, 0);
+        document
+            .apply(Command::AppendSource {
+                asset_id: "v".into(),
+                video_track_id: Some(video_track(&document)),
+                audio_track_id: Some(audio_track(&document)),
+                in_point: 60,
+                out_point: 120,
+            })
+            .unwrap();
+
+        let video = document.project().tracks[0].clips.last().unwrap();
+        let audio = document.project().tracks[1].clips.last().unwrap();
+        assert_eq!((video.start, video.in_point, video.out_point), (300, 60, 120));
+        assert_eq!((audio.start, audio.in_point, audio.out_point), (300, 60, 120));
+        assert!(video.link_group.is_some());
+        assert_eq!(video.link_group, audio.link_group);
+    }
+
+    #[test]
     fn markers_are_saved_edited_and_undone() {
         let mut document = document();
         document

@@ -123,36 +123,70 @@
         <p id="asset-empty">Drop video, audio or image files here, or use Import.</p>
       </aside>
 
-      <section id="preview-panel">
-        <header class="panel-head">
-          <h2>Preview</h2>
-          <button id="btn-debug" class="small" type="button">Debug</button>
-        </header>
-        <div id="stage-wrap">
-          <div id="stage">
-            <div id="stage-inner"><canvas id="stage-exact"></canvas></div>
-            <canvas id="stage-visuals" aria-label="Text and shape layers"></canvas>
-            <canvas id="stage-overlay" aria-label="Program Monitor selection overlay"></canvas>
+      <div id="monitor-workspace">
+        <section id="source-panel">
+          <header class="panel-head">
+            <h2>Source Monitor</h2>
+          </header>
+          <div id="source-stage-wrap" class="monitor-stage-wrap">
+            <div id="source-stage" class="monitor-stage">
+              <div id="source-stage-inner" class="monitor-stage-inner"></div>
+            </div>
+            <p id="source-hint">Select an asset to preview it before placing it.</p>
           </div>
-          <span id="stage-mode" hidden></span>
-          <p id="stage-hint">Drop media on the timeline below to see it here.</p>
-        </div>
-        <div id="transport">
-          <button id="btn-play" title="Play or pause (Space)">▶</button>
-          <span id="clock" class="mono">0:00:00.00</span>
-          <span class="dim mono">/</span>
-          <span id="duration" class="mono dim">0:00:00.00</span>
-          <span class="menubar-gap"></span>
-          <label class="inline">
-            Preview quality
-            <select id="preview-quality">
-              <option value="full">Full</option>
-              <option value="half">Half</option>
-              <option value="quarter">Quarter</option>
-            </select>
-          </label>
-        </div>
-      </section>
+          <div id="source-transport" class="monitor-transport">
+            <button id="source-play" title="Play or pause the source">▶</button>
+            <span id="source-clock" class="mono">0:00:00:00</span>
+            <span class="dim mono">/</span>
+            <span id="source-duration" class="mono dim">0:00:00:00</span>
+            <button id="source-mark-in" title="Set the source in point">In</button>
+            <button id="source-mark-out" title="Set the source out point">Out</button>
+          </div>
+          <div id="source-actions">
+            <input id="source-seek" type="range" min="0" max="1" step="1" value="0" aria-label="Source position" />
+            <span id="source-range" class="mono dim">0:00:00:00 – 0:00:00:00</span>
+            <label class="check"><input id="source-video" type="checkbox" checked /> Video</label>
+            <label class="check"><input id="source-audio" type="checkbox" checked /> Audio</label>
+            <label class="inline">Insert ripple
+              <select id="source-ripple"><option value="track">Target tracks</option><option value="all">All tracks</option></select>
+            </label>
+            <button id="source-insert">Insert</button>
+            <button id="source-overwrite">Overwrite</button>
+            <button id="source-append">Append</button>
+          </div>
+        </section>
+
+        <section id="preview-panel">
+          <header class="panel-head">
+            <h2>Program Monitor</h2>
+            <button id="btn-debug" class="small" type="button">Debug</button>
+          </header>
+          <div id="stage-wrap">
+            <div id="stage">
+              <div id="stage-inner"><canvas id="stage-exact"></canvas></div>
+              <canvas id="stage-visuals" aria-label="Text and shape layers"></canvas>
+              <canvas id="stage-overlay" aria-label="Program Monitor selection overlay"></canvas>
+            </div>
+            <span id="stage-mode" hidden></span>
+            <p id="stage-hint">Drop media on the timeline below to see it here.</p>
+          </div>
+          <div id="transport">
+            <button id="btn-play" title="Play or pause (Space)">▶</button>
+            <span id="clock" class="mono">0:00:00.00</span>
+            <span class="dim mono">/</span>
+            <span id="duration" class="mono dim">0:00:00.00</span>
+            <span class="menubar-gap"></span>
+            <label class="inline">
+              Preview quality
+              <select id="preview-quality">
+                <option value="full">Full</option>
+                <option value="half">Half</option>
+                <option value="quarter">Quarter</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </div>
 
       <aside id="inspector-panel">
         <header class="panel-head">
@@ -160,6 +194,13 @@
         </header>
         <div id="inspector-body">
           <p id="inspector-empty" class="dim small-text">Select a clip or a layer to edit its properties.</p>
+          <div id="transform-panel" hidden>
+            <h3>Transform</h3>
+            <div class="field-pair"><label>X <input id="transform-x" type="number" step="1" /></label><label>Y <input id="transform-y" type="number" step="1" /></label></div>
+            <div class="field-pair"><label>Width <input id="transform-width" type="number" min="1" step="1" /></label><label>Height <input id="transform-height" type="number" min="1" step="1" /></label></div>
+            <label class="row">Rotation <input id="transform-rotation" type="number" step="0.1" /></label>
+            <label class="row">Opacity <input id="transform-opacity" type="range" min="0" max="1" step="0.01" /><input id="transform-opacity-value" class="compact-number" type="number" min="0" max="1" step="0.01" /></label>
+          </div>
           <div id="clip-panel" hidden>
             <h3>Clip</h3>
             <p id="clip-summary" class="dim small-text"></p>
@@ -486,6 +527,7 @@
   <script src="time.js"></script>
   <script src="geometry.js"></script>
   <script src="timeline.js"></script>
+  <script src="source.js"></script>
   <script src="shortcuts.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>

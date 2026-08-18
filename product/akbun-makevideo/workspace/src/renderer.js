@@ -21,6 +21,7 @@ const T = globalThis.timeLib;
 const K = globalThis.shortcutLib;
 const X = globalThis.transformLib;
 const G = globalThis.guideLib;
+const S = globalThis.sourceLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
@@ -73,6 +74,23 @@ const dom = {
   assetsPanel: el('assets-panel'),
   btnImport: el('btn-import'),
   btnDebug: el('btn-debug'),
+  sourceStageWrap: el('source-stage-wrap'),
+  sourceStage: el('source-stage'),
+  sourceStageInner: el('source-stage-inner'),
+  sourceHint: el('source-hint'),
+  sourcePlay: el('source-play'),
+  sourceClock: el('source-clock'),
+  sourceDuration: el('source-duration'),
+  sourceMarkIn: el('source-mark-in'),
+  sourceMarkOut: el('source-mark-out'),
+  sourceSeek: el('source-seek'),
+  sourceRange: el('source-range'),
+  sourceVideo: el('source-video'),
+  sourceAudio: el('source-audio'),
+  sourceRipple: el('source-ripple'),
+  sourceInsert: el('source-insert'),
+  sourceOverwrite: el('source-overwrite'),
+  sourceAppend: el('source-append'),
   debugPanel: el('debug-panel'),
   debugMetrics: el('debug-metrics'),
   debugLog: el('debug-log'),
@@ -113,6 +131,14 @@ const dom = {
   ruler: el('ruler'),
   markerList: el('marker-list'),
   inspectorEmpty: el('inspector-empty'),
+  transformPanel: el('transform-panel'),
+  transformX: el('transform-x'),
+  transformY: el('transform-y'),
+  transformWidth: el('transform-width'),
+  transformHeight: el('transform-height'),
+  transformRotation: el('transform-rotation'),
+  transformOpacity: el('transform-opacity'),
+  transformOpacityValue: el('transform-opacity-value'),
   clipPanel: el('clip-panel'),
   clipSummary: el('clip-summary'),
   clipOpacityRow: el('clip-opacity-row'),
@@ -186,6 +212,7 @@ const state = {
   selectedClipId: null,
   selectedVisualItemId: null,
   selectedAssetId: null,
+  sourceSelection: null,
   targetTrackId: null,
   pxPerSecond: 30,
   rendering: false,
@@ -198,6 +225,7 @@ const state = {
 
 let preview = null;
 let mediaPreview = null;
+let sourcePreview = null;
 let qualityMonitor = null;
 let visualDrag = null;
 let editorOverlayActive = false;
@@ -559,6 +587,80 @@ function renderAssets() {
   dom.assetEmpty.hidden = state.project.assets.length > 0;
 }
 
+function selectedSourceAsset() {
+  return state.selectedAssetId ? L.findAsset(state.project, state.selectedAssetId) : null;
+}
+
+function sourceTime(frame) {
+  return L.formatTimecode(Math.max(0, Math.round(frame || 0)), rate());
+}
+
+function renderSourceMonitor() {
+  const asset = selectedSourceAsset();
+  if (state.selectedAssetId && !asset) {
+    state.selectedAssetId = null;
+    state.sourceSelection = null;
+    if (sourcePreview) sourcePreview.showAsset(null);
+  }
+  const selection = asset && (state.sourceSelection || S.selectionFor(asset, rate()));
+  const limit = asset ? S.sourceLimitFrames(asset, rate()) : 0;
+  if (selection) state.sourceSelection = selection;
+  dom.sourceHint.hidden = Boolean(asset);
+  dom.sourceClock.textContent = sourceTime(sourcePreview ? sourcePreview.position() : 0);
+  dom.sourceDuration.textContent = sourceTime(limit);
+  dom.sourceSeek.max = String(Math.max(1, limit));
+  dom.sourceSeek.value = String(Math.min(limit, Math.round(sourcePreview ? sourcePreview.position() : 0)));
+  dom.sourceSeek.disabled = !asset || asset.kind === 'image';
+  dom.sourceRange.textContent = selection
+    ? `${sourceTime(selection.inPoint)} – ${sourceTime(selection.outPoint)}`
+    : `${sourceTime(0)} – ${sourceTime(0)}`;
+  const canVideo = Boolean(asset) && (asset.kind === 'video' || asset.kind === 'image');
+  const canAudio = Boolean(asset) &&
+    (asset.kind === 'audio' || (asset.kind === 'video' && asset.hasAudio));
+  dom.sourceVideo.disabled = !canVideo;
+  dom.sourceAudio.disabled = !canAudio;
+  if (!canVideo) dom.sourceVideo.checked = false;
+  if (!canAudio) dom.sourceAudio.checked = false;
+  dom.sourcePlay.disabled = !asset || asset.kind === 'image';
+  dom.sourceMarkIn.disabled = !asset || asset.kind === 'image';
+  dom.sourceMarkOut.disabled = !asset || asset.kind === 'image';
+  const command = asset && S.commandFor('insert', state.project, asset, selection, {
+    video: dom.sourceVideo.checked,
+    audio: dom.sourceAudio.checked,
+    targetTrackId: state.targetTrackId,
+    start: preview ? preview.position() : 0,
+  });
+  for (const button of [dom.sourceInsert, dom.sourceOverwrite, dom.sourceAppend]) {
+    button.disabled = !command;
+  }
+}
+
+function setSourceMark(which) {
+  const asset = selectedSourceAsset();
+  if (!asset || !state.sourceSelection || !sourcePreview) return;
+  const at = Math.round(sourcePreview.position());
+  state.sourceSelection = which === 'in'
+    ? S.markIn(state.sourceSelection, at)
+    : S.markOut(state.sourceSelection, at, S.sourceLimitFrames(asset, rate()));
+  renderSourceMonitor();
+}
+
+async function placeSource(mode) {
+  const asset = selectedSourceAsset();
+  if (!asset || !state.sourceSelection) return;
+  const command = S.commandFor(mode, state.project, asset, state.sourceSelection, {
+    video: dom.sourceVideo.checked,
+    audio: dom.sourceAudio.checked,
+    targetTrackId: state.targetTrackId,
+    start: preview.position(),
+    rippleAllTracks: dom.sourceRipple.value === 'all',
+  });
+  if (!command) return;
+  const made = await edit(command);
+  if (!made || !made.length) return;
+  selectClip(made[0]);
+}
+
 /** An asset whose length ffprobe could not report is measured by the browser
  *  instead, once. Without this every clip of it would be five seconds long.
  *
@@ -904,6 +1006,7 @@ function checkLutFiles() {
 
 function refresh() {
   renderAssets();
+  renderSourceMonitor();
   renderTimeline();
   checkLutFiles();
   el('menu-delete-project').disabled = !state.path;
@@ -911,6 +1014,7 @@ function refresh() {
     preview.prune();
     preview.layout();
   }
+  if (sourcePreview) sourcePreview.layout();
   updateTitle();
 }
 
@@ -1428,7 +1532,14 @@ function updateLinkUi() {
 
 function selectAsset(assetId) {
   state.selectedAssetId = assetId;
+  const asset = L.findAsset(state.project, assetId);
+  state.sourceSelection = asset ? S.selectionFor(asset, rate()) : null;
+  dom.sourceVideo.checked = Boolean(asset) && (asset.kind === 'video' || asset.kind === 'image');
+  dom.sourceAudio.checked = Boolean(asset) &&
+    (asset.kind === 'audio' || (asset.kind === 'video' && asset.hasAudio));
+  if (sourcePreview) sourcePreview.showAsset(asset);
   renderAssets();
+  renderSourceMonitor();
 }
 
 /** The selection is an id, and clips go away underneath it: opening a project,
@@ -1573,7 +1684,18 @@ function renderInspector() {
   dom.subtitlePanel.hidden = !text || !subtitle;
   dom.shapePanel.hidden = !shape;
   dom.clipPanel.hidden = !clip;
+  dom.transformPanel.hidden = !item;
   dom.inspectorEmpty.hidden = Boolean(item || clip);
+  if (item) {
+    const transform = item.transform;
+    dom.transformX.value = transform.x;
+    dom.transformY.value = transform.y;
+    dom.transformWidth.value = transform.width;
+    dom.transformHeight.value = transform.height;
+    dom.transformRotation.value = transform.rotation;
+    dom.transformOpacity.value = transform.opacity;
+    dom.transformOpacityValue.value = transform.opacity;
+  }
   if (clip) {
     const asset = L.findAsset(state.project, clip.clip.assetId);
     dom.clipSummary.textContent = `${asset ? asset.name || baseName(asset.path) : 'missing file'} · ${clip.track.name}`;
@@ -1611,6 +1733,27 @@ function renderInspector() {
   dom.textStrokeColor.value = hexColor(style.strokeColor, '#000000');
   dom.textStrokeWidth.value = style.strokeWidth || 0;
   dom.textShadowColor.value = hexColor(style.shadowColor, '#000000');
+}
+
+function updateSelectedTransform(event) {
+  const item = selectedVisualItem();
+  if (!item) return;
+  if (event && event.target === dom.transformOpacity) {
+    dom.transformOpacityValue.value = dom.transformOpacity.value;
+  } else if (event && event.target === dom.transformOpacityValue) {
+    dom.transformOpacity.value = dom.transformOpacityValue.value;
+  }
+  const transform = {
+    x: Number(dom.transformX.value),
+    y: Number(dom.transformY.value),
+    width: Math.max(1, Number(dom.transformWidth.value) || 1),
+    height: Math.max(1, Number(dom.transformHeight.value) || 1),
+    rotation: Number(dom.transformRotation.value),
+    opacity: Math.max(0, Math.min(1, Number(dom.transformOpacityValue.value) || 0)),
+  };
+  edit({ op: 'setVisualTransform', itemId: item.id, transform })
+    .then(() => selectVisualItem(item.id))
+    .catch((error) => reportError(error, 'transform:edit'));
 }
 
 function updateSelectedShape() {
@@ -2323,11 +2466,16 @@ function loadDocument(doc, path) {
   state.selectedClipId = null;
   state.selectedVisualItemId = null;
   state.selectedAssetId = null;
+  state.sourceSelection = null;
   state.targetTrackId = null;
   state.proxies = {};
   state.waveforms = {};
   preview.clear();
   preview.showTimeline();
+  if (sourcePreview) {
+    sourcePreview.clear();
+    sourcePreview.showAsset(null);
+  }
   for (const asset of state.project.assets) hydrateDuration(asset);
   refresh();
   prepareDerivedMedia();
@@ -2885,6 +3033,16 @@ function wireMenus() {
 
 function wireAssets() {
   dom.btnImport.addEventListener('click', importViaDialog);
+  dom.sourcePlay.addEventListener('click', () => sourcePreview.toggle());
+  dom.sourceSeek.addEventListener('input', () => sourcePreview.seek(Number(dom.sourceSeek.value)));
+  dom.sourceMarkIn.addEventListener('click', () => setSourceMark('in'));
+  dom.sourceMarkOut.addEventListener('click', () => setSourceMark('out'));
+  dom.sourceInsert.addEventListener('click', () => placeSource('insert'));
+  dom.sourceOverwrite.addEventListener('click', () => placeSource('overwrite'));
+  dom.sourceAppend.addEventListener('click', () => placeSource('append'));
+  for (const input of [dom.sourceVideo, dom.sourceAudio, dom.sourceRipple]) {
+    input.addEventListener('change', renderSourceMonitor);
+  }
   dom.btnDebug.addEventListener('click', () => {
     if (dom.debugPanel.hidden) showDebug();
     else hideDebug();
@@ -3027,6 +3185,12 @@ function wireTimeline() {
   }
   for (const input of [dom.clipOpacity, dom.clipVolume]) {
     input.addEventListener('change', updateSelectedClipGain);
+  }
+  for (const input of [
+    dom.transformX, dom.transformY, dom.transformWidth, dom.transformHeight,
+    dom.transformRotation, dom.transformOpacity, dom.transformOpacityValue,
+  ]) {
+    input.addEventListener('change', updateSelectedTransform);
   }
   dom.lanes.addEventListener('pointerdown', (event) => {
     const visual = event.target.closest('[data-visual-item-id]');
@@ -3353,6 +3517,19 @@ function subscribe(source, register, handler) {
 
 async function boot() {
   state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
+
+  sourcePreview = globalThis.previewLib.createPreview({
+    stage: dom.sourceStage,
+    inner: dom.sourceStageInner,
+    wrap: dom.sourceStageWrap,
+    getProject: () => state.project,
+    playbackPath,
+    onTick: (frame, playing) => {
+      dom.sourceClock.textContent = sourceTime(frame);
+      dom.sourceSeek.value = String(Math.round(frame));
+      dom.sourcePlay.textContent = playing ? '❚❚' : '▶';
+    },
+  });
 
   qualityMonitor = globalThis.qualityLib.createQualityMonitor({});
   mediaPreview = globalThis.previewLib.createPreview({
