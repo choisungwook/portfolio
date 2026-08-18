@@ -1376,6 +1376,28 @@ mod tests {
     }
 
     #[test]
+    fn source_video_only_overwrite_preserves_linked_audio() {
+        let mut document = document();
+        add_linked(&mut document, 0);
+        let mut expected_audio = document.project().tracks[1].clips.clone();
+        expected_audio[0].link_group = None;
+
+        document
+            .apply(Command::OverwriteSource {
+                asset_id: "v".into(),
+                video_track_id: Some(video_track(&document)),
+                audio_track_id: None,
+                start: 90,
+                in_point: 30,
+                out_point: 90,
+            })
+            .unwrap();
+
+        assert_eq!(clips(&document).len(), 3);
+        assert_eq!(document.project().tracks[1].clips, expected_audio);
+    }
+
+    #[test]
     fn source_video_and_audio_are_linked_and_append_uses_the_sequence_end() {
         let mut document = document();
         add(&mut document, 0);

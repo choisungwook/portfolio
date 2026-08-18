@@ -1223,7 +1223,31 @@ fn carve_overwrite(
         }
     }
     for clip_id in units {
-        let placements = project.linked_placements(&clip_id);
+        let mut linked = project.linked_placements(&clip_id);
+        if linked
+            .iter()
+            .any(|entry| !target_set.contains(entry.track_id.as_str()))
+        {
+            let link_group = linked
+                .first()
+                .and_then(|entry| entry.clip.link_group.clone());
+            if let Some(link_group) = link_group {
+                for track in &mut project.tracks {
+                    for clip in &mut track.clips {
+                        if clip.link_group.as_deref() == Some(&link_group) {
+                            clip.link_group = None;
+                        }
+                    }
+                }
+                for entry in &mut linked {
+                    entry.clip.link_group = None;
+                }
+            }
+        }
+        let placements: Vec<_> = linked
+            .into_iter()
+            .filter(|entry| target_set.contains(entry.track_id.as_str()))
+            .collect();
         let remove: HashSet<String> = placements
             .iter()
             .map(|entry| entry.clip.id.clone())
