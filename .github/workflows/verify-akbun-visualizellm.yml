@@ -1,0 +1,38 @@
+name: verify-akbun-visualizellm
+
+# Deployment is a Cloudflare Pages build on push to master, so there is nothing
+# to release here. This job only proves the page still tests and builds.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-visualizellm/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-visualizellm/workspace
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-visualizellm/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # src/lib is DOM free, so this needs no browser and no display.
+      - name: Run tests
+        run: npm test
+
+      - name: Build the page
+        run: npm run build

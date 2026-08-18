@@ -1,0 +1,98 @@
+---
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>akbun visualize llm</title>
+  <meta name="description" content="Open a model config.json and read the architecture it describes: a 2D map of the whole stack with the role of every block, and a 3D view of every weight matrix. Runs entirely in the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <button id="toggle-side" class="nav-toggle ghost" type="button"
+            aria-controls="pane-side" aria-expanded="false">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true">
+        <path d="M3 5h14M3 10h14M3 15h14"></path>
+      </svg>
+      <span class="nav-toggle-label">Config</span>
+    </button>
+    <div class="app-title">
+      <h1>akbun visualize llm</h1>
+      <p>Open a model config.json and see the architecture it describes.</p>
+    </div>
+    <div class="header-actions">
+      <div class="mode-switch" role="group" aria-label="View mode">
+        <button id="mode-2d" class="mode-button is-active" type="button" aria-pressed="true">2D</button>
+        <button id="mode-3d" class="mode-button" type="button" aria-pressed="false">3D</button>
+      </div>
+      <label class="toggle" title="Draw an arrow from each config field to the blocks it shapes">
+        <input id="toggle-annotations" type="checkbox" checked>
+        <span>Config arrows</span>
+      </label>
+      <button id="open-loader" type="button">Load config</button>
+    </div>
+  </header>
+
+  <main class="split">
+    <div id="pane-backdrop" class="pane-backdrop" hidden></div>
+    <aside id="pane-side" class="pane-side">
+      <div class="model-head">
+        <h2 id="model-name">No config loaded</h2>
+        <p id="model-type" class="model-type"></p>
+      </div>
+      <dl id="summary" class="summary"></dl>
+      <h3 class="side-heading">config.json</h3>
+      <pre id="config-view" class="config-view" aria-label="Loaded config"></pre>
+    </aside>
+
+    <section class="pane-main">
+      <div id="view-2d" class="view-2d">
+        <div id="diagram" class="diagram">
+          <svg id="arrows" class="arrows" aria-hidden="true"></svg>
+          <div id="lane" class="lane"></div>
+          <div id="blocks" class="blocks"></div>
+        </div>
+      </div>
+      <div id="view-3d" class="view-3d" hidden>
+        <canvas id="scene"></canvas>
+        <div class="scene-controls">
+          <button id="view-start" class="ghost" type="button">Start</button>
+          <button id="view-all" class="ghost" type="button">Fit all</button>
+        </div>
+        <div class="scene-hint">Drag to orbit, scroll to zoom, right-drag to pan. Hover a block to read it.</div>
+        <div class="scene-legend" id="legend"></div>
+      </div>
+      <div id="tip" class="tip" role="tooltip" hidden></div>
+    </section>
+  </main>
+
+  <div id="loader" class="loader" role="dialog" aria-modal="true" aria-label="Load a model config">
+    <div class="loader-card">
+      <h2>Load a model config.json</h2>
+      <p>Paste the file, open it from disk, or start from one of the samples. The config is read in this browser and uploaded nowhere.</p>
+      <textarea id="config-input" spellcheck="false" autocomplete="off"
+                placeholder='{"model_type": "llama", "hidden_size": 4096, "num_hidden_layers": 32, ... }'
+                aria-label="Model config"></textarea>
+      <div id="load-status" class="status" role="status" aria-live="polite"></div>
+      <div class="samples" id="samples"></div>
+      <div class="loader-actions">
+        <button id="load-config" type="button">Load</button>
+        <button id="pick-file" class="ghost" type="button">Open file…</button>
+        <input id="file-input" type="file" accept=".json,application/json" hidden>
+        <button id="close-loader" class="ghost" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import '../scripts/main.js';
+  </script>
+</body>
+</html>

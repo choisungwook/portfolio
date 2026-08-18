@@ -1,7 +1,16 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-15",
+  "updated": "2026-08-18",
   "products": [
+    {
+      "id": "akbun-visualizellm",
+      "name": "akbun-visualizellm",
+      "description": "모델 config.json을 읽어 LLM 아키텍처를 2D 흐름도와 3D 가중치 배치로 보여주는 웹 페이지",
+      "kind": "web",
+      "tags": ["astro", "llm", "cloudflare"],
+      "site": "https://visualizellm.akbun.com",
+      "released": "2026-08-18"
+    },
     {
       "id": "akbun-productcatalog",
       "name": "akbun-productcatalog",
