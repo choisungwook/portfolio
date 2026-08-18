@@ -455,7 +455,88 @@ select {
 #preview-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+#monitor-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+#source-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+
+.monitor-stage-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--stage);
+}
+
+.monitor-stage {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.monitor-stage-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+#source-hint {
+  position: absolute;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #d8dade;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.monitor-transport,
+#source-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+#source-actions {
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+#source-actions button,
+#source-actions select,
+.monitor-transport button {
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+#source-range {
+  flex: 1 1 100%;
+}
+
+#source-seek {
+  flex: 1 1 100%;
+  width: 100%;
 }
 
 .segmented {
@@ -484,6 +565,7 @@ select {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  min-width: 0;
   background: var(--stage);
   overflow: hidden;
 }
@@ -598,6 +680,8 @@ audio.stage-media {
   padding: 6px 10px;
   background: var(--panel);
   border-top: 1px solid var(--border);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 #btn-play {
@@ -829,6 +913,30 @@ button.icon.on {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 168px;
+}
+
+#inspector-body .field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#inspector-body .field-pair label {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+#inspector-body .field-pair input,
+#inspector-body .compact-number {
+  min-width: 0;
+  width: 100%;
+}
+
+#inspector-body .compact-number {
+  flex: 0 0 62px;
 }
 
 #marker-panel {

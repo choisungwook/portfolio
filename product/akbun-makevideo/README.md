@@ -8,6 +8,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Projects are folders under a workspace directory (`~/Documents/akbun-makevideo` by default, settable), with an Open list instead of a file dialog
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
+- Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
+- Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
 - Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
 - Frame rates including the broadcast ones — 23.976, 29.97 and 59.94 are held as the exact ratios they are, so a camera file stays in step with itself. The clock reads in timecode and the arrow keys step a frame at a time
