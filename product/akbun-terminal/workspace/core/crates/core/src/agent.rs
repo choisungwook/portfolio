@@ -17,14 +17,19 @@ use serde::Deserialize;
 
 use crate::tree::WorkspaceStatus;
 
-/// The rules for one agent. Every list is optional so a file can start with the
-/// one phrase its author is sure about.
+/// The rules for one agent. The phrase lists are optional, so a file can start
+/// with the one phrase its author is sure about; `processes` is not, because it
+/// is what decides whether the rule is consulted.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Rule {
     pub name: String,
     /// Process names that mean this agent is present. Matched against the whole
     /// process tree under the shell, not just the shell itself.
-    #[serde(default)]
+    ///
+    /// This is the one list a rule cannot leave out. It is what decides whether
+    /// the rule applies at all, so a file without it never colours anything;
+    /// phrases alone would be matched in every workspace, including the ones
+    /// running no agent.
     pub processes: Vec<String>,
     /// On screen while the agent is waiting for the user to answer.
     #[serde(default)]
@@ -135,14 +140,16 @@ fn matches(phrases: &[String], screen: &str) -> bool {
 // process would be cheaper if the tick ever gets faster than a second.
 pub fn descendant_names(root: u32, snapshot: &[(u32, u32, String)]) -> Vec<String> {
     let mut children: HashMap<u32, Vec<usize>> = HashMap::new();
-    for (index, (_, parent, _)) in snapshot.iter().enumerate() {
+    let mut named: HashMap<u32, &str> = HashMap::new();
+    for (index, (pid, parent, name)) in snapshot.iter().enumerate() {
         children.entry(*parent).or_default().push(index);
+        named.insert(*pid, name.as_str());
     }
     let mut names = Vec::new();
     let mut pending = vec![root];
     while let Some(pid) = pending.pop() {
-        if let Some((_, _, name)) = snapshot.iter().find(|(id, _, _)| *id == pid) {
-            names.push(name.clone());
+        if let Some(name) = named.get(&pid) {
+            names.push(name.to_string());
         }
         for index in children.get(&pid).into_iter().flatten() {
             pending.push(snapshot[*index].0);
@@ -279,8 +286,10 @@ mod tests {
         assert_eq!(extended.len(), BUILT_IN.len() + 1);
         assert!(extended.iter().any(|rule| rule.name == "Mine"));
 
-        // A file that will not parse costs its own agent and nothing else.
+        // A file that will not parse costs its own agent and nothing else, and
+        // one without the list that decides when it applies does not parse.
         fs::write(directory.join("broken.json"), "{").unwrap();
+        fs::write(directory.join("no-process.json"), r#"{"name":"X","done":["idle"]}"#).unwrap();
         assert_eq!(load(&path).unwrap().len(), BUILT_IN.len() + 1);
         fs::remove_dir_all(directory).unwrap();
     }

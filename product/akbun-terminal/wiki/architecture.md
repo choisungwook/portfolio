@@ -96,7 +96,7 @@ One JSON file per agent, in `agents/` under the app data directory. The core wri
 }
 ```
 
-`processes` is matched against every process in the tree under the shell, not just its direct child. The other three are substrings looked for on the interpreted screen, in the order asking, running, done. A file that will not parse costs that agent its colours and nothing else.
+`processes` is matched against every process in the tree under the shell, not just its direct child, and it is the one field a rule cannot leave out: it decides whether the rule applies at all. The other three are optional substrings looked for on the interpreted screen, in the order asking, running, done. A file that will not parse, or one without `processes`, costs that agent its colours and nothing else.
 
 ## Where the next milestones attach
 
