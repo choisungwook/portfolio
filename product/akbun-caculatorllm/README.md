@@ -48,4 +48,4 @@ npm test
 npm run build
 ```
 
-Deployment setup and caveats are in [wiki/development.md](./wiki/development.md).
+Deployment is a Cloudflare Pages build on push to master. The setup steps and caveats are in [wiki/development.md](./wiki/development.md).
