@@ -10,7 +10,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   const context = vm.createContext({});
   const names = [
     'time.js', 'geometry.js', 'timeline.js', 'shortcuts.js', 'quality.js',
-    'preview.js', 'transform.js', 'guides.js', 'monitor.js',
+    'preview.js', 'transform.js', 'guides.js', 'monitor.js', 'panel.js',
   ];
   for (const name of names) {
     const file = path.join(__dirname, '..', 'src', name);
@@ -24,6 +24,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.qualityLib);
   assert.ok(context.previewLib);
   assert.ok(context.monitorLib);
+  assert.ok(context.panelLib);
 });
 
 // Each of these is loaded with a `<script>` tag and reached through its one
@@ -43,4 +44,25 @@ test('every library the page loads is a script tag on the page', () => {
   assert.ok(loaded.indexOf('geometry.js') < loaded.indexOf('preview.js'));
   assert.ok(loaded.indexOf('geometry.js') < loaded.indexOf('monitor.js'));
   assert.ok(loaded.indexOf('preview.js') < loaded.indexOf('renderer.js'));
+});
+
+test('the editor exposes one toggleable selected panel from the title bar', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
+  const selectedPanel = [...page.matchAll(/<aside\b[^>]*>/g)]
+    .map((match) => match[0])
+    .find((tag) => /\bid="selected-panel"/.test(tag));
+
+  assert.ok(selectedPanel);
+  assert.match(selectedPanel, /\bhidden\b/);
+  assert.match(page, /id="panel-tab-bar" role="toolbar"/);
+  assert.doesNotMatch(page, /role="tab(?:list|panel)?"/);
+  assert.deepStrictEqual(
+    [...page.matchAll(/data-panel-action="([^"]+)"/g)].map((match) => match[1]),
+    ['inspector', 'shape', 'marker', 'debug'],
+  );
+  assert.deepStrictEqual(
+    [...page.matchAll(/data-inspector-tab="([^"]+)"/g)].map((match) => match[1]),
+    ['video', 'audio', 'effects', 'transition', 'image', 'file'],
+  );
+  assert.doesNotMatch(page, /id="project-name"|id="btn-debug"|id="marker-panel"/);
 });

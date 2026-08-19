@@ -1,0 +1,22 @@
+{
+  "color": {
+    "background": { "$type": "color", "$value": "#f2f3f5" },
+    "panel": { "$type": "color", "$value": "#ffffff" },
+    "panelSubtle": { "$type": "color", "$value": "#f7f8fa" },
+    "text": { "$type": "color", "$value": "#1a1a1c" },
+    "textMuted": { "$type": "color", "$value": "#6a6d73" },
+    "border": { "$type": "color", "$value": "#dcdfe4" },
+    "accent": { "$type": "color", "$value": "#2f6df0" },
+    "monitor": { "$type": "color", "$value": "#0b0b0d" }
+  },
+  "size": {
+    "assetsPanelWidth": { "$type": "dimension", "$value": { "value": 264, "unit": "px" } },
+    "selectedPanelWidth": { "$type": "dimension", "$value": { "value": 280, "unit": "px" } },
+    "trackHeaderWidth": { "$type": "dimension", "$value": { "value": 132, "unit": "px" } },
+    "panelGap": { "$type": "dimension", "$value": { "value": 1, "unit": "px" } }
+  },
+  "radius": {
+    "control": { "$type": "dimension", "$value": { "value": 6, "unit": "px" } },
+    "panel": { "$type": "dimension", "$value": { "value": 8, "unit": "px" } }
+  }
+}
