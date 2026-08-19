@@ -43,6 +43,14 @@ test('in and out cannot cross or leave the source', () => {
   });
 });
 
+test('source boundary markers stay on the seek range', () => {
+  assert.strictEqual(S.markerPercent(0, 300), 0);
+  assert.strictEqual(S.markerPercent(75, 300), 25);
+  assert.strictEqual(S.markerPercent(300, 300), 100);
+  assert.strictEqual(S.markerPercent(-30, 300), 0);
+  assert.strictEqual(S.markerPercent(400, 300), 100);
+});
+
 test('placement names a target per media kind and keeps the chosen range', () => {
   assert.deepStrictEqual(
     S.commandFor('insert', project, video, { inPoint: 30, outPoint: 120 }, {

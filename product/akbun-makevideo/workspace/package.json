@@ -1,6 +1,6 @@
 {
   "name": "akbun-makevideo",
-  "version": "0.33.1",
+  "version": "0.34.0",
   "private": true,
   "description": "Desktop video editor: multi track timeline, live preview, ffmpeg render to FHD and 4K",
   "author": "akbun",

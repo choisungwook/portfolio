@@ -22,6 +22,8 @@
   --clip-visual-edge: #9a79dd;
   --select: #f0a52f;
   --danger: #d0453b;
+  --mark-in: #168a4d;
+  --mark-out: #d46713;
   --stage: #0b0b0d;
   --shadow: 0 8px 30px rgba(15, 18, 25, 0.18);
 
@@ -50,6 +52,8 @@
     --clip-visual-edge: #9a79dd;
     --select: #f0a52f;
     --danger: #e2695f;
+    --mark-in: #54d68c;
+    --mark-out: #ff9b4a;
     --stage: #000000;
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   }
@@ -539,9 +543,64 @@ select {
   flex: 1 1 100%;
 }
 
-#source-seek {
+#source-seek-wrap {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
   flex: 1 1 100%;
+  height: 30px;
+}
+
+#source-seek {
   width: 100%;
+  margin: 0;
+}
+
+#source-marker-layer {
+  position: absolute;
+  inset: 0 7px 2px;
+  pointer-events: none;
+}
+
+.source-boundary-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translateX(-1px);
+}
+
+.source-boundary-marker::before {
+  position: absolute;
+  top: 0;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: var(--panel);
+  content: attr(data-label);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 11px;
+}
+
+.source-boundary-marker.in {
+  color: var(--mark-in);
+}
+
+.source-boundary-marker.in::before {
+  left: 0;
+}
+
+.source-boundary-marker.out {
+  color: var(--mark-out);
+}
+
+.source-boundary-marker.out::before {
+  top: auto;
+  right: 0;
+  bottom: 0;
 }
 
 .segmented {
