@@ -220,9 +220,11 @@ function tipHtml(node) {
 function layoutLane() {
   laneEl.innerHTML = '';
   arrowsEl.innerHTML = '';
-  const off = !state.showAnnotations || phoneQuery.matches;
-  diagramEl.classList.toggle('no-lane', !state.showAnnotations);
-  if (off) return;
+  // On a phone the switch is out of reach, so the field list under each block
+  // stays whatever the last desktop visit left behind unless the class is
+  // decided here too. The lane itself is off either way.
+  diagramEl.classList.toggle('no-lane', !state.showAnnotations && !phoneQuery.matches);
+  if (!state.showAnnotations || phoneQuery.matches) return;
 
   const base = diagramEl.getBoundingClientRect();
   const rows = state.fields
@@ -308,8 +310,11 @@ function highlight(field, nodeId = null) {
   for (const line of configView.querySelectorAll('.used')) {
     line.classList.toggle('is-hot', fields.includes(line.dataset.field));
   }
+  // Hovering a block is the other direction of the same chain, and it arrives
+  // with no field, so the check is whether anything is highlighted at all.
+  const active = fields.length > 0 || nodeId !== null;
   for (const block of blocksEl.querySelectorAll('[data-node]')) {
-    block.classList.toggle('is-hot', field !== null && nodes.has(block.dataset.node));
+    block.classList.toggle('is-hot', active && nodes.has(block.dataset.node));
   }
 }
 

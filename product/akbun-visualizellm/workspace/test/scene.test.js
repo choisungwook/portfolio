@@ -6,6 +6,7 @@ import { sampleById } from '../src/lib/samples.js';
 
 const dense = deriveModel(sampleById('dense-7b').config);
 const moe = deriveModel(sampleById('moe-8x7b').config);
+const tied = deriveModel(sampleById('gqa-1_5b').config);
 
 test('side compresses a 1000x range into a drawable one', () => {
   assert.ok(side(128) < side(4096));
@@ -53,8 +54,15 @@ test('expert MLPs are drawn as copies of one block', () => {
   assert.ok(scene.blocks.some((b) => b.id === 'layer0-router'));
 });
 
+test('a tied lm head is drawn but counted once', () => {
+  const head = buildScene(tied).blocks.find((b) => b.id === 'lm-head');
+  assert.equal(head.params, 0);
+  assert.ok(head.h > 0 && head.d > 0);
+  assert.equal(buildScene(dense).blocks.find((b) => b.id === 'lm-head').params, 4096 * 32000);
+});
+
 test('the scene weights add up to the estimate from the config', () => {
-  for (const model of [dense, moe]) {
+  for (const model of [dense, moe, tied]) {
     const counted = sceneParams(buildScene(model));
     const ratio = counted / model.params.total;
     assert.ok(ratio > 0.99 && ratio < 1.01, `${model.name}: ${counted} vs ${model.params.total}`);

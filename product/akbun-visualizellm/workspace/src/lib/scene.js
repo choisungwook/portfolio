@@ -64,7 +64,7 @@ export function buildScene(model) {
     colsLabel: 'scale',
     role: 'The last rescale before the vocabulary scores are read off.',
   }));
-  push(matrix({
+  const head = matrix({
     id: 'lm-head',
     tone: 'head',
     label: model.flags.tied ? 'LM Head (tied to the embedding)' : 'LM Head',
@@ -73,7 +73,14 @@ export function buildScene(model) {
     rowsLabel: 'hidden',
     colsLabel: 'vocab',
     role: 'Scores every vocabulary entry against the final vector. The sampler reads these numbers and picks the next token.',
-  }));
+  });
+  if (model.flags.tied) {
+    // Drawn at full size because the matrix is still used, but it is the
+    // embedding transposed, so counting it again would double it.
+    head.params = 0;
+    head.role += ' Tied here: it is the embedding matrix transposed, so it holds no weights of its own.';
+  }
+  push(head);
 
   return { blocks, span: x, layerSpan, layers: model.dims.layers };
 }

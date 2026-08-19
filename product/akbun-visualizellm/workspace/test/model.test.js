@@ -95,3 +95,21 @@ test('every sample derives without throwing', () => {
     assert.ok(model.params.total > 0, sample.id);
   }
 });
+
+test('a dimension that is present but unusable is rejected by name', () => {
+  assert.throws(
+    () => parseConfig('{"hidden_size": "4096", "num_hidden_layers": 32}'),
+    /hidden_size has to be a positive number/,
+  );
+  assert.throws(
+    () => parseConfig('{"hidden_size": 4096, "n_layer": 0}'),
+    /n_layer has to be a positive number/,
+  );
+});
+
+test('a zero head count falls back instead of producing NaN', () => {
+  const model = deriveModel({ hidden_size: 4096, num_hidden_layers: 32, num_attention_heads: 0 });
+  assert.equal(model.dims.heads, 1);
+  assert.equal(model.dims.headDim, 4096);
+  assert.ok(Number.isFinite(model.params.total));
+});

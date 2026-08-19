@@ -47,10 +47,28 @@ export function parseConfig(text) {
     throw new Error('A config.json is a JSON object.');
   }
   const config = unwrapTextConfig(parsed);
-  if (readField(config, 'hidden') === null || readField(config, 'layers') === null) {
+  const hidden = readField(config, 'hidden');
+  const layers = readField(config, 'layers');
+  if (hidden === null || layers === null) {
     throw new Error('No hidden size or layer count found. This does not look like a model config.json.');
   }
+  // Present but unusable is its own failure. Without this the page would carry
+  // a string or a zero all the way to a NaN in the drawing.
+  for (const found of [hidden, layers]) {
+    if (!isPositiveNumber(found.value)) {
+      throw new Error(`${found.source} has to be a positive number, not ${JSON.stringify(found.value)}.`);
+    }
+  }
   return config;
+}
+
+/**
+ * Whether a value can be used as a dimension.
+ * @param {*} value anything read from a config
+ * @returns {boolean} true for a finite number above zero
+ */
+export function isPositiveNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 // Multimodal configs keep the language model one level down. The page draws the
@@ -80,9 +98,11 @@ export function readField(config, key) {
   return null;
 }
 
+// A field is only taken when it is a usable dimension. A zero head count or a
+// string width falls back rather than turning into Infinity or NaN downstream.
 function numberField(config, key, fallback = null) {
   const found = readField(config, key);
-  if (found === null || typeof found.value !== 'number') {
+  if (found === null || !isPositiveNumber(found.value)) {
     return fallback === null ? null : { value: fallback, source: null };
   }
   return found;
@@ -98,7 +118,7 @@ export function deriveModel(config) {
   const layers = numberField(config, 'layers');
   const heads = numberField(config, 'heads', 1);
   const kvHeads = numberField(config, 'kvHeads', heads.value);
-  const headDim = numberField(config, 'headDim', Math.floor(hidden.value / heads.value));
+  const headDim = numberField(config, 'headDim', Math.max(1, Math.floor(hidden.value / heads.value)));
   const intermediate = numberField(config, 'intermediate', hidden.value * 4);
   const vocab = numberField(config, 'vocab', 32000);
   const context = numberField(config, 'context', 2048);
