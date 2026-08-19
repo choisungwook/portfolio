@@ -17,9 +17,12 @@ public enum CoreCommand: Encodable {
   case write(session: UInt32, bytes: [UInt8])
   case resize(session: UInt32, cols: UInt16, rows: UInt16)
   case close(session: UInt32)
+  case loadState(directory: String)
+  case createProject(name: String, path: String?)
+  case createWorkspace(project: UInt64, name: String)
 
   private enum Key: String, CodingKey {
-    case type, cwd, cols, rows, session, bytes
+    case type, cwd, cols, rows, session, bytes, directory, name, path, project
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -44,6 +47,17 @@ public enum CoreCommand: Encodable {
     case .close(let session):
       try container.encode("close", forKey: .type)
       try container.encode(session, forKey: .session)
+    case .loadState(let directory):
+      try container.encode("load_state", forKey: .type)
+      try container.encode(directory, forKey: .directory)
+    case .createProject(let name, let path):
+      try container.encode("create_project", forKey: .type)
+      try container.encode(name, forKey: .name)
+      try container.encodeIfPresent(path, forKey: .path)
+    case .createWorkspace(let project, let name):
+      try container.encode("create_workspace", forKey: .type)
+      try container.encode(project, forKey: .project)
+      try container.encode(name, forKey: .name)
     }
   }
 }
@@ -60,21 +74,53 @@ public struct CoreRequest: Encodable {
   }
 }
 
-public enum CoreResponse: Equatable {
+public enum CoreResponse: Equatable, Sendable {
   case hello(protocol: UInt32)
   case spawned(session: UInt32)
   case ok
+  case state(CoreTreeState)
   case error(message: String)
 }
 
-public enum CoreEvent: Equatable {
+public struct CoreTreeState: Decodable, Equatable, Sendable {
+  public let schemaVersion: UInt32
+  public let projects: [CoreProject]
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case projects
+  }
+}
+
+public struct CoreProject: Decodable, Equatable, Sendable {
+  public let id: UInt64
+  public let name: String
+  public let path: String?
+  public let workspaces: [CoreWorkspace]
+}
+
+public struct CoreWorkspace: Decodable, Equatable, Sendable {
+  public let id: UInt64
+  public let name: String
+  public let status: CoreWorkspaceStatus
+}
+
+public enum CoreWorkspaceStatus: String, Decodable, Equatable, Sendable {
+  case idle
+  case running
+  case needsAttention = "needs_attention"
+  case completed
+  case failed
+}
+
+public enum CoreEvent: Equatable, Sendable {
   case output(session: UInt32, bytes: [UInt8])
   case exited(session: UInt32)
 }
 
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
-    case type, `protocol`, session, message
+    case type, `protocol`, session, state, message
   }
 
   public init(from decoder: Decoder) throws {
@@ -86,6 +132,8 @@ extension CoreResponse: Decodable {
       self = .spawned(session: try container.decode(UInt32.self, forKey: .session))
     case "ok":
       self = .ok
+    case "state":
+      self = .state(try container.decode(CoreTreeState.self, forKey: .state))
     case "error":
       self = .error(message: try container.decode(String.self, forKey: .message))
     case let other:
