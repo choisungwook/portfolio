@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::browse::Entry;
 use crate::markdown::Block;
 use crate::theme::Theme;
-use crate::tree::TreeState;
+use crate::tree::{TreeState, WorkspaceStatus};
 
 /// Bumped only when an existing field changes meaning or disappears. Adding an
 /// optional field or a new command variant does not need a bump, because both
@@ -31,10 +31,15 @@ pub enum Command {
     /// the core answers with a version it does not know.
     Hello,
     /// Starts a shell session. `cwd` empty means the home directory.
+    ///
+    /// `workspace` is what the session's screen is judged under. It is optional
+    /// so a shell that does not track workspaces still spawns.
     Spawn {
         cwd: String,
         cols: u16,
         rows: u16,
+        #[serde(default)]
+        workspace: Option<u64>,
     },
     /// Keystrokes on their way to the shell.
     Write {
@@ -81,6 +86,27 @@ pub enum Command {
     SetTheme {
         name: String,
     },
+    /// Points the agent rules at a directory, seeding it with the shipped files
+    /// when it holds none. Judging answers `idle` for everything until this has
+    /// been called.
+    LoadRules {
+        directory: String,
+    },
+    /// Judges every workspace that has a session and answers with the ones whose
+    /// status changed. Called on its own timer, away from the path that draws
+    /// output, because running the rules per byte would stall a noisy screen.
+    Detect,
+    /// Takes the finished colour off a workspace. Finished means nobody has
+    /// looked yet, so opening it is what ends the state.
+    ClearStatus {
+        workspace: u64,
+    },
+    /// The character under a click. `line` is what the terminal has on that row
+    /// and `column` is where the click landed in it.
+    UrlAt {
+        line: String,
+        column: usize,
+    },
 }
 
 /// What the core answers with. One shape per call, so the shell never has to
@@ -96,7 +122,17 @@ pub enum Response {
     File { text: String },
     Markdown { blocks: Vec<Block> },
     Themes { themes: Vec<Theme> },
+    /// Only the workspaces whose status changed since the last call.
+    Statuses { statuses: Vec<WorkspaceState> },
+    /// Absent when the click did not land on something this core will open.
+    Url { url: Option<String> },
     Error { message: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WorkspaceState {
+    pub workspace: u64,
+    pub status: WorkspaceStatus,
 }
 
 /// What the core pushes out on its own. The shell drains these; the core never
@@ -135,7 +171,7 @@ mod tests {
     fn reads_a_command_at_the_current_version() {
         let json = r#"{"v":1,"command":{"type":"spawn","cwd":"/tmp","cols":80,"rows":24}}"#;
         match parse_request(json).expect("should parse") {
-            Command::Spawn { cwd, cols, rows } => {
+            Command::Spawn { cwd, cols, rows, .. } => {
                 assert_eq!(cwd, "/tmp");
                 assert_eq!((cols, rows), (80, 24));
             }
@@ -176,6 +212,34 @@ mod tests {
             response,
             r#"{"type":"state","state":{"schema_version":1,"projects":[]}}"#
         );
+    }
+
+    #[test]
+    fn a_spawn_without_a_workspace_still_reads() {
+        // The field was added after the first release, so an older shell has to
+        // keep working against a newer core.
+        let json = r#"{"v":1,"command":{"type":"spawn","cwd":"","cols":80,"rows":24}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::Spawn { workspace, .. } => assert_eq!(workspace, None),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn status_and_url_keep_their_wire_names() {
+        let response = serde_json::to_string(&Response::Statuses {
+            statuses: vec![WorkspaceState {
+                workspace: 3,
+                status: WorkspaceStatus::NeedsAttention,
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"statuses","statuses":[{"workspace":3,"status":"needs_attention"}]}"#
+        );
+        let response = serde_json::to_string(&Response::Url { url: None }).unwrap();
+        assert_eq!(response, r#"{"type":"url","url":null}"#);
     }
 
     #[test]

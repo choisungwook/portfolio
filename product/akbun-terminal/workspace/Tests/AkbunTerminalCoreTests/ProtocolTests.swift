@@ -17,8 +17,46 @@ struct ProtocolTests {
   }
 
   @Test func spawnNamesTheFieldsTheCoreReads() throws {
-    let encoded = try json(.spawn(cwd: "/tmp", cols: 80, rows: 24))
-    #expect(encoded == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn"},"v":1}"#)
+    let encoded = try json(.spawn(cwd: "/tmp", cols: 80, rows: 24, workspace: 7))
+    #expect(
+      encoded
+        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":1}"#)
+  }
+
+  @Test func spawnWithoutAWorkspaceLeavesTheFieldOut() throws {
+    let encoded = try json(.spawn(cwd: "", cols: 80, rows: 24, workspace: nil))
+    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":1}"#)
+  }
+
+  @Test func agentAndLinkCommandsKeepTheirWireNames() throws {
+    #expect(
+      try json(.loadRules(directory: "/tmp/agents"))
+        == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":1}"#)
+    #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":1}"#)
+    #expect(
+      try json(.clearStatus(workspace: 4))
+        == #"{"command":{"type":"clear_status","workspace":4},"v":1}"#)
+    #expect(
+      try json(.urlAt(line: "see https://a.example", column: 6))
+        == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":1}"#)
+  }
+
+  @Test func readsWhatTheCoreJudgedAndWhatItWillOpen() throws {
+    let statuses = #"{"type":"statuses","statuses":[{"workspace":2,"status":"needs_attention"}]}"#
+    guard case .statuses(let states) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(statuses.utf8))
+    else {
+      Issue.record("expected statuses")
+      return
+    }
+    #expect(states == [CoreWorkspaceState(workspace: 2, status: .needsAttention)])
+
+    let found = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(#"{"type":"url","url":"https://a.example"}"#.utf8))
+    #expect(found == .url("https://a.example"))
+    let missing = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(#"{"type":"url","url":null}"#.utf8))
+    #expect(missing == .url(nil))
   }
 
   @Test func writeSendsBytesNotText() throws {

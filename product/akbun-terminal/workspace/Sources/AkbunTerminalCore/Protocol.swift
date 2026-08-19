@@ -13,7 +13,7 @@ public enum CoreProtocol {
 
 public enum CoreCommand: Encodable {
   case hello
-  case spawn(cwd: String, cols: UInt16, rows: UInt16)
+  case spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?)
   case write(session: UInt32, bytes: [UInt8])
   case resize(session: UInt32, cols: UInt16, rows: UInt16)
   case close(session: UInt32)
@@ -26,9 +26,14 @@ public enum CoreCommand: Encodable {
   case renderMarkdown(text: String)
   case themes
   case setTheme(name: String)
+  case loadRules(directory: String)
+  case detect
+  case clearStatus(workspace: UInt64)
+  case urlAt(line: String, column: Int)
 
   private enum Key: String, CodingKey {
     case type, cwd, cols, rows, session, bytes, directory, name, path, project, text
+    case workspace, line, column
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -36,11 +41,12 @@ public enum CoreCommand: Encodable {
     switch self {
     case .hello:
       try container.encode("hello", forKey: .type)
-    case .spawn(let cwd, let cols, let rows):
+    case .spawn(let cwd, let cols, let rows, let workspace):
       try container.encode("spawn", forKey: .type)
       try container.encode(cwd, forKey: .cwd)
       try container.encode(cols, forKey: .cols)
       try container.encode(rows, forKey: .rows)
+      try container.encodeIfPresent(workspace, forKey: .workspace)
     case .write(let session, let bytes):
       try container.encode("write", forKey: .type)
       try container.encode(session, forKey: .session)
@@ -82,6 +88,18 @@ public enum CoreCommand: Encodable {
     case .setTheme(let name):
       try container.encode("set_theme", forKey: .type)
       try container.encode(name, forKey: .name)
+    case .loadRules(let directory):
+      try container.encode("load_rules", forKey: .type)
+      try container.encode(directory, forKey: .directory)
+    case .detect:
+      try container.encode("detect", forKey: .type)
+    case .clearStatus(let workspace):
+      try container.encode("clear_status", forKey: .type)
+      try container.encode(workspace, forKey: .workspace)
+    case .urlAt(let line, let column):
+      try container.encode("url_at", forKey: .type)
+      try container.encode(line, forKey: .line)
+      try container.encode(column, forKey: .column)
     }
   }
 }
@@ -107,7 +125,20 @@ public enum CoreResponse: Equatable, Sendable {
   case file(text: String)
   case markdown([CoreBlock])
   case themes([CoreTheme])
+  case statuses([CoreWorkspaceState])
+  case url(String?)
   case error(message: String)
+}
+
+/// One workspace's judged status. Only the ones that moved are sent.
+public struct CoreWorkspaceState: Decodable, Equatable, Sendable {
+  public let workspace: UInt64
+  public let status: CoreWorkspaceStatus
+
+  public init(workspace: UInt64, status: CoreWorkspaceStatus) {
+    self.workspace = workspace
+    self.status = status
+  }
 }
 
 public struct CoreTreeState: Decodable, Equatable, Sendable {
@@ -245,6 +276,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, blocks, themes
+    case statuses, url
   }
 
   public init(from decoder: Decoder) throws {
@@ -266,6 +298,10 @@ extension CoreResponse: Decodable {
       self = .markdown(try container.decode([CoreBlock].self, forKey: .blocks))
     case "themes":
       self = .themes(try container.decode([CoreTheme].self, forKey: .themes))
+    case "statuses":
+      self = .statuses(try container.decode([CoreWorkspaceState].self, forKey: .statuses))
+    case "url":
+      self = .url(try container.decodeIfPresent(String.self, forKey: .url))
     case "error":
       self = .error(message: try container.decode(String.self, forKey: .message))
     case let other:

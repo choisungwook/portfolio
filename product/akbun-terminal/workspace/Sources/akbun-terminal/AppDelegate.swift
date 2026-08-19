@@ -1,9 +1,14 @@
 import AppKit
 import AkbunTerminalCore
+import UserNotifications
 
 /// Wires the core to one window and puts the update check in the menu.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
+  UNUserNotificationCenterDelegate
+{
+  /// The workspace a delivered notification will take the user to.
+  private static let workspaceKey = "workspace"
   private var core: CoreBridge?
   private var windowController: TerminalWindowController?
 
@@ -23,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       // Built after the controller, because the theme list comes from the core
       // and there is nothing to choose between before it has answered.
       buildMenu(for: controller)
+      prepareNotifications(for: controller)
     } catch {
       // A core that cannot start leaves nothing to show, so say why and stop
       // rather than opening an empty window.
@@ -60,6 +66,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     editItem.submenu = editMenu
 
     let viewMenu = NSMenu(title: "View")
+    viewMenu.addItem(withTitle: "Bigger", action: #selector(zoomIn), keyEquivalent: "+").target = self
+    // The same command on the key people actually press. ⌘+ needs shift on a US
+    // keyboard, and nobody holds shift to zoom in.
+    let alsoBigger = viewMenu.addItem(
+      withTitle: "Bigger", action: #selector(zoomIn), keyEquivalent: "=")
+    alsoBigger.target = self
+    alsoBigger.isHidden = true
+    viewMenu.addItem(withTitle: "Smaller", action: #selector(zoomOut), keyEquivalent: "-").target = self
+    viewMenu.addItem(
+      withTitle: "Default Size", action: #selector(zoomReset), keyEquivalent: "0"
+    ).target = self
+    viewMenu.addItem(.separator())
     viewMenu.addItem(
       withTitle: "Hide File Browser", action: #selector(toggleFileBrowser), keyEquivalent: "b"
     ).target = self
@@ -79,6 +97,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     mainMenu.addItem(editItem)
     mainMenu.addItem(viewItem)
     NSApp.mainMenu = mainMenu
+  }
+
+  @objc private func zoomIn() {
+    windowController?.zoom(by: 1)
+  }
+
+  @objc private func zoomOut() {
+    windowController?.zoom(by: -1)
+  }
+
+  @objc private func zoomReset() {
+    windowController?.zoom(by: 0)
+  }
+
+  // MARK: Notifications
+
+  /// Asks once for permission and routes a finished workspace to a banner.
+  ///
+  /// A refusal is not an error worth reporting: the colour in the sidebar is the
+  /// primary signal and it does not need permission from anyone. The banner is
+  /// the part that reaches somebody looking at another window.
+  private func prepareNotifications(for controller: TerminalWindowController) {
+    guard Bundle.main.bundleIdentifier != nil else { return }
+    let centre = UNUserNotificationCenter.current()
+    centre.delegate = self
+    centre.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    controller.onWorkspaceFinished = { project, workspace in
+      let content = UNMutableNotificationContent()
+      content.title = workspace.name
+      content.body = "\(project.name) finished."
+      content.userInfo = [Self.workspaceKey: String(workspace.id)]
+      centre.add(
+        UNNotificationRequest(
+          identifier: "workspace-\(workspace.id)", content: content, trigger: nil))
+    }
+  }
+
+  /// The window is not necessarily in front when work finishes, and the banner
+  /// is the whole point, so it is shown even while the app is active.
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let info = response.notification.request.content.userInfo
+    if let raw = info[Self.workspaceKey] as? String, let workspace = UInt64(raw) {
+      NSApp.activate(ignoringOtherApps: true)
+      windowController?.reveal(workspace: workspace)
+    }
+    completionHandler()
   }
 
   @objc private func toggleFileBrowser(_ sender: NSMenuItem) {

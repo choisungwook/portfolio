@@ -4,7 +4,7 @@ Notes for the next agent taking over this app. Read [architecture.md](./architec
 
 ## What the app is
 
-A macOS app that wraps shells. The left sidebar holds projects and their workspace groups, the middle runs the selected workspace's terminal tabs with a markdown pane under them, and the right lists the project's files. Agent state detection comes later.
+A macOS app that wraps shells. The left sidebar holds projects and their workspace groups and colours each by what the agent inside it is doing, the middle runs the selected workspace's terminal tabs with a markdown pane under them, and the right lists the project's files.
 
 ## Where the risk is
 
@@ -17,6 +17,12 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **The browser reads what is opened, and only that.** `read_directory` answers one level. The outline view asks for children inside `numberOfChildrenOfItem`, which is the moment a folder is opened, so nothing below a closed folder has been read. Dotfiles are hidden and symlinks are leaves, both decided in the core.
 - **A document is data, never markup.** Markdown arrives as blocks and is drawn as an attributed string. Raw HTML is dropped in the core and links are not clickable, so opening a file someone else wrote cannot reach anything.
 - **The core owns the tree.** The shell supplies the app data directory and folder picker results. Rust validates, stores and returns the complete versioned project state after every mutation.
+- **Judging reads a screen, not a stream.** `screen.rs` keeps an interpreted grid per session, updated on the reader thread. An agent paints over its own question within a second of it being answered, so a search over the raw bytes finds it forever. Only cursor movement and erasing are implemented; colour is dropped.
+- **The phrases are data.** `agent.rs` reads one JSON file per agent from the app data directory and seeds it with the three shipped ones. A wording change in an agent's status line is a file edit, never a build.
+- **Finished is a transition.** It is only reachable from working or asking, and `clear_status` is what ends it. That is what makes the same idle screen mean nothing at launch and mean "look at me" after a run, and what fires the notification exactly once.
+- **A split view owns its subviews' widths.** Panes are placed with `setPosition` and limited by the delegate. A width constraint is a second opinion about the same number, and whichever one loses is either a pane that opens at nothing or a divider that snaps back.
+- **A thin divider is one point wide.** Nobody can aim at that, which is what made the panes look fixed. `splitView(_:effectiveRect:forDrawnRect:ofDividerAt:)` grows what answers the mouse without touching what is drawn.
+- **The URL rule is not the emulator's.** SwiftTerm detects links itself and lives in the half that gets replaced. The view answers where a click landed; `url.rs` decides what may be opened, and only http and https ever are.
 
 ## Files
 
@@ -29,6 +35,10 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `core/crates/core/src/browse.rs` | one directory level, hidden files and link rules |
 | `core/crates/core/src/markdown.rs` | markdown to blocks, and the place raw HTML is dropped |
 | `core/crates/core/src/theme.rs` | the known colour schemes as a hex table |
+| `core/crates/core/src/screen.rs` | the interpreted screen the judging reads |
+| `core/crates/core/src/agent.rs` | rule files, the process tree walk, and the judgement |
+| `core/crates/core/rules/*.json` | the agent rules this build ships and seeds |
+| `core/crates/core/src/url.rs` | what counts as a URL, and what may be opened |
 | `core/crates/ffi/src/lib.rs` | the five function C surface |
 | `Sources/CAkbunTerminalCore/include/akbun_terminal.h` | the header that mirrors it |
 | `Sources/AkbunTerminalCore/Protocol.swift` | the Swift half of the protocol |
@@ -45,10 +55,11 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/akbun-terminal/MarkdownAttributedText.swift` | blocks to one attributed string |
 | `Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
 | `Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
+| `Sources/akbun-terminal/Browsers.swift` | the installed browsers, asked of the system once |
 | `Sources/akbun-terminal/Updater.swift` | release check, dmg download, bundle swap |
 | `scripts/build-core.sh` | the Rust archive the package links |
 | `scripts/bundle.sh` | assembles the .app and the dmg |
 
 ## What is not here yet
 
-Agent state detection and the URL menu. Each has its own issue. When adding one, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.
+Windows and Linux, a second window, and search in the scrollback. When adding anything, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.

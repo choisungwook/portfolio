@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-20
+
+* **Creation**: [NSSplitView의 pane 너비는 divider 위치로 정하고 제약으로 정하지 않는다](topics/nssplitview-width-constraint-fights-the-divider.md) topic 기록. akbun-terminal의 패널이 고정으로 보인 원인을 1pt hit 영역과 holding priority에 지는 너비 제약으로 갈라내고, 조합별 실측 결과를 남긴다.
+
 ## 2026-08-19
 
 * **Creation**: [코어와 화면은 버전 붙인 타입으로 먼저 가르고 프로세스 분리는 미룬다](decisions/2026-08-typed-boundary-before-process-boundary.md) 결정 기록. akbun-terminal에서 Rust 코어와 네이티브 shell을 가를 때 상주 프로세스를 만들지 않고 버전 붙인 타입만 먼저 나눈 판단과, 그 선택을 되돌아볼 조건을 남긴다.

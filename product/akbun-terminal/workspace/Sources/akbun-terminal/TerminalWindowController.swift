@@ -10,7 +10,11 @@ import AkbunTerminalCore
 /// engine would replace.
 ///
 /// The three panes are split views rather than fixed widths, which is the whole
-/// of "resizable and collapsible": dragging and hiding come with the class.
+/// of "resizable and collapsible": dragging and hiding come with the class. The
+/// sizes belong to the split view, so the widths here are placed once as divider
+/// positions and the limits are answered by the delegate; a width constraint
+/// would be a second opinion about the same number and one of the two has to
+/// lose, which is what a divider that will not move looks like.
 @MainActor
 final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSplitViewDelegate {
   private let core: CoreBridge
@@ -27,8 +31,16 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private var views: [UInt32: TerminalRendering] = [:]
   private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
+  private var detect: Timer?
   private(set) var themes: [CoreTheme] = []
   private(set) var themeName = CoreTheme.system
+  /// Applies to every terminal in the window, and to the next one opened.
+  private var fontSize: Double = 13
+  private(set) var browsers = Browsers.none
+  /// Called when a workspace finishes its work, so the app can say so outside
+  /// its own window. Kept as a closure because the notification permission and
+  /// the click that comes back belong to the application, not to one window.
+  var onWorkspaceFinished: ((CoreProject, CoreWorkspace) -> Void)?
 
   init(core: CoreBridge) {
     self.core = core
@@ -87,7 +99,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     centre.addArrangedSubview(terminalPane)
     centre.addArrangedSubview(editor)
     editor.isHidden = true
-    editor.heightAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
 
     panes.isVertical = true
     panes.dividerStyle = .thin
@@ -103,19 +114,50 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       panes.leadingAnchor.constraint(equalTo: content.leadingAnchor),
       panes.trailingAnchor.constraint(equalTo: content.trailingAnchor),
     ])
-    // Starting widths, given up first when the window is resized. The middle
-    // keeps the default holding priority, so it is what stretches.
-    width(sidebar, 240, minimum: 170)
-    width(browser, 260, minimum: 180)
     panes.setHoldingPriority(.init(260), forSubviewAt: 0)
     panes.setHoldingPriority(.init(260), forSubviewAt: 2)
+    // Starting widths. A width constraint cannot say this: it either loses to
+    // the holding priority above and the pane opens at nothing, or it wins and
+    // then puts the pane back where it was after every drag. Placing the
+    // dividers says it once and leaves them free afterwards.
+    content.layoutSubtreeIfNeeded()
+    panes.setPosition(240, ofDividerAt: 0)
+    panes.setPosition(panes.bounds.width - 260, ofDividerAt: 1)
   }
 
-  private func width(_ view: NSView, _ points: Double, minimum: Double) {
-    let wanted = view.widthAnchor.constraint(equalToConstant: points)
-    wanted.priority = .defaultLow
-    wanted.isActive = true
-    view.widthAnchor.constraint(greaterThanOrEqualToConstant: minimum).isActive = true
+  /// How much of a pane has to be left. This is the delegate's answer rather
+  /// than a constraint because a required constraint a drag cannot satisfy has
+  /// to break for the drag to finish; a limit the split view knows about just
+  /// stops the drag in the right place.
+  private static let minimumPaneSize: CGFloat = 150
+
+  func splitView(
+    _ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat,
+    ofSubviewAt dividerIndex: Int
+  ) -> CGFloat {
+    // The coordinate is measured from the split view's own edge, so the first
+    // divider's minimum is one pane in and the second is two.
+    max(proposedMinimumPosition, Self.minimumPaneSize * CGFloat(dividerIndex + 1))
+  }
+
+  func splitView(
+    _ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat,
+    ofSubviewAt dividerIndex: Int
+  ) -> CGFloat {
+    let extent = splitView.isVertical ? splitView.bounds.width : splitView.bounds.height
+    let panesAfter = CGFloat(splitView.arrangedSubviews.count - dividerIndex - 1)
+    return min(proposedMaximumPosition, extent - Self.minimumPaneSize * panesAfter)
+  }
+
+  /// The reason these panes felt fixed. A thin divider draws as one point, and
+  /// one point is not something a person can aim a mouse at, so the drag almost
+  /// never started. The line stays thin; the part that answers the mouse grows.
+  func splitView(
+    _ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect,
+    forDrawnRect drawnRect: NSRect, ofDividerAt dividerIndex: Int
+  ) -> NSRect {
+    proposedEffectiveRect.insetBy(
+      dx: splitView.isVertical ? -4 : 0, dy: splitView.isVertical ? 0 : -4)
   }
 
   private func connect() {
@@ -139,6 +181,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   func start() throws {
     let dataDirectory = try appDataDirectory()
     let state = try core.state(.loadState(directory: dataDirectory.path))
+    // The rules directory is seeded by the core on the first run, so it is also
+    // where a new agent is added: drop a file in and restart.
+    try? core.expectOk(
+      .loadRules(directory: dataDirectory.appendingPathComponent("agents", isDirectory: true).path))
+    browsers = Browsers.installed()
     themes = (try? core.themes()) ?? []
     themeName = state.theme ?? CoreTheme.system
     sidebar.render(state)
@@ -149,6 +196,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     drain = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
       // The timer fires on the run loop that scheduled it, which is this one.
       MainActor.assumeIsolated { self?.drainEvents() }
+    }
+
+    // Judging runs on its own clock, well away from the one above. Reading the
+    // rules against every byte would stall the screen exactly when an agent is
+    // at its noisiest, and a status nobody sees for two seconds costs nothing.
+    detect = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+      MainActor.assumeIsolated { self?.applyDetectedStatuses() }
     }
 
     // Opening on the first workspace saves the click that every launch would
@@ -178,6 +232,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     guard editor.confirmDiscardingChanges() else { return }
     let changedProject = selection?.project.id != project.id
     selection = (project, workspace)
+    // Finished means nobody has looked yet, and this is somebody looking.
+    try? core.expectOk(.clearStatus(workspace: workspace.id))
+    sidebar.setStatus(.idle, for: workspace.id)
     sidebar.select(workspace: workspace.id)
     if changedProject {
       hideDocument()
@@ -195,10 +252,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     guard let selection else { return }
     let terminal = SwiftTermTerminalView(frame: terminalArea.bounds)
     terminal.apply(theme: currentTheme)
+    terminal.fontSize = fontSize
+    terminal.onCellClick = { [weak self] line, column, point in
+      self?.offerURL(in: line, column: column, at: point, from: terminal.view)
+    }
     let cwd = selection.project.path ?? FileManager.default.homeDirectoryForCurrentUser.path
     do {
       let grid = terminal.grid
-      let session = try core.spawn(cwd: cwd, cols: grid.cols, rows: grid.rows)
+      let session = try core.spawn(
+        cwd: cwd, cols: grid.cols, rows: grid.rows, workspace: selection.workspace.id)
       terminal.onInput = { [weak self] bytes in
         try? self?.core.expectOk(.write(session: session, bytes: bytes))
       }
@@ -276,6 +338,76 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private func hideDocument() {
     editor.isHidden = true
     centre.adjustSubviews()
+  }
+
+  // MARK: Zoom
+
+  /// Steps the terminal font up or down, or back to the default at zero. The
+  /// view reports its new cell grid on its own, which is what tells the shell
+  /// on the other side that its window changed shape.
+  func zoom(by steps: Double) {
+    fontSize = steps == 0 ? 13 : min(36, max(7, fontSize + steps))
+    for view in views.values {
+      view.fontSize = fontSize
+    }
+  }
+
+  // MARK: Links
+
+  /// Offers what can be done with the URL under a click. Nothing happens when
+  /// the core does not recognise one, so an ordinary click stays ordinary.
+  private func offerURL(in line: String, column: Int, at point: NSPoint, from view: NSView) {
+    guard let text = core.url(inLine: line, column: column), let url = URL(string: text) else {
+      return
+    }
+    let menu = NSMenu(title: text)
+    menu.addItem(withTitle: text, action: nil, keyEquivalent: "").isEnabled = false
+    menu.addItem(.separator())
+    menu.addItem(LinkItem(title: "Copy Link", url: url, browser: nil, copy: true))
+    menu.addItem(LinkItem(title: "Open", url: url, browser: nil, copy: false))
+    // With no browser installed there is nothing to choose between, so the
+    // system default above is the whole menu.
+    if !browsers.all.isEmpty {
+      let choices = NSMenu(title: "Open With")
+      for browser in browsers.all {
+        choices.addItem(LinkItem(title: browser.name, url: url, browser: browser, copy: false))
+      }
+      let openWith = menu.addItem(withTitle: "Open With", action: nil, keyEquivalent: "")
+      openWith.submenu = choices
+    }
+    menu.popUp(positioning: nil, at: point, in: view)
+  }
+
+  // MARK: Agent status
+
+  /// Paints what the core judged and says so when work finished.
+  private func applyDetectedStatuses() {
+    guard let changed = try? core.detect() else { return }
+    for state in changed {
+      sidebar.setStatus(state.status, for: state.workspace)
+      guard state.status == .completed, let found = find(workspace: state.workspace) else {
+        continue
+      }
+      onWorkspaceFinished?(found.project, found.workspace)
+    }
+  }
+
+  private func find(workspace id: UInt64) -> (project: CoreProject, workspace: CoreWorkspace)? {
+    for project in sidebar.projects {
+      if let workspace = project.workspaces.first(where: { $0.id == id }) {
+        return (project, workspace)
+      }
+    }
+    return nil
+  }
+
+  /// Brings a workspace on screen from outside the window, which is what a
+  /// notification click asks for.
+  func reveal(workspace id: UInt64) {
+    guard let found = find(workspace: id) else { return }
+    showWindow(nil)
+    window?.makeKeyAndOrderFront(nil)
+    selectWorkspace(project: found.project, workspace: found.workspace)
   }
 
   // MARK: Theme
@@ -399,10 +531,44 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   func closeSessions() {
     drain?.invalidate()
     drain = nil
+    detect?.invalidate()
+    detect = nil
     for session in tabs.allSessions {
       try? core.expectOk(.close(session: session))
     }
     tabs = TerminalTabs()
     views.removeAll()
+  }
+}
+
+
+/// A menu entry that carries what it is for. A menu item's title is not a URL
+/// and a browser is not a selector, so both ride on the item itself rather than
+/// being looked up again when it is picked.
+@MainActor
+private final class LinkItem: NSMenuItem {
+  private let url: URL
+  private let browser: Browsers.Browser?
+  private let copy: Bool
+
+  init(title: String, url: URL, browser: Browsers.Browser?, copy: Bool) {
+    self.url = url
+    self.browser = browser
+    self.copy = copy
+    super.init(title: title, action: #selector(run), keyEquivalent: "")
+    target = self
+  }
+
+  required init(coder: NSCoder) {
+    fatalError("not loaded from a nib")
+  }
+
+  @objc private func run() {
+    guard !copy else {
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(url.absoluteString, forType: .string)
+      return
+    }
+    Browsers.open(url, in: browser)
   }
 }

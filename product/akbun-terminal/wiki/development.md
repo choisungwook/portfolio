@@ -30,7 +30,13 @@ cargo test --manifest-path core/Cargo.toml   # protocol, pty round trip, session
 
 The core tests need no macOS and no AppKit, which is why CI runs them on the cheap runner. The Swift tests need the archive first; `swift test` without it fails to link.
 
-`BridgeTests` starts a real shell. It is the test that fails when the header and the Rust surface drift apart, so do not skip it when changing either.
+`BridgeTests` starts a real shell. It is the test that fails when the header and the Rust surface drift apart, so do not skip it when changing either. One of its cases runs the whole detection path through the boundary: a rule file, a real pty, and a status back.
+
+SwiftPM does not know the static archive is an input, so rebuilding the core is not enough to make `swift test` use it. The symptom is a Rust change that has clearly compiled and a Swift test still reporting the old behaviour, usually as an unknown command variant. Delete the test bundle to force the relink.
+
+```bash
+rm -rf .build/arm64-apple-macosx/debug/akbun-terminalPackageTests.xctest
+```
 
 ## Caveats
 

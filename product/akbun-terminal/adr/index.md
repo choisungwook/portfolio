@@ -11,3 +11,5 @@
 | [The file browser reads one level at a time](./2026-08-file-browser-one-level-at-a-time.md) | A folder is read when it is opened, dotfiles hidden and links left as leaves |
 | [Markdown crosses the boundary as blocks](./2026-08-markdown-blocks-not-html.md) | Blocks from the core into an attributed string, raw HTML dropped, one pane with two modes |
 | [Known themes ship in the core as data](./2026-08-named-themes-in-the-core.md) | Named palettes as a hex table beside the tree, System as the default |
+| [Agent status comes from a screen and a process list](./2026-08-agent-status-from-a-screen-and-a-process.md) | Two layers, phrases as one JSON file per agent, finished as a transition that opening clears |
+| [The URL rule stays in the core](./2026-08-url-rule-in-the-core.md) | The view answers where the click landed, the core decides what may be opened |
