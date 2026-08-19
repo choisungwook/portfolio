@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-19
+
+* [Inspector는 타임라인에서 선택한 미디어 트랙을 따른다](decisions/2026-08-inspector-follows-timeline-media.md) 결정 기록. 연결된 영상과 오디오의 속성 대상과 기본 탭을 타임라인 선택에 맞춤.
+
 ## 2026-08-12
 
 * [native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다](decisions/2026-08-native-monitor-is-a-window-overlay.md) 결정 기록. GPU preview 오프셋을 WebKit 내부 layer 문제가 아닌 window overlay 좌표 변환 문제로 분리함.

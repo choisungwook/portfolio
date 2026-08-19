@@ -202,12 +202,19 @@
             <label class="row">Opacity <input id="transform-opacity" type="range" min="0" max="1" step="0.01" /><input id="transform-opacity-value" class="compact-number" type="number" min="0" max="1" step="0.01" /></label>
           </div>
           <div id="clip-panel" hidden>
-            <h3>Clip</h3>
             <p id="clip-summary" class="dim small-text"></p>
-            <label class="row" id="clip-opacity-row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
-            <!-- 0..1 because that is what the edit model stores; a wider
-                 slider would snap back on release. -->
-            <label class="row" id="clip-volume-row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
+            <div id="clip-tabs" class="inspector-tabs" role="tablist" aria-label="Clip properties">
+              <button id="clip-video-tab" type="button" role="tab">Video</button>
+              <button id="clip-audio-tab" type="button" role="tab">Audio</button>
+            </div>
+            <div id="clip-video-panel" role="tabpanel">
+              <label class="row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
+            </div>
+            <div id="clip-audio-panel" role="tabpanel">
+              <!-- 0..1 because that is what the edit model stores; a wider
+                   slider would snap back on release. -->
+              <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
+            </div>
           </div>
           <div id="text-panel" hidden>
             <h3>Text</h3>
@@ -528,6 +535,7 @@
   <script src="geometry.js"></script>
   <script src="timeline.js"></script>
   <script src="source.js"></script>
+  <script src="inspector.js"></script>
   <script src="shortcuts.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>
