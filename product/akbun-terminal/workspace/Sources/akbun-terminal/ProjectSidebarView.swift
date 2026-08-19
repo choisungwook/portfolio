@@ -6,8 +6,11 @@ final class ProjectSidebarView: NSView {
   var onChooseFolder: (() -> Void)?
   var onCreateEmptyProject: (() -> Void)?
   var onCreateWorkspace: ((CoreProject) -> Void)?
+  var onSelectWorkspace: ((CoreProject, CoreWorkspace) -> Void)?
 
   private let rows = FlippedStackView()
+  private var projects: [CoreProject] = []
+  private var selected: UInt64?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -63,11 +66,24 @@ final class ProjectSidebarView: NSView {
   }
 
   func render(_ state: CoreTreeState) {
+    projects = state.projects
+    redraw()
+  }
+
+  /// Marks a workspace as the one on screen. Selection is drawn here and owned
+  /// by the controller, because the terminal it opens is what it really means.
+  func select(workspace: UInt64?) {
+    guard selected != workspace else { return }
+    selected = workspace
+    redraw()
+  }
+
+  private func redraw() {
     rows.arrangedSubviews.forEach {
       rows.removeArrangedSubview($0)
       $0.removeFromSuperview()
     }
-    if state.projects.isEmpty {
+    if projects.isEmpty {
       let empty = NSTextField(wrappingLabelWithString: "Add a folder or create an empty project.")
       empty.textColor = .secondaryLabelColor
       empty.font = .systemFont(ofSize: 12)
@@ -77,7 +93,7 @@ final class ProjectSidebarView: NSView {
       empty.trailingAnchor.constraint(lessThanOrEqualTo: rows.trailingAnchor, constant: -12).isActive = true
       return
     }
-    state.projects.forEach(addProject)
+    projects.forEach(addProject)
   }
 
   private func addProject(_ project: CoreProject) {
@@ -105,11 +121,14 @@ final class ProjectSidebarView: NSView {
       let label = NSTextField(labelWithString: workspace.name)
       label.font = .systemFont(ofSize: 12)
       label.lineBreakMode = .byTruncatingTail
-      let workspaceRow = NSStackView(views: [dot, label])
+      let workspaceRow = WorkspaceRow(isSelected: workspace.id == selected, name: workspace.name) { [weak self] in
+        self?.onSelectWorkspace?(project, workspace)
+      }
+      workspaceRow.setViews([dot, label], in: .leading)
       workspaceRow.orientation = .horizontal
       workspaceRow.alignment = .centerY
       workspaceRow.spacing = 7
-      workspaceRow.edgeInsets = NSEdgeInsets(top: 2, left: 31, bottom: 2, right: 8)
+      workspaceRow.edgeInsets = NSEdgeInsets(top: 3, left: 31, bottom: 3, right: 8)
       rows.addArrangedSubview(workspaceRow)
       workspaceRow.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
     }
@@ -153,6 +172,37 @@ private final class ActionButton: NSButton {
 
   @objc private func run() {
     handler()
+  }
+}
+
+/// A workspace line. Clicking it is how a terminal is opened, so the row itself
+/// is the control rather than a label with a gesture bolted on.
+private final class WorkspaceRow: NSStackView {
+  private let handler: () -> Void
+
+  init(isSelected: Bool, name: String, handler: @escaping () -> Void) {
+    self.handler = handler
+    super.init(frame: .zero)
+    setAccessibilityElement(true)
+    setAccessibilityRole(.button)
+    setAccessibilityLabel(name)
+    wantsLayer = true
+    layer?.cornerRadius = 4
+    layer?.backgroundColor =
+      (isSelected ? NSColor.selectedContentBackgroundColor : NSColor.clear).cgColor
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("not loaded from a nib")
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    handler()
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    handler()
+    return true
   }
 }
 

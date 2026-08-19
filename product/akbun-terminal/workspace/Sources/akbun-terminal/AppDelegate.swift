@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
-    windowController?.closeSession()
+    windowController?.closeSessions()
   }
 
   private func buildMenu() {
@@ -84,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       guard confirmInstall(version: latest) else { return }
       let downloaded = try await Updater.downloadDmg(from: dmg)
       try Updater.spawnSwap(appBundle: Bundle.main.bundleURL, dmg: downloaded)
-      windowController?.closeSession()
+      windowController?.closeSessions()
       NSApp.terminate(nil)
     } catch {
       presentInfo("Update check failed: \(error.localizedDescription)")

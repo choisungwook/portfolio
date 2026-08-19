@@ -4,7 +4,7 @@ Notes for the next agent taking over this app. Read [architecture.md](./architec
 
 ## What the app is
 
-A macOS app that wraps shells. The left sidebar holds projects and their workspace groups, while the main pane runs a terminal. Agent state detection, terminal tabs and the file browser come later.
+A macOS app that wraps shells. The left sidebar holds projects and their workspace groups, and the main pane runs the selected workspace's terminal tabs. Agent state detection and the file browser come later.
 
 ## Where the risk is
 
@@ -31,13 +31,15 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/AkbunTerminalCore/Release.swift` | version arithmetic and dmg naming, pure |
 | `Sources/AkbunTerminalCore/UpdateScript.swift` | the bundle swap script, testable as text |
 | `Sources/akbun-terminal/TerminalRendering.swift` | the seam a real terminal engine plugs into |
-| `Sources/akbun-terminal/PlainTextTerminalView.swift` | the placeholder view behind that seam |
+| `Sources/akbun-terminal/SwiftTermTerminalView.swift` | the emulator behind that seam |
+| `Sources/akbun-terminal/TerminalTabBarView.swift` | the tab strip for the selected workspace |
+| `Sources/AkbunTerminalCore/TerminalTabs.swift` | which session belongs to which workspace, and which is on screen |
 | `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
-| `Sources/akbun-terminal/TerminalWindowController.swift` | one window, one session, the drain timer |
+| `Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
 | `Sources/akbun-terminal/Updater.swift` | release check, dmg download, bundle swap |
 | `scripts/build-core.sh` | the Rust archive the package links |
 | `scripts/bundle.sh` | assembles the .app and the dmg |
 
 ## What is not here yet
 
-Terminal tabs, agent state detection, the file browser, the markdown viewer and the URL menu. Each has its own issue. When adding one, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.
+Agent state detection, the file browser, the markdown viewer and the URL menu. Each has its own issue. When adding one, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.
