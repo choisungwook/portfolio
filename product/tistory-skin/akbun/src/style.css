@@ -1348,7 +1348,7 @@ img {
 
 /* 스킨 chrome과 티스토리가 본문 뒤에 붙이는 블록을 모두 숨긴다.
    좋아요/공유/CCL(.container_postbtn), 같은 카테고리 글(.another_category),
-   프로필 명함/구독 툴바(data-tistory-react-app, .menu_toolbar), 광고, 댓글 */
+   프로필 명함/구독 툴바([data-tistory-react-app], .menu_toolbar), 광고, 댓글 */
 #tt-body-page.presentation-mode .site-header,
 #tt-body-page.presentation-mode .site-footer,
 #tt-body-page.presentation-mode .sidebar,
