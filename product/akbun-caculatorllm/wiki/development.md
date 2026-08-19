@@ -33,25 +33,30 @@ npm run preview
 
 ## Deploy
 
-The release workflow runs tests and a production build for pull requests. A push to `master` repeats verification and deploys the static `dist/` directory through Wrangler.
+Cloudflare Pages builds on push to master. There is no GitHub Actions release job and no tag, so nothing breaks when the version in `package.json` stands still. It is bumped anyway, by the repository rule that a change under `workspace/` carries one.
 
-Create two GitHub Actions secrets before the first deployment:
+First time setup, once:
 
-| Secret | Value |
-|---|---|
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account identifier |
-| `CLOUDFLARE_API_TOKEN` | Token allowed to edit Workers scripts for the account |
+1. Cloudflare Dashboard, Workers & Pages, Create, Pages, Connect to Git.
+2. Pick `choisungwook/portfolio`.
+3. Build settings:
+   - Build command: `cd product/akbun-caculatorllm/workspace && npm install && npm run build`
+   - Deploy command: `cd product/akbun-caculatorllm/workspace && npm run deploy`
+   - Build output directory: `product/akbun-caculatorllm/workspace/dist`
+   - Root directory: `/`, since this is a monorepo
+4. Custom domains, add `caculatorllm.akbun.com`. Cloudflare writes the CNAME and issues the certificate. The Open Graph metadata already uses that hostname.
+5. Settings, Builds & deployments, Build watch paths:
+   - Include: `product/akbun-caculatorllm/**`
+   - Exclude: `product/akbun-caculatorllm/*.md`
 
-The worker name is `akbun-caculatorllm`. Add `caculatorllm.akbun.com` as its custom domain after the first deployment. The Open Graph metadata already uses that hostname.
+Without the watch paths every commit anywhere in the repository triggers a build of this page.
 
-Deploy from a trusted local shell when the workflow is not used:
+Deploy from a trusted local shell when the Pages build is not used:
 
 ```bash
 npm run build
 npm run deploy
 ```
-
-No GitHub tag or binary release is created. `package.json` remains the product version record and must be bumped with each change under `workspace/`.
 
 ## Release
 
@@ -60,7 +65,7 @@ No GitHub tag or binary release is created. `package.json` remains the product v
 3. Run `npm test`.
 4. Run `npm run build`.
 5. Merge to `master` only after pull request verification passes.
-6. Confirm the master workflow deploy job and the custom domain.
+6. Confirm the Cloudflare Pages build and the custom domain.
 
 ## Caveats
 
