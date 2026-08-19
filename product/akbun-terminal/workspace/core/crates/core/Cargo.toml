@@ -11,3 +11,4 @@ name = "akbun_terminal_core"
 serde.workspace = true
 serde_json.workspace = true
 portable-pty.workspace = true
+pulldown-cmark.workspace = true

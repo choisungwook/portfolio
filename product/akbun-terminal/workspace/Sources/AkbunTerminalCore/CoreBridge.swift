@@ -93,6 +93,42 @@ public final class CoreBridge {
     }
   }
 
+  public func entries(in directory: String) throws -> [CoreEntry] {
+    let response = try send(.readDirectory(path: directory))
+    switch response {
+    case .entries(let entries): return entries
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  public func text(ofFile path: String) throws -> String {
+    let response = try send(.readFile(path: path))
+    switch response {
+    case .file(let text): return text
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  public func markdown(_ source: String) throws -> [CoreBlock] {
+    let response = try send(.renderMarkdown(text: source))
+    switch response {
+    case .markdown(let blocks): return blocks
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  public func themes() throws -> [CoreTheme] {
+    let response = try send(.themes)
+    switch response {
+    case .themes(let themes): return themes
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
   /// Everything the core has queued since the last call.
   ///
   /// Draining on demand is what keeps drawing on one thread: the core never calls

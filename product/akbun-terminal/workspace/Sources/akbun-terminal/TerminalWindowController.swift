@@ -1,31 +1,42 @@
 import AppKit
 import AkbunTerminalCore
 
-/// One window: the project tree on the left, and the selected workspace's
-/// terminal tabs on the right.
+/// One window: the project tree on the left, the selected workspace's terminal
+/// tabs in the middle, and that project's files on the right.
 ///
 /// The sessions behind those tabs live in the core. What is kept here is the
 /// arrangement around them — which workspace is open, which tab is on screen and
 /// which view draws which session — because that is what a different terminal
 /// engine would replace.
+///
+/// The three panes are split views rather than fixed widths, which is the whole
+/// of "resizable and collapsible": dragging and hiding come with the class.
 @MainActor
-final class TerminalWindowController: NSWindowController, NSWindowDelegate {
+final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSplitViewDelegate {
   private let core: CoreBridge
   private let sidebar = ProjectSidebarView()
   private let tabBar = TerminalTabBarView()
   private let terminalArea = NSView()
+  private let browser: FileBrowserView
+  private let editor: MarkdownDocumentView
+  private let panes = NSSplitView()
+  private let centre = NSSplitView()
   private let placeholder = NSTextField(
     labelWithString: "Select a workspace on the left to open a terminal.")
   private var tabs = TerminalTabs()
   private var views: [UInt32: TerminalRendering] = [:]
   private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
+  private(set) var themes: [CoreTheme] = []
+  private(set) var themeName = CoreTheme.system
 
   init(core: CoreBridge) {
     self.core = core
+    self.browser = FileBrowserView(core: core)
+    self.editor = MarkdownDocumentView(core: core)
 
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
+      contentRect: NSRect(x: 0, y: 0, width: 1100, height: 620),
       styleMask: [.titled, .closable, .miniaturizable, .resizable],
       backing: .buffered,
       defer: false
@@ -37,42 +48,77 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     super.init(window: window)
     window.delegate = self
 
-    let content = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 560))
+    layOut(in: window)
+    connect()
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("not loaded from a nib")
+  }
+
+  private func layOut(in window: NSWindow) {
+    let content = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 620))
     content.autoresizingMask = [.width, .height]
     window.contentView = content
-    sidebar.translatesAutoresizingMaskIntoConstraints = false
-    tabBar.translatesAutoresizingMaskIntoConstraints = false
-    terminalArea.translatesAutoresizingMaskIntoConstraints = false
+
+    let terminalPane = NSView()
+    for view in [tabBar, terminalArea] {
+      view.translatesAutoresizingMaskIntoConstraints = false
+      terminalPane.addSubview(view)
+    }
     placeholder.textColor = .secondaryLabelColor
     placeholder.translatesAutoresizingMaskIntoConstraints = false
-    let divider = NSBox()
-    divider.boxType = .separator
-    divider.translatesAutoresizingMaskIntoConstraints = false
-    content.addSubview(sidebar)
-    content.addSubview(divider)
-    content.addSubview(tabBar)
-    content.addSubview(terminalArea)
     terminalArea.addSubview(placeholder)
     NSLayoutConstraint.activate([
-      sidebar.topAnchor.constraint(equalTo: content.topAnchor),
-      sidebar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-      sidebar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-      sidebar.widthAnchor.constraint(equalToConstant: 240),
-      divider.topAnchor.constraint(equalTo: content.topAnchor),
-      divider.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-      divider.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-      divider.widthAnchor.constraint(equalToConstant: 1),
-      tabBar.topAnchor.constraint(equalTo: content.topAnchor),
-      tabBar.leadingAnchor.constraint(equalTo: divider.trailingAnchor),
-      tabBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      tabBar.topAnchor.constraint(equalTo: terminalPane.topAnchor),
+      tabBar.leadingAnchor.constraint(equalTo: terminalPane.leadingAnchor),
+      tabBar.trailingAnchor.constraint(equalTo: terminalPane.trailingAnchor),
       terminalArea.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
-      terminalArea.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-      terminalArea.leadingAnchor.constraint(equalTo: divider.trailingAnchor),
-      terminalArea.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      terminalArea.bottomAnchor.constraint(equalTo: terminalPane.bottomAnchor),
+      terminalArea.leadingAnchor.constraint(equalTo: terminalPane.leadingAnchor),
+      terminalArea.trailingAnchor.constraint(equalTo: terminalPane.trailingAnchor),
       placeholder.centerXAnchor.constraint(equalTo: terminalArea.centerXAnchor),
       placeholder.centerYAnchor.constraint(equalTo: terminalArea.centerYAnchor),
     ])
 
+    centre.isVertical = false
+    centre.dividerStyle = .thin
+    centre.delegate = self
+    centre.addArrangedSubview(terminalPane)
+    centre.addArrangedSubview(editor)
+    editor.isHidden = true
+    editor.heightAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
+
+    panes.isVertical = true
+    panes.dividerStyle = .thin
+    panes.delegate = self
+    panes.translatesAutoresizingMaskIntoConstraints = false
+    panes.addArrangedSubview(sidebar)
+    panes.addArrangedSubview(centre)
+    panes.addArrangedSubview(browser)
+    content.addSubview(panes)
+    NSLayoutConstraint.activate([
+      panes.topAnchor.constraint(equalTo: content.topAnchor),
+      panes.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+      panes.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+      panes.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+    ])
+    // Starting widths, given up first when the window is resized. The middle
+    // keeps the default holding priority, so it is what stretches.
+    width(sidebar, 240, minimum: 170)
+    width(browser, 260, minimum: 180)
+    panes.setHoldingPriority(.init(260), forSubviewAt: 0)
+    panes.setHoldingPriority(.init(260), forSubviewAt: 2)
+  }
+
+  private func width(_ view: NSView, _ points: Double, minimum: Double) {
+    let wanted = view.widthAnchor.constraint(equalToConstant: points)
+    wanted.priority = .defaultLow
+    wanted.isActive = true
+    view.widthAnchor.constraint(greaterThanOrEqualToConstant: minimum).isActive = true
+  }
+
+  private func connect() {
     sidebar.onChooseFolder = { [weak self] in self?.chooseProjectFolder() }
     sidebar.onCreateEmptyProject = { [weak self] in self?.createEmptyProject() }
     sidebar.onCreateWorkspace = { [weak self] project in self?.createWorkspace(in: project) }
@@ -82,10 +128,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     tabBar.onNew = { [weak self] in self?.openTab() }
     tabBar.onSelect = { [weak self] session in self?.selectTab(session) }
     tabBar.onClose = { [weak self] session in self?.closeTab(session) }
-  }
-
-  required init?(coder: NSCoder) {
-    fatalError("not loaded from a nib")
+    browser.onOpenFile = { [weak self] entry in self?.open(entry) }
+    browser.onError = { [weak self] error in self?.present(error, whileDoing: "That folder could not be read") }
+    editor.onError = { [weak self] error in self?.present(error, whileDoing: "That file could not be used") }
+    editor.onClose = { [weak self] in self?.hideDocument() }
   }
 
   /// Loads the tree and begins draining events. No shell starts until a
@@ -93,6 +139,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   func start() throws {
     let dataDirectory = try appDataDirectory()
     let state = try core.state(.loadState(directory: dataDirectory.path))
+    themes = (try? core.themes()) ?? []
+    themeName = state.theme ?? CoreTheme.system
     sidebar.render(state)
     showActiveTab()
 
@@ -125,8 +173,16 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   // MARK: Tabs
 
   private func selectWorkspace(project: CoreProject, workspace: CoreWorkspace) {
+    // Moving away from an edited file is the last chance to keep it, so the
+    // question comes before anything on screen changes.
+    guard editor.confirmDiscardingChanges() else { return }
+    let changedProject = selection?.project.id != project.id
     selection = (project, workspace)
     sidebar.select(workspace: workspace.id)
+    if changedProject {
+      hideDocument()
+      browser.show(project: project)
+    }
     if tabs.tabs(in: workspace.id).isEmpty {
       openTab()
     } else {
@@ -138,6 +194,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   private func openTab() {
     guard let selection else { return }
     let terminal = SwiftTermTerminalView(frame: terminalArea.bounds)
+    terminal.apply(theme: currentTheme)
     let cwd = selection.project.path ?? FileManager.default.homeDirectoryForCurrentUser.path
     do {
       let grid = terminal.grid
@@ -201,6 +258,56 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     window?.makeFirstResponder(active.flatMap { views[$0] }?.focusView)
   }
 
+  // MARK: Files
+
+  /// Markdown only. A code editor with highlighting is a different amount of
+  /// work, and reading documents is what this pane is for.
+  private func open(_ entry: CoreEntry) {
+    let suffix = (entry.name as NSString).pathExtension.lowercased()
+    guard suffix == "md" || suffix == "markdown" else { return }
+    guard editor.confirmDiscardingChanges() else { return }
+    editor.open(entry)
+    guard editor.isHidden else { return }
+    editor.isHidden = false
+    centre.adjustSubviews()
+    centre.setPosition(centre.frame.height * 0.55, ofDividerAt: 0)
+  }
+
+  private func hideDocument() {
+    editor.isHidden = true
+    centre.adjustSubviews()
+  }
+
+  // MARK: Theme
+
+  private var currentTheme: CoreTheme? {
+    themes.first { $0.name == themeName }
+  }
+
+  /// Applies a theme to every open terminal and remembers it in the core, so the
+  /// next launch and any second window agree on the colours.
+  func applyTheme(named name: String) {
+    do {
+      let state = try core.state(.setTheme(name: name))
+      themeName = state.theme ?? CoreTheme.system
+      let theme = currentTheme
+      for view in views.values {
+        view.apply(theme: theme)
+      }
+    } catch {
+      present(error, whileDoing: "That theme could not be applied")
+    }
+  }
+
+  /// Folds the file pane away and back. Returns whether it is now hidden, which
+  /// is what the menu item's own wording is.
+  @discardableResult
+  func toggleFileBrowser() -> Bool {
+    browser.isHidden.toggle()
+    panes.adjustSubviews()
+    return browser.isHidden
+  }
+
   // MARK: Tree
 
   private func chooseProjectFolder() {
@@ -244,6 +351,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
   func windowDidBecomeKey(_ notification: Notification) {
     showActiveTab()
+  }
+
+  /// Everything but the terminal folds away: both side panes and the markdown
+  /// pane under it. The terminal is the app.
+  func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool {
+    subview === sidebar || subview === browser || subview === editor
   }
 
   private func askName(title: String, placeholder: String, initial: String = "") -> String? {
