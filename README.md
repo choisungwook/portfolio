@@ -129,6 +129,7 @@
 - [제품 목록을 모아 저장소로 보내는 카탈로그 웹 페이지 (products.akbun.com)](./product/akbun-productcatalog/) (26.8.10)
 - [모델 config.json으로 LLM 아키텍처를 2D와 3D로 보는 웹 페이지 (visualizellm.akbun.com)](./product/akbun-visualizellm/) (26.8.18)
 - [셸을 감싸는 터미널 작업 공간 macOS 데스크톱 앱 (akbun-terminal)](./product/akbun-terminal/) (26.8.19)
+- [LLM serving RPS, latency, and KV cache calculator (akbun-caculatorllm)](./product/akbun-caculatorllm/) (26.8.19)
 
 ## Dockerfile
 

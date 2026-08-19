@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Estimate LLM serving throughput, sustainable requests per second, latency, and KV cache capacity from measured vLLM performance.">
+  <meta name="theme-color" content="#11130f">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="akbun caculatorllm — LLM serving capacity">
+  <meta property="og:description" content="Turn measured prefill and decode throughput into sustainable RPS, latency, and KV cache limits.">
+  <meta property="og:image" content="https://caculatorllm.akbun.com/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://caculatorllm.akbun.com/og.png">
+  <title>akbun caculatorllm — LLM serving capacity</title>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="akbun caculatorllm home">
+      <span class="brand-mark" aria-hidden="true">a</span>
+      <span>akbun caculatorllm</span>
+    </a>
+    <div class="header-meta">
+      <span class="privacy-dot" aria-hidden="true"></span>
+      Local calculation
+    </div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">LLM SERVING CAPACITY PLANNER</p>
+        <h1 id="page-title">Know what your GPUs can actually serve.</h1>
+      </div>
+      <p class="intro-copy">Turn measured prefill and decode throughput into sustainable RPS, per-request latency, and KV cache limits. Every result includes the arithmetic behind it.</p>
+    </section>
+
+    <div class="workspace">
+      <section class="input-panel" aria-labelledby="inputs-title">
+        <div class="panel-heading">
+          <div>
+            <span class="step-number">01</span>
+            <h2 id="inputs-title">Serving profile</h2>
+          </div>
+          <button class="text-button" id="reset-button" type="button">Reset example</button>
+        </div>
+
+        <div class="preset-row" aria-label="Workload presets">
+          <button class="preset active" type="button" data-preset="chat">Chat · 1K → 256</button>
+          <button class="preset" type="button" data-preset="rag">RAG · 4K → 512</button>
+          <button class="preset" type="button" data-preset="agent">Agent · 8K → 1K</button>
+        </div>
+
+        <form id="calculator-form" novalidate>
+          <fieldset>
+            <legend>Workload</legend>
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">Average prompt</span>
+                <span class="input-wrap"><input id="promptTokens" name="promptTokens" type="number" min="1" step="1" value="1024" inputmode="numeric"><span>tokens</span></span>
+              </label>
+              <label class="field">
+                <span class="field-label">Average output</span>
+                <span class="input-wrap"><input id="outputTokens" name="outputTokens" type="number" min="1" step="1" value="256" inputmode="numeric"><span>tokens</span></span>
+              </label>
+              <label class="field wide">
+                <span class="field-label">Traffic target</span>
+                <span class="input-wrap"><input id="targetRps" name="targetRps" type="number" min="0" step="0.01" value="1.5" inputmode="decimal"><span>req/s</span></span>
+                <small>Used to check whether the deployment meets demand.</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Deployment</legend>
+            <div class="field-grid three">
+              <label class="field">
+                <span class="field-label">Total GPUs</span>
+                <span class="input-wrap"><input id="totalGpus" name="totalGpus" type="number" min="1" step="1" value="4" inputmode="numeric"><span>GPU</span></span>
+              </label>
+              <label class="field">
+                <span class="field-label">Tensor parallel</span>
+                <span class="input-wrap"><input id="tensorParallel" name="tensorParallel" type="number" min="1" step="1" value="2" inputmode="numeric"><span>GPU/replica</span></span>
+              </label>
+              <label class="field">
+                <span class="field-label">Safety reserve</span>
+                <span class="input-wrap"><input id="reservePercent" name="reservePercent" type="number" min="0" max="95" step="1" value="20" inputmode="numeric"><span>%</span></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Measured capacity <span class="legend-note">per replica</span></legend>
+            <div class="measurement-note">
+              <span class="note-icon" aria-hidden="true">i</span>
+              <p>Use a benchmark with the same model, quantization, token lengths, and concurrency. Prefill throughput can be derived as <strong>total token throughput − output token throughput</strong>.</p>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">Prefill throughput</span>
+                <span class="input-wrap"><input id="prefillTps" name="prefillTps" type="number" min="0.01" step="0.01" value="4200" inputmode="decimal"><span>tok/s</span></span>
+              </label>
+              <label class="field">
+                <span class="field-label">Decode throughput</span>
+                <span class="input-wrap"><input id="decodeTps" name="decodeTps" type="number" min="0.01" step="0.01" value="680" inputmode="decimal"><span>tok/s</span></span>
+              </label>
+              <label class="field">
+                <span class="field-label">Active decode sequences</span>
+                <span class="input-wrap"><input id="decodeConcurrency" name="decodeConcurrency" type="number" min="1" step="1" value="16" inputmode="numeric"><span>seq</span></span>
+                <small>Concurrency used when decode throughput was measured.</small>
+              </label>
+              <label class="field">
+                <span class="field-label">Queue + network</span>
+                <span class="input-wrap"><input id="overheadMs" name="overheadMs" type="number" min="0" step="1" value="25" inputmode="numeric"><span>ms</span></span>
+                <small>Optional non-inference overhead for end-to-end latency.</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <details class="advanced">
+            <summary>
+              <span><span class="summary-plus" aria-hidden="true">+</span> KV cache estimate</span>
+              <span class="summary-hint">Advanced</span>
+            </summary>
+            <div class="advanced-body">
+              <p class="advanced-copy">Estimates the standard attention KV shape. Hybrid, MLA, sliding-window, cache quantization, and runtime overhead can change actual usage.</p>
+              <div class="field-grid three">
+                <label class="field">
+                  <span class="field-label">KV cache / replica</span>
+                  <span class="input-wrap"><input id="kvCacheGib" name="kvCacheGib" type="number" min="0.01" step="0.1" value="24" inputmode="decimal"><span>GiB</span></span>
+                </label>
+                <label class="field">
+                  <span class="field-label">Transformer layers</span>
+                  <span class="input-wrap"><input id="layers" name="layers" type="number" min="1" step="1" value="32" inputmode="numeric"><span>layers</span></span>
+                </label>
+                <label class="field">
+                  <span class="field-label">KV heads</span>
+                  <span class="input-wrap"><input id="kvHeads" name="kvHeads" type="number" min="1" step="1" value="8" inputmode="numeric"><span>heads</span></span>
+                </label>
+                <label class="field">
+                  <span class="field-label">Head dimension</span>
+                  <span class="input-wrap"><input id="headDim" name="headDim" type="number" min="1" step="1" value="128" inputmode="numeric"><span>dim</span></span>
+                </label>
+                <label class="field">
+                  <span class="field-label">KV element size</span>
+                  <span class="input-wrap"><input id="kvBytes" name="kvBytes" type="number" min="0.25" step="0.25" value="2" inputmode="decimal"><span>bytes</span></span>
+                  <small>2 for FP16/BF16, 1 for FP8.</small>
+                </label>
+                <label class="field">
+                  <span class="field-label">Cache block</span>
+                  <span class="input-wrap"><input id="blockSize" name="blockSize" type="number" min="1" step="1" value="16" inputmode="numeric"><span>tokens</span></span>
+                </label>
+              </div>
+            </div>
+          </details>
+        </form>
+      </section>
+
+      <section class="results-panel" aria-labelledby="results-title" aria-live="polite">
+        <div class="panel-heading result-heading">
+          <div>
+            <span class="step-number inverse">02</span>
+            <h2 id="results-title">Capacity result</h2>
+          </div>
+          <button class="copy-button" id="copy-button" type="button">Copy summary</button>
+        </div>
+
+        <div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+        <article class="hero-result">
+          <div class="hero-label">
+            <span>MAX SUSTAINABLE LOAD</span>
+            <span id="bottleneck-badge" class="bottleneck-badge">DECODE BOUND</span>
+          </div>
+          <div class="hero-value"><strong id="max-rps">0.00</strong><span>requests / second</span></div>
+          <div class="target-line">
+            <span id="target-status">Target fits</span>
+            <span id="target-ratio">0% of safe capacity</span>
+          </div>
+          <div class="target-track" aria-hidden="true"><span id="target-fill"></span><i id="target-marker"></i></div>
+          <button class="formula-toggle" type="button" data-formula-toggle="rps-formula" aria-expanded="false">Show calculation</button>
+          <div id="rps-formula" class="formula" hidden></div>
+        </article>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span class="metric-index">A</span>
+            <span class="metric-label">Total throughput</span>
+            <strong id="total-tps">0</strong>
+            <span class="metric-unit">tokens / second</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-index">B</span>
+            <span class="metric-label">Requests per hour</span>
+            <strong id="requests-hour">0</strong>
+            <span class="metric-unit">at safe capacity</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-index">C</span>
+            <span class="metric-label">Serving replicas</span>
+            <strong id="replicas">0</strong>
+            <span class="metric-unit" id="replicas-note">0 GPUs allocated</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-index">D</span>
+            <span class="metric-label">Tokens per GPU</span>
+            <strong id="tps-gpu">0</strong>
+            <span class="metric-unit">tok/s at safe capacity</span>
+          </article>
+        </div>
+
+        <article class="result-section">
+          <div class="section-title-row">
+            <div><span class="section-kicker">RESOURCE LOAD</span><h3>Where capacity goes</h3></div>
+            <span id="target-verdict" class="verdict">READY</span>
+          </div>
+          <div class="load-row">
+            <div class="load-meta"><span>Prefill</span><strong id="prefill-util">0%</strong></div>
+            <div class="load-track"><span id="prefill-fill" class="prefill-fill"></span></div>
+            <small id="prefill-capacity">0 tok/s available</small>
+          </div>
+          <div class="load-row">
+            <div class="load-meta"><span>Decode</span><strong id="decode-util">0%</strong></div>
+            <div class="load-track"><span id="decode-fill" class="decode-fill"></span></div>
+            <small id="decode-capacity">0 tok/s available</small>
+          </div>
+        </article>
+
+        <article class="result-section">
+          <div class="section-title-row">
+            <div><span class="section-kicker">LATENCY MODEL</span><h3>One request, estimated</h3></div>
+            <span class="assumption-chip">No queueing model</span>
+          </div>
+          <div class="latency-line">
+            <div class="latency-segment ttft" id="ttft-segment"><span>TTFT</span></div>
+            <div class="latency-segment decode" id="decode-segment"><span>Decode</span></div>
+            <div class="latency-segment overhead" id="overhead-segment"><span>Other</span></div>
+          </div>
+          <div class="latency-stats">
+            <div><span>TTFT</span><strong id="ttft">0 ms</strong></div>
+            <div><span>Inter-token latency</span><strong id="itl">0 ms</strong></div>
+            <div><span>End-to-end</span><strong id="e2e">0 s</strong></div>
+            <div><span>Output speed</span><strong id="output-speed">0 tok/s</strong></div>
+          </div>
+          <button class="formula-toggle" type="button" data-formula-toggle="latency-formula" aria-expanded="false">Show assumptions</button>
+          <div id="latency-formula" class="formula" hidden></div>
+        </article>
+
+        <article class="result-section kv-section">
+          <div class="section-title-row">
+            <div><span class="section-kicker">MEMORY CEILING</span><h3>KV cache estimate</h3></div>
+            <strong id="kv-pressure" class="kv-pressure">0%</strong>
+          </div>
+          <div class="kv-main">
+            <div><strong id="kv-sequences">0</strong><span>estimated sequences across all replicas</span></div>
+            <div><strong id="kv-request">0 MiB</strong><span>per full request</span></div>
+          </div>
+          <p id="kv-summary" class="kv-summary"></p>
+          <button class="formula-toggle" type="button" data-formula-toggle="kv-formula" aria-expanded="false">Show memory formula</button>
+          <div id="kv-formula" class="formula" hidden></div>
+        </article>
+
+        <aside class="interpretation" id="interpretation"></aside>
+      </section>
+    </div>
+
+    <section class="method" aria-labelledby="method-title">
+      <div class="method-heading">
+        <p class="eyebrow">READ THE MODEL</p>
+        <h2 id="method-title">A capacity estimate, not a benchmark.</h2>
+      </div>
+      <div class="method-grid">
+        <article>
+          <span>01</span>
+          <h3>Measure the same workload</h3>
+          <p>Benchmark the same model, GPU shape, quantization, prompt/output distribution, and concurrency that production will use.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Separate the two budgets</h3>
+          <p>Each request consumes prompt tokens from prefill capacity and generated tokens from decode capacity. The smaller RPS limit wins.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Keep operational reserve</h3>
+          <p>The reserve absorbs traffic variance, long prompts, scheduler effects, and tail latency. It is not a guarantee against overload.</p>
+        </article>
+      </div>
+      <div class="sources">
+        <span>PRIMARY REFERENCES</span>
+        <a href="https://docs.vllm.ai/en/latest/benchmarking/cli/" target="_blank" rel="noreferrer">vLLM benchmark metrics ↗</a>
+        <a href="https://docs.vllm.ai/en/latest/features/per_request_metrics/" target="_blank" rel="noreferrer">vLLM per-request metrics ↗</a>
+        <a href="https://docs.vllm.ai/en/stable/serving/data_parallel_deployment/" target="_blank" rel="noreferrer">vLLM data parallel deployment ↗</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>akbun caculatorllm</span>
+    <span>Numbers stay in this browser.</span>
+  </footer>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
