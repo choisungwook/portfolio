@@ -29,6 +29,23 @@
         <path d="M3 6h9M6.5 6V4h3v2M5 6l.7 10h4.6l.7-10" />
         <path d="M17 11H12M14.5 8.5 17 11l-2.5 2.5" />
       </g>
+      <g id="icon-inspector">
+        <path d="M4 5h12M4 10h12M4 15h12" />
+        <circle cx="8" cy="5" r="1.7" />
+        <circle cx="13" cy="10" r="1.7" />
+        <circle cx="7" cy="15" r="1.7" />
+      </g>
+      <g id="icon-shape">
+        <rect x="3.5" y="4" width="9" height="9" rx="1.5" />
+        <circle cx="13.5" cy="12.5" r="3.5" />
+      </g>
+      <g id="icon-marker">
+        <path d="M10 17s5-4.2 5-9a5 5 0 1 0-10 0c0 4.8 5 9 5 9Z" />
+        <circle cx="10" cy="8" r="1.6" />
+      </g>
+      <g id="icon-debug">
+        <path d="M6 7.5h8v5a4 4 0 0 1-8 0v-5ZM8 7.5V5a2 2 0 0 1 4 0v2.5M3.5 9h2.5M14 9h2.5M3.5 13h2.5M14 13h2.5M6 16l-2 2M14 16l2 2" />
+      </g>
     </defs>
   </svg>
 
@@ -109,7 +126,24 @@
     <span class="menubar-gap"></span>
     <button id="tool-warning" hidden title="Rendering needs ffmpeg on this machine">ffmpeg not found</button>
     <span id="playback-warning" class="dim small-text" hidden></span>
-    <span id="project-name">Untitled</span>
+    <div id="global-actions" role="toolbar" aria-label="Global panels">
+      <button class="global-action" type="button" data-panel-action="inspector" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-inspector" /></svg>
+        <span>Inspector</span>
+      </button>
+      <button class="global-action" type="button" data-panel-action="shape" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-shape" /></svg>
+        <span>Shape</span>
+      </button>
+      <button class="global-action" type="button" data-panel-action="marker" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-marker" /></svg>
+        <span>Marker</span>
+      </button>
+      <button class="global-action" type="button" data-panel-action="debug" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-debug" /></svg>
+        <span>Debug</span>
+      </button>
+    </div>
   </header>
 
   <main id="panels">
@@ -143,7 +177,13 @@
             <button id="source-mark-out" title="Set the source out point">Out</button>
           </div>
           <div id="source-actions">
-            <input id="source-seek" type="range" min="0" max="1" step="1" value="0" aria-label="Source position" />
+            <div id="source-seek-wrap">
+              <input id="source-seek" type="range" min="0" max="1" step="1" value="0" aria-label="Source position" />
+              <div id="source-marker-layer" aria-hidden="true" hidden>
+                <span id="source-in-marker" class="source-boundary-marker in" data-label="IN"></span>
+                <span id="source-out-marker" class="source-boundary-marker out" data-label="OUT"></span>
+              </div>
+            </div>
             <span id="source-range" class="mono dim">0:00:00:00 – 0:00:00:00</span>
             <label class="check"><input id="source-video" type="checkbox" checked /> Video</label>
             <label class="check"><input id="source-audio" type="checkbox" checked /> Audio</label>
@@ -159,7 +199,6 @@
         <section id="preview-panel">
           <header class="panel-head">
             <h2>Program Monitor</h2>
-            <button id="btn-debug" class="small" type="button">Debug</button>
           </header>
           <div id="stage-wrap">
             <div id="stage">
@@ -188,11 +227,20 @@
         </section>
       </div>
 
-      <aside id="inspector-panel">
+      <aside id="selected-panel" hidden>
         <header class="panel-head">
-          <h2>Inspector</h2>
+          <h2 id="selected-panel-title">Inspector</h2>
         </header>
-        <div id="inspector-body">
+        <div id="panel-tab-bar" role="toolbar" aria-label="Inspector category">
+          <button id="panel-tab-video" type="button" data-inspector-tab="video" aria-pressed="true">Video</button>
+          <button id="panel-tab-audio" type="button" data-inspector-tab="audio" aria-pressed="false" tabindex="-1">Audio</button>
+          <button id="panel-tab-effects" type="button" data-inspector-tab="effects" aria-pressed="false" tabindex="-1">Effects</button>
+          <button id="panel-tab-transition" type="button" data-inspector-tab="transition" aria-pressed="false" tabindex="-1">Transition</button>
+          <button id="panel-tab-image" type="button" data-inspector-tab="image" aria-pressed="false" tabindex="-1">Image</button>
+          <button id="panel-tab-file" type="button" data-inspector-tab="file" aria-pressed="false" tabindex="-1">File</button>
+        </div>
+        <div id="inspector-view" class="selected-panel-view">
+          <div id="inspector-body">
           <p id="inspector-empty" class="dim small-text">Select a clip or a layer to edit its properties.</p>
           <div id="transform-panel" hidden>
             <h3>Transform</h3>
@@ -202,12 +250,15 @@
             <label class="row">Opacity <input id="transform-opacity" type="range" min="0" max="1" step="0.01" /><input id="transform-opacity-value" class="compact-number" type="number" min="0" max="1" step="0.01" /></label>
           </div>
           <div id="clip-panel" hidden>
-            <h3>Clip</h3>
             <p id="clip-summary" class="dim small-text"></p>
-            <label class="row" id="clip-opacity-row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
-            <!-- 0..1 because that is what the edit model stores; a wider
-                 slider would snap back on release. -->
-            <label class="row" id="clip-volume-row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
+            <div id="clip-video-panel">
+              <label class="row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
+            </div>
+            <div id="clip-audio-panel">
+              <!-- 0..1 because that is what the edit model stores; a wider
+                   slider would snap back on release. -->
+              <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
+            </div>
           </div>
           <div id="text-panel" hidden>
             <h3>Text</h3>
@@ -246,7 +297,29 @@
             </div>
           </div>
           <datalist id="font-options"></datalist>
+          </div>
         </div>
+        <section id="shape-tool-view" class="selected-panel-view" hidden>
+          <h3>Shape</h3>
+          <p class="dim small-text">Add at the playhead, or drag the button onto a video track.</p>
+          <button id="btn-add-shape" type="button">+ Shape</button>
+        </section>
+        <section id="marker-tool-view" class="selected-panel-view" hidden>
+          <div class="selected-panel-actions">
+            <h3>Markers</h3>
+            <button id="btn-add-marker" class="small" type="button">+ Marker</button>
+          </div>
+          <p id="marker-empty" class="dim small-text">No markers on the timeline.</p>
+          <div id="marker-list"></div>
+        </section>
+        <section id="debug-view" class="selected-panel-view" hidden>
+          <div id="debug-metrics" class="debug-block"></div>
+          <div class="debug-actions">
+            <button id="btn-refresh-debug" class="small" type="button">Refresh</button>
+            <button id="btn-toggle-logs" class="small" type="button">Show error log</button>
+          </div>
+          <pre id="debug-log" class="debug-log" hidden></pre>
+        </section>
       </aside>
     </section>
 
@@ -266,8 +339,6 @@
         </button>
         <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
         <button id="btn-add-text" class="small" title="Add a 4 second title at the playhead — or drag onto a video track">+ Text</button>
-        <button id="btn-add-shape" class="small" title="Add a 4 second shape at the playhead — or drag onto a video track">+ Shape</button>
-        <button id="btn-add-marker" class="small" title="Add a marker at the playhead">+ Marker</button>
         <span class="sep-v"></span>
         <button id="btn-add-video" class="small">+ Video track</button>
         <button id="btn-add-audio" class="small">+ Audio track</button>
@@ -289,25 +360,8 @@
           </div>
         </div>
       </div>
-      <details id="marker-panel">
-        <summary>Markers</summary>
-        <div id="marker-list"></div>
-      </details>
     </section>
   </main>
-
-  <aside id="debug-panel" hidden>
-    <header class="panel-head">
-      <h2>Debug</h2>
-      <button id="btn-close-debug" class="small" type="button">Close</button>
-    </header>
-    <div id="debug-metrics" class="debug-block"></div>
-    <div class="debug-actions">
-      <button id="btn-refresh-debug" class="small" type="button">Refresh</button>
-      <button id="btn-toggle-logs" class="small" type="button">Show error log</button>
-    </div>
-    <pre id="debug-log" class="debug-log" hidden></pre>
-  </aside>
 
   <div id="timeline-context-menu" class="timeline-context-menu" hidden></div>
 
@@ -528,6 +582,8 @@
   <script src="geometry.js"></script>
   <script src="timeline.js"></script>
   <script src="source.js"></script>
+  <script src="inspector.js"></script>
+  <script src="panel.js"></script>
   <script src="shortcuts.js"></script>
   <script src="quality.js"></script>
   <script src="preview.js"></script>

@@ -33,6 +33,12 @@ function markOut(selection, frame, limit) {
   };
 }
 
+function markerPercent(frame, limit) {
+  const end = Math.max(1, Math.round(Number(limit) || 0));
+  const position = Math.max(0, Math.min(Number(frame) || 0, end));
+  return position / end * 100;
+}
+
 function targetTrack(project, kind, preferredId) {
   const preferred = project.tracks.find(
     (track) => track.id === preferredId && track.kind === kind
@@ -68,6 +74,7 @@ const exported = {
   selectionFor,
   markIn,
   markOut,
+  markerPercent,
   targetTrack,
   commandFor,
 };

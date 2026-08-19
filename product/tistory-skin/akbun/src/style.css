@@ -1346,9 +1346,36 @@ img {
   max-width: none;
 }
 
+/* 스킨 chrome과 티스토리가 본문 뒤에 붙이는 블록을 모두 숨긴다.
+   좋아요/공유/CCL(.container_postbtn), 같은 카테고리 글(.another_category),
+   프로필 명함/구독 툴바([data-tistory-react-app], .menu_toolbar), 광고, 댓글 */
+#tt-body-page.presentation-mode .site-header,
+#tt-body-page.presentation-mode .site-footer,
+#tt-body-page.presentation-mode .sidebar,
+#tt-body-page.presentation-mode .page-home-link-anchor,
+#tt-body-page.presentation-mode .copy-markdown-btn,
+#tt-body-page.presentation-mode .post-tags,
+#tt-body-page.presentation-mode .post-admin,
 #tt-body-page.presentation-mode .comments-section,
-#tt-body-page.presentation-mode .site-footer {
-  display: none;
+#tt-body-page.presentation-mode .container_postbtn,
+#tt-body-page.presentation-mode .postbtn_like,
+#tt-body-page.presentation-mode .postbtn_ccl,
+#tt-body-page.presentation-mode .wrap_btn_share,
+#tt-body-page.presentation-mode .wrap_btn_etc,
+#tt-body-page.presentation-mode .another_category,
+#tt-body-page.presentation-mode .related-posts,
+#tt-body-page.presentation-mode .layer_post,
+#tt-body-page.presentation-mode .menu_toolbar,
+#tt-body-page.presentation-mode .revenue_unit_wrap,
+#tt-body-page.presentation-mode .revenue_unit_item,
+#tt-body-page.presentation-mode .adsbygoogle,
+#tt-body-page.presentation-mode [data-tistory-react-app] {
+  display: none !important;
+}
+
+/* 남는 것은 fixed로 뜨는 종료 버튼뿐이라 빈 줄 간격을 지운다 */
+#tt-body-page.presentation-mode .page-home-link {
+  margin-bottom: 0;
 }
 
 #tt-body-page.presentation-mode .presentation-mode-btn {
@@ -1362,11 +1389,11 @@ img {
 
 #tt-body-page.presentation-mode .floating-toc.visible {
   display: block !important;
-  top: 6.5rem;
+  top: 3rem;
   right: auto;
   left: max(1.5rem, calc((100vw - 1440px) / 2 + 3rem));
   width: 240px;
-  max-height: calc(100vh - 8rem);
+  max-height: calc(100vh - 5rem);
 }
 
 #tt-body-page.presentation-mode .toc-link {
