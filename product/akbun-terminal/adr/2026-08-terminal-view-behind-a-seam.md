@@ -15,3 +15,5 @@ The pty and the session lifetime deliberately stay in the core rather than movin
 ## Consequence
 
 A full screen program looks wrong in this build, and that is documented as a known limit rather than filed as a bug. The plain view is expected to be replaced, not fixed.
+
+It was replaced in the next milestone, by SwiftTerm. See [An existing emulator fills the seam](./2026-08-swiftterm-and-workspace-tabs.md); the seam itself is unchanged, which is the part that was worth deciding.

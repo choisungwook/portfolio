@@ -100,3 +100,24 @@ fn shutdown_leaves_no_session_behind() {
     app.shutdown();
     assert_eq!(app.session_count(), 0);
 }
+
+#[test]
+fn the_shell_is_told_which_terminal_it_is_talking_to() {
+    // A GUI process has no TERM to inherit. Everything the shell runs reads it,
+    // so when it is missing `clear` fails and escape sequences land on screen as
+    // text, which is exactly what the first build looked like.
+    let app = App::new();
+    let spawned = dispatch(&app, r#"{"type":"spawn","cwd":"","cols":80,"rows":24}"#);
+    let id = serde_json::from_str::<serde_json::Value>(&spawned).expect("json")["session"]
+        .as_u64()
+        .expect("session id");
+
+    let typed: Vec<u8> = b"echo term-is-$TERM\n".to_vec();
+    dispatch(
+        &app,
+        &format!(r#"{{"type":"write","session":{id},"bytes":{typed:?}}}"#),
+    );
+
+    let seen = wait_for_output(&app, "term-is-xterm-256color");
+    assert!(seen.contains("term-is-xterm-256color"), "output was: {seen}");
+}

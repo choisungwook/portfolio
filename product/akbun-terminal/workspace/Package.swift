@@ -13,6 +13,11 @@ import PackageDescription
 let package = Package(
   name: "akbun-terminal",
   platforms: [.macOS(.v14)],
+  dependencies: [
+    // The terminal emulator behind the view seam. A shell writes escape
+    // sequences, so anything that does not interpret them is not a terminal.
+    .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.19.0")
+  ],
   targets: [
     .systemLibrary(name: "CAkbunTerminalCore", path: "Sources/CAkbunTerminalCore"),
     .target(
@@ -25,7 +30,7 @@ let package = Package(
     ),
     .executableTarget(
       name: "akbun-terminal",
-      dependencies: ["AkbunTerminalCore"]
+      dependencies: ["AkbunTerminalCore", .product(name: "SwiftTerm", package: "SwiftTerm")]
     ),
     .testTarget(
       name: "AkbunTerminalCoreTests",

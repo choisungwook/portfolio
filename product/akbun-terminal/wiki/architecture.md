@@ -42,13 +42,17 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Launch.** The shell sweeps update leftovers, creates the core, runs the handshake, and only then opens a window. A protocol mismatch or a core that will not start ends in an alert rather than an empty window.
 
+**Opening a tab.** A workspace is selected in the sidebar, the shell spawns a session in the project folder and adds a tab for it. `TerminalTabs` decides which tab is on screen, including after a close; the core only knows the sessions.
+
 **Keystroke.** The view hands bytes to `onInput`, the controller wraps them in a `write` command, the core writes them into the pty master. The view never sees a file descriptor.
 
 **Output.** The session's reader thread pushes `output` events onto a queue in the core. A timer on the main run loop drains the queue about once a frame and hands bytes to the view. The core never calls into Swift, so the question of which thread may draw never arises.
 
-**Resize.** The view recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong.
+**Resize.** The emulator recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong.
 
-**Quit.** The window controller closes its session, and freeing the core clears whatever is left. Both paths kill and wait, because an unreaped shell becomes a zombie and closing tabs all day is how they accumulate.
+**Spawn environment.** The core sets `TERM` on the child. A GUI process inherits none, and a shell that does not know what is drawing it writes for a dumb terminal.
+
+**Quit.** The window controller closes every session it opened, and freeing the core clears whatever is left. Both paths kill and wait, because an unreaped shell becomes a zombie and closing tabs all day is how they accumulate.
 
 ## Command surface
 
@@ -68,6 +72,5 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 ## Where the next milestones attach
 
 - Projects and workspaces: state and persistence in the core, the sidebar reads it.
-- Terminal tabs: many sessions instead of one; the core already keys them by id.
 - Agent state colours: the core already sees every byte, so detection reads the same stream the view draws.
 - File browser, markdown, URL menu: directory reads, parsing and URL rules in the core; presentation in the shell.

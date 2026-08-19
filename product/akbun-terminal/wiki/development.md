@@ -34,7 +34,8 @@ The core tests need no macOS and no AppKit, which is why CI runs them on the che
 
 ## Caveats
 
-- The terminal view is not an emulator. Escape sequences are drawn as text, so `vim` or a progress bar looks wrong. That is this build's known limit, not a bug to file.
+- SwiftTerm is fetched by SwiftPM, so the first build and the CI jobs need network. `Package.resolved` is what pins it.
+- `TERM` is set by the core, not by the user's profile. A GUI process inherits none, and without it `clear` fails and escape codes land on screen as text.
 - Output bytes cross as JSON arrays, several times their own size. Fine for one session; the protocol version is there for when it is not.
 - The header is not generated. Change `core/crates/ffi/src/lib.rs` and the header together, in the same commit.
 

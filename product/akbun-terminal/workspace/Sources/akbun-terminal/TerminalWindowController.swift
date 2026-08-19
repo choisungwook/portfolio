@@ -1,18 +1,28 @@
 import AppKit
 import AkbunTerminalCore
 
-/// One project tree and terminal pane backed by state and sessions in the core.
+/// One window: the project tree on the left, and the selected workspace's
+/// terminal tabs on the right.
+///
+/// The sessions behind those tabs live in the core. What is kept here is the
+/// arrangement around them — which workspace is open, which tab is on screen and
+/// which view draws which session — because that is what a different terminal
+/// engine would replace.
 @MainActor
 final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   private let core: CoreBridge
-  private let terminal: TerminalRendering
   private let sidebar = ProjectSidebarView()
-  private var session: UInt32?
+  private let tabBar = TerminalTabBarView()
+  private let terminalArea = NSView()
+  private let placeholder = NSTextField(
+    labelWithString: "Select a workspace on the left to open a terminal.")
+  private var tabs = TerminalTabs()
+  private var views: [UInt32: TerminalRendering] = [:]
+  private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
 
   init(core: CoreBridge) {
     self.core = core
-    self.terminal = PlainTextTerminalView(frame: NSRect(x: 0, y: 0, width: 900, height: 560))
 
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
@@ -31,13 +41,18 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     content.autoresizingMask = [.width, .height]
     window.contentView = content
     sidebar.translatesAutoresizingMaskIntoConstraints = false
-    terminal.view.translatesAutoresizingMaskIntoConstraints = false
+    tabBar.translatesAutoresizingMaskIntoConstraints = false
+    terminalArea.translatesAutoresizingMaskIntoConstraints = false
+    placeholder.textColor = .secondaryLabelColor
+    placeholder.translatesAutoresizingMaskIntoConstraints = false
     let divider = NSBox()
     divider.boxType = .separator
     divider.translatesAutoresizingMaskIntoConstraints = false
     content.addSubview(sidebar)
     content.addSubview(divider)
-    content.addSubview(terminal.view)
+    content.addSubview(tabBar)
+    content.addSubview(terminalArea)
+    terminalArea.addSubview(placeholder)
     NSLayoutConstraint.activate([
       sidebar.topAnchor.constraint(equalTo: content.topAnchor),
       sidebar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
@@ -47,43 +62,53 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
       divider.bottomAnchor.constraint(equalTo: content.bottomAnchor),
       divider.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
       divider.widthAnchor.constraint(equalToConstant: 1),
-      terminal.view.topAnchor.constraint(equalTo: content.topAnchor),
-      terminal.view.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-      terminal.view.leadingAnchor.constraint(equalTo: divider.trailingAnchor),
-      terminal.view.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      tabBar.topAnchor.constraint(equalTo: content.topAnchor),
+      tabBar.leadingAnchor.constraint(equalTo: divider.trailingAnchor),
+      tabBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      terminalArea.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+      terminalArea.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+      terminalArea.leadingAnchor.constraint(equalTo: divider.trailingAnchor),
+      terminalArea.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      placeholder.centerXAnchor.constraint(equalTo: terminalArea.centerXAnchor),
+      placeholder.centerYAnchor.constraint(equalTo: terminalArea.centerYAnchor),
     ])
 
     sidebar.onChooseFolder = { [weak self] in self?.chooseProjectFolder() }
     sidebar.onCreateEmptyProject = { [weak self] in self?.createEmptyProject() }
     sidebar.onCreateWorkspace = { [weak self] project in self?.createWorkspace(in: project) }
+    sidebar.onSelectWorkspace = { [weak self] project, workspace in
+      self?.selectWorkspace(project: project, workspace: workspace)
+    }
+    tabBar.onNew = { [weak self] in self?.openTab() }
+    tabBar.onSelect = { [weak self] session in self?.selectTab(session) }
+    tabBar.onClose = { [weak self] session in self?.closeTab(session) }
   }
 
   required init?(coder: NSCoder) {
     fatalError("not loaded from a nib")
   }
 
-  /// Starts the shell and begins draining events.
+  /// Loads the tree and begins draining events. No shell starts until a
+  /// workspace is chosen, because a tab belongs to one.
   func start() throws {
     let dataDirectory = try appDataDirectory()
-    sidebar.render(try core.state(.loadState(directory: dataDirectory.path)))
-    terminal.onInput = { [weak self] bytes in
-      guard let self, let session = self.session else { return }
-      try? self.core.expectOk(.write(session: session, bytes: bytes))
-    }
-    terminal.onGridChange = { [weak self] cols, rows in
-      guard let self, let session = self.session else { return }
-      try? self.core.expectOk(.resize(session: session, cols: cols, rows: rows))
-    }
-
-    let grid = terminal.grid
-    session = try core.spawn(cwd: FileManager.default.homeDirectoryForCurrentUser.path,
-                             cols: grid.cols, rows: grid.rows)
+    let state = try core.state(.loadState(directory: dataDirectory.path))
+    sidebar.render(state)
+    showActiveTab()
 
     // Roughly a frame. The core queues in the meantime, so a burst of output
     // arrives as one batch rather than one hop per read.
     drain = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
       // The timer fires on the run loop that scheduled it, which is this one.
       MainActor.assumeIsolated { self?.drainEvents() }
+    }
+
+    // Opening on the first workspace saves the click that every launch would
+    // otherwise start with.
+    if let project = state.projects.first(where: { !$0.workspaces.isEmpty }),
+      let workspace = project.workspaces.first
+    {
+      selectWorkspace(project: project, workspace: workspace)
     }
   }
 
@@ -96,6 +121,85 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     )
     return base.appendingPathComponent("io.akbun.terminal", isDirectory: true)
   }
+
+  // MARK: Tabs
+
+  private func selectWorkspace(project: CoreProject, workspace: CoreWorkspace) {
+    selection = (project, workspace)
+    sidebar.select(workspace: workspace.id)
+    if tabs.tabs(in: workspace.id).isEmpty {
+      openTab()
+    } else {
+      showActiveTab()
+    }
+  }
+
+  /// Starts a shell for the selected workspace in the project's folder.
+  private func openTab() {
+    guard let selection else { return }
+    let terminal = SwiftTermTerminalView(frame: terminalArea.bounds)
+    let cwd = selection.project.path ?? FileManager.default.homeDirectoryForCurrentUser.path
+    do {
+      let grid = terminal.grid
+      let session = try core.spawn(cwd: cwd, cols: grid.cols, rows: grid.rows)
+      terminal.onInput = { [weak self] bytes in
+        try? self?.core.expectOk(.write(session: session, bytes: bytes))
+      }
+      terminal.onGridChange = { [weak self] cols, rows in
+        try? self?.core.expectOk(.resize(session: session, cols: cols, rows: rows))
+      }
+      views[session] = terminal
+      tabs.add(session: session, to: selection.workspace.id)
+      showActiveTab()
+    } catch {
+      present(error, whileDoing: "The shell could not start")
+    }
+  }
+
+  private func selectTab(_ session: UInt32) {
+    guard let workspace = selection?.workspace.id else { return }
+    tabs.select(session: session, in: workspace)
+    showActiveTab()
+  }
+
+  private func closeTab(_ session: UInt32) {
+    try? core.expectOk(.close(session: session))
+    tabs.close(session: session)
+    views.removeValue(forKey: session)
+    showActiveTab()
+  }
+
+  /// Puts the active tab's view on screen and redraws the strip above it.
+  private func showActiveTab() {
+    guard let workspace = selection?.workspace.id else {
+      tabBar.render(tabs: [], active: nil)
+      placeholder.isHidden = false
+      return
+    }
+    let active = tabs.activeSession(in: workspace)
+    tabBar.render(tabs: tabs.tabs(in: workspace), active: active)
+
+    let wanted = active.flatMap { views[$0] }?.view
+    for subview in terminalArea.subviews where subview !== placeholder && subview !== wanted {
+      subview.removeFromSuperview()
+    }
+    placeholder.isHidden = wanted != nil
+    guard let wanted, wanted.superview !== terminalArea else {
+      window?.makeFirstResponder(active.flatMap { views[$0] }?.focusView)
+      return
+    }
+    wanted.translatesAutoresizingMaskIntoConstraints = false
+    terminalArea.addSubview(wanted)
+    NSLayoutConstraint.activate([
+      wanted.topAnchor.constraint(equalTo: terminalArea.topAnchor),
+      wanted.bottomAnchor.constraint(equalTo: terminalArea.bottomAnchor),
+      wanted.leadingAnchor.constraint(equalTo: terminalArea.leadingAnchor),
+      wanted.trailingAnchor.constraint(equalTo: terminalArea.trailingAnchor),
+    ])
+    window?.makeFirstResponder(active.flatMap { views[$0] }?.focusView)
+  }
+
+  // MARK: Tree
 
   private func chooseProjectFolder() {
     let panel = NSOpenPanel()
@@ -118,12 +222,26 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     updateTree(.createWorkspace(project: project.id, name: name))
   }
 
-  func windowDidBecomeKey(_ notification: Notification) {
-    focusTerminal()
+  private func updateTree(_ command: CoreCommand) {
+    do {
+      let state = try core.state(command)
+      sidebar.render(state)
+      // The selected project is a value copied out of the previous state, so it
+      // is refreshed here or the next tab would open against a stale folder.
+      if let current = selection,
+        let project = state.projects.first(where: { $0.id == current.project.id }),
+        let workspace = project.workspaces.first(where: { $0.id == current.workspace.id })
+      {
+        selection = (project, workspace)
+      }
+      sidebar.select(workspace: selection?.workspace.id)
+    } catch {
+      present(error, whileDoing: "Project tree could not be updated")
+    }
   }
 
-  private func focusTerminal() {
-    window?.makeFirstResponder(terminal.focusView)
+  func windowDidBecomeKey(_ notification: Notification) {
+    showActiveTab()
   }
 
   private func askName(title: String, placeholder: String, initial: String = "") -> String? {
@@ -140,39 +258,36 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     return name.isEmpty ? nil : name
   }
 
-  private func updateTree(_ command: CoreCommand) {
-    do {
-      sidebar.render(try core.state(command))
-    } catch {
-      let alert = NSAlert()
-      alert.messageText = "Project tree could not be updated"
-      alert.informativeText = error.localizedDescription
-      alert.runModal()
-    }
+  private func present(_ error: Error, whileDoing what: String) {
+    let alert = NSAlert()
+    alert.messageText = what
+    alert.informativeText = error.localizedDescription
+    alert.runModal()
   }
 
   private func drainEvents() {
     for event in core.drainEvents() {
       switch event {
-      case .output(_, let bytes):
-        terminal.present(bytes: bytes)
-      case .exited:
-        terminal.presentExit()
-        stopDraining()
+      case .output(let session, let bytes):
+        views[session]?.present(bytes: bytes)
+      case .exited(let session):
+        // The tab stays until it is closed, so what the shell said before it
+        // ended is still readable. Other tabs keep running, which is why the
+        // drain timer lives as long as the window rather than the session.
+        views[session]?.presentExit()
       }
     }
   }
 
-  func stopDraining() {
+  /// Ends every shell. The core also clears sessions when it is freed; doing it
+  /// here means a closed window does not leave one running until quit.
+  func closeSessions() {
     drain?.invalidate()
     drain = nil
-  }
-
-  /// Ends the shell. The core also clears sessions when it is freed; doing it
-  /// here means a closed window does not leave one running until quit.
-  func closeSession() {
-    stopDraining()
-    if let session { try? core.expectOk(.close(session: session)) }
-    session = nil
+    for session in tabs.allSessions {
+      try? core.expectOk(.close(session: session))
+    }
+    tabs = TerminalTabs()
+    views.removeAll()
   }
 }

@@ -45,6 +45,13 @@ impl Session {
         // the terminal at all; without it the aliases and PATH are not theirs.
         command.arg("-l");
         command.cwd(if cwd.is_empty() { home_dir() } else { cwd.to_string() });
+        // A GUI app is launched by launchd, not by a terminal, so it inherits no
+        // TERM. Without it the shell and everything under it think they are on a
+        // dumb terminal: `clear` refuses to run and full screen programs draw
+        // nothing. The value names what the view on the other side can actually
+        // interpret, so it belongs here rather than in the user's profile.
+        command.env("TERM", "xterm-256color");
+        command.env("COLORTERM", "truecolor");
 
         let child = pty.slave.spawn_command(command).map_err(|error| error.to_string())?;
         let writer = pty.master.take_writer().map_err(|error| error.to_string())?;
