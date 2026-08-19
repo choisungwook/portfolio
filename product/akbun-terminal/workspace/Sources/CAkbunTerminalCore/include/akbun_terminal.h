@@ -10,6 +10,10 @@
 #ifndef AKBUN_TERMINAL_H
 #define AKBUN_TERMINAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct AkbunCore AkbunCore;
 
 AkbunCore *akbun_core_new(void);
@@ -22,5 +26,9 @@ char *akbun_core_dispatch(AkbunCore *core, const char *request);
 char *akbun_core_poll_event(AkbunCore *core);
 
 void akbun_core_string_free(char *text);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -13,7 +13,11 @@ import AppKit
 /// AkbunTerminalCore so they can be tested without an app bundle. What is left
 /// here is the network and the process work.
 enum Updater {
-  private static let releasesAPI = URL(string: "https://api.github.com/repos/choisungwook/portfolio/releases")!
+  /// Every product in this repository releases from here, so one page of the
+  /// default 30 can be filled by other products and hide this one's newest tag,
+  /// which would read as "no updates". 100 is the API maximum.
+  private static let releasesAPI = URL(
+    string: "https://api.github.com/repos/choisungwook/portfolio/releases?per_page=100")!
 
   /// Neither request can be left without a deadline. A stalled check would hang
   /// with no way back, and a stalled download would hang with the install already

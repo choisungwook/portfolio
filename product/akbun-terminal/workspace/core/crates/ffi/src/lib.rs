@@ -40,6 +40,9 @@ pub unsafe extern "C" fn akbun_core_dispatch(
     let Some(core) = core.as_ref() else {
         return to_c(r#"{"type":"error","message":"core handle is null"}"#);
     };
+    if request.is_null() {
+        return to_c(r#"{"type":"error","message":"request pointer is null"}"#);
+    }
     let Ok(request) = std::ffi::CStr::from_ptr(request).to_str() else {
         return to_c(r#"{"type":"error","message":"request is not utf8"}"#);
     };
@@ -74,4 +77,31 @@ fn to_c(text: &str) -> *mut c_char {
     CString::new(text)
         .unwrap_or_else(|_| CString::new(r#"{"type":"error","message":"reply held a nul byte"}"#).unwrap())
         .into_raw()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every pointer this surface takes may be null, because a caller that got
+    /// something wrong is exactly the caller that will pass one.
+    #[test]
+    fn null_pointers_are_answered_not_dereferenced() {
+        unsafe {
+            let reply = akbun_core_dispatch(std::ptr::null_mut(), c"{}".as_ptr());
+            assert!(std::ffi::CStr::from_ptr(reply).to_str().unwrap().contains("core handle is null"));
+            akbun_core_string_free(reply);
+
+            let core = akbun_core_new();
+            let reply = akbun_core_dispatch(core, std::ptr::null());
+            assert!(std::ffi::CStr::from_ptr(reply).to_str().unwrap().contains("request pointer is null"));
+            akbun_core_string_free(reply);
+            akbun_core_free(core);
+
+            // Both frees accept null, and poll on a null core yields nothing.
+            assert!(akbun_core_poll_event(std::ptr::null_mut()).is_null());
+            akbun_core_string_free(std::ptr::null_mut());
+            akbun_core_free(std::ptr::null_mut());
+        }
+    }
 }
