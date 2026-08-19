@@ -7,6 +7,8 @@
 pub mod app;
 pub mod protocol;
 pub mod session;
+pub mod tree;
 
 pub use app::App;
-pub use protocol::{Command, Event, PROTOCOL_VERSION, Request, Response};
+pub use protocol::{Command, Event, Request, Response, PROTOCOL_VERSION};
+pub use tree::{Project, TreeState, Workspace, WorkspaceStatus, STATE_SCHEMA_VERSION};

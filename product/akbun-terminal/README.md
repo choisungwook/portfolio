@@ -1,6 +1,6 @@
 # akbun-terminal
 
-A macOS window that wraps a shell. Projects, workspaces of terminal tabs, agent state colours, a file browser and a markdown viewer are the destination; this first build is the boundary those parts stand on.
+A macOS window that wraps a shell. It restores a project and workspace tree beside the terminal; terminal tabs, agent state detection, a file browser and a markdown viewer are the destination.
 
 ## Directory
 
@@ -42,6 +42,8 @@ cargo test --manifest-path core/Cargo.toml
 ## What this build does
 
 - Opens one window with one shell running in the user's login shell and home directory.
+- Adds folder-backed or empty projects and workspace children in a two-level sidebar.
+- Restores the project tree from a versioned JSON file in the app data directory.
 - Sends keystrokes to it, draws what comes back, and tells it the new size when the window changes.
 - Ends the shell when the window closes or the app quits, and reaps it, so nothing lingers.
 - Checks for updates from the application menu and replaces the installed bundle in place.

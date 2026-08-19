@@ -6,17 +6,19 @@
 //! which thread may draw entirely on the shell's side.
 
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
-use crate::protocol::{Command, Event, PROTOCOL_VERSION, Response, parse_request};
+use crate::protocol::{parse_request, Command, Event, Response, PROTOCOL_VERSION};
 use crate::session::Session;
+use crate::tree::TreeStore;
 
 pub struct App {
     sessions: Mutex<HashMap<u32, Session>>,
     next_session: Mutex<u32>,
     sender: Sender<Event>,
     receiver: Mutex<Receiver<Event>>,
+    tree: Mutex<TreeStore>,
 }
 
 impl Default for App {
@@ -33,6 +35,7 @@ impl App {
             next_session: Mutex::new(1),
             sender,
             receiver: Mutex::new(receiver),
+            tree: Mutex::new(TreeStore::default()),
         }
     }
 
@@ -62,11 +65,37 @@ impl App {
                 protocol: PROTOCOL_VERSION,
             },
             Command::Spawn { cwd, cols, rows } => self.spawn(&cwd, cols, rows),
-            Command::Write { session, bytes } => self.with_session(session, |session| session.write(&bytes)),
-            Command::Resize { session, cols, rows } => {
-                self.with_session(session, |session| session.resize(cols, rows))
+            Command::Write { session, bytes } => {
+                self.with_session(session, |session| session.write(&bytes))
             }
+            Command::Resize {
+                session,
+                cols,
+                rows,
+            } => self.with_session(session, |session| session.resize(cols, rows)),
             Command::Close { session } => self.close(session),
+            Command::LoadState { directory } => self.with_tree(|tree| tree.load(&directory)),
+            Command::CreateProject { name, path } => {
+                self.with_tree(|tree| tree.create_project(name, path))
+            }
+            Command::CreateWorkspace { project, name } => {
+                self.with_tree(|tree| tree.create_workspace(project, name))
+            }
+        }
+    }
+
+    fn with_tree<F>(&self, action: F) -> Response
+    where
+        F: FnOnce(&mut TreeStore) -> Result<crate::tree::TreeState, String>,
+    {
+        let Ok(mut tree) = self.tree.lock() else {
+            return Response::Error {
+                message: "project state is poisoned".to_string(),
+            };
+        };
+        match action(&mut tree) {
+            Ok(state) => Response::State { state },
+            Err(message) => Response::Error { message },
         }
     }
 
@@ -140,6 +169,9 @@ impl App {
     }
 
     pub fn session_count(&self) -> usize {
-        self.sessions.lock().map(|sessions| sessions.len()).unwrap_or(0)
+        self.sessions
+            .lock()
+            .map(|sessions| sessions.len())
+            .unwrap_or(0)
     }
 }

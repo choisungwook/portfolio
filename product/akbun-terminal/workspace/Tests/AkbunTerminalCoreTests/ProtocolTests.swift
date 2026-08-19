@@ -26,6 +26,18 @@ struct ProtocolTests {
     #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":1}"#)
   }
 
+  @Test func treeCommandsKeepTheirWireNames() throws {
+    #expect(
+      try json(.loadState(directory: "/tmp/app"))
+        == #"{"command":{"directory":"\/tmp\/app","type":"load_state"},"v":1}"#)
+    #expect(
+      try json(.createProject(name: "Demo", path: nil))
+        == #"{"command":{"name":"Demo","type":"create_project"},"v":1}"#)
+    #expect(
+      try json(.createWorkspace(project: 7, name: "Server"))
+        == #"{"command":{"name":"Server","project":7,"type":"create_workspace"},"v":1}"#)
+  }
+
   @Test func decodesTheResponsesTheCoreSends() throws {
     let decoder = JSONDecoder()
     #expect(
@@ -35,6 +47,27 @@ struct ProtocolTests {
       try decoder.decode(CoreResponse.self, from: Data(#"{"type":"spawned","session":7}"#.utf8))
         == .spawned(session: 7))
     #expect(try decoder.decode(CoreResponse.self, from: Data(#"{"type":"ok"}"#.utf8)) == .ok)
+    let state = try decoder.decode(
+      CoreResponse.self,
+      from: Data(
+        #"{"type":"state","state":{"schema_version":1,"projects":[{"id":2,"name":"Demo","path":null,"workspaces":[{"id":3,"name":"Server","status":"needs_attention"}]}]}}"#.utf8
+      )
+    )
+    #expect(
+      state == .state(
+        CoreTreeState(
+          schemaVersion: 1,
+          projects: [
+            CoreProject(
+              id: 2,
+              name: "Demo",
+              path: nil,
+              workspaces: [CoreWorkspace(id: 3, name: "Server", status: .needsAttention)]
+            )
+          ]
+        )
+      )
+    )
   }
 
   @Test func anUnknownResponseBecomesAnErrorRatherThanACrash() throws {

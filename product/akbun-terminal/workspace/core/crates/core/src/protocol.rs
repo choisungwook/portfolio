@@ -7,6 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::tree::TreeState;
+
 /// Bumped only when an existing field changes meaning or disappears. Adding an
 /// optional field or a new command variant does not need a bump, because both
 /// sides ignore what they do not know.
@@ -44,6 +46,17 @@ pub enum Command {
     Close {
         session: u32,
     },
+    LoadState {
+        directory: String,
+    },
+    CreateProject {
+        name: String,
+        path: Option<String>,
+    },
+    CreateWorkspace {
+        project: u64,
+        name: String,
+    },
 }
 
 /// What the core answers with. One shape per call, so the shell never has to
@@ -54,6 +67,7 @@ pub enum Response {
     Hello { protocol: u32 },
     Spawned { session: u32 },
     Ok,
+    State { state: TreeState },
     Error { message: String },
 }
 
@@ -125,5 +139,26 @@ mod tests {
 
         let event = serde_json::to_string(&Event::Exited { session: 7 }).unwrap();
         assert_eq!(event, r#"{"type":"exited","session":7}"#);
+
+        let response = serde_json::to_string(&Response::State {
+            state: TreeState::default(),
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"state","state":{"schema_version":1,"projects":[]}}"#
+        );
+    }
+
+    #[test]
+    fn reads_tree_mutation_commands() {
+        let json = r#"{"v":1,"command":{"type":"create_workspace","project":3,"name":"Server"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::CreateWorkspace { project, name } => {
+                assert_eq!(project, 3);
+                assert_eq!(name, "Server");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 }

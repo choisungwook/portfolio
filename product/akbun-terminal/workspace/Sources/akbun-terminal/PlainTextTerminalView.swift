@@ -15,7 +15,7 @@ final class PlainTextTerminalView: NSView, TerminalRendering {
   var view: NSView { self }
 
   private let scrollView = NSScrollView()
-  private let textView = NSTextView()
+  private let textView = TerminalTextView()
   private let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
   private var pendingBytes: [UInt8] = []
   private var lastGrid: (cols: UInt16, rows: UInt16) = (80, 24)
@@ -37,6 +37,7 @@ final class PlainTextTerminalView: NSView, TerminalRendering {
     textView.font = font
     textView.textColor = .textColor
     textView.autoresizingMask = [.width]
+    textView.onTerminalInput = { [weak self] bytes in self?.onInput?(bytes) }
 
     scrollView.documentView = textView
     scrollView.hasVerticalScroller = true
@@ -97,5 +98,25 @@ final class PlainTextTerminalView: NSView, TerminalRendering {
     let visible = scrollView.contentView.bounds
     guard let documentHeight = scrollView.documentView?.bounds.height else { return true }
     return visible.maxY >= documentHeight - font.pointSize * 2
+  }
+}
+
+private final class TerminalTextView: NSTextView {
+  var onTerminalInput: (([UInt8]) -> Void)?
+
+  override var acceptsFirstResponder: Bool { true }
+
+  override func mouseDown(with event: NSEvent) {
+    window?.makeFirstResponder(self)
+    super.mouseDown(with: event)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) {
+      super.keyDown(with: event)
+      return
+    }
+    guard let characters = event.characters, !characters.isEmpty else { return }
+    onTerminalInput?(Array(characters.utf8))
   }
 }

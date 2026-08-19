@@ -84,6 +84,15 @@ public final class CoreBridge {
     }
   }
 
+  public func state(_ command: CoreCommand) throws -> CoreTreeState {
+    let response = try send(command)
+    switch response {
+    case .state(let state): return state
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
   /// Everything the core has queued since the last call.
   ///
   /// Draining on demand is what keeps drawing on one thread: the core never calls
