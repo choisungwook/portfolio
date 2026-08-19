@@ -1,0 +1,13 @@
+[package]
+name = "akbun-terminal-ffi"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "akbun_terminal_ffi"
+# staticlib so the shell links one archive and ships no dylib to locate at runtime.
+crate-type = ["staticlib"]
+
+[dependencies]
+akbun-terminal-core = { path = "../core" }

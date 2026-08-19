@@ -1,0 +1,14 @@
+[workspace]
+members = ["crates/core", "crates/ffi"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+# Not the product version. The one that ships lives in workspace/VERSION.
+version = "0.0.0"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+portable-pty = "0.9.0"

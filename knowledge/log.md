@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-19
+
+* **Creation**: [코어와 화면은 버전 붙인 타입으로 먼저 가르고 프로세스 분리는 미룬다](decisions/2026-08-typed-boundary-before-process-boundary.md) 결정 기록. akbun-terminal에서 Rust 코어와 네이티브 shell을 가를 때 상주 프로세스를 만들지 않고 버전 붙인 타입만 먼저 나눈 판단과, 그 선택을 되돌아볼 조건을 남긴다.
+
 ## 2026-08-16
 
 * **Creation**: [검증 도구는 화면을 뺏지 않는 순서로 고르고, 그 순서는 AGENTS.md 본문에 둔다](decisions/2026-08-verification-tool-order.md) 결정 기록. 테스트 섹션이 저장소에 없는 test.md를 가리키고 있어 UI 검증 규칙이 사실상 비어 있었고, 그 자리를 화면을 잡지 않는 순서로 채운 판단과, 그것을 도구 중립 원칙의 예외로 AGENTS.md 본문에 둔 이유를 남긴다.

@@ -128,6 +128,7 @@
 - [HTTP 요청, 폴더 관리, 공통 변수, curl 변환, .http 가져오기 데스크톱 앱 (akbun-requesthttp)](./product/akbun-requesthttp/) (26.8.6)
 - [제품 목록을 모아 저장소로 보내는 카탈로그 웹 페이지 (products.akbun.com)](./product/akbun-productcatalog/) (26.8.10)
 - [모델 config.json으로 LLM 아키텍처를 2D와 3D로 보는 웹 페이지 (visualizellm.akbun.com)](./product/akbun-visualizellm/) (26.8.18)
+- [셸을 감싸는 터미널 작업 공간 macOS 데스크톱 앱 (akbun-terminal)](./product/akbun-terminal/) (26.8.19)
 
 ## Dockerfile
 
