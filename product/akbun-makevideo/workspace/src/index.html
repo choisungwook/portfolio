@@ -231,13 +231,13 @@
         <header class="panel-head">
           <h2 id="selected-panel-title">Inspector</h2>
         </header>
-        <div id="panel-tab-bar" role="tablist" aria-label="Inspector category">
-          <button id="panel-tab-video" type="button" role="tab" data-inspector-tab="video" aria-selected="true">Video</button>
-          <button id="panel-tab-audio" type="button" role="tab" data-inspector-tab="audio" aria-selected="false" tabindex="-1">Audio</button>
-          <button id="panel-tab-effects" type="button" role="tab" data-inspector-tab="effects" aria-selected="false" tabindex="-1">Effects</button>
-          <button id="panel-tab-transition" type="button" role="tab" data-inspector-tab="transition" aria-selected="false" tabindex="-1">Transition</button>
-          <button id="panel-tab-image" type="button" role="tab" data-inspector-tab="image" aria-selected="false" tabindex="-1">Image</button>
-          <button id="panel-tab-file" type="button" role="tab" data-inspector-tab="file" aria-selected="false" tabindex="-1">File</button>
+        <div id="panel-tab-bar" role="toolbar" aria-label="Inspector category">
+          <button id="panel-tab-video" type="button" data-inspector-tab="video" aria-pressed="true">Video</button>
+          <button id="panel-tab-audio" type="button" data-inspector-tab="audio" aria-pressed="false" tabindex="-1">Audio</button>
+          <button id="panel-tab-effects" type="button" data-inspector-tab="effects" aria-pressed="false" tabindex="-1">Effects</button>
+          <button id="panel-tab-transition" type="button" data-inspector-tab="transition" aria-pressed="false" tabindex="-1">Transition</button>
+          <button id="panel-tab-image" type="button" data-inspector-tab="image" aria-pressed="false" tabindex="-1">Image</button>
+          <button id="panel-tab-file" type="button" data-inspector-tab="file" aria-pressed="false" tabindex="-1">File</button>
         </div>
         <div id="inspector-view" class="selected-panel-view">
           <div id="inspector-body">
@@ -251,10 +251,10 @@
           </div>
           <div id="clip-panel" hidden>
             <p id="clip-summary" class="dim small-text"></p>
-            <div id="clip-video-panel" role="tabpanel" aria-labelledby="panel-tab-video">
+            <div id="clip-video-panel">
               <label class="row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
             </div>
-            <div id="clip-audio-panel" role="tabpanel" aria-labelledby="panel-tab-audio">
+            <div id="clip-audio-panel">
               <!-- 0..1 because that is what the edit model stores; a wider
                    slider would snap back on release. -->
               <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>

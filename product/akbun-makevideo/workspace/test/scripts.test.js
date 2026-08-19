@@ -48,8 +48,14 @@ test('every library the page loads is a script tag on the page', () => {
 
 test('the editor exposes one toggleable selected panel from the title bar', () => {
   const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
+  const selectedPanel = [...page.matchAll(/<aside\b[^>]*>/g)]
+    .map((match) => match[0])
+    .find((tag) => /\bid="selected-panel"/.test(tag));
 
-  assert.match(page, /<aside id="selected-panel" hidden>/);
+  assert.ok(selectedPanel);
+  assert.match(selectedPanel, /\bhidden\b/);
+  assert.match(page, /id="panel-tab-bar" role="toolbar"/);
+  assert.doesNotMatch(page, /role="tab(?:list|panel)?"/);
   assert.deepStrictEqual(
     [...page.matchAll(/data-panel-action="([^"]+)"/g)].map((match) => match[1]),
     ['inspector', 'shape', 'marker', 'debug'],

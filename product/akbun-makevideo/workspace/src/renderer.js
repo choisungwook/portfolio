@@ -540,7 +540,7 @@ function activateSelectedPanel(panel) {
   for (const button of dom.globalActions.querySelectorAll('[data-panel-action]')) {
     const active = button.dataset.panelAction === panel;
     button.setAttribute('aria-pressed', String(active));
-    button.setAttribute('aria-expanded', String(active));
+    button.setAttribute('aria-expanded', String(Boolean(panel)));
   }
   if (panel === 'debug') startDebug();
   else stopDebug();
@@ -1771,7 +1771,7 @@ function renderInspector() {
   dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets);
   for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
     const active = button.dataset.inspectorTab === tab;
-    button.setAttribute('aria-selected', String(active));
+    button.setAttribute('aria-pressed', String(active));
     button.tabIndex = active ? 0 : -1;
   }
   if (item) {

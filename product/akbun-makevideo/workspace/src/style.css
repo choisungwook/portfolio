@@ -973,7 +973,7 @@ button.icon.on {
   font-size: 9px;
 }
 
-#panel-tab-bar button[aria-selected='true'] {
+#panel-tab-bar button[aria-pressed='true'] {
   border-color: var(--border);
   background: var(--panel);
   color: var(--accent);
