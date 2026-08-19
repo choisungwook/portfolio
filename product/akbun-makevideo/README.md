@@ -9,6 +9,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
+- Global Action Bar: toggle Inspector, Shape, Marker and Debug in the shared right panel
 - Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
 - Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
@@ -59,6 +60,7 @@ Cmd on macOS, Ctrl elsewhere.
 | Directory | Description |
 |---|---|
 | [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the model, render and compositor crates in src-tauri/ |
+| [designs/](./designs/) | Figma-importable SVG layout, design tokens and UI interaction rules |
 | [wiki/](./wiki/) | What the next agent reads before taking over, one page per part under [wiki/architecture/](./wiki/architecture/) |
 | [adr/](./adr/) | Decision records |
 | [quality/](./quality/) | Playback quality harnesses, thresholds and baseline |
