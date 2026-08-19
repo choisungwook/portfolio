@@ -945,8 +945,7 @@ button.icon.on {
 }
 
 .inspector-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 4px;
   margin: 8px 0 12px;
   padding: 3px;
@@ -955,6 +954,7 @@ button.icon.on {
 }
 
 .inspector-tabs button {
+  flex: 1;
   border-color: transparent;
   background: transparent;
 }

@@ -1713,6 +1713,8 @@ function renderInspector() {
     dom.clipAudioTab.hidden = !clipTargets.audio;
     dom.clipVideoTab.setAttribute('aria-selected', String(state.inspectorTab === 'video'));
     dom.clipAudioTab.setAttribute('aria-selected', String(state.inspectorTab === 'audio'));
+    dom.clipVideoTab.tabIndex = state.inspectorTab === 'video' ? 0 : -1;
+    dom.clipAudioTab.tabIndex = state.inspectorTab === 'audio' ? 0 : -1;
     dom.clipVideoPanel.hidden = state.inspectorTab !== 'video';
     dom.clipAudioPanel.hidden = state.inspectorTab !== 'audio';
     if (clipTargets.video) dom.clipOpacity.value = String(clipTargets.video.clip.opacity ?? 1);
@@ -1874,6 +1876,22 @@ function updateSelectedAudioVolume() {
     clipId: targets.audio.clip.id,
     volume: Math.max(0, Math.min(1, Number(dom.clipVolume.value) || 0)),
   }).catch((error) => reportError(error, 'clip:volume'));
+}
+
+function activateInspectorTab(tab) {
+  state.inspectorTab = tab;
+  renderInspector();
+}
+
+function moveInspectorTab(event) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  const tabs = [dom.clipVideoTab, dom.clipAudioTab].filter((tab) => !tab.hidden);
+  const current = tabs.indexOf(event.currentTarget);
+  const offset = event.key === 'ArrowRight' ? 1 : -1;
+  const next = tabs[(current + offset + tabs.length) % tabs.length];
+  activateInspectorTab(next === dom.clipVideoTab ? 'video' : 'audio');
+  next.focus();
+  event.preventDefault();
 }
 
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
@@ -3238,13 +3256,13 @@ function wireTimeline() {
     input.addEventListener('change', updateSubtitleStyle);
   }
   dom.clipVideoTab.addEventListener('click', () => {
-    state.inspectorTab = 'video';
-    renderInspector();
+    activateInspectorTab('video');
   });
   dom.clipAudioTab.addEventListener('click', () => {
-    state.inspectorTab = 'audio';
-    renderInspector();
+    activateInspectorTab('audio');
   });
+  dom.clipVideoTab.addEventListener('keydown', moveInspectorTab);
+  dom.clipAudioTab.addEventListener('keydown', moveInspectorTab);
   dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
   dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
   for (const input of [

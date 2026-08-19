@@ -204,13 +204,13 @@
           <div id="clip-panel" hidden>
             <p id="clip-summary" class="dim small-text"></p>
             <div id="clip-tabs" class="inspector-tabs" role="tablist" aria-label="Clip properties">
-              <button id="clip-video-tab" type="button" role="tab">Video</button>
-              <button id="clip-audio-tab" type="button" role="tab">Audio</button>
+              <button id="clip-video-tab" type="button" role="tab" aria-controls="clip-video-panel" aria-selected="false" tabindex="-1">Video</button>
+              <button id="clip-audio-tab" type="button" role="tab" aria-controls="clip-audio-panel" aria-selected="false" tabindex="-1">Audio</button>
             </div>
-            <div id="clip-video-panel" role="tabpanel">
+            <div id="clip-video-panel" role="tabpanel" aria-labelledby="clip-video-tab">
               <label class="row">Opacity <input id="clip-opacity" type="range" min="0" max="1" step="0.01" /></label>
             </div>
-            <div id="clip-audio-panel" role="tabpanel">
+            <div id="clip-audio-panel" role="tabpanel" aria-labelledby="clip-audio-tab">
               <!-- 0..1 because that is what the edit model stores; a wider
                    slider would snap back on release. -->
               <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
