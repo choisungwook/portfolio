@@ -10,6 +10,9 @@ import AppKit
 protocol TerminalRendering: AnyObject {
   var view: NSView { get }
 
+  /// The deepest view that should receive keyboard focus.
+  var focusView: NSView { get }
+
   /// Called with keystrokes on their way to the shell.
   var onInput: (([UInt8]) -> Void)? { get set }
 

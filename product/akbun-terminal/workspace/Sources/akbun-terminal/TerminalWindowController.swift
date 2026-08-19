@@ -123,7 +123,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   }
 
   private func focusTerminal() {
-    window?.makeFirstResponder(terminal.view)
+    window?.makeFirstResponder(terminal.focusView)
   }
 
   private func askName(title: String, placeholder: String, initial: String = "") -> String? {

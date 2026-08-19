@@ -177,9 +177,9 @@ private final class StatusDot: NSView {
 
   private static func color(_ status: CoreWorkspaceStatus) -> NSColor {
     switch status {
-    case .idle: .tertiaryLabelColor
-    case .running: .systemBlue
-    case .needsAttention: .systemOrange
+    case .idle: .clear
+    case .running: .systemOrange
+    case .needsAttention: .systemRed
     case .completed: .systemGreen
     case .failed: .systemRed
     }

@@ -13,6 +13,7 @@ final class PlainTextTerminalView: NSView, TerminalRendering {
   var onGridChange: ((UInt16, UInt16) -> Void)?
 
   var view: NSView { self }
+  var focusView: NSView { textView }
 
   private let scrollView = NSScrollView()
   private let textView = TerminalTextView()
@@ -57,6 +58,10 @@ final class PlainTextTerminalView: NSView, TerminalRendering {
   override var acceptsFirstResponder: Bool { true }
 
   override func keyDown(with event: NSEvent) {
+    if event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) {
+      super.keyDown(with: event)
+      return
+    }
     guard let characters = event.characters, !characters.isEmpty else { return }
     onInput?(Array(characters.utf8))
   }
@@ -118,5 +123,10 @@ private final class TerminalTextView: NSTextView {
     }
     guard let characters = event.characters, !characters.isEmpty else { return }
     onTerminalInput?(Array(characters.utf8))
+  }
+
+  override func paste(_ sender: Any?) {
+    guard let text = NSPasteboard.general.string(forType: .string) else { return }
+    onTerminalInput?(Array(text.utf8))
   }
 }
