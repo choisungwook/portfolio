@@ -1,0 +1,7 @@
+{
+  "name": "akbun-caculatorllm",
+  "compatibility_date": "2026-08-19",
+  "assets": {
+    "directory": "./dist"
+  }
+}

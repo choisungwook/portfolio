@@ -1,7 +1,16 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-18",
+  "updated": "2026-08-19",
   "products": [
+    {
+      "id": "akbun-caculatorllm",
+      "name": "akbun-caculatorllm",
+      "description": "Measured prefill and decode throughput into LLM serving RPS, latency, and KV cache capacity",
+      "kind": "web",
+      "tags": ["vite", "llm", "cloudflare"],
+      "site": "https://caculatorllm.akbun.com",
+      "released": "2026-08-19"
+    },
     {
       "id": "akbun-visualizellm",
       "name": "akbun-visualizellm",
