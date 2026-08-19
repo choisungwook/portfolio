@@ -22,6 +22,7 @@ const K = globalThis.shortcutLib;
 const X = globalThis.transformLib;
 const G = globalThis.guideLib;
 const S = globalThis.sourceLib;
+const I = globalThis.inspectorLib;
 
 // Pointer distance from a clip edge that starts a trim instead of a move.
 const HANDLE_PX = 8;
@@ -74,6 +75,7 @@ const dom = {
   assetsPanel: el('assets-panel'),
   btnImport: el('btn-import'),
   btnDebug: el('btn-debug'),
+  sourcePanel: el('source-panel'),
   sourceStageWrap: el('source-stage-wrap'),
   sourceStage: el('source-stage'),
   sourceStageInner: el('source-stage-inner'),
@@ -141,8 +143,10 @@ const dom = {
   transformOpacityValue: el('transform-opacity-value'),
   clipPanel: el('clip-panel'),
   clipSummary: el('clip-summary'),
-  clipOpacityRow: el('clip-opacity-row'),
-  clipVolumeRow: el('clip-volume-row'),
+  clipVideoTab: el('clip-video-tab'),
+  clipAudioTab: el('clip-audio-tab'),
+  clipVideoPanel: el('clip-video-panel'),
+  clipAudioPanel: el('clip-audio-panel'),
   clipOpacity: el('clip-opacity'),
   clipVolume: el('clip-volume'),
   fontOptions: el('font-options'),
@@ -211,6 +215,7 @@ const state = {
   waveforms: {},
   selectedClipId: null,
   selectedVisualItemId: null,
+  inspectorTab: null,
   selectedAssetId: null,
   sourceSelection: null,
   targetTrackId: null,
@@ -657,8 +662,7 @@ async function placeSource(mode) {
   });
   if (!command) return;
   const made = await edit(command);
-  if (!made || !made.length) return;
-  selectClip(made[0]);
+  selectMadeOnTrack(made, command.videoTrackId || command.audioTrackId);
 }
 
 /** An asset whose length ffprobe could not report is measured by the browser
@@ -1115,6 +1119,8 @@ function scheduleExactFrame() {
 
 function selectClip(clipId) {
   state.selectedClipId = clipId;
+  const targets = clipId ? I.clipTargets(state.project, clipId) : null;
+  state.inspectorTab = I.activeTab(targets);
   // One selection at a time, so the inspector always shows the thing that was
   // picked last rather than whichever kind happens to win a tie.
   if (clipId && state.selectedVisualItemId) selectVisualItem(null);
@@ -1679,7 +1685,10 @@ function renderInspector() {
   const shape = item && item.content && item.content.kind === 'shape' ? item.content : null;
   const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
   const subtitle = track && track.kind === 'subtitle';
-  const clip = !item && liveSelection() ? L.findClip(state.project, liveSelection()) : null;
+  const clipTargets = !item && liveSelection()
+    ? I.clipTargets(state.project, liveSelection())
+    : null;
+  const clip = clipTargets && clipTargets.selected;
   dom.textPanel.hidden = !text || subtitle;
   dom.subtitlePanel.hidden = !text || !subtitle;
   dom.shapePanel.hidden = !shape;
@@ -1699,10 +1708,17 @@ function renderInspector() {
   if (clip) {
     const asset = L.findAsset(state.project, clip.clip.assetId);
     dom.clipSummary.textContent = `${asset ? asset.name || baseName(asset.path) : 'missing file'} · ${clip.track.name}`;
-    dom.clipOpacityRow.hidden = clip.track.kind !== 'video';
-    dom.clipVolumeRow.hidden = Boolean(asset) && asset.kind === 'image';
-    dom.clipOpacity.value = String(clip.clip.opacity ?? 1);
-    dom.clipVolume.value = String(clip.clip.volume ?? 1);
+    state.inspectorTab = I.activeTab(clipTargets, state.inspectorTab);
+    dom.clipVideoTab.hidden = !clipTargets.video;
+    dom.clipAudioTab.hidden = !clipTargets.audio;
+    dom.clipVideoTab.setAttribute('aria-selected', String(state.inspectorTab === 'video'));
+    dom.clipAudioTab.setAttribute('aria-selected', String(state.inspectorTab === 'audio'));
+    dom.clipVideoTab.tabIndex = state.inspectorTab === 'video' ? 0 : -1;
+    dom.clipAudioTab.tabIndex = state.inspectorTab === 'audio' ? 0 : -1;
+    dom.clipVideoPanel.hidden = state.inspectorTab !== 'video';
+    dom.clipAudioPanel.hidden = state.inspectorTab !== 'audio';
+    if (clipTargets.video) dom.clipOpacity.value = String(clipTargets.video.clip.opacity ?? 1);
+    if (clipTargets.audio) dom.clipVolume.value = String(clipTargets.audio.clip.volume ?? 1);
   }
   if (shape) {
     dom.shapeKind.value = shape.shape || 'rectangle';
@@ -1836,17 +1852,46 @@ async function removeSelectedVisualItem() {
   if (done) selectVisualItem(null);
 }
 
-/** The clip inspector's two sliders. One command with both values: Rust takes
- *  either as optional, and sending both keeps this one function. */
-function updateSelectedClipGain() {
+/** Resolve both halves of a linked timeline selection for the Inspector tabs. */
+function selectedClipTargets() {
   const clipId = liveSelection();
-  if (!clipId) return;
+  return clipId ? I.clipTargets(state.project, clipId) : null;
+}
+
+function updateSelectedVideoOpacity() {
+  const targets = selectedClipTargets();
+  if (!targets || !targets.video) return;
   edit({
     op: 'setClipGain',
-    clipId,
+    clipId: targets.video.clip.id,
     opacity: Math.max(0, Math.min(1, Number(dom.clipOpacity.value) || 0)),
+  }).catch((error) => reportError(error, 'clip:opacity'));
+}
+
+function updateSelectedAudioVolume() {
+  const targets = selectedClipTargets();
+  if (!targets || !targets.audio) return;
+  edit({
+    op: 'setClipGain',
+    clipId: targets.audio.clip.id,
     volume: Math.max(0, Math.min(1, Number(dom.clipVolume.value) || 0)),
-  }).catch((error) => reportError(error, 'clip:gain'));
+  }).catch((error) => reportError(error, 'clip:volume'));
+}
+
+function activateInspectorTab(tab) {
+  state.inspectorTab = tab;
+  renderInspector();
+}
+
+function moveInspectorTab(event) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  const tabs = [dom.clipVideoTab, dom.clipAudioTab].filter((tab) => !tab.hidden);
+  const current = tabs.indexOf(event.currentTarget);
+  const offset = event.key === 'ArrowRight' ? 1 : -1;
+  const next = tabs[(current + offset + tabs.length) % tabs.length];
+  activateInspectorTab(next === dom.clipVideoTab ? 'video' : 'audio');
+  next.focus();
+  event.preventDefault();
 }
 
 /** Delete, or delete and close the gap behind it. Ripple is destructive in a
@@ -2230,6 +2275,21 @@ function laneAtPoint(x, y) {
   return under.closest('.lane');
 }
 
+function sourcePanelAtPoint(x, y) {
+  const under = document.elementFromPoint(x, y);
+  if (!under || !under.closest) return null;
+  return under.closest('#source-panel');
+}
+
+function selectMadeOnTrack(made, trackId) {
+  if (!made || !made.length) return;
+  const selected = made.find((clipId) => {
+    const found = L.findClip(state.project, clipId);
+    return found && found.track.id === trackId;
+  });
+  selectClip(selected || made[0]);
+}
+
 /** Dragging an asset out of the panel and onto a lane runs on pointer events
  *  rather than HTML5 drag and drop.
  *
@@ -2264,9 +2324,11 @@ function updateAssetDrag(event) {
   assetDrag.ghost.style.left = `${event.clientX + 12}px`;
   assetDrag.ghost.style.top = `${event.clientY + 12}px`;
   const lane = laneAtPoint(event.clientX, event.clientY);
+  const sourcePanel = sourcePanelAtPoint(event.clientX, event.clientY);
   for (const node of dom.lanes.querySelectorAll('.lane')) {
     node.classList.toggle('drop-target', node === lane);
   }
+  dom.sourcePanel.classList.toggle('drop-target', Boolean(sourcePanel) && !lane);
 }
 
 /** Put the page back the way it was and report the drag that was running, if it
@@ -2283,6 +2345,7 @@ function clearAssetDrag() {
   current.ghost.remove();
   document.body.classList.remove('dragging');
   for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+  dom.sourcePanel.classList.remove('drop-target');
   return current;
 }
 
@@ -2291,6 +2354,10 @@ async function endAssetDrag(event) {
   if (!current) return;
 
   const lane = laneAtPoint(event.clientX, event.clientY);
+  if (sourcePanelAtPoint(event.clientX, event.clientY)) {
+    selectAsset(current.asset.id);
+    return;
+  }
   if (!lane) return;
   const at = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
   const commands = dropCommands(lane.dataset.trackId, [current.asset], at);
@@ -2301,7 +2368,7 @@ async function endAssetDrag(event) {
     return;
   }
   const made = await edit(...commands);
-  if (made && made.length) selectClip(made[made.length - 1]);
+  selectMadeOnTrack(made, lane.dataset.trackId);
 }
 
 async function handleOsDrop(payload) {
@@ -2309,14 +2376,17 @@ async function handleOsDrop(payload) {
     const point = payload.position || { x: 0, y: 0 };
     const ratio = window.devicePixelRatio || 1;
     const lane = laneAtPoint(point.x / ratio, point.y / ratio);
+    const sourcePanel = sourcePanelAtPoint(point.x / ratio, point.y / ratio);
     for (const node of dom.lanes.querySelectorAll('.lane')) {
       node.classList.toggle('drop-target', node === lane);
     }
-    dom.assetsPanel.classList.toggle('drop-target', !lane);
+    dom.sourcePanel.classList.toggle('drop-target', Boolean(sourcePanel) && !lane);
+    dom.assetsPanel.classList.toggle('drop-target', !lane && !sourcePanel);
     return;
   }
   for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
   dom.assetsPanel.classList.remove('drop-target');
+  dom.sourcePanel.classList.remove('drop-target');
   if (payload.type !== 'drop') return;
 
   // The event carries physical pixels; elementFromPoint wants CSS pixels.
@@ -2325,6 +2395,7 @@ async function handleOsDrop(payload) {
   const x = point.x / ratio;
   const y = point.y / ratio;
   const lane = laneAtPoint(x, y);
+  const sourcePanel = sourcePanelAtPoint(x, y);
 
   const found = await probePaths(payload.paths || []);
   if (!found.length) return;
@@ -2342,7 +2413,8 @@ async function handleOsDrop(payload) {
     { op: 'addAssets', assets: found },
     ...commands
   );
-  if (made && made.length) selectClip(made[made.length - 1]);
+  if (sourcePanel) selectAsset(found[0].id);
+  else if (lane) selectMadeOnTrack(made, lane.dataset.trackId);
   for (const asset of found) hydrateDuration(asset);
 }
 
@@ -3183,9 +3255,16 @@ function wireTimeline() {
   for (const input of [dom.subtitleFont, dom.subtitleSize, dom.subtitleColor]) {
     input.addEventListener('change', updateSubtitleStyle);
   }
-  for (const input of [dom.clipOpacity, dom.clipVolume]) {
-    input.addEventListener('change', updateSelectedClipGain);
-  }
+  dom.clipVideoTab.addEventListener('click', () => {
+    activateInspectorTab('video');
+  });
+  dom.clipAudioTab.addEventListener('click', () => {
+    activateInspectorTab('audio');
+  });
+  dom.clipVideoTab.addEventListener('keydown', moveInspectorTab);
+  dom.clipAudioTab.addEventListener('keydown', moveInspectorTab);
+  dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
+  dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
   for (const input of [
     dom.transformX, dom.transformY, dom.transformWidth, dom.transformHeight,
     dom.transformRotation, dom.transformOpacity, dom.transformOpacityValue,

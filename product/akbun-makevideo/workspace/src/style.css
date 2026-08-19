@@ -382,6 +382,11 @@ select {
   outline-offset: -4px;
 }
 
+#source-panel.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+
 #asset-list {
   margin: 0;
   padding: 6px;
@@ -937,6 +942,31 @@ button.icon.on {
 
 #inspector-body .compact-number {
   flex: 0 0 62px;
+}
+
+.inspector-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0 12px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+.inspector-tabs button {
+  flex: 1;
+  border-color: transparent;
+  background: transparent;
+}
+
+.inspector-tabs button[aria-selected='true'] {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--accent);
+}
+
+.inspector-tabs button[hidden] {
+  display: none;
 }
 
 #marker-panel {
