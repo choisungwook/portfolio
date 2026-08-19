@@ -9,9 +9,10 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
-use crate::protocol::{parse_request, Command, Event, Response, PROTOCOL_VERSION};
+use crate::agent::Rule;
+use crate::protocol::{parse_request, Command, Event, Response, WorkspaceState, PROTOCOL_VERSION};
 use crate::session::Session;
-use crate::tree::TreeStore;
+use crate::tree::{TreeStore, WorkspaceStatus};
 
 pub struct App {
     sessions: Mutex<HashMap<u32, Session>>,
@@ -19,6 +20,10 @@ pub struct App {
     sender: Sender<Event>,
     receiver: Mutex<Receiver<Event>>,
     tree: Mutex<TreeStore>,
+    rules: Mutex<Vec<Rule>>,
+    /// The last judgement per workspace. Finished is a transition rather than
+    /// something on screen, so the previous answer is part of the next one.
+    statuses: Mutex<HashMap<u64, WorkspaceStatus>>,
 }
 
 impl Default for App {
@@ -36,6 +41,8 @@ impl App {
             sender,
             receiver: Mutex::new(receiver),
             tree: Mutex::new(TreeStore::default()),
+            rules: Mutex::new(Vec::new()),
+            statuses: Mutex::new(HashMap::new()),
         }
     }
 
@@ -64,7 +71,12 @@ impl App {
             Command::Hello => Response::Hello {
                 protocol: PROTOCOL_VERSION,
             },
-            Command::Spawn { cwd, cols, rows } => self.spawn(&cwd, cols, rows),
+            Command::Spawn {
+                cwd,
+                cols,
+                rows,
+                workspace,
+            } => self.spawn(workspace, &cwd, cols, rows),
             Command::Write { session, bytes } => {
                 self.with_session(session, |session| session.write(&bytes))
             }
@@ -100,7 +112,83 @@ impl App {
             Command::Themes => Response::Themes {
                 themes: crate::theme::all(),
             },
+            Command::LoadRules { directory } => match crate::agent::load(&directory) {
+                Ok(loaded) => match self.rules.lock() {
+                    Ok(mut rules) => {
+                        *rules = loaded;
+                        Response::Ok
+                    }
+                    Err(_) => Response::Error {
+                        message: "agent rules are poisoned".to_string(),
+                    },
+                },
+                Err(message) => Response::Error { message },
+            },
+            Command::Detect => Response::Statuses {
+                statuses: self.detect(),
+            },
+            Command::ClearStatus { workspace } => {
+                if let Ok(mut statuses) = self.statuses.lock() {
+                    if statuses.get(&workspace) == Some(&WorkspaceStatus::Completed) {
+                        statuses.insert(workspace, WorkspaceStatus::Idle);
+                    }
+                }
+                Response::Ok
+            }
+            Command::UrlAt { line, column } => Response::Url {
+                url: crate::url::at(&line, column),
+            },
         }
+    }
+
+    /// Judges every workspace that has a session open and answers with the ones
+    /// that moved. One process snapshot serves them all, because the cost here
+    /// is the snapshot rather than the rules.
+    fn detect(&self) -> Vec<WorkspaceState> {
+        let (Ok(sessions), Ok(rules), Ok(mut statuses)) =
+            (self.sessions.lock(), self.rules.lock(), self.statuses.lock())
+        else {
+            return Vec::new();
+        };
+        if rules.is_empty() {
+            return Vec::new();
+        }
+
+        // workspace -> the screens and pids of every shell open in it.
+        let mut open: HashMap<u64, (String, Vec<u32>)> = HashMap::new();
+        for session in sessions.values() {
+            let Some(workspace) = session.workspace() else {
+                continue;
+            };
+            let entry = open.entry(workspace).or_default();
+            entry.0.push_str(&session.screen_text());
+            entry.0.push('\n');
+            if let Some(pid) = session.pid() {
+                entry.1.push(pid);
+            }
+        }
+        if open.is_empty() {
+            return Vec::new();
+        }
+
+        let snapshot = crate::agent::process_snapshot();
+        let mut changed = Vec::new();
+        for (workspace, (screen, pids)) in open {
+            let processes: Vec<String> = pids
+                .iter()
+                .flat_map(|pid| crate::agent::descendant_names(*pid, &snapshot))
+                .collect();
+            let previous = statuses
+                .get(&workspace)
+                .copied()
+                .unwrap_or(WorkspaceStatus::Idle);
+            let status = crate::agent::judge(&rules, &processes, &screen, previous);
+            if status != previous {
+                statuses.insert(workspace, status);
+                changed.push(WorkspaceState { workspace, status });
+            }
+        }
+        changed
     }
 
     fn with_tree<F>(&self, action: F) -> Response
@@ -118,7 +206,7 @@ impl App {
         }
     }
 
-    fn spawn(&self, cwd: &str, cols: u16, rows: u16) -> Response {
+    fn spawn(&self, workspace: Option<u64>, cwd: &str, cols: u16, rows: u16) -> Response {
         let id = {
             let Ok(mut next) = self.next_session.lock() else {
                 return Response::Error {
@@ -130,7 +218,7 @@ impl App {
             id
         };
 
-        match Session::spawn(id, cwd, cols, rows, self.sender.clone()) {
+        match Session::spawn(id, workspace, cwd, cols, rows, self.sender.clone()) {
             Ok(session) => match self.sessions.lock() {
                 Ok(mut sessions) => {
                     sessions.insert(id, session);

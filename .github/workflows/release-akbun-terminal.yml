@@ -118,6 +118,10 @@ jobs:
           - The terminal is SwiftTerm, so colour, the cursor and full screen programs draw properly.
           - Markdown files open under the terminal, rendered or as source, and save back.
           - Colour schemes known by name are in the View menu; the default follows the system appearance.
+          - Each workspace is coloured by what the agent in it is doing, and a notification says when one finishes.
+          - Which phrases mean what is one JSON file per agent under the app data directory, so a new agent is a new file.
+          - Clicking a URL in the terminal offers to copy it or open it, in the system browser or one you name.
+          - Command plus and minus zoom the terminal; the side panes drag to any width.
           - "Check for Updates…" in the application menu replaces the installed bundle in place.
 
           ## Install

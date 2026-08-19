@@ -11,3 +11,4 @@
 * [move 클로저가 필드 이름을 대면 Send는 wrapper에 남고 클로저는 필드만 가져간다](move-closure-captures-the-field-not-the-wrapper.md) - unsafe impl Send를 붙였는데도 스레드 경계를 못 넘을 때 캡처 단위를 올려 고치는 방법.
 * [업데이트 서명 불일치는 서명과 pubkey의 key ID를 뽑아 갈라낸다](tauri-updater-key-id-mismatch.md) - 읽을 수 없는 secret을 두고 서명한 키와 신뢰하는 키가 같은지 판정하는 방법.
 * [crate마다 step을 나눈 verify job은 첫 실패에서 멈추므로 파손 범위를 보여주지 않는다](verify-job-stops-at-the-first-failing-step.md) - CI가 보고한 에러 개수를 파손 전부로 믿지 않고 로컬에서 남은 step을 마저 돌려 범위를 확정하는 방법.
+* [NSSplitView의 pane 너비는 divider 위치로 정하고 제약으로 정하지 않는다](nssplitview-width-constraint-fights-the-divider.md) - 드래그가 안 먹는 split view의 원인을 hit 영역과 제약 우선순위로 갈라내고 실측 표로 확정하는 방법.

@@ -75,8 +75,8 @@ public final class CoreBridge {
     }
   }
 
-  public func spawn(cwd: String, cols: UInt16, rows: UInt16) throws -> UInt32 {
-    let response = try send(.spawn(cwd: cwd, cols: cols, rows: rows))
+  public func spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?) throws -> UInt32 {
+    let response = try send(.spawn(cwd: cwd, cols: cols, rows: rows, workspace: workspace))
     switch response {
     case .spawned(let session): return session
     case .error(let message): throw Failure.core(message)
@@ -127,6 +127,24 @@ public final class CoreBridge {
     case .error(let message): throw Failure.core(message)
     default: throw Failure.unexpected(response)
     }
+  }
+
+  /// The workspaces whose agent status moved since the last call. An empty
+  /// answer is the normal one, so this is cheap to ask often.
+  public func detect() throws -> [CoreWorkspaceState] {
+    let response = try send(.detect)
+    switch response {
+    case .statuses(let statuses): return statuses
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  /// The URL under a click, or nothing when the core will not open what is
+  /// there. The rule is the core's, so a view swap does not take it along.
+  public func url(inLine line: String, column: Int) -> String? {
+    guard case .url(let url) = try? send(.urlAt(line: line, column: column)) else { return nil }
+    return url
   }
 
   /// Everything the core has queued since the last call.

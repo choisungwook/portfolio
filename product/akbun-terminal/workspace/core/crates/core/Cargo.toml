@@ -12,3 +12,4 @@ serde.workspace = true
 serde_json.workspace = true
 portable-pty.workspace = true
 pulldown-cmark.workspace = true
+vte.workspace = true

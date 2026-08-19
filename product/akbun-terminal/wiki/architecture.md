@@ -48,7 +48,11 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Output.** The session's reader thread pushes `output` events onto a queue in the core. A timer on the main run loop drains the queue about once a frame and hands bytes to the view. The core never calls into Swift, so the question of which thread may draw never arises.
 
-**Resize.** The emulator recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong.
+**Resize.** The emulator recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong. Zooming the font takes the same path: the view is given a point size, works out how many cells now fit, and reports that.
+
+**Judging.** Every session's bytes also go into an interpreted screen, on the reader thread that already has them. A second timer, two seconds apart from the one that draws, asks the core to judge: one `ps` snapshot names the processes under each shell, the rule files say what the screens mean, and the answer is only the workspaces that moved. The shell paints those and raises a notification for the ones that finished.
+
+**Clicking a link.** The view turns the point into a row of text and a column and hands both to the core. The core finds the word, trims what a sentence left on it, and answers only for http and https. Nothing is opened without that answer.
 
 **Spawn environment.** The core sets `TERM` on the child. A GUI process inherits none, and a shell that does not know what is drawing it writes for a dumb terminal.
 
@@ -68,14 +72,33 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
 | `render_markdown` | `markdown` | blocks, and where raw HTML is dropped |
 | `themes` | `themes` | the known palettes as hex |
+| `load_rules` | `ok` | reads one JSON file per agent, seeding the shipped ones |
+| `detect` | `statuses` | judges every workspace with a session, answering only what moved |
+| `clear_status` | `ok` | takes the finished colour off a workspace that has been opened |
+| `url_at` | `url` | the URL under a click, absent when there is nothing openable there |
 
 | Event | Notes |
 |---|---|
 | `output` | shell bytes for a session |
 | `exited` | the shell ended; the view stops taking keys |
 
+## Agent rules
+
+One JSON file per agent, in `agents/` under the app data directory. The core writes the three it ships the first time the directory is empty, so the shipped files are also the worked example.
+
+```json
+{
+  "name": "Claude Code",
+  "processes": ["claude"],
+  "asking": ["Do you want to"],
+  "running": ["esc to interrupt"],
+  "done": ["? for shortcuts"]
+}
+```
+
+`processes` is matched against every process in the tree under the shell, not just its direct child. The other three are substrings looked for on the interpreted screen, in the order asking, running, done. A file that will not parse costs that agent its colours and nothing else.
+
 ## Where the next milestones attach
 
-- Projects and workspaces: state and persistence in the core, the sidebar reads it.
-- Agent state colours: the core already sees every byte, so detection reads the same stream the view draws.
-- URL menu: the rules in the core, presentation in the shell, the way the browser and the markdown pane already work.
+- A second window: `TerminalWindowController` already holds everything a window owns, and the core keys sessions by id rather than by window.
+- Windows and Linux: the core is portable apart from `agent.rs`, which shells out to `ps`. The shell is AppKit throughout.

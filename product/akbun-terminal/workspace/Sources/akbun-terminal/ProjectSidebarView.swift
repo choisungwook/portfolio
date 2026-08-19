@@ -9,8 +9,12 @@ final class ProjectSidebarView: NSView {
   var onSelectWorkspace: ((CoreProject, CoreWorkspace) -> Void)?
 
   private let rows = FlippedStackView()
-  private var projects: [CoreProject] = []
+  private(set) var projects: [CoreProject] = []
   private var selected: UInt64?
+  /// What the core judged each workspace to be doing. Kept apart from the tree
+  /// because it is what is happening now, not what was saved: a status written
+  /// to disk would come back after a restart describing work that is over.
+  private var statuses: [UInt64: CoreWorkspaceStatus] = [:]
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -70,6 +74,13 @@ final class ProjectSidebarView: NSView {
     redraw()
   }
 
+  /// Colours one workspace's row. The judging is the core's; this only paints.
+  func setStatus(_ status: CoreWorkspaceStatus, for workspace: UInt64) {
+    guard statuses[workspace] != status else { return }
+    statuses[workspace] = status
+    redraw()
+  }
+
   /// Marks a workspace as the one on screen. Selection is drawn here and owned
   /// by the controller, because the terminal it opens is what it really means.
   func select(workspace: UInt64?) {
@@ -117,7 +128,7 @@ final class ProjectSidebarView: NSView {
     row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
 
     for workspace in project.workspaces {
-      let dot = StatusDot(status: workspace.status)
+      let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status)
       let label = NSTextField(labelWithString: workspace.name)
       label.font = .systemFont(ofSize: 12)
       label.lineBreakMode = .byTruncatingTail

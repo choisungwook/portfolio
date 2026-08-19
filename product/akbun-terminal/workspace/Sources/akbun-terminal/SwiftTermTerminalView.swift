@@ -18,11 +18,12 @@ import SwiftTerm
 final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency TerminalViewDelegate {
   var onInput: (([UInt8]) -> Void)?
   var onGridChange: ((UInt16, UInt16) -> Void)?
+  var onCellClick: ((String, Int, NSPoint) -> Void)?
 
   var view: NSView { self }
   var focusView: NSView { terminal }
 
-  private let terminal = TerminalView()
+  private let terminal = ClickableTerminalView()
   private var ended = false
 
   override init(frame frameRect: NSRect) {
@@ -41,6 +42,7 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     // Takes the colours from the system appearance, which is what makes the view
     // follow dark and light mode without a palette of its own.
     terminal.configureNativeColors()
+    terminal.onPlainClick = { [weak self] point in self?.reportClick(at: point) ?? false }
     terminal.translatesAutoresizingMaskIntoConstraints = false
     addSubview(terminal)
     NSLayoutConstraint.activate([
@@ -54,6 +56,14 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
   var grid: (cols: UInt16, rows: UInt16) {
     let size = terminal.getTerminal()
     return (UInt16(max(1, size.cols)), UInt16(max(1, size.rows)))
+  }
+
+  /// Zoom. SwiftTerm recomputes its cell size from the font and then reports the
+  /// new grid through `sizeChanged`, which is what resizes the pty, so nothing
+  /// here has to work out how many cells fit.
+  var fontSize: Double {
+    get { terminal.font.pointSize }
+    set { terminal.font = NSFont.monospacedSystemFont(ofSize: newValue, weight: .regular) }
   }
 
   /// Installs a colour scheme, or hands the view back to the system appearance
@@ -96,6 +106,24 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     terminal.feed(text: "\r\n[process exited]\r\n")
   }
 
+  /// Turns a point into the row's text and the column the click fell in.
+  ///
+  /// This calculation belongs to whatever draws the cells, which is why it sits
+  /// behind the seam rather than in the controller: a different engine measures
+  /// its grid differently, and only the answer travels upwards.
+  private func reportClick(at point: NSPoint) -> Bool {
+    guard let onCellClick,
+      let cell = terminal.cellSizeInPixels(source: terminal.getTerminal()),
+      cell.width > 0, cell.height > 0
+    else { return false }
+    let scale = window?.backingScaleFactor ?? 2
+    let column = Int(point.x / (Double(cell.width) / scale))
+    let row = Int((terminal.bounds.height - point.y) / (Double(cell.height) / scale))
+    guard let line = terminal.getTerminal().getLine(row: row) else { return false }
+    onCellClick(line.translateToString(trimRight: true), column, convert(point, from: terminal))
+    return true
+  }
+
   // MARK: TerminalViewDelegate
 
   func send(source: TerminalView, data: ArraySlice<UInt8>) {
@@ -116,4 +144,33 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
   func scrolled(source: TerminalView, position: Double) {}
 
   func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+}
+
+/// A terminal view that reports a plain click before it does anything with it.
+///
+/// A click that dragged is a selection and a click while a full screen program
+/// is reading the mouse belongs to that program, so neither is offered. What is
+/// left is the gesture a person makes at a URL.
+private final class ClickableTerminalView: TerminalView {
+  /// Returns whether the click was consumed.
+  var onPlainClick: ((NSPoint) -> Bool)?
+
+  private var pressedAt: NSPoint?
+
+  override func mouseDown(with event: NSEvent) {
+    pressedAt = convert(event.locationInWindow, from: nil)
+    super.mouseDown(with: event)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    let point = convert(event.locationInWindow, from: nil)
+    let dragged = pressedAt.map { hypot(point.x - $0.x, point.y - $0.y) > 3 } ?? true
+    pressedAt = nil
+    if !dragged, getTerminal().mouseMode == .off, event.clickCount == 1,
+      onPlainClick?(point) == true
+    {
+      return
+    }
+    super.mouseUp(with: event)
+  }
 }

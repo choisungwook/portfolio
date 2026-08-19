@@ -13,12 +13,19 @@ use std::thread;
 use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 
 use crate::protocol::Event;
+use crate::screen::Screen;
 
 pub struct Session {
     id: u32,
+    /// Which workspace this shell is judged under. None when the shell that
+    /// spawned it does not track workspaces.
+    workspace: Option<u64>,
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
+    /// The interpreted screen, kept up to date on the reader thread so that
+    /// detection never sits on the path that draws output.
+    screen: Arc<Mutex<Screen>>,
 }
 
 impl Session {
@@ -26,6 +33,7 @@ impl Session {
     /// `events` from a reader thread.
     pub fn spawn(
         id: u32,
+        workspace: Option<u64>,
         cwd: &str,
         cols: u16,
         rows: u16,
@@ -57,12 +65,17 @@ impl Session {
         let writer = pty.master.take_writer().map_err(|error| error.to_string())?;
         let mut reader = pty.master.try_clone_reader().map_err(|error| error.to_string())?;
 
+        let screen = Arc::new(Mutex::new(Screen::new(cols, rows)));
+        let feeding = Arc::clone(&screen);
         thread::spawn(move || {
             let mut buffer = [0u8; 8192];
             loop {
                 match reader.read(&mut buffer) {
                     Ok(0) | Err(_) => break,
                     Ok(read) => {
+                        if let Ok(mut screen) = feeding.lock() {
+                            screen.feed(&buffer[..read]);
+                        }
                         if events
                             .send(Event::Output {
                                 session: id,
@@ -81,14 +94,33 @@ impl Session {
 
         Ok(Self {
             id,
+            workspace,
             master: pty.master,
             writer,
             child: Arc::new(Mutex::new(child)),
+            screen,
         })
     }
 
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    pub fn workspace(&self) -> Option<u64> {
+        self.workspace
+    }
+
+    /// The shell's pid, which is the root of the tree an agent runs somewhere in.
+    pub fn pid(&self) -> Option<u32> {
+        self.child.lock().ok().and_then(|child| child.process_id())
+    }
+
+    /// What this shell has on screen right now.
+    pub fn screen_text(&self) -> String {
+        self.screen
+            .lock()
+            .map(|screen| screen.text())
+            .unwrap_or_default()
     }
 
     pub fn write(&mut self, bytes: &[u8]) -> Result<(), String> {
@@ -99,6 +131,9 @@ impl Session {
     /// A shell that is not told the new size keeps drawing at the old one, so
     /// every interactive program in it looks broken after a window resize.
     pub fn resize(&self, cols: u16, rows: u16) -> Result<(), String> {
+        if let Ok(mut screen) = self.screen.lock() {
+            screen.resize(cols, rows);
+        }
         self.master
             .resize(PtySize {
                 rows,

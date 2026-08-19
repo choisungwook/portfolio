@@ -1,0 +1,17 @@
+{
+  "name": "Gemini CLI",
+  "processes": ["gemini"],
+  "asking": [
+    "Apply this change?",
+    "Allow execution of",
+    "● 1. Yes"
+  ],
+  "running": [
+    "esc to cancel",
+    "(esc to cancel"
+  ],
+  "done": [
+    "Type your message",
+    "for shortcuts"
+  ]
+}

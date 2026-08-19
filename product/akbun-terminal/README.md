@@ -1,6 +1,6 @@
 # akbun-terminal
 
-A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files on the right; agent state detection is what remains.
+A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files on the right, and colours each workspace with what the CLI agent inside it is doing.
 
 ## Directory
 
@@ -50,4 +50,10 @@ cargo test --manifest-path core/Cargo.toml
 - Lists the selected project's files on the right, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
 - Opens a markdown file under the terminal, rendered or as source, and writes it back on save.
 - Wears a known colour scheme picked from the View menu, or follows the system appearance.
+- Zooms the terminal with Command plus and minus, and back to the default size with Command zero.
+- Lets the sidebar and the file pane be dragged to any width, and folded away entirely.
+- Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening the workspace takes the green away.
+- Raises a notification when a workspace finishes, and opens that workspace when the notification is clicked.
+- Reads those judgements from one JSON file per agent under the app data directory, so a new agent is a new file rather than a new build.
+- Offers to copy or open a URL clicked in the terminal, in the system browser or a named one, and refuses anything that is not http or https.
 - Checks for updates from the application menu and replaces the installed bundle in place.
