@@ -1,0 +1,132 @@
+name: release-akbun-terminal
+
+on:
+  push:
+    branches:
+      - master
+    # Nothing to build when only the workflow file changed.
+    paths:
+      - 'product/akbun-terminal/workspace/**'
+  pull_request:
+    paths:
+      - 'product/akbun-terminal/workspace/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-terminal/workspace
+
+jobs:
+  # The core carries no AppKit, so its tests run on the cheap runner. This is the
+  # payoff of keeping the model in its own crates: the pty round trip, the
+  # protocol and the session lifetime are all checked here in seconds.
+  core:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-terminal/workspace/core
+
+      - name: Run core tests
+        run: cargo test --manifest-path core/Cargo.toml
+
+  # The shell needs macOS, because the package links AppKit. This job is also the
+  # only place the two languages are linked together, which is the step most
+  # likely to break.
+  shell:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-terminal/workspace/core
+
+      - name: Build the core static library
+        run: ./scripts/build-core.sh
+
+      - name: Run shell tests
+        run: swift test
+
+  # macOS arm64 only. The build has to succeed before the tag is created, and the
+  # tag before the release. Version comes from workspace/VERSION.
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-terminal/workspace/core
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-terminal-v$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Run core tests
+        run: cargo test --manifest-path core/Cargo.toml
+
+      - name: Run shell tests
+        run: |
+          ./scripts/build-core.sh
+          swift test
+
+      - name: Build dmg
+        run: ./scripts/bundle.sh
+
+      # Only tag once the build succeeded.
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      # Only release once the tag exists.
+      - name: Create release with dmg
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - A macOS window that wraps a shell. The model, the sessions and the protocol live in a Rust core; the window is a thin AppKit shell over it.
+          - This build proves the boundary: one terminal, keystrokes in, output back, resize followed, shells reaped on quit.
+          - The view is a plain text view, not an emulator yet, so a full screen program still draws its escape sequences as text.
+          - "Check for Updates…" in the application menu replaces the installed bundle in place.
+
+          ## Install
+
+          - The dmg is Apple Silicon (arm64) only.
+          - Unsigned build, so the first launch fails with "damaged and can't be opened".
+          - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-terminal.app`
+          EOF
+          # --generate-notes appends the "What's Changed" commit list under the notes file.
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --generate-notes \
+            product/akbun-terminal/workspace/build/*.dmg

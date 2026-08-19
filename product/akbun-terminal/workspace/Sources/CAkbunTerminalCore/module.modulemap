@@ -1,0 +1,4 @@
+module CAkbunTerminalCore {
+  header "include/akbun_terminal.h"
+  export *
+}
