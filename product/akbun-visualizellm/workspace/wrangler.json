@@ -1,0 +1,7 @@
+{
+  "name": "akbun-visualizellm",
+  "compatibility_date": "2026-08-18",
+  "assets": {
+    "directory": "./dist"
+  }
+}
