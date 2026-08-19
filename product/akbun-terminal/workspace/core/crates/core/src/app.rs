@@ -81,6 +81,25 @@ impl App {
             Command::CreateWorkspace { project, name } => {
                 self.with_tree(|tree| tree.create_workspace(project, name))
             }
+            Command::SetTheme { name } => self.with_tree(|tree| tree.set_theme(name)),
+            Command::ReadDirectory { path } => match crate::browse::read_directory(&path) {
+                Ok(entries) => Response::Entries { entries },
+                Err(message) => Response::Error { message },
+            },
+            Command::ReadFile { path } => match crate::browse::read_file(&path) {
+                Ok(text) => Response::File { text },
+                Err(message) => Response::Error { message },
+            },
+            Command::WriteFile { path, text } => match crate::browse::write_file(&path, &text) {
+                Ok(()) => Response::Ok,
+                Err(message) => Response::Error { message },
+            },
+            Command::RenderMarkdown { text } => Response::Markdown {
+                blocks: crate::markdown::render(&text),
+            },
+            Command::Themes => Response::Themes {
+                themes: crate::theme::all(),
+            },
         }
     }
 

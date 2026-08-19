@@ -63,6 +63,11 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `write` | `ok` | bytes, not text |
 | `resize` | `ok` | cells, not pixels |
 | `close` | `ok` | kills and reaps |
+| `load_state`, `create_project`, `create_workspace`, `set_theme` | `state` | every mutation answers with the whole tree |
+| `read_directory` | `entries` | one level, dotfiles hidden, links left as leaves |
+| `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
+| `render_markdown` | `markdown` | blocks, and where raw HTML is dropped |
+| `themes` | `themes` | the known palettes as hex |
 
 | Event | Notes |
 |---|---|
@@ -73,4 +78,4 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 - Projects and workspaces: state and persistence in the core, the sidebar reads it.
 - Agent state colours: the core already sees every byte, so detection reads the same stream the view draws.
-- File browser, markdown, URL menu: directory reads, parsing and URL rules in the core; presentation in the shell.
+- URL menu: the rules in the core, presentation in the shell, the way the browser and the markdown pane already work.

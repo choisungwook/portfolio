@@ -7,6 +7,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::browse::Entry;
+use crate::markdown::Block;
+use crate::theme::Theme;
 use crate::tree::TreeState;
 
 /// Bumped only when an existing field changes meaning or disappears. Adding an
@@ -57,6 +60,27 @@ pub enum Command {
         project: u64,
         name: String,
     },
+    /// One directory level. The shell asks again for each folder it opens
+    /// rather than receiving a tree it did not ask for.
+    ReadDirectory {
+        path: String,
+    },
+    ReadFile {
+        path: String,
+    },
+    WriteFile {
+        path: String,
+        text: String,
+    },
+    /// Markdown in, blocks out. The text is sent rather than a path so the
+    /// preview follows what is being typed, not what is on disk.
+    RenderMarkdown {
+        text: String,
+    },
+    Themes,
+    SetTheme {
+        name: String,
+    },
 }
 
 /// What the core answers with. One shape per call, so the shell never has to
@@ -68,6 +92,10 @@ pub enum Response {
     Spawned { session: u32 },
     Ok,
     State { state: TreeState },
+    Entries { entries: Vec<Entry> },
+    File { text: String },
+    Markdown { blocks: Vec<Block> },
+    Themes { themes: Vec<Theme> },
     Error { message: String },
 }
 

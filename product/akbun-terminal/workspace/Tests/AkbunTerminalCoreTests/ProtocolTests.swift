@@ -26,6 +26,77 @@ struct ProtocolTests {
     #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":1}"#)
   }
 
+  @Test func fileAndThemeCommandsKeepTheirWireNames() throws {
+    #expect(
+      try json(.readDirectory(path: "/tmp"))
+        == #"{"command":{"path":"\/tmp","type":"read_directory"},"v":1}"#)
+    #expect(
+      try json(.writeFile(path: "/tmp/a.md", text: "hi"))
+        == #"{"command":{"path":"\/tmp\/a.md","text":"hi","type":"write_file"},"v":1}"#)
+    #expect(try json(.themes) == #"{"command":{"type":"themes"},"v":1}"#)
+    #expect(
+      try json(.setTheme(name: "Nord"))
+        == #"{"command":{"name":"Nord","type":"set_theme"},"v":1}"#)
+  }
+
+  @Test func readsTheBlocksTheCoreSends() throws {
+    let json = """
+      {"type":"markdown","blocks":[
+        {"type":"heading","level":2,"spans":[{"text":"Title","bold":true,"italic":false,"code":false,"link":null}]},
+        {"type":"list_item","depth":1,"marker":"[x]","spans":[{"text":"done"}]},
+        {"type":"table","header":["a"],"rows":[["1"]]},
+        {"type":"something_new"}]}
+      """
+    let response = try JSONDecoder().decode(CoreResponse.self, from: Data(json.utf8))
+    guard case .markdown(let blocks) = response else {
+      Issue.record("expected markdown, got \(response)")
+      return
+    }
+    guard case .heading(let level, let spans) = blocks[0] else {
+      Issue.record("expected a heading, got \(blocks[0])")
+      return
+    }
+    #expect(level == 2)
+    #expect(spans.first?.bold == true)
+    guard case .listItem(let depth, let marker, let items) = blocks[1] else {
+      Issue.record("expected a list item, got \(blocks[1])")
+      return
+    }
+    // The style flags are optional on the wire, so a span without them reads.
+    #expect((depth, marker, items.map(\.text), items[0].code) == (1, "[x]", ["done"], false))
+    #expect(blocks[2] == .table(header: ["a"], rows: [["1"]]))
+    // A block a newer core adds must draw as nothing rather than fail the file.
+    #expect(blocks[3] == .unknown)
+  }
+
+  @Test func readsADirectoryListing() throws {
+    let json = #"{"type":"entries","entries":[{"name":"src","path":"/p/src","is_directory":true}]}"#
+    let response = try JSONDecoder().decode(CoreResponse.self, from: Data(json.utf8))
+    guard case .entries(let entries) = response else {
+      Issue.record("expected entries, got \(response)")
+      return
+    }
+    #expect(entries == [CoreEntry(name: "src", path: "/p/src", isDirectory: true)])
+  }
+
+  @Test func readsAThemeAndItsColours() throws {
+    let palette = Array(repeating: "\"#3b4252\"", count: 16).joined(separator: ",")
+    let json = #"""
+      {"type":"themes","themes":[{"name":"Nord","background":"#2e3440","foreground":"#d8dee9",
+      "cursor":"#d8dee9","palette":[
+      """# + palette + "]}]}"
+    let response = try JSONDecoder().decode(CoreResponse.self, from: Data(json.utf8))
+    guard case .themes(let themes) = response, let theme = themes.first else {
+      Issue.record("expected themes, got \(response)")
+      return
+    }
+    #expect(CoreTheme.rgb(theme.background)! == (0x2e, 0x34, 0x40))
+    #expect(theme.rgbPalette?.count == 16)
+    // Anything that is not #rrggbb is refused rather than drawn as black.
+    #expect(CoreTheme.rgb("2e3440") == nil)
+    #expect(CoreTheme.rgb("#zzzzzz") == nil)
+  }
+
   @Test func treeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadState(directory: "/tmp/app"))
@@ -64,7 +135,9 @@ struct ProtocolTests {
               path: nil,
               workspaces: [CoreWorkspace(id: 3, name: "Server", status: .needsAttention)]
             )
-          ]
+          ],
+          // Absent in the state a build without themes wrote, which still reads.
+          theme: nil
         )
       )
     )

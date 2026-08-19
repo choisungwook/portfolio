@@ -11,7 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Clear whatever an update killed halfway through, before anything else can
     // add to the temp directory.
     Updater.cleanupTempDirs()
-    buildMenu()
 
     do {
       let core = try CoreBridge()
@@ -21,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       controller.showWindow(nil)
       self.core = core
       self.windowController = controller
+      // Built after the controller, because the theme list comes from the core
+      // and there is nothing to choose between before it has answered.
+      buildMenu(for: controller)
     } catch {
       // A core that cannot start leaves nothing to show, so say why and stop
       // rather than opening an empty window.
@@ -40,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     windowController?.closeSessions()
   }
 
-  private func buildMenu() {
+  private func buildMenu(for controller: TerminalWindowController) {
     let appMenu = NSMenu()
     appMenu.addItem(
       withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""
@@ -57,10 +59,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let editItem = NSMenuItem()
     editItem.submenu = editMenu
 
+    let viewMenu = NSMenu(title: "View")
+    viewMenu.addItem(
+      withTitle: "Hide File Browser", action: #selector(toggleFileBrowser), keyEquivalent: "b"
+    ).target = self
+    let themes = NSMenu(title: "Theme")
+    for name in [CoreTheme.system] + controller.themes.map(\.name) {
+      let item = themes.addItem(withTitle: name, action: #selector(chooseTheme), keyEquivalent: "")
+      item.target = self
+      item.state = name == controller.themeName ? .on : .off
+    }
+    let themeItem = viewMenu.addItem(withTitle: "Theme", action: nil, keyEquivalent: "")
+    themeItem.submenu = themes
+    let viewItem = NSMenuItem()
+    viewItem.submenu = viewMenu
+
     let mainMenu = NSMenu()
     mainMenu.addItem(appItem)
     mainMenu.addItem(editItem)
+    mainMenu.addItem(viewItem)
     NSApp.mainMenu = mainMenu
+  }
+
+  @objc private func toggleFileBrowser(_ sender: NSMenuItem) {
+    guard let hidden = windowController?.toggleFileBrowser() else { return }
+    sender.title = hidden ? "Show File Browser" : "Hide File Browser"
+  }
+
+  @objc private func chooseTheme(_ sender: NSMenuItem) {
+    windowController?.applyTheme(named: sender.title)
+    // The tick follows the controller, not the click, so a name the core
+    // refused does not end up looking like it was applied.
+    for item in sender.menu?.items ?? [] {
+      item.state = item.title == windowController?.themeName ? .on : .off
+    }
   }
 
   @objc private func checkForUpdates() {

@@ -1,4 +1,5 @@
 import AppKit
+import AkbunTerminalCore
 import SwiftTerm
 
 /// The terminal view behind the seam, drawn by SwiftTerm.
@@ -53,6 +54,36 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
   var grid: (cols: UInt16, rows: UInt16) {
     let size = terminal.getTerminal()
     return (UInt16(max(1, size.cols)), UInt16(max(1, size.rows)))
+  }
+
+  /// Installs a colour scheme, or hands the view back to the system appearance
+  /// when there is none. Following the system is the only setting that changes
+  /// with dark and light mode, so it is what an unset theme means.
+  func apply(theme: CoreTheme?) {
+    guard let theme, let palette = theme.rgbPalette,
+      let background = CoreTheme.rgb(theme.background),
+      let foreground = CoreTheme.rgb(theme.foreground)
+    else {
+      terminal.configureNativeColors()
+      return
+    }
+    terminal.installColors(palette.map(Self.color))
+    terminal.nativeBackgroundColor = Self.native(background)
+    terminal.nativeForegroundColor = Self.native(foreground)
+    if let cursor = CoreTheme.rgb(theme.cursor) {
+      terminal.caretColor = Self.native(cursor)
+    }
+  }
+
+  private static func color(_ rgb: (red: UInt8, green: UInt8, blue: UInt8)) -> SwiftTerm.Color {
+    SwiftTerm.Color(
+      red8: UInt16(rgb.red), green8: UInt16(rgb.green), blue8: UInt16(rgb.blue))
+  }
+
+  private static func native(_ rgb: (red: UInt8, green: UInt8, blue: UInt8)) -> NSColor {
+    NSColor(
+      srgbRed: Double(rgb.red) / 255, green: Double(rgb.green) / 255,
+      blue: Double(rgb.blue) / 255, alpha: 1)
   }
 
   func present(bytes: [UInt8]) {

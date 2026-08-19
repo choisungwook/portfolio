@@ -10,6 +10,11 @@ const STATE_FILE: &str = "projects.json";
 pub struct TreeState {
     pub schema_version: u32,
     pub projects: Vec<Project>,
+    /// The chosen terminal theme, absent while it is the system appearance.
+    /// Optional and skipped when empty, so a state file written by a build
+    /// without themes still reads here and the wire shape does not change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
 }
 
 impl Default for TreeState {
@@ -17,6 +22,7 @@ impl Default for TreeState {
         Self {
             schema_version: STATE_SCHEMA_VERSION,
             projects: Vec::new(),
+            theme: None,
         }
     }
 }
@@ -107,6 +113,15 @@ impl TreeStore {
         self.commit(next)
     }
 
+    pub fn set_theme(&mut self, name: String) -> Result<TreeState, String> {
+        if !crate::theme::exists(&name) {
+            return Err(format!("no theme named {name}"));
+        }
+        let mut next = self.state.clone();
+        next.theme = (name != crate::theme::SYSTEM).then_some(name);
+        self.commit(next)
+    }
+
     fn commit(&mut self, next: TreeState) -> Result<TreeState, String> {
         let Some(directory) = &self.directory else {
             return Err("project state has not been loaded".to_string());
@@ -190,6 +205,20 @@ mod tests {
             restored.projects[0].workspaces[0].status,
             WorkspaceStatus::Idle
         );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn remembers_the_theme_and_refuses_one_it_does_not_have() {
+        let directory = test_directory();
+        let path = directory.to_string_lossy().to_string();
+        let mut store = TreeStore::default();
+        store.load(&path).unwrap();
+        assert_eq!(store.set_theme("Nord".to_string()).unwrap().theme.as_deref(), Some("Nord"));
+        assert_eq!(TreeStore::default().load(&path).unwrap().theme.as_deref(), Some("Nord"));
+        // Back to the system appearance, which is stored as nothing at all.
+        assert_eq!(store.set_theme(crate::theme::SYSTEM.to_string()).unwrap().theme, None);
+        assert!(store.set_theme("Nope".to_string()).is_err());
         fs::remove_dir_all(directory).unwrap();
     }
 

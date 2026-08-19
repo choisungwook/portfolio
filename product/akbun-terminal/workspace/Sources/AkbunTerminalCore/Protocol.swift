@@ -20,9 +20,15 @@ public enum CoreCommand: Encodable {
   case loadState(directory: String)
   case createProject(name: String, path: String?)
   case createWorkspace(project: UInt64, name: String)
+  case readDirectory(path: String)
+  case readFile(path: String)
+  case writeFile(path: String, text: String)
+  case renderMarkdown(text: String)
+  case themes
+  case setTheme(name: String)
 
   private enum Key: String, CodingKey {
-    case type, cwd, cols, rows, session, bytes, directory, name, path, project
+    case type, cwd, cols, rows, session, bytes, directory, name, path, project, text
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -58,6 +64,24 @@ public enum CoreCommand: Encodable {
       try container.encode("create_workspace", forKey: .type)
       try container.encode(project, forKey: .project)
       try container.encode(name, forKey: .name)
+    case .readDirectory(let path):
+      try container.encode("read_directory", forKey: .type)
+      try container.encode(path, forKey: .path)
+    case .readFile(let path):
+      try container.encode("read_file", forKey: .type)
+      try container.encode(path, forKey: .path)
+    case .writeFile(let path, let text):
+      try container.encode("write_file", forKey: .type)
+      try container.encode(path, forKey: .path)
+      try container.encode(text, forKey: .text)
+    case .renderMarkdown(let text):
+      try container.encode("render_markdown", forKey: .type)
+      try container.encode(text, forKey: .text)
+    case .themes:
+      try container.encode("themes", forKey: .type)
+    case .setTheme(let name):
+      try container.encode("set_theme", forKey: .type)
+      try container.encode(name, forKey: .name)
     }
   }
 }
@@ -79,17 +103,117 @@ public enum CoreResponse: Equatable, Sendable {
   case spawned(session: UInt32)
   case ok
   case state(CoreTreeState)
+  case entries([CoreEntry])
+  case file(text: String)
+  case markdown([CoreBlock])
+  case themes([CoreTheme])
   case error(message: String)
 }
 
 public struct CoreTreeState: Decodable, Equatable, Sendable {
   public let schemaVersion: UInt32
   public let projects: [CoreProject]
+  /// Absent while the terminal follows the system appearance.
+  public let theme: String?
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion = "schema_version"
-    case projects
+    case projects, theme
   }
+}
+
+/// One row of a directory. Children are never carried: the shell asks for a
+/// folder's contents when it is opened, and not before.
+public struct CoreEntry: Decodable, Equatable, Sendable {
+  public let name: String
+  public let path: String
+  public let isDirectory: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case name, path
+    case isDirectory = "is_directory"
+  }
+}
+
+public struct CoreSpan: Decodable, Equatable, Sendable {
+  public let text: String
+  public let bold: Bool
+  public let italic: Bool
+  public let code: Bool
+  public let link: String?
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    text = try container.decode(String.self, forKey: .text)
+    bold = try container.decodeIfPresent(Bool.self, forKey: .bold) ?? false
+    italic = try container.decodeIfPresent(Bool.self, forKey: .italic) ?? false
+    code = try container.decodeIfPresent(Bool.self, forKey: .code) ?? false
+    link = try container.decodeIfPresent(String.self, forKey: .link)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case text, bold, italic, code, link
+  }
+}
+
+public enum CoreBlock: Decodable, Equatable, Sendable {
+  case heading(level: Int, spans: [CoreSpan])
+  case paragraph(spans: [CoreSpan])
+  case quote(spans: [CoreSpan])
+  case code(language: String?, text: String)
+  case listItem(depth: Int, marker: String, spans: [CoreSpan])
+  case table(header: [String], rows: [[String]])
+  case rule
+  /// A block from a newer core. Drawn as nothing rather than crashing the view.
+  case unknown
+
+  private enum Key: String, CodingKey {
+    case type, level, spans, language, text, depth, marker, header, rows
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: Key.self)
+    func spans() throws -> [CoreSpan] {
+      try container.decode([CoreSpan].self, forKey: .spans)
+    }
+    switch try container.decode(String.self, forKey: .type) {
+    case "heading":
+      self = .heading(level: try container.decode(Int.self, forKey: .level), spans: try spans())
+    case "paragraph":
+      self = .paragraph(spans: try spans())
+    case "quote":
+      self = .quote(spans: try spans())
+    case "code":
+      self = .code(
+        language: try container.decodeIfPresent(String.self, forKey: .language),
+        text: try container.decode(String.self, forKey: .text))
+    case "list_item":
+      self = .listItem(
+        depth: try container.decode(Int.self, forKey: .depth),
+        marker: try container.decode(String.self, forKey: .marker),
+        spans: try spans())
+    case "table":
+      self = .table(
+        header: try container.decode([String].self, forKey: .header),
+        rows: try container.decode([[String]].self, forKey: .rows))
+    case "rule":
+      self = .rule
+    default:
+      self = .unknown
+    }
+  }
+}
+
+public struct CoreTheme: Decodable, Equatable, Sendable {
+  public let name: String
+  public let background: String
+  public let foreground: String
+  public let cursor: String
+  public let palette: [String]
+
+  /// The name the core stores for "follow the system appearance". Must match
+  /// `theme::SYSTEM` in the core, which is what refuses an unknown name.
+  public static let system = "System"
 }
 
 public struct CoreProject: Decodable, Equatable, Sendable {
@@ -120,7 +244,7 @@ public enum CoreEvent: Equatable, Sendable {
 
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
-    case type, `protocol`, session, state, message
+    case type, `protocol`, session, state, message, entries, text, blocks, themes
   }
 
   public init(from decoder: Decoder) throws {
@@ -134,6 +258,14 @@ extension CoreResponse: Decodable {
       self = .ok
     case "state":
       self = .state(try container.decode(CoreTreeState.self, forKey: .state))
+    case "entries":
+      self = .entries(try container.decode([CoreEntry].self, forKey: .entries))
+    case "file":
+      self = .file(text: try container.decode(String.self, forKey: .text))
+    case "markdown":
+      self = .markdown(try container.decode([CoreBlock].self, forKey: .blocks))
+    case "themes":
+      self = .themes(try container.decode([CoreTheme].self, forKey: .themes))
     case "error":
       self = .error(message: try container.decode(String.self, forKey: .message))
     case let other:

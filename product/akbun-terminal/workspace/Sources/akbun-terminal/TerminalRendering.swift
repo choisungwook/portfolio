@@ -1,4 +1,5 @@
 import AppKit
+import AkbunTerminalCore
 
 /// What the shell needs from whatever draws a terminal.
 ///
@@ -25,6 +26,9 @@ protocol TerminalRendering: AnyObject {
   /// Shell output. Bytes, not text, because a terminal stream is not guaranteed
   /// to split on character boundaries.
   func present(bytes: [UInt8])
+
+  /// Colours. Nil means whatever the system appearance says.
+  func apply(theme: CoreTheme?)
 
   /// The shell ended. The view stops taking keys and says so on screen.
   func presentExit()
