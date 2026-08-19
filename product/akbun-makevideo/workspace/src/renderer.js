@@ -86,6 +86,9 @@ const dom = {
   sourceMarkIn: el('source-mark-in'),
   sourceMarkOut: el('source-mark-out'),
   sourceSeek: el('source-seek'),
+  sourceMarkerLayer: el('source-marker-layer'),
+  sourceInMarker: el('source-in-marker'),
+  sourceOutMarker: el('source-out-marker'),
   sourceRange: el('source-range'),
   sourceVideo: el('source-video'),
   sourceAudio: el('source-audio'),
@@ -616,6 +619,11 @@ function renderSourceMonitor() {
   dom.sourceSeek.max = String(Math.max(1, limit));
   dom.sourceSeek.value = String(Math.min(limit, Math.round(sourcePreview ? sourcePreview.position() : 0)));
   dom.sourceSeek.disabled = !asset || asset.kind === 'image';
+  dom.sourceMarkerLayer.hidden = !selection || !asset || asset.kind === 'image';
+  if (selection) {
+    dom.sourceInMarker.style.left = `${S.markerPercent(selection.inPoint, limit)}%`;
+    dom.sourceOutMarker.style.left = `${S.markerPercent(selection.outPoint, limit)}%`;
+  }
   dom.sourceRange.textContent = selection
     ? `${sourceTime(selection.inPoint)} – ${sourceTime(selection.outPoint)}`
     : `${sourceTime(0)} – ${sourceTime(0)}`;
