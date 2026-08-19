@@ -20,7 +20,6 @@ final class FileBrowserView: NSView {
   private let empty = NSTextField(
     wrappingLabelWithString: "Choose a folder for this project to see its files.")
   private var root: String?
-  private var children: [String: [Node]] = [:]
 
   /// One row. A reference type because the outline view holds on to items by
   /// identity, and a struct copied into it would never match on refresh.
@@ -107,7 +106,6 @@ final class FileBrowserView: NSView {
   }
 
   private func reload() {
-    children.removeAll()
     roots = root.map(read) ?? []
     empty.isHidden = root != nil
     outline.enclosingScrollView?.isHidden = root == nil
@@ -116,6 +114,16 @@ final class FileBrowserView: NSView {
 
   @objc private func refresh() {
     reload()
+  }
+
+  /// The children of a folder, read the first time they are asked for. Both
+  /// data source calls go through here, so neither can see a half filled node.
+  private func children(of node: Node) -> [Node] {
+    guard node.entry.isDirectory else { return [] }
+    if node.loaded == nil {
+      node.loaded = read(node.entry.path)
+    }
+    return node.loaded ?? []
   }
 
   private func read(_ path: String) -> [Node] {
@@ -168,17 +176,13 @@ final class FileBrowserView: NSView {
 extension FileBrowserView: NSOutlineViewDataSource {
   func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
     guard let node = item as? Node else { return roots.count }
-    guard node.entry.isDirectory else { return 0 }
     // The read happens here, on the way to drawing the row that was opened.
-    if node.loaded == nil {
-      node.loaded = read(node.entry.path)
-    }
-    return node.loaded?.count ?? 0
+    return children(of: node).count
   }
 
   func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
     guard let node = item as? Node else { return roots[index] }
-    return node.loaded?[index] ?? Node(node.entry)
+    return children(of: node)[index]
   }
 
   func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {

@@ -353,7 +353,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     showActiveTab()
   }
 
-  /// Both side panes fold away; the middle one is the app.
+  /// Everything but the terminal folds away: both side panes and the markdown
+  /// pane under it. The terminal is the app.
   func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool {
     subview === sidebar || subview === browser || subview === editor
   }
