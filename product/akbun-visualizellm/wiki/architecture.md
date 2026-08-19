@@ -49,6 +49,8 @@ Recomputing is needed only when the content itself moves: a resize, a reload of 
 
 `buildScene` places one box per matrix along x, layer after layer, with height and depth log scaled from the matrix dimensions. Log scale is not cosmetic: a vocabulary of 150,000 next to a head dimension of 128 is a thousandfold range that no linear scale can show on one screen.
 
+The layer slider and the legend switches feed one filter object into `visibleBlocks`, in `scene.js`, and the view only turns its answer into visibility flags and a new pick list. Nothing is rebuilt on a filter change, and hiding a block also removes it from the raycaster, so a hidden matrix cannot be hovered through a visible one. Isolating a layer keeps the embedding, the final norm and the head, because a layer with nothing on either side of it stops being a place in the model.
+
 Colors come from the CSS variables at build time of the scene, so the boxes follow the page theme. The camera opens on the first layers at reading distance, because framing the whole model turns every matrix into a speck; "Fit all" is the button for the other question.
 
 ## State

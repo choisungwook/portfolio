@@ -27,6 +27,8 @@ const loadStatus = el('load-status');
 const fileInput = el('file-input');
 const samplesEl = el('samples');
 const annotationsToggle = el('toggle-annotations');
+const layerRange = el('layer-range');
+const layerLabel = el('layer-label');
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // Matches the phone breakpoint in global.css. The two have to move together.
@@ -359,7 +361,14 @@ async function setMode(mode) {
       });
       el('view-start').addEventListener('click', () => scene3d.focusStart());
       el('view-all').addEventListener('click', () => scene3d.fitAll());
+      layerRange.addEventListener('input', () => {
+        const value = Number(layerRange.value);
+        const layer = value < 0 ? null : value;
+        layerLabel.textContent = layer === null ? 'All layers' : `Layer ${layer}`;
+        scene3d.setLayer(layer);
+      });
     }
+    syncLayerControl();
     scene3d.show(state.model);
   } else if (scene3d) {
     scene3d.hide();
@@ -368,10 +377,21 @@ async function setMode(mode) {
   save(configInput.value);
 }
 
+// A new model resets the layer control, because the view it drives is rebuilt
+// with the whole stack showing.
+function syncLayerControl() {
+  layerRange.max = String(Math.max(0, state.model.dims.layers - 1));
+  layerRange.value = '-1';
+  layerLabel.textContent = 'All layers';
+}
+
 function renderAll() {
   renderSide();
   render2D();
-  if (state.mode === '3d' && scene3d) scene3d.show(state.model);
+  if (state.mode === '3d' && scene3d) {
+    syncLayerControl();
+    scene3d.show(state.model);
+  }
 }
 
 // ===== Loader dialog =====

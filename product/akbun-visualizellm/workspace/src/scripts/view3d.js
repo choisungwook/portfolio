@@ -1,9 +1,10 @@
 // The 3D view. Every weight matrix of the model is a box, sized by its shape
 // and placed along the flow by src/lib/scene.js, which is where the arithmetic
-// lives. This file only turns that list into three.js objects.
+// lives. This file only turns that list into three.js objects and hides the
+// ones the filter has switched off.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { buildScene } from '../lib/scene.js';
+import { buildScene, visibleBlocks, bounds } from '../lib/scene.js';
 
 const TONE_VARS = {
   embed: '--t-embed',
@@ -14,13 +15,15 @@ const TONE_VARS = {
   io: '--t-io',
 };
 
-const LEGEND = [
+export const LEGEND = [
   ['embed', 'Embedding'],
   ['norm', 'Normalization'],
   ['attn', 'Attention'],
   ['mlp', 'Feed-forward'],
   ['head', 'Output head'],
 ];
+
+const ALL_TONES = LEGEND.map(([tone]) => tone);
 
 // Experts are all the same matrix, so a handful of copies reads as "many"
 // without putting a thousand boxes on the screen.
@@ -29,7 +32,7 @@ const MAX_COPIES = 5;
 /**
  * Mount the 3D view on a canvas.
  * @param {{canvas: HTMLCanvasElement, legend: HTMLElement, onHover: Function}} options
- * @returns {{show: Function, hide: Function}} the view handle
+ * @returns {object} the view handle
  */
 export function createSceneView({ canvas, legend, onHover }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -51,17 +54,24 @@ export function createSceneView({ canvas, legend, onHover }) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  let meshes = [];
+  let boxes = [];
+  let marks = [];
+  let pickable = [];
   let hovered = null;
   let frame = null;
   let currentModel = null;
-  let lastLayout = null;
+  let layout = null;
+  // layer null means the whole stack; tones is the set of parts left switched on.
+  const filter = { layer: null, tones: [...ALL_TONES] };
 
   legend.innerHTML = LEGEND.map(([tone, label]) => `
-    <div class="legend-row">
+    <button class="legend-row is-on" type="button" data-tone="${tone}" aria-pressed="true">
       <span class="legend-dot" style="background: var(${TONE_VARS[tone]})"></span>${label}
-    </div>
+    </button>
   `).join('');
+  for (const button of legend.querySelectorAll('[data-tone]')) {
+    button.addEventListener('click', () => toggleTone(button.dataset.tone));
+  }
 
   function cssColor(name) {
     const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -69,19 +79,21 @@ export function createSceneView({ canvas, legend, onHover }) {
   }
 
   function clear() {
-    for (const mesh of group.children) {
-      if (mesh.material) mesh.material.dispose();
-      if (mesh.material?.map) mesh.material.map.dispose();
+    for (const child of group.children) {
+      if (child.material?.map) child.material.map.dispose();
+      if (child.material) child.material.dispose();
     }
     group.clear();
-    meshes = [];
+    boxes = [];
+    marks = [];
+    pickable = [];
     hovered = null;
   }
 
   function build(model) {
     clear();
     scene.background = cssColor('--scene-bg');
-    const layout = buildScene(model);
+    layout = buildScene(model);
     const materials = new Map();
     const materialFor = (tone, activation) => {
       const key = `${tone}:${activation}`;
@@ -104,15 +116,16 @@ export function createSceneView({ canvas, legend, onHover }) {
         mesh.position.set(block.x, block.h / 2 + 0.35, c * 0.5);
         mesh.userData.block = block;
         group.add(mesh);
-        meshes.push(mesh);
+        boxes.push(mesh);
       }
     }
 
     // The residual stream: the one thing that runs the whole length of the
-    // model, drawn as the rail every block sits on.
+    // model, drawn as the rail every block sits on. No filter hides it.
     const rail = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: cssColor('--t-residual') }));
     rail.scale.set(layout.span + 2, 0.12, 0.12);
     rail.position.set(layout.span / 2 - 1, 0.06, 0);
+    rail.userData.always = true;
     rail.userData.block = {
       label: 'Residual stream',
       shape: `hidden ${model.dims.hidden} per token`,
@@ -120,26 +133,30 @@ export function createSceneView({ canvas, legend, onHover }) {
       params: 0,
     };
     group.add(rail);
-    meshes.push(rail);
+    boxes.push(rail);
 
-    addLabels(layout, model);
-    lastLayout = layout;
-    focusStart();
+    addLabels(model);
     currentModel = model;
+    filter.layer = null;
+    filter.tones = [...ALL_TONES];
+    applyFilter();
+    focusStart();
   }
 
-  function addLabels(layout, model) {
+  function addLabels(model) {
     const step = Math.max(1, Math.round(model.dims.layers / 6));
-    const marks = [{ x: layout.blocks[0].x, text: 'Embedding', y: -2.6 }];
+    const wanted = [{ x: layout.blocks[0].x, text: 'Embedding', y: -2.6, layer: null }];
     for (let i = 0; i < model.dims.layers; i += step) {
       const first = layout.blocks.find((block) => block.layer === i);
-      if (first) marks.push({ x: first.x, text: `Layer ${i}`, y: -1.2 });
+      if (first) wanted.push({ x: first.x, text: `Layer ${i}`, y: -1.2, layer: i });
     }
-    marks.push({ x: layout.blocks.at(-1).x, text: 'LM Head', y: -2.6 });
-    for (const mark of marks) {
+    wanted.push({ x: layout.blocks.at(-1).x, text: 'LM Head', y: -2.6, layer: null });
+    for (const mark of wanted) {
       const sprite = textSprite(mark.text);
       sprite.position.set(mark.x, mark.y, 0);
+      sprite.userData.layer = mark.layer;
       group.add(sprite);
+      marks.push(sprite);
     }
   }
 
@@ -159,20 +176,60 @@ export function createSceneView({ canvas, legend, onHover }) {
     return sprite;
   }
 
+  // Which boxes a layer choice and the legend switches leave standing. The
+  // decision itself is in scene.js so it can be tested; here it only turns into
+  // visibility flags and a new pick list.
+  function applyFilter() {
+    if (!layout) return;
+    const shown = new Set(visibleBlocks(layout, filter));
+    pickable = [];
+    for (const mesh of boxes) {
+      mesh.visible = mesh.userData.always === true || shown.has(mesh.userData.block);
+      if (mesh.visible) pickable.push(mesh);
+    }
+    for (const sprite of marks) {
+      sprite.visible = filter.layer === null || sprite.userData.layer === null || sprite.userData.layer === filter.layer;
+    }
+    if (hovered && !shown.has(hovered)) {
+      hovered = null;
+      onHover(null);
+    }
+  }
+
+  function setLayer(value) {
+    filter.layer = value;
+    applyFilter();
+    if (value === null) {
+      focusStart();
+      return;
+    }
+    const extent = bounds(visibleBlocks(layout, { layer: value, tones: filter.tones }).filter((b) => b.layer === value));
+    if (extent) look(new THREE.Vector3(extent.centerX, 3, 0), new THREE.Vector3(extent.centerX - extent.width * 0.6, extent.width * 0.55, extent.width * 1.1));
+  }
+
+  function toggleTone(tone) {
+    const on = filter.tones.includes(tone);
+    filter.tones = on ? filter.tones.filter((t) => t !== tone) : [...filter.tones, tone];
+    const button = legend.querySelector(`[data-tone="${tone}"]`);
+    button.classList.toggle('is-on', !on);
+    button.setAttribute('aria-pressed', String(!on));
+    applyFilter();
+  }
+
   // A whole model is hundreds of units long and a few units wide, so framing all
   // of it turns every matrix into a speck. The opening shot is the first layers
   // at reading distance; "Fit all" is a button for when the shape is the point.
   function focusStart() {
-    if (!lastLayout) return;
-    const reach = Math.max(lastLayout.layerSpan * 2.2, 22);
-    const x = Math.min(lastLayout.layerSpan * 0.7, lastLayout.span / 2);
+    if (!layout) return;
+    const reach = Math.max(layout.layerSpan * 2.2, 22);
+    const x = Math.min(layout.layerSpan * 0.7, layout.span / 2);
     look(new THREE.Vector3(x, 3, 0), new THREE.Vector3(x - reach * 0.55, reach * 0.42, reach * 0.8));
   }
 
   function fitAll() {
-    if (!lastLayout) return;
-    const center = new THREE.Vector3(lastLayout.span / 2, 2, 0);
-    look(center, new THREE.Vector3(center.x - lastLayout.span * 0.25, lastLayout.span * 0.3, lastLayout.span * 0.45));
+    if (!layout) return;
+    const center = new THREE.Vector3(layout.span / 2, 2, 0);
+    look(center, new THREE.Vector3(center.x - layout.span * 0.25, layout.span * 0.3, layout.span * 0.45));
   }
 
   function look(target, position) {
@@ -196,14 +253,9 @@ export function createSceneView({ canvas, legend, onHover }) {
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(meshes, false)[0];
-    const block = hit?.object.userData.block ?? null;
-    if (block !== hovered) {
-      hovered = block;
-      onHover(block, event);
-    } else if (block) {
-      onHover(block, event);
-    }
+    const hit = raycaster.intersectObjects(pickable, false)[0];
+    hovered = hit?.object.userData.block ?? null;
+    onHover(hovered, event);
   }
 
   canvas.addEventListener('pointermove', pick);
@@ -229,6 +281,7 @@ export function createSceneView({ canvas, legend, onHover }) {
     },
     focusStart,
     fitAll,
+    setLayer,
     hide() {
       if (frame !== null) cancelAnimationFrame(frame);
       frame = null;

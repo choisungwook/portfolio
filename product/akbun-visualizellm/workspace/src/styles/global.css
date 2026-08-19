@@ -386,8 +386,9 @@ button.ghost:hover { background: var(--surface-sub); }
   font-size: 0.78rem;
   color: var(--text-sub);
   padding: 0.35rem 0.6rem;
-  pointer-events: none;
 }
+
+.scene-hint { pointer-events: none; }
 
 .scene-hint { left: 0.9rem; bottom: 0.9rem; }
 
@@ -406,8 +407,39 @@ button.ghost:hover { background: var(--surface-sub); }
 }
 .scene-legend { right: 0.9rem; top: 0.9rem; display: grid; gap: 0.2rem; }
 
-.legend-row { display: flex; align-items: center; gap: 0.4rem; }
+/* The legend is the part filter: each row switches its own boxes off. */
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-sub);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.1rem 0.25rem;
+  opacity: 0.4;
+}
+
+.legend-row:hover { background: var(--surface-sub); }
+.legend-row.is-on { opacity: 1; color: var(--text); }
 .legend-dot { width: 0.7rem; height: 0.7rem; border-radius: 3px; }
+
+.layer-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 2px solid var(--text);
+  border-radius: 10px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.layer-pick span { min-width: 5.5rem; }
+.layer-pick input { width: 9rem; accent-color: var(--accent); }
 
 /* ===== Tooltip ===== */
 .tip {

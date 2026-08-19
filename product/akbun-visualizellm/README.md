@@ -14,6 +14,7 @@ Deployed as a static Astro build on Cloudflare at [visualizellm.akbun.com](https
 | Roles | Hovering any block explains what it does in the model and why it is shaped that way, with its parameter count and the config fields behind it |
 | Config arrows | Every config field the diagram used sits in a lane beside the drawing with an arrow into each block its value shaped. The header switch turns the lane off, and hovering a chip, a config line or a block lights up the whole chain |
 | 3D view | Every weight matrix as a box, its height and depth log scaled from its real dimensions, laid along the residual stream one layer after another. Orbit, zoom, pan, and hover a box to read the same explanation. Attention scores are drawn translucent because they are built at run time and are not weights |
+| Layer and part filter | The 3D view carries a layer slider and a legend that doubles as a switch: isolate one layer of the stack, or hide attention, feed-forward or normalization to see what is left. The embedding and the head stay, because they are what the stack sits between |
 | Shape reading | Grouped-query attention shows as K and V boxes visibly thinner than Q; a mixture model shows the router and its expert copies; a tied LM head is named as tied and left out of the count |
 | Parameters | Estimated from the shapes alone, per block, per layer and in total, so a config that never shipped a weight file still reports a size |
 | Restore | The loaded config, the view mode and the arrow switch are kept in `localStorage` |

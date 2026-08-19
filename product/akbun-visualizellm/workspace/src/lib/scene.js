@@ -230,3 +230,35 @@ function matrix({ id, tone, label, rows, cols, rowsLabel, colsLabel, role }) {
 export function sceneParams(scene) {
   return scene.blocks.reduce((sum, b) => sum + (b.params ?? 0) * (b.copies ?? 1), 0);
 }
+
+/**
+ * The blocks a filter leaves visible.
+ * @param {{blocks: Array<object>}} scene the scene from buildScene
+ * @param {{layer?: number|null, tones?: Array<string>|null}} filter a layer to isolate and the tones to keep
+ * @returns {Array<object>} the visible blocks
+ */
+export function visibleBlocks(scene, filter = {}) {
+  const { layer = null, tones = null } = filter;
+  return scene.blocks.filter((block) => {
+    // The embedding, the final norm and the head belong to no layer, so
+    // isolating a layer keeps them: they are what the layer sits between.
+    if (layer !== null && block.layer !== undefined && block.layer !== layer) return false;
+    return tones === null || tones.includes(block.tone);
+  });
+}
+
+/**
+ * The extent of a set of blocks along the flow axis.
+ * @param {Array<object>} blocks blocks from the scene
+ * @returns {{minX: number, maxX: number, centerX: number, width: number}|null} the extent, or null when empty
+ */
+export function bounds(blocks) {
+  if (blocks.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const block of blocks) {
+    minX = Math.min(minX, block.x - block.w / 2);
+    maxX = Math.max(maxX, block.x + block.w / 2);
+  }
+  return { minX, maxX, centerX: (minX + maxX) / 2, width: maxX - minX };
+}

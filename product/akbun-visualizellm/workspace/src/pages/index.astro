@@ -65,8 +65,13 @@ import '../styles/global.css';
         <div class="scene-controls">
           <button id="view-start" class="ghost" type="button">Start</button>
           <button id="view-all" class="ghost" type="button">Fit all</button>
+          <label class="layer-pick">
+            <span id="layer-label">All layers</span>
+            <input id="layer-range" type="range" min="-1" max="0" value="-1" step="1"
+                   aria-label="Layer to isolate">
+          </label>
         </div>
-        <div class="scene-hint">Drag to orbit, scroll to zoom, right-drag to pan. Hover a block to read it.</div>
+        <div class="scene-hint">Drag to orbit, scroll to zoom, right-drag to pan. Hover a block to read it, and click a legend entry to hide that part.</div>
         <div class="scene-legend" id="legend"></div>
       </div>
       <div id="tip" class="tip" role="tooltip" hidden></div>

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveModel } from '../src/lib/model.js';
-import { buildScene, sceneParams, side } from '../src/lib/scene.js';
+import { buildScene, sceneParams, side, visibleBlocks, bounds } from '../src/lib/scene.js';
 import { sampleById } from '../src/lib/samples.js';
 
 const dense = deriveModel(sampleById('dense-7b').config);
@@ -59,4 +59,36 @@ test('the scene weights add up to the estimate from the config', () => {
     const ratio = counted / model.params.total;
     assert.ok(ratio > 0.99 && ratio < 1.01, `${model.name}: ${counted} vs ${model.params.total}`);
   }
+});
+
+test('isolating a layer keeps that layer and the blocks outside the stack', () => {
+  const scene = buildScene(dense);
+  const shown = visibleBlocks(scene, { layer: 5 });
+  const layers = new Set(shown.filter((b) => b.layer !== undefined).map((b) => b.layer));
+  assert.deepEqual([...layers], [5]);
+  assert.ok(shown.some((b) => b.id === 'embedding'));
+  assert.ok(shown.some((b) => b.id === 'lm-head'));
+  assert.ok(shown.some((b) => b.id === 'norm-final'));
+});
+
+test('a tone filter drops the parts it does not name', () => {
+  const scene = buildScene(dense);
+  const shown = visibleBlocks(scene, { tones: ['attn'] });
+  assert.ok(shown.length > 0);
+  assert.ok(shown.every((b) => b.tone === 'attn'));
+  assert.equal(visibleBlocks(scene, { tones: [] }).length, 0);
+});
+
+test('an empty filter shows everything', () => {
+  const scene = buildScene(dense);
+  assert.equal(visibleBlocks(scene).length, scene.blocks.length);
+});
+
+test('bounds measure the extent of what is visible', () => {
+  const scene = buildScene(dense);
+  const all = bounds(scene.blocks);
+  const one = bounds(visibleBlocks(scene, { layer: 5, tones: ['attn'] }));
+  assert.ok(one.width < all.width);
+  assert.ok(one.centerX > all.minX && one.centerX < all.maxX);
+  assert.equal(bounds([]), null);
 });
