@@ -84,3 +84,24 @@
 #tt-body-search .article-section,
 #tt-body-tag .article-section { display: none; }
 ```
+
+## 티스토리가 자동으로 붙이는 블록
+
+`[##_article_rep_desc_##]` 자리에는 글 본문만 오지 않는다. 티스토리가 본문 뒤와 페이지 하단에 자체 블록을 붙인다. 스킨 마크업에는 없으므로 실제 글 페이지 HTML을 받아야 확인할 수 있다.
+
+| 선택자 | 내용 | 위치 |
+|---|---|---|
+| `.container_postbtn` | 좋아요/공감, 공유하기, CCL, 구독 버튼 | `.post-body` 끝 |
+| `[data-tistory-react-app]` | Reaction, Namecard(프로필), SupportButton, NaverAd | 본문과 댓글 영역 |
+| `.another_category` | 같은 카테고리의 다른 글 표 | `.post-body` 끝 |
+| `.revenue_unit_wrap`, `.adsbygoogle` | 광고 | 본문 위아래 |
+| `.menu_toolbar` | 우측 하단 구독 툴바 | body 끝 |
+| `.layer_post` | 공유/기타 팝업 레이어 | 본문 안 |
+
+집중 화면(프리젠테이션 모드)이나 본문 추출처럼 "본문만" 다뤄야 하는 기능은 이 목록을 함께 처리해야 한다. skin.html의 Markdown 복사 로직과 style.css의 프리젠테이션 모드가 같은 목록을 쓴다.
+
+실제 렌더링 결과를 확인하려면 배포된 글을 직접 받는다.
+
+```bash
+curl -sL -A "Mozilla/5.0" https://malwareanalysis.tistory.com/955 | grep -o 'class="[^"]*"' | sort -u
+```
