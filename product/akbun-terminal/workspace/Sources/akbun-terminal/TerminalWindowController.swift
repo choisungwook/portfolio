@@ -173,9 +173,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
   private func showActiveTab() {
     guard let workspace = selection?.workspace.id else {
       tabBar.render(tabs: [], active: nil)
+      tabBar.show(false)
       placeholder.isHidden = false
       return
     }
+    tabBar.show(true)
     let active = tabs.activeSession(in: workspace)
     tabBar.render(tabs: tabs.tabs(in: workspace), active: active)
 

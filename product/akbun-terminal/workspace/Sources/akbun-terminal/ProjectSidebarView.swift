@@ -121,7 +121,7 @@ final class ProjectSidebarView: NSView {
       let label = NSTextField(labelWithString: workspace.name)
       label.font = .systemFont(ofSize: 12)
       label.lineBreakMode = .byTruncatingTail
-      let workspaceRow = WorkspaceRow(isSelected: workspace.id == selected) { [weak self] in
+      let workspaceRow = WorkspaceRow(isSelected: workspace.id == selected, name: workspace.name) { [weak self] in
         self?.onSelectWorkspace?(project, workspace)
       }
       workspaceRow.setViews([dot, label], in: .leading)
@@ -180,9 +180,12 @@ private final class ActionButton: NSButton {
 private final class WorkspaceRow: NSStackView {
   private let handler: () -> Void
 
-  init(isSelected: Bool, handler: @escaping () -> Void) {
+  init(isSelected: Bool, name: String, handler: @escaping () -> Void) {
     self.handler = handler
     super.init(frame: .zero)
+    setAccessibilityElement(true)
+    setAccessibilityRole(.button)
+    setAccessibilityLabel(name)
     wantsLayer = true
     layer?.cornerRadius = 4
     layer?.backgroundColor =
@@ -195,6 +198,11 @@ private final class WorkspaceRow: NSStackView {
 
   override func mouseDown(with event: NSEvent) {
     handler()
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    handler()
+    return true
   }
 }
 

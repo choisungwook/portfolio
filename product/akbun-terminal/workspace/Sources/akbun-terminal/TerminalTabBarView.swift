@@ -13,6 +13,7 @@ final class TerminalTabBarView: NSView {
   var onNew: (() -> Void)?
 
   private let row = NSStackView()
+  private var height: NSLayoutConstraint!
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -44,8 +45,16 @@ final class TerminalTabBarView: NSView {
       divider.leadingAnchor.constraint(equalTo: leadingAnchor),
       divider.trailingAnchor.constraint(equalTo: trailingAnchor),
       divider.bottomAnchor.constraint(equalTo: bottomAnchor),
-      heightAnchor.constraint(equalToConstant: 32),
     ])
+    height = heightAnchor.constraint(equalToConstant: 32)
+    height.isActive = true
+  }
+
+  /// With no workspace selected there is nothing to add a tab to, so the strip
+  /// collapses rather than leaving a "+" that does nothing.
+  func show(_ visible: Bool) {
+    isHidden = !visible
+    height.constant = visible ? 32 : 0
   }
 
   func render(tabs: [TerminalTabs.Tab], active: UInt32?) {
@@ -81,6 +90,11 @@ private final class TabButton: NSView {
   init(tab: TerminalTabs.Tab, isActive: Bool, select: @escaping () -> Void, close: @escaping () -> Void) {
     self.select = select
     super.init(frame: .zero)
+    // The row is the control, so it has to say so itself; VoiceOver has no other
+    // way to find a tab drawn as a plain view.
+    setAccessibilityElement(true)
+    setAccessibilityRole(.button)
+    setAccessibilityLabel(tab.title)
     wantsLayer = true
     layer?.cornerRadius = 5
     layer?.backgroundColor =
@@ -112,6 +126,11 @@ private final class TabButton: NSView {
 
   override func mouseDown(with event: NSEvent) {
     select()
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    select()
+    return true
   }
 }
 
