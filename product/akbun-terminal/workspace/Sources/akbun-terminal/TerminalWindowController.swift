@@ -280,7 +280,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   }
 
   private func closeTab(_ content: TerminalTabs.Content) {
-    guard let workspace = tabs.workspace(of: content) else { return }
+    // The tab being closed is one of the strip on screen, so the workspace comes
+    // from the selection. Looking it up from the content would find whichever
+    // workspace holds that path first, which is another workspace's tab as often
+    // as this one's.
+    guard let workspace = selection?.workspace.id else { return }
     switch content {
     case .shell(let session):
       try? core.expectOk(.close(session: session))
@@ -292,7 +296,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       guard documents[key]?.confirmDiscardingChanges() ?? true else { return }
       documents.removeValue(forKey: key)
     }
-    tabs.close(content)
+    tabs.close(content, in: workspace)
     showActiveTab()
   }
 
@@ -313,7 +317,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       subview.removeFromSuperview()
     }
     placeholder.isHidden = shown != nil
-    guard let shown else { return }
+    guard let shown else {
+      // The view that had the keyboard has just left the window, so the window
+      // is told rather than left holding a responder that is no longer in it.
+      window?.makeFirstResponder(nil)
+      return
+    }
     guard shown.view.superview !== contentArea else {
       window?.makeFirstResponder(shown.focus)
       return
@@ -598,6 +607,16 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
         views[session]?.presentExit()
       }
     }
+  }
+
+  /// Asks about every unsaved document. `false` means the app must stay open,
+  /// which is why this is separate from `closeSessions`: by the time the shells
+  /// are being ended it is too late to cancel.
+  func confirmClosingDocuments() -> Bool {
+    for document in documents.values where !document.confirmDiscardingChanges() {
+      return false
+    }
+    return true
   }
 
   /// Ends every shell. The core also clears sessions when it is freed; doing it

@@ -58,8 +58,12 @@ public struct TerminalTabs: Equatable, Sendable {
     return session
   }
 
-  public func workspace(of content: Content) -> UInt64? {
-    byWorkspace.first { $0.value.contains { $0.content == content } }?.key
+  /// A session is unique across the window, so it can be traced back to its
+  /// workspace. A document cannot: two workspaces may hold the same path, and
+  /// the first match would be the wrong tab as often as the right one. Anything
+  /// that acts on a document is given the workspace it is looking at instead.
+  public func workspace(of session: UInt32) -> UInt64? {
+    byWorkspace.first { $0.value.contains { $0.session == session } }?.key
   }
 
   /// Every open session, for the shutdown path. Documents are not here because
@@ -95,8 +99,7 @@ public struct TerminalTabs: Equatable, Sendable {
   /// Removes a tab. Closing the one on screen shows whatever slides into its
   /// place, and the new last tab when it was the rightmost one, so the strip
   /// does not jump somewhere else while tabs are being closed in a row.
-  public mutating func close(_ content: Content) {
-    guard let workspace = workspace(of: content) else { return }
+  public mutating func close(_ content: Content, in workspace: UInt64) {
     var tabs = self.tabs(in: workspace)
     guard let index = tabs.firstIndex(where: { $0.content == content }) else { return }
     tabs.remove(at: index)

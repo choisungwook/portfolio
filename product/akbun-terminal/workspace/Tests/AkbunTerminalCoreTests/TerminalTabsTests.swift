@@ -15,7 +15,7 @@ struct TerminalTabsTests {
     // Each workspace remembers its own tab, so switching back does not reset it.
     #expect(tabs.activeSession(in: 10) == 1)
     #expect(tabs.activeSession(in: 20) == 2)
-    #expect(tabs.workspace(of: .shell(session: 2)) == 20)
+    #expect(tabs.workspace(of: 2) == 20)
     #expect(tabs.allSessions.sorted() == [1, 2])
   }
 
@@ -25,14 +25,14 @@ struct TerminalTabsTests {
     #expect(tabs.activeSession(in: 10) == 3)
 
     tabs.select(.shell(session: 2), in: 10)
-    tabs.close(.shell(session: 2))
+    tabs.close(.shell(session: 2), in: 10)
     #expect(tabs.activeSession(in: 10) == 3)
 
     // The rightmost tab has nothing after it, so the strip falls back leftwards.
-    tabs.close(.shell(session: 3))
+    tabs.close(.shell(session: 3), in: 10)
     #expect(tabs.activeSession(in: 10) == 1)
 
-    tabs.close(.shell(session: 1))
+    tabs.close(.shell(session: 1), in: 10)
     #expect(tabs.tabs(in: 10).isEmpty)
     #expect(tabs.active(in: 10) == nil)
   }
@@ -40,7 +40,7 @@ struct TerminalTabsTests {
   @Test func closingAnInactiveTabLeavesTheActiveOneAlone() {
     var tabs = TerminalTabs()
     [1, 2].forEach { tabs.add(session: UInt32($0), to: 10) }
-    tabs.close(.shell(session: 1))
+    tabs.close(.shell(session: 1), in: 10)
     #expect(tabs.activeSession(in: 10) == 2)
   }
 
@@ -64,6 +64,18 @@ struct TerminalTabsTests {
 
     #expect(tabs.tabs(in: 10).count == 2)
     #expect(tabs.active(in: 10) == .document(path: "/p/README.md"))
+  }
+
+  @Test func theSameDocumentInTwoWorkspacesIsTwoTabs() {
+    var tabs = TerminalTabs()
+    tabs.add(document: "/p/README.md", title: "README.md", to: 10)
+    tabs.add(document: "/p/README.md", title: "README.md", to: 20)
+
+    // Closing one leaves the other alone: the path alone cannot say which
+    // workspace was meant, so the caller says.
+    tabs.close(.document(path: "/p/README.md"), in: 20)
+    #expect(tabs.tabs(in: 10).count == 1)
+    #expect(tabs.tabs(in: 20).isEmpty)
   }
 
   @Test func shellsAreNumberedWithoutCountingDocuments() {

@@ -20,6 +20,6 @@ The terminal owns the window. A pane under it meant reading anything cost half t
 
 Only markdown opens. A code file would want highlighting, which is a different amount of work and a separate issue.
 
-The preview is rebuilt from the editor's text when the mode is switched, so what is previewed is what is being typed rather than what is on disk. Unsaved changes are asked about when the tab is closed; a tab left open keeps them, which is why switching workspace no longer asks.
+The preview is rebuilt from the editor's text when the mode is switched, so what is previewed is what is being typed rather than what is on disk. Unsaved changes are asked about when the tab is closed and again when the app is asked to quit; a tab left open keeps them, which is why switching workspace no longer asks.
 
 Following links opens a tab each time. A document that links onwards leaves a trail of tabs behind it, which is also the way back.
