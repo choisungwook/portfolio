@@ -52,6 +52,8 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Judging.** Every session's bytes also go into an interpreted screen, on the reader thread that already has them. A second timer, two seconds apart from the one that draws, asks the core to judge: one `ps` snapshot names the processes under each shell, the rule files say what the screens mean, and the answer is only the workspaces that moved. The shell paints those and raises a notification for the ones that finished.
 
+**Opening a file.** A single click in the file pane sends the entry to the window, which opens a tab for it and asks the core for its text. Markdown comes back as blocks, everything else as coloured tokens; both are drawn as one attributed string in a read only text view. Command E swaps that view for the plain editable one, and Command S sends the text back through `write_file`. The core is asked once per mode change, never per keystroke.
+
 **Clicking a link.** The view turns the point into a row of text and a column and hands both to the core. The core finds the word, trims what a sentence left on it, and answers only for http and https. Nothing is opened without that answer.
 
 **Spawn environment.** The core sets `TERM` on the child. A GUI process inherits none, and a shell that does not know what is drawing it writes for a dumb terminal.

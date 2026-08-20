@@ -3,18 +3,29 @@ import Foundation
 /// Where a link inside a rendered markdown document points.
 ///
 /// The rule is here rather than in the view because it is the whole of what a
-/// command click does: a document next to this one opens in a tab, an address
-/// with a scheme goes to a browser, and anything else is left alone. A view
-/// cannot be asked those questions in a test; this can.
+/// command click does: a file next to this one opens in a tab, an address with
+/// a scheme goes to a browser, and anything else is left alone. A view cannot
+/// be asked those questions in a test; this can.
 public enum DocumentLink: Equatable, Sendable {
-  /// A markdown file on disk, as an absolute path.
+  /// A file on disk, as an absolute path. Any file with a suffix: the window
+  /// opens whatever the browser opens, so a link to a source file next to the
+  /// document is no longer a link to nowhere. A target with no suffix at all is
+  /// left alone, because in a rendered page that is a heading slug far more
+  /// often than it is a file.
   case document(path: String)
   /// Something a browser handles.
   case external(url: URL)
 
-  /// What this app opens in a tab. A link to a source file is not refused
-  /// because it is dangerous but because there is no editor to open it in.
-  public static let markdownExtensions = ["md", "markdown"]
+  /// What is rendered rather than shown as source. Every other file opens too
+  /// now; these are the ones with a second way to look at them.
+  public static let markdownExtensions = ["md", "markdown", "mdown", "mkd"]
+
+  /// Whether a path is one of those. The suffix comparison is here rather than
+  /// at each call site, because three views were about to lowercase a path
+  /// extension in three slightly different ways.
+  public static func isMarkdown(_ path: String) -> Bool {
+    markdownExtensions.contains((path as NSString).pathExtension.lowercased())
+  }
 
   /// What may leave the app. The same two schemes the terminal's URL rule
   /// allows, and for the same reason: a document someone else wrote should not
@@ -46,9 +57,12 @@ public enum DocumentLink: Equatable, Sendable {
       }
     }
     path = path.removingPercentEncoding ?? path
-    guard !path.isEmpty else { return nil }
-    let suffix = (path as NSString).pathExtension.lowercased()
-    guard markdownExtensions.contains(suffix) else { return nil }
+    // A target with nothing but a folder in it is not a file, and neither is a
+    // bare name with no suffix at all: a link like that is usually a heading
+    // slug in a page this app does not render.
+    guard !path.isEmpty, !path.hasSuffix("/"),
+      !(path as NSString).pathExtension.isEmpty
+    else { return nil }
 
     let folder = (documentPath as NSString).deletingLastPathComponent
     let absolute =

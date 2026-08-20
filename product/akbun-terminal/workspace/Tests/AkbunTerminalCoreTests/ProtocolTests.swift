@@ -165,8 +165,11 @@ struct ProtocolTests {
       return
     }
     #expect(status.repository)
-    #expect(status.byPath["/p/src"] == .modified)
-    #expect(status.byPath["/p/new.txt"] == .untracked)
+    #expect(status.byPath["/p/src"]?.status == .modified)
+    #expect(status.byPath["/p/new.txt"]?.status == .untracked)
+    // A core built before the stage was carried says nothing about it, and the
+    // working tree is the half a change is in before anyone touches it.
+    #expect(status.byPath["/p/src"]?.stage == .unstaged)
 
     // A project outside a repository is an answer, not a failure.
     let plain = #"{"type":"git","status":{"repository":false,"entries":[]}}"#
@@ -178,6 +181,60 @@ struct ProtocolTests {
     }
     #expect(!none.repository)
     #expect(none.byPath.isEmpty)
+  }
+
+  @Test func readsWhichHalfOfGitAChangeIsIn() throws {
+    let json = #"""
+      {"type":"git","status":{"repository":true,"entries":[
+      {"path":"/p/added.txt","status":"added","stage":"staged"},
+      {"path":"/p/edited.txt","status":"modified","stage":"unstaged"},
+      {"path":"/p/half.txt","status":"modified","stage":"both"}]}}
+      """#
+    guard case .git(let status) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(json.utf8))
+    else {
+      Issue.record("expected a git status")
+      return
+    }
+    #expect(status.byPath["/p/added.txt"]?.stage == .staged)
+    #expect(status.byPath["/p/edited.txt"]?.stage == .unstaged)
+    #expect(status.byPath["/p/half.txt"]?.stage == .both)
+  }
+
+  @Test func highlightingKeepsItsWireNames() throws {
+    #expect(
+      try json(.highlight(path: "/p/main.rs", text: "let x = 1;"))
+        == #"{"command":{"path":"\/p\/main.rs","text":"let x = 1;","type":"highlight"},"v":1}"#)
+
+    let coloured = #"""
+      {"type":"highlighted","language":"Rust","lines":[
+      [{"text":"let","kind":"keyword"},{"text":" x = ","kind":"plain"},
+      {"text":"1","kind":"number"},{"text":"something_new","kind":"invented"}],[]]}
+      """#
+    guard case .highlighted(let highlighted) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(coloured.utf8))
+    else {
+      Issue.record("expected highlighted lines")
+      return
+    }
+    #expect(highlighted.language == "Rust")
+    #expect(highlighted.lines.count == 2)
+    #expect(highlighted.lines[0][0] == CoreToken(text: "let", kind: .keyword))
+    #expect(highlighted.lines[0][2].kind == .number)
+    // A kind a newer core invented is drawn as ordinary text, never dropped.
+    #expect(highlighted.lines[0][3].kind == .plain)
+    #expect(highlighted.lines[1].isEmpty)
+
+    // A file nothing recognised is still a file, and still has lines.
+    let plain = #"{"type":"highlighted","language":null,"lines":[[{"text":"x","kind":"plain"}]]}"#
+    guard case .highlighted(let unknown) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(plain.utf8))
+    else {
+      Issue.record("expected highlighted lines")
+      return
+    }
+    #expect(unknown.language == nil)
+    #expect(unknown.lines.count == 1)
   }
 
   @Test func aThemeDressesEverySurfaceInTheWindow() throws {

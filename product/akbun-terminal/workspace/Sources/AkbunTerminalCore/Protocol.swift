@@ -29,6 +29,7 @@ public enum CoreCommand: Encodable {
   case readFile(path: String)
   case writeFile(path: String, text: String)
   case renderMarkdown(text: String)
+  case highlight(path: String, text: String)
   case themes
   case setTheme(name: String)
   case loadRules(directory: String)
@@ -105,6 +106,10 @@ public enum CoreCommand: Encodable {
     case .renderMarkdown(let text):
       try container.encode("render_markdown", forKey: .type)
       try container.encode(text, forKey: .text)
+    case .highlight(let path, let text):
+      try container.encode("highlight", forKey: .type)
+      try container.encode(path, forKey: .path)
+      try container.encode(text, forKey: .text)
     case .themes:
       try container.encode("themes", forKey: .type)
     case .setTheme(let name):
@@ -147,6 +152,7 @@ public enum CoreResponse: Equatable, Sendable {
   case git(CoreGitStatus)
   case file(text: String)
   case markdown([CoreBlock])
+  case highlighted(CoreHighlighted)
   case themes([CoreTheme])
   case statuses([CoreWorkspaceState])
   case url(String?)
@@ -208,18 +214,34 @@ public struct CoreGitStatus: Decodable, Equatable, Sendable {
 
   /// Ready to look a row up by its path, which is the only thing the browser
   /// does with this.
-  public var byPath: [String: CoreFileStatus] {
-    Dictionary(entries.map { ($0.path, $0.status) }, uniquingKeysWith: { first, _ in first })
+  public var byPath: [String: CoreGitEntry] {
+    Dictionary(entries.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
   }
 }
 
 public struct CoreGitEntry: Decodable, Equatable, Sendable {
   public let path: String
   public let status: CoreFileStatus
+  /// Which half of git the change is in. Absent from an older core, which is
+  /// read as the working tree: that is where a change is before anything is
+  /// done to it, so an unknown one is drawn as the quieter of the two.
+  public let stage: CoreFileStage
 
-  public init(path: String, status: CoreFileStatus) {
+  public init(path: String, status: CoreFileStatus, stage: CoreFileStage = .unstaged) {
     self.path = path
     self.status = status
+    self.stage = stage
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    path = try container.decode(String.self, forKey: .path)
+    status = try container.decode(CoreFileStatus.self, forKey: .status)
+    stage = try container.decodeIfPresent(CoreFileStage.self, forKey: .stage) ?? .unstaged
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case path, status, stage
   }
 }
 
@@ -230,6 +252,65 @@ public enum CoreFileStatus: String, Decodable, Equatable, Sendable {
   case modified
   case renamed
   case untracked
+}
+
+/// Staged, not staged, or both at once. The pair with `CoreFileStatus` is what
+/// a row in the file pane is drawn from: the status says what happened and this
+/// says whether git has been told about it yet.
+public enum CoreFileStage: String, Decodable, Equatable, Sendable {
+  case staged
+  case unstaged
+  case both
+}
+
+/// One file coloured, as the core read it.
+///
+/// `language` absent means nothing recognised the file: the lines are still
+/// there and still drawn, in one colour. The view shows the name, so a reader
+/// can tell "not recognised" from "nothing to colour".
+public struct CoreHighlighted: Decodable, Equatable, Sendable {
+  public let language: String?
+  public let lines: [[CoreToken]]
+
+  public init(language: String?, lines: [[CoreToken]]) {
+    self.language = language
+    self.lines = lines
+  }
+}
+
+public struct CoreToken: Decodable, Equatable, Sendable {
+  public let text: String
+  public let kind: CoreTokenKind
+
+  public init(text: String, kind: CoreTokenKind) {
+    self.text = text
+    self.kind = kind
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    text = try container.decode(String.self, forKey: .text)
+    // A kind a newer core invented is drawn as ordinary text rather than
+    // failing the file it arrived in.
+    kind = (try? container.decode(CoreTokenKind.self, forKey: .kind)) ?? .plain
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case text, kind
+  }
+}
+
+public enum CoreTokenKind: String, Decodable, Equatable, Sendable {
+  case plain
+  case comment
+  case string
+  case number
+  case keyword
+  case type
+  case constant
+  case function
+  case key
+  case punctuation
 }
 
 public struct CoreSpan: Decodable, Equatable, Sendable {
@@ -342,7 +423,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, blocks, themes
-    case statuses, url, status
+    case statuses, url, status, language, lines
   }
 
   public init(from decoder: Decoder) throws {
@@ -364,6 +445,11 @@ extension CoreResponse: Decodable {
       self = .file(text: try container.decode(String.self, forKey: .text))
     case "markdown":
       self = .markdown(try container.decode([CoreBlock].self, forKey: .blocks))
+    case "highlighted":
+      self = .highlighted(
+        CoreHighlighted(
+          language: try container.decodeIfPresent(String.self, forKey: .language),
+          lines: try container.decode([[CoreToken]].self, forKey: .lines)))
     case "themes":
       self = .themes(try container.decode([CoreTheme].self, forKey: .themes))
     case "statuses":

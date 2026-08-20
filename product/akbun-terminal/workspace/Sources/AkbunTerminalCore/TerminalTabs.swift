@@ -2,11 +2,11 @@ import Foundation
 
 /// What is open in each workspace, and which one is on screen.
 ///
-/// A tab is either a shell or a markdown document. They share one strip because
-/// a document was a second pane under the terminal before, which halved the only
-/// area worth reading in and left both halves too short; a document that takes
-/// the whole area when it is looked at and none of it when it is not is what the
-/// window is actually for.
+/// A tab is either a shell or a file. They share one strip because a document
+/// was a second pane under the terminal before, which halved the only area worth
+/// reading in and left both halves too short; a file that takes the whole area
+/// when it is looked at and none of it when it is not is what the window is
+/// actually for.
 ///
 /// Sessions themselves live in the core; this is the arrangement around them,
 /// which is why it is a value type with no window in sight. Keeping it here

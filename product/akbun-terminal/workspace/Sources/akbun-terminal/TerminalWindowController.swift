@@ -9,10 +9,10 @@ import AkbunTerminalCore
 /// which view draws which tab — because that is what a different terminal engine
 /// would replace.
 ///
-/// A tab is a shell or a markdown document, and both fill the same area. The
-/// document used to be a pane under the terminal, which meant reading anything
-/// cost half the terminal for as long as it stayed open; as a tab it takes the
-/// whole area while it is being read and none of it afterwards.
+/// A tab is a shell or a file, and both fill the same area. The document used to
+/// be a pane under the terminal, which meant reading anything cost half the
+/// terminal for as long as it stayed open; as a tab it takes the whole area
+/// while it is being read and none of it afterwards.
 ///
 /// The panes are split views rather than fixed widths, which is the whole of
 /// "resizable and collapsible": dragging and hiding come with the class. The
@@ -32,7 +32,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     labelWithString: "Select a workspace on the left to open a terminal.")
   private var tabs = TerminalTabs()
   private var views: [UInt32: TerminalRendering] = [:]
-  private var documents: [DocumentKey: MarkdownDocumentView] = [:]
+  private var documents: [DocumentKey: DocumentView] = [:]
   private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
   private var detect: Timer?
@@ -378,20 +378,19 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   // MARK: Files
 
-  /// Markdown only. A code editor with highlighting is a different amount of
-  /// work, and reading documents is what a document tab is for.
+  /// Every file, not only markdown. The pane on the right lists a whole
+  /// repository, and a browser where nine names in ten do nothing when clicked
+  /// is a list rather than a browser. What a file looks like is the core's
+  /// answer: markdown is rendered and everything else is coloured.
   private func open(_ entry: CoreEntry) {
     openDocument(at: entry.path)
   }
 
   private func openDocument(at path: String) {
     guard let selection else { return }
-    let suffix = (path as NSString).pathExtension.lowercased()
-    guard DocumentLink.markdownExtensions.contains(suffix) else { return }
-
     let key = DocumentKey(workspace: selection.workspace.id, path: path)
     if documents[key] == nil {
-      let document = MarkdownDocumentView(core: core)
+      let document = DocumentView(core: core)
       document.zoom = zoomLevel
       document.palette = palette
       document.onError = { [weak self] error in
@@ -407,6 +406,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     tabs.add(
       document: path, title: (path as NSString).lastPathComponent, to: selection.workspace.id)
     showActiveTab()
+  }
+
+  /// Turns the file on screen between reading and editing. Nothing happens on
+  /// a shell tab: a terminal is always editable and has no second mode to go to.
+  func toggleEditMode() {
+    guard let workspace = selection?.workspace.id,
+      case .document(let path)? = tabs.active(in: workspace)
+    else { return }
+    documents[DocumentKey(workspace: workspace, path: path)]?.toggleEditing()
   }
 
   /// A command click inside a rendered document. A markdown file next to it

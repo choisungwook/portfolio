@@ -128,6 +128,13 @@ impl App {
             Command::RenderMarkdown { text } => Response::Markdown {
                 blocks: crate::markdown::render(&text),
             },
+            Command::Highlight { path, text } => {
+                let highlighted = crate::highlight::highlight(&path, &text);
+                Response::Highlighted {
+                    language: highlighted.language,
+                    lines: highlighted.lines,
+                }
+            }
             Command::Themes => Response::Themes {
                 themes: crate::theme::all(),
             },

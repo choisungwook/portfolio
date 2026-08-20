@@ -129,6 +129,18 @@ public final class CoreBridge {
     }
   }
 
+  /// The file's text as coloured tokens. Never throws for a language nothing
+  /// recognises: the core answers plain lines, because a file the highlighter
+  /// does not know still has to be readable.
+  public func highlight(path: String, text: String) throws -> CoreHighlighted {
+    let response = try send(.highlight(path: path, text: text))
+    switch response {
+    case .highlighted(let highlighted): return highlighted
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
   public func themes() throws -> [CoreTheme] {
     let response = try send(.themes)
     switch response {
