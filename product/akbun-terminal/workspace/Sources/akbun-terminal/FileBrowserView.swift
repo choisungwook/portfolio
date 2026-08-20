@@ -7,6 +7,11 @@ import AkbunTerminalCore
 /// should be read, and that is the moment `numberOfChildrenOfItem` is called.
 /// Nothing is read until then, so a folder with a dependency directory in it
 /// costs nothing until someone opens it.
+///
+/// Hidden files and folders are listed, because the folders this opens are
+/// repositories and .github, .claude and .gitignore are the files people go
+/// looking for. The rule itself is in the core, so the browser and anything
+/// else that reads a folder agree about what is in it.
 @MainActor
 final class FileBrowserView: NSView {
   /// A markdown file was double clicked.
@@ -20,6 +25,14 @@ final class FileBrowserView: NSView {
   private let empty = NSTextField(
     wrappingLabelWithString: "Choose a folder for this project to see its files.")
   private var root: String?
+
+  /// Everything in the window is one size, so the browser follows the terminal.
+  var zoom = Zoom() {
+    didSet {
+      guard zoom != oldValue else { return }
+      applyZoom()
+    }
+  }
 
   /// One row. A reference type because the outline view holds on to items by
   /// identity, and a struct copied into it would never match on refresh.
@@ -45,7 +58,6 @@ final class FileBrowserView: NSView {
     wantsLayer = true
     layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
-    title.font = .systemFont(ofSize: 13, weight: .semibold)
     let refresh = NSButton(
       image: NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")!,
       target: self, action: #selector(refresh))
@@ -61,8 +73,7 @@ final class FileBrowserView: NSView {
     outline.addTableColumn(column)
     outline.outlineTableColumn = column
     outline.headerView = nil
-    outline.rowSizeStyle = .small
-    outline.indentationPerLevel = 13
+    outline.rowSizeStyle = .custom
     outline.dataSource = self
     outline.delegate = self
     outline.target = self
@@ -77,8 +88,8 @@ final class FileBrowserView: NSView {
     scroll.translatesAutoresizingMaskIntoConstraints = false
 
     empty.textColor = .secondaryLabelColor
-    empty.font = .systemFont(ofSize: 12)
     empty.translatesAutoresizingMaskIntoConstraints = false
+    applyZoom()
 
     addSubview(header)
     addSubview(scroll)
@@ -95,6 +106,17 @@ final class FileBrowserView: NSView {
       empty.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
       empty.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
     ])
+  }
+
+  /// Row heights and indentation are set here rather than left to the outline
+  /// view's own small style, because that style is a fixed size and a fixed size
+  /// clips the text as soon as the window is zoomed in.
+  private func applyZoom() {
+    title.font = .systemFont(ofSize: zoom.size(13), weight: .semibold)
+    empty.font = .systemFont(ofSize: zoom.size(12))
+    outline.rowHeight = CGFloat(zoom.size(18))
+    outline.indentationPerLevel = CGFloat(zoom.size(13))
+    outline.reloadData()
   }
 
   /// Points the browser at a project. A project with no folder shows the notice
@@ -198,8 +220,10 @@ extension FileBrowserView: NSOutlineViewDelegate {
     let symbol = node.entry.isDirectory ? "folder" : "doc.text"
     let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
     icon.contentTintColor = .secondaryLabelColor
+    icon.symbolConfiguration = NSImage.SymbolConfiguration(
+      pointSize: CGFloat(zoom.size(12)), weight: .regular)
     let label = NSTextField(labelWithString: node.entry.name)
-    label.font = .systemFont(ofSize: 12)
+    label.font = .systemFont(ofSize: zoom.size(12))
     label.lineBreakMode = .byTruncatingMiddle
     label.toolTip = node.entry.path
     let row = NSStackView(views: [icon, label])

@@ -1,24 +1,47 @@
 import Foundation
 
-/// Which shell sessions belong to which workspace, and which one is on screen.
+/// What is open in each workspace, and which one is on screen.
+///
+/// A tab is either a shell or a markdown document. They share one strip because
+/// a document was a second pane under the terminal before, which halved the only
+/// area worth reading in and left both halves too short; a document that takes
+/// the whole area when it is looked at and none of it when it is not is what the
+/// window is actually for.
 ///
 /// Sessions themselves live in the core; this is the arrangement around them,
 /// which is why it is a value type with no window in sight. Keeping it here
 /// rather than inside the window controller is what lets the rule that decides
 /// the next active tab after a close be tested without opening one.
 public struct TerminalTabs: Equatable, Sendable {
+  /// What a tab holds. The session id and the document path are the identity of
+  /// the tab, so nothing else has to be looked up to know what to draw.
+  public enum Content: Hashable, Sendable {
+    case shell(session: UInt32)
+    case document(path: String)
+  }
+
   public struct Tab: Equatable, Sendable {
-    public let session: UInt32
+    public let content: Content
     public let title: String
 
-    public init(session: UInt32, title: String) {
-      self.session = session
+    public init(content: Content, title: String) {
+      self.content = content
       self.title = title
+    }
+
+    public var session: UInt32? {
+      guard case .shell(let session) = content else { return nil }
+      return session
+    }
+
+    public var documentPath: String? {
+      guard case .document(let path) = content else { return nil }
+      return path
     }
   }
 
   private var byWorkspace: [UInt64: [Tab]] = [:]
-  private var active: [UInt64: UInt32] = [:]
+  private var activeByWorkspace: [UInt64: Content] = [:]
 
   public init() {}
 
@@ -26,47 +49,69 @@ public struct TerminalTabs: Equatable, Sendable {
     byWorkspace[workspace] ?? []
   }
 
+  public func active(in workspace: UInt64) -> Content? {
+    activeByWorkspace[workspace]
+  }
+
   public func activeSession(in workspace: UInt64) -> UInt32? {
-    active[workspace]
+    guard case .shell(let session) = activeByWorkspace[workspace] else { return nil }
+    return session
   }
 
-  public func workspace(of session: UInt32) -> UInt64? {
-    byWorkspace.first { $0.value.contains { $0.session == session } }?.key
+  public func workspace(of content: Content) -> UInt64? {
+    byWorkspace.first { $0.value.contains { $0.content == content } }?.key
   }
 
-  /// Every open session, for the shutdown path.
+  /// Every open session, for the shutdown path. Documents are not here because
+  /// nothing has to be told they are closing.
   public var allSessions: [UInt32] {
-    byWorkspace.values.flatMap { $0 }.map(\.session)
+    byWorkspace.values.flatMap { $0 }.compactMap(\.session)
   }
 
   /// Adds a tab and makes it the active one, because a tab nobody asked to see
   /// is not what the button that created it meant.
   public mutating func add(session: UInt32, to workspace: UInt64) {
-    let title = "Shell \(tabs(in: workspace).count + 1)"
-    byWorkspace[workspace, default: []].append(Tab(session: session, title: title))
-    active[workspace] = session
+    let shells = tabs(in: workspace).filter { $0.session != nil }.count
+    append(Tab(content: .shell(session: session), title: "Shell \(shells + 1)"), to: workspace)
   }
 
-  public mutating func select(session: UInt32, in workspace: UInt64) {
-    guard tabs(in: workspace).contains(where: { $0.session == session }) else { return }
-    active[workspace] = session
+  /// Opens a document, or moves to it when this workspace already has it open.
+  /// A second tab on the same file would be two views of one buffer, and one of
+  /// them would be showing text the other had already replaced.
+  public mutating func add(document path: String, title: String, to workspace: UInt64) {
+    let content = Content.document(path: path)
+    guard !tabs(in: workspace).contains(where: { $0.content == content }) else {
+      activeByWorkspace[workspace] = content
+      return
+    }
+    append(Tab(content: content, title: title), to: workspace)
+  }
+
+  public mutating func select(_ content: Content, in workspace: UInt64) {
+    guard tabs(in: workspace).contains(where: { $0.content == content }) else { return }
+    activeByWorkspace[workspace] = content
   }
 
   /// Removes a tab. Closing the one on screen shows whatever slides into its
   /// place, and the new last tab when it was the rightmost one, so the strip
   /// does not jump somewhere else while tabs are being closed in a row.
-  public mutating func close(session: UInt32) {
-    guard let workspace = workspace(of: session) else { return }
+  public mutating func close(_ content: Content) {
+    guard let workspace = workspace(of: content) else { return }
     var tabs = self.tabs(in: workspace)
-    guard let index = tabs.firstIndex(where: { $0.session == session }) else { return }
+    guard let index = tabs.firstIndex(where: { $0.content == content }) else { return }
     tabs.remove(at: index)
     byWorkspace[workspace] = tabs
 
-    guard active[workspace] == session else { return }
+    guard activeByWorkspace[workspace] == content else { return }
     if tabs.isEmpty {
-      active[workspace] = nil
+      activeByWorkspace[workspace] = nil
     } else {
-      active[workspace] = tabs[min(index, tabs.count - 1)].session
+      activeByWorkspace[workspace] = tabs[min(index, tabs.count - 1)].content
     }
+  }
+
+  private mutating func append(_ tab: Tab, to workspace: UInt64) {
+    byWorkspace[workspace, default: []].append(tab)
+    activeByWorkspace[workspace] = tab.content
   }
 }

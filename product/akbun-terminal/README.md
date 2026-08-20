@@ -47,10 +47,11 @@ cargo test --manifest-path core/Cargo.toml
 - Runs each tab as the user's login shell in the project folder, with colour, the cursor and full screen programs drawn properly.
 - Sends keystrokes to it, draws what comes back, and tells it the new size when the window changes.
 - Ends every shell when the window closes or the app quits, and reaps it, so nothing lingers.
-- Lists the selected project's files on the right, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
-- Opens a markdown file under the terminal, rendered or as source, and writes it back on save.
+- Lists the selected project's files on the right, hidden files and folders included, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
+- Opens a markdown file in a tab beside the shells, rendered or as source, and writes it back on save.
+- Opens a markdown link inside a rendered document in its own tab on Command click, and sends an http or https link to a browser.
 - Wears a known colour scheme picked from the View menu, or follows the system appearance.
-- Zooms the terminal with Command plus and minus, and back to the default size with Command zero.
+- Zooms the whole window with Command plus and minus, and back to the default size with Command zero: the terminal, the tab strip, the project tree, the file list and the rendered document all follow one size.
 - Lets the sidebar and the file pane be dragged to any width, and folded away entirely.
 - Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening the workspace takes the green away.
 - Raises a notification when a workspace finishes, and opens that workspace when the notification is clicked.

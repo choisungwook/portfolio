@@ -15,6 +15,16 @@ final class ProjectSidebarView: NSView {
   /// because it is what is happening now, not what was saved: a status written
   /// to disk would come back after a restart describing work that is over.
   private var statuses: [UInt64: CoreWorkspaceStatus] = [:]
+  /// Everything in the window is one size, so the tree follows the terminal.
+  var zoom = Zoom() {
+    didSet {
+      guard zoom != oldValue else { return }
+      title.font = .systemFont(ofSize: zoom.size(13), weight: .semibold)
+      redraw()
+    }
+  }
+
+  private let title = NSTextField(labelWithString: "Projects")
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -30,8 +40,7 @@ final class ProjectSidebarView: NSView {
     wantsLayer = true
     layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
-    let title = NSTextField(labelWithString: "Projects")
-    title.font = .systemFont(ofSize: 13, weight: .semibold)
+    title.font = .systemFont(ofSize: zoom.size(13), weight: .semibold)
 
     let add = NSPopUpButton(frame: .zero, pullsDown: true)
     add.bezelStyle = .accessoryBarAction
@@ -97,7 +106,7 @@ final class ProjectSidebarView: NSView {
     if projects.isEmpty {
       let empty = NSTextField(wrappingLabelWithString: "Add a folder or create an empty project.")
       empty.textColor = .secondaryLabelColor
-      empty.font = .systemFont(ofSize: 12)
+      empty.font = .systemFont(ofSize: zoom.size(12))
       empty.translatesAutoresizingMaskIntoConstraints = false
       rows.addArrangedSubview(empty)
       empty.leadingAnchor.constraint(equalTo: rows.leadingAnchor, constant: 12).isActive = true
@@ -110,9 +119,12 @@ final class ProjectSidebarView: NSView {
   private func addProject(_ project: CoreProject) {
     let icon = NSImageView(image: NSImage(systemSymbolName: "folder", accessibilityDescription: "Project")!)
     icon.contentTintColor = .secondaryLabelColor
-    icon.widthAnchor.constraint(equalToConstant: 14).isActive = true
+    icon.symbolConfiguration = NSImage.SymbolConfiguration(
+      pointSize: CGFloat(zoom.size(12)), weight: .regular)
+    icon.widthAnchor.constraint(equalToConstant: CGFloat(zoom.size(14))).isActive = true
 
     let name = NSTextField(labelWithString: project.name)
+    name.font = .systemFont(ofSize: zoom.size(13))
     name.lineBreakMode = .byTruncatingMiddle
     name.toolTip = project.path ?? "Empty project · home directory"
 
@@ -128,9 +140,9 @@ final class ProjectSidebarView: NSView {
     row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
 
     for workspace in project.workspaces {
-      let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status)
+      let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status, size: zoom.size(8))
       let label = NSTextField(labelWithString: workspace.name)
-      label.font = .systemFont(ofSize: 12)
+      label.font = .systemFont(ofSize: zoom.size(12))
       label.lineBreakMode = .byTruncatingTail
       let workspaceRow = WorkspaceRow(isSelected: workspace.id == selected, name: workspace.name) { [weak self] in
         self?.onSelectWorkspace?(project, workspace)
@@ -139,7 +151,8 @@ final class ProjectSidebarView: NSView {
       workspaceRow.orientation = .horizontal
       workspaceRow.alignment = .centerY
       workspaceRow.spacing = 7
-      workspaceRow.edgeInsets = NSEdgeInsets(top: 3, left: 31, bottom: 3, right: 8)
+      workspaceRow.edgeInsets = NSEdgeInsets(
+        top: 3, left: CGFloat(zoom.size(31)), bottom: 3, right: 8)
       rows.addArrangedSubview(workspaceRow)
       workspaceRow.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
     }
@@ -222,14 +235,15 @@ private final class FlippedStackView: NSStackView {
 }
 
 private final class StatusDot: NSView {
-  init(status: CoreWorkspaceStatus) {
-    super.init(frame: NSRect(x: 0, y: 0, width: 8, height: 8))
+  init(status: CoreWorkspaceStatus, size: Double) {
+    let side = CGFloat(size)
+    super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
     wantsLayer = true
-    layer?.cornerRadius = 4
+    layer?.cornerRadius = side / 2
     layer?.backgroundColor = Self.color(status).cgColor
     translatesAutoresizingMaskIntoConstraints = false
-    widthAnchor.constraint(equalToConstant: 8).isActive = true
-    heightAnchor.constraint(equalToConstant: 8).isActive = true
+    widthAnchor.constraint(equalToConstant: side).isActive = true
+    heightAnchor.constraint(equalToConstant: side).isActive = true
   }
 
   required init?(coder: NSCoder) {

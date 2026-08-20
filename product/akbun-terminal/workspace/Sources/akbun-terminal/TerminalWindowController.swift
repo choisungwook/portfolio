@@ -1,16 +1,21 @@
 import AppKit
 import AkbunTerminalCore
 
-/// One window: the project tree on the left, the selected workspace's terminal
-/// tabs in the middle, and that project's files on the right.
+/// One window: the project tree on the left, the selected workspace's tabs in
+/// the middle, and that project's files on the right.
 ///
 /// The sessions behind those tabs live in the core. What is kept here is the
 /// arrangement around them — which workspace is open, which tab is on screen and
-/// which view draws which session — because that is what a different terminal
-/// engine would replace.
+/// which view draws which tab — because that is what a different terminal engine
+/// would replace.
 ///
-/// The three panes are split views rather than fixed widths, which is the whole
-/// of "resizable and collapsible": dragging and hiding come with the class. The
+/// A tab is a shell or a markdown document, and both fill the same area. The
+/// document used to be a pane under the terminal, which meant reading anything
+/// cost half the terminal for as long as it stayed open; as a tab it takes the
+/// whole area while it is being read and none of it afterwards.
+///
+/// The panes are split views rather than fixed widths, which is the whole of
+/// "resizable and collapsible": dragging and hiding come with the class. The
 /// sizes belong to the split view, so the widths here are placed once as divider
 /// positions and the limits are answered by the delegate; a width constraint
 /// would be a second opinion about the same number and one of the two has to
@@ -20,32 +25,38 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private let core: CoreBridge
   private let sidebar = ProjectSidebarView()
   private let tabBar = TerminalTabBarView()
-  private let terminalArea = NSView()
+  private let contentArea = NSView()
   private let browser: FileBrowserView
-  private let editor: MarkdownDocumentView
   private let panes = NSSplitView()
-  private let centre = NSSplitView()
   private let placeholder = NSTextField(
     labelWithString: "Select a workspace on the left to open a terminal.")
   private var tabs = TerminalTabs()
   private var views: [UInt32: TerminalRendering] = [:]
+  private var documents: [DocumentKey: MarkdownDocumentView] = [:]
   private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
   private var detect: Timer?
   private(set) var themes: [CoreTheme] = []
   private(set) var themeName = CoreTheme.system
-  /// Applies to every terminal in the window, and to the next one opened.
-  private var fontSize: Double = 13
+  /// Applies to every pane in the window, and to the next terminal opened.
+  private var zoomLevel = Zoom()
   private(set) var browsers = Browsers.none
   /// Called when a workspace finishes its work, so the app can say so outside
   /// its own window. Kept as a closure because the notification permission and
   /// the click that comes back belong to the application, not to one window.
   var onWorkspaceFinished: ((CoreProject, CoreWorkspace) -> Void)?
 
+  /// A document belongs to the strip that carries it, so the same file reached
+  /// from two workspaces is two tabs with a view each rather than one buffer
+  /// shared between them.
+  private struct DocumentKey: Hashable {
+    let workspace: UInt64
+    let path: String
+  }
+
   init(core: CoreBridge) {
     self.core = core
     self.browser = FileBrowserView(core: core)
-    self.editor = MarkdownDocumentView(core: core)
 
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1100, height: 620),
@@ -73,39 +84,32 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     content.autoresizingMask = [.width, .height]
     window.contentView = content
 
-    let terminalPane = NSView()
-    for view in [tabBar, terminalArea] {
+    let workArea = NSView()
+    for view in [tabBar, contentArea] {
       view.translatesAutoresizingMaskIntoConstraints = false
-      terminalPane.addSubview(view)
+      workArea.addSubview(view)
     }
     placeholder.textColor = .secondaryLabelColor
     placeholder.translatesAutoresizingMaskIntoConstraints = false
-    terminalArea.addSubview(placeholder)
+    contentArea.addSubview(placeholder)
     NSLayoutConstraint.activate([
-      tabBar.topAnchor.constraint(equalTo: terminalPane.topAnchor),
-      tabBar.leadingAnchor.constraint(equalTo: terminalPane.leadingAnchor),
-      tabBar.trailingAnchor.constraint(equalTo: terminalPane.trailingAnchor),
-      terminalArea.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
-      terminalArea.bottomAnchor.constraint(equalTo: terminalPane.bottomAnchor),
-      terminalArea.leadingAnchor.constraint(equalTo: terminalPane.leadingAnchor),
-      terminalArea.trailingAnchor.constraint(equalTo: terminalPane.trailingAnchor),
-      placeholder.centerXAnchor.constraint(equalTo: terminalArea.centerXAnchor),
-      placeholder.centerYAnchor.constraint(equalTo: terminalArea.centerYAnchor),
+      tabBar.topAnchor.constraint(equalTo: workArea.topAnchor),
+      tabBar.leadingAnchor.constraint(equalTo: workArea.leadingAnchor),
+      tabBar.trailingAnchor.constraint(equalTo: workArea.trailingAnchor),
+      contentArea.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+      contentArea.bottomAnchor.constraint(equalTo: workArea.bottomAnchor),
+      contentArea.leadingAnchor.constraint(equalTo: workArea.leadingAnchor),
+      contentArea.trailingAnchor.constraint(equalTo: workArea.trailingAnchor),
+      placeholder.centerXAnchor.constraint(equalTo: contentArea.centerXAnchor),
+      placeholder.centerYAnchor.constraint(equalTo: contentArea.centerYAnchor),
     ])
-
-    centre.isVertical = false
-    centre.dividerStyle = .thin
-    centre.delegate = self
-    centre.addArrangedSubview(terminalPane)
-    centre.addArrangedSubview(editor)
-    editor.isHidden = true
 
     panes.isVertical = true
     panes.dividerStyle = .thin
     panes.delegate = self
     panes.translatesAutoresizingMaskIntoConstraints = false
     panes.addArrangedSubview(sidebar)
-    panes.addArrangedSubview(centre)
+    panes.addArrangedSubview(workArea)
     panes.addArrangedSubview(browser)
     content.addSubview(panes)
     NSLayoutConstraint.activate([
@@ -168,12 +172,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       self?.selectWorkspace(project: project, workspace: workspace)
     }
     tabBar.onNew = { [weak self] in self?.openTab() }
-    tabBar.onSelect = { [weak self] session in self?.selectTab(session) }
-    tabBar.onClose = { [weak self] session in self?.closeTab(session) }
+    tabBar.onSelect = { [weak self] content in self?.selectTab(content) }
+    tabBar.onClose = { [weak self] content in self?.closeTab(content) }
     browser.onOpenFile = { [weak self] entry in self?.open(entry) }
     browser.onError = { [weak self] error in self?.present(error, whileDoing: "That folder could not be read") }
-    editor.onError = { [weak self] error in self?.present(error, whileDoing: "That file could not be used") }
-    editor.onClose = { [weak self] in self?.hideDocument() }
   }
 
   /// Loads the tree and begins draining events. No shell starts until a
@@ -227,9 +229,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   // MARK: Tabs
 
   private func selectWorkspace(project: CoreProject, workspace: CoreWorkspace) {
-    // Moving away from an edited file is the last chance to keep it, so the
-    // question comes before anything on screen changes.
-    guard editor.confirmDiscardingChanges() else { return }
     let changedProject = selection?.project.id != project.id
     selection = (project, workspace)
     // Finished means nobody has looked yet, and this is somebody looking.
@@ -237,7 +236,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     sidebar.setStatus(.idle, for: workspace.id)
     sidebar.select(workspace: workspace.id)
     if changedProject {
-      hideDocument()
       browser.show(project: project)
     }
     if tabs.tabs(in: workspace.id).isEmpty {
@@ -250,9 +248,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   /// Starts a shell for the selected workspace in the project's folder.
   private func openTab() {
     guard let selection else { return }
-    let terminal = SwiftTermTerminalView(frame: terminalArea.bounds)
+    let terminal = SwiftTermTerminalView(frame: contentArea.bounds)
     terminal.apply(theme: currentTheme)
-    terminal.fontSize = fontSize
+    terminal.fontSize = zoomLevel.terminalFontSize
     terminal.onCellClick = { [weak self] line, column, point in
       self?.offerURL(in: line, column: column, at: point, from: terminal.view)
     }
@@ -275,16 +273,26 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     }
   }
 
-  private func selectTab(_ session: UInt32) {
+  private func selectTab(_ content: TerminalTabs.Content) {
     guard let workspace = selection?.workspace.id else { return }
-    tabs.select(session: session, in: workspace)
+    tabs.select(content, in: workspace)
     showActiveTab()
   }
 
-  private func closeTab(_ session: UInt32) {
-    try? core.expectOk(.close(session: session))
-    tabs.close(session: session)
-    views.removeValue(forKey: session)
+  private func closeTab(_ content: TerminalTabs.Content) {
+    guard let workspace = tabs.workspace(of: content) else { return }
+    switch content {
+    case .shell(let session):
+      try? core.expectOk(.close(session: session))
+      views.removeValue(forKey: session)
+    case .document(let path):
+      let key = DocumentKey(workspace: workspace, path: path)
+      // Closing is the last chance to keep an edit, so the question comes before
+      // the tab goes.
+      guard documents[key]?.confirmDiscardingChanges() ?? true else { return }
+      documents.removeValue(forKey: key)
+    }
+    tabs.close(content)
     showActiveTab()
   }
 
@@ -297,59 +305,126 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       return
     }
     tabBar.show(true)
-    let active = tabs.activeSession(in: workspace)
+    let active = tabs.active(in: workspace)
     tabBar.render(tabs: tabs.tabs(in: workspace), active: active)
 
-    let wanted = active.flatMap { views[$0] }?.view
-    for subview in terminalArea.subviews where subview !== placeholder && subview !== wanted {
+    let shown = active.flatMap { view(for: $0, in: workspace) }
+    for subview in contentArea.subviews where subview !== placeholder && subview !== shown?.view {
       subview.removeFromSuperview()
     }
-    placeholder.isHidden = wanted != nil
-    guard let wanted, wanted.superview !== terminalArea else {
-      window?.makeFirstResponder(active.flatMap { views[$0] }?.focusView)
+    placeholder.isHidden = shown != nil
+    guard let shown else { return }
+    guard shown.view.superview !== contentArea else {
+      window?.makeFirstResponder(shown.focus)
       return
     }
-    wanted.translatesAutoresizingMaskIntoConstraints = false
-    terminalArea.addSubview(wanted)
+    shown.view.translatesAutoresizingMaskIntoConstraints = false
+    contentArea.addSubview(shown.view)
     NSLayoutConstraint.activate([
-      wanted.topAnchor.constraint(equalTo: terminalArea.topAnchor),
-      wanted.bottomAnchor.constraint(equalTo: terminalArea.bottomAnchor),
-      wanted.leadingAnchor.constraint(equalTo: terminalArea.leadingAnchor),
-      wanted.trailingAnchor.constraint(equalTo: terminalArea.trailingAnchor),
+      shown.view.topAnchor.constraint(equalTo: contentArea.topAnchor),
+      shown.view.bottomAnchor.constraint(equalTo: contentArea.bottomAnchor),
+      shown.view.leadingAnchor.constraint(equalTo: contentArea.leadingAnchor),
+      shown.view.trailingAnchor.constraint(equalTo: contentArea.trailingAnchor),
     ])
-    window?.makeFirstResponder(active.flatMap { views[$0] }?.focusView)
+    window?.makeFirstResponder(shown.focus)
+  }
+
+  /// What draws a tab, and what inside it should take the keyboard.
+  private func view(for content: TerminalTabs.Content, in workspace: UInt64)
+    -> (view: NSView, focus: NSView)?
+  {
+    switch content {
+    case .shell(let session):
+      guard let terminal = views[session] else { return nil }
+      return (terminal.view, terminal.focusView)
+    case .document(let path):
+      guard let document = documents[DocumentKey(workspace: workspace, path: path)] else {
+        return nil
+      }
+      return (document, document.focusView)
+    }
   }
 
   // MARK: Files
 
   /// Markdown only. A code editor with highlighting is a different amount of
-  /// work, and reading documents is what this pane is for.
+  /// work, and reading documents is what a document tab is for.
   private func open(_ entry: CoreEntry) {
-    let suffix = (entry.name as NSString).pathExtension.lowercased()
-    guard suffix == "md" || suffix == "markdown" else { return }
-    guard editor.confirmDiscardingChanges() else { return }
-    editor.open(entry)
-    guard editor.isHidden else { return }
-    editor.isHidden = false
-    centre.adjustSubviews()
-    centre.setPosition(centre.frame.height * 0.55, ofDividerAt: 0)
+    openDocument(at: entry.path)
   }
 
-  private func hideDocument() {
-    editor.isHidden = true
-    centre.adjustSubviews()
+  private func openDocument(at path: String) {
+    guard let selection else { return }
+    let suffix = (path as NSString).pathExtension.lowercased()
+    guard DocumentLink.markdownExtensions.contains(suffix) else { return }
+
+    let key = DocumentKey(workspace: selection.workspace.id, path: path)
+    if documents[key] == nil {
+      let document = MarkdownDocumentView(core: core)
+      document.zoom = zoomLevel
+      document.onError = { [weak self] error in
+        self?.present(error, whileDoing: "That file could not be used")
+      }
+      document.onOpenLink = { [weak self] link in self?.follow(link, from: path) }
+      document.open(path: path)
+      // A file that could not be read has already said so, and an empty tab
+      // would be the second thing to go wrong.
+      guard document.path != nil else { return }
+      documents[key] = document
+    }
+    tabs.add(
+      document: path, title: (path as NSString).lastPathComponent, to: selection.workspace.id)
+    showActiveTab()
+  }
+
+  /// A command click inside a rendered document. A markdown file next to it
+  /// opens in its own tab, so following a chain of documents leaves the way back
+  /// on screen; anything with a scheme is the browser's.
+  private func follow(_ link: String, from documentPath: String) {
+    switch DocumentLink.resolve(link, from: documentPath) {
+    case .document(let path):
+      guard FileManager.default.fileExists(atPath: path) else {
+        let alert = NSAlert()
+        alert.messageText = "That link points at a file that is not there"
+        alert.informativeText = path
+        alert.runModal()
+        return
+      }
+      openDocument(at: path)
+    case .external(let url):
+      Browsers.open(url, in: nil)
+    case nil:
+      // An anchor inside the page, or a file this window has no view for.
+      break
+    }
   }
 
   // MARK: Zoom
 
-  /// Steps the terminal font up or down, or back to the default at zero. The
-  /// view reports its new cell grid on its own, which is what tells the shell
-  /// on the other side that its window changed shape.
+  /// Steps the whole window up or down, or back to the default at zero.
+  ///
+  /// Zoom was the terminal's font size alone, which left the tab titles, the
+  /// project list and the file names at their original size while the terminal
+  /// grew — readable in one pane and not in the others. One value drives all of
+  /// them now.
   func zoom(by steps: Double) {
-    fontSize = steps == 0 ? 13 : min(36, max(7, fontSize + steps))
+    zoomLevel.step(by: steps)
+    applyZoom()
+  }
+
+  private func applyZoom() {
+    // The terminal reports its new cell grid on its own, which is what tells the
+    // shell on the other side that its window changed shape.
     for view in views.values {
-      view.fontSize = fontSize
+      view.fontSize = zoomLevel.terminalFontSize
     }
+    for document in documents.values {
+      document.zoom = zoomLevel
+    }
+    sidebar.zoom = zoomLevel
+    browser.zoom = zoomLevel
+    tabBar.zoom = zoomLevel
+    placeholder.font = .systemFont(ofSize: zoomLevel.size(13))
   }
 
   // MARK: Links
@@ -485,10 +560,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     showActiveTab()
   }
 
-  /// Everything but the terminal folds away: both side panes and the markdown
-  /// pane under it. The terminal is the app.
+  /// Everything but the middle folds away. The tabs are the app.
   func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool {
-    subview === sidebar || subview === browser || subview === editor
+    subview === sidebar || subview === browser
   }
 
   private func askName(title: String, placeholder: String, initial: String = "") -> String? {
@@ -538,6 +612,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     }
     tabs = TerminalTabs()
     views.removeAll()
+    documents.removeAll()
   }
 }
 

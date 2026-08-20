@@ -6,14 +6,27 @@ import AkbunTerminalCore
 /// The colours are all semantic, so the rendered document follows dark and light
 /// mode the same way the rest of the window does. Nothing here parses markdown;
 /// by the time a block arrives the decisions have already been made in the core.
-enum MarkdownAttributedText {
-  static func build(_ blocks: [CoreBlock]) -> NSAttributedString {
+struct MarkdownAttributedText {
+  /// Where a span's link is kept. Deliberately not `.link`, because that
+  /// attribute makes a plain click open the destination, and a document someone
+  /// else wrote should not open anything just because the pointer passed over
+  /// it. A command click reads this key instead, which is a gesture nobody
+  /// makes by accident.
+  static let linkKey = NSAttributedString.Key("io.akbun.terminal.link")
+
+  let zoom: Zoom
+
+  static func build(_ blocks: [CoreBlock], zoom: Zoom = Zoom()) -> NSAttributedString {
+    MarkdownAttributedText(zoom: zoom).build(blocks)
+  }
+
+  func build(_ blocks: [CoreBlock]) -> NSAttributedString {
     let document = NSMutableAttributedString()
     for block in blocks {
       switch block {
       case .heading(let level, let spans):
         let size = max(13.0, 24.0 - Double(level) * 2.5)
-        append(spans, to: document, base: .systemFont(ofSize: size, weight: .semibold))
+        append(spans, to: document, base: .systemFont(ofSize: zoom.size(size), weight: .semibold))
       case .paragraph(let spans):
         append(spans, to: document, base: body)
       case .quote(let spans):
@@ -27,7 +40,7 @@ enum MarkdownAttributedText {
         // this view is for reading documents.
         appendLine(text, to: document, font: monospace, indent: 18, color: .textColor)
       case .table(let header, let rows):
-        appendLine(table(header: header, rows: rows), to: document, font: monospace, indent: 12)
+        appendLine(Self.table(header: header, rows: rows), to: document, font: monospace, indent: 12)
       case .rule:
         appendLine(String(repeating: "─", count: 40), to: document, font: body,
           indent: 0, color: .tertiaryLabelColor)
@@ -38,10 +51,10 @@ enum MarkdownAttributedText {
     return document
   }
 
-  private static var body: NSFont { .systemFont(ofSize: 13) }
-  private static var monospace: NSFont { .monospacedSystemFont(ofSize: 12, weight: .regular) }
+  private var body: NSFont { .systemFont(ofSize: zoom.size(13)) }
+  private var monospace: NSFont { .monospacedSystemFont(ofSize: zoom.size(12), weight: .regular) }
 
-  private static func append(
+  private func append(
     _ spans: [CoreSpan], to document: NSMutableAttributedString, base: NSFont,
     indent: Double = 0, prefix: String = "", color: NSColor = .textColor
   ) {
@@ -55,13 +68,15 @@ enum MarkdownAttributedText {
         attributes[.font] = NSFont.monospacedSystemFont(ofSize: base.pointSize - 1, weight: .regular)
         attributes[.foregroundColor] = NSColor.systemPink
       } else {
-        attributes[.font] = styled(base, bold: span.bold, italic: span.italic)
+        attributes[.font] = Self.styled(base, bold: span.bold, italic: span.italic)
       }
       if let link = span.link {
-        // Text only. The destination is shown rather than made clickable, so a
-        // document someone else wrote cannot open anything by being read.
+        // Drawn as a link and carrying its destination, which is what a command
+        // click asks for and what the tooltip shows to anyone else.
         attributes[.foregroundColor] = NSColor.linkColor
+        attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         attributes[.toolTip] = link
+        attributes[Self.linkKey] = link
       }
       line.append(NSAttributedString(string: span.text, attributes: attributes))
     }
@@ -71,7 +86,7 @@ enum MarkdownAttributedText {
     document.append(line)
   }
 
-  private static func appendLine(
+  private func appendLine(
     _ text: String, to document: NSMutableAttributedString, font: NSFont, indent: Double,
     color: NSColor = .secondaryLabelColor
   ) {
@@ -91,11 +106,13 @@ enum MarkdownAttributedText {
     return NSFontManager.shared.convert(font, toHaveTrait: traits)
   }
 
-  private static func paragraph(indent: Double) -> NSParagraphStyle {
+  /// Indents follow the zoom too. Left alone they would be a hair's width at a
+  /// large font, which reads as a list that lost its shape.
+  private func paragraph(indent: Double) -> NSParagraphStyle {
     let style = NSMutableParagraphStyle()
-    style.headIndent = indent
-    style.firstLineHeadIndent = indent
-    style.paragraphSpacing = 6
+    style.headIndent = zoom.size(indent)
+    style.firstLineHeadIndent = zoom.size(indent)
+    style.paragraphSpacing = zoom.size(6)
     return style
   }
 

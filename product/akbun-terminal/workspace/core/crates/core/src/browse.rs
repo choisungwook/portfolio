@@ -5,9 +5,16 @@
 //! first row is what makes a file browser feel stuck.
 //!
 //! Two rules live here rather than in the shell, so the same folder does not
-//! look different depending on what draws it: dotfiles are hidden, and a symlink
-//! is a leaf even when it points at a directory. Not following links is the
-//! cheapest way to never walk into a cycle.
+//! look different depending on what draws it: everything on disk is listed,
+//! dotfiles included, and a symlink is a leaf even when it points at a
+//! directory. Not following links is the cheapest way to never walk into a
+//! cycle.
+//!
+//! Hiding dotfiles was the first rule and it was wrong for this browser. The
+//! folders it opens are repositories, where the interesting files are exactly
+//! the hidden ones: .github, .claude, .gitignore, .env. A browser that cannot
+//! show them sends the reader back to the shell, which is the one place they
+//! were trying not to be.
 
 use std::fs;
 use std::path::Path;
@@ -29,9 +36,6 @@ pub fn read_directory(path: &str) -> Result<Vec<Entry>, String> {
     for entry in fs::read_dir(path).map_err(|error| format!("{}: {error}", path.display()))? {
         let entry = entry.map_err(|error| error.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') {
-            continue;
-        }
         let is_directory = match entry.file_type() {
             // A symlink reports its own type here, never the target's, which is
             // exactly the leaf behaviour wanted.
@@ -82,18 +86,19 @@ mod tests {
     }
 
     #[test]
-    fn hides_dotfiles_and_puts_directories_first() {
+    fn lists_hidden_entries_and_puts_directories_first() {
         let directory = temp_directory();
         fs::write(directory.join("README.md"), "hi").unwrap();
-        fs::write(directory.join(".hidden"), "no").unwrap();
+        fs::write(directory.join(".gitignore"), "target").unwrap();
         fs::create_dir(directory.join("src")).unwrap();
         fs::create_dir(directory.join("Apps")).unwrap();
+        fs::create_dir(directory.join(".github")).unwrap();
 
         let entries = read_directory(directory.to_str().unwrap()).unwrap();
         let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
-        assert_eq!(names, ["Apps", "src", "README.md"]);
+        assert_eq!(names, [".github", "Apps", "src", ".gitignore", "README.md"]);
         assert!(entries[0].is_directory);
-        assert!(!entries[2].is_directory);
+        assert!(!entries[3].is_directory);
         fs::remove_dir_all(directory).unwrap();
     }
 
