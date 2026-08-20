@@ -7,9 +7,11 @@ import Foundation
 /// a scheme goes to a browser, and anything else is left alone. A view cannot
 /// be asked those questions in a test; this can.
 public enum DocumentLink: Equatable, Sendable {
-  /// A file on disk, as an absolute path. Any file: the window opens whatever
-  /// the browser opens, so a link to a source file next to the document is no
-  /// longer a link to nowhere.
+  /// A file on disk, as an absolute path. Any file with a suffix: the window
+  /// opens whatever the browser opens, so a link to a source file next to the
+  /// document is no longer a link to nowhere. A target with no suffix at all is
+  /// left alone, because in a rendered page that is a heading slug far more
+  /// often than it is a file.
   case document(path: String)
   /// Something a browser handles.
   case external(url: URL)

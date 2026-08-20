@@ -111,6 +111,11 @@ extension NSColor {
 /// opening this app. The colour answers "has git been told about this yet",
 /// because that is the question somebody who has just typed `git add` is asking
 /// the pane; the badge beside the name answers what happened.
+///
+/// So a staged delete is green rather than red, and a staged rename green
+/// rather than purple. Red and purple are what those look like while they are
+/// still only in the working tree. One row cannot carry two questions in one
+/// colour, and the D or the R after the name is the other one.
 @MainActor
 enum GitColor {
   static func of(_ entry: CoreGitEntry?, in palette: Palette) -> NSColor {

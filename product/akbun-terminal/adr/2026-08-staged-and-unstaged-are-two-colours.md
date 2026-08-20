@@ -12,7 +12,7 @@ The core carries the stage beside the status, and the pane draws the pair.
 
 - `Stage` is `staged`, `unstaged` or `both`, read from the two columns of the porcelain code. A conflict is both; an untracked file is unstaged.
 - A folder wears both when the files under it disagree, which is the same roll up the status already had.
-- The colour answers "has git been told about this yet": green for staged, orange for a working tree change, yellow for staged and then changed again. Red, purple, grey and pink stay where they were for deleted, renamed, untracked and conflicted.
+- The colour answers "has git been told about this yet": green for staged, orange for a working tree change, yellow for staged and then changed again. Red and purple keep their meanings for a delete and a rename that are still only in the working tree; staged, both are green, because the letter after the name already says which one it is. Grey and pink stay as they were for untracked and conflicted, neither of which has two halves to tell apart.
 - A letter after the name says what the change was: A, M, D, R, `?` for untracked, `!` for a conflict, a star for the half staged case. The tooltip spells it in words.
 
 ## Consequences

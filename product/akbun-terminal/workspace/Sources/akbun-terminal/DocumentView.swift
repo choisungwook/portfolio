@@ -247,12 +247,25 @@ final class DocumentView: NSView {
 
   private func renderCode() {
     guard let path else { return }
-    let highlighted = (try? core.highlight(path: path, text: source.string)) ?? .empty
+    // A core that cannot answer still leaves a file to read. The text falls
+    // back to itself in one colour rather than to an empty tab, which is what
+    // an older core without the highlight command would otherwise produce.
+    let highlighted = (try? core.highlight(path: path, text: source.string)) ?? uncoloured()
     // A language nobody recognised is said out loud rather than left blank, so
     // an uncoloured file does not read as a broken one.
     language.stringValue = highlighted.language ?? "Plain text"
     reader.textStorage?.setAttributedString(
       CodeAttributedText.build(highlighted, zoom: zoom, palette: palette))
+  }
+
+  /// The file as its own text, one plain token per line. The answer when the
+  /// core refuses, so losing the colour never costs the contents.
+  private func uncoloured() -> CoreHighlighted {
+    CoreHighlighted(
+      language: nil,
+      lines: source.string.components(separatedBy: "\n").map { line in
+        line.isEmpty ? [] : [CoreToken(text: line, kind: .plain)]
+      })
   }
 
   /// Both halves are redrawn, not only the one on screen: the other is one

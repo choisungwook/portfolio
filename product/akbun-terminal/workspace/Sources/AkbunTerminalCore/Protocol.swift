@@ -276,8 +276,6 @@ public struct CoreHighlighted: Decodable, Equatable, Sendable {
     self.language = language
     self.lines = lines
   }
-
-  public static let empty = CoreHighlighted(language: nil, lines: [])
 }
 
 public struct CoreToken: Decodable, Equatable, Sendable {
