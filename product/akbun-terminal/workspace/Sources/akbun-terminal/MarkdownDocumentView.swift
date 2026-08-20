@@ -1,26 +1,40 @@
 import AppKit
 import AkbunTerminalCore
 
-/// A markdown file, below the terminal.
+/// A markdown file, in a tab of its own.
 ///
-/// One area with two modes rather than a split preview: the terminal owns the
-/// window, so what is left is already narrow and halving it again would leave
-/// two columns of nothing. The rendered side is an attributed string in a plain
-/// text view, which is why no HTML and no second web view appear anywhere here.
+/// One area with two modes rather than a split preview: a tab is the whole area
+/// under the strip, and halving it would leave two columns of nothing. The
+/// rendered side is an attributed string in a plain text view, which is why no
+/// HTML and no second web view appear anywhere here.
+///
+/// It used to be a pane under the terminal. Sharing the tab strip is what makes
+/// a document as easy to leave and come back to as a shell, and it is also what
+/// lets a link inside one document open another beside it.
 @MainActor
 final class MarkdownDocumentView: NSView {
-  var onClose: (() -> Void)?
   var onError: ((Error) -> Void)?
+  /// A command click landed on a link. The destination is passed exactly as the
+  /// document wrote it; deciding what it points at is the window's job.
+  var onOpenLink: ((String) -> Void)?
 
   private(set) var path: String?
   private(set) var isDirty = false
+
+  /// Everything in the window is one size, so the document follows the terminal.
+  var zoom = Zoom() {
+    didSet {
+      guard zoom != oldValue else { return }
+      applyZoom()
+    }
+  }
 
   private let core: CoreBridge
   private let title = NSTextField(labelWithString: "")
   private let modes = NSSegmentedControl(
     labels: ["Preview", "Source"], trackingMode: .selectOne, target: nil, action: nil)
   private let saveButton = NSButton(title: "Save", target: nil, action: nil)
-  private let preview = NSTextView()
+  private let preview = LinkTextView()
   private let source = NSTextView()
   private let previewScroll = NSScrollView()
   private let sourceScroll = NSScrollView()
@@ -39,7 +53,6 @@ final class MarkdownDocumentView: NSView {
     wantsLayer = true
     layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
-    title.font = .systemFont(ofSize: 12, weight: .medium)
     title.lineBreakMode = .byTruncatingMiddle
     modes.selectedSegment = 0
     modes.target = self
@@ -49,12 +62,8 @@ final class MarkdownDocumentView: NSView {
     saveButton.bezelStyle = .accessoryBarAction
     saveButton.keyEquivalent = "s"
     saveButton.keyEquivalentModifierMask = .command
-    let close = NSButton(
-      image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")!,
-      target: self, action: #selector(closeDocument))
-    close.bezelStyle = .accessoryBarAction
 
-    let header = NSStackView(views: [title, NSView(), modes, saveButton, close])
+    let header = NSStackView(views: [title, NSView(), modes, saveButton])
     header.orientation = .horizontal
     header.alignment = .centerY
     header.spacing = 8
@@ -63,8 +72,9 @@ final class MarkdownDocumentView: NSView {
     configure(scroll: previewScroll, text: preview, editable: false)
     configure(scroll: sourceScroll, text: source, editable: true)
     source.delegate = self
-    source.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+    preview.onCommandClick = { [weak self] link in self?.onOpenLink?(link) }
     sourceScroll.isHidden = true
+    applyZoom()
 
     addSubview(header)
     addSubview(previewScroll)
@@ -99,11 +109,11 @@ final class MarkdownDocumentView: NSView {
 
   /// Loads a file. The caller has already dealt with anything unsaved, because
   /// asking here would put the question in the middle of drawing.
-  func open(_ entry: CoreEntry) {
+  func open(path target: String) {
     do {
-      let text = try core.text(ofFile: entry.path)
-      path = entry.path
-      title.stringValue = entry.name
+      let text = try core.text(ofFile: target)
+      path = target
+      title.stringValue = (target as NSString).lastPathComponent
       source.string = text
       isDirty = false
       renderPreview()
@@ -122,15 +132,6 @@ final class MarkdownDocumentView: NSView {
     } catch {
       onError?(error)
     }
-  }
-
-  @objc private func closeDocument() {
-    guard confirmDiscardingChanges() else { return }
-    path = nil
-    isDirty = false
-    source.string = ""
-    preview.string = ""
-    onClose?()
   }
 
   /// Asks about unsaved work. `false` means the caller must stay where it is.
@@ -155,6 +156,11 @@ final class MarkdownDocumentView: NSView {
     }
   }
 
+  /// The view that should take the keyboard when this tab comes forward.
+  var focusView: NSView {
+    sourceScroll.isHidden ? (preview as NSTextView) : source
+  }
+
   @objc private func modeChanged() {
     let wantsPreview = modes.selectedSegment == 0
     if wantsPreview {
@@ -175,10 +181,20 @@ final class MarkdownDocumentView: NSView {
   private func renderPreview() {
     do {
       let blocks = try core.markdown(source.string)
-      preview.textStorage?.setAttributedString(MarkdownAttributedText.build(blocks))
+      preview.textStorage?.setAttributedString(MarkdownAttributedText.build(blocks, zoom: zoom))
     } catch {
       onError?(error)
     }
+  }
+
+  /// Both halves are redrawn, not only the one on screen: the other is one
+  /// segment click away and a document that changes size when it is looked at
+  /// is worse than one that was the wrong size all along.
+  private func applyZoom() {
+    title.font = .systemFont(ofSize: zoom.size(12), weight: .medium)
+    source.font = .monospacedSystemFont(ofSize: zoom.size(12), weight: .regular)
+    guard path != nil else { return }
+    renderPreview()
   }
 
   private func updateTitle() {
@@ -193,5 +209,39 @@ extension MarkdownDocumentView: NSTextViewDelegate {
     guard !isDirty else { return }
     isDirty = true
     updateTitle()
+  }
+}
+
+/// A read only text view that answers a command click on a link.
+///
+/// The gesture is command click rather than a plain one because the preview is
+/// also where text is selected, and because a document is something being read
+/// rather than a set of buttons. Everything else goes to the text view, so
+/// selecting and scrolling are untouched.
+private final class LinkTextView: NSTextView {
+  var onCommandClick: ((String) -> Void)?
+
+  override func mouseDown(with event: NSEvent) {
+    guard event.modifierFlags.contains(.command), let link = link(at: event) else {
+      super.mouseDown(with: event)
+      return
+    }
+    onCommandClick?(link)
+  }
+
+  private func link(at event: NSEvent) -> String? {
+    guard let storage = textStorage, storage.length > 0 else { return nil }
+    let point = convert(event.locationInWindow, from: nil)
+    let insertion = characterIndexForInsertion(at: point)
+    // The insertion point is between two characters, so the click that landed on
+    // the last character of a link reports the index after it.
+    for index in [insertion, insertion - 1] where index >= 0 && index < storage.length {
+      if let link = storage.attribute(MarkdownAttributedText.linkKey, at: index, effectiveRange: nil)
+        as? String
+      {
+        return link
+      }
+    }
+    return nil
   }
 }

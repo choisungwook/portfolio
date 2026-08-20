@@ -48,7 +48,7 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Output.** The session's reader thread pushes `output` events onto a queue in the core. A timer on the main run loop drains the queue about once a frame and hands bytes to the view. The core never calls into Swift, so the question of which thread may draw never arises.
 
-**Resize.** The emulator recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong. Zooming the font takes the same path: the view is given a point size, works out how many cells now fit, and reports that.
+**Resize.** The emulator recomputes its cell grid on layout and reports it; the core resizes the pty. A shell that is not told stays at the old size and every interactive program in it draws wrong. Zooming takes the same path: one `Zoom` value gives the view a point size, the view works out how many cells now fit and reports that. Every other pane reads the same value, which is why the tab strip, the tree, the file list and a rendered document change size together with the terminal.
 
 **Judging.** Every session's bytes also go into an interpreted screen, on the reader thread that already has them. A second timer, two seconds apart from the one that draws, asks the core to judge: one `ps` snapshot names the processes under each shell, the rule files say what the screens mean, and the answer is only the workspaces that moved. The shell paints those and raises a notification for the ones that finished.
 
@@ -68,7 +68,7 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `resize` | `ok` | cells, not pixels |
 | `close` | `ok` | kills and reaps |
 | `load_state`, `create_project`, `create_workspace`, `set_theme` | `state` | every mutation answers with the whole tree |
-| `read_directory` | `entries` | one level, dotfiles hidden, links left as leaves |
+| `read_directory` | `entries` | one level, hidden entries included, links left as leaves |
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
 | `render_markdown` | `markdown` | blocks, and where raw HTML is dropped |
 | `themes` | `themes` | the known palettes as hex |

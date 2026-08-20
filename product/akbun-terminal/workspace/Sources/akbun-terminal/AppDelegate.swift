@@ -44,6 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     true
   }
 
+  /// Quitting is the other way a document tab closes, and the only one that
+  /// used to take unsaved work with it. The question belongs here rather than in
+  /// `applicationWillTerminate`, which cannot say no.
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    (windowController?.confirmClosingDocuments() ?? true) ? .terminateNow : .terminateCancel
+  }
+
   func applicationWillTerminate(_ notification: Notification) {
     windowController?.closeSessions()
   }

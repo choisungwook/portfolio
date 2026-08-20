@@ -1,19 +1,31 @@
 import AppKit
 import AkbunTerminalCore
 
-/// The tab strip above the terminal for the selected workspace.
+/// The tab strip above the content for the selected workspace.
 ///
 /// It draws what it is handed and reports clicks. Which tab is active and what
 /// happens when one closes is decided by `TerminalTabs`, so the rule is testable
 /// and this file stays a view.
 @MainActor
 final class TerminalTabBarView: NSView {
-  var onSelect: ((UInt32) -> Void)?
-  var onClose: ((UInt32) -> Void)?
+  var onSelect: ((TerminalTabs.Content) -> Void)?
+  var onClose: ((TerminalTabs.Content) -> Void)?
   var onNew: (() -> Void)?
+
+  /// The strip grows with everything else, so a zoomed window does not draw
+  /// large text under a strip built for small.
+  var zoom = Zoom() {
+    didSet {
+      guard zoom != oldValue else { return }
+      height.constant = isHidden ? 0 : barHeight
+      render(tabs: shown, active: activeContent)
+    }
+  }
 
   private let row = NSStackView()
   private var height: NSLayoutConstraint!
+  private var shown: [TerminalTabs.Tab] = []
+  private var activeContent: TerminalTabs.Content?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -46,18 +58,22 @@ final class TerminalTabBarView: NSView {
       divider.trailingAnchor.constraint(equalTo: trailingAnchor),
       divider.bottomAnchor.constraint(equalTo: bottomAnchor),
     ])
-    height = heightAnchor.constraint(equalToConstant: 32)
+    height = heightAnchor.constraint(equalToConstant: barHeight)
     height.isActive = true
   }
+
+  private var barHeight: CGFloat { CGFloat(zoom.size(32)) }
 
   /// With no workspace selected there is nothing to add a tab to, so the strip
   /// collapses rather than leaving a "+" that does nothing.
   func show(_ visible: Bool) {
     isHidden = !visible
-    height.constant = visible ? 32 : 0
+    height.constant = visible ? barHeight : 0
   }
 
-  func render(tabs: [TerminalTabs.Tab], active: UInt32?) {
+  func render(tabs: [TerminalTabs.Tab], active: TerminalTabs.Content?) {
+    shown = tabs
+    activeContent = active
     row.arrangedSubviews.forEach {
       row.removeArrangedSubview($0)
       $0.removeFromSuperview()
@@ -66,9 +82,10 @@ final class TerminalTabBarView: NSView {
       row.addArrangedSubview(
         TabButton(
           tab: tab,
-          isActive: tab.session == active,
-          select: { [weak self] in self?.onSelect?(tab.session) },
-          close: { [weak self] in self?.onClose?(tab.session) }
+          isActive: tab.content == active,
+          zoom: zoom,
+          select: { [weak self] in self?.onSelect?(tab.content) },
+          close: { [weak self] in self?.onClose?(tab.content) }
         ))
     }
     let add = NSButton(
@@ -87,7 +104,10 @@ final class TerminalTabBarView: NSView {
 private final class TabButton: NSView {
   private let select: () -> Void
 
-  init(tab: TerminalTabs.Tab, isActive: Bool, select: @escaping () -> Void, close: @escaping () -> Void) {
+  init(
+    tab: TerminalTabs.Tab, isActive: Bool, zoom: Zoom, select: @escaping () -> Void,
+    close: @escaping () -> Void
+  ) {
     self.select = select
     super.init(frame: .zero)
     // The row is the control, so it has to say so itself; VoiceOver has no other
@@ -100,12 +120,18 @@ private final class TabButton: NSView {
     layer?.backgroundColor =
       (isActive ? NSColor.selectedContentBackgroundColor : NSColor.clear).cgColor
 
+    // A document and a shell are both tabs, and the icon is what says which one
+    // is about to come forward without reading the file name.
+    let symbol = tab.documentPath == nil ? "terminal" : "doc.text"
+    let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
+    icon.contentTintColor = isActive ? .selectedMenuItemTextColor : .secondaryLabelColor
+
     let label = NSTextField(labelWithString: tab.title)
-    label.font = .systemFont(ofSize: 12)
+    label.font = .systemFont(ofSize: zoom.size(12))
     label.textColor = isActive ? .selectedMenuItemTextColor : .labelColor
 
-    let closeButton = CloseButton(handler: close)
-    let content = NSStackView(views: [label, closeButton])
+    let closeButton = CloseButton(width: zoom.size(14), handler: close)
+    let content = NSStackView(views: [icon, label, closeButton])
     content.orientation = .horizontal
     content.alignment = .centerY
     content.spacing = 4
@@ -137,7 +163,7 @@ private final class TabButton: NSView {
 private final class CloseButton: NSButton {
   private let handler: () -> Void
 
-  init(handler: @escaping () -> Void) {
+  init(width: Double, handler: @escaping () -> Void) {
     self.handler = handler
     super.init(frame: .zero)
     image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close tab")!
@@ -146,7 +172,7 @@ private final class CloseButton: NSButton {
     toolTip = "Close tab"
     target = self
     action = #selector(run)
-    widthAnchor.constraint(equalToConstant: 14).isActive = true
+    widthAnchor.constraint(equalToConstant: CGFloat(width)).isActive = true
   }
 
   required init?(coder: NSCoder) {
