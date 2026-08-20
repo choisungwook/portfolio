@@ -46,6 +46,7 @@ cargo test --manifest-path core/Cargo.toml
 - Opens a terminal tab strip for the selected workspace, with add, switch and close.
 - Runs each tab as the user's login shell in the project folder, with colour, the cursor and full screen programs drawn properly.
 - Sends keystrokes to it, draws what comes back, and tells it the new size when the window changes.
+- Sends escape and return for shift with return, so a CLI agent in a tab takes a new line instead of the prompt.
 - Ends every shell when the window closes or the app quits, and reaps it, so nothing lingers.
 - Lists the selected project's files on the right, hidden files and folders included, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
 - Colours those names by what git makes of them when the project is a repository, with a closed folder wearing the strongest status of anything inside it, refreshed while the shell beside it works.

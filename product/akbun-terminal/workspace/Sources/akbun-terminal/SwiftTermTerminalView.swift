@@ -43,6 +43,13 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     // follow dark and light mode without a palette of its own.
     terminal.configureNativeColors()
     terminal.onPlainClick = { [weak self] point in self?.reportClick(at: point) ?? false }
+    // Shift and return has to reach the shell as something a plain return is
+    // not, and the emulator sends the same byte for both. The encoding is the
+    // core's; this only carries the answer to the pty.
+    terminal.onEncodedKey = { [weak self] bytes in
+      guard let self, !self.ended else { return }
+      self.onInput?(bytes)
+    }
     terminal.translatesAutoresizingMaskIntoConstraints = false
     addSubview(terminal)
     NSLayoutConstraint.activate([
@@ -154,8 +161,24 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
 private final class ClickableTerminalView: TerminalView {
   /// Returns whether the click was consumed.
   var onPlainClick: ((NSPoint) -> Bool)?
+  /// A key this app encodes itself, already in bytes.
+  var onEncodedKey: (([UInt8]) -> Void)?
 
   private var pressedAt: NSPoint?
+
+  /// Shift and return, and nothing else. Every other key goes to the emulator
+  /// untouched, so the layout, the dead keys and the escape sequences it
+  /// already implements are not being reimplemented here.
+  override func keyDown(with event: NSEvent) {
+    guard
+      let bytes = TerminalKeys.bytes(
+        keyCode: event.keyCode, shift: event.modifierFlags.contains(.shift))
+    else {
+      super.keyDown(with: event)
+      return
+    }
+    onEncodedKey?(bytes)
+  }
 
   override func mouseDown(with event: NSEvent) {
     pressedAt = convert(event.locationInWindow, from: nil)

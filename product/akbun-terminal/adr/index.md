@@ -16,3 +16,4 @@
 | [Git status is asked of git](./2026-08-git-status-in-the-file-browser.md) | Porcelain output read in the core, folders carrying the strongest status under them |
 | [One palette dresses the whole window](./2026-08-one-palette-for-the-window.md) | A theme mixed once in the core and handed to every view, system appearance as one of them |
 | [A deleted row's id is never reused](./2026-08-deleting-a-row-never-reuses-its-id.md) | A high water mark in the state file, and the tabs and colour of a deleted workspace going with it |
+| [Shift and return sends escape return](./2026-08-shift-return-sends-escape-return.md) | The one keystroke this app encodes itself, decided in the core rather than in the view |

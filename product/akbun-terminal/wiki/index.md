@@ -25,6 +25,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **Git is asked, never inferred.** `git.rs` runs porcelain status and rolls it up the directory tree, so the colours in the file pane agree with the shell in the middle of the window. The paths are built from `--show-prefix` rather than `--show-toplevel`: a symlink above the project makes the resolved root a different string from the one the browser holds, and a status keyed by a path no row has never shows up. It runs on the run loop every three seconds, the same bet `detect` makes with `ps`; a repository big enough for `git status` to take a visible moment is what would make that wrong.
 - **One palette, or the window looks broken.** A theme reaches every pane through `Palette`, mixed once from the theme's three colours in `Theme.swift`. A view reads colours and never asks which mode it is in; following the system is a palette like any other. Anything drawn by AppKit itself follows `window.appearance`, which is set alongside.
 - **Ids are never reused.** `next_id` in the state file is a high water mark. Tabs, the agent colour and the finished notification are all keyed by workspace id, so a reused one shows a deleted workspace's state on a new row.
+- **One keystroke is ours, the rest are the emulator's.** A terminal sends the same byte for return whether or not shift was held, so `TerminalKeys` turns shift and return into escape and return for the CLI agents that need a new line. It is a pure function in the core package for the same reason the URL rule is: the emulator behind the seam is expected to be replaced. Anything wider would be a second keyboard layout in front of SwiftTerm's.
 - **The URL rule is not the emulator's.** SwiftTerm detects links itself and lives in the half that gets replaced. The view answers where a click landed; `url.rs` decides what may be opened, and only http and https ever are.
 
 ## Files
@@ -54,6 +55,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/akbun-terminal/TerminalTabBarView.swift` | the tab strip for the selected workspace |
 | `Sources/AkbunTerminalCore/TerminalTabs.swift` | which shell and which document belong to which workspace, and which is on screen |
 | `Sources/AkbunTerminalCore/Zoom.swift` | the one size the whole window is drawn at |
+| `Sources/AkbunTerminalCore/TerminalKeys.swift` | the keystrokes this app encodes itself, shift and return so far |
 | `Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
 | `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
 | `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened |
