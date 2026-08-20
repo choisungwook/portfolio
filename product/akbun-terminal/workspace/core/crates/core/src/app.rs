@@ -5,7 +5,7 @@
 //! drains them when it is ready to touch the screen. That keeps the question of
 //! which thread may draw entirely on the shell's side.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
@@ -97,18 +97,16 @@ impl App {
                 self.with_tree(|tree| tree.rename_project(project, name))
             }
             Command::DeleteProject { project } => {
-                self.with_tree(|tree| tree.delete_project(project))
+                let response = self.with_tree(|tree| tree.delete_project(project));
+                self.forget_statuses_outside(&response);
+                response
             }
             Command::RenameWorkspace { workspace, name } => {
                 self.with_tree(|tree| tree.rename_workspace(workspace, name))
             }
             Command::DeleteWorkspace { workspace } => {
                 let response = self.with_tree(|tree| tree.delete_workspace(workspace));
-                // The judged status is kept apart from the tree, so removing the
-                // workspace has to reach it here or the colour outlives the row.
-                if let Ok(mut statuses) = self.statuses.lock() {
-                    statuses.remove(&workspace);
-                }
+                self.forget_statuses_outside(&response);
                 response
             }
             Command::SetTheme { name } => self.with_tree(|tree| tree.set_theme(name)),
@@ -160,6 +158,29 @@ impl App {
                 url: crate::url::at(&line, column),
             },
         }
+    }
+
+    /// Drops the judged status of every workspace the tree no longer has.
+    ///
+    /// The statuses are kept apart from the tree, because they describe what is
+    /// happening now rather than what was saved. That means a deletion has to
+    /// reach them separately, and reading the answer the tree just gave is the
+    /// way to do it that cannot miss one: deleting a project takes its
+    /// workspaces with it without ever naming them.
+    fn forget_statuses_outside(&self, response: &Response) {
+        let Response::State { state } = response else {
+            return;
+        };
+        let Ok(mut statuses) = self.statuses.lock() else {
+            return;
+        };
+        let alive: HashSet<u64> = state
+            .projects
+            .iter()
+            .flat_map(|project| project.workspaces.iter())
+            .map(|workspace| workspace.id)
+            .collect();
+        statuses.retain(|workspace, _| alive.contains(workspace));
     }
 
     /// Judges every workspace that has a session open and answers with the ones

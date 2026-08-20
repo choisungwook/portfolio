@@ -94,11 +94,15 @@ final class ProjectSidebarView: NSView {
   /// projects and their workspaces into a block that had to be read carefully to
   /// see where one project ended. The list is short — a handful of projects with
   /// a few workspaces each — so there is room to give every row the height it
-  /// takes to be picked out at a glance. Both follow the zoom, or a zoomed in
-  /// window would grow the text inside rows that stayed the old height.
+  /// takes to be picked out at a glance. All of them follow the zoom, sideways
+  /// as well as down: a zoomed in window would otherwise grow the text inside
+  /// rows that kept their old height and their old margins, which is tighter
+  /// than where this started rather than looser.
   private var rowSpacing: CGFloat { CGFloat(zoom.size(6)) }
   private var projectPadding: CGFloat { CGFloat(zoom.size(8)) }
   private var workspacePadding: CGFloat { CGFloat(zoom.size(6)) }
+  private var leadingInset: CGFloat { CGFloat(zoom.size(8)) }
+  private var trailingInset: CGFloat { CGFloat(zoom.size(6)) }
 
   func render(_ state: CoreTreeState) {
     projects = state.projects
@@ -167,7 +171,8 @@ final class ProjectSidebarView: NSView {
     row.orientation = .horizontal
     row.alignment = .centerY
     row.spacing = 5
-    row.edgeInsets = NSEdgeInsets(top: projectPadding, left: 8, bottom: projectPadding, right: 6)
+    row.edgeInsets = NSEdgeInsets(
+      top: projectPadding, left: leadingInset, bottom: projectPadding, right: trailingInset)
     rows.addArrangedSubview(row)
     row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
 
@@ -197,7 +202,8 @@ final class ProjectSidebarView: NSView {
     row.alignment = .centerY
     row.spacing = 7
     row.edgeInsets = NSEdgeInsets(
-      top: workspacePadding, left: CGFloat(zoom.size(31)), bottom: workspacePadding, right: 6)
+      top: workspacePadding, left: CGFloat(zoom.size(31)), bottom: workspacePadding,
+      right: trailingInset)
     rows.addArrangedSubview(row)
     row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
   }

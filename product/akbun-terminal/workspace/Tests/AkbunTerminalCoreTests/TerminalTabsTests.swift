@@ -78,7 +78,7 @@ struct TerminalTabsTests {
     #expect(tabs.tabs(in: 20).isEmpty)
   }
 
-  @Test func aDeletedWorkspaceTakesItsTabsAndNamesItsShells() {
+  @Test func aDeletedWorkspaceTakesItsTabsWithIt() {
     var tabs = TerminalTabs()
     tabs.add(session: 1, to: 10)
     tabs.add(document: "/p/README.md", title: "README.md", to: 10)
