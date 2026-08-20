@@ -13,6 +13,7 @@ The view intercepts shift with return and sends escape then carriage return. Eve
 - The encoding is in the core package as a pure function of the key code and whether shift was down, so it survives a change of terminal engine and is checked without opening a window.
 - Only shift with return is intercepted. Anything wider would be a second keyboard layout in front of the one SwiftTerm already implements.
 - The keypad's Enter is the same key to a person and a different key code to macOS, so both are read.
+- It is answered as a key equivalent, not a `keyDown` override. SwiftTerm's `keyDown` is public and not open, so it cannot be overridden from this module at all; the window offers every key press to the view hierarchy first, which is the same route a default button's return takes, and only the view holding the keyboard answers.
 
 ## Consequences
 

@@ -43,13 +43,6 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     // follow dark and light mode without a palette of its own.
     terminal.configureNativeColors()
     terminal.onPlainClick = { [weak self] point in self?.reportClick(at: point) ?? false }
-    // Shift and return has to reach the shell as something a plain return is
-    // not, and the emulator sends the same byte for both. The encoding is the
-    // core's; this only carries the answer to the pty.
-    terminal.onEncodedKey = { [weak self] bytes in
-      guard let self, !self.ended else { return }
-      self.onInput?(bytes)
-    }
     terminal.translatesAutoresizingMaskIntoConstraints = false
     addSubview(terminal)
     NSLayoutConstraint.activate([
@@ -58,6 +51,31 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
       terminal.leadingAnchor.constraint(equalTo: leadingAnchor),
       terminal.trailingAnchor.constraint(equalTo: trailingAnchor),
     ])
+  }
+
+  /// Shift and return, before the emulator sees it.
+  ///
+  /// A key equivalent rather than a `keyDown` override, because SwiftTerm's
+  /// `keyDown` is public and not open: it cannot be overridden from this module
+  /// at all. The window offers every key press to this hierarchy here first,
+  /// which is the same route a default button's return takes, so the one key
+  /// this app encodes itself is answered before anything else reads it.
+  ///
+  /// Only while the terminal holds the keyboard. This view is on screen for a
+  /// shell tab, and a document tab beside it has its own idea of what return
+  /// means.
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    guard !ended, terminalHasFocus,
+      let bytes = TerminalKeys.bytes(
+        keyCode: event.keyCode, shift: event.modifierFlags.contains(.shift))
+    else { return super.performKeyEquivalent(with: event) }
+    onInput?(bytes)
+    return true
+  }
+
+  private var terminalHasFocus: Bool {
+    guard let responder = window?.firstResponder as? NSView else { return false }
+    return responder === terminal || responder.isDescendant(of: terminal)
   }
 
   var grid: (cols: UInt16, rows: UInt16) {
@@ -161,24 +179,8 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
 private final class ClickableTerminalView: TerminalView {
   /// Returns whether the click was consumed.
   var onPlainClick: ((NSPoint) -> Bool)?
-  /// A key this app encodes itself, already in bytes.
-  var onEncodedKey: (([UInt8]) -> Void)?
 
   private var pressedAt: NSPoint?
-
-  /// Shift and return, and nothing else. Every other key goes to the emulator
-  /// untouched, so the layout, the dead keys and the escape sequences it
-  /// already implements are not being reimplemented here.
-  override func keyDown(with event: NSEvent) {
-    guard
-      let bytes = TerminalKeys.bytes(
-        keyCode: event.keyCode, shift: event.modifierFlags.contains(.shift))
-    else {
-      super.keyDown(with: event)
-      return
-    }
-    onEncodedKey?(bytes)
-  }
 
   override func mouseDown(with event: NSEvent) {
     pressedAt = convert(event.locationInWindow, from: nil)
