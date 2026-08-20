@@ -77,6 +77,7 @@ public struct ShortcutKey: Equatable, Sendable {
   /// a saved shortcut from a newer core leaves the item without a key rather
   /// than with the wrong one.
   public static func parse(_ text: String) -> ShortcutKey? {
+    guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
     var modifiers = Modifiers()
     var base: String?
     for part in text.split(separator: "+", omittingEmptySubsequences: false) {

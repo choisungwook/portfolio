@@ -32,6 +32,7 @@ struct ShortcutKeyTests {
     #expect(ShortcutKey.parse("cmd+nonsense") == nil)
     #expect(ShortcutKey.parse("cmd") == nil)
     #expect(ShortcutKey.parse("") == nil)
+    #expect(ShortcutKey.parse("   ") == nil)
   }
 
   @Test func thePersonReadingItSeesTheSymbolsInTheOrderMacOSUses() {

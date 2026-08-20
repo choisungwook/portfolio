@@ -394,7 +394,7 @@ final class DocumentView: NSView {
     clearMarks()
     matches = []
     matchIndex = nil
-    window?.makeFirstResponder(mode == .edit ? source : (reader as NSTextView))
+    window?.makeFirstResponder(focusView)
   }
 
   @objc private func findFieldChanged() {

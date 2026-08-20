@@ -69,7 +69,11 @@ impl Index {
     pub fn build(root: &str) -> Self {
         let mut files = Vec::new();
         walk(Path::new(root), 0, &mut files);
-        files.sort();
+        files.sort_by(|left, right| {
+            left.len()
+                .cmp(&right.len())
+                .then_with(|| left.cmp(right))
+        });
         Self {
             root: root.to_string(),
             files,
@@ -357,7 +361,11 @@ mod tests {
         fs::write(directory.join(".github/workflows/ci.yml"), "").unwrap();
 
         let index = Index::build(directory.to_str().unwrap());
-        let names: Vec<String> = index.search("", 10).into_iter().map(|m| m.relative).collect();
+        let names: Vec<String> = index
+            .search("", 10)
+            .into_iter()
+            .map(|m| m.relative)
+            .collect();
         assert!(names.contains(&".github/workflows/ci.yml".to_string()), "{names:?}");
         assert!(names.contains(&"src/main.rs".to_string()), "{names:?}");
         assert!(!names.iter().any(|name| name.contains("node_modules")), "{names:?}");
@@ -365,6 +373,20 @@ mod tests {
         let found = index.search("mainrs", 10);
         assert_eq!(found[0].relative, "src/main.rs");
         assert!(found[0].path.starts_with(directory.to_str().unwrap()));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_empty_query_shows_shortest_paths_first() {
+        let directory = temp_directory();
+        fs::create_dir_all(directory.join("long/folder")).unwrap();
+        fs::write(directory.join("z.txt"), "").unwrap();
+        fs::write(directory.join("a.txt"), "").unwrap();
+        fs::write(directory.join("long/folder/file.txt"), "").unwrap();
+
+        let index = Index::build(directory.to_str().unwrap());
+        let names: Vec<String> = index.search("", 10).into_iter().map(|m| m.relative).collect();
+        assert_eq!(names, ["a.txt", "z.txt", "long/folder/file.txt"]);
         fs::remove_dir_all(directory).unwrap();
     }
 
