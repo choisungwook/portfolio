@@ -93,10 +93,31 @@ impl App {
             Command::CreateWorkspace { project, name } => {
                 self.with_tree(|tree| tree.create_workspace(project, name))
             }
+            Command::RenameProject { project, name } => {
+                self.with_tree(|tree| tree.rename_project(project, name))
+            }
+            Command::DeleteProject { project } => {
+                self.with_tree(|tree| tree.delete_project(project))
+            }
+            Command::RenameWorkspace { workspace, name } => {
+                self.with_tree(|tree| tree.rename_workspace(workspace, name))
+            }
+            Command::DeleteWorkspace { workspace } => {
+                let response = self.with_tree(|tree| tree.delete_workspace(workspace));
+                // The judged status is kept apart from the tree, so removing the
+                // workspace has to reach it here or the colour outlives the row.
+                if let Ok(mut statuses) = self.statuses.lock() {
+                    statuses.remove(&workspace);
+                }
+                response
+            }
             Command::SetTheme { name } => self.with_tree(|tree| tree.set_theme(name)),
             Command::ReadDirectory { path } => match crate::browse::read_directory(&path) {
                 Ok(entries) => Response::Entries { entries },
                 Err(message) => Response::Error { message },
+            },
+            Command::GitStatus { path } => Response::Git {
+                status: crate::git::status(&path),
             },
             Command::ReadFile { path } => match crate::browse::read_file(&path) {
                 Ok(text) => Response::File { text },

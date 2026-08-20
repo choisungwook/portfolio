@@ -36,8 +36,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private var selection: (project: CoreProject, workspace: CoreWorkspace)?
   private var drain: Timer?
   private var detect: Timer?
+  private var watchGit: Timer?
   private(set) var themes: [CoreTheme] = []
   private(set) var themeName = CoreTheme.system
+  /// Every colour the window draws with. The theme used to reach the terminal
+  /// alone, which left a system coloured sidebar, tab strip and file list around
+  /// it; one palette handed to every view is what makes the window one surface.
+  private var palette = Palette.system
   /// Applies to every pane in the window, and to the next terminal opened.
   private var zoomLevel = Zoom()
   private(set) var browsers = Browsers.none
@@ -171,6 +176,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     sidebar.onSelectWorkspace = { [weak self] project, workspace in
       self?.selectWorkspace(project: project, workspace: workspace)
     }
+    sidebar.onRenameProject = { [weak self] project in self?.renameProject(project) }
+    sidebar.onDeleteProject = { [weak self] project in self?.deleteProject(project) }
+    sidebar.onRenameWorkspace = { [weak self] _, workspace in self?.renameWorkspace(workspace) }
+    sidebar.onDeleteWorkspace = { [weak self] _, workspace in self?.deleteWorkspace(workspace) }
     tabBar.onNew = { [weak self] in self?.openTab() }
     tabBar.onSelect = { [weak self] content in self?.selectTab(content) }
     tabBar.onClose = { [weak self] content in self?.closeTab(content) }
@@ -190,6 +199,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     browsers = Browsers.installed()
     themes = (try? core.themes()) ?? []
     themeName = state.theme ?? CoreTheme.system
+    applyPalette()
     sidebar.render(state)
     showActiveTab()
 
@@ -205,6 +215,14 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     // at its noisiest, and a status nobody sees for two seconds costs nothing.
     detect = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
       MainActor.assumeIsolated { self?.applyDetectedStatuses() }
+    }
+
+    // What git makes of the files changes on the shell's clock, not on anyone
+    // clicking refresh, so it is asked for on its own timer. Slower than the
+    // judging above because it runs a process, and it only repaints: the tree
+    // itself is left alone, so nothing a reader opened closes underneath them.
+    watchGit = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+      MainActor.assumeIsolated { self?.browser.refreshGitStatus() }
     }
 
     // Opening on the first workspace saves the click that every launch would
@@ -237,6 +255,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     sidebar.select(workspace: workspace.id)
     if changedProject {
       browser.show(project: project)
+    } else {
+      // Same folder, but the shell in the workspace just left may have changed
+      // what is in it.
+      browser.refreshGitStatus()
     }
     if tabs.tabs(in: workspace.id).isEmpty {
       openTab()
@@ -371,6 +393,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     if documents[key] == nil {
       let document = MarkdownDocumentView(core: core)
       document.zoom = zoomLevel
+      document.palette = palette
       document.onError = { [weak self] error in
         self?.present(error, whileDoing: "That file could not be used")
       }
@@ -506,13 +529,36 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     do {
       let state = try core.state(.setTheme(name: name))
       themeName = state.theme ?? CoreTheme.system
-      let theme = currentTheme
-      for view in views.values {
-        view.apply(theme: theme)
-      }
+      applyPalette()
     } catch {
       present(error, whileDoing: "That theme could not be applied")
     }
+  }
+
+  /// Hands the chosen colours to everything in the window, terminals included.
+  ///
+  /// One call rather than a branch in each view: a view that reads the palette
+  /// cannot forget to follow a change, and following the system appearance is a
+  /// palette of dynamic system colours rather than a special case.
+  private func applyPalette() {
+    palette = Palette.of(currentTheme)
+    let theme = currentTheme
+    for view in views.values {
+      view.apply(theme: theme)
+    }
+    for document in documents.values {
+      document.palette = palette
+    }
+    sidebar.palette = palette
+    browser.palette = palette
+    tabBar.palette = palette
+    contentArea.wantsLayer = true
+    contentArea.layer?.backgroundColor = palette.background.cgColor
+    placeholder.textColor = palette.secondaryText
+    window?.backgroundColor = palette.background
+    // The title bar and any menu drawn over the window are AppKit's to paint,
+    // and they follow the appearance rather than a colour anyone sets.
+    window?.appearance = palette.appearance
   }
 
   /// Folds the file pane away and back. Returns whether it is now hidden, which
@@ -547,6 +593,72 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     updateTree(.createWorkspace(project: project.id, name: name))
   }
 
+  private func renameProject(_ project: CoreProject) {
+    guard
+      let name = askName(
+        title: "Rename Project", placeholder: project.name, initial: project.name,
+        confirm: "Rename")
+    else { return }
+    updateTree(.renameProject(project: project.id, name: name))
+  }
+
+  private func renameWorkspace(_ workspace: CoreWorkspace) {
+    guard
+      let name = askName(
+        title: "Rename Workspace", placeholder: workspace.name, initial: workspace.name,
+        confirm: "Rename")
+    else { return }
+    updateTree(.renameWorkspace(workspace: workspace.id, name: name))
+  }
+
+  /// Removes a project from the tree. The shells under it end here rather than
+  /// in the core, because the core is told about sessions and knows nothing
+  /// about which row they were opened from.
+  private func deleteProject(_ project: CoreProject) {
+    let workspaces = project.workspaces.count
+    guard
+      confirmDelete(
+        what: "the project “\(project.name)”",
+        detail: workspaces == 0
+          ? "The folder on disk is not touched."
+          : "Its \(workspaces) workspace(s) and their shells close. The folder on disk is not touched.")
+    else { return }
+    for workspace in project.workspaces {
+      endTabs(of: workspace.id)
+    }
+    if selection?.project.id == project.id {
+      selection = nil
+      browser.show(project: nil)
+    }
+    updateTree(.deleteProject(project: project.id))
+  }
+
+  private func deleteWorkspace(_ workspace: CoreWorkspace) {
+    guard
+      confirmDelete(
+        what: "the workspace “\(workspace.name)”",
+        detail: "Its shells close. Nothing on disk is touched.")
+    else { return }
+    endTabs(of: workspace.id)
+    if selection?.workspace.id == workspace.id {
+      selection = nil
+    }
+    updateTree(.deleteWorkspace(workspace: workspace.id))
+  }
+
+  /// Ends every shell a workspace had open and forgets its tabs. Unsaved
+  /// documents are asked about first, the same question closing the tab asks.
+  private func endTabs(of workspace: UInt64) {
+    for document in documents.filter({ $0.key.workspace == workspace }) {
+      _ = document.value.confirmDiscardingChanges()
+      documents.removeValue(forKey: document.key)
+    }
+    for session in tabs.removeWorkspace(workspace) {
+      try? core.expectOk(.close(session: session))
+      views.removeValue(forKey: session)
+    }
+  }
+
   private func updateTree(_ command: CoreCommand) {
     do {
       let state = try core.state(command)
@@ -560,6 +672,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
         selection = (project, workspace)
       }
       sidebar.select(workspace: selection?.workspace.id)
+      // A deleted row leaves nothing selected, so the strip and the area under
+      // it are redrawn rather than left showing the tabs of a workspace that is
+      // no longer in the tree.
+      showActiveTab()
     } catch {
       present(error, whileDoing: "Project tree could not be updated")
     }
@@ -574,14 +690,28 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     subview === sidebar || subview === browser
   }
 
-  private func askName(title: String, placeholder: String, initial: String = "") -> String? {
+  /// A yes or no before something goes. The destructive button is not the
+  /// default one, so the return key cannot delete anything.
+  private func confirmDelete(what: String, detail: String) -> Bool {
+    let alert = NSAlert()
+    alert.messageText = "Delete \(what)?"
+    alert.informativeText = detail
+    alert.alertStyle = .warning
+    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: "Delete")
+    return alert.runModal() == .alertSecondButtonReturn
+  }
+
+  private func askName(
+    title: String, placeholder: String, initial: String = "", confirm: String = "Create"
+  ) -> String? {
     let field = NSTextField(string: initial)
     field.placeholderString = placeholder
     field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
     let alert = NSAlert()
     alert.messageText = title
     alert.accessoryView = field
-    alert.addButton(withTitle: "Create")
+    alert.addButton(withTitle: confirm)
     alert.addButton(withTitle: "Cancel")
     guard alert.runModal() == .alertFirstButtonReturn else { return nil }
     let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -626,6 +756,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     drain = nil
     detect?.invalidate()
     detect = nil
+    watchGit?.invalidate()
+    watchGit = nil
     for session in tabs.allSessions {
       try? core.expectOk(.close(session: session))
     }

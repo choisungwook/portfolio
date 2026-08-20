@@ -12,6 +12,11 @@ import AkbunTerminalCore
 /// repositories and .github, .claude and .gitignore are the files people go
 /// looking for. The rule itself is in the core, so the browser and anything
 /// else that reads a folder agree about what is in it.
+///
+/// Names are coloured by what git makes of them, which is why the folders that
+/// were worth opening are now visible without opening them: a closed folder
+/// wears the strongest status of anything inside it. The judging is the core's
+/// and so is the roll up; this file only turns a status into a colour.
 @MainActor
 final class FileBrowserView: NSView {
   /// A markdown file was double clicked.
@@ -25,6 +30,9 @@ final class FileBrowserView: NSView {
   private let empty = NSTextField(
     wrappingLabelWithString: "Choose a folder for this project to see its files.")
   private var root: String?
+  /// What git said the last time it was asked, by absolute path. Empty for a
+  /// project that is not in a repository, which draws every name plainly.
+  private var git: [String: CoreFileStatus] = [:]
 
   /// Everything in the window is one size, so the browser follows the terminal.
   var zoom = Zoom() {
@@ -32,6 +40,12 @@ final class FileBrowserView: NSView {
       guard zoom != oldValue else { return }
       applyZoom()
     }
+  }
+
+  /// Every colour in the window comes from one place, so a dark theme does not
+  /// leave a light file list beside a dark terminal.
+  var palette = Palette.system {
+    didSet { applyPalette() }
   }
 
   /// One row. A reference type because the outline view holds on to items by
@@ -56,7 +70,6 @@ final class FileBrowserView: NSView {
 
   private func setUp() {
     wantsLayer = true
-    layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
     let refresh = NSButton(
       image: NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")!,
@@ -87,9 +100,9 @@ final class FileBrowserView: NSView {
     scroll.drawsBackground = false
     scroll.translatesAutoresizingMaskIntoConstraints = false
 
-    empty.textColor = .secondaryLabelColor
     empty.translatesAutoresizingMaskIntoConstraints = false
     applyZoom()
+    applyPalette()
 
     addSubview(header)
     addSubview(scroll)
@@ -119,6 +132,13 @@ final class FileBrowserView: NSView {
     outline.reloadData()
   }
 
+  private func applyPalette() {
+    layer?.backgroundColor = palette.panel.cgColor
+    title.textColor = palette.text
+    empty.textColor = palette.secondaryText
+    outline.reloadData()
+  }
+
   /// Points the browser at a project. A project with no folder shows the notice
   /// and an empty tree rather than the previous project's files.
   func show(project: CoreProject?) {
@@ -128,6 +148,7 @@ final class FileBrowserView: NSView {
   }
 
   private func reload() {
+    readGitStatus()
     roots = root.map(read) ?? []
     empty.isHidden = root != nil
     outline.enclosingScrollView?.isHidden = root == nil
@@ -136,6 +157,23 @@ final class FileBrowserView: NSView {
 
   @objc private func refresh() {
     reload()
+  }
+
+  /// Asks git again and repaints, without reading a single directory.
+  ///
+  /// Separate from `reload` because these two change on different clocks: what
+  /// is in a folder changes when someone adds a file, and what git makes of it
+  /// changes on every save. Rebuilding the tree on that second clock would
+  /// close every folder the reader had opened.
+  func refreshGitStatus() {
+    let before = git
+    readGitStatus()
+    guard git != before else { return }
+    outline.reloadData()
+  }
+
+  private func readGitStatus() {
+    git = root.map { core.gitStatus(in: $0).byPath } ?? [:]
   }
 
   /// The children of a folder, read the first time they are asked for. Both
@@ -219,13 +257,18 @@ extension FileBrowserView: NSOutlineViewDelegate {
     guard let node = item as? Node else { return nil }
     let symbol = node.entry.isDirectory ? "folder" : "doc.text"
     let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
-    icon.contentTintColor = .secondaryLabelColor
+    let status = git[node.entry.path]
+    let colour = GitColor.of(status, in: palette)
+    icon.contentTintColor = status == nil ? palette.secondaryText : colour
     icon.symbolConfiguration = NSImage.SymbolConfiguration(
       pointSize: CGFloat(zoom.size(12)), weight: .regular)
     let label = NSTextField(labelWithString: node.entry.name)
     label.font = .systemFont(ofSize: zoom.size(12))
+    label.textColor = colour
     label.lineBreakMode = .byTruncatingMiddle
-    label.toolTip = node.entry.path
+    // The status is named as well as coloured, because a colour alone cannot be
+    // told apart by everyone looking at it.
+    label.toolTip = status.map { "\(node.entry.path) — \($0.rawValue)" } ?? node.entry.path
     let row = NSStackView(views: [icon, label])
     row.orientation = .horizontal
     row.alignment = .centerY

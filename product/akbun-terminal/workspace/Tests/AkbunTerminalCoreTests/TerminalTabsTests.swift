@@ -78,6 +78,20 @@ struct TerminalTabsTests {
     #expect(tabs.tabs(in: 20).isEmpty)
   }
 
+  @Test func aDeletedWorkspaceTakesItsTabsAndNamesItsShells() {
+    var tabs = TerminalTabs()
+    tabs.add(session: 1, to: 10)
+    tabs.add(document: "/p/README.md", title: "README.md", to: 10)
+    tabs.add(session: 2, to: 20)
+
+    // The sessions come back because the core still has to be told to end them.
+    #expect(tabs.removeWorkspace(10) == [1])
+    #expect(tabs.tabs(in: 10).isEmpty)
+    #expect(tabs.active(in: 10) == nil)
+    #expect(tabs.tabs(in: 20).count == 1)
+    #expect(tabs.removeWorkspace(999).isEmpty)
+  }
+
   @Test func shellsAreNumberedWithoutCountingDocuments() {
     var tabs = TerminalTabs()
     tabs.add(session: 1, to: 10)

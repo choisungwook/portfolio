@@ -68,7 +68,9 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `resize` | `ok` | cells, not pixels |
 | `close` | `ok` | kills and reaps |
 | `load_state`, `create_project`, `create_workspace`, `set_theme` | `state` | every mutation answers with the whole tree |
+| `rename_project`, `delete_project`, `rename_workspace`, `delete_workspace` | `state` | ids are never reused, and nothing on disk is touched |
 | `read_directory` | `entries` | one level, hidden entries included, links left as leaves |
+| `git_status` | `git` | what git makes of a folder, directories included; not being a repository is an answer |
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
 | `render_markdown` | `markdown` | blocks, and where raw HTML is dropped |
 | `themes` | `themes` | the known palettes as hex |

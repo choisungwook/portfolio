@@ -22,7 +22,17 @@ final class TerminalTabBarView: NSView {
     }
   }
 
+  /// Every colour in the window comes from one place, so the strip is part of
+  /// the theme rather than a system coloured band above it.
+  var palette = Palette.system {
+    didSet {
+      applyPalette()
+      render(tabs: shown, active: activeContent)
+    }
+  }
+
   private let row = NSStackView()
+  private let divider = NSView()
   private var height: NSLayoutConstraint!
   private var shown: [TerminalTabs.Tab] = []
   private var activeContent: TerminalTabs.Content?
@@ -43,10 +53,11 @@ final class TerminalTabBarView: NSView {
     row.spacing = 4
     row.translatesAutoresizingMaskIntoConstraints = false
 
-    let divider = NSBox()
-    divider.boxType = .separator
+    divider.wantsLayer = true
     divider.translatesAutoresizingMaskIntoConstraints = false
 
+    wantsLayer = true
+    applyPalette()
     addSubview(row)
     addSubview(divider)
     NSLayoutConstraint.activate([
@@ -57,9 +68,15 @@ final class TerminalTabBarView: NSView {
       divider.leadingAnchor.constraint(equalTo: leadingAnchor),
       divider.trailingAnchor.constraint(equalTo: trailingAnchor),
       divider.bottomAnchor.constraint(equalTo: bottomAnchor),
+      divider.heightAnchor.constraint(equalToConstant: 1),
     ])
     height = heightAnchor.constraint(equalToConstant: barHeight)
     height.isActive = true
+  }
+
+  private func applyPalette() {
+    layer?.backgroundColor = palette.panel.cgColor
+    divider.layer?.backgroundColor = palette.separator.cgColor
   }
 
   private var barHeight: CGFloat { CGFloat(zoom.size(32)) }
@@ -84,6 +101,7 @@ final class TerminalTabBarView: NSView {
           tab: tab,
           isActive: tab.content == active,
           zoom: zoom,
+          palette: palette,
           select: { [weak self] in self?.onSelect?(tab.content) },
           close: { [weak self] in self?.onClose?(tab.content) }
         ))
@@ -92,6 +110,7 @@ final class TerminalTabBarView: NSView {
       image: NSImage(systemSymbolName: "plus", accessibilityDescription: "New tab")!,
       target: self, action: #selector(newTab))
     add.bezelStyle = .accessoryBarAction
+    add.contentTintColor = palette.secondaryText
     add.toolTip = "New tab"
     row.addArrangedSubview(add)
   }
@@ -105,8 +124,8 @@ private final class TabButton: NSView {
   private let select: () -> Void
 
   init(
-    tab: TerminalTabs.Tab, isActive: Bool, zoom: Zoom, select: @escaping () -> Void,
-    close: @escaping () -> Void
+    tab: TerminalTabs.Tab, isActive: Bool, zoom: Zoom, palette: Palette,
+    select: @escaping () -> Void, close: @escaping () -> Void
   ) {
     self.select = select
     super.init(frame: .zero)
@@ -117,20 +136,20 @@ private final class TabButton: NSView {
     setAccessibilityLabel(tab.title)
     wantsLayer = true
     layer?.cornerRadius = 5
-    layer?.backgroundColor =
-      (isActive ? NSColor.selectedContentBackgroundColor : NSColor.clear).cgColor
+    layer?.backgroundColor = (isActive ? palette.selection : NSColor.clear).cgColor
 
     // A document and a shell are both tabs, and the icon is what says which one
     // is about to come forward without reading the file name.
     let symbol = tab.documentPath == nil ? "terminal" : "doc.text"
     let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
-    icon.contentTintColor = isActive ? .selectedMenuItemTextColor : .secondaryLabelColor
+    icon.contentTintColor = isActive ? palette.selectedText : palette.secondaryText
 
     let label = NSTextField(labelWithString: tab.title)
     label.font = .systemFont(ofSize: zoom.size(12))
-    label.textColor = isActive ? .selectedMenuItemTextColor : .labelColor
+    label.textColor = isActive ? palette.selectedText : palette.text
 
-    let closeButton = CloseButton(width: zoom.size(14), handler: close)
+    let closeButton = CloseButton(
+      width: zoom.size(14), tint: palette.secondaryText, handler: close)
     let content = NSStackView(views: [icon, label, closeButton])
     content.orientation = .horizontal
     content.alignment = .centerY
@@ -163,10 +182,11 @@ private final class TabButton: NSView {
 private final class CloseButton: NSButton {
   private let handler: () -> Void
 
-  init(width: Double, handler: @escaping () -> Void) {
+  init(width: Double, tint: NSColor, handler: @escaping () -> Void) {
     self.handler = handler
     super.init(frame: .zero)
     image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close tab")!
+    contentTintColor = tint
     imageScaling = .scaleProportionallyDown
     isBordered = false
     toolTip = "Close tab"

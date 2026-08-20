@@ -113,6 +113,18 @@ public struct TerminalTabs: Equatable, Sendable {
     }
   }
 
+  /// Forgets a whole workspace and answers with the sessions that were open in
+  /// it, which the caller still has to end. Deleting a workspace is the one way
+  /// tabs go without anyone closing them, and tabs left behind would be a strip
+  /// of shells belonging to a row that is no longer in the tree.
+  @discardableResult
+  public mutating func removeWorkspace(_ workspace: UInt64) -> [UInt32] {
+    let sessions = tabs(in: workspace).compactMap(\.session)
+    byWorkspace.removeValue(forKey: workspace)
+    activeByWorkspace.removeValue(forKey: workspace)
+    return sessions
+  }
+
   private mutating func append(_ tab: Tab, to workspace: UInt64) {
     byWorkspace[workspace, default: []].append(tab)
     activeByWorkspace[workspace] = tab.content

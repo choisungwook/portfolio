@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::browse::Entry;
+use crate::git::GitStatus;
 use crate::markdown::Block;
 use crate::theme::Theme;
 use crate::tree::{TreeState, WorkspaceStatus};
@@ -65,12 +66,33 @@ pub enum Command {
         project: u64,
         name: String,
     },
+    RenameProject {
+        project: u64,
+        name: String,
+    },
+    /// Forgets a project and everything under it. The folder on disk stays.
+    DeleteProject {
+        project: u64,
+    },
+    RenameWorkspace {
+        workspace: u64,
+        name: String,
+    },
+    DeleteWorkspace {
+        workspace: u64,
+    },
     /// One directory level. The shell asks again for each folder it opens
     /// rather than receiving a tree it did not ask for.
     ReadDirectory {
         path: String,
     },
     ReadFile {
+        path: String,
+    },
+    /// What git makes of everything under a folder, directories included.
+    /// Answered for a folder that is not in a repository too, as nothing to
+    /// draw rather than an error.
+    GitStatus {
         path: String,
     },
     WriteFile {
@@ -119,6 +141,7 @@ pub enum Response {
     Ok,
     State { state: TreeState },
     Entries { entries: Vec<Entry> },
+    Git { status: GitStatus },
     File { text: String },
     Markdown { blocks: Vec<Block> },
     Themes { themes: Vec<Theme> },
@@ -240,6 +263,43 @@ mod tests {
         );
         let response = serde_json::to_string(&Response::Url { url: None }).unwrap();
         assert_eq!(response, r#"{"type":"url","url":null}"#);
+    }
+
+    #[test]
+    fn git_status_keeps_its_wire_names() {
+        // The Swift side decodes these strings and is compiled separately.
+        let response = serde_json::to_string(&Response::Git {
+            status: GitStatus {
+                repository: true,
+                entries: vec![crate::git::GitEntry {
+                    path: "/tmp/a.txt".to_string(),
+                    status: crate::git::FileStatus::Untracked,
+                }],
+            },
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"git","status":{"repository":true,"entries":[{"path":"/tmp/a.txt","status":"untracked"}]}}"#
+        );
+        let json = r#"{"v":1,"command":{"type":"git_status","path":"/tmp"}}"#;
+        assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
+    }
+
+    #[test]
+    fn reads_rename_and_delete_commands() {
+        let json = r#"{"v":1,"command":{"type":"delete_workspace","workspace":4}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::DeleteWorkspace { workspace } => assert_eq!(workspace, 4),
+            other => panic!("unexpected command: {other:?}"),
+        }
+        let json = r#"{"v":1,"command":{"type":"rename_project","project":2,"name":"New"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::RenameProject { project, name } => {
+                assert_eq!((project, name.as_str()), (2, "New"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 
     #[test]

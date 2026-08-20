@@ -29,6 +29,12 @@ final class MarkdownDocumentView: NSView {
     }
   }
 
+  /// A document fills the same area as a terminal, so it wears the terminal's
+  /// background rather than the system's paper colour beside it.
+  var palette = Palette.system {
+    didSet { applyPalette() }
+  }
+
   private let core: CoreBridge
   private let title = NSTextField(labelWithString: "")
   private let modes = NSSegmentedControl(
@@ -51,7 +57,6 @@ final class MarkdownDocumentView: NSView {
 
   private func setUp() {
     wantsLayer = true
-    layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
     title.lineBreakMode = .byTruncatingMiddle
     modes.selectedSegment = 0
@@ -75,6 +80,7 @@ final class MarkdownDocumentView: NSView {
     preview.onCommandClick = { [weak self] link in self?.onOpenLink?(link) }
     sourceScroll.isHidden = true
     applyZoom()
+    applyPalette()
 
     addSubview(header)
     addSubview(previewScroll)
@@ -105,6 +111,22 @@ final class MarkdownDocumentView: NSView {
     scroll.hasVerticalScroller = true
     scroll.drawsBackground = false
     scroll.translatesAutoresizingMaskIntoConstraints = false
+  }
+
+  private func applyPalette() {
+    layer?.backgroundColor = palette.background.cgColor
+    title.textColor = palette.text
+    for text in [preview as NSTextView, source] {
+      text.textColor = palette.text
+      // The caret and the selection are the two things a text view draws in a
+      // colour of its own, and both disappear against a themed background.
+      text.insertionPointColor = palette.text
+      text.selectedTextAttributes = [
+        .backgroundColor: palette.selection, .foregroundColor: palette.text,
+      ]
+    }
+    guard path != nil else { return }
+    renderPreview()
   }
 
   /// Loads a file. The caller has already dealt with anything unsaved, because
@@ -181,7 +203,8 @@ final class MarkdownDocumentView: NSView {
   private func renderPreview() {
     do {
       let blocks = try core.markdown(source.string)
-      preview.textStorage?.setAttributedString(MarkdownAttributedText.build(blocks, zoom: zoom))
+      preview.textStorage?.setAttributedString(
+        MarkdownAttributedText.build(blocks, zoom: zoom, colour: palette.text))
     } catch {
       onError?(error)
     }

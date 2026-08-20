@@ -20,7 +20,12 @@ public enum CoreCommand: Encodable {
   case loadState(directory: String)
   case createProject(name: String, path: String?)
   case createWorkspace(project: UInt64, name: String)
+  case renameProject(project: UInt64, name: String)
+  case deleteProject(project: UInt64)
+  case renameWorkspace(workspace: UInt64, name: String)
+  case deleteWorkspace(workspace: UInt64)
   case readDirectory(path: String)
+  case gitStatus(path: String)
   case readFile(path: String)
   case writeFile(path: String, text: String)
   case renderMarkdown(text: String)
@@ -70,8 +75,25 @@ public enum CoreCommand: Encodable {
       try container.encode("create_workspace", forKey: .type)
       try container.encode(project, forKey: .project)
       try container.encode(name, forKey: .name)
+    case .renameProject(let project, let name):
+      try container.encode("rename_project", forKey: .type)
+      try container.encode(project, forKey: .project)
+      try container.encode(name, forKey: .name)
+    case .deleteProject(let project):
+      try container.encode("delete_project", forKey: .type)
+      try container.encode(project, forKey: .project)
+    case .renameWorkspace(let workspace, let name):
+      try container.encode("rename_workspace", forKey: .type)
+      try container.encode(workspace, forKey: .workspace)
+      try container.encode(name, forKey: .name)
+    case .deleteWorkspace(let workspace):
+      try container.encode("delete_workspace", forKey: .type)
+      try container.encode(workspace, forKey: .workspace)
     case .readDirectory(let path):
       try container.encode("read_directory", forKey: .type)
+      try container.encode(path, forKey: .path)
+    case .gitStatus(let path):
+      try container.encode("git_status", forKey: .type)
       try container.encode(path, forKey: .path)
     case .readFile(let path):
       try container.encode("read_file", forKey: .type)
@@ -122,6 +144,7 @@ public enum CoreResponse: Equatable, Sendable {
   case ok
   case state(CoreTreeState)
   case entries([CoreEntry])
+  case git(CoreGitStatus)
   case file(text: String)
   case markdown([CoreBlock])
   case themes([CoreTheme])
@@ -164,6 +187,49 @@ public struct CoreEntry: Decodable, Equatable, Sendable {
     case name, path
     case isDirectory = "is_directory"
   }
+}
+
+/// What git makes of the files under one folder.
+///
+/// `repository` false is the ordinary answer for a project that is not under
+/// version control, not a failure: the browser draws its names plainly and asks
+/// nothing else. Directories are in `entries` too, carrying the strongest status
+/// of anything beneath them, so a closed folder still says something is inside.
+public struct CoreGitStatus: Decodable, Equatable, Sendable {
+  public let repository: Bool
+  public let entries: [CoreGitEntry]
+
+  public init(repository: Bool, entries: [CoreGitEntry]) {
+    self.repository = repository
+    self.entries = entries
+  }
+
+  public static let none = CoreGitStatus(repository: false, entries: [])
+
+  /// Ready to look a row up by its path, which is the only thing the browser
+  /// does with this.
+  public var byPath: [String: CoreFileStatus] {
+    Dictionary(entries.map { ($0.path, $0.status) }, uniquingKeysWith: { first, _ in first })
+  }
+}
+
+public struct CoreGitEntry: Decodable, Equatable, Sendable {
+  public let path: String
+  public let status: CoreFileStatus
+
+  public init(path: String, status: CoreFileStatus) {
+    self.path = path
+    self.status = status
+  }
+}
+
+public enum CoreFileStatus: String, Decodable, Equatable, Sendable {
+  case conflicted
+  case deleted
+  case added
+  case modified
+  case renamed
+  case untracked
 }
 
 public struct CoreSpan: Decodable, Equatable, Sendable {
@@ -276,7 +342,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, blocks, themes
-    case statuses, url
+    case statuses, url, status
   }
 
   public init(from decoder: Decoder) throws {
@@ -292,6 +358,8 @@ extension CoreResponse: Decodable {
       self = .state(try container.decode(CoreTreeState.self, forKey: .state))
     case "entries":
       self = .entries(try container.decode([CoreEntry].self, forKey: .entries))
+    case "git":
+      self = .git(try container.decode(CoreGitStatus.self, forKey: .status))
     case "file":
       self = .file(text: try container.decode(String.self, forKey: .text))
     case "markdown":

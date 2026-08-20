@@ -135,6 +135,90 @@ struct ProtocolTests {
     #expect(CoreTheme.rgb("#zzzzzz") == nil)
   }
 
+  @Test func renameAndDeleteKeepTheirWireNames() throws {
+    #expect(
+      try json(.renameProject(project: 2, name: "New"))
+        == #"{"command":{"name":"New","project":2,"type":"rename_project"},"v":1}"#)
+    #expect(
+      try json(.deleteProject(project: 2))
+        == #"{"command":{"project":2,"type":"delete_project"},"v":1}"#)
+    #expect(
+      try json(.renameWorkspace(workspace: 5, name: "Web"))
+        == #"{"command":{"name":"Web","type":"rename_workspace","workspace":5},"v":1}"#)
+    #expect(
+      try json(.deleteWorkspace(workspace: 5))
+        == #"{"command":{"type":"delete_workspace","workspace":5},"v":1}"#)
+  }
+
+  @Test func readsWhatGitMakesOfAFolder() throws {
+    #expect(
+      try json(.gitStatus(path: "/p"))
+        == #"{"command":{"path":"\/p","type":"git_status"},"v":1}"#)
+    let found = #"""
+      {"type":"git","status":{"repository":true,"entries":[
+      {"path":"/p/src","status":"modified"},{"path":"/p/new.txt","status":"untracked"}]}}
+      """#
+    guard case .git(let status) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(found.utf8))
+    else {
+      Issue.record("expected a git status")
+      return
+    }
+    #expect(status.repository)
+    #expect(status.byPath["/p/src"] == .modified)
+    #expect(status.byPath["/p/new.txt"] == .untracked)
+
+    // A project outside a repository is an answer, not a failure.
+    let plain = #"{"type":"git","status":{"repository":false,"entries":[]}}"#
+    guard case .git(let none) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(plain.utf8))
+    else {
+      Issue.record("expected a git status")
+      return
+    }
+    #expect(!none.repository)
+    #expect(none.byPath.isEmpty)
+  }
+
+  @Test func aThemeDressesEverySurfaceInTheWindow() throws {
+    // The mixing is here rather than in the views, so it is checked here too.
+    let dark = try theme(background: "#1e1e2e", foreground: "#cdd6f4", blue: "#89b4fa")
+    #expect(dark.isDark)
+    // The panel sits between the terminal and its text, never outside them.
+    let panel = try #require(dark.panelBackground)
+    #expect(panel.red > 0x1e && panel.red < 0xcd)
+    let secondary = try #require(dark.secondaryForeground)
+    #expect(secondary.red < 0xcd && secondary.red > 0x1e)
+    #expect(dark.selectionBackground != nil)
+
+    let light = try theme(background: "#ffffff", foreground: "#24292e", blue: "#0366d6")
+    #expect(!light.isDark)
+    // The same nudge in the other direction: a light theme darkens its panel.
+    let lightPanel = try #require(light.panelBackground)
+    #expect(lightPanel.red < 0xff)
+
+    // Half of black and white is grey, whichever way round it is asked.
+    #expect(CoreTheme.blend((0, 0, 0), (255, 255, 255), amount: 0.5) == (128, 128, 128))
+    #expect(CoreTheme.blend((0, 0, 0), (255, 255, 255), amount: 0) == (0, 0, 0))
+
+    // A theme this build cannot read dresses nothing, rather than in black.
+    let broken = try theme(background: "nope", foreground: "#cdd6f4", blue: "#89b4fa")
+    #expect(broken.panelBackground == nil)
+    #expect(broken.selectionBackground == nil)
+  }
+
+  /// One theme built from three colours, which is all the mixing above reads.
+  private func theme(background: String, foreground: String, blue: String) throws -> CoreTheme {
+    var palette = Array(repeating: "#000000", count: 16)
+    palette[4] = blue
+    let colours = palette.map { "\"\($0)\"" }.joined(separator: ",")
+    let json = """
+      {"name":"Test","background":"\(background)","foreground":"\(foreground)",
+      "cursor":"\(foreground)","palette":[\(colours)]}
+      """
+    return try JSONDecoder().decode(CoreTheme.self, from: Data(json.utf8))
+  }
+
   @Test func treeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadState(directory: "/tmp/app"))

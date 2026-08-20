@@ -102,6 +102,15 @@ public final class CoreBridge {
     }
   }
 
+  /// What git makes of a folder. Never throws: a browser that cannot colour a
+  /// row still has to draw it, so every failure reads as "nothing to colour".
+  public func gitStatus(in directory: String) -> CoreGitStatus {
+    guard case .git(let status) = try? send(.gitStatus(path: directory)) else {
+      return .none
+    }
+    return status
+  }
+
   public func text(ofFile path: String) throws -> String {
     let response = try send(.readFile(path: path))
     switch response {
