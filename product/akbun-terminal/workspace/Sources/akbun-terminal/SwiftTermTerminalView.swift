@@ -53,6 +53,31 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     ])
   }
 
+  /// Shift and return, before the emulator sees it.
+  ///
+  /// A key equivalent rather than a `keyDown` override, because SwiftTerm's
+  /// `keyDown` is public and not open: it cannot be overridden from this module
+  /// at all. The window offers every key press to this hierarchy here first,
+  /// which is the same route a default button's return takes, so the one key
+  /// this app encodes itself is answered before anything else reads it.
+  ///
+  /// Only while the terminal holds the keyboard. This view is on screen for a
+  /// shell tab, and a document tab beside it has its own idea of what return
+  /// means.
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    guard !ended, terminalHasFocus,
+      let bytes = TerminalKeys.bytes(
+        keyCode: event.keyCode, shift: event.modifierFlags.contains(.shift))
+    else { return super.performKeyEquivalent(with: event) }
+    onInput?(bytes)
+    return true
+  }
+
+  private var terminalHasFocus: Bool {
+    guard let responder = window?.firstResponder as? NSView else { return false }
+    return responder === terminal || responder.isDescendant(of: terminal)
+  }
+
   var grid: (cols: UInt16, rows: UInt16) {
     let size = terminal.getTerminal()
     return (UInt16(max(1, size.cols)), UInt16(max(1, size.rows)))

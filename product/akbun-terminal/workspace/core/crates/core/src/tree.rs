@@ -15,6 +15,20 @@ pub struct TreeState {
     /// without themes still reads here and the wire shape does not change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// The highest id handed out so far, projects and workspaces together.
+    ///
+    /// Ids used to be the largest one in the tree plus one, which reuses the id
+    /// of whatever was deleted last. Nothing in the file minded, but the running
+    /// app keeps a status and a set of open tabs per workspace id, so a new
+    /// workspace would inherit the colour and the tabs of the one it replaced.
+    /// Skipped while it is zero, so a file written before this existed still
+    /// reads and an empty tree still writes the same bytes.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub next_id: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl Default for TreeState {
@@ -23,6 +37,7 @@ impl Default for TreeState {
             schema_version: STATE_SCHEMA_VERSION,
             projects: Vec::new(),
             theme: None,
+            next_id: 0,
         }
     }
 }
@@ -89,8 +104,9 @@ impl TreeStore {
     ) -> Result<TreeState, String> {
         let name = required_name(name, "project")?;
         let mut next = self.state.clone();
+        let id = take_id(&mut next);
         next.projects.push(Project {
-            id: next_project_id(&next),
+            id,
             name,
             path: path.filter(|value| !value.is_empty()),
             workspaces: Vec::new(),
@@ -100,8 +116,8 @@ impl TreeStore {
 
     pub fn create_workspace(&mut self, project: u64, name: String) -> Result<TreeState, String> {
         let name = required_name(name, "workspace")?;
-        let id = next_workspace_id(&self.state);
         let mut next = self.state.clone();
+        let id = take_id(&mut next);
         let Some(project) = next.projects.iter_mut().find(|item| item.id == project) else {
             return Err(format!("no project {project}"));
         };
@@ -110,6 +126,58 @@ impl TreeStore {
             name,
             status: WorkspaceStatus::Idle,
         });
+        self.commit(next)
+    }
+
+    pub fn rename_project(&mut self, project: u64, name: String) -> Result<TreeState, String> {
+        let name = required_name(name, "project")?;
+        let mut next = self.state.clone();
+        let Some(found) = next.projects.iter_mut().find(|item| item.id == project) else {
+            return Err(format!("no project {project}"));
+        };
+        found.name = name;
+        self.commit(next)
+    }
+
+    /// Removes a project and the workspaces under it. The folder on disk is not
+    /// touched: this tree is a list of places to open, and a list forgetting a
+    /// place has never meant deleting it.
+    pub fn delete_project(&mut self, project: u64) -> Result<TreeState, String> {
+        let mut next = self.state.clone();
+        let before = next.projects.len();
+        next.projects.retain(|item| item.id != project);
+        if next.projects.len() == before {
+            return Err(format!("no project {project}"));
+        }
+        self.commit(next)
+    }
+
+    pub fn rename_workspace(&mut self, workspace: u64, name: String) -> Result<TreeState, String> {
+        let name = required_name(name, "workspace")?;
+        let mut next = self.state.clone();
+        let Some(found) = next
+            .projects
+            .iter_mut()
+            .flat_map(|project| project.workspaces.iter_mut())
+            .find(|item| item.id == workspace)
+        else {
+            return Err(format!("no workspace {workspace}"));
+        };
+        found.name = name;
+        self.commit(next)
+    }
+
+    pub fn delete_workspace(&mut self, workspace: u64) -> Result<TreeState, String> {
+        let mut next = self.state.clone();
+        let mut removed = false;
+        for project in next.projects.iter_mut() {
+            let before = project.workspaces.len();
+            project.workspaces.retain(|item| item.id != workspace);
+            removed = removed || project.workspaces.len() != before;
+        }
+        if !removed {
+            return Err(format!("no workspace {workspace}"));
+        }
         self.commit(next)
     }
 
@@ -140,25 +208,25 @@ fn required_name(name: String, kind: &str) -> Result<String, String> {
     Ok(name.to_string())
 }
 
-fn next_project_id(state: &TreeState) -> u64 {
-    state
+/// The next id, and never one that has been used before. The high water mark is
+/// raised to whatever is already in the tree first, so a file written by a build
+/// without one is still safe to add to.
+fn take_id(state: &mut TreeState) -> u64 {
+    let highest = state
         .projects
         .iter()
         .map(|project| project.id)
+        .chain(
+            state
+                .projects
+                .iter()
+                .flat_map(|project| project.workspaces.iter())
+                .map(|workspace| workspace.id),
+        )
         .max()
-        .unwrap_or(0)
-        + 1
-}
-
-fn next_workspace_id(state: &TreeState) -> u64 {
-    state
-        .projects
-        .iter()
-        .flat_map(|project| project.workspaces.iter())
-        .map(|workspace| workspace.id)
-        .max()
-        .unwrap_or(0)
-        + 1
+        .unwrap_or(0);
+    state.next_id = state.next_id.max(highest) + 1;
+    state.next_id
 }
 
 fn write_state(directory: &Path, state: &TreeState) -> Result<(), String> {
@@ -219,6 +287,59 @@ mod tests {
         // Back to the system appearance, which is stored as nothing at all.
         assert_eq!(store.set_theme(crate::theme::SYSTEM.to_string()).unwrap().theme, None);
         assert!(store.set_theme("Nope".to_string()).is_err());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn renames_and_deletes_both_levels() {
+        let directory = test_directory();
+        let path = directory.to_string_lossy().to_string();
+        let mut store = TreeStore::default();
+        store.load(&path).unwrap();
+        let state = store.create_project("Demo".to_string(), None).unwrap();
+        let project = state.projects[0].id;
+        let state = store.create_workspace(project, "Server".to_string()).unwrap();
+        let workspace = state.projects[0].workspaces[0].id;
+
+        let state = store.rename_project(project, "Renamed".to_string()).unwrap();
+        assert_eq!(state.projects[0].name, "Renamed");
+        let state = store.rename_workspace(workspace, "Web".to_string()).unwrap();
+        assert_eq!(state.projects[0].workspaces[0].name, "Web");
+        assert!(store.rename_workspace(workspace, "  ".to_string()).is_err());
+
+        let state = store.delete_workspace(workspace).unwrap();
+        assert!(state.projects[0].workspaces.is_empty());
+        assert!(store.delete_workspace(workspace).is_err());
+        let state = store.delete_project(project).unwrap();
+        assert!(state.projects.is_empty());
+        assert!(store.delete_project(project).is_err());
+        assert_eq!(TreeStore::default().load(&path).unwrap().projects.len(), 0);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_id_is_never_handed_out_twice() {
+        // The running app keys open tabs and agent colours by these numbers, so
+        // a reused id shows the deleted workspace's state on a new one.
+        let directory = test_directory();
+        let path = directory.to_string_lossy().to_string();
+        let mut store = TreeStore::default();
+        store.load(&path).unwrap();
+        let state = store.create_project("Demo".to_string(), None).unwrap();
+        let project = state.projects[0].id;
+        let state = store.create_workspace(project, "First".to_string()).unwrap();
+        let first = state.projects[0].workspaces[0].id;
+        store.delete_workspace(first).unwrap();
+        let state = store.create_workspace(project, "Second".to_string()).unwrap();
+        assert_ne!(state.projects[0].workspaces[0].id, first);
+
+        // And across a restart, where the tree no longer remembers the deleted one.
+        let mut restarted = TreeStore::default();
+        let state = restarted.load(&path).unwrap();
+        let highest = state.projects[0].workspaces[0].id;
+        restarted.delete_workspace(highest).unwrap();
+        let state = restarted.create_workspace(project, "Third".to_string()).unwrap();
+        assert!(state.projects[0].workspaces[0].id > highest);
         fs::remove_dir_all(directory).unwrap();
     }
 

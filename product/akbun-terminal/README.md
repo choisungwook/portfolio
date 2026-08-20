@@ -46,11 +46,14 @@ cargo test --manifest-path core/Cargo.toml
 - Opens a terminal tab strip for the selected workspace, with add, switch and close.
 - Runs each tab as the user's login shell in the project folder, with colour, the cursor and full screen programs drawn properly.
 - Sends keystrokes to it, draws what comes back, and tells it the new size when the window changes.
+- Sends escape and return for shift with return, so a CLI agent in a tab takes a new line instead of the prompt.
 - Ends every shell when the window closes or the app quits, and reaps it, so nothing lingers.
 - Lists the selected project's files on the right, hidden files and folders included, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
+- Colours those names by what git makes of them when the project is a repository, with a closed folder wearing the strongest status of anything inside it, refreshed while the shell beside it works.
 - Opens a markdown file in a tab beside the shells, rendered or as source, and writes it back on save.
 - Opens a markdown link inside a rendered document in its own tab on Command click, and sends an http or https link to a browser.
-- Wears a known colour scheme picked from the View menu, or follows the system appearance.
+- Wears a known colour scheme picked from the View menu, or follows the system appearance, and dresses every pane in it rather than the terminal alone.
+- Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.
 - Zooms the whole window with Command plus and minus, and back to the default size with Command zero: the terminal, the tab strip, the project tree, the file list and the rendered document all follow one size.
 - Lets the sidebar and the file pane be dragged to any width, and folded away entirely.
 - Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening the workspace takes the green away.

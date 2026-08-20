@@ -7,6 +7,10 @@ final class ProjectSidebarView: NSView {
   var onCreateEmptyProject: (() -> Void)?
   var onCreateWorkspace: ((CoreProject) -> Void)?
   var onSelectWorkspace: ((CoreProject, CoreWorkspace) -> Void)?
+  var onRenameProject: ((CoreProject) -> Void)?
+  var onDeleteProject: ((CoreProject) -> Void)?
+  var onRenameWorkspace: ((CoreProject, CoreWorkspace) -> Void)?
+  var onDeleteWorkspace: ((CoreProject, CoreWorkspace) -> Void)?
 
   private let rows = FlippedStackView()
   private(set) var projects: [CoreProject] = []
@@ -24,6 +28,12 @@ final class ProjectSidebarView: NSView {
     }
   }
 
+  /// Every colour in the window comes from one place, so a dark theme does not
+  /// leave a light list beside a dark terminal.
+  var palette = Palette.system {
+    didSet { redraw() }
+  }
+
   private let title = NSTextField(labelWithString: "Projects")
 
   override init(frame frameRect: NSRect) {
@@ -38,7 +48,6 @@ final class ProjectSidebarView: NSView {
 
   private func setUp() {
     wantsLayer = true
-    layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
     title.font = .systemFont(ofSize: zoom.size(13), weight: .semibold)
 
@@ -55,7 +64,7 @@ final class ProjectSidebarView: NSView {
 
     rows.orientation = .vertical
     rows.alignment = .leading
-    rows.spacing = 4
+    rows.spacing = rowSpacing
     rows.translatesAutoresizingMaskIntoConstraints = false
 
     let scroll = NSScrollView()
@@ -76,7 +85,24 @@ final class ProjectSidebarView: NSView {
       scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
       rows.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
     ])
+    redraw()
   }
+
+  /// How far apart the rows sit, and how tall each one is.
+  ///
+  /// These were four points of spacing and three of padding, which packed the
+  /// projects and their workspaces into a block that had to be read carefully to
+  /// see where one project ended. The list is short — a handful of projects with
+  /// a few workspaces each — so there is room to give every row the height it
+  /// takes to be picked out at a glance. All of them follow the zoom, sideways
+  /// as well as down: a zoomed in window would otherwise grow the text inside
+  /// rows that kept their old height and their old margins, which is tighter
+  /// than where this started rather than looser.
+  private var rowSpacing: CGFloat { CGFloat(zoom.size(6)) }
+  private var projectPadding: CGFloat { CGFloat(zoom.size(8)) }
+  private var workspacePadding: CGFloat { CGFloat(zoom.size(6)) }
+  private var leadingInset: CGFloat { CGFloat(zoom.size(8)) }
+  private var trailingInset: CGFloat { CGFloat(zoom.size(6)) }
 
   func render(_ state: CoreTreeState) {
     projects = state.projects
@@ -99,13 +125,16 @@ final class ProjectSidebarView: NSView {
   }
 
   private func redraw() {
+    layer?.backgroundColor = palette.panel.cgColor
+    title.textColor = palette.text
+    rows.spacing = rowSpacing
     rows.arrangedSubviews.forEach {
       rows.removeArrangedSubview($0)
       $0.removeFromSuperview()
     }
     if projects.isEmpty {
       let empty = NSTextField(wrappingLabelWithString: "Add a folder or create an empty project.")
-      empty.textColor = .secondaryLabelColor
+      empty.textColor = palette.secondaryText
       empty.font = .systemFont(ofSize: zoom.size(12))
       empty.translatesAutoresizingMaskIntoConstraints = false
       rows.addArrangedSubview(empty)
@@ -118,44 +147,65 @@ final class ProjectSidebarView: NSView {
 
   private func addProject(_ project: CoreProject) {
     let icon = NSImageView(image: NSImage(systemSymbolName: "folder", accessibilityDescription: "Project")!)
-    icon.contentTintColor = .secondaryLabelColor
+    icon.contentTintColor = palette.secondaryText
     icon.symbolConfiguration = NSImage.SymbolConfiguration(
       pointSize: CGFloat(zoom.size(12)), weight: .regular)
     icon.widthAnchor.constraint(equalToConstant: CGFloat(zoom.size(14))).isActive = true
 
     let name = NSTextField(labelWithString: project.name)
     name.font = .systemFont(ofSize: zoom.size(13))
+    name.textColor = palette.text
     name.lineBreakMode = .byTruncatingMiddle
     name.toolTip = project.path ?? "Empty project · home directory"
 
-    let add = ActionButton(symbol: "plus", help: "Add workspace") { [weak self] in
-      self?.onCreateWorkspace?(project)
+    let add = ActionButton(symbol: "plus", help: "Add workspace", tint: palette.secondaryText) {
+      [weak self] in self?.onCreateWorkspace?(project)
     }
-    let row = NSStackView(views: [icon, name, NSView(), add])
+    let rename = ActionButton(
+      symbol: "pencil", help: "Rename project", tint: palette.secondaryText
+    ) { [weak self] in self?.onRenameProject?(project) }
+    let delete = ActionButton(symbol: "trash", help: "Delete project", tint: palette.secondaryText) {
+      [weak self] in self?.onDeleteProject?(project)
+    }
+    let row = NSStackView(views: [icon, name, NSView(), add, rename, delete])
     row.orientation = .horizontal
     row.alignment = .centerY
     row.spacing = 5
-    row.edgeInsets = NSEdgeInsets(top: 3, left: 8, bottom: 3, right: 6)
+    row.edgeInsets = NSEdgeInsets(
+      top: projectPadding, left: leadingInset, bottom: projectPadding, right: trailingInset)
     rows.addArrangedSubview(row)
     row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
 
     for workspace in project.workspaces {
-      let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status, size: zoom.size(8))
-      let label = NSTextField(labelWithString: workspace.name)
-      label.font = .systemFont(ofSize: zoom.size(12))
-      label.lineBreakMode = .byTruncatingTail
-      let workspaceRow = WorkspaceRow(isSelected: workspace.id == selected, name: workspace.name) { [weak self] in
-        self?.onSelectWorkspace?(project, workspace)
-      }
-      workspaceRow.setViews([dot, label], in: .leading)
-      workspaceRow.orientation = .horizontal
-      workspaceRow.alignment = .centerY
-      workspaceRow.spacing = 7
-      workspaceRow.edgeInsets = NSEdgeInsets(
-        top: 3, left: CGFloat(zoom.size(31)), bottom: 3, right: 8)
-      rows.addArrangedSubview(workspaceRow)
-      workspaceRow.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
+      addWorkspace(workspace, of: project)
     }
+  }
+
+  private func addWorkspace(_ workspace: CoreWorkspace, of project: CoreProject) {
+    let isSelected = workspace.id == selected
+    let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status, size: zoom.size(8))
+    let label = NSTextField(labelWithString: workspace.name)
+    label.font = .systemFont(ofSize: zoom.size(12))
+    label.textColor = isSelected ? palette.selectedText : palette.text
+    label.lineBreakMode = .byTruncatingTail
+    let rename = ActionButton(
+      symbol: "pencil", help: "Rename workspace", tint: palette.secondaryText
+    ) { [weak self] in self?.onRenameWorkspace?(project, workspace) }
+    let delete = ActionButton(
+      symbol: "trash", help: "Delete workspace", tint: palette.secondaryText
+    ) { [weak self] in self?.onDeleteWorkspace?(project, workspace) }
+    let row = WorkspaceRow(
+      isSelected: isSelected, name: workspace.name, selection: palette.selection
+    ) { [weak self] in self?.onSelectWorkspace?(project, workspace) }
+    row.setViews([dot, label, NSView(), rename, delete], in: .leading)
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 7
+    row.edgeInsets = NSEdgeInsets(
+      top: workspacePadding, left: CGFloat(zoom.size(31)), bottom: workspacePadding,
+      right: trailingInset)
+    rows.addArrangedSubview(row)
+    row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
   }
 
   private func projectMenu() -> NSMenu {
@@ -179,13 +229,14 @@ final class ProjectSidebarView: NSView {
 private final class ActionButton: NSButton {
   private let handler: () -> Void
 
-  init(symbol: String, help: String, handler: @escaping () -> Void) {
+  init(symbol: String, help: String, tint: NSColor, handler: @escaping () -> Void) {
     self.handler = handler
     let image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)!
     super.init(frame: .zero)
     self.image = image
     self.toolTip = help
     self.bezelStyle = .accessoryBarAction
+    self.contentTintColor = tint
     self.target = self
     self.action = #selector(run)
   }
@@ -200,11 +251,13 @@ private final class ActionButton: NSButton {
 }
 
 /// A workspace line. Clicking it is how a terminal is opened, so the row itself
-/// is the control rather than a label with a gesture bolted on.
+/// is the control rather than a label with a gesture bolted on. The buttons on
+/// it answer their own clicks, so they never open the terminal on the way to
+/// renaming or deleting it.
 private final class WorkspaceRow: NSStackView {
   private let handler: () -> Void
 
-  init(isSelected: Bool, name: String, handler: @escaping () -> Void) {
+  init(isSelected: Bool, name: String, selection: NSColor, handler: @escaping () -> Void) {
     self.handler = handler
     super.init(frame: .zero)
     setAccessibilityElement(true)
@@ -212,8 +265,7 @@ private final class WorkspaceRow: NSStackView {
     setAccessibilityLabel(name)
     wantsLayer = true
     layer?.cornerRadius = 4
-    layer?.backgroundColor =
-      (isSelected ? NSColor.selectedContentBackgroundColor : NSColor.clear).cgColor
+    layer?.backgroundColor = (isSelected ? selection : NSColor.clear).cgColor
   }
 
   required init?(coder: NSCoder) {

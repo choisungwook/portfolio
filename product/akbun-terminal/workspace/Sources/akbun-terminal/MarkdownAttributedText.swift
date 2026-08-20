@@ -3,9 +3,12 @@ import AkbunTerminalCore
 
 /// Blocks from the core to one attributed string.
 ///
-/// The colours are all semantic, so the rendered document follows dark and light
-/// mode the same way the rest of the window does. Nothing here parses markdown;
-/// by the time a block arrives the decisions have already been made in the core.
+/// The text colour is handed in rather than looked up, because a document tab
+/// fills the same area as a terminal and has to wear the same theme: semantic
+/// colours would draw black text on a Dracula background. The quieter shades are
+/// that colour faded towards the background, which is one colour to pass instead
+/// of four. Nothing here parses markdown; by the time a block arrives the
+/// decisions have already been made in the core.
 struct MarkdownAttributedText {
   /// Where a span's link is kept. Deliberately not `.link`, because that
   /// attribute makes a plain click open the destination, and a document someone
@@ -15,10 +18,17 @@ struct MarkdownAttributedText {
   static let linkKey = NSAttributedString.Key("io.akbun.terminal.link")
 
   let zoom: Zoom
+  let colour: NSColor
 
-  static func build(_ blocks: [CoreBlock], zoom: Zoom = Zoom()) -> NSAttributedString {
-    MarkdownAttributedText(zoom: zoom).build(blocks)
+  static func build(_ blocks: [CoreBlock], zoom: Zoom = Zoom(), colour: NSColor = .textColor)
+    -> NSAttributedString
+  {
+    MarkdownAttributedText(zoom: zoom, colour: colour).build(blocks)
   }
+
+  /// A quote, a table, a rule: present but not what is being read.
+  private var quiet: NSColor { colour.withAlphaComponent(0.6) }
+  private var quietest: NSColor { colour.withAlphaComponent(0.35) }
 
   func build(_ blocks: [CoreBlock]) -> NSAttributedString {
     let document = NSMutableAttributedString()
@@ -30,7 +40,7 @@ struct MarkdownAttributedText {
       case .paragraph(let spans):
         append(spans, to: document, base: body)
       case .quote(let spans):
-        append(spans, to: document, base: body, indent: 18, color: .secondaryLabelColor)
+        append(spans, to: document, base: body, indent: 18, color: quiet)
       case .listItem(let depth, let marker, let spans):
         let bullet = marker.isEmpty ? "" : "\(marker) "
         append(
@@ -38,12 +48,14 @@ struct MarkdownAttributedText {
       case .code(_, let text):
         // The language is not drawn: highlighting is a code editor's job, and
         // this view is for reading documents.
-        appendLine(text, to: document, font: monospace, indent: 18, color: .textColor)
+        appendLine(text, to: document, font: monospace, indent: 18, color: colour)
       case .table(let header, let rows):
-        appendLine(Self.table(header: header, rows: rows), to: document, font: monospace, indent: 12)
+        appendLine(
+          Self.table(header: header, rows: rows), to: document, font: monospace, indent: 12,
+          color: quiet)
       case .rule:
         appendLine(String(repeating: "─", count: 40), to: document, font: body,
-          indent: 0, color: .tertiaryLabelColor)
+          indent: 0, color: quietest)
       case .unknown:
         continue
       }
@@ -56,8 +68,9 @@ struct MarkdownAttributedText {
 
   private func append(
     _ spans: [CoreSpan], to document: NSMutableAttributedString, base: NSFont,
-    indent: Double = 0, prefix: String = "", color: NSColor = .textColor
+    indent: Double = 0, prefix: String = "", color: NSColor? = nil
   ) {
+    let color = color ?? colour
     let line = NSMutableAttributedString()
     if !prefix.isEmpty {
       line.append(NSAttributedString(string: prefix, attributes: [.font: base, .foregroundColor: color]))
@@ -88,7 +101,7 @@ struct MarkdownAttributedText {
 
   private func appendLine(
     _ text: String, to document: NSMutableAttributedString, font: NSFont, indent: Double,
-    color: NSColor = .secondaryLabelColor
+    color: NSColor
   ) {
     document.append(
       NSAttributedString(
