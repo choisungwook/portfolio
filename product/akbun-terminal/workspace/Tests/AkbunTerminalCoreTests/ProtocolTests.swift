@@ -329,6 +329,49 @@ struct ProtocolTests {
     #expect(response == .error(message: "unknown response type tomorrow"))
   }
 
+  @Test func namesTheFieldsTheSettingsWindowAndThePaletteSend() throws {
+    #expect(try json(.shortcuts) == #"{"command":{"type":"shortcuts"},"v":1}"#)
+    #expect(
+      try json(.setShortcut(command: "save", key: "cmd+shift+s"))
+        == #"{"command":{"command":"save","key":"cmd+shift+s","type":"set_shortcut"},"v":1}"#)
+    #expect(
+      try json(.findFiles(root: "/p", query: "app", limit: 60))
+        == #"{"command":{"limit":60,"query":"app","root":"\/p","type":"find_files"},"v":1}"#)
+    // The limit is optional, so a caller with no opinion leaves it out.
+    #expect(
+      try json(.findFiles(root: "/p", query: "app", limit: nil))
+        == #"{"command":{"query":"app","root":"\/p","type":"find_files"},"v":1}"#)
+  }
+
+  @Test func decodesShortcutsAndFileMatches() throws {
+    let decoder = JSONDecoder()
+    let shortcuts = try decoder.decode(
+      CoreResponse.self,
+      from: Data(
+        #"{"type":"shortcuts","shortcuts":[{"command":"save","title":"Save","menu":"File","key":"cmd+s","default_key":"cmd+s"}]}"#.utf8
+      ))
+    #expect(
+      shortcuts == .shortcuts([
+        CoreShortcut(command: "save", title: "Save", menu: "File", key: "cmd+s", defaultKey: "cmd+s")
+      ]))
+    let matches = try decoder.decode(
+      CoreResponse.self,
+      from: Data(
+        #"{"type":"matches","matches":[{"path":"/p/a.rs","relative":"a.rs","score":9,"positions":[0]}]}"#.utf8
+      ))
+    #expect(
+      matches == .matches([
+        CoreMatch(path: "/p/a.rs", relative: "a.rs", score: 9, positions: [0])
+      ]))
+  }
+
+  @Test func aMermaidFenceArrivesAsItsOwnBlock() throws {
+    let response = try JSONDecoder().decode(
+      CoreResponse.self,
+      from: Data(#"{"type":"markdown","blocks":[{"type":"mermaid","text":"graph TD"}]}"#.utf8))
+    #expect(response == .markdown([.mermaid(text: "graph TD")]))
+  }
+
   @Test func decodesOutputAndExitEvents() throws {
     let decoder = JSONDecoder()
     #expect(

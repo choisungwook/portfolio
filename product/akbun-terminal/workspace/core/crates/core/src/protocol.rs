@@ -11,6 +11,8 @@ use crate::browse::Entry;
 use crate::git::GitStatus;
 use crate::highlight::Token;
 use crate::markdown::Block;
+use crate::search::Match;
+use crate::shortcuts::Shortcut;
 use crate::theme::Theme;
 use crate::tree::{TreeState, WorkspaceStatus};
 
@@ -116,6 +118,27 @@ pub enum Command {
     SetTheme {
         name: String,
     },
+    /// Every menu command with the key it currently runs on.
+    Shortcuts,
+    /// Puts a key on a command. An empty `key` restores that command's default,
+    /// and a key another command already has is refused rather than shared.
+    SetShortcut {
+        command: String,
+        key: String,
+    },
+    /// Every command back to the key it shipped with.
+    ResetShortcuts,
+    /// The files under `root` that `query` means, best first.
+    ///
+    /// The whole query is sent on every keystroke rather than a cursor into a
+    /// previous answer, because the ordering is over the whole project and a
+    /// narrowed list cannot widen again when a character is deleted.
+    FindFiles {
+        root: String,
+        query: String,
+        #[serde(default)]
+        limit: Option<usize>,
+    },
     /// Points the agent rules at a directory, seeding it with the shipped files
     /// when it holds none. Judging answers `idle` for everything until this has
     /// been called.
@@ -160,6 +183,8 @@ pub enum Response {
         lines: Vec<Vec<Token>>,
     },
     Themes { themes: Vec<Theme> },
+    Shortcuts { shortcuts: Vec<Shortcut> },
+    Matches { matches: Vec<Match> },
     /// Only the workspaces whose status changed since the last call.
     Statuses { statuses: Vec<WorkspaceState> },
     /// Absent when the click did not land on something this core will open.
@@ -278,6 +303,55 @@ mod tests {
         );
         let response = serde_json::to_string(&Response::Url { url: None }).unwrap();
         assert_eq!(response, r#"{"type":"url","url":null}"#);
+    }
+
+    #[test]
+    fn shortcuts_and_file_search_keep_their_wire_names() {
+        // Decoded by a Swift file compiled apart from this crate, so a rename
+        // has to fail here rather than at runtime on somebody's machine.
+        let response = serde_json::to_string(&Response::Shortcuts {
+            shortcuts: vec![crate::shortcuts::Shortcut {
+                command: "save".to_string(),
+                title: "Save".to_string(),
+                menu: "File".to_string(),
+                key: "cmd+s".to_string(),
+                default_key: "cmd+s".to_string(),
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"shortcuts","shortcuts":[{"command":"save","title":"Save","menu":"File","key":"cmd+s","default_key":"cmd+s"}]}"#
+        );
+        let response = serde_json::to_string(&Response::Matches {
+            matches: vec![crate::search::Match {
+                path: "/tmp/a/b.rs".to_string(),
+                relative: "a/b.rs".to_string(),
+                score: 42,
+                positions: vec![0, 2],
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"matches","matches":[{"path":"/tmp/a/b.rs","relative":"a/b.rs","score":42,"positions":[0,2]}]}"#
+        );
+
+        let json = r#"{"v":1,"command":{"type":"set_shortcut","command":"save","key":"cmd+shift+s"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::SetShortcut { command, key } => {
+                assert_eq!((command.as_str(), key.as_str()), ("save", "cmd+shift+s"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        // The limit is optional, so a shell that does not send one still asks.
+        let json = r#"{"v":1,"command":{"type":"find_files","root":"/tmp","query":"ap"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::FindFiles { root, query, limit } => {
+                assert_eq!((root.as_str(), query.as_str(), limit), ("/tmp", "ap", None));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 
     #[test]

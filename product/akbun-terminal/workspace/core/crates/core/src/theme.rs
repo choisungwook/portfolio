@@ -153,6 +153,76 @@ const ROWS: &[Row] = &[
             "#959da5", "#cb2431", "#22863a", "#b08800", "#005cc8", "#5a32a3", "#3192aa", "#d1d5da",
         ],
     },
+    Row {
+        name: "Light",
+        background: "#ffffff",
+        foreground: "#1a1a1a",
+        cursor: "#1a1a1a",
+        palette: [
+            "#1a1a1a", "#c0392b", "#2e7d32", "#a67c00", "#1565c0", "#8e24aa", "#00838f", "#d0d0d0",
+            "#6b6b6b", "#e74c3c", "#43a047", "#c9a227", "#1e88e5", "#ab47bc", "#00acc1", "#ffffff",
+        ],
+    },
+    Row {
+        name: "Catppuccin Latte",
+        background: "#eff1f5",
+        foreground: "#4c4f69",
+        cursor: "#dc8a78",
+        palette: [
+            "#5c5f77", "#d20f39", "#40a02b", "#df8e1d", "#1e66f5", "#ea76cb", "#179299", "#acb0be",
+            "#6c6f85", "#d20f39", "#40a02b", "#df8e1d", "#1e66f5", "#ea76cb", "#179299", "#bcc0cc",
+        ],
+    },
+    Row {
+        name: "One Light",
+        background: "#fafafa",
+        foreground: "#383a42",
+        cursor: "#526fff",
+        palette: [
+            "#383a42", "#e45649", "#50a14f", "#c18401", "#0184bc", "#a626a4", "#0997b3", "#a0a1a7",
+            "#4f525e", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#ffffff",
+        ],
+    },
+    Row {
+        name: "Gruvbox Light",
+        background: "#fbf1c7",
+        foreground: "#3c3836",
+        cursor: "#3c3836",
+        palette: [
+            "#fbf1c7", "#cc241d", "#98971a", "#d79921", "#458588", "#b16286", "#689d6a", "#7c6f64",
+            "#928374", "#9d0006", "#79740e", "#b57614", "#076678", "#8f3f71", "#427b58", "#3c3836",
+        ],
+    },
+    Row {
+        name: "Ayu Light",
+        background: "#fafafa",
+        foreground: "#5c6166",
+        cursor: "#ff9940",
+        palette: [
+            "#000000", "#ff3333", "#86b300", "#f29718", "#41a6d9", "#f07178", "#4dbf99", "#ffffff",
+            "#323232", "#ff6565", "#b8e532", "#ffc44c", "#73d8ff", "#ffa3aa", "#7ff1cb", "#ffffff",
+        ],
+    },
+    Row {
+        name: "Rosé Pine Dawn",
+        background: "#faf4ed",
+        foreground: "#575279",
+        cursor: "#575279",
+        palette: [
+            "#f2e9e1", "#b4637a", "#286983", "#ea9d34", "#56949f", "#907aa9", "#d7827e", "#575279",
+            "#9893a5", "#b4637a", "#286983", "#ea9d34", "#56949f", "#907aa9", "#d7827e", "#575279",
+        ],
+    },
+    Row {
+        name: "Tokyo Night Day",
+        background: "#e1e2e7",
+        foreground: "#3760bf",
+        cursor: "#3760bf",
+        palette: [
+            "#e9e9ec", "#f52a65", "#587539", "#8c6c3e", "#2e7de9", "#9854f1", "#007197", "#6172b0",
+            "#a1a6c5", "#f52a65", "#587539", "#8c6c3e", "#2e7de9", "#9854f1", "#007197", "#3760bf",
+        ],
+    },
 ];
 
 /// Every theme by name. The system default is not in here: it has no colours of
@@ -197,6 +267,38 @@ mod tests {
             {
                 assert!(is_hex(color), "{} has {color}", theme.name);
             }
+        }
+    }
+
+    /// The same weighting the shell uses to decide which way to nudge a
+    /// surface. Repeated here so this test does not need the Swift side.
+    fn luminance(background: &str) -> f64 {
+        let value = u32::from_str_radix(&background[1..], 16).unwrap();
+        let (red, green, blue) = (value >> 16 & 0xff, value >> 8 & 0xff, value & 0xff);
+        (0.2126 * red as f64 + 0.7152 * green as f64 + 0.0722 * blue as f64) / 255.0
+    }
+
+    #[test]
+    fn a_light_scheme_can_be_chosen_without_knowing_which_names_are_light() {
+        // The list was almost all dark, and the two light schemes in it were
+        // named after their dark twins, so nobody found them. Half a dozen light
+        // rows and one called Light is the fix.
+        let themes = all();
+        let light: Vec<&str> = themes
+            .iter()
+            .filter(|theme| luminance(&theme.background) >= 0.5)
+            .map(|theme| theme.name.as_str())
+            .collect();
+        assert!(light.len() >= 7, "{light:?}");
+        assert!(light.contains(&"Light"), "{light:?}");
+        // A light scheme with light text on it would be unreadable, and the
+        // shell trusts these two colours for every surface in the window.
+        for theme in themes.iter().filter(|theme| luminance(&theme.background) >= 0.5) {
+            assert!(
+                luminance(&theme.foreground) < luminance(&theme.background),
+                "{}",
+                theme.name
+            );
         }
     }
 

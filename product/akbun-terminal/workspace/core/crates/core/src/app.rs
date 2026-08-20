@@ -8,9 +8,11 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use crate::agent::Rule;
 use crate::protocol::{parse_request, Command, Event, Response, WorkspaceState, PROTOCOL_VERSION};
+use crate::search::Index;
 use crate::session::Session;
 use crate::tree::{TreeStore, WorkspaceStatus};
 
@@ -24,6 +26,10 @@ pub struct App {
     /// The last judgement per workspace. Finished is a transition rather than
     /// something on screen, so the previous answer is part of the next one.
     statuses: Mutex<HashMap<u64, WorkspaceStatus>>,
+    /// The files under the project the palette last searched. Kept because a
+    /// palette walks the same tree on every keystroke otherwise, and a project
+    /// is thousands of files.
+    index: Mutex<Option<Index>>,
 }
 
 impl Default for App {
@@ -43,6 +49,7 @@ impl App {
             tree: Mutex::new(TreeStore::default()),
             rules: Mutex::new(Vec::new()),
             statuses: Mutex::new(HashMap::new()),
+            index: Mutex::new(None),
         }
     }
 
@@ -138,6 +145,21 @@ impl App {
             Command::Themes => Response::Themes {
                 themes: crate::theme::all(),
             },
+            Command::Shortcuts => match self.tree.lock() {
+                Ok(tree) => Response::Shortcuts {
+                    shortcuts: tree.shortcuts(),
+                },
+                Err(_) => Response::Error {
+                    message: "project state is poisoned".to_string(),
+                },
+            },
+            Command::SetShortcut { command, key } => {
+                self.with_tree(|tree| tree.set_shortcut(&command, &key))
+            }
+            Command::ResetShortcuts => self.with_tree(|tree| tree.reset_shortcuts()),
+            Command::FindFiles { root, query, limit } => Response::Matches {
+                matches: self.find_files(&root, &query, limit.unwrap_or(Self::MATCH_LIMIT)),
+            },
             Command::LoadRules { directory } => match crate::agent::load(&directory) {
                 Ok(loaded) => match self.rules.lock() {
                     Ok(mut rules) => {
@@ -165,6 +187,30 @@ impl App {
                 url: crate::url::at(&line, column),
             },
         }
+    }
+
+    /// How many rows a palette shows before scrolling stops being reading.
+    const MATCH_LIMIT: usize = 200;
+
+    /// How long the walked file list is trusted. Long enough that typing does
+    /// not walk the tree, short enough that a file the shell beside it just
+    /// created turns up without a restart.
+    const INDEX_AGE: Duration = Duration::from_secs(5);
+
+    fn find_files(&self, root: &str, query: &str, limit: usize) -> Vec<crate::search::Match> {
+        let Ok(mut index) = self.index.lock() else {
+            return Vec::new();
+        };
+        let fresh = index
+            .as_ref()
+            .is_some_and(|built| built.is_fresh_for(root, Self::INDEX_AGE));
+        if !fresh {
+            *index = Some(Index::build(root));
+        }
+        index
+            .as_ref()
+            .map(|built| built.search(query, limit))
+            .unwrap_or_default()
     }
 
     /// Drops the judged status of every workspace the tree no longer has.

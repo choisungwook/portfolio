@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,6 +16,12 @@ pub struct TreeState {
     /// without themes still reads here and the wire shape does not change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// The keys a person moved off their defaults, by command id. Only the
+    /// changed ones are stored, so a default this build changes later reaches
+    /// everyone who never touched it. Skipped when empty for the same reason
+    /// the theme is: a file written before this existed still reads.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub shortcuts: BTreeMap<String, String>,
     /// The highest id handed out so far, projects and workspaces together.
     ///
     /// Ids used to be the largest one in the tree plus one, which reuses the id
@@ -37,6 +44,7 @@ impl Default for TreeState {
             schema_version: STATE_SCHEMA_VERSION,
             projects: Vec::new(),
             theme: None,
+            shortcuts: BTreeMap::new(),
             next_id: 0,
         }
     }
@@ -190,6 +198,26 @@ impl TreeStore {
         self.commit(next)
     }
 
+    /// Puts a key on a command, or restores its default when `key` is empty.
+    /// The rule about which keys may be put where is in `shortcuts`; this is
+    /// only the part that saves the answer.
+    pub fn set_shortcut(&mut self, command: &str, key: &str) -> Result<TreeState, String> {
+        let shortcuts = crate::shortcuts::set(&self.state.shortcuts, command, key)?;
+        let mut next = self.state.clone();
+        next.shortcuts = shortcuts;
+        self.commit(next)
+    }
+
+    pub fn reset_shortcuts(&mut self) -> Result<TreeState, String> {
+        let mut next = self.state.clone();
+        next.shortcuts = BTreeMap::new();
+        self.commit(next)
+    }
+
+    pub fn shortcuts(&self) -> Vec<crate::shortcuts::Shortcut> {
+        crate::shortcuts::all(&self.state.shortcuts)
+    }
+
     fn commit(&mut self, next: TreeState) -> Result<TreeState, String> {
         let Some(directory) = &self.directory else {
             return Err("project state has not been loaded".to_string());
@@ -287,6 +315,31 @@ mod tests {
         // Back to the system appearance, which is stored as nothing at all.
         assert_eq!(store.set_theme(crate::theme::SYSTEM.to_string()).unwrap().theme, None);
         assert!(store.set_theme("Nope".to_string()).is_err());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn remembers_a_changed_shortcut_and_forgets_it_again() {
+        let directory = test_directory();
+        let path = directory.to_string_lossy().to_string();
+        let mut store = TreeStore::default();
+        store.load(&path).unwrap();
+
+        store.set_shortcut("save", "cmd+shift+s").unwrap();
+        let restored = TreeStore::default().load(&path).unwrap();
+        assert_eq!(restored.shortcuts.get("save").map(String::as_str), Some("cmd+shift+s"));
+        // Only what changed is written, so a default this build changes later
+        // still reaches anyone who never touched that row.
+        assert_eq!(restored.shortcuts.len(), 1);
+
+        assert!(store.set_shortcut("save", "cmd+w").is_err());
+        assert!(store.set_shortcut("nope", "cmd+k").is_err());
+
+        store.set_shortcut("save", "").unwrap();
+        assert!(TreeStore::default().load(&path).unwrap().shortcuts.is_empty());
+
+        store.set_shortcut("find", "cmd+alt+f").unwrap();
+        assert!(store.reset_shortcuts().unwrap().shortcuts.is_empty());
         fs::remove_dir_all(directory).unwrap();
     }
 

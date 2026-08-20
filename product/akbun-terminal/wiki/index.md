@@ -15,6 +15,9 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **Events are drained, never pushed.** The core queues; the shell asks on its run loop. Nothing calls back from a reader thread, so no view is ever touched off the main thread.
 - **Bytes ride as JSON arrays.** Correct and several times larger than the payload. Acceptable while one session is being proved out, and the first thing to move to its own channel; the protocol version exists for exactly that.
 - **The browser reads what is opened, and only that.** `read_directory` answers one level. The outline view asks for children inside `numberOfChildrenOfItem`, which is the moment a folder is opened, so nothing below a closed folder has been read. Hidden files and folders are listed and symlinks are leaves, both decided in the core.
+- **A web view exists, for two things.** A mermaid fence is drawn by the bundled mermaid in a web view that is never on screen and photographed into the text flow; an HTML file has a Render mode with scripting off. Both are narrow on purpose, and everything else about a document is unchanged. `MermaidPage` holds the escaping and the policy, in the core package, because that rule is the whole reason this is safe.
+- **The menu bar is built from the core.** `shortcuts.rs` is the list of commands, their titles, their menu and their default keys; `AppDelegate` maps an id to a selector and nothing else. A key nobody changed is not in the state file, which is what lets a default move later.
+- **The palette walks once.** `search.rs` keeps the project's file list for a few seconds and scores a query with a dynamic program, not a greedy scan; greedy loses `src/app.rs` for the query `app`. Positions are character offsets, because a path can hold anything.
 - **A document is data, never markup.** Markdown arrives as blocks and is drawn as an attributed string. Raw HTML is dropped in the core and links are not clickable, so opening a file someone else wrote cannot reach anything.
 - **Every file opens, and it opens to be read.** One click on a file gives a tab; a folder still needs the triangle or a double click. Markdown is rendered, everything else is coloured, and Command E is what makes the tab editable. Nothing on screen can be typed into until somebody asks for it.
 - **Colour is a table, not a grammar.** `highlight.rs` is one lexer with a row per language. It cannot see nesting, which is why a regular expression body or a nested template literal is coloured approximately. Above half a megabyte a file is answered as plain lines, because tokenizing runs on the run loop that draws.
@@ -43,7 +46,9 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `core/crates/core/src/git.rs` | porcelain status, the stage beside it, and the roll up that gives a folder a colour |
 | `core/crates/core/src/markdown.rs` | markdown to blocks, and the place raw HTML is dropped |
 | `core/crates/core/src/highlight.rs` | the language table, the lexer, and the size limit that keeps it off the run loop |
-| `core/crates/core/src/theme.rs` | the known colour schemes as a hex table |
+| `core/crates/core/src/theme.rs` | the known colour schemes as a hex table, dark and light |
+| `core/crates/core/src/shortcuts.rs` | the menu commands, their default keys and the rule about clashes |
+| `core/crates/core/src/search.rs` | the project file index and the score that ranks a query's matches |
 | `core/crates/core/src/screen.rs` | the interpreted screen the judging reads |
 | `core/crates/core/src/agent.rs` | rule files, the process tree walk, and the judgement |
 | `core/crates/core/rules/*.json` | the agent rules this build ships and seeds |
@@ -61,10 +66,16 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/AkbunTerminalCore/Zoom.swift` | the one size the whole window is drawn at |
 | `Sources/AkbunTerminalCore/TerminalKeys.swift` | the keystrokes this app encodes itself, shift and return so far |
 | `Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
+| `Sources/AkbunTerminalCore/ShortcutKey.swift` | a core shortcut string to a key equivalent and a modifier mask, and back |
+| `Sources/AkbunTerminalCore/DocumentSearch.swift` | Command F over the file on screen: the matches and which one is next |
+| `Sources/AkbunTerminalCore/MermaidPage.swift` | the page a diagram is drawn in, its policy and its escaping |
 | `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
 | `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened |
 | `Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
-| `Sources/akbun-terminal/MarkdownAttributedText.swift` | blocks to one attributed string |
+| `Sources/akbun-terminal/MarkdownAttributedText.swift` | blocks to one attributed string, diagrams included |
+| `Sources/akbun-terminal/MermaidRenderer.swift` | the offscreen web view a diagram is drawn and photographed in |
+| `Sources/akbun-terminal/CommandPaletteView.swift` | the Command O sheet: the list, the keyboard and the marks |
+| `Sources/akbun-terminal/ShortcutsWindowController.swift` | Settings › Shortcuts, and the recording monitor |
 | `Sources/akbun-terminal/CodeAttributedText.swift` | coloured tokens to one attributed string, and what each kind looks like |
 | `Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
 | `Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
@@ -76,4 +87,4 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 
 ## What is not here yet
 
-Windows and Linux, a second window, and search in the scrollback. When adding anything, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.
+Windows and Linux, a second window, and search in the scrollback. Command F searches the file in the tab, never the terminal beside it. When adding anything, ask first whether it belongs in the core; the answer is yes unless it is pixels or keystrokes.

@@ -20,3 +20,6 @@
 | [One click opens every file](./2026-08-one-click-opens-every-file.md) | A click opens any file to read, Command E turns the tab into an editor |
 | [Highlighting is a table in the core](./2026-08-highlighting-in-the-core.md) | One lexer and a row per language in Rust, the shell turning a kind into a colour |
 | [Staged and unstaged are two colours](./2026-08-staged-and-unstaged-are-two-colours.md) | The stage carried beside the status, colour for which half of git and a letter for the change |
+| [A web view, for two things only](./2026-08-a-web-view-for-diagrams-and-pages.md) | Mermaid drawn offscreen and photographed into the page, HTML rendered with scripting off, nothing else |
+| [Shortcuts are a table in the core](./2026-08-shortcuts-are-a-table-in-the-core.md) | The menu bar built from the core's command list, only changed keys saved, duplicates refused |
+| [Finding a file is the core's job](./2026-08-finding-a-file-is-the-cores-job.md) | A walked index and a scored match in Rust, the in-document find in the Swift core package |
