@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::browse::Entry;
 use crate::git::GitStatus;
+use crate::highlight::Token;
 use crate::markdown::Block;
 use crate::theme::Theme;
 use crate::tree::{TreeState, WorkspaceStatus};
@@ -104,6 +105,13 @@ pub enum Command {
     RenderMarkdown {
         text: String,
     },
+    /// Source in, coloured lines out. The path names the language and the text
+    /// is what to colour, for the same reason markdown sends both: the view
+    /// shows the buffer, which is not always the file.
+    Highlight {
+        path: String,
+        text: String,
+    },
     Themes,
     SetTheme {
         name: String,
@@ -144,6 +152,13 @@ pub enum Response {
     Git { status: GitStatus },
     File { text: String },
     Markdown { blocks: Vec<Block> },
+    /// `language` absent means nothing recognised the file and the lines are
+    /// plain. Never an error: a file the highlighter does not know still has to
+    /// be readable.
+    Highlighted {
+        language: Option<String>,
+        lines: Vec<Vec<Token>>,
+    },
     Themes { themes: Vec<Theme> },
     /// Only the workspaces whose status changed since the last call.
     Statuses { statuses: Vec<WorkspaceState> },
@@ -274,16 +289,43 @@ mod tests {
                 entries: vec![crate::git::GitEntry {
                     path: "/tmp/a.txt".to_string(),
                     status: crate::git::FileStatus::Untracked,
+                    stage: crate::git::Stage::Unstaged,
                 }],
             },
         })
         .unwrap();
         assert_eq!(
             response,
-            r#"{"type":"git","status":{"repository":true,"entries":[{"path":"/tmp/a.txt","status":"untracked"}]}}"#
+            r#"{"type":"git","status":{"repository":true,"entries":[{"path":"/tmp/a.txt","status":"untracked","stage":"unstaged"}]}}"#
         );
         let json = r#"{"v":1,"command":{"type":"git_status","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
+    }
+
+    #[test]
+    fn highlighting_keeps_its_wire_names() {
+        // Decoded by a Swift file compiled apart from this crate, so a rename
+        // has to fail here rather than at runtime on somebody's machine.
+        let response = serde_json::to_string(&Response::Highlighted {
+            language: Some("Rust".to_string()),
+            lines: vec![vec![crate::highlight::Token {
+                text: "let".to_string(),
+                kind: crate::highlight::TokenKind::Keyword,
+            }]],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"highlighted","language":"Rust","lines":[[{"text":"let","kind":"keyword"}]]}"#
+        );
+        let json = r#"{"v":1,"command":{"type":"highlight","path":"/tmp/a.rs","text":"let x = 1;"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::Highlight { path, text } => {
+                assert_eq!(path, "/tmp/a.rs");
+                assert_eq!(text, "let x = 1;");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 
     #[test]

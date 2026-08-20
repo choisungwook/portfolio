@@ -69,6 +69,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     let editMenu = NSMenu(title: "Edit")
     editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
     editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+    editMenu.addItem(.separator())
+    // A file opens to be read. This is the one keystroke that turns the tab on
+    // screen into something that can be changed, and back.
+    editMenu.addItem(
+      withTitle: "Edit Mode", action: #selector(toggleEditMode), keyEquivalent: "e"
+    ).target = self
     let editItem = NSMenuItem()
     editItem.submenu = editMenu
 
@@ -104,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     mainMenu.addItem(editItem)
     mainMenu.addItem(viewItem)
     NSApp.mainMenu = mainMenu
+  }
+
+  @objc private func toggleEditMode() {
+    windowController?.toggleEditMode()
   }
 
   @objc private func zoomIn() {

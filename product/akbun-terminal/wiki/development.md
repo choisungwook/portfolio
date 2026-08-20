@@ -38,6 +38,23 @@ SwiftPM does not know the static archive is an input, so rebuilding the core is 
 rm -rf .build/arm64-apple-macosx/debug/akbun-terminalPackageTests.xctest
 ```
 
+## Adding a language to the highlighter
+
+`core/crates/core/src/highlight.rs` holds one lexer and a table. A new language is a row in `LANGUAGES`: its name, its suffixes, and only the fields that differ from `plain_language`.
+
+```rust
+Language {
+    line_comments: &["#"],
+    quotes: C_STRINGS,
+    keywords: &["def", "end"],
+    ..plain_language("Elixir", &["ex", "exs"])
+},
+```
+
+Nothing on the Swift side changes. The shell only turns a token kind into a colour, and the kinds are fixed.
+
+Two rules are worth knowing before adding a row. A quote that may not cross a line stops at the end of it, which is what keeps an apostrophe in prose from swallowing the file; set `multiline` only for the delimiters that really do span lines. And a language whose meaning depends on nesting will be coloured approximately, because there is no grammar here to nest with.
+
 ## Caveats
 
 - SwiftTerm is fetched by SwiftPM, so the first build and the CI jobs need network. `Package.resolved` is what pins it.

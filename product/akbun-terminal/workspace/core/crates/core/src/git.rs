@@ -10,6 +10,11 @@
 //! Two decisions are made here rather than in the shell, so a second view of the
 //! same folder cannot disagree with this one.
 //!
+//! A change is also placed in the half of git it is sitting in. `git add` and an
+//! edit that has not been added yet are two different states of one file, and a
+//! browser that draws them the same way makes staging invisible from the pane
+//! that is meant to show what happened.
+//!
 //! Directories carry the strongest status among the files under them. A closed
 //! folder is the only thing on screen, and a folder that looks untouched while
 //! something inside it is modified is worse than no colour at all.
@@ -51,10 +56,62 @@ impl FileStatus {
     }
 }
 
+/// Which half of git a change is sitting in.
+///
+/// The two columns of a porcelain code are two different states of the same
+/// file, and a browser that shows only one of them tells a reader who has just
+/// run `git add` that nothing happened. Carried beside the status rather than
+/// folded into it, because "what changed" and "is it staged" are two questions
+/// and every answer is a pair of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Stage {
+    /// In the index and nothing further in the working tree.
+    Staged,
+    /// In the working tree only. An untracked file is here too.
+    Unstaged,
+    /// Staged and then changed again, which is the state a commit would only
+    /// half capture.
+    Both,
+}
+
+impl Stage {
+    fn of(code: &str) -> Self {
+        // Untracked reports `??`, which is a working tree change and nothing in
+        // the index however it is read.
+        if code == "??" {
+            return Self::Unstaged;
+        }
+        let mut letters = code.chars();
+        let index = letters.next().unwrap_or(' ');
+        let worktree = letters.next().unwrap_or(' ');
+        // A conflict is written into both columns and belongs to neither half.
+        if is_conflict(code) {
+            return Self::Both;
+        }
+        match (index != ' ', worktree != ' ') {
+            (true, true) => Self::Both,
+            (false, true) => Self::Unstaged,
+            _ => Self::Staged,
+        }
+    }
+
+    /// What a directory wears when two children disagree. A folder holding one
+    /// staged file and one that is not is both.
+    fn merged(self, other: Self) -> Self {
+        if self == other {
+            self
+        } else {
+            Self::Both
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GitEntry {
     pub path: String,
     pub status: FileStatus,
+    pub stage: Stage,
 }
 
 /// The answer for one folder. `repository` false means there is nothing to
@@ -127,7 +184,7 @@ fn run(directory: &str, arguments: &[&str]) -> Option<String> {
 /// Reads `--porcelain -z` and rolls the answer up the directory tree.
 fn entries(root: &Path, porcelain: &str) -> Vec<GitEntry> {
     let mut records = porcelain.split('\0').filter(|record| !record.is_empty());
-    let mut strongest: Vec<(String, FileStatus)> = Vec::new();
+    let mut strongest: Vec<(String, FileStatus, Stage)> = Vec::new();
     while let Some(record) = records.next() {
         if record.len() < 4 {
             continue;
@@ -140,34 +197,44 @@ fn entries(root: &Path, porcelain: &str) -> Vec<GitEntry> {
             records.next();
         }
         let status = classify(code);
+        let stage = Stage::of(code);
         let mut current = root.join(relative);
-        note(&mut strongest, &current, status);
+        note(&mut strongest, &current, status, stage);
         // Every folder between the file and the root wears it too.
         while let Some(parent) = current.parent().map(Path::to_path_buf) {
             if parent == root || !parent.starts_with(root) {
                 break;
             }
-            note(&mut strongest, &parent, status);
+            note(&mut strongest, &parent, status, stage);
             current = parent;
         }
     }
     strongest.sort_by(|left, right| left.0.cmp(&right.0));
     strongest
         .into_iter()
-        .map(|(path, status)| GitEntry { path, status })
+        .map(|(path, status, stage)| GitEntry {
+            path,
+            status,
+            stage,
+        })
         .collect()
 }
 
-fn note(into: &mut Vec<(String, FileStatus)>, path: &Path, status: FileStatus) {
+fn note(into: &mut Vec<(String, FileStatus, Stage)>, path: &Path, status: FileStatus, stage: Stage) {
     let path = path.to_string_lossy().to_string();
-    match into.iter_mut().find(|(known, _)| *known == path) {
+    match into.iter_mut().find(|(known, _, _)| *known == path) {
         Some(found) => {
             if status.rank() < found.1.rank() {
                 found.1 = status;
             }
+            found.2 = found.2.merged(stage);
         }
-        None => into.push((path, status)),
+        None => into.push((path, status, stage)),
     }
+}
+
+fn is_conflict(code: &str) -> bool {
+    matches!(code, "DD" | "AU" | "UD" | "UA" | "DU" | "AA" | "UU")
 }
 
 /// The two letter code from `git status --porcelain`, as one colour.
@@ -177,7 +244,7 @@ fn note(into: &mut Vec<(String, FileStatus)>, path: &Path, status: FileStatus) {
 fn classify(code: &str) -> FileStatus {
     match code {
         "??" => FileStatus::Untracked,
-        "DD" | "AU" | "UD" | "UA" | "DU" | "AA" | "UU" => FileStatus::Conflicted,
+        code if is_conflict(code) => FileStatus::Conflicted,
         _ => {
             let letters: Vec<char> = code.chars().collect();
             for letter in letters {
@@ -229,11 +296,18 @@ mod tests {
     }
 
     fn status_of(status: &GitStatus, path: &Path) -> Option<FileStatus> {
+        entry_of(status, path).map(|entry| entry.status)
+    }
+
+    fn stage_of(status: &GitStatus, path: &Path) -> Option<Stage> {
+        entry_of(status, path).map(|entry| entry.stage)
+    }
+
+    fn entry_of<'a>(status: &'a GitStatus, path: &Path) -> Option<&'a GitEntry> {
         status
             .entries
             .iter()
             .find(|entry| entry.path == path.to_string_lossy())
-            .map(|entry| entry.status)
     }
 
     #[test]
@@ -314,6 +388,51 @@ mod tests {
         assert!(status.repository);
         assert_eq!(status_of(&status, &inner.join("c.txt")), Some(FileStatus::Untracked));
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_added_file_is_told_from_one_that_is_only_edited() {
+        // The reason this exists: after `git add` the row has to change, and
+        // before this it did not.
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        fs::write(directory.join("kept.txt"), "two\n").unwrap();
+        fs::write(directory.join("staged.txt"), "new\n").unwrap();
+        fs::write(directory.join("both.txt"), "new\n").unwrap();
+        run(path, &["add", "staged.txt", "both.txt"]).unwrap();
+        fs::write(directory.join("both.txt"), "changed again\n").unwrap();
+
+        let status = status(path);
+        assert_eq!(stage_of(&status, &directory.join("kept.txt")), Some(Stage::Unstaged));
+        assert_eq!(stage_of(&status, &directory.join("staged.txt")), Some(Stage::Staged));
+        assert_eq!(stage_of(&status, &directory.join("both.txt")), Some(Stage::Both));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_folder_holding_both_halves_wears_both() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        let inner = directory.join("src");
+        fs::create_dir_all(&inner).unwrap();
+        fs::write(inner.join("added.txt"), "new\n").unwrap();
+        fs::write(inner.join("loose.txt"), "new\n").unwrap();
+        run(path, &["add", "src/added.txt"]).unwrap();
+
+        let status = status(path);
+        assert_eq!(stage_of(&status, &inner.join("added.txt")), Some(Stage::Staged));
+        assert_eq!(stage_of(&status, &inner.join("loose.txt")), Some(Stage::Unstaged));
+        assert_eq!(stage_of(&status, &inner), Some(Stage::Both));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn each_half_of_a_code_is_read_for_the_stage() {
+        assert_eq!(Stage::of("??"), Stage::Unstaged);
+        assert_eq!(Stage::of("A "), Stage::Staged);
+        assert_eq!(Stage::of(" M"), Stage::Unstaged);
+        assert_eq!(Stage::of("AM"), Stage::Both);
+        assert_eq!(Stage::of("UU"), Stage::Both);
     }
 
     #[test]

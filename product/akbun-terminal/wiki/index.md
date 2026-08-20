@@ -4,7 +4,7 @@ Notes for the next agent taking over this app. Read [architecture.md](./architec
 
 ## What the app is
 
-A macOS app that wraps shells. The left sidebar holds projects and their workspace groups and colours each by what the agent inside it is doing, the middle runs the selected workspace's tabs — shells and markdown documents in one strip — and the right lists the project's files.
+A macOS app that wraps shells. The left sidebar holds projects and their workspace groups and colours each by what the agent inside it is doing, the middle runs the selected workspace's tabs — shells and files in one strip — and the right lists the project's files.
 
 ## Where the risk is
 
@@ -16,6 +16,9 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **Bytes ride as JSON arrays.** Correct and several times larger than the payload. Acceptable while one session is being proved out, and the first thing to move to its own channel; the protocol version exists for exactly that.
 - **The browser reads what is opened, and only that.** `read_directory` answers one level. The outline view asks for children inside `numberOfChildrenOfItem`, which is the moment a folder is opened, so nothing below a closed folder has been read. Hidden files and folders are listed and symlinks are leaves, both decided in the core.
 - **A document is data, never markup.** Markdown arrives as blocks and is drawn as an attributed string. Raw HTML is dropped in the core and links are not clickable, so opening a file someone else wrote cannot reach anything.
+- **Every file opens, and it opens to be read.** One click on a file gives a tab; a folder still needs the triangle or a double click. Markdown is rendered, everything else is coloured, and Command E is what makes the tab editable. Nothing on screen can be typed into until somebody asks for it.
+- **Colour is a table, not a grammar.** `highlight.rs` is one lexer with a row per language. It cannot see nesting, which is why a regular expression body or a nested template literal is coloured approximately. Above half a megabyte a file is answered as plain lines, because tokenizing runs on the run loop that draws.
+- **Git has two halves and the pane shows both.** The porcelain code's two columns are carried as a `Stage` beside the status. Green is staged, orange is the working tree, yellow is both, and the letter after the name is the change itself. Before this, `git add` changed nothing on screen.
 - **The core owns the tree.** The shell supplies the app data directory and folder picker results. Rust validates, stores and returns the complete versioned project state after every mutation.
 - **Judging reads a screen, not a stream.** `screen.rs` keeps an interpreted grid per session, updated on the reader thread. An agent paints over its own question within a second of it being answered, so a search over the raw bytes finds it forever. Only cursor movement and erasing are implemented; colour is dropped.
 - **The phrases are data.** `agent.rs` reads one JSON file per agent from the app data directory and seeds it with the three shipped ones. A wording change in an agent's status line is a file edit, never a build.
@@ -37,8 +40,9 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `core/crates/core/src/session.rs` | one shell under a pty, its reader thread and its reaping |
 | `core/crates/core/src/tree.rs` | project/workspace model, chosen theme, atomic JSON persistence |
 | `core/crates/core/src/browse.rs` | one directory level, and the link rule that keeps it out of cycles |
-| `core/crates/core/src/git.rs` | porcelain status, and the roll up that gives a folder a colour |
+| `core/crates/core/src/git.rs` | porcelain status, the stage beside it, and the roll up that gives a folder a colour |
 | `core/crates/core/src/markdown.rs` | markdown to blocks, and the place raw HTML is dropped |
+| `core/crates/core/src/highlight.rs` | the language table, the lexer, and the size limit that keeps it off the run loop |
 | `core/crates/core/src/theme.rs` | the known colour schemes as a hex table |
 | `core/crates/core/src/screen.rs` | the interpreted screen the judging reads |
 | `core/crates/core/src/agent.rs` | rule files, the process tree walk, and the judgement |
@@ -59,11 +63,12 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
 | `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
 | `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened |
-| `Sources/akbun-terminal/MarkdownDocumentView.swift` | one document tab, preview and source, save, the unsaved question and the command click on a link |
+| `Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
 | `Sources/akbun-terminal/MarkdownAttributedText.swift` | blocks to one attributed string |
+| `Sources/akbun-terminal/CodeAttributedText.swift` | coloured tokens to one attributed string, and what each kind looks like |
 | `Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
 | `Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
-| `Sources/akbun-terminal/Palette.swift` | every colour the window draws with, and what git status looks like |
+| `Sources/akbun-terminal/Palette.swift` | every colour the window draws with, and what a git status and its stage look like |
 | `Sources/akbun-terminal/Browsers.swift` | the installed browsers, asked of the system once |
 | `Sources/akbun-terminal/Updater.swift` | release check, dmg download, bundle swap |
 | `scripts/build-core.sh` | the Rust archive the package links |

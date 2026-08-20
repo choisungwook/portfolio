@@ -106,24 +106,75 @@ extension NSColor {
 
 /// The colour a file's name is drawn in, from what git says about it.
 ///
-/// The names are the ones every git client has settled on, which is the reason
-/// to reuse them: a red row meaning "deleted" and a green one meaning "added"
-/// is something the reader already knows before opening this app.
+/// Green for staged and orange for not is the pair every git client has settled
+/// on, which is the reason to reuse it: the reader already knows it before
+/// opening this app. The colour answers "has git been told about this yet",
+/// because that is the question somebody who has just typed `git add` is asking
+/// the pane; the badge beside the name answers what happened.
 @MainActor
 enum GitColor {
-  static func of(_ status: CoreFileStatus?, in palette: Palette) -> NSColor {
+  static func of(_ entry: CoreGitEntry?, in palette: Palette) -> NSColor {
     // Nothing to say about a file is the ordinary case, and it is drawn in the
     // ordinary colour rather than in a sixth shade of something.
-    guard let status else { return palette.text }
-    switch status {
-    case .modified: return .systemOrange
-    case .added: return .systemGreen
-    case .renamed: return .systemPurple
-    case .deleted: return .systemRed
+    guard let entry else { return palette.text }
+    switch entry.status {
     case .conflicted: return .systemPink
     // Untracked is the quiet one. A repository has more of these than anything
     // else, and a build directory should not be the loudest thing on screen.
     case .untracked: return .systemGray
+    default: break
     }
+    switch entry.stage {
+    case .staged: return .systemGreen
+    // Staged and then changed again: a commit now would take half of it, and
+    // neither of the two colours would be telling the truth on its own.
+    case .both: return .systemYellow
+    case .unstaged:
+      switch entry.status {
+      case .deleted: return .systemRed
+      case .renamed: return .systemPurple
+      default: return .systemOrange
+      }
+    }
+  }
+}
+
+/// The letter drawn after a name, and the words behind it.
+///
+/// A colour alone cannot be told apart by everyone looking at it, and the two
+/// git halves are now two shades of the same idea. The letter is git's own, so
+/// it says the same thing as the shell in the middle of the window.
+@MainActor
+enum GitBadge {
+  static func of(_ entry: CoreGitEntry) -> String {
+    switch entry.status {
+    case .untracked: return "?"
+    case .conflicted: return "!"
+    case .added: return mark("A", entry.stage)
+    case .modified: return mark("M", entry.stage)
+    case .deleted: return mark("D", entry.stage)
+    case .renamed: return mark("R", entry.stage)
+    }
+  }
+
+  /// What the row means, spelled out for a tooltip and for anyone who reads the
+  /// pane with something other than their eyes.
+  static func describe(_ entry: CoreGitEntry) -> String {
+    switch entry.status {
+    case .untracked: return "untracked"
+    case .conflicted: return "conflicted"
+    default: break
+    }
+    switch entry.stage {
+    case .staged: return "\(entry.status.rawValue), staged"
+    case .unstaged: return "\(entry.status.rawValue), not staged"
+    case .both: return "\(entry.status.rawValue), staged with further changes"
+    }
+  }
+
+  /// The star is the "and changed again" half. Two letters would read as a
+  /// porcelain code, which is a different thing.
+  private static func mark(_ letter: String, _ stage: CoreFileStage) -> String {
+    stage == .both ? "\(letter)*" : letter
   }
 }
