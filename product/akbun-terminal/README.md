@@ -53,9 +53,14 @@ cargo test --manifest-path core/Cargo.toml
 - Tells a staged change from one that is only in the working tree: green for staged, orange for not, yellow for both, and a letter after the name for what the change was.
 - Opens any file in a tab beside the shells on one click, rendered for markdown and coloured by language for everything else, and writes it back on save.
 - Turns the tab on screen between reading and editing with Command E.
+- Draws a mermaid fence in a markdown file as a diagram, by the mermaid bundled into the app, in a web view that is never on screen and photographed into the page.
+- Gives an HTML file a Render mode beside View and Edit, drawn as a page with scripting off.
+- Finds text in the file on screen with Command F, marking every match and stepping through them with Command G.
+- Opens any file in the project by typing part of its path with Command O, best match first and the typed characters marked.
 - Recognises around twenty languages by suffix or file name, and shows a file it does not recognise as plain text rather than refusing it.
 - Opens a link inside a rendered document in its own tab on Command click, and sends an http or https link to a browser.
-- Wears a known colour scheme picked from the View menu, or follows the system appearance, and dresses every pane in it rather than the terminal alone.
+- Wears a known colour scheme picked from Settings, or follows the system appearance, and dresses every pane in it rather than the terminal alone. A dozen dark schemes and seven light ones, one of which is called Light.
+- Puts any menu command on any keystroke from Settings, refusing a key another command already has, and remembers only what was changed.
 - Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.
 - Zooms the whole window with Command plus and minus, and back to the default size with Command zero: the terminal, the tab strip, the project tree, the file list and the rendered document all follow one size.
 - Lets the sidebar and the file pane be dragged to any width, and folded away entirely.

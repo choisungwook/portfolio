@@ -32,6 +32,12 @@ public enum CoreCommand: Encodable {
   case highlight(path: String, text: String)
   case themes
   case setTheme(name: String)
+  case shortcuts
+  /// An empty `key` restores that command's default. A key another command
+  /// already has is refused by the core rather than shared between the two.
+  case setShortcut(command: String, key: String)
+  case resetShortcuts
+  case findFiles(root: String, query: String, limit: Int?)
   case loadRules(directory: String)
   case detect
   case clearStatus(workspace: UInt64)
@@ -39,7 +45,7 @@ public enum CoreCommand: Encodable {
 
   private enum Key: String, CodingKey {
     case type, cwd, cols, rows, session, bytes, directory, name, path, project, text
-    case workspace, line, column
+    case workspace, line, column, command, key, root, query, limit
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -115,6 +121,19 @@ public enum CoreCommand: Encodable {
     case .setTheme(let name):
       try container.encode("set_theme", forKey: .type)
       try container.encode(name, forKey: .name)
+    case .shortcuts:
+      try container.encode("shortcuts", forKey: .type)
+    case .setShortcut(let command, let key):
+      try container.encode("set_shortcut", forKey: .type)
+      try container.encode(command, forKey: .command)
+      try container.encode(key, forKey: .key)
+    case .resetShortcuts:
+      try container.encode("reset_shortcuts", forKey: .type)
+    case .findFiles(let root, let query, let limit):
+      try container.encode("find_files", forKey: .type)
+      try container.encode(root, forKey: .root)
+      try container.encode(query, forKey: .query)
+      try container.encodeIfPresent(limit, forKey: .limit)
     case .loadRules(let directory):
       try container.encode("load_rules", forKey: .type)
       try container.encode(directory, forKey: .directory)
@@ -154,9 +173,58 @@ public enum CoreResponse: Equatable, Sendable {
   case markdown([CoreBlock])
   case highlighted(CoreHighlighted)
   case themes([CoreTheme])
+  case shortcuts([CoreShortcut])
+  case matches([CoreMatch])
   case statuses([CoreWorkspaceState])
   case url(String?)
   case error(message: String)
+}
+
+/// One menu command and the keystroke that runs it.
+///
+/// The list is the core's, so the menu bar and the settings window are drawn
+/// from one table rather than two that have to agree.
+public struct CoreShortcut: Decodable, Equatable, Sendable {
+  public let command: String
+  public let title: String
+  /// Which menu the command belongs under, so the settings window groups its
+  /// rows the way the menu bar does.
+  public let menu: String
+  public let key: String
+  /// What the key was before anyone changed it, for the restore button.
+  public let defaultKey: String
+
+  public init(command: String, title: String, menu: String, key: String, defaultKey: String) {
+    self.command = command
+    self.title = title
+    self.menu = menu
+    self.key = key
+    self.defaultKey = defaultKey
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case command, title, menu, key
+    case defaultKey = "default_key"
+  }
+}
+
+/// One file the palette found, and where the typed characters landed in it.
+public struct CoreMatch: Decodable, Equatable, Sendable {
+  /// Absolute, because opening it is what happens next.
+  public let path: String
+  /// The path with the project folder taken off the front. What is shown, and
+  /// what `positions` indexes into.
+  public let relative: String
+  public let score: Int
+  /// Character offsets into `relative`, so the shell can mark them.
+  public let positions: [Int]
+
+  public init(path: String, relative: String, score: Int, positions: [Int]) {
+    self.path = path
+    self.relative = relative
+    self.score = score
+    self.positions = positions
+  }
 }
 
 /// One workspace's judged status. Only the ones that moved are sent.
@@ -339,6 +407,9 @@ public enum CoreBlock: Decodable, Equatable, Sendable {
   case paragraph(spans: [CoreSpan])
   case quote(spans: [CoreSpan])
   case code(language: String?, text: String)
+  /// A fenced block whose language was mermaid. Its own case because the shell
+  /// draws it as a diagram rather than as source.
+  case mermaid(text: String)
   case listItem(depth: Int, marker: String, spans: [CoreSpan])
   case table(header: [String], rows: [[String]])
   case rule
@@ -374,6 +445,8 @@ public enum CoreBlock: Decodable, Equatable, Sendable {
       self = .table(
         header: try container.decode([String].self, forKey: .header),
         rows: try container.decode([[String]].self, forKey: .rows))
+    case "mermaid":
+      self = .mermaid(text: try container.decode(String.self, forKey: .text))
     case "rule":
       self = .rule
     default:
@@ -423,7 +496,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, blocks, themes
-    case statuses, url, status, language, lines
+    case statuses, url, status, language, lines, shortcuts, matches
   }
 
   public init(from decoder: Decoder) throws {
@@ -452,6 +525,10 @@ extension CoreResponse: Decodable {
           lines: try container.decode([[CoreToken]].self, forKey: .lines)))
     case "themes":
       self = .themes(try container.decode([CoreTheme].self, forKey: .themes))
+    case "shortcuts":
+      self = .shortcuts(try container.decode([CoreShortcut].self, forKey: .shortcuts))
+    case "matches":
+      self = .matches(try container.decode([CoreMatch].self, forKey: .matches))
     case "statuses":
       self = .statuses(try container.decode([CoreWorkspaceState].self, forKey: .statuses))
     case "url":

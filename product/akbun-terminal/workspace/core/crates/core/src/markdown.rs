@@ -31,6 +31,10 @@ pub enum Block {
     Paragraph { spans: Vec<Span> },
     Quote { spans: Vec<Span> },
     Code { language: Option<String>, text: String },
+    /// A fenced block whose language is mermaid. Its own variant rather than a
+    /// code block with a name on it, because the shell draws it as a diagram
+    /// and a view should not have to compare a language string to know that.
+    Mermaid { text: String },
     ListItem { depth: u8, marker: String, spans: Vec<Span> },
     Table { header: Vec<String>, rows: Vec<Vec<String>> },
     Rule,
@@ -144,9 +148,14 @@ impl Builder {
             TagEnd::BlockQuote(_) => self.quote = self.quote.saturating_sub(1),
             TagEnd::CodeBlock => {
                 if let Some((language, text)) = self.code.take() {
-                    self.blocks.push(Block::Code {
-                        language,
-                        text: text.trim_end_matches('\n').to_string(),
+                    let text = text.trim_end_matches('\n').to_string();
+                    let is_mermaid = language
+                        .as_deref()
+                        .is_some_and(|name| name.trim().to_lowercase() == "mermaid");
+                    self.blocks.push(if is_mermaid {
+                        Block::Mermaid { text }
+                    } else {
+                        Block::Code { language, text }
                     });
                 }
             }
@@ -304,6 +313,24 @@ mod tests {
                 (1, "•", "nested".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn a_mermaid_fence_is_a_diagram_rather_than_a_code_block() {
+        // The shell draws this one, so it must not arrive looking like source
+        // with a language attached to it.
+        let blocks = render("```mermaid\ngraph TD\n  A --> B\n```\n");
+        assert_eq!(
+            blocks,
+            [Block::Mermaid { text: "graph TD\n  A --> B".into() }]
+        );
+        // The comparison ignores case and spacing, because a fence is typed by
+        // hand and Mermaid is a proper noun.
+        let blocks = render("``` Mermaid \nsequenceDiagram\n```\n");
+        assert!(matches!(blocks[0], Block::Mermaid { .. }), "{blocks:?}");
+        // Everything else is still a code block.
+        let blocks = render("```rust\nlet x = 1;\n```\n");
+        assert!(matches!(blocks[0], Block::Code { .. }), "{blocks:?}");
     }
 
     #[test]

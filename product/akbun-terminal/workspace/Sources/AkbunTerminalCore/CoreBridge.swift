@@ -150,6 +150,46 @@ public final class CoreBridge {
     }
   }
 
+  /// Every menu command with the key it currently runs on.
+  public func shortcuts() throws -> [CoreShortcut] {
+    let response = try send(.shortcuts)
+    switch response {
+    case .shortcuts(let shortcuts): return shortcuts
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  /// Puts a key on a command, or restores its default when `key` is empty. The
+  /// core refuses a key another command already has, and that refusal is the
+  /// message the settings window shows.
+  public func setShortcut(command: String, key: String) throws {
+    let response = try send(.setShortcut(command: command, key: key))
+    switch response {
+    case .state: return
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  public func resetShortcuts() throws {
+    let response = try send(.resetShortcuts)
+    switch response {
+    case .state: return
+    case .error(let message): throw Failure.core(message)
+    default: throw Failure.unexpected(response)
+    }
+  }
+
+  /// The files under `root` that `query` means, best first. Never throws: a
+  /// palette with nothing in it is the honest answer to a folder that cannot be
+  /// walked, and an alert over a list somebody is typing into is not.
+  public func findFiles(root: String, query: String, limit: Int? = nil) -> [CoreMatch] {
+    guard case .matches(let matches) = try? send(.findFiles(root: root, query: query, limit: limit))
+    else { return [] }
+    return matches
+  }
+
   /// The workspaces whose agent status moved since the last call. An empty
   /// answer is the normal one, so this is cheap to ask often.
   public func detect() throws -> [CoreWorkspaceState] {

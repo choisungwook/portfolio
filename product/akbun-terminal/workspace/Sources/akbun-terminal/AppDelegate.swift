@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
   private static let workspaceKey = "workspace"
   private var core: CoreBridge?
   private var windowController: TerminalWindowController?
+  /// Kept so the settings window is the same one every time it is opened.
+  private var shortcutsWindow: ShortcutsWindowController?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     // Clear whatever an update killed halfway through, before anything else can
@@ -55,61 +57,164 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     windowController?.closeSessions()
   }
 
+  /// Builds the menu bar from the core's command list.
+  ///
+  /// Every key on it comes from the core, so a rebound shortcut is one call and
+  /// a redraw rather than a search through this file. The action for a command
+  /// is looked up by id: adding a command is a row in the core's table and a
+  /// selector here, and nothing in between.
   private func buildMenu(for controller: TerminalWindowController) {
+    let shortcuts = (try? core?.shortcuts()) ?? []
+
     let appMenu = NSMenu()
     appMenu.addItem(
       withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""
     ).target = self
     appMenu.addItem(.separator())
-    appMenu.addItem(withTitle: "Quit akbun-terminal", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-
+    appMenu.addItem(
+      withTitle: "Quit akbun-terminal", action: #selector(NSApplication.terminate(_:)),
+      keyEquivalent: "q")
     let appItem = NSMenuItem()
     appItem.submenu = appMenu
+
+    let fileMenu = NSMenu(title: "File")
+    add(commands(in: "File", from: shortcuts), to: fileMenu)
+    let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+    fileItem.submenu = fileMenu
 
     let editMenu = NSMenu(title: "Edit")
     editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
     editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
     editMenu.addItem(.separator())
-    // A file opens to be read. This is the one keystroke that turns the tab on
-    // screen into something that can be changed, and back.
-    editMenu.addItem(
-      withTitle: "Edit Mode", action: #selector(toggleEditMode), keyEquivalent: "e"
-    ).target = self
-    let editItem = NSMenuItem()
+    add(commands(in: "Edit", from: shortcuts), to: editMenu)
+    let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
     editItem.submenu = editMenu
 
     let viewMenu = NSMenu(title: "View")
-    viewMenu.addItem(withTitle: "Bigger", action: #selector(zoomIn), keyEquivalent: "+").target = self
-    // The same command on the key people actually press. ⌘+ needs shift on a US
-    // keyboard, and nobody holds shift to zoom in.
-    let alsoBigger = viewMenu.addItem(
-      withTitle: "Bigger", action: #selector(zoomIn), keyEquivalent: "=")
-    alsoBigger.target = self
-    alsoBigger.isHidden = true
-    viewMenu.addItem(withTitle: "Smaller", action: #selector(zoomOut), keyEquivalent: "-").target = self
-    viewMenu.addItem(
-      withTitle: "Default Size", action: #selector(zoomReset), keyEquivalent: "0"
+    add(commands(in: "View", from: shortcuts), to: viewMenu)
+    let viewItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
+    viewItem.submenu = viewMenu
+
+    // Settings is its own menu rather than an item under the application menu,
+    // because the theme list used to be buried in View where nobody looking for
+    // it would think to open it.
+    let settingsMenu = NSMenu(title: "Settings")
+    let themeItem = settingsMenu.addItem(withTitle: "Theme", action: nil, keyEquivalent: "")
+    themeItem.submenu = themeMenu(for: controller)
+    settingsMenu.addItem(
+      withTitle: "Shortcuts…", action: #selector(openShortcuts), keyEquivalent: ""
     ).target = self
-    viewMenu.addItem(.separator())
-    viewMenu.addItem(
-      withTitle: "Hide File Browser", action: #selector(toggleFileBrowser), keyEquivalent: "b"
-    ).target = self
+    let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+    settingsItem.submenu = settingsMenu
+
+    let mainMenu = NSMenu()
+    for item in [appItem, fileItem, editItem, viewItem, settingsItem] {
+      mainMenu.addItem(item)
+    }
+    NSApp.mainMenu = mainMenu
+  }
+
+  private func commands(in menu: String, from shortcuts: [CoreShortcut]) -> [CoreShortcut] {
+    shortcuts.filter { $0.menu == menu }
+  }
+
+  /// One item per command, with the key the core says it is on. A command this
+  /// build has no action for is skipped rather than drawn as a dead row.
+  private func add(_ shortcuts: [CoreShortcut], to menu: NSMenu) {
+    for shortcut in shortcuts {
+      guard let action = Self.actions[shortcut.command] else { continue }
+      let item = menu.addItem(withTitle: shortcut.title, action: action, keyEquivalent: "")
+      item.target = self
+      guard let key = ShortcutKey.parse(shortcut.key) else { continue }
+      item.keyEquivalent = key.equivalent
+      item.keyEquivalentModifierMask = Self.flags(key.modifiers)
+      // ⌘+ needs shift on a US keyboard and nobody holds shift to zoom in, so
+      // the same command is also on the key people actually press.
+      if key.equivalent == "+" {
+        let twin = menu.addItem(withTitle: shortcut.title, action: action, keyEquivalent: "=")
+        twin.target = self
+        twin.keyEquivalentModifierMask = Self.flags(key.modifiers)
+        twin.isHidden = true
+      }
+    }
+  }
+
+  /// The one place a command id becomes something that runs. The core owns the
+  /// list and the keys; this owns what each one does.
+  private static let actions: [String: Selector] = [
+    "new_tab": #selector(AppDelegate.newTab),
+    "open_file": #selector(AppDelegate.openPalette),
+    "close_tab": #selector(AppDelegate.closeTab),
+    "save": #selector(AppDelegate.saveDocument),
+    "edit_mode": #selector(AppDelegate.toggleEditMode),
+    "find": #selector(AppDelegate.beginFind),
+    "find_next": #selector(AppDelegate.findNext),
+    "find_previous": #selector(AppDelegate.findPrevious),
+    "zoom_in": #selector(AppDelegate.zoomIn),
+    "zoom_out": #selector(AppDelegate.zoomOut),
+    "zoom_reset": #selector(AppDelegate.zoomReset),
+    "toggle_file_browser": #selector(AppDelegate.toggleFileBrowser),
+  ]
+
+  private static func flags(_ modifiers: ShortcutKey.Modifiers) -> NSEvent.ModifierFlags {
+    var flags = NSEvent.ModifierFlags()
+    if modifiers.contains(.command) { flags.insert(.command) }
+    if modifiers.contains(.control) { flags.insert(.control) }
+    if modifiers.contains(.option) { flags.insert(.option) }
+    if modifiers.contains(.shift) { flags.insert(.shift) }
+    return flags
+  }
+
+  private func themeMenu(for controller: TerminalWindowController) -> NSMenu {
     let themes = NSMenu(title: "Theme")
     for name in [CoreTheme.system] + controller.themes.map(\.name) {
       let item = themes.addItem(withTitle: name, action: #selector(chooseTheme), keyEquivalent: "")
       item.target = self
       item.state = name == controller.themeName ? .on : .off
     }
-    let themeItem = viewMenu.addItem(withTitle: "Theme", action: nil, keyEquivalent: "")
-    themeItem.submenu = themes
-    let viewItem = NSMenuItem()
-    viewItem.submenu = viewMenu
+    return themes
+  }
 
-    let mainMenu = NSMenu()
-    mainMenu.addItem(appItem)
-    mainMenu.addItem(editItem)
-    mainMenu.addItem(viewItem)
-    NSApp.mainMenu = mainMenu
+  @objc private func openShortcuts() {
+    guard let core else { return }
+    let controller = shortcutsWindow ?? ShortcutsWindowController(core: core)
+    shortcutsWindow = controller
+    controller.onChange = { [weak self] in
+      guard let self, let window = self.windowController else { return }
+      // The menu is built from the core, so a changed key is one rebuild.
+      self.buildMenu(for: window)
+    }
+    controller.showWindow(nil)
+    controller.window?.center()
+    controller.window?.makeKeyAndOrderFront(nil)
+  }
+
+  @objc private func newTab() {
+    windowController?.openTab()
+  }
+
+  @objc private func openPalette() {
+    windowController?.openCommandPalette()
+  }
+
+  @objc private func closeTab() {
+    windowController?.closeActiveTab()
+  }
+
+  @objc private func saveDocument() {
+    windowController?.saveActiveDocument()
+  }
+
+  @objc private func beginFind() {
+    windowController?.beginFind()
+  }
+
+  @objc private func findNext() {
+    windowController?.findNext()
+  }
+
+  @objc private func findPrevious() {
+    windowController?.findPrevious()
   }
 
   @objc private func toggleEditMode() {

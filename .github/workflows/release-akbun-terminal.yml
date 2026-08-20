@@ -116,8 +116,10 @@ jobs:
           - A macOS window that wraps a shell. The model, the sessions and the protocol live in a Rust core; the window is a thin AppKit shell over it.
           - Projects and workspaces on the left, terminal tabs in the middle, the project's files on the right.
           - The terminal is SwiftTerm, so colour, the cursor and full screen programs draw properly.
-          - Markdown files open under the terminal, rendered or as source, and save back.
-          - Colour schemes known by name are in the View menu; the default follows the system appearance.
+          - Markdown files open under the terminal, rendered or as source, and save back. A mermaid fence is drawn as a diagram, and an HTML file has a Render mode beside View and Edit.
+          - Command F finds text in the file on screen; Command O opens any file in the project by typing part of its path.
+          - Colour schemes known by name are under Settings, dark and light; the default follows the system appearance.
+          - Settings also puts any menu command on any keystroke.
           - Each workspace is coloured by what the agent in it is doing, and a notification says when one finishes.
           - Which phrases mean what is one JSON file per agent under the app data directory, so a new agent is a new file.
           - Clicking a URL in the terminal offers to copy it or open it, in the system browser or one you name.

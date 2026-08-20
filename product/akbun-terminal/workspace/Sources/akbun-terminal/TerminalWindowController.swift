@@ -268,7 +268,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   }
 
   /// Starts a shell for the selected workspace in the project's folder.
-  private func openTab() {
+  func openTab() {
     guard let selection else { return }
     let terminal = SwiftTermTerminalView(frame: contentArea.bounds)
     terminal.apply(theme: currentTheme)
@@ -411,10 +411,80 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   /// Turns the file on screen between reading and editing. Nothing happens on
   /// a shell tab: a terminal is always editable and has no second mode to go to.
   func toggleEditMode() {
+    activeDocument?.toggleEditing()
+  }
+
+  /// The document tab on screen, or nothing when the tab is a shell. Every menu
+  /// command that only means something for a file goes through here, so a
+  /// keystroke pressed over a terminal is quietly nothing rather than an error.
+  private var activeDocument: DocumentView? {
     guard let workspace = selection?.workspace.id,
       case .document(let path)? = tabs.active(in: workspace)
-    else { return }
-    documents[DocumentKey(workspace: workspace, path: path)]?.toggleEditing()
+    else { return nil }
+    return documents[DocumentKey(workspace: workspace, path: path)]
+  }
+
+  func saveActiveDocument() {
+    activeDocument?.save()
+  }
+
+  func beginFind() {
+    activeDocument?.beginFind()
+  }
+
+  func findNext() {
+    activeDocument?.findNext()
+  }
+
+  func findPrevious() {
+    activeDocument?.findPrevious()
+  }
+
+  /// Closes the tab on screen, shell or file. The same path the strip's own
+  /// close button takes, so unsaved work is asked about once and in one place.
+  func closeActiveTab() {
+    guard let workspace = selection?.workspace.id, let content = tabs.active(in: workspace) else {
+      return
+    }
+    closeTab(content)
+  }
+
+  // MARK: Command palette
+
+  /// Opens the file finder over the window.
+  ///
+  /// It is a sheet on this window because the folder it searches is this
+  /// window's project. With no project open there is nothing to search, and
+  /// saying so is better than an empty list somebody types into.
+  func openCommandPalette() {
+    guard let window else { return }
+    guard let root = selection?.project.path else {
+      let alert = NSAlert()
+      alert.messageText = "There is no folder to search"
+      alert.informativeText =
+        "Open a project that points at a folder on disk, then try again."
+      alert.beginSheetModal(for: window)
+      return
+    }
+    let sheet = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+      styleMask: [.titled, .fullSizeContentView],
+      backing: .buffered,
+      defer: false)
+    sheet.appearance = palette.appearance
+    let view = CommandPaletteView(core: core, root: root, palette: palette, zoom: zoomLevel)
+    view.onClose = { [weak self, weak sheet] in
+      guard let sheet else { return }
+      self?.window?.endSheet(sheet)
+    }
+    view.onOpen = { [weak self, weak sheet] path in
+      guard let sheet else { return }
+      self?.window?.endSheet(sheet)
+      self?.openDocument(at: path)
+    }
+    sheet.contentView = view
+    window.beginSheet(sheet)
+    view.takeKeyboard()
   }
 
   /// A command click inside a rendered document. A markdown file next to it

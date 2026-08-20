@@ -19,11 +19,25 @@ struct MarkdownAttributedText {
 
   let zoom: Zoom
   let colour: NSColor
+  /// The diagrams that have already been drawn, by their source. A mermaid
+  /// block whose image is not here yet is drawn as its own source, so the page
+  /// reads while the diagram is still being made rather than showing a gap.
+  let diagrams: [String: NSImage]
 
-  static func build(_ blocks: [CoreBlock], zoom: Zoom = Zoom(), colour: NSColor = .textColor)
-    -> NSAttributedString
-  {
-    MarkdownAttributedText(zoom: zoom, colour: colour).build(blocks)
+  static func build(
+    _ blocks: [CoreBlock], zoom: Zoom = Zoom(), colour: NSColor = .textColor,
+    diagrams: [String: NSImage] = [:]
+  ) -> NSAttributedString {
+    MarkdownAttributedText(zoom: zoom, colour: colour, diagrams: diagrams).build(blocks)
+  }
+
+  /// Every mermaid block in a document, in order. The view asks for these so it
+  /// knows what to have drawn.
+  static func mermaidSources(in blocks: [CoreBlock]) -> [String] {
+    blocks.compactMap { block in
+      guard case .mermaid(let text) = block else { return nil }
+      return text
+    }
   }
 
   /// A quote, a table, a rule: present but not what is being read.
@@ -49,6 +63,8 @@ struct MarkdownAttributedText {
         // The language is not drawn: highlighting is a code editor's job, and
         // this view is for reading documents.
         appendLine(text, to: document, font: monospace, indent: 18, color: colour)
+      case .mermaid(let text):
+        append(diagram: text, to: document)
       case .table(let header, let rows):
         appendLine(
           Self.table(header: header, rows: rows), to: document, font: monospace, indent: 12,
@@ -61,6 +77,30 @@ struct MarkdownAttributedText {
       }
     }
     return document
+  }
+
+  /// A drawn diagram as an image in the text flow, or its source until it has
+  /// been drawn. An image in the flow selects, scrolls and prints with the rest
+  /// of the page, which a live view sitting on top of it would not.
+  private func append(diagram source: String, to document: NSMutableAttributedString) {
+    guard let image = diagrams[source] else {
+      appendLine(source, to: document, font: monospace, indent: 18, color: quiet)
+      return
+    }
+    let attachment = NSTextAttachment()
+    attachment.image = image
+    // The snapshot is taken at the screen's own scale, so it is drawn at half
+    // its pixel size on a retina display rather than twice as wide as the page.
+    let scale = image.recommendedLayerContentsScale(0) > 0
+      ? image.recommendedLayerContentsScale(0) : 1
+    let size = NSSize(width: image.size.width / scale, height: image.size.height / scale)
+    attachment.bounds = NSRect(origin: .zero, size: size)
+    let line = NSMutableAttributedString(attachment: attachment)
+    line.append(NSAttributedString(string: "\n"))
+    line.addAttribute(
+      .paragraphStyle, value: paragraph(indent: 12),
+      range: NSRange(location: 0, length: line.length))
+    document.append(line)
   }
 
   private var body: NSFont { .systemFont(ofSize: zoom.size(13)) }
