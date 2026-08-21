@@ -21,7 +21,7 @@ The split is by expected lifetime rather than by layer. The shell is the part mo
 Every call is one JSON envelope:
 
 ```json
-{"v":1,"command":{"type":"spawn","cwd":"/Users/me/code","cols":120,"rows":40}}
+{"v":2,"command":{"type":"spawn","cwd":"/Users/me/code","cols":120,"rows":40}}
 ```
 
 The version is checked by the core before the command is read. A shell built against a different version gets an error response, never a partial parse.
@@ -52,9 +52,13 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Judging.** Every session's bytes also go into an interpreted screen, on the reader thread that already has them. A second timer, two seconds apart from the one that draws, asks the core to judge: one `ps` snapshot names the processes under each shell, the rule files say what the screens mean, and the answer is only the workspaces that moved. The shell paints those and raises a notification for the ones that finished.
 
-**Opening a file.** A single click in the file pane sends the entry to the window, which opens a tab for it and asks the core for its text. Markdown comes back as blocks, everything else as coloured tokens; both are drawn as one attributed string in a read only text view. Command E swaps that view for the plain editable one, and Command S sends the text back through `write_file`. The core is asked once per mode change, never per keystroke.
+**Opening a file.** A single click in the file pane opens a tab and asks the core only for text. View mode delegates source highlighting to HighlighterSwift and Highlight.js. Markdown Preview delegates parsing and rendering to bundled markdown-it, Highlight.js and Mermaid in a non-persistent WebKit view; raw document HTML is disabled. Command E swaps View and Edit, and Command S writes through `write_file`.
 
-**Clicking a link.** The view turns the point into a row of text and a column and hands both to the core. The core finds the word, trims what a sentence left on it, and answers only for http and https. Nothing is opened without that answer.
+**Opening HTML.** HTML has no internal Render mode. `Open in Browser` is an independent action that hands the saved local file to the system browser. A dirty buffer first offers Save and Open, Open Saved Version or Cancel. The app never executes document JavaScript in its own process.
+
+**Clicking a Markdown link.** The preview cancels WebKit navigation. A relative file opens in an app tab, http and https go to the system browser, and every other scheme is ignored.
+
+**Clicking a terminal link.** The view turns the point into a row of text and a column and hands both to the core. The core finds the word, trims what a sentence left on it, and answers only for http and https. Nothing is opened without that answer.
 
 **Spawn environment.** The core sets `TERM` on the child. A GUI process inherits none, and a shell that does not know what is drawing it writes for a dumb terminal.
 
@@ -74,7 +78,6 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `read_directory` | `entries` | one level, hidden entries included, links left as leaves |
 | `git_status` | `git` | what git makes of a folder, directories included; not being a repository is an answer |
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
-| `render_markdown` | `markdown` | blocks, and where raw HTML is dropped |
 | `themes` | `themes` | the known palettes as hex |
 | `load_rules` | `ok` | reads one JSON file per agent, seeding the shipped ones |
 | `detect` | `statuses` | judges every workspace with a session, answering only what moved |

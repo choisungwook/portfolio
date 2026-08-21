@@ -23,8 +23,13 @@ struct Palette {
   let panel: NSColor
   let text: NSColor
   let secondaryText: NSColor
+  /// The theme's own emphasis colour. Active controls use this instead of a
+  /// mathematical RGB inverse, which is not guaranteed to remain readable.
+  let accent: NSColor
   let selection: NSColor
   let separator: NSColor
+  /// The closest Highlight.js theme shipped by HighlighterSwift.
+  let syntaxTheme: String
   /// Nothing was chosen, so AppKit is left to follow dark and light mode on its
   /// own. Views still read the colours from here; the values are the dynamic
   /// system ones, which is what keeps the switch automatic.
@@ -35,8 +40,10 @@ struct Palette {
     panel: .windowBackgroundColor,
     text: .labelColor,
     secondaryText: .secondaryLabelColor,
+    accent: .controlAccentColor,
     selection: .selectedContentBackgroundColor,
     separator: .separatorColor,
+    syntaxTheme: "system",
     followsSystem: true
   )
 
@@ -45,27 +52,33 @@ struct Palette {
   init?(theme: CoreTheme) {
     guard let background = theme.backgroundRGB, let text = theme.foregroundRGB,
       let panel = theme.panelBackground, let secondary = theme.secondaryForeground,
+      let accent = theme.rgbPalette?[4],
       let selection = theme.selectionBackground, let separator = theme.separator
     else { return nil }
     self.background = NSColor(background)
     self.panel = NSColor(panel)
     self.text = NSColor(text)
     self.secondaryText = NSColor(secondary)
+    self.accent = NSColor(accent)
     self.selection = NSColor(selection)
     self.separator = NSColor(separator)
+    self.syntaxTheme = Self.syntaxTheme(for: theme.name, dark: theme.isDark)
     self.followsSystem = false
   }
 
   private init(
     background: NSColor, panel: NSColor, text: NSColor, secondaryText: NSColor,
-    selection: NSColor, separator: NSColor, followsSystem: Bool
+    accent: NSColor, selection: NSColor, separator: NSColor, syntaxTheme: String,
+    followsSystem: Bool
   ) {
     self.background = background
     self.panel = panel
     self.text = text
     self.secondaryText = secondaryText
+    self.accent = accent
     self.selection = selection
     self.separator = separator
+    self.syntaxTheme = syntaxTheme
     self.followsSystem = followsSystem
   }
 
@@ -85,6 +98,32 @@ struct Palette {
   /// Text on a selected row. The selection is a mix of the background and the
   /// theme's blue, so the ordinary text colour still reads on it.
   var selectedText: NSColor { text }
+
+  var isDark: Bool { text.isLighter(than: background) }
+
+  var resolvedSyntaxTheme: String {
+    syntaxTheme == "system" ? (isDark ? "github-dark" : "github") : syntaxTheme
+  }
+
+  private static func syntaxTheme(for name: String, dark: Bool) -> String {
+    switch name {
+    case "Dracula": return "dracula"
+    case "Nord": return "nord"
+    case "Solarized Dark": return "solarized-dark"
+    case "Solarized Light": return "solarized-light"
+    case "Gruvbox Dark": return "gruvbox-dark"
+    case "Gruvbox Light": return "gruvbox-light"
+    case "Tokyo Night": return "tokyo-night-dark"
+    case "Tokyo Night Day": return "tokyo-night-light"
+    case "One Dark": return "atom-one-dark-reasonable"
+    case "One Light": return "atom-one-light"
+    case "Monokai": return "monokai"
+    case "Rosé Pine": return "rose-pine"
+    case "Rosé Pine Dawn": return "rose-pine-dawn"
+    case "GitHub Light", "Light": return "github"
+    default: return dark ? "github-dark" : "github"
+    }
+  }
 }
 
 extension NSColor {
@@ -96,11 +135,27 @@ extension NSColor {
 
   /// Compares two theme colours, which are always plain sRGB, so the conversion
   /// cannot fail in practice and a failure means "leave it alone".
-  fileprivate func isLighter(than other: NSColor) -> Bool {
-    guard let left = usingColorSpace(.sRGB), let right = other.usingColorSpace(.sRGB) else {
+  @MainActor fileprivate func isLighter(than other: NSColor) -> Bool {
+    guard let left = resolvedRGB, let right = other.resolvedRGB
+    else {
       return false
     }
     return left.brightnessComponent > right.brightnessComponent
+  }
+
+  @MainActor var cssHex: String {
+    let colour = resolvedRGB ?? self
+    return String(
+      format: "#%02x%02x%02x", Int(colour.redComponent * 255),
+      Int(colour.greenComponent * 255), Int(colour.blueComponent * 255))
+  }
+
+  @MainActor private var resolvedRGB: NSColor? {
+    var colour: NSColor?
+    NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+      colour = usingColorSpace(.sRGB)
+    }
+    return colour
   }
 }
 

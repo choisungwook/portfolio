@@ -51,14 +51,15 @@ cargo test --manifest-path core/Cargo.toml
 - Lists the selected project's files on the right, hidden files and folders included, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
 - Colours those names by what git makes of them when the project is a repository, with a closed folder wearing the strongest status of anything inside it, refreshed while the shell beside it works.
 - Tells a staged change from one that is only in the working tree: green for staged, orange for not, yellow for both, and a letter after the name for what the change was.
-- Opens any file in a tab beside the shells on one click, rendered for markdown and coloured by language for everything else, and writes it back on save.
-- Turns the tab on screen between reading and editing with Command E.
-- Draws a mermaid fence in a markdown file as a diagram, by the mermaid bundled into the app, in a web view that is never on screen and photographed into the page.
-- Gives an HTML file a Render mode beside View and Edit, drawn as a page with scripting off.
+- Opens any file in a tab beside the shells on one click and writes it back on save.
+- Delegates source highlighting to HighlighterSwift and Highlight.js instead of maintaining one lexer per language.
+- Turns the tab between icon-only View and Edit modes with Command E, using the selected theme's accent for the active icon.
+- Previews Markdown with bundled markdown-it, Highlight.js and Mermaid. Raw document HTML and document scripts are disabled.
+- Opens a saved HTML file in the system browser through an independent `Open in Browser` action, with an explicit choice when the buffer is dirty.
 - Finds text in the file on screen with Command F, marking every match and stepping through them with Command G.
 - Opens any file in the project by typing part of its path with Command O, best match first and the typed characters marked.
-- Recognises around twenty languages by suffix or file name, and shows a file it does not recognise as plain text rather than refusing it.
-- Opens a link inside a rendered document in its own tab on Command click, and sends an http or https link to a browser.
+- Uses Highlight.js language definitions and shows a file it does not recognise as plain text rather than refusing it.
+- Opens a relative link inside a rendered document in its own tab on click, and sends an http or https link to a browser.
 - Wears a known colour scheme picked from Settings, or follows the system appearance, and dresses every pane in it rather than the terminal alone. A dozen dark schemes and seven light ones, one of which is called Light.
 - Puts any menu command on any keystroke from Settings, refusing a key another command already has, and remembers only what was changed.
 - Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.

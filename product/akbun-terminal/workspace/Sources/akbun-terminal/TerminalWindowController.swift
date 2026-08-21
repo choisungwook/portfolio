@@ -380,8 +380,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   /// Every file, not only markdown. The pane on the right lists a whole
   /// repository, and a browser where nine names in ten do nothing when clicked
-  /// is a list rather than a browser. What a file looks like is the core's
-  /// answer: markdown is rendered and everything else is coloured.
+  /// is a list rather than a browser. The core supplies text; the document view
+  /// delegates how that text looks to its rendering engines.
   private func open(_ entry: CoreEntry) {
     openDocument(at: entry.path)
   }
@@ -487,7 +487,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     view.takeKeyboard()
   }
 
-  /// A command click inside a rendered document. A markdown file next to it
+  /// A link clicked inside a rendered document. A markdown file next to it
   /// opens in its own tab, so following a chain of documents leaves the way back
   /// on screen; anything with a scheme is the browser's.
   private func follow(_ link: String, from documentPath: String) {
