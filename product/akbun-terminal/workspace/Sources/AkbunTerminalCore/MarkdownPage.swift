@@ -4,8 +4,8 @@ import Foundation
 ///
 /// The Markdown source is kept in a text-only element. markdown-it reads it
 /// with `textContent`, raw HTML is disabled, and Mermaid runs with its strict
-/// security level. A document can supply text, links and image addresses, but
-/// never a script.
+/// security level. A document can supply text, links and local image addresses,
+/// but never a script or a network image request.
 public enum MarkdownPage {
   public struct Style: Sendable {
     public let background: String
@@ -39,7 +39,7 @@ public enum MarkdownPage {
       <!doctype html>
       <html><head><meta charset="utf-8">
       <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src file: https: data:; font-src data:; connect-src 'none'; object-src 'none';">
+        content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src file: data:; font-src data:; connect-src 'none'; object-src 'none';">
       <style>\(embeddedStyle(highlightStyle))</style>
       <style>
         :root { color-scheme: \(style.dark ? "dark" : "light"); }

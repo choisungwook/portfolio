@@ -25,6 +25,7 @@ struct MarkdownPageTests {
       highlightScript: "// highlight", mermaidScript: "// mermaid")
     #expect(page.contains("default-src 'none'"))
     #expect(page.contains("connect-src 'none'"))
+    #expect(page.contains("img-src file: data:"))
     #expect(page.contains("securityLevel: 'strict'"))
   }
 

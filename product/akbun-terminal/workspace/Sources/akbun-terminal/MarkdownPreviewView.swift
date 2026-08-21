@@ -53,8 +53,7 @@ final class MarkdownPreviewView: WKWebView, WKNavigationDelegate {
         highlightScript: try script(named: "highlight.min"),
         mermaidScript: try script(named: "mermaid.min")
       )
-      let folder = URL(fileURLWithPath: (path as NSString).deletingLastPathComponent)
-      loadHTMLString(page, baseURL: folder)
+      loadHTMLString(page, baseURL: URL(fileURLWithPath: path))
     } catch {
       onError?(error)
     }

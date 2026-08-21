@@ -59,7 +59,7 @@ cargo test --manifest-path core/Cargo.toml
 - Finds text in the file on screen with Command F, marking every match and stepping through them with Command G.
 - Opens any file in the project by typing part of its path with Command O, best match first and the typed characters marked.
 - Uses Highlight.js language definitions and shows a file it does not recognise as plain text rather than refusing it.
-- Opens a link inside a rendered document in its own tab on Command click, and sends an http or https link to a browser.
+- Opens a relative link inside a rendered document in its own tab on click, and sends an http or https link to a browser.
 - Wears a known colour scheme picked from Settings, or follows the system appearance, and dresses every pane in it rather than the terminal alone. A dozen dark schemes and seven light ones, one of which is called Light.
 - Puts any menu command on any keystroke from Settings, refusing a key another command already has, and remembers only what was changed.
 - Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.
