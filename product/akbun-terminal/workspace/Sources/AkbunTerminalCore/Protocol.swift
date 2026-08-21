@@ -8,7 +8,7 @@ import Foundation
 public enum CoreProtocol {
   /// Must match `PROTOCOL_VERSION` on the Rust side. A mismatch is reported by
   /// the core as an error rather than parsed as something else.
-  public static let version: UInt32 = 1
+  public static let version: UInt32 = 2
 }
 
 public enum CoreCommand: Encodable {
@@ -28,8 +28,6 @@ public enum CoreCommand: Encodable {
   case gitStatus(path: String)
   case readFile(path: String)
   case writeFile(path: String, text: String)
-  case renderMarkdown(text: String)
-  case highlight(path: String, text: String)
   case themes
   case setTheme(name: String)
   case shortcuts
@@ -109,13 +107,6 @@ public enum CoreCommand: Encodable {
       try container.encode("write_file", forKey: .type)
       try container.encode(path, forKey: .path)
       try container.encode(text, forKey: .text)
-    case .renderMarkdown(let text):
-      try container.encode("render_markdown", forKey: .type)
-      try container.encode(text, forKey: .text)
-    case .highlight(let path, let text):
-      try container.encode("highlight", forKey: .type)
-      try container.encode(path, forKey: .path)
-      try container.encode(text, forKey: .text)
     case .themes:
       try container.encode("themes", forKey: .type)
     case .setTheme(let name):
@@ -170,8 +161,6 @@ public enum CoreResponse: Equatable, Sendable {
   case entries([CoreEntry])
   case git(CoreGitStatus)
   case file(text: String)
-  case markdown([CoreBlock])
-  case highlighted(CoreHighlighted)
   case themes([CoreTheme])
   case shortcuts([CoreShortcut])
   case matches([CoreMatch])
@@ -331,130 +320,6 @@ public enum CoreFileStage: String, Decodable, Equatable, Sendable {
   case both
 }
 
-/// One file coloured, as the core read it.
-///
-/// `language` absent means nothing recognised the file: the lines are still
-/// there and still drawn, in one colour. The view shows the name, so a reader
-/// can tell "not recognised" from "nothing to colour".
-public struct CoreHighlighted: Decodable, Equatable, Sendable {
-  public let language: String?
-  public let lines: [[CoreToken]]
-
-  public init(language: String?, lines: [[CoreToken]]) {
-    self.language = language
-    self.lines = lines
-  }
-}
-
-public struct CoreToken: Decodable, Equatable, Sendable {
-  public let text: String
-  public let kind: CoreTokenKind
-
-  public init(text: String, kind: CoreTokenKind) {
-    self.text = text
-    self.kind = kind
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    text = try container.decode(String.self, forKey: .text)
-    // A kind a newer core invented is drawn as ordinary text rather than
-    // failing the file it arrived in.
-    kind = (try? container.decode(CoreTokenKind.self, forKey: .kind)) ?? .plain
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case text, kind
-  }
-}
-
-public enum CoreTokenKind: String, Decodable, Equatable, Sendable {
-  case plain
-  case comment
-  case string
-  case number
-  case keyword
-  case type
-  case constant
-  case function
-  case key
-  case punctuation
-}
-
-public struct CoreSpan: Decodable, Equatable, Sendable {
-  public let text: String
-  public let bold: Bool
-  public let italic: Bool
-  public let code: Bool
-  public let link: String?
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    text = try container.decode(String.self, forKey: .text)
-    bold = try container.decodeIfPresent(Bool.self, forKey: .bold) ?? false
-    italic = try container.decodeIfPresent(Bool.self, forKey: .italic) ?? false
-    code = try container.decodeIfPresent(Bool.self, forKey: .code) ?? false
-    link = try container.decodeIfPresent(String.self, forKey: .link)
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case text, bold, italic, code, link
-  }
-}
-
-public enum CoreBlock: Decodable, Equatable, Sendable {
-  case heading(level: Int, spans: [CoreSpan])
-  case paragraph(spans: [CoreSpan])
-  case quote(spans: [CoreSpan])
-  case code(language: String?, text: String)
-  /// A fenced block whose language was mermaid. Its own case because the shell
-  /// draws it as a diagram rather than as source.
-  case mermaid(text: String)
-  case listItem(depth: Int, marker: String, spans: [CoreSpan])
-  case table(header: [String], rows: [[String]])
-  case rule
-  /// A block from a newer core. Drawn as nothing rather than crashing the view.
-  case unknown
-
-  private enum Key: String, CodingKey {
-    case type, level, spans, language, text, depth, marker, header, rows
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: Key.self)
-    func spans() throws -> [CoreSpan] {
-      try container.decode([CoreSpan].self, forKey: .spans)
-    }
-    switch try container.decode(String.self, forKey: .type) {
-    case "heading":
-      self = .heading(level: try container.decode(Int.self, forKey: .level), spans: try spans())
-    case "paragraph":
-      self = .paragraph(spans: try spans())
-    case "quote":
-      self = .quote(spans: try spans())
-    case "code":
-      self = .code(
-        language: try container.decodeIfPresent(String.self, forKey: .language),
-        text: try container.decode(String.self, forKey: .text))
-    case "list_item":
-      self = .listItem(
-        depth: try container.decode(Int.self, forKey: .depth),
-        marker: try container.decode(String.self, forKey: .marker),
-        spans: try spans())
-    case "table":
-      self = .table(
-        header: try container.decode([String].self, forKey: .header),
-        rows: try container.decode([[String]].self, forKey: .rows))
-    case "mermaid":
-      self = .mermaid(text: try container.decode(String.self, forKey: .text))
-    case "rule":
-      self = .rule
-    default:
-      self = .unknown
-    }
-  }
-}
-
 public struct CoreTheme: Decodable, Equatable, Sendable {
   public let name: String
   public let background: String
@@ -495,8 +360,8 @@ public enum CoreEvent: Equatable, Sendable {
 
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
-    case type, `protocol`, session, state, message, entries, text, blocks, themes
-    case statuses, url, status, language, lines, shortcuts, matches
+    case type, `protocol`, session, state, message, entries, text, themes
+    case statuses, url, status, shortcuts, matches
   }
 
   public init(from decoder: Decoder) throws {
@@ -516,13 +381,6 @@ extension CoreResponse: Decodable {
       self = .git(try container.decode(CoreGitStatus.self, forKey: .status))
     case "file":
       self = .file(text: try container.decode(String.self, forKey: .text))
-    case "markdown":
-      self = .markdown(try container.decode([CoreBlock].self, forKey: .blocks))
-    case "highlighted":
-      self = .highlighted(
-        CoreHighlighted(
-          language: try container.decodeIfPresent(String.self, forKey: .language),
-          lines: try container.decode([[CoreToken]].self, forKey: .lines)))
     case "themes":
       self = .themes(try container.decode([CoreTheme].self, forKey: .themes))
     case "shortcuts":

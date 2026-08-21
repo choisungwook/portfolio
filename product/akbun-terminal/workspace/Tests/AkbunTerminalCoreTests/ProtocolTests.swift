@@ -13,32 +13,32 @@ struct ProtocolTests {
   }
 
   @Test func everyRequestCarriesTheProtocolVersion() throws {
-    #expect(try json(.hello) == #"{"command":{"type":"hello"},"v":1}"#)
+    #expect(try json(.hello) == #"{"command":{"type":"hello"},"v":2}"#)
   }
 
   @Test func spawnNamesTheFieldsTheCoreReads() throws {
     let encoded = try json(.spawn(cwd: "/tmp", cols: 80, rows: 24, workspace: 7))
     #expect(
       encoded
-        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":1}"#)
+        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":2}"#)
   }
 
   @Test func spawnWithoutAWorkspaceLeavesTheFieldOut() throws {
     let encoded = try json(.spawn(cwd: "", cols: 80, rows: 24, workspace: nil))
-    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":1}"#)
+    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":2}"#)
   }
 
   @Test func agentAndLinkCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadRules(directory: "/tmp/agents"))
-        == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":1}"#)
-    #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":1}"#)
+        == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":2}"#)
+    #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":2}"#)
     #expect(
       try json(.clearStatus(workspace: 4))
-        == #"{"command":{"type":"clear_status","workspace":4},"v":1}"#)
+        == #"{"command":{"type":"clear_status","workspace":4},"v":2}"#)
     #expect(
       try json(.urlAt(line: "see https://a.example", column: 6))
-        == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":1}"#)
+        == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":2}"#)
   }
 
   @Test func readsWhatTheCoreJudgedAndWhatItWillOpen() throws {
@@ -61,50 +61,20 @@ struct ProtocolTests {
 
   @Test func writeSendsBytesNotText() throws {
     let encoded = try json(.write(session: 3, bytes: [104, 105]))
-    #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":1}"#)
+    #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":2}"#)
   }
 
   @Test func fileAndThemeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.readDirectory(path: "/tmp"))
-        == #"{"command":{"path":"\/tmp","type":"read_directory"},"v":1}"#)
+        == #"{"command":{"path":"\/tmp","type":"read_directory"},"v":2}"#)
     #expect(
       try json(.writeFile(path: "/tmp/a.md", text: "hi"))
-        == #"{"command":{"path":"\/tmp\/a.md","text":"hi","type":"write_file"},"v":1}"#)
-    #expect(try json(.themes) == #"{"command":{"type":"themes"},"v":1}"#)
+        == #"{"command":{"path":"\/tmp\/a.md","text":"hi","type":"write_file"},"v":2}"#)
+    #expect(try json(.themes) == #"{"command":{"type":"themes"},"v":2}"#)
     #expect(
       try json(.setTheme(name: "Nord"))
-        == #"{"command":{"name":"Nord","type":"set_theme"},"v":1}"#)
-  }
-
-  @Test func readsTheBlocksTheCoreSends() throws {
-    let json = """
-      {"type":"markdown","blocks":[
-        {"type":"heading","level":2,"spans":[{"text":"Title","bold":true,"italic":false,"code":false,"link":null}]},
-        {"type":"list_item","depth":1,"marker":"[x]","spans":[{"text":"done"}]},
-        {"type":"table","header":["a"],"rows":[["1"]]},
-        {"type":"something_new"}]}
-      """
-    let response = try JSONDecoder().decode(CoreResponse.self, from: Data(json.utf8))
-    guard case .markdown(let blocks) = response else {
-      Issue.record("expected markdown, got \(response)")
-      return
-    }
-    guard case .heading(let level, let spans) = blocks[0] else {
-      Issue.record("expected a heading, got \(blocks[0])")
-      return
-    }
-    #expect(level == 2)
-    #expect(spans.first?.bold == true)
-    guard case .listItem(let depth, let marker, let items) = blocks[1] else {
-      Issue.record("expected a list item, got \(blocks[1])")
-      return
-    }
-    // The style flags are optional on the wire, so a span without them reads.
-    #expect((depth, marker, items.map(\.text), items[0].code) == (1, "[x]", ["done"], false))
-    #expect(blocks[2] == .table(header: ["a"], rows: [["1"]]))
-    // A block a newer core adds must draw as nothing rather than fail the file.
-    #expect(blocks[3] == .unknown)
+        == #"{"command":{"name":"Nord","type":"set_theme"},"v":2}"#)
   }
 
   @Test func readsADirectoryListing() throws {
@@ -138,22 +108,22 @@ struct ProtocolTests {
   @Test func renameAndDeleteKeepTheirWireNames() throws {
     #expect(
       try json(.renameProject(project: 2, name: "New"))
-        == #"{"command":{"name":"New","project":2,"type":"rename_project"},"v":1}"#)
+        == #"{"command":{"name":"New","project":2,"type":"rename_project"},"v":2}"#)
     #expect(
       try json(.deleteProject(project: 2))
-        == #"{"command":{"project":2,"type":"delete_project"},"v":1}"#)
+        == #"{"command":{"project":2,"type":"delete_project"},"v":2}"#)
     #expect(
       try json(.renameWorkspace(workspace: 5, name: "Web"))
-        == #"{"command":{"name":"Web","type":"rename_workspace","workspace":5},"v":1}"#)
+        == #"{"command":{"name":"Web","type":"rename_workspace","workspace":5},"v":2}"#)
     #expect(
       try json(.deleteWorkspace(workspace: 5))
-        == #"{"command":{"type":"delete_workspace","workspace":5},"v":1}"#)
+        == #"{"command":{"type":"delete_workspace","workspace":5},"v":2}"#)
   }
 
   @Test func readsWhatGitMakesOfAFolder() throws {
     #expect(
       try json(.gitStatus(path: "/p"))
-        == #"{"command":{"path":"\/p","type":"git_status"},"v":1}"#)
+        == #"{"command":{"path":"\/p","type":"git_status"},"v":2}"#)
     let found = #"""
       {"type":"git","status":{"repository":true,"entries":[
       {"path":"/p/src","status":"modified"},{"path":"/p/new.txt","status":"untracked"}]}}
@@ -201,42 +171,6 @@ struct ProtocolTests {
     #expect(status.byPath["/p/half.txt"]?.stage == .both)
   }
 
-  @Test func highlightingKeepsItsWireNames() throws {
-    #expect(
-      try json(.highlight(path: "/p/main.rs", text: "let x = 1;"))
-        == #"{"command":{"path":"\/p\/main.rs","text":"let x = 1;","type":"highlight"},"v":1}"#)
-
-    let coloured = #"""
-      {"type":"highlighted","language":"Rust","lines":[
-      [{"text":"let","kind":"keyword"},{"text":" x = ","kind":"plain"},
-      {"text":"1","kind":"number"},{"text":"something_new","kind":"invented"}],[]]}
-      """#
-    guard case .highlighted(let highlighted) = try JSONDecoder().decode(
-      CoreResponse.self, from: Data(coloured.utf8))
-    else {
-      Issue.record("expected highlighted lines")
-      return
-    }
-    #expect(highlighted.language == "Rust")
-    #expect(highlighted.lines.count == 2)
-    #expect(highlighted.lines[0][0] == CoreToken(text: "let", kind: .keyword))
-    #expect(highlighted.lines[0][2].kind == .number)
-    // A kind a newer core invented is drawn as ordinary text, never dropped.
-    #expect(highlighted.lines[0][3].kind == .plain)
-    #expect(highlighted.lines[1].isEmpty)
-
-    // A file nothing recognised is still a file, and still has lines.
-    let plain = #"{"type":"highlighted","language":null,"lines":[[{"text":"x","kind":"plain"}]]}"#
-    guard case .highlighted(let unknown) = try JSONDecoder().decode(
-      CoreResponse.self, from: Data(plain.utf8))
-    else {
-      Issue.record("expected highlighted lines")
-      return
-    }
-    #expect(unknown.language == nil)
-    #expect(unknown.lines.count == 1)
-  }
-
   @Test func aThemeDressesEverySurfaceInTheWindow() throws {
     // The mixing is here rather than in the views, so it is checked here too.
     let dark = try theme(background: "#1e1e2e", foreground: "#cdd6f4", blue: "#89b4fa")
@@ -279,13 +213,13 @@ struct ProtocolTests {
   @Test func treeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadState(directory: "/tmp/app"))
-        == #"{"command":{"directory":"\/tmp\/app","type":"load_state"},"v":1}"#)
+        == #"{"command":{"directory":"\/tmp\/app","type":"load_state"},"v":2}"#)
     #expect(
       try json(.createProject(name: "Demo", path: nil))
-        == #"{"command":{"name":"Demo","type":"create_project"},"v":1}"#)
+        == #"{"command":{"name":"Demo","type":"create_project"},"v":2}"#)
     #expect(
       try json(.createWorkspace(project: 7, name: "Server"))
-        == #"{"command":{"name":"Server","project":7,"type":"create_workspace"},"v":1}"#)
+        == #"{"command":{"name":"Server","project":7,"type":"create_workspace"},"v":2}"#)
   }
 
   @Test func decodesTheResponsesTheCoreSends() throws {
@@ -330,17 +264,17 @@ struct ProtocolTests {
   }
 
   @Test func namesTheFieldsTheSettingsWindowAndThePaletteSend() throws {
-    #expect(try json(.shortcuts) == #"{"command":{"type":"shortcuts"},"v":1}"#)
+    #expect(try json(.shortcuts) == #"{"command":{"type":"shortcuts"},"v":2}"#)
     #expect(
       try json(.setShortcut(command: "save", key: "cmd+shift+s"))
-        == #"{"command":{"command":"save","key":"cmd+shift+s","type":"set_shortcut"},"v":1}"#)
+        == #"{"command":{"command":"save","key":"cmd+shift+s","type":"set_shortcut"},"v":2}"#)
     #expect(
       try json(.findFiles(root: "/p", query: "app", limit: 60))
-        == #"{"command":{"limit":60,"query":"app","root":"\/p","type":"find_files"},"v":1}"#)
+        == #"{"command":{"limit":60,"query":"app","root":"\/p","type":"find_files"},"v":2}"#)
     // The limit is optional, so a caller with no opinion leaves it out.
     #expect(
       try json(.findFiles(root: "/p", query: "app", limit: nil))
-        == #"{"command":{"query":"app","root":"\/p","type":"find_files"},"v":1}"#)
+        == #"{"command":{"query":"app","root":"\/p","type":"find_files"},"v":2}"#)
   }
 
   @Test func decodesShortcutsAndFileMatches() throws {
@@ -363,13 +297,6 @@ struct ProtocolTests {
       matches == .matches([
         CoreMatch(path: "/p/a.rs", relative: "a.rs", score: 9, positions: [0])
       ]))
-  }
-
-  @Test func aMermaidFenceArrivesAsItsOwnBlock() throws {
-    let response = try JSONDecoder().decode(
-      CoreResponse.self,
-      from: Data(#"{"type":"markdown","blocks":[{"type":"mermaid","text":"graph TD"}]}"#.utf8))
-    #expect(response == .markdown([.mermaid(text: "graph TD")]))
   }
 
   @Test func decodesOutputAndExitEvents() throws {

@@ -9,8 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::browse::Entry;
 use crate::git::GitStatus;
-use crate::highlight::Token;
-use crate::markdown::Block;
 use crate::search::Match;
 use crate::shortcuts::Shortcut;
 use crate::theme::Theme;
@@ -19,7 +17,7 @@ use crate::tree::{TreeState, WorkspaceStatus};
 /// Bumped only when an existing field changes meaning or disappears. Adding an
 /// optional field or a new command variant does not need a bump, because both
 /// sides ignore what they do not know.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// What the shell sends in.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,18 +100,6 @@ pub enum Command {
         path: String,
         text: String,
     },
-    /// Markdown in, blocks out. The text is sent rather than a path so the
-    /// preview follows what is being typed, not what is on disk.
-    RenderMarkdown {
-        text: String,
-    },
-    /// Source in, coloured lines out. The path names the language and the text
-    /// is what to colour, for the same reason markdown sends both: the view
-    /// shows the buffer, which is not always the file.
-    Highlight {
-        path: String,
-        text: String,
-    },
     Themes,
     SetTheme {
         name: String,
@@ -174,14 +160,6 @@ pub enum Response {
     Entries { entries: Vec<Entry> },
     Git { status: GitStatus },
     File { text: String },
-    Markdown { blocks: Vec<Block> },
-    /// `language` absent means nothing recognised the file and the lines are
-    /// plain. Never an error: a file the highlighter does not know still has to
-    /// be readable.
-    Highlighted {
-        language: Option<String>,
-        lines: Vec<Vec<Token>>,
-    },
     Themes { themes: Vec<Theme> },
     Shortcuts { shortcuts: Vec<Shortcut> },
     Matches { matches: Vec<Match> },
@@ -232,7 +210,7 @@ mod tests {
 
     #[test]
     fn reads_a_command_at_the_current_version() {
-        let json = r#"{"v":1,"command":{"type":"spawn","cwd":"/tmp","cols":80,"rows":24}}"#;
+        let json = r#"{"v":2,"command":{"type":"spawn","cwd":"/tmp","cols":80,"rows":24}}"#;
         match parse_request(json).expect("should parse") {
             Command::Spawn { cwd, cols, rows, .. } => {
                 assert_eq!(cwd, "/tmp");
@@ -253,7 +231,7 @@ mod tests {
     fn an_unknown_field_does_not_break_an_old_core() {
         // Forward compatibility in the direction that matters: a newer shell
         // adding a field must not stop an installed core from working.
-        let json = r#"{"v":1,"command":{"type":"hello"},"sent_at":"2026-08-19"}"#;
+        let json = r#"{"v":2,"command":{"type":"hello"},"sent_at":"2026-08-19"}"#;
         assert!(parse_request(json).is_ok());
     }
 
@@ -281,7 +259,7 @@ mod tests {
     fn a_spawn_without_a_workspace_still_reads() {
         // The field was added after the first release, so an older shell has to
         // keep working against a newer core.
-        let json = r#"{"v":1,"command":{"type":"spawn","cwd":"","cols":80,"rows":24}}"#;
+        let json = r#"{"v":2,"command":{"type":"spawn","cwd":"","cols":80,"rows":24}}"#;
         match parse_request(json).expect("should parse") {
             Command::Spawn { workspace, .. } => assert_eq!(workspace, None),
             other => panic!("unexpected command: {other:?}"),
@@ -337,7 +315,7 @@ mod tests {
             r#"{"type":"matches","matches":[{"path":"/tmp/a/b.rs","relative":"a/b.rs","score":42,"positions":[0,2]}]}"#
         );
 
-        let json = r#"{"v":1,"command":{"type":"set_shortcut","command":"save","key":"cmd+shift+s"}}"#;
+        let json = r#"{"v":2,"command":{"type":"set_shortcut","command":"save","key":"cmd+shift+s"}}"#;
         match parse_request(json).expect("should parse") {
             Command::SetShortcut { command, key } => {
                 assert_eq!((command.as_str(), key.as_str()), ("save", "cmd+shift+s"));
@@ -345,7 +323,7 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
         // The limit is optional, so a shell that does not send one still asks.
-        let json = r#"{"v":1,"command":{"type":"find_files","root":"/tmp","query":"ap"}}"#;
+        let json = r#"{"v":2,"command":{"type":"find_files","root":"/tmp","query":"ap"}}"#;
         match parse_request(json).expect("should parse") {
             Command::FindFiles { root, query, limit } => {
                 assert_eq!((root.as_str(), query.as_str(), limit), ("/tmp", "ap", None));
@@ -372,44 +350,18 @@ mod tests {
             response,
             r#"{"type":"git","status":{"repository":true,"entries":[{"path":"/tmp/a.txt","status":"untracked","stage":"unstaged"}]}}"#
         );
-        let json = r#"{"v":1,"command":{"type":"git_status","path":"/tmp"}}"#;
+        let json = r#"{"v":2,"command":{"type":"git_status","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
     }
 
     #[test]
-    fn highlighting_keeps_its_wire_names() {
-        // Decoded by a Swift file compiled apart from this crate, so a rename
-        // has to fail here rather than at runtime on somebody's machine.
-        let response = serde_json::to_string(&Response::Highlighted {
-            language: Some("Rust".to_string()),
-            lines: vec![vec![crate::highlight::Token {
-                text: "let".to_string(),
-                kind: crate::highlight::TokenKind::Keyword,
-            }]],
-        })
-        .unwrap();
-        assert_eq!(
-            response,
-            r#"{"type":"highlighted","language":"Rust","lines":[[{"text":"let","kind":"keyword"}]]}"#
-        );
-        let json = r#"{"v":1,"command":{"type":"highlight","path":"/tmp/a.rs","text":"let x = 1;"}}"#;
-        match parse_request(json).expect("should parse") {
-            Command::Highlight { path, text } => {
-                assert_eq!(path, "/tmp/a.rs");
-                assert_eq!(text, "let x = 1;");
-            }
-            other => panic!("unexpected command: {other:?}"),
-        }
-    }
-
-    #[test]
     fn reads_rename_and_delete_commands() {
-        let json = r#"{"v":1,"command":{"type":"delete_workspace","workspace":4}}"#;
+        let json = r#"{"v":2,"command":{"type":"delete_workspace","workspace":4}}"#;
         match parse_request(json).expect("should parse") {
             Command::DeleteWorkspace { workspace } => assert_eq!(workspace, 4),
             other => panic!("unexpected command: {other:?}"),
         }
-        let json = r#"{"v":1,"command":{"type":"rename_project","project":2,"name":"New"}}"#;
+        let json = r#"{"v":2,"command":{"type":"rename_project","project":2,"name":"New"}}"#;
         match parse_request(json).expect("should parse") {
             Command::RenameProject { project, name } => {
                 assert_eq!((project, name.as_str()), (2, "New"));
@@ -420,7 +372,7 @@ mod tests {
 
     #[test]
     fn reads_tree_mutation_commands() {
-        let json = r#"{"v":1,"command":{"type":"create_workspace","project":3,"name":"Server"}}"#;
+        let json = r#"{"v":2,"command":{"type":"create_workspace","project":3,"name":"Server"}}"#;
         match parse_request(json).expect("should parse") {
             Command::CreateWorkspace { project, name } => {
                 assert_eq!(project, 3);

@@ -1,5 +1,7 @@
 # Markdown crosses the boundary as blocks, never as HTML
 
+> Superseded by [Rendering is delegated without LSP](../knowledge/decisions/2026-08-rendering-is-delegated-without-lsp.md).
+
 ## Decision
 
 The core parses markdown with pulldown-cmark and returns a flat list of blocks: headings, paragraphs, quotes, code, list items with a depth number, tables and rules. The shell turns that list into one attributed string in a plain text view.

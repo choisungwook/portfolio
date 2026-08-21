@@ -3,7 +3,7 @@ import Foundation
 /// Where a link inside a rendered markdown document points.
 ///
 /// The rule is here rather than in the view because it is the whole of what a
-/// command click does: a file next to this one opens in a tab, an address with
+/// link click does: a file next to this one opens in a tab, an address with
 /// a scheme goes to a browser, and anything else is left alone. A view cannot
 /// be asked those questions in a test; this can.
 public enum DocumentLink: Equatable, Sendable {

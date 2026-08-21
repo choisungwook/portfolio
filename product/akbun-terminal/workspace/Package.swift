@@ -16,7 +16,10 @@ let package = Package(
   dependencies: [
     // The terminal emulator behind the view seam. A shell writes escape
     // sequences, so anything that does not interpret them is not a terminal.
-    .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.19.0")
+    .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.19.0"),
+    // Highlight.js behind a native NSAttributedString boundary. Language
+    // grammars are maintained upstream instead of as lexer tables in the core.
+    .package(url: "https://github.com/smittytone/HighlighterSwift", from: "3.1.0")
   ],
   targets: [
     .systemLibrary(name: "CAkbunTerminalCore", path: "Sources/CAkbunTerminalCore"),
@@ -30,7 +33,12 @@ let package = Package(
     ),
     .executableTarget(
       name: "akbun-terminal",
-      dependencies: ["AkbunTerminalCore", .product(name: "SwiftTerm", package: "SwiftTerm")]
+      dependencies: [
+        "AkbunTerminalCore",
+        .product(name: "Highlighter", package: "HighlighterSwift"),
+        .product(name: "SwiftTerm", package: "SwiftTerm"),
+      ],
+      resources: [.copy("Resources")]
     ),
     .testTarget(
       name: "AkbunTerminalCoreTests",

@@ -30,7 +30,8 @@ struct Browsers {
   }
 
   /// Hands the URL to a named browser, or to whatever the system would use when
-  /// `browser` is nil. The caller has already had the core approve the URL.
+  /// `browser` is nil. The caller owns the policy: terminal URLs are approved
+  /// by the core, while an HTML document supplies its own local file URL.
   static func open(_ url: URL, in browser: Browser?) {
     guard let browser else {
       NSWorkspace.shared.open(url)

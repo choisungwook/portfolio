@@ -21,10 +21,13 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 ./scripts/build-core.sh
 swift build -c release --disable-sandbox
 cp ".build/release/$NAME" "$APP/Contents/MacOS/$NAME"
-# mermaid draws the diagrams in a markdown file, in a web view that is never on
-# screen. It is bundled rather than fetched: a document must not make the app
-# reach the network, and a diagram has to draw with no connection at all.
-cp Resources/mermaid.min.js "$APP/Contents/Resources/mermaid.min.js"
+# `Bundle.module` resolves SwiftPM resource bundles from the application bundle
+# root. The manual .app assembly has to preserve that layout.
+for resource_bundle in .build/release/*.bundle; do
+  if [ -d "$resource_bundle" ]; then
+    cp -R "$resource_bundle" "$APP/"
+  fi
+done
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

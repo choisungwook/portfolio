@@ -1,5 +1,7 @@
 # Highlighting is a table in the core, not a grammar set in the shell
 
+> Superseded by [Rendering is delegated without LSP](../knowledge/decisions/2026-08-rendering-is-delegated-without-lsp.md).
+
 ## Context
 
 Once every file opens, a file has to be readable. Source in one colour is a wall of text, and the pane it sits in is next to a terminal that has been colouring its output all along.

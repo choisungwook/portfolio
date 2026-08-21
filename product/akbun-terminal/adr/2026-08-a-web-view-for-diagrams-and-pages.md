@@ -1,5 +1,7 @@
 # A web view, for two things only
 
+> Superseded by [Rendering is delegated without LSP](../knowledge/decisions/2026-08-rendering-is-delegated-without-lsp.md).
+
 ## Decision
 
 Two kinds of content are drawn by WebKit rather than as an attributed string.

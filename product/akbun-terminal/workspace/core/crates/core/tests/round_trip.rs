@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use akbun_terminal_core::App;
 
 fn dispatch(app: &App, command: &str) -> String {
-    app.dispatch(&format!(r#"{{"v":1,"command":{command}}}"#))
+    app.dispatch(&format!(r#"{{"v":2,"command":{command}}}"#))
 }
 
 /// Collects output events until `needle` shows up or the deadline passes.
