@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "akbun-macdiskviewer",
+  "version": "../package.json",
+  "identifier": "io.akbun.macdiskviewer",
+  "build": {
+    "beforeDevCommand": "npm run build:scanner",
+    "beforeBuildCommand": "npm run build:scanner:mac",
+    "frontendDist": "../src/renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "akbun-macdiskviewer",
+        "width": 1240,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 620,
+        "backgroundColor": "#f5f5f3"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg"],
+    "category": "Utility",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
+    "resources": {
+      "../scanner/target/aarch64-apple-darwin/release/akbun-macdiskviewer-scanner": "bin/akbun-macdiskviewer-scanner"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}

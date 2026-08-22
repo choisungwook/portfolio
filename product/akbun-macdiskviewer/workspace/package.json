@@ -1,0 +1,21 @@
+{
+  "name": "akbun-macdiskviewer",
+  "version": "0.1.0",
+  "description": "Tauri macOS disk and Git worktree storage viewer",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "build:scanner": "cargo build --release --manifest-path scanner/Cargo.toml",
+    "build:scanner:mac": "cargo build --release --target aarch64-apple-darwin --manifest-path scanner/Cargo.toml",
+    "start": "tauri dev",
+    "dev": "tauri dev",
+    "test": "npm run test:js && npm run test:rust",
+    "test:js": "node --test test/*.test.js",
+    "test:rust": "cargo test --manifest-path scanner/Cargo.toml && cargo test --manifest-path src-tauri/Cargo.toml",
+    "check:rust": "cargo clippy --all-targets --manifest-path scanner/Cargo.toml -- -D warnings && cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "dist": "tauri build --target aarch64-apple-darwin"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

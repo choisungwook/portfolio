@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost">
+  <title>akbun-macdiskviewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <strong>Mac Disk Viewer</strong>
+          <span>by akbun</span>
+        </div>
+      </div>
+
+      <nav aria-label="Views">
+        <button class="nav-item active" id="diskNav">
+          <span class="nav-icon">▤</span>
+          Disk browser
+        </button>
+        <button class="nav-item" id="worktreeNav">
+          <span class="nav-icon">⑂</span>
+          Worktrees
+        </button>
+        <button class="nav-item" id="largestButton">
+          <span class="nav-icon">⇣</span>
+          Largest items
+        </button>
+        <button class="nav-item" id="recentButton">
+          <span class="nav-icon">◷</span>
+          Recently changed
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="impact-card">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Low impact scan</strong>
+            <span>One folder at a time</span>
+          </div>
+        </div>
+        <button class="text-button" id="permissionButton">Full Disk Access…</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1 id="viewTitle">Macintosh HD</h1>
+          <p id="lastScanText">Preparing disk index…</p>
+        </div>
+        <div class="top-actions">
+          <label class="search-box" id="diskSearchBox">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Search files and folders" autocomplete="off">
+          </label>
+          <button class="primary-button" id="scanButton">Scan disk</button>
+        </div>
+      </header>
+
+      <div id="diskView">
+      <section class="summary-card">
+        <div class="disk-ring" id="diskRing">
+          <div><strong id="usedPercent">—</strong><span>used</span></div>
+        </div>
+        <div class="disk-copy">
+          <span class="eyebrow">STARTUP DISK</span>
+          <h2 id="usedText">Reading disk capacity…</h2>
+          <p id="capacityText">—</p>
+          <div class="capacity-bar"><span id="capacityFill"></span></div>
+        </div>
+        <div class="summary-stats">
+          <div><span>Indexed items</span><strong id="itemCount">—</strong></div>
+          <div><span>Unavailable</span><strong id="issueCount">—</strong></div>
+        </div>
+      </section>
+
+      <section class="scan-panel hidden" id="scanPanel">
+        <div class="scan-heading">
+          <div>
+            <strong id="scanTitle">Scanning with low priority</strong>
+            <span id="scanPath">/</span>
+          </div>
+          <div class="scan-actions">
+            <button class="secondary-button" id="pauseButton">Pause</button>
+            <button class="secondary-button danger" id="cancelButton">Cancel</button>
+          </div>
+        </div>
+        <div class="indeterminate"><span></span></div>
+        <p id="scanStats">Starting…</p>
+      </section>
+
+      <section class="browser-card">
+        <div class="browser-toolbar">
+          <div class="breadcrumbs" id="breadcrumbs"></div>
+          <div class="filters">
+            <select id="scopeSelect" aria-label="Scope">
+              <option value="children">This folder</option>
+              <option value="all">All descendants</option>
+            </select>
+            <select id="sortSelect" aria-label="Sort">
+              <option value="size-desc">Size: largest</option>
+              <option value="size-asc">Size: smallest</option>
+              <option value="modified-desc">Date: newest</option>
+              <option value="modified-asc">Date: oldest</option>
+              <option value="name-asc">Name: A–Z</option>
+              <option value="name-desc">Name: Z–A</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="permission-banner hidden" id="permissionBanner">
+          <div>
+            <strong>Some folders could not be read</strong>
+            <span>Grant Full Disk Access, then scan again for a complete index.</span>
+          </div>
+          <button class="secondary-button" id="bannerPermissionButton">Open Settings</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Kind</th>
+                <th class="number">Disk size</th>
+                <th>Modified</th>
+              </tr>
+            </thead>
+            <tbody id="fileRows"></tbody>
+          </table>
+          <div class="empty-state hidden" id="emptyState">
+            <div>◌</div>
+            <strong>No indexed items</strong>
+            <span>The first full-disk scan may take a while.</span>
+          </div>
+        </div>
+
+        <footer class="pagination">
+          <span id="resultCount">0 items</span>
+          <div>
+            <button class="page-button" id="previousButton" aria-label="Previous page">‹</button>
+            <span id="pageText">Page 1</span>
+            <button class="page-button" id="nextButton" aria-label="Next page">›</button>
+          </div>
+        </footer>
+      </section>
+      </div>
+
+      <div class="hidden" id="worktreeView">
+        <section class="worktree-summary">
+          <div>
+            <span class="eyebrow">AI AGENT WORKTREES</span>
+            <strong id="worktreeSize">0 B</strong>
+            <p>Disk space used by linked Git worktrees</p>
+          </div>
+          <div class="worktree-stat">
+            <span>Detected</span>
+            <strong id="worktreeCount">0</strong>
+          </div>
+        </section>
+
+        <section class="browser-card worktree-card">
+          <div class="browser-toolbar">
+            <div>
+              <strong>Linked worktrees</strong>
+              <p class="toolbar-copy">Detected from <code>.git</code> pointer files in the latest disk index.</p>
+            </div>
+            <div class="filters">
+              <label class="search-box compact">
+                <span>⌕</span>
+                <input id="worktreeSearch" type="search" placeholder="Search repo, branch, or path" autocomplete="off">
+              </label>
+              <select id="worktreeSort" aria-label="Worktree sort">
+                <option value="size-desc">Size: largest</option>
+                <option value="modified-desc">Date: newest</option>
+                <option value="name-asc">Path: A–Z</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="worktree-table">
+              <thead>
+                <tr>
+                  <th>Repository / Worktree</th>
+                  <th>Branch</th>
+                  <th class="number">Disk size</th>
+                  <th>Modified</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="worktreeRows"></tbody>
+            </table>
+            <div class="empty-state hidden" id="worktreeEmpty">
+              <div>⑂</div>
+              <strong>No linked worktrees found</strong>
+              <span>Run a disk scan after an AI agent creates worktrees.</span>
+            </div>
+          </div>
+          <footer class="pagination">
+            <span id="worktreeResultCount">0 worktrees</span>
+            <span>Right click a row for Finder and terminal actions</span>
+          </footer>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="context-menu hidden" id="contextMenu" role="menu"></div>
+  <script src="preview.js"></script>
+  <script src="api.js"></script>
+  <script src="view-model.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Core APIs for the main disk viewer window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
