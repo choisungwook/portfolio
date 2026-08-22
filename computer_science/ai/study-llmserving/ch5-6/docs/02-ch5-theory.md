@@ -1,232 +1,112 @@
-# Chapter 5 LLM serving challenge
+# 16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유
 
-- PDF 범위: 163페이지 시작
-- 다음 장 시작: 198페이지
+7B 모델의 BF16 weight는 약 14GB입니다. 16GB GPU라면 숫자상으로는 들어갈 것처럼 보입니다. 그런데 실제 serving에서는 모델이 올라가지 않거나 첫 요청부터 OOM이 발생할 수 있습니다. **GPU memory는 weight 저장 공간이 아니라 요청을 처리하는 작업 공간이기도 하기 때문입니다.**
 
-## 학습 여부
+이 장의 핵심은 GPU 사양을 외우는 것이 아닙니다. model weight, KV cache, data movement를 계산해 병목을 먼저 찾고, 그 병목에 맞는 optimization을 선택하는 것입니다.
 
-- 학습 필요
-- 단순 Kubernetes 용어 정리 아님
-- Chapter 6 optimization을 이유부터 이해하기 위한 hardware 기초임
+## 빠른 결론
 
-## 목표
+- GPU 선택은 FLOPS보다 workload에서 시작합니다.
+- VRAM에는 weight뿐 아니라 KV cache, activation, runtime overhead가 들어갑니다.
+- 긴 prefill과 token 단위 decode는 서로 다른 병목을 만듭니다.
+- compute-bound에는 연산량을 줄이는 방법이 필요합니다.
+- memory bandwidth-bound에는 이동할 data를 줄이는 방법이 필요합니다.
+- 따라서 optimization technique보다 병목 측정이 먼저입니다.
 
-- LLM serving optimization의 business 가치 판단
-- GPU spec을 model workload 관점에서 해석
-- model weight, KV cache, activation의 GPU memory 요구량 추정
-- prefill과 decode의 병목을 arithmetic intensity로 구분
-- compute-bound와 memory bandwidth-bound에 맞는 optimization 방향 선택
+## 왜 serving optimization이 필요한가
 
-## 목차
+Training 비용은 주로 모델을 만드는 시점에 발생합니다. Inference 비용은 production request가 들어올 때마다 반복됩니다. 같은 GPU에서 처리량을 높이면 request당 비용이 내려가고, 같은 traffic을 더 적은 replica로 감당할 가능성이 생깁니다.
 
-1. LLM serving optimization의 필요성
-2. GPU spec과 accelerator 선택
-3. model loading과 GPU memory budget
-4. arithmetic intensity와 roofline model
-5. prefill·decode 병목과 memory wall
+하지만 latency를 무조건 줄이는 것이 답은 아닙니다. 20초를 1초로 줄이는 변화와 100ms를 10ms로 줄이는 변화는 사용자 가치가 다릅니다. 먼저 목표를 다음 순서로 고정해야 합니다.
 
-## 주제별 핵심 주장
+1. 실제 workload와 Service Level Objective(SLO)를 정의합니다.
+2. quality를 만족하는 model을 선택합니다.
+3. Time to First Token(TTFT)과 End-to-End(E2E) latency를 확인합니다.
+4. 목표 latency를 만족한 뒤 throughput과 cost를 개선합니다.
 
-### 1. LLM serving optimization의 필요성
+여기서 보통 “가장 빠른 GPU를 쓰면 끝나지 않나”라고 묻습니다. Peak FLOPS를 workload가 사용하지 못하면 비싼 compute unit이 기다리는 시간이 늘어날 뿐입니다. GPU 가격이 아니라 실제 RPS와 token throughput으로 판단해야 합니다.
 
-- optimization은 customer experience, cost, scalability를 동시에 좌우함
-- 충분히 빠른 latency 이후에는 throughput과 cost 최적화가 더 큰 가치임
+## GPU 사양은 하나의 숫자가 아닙니다
 
-### 2. GPU spec과 accelerator 선택
+GPU를 비교할 때 FLOPS만 보면 decode 병목을 놓칩니다. **실제 serving capacity는 compute, memory capacity, memory bandwidth, interconnect, power가 함께 결정합니다.**
 
-- GPU 선택 기준은 FLOPS 하나가 아니라 memory capacity, memory bandwidth, interconnect, power의 조합임
-- workload가 사용하지 못하는 peak FLOPS는 운영 가치가 없음
+### Compute capability
 
-### 3. model loading과 GPU memory budget
+- 확인값: FP16·BF16·FP8·INT8별 FLOPS
+- 결정 대상: matrix multiplication 처리 상한
+- 함정: model과 kernel이 해당 precision을 지원하지 않으면 peak 성능을 사용할 수 없음
 
-- GPU memory에는 model weight뿐 아니라 KV cache와 activation 공간도 필요함
-- model이 겨우 적재되는 GPU보다 batch와 context를 감당할 여유가 있는 GPU가 필요함
+### Memory capacity
 
-### 4. arithmetic intensity와 roofline model
+- 확인값: VRAM 총량
+- 결정 대상: weight, KV cache, activation을 동시에 적재할 수 있는지
+- 함정: weight가 겨우 들어가는 상태는 serving 가능 상태가 아님
 
-- arithmetic intensity는 연산량을 data movement로 나눈 값임
-- hardware crossover point보다 낮으면 memory bandwidth-bound, 높으면 compute-bound임
+### Memory bandwidth
 
-### 5. prefill·decode 병목과 memory wall
+- 확인값: VRAM과 compute unit 사이의 초당 data 이동량
+- 결정 대상: weight를 반복해서 읽는 decode 처리량
+- 함정: FLOPS가 높아도 data 공급이 느리면 compute unit이 기다림
 
-- 긴 prefill은 compute-bound가 될 수 있으나 batch 1의 decode는 대체로 memory bandwidth-bound임
-- compute 발전보다 data movement 발전이 느린 memory wall이 LLM serving의 핵심 제약임
+### Interconnect
 
-## 읽기 전 용어
+- 확인값: PCIe·NVLink·NVSwitch·RDMA 대역폭과 latency
+- 결정 대상: tensor·pipeline parallel에서 GPU 간 통신 비용
+- 함정: independent replica에는 충분한 연결도 model sharding에서는 병목이 될 수 있음
 
-### 1. LLM serving optimization의 필요성
+### Power
 
-- `latency`: 요청부터 응답까지 걸린 시간
-- `TTFT`: 첫 token이 나오기까지 걸린 시간
-- `throughput`: 단위 시간당 처리량
-- `SLO`: 서비스가 달성해야 할 성능 목표
+- 확인값: GPU power limit과 rack 전력·cooling 한도
+- 결정 대상: 한 rack에 배치할 수 있는 GPU 수
+- 함정: chip 가격만 계산하면 facility 제약을 빠뜨림
 
-### 2. GPU spec과 accelerator 선택
+GPU를 고를 때는 “몇 TFLOPS인가”보다 “이 workload가 어느 사양을 소모하는가”를 먼저 묻는 편이 정확합니다.
 
-- `FLOPS`: 초당 floating-point operation 수
-- `VRAM`: GPU가 model과 실행 상태를 보관하는 memory
-- `memory bandwidth`: VRAM과 compute unit 사이의 초당 data movement 양
-- `interconnect`: GPU 사이 data 이동 경로
-- `NVLink`, `PCIe`, `RDMA`: 서로 다른 범위와 성능의 interconnect 기술
-- `TDP`: 지속 부하에서 고려할 전력 한도
+## Weight만 계산하면 OOM을 예측할 수 없습니다
 
-### 3. model loading과 GPU memory budget
-
-- `parameter`: model이 학습한 weight 값
-- `precision`: parameter 하나를 표현하는 bit 수
-- `KV cache`: 이전 token의 Key·Value를 재사용하기 위한 실행 상태
-- `activation`: layer 중간 계산에서 생성되는 tensor
-- `OOM`: 필요한 memory가 가용 memory를 넘은 상태
-
-### 4. arithmetic intensity와 roofline model
-
-- `arithmetic intensity`: FLOPS/Byte
-- `roofline model`: compute와 memory bandwidth가 만드는 성능 상한 모델
-- `crossover point`: 두 상한이 만나는 arithmetic intensity
-- `HBM`: 큰 model data를 담는 off-chip GPU memory
-- `SRAM`: compute unit 가까이 위치한 작고 빠른 on-chip memory
-
-### 5. prefill·decode 병목과 memory wall
-
-- `prefill`: input token 전체를 병렬 처리하고 최초 KV cache를 만드는 단계
-- `decode`: token을 autoregressive 방식으로 하나씩 생성하는 단계
-- `compute-bound`: compute capability가 성능 상한인 상태
-- `memory bandwidth-bound`: data movement가 성능 상한인 상태
-- `memory wall`: compute 증가 속도를 memory와 interconnect가 따라가지 못하는 현상
-
-## 주제별 선행지식
-
-### 1. LLM serving optimization의 필요성
-
-- request, latency, throughput의 기본 의미
-- horizontal scaling과 peak traffic 개념
-- GPU instance 비용이 request 증가에 따라 누적되는 구조
-
-### 2. GPU spec과 accelerator 선택
-
-- byte, GB, GB/s 단위
-- single node와 multi-node 구분
-- PCIe 장치와 network 기본 구조
-
-### 3. model loading과 GPU memory budget
-
-- FP32 4 byte, FP16·BF16 2 byte, INT8·FP8 1 byte
-- Transformer의 layer, attention head, hidden dimension
-- batch size와 sequence length
-
-### 4. arithmetic intensity와 roofline model
-
-- matrix multiplication의 입력·weight·출력 shape
-- multiplication과 addition을 FLOPS로 세는 방법
-- 비율과 단위 변환
-
-### 5. prefill·decode 병목과 memory wall
-
-- Transformer inference의 prefill·decode 분리
-- HBM → SRAM → register data movement
-- autoregressive generation
-
-## 스스로 이해하는 질문 10개
-
-1. 질문: latency를 무조건 줄이는 것이 좋은가?
-   - 답: 아님. 사용자 체감 SLO를 이미 만족하면 throughput과 cost 개선의 가치가 더 큼
-2. 질문: peak FLOPS가 가장 높은 GPU가 항상 최선인가?
-   - 답: 아님. model 적재 가능 여부와 workload의 memory bandwidth 요구, interconnect 비용까지 함께 판단 필요
-3. 질문: 7B BF16 model weight의 대략적인 크기는 얼마인가?
-   - 답: `7 billion × 2 byte = 약 14 GB`임
-4. 질문: 16 GB GPU에 14 GB model이 들어가면 운영에 충분한가?
-   - 답: 대체로 부족함. KV cache, activation, runtime overhead 공간이 거의 남지 않음
-5. 질문: KV cache가 batch size와 context length에 비례하는 이유는 무엇인가?
-   - 답: 동시에 유지할 모든 request의 모든 cached token 상태가 필요하기 때문임
-6. 질문: arithmetic intensity가 낮다는 뜻은 무엇인가?
-   - 답: 가져온 data 양에 비해 수행하는 연산이 적다는 뜻임
-7. 질문: hardware crossover point는 어떻게 구하는가?
-   - 답: `peak FLOPS / memory bandwidth`로 근사함
-8. 질문: 긴 prefill이 compute-bound가 될 수 있는 이유는 무엇인가?
-   - 답: 많은 input token을 함께 처리해 matrix가 커지고 data 재사용과 병렬 연산이 증가하기 때문임
-9. 질문: batch 1 decode가 memory bandwidth-bound인 이유는 무엇인가?
-   - 답: token 하나를 만들 때 큰 weight를 읽지만 병렬 계산량은 작기 때문임
-10. 질문: memory bandwidth-bound workload에 먼저 적용할 방향은 무엇인가?
-    - 답: precision 축소, batching, cache 최적화, 불필요한 HBM data movement 제거임
-
-## 상세 설명
-
-### 1. LLM serving optimization의 필요성
-
-- customer experience
-  - chatbot의 핵심 체감 지표: TTFT
-  - agent workflow의 핵심 지표: 여러 model call이 누적된 E2E latency
-  - 20초를 1초로 줄이는 변화와 0.1초를 0.01초로 줄이는 변화의 가치 차이 존재
-- cost efficiency
-  - training: 주로 선투자 성격
-  - inference: 모든 production request마다 반복되는 비용
-  - 같은 hardware에서 throughput 증가 시 request당 cost 감소
-- scalability와 feasibility
-  - peak traffic에서 GPU 공급과 scale-out 속도가 제한 요소
-  - 작은 GPU 또는 여러 region에서 실행 가능할수록 배포 선택지 증가
-- 판단 순서
-  1. workload와 SLO 정의
-  2. quality를 만족하는 model 선정
-  3. latency 목표 충족 여부 확인
-  4. throughput과 cost 개선
-
-### 2. GPU spec과 accelerator 선택
-
-- compute capability
-  - precision별 FLOPS 확인 필요
-  - FP16, FP8, INT8 지원 여부에 따라 실제 사용 가능한 peak 값 변화
-- memory capacity
-  - model weight, KV cache, activation 적재 가능 여부 결정
-  - capacity 부족 시 실행 자체가 불가능하거나 multi-GPU 필요
-- memory bandwidth
-  - decode처럼 weight를 반복해서 읽는 workload의 핵심 한계
-  - 높은 FLOPS라도 data 공급이 느리면 compute unit idle 발생
-- interconnect
-  - independent model을 GPU별로 실행하면 PCIe로 충분할 수 있음
-  - 하나의 model을 shard하면 NVLink·NVSwitch·RDMA 중요도 증가
-  - inter-node bandwidth는 보통 intra-node보다 낮아 latency 위험 증가
-- power
-  - rack 전력과 cooling 한도가 배치 가능한 GPU 수를 제한함
-  - chip 가격 외에 facility 제약까지 포함한 판단 필요
-
-### 3. model loading과 GPU memory budget
-
-- model weight 근사식
+Model weight의 첫 번째 근사는 간단합니다.
 
 ```text
 model weight bytes = parameter count × bytes per parameter
 ```
 
-- MHA 기준 KV cache 근사식
+- FP32: parameter당 4 byte
+- FP16·BF16: parameter당 2 byte
+- INT8·FP8: parameter당 1 byte
+- INT4: parameter당 0.5 byte
+
+이 계산으로 7B BF16 weight는 약 14GB입니다. 문제는 request가 들어온 뒤입니다. Transformer는 이전 token의 Key와 Value를 KV cache에 보관합니다.
+
+Multi-Head Attention(MHA) 기준 KV cache 근사식은 다음과 같습니다.
 
 ```text
 KV bytes/token = 2 × layers × KV heads × head dimension × bytes per element
 total KV bytes = KV bytes/token × batch size × sequence length
 ```
 
-- `2`의 의미: Key와 Value 두 tensor
-- Llama 2 7B 예시
-  - 32 layers, 32 KV heads, head dimension 128, BF16 2 byte
-  - token당 약 0.5 MB
-  - batch 16, sequence 4096이면 KV cache 약 32 GB
-- 실제 budget
-  - `weight + KV cache + activation + runtime overhead + safety margin`
-  - 이론상 최대 batch보다 낮게 운영하는 이유임
-  - 시작점 경험칙: model size의 약 2배 GPU memory 검토
-- DevOps 관점
-  - Pod `nvidia.com/gpu: 1`만으로 capacity 보장 불가
-  - model config, max sequence, concurrency가 함께 배포 단위가 되어야 함
+앞의 `2`는 Key와 Value 두 tensor를 뜻합니다. Llama 2 7B의 32 layers, 32 KV heads, head dimension 128, BF16을 대입하면 token당 약 0.5MB입니다. batch 16과 sequence 4096이면 KV cache만 약 32GB가 됩니다.
 
-### 4. arithmetic intensity와 roofline model
+실제 memory budget은 다음 항목을 함께 잡아야 합니다.
 
-- 기본식
+```text
+weight + KV cache + activation + runtime overhead + safety margin
+```
+
+여기서 “GPU utilization을 100%로 설정하면 남는 공간을 없앨 수 있지 않나”라고 생각할 수 있습니다. 그러면 긴 context나 순간 concurrency 증가를 받아낼 여유도 없어집니다. 높은 사용률은 효율이 아니라 OOM과 안정성 사이의 선택입니다.
+
+## Roofline은 optimization 방향을 고르는 지도입니다
+
+Arithmetic intensity는 한 byte를 이동할 때 얼마나 많은 연산을 수행하는지 나타냅니다.
 
 ```text
 arithmetic intensity = number of FLOPS / moved bytes
 crossover point = peak FLOPS / memory bandwidth
 ```
 
-- FP16 matrix multiplication 근사
+- workload intensity가 crossover보다 낮음: memory bandwidth-bound
+- workload intensity가 crossover 이상: compute-bound
+
+FP16 matrix multiplication의 단순 근사는 다음과 같습니다.
 
 ```text
 operations = 2 × M × N × K
@@ -234,61 +114,48 @@ moved bytes = 2 × (M × K + K × N + M × N)
 intensity = M × N × K / (M × K + K × N + M × N)
 ```
 
-- 판정
-  - workload intensity < crossover point: memory bandwidth-bound
-  - workload intensity >= crossover point: compute-bound
-- 해석 한계
-  - peak spec과 이상적인 data reuse를 사용한 상한 모델임
-  - kernel overhead, cache hit, scheduler, thermal 상태는 별도 측정 필요
+Roofline은 실제 latency를 맞히는 계산기가 아닙니다. Kernel overhead, cache hit, scheduler, thermal 상태를 제외한 상한 모델입니다. 대신 “연산을 줄일 것인가, data movement를 줄일 것인가”라는 첫 방향을 정하는 데 유용합니다.
 
-### 5. prefill·decode 병목과 memory wall
+## Prefill과 decode는 같은 모델의 다른 workload입니다
 
-- prefill
-  - input shape의 sequence dimension이 큼
-  - input token 병렬 처리 가능
-  - 짧은 prompt에서는 memory bandwidth-bound 가능
-  - 긴 prompt에서는 compute-bound 전환 가능
-- decode
-  - iteration마다 새 token 하나 생성
-  - batch 1에서 matrix의 token dimension이 1임
-  - 큰 weight 이동 대비 계산량이 작아 memory bandwidth-bound 경향
-- optimization 연결
-  - compute-bound: 낮은 precision compute, kernel, FLOPS 감소 방향
-  - memory bandwidth-bound: quantization, batching, KV cache 축소, kernel fusion 방향
-- memory wall
-  - compute FLOPS 발전 속도보다 HBM과 interconnect 발전 속도가 느린 상태
-  - on-chip SRAM 활용과 tightly coupled multi-GPU system이 대응 방향
+Prefill은 input token 전체를 병렬 처리하고 최초 KV cache를 만듭니다. Decode는 이전 token을 이용해 새 token을 하나씩 생성합니다. 같은 Transformer라도 matrix shape와 data reuse가 달라집니다.
 
-## 이해 점검 퀴즈
+### Prefill
 
-1. 13B FP16 model weight의 근사 크기는?
-2. KV cache를 계산할 때 Key와 Value 때문에 곱하는 값은?
-3. GPU의 peak FLOPS가 100 TFLOPS, memory bandwidth가 1 TB/s이면 crossover point는?
-4. workload arithmetic intensity가 40 FLOPS/B이면 3번 GPU에서 예상되는 병목은?
-5. batch 1 decode에서 GPU utilization이 낮은 핵심 이유는?
-6. 14 GB model을 16 GB GPU에 올렸을 때 가장 먼저 제한되는 두 항목은?
-7. multi-GPU model shard에서 interconnect가 중요한 이유는?
-8. latency SLO를 이미 만족한 뒤 우선 검토할 지표는?
+- input token을 병렬로 처리할 수 있음
+- 짧은 prompt에서는 memory bandwidth-bound 가능
+- 긴 prompt에서는 matrix dimension이 커져 compute-bound로 전환 가능
+- 우선 관찰: prefill time, TTFT, GPU utilization
 
-### 정답
+### Decode
 
-1. 약 26 GB
-2. 2
-3. 약 100 FLOPS/B
-4. memory bandwidth-bound
-5. weight data movement 대비 token 하나의 계산량이 작기 때문
-6. KV cache와 activation
-7. layer 또는 tensor shard 사이 data 교환이 inference critical path에 들어가기 때문
-8. throughput과 request당 cost
+- iteration마다 새 token 하나를 생성
+- batch 1에서는 token dimension이 1에 가까움
+- 큰 weight를 반복해서 읽지만 계산량은 작음
+- memory bandwidth-bound 경향
+- 우선 관찰: Time Per Output Token(TPOT), Output TPS, KV cache usage
 
-## 다음 날 2분 복습
+여기서 “prefill이 빨라졌으니 decode도 빨라지겠지”라고 보기 쉽습니다. 하지만 prefill 개선은 TTFT에, decode 개선은 TPOT와 output throughput에 주로 나타납니다. 두 단계는 같은 benchmark 하나로 판단하면 안 됩니다.
 
-- model weight: `parameter × bytes`
-- KV cache: `2 × layers × KV heads × head dimension × bytes × tokens`
-- GPU 선택: FLOPS + memory capacity + memory bandwidth + interconnect + power
-- roofline crossover: `peak FLOPS / memory bandwidth`
-- prefill: 긴 sequence에서 compute-bound 가능
-- decode: batch 1에서 memory bandwidth-bound 경향
-- compute-bound 대응: compute 축소와 efficient kernel
-- memory bandwidth-bound 대응: data movement 축소와 batching
-- 결론: optimization technique보다 먼저 workload 병목 확인 필요
+## 병목에 따라 optimization이 달라집니다
+
+| 병목 | 먼저 검토할 방법 | 기대 효과 | 잃는 것 또는 주의점 |
+| --- | --- | --- | --- |
+| Compute-bound prefill | FP8·W8A8, efficient kernel | 연산량·연산 시간 감소 | hardware·kernel 지원 필요 |
+| Bandwidth-bound decode | W4A16, batching | weight 이동량 감소·data reuse 증가 | dequantization·queue latency 가능 |
+| KV cache capacity | GQA·MQA, shorter context | request capacity 증가 | architecture·quality trade-off |
+| Fragmentation | PagedAttention | allocation waste 감소 | runtime 구현에 의존 |
+| 반복 prompt prefill | prefix caching | TTFT와 prefill 계산 감소 | hit rate·tenant isolation 필요 |
+
+Optimization 이름을 먼저 고르면 성능이 개선되지 않아도 원인을 설명하기 어렵습니다. 병목을 먼저 고정하면 결과가 가설과 달랐을 때 kernel, scheduler, cache 중 어디를 더 확인할지도 좁힐 수 있습니다.
+
+## 정리
+
+16GB GPU에 7B BF16 weight가 계산상 들어가더라도 serving이 된다는 뜻은 아닙니다. request를 처리할 KV cache와 runtime 공간이 빠졌기 때문입니다. **GPU serving은 모델 크기 문제가 아니라 workload가 compute와 memory를 어떻게 소비하는지의 문제입니다.**
+
+그래서 Chapter 6의 batching, quantization, PagedAttention, prefix caching을 보기 전에 이 장의 memory budget과 prefill·decode 병목을 먼저 이해해야 합니다.
+
+## 참고자료
+
+- *Hands-On LLM Serving and Optimization*, Chapter 5
+- [NVIDIA GPU Performance Background User's Guide](https://docs.nvidia.com/deeplearning/performance/dl-performance-gpu-background/index.html)

@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 BYTES_PER_GIB = 1024**3
+REPORTED_GPU_MEMORY_MIB = 16311
 
 
 @dataclass(frozen=True)
@@ -59,11 +60,12 @@ def max_batch_size(
 
 
 def main() -> None:
-  """Compare 7B BF16 and quantized weight budgets on a 12 GiB GPU."""
+  """Compare 7B BF16 and quantized weight budgets on a 16 GB-class GPU."""
   model = ModelShape(7.61, 28, 28, 4, 3584)
+  gpu_gib = REPORTED_GPU_MEMORY_MIB / 1024
   for name, bytes_per_parameter in [("BF16", 2), ("FP8", 1), ("INT4", 0.5)]:
     weights = weight_gib(model.parameters_billions, bytes_per_parameter)
-    available = available_kv_gib(12, weights, reserve_gib=1.5)
+    available = available_kv_gib(gpu_gib, weights, reserve_gib=1.5)
     batch = max_batch_size(available, model, 2, sequence_length=4096)
     print(f"{name}: weights={weights:.1f} GiB, KV budget={available:.1f} GiB, batch≈{batch}")
 

@@ -1,12 +1,9 @@
 COMPOSE := docker compose
-BATCH ?= 4
-DELAY_MS ?= 20
 MODEL_LABEL ?= bf16
 
 .PHONY: setup build gpu-check observability-up ch5-calculate ch5-oom ch5-load \
-	dynamic-up dynamic-test dynamic-matrix vllm-bf16 vllm-gptq vllm-fp8 \
-	quant-benchmark accuracy smoke gsm8k prefix-test summary mac-setup mac-benchmark \
-	mac-dynamic-up down clean test lint format
+	vllm-bf16 vllm-gptq vllm-fp8 \
+	quant-benchmark accuracy smoke gsm8k prefix-test summary down clean test lint format
 
 setup:
 	uv sync --group dev --group client
@@ -29,15 +26,6 @@ ch5-oom: build
 
 ch5-load: build
 	$(COMPOSE) --profile tools run --rm model-loader python -m model_loader.load_3b
-
-dynamic-up: build
-	MAX_BATCH_SIZE=$(BATCH) MAX_DELAY_MS=$(DELAY_MS) $(COMPOSE) --profile dynamic up -d --force-recreate dynamic-batcher
-
-dynamic-test:
-	$(COMPOSE) --profile tools run --rm -e MODEL_BASE_URL=http://dynamic-batcher:8000 benchmark python -m benchmark.benchmark_dynamic
-
-dynamic-matrix: build observability-up
-	bash scripts/run_dynamic_matrix.sh
 
 vllm-bf16: build
 	$(COMPOSE) --profile bf16 up -d vllm-bf16
@@ -65,17 +53,6 @@ prefix-test:
 
 summary:
 	uv run --group client python -m benchmark.summary
-
-mac-setup:
-	uv sync --group dev --group client --group dynamic --group mac
-
-mac-benchmark:
-	uv run --group mac python -m macos.benchmark_bf16
-	uv run --group mac python -m macos.benchmark_8bit
-	uv run --group mac python -m macos.benchmark_4bit
-
-mac-dynamic-up:
-	DEVICE=mps MAX_BATCH_SIZE=$(BATCH) MAX_DELAY_MS=$(DELAY_MS) uv run --group dynamic uvicorn dynamic_batcher.server:app --host 127.0.0.1 --port 8000
 
 down:
 	$(COMPOSE) --profile "*" down --remove-orphans

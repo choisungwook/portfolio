@@ -23,6 +23,8 @@ PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://prometheus:9090")
 MODEL_NAME = os.getenv("SERVED_MODEL_NAME", "qwen")
 MODEL_LABEL = os.getenv("MODEL_LABEL", "unknown")
 PRECISION = os.getenv("PRECISION", "unknown")
+MAX_NUM_SEQS = int(os.getenv("VLLM_MAX_NUM_SEQS", "8"))
+MAX_NUM_BATCHED_TOKENS = int(os.getenv("VLLM_MAX_NUM_BATCHED_TOKENS", "4096"))
 CONCURRENCY_LEVELS = [1, 4, 8]
 WARMUP_REQUESTS = 5
 MEASURED_REQUESTS = 20
@@ -51,6 +53,10 @@ async def run_workload(workload: Workload) -> dict[str, object]:
     "model": MODEL_LABEL,
     "precision": PRECISION,
     "workload": workload.name,
+    "scheduler": {
+      "max_num_seqs": MAX_NUM_SEQS,
+      "max_num_batched_tokens": MAX_NUM_BATCHED_TOKENS,
+    },
     "results": results,
   }
   output = Path(f"results/performance-{MODEL_LABEL}-{workload.name}.json")

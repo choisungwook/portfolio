@@ -1,304 +1,183 @@
-# Chapter 6 Essential LLM optimization
+# LLM serving optimization은 왜 하나의 옵션으로 끝나지 않을까
 
-- PDF 범위: 198페이지 시작
-- 예제 연결: `llm-model-inference/ch06/quantization_3way_300.ipynb`
+Batch를 키우면 throughput은 오르지만 queue가 길어질 수 있습니다. Weight를 4 bit로 줄이면 VRAM은 줄지만 prefill이 반드시 빨라지는 것은 아닙니다. Prefix caching을 켜도 prompt 순서가 달라지면 hit가 사라집니다. **Optimization은 기능을 많이 켜는 일이 아니라, 병목과 trade-off를 맞추는 일입니다.**
 
-## 학습 여부
+이 장은 scheduling, KV cache, quantization, prefix caching이 각각 무엇을 해결하는지 구분합니다. 선택 기준은 언제나 같은 workload에서 측정한 TTFT, TPOT, throughput, VRAM, accuracy입니다.
 
-- 학습 필요
-- 단순 Kubernetes 용어 정리 아님
-- Chapter 5에서 찾은 compute·memory 병목에 실제 technique을 연결하는 장임
+## 먼저 구분할 지표
 
-## 목표
+| 지표 | 답하는 질문 |
+| --- | --- |
+| TTFT | 사용자가 첫 token을 얼마나 기다리는가 |
+| TPOT | 첫 token 이후 생성 속도가 얼마나 빠른가 |
+| E2E latency | request 전체가 언제 끝나는가 |
+| RPS | 초당 request를 몇 개 완료하는가 |
+| Output TPS | 초당 output token을 몇 개 생성하는가 |
+| Accuracy | 빨라진 model이 여전히 쓸 만한가 |
 
-- dynamic batching, continuous batching, chunked prefill의 차이 판단
-- MHA, MQA, GQA, MLA와 KV cache 크기의 관계 이해
-- kernel fusion, FlashAttention, PagedAttention의 해결 대상 구분
-- quantization, distillation, pruning의 trade-off 판단
-- prefix caching의 hit rate, scaling, tenant isolation 설계
+`TTOP`은 일반적인 serving 지표 명칭이 아닙니다. Token 생성 간격은 TPOT(Time Per Output Token) 또는 ITL(Inter-Token Latency)로 구분합니다.
 
-## 핵심 성능 지표
+## Variable-length request가 batching을 어렵게 만듭니다
 
-| 지표 | 정의 | 주요 영향 |
-| --- | --- | --- |
-| TTFT | request부터 첫 token까지의 시간 | queue와 prefill |
-| TPOT | 첫 token 이후 output token당 평균 시간 | decode |
-| E2E latency | request부터 마지막 token까지의 시간 | 전체 경로 |
-| RPS | 초당 완료 request 수 | request throughput |
-| Output TPS | 초당 생성 output token 수 | decode throughput |
-| Accuracy | 정답 비율 | quality |
+Traditional ML의 static batch는 input과 output 크기가 비슷할 때 잘 동작합니다. LLM request는 prompt 길이와 output 길이가 다릅니다. 긴 request 하나가 끝날 때까지 batch 전체를 묶어 두면 먼저 끝난 slot이 놀게 됩니다.
 
-- `TTOP`: 일반적인 serving 지표 명칭 아님
-- `TPOT`: time per output token
-- `ITL`: inter-token latency
+### Dynamic batching
 
-## 목차
+- dispatch 조건: max batch size 도달 또는 max delay 만료
+- 장점: 짧은 시간에 들어온 request를 묶어 GPU utilization 개선
+- 단점: variable-length generation에서는 가장 긴 request가 batch 완료를 지배
+- 적합한 경우: 길이가 비슷한 offline 또는 traditional inference workload
 
-1. Request batching과 scheduling
-2. Attention과 KV cache optimization
-3. Model compression
-4. Prefix caching
+### Continuous batching
 
-## 주제별 핵심 주장
+- scheduling 단위: request 전체가 아니라 generation iteration
+- 동작: 완료된 slot에 queued request를 바로 투입
+- 장점: 서로 다른 output 길이에서 GPU idle 감소
+- 단점: concurrency 증가에 따라 KV cache와 queue가 커질 수 있음
+- 주요 제한값
+  - `max_num_seqs`: 동시에 처리할 sequence 수의 상한
+  - `max_num_batched_tokens`: iteration 전체 token budget
 
-### 1. Request batching과 scheduling
+여기서 보통 “batch size만 크게 잡으면 throughput이 최대가 되지 않나”라고 묻습니다. GPU memory와 token budget이 부족하면 waiting request가 쌓이고 TTFT가 나빠집니다. 좋은 batch 설정은 가장 큰 값이 아니라 latency SLO를 만족하면서 throughput이 가장 높은 값입니다.
 
-- continuous batching은 완료된 request 자리를 즉시 재사용해 variable-length request의 GPU idle을 줄임
-- chunked prefill은 throughput·ITL을 개선할 수 있지만 TTFT와 prefill overhead를 늘릴 수 있음
+### Chunked prefill
 
-### 2. Attention과 KV cache optimization
+긴 prefill은 running decode를 오래 막을 수 있습니다. Chunked prefill은 prompt를 작은 token chunk로 나눠 decode iteration 사이에 끼워 넣습니다.
 
-- MQA·GQA·MLA는 KV cache 자체를 줄이고, FlashAttention은 attention I/O를 줄이며, PagedAttention은 allocation waste를 줄임
-- 같은 attention optimization이라는 이름 아래 서로 다른 병목을 해결함
+- 작은 chunk
+  - 얻는 것: decode blocking과 ITL 감소 가능
+  - 잃는 것: scheduling overhead와 낮은 compute utilization 가능
+- 큰 chunk
+  - 얻는 것: prefill compute 효율
+  - 잃는 것: decode blocking과 ITL 증가 가능
 
-### 3. Model compression
+Online variable-length serving에서는 continuous batching을 기본으로 보고, long-context interactive workload에서 chunked prefill 크기를 측정하는 순서가 합리적입니다.
 
-- quantization은 가장 적용하기 쉬운 production compression이며 memory, data movement, compute를 줄일 수 있음
-- precision과 방식은 accuracy, hardware support, prefill·decode workload를 함께 보고 선택해야 함
+## Attention optimization은 서로 다른 층을 고칩니다
 
-### 4. Prefix caching
+MHA, GQA, FlashAttention, PagedAttention은 모두 attention과 관련되지만 같은 문제를 해결하지 않습니다. **Architecture, kernel, memory manager를 분리해서 봐야 합니다.**
 
-- prefix caching은 반복 prompt의 KV cache를 재사용해 prefill과 TTFT를 줄임
-- 실제 hit rate는 prompt ordering·format, cache-aware routing, tenant isolation에 좌우됨
+### Architecture: KV cache 자체를 줄입니다
 
-## 읽기 전 용어
+| 방식 | KV head 구조 | 얻는 것 | 잃는 것 또는 주의점 |
+| --- | --- | --- | --- |
+| MHA | query head마다 KV head | 표현력 기준점 | KV cache가 큼 |
+| GQA | query head group이 KV head 공유 | memory와 quality 균형 | model architecture에 고정 |
+| MQA | 모든 query head가 KV head 하나 공유 | KV cache 최소화 | quality trade-off 가능 |
+| MLA | latent KV representation | KV cache 압축 | 지원 model·runtime 필요 |
 
-### 1. Request batching과 scheduling
+KV head가 줄면 token당 KV cache와 decode의 HBM data movement가 줄어듭니다. 다만 serving option으로 MHA model을 GQA model로 즉시 바꾸는 것은 아닙니다. Model architecture 선택 단계의 결정입니다.
 
-- `static batching`: 정해진 batch가 찰 때까지 대기하는 방식
-- `dynamic batching`: max batch size 또는 max delay 조건으로 batch를 내보내는 방식
-- `continuous batching`: iteration 중 빈 slot에 새 request를 투입하는 방식
-- `max_num_seqs`: 동시에 처리할 request 수의 상한
-- `max_num_batched_tokens`: 한 iteration에서 처리할 token 수의 상한
-- `chunked prefill`: 긴 prefill을 작은 token chunk로 분리하는 방식
+### Kernel: HBM 왕복을 줄입니다
 
-### 2. Attention과 KV cache optimization
-
-- `MHA`: query head마다 독립 Key·Value head를 갖는 구조
-- `MQA`: 모든 query head가 하나의 Key·Value head를 공유하는 구조
-- `GQA`: query head group마다 Key·Value head를 공유하는 구조
-- `MLA`: Key·Value를 latent representation으로 압축하는 구조
-- `kernel fusion`: 여러 GPU operation을 하나의 kernel로 결합하는 기법
-- `FlashAttention`: tiling과 online softmax로 HBM I/O를 줄이는 attention kernel
-- `PagedAttention`: KV cache를 fixed-size block으로 관리하는 방식
-
-### 3. Model compression
-
-- `quantization`: parameter precision을 낮추는 기법
-- `rounding error`: 표현 가능한 가까운 값으로 바뀌며 생기는 오차
-- `clamping error`: 표현 범위 밖 값을 경계값으로 자르며 생기는 오차
-- `W4A16`: weight 4 bit, activation 16 bit
-- `W8A8`: weight 8 bit, activation 8 bit
-- `PTQ`: training 완료 후 적용하는 quantization
-- `QAT`: training 중 quantization effect를 반영하는 방식
-- `distillation`: teacher model 지식을 작은 student model에 전달하는 방식
-- `pruning`: 불필요한 weight 또는 구조를 제거하는 방식
-
-### 4. Prefix caching
-
-- `prefix`: prompt 앞부분의 동일한 token sequence
-- `RadixAttention`: radix tree로 prefix와 KV cache를 연결하는 방식
-- `LRU`: 오래 사용하지 않은 cache부터 제거하는 정책
-- `cache-aware routing`: prefix가 있는 replica로 request를 보내는 routing
-- `tenant isolation`: tenant 사이 cache 정보 노출을 차단하는 경계
-
-## 주제별 선행지식
-
-### 1. Request batching과 scheduling
-
-- queue와 scheduler
-- prefill, decode, TTFT, ITL, throughput
-- batch size와 sequence length
-
-### 2. Attention과 KV cache optimization
-
-- Query, Key, Value의 역할
-- GPU HBM, SRAM, register 계층
-- memory fragmentation과 OS paging
-
-### 3. Model compression
-
-- bit, byte, signed integer, floating-point
-- weight, activation, KV cache
-- calibration dataset과 accuracy benchmark
-
-### 4. Prefix caching
-
-- hash cache와 prefix tree
-- load balancing과 horizontal scaling
-- multi-tenant threat boundary
-
-## 스스로 이해하는 질문 10개
-
-1. 질문: dynamic batching이 LLM에서 충분하지 않은 이유는 무엇인가?
-   - 답: request별 input·output length가 달라 짧은 request slot이 긴 request 완료까지 idle 상태가 되기 때문임
-2. 질문: continuous batching에서 max delay가 필수가 아닌 이유는 무엇인가?
-   - 답: fixed batch 출발을 기다리지 않고 iteration마다 빈 slot에 request를 추가하기 때문임
-3. 질문: max_num_seqs와 max_num_batched_tokens를 함께 제한하는 이유는 무엇인가?
-   - 답: request 수만으로는 token length 차이를 표현할 수 없기 때문임
-4. 질문: chunked prefill이 개선하는 지표와 악화할 수 있는 지표는 무엇인가?
-   - 답: throughput과 ITL 개선 가능, TTFT와 prefill overhead 악화 가능
-5. 질문: GQA가 MHA보다 KV cache를 적게 쓰는 이유는 무엇인가?
-   - 답: 여러 query head가 더 적은 수의 KV head를 공유하기 때문임
-6. 질문: FlashAttention과 PagedAttention의 차이는 무엇인가?
-   - 답: FlashAttention은 calculation 중 HBM I/O 감소, PagedAttention은 KV cache allocation fragmentation 감소가 목적임
-7. 질문: W4A16이 low-batch decode에 유리한 이유는 무엇인가?
-   - 답: weight가 작아져 memory bandwidth pressure가 크게 감소하기 때문임
-8. 질문: W8A8이 high-batch prefill에 유리한 이유는 무엇인가?
-   - 답: activation까지 낮은 precision으로 계산해 compute throughput을 높일 수 있기 때문임
-9. 질문: prefix caching에서 prompt의 공백 하나가 중요한 이유는 무엇인가?
-   - 답: token sequence가 달라져 해당 지점부터 prefix match가 끊길 수 있기 때문임
-10. 질문: multi-tenant prefix cache에 tenant ID가 필요한 이유는 무엇인가?
-    - 답: latency 차이를 이용한 다른 tenant의 prefix 존재 여부 추론을 막기 위함
-
-## 상세 설명
-
-### 1. Request batching과 scheduling
-
-- batching 효과
-  - model weight를 한 번 읽고 여러 request token을 계산
-  - decode arithmetic intensity와 throughput 증가
-  - batch 증가만큼 latency와 KV cache도 증가 가능
-- dynamic batching
-  - dispatch 조건: max batch size 도달 또는 max delay 만료
-  - traditional ML workload에 적합
-  - variable-length LLM request에서는 longest request가 batch 완료를 지배
-- continuous batching
-  - iteration-level scheduling
-  - 완료 slot에 queued request 즉시 투입
-  - `max_num_seqs`: request-level safety bound
-  - `max_num_batched_tokens`: token-level compute·memory bound
-- chunked prefill
-  - long prefill을 작은 chunk로 분할
-  - running decode와 interleave 가능
-  - 작은 chunk: overhead와 낮은 compute utilization 위험
-  - 큰 chunk: decode blocking과 높은 ITL 위험
-- 선택 기준
-  - offline batch: static batching 가능
-  - online variable length: continuous batching 기본
-  - long-context interactive: chunked prefill 검토
-
-### 2. Attention과 KV cache optimization
-
-- architecture 수준
-  - MHA: `KV heads = attention heads`
-  - MQA: `KV heads = 1`
-  - GQA: `1 < KV heads < attention heads`
-  - MLA: compressed latent KV 사용
-  - KV head 감소 시 capacity와 HBM data movement 감소
-- kernel 수준
-  - kernel fusion: 중간 결과의 HBM write/read round trip 제거
-  - FlashAttention: QKV matrix를 tile로 나누어 SRAM에서 계산
+- kernel fusion
+  - 여러 GPU operation을 한 kernel로 결합
+  - 중간 tensor의 HBM write/read 감소
+- FlashAttention
+  - QKV matrix를 tile로 나눠 SRAM에서 계산
   - online softmax로 전체 attention matrix materialization 회피
-- memory management 수준
-  - contiguous preallocation: variable length에서 internal·external fragmentation 발생
-  - PagedAttention: logical block을 scattered physical block에 mapping
-  - 마지막 block 외 waste를 작게 제한
-- 구분
-  - MQA·GQA·MLA: model architecture 선택
-  - FlashAttention: compute kernel 선택
-  - PagedAttention: serving runtime memory manager 선택
 
-### 3. Model compression
+### Memory manager: allocation waste를 줄입니다
 
-- quantization 효과
-  - model file과 VRAM footprint 감소
-  - HBM data movement 감소
-  - hardware가 낮은 precision을 native 지원하면 compute 증가
-- error
-  - rounding error: 값 간격 부족
-  - clamping error: 값 범위 부족
-  - scaling: original range를 target range에 맞추는 핵심
-- FP16과 BF16
-  - FP16: exponent 5 bit, mantissa 10 bit
-  - BF16: exponent 8 bit, mantissa 7 bit
-  - BF16: FP32와 같은 exponent 폭으로 넓은 dynamic range
-- W4A16
-  - weight-only quantization
-  - model size 약 75% 감소
-  - low-batch decode와 memory 제약에 유리
-  - dequantization 또는 mixed-precision kernel 필요
-- W8A8
-  - weight-and-activation quantization
-  - model size 약 50% 감소
-  - high-batch·long prefill의 compute-bound workload에 유리
-  - static scaling은 빠르지만 calibration 필요
-  - dynamic scaling은 정확하지만 runtime overhead 존재
-- PTQ와 QAT
-  - PTQ: 쉬운 적용, hardware 전환 유연성, 보통 첫 선택
-  - QAT: 낮은 bit accuracy에 유리, training pipeline과 비용 필요
-- distillation
-  - 이미 검증된 student model이 있으면 높은 serving 이점
-  - 직접 수행 시 teacher 접근, dataset, training 비용 필요
-- pruning
-  - structured pruning: hardware가 활용 가능한 구조 제거
-  - unstructured pruning: 유연하지만 sparse kernel 지원 없으면 speedup 제한
-  - 2:4 sparsity: hardware 지원과 함께 사용해야 실제 이점
-- production 판단 순서
-  1. quality acceptance test 정의
-  2. PTQ variant 평가
-  3. workload별 latency·throughput 측정
-  4. model·GPU native format 확인
-  5. quality와 SLO를 모두 만족한 variant 선택
+Contiguous KV cache preallocation은 variable-length request에서 internal·external fragmentation을 만듭니다. PagedAttention은 logical block을 scattered physical block에 mapping해 마지막 block 외의 낭비를 줄입니다.
 
-### 4. Prefix caching
+여기서 헷갈리기 쉬운 지점은 FlashAttention과 PagedAttention입니다. FlashAttention은 attention 계산 중 I/O를 줄이고, PagedAttention은 request별 KV cache를 배치하는 방식을 바꿉니다.
 
-- response cache와 차이
-  - response cache: 전체 input 일치 필요
-  - prefix cache: 앞부분 token의 KV cache만 재사용
-- 적합 workload
-  - multiturn chat: 이전 대화가 다음 request의 prefix가 됨
-  - long-context: 고정 document와 system prompt가 반복됨
-  - RAG: document ordering과 formatting이 안정적일 때 부분 hit 가능
-- hit rate 개선
-  - static content를 앞쪽에 배치
-  - dynamic user input을 뒤쪽에 배치
-  - whitespace, label, document order 고정
-  - retrieval deduplication과 stable ranking 적용
-- scale-out
-  - local GPU cache만 있을 때 round robin은 hit rate 손실 가능
-  - cache-aware routing 또는 consistent hashing 필요
-  - CPU·SSD offload는 capacity를 늘리지만 latency 계층 추가
-- security
-  - shared prefix hit latency가 side channel이 될 수 있음
-  - tenant ID 또는 session ID를 shared system prompt 뒤에 삽입
-  - tenant별 prefix namespace 분리 필요
+## Quantization은 bit 수보다 workload가 중요합니다
 
-## 이해 점검 퀴즈
+Quantization은 weight 또는 activation precision을 낮춰 model size, HBM data movement, compute 비용을 줄입니다. 하지만 낮은 bit가 항상 빠른 것은 아닙니다. Hardware가 해당 format을 native로 처리하는지, dequantization kernel이 효율적인지, workload가 prefill인지 decode인지가 결과를 바꿉니다.
 
-1. variable-length request에서 dynamic batching의 idle을 줄이는 방식은?
-2. chunked prefill이 너무 작을 때 발생하는 문제는?
-3. 32 attention heads와 8 KV heads이면 어떤 attention이며 query 몇 개가 KV 하나를 공유하는가?
-4. FlashAttention이 피하려는 memory는?
-5. PagedAttention이 사용하는 OS 유사 개념은?
-6. 7B FP16 weight를 INT8로 바꾸면 근사 크기는?
-7. W4A16과 W8A8 중 high-batch prefill에 우선 검토할 방식은?
-8. PTQ보다 QAT가 적합한 상황은?
-9. prefix cache hit rate를 높이는 prompt 배치는?
-10. prefix cache와 multi-tenant 환경의 핵심 보안 위험은?
+### 오차는 어디서 생기는가
 
-### 정답
+- rounding error: 표현 가능한 값 사이의 간격 때문에 가까운 값으로 변경
+- clamping error: 표현 범위를 벗어난 값을 경계값으로 제한
+- scaling: original range를 target range에 맞추는 과정
 
-1. continuous batching
-2. scheduler·kernel overhead 증가와 낮은 compute utilization
-3. GQA, query 4개
-4. HBM의 반복 read·write
-5. fixed-size page와 page table mapping
-6. 약 7 GB
-7. W8A8
-8. 4 bit 이하 aggressive quantization에서 accuracy 회복이 필요한 상황
-9. static system·context를 앞에 두고 dynamic input을 뒤에 두는 배치
-10. latency side channel을 통한 다른 tenant prefix 존재 추론
+FP16은 exponent 5 bit와 mantissa 10 bit를 사용합니다. BF16은 exponent 8 bit와 mantissa 7 bit를 사용해 FP32와 같은 exponent 폭을 유지합니다. 같은 16 bit라도 dynamic range와 정밀도 trade-off가 다릅니다.
 
-## 다음 날 2분 복습
+### W4A16과 W8A8은 목표가 다릅니다
 
-- online LLM 기본 scheduler: continuous batching
-- long prefill: chunking으로 decode와 interleave, TTFT trade-off 존재
-- MHA → GQA → MQA: KV head 감소, memory 감소, quality trade-off 증가
-- FlashAttention: HBM I/O 감소
-- PagedAttention: KV cache fragmentation 감소
-- W4A16: low-batch decode와 memory 제약
-- W8A8: high-batch prefill과 compute throughput
-- PTQ: 먼저 시도할 쉬운 quantization
-- prefix caching: static prefix 고정과 cache-aware routing
-- multi-tenant cache: tenant namespace 분리 필수
+| 방식 | 유리한 workload | 얻는 것 | 잃는 것 또는 주의점 |
+| --- | --- | --- | --- |
+| W4A16 | low-batch decode·memory 제약 | weight 크기 약 75% 감소 | dequantization·mixed kernel 필요 |
+| W8A8 | high-batch·long prefill | weight와 activation compute 감소 | calibration 또는 dynamic scaling overhead |
+
+- static scaling
+  - 빠른 runtime
+  - representative calibration dataset 필요
+- dynamic scaling
+  - runtime input range 반영
+  - scale 계산 overhead 발생
+
+여기서 “VRAM이 가장 적은 model을 선택하면 되지 않나”라고 묻습니다. VRAM 감소는 capacity를 늘릴 뿐 latency와 accuracy를 보장하지 않습니다. Long-prefill과 long-decode를 따로 측정하고 quality gate를 통과해야 채택할 수 있습니다.
+
+### PTQ, QAT, distillation, pruning
+
+- Post-Training Quantization(PTQ)
+  - 장점: training 없이 적용하기 쉬움
+  - 단점: 낮은 bit에서 accuracy 저하 가능
+  - 권장 순서: production compression의 첫 평가 대상
+- Quantization-Aware Training(QAT)
+  - 장점: quantization error를 training에 반영
+  - 단점: dataset과 training pipeline 비용
+- Distillation
+  - 장점: 작은 student model로 큰 serving 이점 가능
+  - 단점: teacher 접근과 별도 training 필요
+- Pruning
+  - structured: hardware가 활용할 수 있는 구조 제거
+  - unstructured: sparse kernel 지원이 없으면 speedup 제한
+  - 2:4 sparsity: hardware 지원과 함께 평가 필요
+
+Production에서는 quality test 정의 → PTQ variant 평가 → workload별 성능 측정 → native kernel 확인 → SLO와 quality 동시 판정 순서가 안전합니다.
+
+## Prefix caching은 같은 내용보다 같은 token 순서를 봅니다
+
+Response cache는 전체 input이 같아야 합니다. Prefix cache는 앞부분의 동일한 token sequence에서 계산한 KV cache를 재사용합니다. System prompt, 긴 document, 이전 대화가 반복될 때 prefill과 TTFT를 줄일 수 있습니다.
+
+### Hit rate를 높이는 조건
+
+- static content를 prompt 앞쪽에 배치
+- dynamic user input을 뒤쪽에 배치
+- whitespace, label, document order 고정
+- retrieval 결과 deduplication과 stable ranking 적용
+
+내용이 같아도 document 순서나 whitespace가 바뀌면 token prefix가 달라질 수 있습니다. Semantic similarity가 아니라 token sequence 일치가 기준입니다.
+
+### Scale-out과 security
+
+- round robin routing
+  - 단점: prefix가 없는 replica로 이동해 local cache hit 손실
+- cache-aware routing·consistent hashing
+  - 장점: hit rate 증가
+  - 단점: load imbalance 가능
+- CPU·SSD offload
+  - 장점: cache capacity 증가
+  - 단점: 느린 latency 계층 추가
+- tenant namespace 분리
+  - 장점: tenant 간 cache 정보 노출 차단
+  - 단점: shared cache hit 감소
+
+Shared prefix의 응답 시간 차이는 side channel이 될 수 있습니다. Multi-tenant serving에서는 hit rate보다 tenant isolation이 우선입니다.
+
+## 어떤 optimization을 먼저 고를까
+
+| 관찰한 문제 | 먼저 검토할 선택 | 함께 확인할 지표 |
+| --- | --- | --- |
+| GPU idle과 낮은 throughput | continuous batching | Queue p95·RPS·Output TPS |
+| 긴 prompt가 decode를 막음 | chunked prefill | Prefill p95·TTFT·TPOT |
+| KV cache capacity 부족 | GQA·MQA model, PagedAttention | KV cache usage·waiting request |
+| low-batch decode가 느림 | W4A16 | TPOT·Output TPS·accuracy |
+| long-prefill이 느림 | W8A8·FlashAttention | Prefill time·TTFT·accuracy |
+| 반복 prompt의 TTFT가 큼 | prefix caching | hit rate·TTFT·tenant boundary |
+
+## 정리
+
+Batching, attention kernel, quantization, prefix caching은 서로 대체하는 옵션이 아닙니다. 각각 scheduling, data movement, memory allocation, 반복 계산이라는 다른 문제를 해결합니다. **무엇을 켤지가 아니라 어떤 metric이 왜 나빠졌는지를 먼저 설명할 수 있어야 합니다.**
+
+도입에서 본 것처럼 batch를 키우거나 bit를 낮추는 것만으로는 충분하지 않습니다. 같은 workload에서 latency, throughput, VRAM, accuracy를 함께 측정해야 optimization의 이득과 비용이 드러납니다.
+
+## 참고자료
+
+- *Hands-On LLM Serving and Optimization*, Chapter 6
+- [vLLM Optimization and Tuning](https://docs.vllm.ai/en/stable/configuration/optimization.html)
+- [vLLM Metrics](https://docs.vllm.ai/en/stable/usage/metrics/)

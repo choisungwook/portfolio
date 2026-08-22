@@ -1,4 +1,4 @@
-"""Verify that a 3B BF16 model loads into 12 GiB VRAM."""
+"""Verify that a 3B BF16 model loads into 16 GiB VRAM."""
 
 import json
 from dataclasses import asdict

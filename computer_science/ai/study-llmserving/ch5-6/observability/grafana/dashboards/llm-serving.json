@@ -113,12 +113,12 @@
       "id": 8,
       "targets": [
         {
-          "expr": "sum(rate(dynamic_batch_size_sum[1m])) by (max_batch_size, max_delay_ms) / sum(rate(dynamic_batch_size_count[1m])) by (max_batch_size, max_delay_ms)",
-          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:request_queue_time_seconds_bucket[1m])) by (le))",
+          "legendFormat": "queue p95",
           "refId": "A"
         }
       ],
-      "title": "Dynamic Actual Batch Size",
+      "title": "vLLM Queue p95",
       "type": "timeseries"
     },
     {
@@ -128,12 +128,12 @@
       "id": 9,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(dynamic_queue_delay_seconds_bucket[1m])) by (le, max_batch_size, max_delay_ms))",
-          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:request_prefill_time_seconds_bucket[1m])) by (le))",
+          "legendFormat": "prefill p95",
           "refId": "A"
         }
       ],
-      "title": "Dynamic Queue Delay p95",
+      "title": "vLLM Prefill p95",
       "type": "timeseries"
     },
     {
@@ -143,12 +143,12 @@
       "id": 10,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(dynamic_request_latency_seconds_bucket[1m])) by (le, max_batch_size, max_delay_ms))",
-          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:request_decode_time_seconds_bucket[1m])) by (le))",
+          "legendFormat": "decode p95",
           "refId": "A"
         }
       ],
-      "title": "Dynamic E2E p95",
+      "title": "vLLM Decode p95",
       "type": "timeseries"
     },
     {
@@ -187,7 +187,7 @@
   ],
   "refresh": "5s",
   "schemaVersion": 41,
-  "tags": ["llm", "vllm", "dynamic-batching"],
+  "tags": ["llm", "vllm", "observability"],
   "templating": {
     "list": [
       {

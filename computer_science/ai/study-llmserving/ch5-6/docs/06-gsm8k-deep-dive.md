@@ -1,73 +1,87 @@
-# GSM8K 더 공부할 것
+# GSM8K 20문항 점수만으로 quantization을 선택하면 안 되는 이유
 
-## 현재 핸즈온의 범위
+20문항에서 한 문제 차이는 accuracy 5%p입니다. 숫자는 명확해 보이지만 model ranking을 뒤집기에는 sample이 너무 작습니다. **GSM8K-20은 최종 평가가 아니라 quantization이 큰 quality regression을 만들었는지 빠르게 확인하는 gate입니다.**
+
+## 현재 실습이 답하는 범위
 
 - dataset: official GSM8K test split
 - sample: 앞 20문항
-- 목적: quantization 전후의 빠른 quality regression 탐지
-- 제한: model ranking 또는 통계적 결론에 부족
+- 목적: BF16·W4A16·W8A8 사이의 큰 quality regression 탐지
 - hard timeout: inference 180초
 - timeout 처리: accuracy 대신 `N/A`
+- 답하지 못하는 것: model ranking과 통계적으로 유의한 차이
 
-## GSM8K란
+GSM8K는 multi-step 수학 word problem dataset입니다. 정답에는 reasoning 과정과 `#### number` 형식의 최종 numeric answer가 포함됩니다. 이 실습은 마지막 숫자를 추출해 exact match로 비교합니다.
 
-- 초등학교 수준의 multi-step 수학 word problem dataset
-- 정답에 reasoning 과정과 최종 numeric answer 포함
-- 최종 답 형식: `#### number`
-- exact-match 평가: 마지막 numeric answer 비교
+## Smoke test와 GSM8K는 실패를 다르게 찾습니다
 
-## 왜 smoke 20문항과 분리하는가
+Smoke 20문항은 arithmetic, common knowledge, DevOps 질문을 섞어 pipeline 장애와 심한 quality regression을 빠르게 찾습니다. 표준 benchmark는 아니지만 model endpoint, prompt, parser가 이어지는지 확인하기 좋습니다.
 
-- smoke
-  - arithmetic·common knowledge·DevOps 기본 질문 혼합
-  - pipeline 장애와 심한 quality regression 빠른 확인
-  - benchmark 표준성 낮음
-- GSM8K
-  - multi-step reasoning 중심
-  - quantization이 reasoning output에 미치는 영향 확인 가능
-  - prompt와 answer extraction에 민감
+GSM8K는 multi-step reasoning에 집중합니다. Quantization 전후의 reasoning 결과를 비교할 수 있지만 prompt template과 answer extraction에 민감합니다.
 
-## 20문항 결과의 한계
+| 평가 | 잘 찾는 문제 | 찾기 어려운 문제 |
+| --- | --- | --- |
+| Smoke 20 | pipeline 장애·심한 출력 품질 저하 | 표준화된 reasoning 차이 |
+| GSM8K-20 | 빠른 reasoning regression | 작은 accuracy 차이·model ranking |
+| Full GSM8K | 더 안정적인 reasoning 차이 | 실제 domain quality |
 
-- 한 문제의 비중: 5 percentage points
-- sample ordering bias 존재
-- 작은 model의 answer format 실패 가능
-- 180초 timeout이 느린 model을 accuracy와 함께 벌점 처리할 위험
-- 결과 용도: 빠른 gate만 적합
+여기서 “두 model이 5%p 차이라면 더 높은 쪽을 고르면 되지 않나”라고 묻습니다. 한 문제의 비중이 바로 5%p이므로 parser 실패나 sample ordering 하나가 차이 전체를 만들 수 있습니다.
 
-## full evaluation 전 고정할 항목
+## 20문항 결과가 흔들리는 이유
+
+- sample size
+  - 한 문제의 비중이 5%p
+  - confidence interval이 넓음
+- ordering bias
+  - test split 앞부분이 전체 난이도를 대표한다는 보장 없음
+- answer format
+  - reasoning은 맞아도 마지막 숫자 형식이 달라 parser가 실패할 수 있음
+- timeout
+  - 느린 inference를 reasoning 실패와 같은 0점으로 처리할 위험
+- prompt
+  - chat template·few-shot example·max token 차이가 결과에 영향
+
+Accuracy와 운영 실패도 분리해야 합니다. 180초 timeout은 production 관점에서는 실패지만 model reasoning 능력의 오답과 같은 원인은 아닙니다.
+
+## Full evaluation 전에 고정할 조건
+
+비교 조건이 달라지면 quantization 효과가 아니라 benchmark 설정 차이를 측정하게 됩니다.
 
 - dataset revision과 split
-- prompt template
-- chat template 적용 여부
+- prompt와 chat template
 - few-shot example
 - temperature와 seed
 - max output tokens
 - answer extraction rule
 - timeout과 retry rule
 - concurrency
-- model·runtime version
+- model과 runtime version
 
-## 다음 실습
+여기서 concurrency를 고정하는 이유는 처리량 비교만을 위한 것이 아닙니다. Scheduler와 timeout 조건이 달라지면 완료한 sample 집합까지 달라질 수 있기 때문입니다.
 
-1. 전체 test split을 local file로 고정
-2. model별 serial과 concurrency 4 결과 비교
-3. answer extraction 실패와 reasoning 실패 분리
-4. 95% confidence interval 계산
-5. quantized model의 틀린 문제 교집합·차집합 분석
-6. serving SLO와 accuracy를 함께 만족하는 Pareto frontier 작성
+## 다음 평가에서 확인할 것
 
-## 해석 질문
+1. 전체 test split을 local file로 고정합니다.
+2. model별 serial과 concurrency 4 결과를 비교합니다.
+3. answer extraction 실패와 reasoning 실패를 분리합니다.
+4. 95% confidence interval을 계산합니다.
+5. quantized model이 틀린 문제의 교집합과 차집합을 분석합니다.
+6. serving SLO와 accuracy를 함께 만족하는 Pareto frontier를 작성합니다.
+7. 실제 production domain dataset을 별도 quality gate로 추가합니다.
 
-1. 20문항 accuracy 차이가 full set에서도 유지되는가?
-2. 틀린 이유가 model reasoning인가 answer parser인가?
-3. W4A16과 W8A8이 같은 문제를 틀리는가?
-4. timeout을 accuracy 0점으로 볼 것인가 운영 실패로 분리할 것인가?
-5. concurrency가 deterministic output에 영향을 주는가?
+## 선택 기준
 
-## 권장 결론
+- GSM8K-20: 빠른 regression gate
+- Full GSM8K: 장시간 reasoning evaluation
+- Domain dataset: production 채택 판단
+- Timeout: accuracy와 분리한 운영 실패 지표
+- 속도 우위만 있는 model: 채택 보류
 
-- GSM8K-20: 3분 quick gate
-- full GSM8K: 별도 장시간 evaluation
-- production 채택: domain dataset 추가 필수
-- 속도 우위 단독 채택: 금지
+## 정리
+
+GSM8K 20문항의 숫자는 명확하지만 결론의 범위는 좁습니다. 5%p 차이는 한 문제일 수 있고, 그 한 문제는 reasoning이 아니라 parser나 timeout 문제일 수 있습니다. **GSM8K-20은 큰 이상을 찾는 경보로 사용하고, model 선택은 full evaluation과 domain quality gate에서 결정해야 합니다.**
+
+## 참고자료
+
+- [Training Verifiers to Solve Math Word Problems](https://arxiv.org/abs/2110.14168)
+- [GSM8K dataset](https://huggingface.co/datasets/openai/gsm8k)

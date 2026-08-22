@@ -43,29 +43,6 @@ services:
       SERVED_MODEL_NAME: qwen
     command: ["python", "-m", "benchmark.summary"]
 
-  dynamic-batcher:
-    <<: [*runtime, *gpu]
-    profiles: [dynamic]
-    environment:
-      DEVICE: cuda
-      DYNAMIC_MODEL_ID: Qwen/Qwen2.5-0.5B-Instruct
-      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-4}
-      MAX_DELAY_MS: ${MAX_DELAY_MS:-20}
-      MAX_NEW_TOKENS: ${MAX_NEW_TOKENS:-64}
-    command:
-      - uvicorn
-      - dynamic_batcher.server:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-    ports:
-      - "127.0.0.1:8000:8000"
-    networks:
-      default:
-        aliases:
-          - model-server
-
   vllm-bf16:
     <<: *vllm
     profiles: [bf16]
@@ -80,9 +57,9 @@ services:
       - --max-model-len
       - "4096"
       - --max-num-seqs
-      - "8"
+      - "${VLLM_MAX_NUM_SEQS:-8}"
       - --max-num-batched-tokens
-      - "4096"
+      - "${VLLM_MAX_NUM_BATCHED_TOKENS:-4096}"
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
@@ -100,9 +77,9 @@ services:
       - --max-model-len
       - "4096"
       - --max-num-seqs
-      - "8"
+      - "${VLLM_MAX_NUM_SEQS:-8}"
       - --max-num-batched-tokens
-      - "4096"
+      - "${VLLM_MAX_NUM_BATCHED_TOKENS:-4096}"
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
@@ -120,9 +97,9 @@ services:
       - --max-model-len
       - "4096"
       - --max-num-seqs
-      - "8"
+      - "${VLLM_MAX_NUM_SEQS:-8}"
       - --max-num-batched-tokens
-      - "4096"
+      - "${VLLM_MAX_NUM_BATCHED_TOKENS:-4096}"
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
@@ -137,8 +114,6 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    extra_hosts:
-      - host.docker.internal:host-gateway
     ports:
       - "127.0.0.1:9090:9090"
 

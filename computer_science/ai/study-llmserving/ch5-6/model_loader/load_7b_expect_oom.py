@@ -1,4 +1,4 @@
-"""Verify that a 7B BF16 model cannot fit in 12 GiB VRAM."""
+"""Verify that a 7B BF16 model cannot fit in 16 GiB VRAM with serving overhead."""
 
 import json
 from dataclasses import asdict

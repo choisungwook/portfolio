@@ -1,84 +1,51 @@
-# Chapter 5-6 LLM serving challenge와 optimization
+# LLM serving optimization은 왜 GPU 사양 확인부터 시작해야 할까
 
-> 원본: *Hands-On LLM Serving and Optimization* Chapter 5-6, `llm-model-inference/ch06/quantization_3way_300.ipynb`
+Batching과 quantization option부터 바꾸면 성능 숫자는 달라져도 이유를 설명하기 어렵습니다. Model이 VRAM을 어떻게 쓰고 prefill과 decode가 어디에서 막히는지 먼저 알아야 optimization 결과를 예측할 수 있습니다.
 
-- [01. 환경 준비](./docs/01-setup.md)
-- [02. Chapter 5 이론](./docs/02-ch5-theory.md)
-- [03. Chapter 5 핸즈온](./docs/03-ch5-handson.md)
-- [04. Chapter 6 이론](./docs/04-ch6-theory.md)
-- [05. Chapter 6 핸즈온](./docs/05-ch6-handson.md)
-- [06. GSM8K 더 공부할 것](./docs/06-gsm8k-deep-dive.md)
+이 workspace는 RTX 5060 Ti 16GB에서 memory budget → scheduling → observability → quantization → caching 순서로 가설을 검증합니다.
 
-## 학습 판단
+## 먼저 원리를 이해합니다
 
-- Chapter 5: 학습 필요
-  - GPU memory budget과 roofline 기반 병목 판단 내용임
-- Chapter 6: 학습 필요
-  - scheduling, KV cache, quantization, prefix caching 내용임
-- 단순 Kubernetes 용어 정리: 해당 없음
-- Kubernetes 환경: 제외
-  - 단일 model replica 내부의 GPU·scheduler·cache 관찰이 우선임
-- Chapter 5와 Chapter 6 workspace: 통합
-  - Chapter 5의 병목이 Chapter 6 optimization 선택으로 바로 연결되는 구조임
+- [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](./docs/02-ch5-theory.md)
+  - weight 외 KV cache·activation·runtime overhead를 계산
+  - prefill과 decode의 compute·memory 병목 구분
+- [LLM serving optimization은 왜 하나의 옵션으로 끝나지 않을까](./docs/04-ch6-theory.md)
+  - continuous batching·PagedAttention·quantization·prefix caching의 해결 대상 구분
+  - latency·throughput·VRAM·accuracy trade-off 판단
 
-## 실습 지도
+Chapter 5는 hardware 용어 모음이 아닙니다. Chapter 6의 optimization을 왜 선택하는지 설명하기 위한 병목 판단의 기초입니다.
 
-| 구분 | macOS M3 Pro | Ubuntu RTX 5060 12GB |
-| --- | --- | --- |
-| Chapter 5 | calculator, MLX BF16 load | calculator, 7B BF16 OOM, 3B BF16 load |
-| Dynamic batching | PyTorch MPS 실제 batch | PyTorch CUDA 실제 batch + Grafana |
-| Quantization | MLX BF16·8bit·4bit | vLLM BF16·GPTQ W4A16·FP8 W8A8 |
-| 성능 | TTFT·TPOT·E2E·Output TPS·memory | TTFT·TPOT·E2E·RPS·Output TPS·VRAM |
-| Accuracy | 범위 제외 | smoke 20문항, GSM8K-20 |
+## GPU에서 가설을 검증합니다
 
-## 빠른 실행
+- 환경 준비: [Ubuntu GPU 환경 준비](./docs/01-setup-ubuntu.md)
+- 전체 실습 순서: [LLM serving이 느린 이유를 GPU에서 직접 확인하는 순서](./docs/handson/)
+- 관측 기준: [GPU 사용률이 높은데 LLM이 느릴 때 무엇을 봐야 할까](./docs/prometheus.md)
 
-Ubuntu 환경을 점검하고 image를 build함.
+| 순서 | 질문 | 확인할 결과 |
+| ---: | --- | --- |
+| 1 | Host와 container가 같은 GPU를 사용하는가 | GPU·driver·VRAM·Prometheus target |
+| 2 | 7B BF16은 왜 16GB에서 OOM이 나는가 | weight budget·runtime overhead |
+| 3 | Batch를 키우면 latency와 throughput이 어떻게 바뀌는가 | Queue·TTFT·E2E·Output TPS |
+| 4 | Static·dynamic·continuous batching은 어떻게 다른가 | admission delay·TTFT·RPS |
+| 5 | 느린 구간이 prefill인가 decode인가 | Prefill·Decode p95·TPOT·KV cache |
+| 6 | W4A16과 W8A8 중 무엇이 workload에 맞는가 | 성능·Peak VRAM·accuracy |
+| 7 | Prefix cache는 언제 TTFT를 줄이는가 | cold·warm·reordered request |
 
-```bash
-make gpu-check
-make build
-```
+## 빠른 quality gate의 범위를 구분합니다
 
-7B OOM과 3B load를 실제로 확인함.
+- [GSM8K 20문항 점수만으로 quantization을 선택하면 안 되는 이유](./docs/06-gsm8k-deep-dive.md)
+  - GSM8K-20은 큰 regression을 찾는 quick gate
+  - production 채택에는 full evaluation과 domain dataset 필요
+- [Quiz](./docs/quiz.md)
+  - Chapter 5·6 핵심 개념 복습
 
-```bash
-make ch5-oom
-make ch5-load
-```
+여기서 중요한 것은 가장 빠른 model을 찾는 일이 아닙니다. 같은 workload에서 SLO와 quality를 만족하면서 GPU당 처리량을 높이는 설정을 찾는 일입니다.
 
-dynamic batching 설정 차이를 비교함.
+## 정리
 
-```bash
-make dynamic-matrix
-```
+LLM serving optimization은 option 목록이 아니라 원인과 결과를 연결하는 과정입니다. Memory budget으로 실행 가능성을 확인하고, metric으로 병목을 나눈 뒤, 그 병목에 맞는 scheduling·quantization·cache를 적용해야 결과를 설명할 수 있습니다.
 
-3개 precision의 성능과 accuracy를 비교함.
+## 참고자료
 
-```bash
-make quant-benchmark
-make accuracy
-```
-
-container를 종료하되 model cache는 유지함.
-
-```bash
-make down
-```
-
-model cache까지 삭제할 때만 명시적으로 실행함.
-
-```bash
-make clean
-```
-
-## 설계 결정
-
-- Notebook: 미생성
-  - Python file을 단순 호출하는 Notebook은 독립적인 출력·탐색 가치 없음
-- simulation: memory budget과 roofline calculator만 유지
-  - 실행 가능한 주제는 실제 model·request·metric으로 검증함
-- model cache: Docker named volume 사용
-  - `make down` 이후 재사용함
-- dashboard: Prometheus, Grafana, DCGM Exporter 사용
-  - application metric과 GPU metric의 시간축 비교 목적임
+- *Hands-On LLM Serving and Optimization*, Chapter 5–6
+- 원본 예제: `llm-model-inference/ch06/quantization_3way_300.ipynb`
