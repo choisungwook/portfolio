@@ -1,0 +1,208 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:time_to_first_token_seconds_bucket[1m])) by (le))",
+          "legendFormat": "TTFT p95",
+          "refId": "A"
+        }
+      ],
+      "title": "vLLM TTFT p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:request_time_per_output_token_seconds_bucket[1m])) by (le))",
+          "legendFormat": "TPOT p95",
+          "refId": "A"
+        }
+      ],
+      "title": "vLLM TPOT p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "id": 3,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(vllm:e2e_request_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "E2E p95",
+          "refId": "A"
+        }
+      ],
+      "title": "vLLM E2E p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(vllm:request_success_total[1m]))",
+          "legendFormat": "RPS",
+          "refId": "A"
+        }
+      ],
+      "title": "vLLM RPS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "tps"}},
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8},
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(rate(vllm:generation_tokens_total[1m]))",
+          "legendFormat": "Output TPS",
+          "refId": "A"
+        }
+      ],
+      "title": "vLLM Output TPS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+      "id": 6,
+      "targets": [
+        {"expr": "sum(vllm:num_requests_running)", "legendFormat": "running", "refId": "A"},
+        {"expr": "sum(vllm:num_requests_waiting)", "legendFormat": "waiting", "refId": "B"}
+      ],
+      "title": "vLLM Scheduler",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}},
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+      "id": 7,
+      "targets": [
+        {"expr": "max(vllm:kv_cache_usage_perc)", "legendFormat": "KV cache", "refId": "A"},
+        {
+          "expr": "sum(rate(vllm:prefix_cache_hits_total[1m])) / clamp_min(sum(rate(vllm:prefix_cache_queries_total[1m])), 1)",
+          "legendFormat": "prefix hit rate",
+          "refId": "B"
+        }
+      ],
+      "title": "vLLM Cache",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(rate(dynamic_batch_size_sum[1m])) by (max_batch_size, max_delay_ms) / sum(rate(dynamic_batch_size_count[1m])) by (max_batch_size, max_delay_ms)",
+          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dynamic Actual Batch Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16},
+      "id": 9,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(dynamic_queue_delay_seconds_bucket[1m])) by (le, max_batch_size, max_delay_ms))",
+          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dynamic Queue Delay p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+      "id": 10,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(dynamic_request_latency_seconds_bucket[1m])) by (le, max_batch_size, max_delay_ms))",
+          "legendFormat": "batch={{max_batch_size}} delay={{max_delay_ms}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dynamic E2E p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "decmbytes"}},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+      "id": 11,
+      "targets": [
+        {"expr": "max(DCGM_FI_DEV_FB_USED)", "legendFormat": "VRAM used", "refId": "A"}
+      ],
+      "title": "GPU VRAM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"max": 100, "min": 0, "unit": "percent"}},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24},
+      "id": 12,
+      "targets": [
+        {"expr": "max(DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "GPU utilization", "refId": "A"}
+      ],
+      "title": "GPU Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "watt"}},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24},
+      "id": 13,
+      "targets": [
+        {"expr": "max(DCGM_FI_DEV_POWER_USAGE)", "legendFormat": "power", "refId": "A"}
+      ],
+      "title": "GPU Power",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["llm", "vllm", "dynamic-batching"],
+  "templating": {
+    "list": [
+      {
+        "current": {"text": "Prometheus", "value": "Prometheus"},
+        "hide": 2,
+        "label": "Datasource",
+        "name": "DS_PROMETHEUS",
+        "query": "prometheus",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {"from": "now-15m", "to": "now"},
+  "timezone": "browser",
+  "title": "LLM Serving Chapter 5-6",
+  "uid": "llm-serving-ch5-6",
+  "version": 1
+}

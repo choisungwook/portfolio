@@ -1,0 +1,171 @@
+name: llm-serving-ch5-6
+
+x-runtime: &runtime
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  image: llm-serving-lab:v0.27.1-cu129
+  volumes:
+    - .:/workspace
+    - hf-cache:/root/.cache/huggingface
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+
+x-vllm: &vllm
+  <<: [*runtime, *gpu]
+  ipc: host
+  ports:
+    - "127.0.0.1:8000:8000"
+  networks:
+    default:
+      aliases:
+        - model-server
+
+services:
+  model-loader:
+    <<: [*runtime, *gpu]
+    profiles: [tools]
+    command: ["python", "-m", "model_loader.load_3b"]
+
+  benchmark:
+    <<: *runtime
+    profiles: [tools]
+    environment:
+      MODEL_BASE_URL: http://model-server:8000
+      PROMETHEUS_URL: http://prometheus:9090
+      SERVED_MODEL_NAME: qwen
+    command: ["python", "-m", "benchmark.summary"]
+
+  dynamic-batcher:
+    <<: [*runtime, *gpu]
+    profiles: [dynamic]
+    environment:
+      DEVICE: cuda
+      DYNAMIC_MODEL_ID: Qwen/Qwen2.5-0.5B-Instruct
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-4}
+      MAX_DELAY_MS: ${MAX_DELAY_MS:-20}
+      MAX_NEW_TOKENS: ${MAX_NEW_TOKENS:-64}
+    command:
+      - uvicorn
+      - dynamic_batcher.server:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      default:
+        aliases:
+          - model-server
+
+  vllm-bf16:
+    <<: *vllm
+    profiles: [bf16]
+    command:
+      - vllm
+      - serve
+      - Qwen/Qwen2.5-3B-Instruct
+      - --served-model-name
+      - qwen
+      - --dtype
+      - bfloat16
+      - --max-model-len
+      - "4096"
+      - --max-num-seqs
+      - "8"
+      - --max-num-batched-tokens
+      - "4096"
+      - --enable-chunked-prefill
+      - --enable-prefix-caching
+      - --gpu-memory-utilization
+      - "0.90"
+
+  vllm-gptq:
+    <<: *vllm
+    profiles: [gptq]
+    command:
+      - vllm
+      - serve
+      - Qwen/Qwen2.5-3B-Instruct-GPTQ-Int4
+      - --served-model-name
+      - qwen
+      - --max-model-len
+      - "4096"
+      - --max-num-seqs
+      - "8"
+      - --max-num-batched-tokens
+      - "4096"
+      - --enable-chunked-prefill
+      - --enable-prefix-caching
+      - --gpu-memory-utilization
+      - "0.90"
+
+  vllm-fp8:
+    <<: *vllm
+    profiles: [fp8]
+    command:
+      - vllm
+      - serve
+      - RedHatAI/Qwen2.5-3B-Instruct-FP8-dynamic
+      - --served-model-name
+      - qwen
+      - --max-model-len
+      - "4096"
+      - --max-num-seqs
+      - "8"
+      - --max-num-batched-tokens
+      - "4096"
+      - --enable-chunked-prefill
+      - --enable-prefix-caching
+      - --gpu-memory-utilization
+      - "0.90"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  dcgm-exporter:
+    image: nvidia/dcgm-exporter:4.8.3
+    profiles: [observability]
+    <<: *gpu
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "127.0.0.1:9400:9400"
+
+volumes:
+  hf-cache:
+  prometheus-data:
+  grafana-data:
