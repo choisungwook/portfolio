@@ -1,0 +1,9 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+.ipynb_checkpoints/
+.env
+results/*.json
+results/summary.md
+!uv.lock

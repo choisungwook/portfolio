@@ -102,6 +102,7 @@
 92. 멀티턴 대화 핸즈온 (LLM API는 왜 잊는가, OpenAI/Claude 비교) (26.8.16) - [링크](./computer_science/ai/multi-turn-conversation/)
 93. Amazon Bedrock 모델 호출(Runtime, Mantle, Playground) (26.8.16) - [링크](./aws/bedrock/model-inference/)
 94. Web search tool 실행 위치 비교(Client, LiteLLM, Bedrock, vLLM) (26.8.17) - [링크](./computer_science/ai/web-search-tool/)
+95. LLM serving challenge와 essential optimization Chapter 5-6 핸즈온 (26.8.22) - [링크](./computer_science/ai/study-llmserving/ch5-6/)
 
 ## 직접 만든 제품
 

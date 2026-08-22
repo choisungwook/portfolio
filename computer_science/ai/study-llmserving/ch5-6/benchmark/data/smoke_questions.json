@@ -1,0 +1,22 @@
+[
+  {"question": "What is 17 plus 25?", "answers": ["42"]},
+  {"question": "What is 12 multiplied by 8?", "answers": ["96"]},
+  {"question": "What is the square root of 81?", "answers": ["9"]},
+  {"question": "What is the capital of France?", "answers": ["Paris"]},
+  {"question": "What is the chemical formula for water?", "answers": ["H2O"]},
+  {"question": "Which planet is called the Red Planet?", "answers": ["Mars"]},
+  {"question": "How many days are in one week?", "answers": ["7"]},
+  {"question": "What is 100 divided by 4?", "answers": ["25"]},
+  {"question": "What is the largest ocean on Earth?", "answers": ["Pacific", "Pacific Ocean"]},
+  {"question": "What is 2 to the power of 10?", "answers": ["1024"]},
+  {"question": "What is 15 percent of 200?", "answers": ["30"]},
+  {"question": "At sea level, water boils at how many degrees Celsius?", "answers": ["100"]},
+  {"question": "What is binary 1010 in decimal?", "answers": ["10"]},
+  {"question": "What is the default HTTPS port?", "answers": ["443"]},
+  {"question": "What is the smallest deployable unit in Kubernetes?", "answers": ["Pod"]},
+  {"question": "Which AWS service provides object storage?", "answers": ["S3", "Amazon S3"]},
+  {"question": "Which Linux command prints the current directory?", "answers": ["pwd"]},
+  {"question": "What is 5 factorial?", "answers": ["120"]},
+  {"question": "What is the opposite of cold?", "answers": ["hot"]},
+  {"question": "What is Earth's natural satellite?", "answers": ["Moon", "the Moon"]}
+]
