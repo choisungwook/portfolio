@@ -503,8 +503,9 @@ select {
    Monitor's one — so the two pictures started and ended on different lines.
    Sharing the parent's rows makes the header row, the stage row and the chrome
    rows one height each, which is what puts the two pictures on the same line.
-   A WebView without subgrid drops these two declarations and falls back to the
-   per-panel rows above, which is the old layout rather than a broken one. */
+   A WebView without subgrid drops only the subgrid declaration — `grid-row`
+   still applies — and each panel keeps the rows it declares above, which is the
+   old layout rather than a broken one. */
 #source-panel,
 #preview-panel {
   grid-row: 1 / -1;

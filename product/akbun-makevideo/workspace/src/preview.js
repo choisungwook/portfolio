@@ -99,12 +99,23 @@ function createPreview(options) {
    *  a 4:3 clip in a 16:9 project got the bars the stage already had plus the
    *  ones `object-fit: contain` then added, and the picture came out well short
    *  of the panel. `stageBoxOf` only reads `settings.width` and `height`, so
-   *  the asset's own shape is handed over in that shape. */
+   *  the asset's own shape is handed over in that shape.
+   *
+   *  The shape is read off the project's copy of the asset rather than the one
+   *  handed to `showAsset`. A file ffprobe could not measure gets its size from
+   *  the browser afterwards, and that arrives as a *new* project — the object
+   *  this module was given still says zero, and a layout that trusted it would
+   *  keep the project's shape for as long as the asset stayed selected. */
   function stageShape() {
-    if (mode === 'asset' && assetShown && assetShown.width > 0 && assetShown.height > 0) {
-      return { settings: { width: assetShown.width, height: assetShown.height } };
+    const project = getProject();
+    const assets = project && project.assets;
+    const shown = Array.isArray(assets) && assetShown
+      ? assets.find((asset) => asset.id === assetShown.id) || assetShown
+      : assetShown;
+    if (mode === 'asset' && shown && shown.width > 0 && shown.height > 0) {
+      return { settings: { width: shown.width, height: shown.height } };
     }
-    return getProject();
+    return project;
   }
 
   /** Size the stage to the fitted box, then lay the media out at the quality

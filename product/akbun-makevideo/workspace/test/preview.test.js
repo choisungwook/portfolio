@@ -178,3 +178,51 @@ test('pre-roll waits for media and followers correct drift without seeking', asy
   assert.strictEqual(reference.currentTime, 0.5);
   assert.strictEqual(follower.currentTime, 0.5);
 });
+
+test('an asset measured after it was shown still gets its own shape', async (context) => {
+  // ffprobe cannot always report a file's size, and what the browser measures
+  // afterwards arrives as a new project rather than as a change to the object
+  // the preview was handed. Reading the shape off the stale object left the
+  // Source Monitor on the project's shape for as long as the asset stayed
+  // selected, which is the double letterbox this fit exists to remove.
+  const original = {
+    document: global.document,
+    window: global.window,
+    timelineLib: global.timelineLib,
+    requestAnimationFrame: global.requestAnimationFrame,
+  };
+  context.after(() => Object.assign(global, original));
+
+  global.requestAnimationFrame = () => 0;
+  global.document = { createElement: (tagName) => fakeMedia(tagName.toUpperCase(), () => Promise.resolve()) };
+  global.window = { api: { fileUrl: (path) => path } };
+  global.timelineLib = { tracksOf: () => [], clipsAt: () => [], projectDurationFrames: () => 0 };
+
+  const unmeasured = { id: 'a', kind: 'video', path: '/a.mp4', width: 0, height: 0 };
+  const settings = { width: 1920, height: 1080, rate: T.fps(30) };
+  let project = { settings, tracks: [], assets: [unmeasured] };
+  const stage = { style: {} };
+  const preview = require('../src/preview.js').createPreview({
+    stage,
+    inner: { style: {}, appendChild() {} },
+    wrap: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) },
+    exactCanvas: null,
+    getProject: () => project,
+    onTick: () => {},
+  });
+
+  preview.showAsset(unmeasured);
+  assert.strictEqual(stage.style.width, '800px', 'an unmeasured asset falls back to the project');
+  assert.strictEqual(stage.style.height, '450px');
+
+  // The measurement lands as a whole new project, exactly as describe_asset
+  // returns it. The asset object the preview holds is not touched.
+  project = {
+    settings,
+    tracks: [],
+    assets: [{ ...unmeasured, width: 1080, height: 1080 }],
+  };
+  preview.layout();
+  assert.strictEqual(stage.style.width, '600px', 'the square asset fills the height');
+  assert.strictEqual(stage.style.height, '600px');
+});
