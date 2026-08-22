@@ -92,6 +92,21 @@ function createPreview(options) {
     return T.framesToSeconds(positionFrames, rate());
   }
 
+  /** What the stage is a box for.
+   *
+   *  The timeline is the project canvas, but an asset preview is the file
+   *  itself, and fitting the file into a project-shaped stage fitted it twice —
+   *  a 4:3 clip in a 16:9 project got the bars the stage already had plus the
+   *  ones `object-fit: contain` then added, and the picture came out well short
+   *  of the panel. `stageBoxOf` only reads `settings.width` and `height`, so
+   *  the asset's own shape is handed over in that shape. */
+  function stageShape() {
+    if (mode === 'asset' && assetShown && assetShown.width > 0 && assetShown.height > 0) {
+      return { settings: { width: assetShown.width, height: assetShown.height } };
+    }
+    return getProject();
+  }
+
   /** Size the stage to the fitted box, then lay the media out at the quality
    *  scale and scale it back up so it still fills that box.
    *
@@ -107,7 +122,7 @@ function createPreview(options) {
    *  width. */
   function layout() {
     if (!wrap) return;
-    const box = GEO.stageBoxOf(wrap.getBoundingClientRect(), getProject());
+    const box = GEO.stageBoxOf(wrap.getBoundingClientRect(), stageShape());
     stage.style.width = `${box.width}px`;
     stage.style.height = `${box.height}px`;
     if (!GEO.isDrawable(box)) {
@@ -442,6 +457,7 @@ function createPreview(options) {
     assetShown = asset || null;
     if (!asset) {
       assetElement = null;
+      layout();
       return;
     }
     const made = makeElement(asset, asset.kind !== 'audio');
@@ -451,6 +467,7 @@ function createPreview(options) {
     assetElement.style.zIndex = '50';
     inner.appendChild(assetElement);
     positionFrames = 0;
+    layout();
   }
 
   function showTimeline() {
@@ -465,6 +482,7 @@ function createPreview(options) {
     }
     assetShown = null;
     positionFrames = 0;
+    layout();
   }
 
   /** Show one frame drawn by the Rust compositor — the same shader, the same

@@ -40,7 +40,11 @@
 // falls past it is a stretched picture, which is the other half of the same
 // bug.
 
-const STAGE_PADDING = 14;
+// No inset. A monitor shows the picture as large as the panel allows, so the
+// only thing between the picture and the panel edge is the letterbox the shape
+// itself demands. Kept as a named constant because `stageBoxOf` still takes one
+// and a caller may want an inset that this app does not.
+const STAGE_PADDING = 0;
 
 const DEFAULT_SHAPE = Object.freeze({ width: 1920, height: 1080 });
 
