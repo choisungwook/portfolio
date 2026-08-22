@@ -25,6 +25,7 @@ def build_rows() -> list[list[str]]:
     model = report["model"]
     smoke = load_accuracy("smoke", model)
     gsm8k = load_accuracy("gsm8k", model)
+    scheduler = report.get("scheduler", {})
     for result in report["results"]:
       peak = result["peak_vram_mib"]
       rows.append(
@@ -32,6 +33,8 @@ def build_rows() -> list[list[str]]:
           model,
           report["precision"],
           report["workload"],
+          str(scheduler.get("max_num_seqs", "N/A")),
+          str(scheduler.get("max_num_batched_tokens", "N/A")),
           str(result["concurrency"]),
           f"{result['ttft_p50_ms']:.1f}/{result['ttft_p95_ms']:.1f}",
           f"{result['tpot_p50_ms']:.1f}/{result['tpot_p95_ms']:.1f}",
@@ -49,11 +52,14 @@ def build_rows() -> list[list[str]]:
 def render_table(rows: list[list[str]]) -> str:
   """Render benchmark rows as a Markdown table."""
   header = (
-    "| Model | Precision | Workload | Concurrency | TTFT p50/p95 ms | "
+    "| Model | Precision | Workload | Max seqs | Token budget | Concurrency | TTFT p50/p95 ms | "
     "TPOT p50/p95 ms | E2E p50/p95 ms | RPS | Output TPS | Peak VRAM GiB | "
     "Smoke accuracy | GSM8K-20 |"
   )
-  divider = "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+  divider = (
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+    "---: | ---: |"
+  )
   lines = [header, divider]
   lines.extend("| " + " | ".join(row) + " |" for row in rows)
   return "\n".join(lines) + "\n"

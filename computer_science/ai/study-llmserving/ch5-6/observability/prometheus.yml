@@ -5,7 +5,7 @@ scrape_configs:
   - job_name: model-server
     metrics_path: /metrics
     static_configs:
-      - targets: [model-server:8000, host.docker.internal:8000]
+      - targets: [model-server:8000]
 
   - job_name: dcgm-exporter
     static_configs:
