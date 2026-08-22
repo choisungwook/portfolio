@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { filterWorktrees, formatBytes, sortWorktrees } = require('../src/renderer/view-model');
 
@@ -33,4 +35,15 @@ test('disk sizes use compact binary units', () => {
   assert.equal(formatBytes(0), '0 B');
   assert.equal(formatBytes(1024), '1 KB');
   assert.equal(formatBytes(5 * 1024 ** 3), '5.0 GB');
+});
+
+test('macOS scanner resource stays out of the cross-platform Tauri config', () => {
+  const configDirectory = path.join(__dirname, '..', 'src-tauri');
+  const baseConfig = JSON.parse(fs.readFileSync(path.join(configDirectory, 'tauri.conf.json')));
+  const macConfig = JSON.parse(fs.readFileSync(path.join(configDirectory, 'tauri.macos.conf.json')));
+  const scannerPath = '../scanner/target/aarch64-apple-darwin/release/akbun-macdiskviewer-scanner';
+
+  assert.equal(baseConfig.bundle.resources, undefined);
+  assert.equal(macConfig.bundle.resources[scannerPath], 'bin/akbun-macdiskviewer-scanner');
+  assert.deepEqual(macConfig.bundle.targets, ['dmg']);
 });

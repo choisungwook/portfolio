@@ -27,19 +27,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg"],
     "category": "Utility",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns"
-    ],
-    "resources": {
-      "../scanner/target/aarch64-apple-darwin/release/akbun-macdiskviewer-scanner": "bin/akbun-macdiskviewer-scanner"
-    },
-    "macOS": {
-      "minimumSystemVersion": "13.0"
-    }
+    ]
   }
 }
