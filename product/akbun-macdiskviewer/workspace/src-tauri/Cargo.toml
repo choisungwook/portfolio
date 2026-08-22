@@ -1,0 +1,22 @@
+[package]
+name = "akbun-macdiskviewer-app"
+version = "0.1.0"
+description = "Tauri shell for akbun-macdiskviewer"
+edition = "2024"
+
+[lib]
+name = "akbun_macdiskviewer_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+libc = "0.2.177"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.151"
+tauri = { version = "2.11.5", features = [] }
+
+[dev-dependencies]
+tempfile = "3.23.0"

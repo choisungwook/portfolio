@@ -1,0 +1,127 @@
+name: release-akbun-macdiskviewer
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-macdiskviewer/workspace/**'
+  pull_request:
+    paths:
+      - 'product/akbun-macdiskviewer/workspace/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-macdiskviewer/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            product/akbun-macdiskviewer/workspace/scanner -> target
+            product/akbun-macdiskviewer/workspace/src-tauri -> target
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        working-directory: .
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-macdiskviewer/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            product/akbun-macdiskviewer/workspace/scanner -> target
+            product/akbun-macdiskviewer/workspace/src-tauri -> target
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-macdiskviewer/workspace/package-lock.json
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-macdiskviewer-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build dmg
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - Low-impact macOS startup-disk scanner.
+          - Complete accessible file and directory index with size and date sorting.
+          - Git worktree storage grouped by repository, branch, size, and modification date.
+          - Finder and dynamically detected terminal actions in the right-click menu.
+
+          ## Install
+
+          - Apple Silicon (arm64) only.
+          - Unsigned build. After copying the app to Applications, run `xattr -cr /Applications/akbun-macdiskviewer.app`.
+          EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --generate-notes \
+            product/akbun-macdiskviewer/workspace/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg

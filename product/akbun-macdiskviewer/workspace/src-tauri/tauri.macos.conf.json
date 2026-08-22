@@ -1,0 +1,11 @@
+{
+  "bundle": {
+    "targets": ["dmg"],
+    "resources": {
+      "../scanner/target/aarch64-apple-darwin/release/akbun-macdiskviewer-scanner": "bin/akbun-macdiskviewer-scanner"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}
