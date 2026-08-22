@@ -54,3 +54,17 @@ test('macOS scanner resource stays out of the cross-platform Tauri config', () =
   assert.equal(macConfig.bundle.resources[scannerPath], 'bin/akbun-macdiskviewer-scanner');
   assert.deepEqual(macConfig.bundle.targets, ['dmg']);
 });
+
+test('macOS release tests build the bundled scanner first', () => {
+  const workspaceDirectory = path.join(__dirname, '..');
+  const packageConfig = JSON.parse(fs.readFileSync(path.join(workspaceDirectory, 'package.json'), 'utf8'));
+  const workflowPath = path.join(workspaceDirectory, '..', '..', '..', '.github', 'workflows',
+    'release-akbun-macdiskviewer.yml');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const verifyMac = workflow.slice(workflow.indexOf('\n  verify-macos:\n'), workflow.indexOf('\n  release:\n'));
+  const release = workflow.slice(workflow.indexOf('\n  release:\n'));
+
+  assert.equal(packageConfig.scripts['test:mac'], 'npm run build:scanner:mac && npm test');
+  assert.match(verifyMac, /run: npm run test:mac/);
+  assert.match(release, /run: npm run test:mac/);
+});
