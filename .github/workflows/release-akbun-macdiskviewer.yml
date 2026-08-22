@@ -51,6 +51,34 @@ jobs:
       - name: Run tests
         run: npm test
 
+  verify-macos:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            product/akbun-macdiskviewer/workspace/scanner -> target
+            product/akbun-macdiskviewer/workspace/src-tauri -> target
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-macdiskviewer/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run macOS tests
+        run: npm run test:mac
+
   release:
     if: github.event_name != 'pull_request'
     runs-on: macos-latest
@@ -86,7 +114,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: npm run test:mac
 
       - name: Build dmg
         run: npm run dist
