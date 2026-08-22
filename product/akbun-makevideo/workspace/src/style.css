@@ -473,6 +473,7 @@ select {
 
 #preview-panel {
   display: grid;
+  grid-column: 2;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
@@ -482,16 +483,39 @@ select {
 #monitor-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
 }
 
 #source-panel {
   display: grid;
+  grid-column: 1;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border);
+}
+
+/* Both monitors on the same rows.
+   Left to themselves the two panels each fit a picture into whatever their own
+   chrome left over, and the Source Monitor's chrome is two rows to the Program
+   Monitor's one — so the two pictures started and ended on different lines.
+   Sharing the parent's rows makes the header row, the stage row and the chrome
+   rows one height each, which is what puts the two pictures on the same line.
+   A WebView without subgrid drops only the subgrid declaration — `grid-row`
+   still applies — and each panel keeps the rows it declares above, which is the
+   old layout rather than a broken one. */
+#source-panel,
+#preview-panel {
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+}
+
+/* The Program Monitor has nothing to put in the fourth row, so its transport
+   takes both and centres itself in them rather than leaving a blank strip. */
+#transport {
+  grid-row: 3 / 5;
 }
 
 .monitor-stage-wrap {

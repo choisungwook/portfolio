@@ -54,10 +54,19 @@ test('the panel offset is carried through, because the answer is placed as it is
 // stacking order, so the panel's `overflow: hidden` does not clip it — what
 // hangs over the edge is drawn over the timeline.
 test('a panel with no room in it has no box, rather than a small one', () => {
-  for (const [width, height] of [[0, 600], [800, 0], [-100, 600], [2, 2]]) {
+  for (const [width, height] of [[0, 600], [800, 0], [-100, 600]]) {
     const box = G.stageBoxOf({ left: 0, top: 0, width, height }, HD);
     assert.ok(!G.isDrawable(box), `${width}x${height}`);
   }
+  // Padded past its own size is the same nothing: the room, not the panel, is
+  // what a box is fitted into.
+  assert.ok(!G.isDrawable(G.stageBoxOf({ left: 0, top: 0, width: 20, height: 20 }, HD, 10)));
+});
+
+test('the box fills the panel, because a monitor is not a picture with a margin', () => {
+  const box = G.stageBoxOf({ left: 0, top: 0, width: 800, height: 600 }, HD);
+  assert.strictEqual(box.left, 0);
+  assert.strictEqual(box.width, 800);
 });
 
 test('a box never reaches past the panel it was fitted into', () => {
