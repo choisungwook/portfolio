@@ -25,7 +25,14 @@
     return sorted;
   }
 
-  const model = { filterWorktrees, formatBytes, sortWorktrees };
+  function contextMenuPosition(clientX, clientY, windowWidth, windowHeight) {
+    return {
+      left: Math.max(0, Math.min(clientX, windowWidth - 250)),
+      top: Math.max(0, Math.min(clientY, windowHeight - 220)),
+    };
+  }
+
+  const model = { contextMenuPosition, filterWorktrees, formatBytes, sortWorktrees };
   root.diskViewModel = model;
   if (typeof module !== 'undefined') module.exports = model;
 }(typeof window === 'undefined' ? globalThis : window));

@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { filterWorktrees, formatBytes, sortWorktrees } = require('../src/renderer/view-model');
+const {
+  contextMenuPosition, filterWorktrees, formatBytes, sortWorktrees,
+} = require('../src/renderer/view-model');
 
 const worktrees = [
   { path: '/work/zeta', repository: 'portfolio', branch: 'codex/zeta', sizeBytes: 10, modifiedMs: 100 },
@@ -35,6 +37,11 @@ test('disk sizes use compact binary units', () => {
   assert.equal(formatBytes(0), '0 B');
   assert.equal(formatBytes(1024), '1 KB');
   assert.equal(formatBytes(5 * 1024 ** 3), '5.0 GB');
+});
+
+test('context menu remains inside large and undersized windows', () => {
+  assert.deepEqual(contextMenuPosition(900, 700, 1000, 800), { left: 750, top: 580 });
+  assert.deepEqual(contextMenuPosition(10, 10, 200, 180), { left: 0, top: 0 });
 });
 
 test('macOS scanner resource stays out of the cross-platform Tauri config', () => {

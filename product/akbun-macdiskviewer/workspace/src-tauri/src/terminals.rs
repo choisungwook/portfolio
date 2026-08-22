@@ -3,6 +3,10 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+const CACHE_TTL: Duration = Duration::from_secs(30);
 
 const TERMINAL_HINTS: &[&str] = &[
     "terminal",
@@ -27,7 +31,39 @@ pub struct Terminal {
     pub app_path: String,
 }
 
+#[derive(Default)]
+struct TerminalCache {
+    detected_at: Option<Instant>,
+    terminals: Vec<Terminal>,
+}
+
+impl TerminalCache {
+    fn get(&self, now: Instant) -> Option<Vec<Terminal>> {
+        let age = now.checked_duration_since(self.detected_at?)?;
+        (age < CACHE_TTL).then(|| self.terminals.clone())
+    }
+
+    fn replace(&mut self, now: Instant, terminals: Vec<Terminal>) {
+        self.detected_at = Some(now);
+        self.terminals = terminals;
+    }
+}
+
+static TERMINAL_CACHE: OnceLock<Mutex<TerminalCache>> = OnceLock::new();
+
 pub fn detect() -> Vec<Terminal> {
+    let now = Instant::now();
+    let cache = TERMINAL_CACHE.get_or_init(|| Mutex::new(TerminalCache::default()));
+    let mut cache = cache.lock().unwrap_or_else(|error| error.into_inner());
+    if let Some(terminals) = cache.get(now) {
+        return terminals;
+    }
+    let terminals = detect_uncached();
+    cache.replace(now, terminals.clone());
+    terminals
+}
+
+fn detect_uncached() -> Vec<Terminal> {
     let mut roots = vec![
         PathBuf::from("/Applications"),
         PathBuf::from("/System/Applications"),
@@ -259,5 +295,28 @@ mod tests {
             terminal_arguments(&unknown, Path::new("/tmp/work")),
             ["-a", "/Applications/akbun-terminal.app", "/tmp/work"],
         );
+    }
+
+    #[test]
+    fn terminal_cache_expires_after_thirty_seconds() {
+        let detected_at = Instant::now();
+        let terminal = Terminal {
+            name: "Ghostty".into(),
+            bundle_id: None,
+            app_path: "/Applications/Ghostty.app".into(),
+        };
+        let mut cache = TerminalCache::default();
+        cache.replace(detected_at, vec![terminal]);
+
+        assert_eq!(
+            cache
+                .get(detected_at + Duration::from_secs(29))
+                .unwrap()
+                .len(),
+            1,
+        );
+        assert!(cache
+            .get(detected_at + Duration::from_secs(30))
+            .is_none());
     }
 }

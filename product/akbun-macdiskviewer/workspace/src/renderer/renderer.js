@@ -1,7 +1,9 @@
 'use strict';
 
 const api = window.diskViewer;
-const { filterWorktrees, formatBytes, sortWorktrees } = window.diskViewModel;
+const {
+  contextMenuPosition, filterWorktrees, formatBytes, sortWorktrees,
+} = window.diskViewModel;
 const state = {
   path: '/', scope: 'children', search: '', sort: 'size', direction: 'desc',
   page: 0, pageSize: 100, count: 0, catalog: null, view: 'disk',
@@ -126,8 +128,9 @@ async function showContextMenu(clientX, clientY, targetPath, kind) {
     items.push(contextButton('No terminal apps detected', async () => {}, true));
   }
   elements.contextMenu.replaceChildren(...items);
-  elements.contextMenu.style.left = `${Math.min(clientX, window.innerWidth - 250)}px`;
-  elements.contextMenu.style.top = `${Math.min(clientY, window.innerHeight - 220)}px`;
+  const position = contextMenuPosition(clientX, clientY, window.innerWidth, window.innerHeight);
+  elements.contextMenu.style.left = `${position.left}px`;
+  elements.contextMenu.style.top = `${position.top}px`;
   elements.contextMenu.classList.remove('hidden');
 }
 
