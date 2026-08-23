@@ -11,3 +11,4 @@ akbun-shadowing-player 작업 중 내린 의사결정과 이유다.
 * [로그는 macOS 관례 위치에 자체 rotation 로거로 기록](2026-07-file-logger-macos-logs-dir.md)
 * [업데이트는 dmg를 직접 받아 앱 번들을 교체한다](2026-07-update-download-and-swap.md)
 * [테마는 CSS 변수와 light-dark()로 두되 canvas 색만 예외로 둔다](2026-07-theme-css-vars-canvas-exception.md)
+* [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](2026-07-build-before-tag-and-release.md)

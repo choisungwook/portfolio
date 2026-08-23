@@ -189,7 +189,7 @@ ECR repository도 terraform으로 만든다(litellm 하나, 필요하면 postgre
 - [.claude/rules/terraform.md](../../../../.claude/rules/terraform.md) — provider 버전 웹 검색, default_tags, SSM 접속 패턴
 - [.claude/rules/markdown.md](../../../../.claude/rules/markdown.md) — 헤더·코드블록 규칙
 - [.claude/rules/workflow.md](../../../../.claude/rules/workflow.md) — commit·push·PR·Issue는 사용자 명시 지시 전까지 금지
-- [knowledge/playbooks/add-new-hands-on.md](../../../../knowledge/playbooks/add-new-hands-on.md) — 루트 README 목차 추가 등 핸즈온 표준 절차
+- [.claude/commands/repo-handson.md](../../../../.claude/commands/repo-handson.md) — 루트 README 목차 추가 등 핸즈온 표준 절차
 
 ## 작업 순서
 

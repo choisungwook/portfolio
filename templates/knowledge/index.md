@@ -4,6 +4,8 @@ okf_version: "0.1"
 
 # Knowledge
 
+workspace마다 두는 지식 번들의 템플릿이다. 새 workspace를 만들 때 이 디렉터리를 통째로 복사해 그 workspace의 `knowledge/`로 쓴다. 여기에는 concept를 쌓지 않는다.
+
 AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.1](references/okf-spec-0.1.md)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 
 ## 디렉터리
@@ -15,4 +17,4 @@ AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안�
 
 ## 작성 규칙
 
-concept 작성 규칙은 [.claude/rules/knowledge.md](../.claude/rules/knowledge.md)를 따른다. 변경 이력은 [log.md](log.md)에 남긴다.
+concept 작성 규칙은 저장소 루트의 `.claude/rules/knowledge.md`를 따른다. 변경 이력은 [log.md](log.md)에 남긴다.

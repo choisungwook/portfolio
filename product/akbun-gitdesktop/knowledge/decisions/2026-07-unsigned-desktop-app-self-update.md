@@ -28,5 +28,3 @@ product의 데스크톱 앱은 자동 업데이트를 electron-updater가 아니
 정리 지점을 세 곳이나 두는 이유는 dmg가 크고 누수가 조용하기 때문이다. 실패할 때마다 수백 MB가 쌓이지만 사용자에게 아무 신호가 없어, 손으로 확인하기 어렵다. 그래서 정리 코드가 사라지면 깨지는 테스트를 구현과 한 몸으로 옮긴다.
 
 akbun-k8supgradeview, akbun-shadowing-player, akbun-mactaskbar 세 제품이 같은 코드를 쓴다. 세 번째 포팅에서야 규칙으로 옮겼는데, 두 번째에서 옮겼다면 판단을 한 번 덜 반복했을 것이다.
-
-관련 결정: [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](2026-07-build-before-tag-and-release.md), [Electron 릴리스 빌드는 macOS만](2026-07-electron-release-macos-only.md)
