@@ -49,6 +49,13 @@ def test_parse_search_results() -> None:
   assert results[0].url == "https://example.com"
 
 
+def test_parse_search_results_rejects_missing_text_block() -> None:
+  response = {"result": {"content": [{"type": "image", "data": "ignored"}]}}
+
+  with pytest.raises(ValueError, match="text content block"):
+    AgentCoreWebSearchClient._parse_search_results(response)
+
+
 @pytest.mark.parametrize(
   ("query", "max_results"),
   [("", 5), ("가" * 201, 5), ("정상 질의", 0), ("정상 질의", 26)],

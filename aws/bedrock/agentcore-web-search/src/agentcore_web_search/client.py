@@ -100,7 +100,9 @@ class AgentCoreWebSearchClient:
     if "error" in response:
       raise RuntimeError(json.dumps(response["error"], ensure_ascii=False))
     content = response["result"]["content"]
-    text_block = next(block for block in content if block["type"] == "text")
+    text_block = next((block for block in content if block["type"] == "text"), None)
+    if text_block is None:
+      raise ValueError("MCP 응답에서 text content block을 찾지 못했다")
     document = json.loads(text_block["text"])
     return [
       SearchResult(
