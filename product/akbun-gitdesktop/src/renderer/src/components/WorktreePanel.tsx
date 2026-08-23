@@ -44,11 +44,10 @@ export default function WorktreePanel({
   }
 
   const removeWorktree = async (worktree: WorktreeInfo): Promise<void> => {
-    if (!window.confirm(`Remove this worktree?\n${worktree.path}`)) return
-    const result = await window.gitdesktop.removeWorktree(repo.path, worktree.path, false)
-    if (result.ok) {
+    const result = await window.gitdesktop.removeWorktree(repo.path, worktree.path)
+    if (result.ok && result.data) {
       onChanged()
-    } else {
+    } else if (!result.ok) {
       onError(result.error)
     }
   }

@@ -20,6 +20,8 @@ export interface GitDesktopApi {
   checkCliTools: () => Promise<GitResult<CliStatus>>
   getSettings: () => Promise<GitResult<AppSettings>>
   setTheme: (theme: ThemePreference) => Promise<GitResult<AppSettings>>
+  setForceRemoveWorktree: (enabled: boolean) => Promise<GitResult<AppSettings>>
+  checkForUpdates: () => Promise<void>
 
   listRepos: () => Promise<GitResult<RepoEntry[]>>
   importRepo: () => Promise<GitResult<RepoEntry[]>>
@@ -38,7 +40,7 @@ export interface GitDesktopApi {
     branch: string,
     createNewBranch: boolean
   ) => Promise<GitResult<void>>
-  removeWorktree: (repoPath: string, worktreePath: string, force: boolean) => Promise<GitResult<void>>
+  removeWorktree: (repoPath: string, worktreePath: string) => Promise<GitResult<boolean>>
 
   getCommitFiles: (repoPath: string, hash: string) => Promise<GitResult<FileChange[]>>
   getCommitDiff: (repoPath: string, hash: string, filePath: string) => Promise<GitResult<string>>

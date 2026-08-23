@@ -1,12 +1,16 @@
-import type { JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CliStatus, CliToolStatus } from '../../../shared/types'
 
 interface Props {
   status: CliStatus | null
+  onImportRepo: () => void
   onOpenSettings: () => void
+  onRecheckCli: () => void
+  onCheckForUpdates: () => void
 }
 
-/** Chip class for one tool: missing, degraded (gh without login) or ready. */
+type MenuName = 'repository' | 'settings'
+
 function chipClass(tool: CliToolStatus): string {
   if (!tool.available) return 'tool-chip tool-chip-missing'
   if (tool.id === 'gh' && !tool.authenticated) return 'tool-chip tool-chip-warn'
@@ -32,18 +36,88 @@ function noticeFor(status: CliStatus): string {
   return ''
 }
 
-/**
- * Fixed top bar. It shows how the app depends on the two CLIs it shells out to,
- * git for everything and gh for the GitHub tabs, and opens the settings dialog.
- */
-export default function TopBar({ status, onOpenSettings }: Props): JSX.Element {
+export default function TopBar({
+  status,
+  onImportRepo,
+  onOpenSettings,
+  onRecheckCli,
+  onCheckForUpdates
+}: Props): JSX.Element {
+  const [openMenu, setOpenMenu] = useState<MenuName | null>(null)
+  const menuRef = useRef<HTMLElement>(null)
   const notice = status ? noticeFor(status) : ''
   const blocking = status ? !status.git.available : false
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent): void => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpenMenu(null)
+    }
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpenMenu(null)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [])
+
+  const toggleMenu = (menu: MenuName): void => {
+    setOpenMenu((current) => (current === menu ? null : menu))
+  }
+
+  const run = (action: () => void): void => {
+    setOpenMenu(null)
+    action()
+  }
 
   return (
     <>
       <header className="top-bar">
         <span className="top-bar-title">akbun-gitdesktop</span>
+        <nav className="app-menus" ref={menuRef} aria-label="Application menu">
+          <div className="app-menu">
+            <button
+              className={openMenu === 'repository' ? 'menu-title open' : 'menu-title'}
+              aria-expanded={openMenu === 'repository'}
+              onClick={() => toggleMenu('repository')}
+            >
+              Repository
+            </button>
+            {openMenu === 'repository' && (
+              <div className="menu-list" role="menu">
+                <button role="menuitem" onClick={() => run(onImportRepo)}>
+                  Import Repository…
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="app-menu">
+            <button
+              className={openMenu === 'settings' ? 'menu-title open' : 'menu-title'}
+              aria-expanded={openMenu === 'settings'}
+              onClick={() => toggleMenu('settings')}
+            >
+              Settings
+            </button>
+            {openMenu === 'settings' && (
+              <div className="menu-list" role="menu">
+                <button role="menuitem" onClick={() => run(onOpenSettings)}>
+                  Preferences…
+                </button>
+                <button role="menuitem" onClick={() => run(onRecheckCli)}>
+                  Recheck Command Line Tools
+                </button>
+                <div className="menu-separator" role="separator" />
+                <button role="menuitem" onClick={() => run(onCheckForUpdates)}>
+                  Check for Updates…
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+        <span className="top-bar-spacer" />
         {status && (
           <>
             <span className={chipClass(status.git)} title={status.git.version || 'git CLI not found'}>
@@ -54,10 +128,6 @@ export default function TopBar({ status, onOpenSettings }: Props): JSX.Element {
             </span>
           </>
         )}
-        <span className="top-bar-spacer" />
-        <button onClick={onOpenSettings} title="Open settings">
-          Settings
-        </button>
       </header>
       {notice && <div className={blocking ? 'notice-bar notice-warn' : 'notice-bar'}>{notice}</div>}
     </>

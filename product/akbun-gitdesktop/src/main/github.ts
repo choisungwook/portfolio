@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import type {
   IssueInfo,
   ProjectBoard,
@@ -10,6 +9,7 @@ import type {
   ThreadComment,
   ThreadDetail
 } from '../shared/types'
+import { runCli } from './cli'
 
 const LIST_LIMIT = 50
 /** Wider than the issue list so every listed issue has its parent looked up. */
@@ -27,15 +27,7 @@ const ISSUE_DETAIL_FIELDS =
   'number,title,state,author,url,createdAt,updatedAt,labels,assignees,body,comments'
 
 function runGh(cwd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile('gh', args, { cwd, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr.trim() || error.message))
-        return
-      }
-      resolve(stdout)
-    })
-  })
+  return runCli(cwd, 'gh', args)
 }
 
 interface GhActor {

@@ -105,6 +105,61 @@ body {
 .top-bar-title {
   font-weight: 700;
   letter-spacing: 0.2px;
+  margin-right: 4px;
+}
+
+.app-menus {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 2px;
+}
+
+.app-menu {
+  position: relative;
+}
+
+.menu-title {
+  border: 0;
+  background: transparent;
+  padding: 5px 8px;
+}
+
+.menu-title:hover,
+.menu-title.open {
+  background: var(--bg-hover);
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.menu-list button {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.menu-list button:hover {
+  background: var(--bg-hover);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px;
+  background: var(--border);
 }
 
 .top-bar-spacer {
@@ -1116,6 +1171,28 @@ button:focus-visible,
   color: var(--text-dim);
   font-size: 11px;
   margin-top: 8px;
+}
+
+.setting-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.setting-toggle input {
+  margin-top: 3px;
+}
+
+.setting-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setting-toggle small {
+  color: var(--text-dim);
+  font-size: 11px;
 }
 
 .tool-card {

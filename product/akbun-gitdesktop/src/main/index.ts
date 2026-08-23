@@ -7,7 +7,7 @@ import * as git from './git'
 import * as github from './github'
 import { openInApp, listOpenerApps } from './openWith'
 import { addRepo, loadRepos, removeRepo } from './repoStore'
-import { loadSettings, saveTheme } from './settingsStore'
+import { loadSettings, saveForceRemoveWorktree, saveTheme } from './settingsStore'
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from './update'
 
 function createWindow(): void {
@@ -53,6 +53,9 @@ function registerIpcHandlers(): void {
       return settings
     })
   )
+  ipcMain.handle('settings:setForceRemoveWorktree', (_event, enabled: boolean) =>
+    wrap(() => saveForceRemoveWorktree(enabled))
+  )
 
   ipcMain.handle('repos:import', () =>
     wrap(async () => {
@@ -87,8 +90,25 @@ function registerIpcHandlers(): void {
     (_event, repoPath: string, worktreePath: string, branch: string, createNewBranch: boolean) =>
       wrap(() => git.createWorktree(repoPath, worktreePath, branch, createNewBranch))
   )
-  ipcMain.handle('git:removeWorktree', (_event, repoPath: string, worktreePath: string, force: boolean) =>
-    wrap(() => git.removeWorktree(repoPath, worktreePath, force))
+  ipcMain.handle('git:removeWorktree', (_event, repoPath: string, worktreePath: string) =>
+    wrap(async () => {
+      const settings = await loadSettings()
+      const force = settings.forceRemoveWorktree
+      const answer = await dialog.showMessageBox({
+        type: force ? 'warning' : 'question',
+        message: force ? 'Force remove this worktree?' : 'Remove this worktree?',
+        detail: force
+          ? `${worktreePath}\n\nUncommitted and untracked changes in this worktree can be discarded.`
+          : worktreePath,
+        buttons: [force ? 'Force remove' : 'Remove', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true
+      })
+      if (answer.response !== 0) return false
+      await git.removeWorktree(repoPath, worktreePath, force)
+      return true
+    })
   )
 
   ipcMain.handle('git:commitFiles', (_event, repoPath: string, hash: string) =>
@@ -133,6 +153,7 @@ function registerIpcHandlers(): void {
       return result.canceled || result.filePaths.length === 0 ? '' : result.filePaths[0]
     })
   )
+  ipcMain.handle('update:check', () => runUpdateCheck())
 }
 
 /** 실행 중인 .app 번들 경로. exe는 <앱>.app/Contents/MacOS/<실행파일>이다. */
