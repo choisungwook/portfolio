@@ -1,0 +1,5 @@
+.env
+.runtime.env
+.venv
+terraform/.terraform
+terraform/*.tfstate*
