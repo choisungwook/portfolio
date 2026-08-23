@@ -132,7 +132,7 @@
 - [모델 config.json으로 LLM 아키텍처를 2D와 3D로 보는 웹 페이지 (visualizellm.akbun.com)](./product/akbun-visualizellm/) (26.8.18)
 - [셸을 감싸는 터미널 작업 공간 macOS 데스크톱 앱 (akbun-terminal)](./product/akbun-terminal/) (26.8.19)
 - [LLM serving RPS, latency, and KV cache calculator (akbun-caculatorllm)](./product/akbun-caculatorllm/) (26.8.19)
-- [macOS 전체 디스크와 AI Agent Git worktree 용량을 추적하는 데스크톱 앱 (akbun-macdiskviewer)](./product/akbun-macdiskviewer/) (26.8.22)
+- [macOS 전체 디스크와 Git 저장소·AI Agent worktree 용량을 추적하는 데스크톱 앱 (akbun-macdiskviewer)](./product/akbun-macdiskviewer/) (26.8.22)
 
 ## Dockerfile
 

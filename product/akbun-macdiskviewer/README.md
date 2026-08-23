@@ -1,22 +1,22 @@
 # akbun-macdiskviewer
 
-Tauri macOS app for finding disk pressure from AI-agent Git worktrees while retaining a complete startup-disk browser. Every accessible file and directory is indexed with recursive allocated size and can be sorted by size, modification date, or name.
+Tauri macOS app for finding disk pressure from Git repositories and AI-agent worktrees while retaining a complete startup-disk browser. Every accessible file and directory is indexed with recursive allocated size and can be sorted by size, modification date, or name.
 
-The first run scans `/`. Later runs open the completed SQLite index immediately and scan again only when requested. A low-priority Rust process visits one directory at a time, yields regularly, writes SQLite directly, and can be paused or cancelled.
+The first run scans `/`. Later runs open the completed SQLite index immediately and scan again only when requested. A background-priority Rust process visits one directory at a time, writes SQLite in bounded batches, and can be paused or cancelled.
 
 ## What it does
 
 | Feature | Behavior |
 | --- | --- |
 | Full-disk index | Scans the startup disk and keeps every accessible file, directory, and symbolic link |
-| Worktree storage | Finds linked Git worktrees from `.git` pointer files and shows repository, branch, path, recursive size, and modification date in a separate tab |
+| Git storage | Finds regular repositories and linked worktrees from `.git` directories and pointer files; shows repository, branch, path, recursive size, and modification date in a separate tab |
 | Directory size | Aggregates allocated and logical sizes from descendants; the table sorts by allocated size |
 | Browse and search | Opens directories, searches names, switches between direct children and every descendant, and pages large result sets |
 | Sort | Size, modification date, or name in either direction |
 | Finder | Right click a disk item or worktree and choose Show in Finder |
 | Terminals | Discovers installed terminal apps from bundle metadata; known terminals receive their working-directory option and unknown terminals receive a macOS file-open event |
 | Permissions | Counts unreadable paths and links to macOS Full Disk Access settings |
-| Scan control | Rust scanner with low OS priority, sequential directory reads, timed yielding, pause, resume, and cancel |
+| Scan control | Rust scanner with background I/O and low CPU priority, sequential directory reads, batched SQLite writes, pause, resume, and cancel |
 
 External volumes under `/Volumes`, synthetic device files, APFS duplicate views, VM data, and symbolic-link targets are not traversed. This keeps the result scoped to the startup disk and avoids double counting.
 

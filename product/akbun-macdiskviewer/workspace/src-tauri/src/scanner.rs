@@ -130,17 +130,14 @@ pub fn start(app: AppHandle, backend: Backend) -> Result<bool, String> {
         fs::remove_file(&paths.next).map_err(error_text)?;
     }
     let executable = scanner_executable(&app)?;
-    let mut child = Command::new("/usr/bin/nice")
-        .args(["-n", "10"])
-        .arg(executable)
-        .args(["--root", "/", "--database"])
-        .arg(&paths.next)
+    let mut child = scanner_command(&executable, &paths.next)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(error_text)?;
     let pid = child.id();
+    apply_background_policy(pid);
     let stdin = child
         .stdin
         .take()
@@ -233,6 +230,31 @@ pub fn start(app: AppHandle, backend: Backend) -> Result<bool, String> {
     Ok(true)
 }
 
+fn scanner_command(executable: &Path, database_path: &Path) -> Command {
+    let mut command = Command::new("/usr/bin/nice");
+    command
+        .args(["-n", "10"])
+        .arg(executable)
+        .args(["--root", "/", "--database"])
+        .arg(database_path);
+    command
+}
+
+fn apply_background_policy(pid: u32) {
+    if cfg!(target_os = "macos") {
+        let _ = background_policy_command(pid)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn background_policy_command(pid: u32) -> Command {
+    let mut command = Command::new("/usr/sbin/taskpolicy");
+    command.args(["-b", "-p", &pid.to_string()]);
+    command
+}
+
 fn handle_message(
     app: &AppHandle,
     backend: &Backend,
@@ -316,6 +338,35 @@ fn error_text(error: impl std::fmt::Display) -> String {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn scanner_runs_with_background_io_and_low_cpu_priority() {
+        let command = scanner_command(Path::new("/scanner"), Path::new("/catalog.sqlite"));
+        let program = command.get_program().to_string_lossy();
+        let arguments = command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(program, "/usr/bin/nice");
+        assert_eq!(&arguments[..3], ["-n", "10", "/scanner"]);
+        assert!(arguments.ends_with(&[
+            "--root".into(),
+            "/".into(),
+            "--database".into(),
+            "/catalog.sqlite".into(),
+        ]));
+
+        let background = background_policy_command(42);
+        assert_eq!(background.get_program(), "/usr/sbin/taskpolicy");
+        assert_eq!(
+            background
+                .get_args()
+                .map(|argument| argument.to_string_lossy().into_owned())
+                .collect::<Vec<_>>(),
+            ["-b", "-p", "42"]
+        );
+    }
 
     #[test]
     fn recovers_backup_and_removes_incomplete_scan() {

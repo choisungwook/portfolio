@@ -14,6 +14,7 @@ if (!window.diskViewer && new URLSearchParams(window.location.search).has('previ
     { path: '/cores', parent_path: '/', name: 'cores', kind: 'directory', size_bytes: 0, logical_bytes: 0, modified_ms: now - 60_000_000, descendants: 0 },
   ];
   const worktrees = [
+    { path: '/Users/akbun/git/portfolio', repository: 'portfolio', repositoryPath: '/Users/akbun/git/portfolio', branch: 'main', sizeBytes: 24.1 * gib, modifiedMs: now - 60_000, descendants: 62014 },
     { path: '/Users/akbun/.codex/worktrees/portfolio/agent-42', repository: 'portfolio', repositoryPath: '/Users/akbun/git/portfolio', branch: 'codex/worktree-storage', sizeBytes: 18.4 * gib, modifiedMs: now - 180_000, descendants: 48122 },
     { path: '/Users/akbun/.claude/worktrees/docs/review', repository: 'docs', repositoryPath: '/Users/akbun/git/docs', branch: 'claude/review', sizeBytes: 7.8 * gib, modifiedMs: now - 8_600_000, descendants: 18043 },
     { path: '/Users/akbun/.codex/worktrees/api/test', repository: 'api', repositoryPath: '/Users/akbun/git/api', branch: 'codex/test', sizeBytes: 3.2 * gib, modifiedMs: now - 86_000_000, descendants: 9241 },

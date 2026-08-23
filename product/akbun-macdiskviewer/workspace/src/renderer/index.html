@@ -25,7 +25,7 @@
         </button>
         <button class="nav-item" id="worktreeNav">
           <span class="nav-icon">⑂</span>
-          Worktrees
+          Git storage
         </button>
         <button class="nav-item" id="largestButton">
           <span class="nav-icon">⇣</span>
@@ -156,9 +156,9 @@
       <div class="hidden" id="worktreeView">
         <section class="worktree-summary">
           <div>
-            <span class="eyebrow">AI AGENT WORKTREES</span>
+            <span class="eyebrow">GIT STORAGE</span>
             <strong id="worktreeSize">0 B</strong>
-            <p>Disk space used by linked Git worktrees</p>
+            <p>Disk space used by Git repositories and linked worktrees</p>
           </div>
           <div class="worktree-stat">
             <span>Detected</span>
@@ -169,8 +169,8 @@
         <section class="browser-card worktree-card">
           <div class="browser-toolbar">
             <div>
-              <strong>Linked worktrees</strong>
-              <p class="toolbar-copy">Detected from <code>.git</code> pointer files in the latest disk index.</p>
+              <strong>Repositories and worktrees</strong>
+              <p class="toolbar-copy">Detected from <code>.git</code> directories and pointer files in the latest disk index.</p>
             </div>
             <div class="filters">
               <label class="search-box compact">
@@ -199,12 +199,12 @@
             </table>
             <div class="empty-state hidden" id="worktreeEmpty">
               <div>⑂</div>
-              <strong>No linked worktrees found</strong>
-              <span>Run a disk scan after an AI agent creates worktrees.</span>
+              <strong>No Git repositories found</strong>
+              <span>Run a disk scan to find repositories and linked worktrees.</span>
             </div>
           </div>
           <footer class="pagination">
-            <span id="worktreeResultCount">0 worktrees</span>
+            <span id="worktreeResultCount">0 Git directories</span>
             <span>Right click a row for Finder and terminal actions</span>
           </footer>
         </section>
