@@ -7,6 +7,7 @@ import * as git from './git'
 import * as github from './github'
 import { openInApp, listOpenerApps } from './openWith'
 import { addRepo, loadRepos, removeRepo } from './repoStore'
+import { loadRepoSizes } from './repoSize'
 import { loadSettings, saveForceRemoveWorktree, saveTheme } from './settingsStore'
 import { checkUpdate, cleanupTempDirs, downloadDmg, spawnSwap } from './update'
 
@@ -43,6 +44,7 @@ async function wrap<T>(action: () => Promise<T>): Promise<GitResult<T>> {
 function registerIpcHandlers(): void {
   ipcMain.handle('tools:check', () => wrap(() => git.checkCliTools()))
   ipcMain.handle('repos:list', () => wrap(() => loadRepos()))
+  ipcMain.handle('repos:sizes', () => wrap(() => loadRepoSizes()))
   ipcMain.handle('repos:remove', (_event, repoPath: string) => wrap(() => removeRepo(repoPath)))
 
   ipcMain.handle('settings:get', () => wrap(() => loadSettings()))

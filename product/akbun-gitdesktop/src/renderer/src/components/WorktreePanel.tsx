@@ -6,6 +6,7 @@ interface Props {
   worktrees: WorktreeInfo[]
   selectedWorktree: WorktreeInfo | null
   openerApps: OpenerApp[]
+  width: number
   onSelect: (worktree: WorktreeInfo) => void
   onChanged: () => void
   onError: (message: string) => void
@@ -16,6 +17,7 @@ export default function WorktreePanel({
   worktrees,
   selectedWorktree,
   openerApps,
+  width,
   onSelect,
   onChanged,
   onError
@@ -53,7 +55,7 @@ export default function WorktreePanel({
   }
 
   return (
-    <aside className="worktree-panel">
+    <aside className="worktree-panel" style={{ width }}>
       <div className="panel-header">
         <span>Worktree</span>
       </div>

@@ -279,10 +279,8 @@ button:focus-visible,
 /* Repository sidebar */
 
 .repo-sidebar {
-  width: 220px;
-  min-width: 220px;
+  flex-shrink: 0;
   background: var(--bg-panel);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
@@ -300,6 +298,7 @@ button:focus-visible,
   padding: 8px 12px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  gap: 8px;
 }
 
 .repo-list li:hover {
@@ -313,18 +312,26 @@ button:focus-visible,
 }
 
 .repo-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.repo-size {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Worktree panel */
 
 .worktree-panel {
-  width: 280px;
-  min-width: 280px;
+  flex-shrink: 0;
   background: var(--bg-panel);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
@@ -945,14 +952,46 @@ button:focus-visible,
 /* Diff drawer */
 
 .diff-drawer {
-  width: 46%;
-  min-width: 360px;
-  max-width: 760px;
+  flex-shrink: 0;
   background: var(--bg-panel);
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* Panel resize handles */
+
+.panel-resizer {
+  position: relative;
+  flex: 0 0 7px;
+  width: 7px;
+  min-width: 7px;
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--border);
+}
+
+.panel-resizer:hover::after,
+.panel-resizer:focus-visible::after {
+  left: 2px;
+  width: 3px;
+  background: var(--accent);
+}
+
+body.panel-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .diff-drawer-header {

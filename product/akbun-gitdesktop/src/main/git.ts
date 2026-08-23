@@ -65,6 +65,10 @@ export async function isGitRepository(path: string): Promise<boolean> {
   }
 }
 
+export async function getGitDirectoryPath(repoPath: string): Promise<string> {
+  return (await runGit(repoPath, ['rev-parse', '--absolute-git-dir'])).trim()
+}
+
 export async function getLog(repoPath: string): Promise<CommitInfo[]> {
   const format = ['%H', '%P', '%an', '%ad', '%D', '%s'].join(FIELD_SEP)
   const out = await runGit(repoPath, [

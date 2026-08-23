@@ -3,6 +3,11 @@ export interface RepoEntry {
   name: string
 }
 
+export interface RepoSizeInfo {
+  path: string
+  bytes: number | null
+}
+
 export interface CommitInfo {
   hash: string
   parents: string[]

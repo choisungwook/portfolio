@@ -10,6 +10,7 @@ export type DiffSource =
 interface Props {
   source: DiffSource
   onClose: () => void
+  width: number
 }
 
 function sourceKey(source: DiffSource): string {
@@ -50,7 +51,7 @@ function readDiff(source: DiffSource, filePath: string): ReturnType<typeof windo
  * Side panel that lists the files a commit or branch touched and shows the
  * git diff of the file the user clicks.
  */
-export default function DiffDrawer({ source, onClose }: Props): JSX.Element {
+export default function DiffDrawer({ source, onClose, width }: Props): JSX.Element {
   const [files, setFiles] = useState<FileChange[]>([])
   const [selectedFile, setSelectedFile] = useState('')
   const [diff, setDiff] = useState('')
@@ -107,7 +108,7 @@ export default function DiffDrawer({ source, onClose }: Props): JSX.Element {
   const lines = diff.trim().length > 0 ? diff.split('\n') : []
 
   return (
-    <aside className="diff-drawer">
+    <aside className="diff-drawer" style={{ width }}>
       <div className="diff-drawer-header">
         <div className="diff-drawer-title">
           <strong title={source.title}>{source.title}</strong>

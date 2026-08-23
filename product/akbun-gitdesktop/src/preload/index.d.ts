@@ -11,6 +11,7 @@ import type {
   ProjectListResult,
   PullRequestInfo,
   RepoEntry,
+  RepoSizeInfo,
   ThemePreference,
   ThreadDetail,
   WorktreeInfo
@@ -24,6 +25,7 @@ export interface GitDesktopApi {
   checkForUpdates: () => Promise<void>
 
   listRepos: () => Promise<GitResult<RepoEntry[]>>
+  getRepoSizes: () => Promise<GitResult<RepoSizeInfo[]>>
   importRepo: () => Promise<GitResult<RepoEntry[]>>
   removeRepo: (repoPath: string) => Promise<GitResult<RepoEntry[]>>
 
