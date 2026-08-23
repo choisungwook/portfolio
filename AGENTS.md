@@ -34,7 +34,7 @@
 
 ## 지식 축적
 
-작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 `knowledge/`에 기록해 다음 작업의 컨텍스트로 재사용한다. 기본 위치는 작업한 디렉터리 안의 `knowledge/`이고, 루트 [knowledge/](./knowledge/index.md)는 형식의 템플릿이자 저장소 전체에 영향을 주는 지식의 자리다. 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
+작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 작업한 디렉터리 안의 `knowledge/`에 기록해 다음 작업의 컨텍스트로 재사용한다. workspace마다 자기 `knowledge/`를 가지며 루트에는 두지 않는다. 형식 템플릿은 [templates/knowledge/](./templates/knowledge/index.md)이고, 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
 
 ## 검증
 

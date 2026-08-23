@@ -47,7 +47,7 @@ node:test 내장 러너만 쓴다. 현재 대상은 업데이트의 임시 파�
 .github/workflows/release-akbun-shadowing-player.yml이 담당한다.
 
 - PR: ubuntu에서 npm test (electron 바이너리 다운로드 생략).
-- master push: macos에서 dmg(arm64) 빌드 → package.json version으로 akbun-shadowing-player-v{버전} tag → dmg 첨부 GitHub Release. 빌드 실패 시 빈 release가 남지 않는 순서다. [ADR](../../knowledge/decisions/2026-07-build-before-tag-and-release.md)
+- master push: macos에서 dmg(arm64) 빌드 → package.json version으로 akbun-shadowing-player-v{버전} tag → dmg 첨부 GitHub Release. 빌드 실패 시 빈 release가 남지 않는 순서다. [ADR](./knowledge/decisions/2026-07-build-before-tag-and-release.md)
 - 버전의 유일한 출처는 package.json의 version이다. **코드를 수정하면 마이너 버전을 +1 한다** (예: 0.7.0 -> 0.8.0). 올리지 않으면 기존 tag push에 실패해 release가 안 만들어진다. 문서만 고친 경우는 올리지 않는다.
 
 ## 주의사항

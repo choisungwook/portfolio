@@ -4,7 +4,7 @@ okf_version: "0.1"
 
 # akbun-shadowing-player Knowledge
 
-akbun-shadowing-player 프로젝트의 지식 번들이다. 저장소 루트 [knowledge/](../../../knowledge/index.md)와 같은 OKF 0.1 형식을 따르되, 이 프로젝트에만 유효한 지식을 담는다.
+akbun-shadowing-player 프로젝트의 지식 번들이다. [templates/knowledge/](../../../templates/knowledge/index.md)와 같은 OKF 0.1 형식을 따르되, 이 프로젝트에만 유효한 지식을 담는다.
 
 ## 디렉터리
 

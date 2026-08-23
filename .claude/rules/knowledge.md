@@ -1,6 +1,6 @@
 # Knowledge 기록 규칙
 
-`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.1을 따르는 지식 번들이다. 스펙 원문은 [knowledge/references/okf-spec-0.1.md](../../knowledge/references/okf-spec-0.1.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
+`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.1을 따르는 지식 번들이다. 스펙 원문은 [templates/knowledge/references/okf-spec-0.1.md](../../templates/knowledge/references/okf-spec-0.1.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
 
 ## 기록 시점
 
@@ -8,12 +8,9 @@ PR을 만들기 직전에 이번 작업에서 남길 지식이 있는지 검토�
 
 ## 어디에 기록하는가
 
-기본은 작업한 디렉터리 안의 `knowledge/`다. 핸즈온이면 그 주제 디렉터리, product면 그 product 디렉터리다. 지식이 그것을 쓰는 코드 옆에 남는다.
+작업한 디렉터리 안의 `knowledge/`에 기록한다. 핸즈온이면 그 주제 디렉터리, product면 그 product 디렉터리다. workspace는 각각 독립이므로 지식도 그것을 쓰는 코드 옆에만 남는다. 루트에는 `knowledge/`를 두지 않는다.
 
-루트 `knowledge/`는 두 가지 역할만 한다.
-
-- 형식과 방향의 템플릿. 하위 `knowledge/`는 아래 규칙을 그대로 따르고 루트를 예시로 참조한다.
-- 저장소 전체에 영향을 주는 지식의 기록 위치. 특정 핸즈온이나 product 하나로 범위가 좁혀지면 루트가 아니다.
+[templates/knowledge/](../../templates/knowledge/index.md)는 형식 템플릿이다. 새 workspace를 만들 때 통째로 복사해 그 workspace의 `knowledge/`로 쓰고, 템플릿 자체에는 concept를 쌓지 않는다.
 
 ## 무엇을 기록하는가
 

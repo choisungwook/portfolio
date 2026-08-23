@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-08-23
+
+* [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](decisions/2026-08-harness-does-not-count-its-own-delay.md) 결정을 루트 knowledge에서 옮겨 옴. akbun-makevideo의 프레임 공급 계측에서 나온 판단이라 여기에 둠.
+
 ## 2026-08-22
 
 * [monitor는 패널을 채우고 source monitor는 에셋 비율로 맞춘다](decisions/2026-08-monitor-fills-the-panel.md) 결정 기록. 그림이 패널에 못 미치던 원인을 여백과 이중 레터박스로 좁히고, 두 monitor의 행이 어긋나던 것을 subgrid 공유로 바꿈.

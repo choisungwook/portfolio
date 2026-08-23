@@ -6,7 +6,7 @@
 
 ## 자동 업데이트는 기본 기능이다
 
-`product/`의 Electron 앱은 자동 업데이트를 처음부터 넣는다. 새로 만들 때도, 업데이트가 없는 기존 앱을 고칠 때도 마찬가지다. 매번 다시 판단하지 않고 [akbun-k8supgradeview](../../product/akbun-k8supgradeview/workspace/src/main/update.ts)의 구현을 포팅한다. 배경은 [knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](../../knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
+`product/`의 Electron 앱은 자동 업데이트를 처음부터 넣는다. 새로 만들 때도, 업데이트가 없는 기존 앱을 고칠 때도 마찬가지다. 매번 다시 판단하지 않고 [akbun-k8supgradeview](../../product/akbun-k8supgradeview/workspace/src/main/update.ts)의 구현을 포팅한다. 배경은 [product/akbun-gitdesktop/knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](../../product/akbun-gitdesktop/knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
 
 업데이트가 없으면 릴리스가 사용자에게 도달하지 않는다. 설치본을 손으로 다시 받는 사람은 없다. [product.md](./product.md)의 버전 규칙이 릴리스를 만드는 쪽이고, 이 규칙은 그 릴리스가 실제로 설치되는 쪽이다. 둘 중 하나가 빠지면 고친 코드는 master에만 남는다.
 

@@ -170,7 +170,7 @@ npm run quality:audio -- /tmp/akbun-makevideo-quality/project.akbunvideo --secon
 - `lateBlocks`: 디코더가 제때 내주지 못한 블록. 링버퍼가 흡수하므로 실패가 아니라 경고다
 - `startupDelayP99Ms`: 재생 시작과 seek 직후 소리가 나기까지의 지연
 
-seek 직후 재충전 시간은 `refillingMs`로 따로 빼고 underrun과 drift에서 제외한다. 클럭은 그동안 멈춰 있다가 옳은 자리에서 이어지므로 어긋남이 아니고, 이미 시작 지연으로 세고 있다. [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](../../../knowledge/decisions/2026-08-harness-does-not-count-its-own-delay.md)와 같은 규칙이다.
+seek 직후 재충전 시간은 `refillingMs`로 따로 빼고 underrun과 drift에서 제외한다. 클럭은 그동안 멈춰 있다가 옳은 자리에서 이어지므로 어긋남이 아니고, 이미 시작 지연으로 세고 있다. [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](../knowledge/decisions/2026-08-harness-does-not-count-its-own-delay.md)와 같은 규칙이다.
 
 메모리 지표는 두지 않았다. 프레임 소스가 최대 버퍼를 재는 건 1080p 큐가 클립당 50 MB라 메모리가 버퍼 설정의 교환 대상이기 때문이고, 스테레오 1초는 384 KB라 같은 검사를 두면 절대 실패할 수 없는 검사가 된다.
 

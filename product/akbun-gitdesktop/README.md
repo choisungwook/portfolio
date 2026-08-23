@@ -116,7 +116,7 @@ npm run dist:linux
 
 앱 메뉴 akbun-gitdesktop > Check for Updates…가 GitHub Release API에서 gitdesktop-v 태그의 최신 버전을 찾아 현재 버전과 비교한다. 새 버전이 있으면 dmg를 임시 디렉터리에 받아 교체 스크립트를 분리 프로세스로 띄우고 앱을 종료하며, 스크립트가 .app 번들을 통째로 바꾸고 다시 실행한다.
 
-dmg에 서명이 없어 Squirrel.Mac 기반 자동 업데이트(electron-updater)를 쓸 수 없다. 앱이 fetch로 받은 파일에는 quarantine 속성이 붙지 않아 Gatekeeper를 거치지 않고 교체할 수 있다는 점을 이용한다. 배경은 [knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](../../knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
+dmg에 서명이 없어 Squirrel.Mac 기반 자동 업데이트(electron-updater)를 쓸 수 없다. 앱이 fetch로 받은 파일에는 quarantine 속성이 붙지 않아 Gatekeeper를 거치지 않고 교체할 수 있다는 점을 이용한다. 배경은 [knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](./knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
 
 교체는 macOS 패키지 빌드에서만 동작한다. 개발 모드(`npm run dev`)에서는 교체 대상이 Electron.app이고, Windows와 Linux 빌드에는 받을 dmg가 없다. 두 경우 모두 릴리즈 페이지를 여는 버튼만 보여 준다.
 
