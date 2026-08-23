@@ -10,6 +10,7 @@ const api = {
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
 
   listRepos: () => ipcRenderer.invoke('repos:list'),
+  getRepoSizes: () => ipcRenderer.invoke('repos:sizes'),
   importRepo: () => ipcRenderer.invoke('repos:import'),
   removeRepo: (repoPath: string) => ipcRenderer.invoke('repos:remove', repoPath),
 

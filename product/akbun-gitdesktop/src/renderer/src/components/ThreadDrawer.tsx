@@ -13,6 +13,7 @@ export interface ThreadRef {
 interface Props {
   thread: ThreadRef
   onClose: () => void
+  width: number
 }
 
 function loadThread(thread: ThreadRef): ReturnType<typeof window.gitdesktop.getIssueDetail> {
@@ -39,7 +40,7 @@ function Labels({ labels }: { labels: string[] }): JSX.Element | null {
  * comments. Bodies are GitHub Markdown and are shown as the plain text they are,
  * because rendering them would mean pulling a Markdown parser into the app.
  */
-export default function ThreadDrawer({ thread, onClose }: Props): JSX.Element {
+export default function ThreadDrawer({ thread, onClose, width }: Props): JSX.Element {
   const [detail, setDetail] = useState<ThreadDetail | null>(null)
   const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -69,7 +70,7 @@ export default function ThreadDrawer({ thread, onClose }: Props): JSX.Element {
   const url = detail?.url ?? ''
 
   return (
-    <aside className="diff-drawer">
+    <aside className="diff-drawer" style={{ width }}>
       <div className="diff-drawer-header">
         <div className="diff-drawer-title">
           <strong title={detail?.title ?? thread.title}>{detail?.title ?? thread.title}</strong>

@@ -4,6 +4,7 @@ import BranchPanel from './components/BranchPanel'
 import DiffDrawer, { type DiffSource } from './components/DiffDrawer'
 import GraphView from './components/GraphView'
 import IssuePanel from './components/IssuePanel'
+import { ResizeAfterPanel, ResizeBeforePanel } from './components/PanelResizer'
 import PrPanel from './components/PrPanel'
 import ProjectPanel from './components/ProjectPanel'
 import RepoSidebar from './components/RepoSidebar'
@@ -12,6 +13,7 @@ import ThreadDrawer, { type ThreadRef } from './components/ThreadDrawer'
 import TopBar from './components/TopBar'
 import WorktreePanel from './components/WorktreePanel'
 import { useCliStatus } from './lib/useCliStatus'
+import { usePanelWidth } from './lib/usePanelWidth'
 import { useTheme } from './lib/useTheme'
 
 type Tab = 'graph' | 'branches' | 'prs' | 'issues' | 'projects'
@@ -24,6 +26,10 @@ const TAB_LABELS: Array<[Tab, string]> = [
   ['projects', 'Projects']
 ]
 
+const REPO_PANEL = { defaultWidth: 220, minWidth: 160, maxWidth: 420 }
+const WORKTREE_PANEL = { defaultWidth: 280, minWidth: 200, maxWidth: 520 }
+const DETAIL_PANEL = { defaultWidth: 560, minWidth: 320, maxWidth: 900 }
+
 /** The git tabs show a diff on the right, the GitHub tabs show an issue or a pull request. */
 function isGitTab(tab: Tab): boolean {
   return tab === 'graph' || tab === 'branches'
@@ -31,6 +37,7 @@ function isGitTab(tab: Tab): boolean {
 
 export default function App(): JSX.Element {
   const [repos, setRepos] = useState<RepoEntry[]>([])
+  const [repoSizes, setRepoSizes] = useState<Record<string, number | null>>({})
   const [selectedRepo, setSelectedRepo] = useState<RepoEntry | null>(null)
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([])
   const [selectedWorktree, setSelectedWorktree] = useState<WorktreeInfo | null>(null)
@@ -42,10 +49,35 @@ export default function App(): JSX.Element {
   const [defaultBranch, setDefaultBranch] = useState('HEAD')
   const [diffSource, setDiffSource] = useState<DiffSource | null>(null)
   const [thread, setThread] = useState<ThreadRef | null>(null)
+  const [repoPanelWidth, setRepoPanelWidth] = usePanelWidth(
+    'panel-width:repositories',
+    REPO_PANEL.defaultWidth,
+    REPO_PANEL.minWidth,
+    REPO_PANEL.maxWidth
+  )
+  const [worktreePanelWidth, setWorktreePanelWidth] = usePanelWidth(
+    'panel-width:worktrees',
+    WORKTREE_PANEL.defaultWidth,
+    WORKTREE_PANEL.minWidth,
+    WORKTREE_PANEL.maxWidth
+  )
+  const [detailPanelWidth, setDetailPanelWidth] = usePanelWidth(
+    'panel-width:details',
+    DETAIL_PANEL.defaultWidth,
+    DETAIL_PANEL.minWidth,
+    DETAIL_PANEL.maxWidth
+  )
   const theme = useTheme()
   const cli = useCliStatus()
   // The repository whose default branch lookup is still allowed to win.
   const pendingRepoPath = useRef('')
+
+  const refreshRepoSizes = useCallback(async () => {
+    const result = await window.gitdesktop.getRepoSizes()
+    if (result.ok) {
+      setRepoSizes(Object.fromEntries(result.data.map((entry) => [entry.path, entry.bytes])))
+    }
+  }, [])
 
   useEffect(() => {
     window.gitdesktop.listRepos().then((result) => {
@@ -57,7 +89,8 @@ export default function App(): JSX.Element {
     window.gitdesktop.getSettings().then((result) => {
       if (result.ok) setForceRemoveWorktree(result.data.forceRemoveWorktree)
     })
-  }, [])
+    refreshRepoSizes()
+  }, [refreshRepoSizes])
 
   const changeForceRemoveWorktree = useCallback(async (enabled: boolean) => {
     const result = await window.gitdesktop.setForceRemoveWorktree(enabled)
@@ -105,16 +138,18 @@ export default function App(): JSX.Element {
     if (result.ok) {
       setRepos(result.data)
       setError('')
+      refreshRepoSizes()
     } else {
       setError(result.error)
     }
-  }, [])
+  }, [refreshRepoSizes])
 
   const removeRepo = useCallback(
     async (repo: RepoEntry) => {
       const result = await window.gitdesktop.removeRepo(repo.path)
       if (result.ok) {
         setRepos(result.data)
+        refreshRepoSizes()
         if (selectedRepo?.path === repo.path) {
           pendingRepoPath.current = ''
           setSelectedRepo(null)
@@ -127,7 +162,7 @@ export default function App(): JSX.Element {
         setError(result.error)
       }
     },
-    [selectedRepo]
+    [refreshRepoSizes, selectedRepo]
   )
 
   const targetPath = selectedWorktree?.path ?? selectedRepo?.path ?? ''
@@ -195,9 +230,18 @@ export default function App(): JSX.Element {
         <RepoSidebar
           repos={repos}
           selectedRepo={selectedRepo}
+          repoSizes={repoSizes}
+          width={repoPanelWidth}
           onSelect={selectRepo}
           onImport={importRepo}
           onRemove={removeRepo}
+        />
+        <ResizeAfterPanel
+          label="Resize repository panel"
+          width={repoPanelWidth}
+          minWidth={REPO_PANEL.minWidth}
+          maxWidth={REPO_PANEL.maxWidth}
+          onChange={setRepoPanelWidth}
         />
         {selectedRepo ? (
           <>
@@ -206,9 +250,17 @@ export default function App(): JSX.Element {
               worktrees={worktrees}
               selectedWorktree={selectedWorktree}
               openerApps={openerApps}
+              width={worktreePanelWidth}
               onSelect={selectWorktree}
               onChanged={() => refreshWorktrees(selectedRepo)}
               onError={setError}
+            />
+            <ResizeAfterPanel
+              label="Resize worktree panel"
+              width={worktreePanelWidth}
+              minWidth={WORKTREE_PANEL.minWidth}
+              maxWidth={WORKTREE_PANEL.maxWidth}
+              onChange={setWorktreePanelWidth}
             />
             <main className="main-view">
               <nav className="tabs">
@@ -264,10 +316,36 @@ export default function App(): JSX.Element {
                   )}
                 </div>
                 {isGitTab(tab) && diffSource && (
-                  <DiffDrawer source={diffSource} onClose={() => setDiffSource(null)} />
+                  <>
+                    <ResizeBeforePanel
+                      label="Resize diff panel"
+                      width={detailPanelWidth}
+                      minWidth={DETAIL_PANEL.minWidth}
+                      maxWidth={DETAIL_PANEL.maxWidth}
+                      onChange={setDetailPanelWidth}
+                    />
+                    <DiffDrawer
+                      source={diffSource}
+                      width={detailPanelWidth}
+                      onClose={() => setDiffSource(null)}
+                    />
+                  </>
                 )}
                 {!isGitTab(tab) && thread && (
-                  <ThreadDrawer thread={thread} onClose={() => setThread(null)} />
+                  <>
+                    <ResizeBeforePanel
+                      label="Resize detail panel"
+                      width={detailPanelWidth}
+                      minWidth={DETAIL_PANEL.minWidth}
+                      maxWidth={DETAIL_PANEL.maxWidth}
+                      onChange={setDetailPanelWidth}
+                    />
+                    <ThreadDrawer
+                      thread={thread}
+                      width={detailPanelWidth}
+                      onClose={() => setThread(null)}
+                    />
+                  </>
                 )}
               </div>
             </main>
