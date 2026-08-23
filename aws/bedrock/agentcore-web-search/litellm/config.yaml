@@ -1,0 +1,20 @@
+model_list:
+  - model_name: openai-search-agent
+    litellm_params:
+      model: openai/os.environ/OPENAI_MODEL
+      api_key: os.environ/OPENAI_API_KEY
+
+search_tools:
+  - search_tool_name: agentcore-search
+    litellm_params:
+      search_provider: agentcore
+      api_base: os.environ/AGENTCORE_GATEWAY_URL
+
+litellm_settings:
+  callbacks: ["websearch_interception"]
+  websearch_interception_params:
+    enabled_providers: ["openai"]
+    search_tool_name: agentcore-search
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

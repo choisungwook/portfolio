@@ -104,6 +104,7 @@
 94. Web search tool 실행 위치 비교(Client, LiteLLM, Bedrock, vLLM) (26.8.17) - [링크](./computer_science/ai/web-search-tool/)
 95. LLM serving challenge와 essential optimization Chapter 5-6 핸즈온 (26.8.22) - [링크](./computer_science/ai/study-llmserving/ch5-6/)
 96. SearXNG 프로덕션 주의사항과 봇 탐지 핸즈온 (26.8.23) - [링크](./computer_science/ai/searxng-production/)
+97. Amazon Bedrock AgentCore Web Search 핸즈온 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/)
 
 ## 직접 만든 제품
 
