@@ -26,6 +26,7 @@ public enum CoreCommand: Encodable {
   case deleteWorkspace(workspace: UInt64)
   case readDirectory(path: String)
   case gitStatus(path: String)
+  case gitLog(path: String)
   case readFile(path: String)
   case writeFile(path: String, text: String)
   case themes
@@ -100,6 +101,9 @@ public enum CoreCommand: Encodable {
     case .gitStatus(let path):
       try container.encode("git_status", forKey: .type)
       try container.encode(path, forKey: .path)
+    case .gitLog(let path):
+      try container.encode("git_log", forKey: .type)
+      try container.encode(path, forKey: .path)
     case .readFile(let path):
       try container.encode("read_file", forKey: .type)
       try container.encode(path, forKey: .path)
@@ -160,6 +164,7 @@ public enum CoreResponse: Equatable, Sendable {
   case state(CoreTreeState)
   case entries([CoreEntry])
   case git(CoreGitStatus)
+  case gitLog(CoreGitLog)
   case file(text: String)
   case themes([CoreTheme])
   case shortcuts([CoreShortcut])
@@ -302,6 +307,41 @@ public struct CoreGitEntry: Decodable, Equatable, Sendable {
   }
 }
 
+/// Recent repository history in topological order. An empty commit list is a
+/// valid repository with no commits; `repository` false means there is no Git
+/// tree to draw for the chosen folder.
+public struct CoreGitLog: Decodable, Equatable, Sendable {
+  public let repository: Bool
+  public let commits: [CoreGitCommit]
+
+  public init(repository: Bool, commits: [CoreGitCommit]) {
+    self.repository = repository
+    self.commits = commits
+  }
+
+  public static let none = CoreGitLog(repository: false, commits: [])
+}
+
+public struct CoreGitCommit: Decodable, Equatable, Sendable {
+  public let hash: String
+  public let parents: [String]
+  public let author: String
+  public let date: String
+  public let refs: [String]
+  public let subject: String
+
+  public init(
+    hash: String, parents: [String], author: String, date: String, refs: [String], subject: String
+  ) {
+    self.hash = hash
+    self.parents = parents
+    self.author = author
+    self.date = date
+    self.refs = refs
+    self.subject = subject
+  }
+}
+
 public enum CoreFileStatus: String, Decodable, Equatable, Sendable {
   case conflicted
   case deleted
@@ -361,7 +401,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, themes
-    case statuses, url, status, shortcuts, matches
+    case statuses, url, status, shortcuts, matches, log
   }
 
   public init(from decoder: Decoder) throws {
@@ -379,6 +419,8 @@ extension CoreResponse: Decodable {
       self = .entries(try container.decode([CoreEntry].self, forKey: .entries))
     case "git":
       self = .git(try container.decode(CoreGitStatus.self, forKey: .status))
+    case "git_log":
+      self = .gitLog(try container.decode(CoreGitLog.self, forKey: .log))
     case "file":
       self = .file(text: try container.decode(String.self, forKey: .text))
     case "themes":

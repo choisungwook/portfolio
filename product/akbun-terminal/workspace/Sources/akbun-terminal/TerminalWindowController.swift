@@ -2,7 +2,7 @@ import AppKit
 import AkbunTerminalCore
 
 /// One window: the project tree on the left, the selected workspace's tabs in
-/// the middle, and that project's files on the right.
+/// the middle, and that project's files or Git history on the right.
 ///
 /// The sessions behind those tabs live in the core. What is kept here is the
 /// arrangement around them — which workspace is open, which tab is on screen and
@@ -217,10 +217,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       MainActor.assumeIsolated { self?.applyDetectedStatuses() }
     }
 
-    // What git makes of the files changes on the shell's clock, not on anyone
-    // clicking refresh, so it is asked for on its own timer. Slower than the
-    // judging above because it runs a process, and it only repaints: the tree
-    // itself is left alone, so nothing a reader opened closes underneath them.
+    // Git changes on the shell's clock, not on anyone clicking refresh, so it
+    // is asked for on its own timer. The file view only repaints its status;
+    // the Git view reloads its bounded history only while it is visible.
     watchGit = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
       MainActor.assumeIsolated { self?.browser.refreshGitStatus() }
     }

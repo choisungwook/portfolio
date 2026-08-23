@@ -1,6 +1,6 @@
 # akbun-terminal
 
-A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files on the right, and colours each workspace with what the CLI agent inside it is doing.
+A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files or Git history on the right, and colours each workspace with what the CLI agent inside it is doing.
 
 ## Directory
 
@@ -51,6 +51,7 @@ cargo test --manifest-path core/Cargo.toml
 - Lists the selected project's files on the right, hidden files and folders included, reading a folder when it is opened, with Reveal in Finder, Copy Path and a refresh.
 - Colours those names by what git makes of them when the project is a repository, with a closed folder wearing the strongest status of anything inside it, refreshed while the shell beside it works.
 - Tells a staged change from one that is only in the working tree: green for staged, orange for not, yellow for both, and a letter after the name for what the change was.
+- Switches the right pane from files to a SourceTree-style graph of the latest 200 commits across branches, remotes and tags, with refs, author, time and hash.
 - Opens any file in a tab beside the shells on one click and writes it back on save.
 - Delegates source highlighting to HighlighterSwift and Highlight.js instead of maintaining one lexer per language.
 - Turns the tab between icon-only View and Edit modes with Command E, using the selected theme's accent for the active icon.

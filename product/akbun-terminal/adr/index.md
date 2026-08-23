@@ -14,6 +14,7 @@
 | [Agent status comes from a screen and a process list](./2026-08-agent-status-from-a-screen-and-a-process.md) | Two layers, phrases as one JSON file per agent, finished as a transition that opening clears |
 | [The URL rule stays in the core](./2026-08-url-rule-in-the-core.md) | The view answers where the click landed, the core decides what may be opened |
 | [Git status is asked of git](./2026-08-git-status-in-the-file-browser.md) | Porcelain output read in the core, folders carrying the strongest status under them |
+| [Git history shares the file pane](./2026-08-git-history-shares-the-file-pane.md) | A bounded topological log from the core, drawn as switchable commit lanes in the shell |
 | [One palette dresses the whole window](./2026-08-one-palette-for-the-window.md) | A theme mixed once in the core and handed to every view, system appearance as one of them |
 | [A deleted row's id is never reused](./2026-08-deleting-a-row-never-reuses-its-id.md) | A high water mark in the state file, and the tabs and colour of a deleted workspace going with it |
 | [Shift and return sends escape return](./2026-08-shift-return-sends-escape-return.md) | The one keystroke this app encodes itself, decided in the core rather than in the view |

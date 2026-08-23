@@ -54,6 +54,8 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Opening a file.** A single click in the file pane opens a tab and asks the core only for text. View mode delegates source highlighting to HighlighterSwift and Highlight.js. Markdown Preview delegates parsing and rendering to bundled markdown-it, Highlight.js and Mermaid in a non-persistent WebKit view; raw document HTML is disabled. Command E swaps View and Edit, and Command S writes through `write_file`.
 
+**Opening the Git tree.** The right pane asks the core for a bounded, topologically ordered log across branches, remotes and tags. The shell assigns graph lanes to that ordered list and draws the commit lines beside refs, subject, author, time and short hash. A three-second refresh only reloads the Git view while it is visible.
+
 **Opening HTML.** HTML has no internal Render mode. `Open in Browser` is an independent action that hands the saved local file to the system browser. A dirty buffer first offers Save and Open, Open Saved Version or Cancel. The app never executes document JavaScript in its own process.
 
 **Clicking a Markdown link.** The preview cancels WebKit navigation. A relative file opens in an app tab, http and https go to the system browser, and every other scheme is ignored.
@@ -77,6 +79,7 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `rename_project`, `delete_project`, `rename_workspace`, `delete_workspace` | `state` | ids are never reused, and nothing on disk is touched |
 | `read_directory` | `entries` | one level, hidden entries included, links left as leaves |
 | `git_status` | `git` | what git makes of a folder, directories included; not being a repository is an answer |
+| `git_log` | `git_log` | latest 200 commits across branches, remotes and tags in topological order |
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
 | `themes` | `themes` | the known palettes as hex |
 | `load_rules` | `ok` | reads one JSON file per agent, seeding the shipped ones |
