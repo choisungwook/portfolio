@@ -5,6 +5,9 @@ const api = {
   checkCliTools: () => ipcRenderer.invoke('tools:check'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setTheme: (theme: ThemePreference) => ipcRenderer.invoke('settings:setTheme', theme),
+  setForceRemoveWorktree: (enabled: boolean) =>
+    ipcRenderer.invoke('settings:setForceRemoveWorktree', enabled),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
 
   listRepos: () => ipcRenderer.invoke('repos:list'),
   importRepo: () => ipcRenderer.invoke('repos:import'),
@@ -21,8 +24,8 @@ const api = {
     ipcRenderer.invoke('git:deleteBranch', repoPath, name, force),
   createWorktree: (repoPath: string, worktreePath: string, branch: string, createNewBranch: boolean) =>
     ipcRenderer.invoke('git:createWorktree', repoPath, worktreePath, branch, createNewBranch),
-  removeWorktree: (repoPath: string, worktreePath: string, force: boolean) =>
-    ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath, force),
+  removeWorktree: (repoPath: string, worktreePath: string) =>
+    ipcRenderer.invoke('git:removeWorktree', repoPath, worktreePath),
 
   getCommitFiles: (repoPath: string, hash: string) => ipcRenderer.invoke('git:commitFiles', repoPath, hash),
   getCommitDiff: (repoPath: string, hash: string, filePath: string) =>

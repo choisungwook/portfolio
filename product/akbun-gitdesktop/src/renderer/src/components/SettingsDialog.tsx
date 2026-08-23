@@ -6,6 +6,8 @@ interface Props {
   theme: ThemePreference
   resolvedTheme: ResolvedTheme
   onThemeChange: (theme: ThemePreference) => void
+  forceRemoveWorktree: boolean
+  onForceRemoveWorktreeChange: (enabled: boolean) => void
   status: CliStatus | null
   checking: boolean
   onRecheck: () => void
@@ -67,6 +69,8 @@ export default function SettingsDialog({
   theme,
   resolvedTheme,
   onThemeChange,
+  forceRemoveWorktree,
+  onForceRemoveWorktreeChange,
   status,
   checking,
   onRecheck,
@@ -106,6 +110,21 @@ export default function SettingsDialog({
               ? `Following the system setting, currently ${resolvedTheme}.`
               : `Always ${theme}, ignoring the system setting.`}
           </p>
+        </section>
+
+        <section className="modal-section">
+          <h3>Worktrees</h3>
+          <label className="setting-toggle">
+            <input
+              type="checkbox"
+              checked={forceRemoveWorktree}
+              onChange={(event) => onForceRemoveWorktreeChange(event.target.checked)}
+            />
+            <span>
+              <strong>Force worktree removal</strong>
+              <small>Use git worktree remove --force. A warning dialog is always shown first.</small>
+            </span>
+          </label>
         </section>
 
         <section className="modal-section">

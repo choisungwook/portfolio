@@ -38,6 +38,7 @@ export default function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('graph')
   const [error, setError] = useState<string>('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [forceRemoveWorktree, setForceRemoveWorktree] = useState(false)
   const [defaultBranch, setDefaultBranch] = useState('HEAD')
   const [diffSource, setDiffSource] = useState<DiffSource | null>(null)
   const [thread, setThread] = useState<ThreadRef | null>(null)
@@ -53,6 +54,19 @@ export default function App(): JSX.Element {
     window.gitdesktop.listOpenerApps().then((result) => {
       if (result.ok) setOpenerApps(result.data)
     })
+    window.gitdesktop.getSettings().then((result) => {
+      if (result.ok) setForceRemoveWorktree(result.data.forceRemoveWorktree)
+    })
+  }, [])
+
+  const changeForceRemoveWorktree = useCallback(async (enabled: boolean) => {
+    const result = await window.gitdesktop.setForceRemoveWorktree(enabled)
+    if (result.ok) {
+      setForceRemoveWorktree(result.data.forceRemoveWorktree)
+      setError('')
+    } else {
+      setError(result.error)
+    }
   }, [])
 
   const refreshWorktrees = useCallback(async (repo: RepoEntry) => {
@@ -170,7 +184,13 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-shell">
-      <TopBar status={cli.status} onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar
+        status={cli.status}
+        onImportRepo={importRepo}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onRecheckCli={cli.recheck}
+        onCheckForUpdates={() => window.gitdesktop.checkForUpdates()}
+      />
       <div className="app">
         <RepoSidebar
           repos={repos}
@@ -264,6 +284,8 @@ export default function App(): JSX.Element {
           theme={theme.preference}
           resolvedTheme={theme.resolved}
           onThemeChange={theme.setPreference}
+          forceRemoveWorktree={forceRemoveWorktree}
+          onForceRemoveWorktreeChange={changeForceRemoveWorktree}
           status={cli.status}
           checking={cli.checking}
           onRecheck={cli.recheck}

@@ -148,6 +148,7 @@ export type ThemePreference = 'system' | 'light' | 'dark'
 
 export interface AppSettings {
   theme: ThemePreference
+  forceRemoveWorktree: boolean
 }
 
 /** A single file touched by a commit or by a diff range. */

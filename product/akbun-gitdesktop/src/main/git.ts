@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import type {
   BranchInfo,
   CliStatus,
@@ -7,62 +6,42 @@ import type {
   FileChange,
   WorktreeInfo
 } from '../shared/types'
+import { probeCli, runCli } from './cli'
 
 const FIELD_SEP = '\x1f'
 const MAX_LOG_COUNT = 500
 const DEFAULT_BRANCH_CANDIDATES = ['main', 'master', 'develop']
 
 export function runGit(cwd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr.trim() || error.message))
-        return
-      }
-      resolve(stdout)
-    })
-  })
-}
-
-/** Runs a command anywhere and reports whether it succeeded, instead of throwing. */
-function probe(command: string, args: string[]): Promise<{ ok: boolean; output: string }> {
-  return new Promise((resolve) => {
-    execFile(command, args, (error, stdout, stderr) => {
-      resolve({ ok: !error, output: `${stdout}${stderr}`.trim() })
-    })
-  })
-}
-
-async function locate(command: string): Promise<string> {
-  const finder = process.platform === 'win32' ? 'where' : 'which'
-  const result = await probe(finder, [command])
-  return result.ok ? result.output.split('\n')[0].trim() : ''
+  return runCli(cwd, 'git', args)
 }
 
 async function inspectGit(): Promise<CliToolStatus> {
-  const version = await probe('git', ['--version'])
+  const version = await probeCli('git', ['--version'])
   return {
     id: 'git',
     label: 'git CLI',
     required: true,
     available: version.ok,
     version: version.ok ? version.output.split('\n')[0] : '',
-    path: version.ok ? await locate('git') : '',
+    path: version.path,
     authStatus: '',
     authenticated: false
   }
 }
 
 async function inspectGh(): Promise<CliToolStatus> {
-  const version = await probe('gh', ['--version'])
-  const auth = version.ok ? await probe('gh', ['auth', 'status']) : { ok: false, output: '' }
+  const version = await probeCli('gh', ['--version'])
+  const auth = version.ok
+    ? await probeCli('gh', ['auth', 'status'])
+    : { ok: false, output: '', path: '' }
   return {
     id: 'gh',
     label: 'gh CLI',
     required: false,
     available: version.ok,
     version: version.ok ? version.output.split('\n')[0] : '',
-    path: version.ok ? await locate('gh') : '',
+    path: version.path,
     authStatus: auth.output,
     authenticated: auth.ok
   }
@@ -219,7 +198,7 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
       { ref: `refs/remotes/origin/${candidate}`, name: `origin/${candidate}` }
     ]
     for (const { ref, name } of refs) {
-      const found = await probe('git', ['-C', repoPath, 'rev-parse', '--verify', '--quiet', ref])
+      const found = await probeCli('git', ['-C', repoPath, 'rev-parse', '--verify', '--quiet', ref])
       if (found.ok) return name
     }
   }
