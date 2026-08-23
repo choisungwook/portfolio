@@ -32,15 +32,9 @@ echo "$LAN_INTERFACE $LAN_IP"
 - 사설 IPv4 예시: `192.168.0.10`, `10.0.0.10`
 - DHCP로 주소가 바뀌면 새 주소로 접속
 
-### 2. LAN 주소에 service bind
+### 2. 모든 host interface에 service bind
 
-현재 shell에서 Compose bind 주소를 Ubuntu LAN IP로 제한함.
-
-```bash
-export LAN_BIND_ADDRESS="$LAN_IP"
-```
-
-관측 stack을 기동함.
+`LAN_BIND_ADDRESS`를 지정하지 않고 관측 stack을 기동함.
 
 ```bash
 make observability-up
@@ -53,9 +47,11 @@ docker compose ps
 make vllm-bf16
 ```
 
-- `LAN_BIND_ADDRESS` 미지정 시 `0.0.0.0`에 bind
-- 같은 shell에서 이후 `docker compose`와 `make` 명령 실행
-- 다른 shell에서는 `LAN_BIND_ADDRESS`를 다시 설정
+- 기본값 `0.0.0.0`: LAN IP와 `127.0.0.1`에서 모두 접속 가능
+- 기존 handson 문서와 script의 `127.0.0.1` 호출 유지
+- 로컬 전용 실행: `export LAN_BIND_ADDRESS=127.0.0.1`
+- 특정 interface 실행: `export LAN_BIND_ADDRESS="$LAN_IP"`
+- 특정 interface 실행 시 host의 health check도 `127.0.0.1` 대신 `$LAN_IP` 사용
 
 ### 3. Ubuntu에서 확인
 

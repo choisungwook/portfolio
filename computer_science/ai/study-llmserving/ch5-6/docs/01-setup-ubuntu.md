@@ -157,6 +157,8 @@ docker compose ps
 - Prometheus: `http://127.0.0.1:9090`
 - model endpoint: `http://127.0.0.1:8000`
 - dashboard: `LLM serving / LLM Serving Chapter 5-6`
+- 기본 bind: `0.0.0.0`, 같은 LAN에서도 접근 가능
+- 로컬 전용 bind: 실행 전에 `export LAN_BIND_ADDRESS=127.0.0.1`
 - 같은 Wi-Fi의 다른 기기에서 접속: [LAN endpoint 설정](./03-setup-lan-access.md)
 
 ### Compose profile
