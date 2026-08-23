@@ -74,10 +74,13 @@ final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
   }
 
   func refresh() {
-    log = root.map(core.gitLog) ?? .none
+    let next = root.map(core.gitLog) ?? .none
+    let changed = next != log
+    log = next
+    updateVisibility()
+    guard changed else { return }
     graph = GitGraph.layout(log.commits)
     table.reloadData()
-    updateVisibility()
   }
 
   private func updateVisibility() {
@@ -85,7 +88,7 @@ final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     if root == nil {
       message = "Choose a folder for this project to see its Git tree."
     } else if !log.repository {
-      message = "This folder is not a Git repository."
+      message = "Git history is unavailable for this folder."
     } else if log.commits.isEmpty {
       message = "This repository has no commits."
     } else {

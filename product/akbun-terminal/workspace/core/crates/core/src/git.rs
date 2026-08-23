@@ -184,27 +184,27 @@ pub fn log(path: &str) -> GitLog {
     if repository_root(path).is_none() {
         return GitLog::none();
     }
-    let Some(output) = run(
-        path,
-        &[
-            "log",
-            "HEAD",
-            "--branches",
-            "--remotes",
-            "--tags",
-            "--topo-order",
-            "--max-count=200",
-            "--date=format:%Y-%m-%d %H:%M",
-            "--pretty=format:%H%x1f%P%x1f%an%x1f%ad%x1f%D%x1f%s%x1e",
-        ],
-    ) else {
-        // `git log` exits non-zero for an unborn HEAD. `rev-parse` above has
-        // already established that this is a repository, so no commits is the
-        // useful answer.
-        return GitLog {
-            repository: true,
-            commits: Vec::new(),
-        };
+    let mut arguments = vec!["log"];
+    // A detached HEAD is not covered by any of the ref selectors below. Add it
+    // only when it names a commit: an unborn repository has no HEAD yet, and
+    // `git log --branches --remotes --tags` answers it successfully with no rows.
+    if run(path, &["rev-parse", "--verify", "HEAD^{commit}"]).is_some() {
+        arguments.push("HEAD");
+    }
+    arguments.extend([
+        "--branches",
+        "--remotes",
+        "--tags",
+        "--topo-order",
+        "--max-count=200",
+        "--date=format:%Y-%m-%d %H:%M",
+        "--pretty=format:%H%x1f%P%x1f%an%x1f%ad%x1f%D%x1f%s%x1e",
+    ]);
+    let Some(output) = run(path, &arguments) else {
+        // This is not the unborn case: that command succeeds with no rows.
+        // Corruption, permissions and every other failure make history
+        // unavailable rather than pretending that the repository is empty.
+        return GitLog::none();
     };
     GitLog {
         repository: true,
@@ -572,6 +572,20 @@ mod tests {
     fn a_folder_outside_a_repository_has_no_log() {
         let directory = temp_directory();
         let history = log(directory.to_str().unwrap());
+        assert!(!history.repository);
+        assert!(history.commits.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_broken_object_does_not_look_like_an_empty_repository() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        let head = run(path, &["rev-parse", "HEAD"]).unwrap();
+        let head = head.trim();
+        fs::remove_file(directory.join(".git/objects").join(&head[..2]).join(&head[2..])).unwrap();
+
+        let history = log(path);
         assert!(!history.repository);
         assert!(history.commits.is_empty());
         fs::remove_dir_all(directory).unwrap();
