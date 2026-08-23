@@ -22,12 +22,21 @@ test "$authorized_code" = "200"
 printf 'authentication: unauthenticated=%s authenticated=%s\n' "$unauthorized_code" "$authorized_code"
 
 printf 'upstreams:'
+first_upstream=""
+different_upstream=false
 i=1
 while [ "$i" -le 4 ]; do
   upstream=$(curl -sSI -u "$credentials" -A "$browser_user_agent" -H "Accept: text/html" "$base_url/" | awk -F': ' 'tolower($1) == "x-searxng-upstream" {gsub("\\r", "", $2); print $2}')
+  test -n "$upstream"
+  if [ -z "$first_upstream" ]; then
+    first_upstream="$upstream"
+  elif [ "$upstream" != "$first_upstream" ]; then
+    different_upstream=true
+  fi
   printf ' %s' "$upstream"
   i=$((i + 1))
 done
+test "$different_upstream" = true
 printf '\n'
 
 reset_limiter
@@ -35,6 +44,12 @@ printf 'api limiter:'
 i=1
 while [ "$i" -le 6 ]; do
   code=$(request_code -u "$credentials" -A "$browser_user_agent" -H "Accept: text/html" -H "Accept-Language: en-US,en;q=0.9" "$base_url/search?q=rate-limit&format=json&engines=mock%20success")
+  if [ "$i" -le 4 ]; then
+    expected_code=200
+  else
+    expected_code=429
+  fi
+  test "$code" = "$expected_code"
   printf ' %s' "$code"
   i=$((i + 1))
 done
