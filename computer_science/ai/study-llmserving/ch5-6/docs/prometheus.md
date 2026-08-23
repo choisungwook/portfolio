@@ -49,6 +49,7 @@ curl http://127.0.0.1:9400/metrics
 - Prometheus: `http://127.0.0.1:9090`
 - Grafana: `http://127.0.0.1:3000`
 - Grafana 계정: `admin` / `admin`
+- 같은 Wi-Fi의 다른 기기에서 접속: [LAN endpoint 설정](./03-setup-lan-access.md)
 
 ## Queue, prefill, decode를 먼저 분리합니다
 

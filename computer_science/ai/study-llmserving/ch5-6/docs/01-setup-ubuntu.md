@@ -157,6 +157,7 @@ docker compose ps
 - Prometheus: `http://127.0.0.1:9090`
 - model endpoint: `http://127.0.0.1:8000`
 - dashboard: `LLM serving / LLM Serving Chapter 5-6`
+- 같은 Wi-Fi의 다른 기기에서 접속: [LAN endpoint 설정](./03-setup-lan-access.md)
 
 ### Compose profile
 

@@ -22,7 +22,7 @@ x-vllm: &vllm
   <<: [*runtime, *gpu]
   ipc: host
   ports:
-    - "127.0.0.1:8000:8000"
+    - "${LAN_BIND_ADDRESS:-0.0.0.0}:8000:8000"
   networks:
     default:
       aliases:
@@ -115,7 +115,7 @@ services:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "127.0.0.1:9090:9090"
+      - "${LAN_BIND_ADDRESS:-0.0.0.0}:9090:9090"
 
   grafana:
     image: grafana/grafana:12.1.0
@@ -129,7 +129,7 @@ services:
       - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${LAN_BIND_ADDRESS:-0.0.0.0}:3000:3000"
 
   dcgm-exporter:
     image: nvidia/dcgm-exporter:4.8.3
@@ -138,7 +138,7 @@ services:
     cap_add:
       - SYS_ADMIN
     ports:
-      - "127.0.0.1:9400:9400"
+      - "${LAN_BIND_ADDRESS:-0.0.0.0}:9400:9400"
 
 volumes:
   hf-cache:
