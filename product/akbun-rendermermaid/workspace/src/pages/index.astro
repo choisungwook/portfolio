@@ -8,7 +8,7 @@ import '../styles/global.css';
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>akbun mermaid render</title>
-  <meta name="description" content="Write mermaid code on the left, see the diagram on the right. Zoom it, save it as PNG, open it large. Runs entirely in the browser.">
+  <meta name="description" content="Write mermaid code on the left, see the diagram on the right. Zoom it, save or copy it as PNG, open it large. Runs entirely in the browser.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Outfit:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -35,6 +35,7 @@ import '../styles/global.css';
         <button id="render" type="button" title="Render now (Ctrl/Cmd + Enter)">Render</button>
         <button id="refresh" class="ghost" type="button" title="Clear the preview and draw it again">Refresh</button>
         <button id="save-png" class="ghost" type="button" disabled>Save PNG</button>
+        <button id="copy-png" class="ghost" type="button" disabled>Copy PNG</button>
         <button id="large" class="ghost" type="button" disabled>Large view</button>
         <button id="dots" class="ghost" type="button" aria-pressed="true">Dots</button>
 

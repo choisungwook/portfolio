@@ -13,6 +13,7 @@ Deployed at [mermaid.akbun.com](https://mermaid.akbun.com).
 | Zoom | The preview zooms with its own buttons, with Ctrl or Cmd and +, - or 0, and with Ctrl or Cmd and the wheel. Fit re-fits it to the pane |
 | Errors | A failed parse leaves the last good diagram on screen and prints the mermaid message, with its line and caret, under the editor. Nothing flashes away while you are mid-edit |
 | Save PNG | Rasterizes the rendered SVG at 2x onto a white background and downloads it as `mermaid-<type>-<date>-<time>.png`. The export is the diagram's own size whatever the preview zoom is, and a diagram too wide for a canvas is exported at a lower scale instead of failing |
+| Copy PNG | Rasterizes the diagram through the same path as Save PNG and writes the image to the system clipboard |
 | Large view | Opens the diagram full screen, scaled to fill the window rather than left at its original size. Zoom with the buttons, +/-/0, or Ctrl and the wheel; drag to pan; Escape closes |
 | Dots | A 22 px dot grid behind the preview, for lining diagrams up by eye. It is a background of the pane, so it never appears in an exported PNG. The setting is remembered |
 | Restore | The code is kept in `localStorage`, so a reload or a closed tab does not lose the diagram |

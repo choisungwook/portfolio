@@ -47,7 +47,10 @@ The browser will rasterize an SVG for you, but only through an `<img>`, and the 
 2. Pin the pixel size and strip `max-width`, or the image draws at the clamped size and the PNG comes out small.
 3. Choose a scale. 2x by default, lowered when the long edge would pass 8192 px, which is the smallest canvas limit still in the field. A 7500 px flowchart exports at 1.08x rather than failing.
 4. Fill white first. PNG keeps transparency and a transparent diagram is unreadable anywhere dark.
-5. Draw, `toBlob`, download through an object URL.
+5. Draw and encode with `toBlob`.
+6. Download through an object URL or write the PNG blob with the Clipboard API.
+
+Save and Copy share this rasterization function, so the downloaded and copied images have the same scale, white background and canvas limit. Copy constructs the `ClipboardItem` before rasterization finishes and gives it the pending PNG blob. This keeps the write attached to the button click in browsers that enforce transient user activation.
 
 Two mermaid settings exist for this path alone: `htmlLabels: false`, because HTML labels are drawn inside a `foreignObject` that canvas renders as blank space, and a system font stack, because a webfont is not fetched while an SVG is being rasterized. Both make the preview slightly plainer so that the export matches it.
 
