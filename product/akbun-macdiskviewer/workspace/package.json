@@ -1,7 +1,7 @@
 {
   "name": "akbun-macdiskviewer",
-  "version": "0.1.0",
-  "description": "Tauri macOS disk and Git worktree storage viewer",
+  "version": "0.1.1",
+  "description": "Tauri macOS disk, Git repository, and worktree storage viewer",
   "author": "akbun",
   "license": "MIT",
   "scripts": {

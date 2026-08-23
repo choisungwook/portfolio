@@ -251,7 +251,7 @@ function renderWorktrees() {
   const sorted = sortWorktrees(filtered, elements.worktreeSort.value);
   elements.worktreeRows.replaceChildren(...sorted.map(worktreeRow));
   elements.worktreeEmpty.classList.toggle('hidden', sorted.length !== 0);
-  elements.worktreeResultCount.textContent = `${formatCount(sorted.length)} of ${formatCount(state.worktrees.length)} worktrees`;
+  elements.worktreeResultCount.textContent = `${formatCount(sorted.length)} of ${formatCount(state.worktrees.length)} Git directories`;
 }
 
 async function loadWorktrees() {
@@ -270,7 +270,7 @@ function showView(view) {
   elements.diskSearchBox.classList.toggle('hidden', worktrees);
   elements.diskNav.classList.toggle('active', !worktrees);
   elements.worktreeNav.classList.toggle('active', worktrees);
-  elements.viewTitle.textContent = worktrees ? 'Worktree storage' : 'Macintosh HD';
+  elements.viewTitle.textContent = worktrees ? 'Git storage' : 'Macintosh HD';
   if (worktrees) void loadWorktrees();
 }
 

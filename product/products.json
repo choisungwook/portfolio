@@ -1,11 +1,11 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-22",
+  "updated": "2026-08-23",
   "products": [
     {
       "id": "akbun-macdiskviewer",
       "name": "akbun-macdiskviewer",
-      "description": "macOS 전체 디스크와 AI Agent가 만든 Git worktree의 실제 용량을 낮은 부하로 추적하는 데스크톱 앱",
+      "description": "macOS 전체 디스크와 Git 저장소·AI Agent worktree의 실제 용량을 낮은 부하로 추적하는 데스크톱 앱",
       "kind": "desktop",
       "tags": ["tauri", "rust", "macos", "storage", "git-worktree"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-macdiskviewer",

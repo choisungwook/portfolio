@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow};
-use rusqlite::{Connection, params};
+use rusqlite::types::Value as SqlValue;
+use rusqlite::{Connection, params, params_from_iter};
 use serde_json::{Value, json};
 use std::env;
 use std::fs::{self, Metadata};
@@ -12,14 +13,17 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const SCAN_CANCELLED: &str = "SCAN_CANCELLED";
-const YIELD_EVERY: u64 = 200;
-const THROTTLE_MS: u64 = 8;
+const INSERT_BATCH_SIZE: usize = 1024;
 
 const SCHEMA: &str = r#"
-PRAGMA journal_mode = DELETE;
-PRAGMA synchronous = NORMAL;
+PRAGMA journal_mode = MEMORY;
+PRAGMA synchronous = OFF;
+PRAGMA temp_store = MEMORY;
+PRAGMA locking_mode = EXCLUSIVE;
+PRAGMA cache_size = -32768;
+PRAGMA threads = 2;
 CREATE TABLE entries (
-  path TEXT PRIMARY KEY,
+  path TEXT NOT NULL,
   parent_path TEXT,
   name TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -36,6 +40,10 @@ CREATE TABLE metadata (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+"#;
+
+const INDEX_SCHEMA: &str = r#"
+CREATE UNIQUE INDEX entries_path ON entries(path);
 CREATE INDEX entries_parent ON entries(parent_path);
 CREATE INDEX entries_size ON entries(size_bytes DESC);
 CREATE INDEX entries_modified ON entries(modified_ms DESC);
@@ -76,11 +84,11 @@ struct Aggregate {
     descendants: u64,
 }
 
-struct EntryRow<'a> {
-    path: &'a str,
-    parent_path: Option<&'a str>,
-    name: &'a str,
-    kind: &'a str,
+struct EntryRow {
+    path: String,
+    parent_path: Option<String>,
+    name: String,
+    kind: &'static str,
     size: u64,
     logical: u64,
     modified: i64,
@@ -91,9 +99,9 @@ struct Scanner<'a> {
     database: &'a Connection,
     control: Arc<Control>,
     counters: Counters,
-    since_yield: u64,
     last_progress: Instant,
     root: PathBuf,
+    pending_entries: Vec<EntryRow>,
 }
 
 impl<'a> Scanner<'a> {
@@ -102,30 +110,19 @@ impl<'a> Scanner<'a> {
             database,
             control,
             counters: Counters::default(),
-            since_yield: 0,
             last_progress: Instant::now() - Duration::from_millis(250),
             root,
+            pending_entries: Vec::with_capacity(INSERT_BATCH_SIZE),
         }
     }
 
     fn checkpoint(&mut self, current_path: &Path) -> Result<()> {
-        if self.control.cancelled.load(Ordering::Relaxed) {
+        if wait_for_control(&self.control) {
             return Err(anyhow!(SCAN_CANCELLED));
         }
-        while self.control.paused.load(Ordering::Relaxed) {
-            if self.control.cancelled.load(Ordering::Relaxed) {
-                return Err(anyhow!(SCAN_CANCELLED));
-            }
-            thread::sleep(Duration::from_millis(50));
-        }
-        self.since_yield += 1;
         if self.last_progress.elapsed() >= Duration::from_millis(250) {
             emit(json!({ "type": "progress", "progress": self.counters.json(current_path) }));
             self.last_progress = Instant::now();
-        }
-        if self.since_yield >= YIELD_EVERY {
-            self.since_yield = 0;
-            thread::sleep(Duration::from_millis(THROTTLE_MS));
         }
         Ok(())
     }
@@ -149,16 +146,16 @@ impl<'a> Scanner<'a> {
                 .file_name()
                 .map_or_else(String::new, |value| value.to_string_lossy().into_owned())
         };
-        let path_text = entry_path.to_string_lossy();
+        let path_text = entry_path.to_string_lossy().into_owned();
         let parent_text = parent_path.map(|value| value.to_string_lossy().into_owned());
         let logical = metadata.len();
         let modified = modified_ms(&metadata);
 
         if metadata.file_type().is_symlink() {
             self.insert_entry(EntryRow {
-                path: &path_text,
-                parent_path: parent_text.as_deref(),
-                name: &name,
+                path: path_text,
+                parent_path: parent_text,
+                name,
                 kind: "link",
                 size: 0,
                 logical,
@@ -175,9 +172,9 @@ impl<'a> Scanner<'a> {
         if !metadata.is_dir() {
             let size = allocated_bytes(&metadata);
             self.insert_entry(EntryRow {
-                path: &path_text,
-                parent_path: parent_text.as_deref(),
-                name: &name,
+                path: path_text,
+                parent_path: parent_text,
+                name,
                 kind: "file",
                 size,
                 logical,
@@ -222,9 +219,9 @@ impl<'a> Scanner<'a> {
             Err(error) => self.record_issue(entry_path, &error),
         }
         self.insert_entry(EntryRow {
-            path: &path_text,
-            parent_path: parent_text.as_deref(),
-            name: &name,
+            path: path_text,
+            parent_path: parent_text,
+            name,
             kind: "directory",
             size: aggregate.size,
             logical: aggregate.logical,
@@ -236,22 +233,40 @@ impl<'a> Scanner<'a> {
         Ok(aggregate)
     }
 
-    fn insert_entry(&mut self, entry: EntryRow<'_>) -> Result<()> {
-        let mut statement = self.database.prepare_cached(
+    fn insert_entry(&mut self, entry: EntryRow) -> Result<()> {
+        self.pending_entries.push(entry);
+        if self.pending_entries.len() >= INSERT_BATCH_SIZE {
+            self.flush_entries()?;
+        }
+        Ok(())
+    }
+
+    fn flush_entries(&mut self) -> Result<()> {
+        if self.pending_entries.is_empty() {
+            return Ok(());
+        }
+        let placeholders =
+            std::iter::repeat_n("(?, ?, ?, ?, ?, ?, ?, ?)", self.pending_entries.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+        let sql = format!(
             "INSERT INTO entries
-        (path, parent_path, name, kind, size_bytes, logical_bytes, modified_ms, descendants)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        )?;
-        statement.execute(params![
-            entry.path,
-            entry.parent_path,
-            entry.name,
-            entry.kind,
-            as_i64(entry.size),
-            as_i64(entry.logical),
-            entry.modified,
-            as_i64(entry.descendants)
-        ])?;
+       (path, parent_path, name, kind, size_bytes, logical_bytes, modified_ms, descendants)
+       VALUES {placeholders}"
+        );
+        let mut values = Vec::with_capacity(self.pending_entries.len() * 8);
+        for entry in self.pending_entries.drain(..) {
+            values.push(SqlValue::Text(entry.path));
+            values.push(entry.parent_path.map_or(SqlValue::Null, SqlValue::Text));
+            values.push(SqlValue::Text(entry.name));
+            values.push(SqlValue::Text(entry.kind.into()));
+            values.push(SqlValue::Integer(as_i64(entry.size)));
+            values.push(SqlValue::Integer(as_i64(entry.logical)));
+            values.push(SqlValue::Integer(entry.modified));
+            values.push(SqlValue::Integer(as_i64(entry.descendants)));
+        }
+        self.database
+            .execute(&sql, params_from_iter(values.iter()))?;
         Ok(())
     }
 
@@ -275,31 +290,63 @@ fn scan_disk(root: &Path, database_path: &Path, control: Arc<Control>) -> Result
         .with_context(|| format!("cannot open {}", database_path.display()))?;
     database.execute_batch(SCHEMA)?;
     database.execute_batch("BEGIN")?;
-    let mut scanner = Scanner::new(&database, control, root.to_path_buf());
-    let result = scanner.visit(root, None);
+    let mut scanner = Scanner::new(&database, control.clone(), root.to_path_buf());
+    let result = (|| -> Result<()> {
+        scanner.visit(root, None)?;
+        scanner.flush_entries()?;
+        create_indexes(&database, control.clone())?;
+        let completed_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let hostname = env::var("HOSTNAME").unwrap_or_default();
+        for (key, value) in [
+            ("rootPath", root.to_string_lossy().into_owned()),
+            ("completedAt", completed_at.to_string()),
+            ("hostname", hostname),
+            ("issues", scanner.counters.issues.to_string()),
+        ] {
+            database.execute(
+                "INSERT INTO metadata (key, value) VALUES (?, ?)",
+                params![key, value],
+            )?;
+        }
+        database.execute_batch("COMMIT")?;
+        Ok(())
+    })();
     if let Err(error) = result {
         let _ = database.execute_batch("ROLLBACK");
+        if control.cancelled.load(Ordering::Relaxed) {
+            return Err(anyhow!(SCAN_CANCELLED));
+        }
         return Err(error);
     }
-    let completed_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let hostname = env::var("HOSTNAME").unwrap_or_default();
-    for (key, value) in [
-        ("rootPath", root.to_string_lossy().into_owned()),
-        ("completedAt", completed_at.to_string()),
-        ("hostname", hostname),
-        ("issues", scanner.counters.issues.to_string()),
-    ] {
-        database.execute(
-            "INSERT INTO metadata (key, value) VALUES (?, ?)",
-            params![key, value],
-        )?;
-    }
-    database.execute_batch("COMMIT")?;
     emit(json!({ "type": "progress", "progress": scanner.counters.json(root) }));
     Ok(scanner.counters)
+}
+
+fn create_indexes(database: &Connection, control: Arc<Control>) -> Result<()> {
+    if wait_for_control(&control) {
+        return Err(anyhow!(SCAN_CANCELLED));
+    }
+    let handler_control = control.clone();
+    database.progress_handler(1000, Some(move || wait_for_control(&handler_control)))?;
+    let result = database.execute_batch(INDEX_SCHEMA);
+    database.progress_handler(0, None::<fn() -> bool>)?;
+    if control.cancelled.load(Ordering::Relaxed) {
+        return Err(anyhow!(SCAN_CANCELLED));
+    }
+    result.map_err(Into::into)
+}
+
+fn wait_for_control(control: &Control) -> bool {
+    while control.paused.load(Ordering::Relaxed) {
+        if control.cancelled.load(Ordering::Relaxed) {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    control.cancelled.load(Ordering::Relaxed)
 }
 
 fn listen_for_control(control: Arc<Control>) {
@@ -496,6 +543,37 @@ mod tests {
             .unwrap();
         assert_eq!(metadata_root, root_path);
         assert_eq!(metadata_issues, "0");
+        let indexes: i64 = database
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_index_list('entries')
+         WHERE name IN ('entries_path', 'entries_parent', 'entries_size', 'entries_modified')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexes, 4);
+        drop(database);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn writes_complete_batches_and_the_final_partial_batch() {
+        let directory = temp_directory();
+        let root = directory.join("root");
+        let database_path = directory.join("scan.sqlite");
+        fs::create_dir_all(&root).unwrap();
+        for index in 0..=INSERT_BATCH_SIZE {
+            fs::write(root.join(format!("file-{index}")), b"x").unwrap();
+        }
+
+        let counters = scan_disk(&root, &database_path, Arc::new(Control::default())).unwrap();
+        assert_eq!(counters.entries, INSERT_BATCH_SIZE as u64 + 2);
+
+        let database = Connection::open(&database_path).unwrap();
+        let entries: i64 = database
+            .query_row("SELECT COUNT(*) FROM entries", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(entries, INSERT_BATCH_SIZE as i64 + 2);
         drop(database);
         fs::remove_dir_all(directory).unwrap();
     }
@@ -524,6 +602,25 @@ mod tests {
         assert_eq!(metadata, 0);
         drop(database);
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn cancellation_skips_deferred_index_creation() {
+        let database = Connection::open_in_memory().unwrap();
+        database.execute_batch(SCHEMA).unwrap();
+        let control = Arc::new(Control::default());
+        control.cancelled.store(true, Ordering::Relaxed);
+
+        let error = create_indexes(&database, control).unwrap_err();
+        assert_eq!(error.to_string(), SCAN_CANCELLED);
+        let indexes: i64 = database
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_index_list('entries')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexes, 0);
     }
 
     #[test]
