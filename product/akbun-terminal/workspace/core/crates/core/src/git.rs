@@ -123,6 +123,31 @@ pub struct GitStatus {
     pub entries: Vec<GitEntry>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitCommit {
+    pub hash: String,
+    pub parents: Vec<String>,
+    pub author: String,
+    pub date: String,
+    pub refs: Vec<String>,
+    pub subject: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitLog {
+    pub repository: bool,
+    pub commits: Vec<GitCommit>,
+}
+
+impl GitLog {
+    fn none() -> Self {
+        Self {
+            repository: false,
+            commits: Vec::new(),
+        }
+    }
+}
+
 impl GitStatus {
     fn none() -> Self {
         Self {
@@ -149,6 +174,69 @@ pub fn status(path: &str) -> GitStatus {
         repository: true,
         entries: entries(&root, &porcelain),
     }
+}
+
+/// The recent branch, remote and tag history in topological order.
+///
+/// A bounded answer keeps the panel quick in repositories with a long history.
+/// An unborn repository is still a repository; it returns an empty commit list.
+pub fn log(path: &str) -> GitLog {
+    if repository_root(path).is_none() {
+        return GitLog::none();
+    }
+    let Some(output) = run(
+        path,
+        &[
+            "log",
+            "HEAD",
+            "--branches",
+            "--remotes",
+            "--tags",
+            "--topo-order",
+            "--max-count=200",
+            "--date=format:%Y-%m-%d %H:%M",
+            "--pretty=format:%H%x1f%P%x1f%an%x1f%ad%x1f%D%x1f%s%x1e",
+        ],
+    ) else {
+        // `git log` exits non-zero for an unborn HEAD. `rev-parse` above has
+        // already established that this is a repository, so no commits is the
+        // useful answer.
+        return GitLog {
+            repository: true,
+            commits: Vec::new(),
+        };
+    };
+    GitLog {
+        repository: true,
+        commits: parse_log(&output),
+    }
+}
+
+fn parse_log(output: &str) -> Vec<GitCommit> {
+    output
+        .split('\u{1e}')
+        .filter_map(|record| {
+            let fields: Vec<&str> = record.trim_matches(['\n', '\r']).split('\u{1f}').collect();
+            if fields.len() != 6 || fields[0].is_empty() {
+                return None;
+            }
+            Some(GitCommit {
+                hash: fields[0].to_string(),
+                parents: fields[1]
+                    .split_whitespace()
+                    .map(str::to_string)
+                    .collect(),
+                author: fields[2].to_string(),
+                date: fields[3].to_string(),
+                refs: fields[4]
+                    .split(", ")
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_string)
+                    .collect(),
+                subject: fields[5].to_string(),
+            })
+        })
+        .collect()
 }
 
 /// The repository root, spelled the way the caller spells `path`.
@@ -433,6 +521,60 @@ mod tests {
         assert_eq!(Stage::of(" M"), Stage::Unstaged);
         assert_eq!(Stage::of("AM"), Stage::Both);
         assert_eq!(Stage::of("UU"), Stage::Both);
+    }
+
+    #[test]
+    fn reads_commits_and_refs_in_topological_order() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        run(path, &["tag", "first-release"]).unwrap();
+        fs::write(directory.join("kept.txt"), "two\n").unwrap();
+        run(path, &["add", "kept.txt"]).unwrap();
+        run(path, &["commit", "-m", "second"]).unwrap();
+
+        let history = log(path);
+        assert!(history.repository);
+        assert_eq!(history.commits.len(), 2);
+        assert_eq!(history.commits[0].subject, "second");
+        assert_eq!(history.commits[0].parents, vec![history.commits[1].hash.clone()]);
+        assert!(history.commits[1].refs.iter().any(|name| name == "tag: first-release"));
+        assert_eq!(history.commits[0].author, "Test");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_unborn_repository_has_an_empty_log() {
+        let directory = temp_directory();
+        let path = directory.to_str().unwrap();
+        run(path, &["init", "--initial-branch=main"]).unwrap();
+
+        let history = log(path);
+        assert!(history.repository);
+        assert!(history.commits.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_detached_head_is_in_the_log() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        run(path, &["checkout", "--detach"]).unwrap();
+        fs::write(directory.join("kept.txt"), "detached\n").unwrap();
+        run(path, &["add", "kept.txt"]).unwrap();
+        run(path, &["commit", "-m", "detached work"]).unwrap();
+
+        let history = log(path);
+        assert_eq!(history.commits.first().map(|commit| commit.subject.as_str()), Some("detached work"));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_folder_outside_a_repository_has_no_log() {
+        let directory = temp_directory();
+        let history = log(directory.to_str().unwrap());
+        assert!(!history.repository);
+        assert!(history.commits.is_empty());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

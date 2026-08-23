@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::browse::Entry;
-use crate::git::GitStatus;
+use crate::git::{GitLog, GitStatus};
 use crate::search::Match;
 use crate::shortcuts::Shortcut;
 use crate::theme::Theme;
@@ -96,6 +96,11 @@ pub enum Command {
     GitStatus {
         path: String,
     },
+    /// Recent commits across local branches, remotes and tags, in topological
+    /// order. A non-repository and an unborn repository are distinct answers.
+    GitLog {
+        path: String,
+    },
     WriteFile {
         path: String,
         text: String,
@@ -159,6 +164,7 @@ pub enum Response {
     State { state: TreeState },
     Entries { entries: Vec<Entry> },
     Git { status: GitStatus },
+    GitLog { log: GitLog },
     File { text: String },
     Themes { themes: Vec<Theme> },
     Shortcuts { shortcuts: Vec<Shortcut> },
@@ -352,6 +358,30 @@ mod tests {
         );
         let json = r#"{"v":2,"command":{"type":"git_status","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
+    }
+
+    #[test]
+    fn git_log_keeps_its_wire_names() {
+        let response = serde_json::to_string(&Response::GitLog {
+            log: GitLog {
+                repository: true,
+                commits: vec![crate::git::GitCommit {
+                    hash: "abc".to_string(),
+                    parents: vec!["def".to_string()],
+                    author: "A".to_string(),
+                    date: "2026-08-23 10:00".to_string(),
+                    refs: vec!["HEAD -> main".to_string()],
+                    subject: "message".to_string(),
+                }],
+            },
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"git_log","log":{"repository":true,"commits":[{"hash":"abc","parents":["def"],"author":"A","date":"2026-08-23 10:00","refs":["HEAD -> main"],"subject":"message"}]}}"#
+        );
+        let json = r#"{"v":2,"command":{"type":"git_log","path":"/tmp"}}"#;
+        assert!(matches!(parse_request(json), Ok(Command::GitLog { .. })));
     }
 
     #[test]

@@ -111,6 +111,16 @@ public final class CoreBridge {
     return status
   }
 
+  /// Recent history for the Git panel. Like status, absence is ordinary: an
+  /// empty project or a machine without git still leaves the rest of the app
+  /// usable.
+  public func gitLog(in directory: String) -> CoreGitLog {
+    guard case .gitLog(let log) = try? send(.gitLog(path: directory)) else {
+      return .none
+    }
+    return log
+  }
+
   public func text(ofFile path: String) throws -> String {
     let response = try send(.readFile(path: path))
     switch response {

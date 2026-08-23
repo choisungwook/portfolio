@@ -1,7 +1,7 @@
 import AppKit
 import AkbunTerminalCore
 
-/// The project's files, on the right of the window.
+/// The project's files and Git history, on the right of the window.
 ///
 /// An outline view is used because opening a row is exactly when its contents
 /// should be read, and that is the moment `numberOfChildrenOfItem` is called.
@@ -33,10 +33,14 @@ final class FileBrowserView: NSView {
 
   private let core: CoreBridge
   private let outline = NSOutlineView()
+  private let fileScroll = NSScrollView()
+  private let gitTree: GitTreeView
+  private let mode = NSButton()
   private let title = NSTextField(labelWithString: "Files")
   private let empty = NSTextField(
     wrappingLabelWithString: "Choose a folder for this project to see its files.")
   private var root: String?
+  private var showsGit = false
   /// What git said the last time it was asked, by absolute path. Empty for a
   /// project that is not in a repository, which draws every name plainly.
   private var git: [String: CoreGitEntry] = [:]
@@ -67,6 +71,7 @@ final class FileBrowserView: NSView {
 
   init(core: CoreBridge) {
     self.core = core
+    self.gitTree = GitTreeView(core: core)
     super.init(frame: .zero)
     setUp()
   }
@@ -83,7 +88,14 @@ final class FileBrowserView: NSView {
       target: self, action: #selector(refresh))
     refresh.bezelStyle = .accessoryBarAction
     refresh.toolTip = "Refresh"
-    let header = NSStackView(views: [title, NSView(), refresh])
+    mode.title = "Git"
+    mode.image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "Show Git Tree")
+    mode.imagePosition = .imageLeading
+    mode.target = self
+    mode.action = #selector(selectPanelMode)
+    mode.bezelStyle = .accessoryBarAction
+    mode.toolTip = "Show Git Tree"
+    let header = NSStackView(views: [title, NSView(), mode, refresh])
     header.orientation = .horizontal
     header.alignment = .centerY
     header.translatesAutoresizingMaskIntoConstraints = false
@@ -105,31 +117,37 @@ final class FileBrowserView: NSView {
     outline.menu = rowMenu()
     outline.backgroundColor = .clear
 
-    let scroll = NSScrollView()
-    scroll.documentView = outline
-    scroll.hasVerticalScroller = true
-    scroll.drawsBackground = false
-    scroll.translatesAutoresizingMaskIntoConstraints = false
+    fileScroll.documentView = outline
+    fileScroll.hasVerticalScroller = true
+    fileScroll.drawsBackground = false
+    fileScroll.translatesAutoresizingMaskIntoConstraints = false
+    gitTree.translatesAutoresizingMaskIntoConstraints = false
 
     empty.translatesAutoresizingMaskIntoConstraints = false
     applyZoom()
     applyPalette()
 
     addSubview(header)
-    addSubview(scroll)
+    addSubview(fileScroll)
+    addSubview(gitTree)
     addSubview(empty)
     NSLayoutConstraint.activate([
       header.topAnchor.constraint(equalTo: topAnchor, constant: 12),
       header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
       header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-      scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
-      scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
-      scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
-      scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+      fileScroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+      fileScroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+      fileScroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+      fileScroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+      gitTree.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+      gitTree.leadingAnchor.constraint(equalTo: leadingAnchor),
+      gitTree.trailingAnchor.constraint(equalTo: trailingAnchor),
+      gitTree.bottomAnchor.constraint(equalTo: bottomAnchor),
       empty.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 14),
       empty.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
       empty.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
     ])
+    showMode()
   }
 
   /// Row heights and indentation are set here rather than left to the outline
@@ -141,6 +159,7 @@ final class FileBrowserView: NSView {
     outline.rowHeight = CGFloat(zoom.size(18))
     outline.indentationPerLevel = CGFloat(zoom.size(13))
     outline.reloadData()
+    gitTree.zoom = zoom
   }
 
   private func applyPalette() {
@@ -148,6 +167,7 @@ final class FileBrowserView: NSView {
     title.textColor = palette.text
     empty.textColor = palette.secondaryText
     outline.reloadData()
+    gitTree.palette = palette
   }
 
   /// Points the browser at a project. A project with no folder shows the notice
@@ -161,13 +181,39 @@ final class FileBrowserView: NSView {
   private func reload() {
     readGitStatus()
     roots = root.map(read) ?? []
-    empty.isHidden = root != nil
-    outline.enclosingScrollView?.isHidden = root == nil
     outline.reloadData()
+    if showsGit {
+      gitTree.show(root: root)
+    }
+    showMode()
   }
 
   @objc private func refresh() {
-    reload()
+    if showsGit {
+      gitTree.refresh()
+    } else {
+      reload()
+    }
+  }
+
+  @objc private func selectPanelMode() {
+    showsGit.toggle()
+    let symbol = showsGit ? "folder" : "list.bullet"
+    let help = showsGit ? "Show Files" : "Show Git Tree"
+    mode.title = showsGit ? "Files" : "Git"
+    mode.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)
+    mode.toolTip = help
+    if showsGit {
+      gitTree.show(root: root)
+    }
+    showMode()
+  }
+
+  private func showMode() {
+    let files = !showsGit
+    fileScroll.isHidden = !files || root == nil
+    empty.isHidden = !files || root != nil
+    gitTree.isHidden = files
   }
 
   /// Asks git again and repaints, without reading a single directory.
@@ -179,8 +225,12 @@ final class FileBrowserView: NSView {
   func refreshGitStatus() {
     let before = git
     readGitStatus()
-    guard git != before else { return }
-    outline.reloadData()
+    if git != before {
+      outline.reloadData()
+    }
+    if !gitTree.isHidden {
+      gitTree.refresh()
+    }
   }
 
   private func readGitStatus() {

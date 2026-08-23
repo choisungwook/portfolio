@@ -171,6 +171,23 @@ struct ProtocolTests {
     #expect(status.byPath["/p/half.txt"]?.stage == .both)
   }
 
+  @Test func readsTheGitTree() throws {
+    #expect(
+      try json(.gitLog(path: "/p"))
+        == #"{"command":{"path":"\/p","type":"git_log"},"v":2}"#)
+    let json = #"{"type":"git_log","log":{"repository":true,"commits":[{"hash":"abc","parents":["def"],"author":"A","date":"2026-08-23 10:00","refs":["HEAD -> main"],"subject":"message"}]}}"#
+    guard case .gitLog(let log) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(json.utf8))
+    else {
+      Issue.record("expected a git log")
+      return
+    }
+    #expect(log.repository)
+    #expect(log.commits.first?.hash == "abc")
+    #expect(log.commits.first?.parents == ["def"])
+    #expect(log.commits.first?.refs == ["HEAD -> main"])
+  }
+
   @Test func aThemeDressesEverySurfaceInTheWindow() throws {
     // The mixing is here rather than in the views, so it is checked here too.
     let dark = try theme(background: "#1e1e2e", foreground: "#cdd6f4", blue: "#89b4fa")

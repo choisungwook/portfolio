@@ -124,6 +124,9 @@ impl App {
             Command::GitStatus { path } => Response::Git {
                 status: crate::git::status(&path),
             },
+            Command::GitLog { path } => Response::GitLog {
+                log: crate::git::log(&path),
+            },
             Command::ReadFile { path } => match crate::browse::read_file(&path) {
                 Ok(text) => Response::File { text },
                 Err(message) => Response::Error { message },
