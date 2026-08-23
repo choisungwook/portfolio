@@ -21,8 +21,8 @@ const api = {
 
   createBranch: (repoPath: string, name: string, startPoint: string) =>
     ipcRenderer.invoke('git:createBranch', repoPath, name, startPoint),
-  deleteBranch: (repoPath: string, name: string, force: boolean) =>
-    ipcRenderer.invoke('git:deleteBranch', repoPath, name, force),
+  deleteBranches: (repoPath: string, names: string[], force: boolean) =>
+    ipcRenderer.invoke('git:deleteBranches', repoPath, names, force),
   createWorktree: (repoPath: string, worktreePath: string, branch: string, createNewBranch: boolean) =>
     ipcRenderer.invoke('git:createWorktree', repoPath, worktreePath, branch, createNewBranch),
   removeWorktree: (repoPath: string, worktreePath: string) =>

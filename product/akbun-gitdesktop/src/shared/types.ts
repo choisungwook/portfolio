@@ -25,6 +25,17 @@ export interface BranchInfo {
   isRemote: boolean
 }
 
+export interface BranchDeletionFailure {
+  name: string
+  error: string
+}
+
+export interface BranchDeletionResult {
+  deleted: string[]
+  unmerged: string[]
+  failed: BranchDeletionFailure[]
+}
+
 export interface WorktreeInfo {
   path: string
   head: string
