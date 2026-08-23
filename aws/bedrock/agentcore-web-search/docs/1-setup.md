@@ -45,7 +45,7 @@ aws sts get-caller-identity --profile "$AWS_PROFILE" --region us-east-1
 cp .env.example .env
 ```
 
-`.env`와 AWS 임시 자격 증명을 담는 `.runtime.env`는 Git에서 제외됩니다. 파일 내용은 로그나 이슈에 남기지 않습니다.
+`.env`, `.runtime.env`, `.runtime.aws-credentials`는 Git에서 제외됩니다. 파일 내용은 로그나 이슈에 남기지 않습니다.
 
 ## AgentCore 구성 범위
 
@@ -66,9 +66,33 @@ Bedrock 내장 Web Search는 이 단계가 필요 없습니다. AgentCore 리소
 set -a
 source .env
 set +a
-uv sync
 ./scripts/create-agentcore-resources.sh
+docker compose pull
 docker compose up -d --wait
+```
+
+`scripts/export-runtime-env.sh`는 다음 파일을 만듭니다.
+
+- `.runtime.env`: AgentCore Gateway URL과 AWS 리전
+- `.runtime.aws-credentials`: `aws login`의 임시 자격 증명
+
+LiteLLM은 `.runtime.aws-credentials`를 읽기 전용으로 마운트합니다.
+
+## AWS 로그인 갱신
+
+AWS 로그인 세션이 만료되면 로그인하고 임시 자격 증명 파일을 교체합니다. LiteLLM을 재시작해 AWS SDK의 자격 증명 캐시를 비웁니다.
+
+```bash
+export AWS_PROFILE=default
+aws login --profile "$AWS_PROFILE" --region us-east-1
+./scripts/export-runtime-env.sh
+docker compose restart litellm
+```
+
+AgentCore Gateway를 다시 만들어 URL이 바뀐 경우에는 `.runtime.env`를 다시 읽도록 LiteLLM을 재생성합니다.
+
+```bash
+docker compose up -d --force-recreate litellm
 ```
 
 ## AgentCore 정리
