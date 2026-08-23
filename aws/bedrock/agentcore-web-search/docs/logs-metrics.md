@@ -1,18 +1,30 @@
 # 로그와 메트릭
 
-Terraform이 Gateway APPLICATION_LOGS를 CloudWatch Logs로 전송합니다. 로그 보존 기간의 기본값은 7일입니다.
+AWS CLI 생성 스크립트가 Gateway APPLICATION_LOGS를 CloudWatch Logs로 전송합니다. 로그 보존 기간은 7일입니다.
 
 ## 로그 확인
 
 ```bash
-log_group="$(terraform -chdir=terraform output -raw log_group_name)"
-aws logs tail "$log_group" --region us-east-1 --since 10m
+gateway_id="$(aws bedrock-agentcore-control list-gateways \
+  --profile "$AWS_PROFILE" \
+  --region us-east-1 \
+  --query "items[?name=='agentcore-web-search-handson'].gatewayId | [0]" \
+  --output text)"
+log_group="/aws/vendedlogs/bedrock-agentcore/gateway/APPLICATION_LOGS/$gateway_id"
+aws logs tail "$log_group" \
+  --profile "$AWS_PROFILE" \
+  --region us-east-1 \
+  --since 10m
 ```
 
 지속해서 확인할 때만 `--follow`를 추가합니다.
 
 ```bash
-aws logs tail "$log_group" --region us-east-1 --since 10m --follow
+aws logs tail "$log_group" \
+  --profile "$AWS_PROFILE" \
+  --region us-east-1 \
+  --since 10m \
+  --follow
 ```
 
 Gateway 로그에서 확인할 항목입니다.

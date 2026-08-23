@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+aws_region="us-east-1"
+aws_profile="${AWS_PROFILE:-default}"
+gateway_name="agentcore-web-search-handson"
 target_name="web-search-tool"
 connector_version="${WEB_SEARCH_CONNECTOR_VERSION:-1.2.0}"
 included_domains="${WEB_SEARCH_INCLUDED_DOMAINS_JSON:-[]}"
 excluded_domains="${WEB_SEARCH_EXCLUDED_DOMAINS_JSON:-[]}"
 
-if ! aws bedrock-agentcore-control create-gateway-target --generate-cli-skeleton input \
+aws_cli() {
+  aws "$@" --profile "$aws_profile" --region "$aws_region"
+}
+
+if ! aws_cli bedrock-agentcore-control create-gateway-target --generate-cli-skeleton input \
   2>/dev/null | jq -e '.targetConfiguration.mcp.connector' >/dev/null; then
   echo "AWS CLI 2.36.3 이상이 필요하다. 현재 버전: $(aws --version 2>&1)" >&2
   exit 1
@@ -26,8 +32,13 @@ validate_domains() {
 validate_domains "WEB_SEARCH_INCLUDED_DOMAINS_JSON" "$included_domains"
 validate_domains "WEB_SEARCH_EXCLUDED_DOMAINS_JSON" "$excluded_domains"
 
-gateway_id="$(terraform -chdir="$workspace_dir/terraform" output -raw gateway_id)"
-aws_region="$(terraform -chdir="$workspace_dir/terraform" output -raw aws_region)"
+gateway_id="$(aws_cli bedrock-agentcore-control list-gateways --output json |
+  jq -r --arg name "$gateway_name" \
+    '[.items[]? | select(.name == $name) | .gatewayId][0] // empty')"
+if [[ -z "$gateway_id" ]]; then
+  echo "AgentCore Gateway를 먼저 생성한다: $gateway_name" >&2
+  exit 1
+fi
 domain_filter="$(jq -nc \
   --argjson include "$included_domains" \
   --argjson exclude "$excluded_domains" \
@@ -44,19 +55,17 @@ target_configuration="$(jq -nc \
     configurations: [{name: "WebSearch", parameterValues: $parameter_values}]
   }}}')"
 credential_configuration='[{"credentialProviderType":"GATEWAY_IAM_ROLE"}]'
-target_id="$(aws bedrock-agentcore-control list-gateway-targets \
+target_id="$(aws_cli bedrock-agentcore-control list-gateway-targets \
   --gateway-identifier "$gateway_id" \
-  --region "$aws_region" \
   --output json | jq -r --arg name "$target_name" \
   '[.items[]? | select(.name == $name) | .targetId][0] // empty')"
 
 wait_until_ready() {
   local status
   for _ in {1..30}; do
-    status="$(aws bedrock-agentcore-control get-gateway-target \
+    status="$(aws_cli bedrock-agentcore-control get-gateway-target \
       --gateway-identifier "$gateway_id" \
       --target-id "$target_id" \
-      --region "$aws_region" \
       --query status \
       --output text)"
     if [[ "$status" == "READY" ]]; then
@@ -73,12 +82,11 @@ wait_until_ready() {
 }
 
 if [[ -z "$target_id" ]]; then
-  target_id="$(aws bedrock-agentcore-control create-gateway-target \
+  target_id="$(aws_cli bedrock-agentcore-control create-gateway-target \
     --gateway-identifier "$gateway_id" \
     --name "$target_name" \
     --target-configuration "$target_configuration" \
     --credential-provider-configurations "$credential_configuration" \
-    --region "$aws_region" \
     --query targetId \
     --output text)"
   wait_until_ready
@@ -86,12 +94,12 @@ if [[ -z "$target_id" ]]; then
   exit 0
 fi
 
-aws bedrock-agentcore-control update-gateway-target \
+aws_cli bedrock-agentcore-control update-gateway-target \
   --gateway-identifier "$gateway_id" \
   --target-id "$target_id" \
   --name "$target_name" \
   --target-configuration "$target_configuration" \
   --credential-provider-configurations "$credential_configuration" \
-  --region "$aws_region" >/dev/null
+  >/dev/null
 wait_until_ready
 echo "Web Search target 갱신 완료: $target_name"
