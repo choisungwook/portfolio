@@ -51,3 +51,19 @@ test('다른 그룹의 기준점으로 범위 선택하면 클릭한 브랜치�
     ['origin/dev']
   )
 })
+
+test('컨텍스트 메뉴 좌표는 작은 화면에서도 음수가 되지 않는다', async () => {
+  const { clampMenuCoordinate } = await import('../src/renderer/src/lib/branchSelection.ts')
+
+  assert.strictEqual(clampMenuCoordinate(700, 800, 240), 560)
+  assert.strictEqual(clampMenuCoordinate(20, 200, 240), 0)
+})
+
+test('브랜치 포커스는 목록 경계를 넘지 않는다', async () => {
+  const { nextBranchFocusIndex } = await import('../src/renderer/src/lib/branchSelection.ts')
+
+  assert.strictEqual(nextBranchFocusIndex(4, 0, 'previous'), 0)
+  assert.strictEqual(nextBranchFocusIndex(4, 1, 'next'), 2)
+  assert.strictEqual(nextBranchFocusIndex(4, 2, 'first'), 0)
+  assert.strictEqual(nextBranchFocusIndex(4, 2, 'last'), 3)
+})

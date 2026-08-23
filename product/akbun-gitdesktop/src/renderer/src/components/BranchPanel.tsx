@@ -1,13 +1,20 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type JSX,
   type KeyboardEvent,
   type MouseEvent
 } from 'react'
 import type { BranchDeletionFailure, BranchInfo } from '../../../shared/types'
-import { selectBranchNames, type BranchSelectionMode } from '../lib/branchSelection'
+import {
+  clampMenuCoordinate,
+  nextBranchFocusIndex,
+  selectBranchNames,
+  type BranchFocusMove,
+  type BranchSelectionMode
+} from '../lib/branchSelection'
 
 interface Props {
   repoPath: string
@@ -24,6 +31,11 @@ interface SelectionAnchor {
 interface ContextMenuPosition {
   left: number
   top: number
+}
+
+interface FocusedBranches {
+  local: string
+  remote: string
 }
 
 interface SelectionModifiers {
@@ -49,16 +61,24 @@ export default function BranchPanel({
   const [branches, setBranches] = useState<BranchInfo[]>([])
   const [selectedNames, setSelectedNames] = useState<string[]>([])
   const [anchor, setAnchor] = useState<SelectionAnchor | null>(null)
+  const [focusedBranches, setFocusedBranches] = useState<FocusedBranches>({ local: '', remote: '' })
   const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null)
   const [newBranchName, setNewBranchName] = useState('')
   const [startPoint, setStartPoint] = useState('')
+  const branchElements = useRef(new Map<string, HTMLLIElement>())
 
   const refresh = useCallback(async () => {
     const result = await window.gitdesktop.getBranches(repoPath)
     if (result.ok) {
       const available = new Set(result.data.map((branch) => branch.name))
+      const localNames = result.data.filter((branch) => !branch.isRemote).map((branch) => branch.name)
+      const remoteNames = result.data.filter((branch) => branch.isRemote).map((branch) => branch.name)
       setBranches(result.data)
       setSelectedNames((current) => current.filter((name) => available.has(name)))
+      setFocusedBranches((current) => ({
+        local: localNames.includes(current.local) ? current.local : (localNames[0] ?? ''),
+        remote: remoteNames.includes(current.remote) ? current.remote : (remoteNames[0] ?? '')
+      }))
     } else {
       onError(result.error)
     }
@@ -67,6 +87,7 @@ export default function BranchPanel({
   useEffect(() => {
     setSelectedNames([])
     setAnchor(null)
+    setFocusedBranches({ local: '', remote: '' })
     setContextMenu(null)
     refresh()
   }, [refresh])
@@ -197,9 +218,34 @@ export default function BranchPanel({
       onSelectBranch(branch)
     }
     setContextMenu({
-      left: Math.min(event.clientX, window.innerWidth - 240),
-      top: Math.min(event.clientY, window.innerHeight - 64)
+      left: clampMenuCoordinate(event.clientX, window.innerWidth, 240),
+      top: clampMenuCoordinate(event.clientY, window.innerHeight, 64)
     })
+  }
+
+  const moveBranchFocus = (
+    event: KeyboardEvent<HTMLLIElement>,
+    group: 'local' | 'remote',
+    groupBranches: BranchInfo[]
+  ): boolean => {
+    const moves: Partial<Record<string, BranchFocusMove>> = {
+      ArrowUp: 'previous',
+      ArrowDown: 'next',
+      Home: 'first',
+      End: 'last'
+    }
+    const move = moves[event.key]
+    if (!move) return false
+
+    event.preventDefault()
+    const currentIndex = groupBranches.findIndex((branch) => branch.name === focusedBranches[group])
+    const nextIndex = nextBranchFocusIndex(groupBranches.length, currentIndex, move)
+    const nextName = groupBranches[nextIndex]?.name
+    if (!nextName) return true
+
+    setFocusedBranches((current) => ({ ...current, [group]: nextName }))
+    branchElements.current.get(`${group}:${nextName}`)?.focus()
+    return true
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -222,14 +268,21 @@ export default function BranchPanel({
     return (
       <li
         key={branch.name}
+        ref={(element) => {
+          const key = `${group}:${branch.name}`
+          if (element) branchElements.current.set(key, element)
+          else branchElements.current.delete(key)
+        }}
         className={className}
         role="option"
-        tabIndex={0}
+        tabIndex={focusedBranches[group] === branch.name ? 0 : -1}
         aria-selected={isSelected}
         title={`Show files changed on ${branch.name}`}
         onClick={(event) => selectBranch(branch, group, groupBranches, event)}
         onContextMenu={(event) => openContextMenu(event, branch, group)}
+        onFocus={() => setFocusedBranches((current) => ({ ...current, [group]: branch.name }))}
         onKeyDown={(event) => {
+          if (moveBranchFocus(event, group, groupBranches)) return
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
           selectBranch(branch, group, groupBranches, event)

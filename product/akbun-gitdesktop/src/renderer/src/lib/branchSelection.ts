@@ -1,5 +1,23 @@
 export type BranchSelectionMode = 'single' | 'toggle' | 'range' | 'add-range'
 
+export type BranchFocusMove = 'previous' | 'next' | 'first' | 'last'
+
+export function clampMenuCoordinate(pointer: number, viewport: number, menuSize: number): number {
+  return Math.max(0, Math.min(pointer, viewport - menuSize))
+}
+
+export function nextBranchFocusIndex(
+  itemCount: number,
+  currentIndex: number,
+  move: BranchFocusMove
+): number {
+  if (itemCount === 0) return -1
+  if (move === 'first') return 0
+  if (move === 'last') return itemCount - 1
+  if (move === 'previous') return Math.max(0, currentIndex - 1)
+  return Math.min(itemCount - 1, currentIndex + 1)
+}
+
 export function selectBranchNames(
   groupNames: string[],
   selectedNames: string[],
