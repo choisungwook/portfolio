@@ -26,7 +26,8 @@ const SAMPLE = `flowchart LR
   B -- yes --> C[Render]
   B -- no --> D[Show the error]
   C --> E[Save PNG]
-  C --> F[Large view]`;
+  C --> F[Copy PNG]
+  C --> G[Large view]`;
 
 const codeEl = document.querySelector('#code');
 const diagramEl = document.querySelector('#diagram');
@@ -35,6 +36,7 @@ const statusEl = document.querySelector('#status');
 const renderBtn = document.querySelector('#render');
 const refreshBtn = document.querySelector('#refresh');
 const pngBtn = document.querySelector('#save-png');
+const copyPngBtn = document.querySelector('#copy-png');
 const largeBtn = document.querySelector('#large');
 const dotsBtn = document.querySelector('#dots');
 const previewZoomLabel = document.querySelector('#preview-zoom-level');
@@ -84,8 +86,13 @@ function reportError(error) {
 }
 
 function setDiagramActions(enabled) {
-  pngBtn.disabled = !enabled;
+  setExportActions(enabled);
   largeBtn.disabled = !enabled;
+}
+
+function setExportActions(enabled) {
+  pngBtn.disabled = !enabled;
+  copyPngBtn.disabled = !enabled;
 }
 
 function showEmpty() {
@@ -217,11 +224,7 @@ function exportableMarkup(svg) {
   return new XMLSerializer().serializeToString(copy);
 }
 
-async function savePng() {
-  const svg = diagramEl.querySelector('svg');
-  if (!svg) return;
-
-  pngBtn.disabled = true;
+async function rasterizePng(svg) {
   const markup = exportableMarkup(svg);
   const { width, height } = readSvgSize(markup);
   const scale = exportScale(width, height);
@@ -248,13 +251,50 @@ async function savePng() {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('The PNG could not be encoded.');
 
-    download(blob, pngFileName(codeEl.value, new Date()));
-    setStatus(`Saved PNG at ${canvas.width}x${canvas.height}.`);
+    return { blob, width: canvas.width, height: canvas.height };
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
+async function savePng() {
+  const svg = diagramEl.querySelector('svg');
+  if (!svg) return;
+
+  setExportActions(false);
+
+  try {
+    const png = await rasterizePng(svg);
+    download(png.blob, pngFileName(codeEl.value, new Date()));
+    setStatus(`Saved PNG at ${png.width}x${png.height}.`);
   } catch (error) {
     reportError(error);
   } finally {
-    URL.revokeObjectURL(source);
-    pngBtn.disabled = false;
+    setExportActions(Boolean(diagramEl.querySelector('svg')));
+  }
+}
+
+async function copyPng() {
+  const svg = diagramEl.querySelector('svg');
+  if (!svg) return;
+
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    reportError(new Error('Copying PNG images is not supported by this browser.'));
+    return;
+  }
+
+  setExportActions(false);
+
+  try {
+    const pngPromise = rasterizePng(svg);
+    const blobPromise = pngPromise.then((png) => png.blob);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    const png = await pngPromise;
+    setStatus(`Copied PNG at ${png.width}x${png.height}.`);
+  } catch (error) {
+    reportError(error);
+  } finally {
+    setExportActions(Boolean(diagramEl.querySelector('svg')));
   }
 }
 
@@ -361,6 +401,7 @@ codeEl.addEventListener('keydown', (event) => {
 renderBtn.addEventListener('click', renderNow);
 refreshBtn.addEventListener('click', refresh);
 pngBtn.addEventListener('click', savePng);
+copyPngBtn.addEventListener('click', copyPng);
 largeBtn.addEventListener('click', openLargeView);
 
 dotsBtn.addEventListener('click', () => {
