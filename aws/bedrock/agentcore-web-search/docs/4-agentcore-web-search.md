@@ -4,8 +4,7 @@
 
 ## 호출 구조
 
-- Terraform으로 AgentCore Gateway, IAM, CloudWatch Logs 생성
-- AWS CLI로 Web Search connector target 관리
+- AWS CLI로 AgentCore Gateway, IAM, CloudWatch Logs와 connector target 관리
 - LiteLLM이 OpenAI Responses API의 `web_search` 요청을 AgentCore search provider로 변환
 - OpenAI 모델이 검색 결과를 바탕으로 답변과 출처 생성
 
@@ -14,11 +13,11 @@ OpenAI SDK → LiteLLM Responses API → AgentCore Gateway → Web Search connec
            → OpenAI 모델 → 답변과 인용
 ```
 
-## target 관리
+## 리소스 관리
 
-AWS Provider의 `aws_bedrockagentcore_gateway_target`은 `mcp.connector`를 지원하지 않습니다. Terraform provisioner 대신 AWS CLI 스크립트를 사용합니다.
+`scripts/create-agentcore-resources.sh`는 IAM 역할, Gateway, target, CloudWatch Logs 전송을 순서대로 생성합니다. 모든 AWS 명령은 `us-east-1`을 명시합니다.
 
-`scripts/install-web-search-target.sh`는 같은 이름의 target을 조회합니다. target이 없으면 `create-gateway-target`, 있으면 `update-gateway-target`을 호출합니다.
+`scripts/install-web-search-target.sh`는 같은 이름의 target이 없으면 생성하고, 있으면 갱신합니다. `scripts/delete-agentcore-resources.sh`는 의존 관계의 역순으로 전체 리소스를 삭제합니다.
 
 ## OpenAI Responses 호출
 
@@ -56,7 +55,8 @@ Web Search connector는 유해 질의를 자동 차단하지 않습니다. 안�
 
 ## 구성 파일
 
-- `terraform/`: Gateway, IAM, CloudWatch Logs
+- `scripts/create-agentcore-resources.sh`: IAM, Gateway, target, 로그 전송 생성
+- `scripts/delete-agentcore-resources.sh`: AgentCore와 IAM 리소스 삭제
 - `scripts/install-web-search-target.sh`: target 생성과 갱신
 - `scripts/delete-web-search-target.sh`: target 삭제
 - `litellm/config.yaml`: AgentCore search provider와 OpenAI interception
@@ -67,4 +67,3 @@ Web Search connector는 유해 질의를 자동 차단하지 않습니다. 안�
 
 - [AgentCore Web Search Tool](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-connector-web-search-tool.html)
 - [Gateway target 구성](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-add-target-api-target-config.html)
-- [AWS Provider connector 지원 이슈](https://github.com/hashicorp/terraform-provider-aws/issues/48503)

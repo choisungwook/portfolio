@@ -4,8 +4,4 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
 !uv.lock
-!terraform/.terraform.lock.hcl

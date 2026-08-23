@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+aws_region="us-east-1"
+aws_profile="${AWS_PROFILE:-default}"
+gateway_name="agentcore-web-search-handson"
 target_name="web-search-tool"
-gateway_id="$(terraform -chdir="$workspace_dir/terraform" output -raw gateway_id)"
-aws_region="$(terraform -chdir="$workspace_dir/terraform" output -raw aws_region)"
-target_id="$(aws bedrock-agentcore-control list-gateway-targets \
+
+aws_cli() {
+  aws "$@" --profile "$aws_profile" --region "$aws_region"
+}
+
+gateway_id="$(aws_cli bedrock-agentcore-control list-gateways --output json |
+  jq -r --arg name "$gateway_name" \
+    '[.items[]? | select(.name == $name) | .gatewayId][0] // empty')"
+if [[ -z "$gateway_id" ]]; then
+  echo "삭제할 AgentCore Gateway 없음: $gateway_name"
+  exit 0
+fi
+target_id="$(aws_cli bedrock-agentcore-control list-gateway-targets \
   --gateway-identifier "$gateway_id" \
-  --region "$aws_region" \
   --output json | jq -r --arg name "$target_name" \
   '[.items[]? | select(.name == $name) | .targetId][0] // empty')"
 
@@ -16,15 +27,13 @@ if [[ -z "$target_id" ]]; then
   exit 0
 fi
 
-aws bedrock-agentcore-control delete-gateway-target \
+aws_cli bedrock-agentcore-control delete-gateway-target \
   --gateway-identifier "$gateway_id" \
-  --target-id "$target_id" \
-  --region "$aws_region"
+  --target-id "$target_id"
 
 for _ in {1..30}; do
-  remaining="$(aws bedrock-agentcore-control list-gateway-targets \
+  remaining="$(aws_cli bedrock-agentcore-control list-gateway-targets \
     --gateway-identifier "$gateway_id" \
-    --region "$aws_region" \
     --output json | jq -r --arg id "$target_id" \
     '[.items[]? | select(.targetId == $id)] | length')"
   if [[ "$remaining" == "0" ]]; then
