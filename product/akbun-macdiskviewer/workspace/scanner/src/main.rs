@@ -245,6 +245,9 @@ impl<'a> Scanner<'a> {
         if self.pending_entries.is_empty() {
             return Ok(());
         }
+        if wait_for_control(&self.control) {
+            return Err(anyhow!(SCAN_CANCELLED));
+        }
         let placeholders =
             std::iter::repeat_n("(?, ?, ?, ?, ?, ?, ?, ?)", self.pending_entries.len())
                 .collect::<Vec<_>>()
@@ -265,8 +268,10 @@ impl<'a> Scanner<'a> {
             values.push(SqlValue::Integer(entry.modified));
             values.push(SqlValue::Integer(as_i64(entry.descendants)));
         }
-        self.database
-            .execute(&sql, params_from_iter(values.iter()))?;
+        let database = self.database;
+        execute_with_control(database, self.control.clone(), || {
+            database.execute(&sql, params_from_iter(values.iter()))
+        })?;
         Ok(())
     }
 
@@ -326,12 +331,20 @@ fn scan_disk(root: &Path, database_path: &Path, control: Arc<Control>) -> Result
 }
 
 fn create_indexes(database: &Connection, control: Arc<Control>) -> Result<()> {
+    execute_with_control(database, control, || database.execute_batch(INDEX_SCHEMA))
+}
+
+fn execute_with_control<T>(
+    database: &Connection,
+    control: Arc<Control>,
+    operation: impl FnOnce() -> rusqlite::Result<T>,
+) -> Result<T> {
     if wait_for_control(&control) {
         return Err(anyhow!(SCAN_CANCELLED));
     }
     let handler_control = control.clone();
     database.progress_handler(1000, Some(move || wait_for_control(&handler_control)))?;
-    let result = database.execute_batch(INDEX_SCHEMA);
+    let result = operation();
     database.progress_handler(0, None::<fn() -> bool>)?;
     if control.cancelled.load(Ordering::Relaxed) {
         return Err(anyhow!(SCAN_CANCELLED));
@@ -621,6 +634,34 @@ mod tests {
             )
             .unwrap();
         assert_eq!(indexes, 0);
+    }
+
+    #[test]
+    fn cancellation_skips_a_pending_insert_batch() {
+        let database = Connection::open_in_memory().unwrap();
+        database.execute_batch(SCHEMA).unwrap();
+        let control = Arc::new(Control::default());
+        let mut scanner = Scanner::new(&database, control.clone(), PathBuf::from("/root"));
+        scanner
+            .insert_entry(EntryRow {
+                path: "/root/file".into(),
+                parent_path: Some("/root".into()),
+                name: "file".into(),
+                kind: "file",
+                size: 1,
+                logical: 1,
+                modified: 0,
+                descendants: 0,
+            })
+            .unwrap();
+        control.cancelled.store(true, Ordering::Relaxed);
+
+        let error = scanner.flush_entries().unwrap_err();
+        assert_eq!(error.to_string(), SCAN_CANCELLED);
+        let entries: i64 = database
+            .query_row("SELECT COUNT(*) FROM entries", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(entries, 0);
     }
 
     #[test]
