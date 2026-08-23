@@ -1,11 +1,20 @@
-.PHONY: up down infra-up runtime-env compose-up test format-check scenario1-korean scenario1-harmful scenario1-openai scenario2-curl scenario2-python scenario2-harmful
+-include .env
+export
 
-up: infra-up runtime-env compose-up
+.PHONY: up down infra-up target-up target-down runtime-env compose-up test format-check bedrock-web-search agentcore-web-search agentcore-harmful
+
+up: infra-up target-up runtime-env compose-up
 
 infra-up:
 	uv sync
 	terraform -chdir=terraform init
 	terraform -chdir=terraform apply
+
+target-up:
+	./scripts/install-web-search-target.sh
+
+target-down:
+	./scripts/delete-web-search-target.sh
 
 runtime-env:
 	./scripts/export-runtime-env.sh
@@ -15,6 +24,7 @@ compose-up:
 
 down:
 	docker compose down -v
+	$(MAKE) target-down
 	terraform -chdir=terraform destroy
 
 test:
@@ -29,20 +39,11 @@ format-check:
 	uv run ruff check .
 	terraform -chdir=terraform fmt -check -recursive
 
-scenario1-korean:
-	./scripts/litellm_search.sh "2026년 8월 Amazon Bedrock의 최신 웹 검색 기능을 한국어로 찾아줘"
-
-scenario1-harmful:
+agentcore-harmful:
 	./scripts/litellm_safety_probe.sh
 
-scenario1-openai:
-	./scripts/litellm_openai_agent.sh
+bedrock-web-search:
+	uv run python scripts/bedrock_web_search.py
 
-scenario2-curl:
-	set -a; . ./.runtime.env; set +a; ./scripts/direct_curl.sh
-
-scenario2-python:
-	set -a; . ./.runtime.env; set +a; .venv/bin/python scripts/direct_search.py "2026년 8월 Amazon Bedrock의 최신 웹 검색 기능을 한국어로 찾아줘"
-
-scenario2-harmful:
-	set -a; . ./.runtime.env; set +a; .venv/bin/python scripts/safety_probe.py
+agentcore-web-search:
+	uv run python scripts/agentcore_web_search.py
