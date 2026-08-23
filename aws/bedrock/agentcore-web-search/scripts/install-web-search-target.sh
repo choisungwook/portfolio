@@ -14,13 +14,17 @@ if ! aws bedrock-agentcore-control create-gateway-target --generate-cli-skeleton
 fi
 
 validate_domains() {
-  local domains="$1"
-  jq -e 'type == "array" and length <= 100 and all(.[]; type == "string")' \
-    <<<"$domains" >/dev/null
+  local variable_name="$1"
+  local domains="$2"
+  if ! jq -e 'type == "array" and length <= 100 and all(.[]; type == "string")' \
+    <<<"$domains" >/dev/null 2>&1; then
+    echo "$variable_name는 문자열 배열 JSON이며 최대 100개여야 한다." >&2
+    exit 1
+  fi
 }
 
-validate_domains "$included_domains"
-validate_domains "$excluded_domains"
+validate_domains "WEB_SEARCH_INCLUDED_DOMAINS_JSON" "$included_domains"
+validate_domains "WEB_SEARCH_EXCLUDED_DOMAINS_JSON" "$excluded_domains"
 
 gateway_id="$(terraform -chdir="$workspace_dir/terraform" output -raw gateway_id)"
 aws_region="$(terraform -chdir="$workspace_dir/terraform" output -raw aws_region)"
