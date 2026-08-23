@@ -86,8 +86,8 @@ export default function TopBar({
               Repository
             </button>
             {openMenu === 'repository' && (
-              <div className="menu-list" role="menu">
-                <button role="menuitem" onClick={() => run(onImportRepo)}>
+              <div className="menu-list">
+                <button onClick={() => run(onImportRepo)}>
                   Import Repository…
                 </button>
               </div>
@@ -102,15 +102,15 @@ export default function TopBar({
               Settings
             </button>
             {openMenu === 'settings' && (
-              <div className="menu-list" role="menu">
-                <button role="menuitem" onClick={() => run(onOpenSettings)}>
+              <div className="menu-list">
+                <button onClick={() => run(onOpenSettings)}>
                   Preferences…
                 </button>
-                <button role="menuitem" onClick={() => run(onRecheckCli)}>
+                <button onClick={() => run(onRecheckCli)}>
                   Recheck Command Line Tools
                 </button>
-                <div className="menu-separator" role="separator" />
-                <button role="menuitem" onClick={() => run(onCheckForUpdates)}>
+                <div className="menu-separator" />
+                <button onClick={() => run(onCheckForUpdates)}>
                   Check for Updates…
                 </button>
               </div>

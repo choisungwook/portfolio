@@ -9,6 +9,8 @@ function loadCliModule() {
 }
 
 test('GUI PATH 밖의 Homebrew gh 경로도 검사한다', async () => {
+  if (process.platform === 'win32') return
+
   const { commandPaths } = await loadCliModule()
   const paths = commandPaths('gh')
 
