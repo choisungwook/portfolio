@@ -1,6 +1,8 @@
 use_default_settings:
   engines:
-    keep_only: []
+    keep_only:
+      - google
+      - naver
 
 general:
   debug: false
@@ -27,10 +29,16 @@ outgoing:
   request_timeout: 2.0
 
 engines:
+  - name: google
+    inactive: false
+
+  - name: naver
+    disabled: false
+
   - name: mock success
     engine: xpath
     shortcut: mockok
-    categories: general
+    categories: lab
     disabled: false
     enable_http: true
     search_url: http://mock-engine/ok?q={query}
@@ -42,7 +50,7 @@ engines:
   - name: mock upstream
     engine: xpath
     shortcut: mock
-    categories: general
+    categories: lab
     disabled: false
     enable_http: true
     search_url: http://mock-engine/search?q={query}
