@@ -66,7 +66,7 @@ JSON 검색 결과에서 실제 응답 engine을 확인한다.
 curl -sS --compressed \
   -u lab:production-lab \
   -A 'Mozilla/5.0' \
-  -H 'Accept: text/html' \
+  -H 'Accept: text/html,application/json' \
   -H 'Accept-Language: ko-KR,ko;q=0.9' \
   'http://localhost:8088/search?q=SearXNG&format=json&language=ko-KR' \
   | jq '{engines: [.results[].engine] | unique, unresponsive_engines}'

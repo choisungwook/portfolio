@@ -97,7 +97,7 @@ SafeSearch smoke test가 필요하면 Google에서 `safesearch=0`과 `safesearch
 curl -sS --compressed \
   -u lab:production-lab \
   -A 'Mozilla/5.0' \
-  -H 'Accept: text/html' \
+  -H 'Accept: text/html,application/json' \
   -H 'Accept-Language: ko-KR,ko;q=0.9' \
   'http://localhost:8088/search?q=서울%20지하철&format=json&language=ko-KR&engines=google' \
   | jq '{result_count: (.results | length), unresponsive_engines}'
