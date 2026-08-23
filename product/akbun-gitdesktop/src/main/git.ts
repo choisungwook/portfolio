@@ -1,4 +1,5 @@
 import type {
+  BranchDeletionResult,
   BranchInfo,
   CliStatus,
   CliToolStatus,
@@ -6,6 +7,7 @@ import type {
   FileChange,
   WorktreeInfo
 } from '../shared/types'
+import { deleteBranchBatch } from './branchDeletion'
 import { probeCli, runCli } from './cli'
 
 const FIELD_SEP = '\x1f'
@@ -164,6 +166,39 @@ export async function createBranch(repoPath: string, name: string, startPoint: s
 
 export async function deleteBranch(repoPath: string, name: string, force: boolean): Promise<void> {
   await runGit(repoPath, ['branch', force ? '-D' : '-d', name])
+}
+
+async function isBranchMerged(repoPath: string, name: string): Promise<boolean> {
+  const fields = ['%(refname)', '%(upstream)'].join(FIELD_SEP)
+  const ref = (await runGit(repoPath, [
+    'for-each-ref',
+    `--format=${fields}`,
+    `refs/heads/${name}`
+  ])).trim()
+  if (!ref) throw new Error(`Local branch not found: ${name}`)
+
+  const [, upstream] = ref.split(FIELD_SEP)
+  const target = upstream || 'HEAD'
+  const merged = await runGit(repoPath, [
+    'branch',
+    '--merged',
+    target,
+    '--format=%(refname:short)'
+  ])
+  return merged.split('\n').includes(name)
+}
+
+export async function deleteBranches(
+  repoPath: string,
+  names: string[],
+  force: boolean
+): Promise<BranchDeletionResult> {
+  return deleteBranchBatch(
+    names,
+    force,
+    (name, shouldForce) => deleteBranch(repoPath, name, shouldForce),
+    (name) => isBranchMerged(repoPath, name)
+  )
 }
 
 export async function createWorktree(

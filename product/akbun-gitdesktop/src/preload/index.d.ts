@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  BranchDeletionResult,
   BranchInfo,
   CliStatus,
   CommitInfo,
@@ -35,7 +36,11 @@ export interface GitDesktopApi {
   getDefaultBranch: (repoPath: string) => Promise<GitResult<string>>
 
   createBranch: (repoPath: string, name: string, startPoint: string) => Promise<GitResult<void>>
-  deleteBranch: (repoPath: string, name: string, force: boolean) => Promise<GitResult<void>>
+  deleteBranches: (
+    repoPath: string,
+    names: string[],
+    force: boolean
+  ) => Promise<GitResult<BranchDeletionResult>>
   createWorktree: (
     repoPath: string,
     worktreePath: string,

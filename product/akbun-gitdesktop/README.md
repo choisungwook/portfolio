@@ -20,7 +20,7 @@ UI 언어는 영어다.
 - commit 목록 보기 (graph 행에 subject, author, date, hash 표시)
 - commit을 클릭하면 그 commit이 바꾼 파일 목록, 파일을 클릭하면 diff를 오른쪽 drawer에 표시
 - branch를 클릭하면 기본 브랜치와의 3-dot diff 파일 목록과 diff를 표시
-- branch 보기, 생성, 삭제 (미병합 브랜치는 확인 후 강제 삭제)
+- branch 보기, 생성, 다중 선택과 일괄 삭제 (Cmd/Ctrl 개별 선택, Shift 범위 선택, 미병합 강제 삭제 확인)
 - worktree 보기, 생성(새 브랜치와 함께), 삭제
 - GitHub PR과 issue 목록 보기 (state, label, 작성자, 갱신일)
 - 하위 issue가 있으면 issue 목록을 트리로 표시. 부모 아래에 하위 issue를 들여쓰고 세로선으로 상하관계를 그리며, 부모 행에는 하위 개수를 ↳ 배지로 표시

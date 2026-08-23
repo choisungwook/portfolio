@@ -84,8 +84,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle('git:createBranch', (_event, repoPath: string, name: string, startPoint: string) =>
     wrap(() => git.createBranch(repoPath, name, startPoint))
   )
-  ipcMain.handle('git:deleteBranch', (_event, repoPath: string, name: string, force: boolean) =>
-    wrap(() => git.deleteBranch(repoPath, name, force))
+  ipcMain.handle('git:deleteBranches', (_event, repoPath: string, names: string[], force: boolean) =>
+    wrap(() => git.deleteBranches(repoPath, names, force))
   )
   ipcMain.handle(
     'git:createWorktree',
