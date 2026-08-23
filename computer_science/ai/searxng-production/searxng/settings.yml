@@ -1,0 +1,52 @@
+use_default_settings:
+  engines:
+    keep_only: []
+
+general:
+  debug: false
+  instance_name: SearXNG production lab
+
+search:
+  autocomplete: ""
+  formats:
+    - html
+    - json
+  suspended_times:
+    SearxEngineTooManyRequests: 30
+
+server:
+  secret_key: local-lab-secret-do-not-use-in-production
+  limiter: true
+  public_instance: false
+  image_proxy: true
+
+valkey:
+  url: valkey://valkey:6379/0
+
+outgoing:
+  request_timeout: 2.0
+
+engines:
+  - name: mock success
+    engine: xpath
+    shortcut: mockok
+    categories: general
+    disabled: false
+    enable_http: true
+    search_url: http://mock-engine/ok?q={query}
+    results_xpath: //article
+    url_xpath: ./a/@href
+    title_xpath: ./a
+    content_xpath: ./p
+
+  - name: mock upstream
+    engine: xpath
+    shortcut: mock
+    categories: general
+    disabled: false
+    enable_http: true
+    search_url: http://mock-engine/search?q={query}
+    results_xpath: //article
+    url_xpath: ./a/@href
+    title_xpath: ./a
+    content_xpath: ./p
