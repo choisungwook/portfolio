@@ -1,7 +1,7 @@
 model_list:
   - model_name: openai-search-agent
     litellm_params:
-      model: openai/os.environ/OPENAI_MODEL
+      model: os.environ/OPENAI_MODEL
       api_key: os.environ/OPENAI_API_KEY
 
 search_tools:

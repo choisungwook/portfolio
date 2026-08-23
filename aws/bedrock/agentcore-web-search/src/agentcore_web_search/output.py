@@ -4,7 +4,8 @@ from openai.types.responses import Response
 def print_response(response: Response) -> None:
   """Print Web Search retrieval steps, answer text, and URL citations."""
   searches = [item for item in response.output if item.type == "web_search_call"]
-  print(f"Retrieval steps: {len(searches)}")
+  if searches:
+    print(f"Retrieval steps: {len(searches)}")
   for call in searches:
     if call.action.type == "search":
       print(f"  search: {call.action.queries}")

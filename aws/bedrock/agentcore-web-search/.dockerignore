@@ -1,3 +1,4 @@
 .env
 .runtime.env
+.runtime.aws-credentials
 .venv
