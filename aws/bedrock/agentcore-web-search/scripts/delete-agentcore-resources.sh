@@ -65,9 +65,15 @@ else
 fi
 
 if aws_cli iam get-role --role-name "$role_name" >/dev/null 2>&1; then
-  aws_cli iam delete-role-policy \
+  role_policy_count="$(aws_cli iam list-role-policies \
     --role-name "$role_name" \
-    --policy-name "$role_policy_name"
+    --query "length(PolicyNames[?@=='${role_policy_name}'])" \
+    --output text)"
+  if [[ "$role_policy_count" == "1" ]]; then
+    aws_cli iam delete-role-policy \
+      --role-name "$role_name" \
+      --policy-name "$role_policy_name"
+  fi
   aws_cli iam delete-role --role-name "$role_name"
 fi
 

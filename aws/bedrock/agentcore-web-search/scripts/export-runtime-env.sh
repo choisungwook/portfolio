@@ -6,8 +6,7 @@ aws_region="us-east-1"
 profile="${AWS_PROFILE:-default}"
 gateway_name="agentcore-web-search-handson"
 credentials="$(aws configure export-credentials \
-  --profile "$profile" \
-  --region "$aws_region")"
+  --profile "$profile")"
 gateway_id="$(aws bedrock-agentcore-control list-gateways \
   --profile "$profile" \
   --region "$aws_region" \
