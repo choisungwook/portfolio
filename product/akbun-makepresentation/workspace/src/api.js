@@ -62,6 +62,7 @@ if (!window.__TAURI__) {
     aiSaveSession: async () => 0,
     aiDeleteSession: async () => {},
     aiAttachImage: async () => null,
+    aiSaveSlideImage: async () => '',
     aiCopyImage: async () => {},
     aiImageUrl: (path) => path,
     onAiServerMessage: () => Promise.resolve(() => {}),
@@ -142,6 +143,8 @@ if (!window.__TAURI__) {
     aiDeleteSession: (sessionId) => invoke('ai_delete_session', { sessionId }),
     aiAttachImage: (sessionId, sourcePath, imageId) =>
       invoke('ai_attach_image', { sessionId, sourcePath, imageId }),
+    aiSaveSlideImage: (imageId, dataUrl) =>
+      invoke('ai_save_slide_image', { imageId, dataUrl }),
     aiCopyImage: (sourcePath, destinationPath) =>
       invoke('ai_copy_image', { sourcePath, destinationPath }),
     aiImageUrl: (path) => convertFileSrc(path),

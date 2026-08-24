@@ -282,6 +282,18 @@
               Based on
               <select id="ai-slide-target"></select>
             </label>
+            <div id="ai-chip-row" class="ai-chip-row" role="group" aria-label="Request modifiers"></div>
+            <div id="ai-diagram-style" class="ai-diagram-style" hidden>
+              <label for="ai-layout">
+                Layout
+                <select id="ai-layout"></select>
+              </label>
+              <label for="ai-palette">
+                Palette
+                <select id="ai-palette"></select>
+              </label>
+              <span id="ai-palette-swatches" class="ai-palette-swatches" aria-hidden="true"></span>
+            </div>
             <textarea id="ai-prompt" rows="4" maxlength="100000" placeholder="Ask AI…"></textarea>
             <div class="ai-composer-actions">
               <span id="ai-turn-status" aria-live="polite"></span>
@@ -572,6 +584,8 @@
   <script src="editor/utils.js"></script>
   <script src="editor.js"></script>
   <script src="settings.js"></script>
+  <script src="ai/styles.js"></script>
+  <script src="ai/prompt.js"></script>
   <script src="ai.js"></script>
   <script src="api.js"></script>
   <script src="ai-panel.js"></script>

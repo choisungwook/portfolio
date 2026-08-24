@@ -73,6 +73,9 @@ src/
   settings.js
   api.js
   ai.js
+  ai/
+    styles.js
+    prompt.js
   ai-panel.js
 ```
 
@@ -83,7 +86,9 @@ src/
 - `renderer.js` — menu commands, AI panel integration, and application initialization.
 - `settings.js` — settings defaults, validation, legacy preset migration normalization, and guideline geometry.
 - `api.js` — the only bridge to the OS: native dialogs, filesystem commands, and the updater. Falls back to no-ops in a plain browser.
-- `ai.js` — pure AI session normalization, capacity checks, and validated slide patch application.
+- `ai.js` — facade over the AI helpers: session normalization, capacity checks, the slide output schema, and validated slide patch application.
+- `ai/styles.js` — the diagram layouts and colour palettes the slide mode offers, as pure data plus the functions that turn a choice into prompt lines.
+- `ai/prompt.js` — what the model is told: the slide digest, the quick-chip definitions, and the single place a turn's text is assembled.
 - `ai-panel.js` — App Server JSON-RPC, streaming turns, the Inspector/AI panel switch, and the local conversation UI.
 
 ## IPC surface
@@ -102,6 +107,7 @@ Filesystem access stays behind narrow commands. Deck and export paths come from 
 | `ai_start_server`, `ai_send_rpc`, `ai_stop_server` | App Server lifecycle and JSON-RPC | server info or events |
 | `ai_list_sessions`, `ai_load_session`, `ai_save_session`, `ai_delete_session` | app-owned session JSON | summaries, session, or size |
 | `ai_attach_image`, `ai_copy_image` | validated generated/saved image paths | saved image metadata or file copy |
+| `ai_save_slide_image` | image id, PNG data URL | path of the rendered slide handed to the next turn |
 
 ## Key flows
 
@@ -126,7 +132,26 @@ The app owns the durable conversation instead:
 - A closed or restored session is read-only; continuing requires a new conversation.
 - A stopped turn keeps the received delta text and stores the assistant message as stopped.
 - Codex-generated images are copied from its generated-images directory into the session before display. Deleting the session removes its images.
-- Image insertion is explicit. Slide mode validates structured operations and inserts a changed clone immediately after the source slide, preserving the original.
+- A generated image is inserted into the current slide as soon as it arrives, through the same path a paste takes, so Cmd+Z removes it. The image card keeps its Insert button for putting the same image on another slide.
+- Slide mode validates structured operations and inserts a changed clone immediately after the source slide, preserving the original.
+
+### What the model is told about a slide
+
+The model never sees the deck file, so everything it knows arrives in the turn. Three things go with every slide-mode request ([decision](../knowledge/decisions/2026-08-the-model-is-told-what-the-slide-is.md)):
+
+- **A measured reading.** `ai/prompt.js` states the canvas size and origin, the background, the guideline zones, and then every shape with its index, its resolved bounding box, its stroke and fill, and its text. The index is named as the z-order, because that is what an update operation addresses. Image pixels are never included, only the note that the app keeps them.
+- **Findings.** Overlaps, shapes outside the canvas, edges within 12px of alignment, sibling shapes within 16px of a shared size, and more than three font sizes are computed in JavaScript and listed. These are the observations a model reading raw coordinates gets wrong, and they are exactly what a tidy-up request is about.
+- **A rendered picture.** The page rasterizes the slide, `ai_save_slide_image` stores it in the AI runtime directory, and the turn attaches it as `localImage`. It is turn input, not conversation content, so it lives outside every session directory and never counts against the 128 MiB budget. The four most recent are kept. An App Server that rejects image input makes the turn fall back to text; the reading alone still works.
+
+### Quick chips and diagram style
+
+The chip row above the composer holds request modifiers, filtered to the current mode. A chip is a toggle: clicking one leaves the textarea untouched and only reaches the model at send time, when `composeTurn` assembles the mode rules, the active chips' instructions, the slide reading, the diagram style and the user's text into one turn. Chips stay on across sends, because "draw it, then tidy it, then tidy it again" is one intent held over three turns.
+
+The two slide chips ask for a diagram style, which is a layout and a palette chosen independently: six layouts, each of which writes concrete pixel coordinates derived from the live guideline zone, and ten palettes, each a complete set of `#rrggbb` values. Colours must be literal hex because that is the only form the slide output schema accepts.
+
+### When a patch is rejected
+
+`parseSlidePatch` returns a reason, not just null. A rejected answer buys exactly one retry, which repeats the request with that reason attached; a second failure shows the reason to the user instead of "the slide response was invalid". Sending the same prompt again without the reason buys the same answer.
 
 See [the AI integration ADR](../adr/2026-08-codex-app-server-ai.md).
 
