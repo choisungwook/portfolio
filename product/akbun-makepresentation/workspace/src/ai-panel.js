@@ -25,14 +25,20 @@
   let persistChain = Promise.resolve();
   let persistTimer = null;
   let interruptedSessionsFinalized = false;
+  // Chips stay on across turns on purpose: "draw it, tidy it, tidy it again"
+  // is one intent held over three sends, not three intents.
+  let activeChips = new Set();
+  let diagramStyle = { layout: A.DEFAULT_LAYOUT_ID, palette: A.DEFAULT_PALETTE_ID };
 
   const DEVELOPER_INSTRUCTIONS = [
     'You are embedded in akbun-makepresentation, a desktop slide editor.',
     'Do not run shell commands, inspect files, use web search, modify files, call MCP tools, or delegate work.',
-    'The client labels every request as TEXT MODE, IMAGE MODE, or SLIDE MODE.',
+    'The client labels every request as TEXT MODE, IMAGE MODE, or SLIDE MODE and repeats the rules for that mode.',
     'In TEXT MODE, return text only and do not call a tool.',
     'In IMAGE MODE, use only the built-in image generation tool and save exactly one image.',
     'In SLIDE MODE, return only the JSON required by the supplied output schema.',
+    'A request may attach a rendered picture of the current slide. It is context, never a file to edit.',
+    'The request also carries a measured reading of the slide. Every coordinate in it is exact; never re-measure by eye.',
   ].join(' ');
 
   function setConnection(next) {
@@ -194,7 +200,7 @@
         clientInfo: {
           name: 'akbun_makepresentation',
           title: 'akbun-makepresentation',
-          version: '0.16.0',
+          version: '0.21.0',
         },
         capabilities: { experimentalApi: true },
       });
@@ -356,6 +362,7 @@
       ? `Read-only · ${formatSize(currentSession?.sizeBytes)}`
       : 'Active conversation';
     renderMessages();
+    renderChips();
     if (!readonly) {
       refreshSlideTargets();
       $('ai-prompt').focus();
@@ -498,6 +505,69 @@
     pendingTurn.bodyNode = article?.querySelector('.ai-message-body') || null;
   }
 
+  function renderChips() {
+    const row = $('ai-chip-row');
+    row.replaceChildren();
+    for (const item of A.chipsForMode(selectedMode)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ai-chip';
+      button.dataset.chipId = item.id;
+      button.textContent = item.label;
+      button.title = item.title;
+      button.setAttribute('aria-pressed', String(activeChips.has(item.id)));
+      button.classList.toggle('active', activeChips.has(item.id));
+      button.disabled = !!pendingTurn;
+      row.append(button);
+    }
+    row.hidden = !row.children.length;
+    renderDiagramStyle();
+  }
+
+  function renderDiagramStyle() {
+    const shown = selectedMode === 'slide' && A.usesDiagramStyle(selectedMode, [...activeChips]);
+    $('ai-diagram-style').hidden = !shown;
+    if (!shown) return;
+    fillStyleSelect($('ai-layout'), A.LAYOUTS, diagramStyle.layout);
+    fillStyleSelect($('ai-palette'), A.PALETTES, diagramStyle.palette);
+    renderSwatches();
+  }
+
+  function fillStyleSelect(select, items, value) {
+    if (select.dataset.filled !== String(items.length)) {
+      select.replaceChildren();
+      for (const item of items) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.label;
+        select.append(option);
+      }
+      select.dataset.filled = String(items.length);
+    }
+    select.value = value;
+    select.disabled = !!pendingTurn;
+  }
+
+  // Palette names alone do not say what "Terracotta" looks like, and the whole
+  // point of ten palettes is picking one at a glance.
+  function renderSwatches() {
+    const container = $('ai-palette-swatches');
+    container.replaceChildren();
+    const palette = A.PALETTES.find((item) => item.id === diagramStyle.palette) || A.PALETTES[0];
+    for (const key of ['background', 'surface', 'border', 'accent', 'connector']) {
+      const dot = document.createElement('span');
+      dot.className = 'ai-swatch';
+      dot.style.background = palette[key];
+      container.append(dot);
+    }
+  }
+
+  function toggleChip(id) {
+    if (activeChips.has(id)) activeChips.delete(id);
+    else activeChips.add(id);
+    renderChips();
+  }
+
   function selectMode(mode) {
     selectedMode = A.MODES.has(mode) ? mode : 'text';
     for (const button of $('ai-mode-picker').querySelectorAll('[data-ai-mode]')) {
@@ -507,6 +577,7 @@
     }
     $('ai-slide-target-row').hidden = selectedMode !== 'slide';
     if (selectedMode === 'slide') refreshSlideTargets();
+    renderChips();
   }
 
   function refreshSlideTargets() {
@@ -532,6 +603,7 @@
     for (const button of $('ai-mode-picker').querySelectorAll('button')) button.disabled = streaming;
     $('ai-slide-target').disabled = streaming;
     $('ai-turn-status').textContent = streaming ? 'Generating…' : '';
+    renderChips();
     if (!streaming) renderConnection();
   }
 
@@ -631,6 +703,67 @@
     return isolatedConfigPromise;
   }
 
+  // One raster per slide-mode turn. A failure here is not worth losing the turn
+  // over: the digest alone still works, so fall back to text and say nothing.
+  async function slideImagePath(slideTarget) {
+    if (!slideTarget || selectedMode !== 'slide') return '';
+    try {
+      return (await callbacks.renderSlideImage?.(slideTarget.index)) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function composeTurnText(prompt, slideTarget, slideImage) {
+    return A.composeTurn({
+      mode: selectedMode,
+      prompt,
+      chipIds: [...activeChips],
+      slide: slideTarget ? slideTarget.slide : callbacks.currentSlide?.(),
+      size: callbacks.deckSize?.(),
+      geometry: callbacks.slideGeometry?.(),
+      slideNumber: (slideTarget ? slideTarget.index : callbacks.currentSlideIndex?.() || 0) + 1,
+      slideCount: callbacks.listSlides?.().length,
+      style: diagramStyle,
+      hasSlideImage: !!slideImage,
+    });
+  }
+
+  async function startTurn(activeThreadId, text, slideImage = '') {
+    const runtime = await window.api.aiRuntimeDirectory();
+    const input = [{ type: 'text', text }];
+    if (slideImage) input.push({ type: 'localImage', path: slideImage });
+    const params = {
+      threadId: activeThreadId,
+      input,
+      cwd: runtime,
+      approvalPolicy: 'never',
+      sandboxPolicy: {
+        type: 'workspaceWrite',
+        writableRoots: [runtime],
+        networkAccess: false,
+      },
+    };
+    if (pendingTurn.mode === 'slide') params.outputSchema = A.SLIDE_OUTPUT_SCHEMA;
+    const requestedTurn = pendingTurn;
+    requestedTurn.sentText = text;
+    let result;
+    try {
+      result = await rpc('turn/start', params, 60_000);
+    } catch (error) {
+      // An App Server that does not take image input rejects the whole turn,
+      // not just the attachment. The digest carries the slide on its own, so
+      // losing the picture costs quality, not the answer.
+      if (!slideImage || !/image/i.test(String(error))) throw error;
+      params.input = [{ type: 'text', text: text.replace(/^A rendered picture.*$/m, '') }];
+      result = await rpc('turn/start', params, 60_000);
+    }
+    requestedTurn.turnId = result?.turn?.id || requestedTurn.turnId;
+    if (requestedTurn.stopRequested && requestedTurn.turnId) {
+      await rpc('turn/interrupt', { threadId: activeThreadId, turnId: requestedTurn.turnId });
+    }
+  }
+
   async function sendPrompt() {
     if (pendingTurn || currentSession?.status === 'readonly') return;
     const prompt = $('ai-prompt').value.trim();
@@ -665,6 +798,7 @@
         error: null,
         stopRequested: false,
         slideTarget,
+        retried: false,
         capacityBytes: 0,
         bodyNode: null,
       };
@@ -673,42 +807,8 @@
       $('ai-prompt').value = '';
       setStreaming(true);
       renderMessages();
-
-      const runtime = await window.api.aiRuntimeDirectory();
-      let text = `TEXT MODE. Return text only. User request: ${prompt}`;
-      let outputSchema;
-      if (selectedMode === 'image') {
-        text = `$imagegen IMAGE MODE. Generate exactly one image for this request: ${prompt}`;
-      } else if (selectedMode === 'slide') {
-        text = `SLIDE MODE. ${A.slidePrompt(
-          prompt,
-          slideTarget.slide,
-          callbacks.deckSize?.(),
-          slideTarget.index + 1
-        )}`;
-        outputSchema = A.SLIDE_OUTPUT_SCHEMA;
-      }
-      const params = {
-        threadId: activeThreadId,
-        input: [{ type: 'text', text }],
-        cwd: runtime,
-        approvalPolicy: 'never',
-        sandboxPolicy: {
-          type: 'workspaceWrite',
-          writableRoots: [runtime],
-          networkAccess: false,
-        },
-      };
-      if (outputSchema) params.outputSchema = outputSchema;
-      const requestedTurn = pendingTurn;
-      const result = await rpc('turn/start', params, 60_000);
-      requestedTurn.turnId = result?.turn?.id || requestedTurn.turnId;
-      if (requestedTurn.stopRequested && requestedTurn.turnId) {
-        await rpc('turn/interrupt', {
-          threadId: activeThreadId,
-          turnId: requestedTurn.turnId,
-        });
-      }
+      const slideImage = await slideImagePath(slideTarget);
+      await startTurn(activeThreadId, composeTurnText(prompt, slideTarget, slideImage), slideImage);
     } catch (error) {
       if (String(error).includes('session_limit_exceeded') && currentSession) {
         await reachSessionLimit('Conversation reached 128 MiB.');
@@ -788,6 +888,7 @@
       turn.capacityBytes += image.sizeBytes;
       if (currentSession === session) renderMessages();
       await persist(session);
+      if (currentSession === session) await autoInsertImage(image);
     } catch (error) {
       if (String(error).includes('session_limit_exceeded')) {
         const detail = 'Image could not be saved because the conversation would exceed 128 MiB.';
@@ -808,6 +909,23 @@
     }
   }
 
+  // A generated image the user has to go find and click into the slide is a
+  // second step nobody asked for. It lands on the current slide and Cmd+Z
+  // takes it back, which is the same bargain paste already offers.
+  async function autoInsertImage(image) {
+    try {
+      const slideNumber = await callbacks.insertImage?.(
+        imagePath(image),
+        window.api.aiImageUrl(imagePath(image))
+      );
+      $('ai-turn-status').textContent = slideNumber
+        ? `Inserted into slide ${slideNumber}. Undo with Cmd+Z.`
+        : 'Inserted into the current slide.';
+    } catch (error) {
+      $('ai-turn-status').textContent = `Generated, but not inserted: ${error}`;
+    }
+  }
+
   async function completeTurn(turn) {
     const completed = pendingTurn;
     if (!completed) return;
@@ -824,7 +942,7 @@
       message.status = 'error';
       message.text = completed.error || turn.error?.message || 'AI request failed.';
     } else if (completed.mode === 'slide') {
-      finishSlideMessage(completed, message);
+      if (await finishSlideMessage(completed, message)) return;
     } else if (completed.mode === 'image' && !message.images.length) {
       message.status = 'error';
       message.text = completed.finalText || 'Image generation did not return a saved image.';
@@ -839,12 +957,20 @@
     await persist().catch(handlePersistenceError);
   }
 
-  function finishSlideMessage(completed, message) {
-    const patch = A.parseSlidePatch(completed.finalText, completed.slideTarget.slide.shapes.length);
+  // Returns true when a retry was started, in which case the turn is still
+  // running and completeTurn must not close it out.
+  async function finishSlideMessage(completed, message) {
+    const { patch, reason } = A.parseSlidePatch(
+      completed.finalText,
+      completed.slideTarget.slide.shapes.length
+    );
     if (!patch) {
+      if (!completed.retried && threadId && !completed.stopRequested) {
+        return retrySlideTurn(completed, message, reason);
+      }
       message.status = 'error';
-      message.text = 'The slide response was invalid, so no slide was changed.';
-      return;
+      message.text = `No slide was changed: ${reason}`;
+      return false;
     }
     try {
       const newSlideNumber = callbacks.applySlidePatch?.(completed.slideTarget, patch);
@@ -853,6 +979,35 @@
     } catch (error) {
       message.status = 'error';
       message.text = `The original slide was preserved. ${error}`;
+    }
+    return false;
+  }
+
+  // One retry, and only because it carries the parser's reason. Sending the
+  // same prompt again buys the same answer.
+  async function retrySlideTurn(completed, message, reason) {
+    completed.retried = true;
+    completed.finalText = '';
+    completed.itemTexts.clear();
+    completed.itemPhases.clear();
+    completed.turnId = null;
+    message.status = 'streaming';
+    message.text = '';
+    $('ai-turn-status').textContent = `Retrying: ${reason}`;
+    renderMessages();
+    try {
+      await startTurn(threadId, A.retryTurn(completed.sentText, reason));
+      return true;
+    } catch (error) {
+      completed.retried = true;
+      message.status = 'error';
+      message.text = `No slide was changed: ${reason}`;
+      pendingTurn = null;
+      setStreaming(false);
+      $('ai-turn-status').textContent = String(error).replace(/^Error:\s*/, '');
+      renderMessages();
+      await persist().catch(handlePersistenceError);
+      return true;
     }
   }
 
@@ -979,6 +1134,17 @@
       const button = event.target.closest('[data-ai-mode]');
       if (button && !button.disabled) selectMode(button.dataset.aiMode);
     });
+    $('ai-chip-row').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-chip-id]');
+      if (button && !button.disabled) toggleChip(button.dataset.chipId);
+    });
+    $('ai-layout').addEventListener('change', (event) => {
+      diagramStyle = { ...diagramStyle, layout: event.target.value };
+    });
+    $('ai-palette').addEventListener('change', (event) => {
+      diagramStyle = { ...diagramStyle, palette: event.target.value };
+      renderSwatches();
+    });
     $('ai-session-list').addEventListener('click', (event) => {
       const open = event.target.closest('[data-session-id]');
       const remove = event.target.closest('[data-delete-session]');
@@ -996,6 +1162,7 @@
   async function initialize(options) {
     callbacks = options || {};
     wireEvents();
+    renderChips();
     renderConnection();
     renderSessionList();
     await loadSessionList();

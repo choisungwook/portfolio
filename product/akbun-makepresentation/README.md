@@ -25,6 +25,10 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Self update from Settings, Updates
 - AI panel backed by a separately installed Codex CLI and its ChatGPT subscription login
 - Streaming text, generated images, and non-destructive slide edits from an app-owned conversation
+- Slide mode sends the model a measured reading of the slide and a rendered picture of it, so it works from what is there rather than from a guess
+- Quick chips above the composer: draw an IT architecture diagram, tidy an existing one, polish or summarise the wording, and four image styles (webtoon, watercolour, flat, 3D)
+- Six diagram layouts and ten colour palettes, chosen independently
+- Generated images land on the current slide straight away; Cmd+Z takes one back
 - Up to three local, read-only conversation archives; each archive including images is capped at 128 MiB
 
 ## Shortcuts

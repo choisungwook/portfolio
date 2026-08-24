@@ -4,6 +4,12 @@
   const L = typeof module !== 'undefined' && module.exports
     ? require('./editor.js')
     : globalThis.slidesLib;
+  const Prompt = typeof module !== 'undefined' && module.exports
+    ? require('./ai/prompt.js')
+    : globalThis.makepresentationAiPrompt;
+  const Styles = typeof module !== 'undefined' && module.exports
+    ? require('./ai/styles.js')
+    : globalThis.makepresentationAiStyles;
 
   const SESSION_VERSION = 1;
   const MAX_SESSIONS = 3;
@@ -130,38 +136,20 @@
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   }
 
-  function slideSnapshot(slide) {
-    const copy = structuredClone(slide);
-    for (const shape of copy.shapes || []) {
-      if (shape.kind === 'image') shape.src = '[existing image preserved by the app]';
-    }
-    return copy;
-  }
-
-  function slidePrompt(prompt, slide, size, slideNumber) {
-    return [
-      `Modify slide ${slideNumber} according to the request below.`,
-      'Return only the JSON object required by the output schema.',
-      'Use zero-based shape indices from the supplied slide.',
-      'Do not add image shapes. Existing image shapes may be repositioned with update operations.',
-      'For update operations, set every unchanged field in changes to null.',
-      'For add operations, set fields unused by the shape kind to null. Pen shapes still require points.',
-      'Set background to null unless the slide background should change.',
-      '',
-      `Request: ${prompt}`,
-      `Slide size: ${JSON.stringify(size)}`,
-      `Slide: ${JSON.stringify(slideSnapshot(slide))}`,
-    ].join('\n');
-  }
-
+  // Sent once when the thread starts, so it has to hold every mode. Each turn
+  // then repeats only the rules for the mode it is in; a model that has to
+  // choose which of three instruction blocks applies tends to blend them.
   function baseInstructions(systemPrompts) {
     const prompts = systemPrompts && typeof systemPrompts === 'object' ? systemPrompts : {};
     return [
-      'You are the AI assistant inside akbun-makepresentation.',
-      'Help with presentation text, generated images, and structured slide edits.',
-      'Follow the developer instructions and return only the requested result.',
+      'You are the AI assistant inside akbun-makepresentation, a desktop slide editor.',
+      'You never see the deck file. Everything you know about a slide arrives in the request:',
+      'a measured reading of the slide, and in slide mode a rendered picture of it.',
+      'Treat that reading as authoritative. Do not ask for the slide and do not invent shapes that are not in it.',
+      'Every request is labelled TEXT MODE, IMAGE MODE or SLIDE MODE and carries the rules for that mode.',
+      'Obey the labelled mode even when the user\'s wording sounds like another one.',
       '',
-      'App-configured system prompts follow. Apply the prompt matching the request mode.',
+      'The user configured one system prompt per mode. Apply only the one matching the labelled mode.',
       `<TEXT_MODE_SYSTEM_PROMPT>${safeText(prompts.text, 20_000)}</TEXT_MODE_SYSTEM_PROMPT>`,
       `<IMAGE_MODE_SYSTEM_PROMPT>${safeText(prompts.image, 20_000)}</IMAGE_MODE_SYSTEM_PROMPT>`,
       `<SLIDE_MODE_SYSTEM_PROMPT>${safeText(prompts.slide, 20_000)}</SLIDE_MODE_SYSTEM_PROMPT>`,
@@ -260,35 +248,52 @@
     );
   }
 
+  // Returns { patch, reason }. The reason is the whole point: the old parser
+  // returned null and the panel said "the slide response was invalid", which
+  // told neither the user nor the retry what to fix.
   function parseSlidePatch(text, shapeCount) {
+    const reject = (reason) => ({ patch: null, reason });
     const value = jsonObject(text);
-    if (!value || typeof value.summary !== 'string' || !Array.isArray(value.operations)) {
-      return null;
-    }
+    if (!value) return reject('the answer was not a single JSON object');
+    if (typeof value.summary !== 'string') return reject('summary was missing or not a string');
+    if (!Array.isArray(value.operations)) return reject('operations was missing or not an array');
     const operations = [];
-    for (const operation of value.operations.slice(0, 100)) {
-      if (!operation || typeof operation !== 'object') return null;
+    for (const [position, operation] of value.operations.slice(0, 100).entries()) {
+      if (!operation || typeof operation !== 'object') {
+        return reject(`operation ${position} was not an object`);
+      }
       if (operation.op === 'add') {
         const shape = L.parseClipboardShapes(JSON.stringify([operation.shape]))[0];
-        if (!shape || shape.kind === 'image') return null;
+        if (!shape) {
+          return reject(`operation ${position} adds a shape the editor cannot read; check kind, x, y, w, h and the colour format`);
+        }
+        if (shape.kind === 'image') return reject(`operation ${position} adds an image shape, which is not allowed`);
         operations.push({ op: 'add', shape });
         continue;
       }
       const index = Number(operation.index);
-      if (!Number.isInteger(index) || index < 0 || index >= shapeCount) return null;
+      if (!Number.isInteger(index) || index < 0 || index >= shapeCount) {
+        return reject(`operation ${position} uses index ${operation.index}, but the slide has ${shapeCount} shape${shapeCount === 1 ? '' : 's'} (valid indices 0 to ${shapeCount - 1})`);
+      }
       if (operation.op === 'remove') {
         operations.push({ op: 'remove', index });
       } else if (operation.op === 'update') {
         operations.push({ op: 'update', index, changes: cleanChanges(operation.changes) });
       } else {
-        return null;
+        return reject(`operation ${position} has op "${operation.op}", which is not update, remove or add`);
       }
+    }
+    if (!operations.length && !value.background) {
+      return reject('the answer changed nothing: no operations and no background');
     }
     const background = typeof value.background === 'string' &&
       /^(none|#[0-9a-f]{6})$/i.test(value.background)
       ? value.background
       : null;
-    return { summary: safeText(value.summary, 500), background, operations };
+    return {
+      patch: { summary: safeText(value.summary, 500), background, operations },
+      reason: '',
+    };
   }
 
   function applySlidePatch(sourceSlide, patch) {
@@ -327,11 +332,21 @@
     encodedJsonTextBytes,
     canAppendText,
     cryptoId,
-    slideSnapshot,
-    slidePrompt,
     baseInstructions,
     parseSlidePatch,
     applySlidePatch,
+    QUICK_CHIPS: Prompt.QUICK_CHIPS,
+    chip: Prompt.chip,
+    chipsForMode: Prompt.chipsForMode,
+    selectedChips: Prompt.selectedChips,
+    usesDiagramStyle: Prompt.usesDiagramStyle,
+    slideDigest: Prompt.slideDigest,
+    composeTurn: Prompt.composeTurn,
+    retryTurn: Prompt.retryTurn,
+    PALETTES: Styles.PALETTES,
+    LAYOUTS: Styles.LAYOUTS,
+    DEFAULT_PALETTE_ID: Styles.DEFAULT_PALETTE_ID,
+    DEFAULT_LAYOUT_ID: Styles.DEFAULT_LAYOUT_ID,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
