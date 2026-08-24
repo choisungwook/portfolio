@@ -8,6 +8,16 @@ pub const MAX_SESSIONS: usize = 3;
 pub const SESSION_LIMIT_BYTES: u64 = 128 * 1024 * 1024;
 pub const SESSION_RESERVE_BYTES: u64 = 4 * 1024;
 
+/// A rendered slide handed to the model as turn input. Large enough for a
+/// 1.5x raster of a 16:9 canvas, small enough that a runaway caller cannot
+/// fill the disk one turn at a time.
+pub const MAX_SLIDE_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+
+/// How many rendered slides stay on disk. The model reads the file during the
+/// turn it was written for, so the previous few are kept rather than deleted
+/// straight away, and everything older goes.
+pub const KEPT_SLIDE_IMAGES: usize = 4;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
@@ -195,6 +205,60 @@ impl AiStore {
             path: destination.to_string_lossy().to_string(),
             size_bytes: size,
         })
+    }
+
+    /// Writes a rendered slide into the runtime directory and returns its path.
+    ///
+    /// It lands in the runtime root rather than in a session because it is turn
+    /// input, not conversation content: it must not count against the 128 MiB a
+    /// conversation is allowed, and it must survive the conversation being
+    /// deleted mid-turn.
+    pub fn save_slide_image(&self, image_id: &str, data: &[u8]) -> Result<PathBuf, String> {
+        validate_id(image_id)?;
+        if data.len() > MAX_SLIDE_IMAGE_BYTES {
+            return Err("slide_image_too_large: rendered slide exceeds 8 MiB".into());
+        }
+        if !data.starts_with(&[0x89, b'P', b'N', b'G']) {
+            return Err("slide_image_not_png: expected a PNG image".into());
+        }
+        let directory = self.slide_images_root();
+        fs::create_dir_all(&directory).map_err(display_error("create AI slide image directory"))?;
+        let path = directory.join(format!("{image_id}.png"));
+        let temporary = directory.join(format!("{image_id}.png.tmp"));
+        fs::write(&temporary, data).map_err(display_error("write AI slide image"))?;
+        fs::rename(&temporary, &path).map_err(display_error("replace AI slide image"))?;
+        self.prune_slide_images()?;
+        Ok(path)
+    }
+
+    pub fn slide_images_root(&self) -> PathBuf {
+        self.runtime_root().join("slides")
+    }
+
+    fn prune_slide_images(&self) -> Result<(), String> {
+        let directory = self.slide_images_root();
+        let mut files = Vec::new();
+        for entry in fs::read_dir(&directory).map_err(display_error("list AI slide images"))? {
+            let entry = entry.map_err(display_error("read AI slide image entry"))?;
+            let metadata = entry
+                .metadata()
+                .map_err(display_error("inspect AI slide image"))?;
+            if !metadata.is_file() {
+                continue;
+            }
+            let modified = metadata
+                .modified()
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            files.push((modified, entry.path()));
+        }
+        if files.len() <= KEPT_SLIDE_IMAGES {
+            return Ok(());
+        }
+        files.sort_by(|left, right| right.0.cmp(&left.0));
+        for (_, path) in files.into_iter().skip(KEPT_SLIDE_IMAGES) {
+            let _ = fs::remove_file(path);
+        }
+        Ok(())
     }
 
     pub fn copy_image(&self, source_path: &Path, destination: &Path) -> Result<(), String> {
@@ -442,5 +506,67 @@ mod tests {
         assert!(error.starts_with("session_limit_exceeded:"));
         assert!(!source.exists());
         fs::remove_dir_all(store.root.parent().unwrap()).unwrap();
+    }
+
+    const PNG_HEADER: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+
+    fn png(size: usize) -> Vec<u8> {
+        let mut data = PNG_HEADER.to_vec();
+        data.resize(size.max(PNG_HEADER.len()), 0);
+        data
+    }
+
+    #[test]
+    fn stores_a_rendered_slide_in_the_runtime_directory() {
+        let store = temporary_store();
+        store.ensure().unwrap();
+        let path = store.save_slide_image("slide-one", &png(64)).unwrap();
+
+        assert!(path.exists());
+        assert!(path.starts_with(store.runtime_root()));
+        // Turn input must not count against the conversation budget, so it
+        // lives outside every session directory.
+        assert!(!path.starts_with(store.sessions_root()));
+    }
+
+    #[test]
+    fn rejects_a_slide_image_that_is_not_a_png() {
+        let store = temporary_store();
+        store.ensure().unwrap();
+
+        assert!(store
+            .save_slide_image("slide-one", b"<svg/>")
+            .unwrap_err()
+            .starts_with("slide_image_not_png:"));
+        assert!(store
+            .save_slide_image("../escape", &png(64))
+            .unwrap_err()
+            .starts_with("invalid_session_id:"));
+        assert!(store
+            .save_slide_image("slide-one", &png(MAX_SLIDE_IMAGE_BYTES + 1))
+            .unwrap_err()
+            .starts_with("slide_image_too_large:"));
+    }
+
+    #[test]
+    fn keeps_only_the_most_recent_slide_images() {
+        let store = temporary_store();
+        store.ensure().unwrap();
+        for index in 0..KEPT_SLIDE_IMAGES + 3 {
+            store
+                .save_slide_image(&format!("slide-{index}"), &png(64))
+                .unwrap();
+            // Coarse filesystem timestamps would otherwise make the sort order
+            // arbitrary and the pruning look flaky.
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+
+        let remaining = fs::read_dir(store.slide_images_root()).unwrap().count();
+        assert_eq!(remaining, KEPT_SLIDE_IMAGES);
+        assert!(store
+            .slide_images_root()
+            .join(format!("slide-{}.png", KEPT_SLIDE_IMAGES + 2))
+            .exists());
+        assert!(!store.slide_images_root().join("slide-0.png").exists());
     }
 }

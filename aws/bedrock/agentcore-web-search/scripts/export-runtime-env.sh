@@ -23,12 +23,18 @@ gateway_url="$(aws bedrock-agentcore-control get-gateway \
   --query gatewayUrl \
   --output text)"
 
-jq -r --arg gateway_url "$gateway_url" --arg aws_region "$aws_region" '
-  "AWS_ACCESS_KEY_ID=\(.AccessKeyId)",
-  "AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey)",
-  "AWS_SESSION_TOKEN=\(.SessionToken)",
+jq -r '
+  "[runtime]",
+  "aws_access_key_id = \(.AccessKeyId)",
+  "aws_secret_access_key = \(.SecretAccessKey)",
+  "aws_session_token = \(.SessionToken)"
+' <<<"$credentials" >"$workspace_dir/.runtime.aws-credentials"
+
+jq -nr --arg gateway_url "$gateway_url" --arg aws_region "$aws_region" '
   "AGENTCORE_GATEWAY_URL=\($gateway_url)",
   "AWS_REGION=\($aws_region)"
-' <<<"$credentials" >"$workspace_dir/.runtime.env"
+' >"$workspace_dir/.runtime.env"
 
-chmod 600 "$workspace_dir/.runtime.env"
+chmod 600 \
+  "$workspace_dir/.runtime.aws-credentials" \
+  "$workspace_dir/.runtime.env"

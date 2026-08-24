@@ -2,7 +2,7 @@
 
 ## Decision
 
-Export by serializing the rendered SVG, loading it through an `<img>`, and drawing it onto a canvas at 2x over a white fill. To make that path produce a correct image, turn `htmlLabels` off in mermaid and give it a system font stack instead of the page's webfont. Cap the export scale so the long edge never passes 8192 px.
+Export by serializing the rendered SVG, loading it through an `<img>`, and drawing it onto a canvas at 2x over a white fill. Use the resulting PNG blob for both file download and clipboard copy. To make that path produce a correct image, turn `htmlLabels` off in mermaid and give it a system font stack instead of the page's webfont. Cap the export scale so the long edge never passes 8192 px.
 
 ## Reason
 

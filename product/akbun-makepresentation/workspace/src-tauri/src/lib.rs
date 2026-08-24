@@ -77,6 +77,7 @@ pub fn run() {
             ai::ai_save_session,
             ai::ai_delete_session,
             ai::ai_attach_image,
+            ai::ai_save_slide_image,
             ai::ai_copy_image,
             commands::open_deck,
             commands::save_deck,

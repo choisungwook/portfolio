@@ -1,5 +1,6 @@
 .env
 .runtime.env
+.runtime.aws-credentials
 .venv/
 __pycache__/
 .pytest_cache/

@@ -1,7 +1,8 @@
 -include .env
+-include .runtime.env
 export
 
-.PHONY: test format-check bedrock-web-search agentcore-web-search agentcore-harmful
+.PHONY: test format-check bedrock-web-search agentcore-web-search direct-agentcore-web-search agentcore-harmful
 
 test:
 	uv sync --dev
@@ -20,4 +21,8 @@ bedrock-web-search:
 	uv run python scripts/bedrock_web_search.py
 
 agentcore-web-search:
-	uv run python scripts/agentcore_web_search.py
+	uv run python -m agentcore_web_search.litellm_with_agentcore_web_search
+
+direct-agentcore-web-search:
+	AWS_SHARED_CREDENTIALS_FILE=$(CURDIR)/.runtime.aws-credentials AWS_PROFILE=runtime \
+		uv run python -m agentcore_web_search.direct_agentcore_web_search

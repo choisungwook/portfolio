@@ -15,3 +15,5 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [편집 기본값은 객체 종류별 로컬 설정으로 관리](2026-08-editor-defaults-are-local-settings.md)
 * [도형 정렬과 자석은 보이는 바깥 경계를 사용](2026-08-shape-alignment-uses-visual-bounds.md)
 * [브라우저 편집기 파일은 변경 이유별로 분리](2026-08-browser-editor-files-follow-change-reasons.md)
+* [슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다](2026-08-the-model-is-told-what-the-slide-is.md)
+* [AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다](2026-08-quick-chips-are-toggles-not-macros.md)

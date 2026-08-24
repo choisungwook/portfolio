@@ -105,7 +105,8 @@
 95. LLM serving challenge와 essential optimization Chapter 5-6 핸즈온 (26.8.22) - [링크](./computer_science/ai/study-llmserving/ch5-6/)
 96. SearXNG 프로덕션 주의사항과 봇 탐지 핸즈온 (26.8.23) - [링크](./computer_science/ai/searxng-production/)
 97. Amazon Bedrock Web Search와 AgentCore 핸즈온 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/)
-98. OpenAI Codex 평가 게이트와 개선 루프 핸즈온 (26.8.25) - [링크](./computer_science/ai/codex-eval-loop/)
+98. Amazon Bedrock Web Search 유해콘텐스 검색 테스트 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/docs/5-safety-test.md)
+99. OpenAI Codex 평가 게이트와 개선 루프 핸즈온 (26.8.25) - [링크](./computer_science/ai/codex-eval-loop/)
 
 ## 직접 만든 제품
 

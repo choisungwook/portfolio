@@ -121,16 +121,31 @@ fi
 aws_cli logs put-retention-policy \
   --log-group-name "$log_group_name" \
   --retention-in-days 7
-aws_cli logs put-delivery-source \
-  --name "$delivery_source_name" \
-  --resource-arn "$gateway_arn" \
-  --log-type APPLICATION_LOGS \
-  --tags ManagedBy=AWSCLI,Project="$project_name" >/dev/null
+
+delivery_source_args=(
+  --name "$delivery_source_name"
+  --resource-arn "$gateway_arn"
+  --log-type APPLICATION_LOGS
+)
+if ! aws_cli logs describe-delivery-sources --output json |
+  jq -e --arg name "$delivery_source_name" \
+    '.deliverySources[]? | select(.name == $name)' >/dev/null; then
+  delivery_source_args+=(--tags ManagedBy=AWSCLI,Project="$project_name")
+fi
+aws_cli logs put-delivery-source "${delivery_source_args[@]}" >/dev/null
+
+delivery_destination_args=(
+  --name "$delivery_destination_name"
+  --output-format json
+  --delivery-destination-configuration destinationResourceArn="$log_group_arn"
+)
+if ! aws_cli logs describe-delivery-destinations --output json |
+  jq -e --arg name "$delivery_destination_name" \
+    '.deliveryDestinations[]? | select(.name == $name)' >/dev/null; then
+  delivery_destination_args+=(--tags ManagedBy=AWSCLI,Project="$project_name")
+fi
 delivery_destination_arn="$(aws_cli logs put-delivery-destination \
-  --name "$delivery_destination_name" \
-  --output-format json \
-  --delivery-destination-configuration destinationResourceArn="$log_group_arn" \
-  --tags ManagedBy=AWSCLI,Project="$project_name" \
+  "${delivery_destination_args[@]}" \
   --query deliveryDestination.arn \
   --output text)"
 delivery_id="$(aws_cli logs describe-deliveries \

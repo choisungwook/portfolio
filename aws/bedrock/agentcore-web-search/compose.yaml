@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: "${LITELLM_DATABASE_NAME:-litellm}"
+      POSTGRES_USER: "${LITELLM_DATABASE_USER:-litellm}"
+      POSTGRES_PASSWORD: "${LITELLM_DATABASE_PASSWORD:-litellm-local}"
+    volumes:
+      - litellm_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   litellm:
     image: ghcr.io/berriai/litellm@sha256:a3596b705e24f83ede26b38fb8df002b44ef4ef9ae9a8aaef731f18892a1b30a
     command: ["--config", "/app/config.yaml", "--port", "4000"]
@@ -7,10 +24,18 @@ services:
         required: false
       - path: .runtime.env
         required: false
+    environment:
+      AWS_PROFILE: runtime
+      AWS_SHARED_CREDENTIALS_FILE: /run/secrets/aws_credentials
+      DATABASE_URL: "postgresql://${LITELLM_DATABASE_USER:-litellm}:${LITELLM_DATABASE_PASSWORD:-litellm-local}@postgres:5432/${LITELLM_DATABASE_NAME:-litellm}"
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${LITELLM_PORT:-4001}:4000"
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
+      - ./.runtime.aws-credentials:/run/secrets/aws_credentials:ro
     healthcheck:
       test:
         - CMD
@@ -21,3 +46,6 @@ services:
       timeout: 3s
       retries: 12
     restart: unless-stopped
+
+volumes:
+  litellm_postgres_data:

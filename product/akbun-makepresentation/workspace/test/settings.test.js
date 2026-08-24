@@ -125,3 +125,20 @@ test('settings keep snapping enabled unless the user turns it off', () => {
     { enabled: false }
   );
 });
+
+test('an untouched legacy AI prompt is refreshed but a written one is kept', () => {
+  const written = '내가 직접 쓴 프롬프트';
+  const prompts = S.normalizeAiSystemPrompts({
+    text: S.LEGACY_AI_SYSTEM_PROMPTS.text,
+    image: written,
+  });
+
+  assert.equal(prompts.text, S.DEFAULT_AI_SYSTEM_PROMPTS.text);
+  assert.equal(prompts.image, written);
+  assert.equal(prompts.slide, S.DEFAULT_AI_SYSTEM_PROMPTS.slide);
+});
+
+test('the slide prompt tells the model the measurements outrank its impression', () => {
+  assert.match(S.DEFAULT_AI_SYSTEM_PROMPTS.slide, /Trust the measurements/);
+  assert.match(S.DEFAULT_AI_SYSTEM_PROMPTS.text, /measured reading/);
+});

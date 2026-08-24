@@ -114,6 +114,20 @@ async function insertAiImage(_path, assetUrl) {
   if (!response.ok) throw new Error(`cannot read saved image (${response.status})`);
   const shape = await pastedImageShape(await response.blob(), 0);
   insertShapes([shape], 0);
+  return state.current + 1;
+}
+
+// The model reads coordinates from the digest, but only a picture tells it that
+// two boxes look crowded. The raster goes to the AI runtime directory rather
+// than to a session: it is input for one turn, not conversation content.
+async function renderAiSlideImage(index) {
+  const reference = state.deck.slides[index];
+  if (!reference || !window.api.isDesktop) return '';
+  const raster = await rasterizeSlideCanvas(reference, 0);
+  return window.api.aiSaveSlideImage(
+    AI.cryptoId().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64),
+    raster.toDataURL('image/png')
+  );
 }
 
 async function initialize() {
@@ -137,9 +151,15 @@ async function initialize() {
       label: `Slide ${index + 1}`,
     })),
     captureSlide: captureAiSlide,
+    currentSlide: () => state.deck.slides[state.current],
     applySlidePatch: applyAiSlidePatch,
     insertImage: insertAiImage,
+    renderSlideImage: renderAiSlideImage,
     deckSize,
+    slideGeometry: () => {
+      const { width, height } = deckSize();
+      return S.guidelineGeometry(width, height, appSettings.guidelines);
+    },
     systemPrompts: () => appSettings.aiSystemPrompts,
   });
 }

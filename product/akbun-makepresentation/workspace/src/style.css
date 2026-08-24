@@ -911,6 +911,65 @@ main {
   max-width: 160px;
 }
 
+.ai-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+/* A chip is on until it is turned off, so the active state has to read at a
+   glance next to three or four siblings, not only against the panel. */
+.ai-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ai-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.ai-chip:disabled {
+  opacity: 0.5;
+}
+
+.ai-diagram-style {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-diagram-style label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ai-diagram-style select {
+  max-width: 132px;
+}
+
+.ai-palette-swatches {
+  display: flex;
+  gap: 2px;
+}
+
+.ai-swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
 #ai-prompt {
   width: 100%;
   min-height: 74px;

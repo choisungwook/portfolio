@@ -9,10 +9,34 @@
   const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
   const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
   const DEFAULT_AI_SYSTEM_PROMPTS = Object.freeze({
+    text: [
+      'You write presentation copy. Every request carries a measured reading of the current slide; answer about that slide, not about slides in general.',
+      'Prefer short lines with parallel grammar over sentences. One idea per line.',
+      'Keep the user\'s language and every technical term exactly as written. Return only the requested text.',
+    ].join(' '),
+    image: [
+      'You generate one presentation-ready image per request.',
+      'Compose for a projector: a single clear subject, generous margins, high contrast, nothing important near the edges.',
+      'Add no text, captions, labels, watermarks or UI unless the request asks for them.',
+    ].join(' '),
+    slide: [
+      'You edit slides through a structured patch. The request carries a measured reading of the slide, and often a rendered picture of it; both describe the same slide.',
+      'Trust the measurements over your impression. Indices, coordinates and colours in the reading are exact.',
+      'Fix what the reading reports: overlaps, shapes outside the canvas, edges that nearly align, sibling shapes that are nearly the same size, and more than three font sizes.',
+      'Change meaning only when asked. Prefer moving and resizing what exists over adding more.',
+    ].join(' '),
+  });
+
+  // The v4 defaults. A user who never opened the prompt boxes should get the
+  // sharper text above, but a user who wrote their own must keep it, and the
+  // two are indistinguishable in stored settings unless the old wording is
+  // remembered here.
+  const LEGACY_AI_SYSTEM_PROMPTS = Object.freeze({
     text: 'You are a presentation writing assistant. Produce concise, audience-ready wording with a clear hierarchy. Preserve the user\'s language and return only the requested text.',
     image: 'You are a presentation visual designer. Generate one clean, presentation-ready image that communicates the requested idea. Avoid embedded text unless the user explicitly asks for it.',
     slide: 'You are a presentation slide editor. Improve the selected slide\'s clarity, hierarchy, spacing, alignment, and visual consistency while preserving its core meaning. Prefer focused edits over unnecessary additions.',
   });
+
   const DEFAULT_SHAPE_BORDER = Object.freeze({
     color: '#e03131',
     width: 2,
@@ -113,17 +137,20 @@
     return { enabled: source.enabled !== false };
   }
 
-  function normalizeSystemPrompt(value, fallback) {
+  function normalizeSystemPrompt(value, mode) {
     const prompt = typeof value === 'string' ? value.trim() : '';
-    return prompt ? prompt.slice(0, MAX_SYSTEM_PROMPT_LENGTH) : fallback;
+    if (!prompt || prompt === LEGACY_AI_SYSTEM_PROMPTS[mode]) {
+      return DEFAULT_AI_SYSTEM_PROMPTS[mode];
+    }
+    return prompt.slice(0, MAX_SYSTEM_PROMPT_LENGTH);
   }
 
   function normalizeAiSystemPrompts(value) {
     const source = value && typeof value === 'object' ? value : {};
     return Object.fromEntries(
-      Object.entries(DEFAULT_AI_SYSTEM_PROMPTS).map(([mode, fallback]) => [
+      Object.keys(DEFAULT_AI_SYSTEM_PROMPTS).map((mode) => [
         mode,
-        normalizeSystemPrompt(source[mode], fallback),
+        normalizeSystemPrompt(source[mode], mode),
       ])
     );
   }
@@ -195,6 +222,7 @@
     DEFAULT_SHAPE_BORDER,
     DEFAULT_IMAGE_BORDER,
     DEFAULT_AI_SYSTEM_PROMPTS,
+    LEGACY_AI_SYSTEM_PROMPTS,
     MAX_SYSTEM_PROMPT_LENGTH,
     defaultAppSettings,
     normalizeGuidelines,

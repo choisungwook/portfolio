@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-08-24
+
+* **Creation**: [슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다](decisions/2026-08-the-model-is-told-what-the-slide-is.md) 결정 기록.
+* **Creation**: [AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다](decisions/2026-08-quick-chips-are-toggles-not-macros.md) 결정 기록.
+
 ## 2026-08-16
 
 * **Creation**: [브라우저 편집기 파일은 변경 이유별로 분리](decisions/2026-08-browser-editor-files-follow-change-reasons.md) 결정 기록.
