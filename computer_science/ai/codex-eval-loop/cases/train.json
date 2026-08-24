@@ -1,0 +1,10 @@
+[
+  {"name": "source file", "path": "src/app.py", "expected": true},
+  {"name": "absolute path", "path": "/etc/passwd", "expected": false},
+  {"name": "parent prefix", "path": "../secret", "expected": false},
+  {"name": "parent segment", "path": "src/../secret", "expected": false},
+  {"name": "empty segment", "path": "src//app.py", "expected": false},
+  {"name": "backslash", "path": "src\\app.py", "expected": false},
+  {"name": "empty path", "path": "", "expected": false},
+  {"name": "documentation", "path": "docs/agent-loop.md", "expected": true}
+]
