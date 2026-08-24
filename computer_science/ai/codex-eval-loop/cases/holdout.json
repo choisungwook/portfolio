@@ -1,0 +1,10 @@
+[
+  {"name": "workflow", "path": ".github/workflows/test.yml", "expected": true},
+  {"name": "double dot in name", "path": "notes..md", "expected": true},
+  {"name": "current prefix", "path": "./src/app.py", "expected": false},
+  {"name": "current segment", "path": "src/./app.py", "expected": false},
+  {"name": "space", "path": "src/app test.py", "expected": false},
+  {"name": "non ascii", "path": "src/한글.md", "expected": false},
+  {"name": "dot file", "path": "src/.env", "expected": true},
+  {"name": "trailing slash", "path": "src/", "expected": false}
+]
