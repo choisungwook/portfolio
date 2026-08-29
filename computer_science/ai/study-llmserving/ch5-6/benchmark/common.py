@@ -121,27 +121,118 @@ async def stream_completion(
   return RequestMetric(ttft * 1000, tpot * 1000, (finished - started) * 1000, output_tokens)
 
 
+GAUGE_PATTERN = r"^{name}(?:\{{[^}}]*\}})?\s+([0-9.eE+-]+)$"
+
+
+class ServerGaugeSampler:
+  """Poll a server's own /metrics while a benchmark runs and keep the peaks.
+
+  Prometheus scrapes every few seconds, so a benchmark step that finishes in
+  two seconds can leave no sample at all and report a peak of zero. Reading the
+  endpoint directly at a short interval removes that blind spot.
+  """
+
+  def __init__(self, metrics_url: str, gauges: list[str], interval_seconds: float = 0.5):
+    self.metrics_url = metrics_url
+    self.gauges = gauges
+    self.interval_seconds = interval_seconds
+    self.peaks: dict[str, float] = {}
+    self._task = None
+
+  async def __aenter__(self) -> "ServerGaugeSampler":
+    """Start sampling in the background."""
+    import asyncio
+
+    self._task = asyncio.create_task(self._run())
+    return self
+
+  async def __aexit__(self, *_) -> None:
+    """Stop sampling."""
+    import asyncio
+
+    if self._task:
+      self._task.cancel()
+      try:
+        await self._task
+      except asyncio.CancelledError:
+        pass
+
+  async def _run(self) -> None:
+    """Sample until cancelled, ignoring transient scrape failures."""
+    import asyncio
+
+    async with httpx.AsyncClient(timeout=5) as client:
+      while True:
+        try:
+          response = await client.get(self.metrics_url)
+          self._record(response.text)
+        except httpx.HTTPError:
+          pass
+        await asyncio.sleep(self.interval_seconds)
+
+  def _record(self, metrics_text: str) -> None:
+    """Keep the highest value seen for each watched gauge."""
+    import re
+
+    for gauge in self.gauges:
+      pattern = GAUGE_PATTERN.format(name=re.escape(gauge))
+      values = [float(match) for match in re.findall(pattern, metrics_text, re.MULTILINE)]
+      if values:
+        self.peaks[gauge] = max(self.peaks.get(gauge, 0.0), max(values))
+
+
+async def fetch_metric_values(
+  prometheus_url: str,
+  query: str,
+  started_epoch: float,
+  finished_epoch: float,
+) -> list[float]:
+  """Read every sample of one Prometheus query inside a benchmark window."""
+  params = {"query": query, "start": started_epoch, "end": finished_epoch, "step": "5s"}
+  try:
+    async with httpx.AsyncClient(timeout=20) as client:
+      response = await client.get(f"{prometheus_url}/api/v1/query_range", params=params)
+      response.raise_for_status()
+      series = response.json()["data"]["result"]
+    return [float(value) for item in series for _, value in item["values"]]
+  except (httpx.HTTPError, KeyError, TypeError, ValueError):
+    return []
+
+
+async def fetch_metric_peak(
+  prometheus_url: str,
+  query: str,
+  started_epoch: float,
+  finished_epoch: float,
+) -> float | None:
+  """Return the highest sample of one Prometheus query inside a window."""
+  values = await fetch_metric_values(prometheus_url, query, started_epoch, finished_epoch)
+  return max(values) if values else None
+
+
+async def fetch_metric_mean(
+  prometheus_url: str,
+  query: str,
+  started_epoch: float,
+  finished_epoch: float,
+) -> float | None:
+  """Return the mean sample of one Prometheus query inside a window."""
+  values = await fetch_metric_values(prometheus_url, query, started_epoch, finished_epoch)
+  return sum(values) / len(values) if values else None
+
+
 async def fetch_peak_vram_mib(
   prometheus_url: str,
   started_epoch: float,
   finished_epoch: float,
 ) -> float | None:
   """Read peak framebuffer usage from DCGM metrics for one benchmark window."""
-  params = {
-    "query": "DCGM_FI_DEV_FB_USED",
-    "start": started_epoch,
-    "end": finished_epoch,
-    "step": "5s",
-  }
-  try:
-    async with httpx.AsyncClient(timeout=20) as client:
-      response = await client.get(f"{prometheus_url}/api/v1/query_range", params=params)
-      response.raise_for_status()
-      series = response.json()["data"]["result"]
-    values = [float(value) for item in series for _, value in item["values"]]
-    return max(values) if values else None
-  except (httpx.HTTPError, KeyError, TypeError, ValueError):
-    return None
+  return await fetch_metric_peak(
+    prometheus_url,
+    "DCGM_FI_DEV_FB_USED",
+    started_epoch,
+    finished_epoch,
+  )
 
 
 def save_json(data: dict[str, Any], path: Path) -> None:

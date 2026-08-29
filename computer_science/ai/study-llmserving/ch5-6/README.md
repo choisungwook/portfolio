@@ -4,6 +4,21 @@ Batching과 quantization option부터 바꾸면 성능 숫자는 달라져도 �
 
 이 workspace는 RTX 5060 Ti 16GB에서 memory budget → scheduling → observability → quantization → caching 순서로 가설을 검증합니다.
 
+## 문서 인덱스
+
+전체 문서 목록과 chapter별 경로는 [문서 인덱스](./docs/)에 있습니다. 실습만 볼 때는 [실습 인덱스](./docs/handson/)를 봅니다.
+
+**Chapter 5만 볼 때는 이 순서입니다.**
+
+| 순서 | 문서 | 답하는 질문 |
+| ---: | --- | --- |
+| 0 | [Chapter 5 이론](./docs/02-ch5-theory.md) | weight 말고 무엇이 VRAM을 쓰는가 |
+| 1 | [02 메모리 예산과 OOM](./docs/handson/02-memory-budget-oom.md) | 계산상 들어가는데 왜 OOM이 나는가 |
+| 2 | [09 KV cache 배치·시퀀스](./docs/handson/09-kv-cache-batch-sequence.md) | 캐시할 토큰 개수를 어떻게 세고 최대 배치는 무엇이 정하는가 |
+| 3 | [08 roofline과 병목 재현](./docs/handson/08-roofline-bottleneck.md) | 연산집약도 축은 무엇이고 병목이 연산인가 대역폭인가 |
+
+Chapter 6는 [Chapter 6 이론](./docs/04-ch6-theory.md) 다음에 실습 03, 04, 06, 07 순서입니다.
+
 ## 먼저 원리를 이해합니다
 
 - [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](./docs/02-ch5-theory.md)
@@ -22,15 +37,19 @@ Chapter 5는 hardware 용어 모음이 아닙니다. Chapter 6의 optimization�
 - 전체 실습 순서: [LLM serving이 느린 이유를 GPU에서 직접 확인하는 순서](./docs/handson/)
 - 관측 기준: [GPU 사용률이 높은데 LLM이 느릴 때 무엇을 봐야 할까](./docs/prometheus.md)
 
-| 순서 | 질문 | 확인할 결과 |
-| ---: | --- | --- |
-| 1 | Host와 container가 같은 GPU를 사용하는가 | GPU·driver·VRAM·Prometheus target |
-| 2 | 7B BF16은 왜 16GB에서 OOM이 나는가 | weight budget·runtime overhead |
-| 3 | Batch를 키우면 latency와 throughput이 어떻게 바뀌는가 | Queue·TTFT·E2E·Output TPS |
-| 4 | Static·dynamic·continuous batching은 어떻게 다른가 | admission delay·TTFT·RPS |
-| 5 | 느린 구간이 prefill인가 decode인가 | Prefill·Decode p95·TPOT·KV cache |
-| 6 | W4A16과 W8A8 중 무엇이 workload에 맞는가 | 성능·Peak VRAM·accuracy |
-| 7 | Prefix cache는 언제 TTFT를 줄이는가 | cold·warm·reordered request |
+| 순서 | Ch | 질문 | 확인할 결과 |
+| ---: | :-: | --- | --- |
+| 1 | 환경 | Host와 container가 같은 GPU를 사용하는가 | GPU·driver·VRAM·Prometheus target |
+| 2 | **5** | 7B BF16은 왜 16GB에서 OOM이 나는가 | weight budget·runtime overhead |
+| 3 | 6 | Batch를 키우면 latency와 throughput이 어떻게 바뀌는가 | Queue·TTFT·E2E·Output TPS |
+| 4 | 6 | Static·dynamic·continuous batching은 어떻게 다른가 | admission delay·TTFT·RPS |
+| 5 | 5→6 | 느린 구간이 prefill인가 decode인가 | Prefill·Decode p95·TPOT·KV cache |
+| 6 | 6 | W4A16과 W8A8 중 무엇이 workload에 맞는가 | 성능·Peak VRAM·accuracy |
+| 7 | 6 | Prefix cache는 언제 TTFT를 줄이는가 | cold·warm·reordered request |
+| 8 | **5** | 내 카드의 crossover는 몇 FLOPS/B인가 | 실측 peak TFLOPS·bandwidth·roofline 그래프 |
+| 9 | **5** | 배치와 시퀀스를 키우면 KV cache가 어떻게 차는가 | 예측 대비 실측 pool 점유율·running·waiting |
+
+번호는 만든 순서라 chapter가 섞여 있습니다. **Chapter 5만 보려면 이론 → 2 → 9 → 8 순서**로 읽습니다. chapter별 경로는 [실습 인덱스](./docs/handson/)에 정리돼 있습니다.
 
 ## 빠른 quality gate의 범위를 구분합니다
 

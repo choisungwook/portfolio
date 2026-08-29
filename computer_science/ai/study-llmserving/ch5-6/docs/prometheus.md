@@ -132,13 +132,36 @@ Waiting request가 늘어도 원인은 하나가 아닙니다. KV cache usage와
   - 단위: percent
   - 목적: GPU busy 비율 확인
   - 관찰: batch·prefill·decode별 utilization 변화
+- `DCGM_FI_DEV_MEM_COPY_UTIL`
+  - 수집값: memory interface가 read·write 중이던 시간 비율
+  - 단위: percent
+  - 목적: GPU utilization이 연산 때문인지 data 이동 때문인지 구분
+  - 관찰: decode 위주 workload에서 GPU util과 함께 높게 유지되는지
 - `DCGM_FI_DEV_POWER_USAGE`
   - 수집값: GPU power usage
   - 단위: watt
   - 목적: workload 강도와 전력 사용 연결
   - 관찰: batch·precision별 power pattern
 
-GPU utilization이 높다고 compute-bound로 단정할 수는 없습니다. Memory access를 기다리는 동안에도 GPU가 busy로 보일 수 있으므로 TTFT, TPOT, throughput, VRAM을 함께 해석해야 합니다.
+GPU utilization이 높다고 compute-bound로 단정할 수는 없습니다. Memory access를 기다리는 동안에도 GPU가 busy로 보일 수 있습니다.
+
+### MEM_COPY_UTIL을 겹쳐 봤지만 구분되지 않았습니다
+
+`DCGM_FI_DEV_GPU_UTIL`은 "SM에 할 일이 배정된 시간 비율"이라 대기 중에도 올라갑니다. 그래서 `DCGM_FI_DEV_MEM_COPY_UTIL`을 겹치면 방향이 보일 것이라 기대하고 실제로 재봤습니다. 결과는 기대와 달랐습니다.
+
+| 시나리오 | GPU util | Memory util |
+| --- | ---: | ---: |
+| decode 위주, batch 16 | 25% | 24% |
+| prefill 위주, prompt 3584 | 100% | 96% |
+| 혼합 | 100% | 96% |
+
+**두 값이 거의 같이 움직입니다.** 연산 병목을 노린 prefill 시나리오에서도 memory util이 96%로 높게 나옵니다. 이 카드에서 `MEM_COPY_UTIL`은 `GPU_UTIL`과 사실상 중복이라, 이것만으로 병목을 가르면 안 됩니다.
+
+이유는 지표의 정의에 있습니다. 둘 다 **"그 시간 동안 바빴는가"**를 재는 시간 비율이지 "대역폭의 몇 %를 썼는가"가 아닙니다. 후자를 재려면 `DCGM_FI_PROF_DRAM_ACTIVE` 같은 profiling 지표가 필요한데 GeForce 계열에는 노출되지 않습니다.
+
+그래서 판별은 지표가 아니라 산수로 합니다. [roofline과 병목 재현](./handson/08-roofline-bottleneck.md)에서 하듯 **측정한 대역폭에서 나오는 이론 상한과 실제 token 생성 속도를 비교**합니다. 실측에서 batch 1 decode가 상한의 101%, batch 16에서도 96%로 나왔고, 이것이 대역폭 병목의 훨씬 확실한 증거입니다.
+
+두 지표를 여전히 대시보드에 두는 이유는 세 번째 경우를 잡기 위해서입니다. 둘 다 낮으면 GPU가 노는 것이고, 그때는 client 동시성이나 queue를 봐야 합니다.
 
 ## Grafana에서는 질문별로 panel을 묶습니다
 

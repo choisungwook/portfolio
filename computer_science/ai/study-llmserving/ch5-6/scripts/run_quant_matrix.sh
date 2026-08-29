@@ -25,15 +25,15 @@ run_model() {
   docker compose --profile tools run --rm \
     -e "MODEL_LABEL=$label" \
     -e "PRECISION=$precision" \
-    benchmark python -m benchmark.benchmark_long_prefill
+    benchmark python3 -m benchmark.benchmark_long_prefill
   docker compose --profile tools run --rm \
     -e "MODEL_LABEL=$label" \
     -e "PRECISION=$precision" \
-    benchmark python -m benchmark.benchmark_long_decode
+    benchmark python3 -m benchmark.benchmark_long_decode
   if [[ "$label" == "bf16" ]]; then
     docker compose --profile tools run --rm \
       -e MODEL_LABEL=bf16 \
-      benchmark python -m benchmark.benchmark_prefix_cache
+      benchmark python3 -m benchmark.benchmark_prefix_cache
   fi
   docker compose stop "$service"
   docker compose rm -f "$service"
@@ -43,4 +43,4 @@ run_model() {
 run_model vllm-bf16 bf16 bf16 BF16
 run_model vllm-gptq gptq gptq-int4 W4A16
 run_model vllm-fp8 fp8 fp8 W8A8
-docker compose --profile tools run --rm benchmark python -m benchmark.summary
+docker compose --profile tools run --rm benchmark python3 -m benchmark.summary

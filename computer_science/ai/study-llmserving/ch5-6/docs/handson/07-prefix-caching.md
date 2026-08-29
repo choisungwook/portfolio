@@ -43,7 +43,7 @@ bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 Cold, warm, reordered request를 순서대로 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python -m benchmark.benchmark_prefix_cache
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python3 -m benchmark.benchmark_prefix_cache
 ```
 
 Request별 TTFT 결과를 확인합니다.

@@ -30,6 +30,8 @@ cd computer_science/ai/study-llmserving/ch5-6
 - reasoning quality gate: GSM8K 앞 20문항
 - 비교 지표: TTFT·TPOT·RPS·Output TPS·Peak VRAM·accuracy
 
+Peak VRAM을 비교하려면 `VLLM_GPU_MEMORY_UTILIZATION`을 세 설정에서 같게 두어야 합니다. 이 값이 KV pool 크기를 직접 정하기 때문에, 값이 다르면 quantization이 아니라 설정 차이를 재게 됩니다. 기본값 `0.85`를 그대로 쓰고 결과에 함께 기록합니다.
+
 ## BF16으로 기준점을 만듭니다
 
 Quantization 결과를 해석하려면 같은 model family의 BF16 결과가 먼저 필요합니다.
@@ -37,10 +39,10 @@ Quantization 결과를 해석하려면 같은 model family의 BF16 결과가 먼
 ```bash
 docker compose --profile bf16 up -d vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python -m benchmark.benchmark_long_prefill
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python -m benchmark.benchmark_long_decode
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python -m benchmark.accuracy_smoke
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python -m benchmark.accuracy_gsm8k
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python3 -m benchmark.benchmark_long_prefill
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python3 -m benchmark.benchmark_long_decode
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python3 -m benchmark.accuracy_smoke
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python3 -m benchmark.accuracy_gsm8k
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -52,10 +54,10 @@ docker compose rm -f vllm-bf16
 ```bash
 docker compose --profile gptq up -d vllm-gptq
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python -m benchmark.benchmark_long_prefill
-docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python -m benchmark.benchmark_long_decode
-docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 benchmark python -m benchmark.accuracy_smoke
-docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 benchmark python -m benchmark.accuracy_gsm8k
+docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python3 -m benchmark.benchmark_long_prefill
+docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python3 -m benchmark.benchmark_long_decode
+docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 benchmark python3 -m benchmark.accuracy_smoke
+docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 benchmark python3 -m benchmark.accuracy_gsm8k
 docker compose stop vllm-gptq
 docker compose rm -f vllm-gptq
 ```
@@ -69,10 +71,10 @@ FP8 model에도 같은 조건을 적용합니다.
 ```bash
 docker compose --profile fp8 up -d vllm-fp8
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python -m benchmark.benchmark_long_prefill
-docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python -m benchmark.benchmark_long_decode
-docker compose --profile tools run --rm -e MODEL_LABEL=fp8 benchmark python -m benchmark.accuracy_smoke
-docker compose --profile tools run --rm -e MODEL_LABEL=fp8 benchmark python -m benchmark.accuracy_gsm8k
+docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python3 -m benchmark.benchmark_long_prefill
+docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python3 -m benchmark.benchmark_long_decode
+docker compose --profile tools run --rm -e MODEL_LABEL=fp8 benchmark python3 -m benchmark.accuracy_smoke
+docker compose --profile tools run --rm -e MODEL_LABEL=fp8 benchmark python3 -m benchmark.accuracy_gsm8k
 docker compose stop vllm-fp8
 docker compose rm -f vllm-fp8
 ```
@@ -84,7 +86,7 @@ W8A8의 우선 확인값은 long-prefill TTFT와 RPS입니다. Hardware가 FP8 p
 성능과 quality 결과를 한 표로 결합합니다.
 
 ```bash
-docker compose --profile tools run --rm benchmark python -m benchmark.summary
+docker compose --profile tools run --rm benchmark python3 -m benchmark.summary
 ```
 
 | 질문 | 판단 지표 |
