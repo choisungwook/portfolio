@@ -55,8 +55,26 @@ fn resolve_cli(command: &str) -> PathBuf {
         .into_iter()
         .filter(|directory| seen.insert(directory.clone()))
         .map(|directory| directory.join(command))
-        .find(|candidate| candidate.is_file())
+        .find(|candidate| is_executable_file(candidate))
         .unwrap_or_else(|| PathBuf::from(command))
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(metadata) = fs::metadata(path) else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.permissions().mode() & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    true
 }
 
 fn run_output(cwd: Option<&Path>, command: &str, args: &[String]) -> Result<Output, String> {
@@ -980,20 +998,38 @@ pub fn open_in_app(target_path: String, app_id: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    #[cfg(unix)]
     #[test]
-    fn cli_candidates_include_gui_missing_paths() {
-        if cfg!(windows) {
-            return;
-        }
+    fn cli_resolution_skips_non_executable_files() {
+        let root =
+            env::temp_dir().join(format!("akbun-gitdesktop-cli-test-{}", std::process::id()));
+        let blocked_dir = root.join("blocked");
+        let executable_dir = root.join("executable");
+        let command = "gitdesktop-cli-test";
+        fs::create_dir_all(&blocked_dir).expect("create blocked directory");
+        fs::create_dir_all(&executable_dir).expect("create executable directory");
+        fs::write(blocked_dir.join(command), "blocked").expect("write blocked command");
+        fs::write(executable_dir.join(command), "executable").expect("write executable command");
+        fs::set_permissions(
+            executable_dir.join(command),
+            fs::Permissions::from_mode(0o755),
+        )
+        .expect("make command executable");
         let saved = env::var_os("PATH");
-        env::set_var("PATH", "");
-        let path = resolve_cli("gitdesktop-command-that-does-not-exist");
+        env::set_var(
+            "PATH",
+            env::join_paths([&blocked_dir, &executable_dir]).expect("join test PATH"),
+        );
+
+        let resolved = resolve_cli(command);
+
         if let Some(value) = saved {
             env::set_var("PATH", value);
         }
-        assert_eq!(
-            path,
-            PathBuf::from("gitdesktop-command-that-does-not-exist")
-        );
+        assert_eq!(resolved, executable_dir.join(command));
+        fs::remove_dir_all(root).expect("remove test directory");
     }
 }

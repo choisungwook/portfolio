@@ -11,10 +11,20 @@ fn data_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
 }
 
 fn load_json<T: DeserializeOwned>(app: &AppHandle, name: &str) -> Result<T, String> {
-    let path = data_file(app, name)?;
-    let contents = fs::read_to_string(&path)
-        .or_else(|_| fs::read_to_string(legacy_data_file(name)?))
-        .map_err(|error| error.to_string())?;
+    let current = data_file(app, name)?;
+    let legacy = legacy_data_file(name).ok();
+    load_json_paths(&current, legacy.as_deref())
+}
+
+fn load_json_paths<T: DeserializeOwned>(
+    current: &std::path::Path,
+    legacy: Option<&std::path::Path>,
+) -> Result<T, String> {
+    read_json(current).or_else(|current_error| legacy.map(read_json).unwrap_or(Err(current_error)))
+}
+
+fn read_json<T: DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {
+    let contents = fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&contents).map_err(|error| error.to_string())
 }
 
@@ -74,4 +84,30 @@ pub fn load_settings(app: &AppHandle) -> AppSettings {
 
 pub fn save_settings(app: &AppHandle, settings: &AppSettings) -> Result<(), String> {
     save_json(app, "settings.json", settings)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_current_json_falls_back_to_legacy() {
+        let root = env::temp_dir().join(format!(
+            "akbun-gitdesktop-store-test-{}",
+            std::process::id()
+        ));
+        let current = root.join("current.json");
+        let legacy = root.join("legacy.json");
+        fs::create_dir_all(&root).expect("create test directory");
+        fs::write(&current, "{").expect("write invalid current data");
+        fs::write(&legacy, r#"{"theme":"dark","forceRemoveWorktree":true}"#)
+            .expect("write legacy data");
+
+        let settings: AppSettings =
+            load_json_paths(&current, Some(&legacy)).expect("load legacy data");
+
+        assert_eq!(settings.theme, "dark");
+        assert!(settings.force_remove_worktree);
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
 }
