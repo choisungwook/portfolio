@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-08-29
+
+* **Creation**: [Tauri updater로 서명 검증과 다중 플랫폼 업데이트 통합](decisions/2026-08-tauri-signed-updater.md) 결정 기록. Electron 수동 dmg 교체를 Tauri 서명 검증 updater로 대체.
+* **Update**: [GUI 앱은 CLI의 알려진 설치 경로를 직접 탐색](decisions/2026-08-gui-app-resolves-cli-paths.md) 설명을 런타임 중립 표현으로 변경.
+
 ## 2026-08-23
 
 * **Creation**: [서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다](decisions/2026-07-unsigned-desktop-app-self-update.md) 결정을 루트 knowledge에서 옮겨 옴. 루트 knowledge를 템플릿으로 비우면서, 이 결정을 실제로 구현한 workspace 옆으로 내림.

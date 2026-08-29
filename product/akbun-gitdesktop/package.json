@@ -1,70 +1,36 @@
 {
   "name": "akbun-gitdesktop",
   "productName": "akbun-gitdesktop",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Git graph desktop viewer for local repositories and worktrees",
-  "main": "out/main/index.js",
   "author": "akbun",
   "license": "MIT",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "node --test \"test/*.test.js\"",
-    "start": "electron-vite preview",
-    "dist": "electron-vite build && electron-builder --publish never",
-    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "electron-vite build && electron-builder --win --publish never",
-    "dist:linux": "electron-vite build && electron-builder --linux --publish never"
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "web:dev": "vite --config vite.config.ts",
+    "web:build": "vite build --config vite.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json",
+    "test": "node --test test/renderer-utils.test.cjs",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p gitdesktop-core",
+    "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^43.2.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^5.0.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6"
-  },
-  "build": {
-    "appId": "com.akbun.gitdesktop",
-    "productName": "akbun-gitdesktop",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "category": "public.app-category.developer-tools"
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "Development"
-    }
+    "vite": "^8.2.2"
   }
 }

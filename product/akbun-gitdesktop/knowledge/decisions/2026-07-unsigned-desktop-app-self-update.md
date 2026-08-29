@@ -6,6 +6,8 @@ tags: [electron, macos, release, product]
 timestamp: 2026-07-31T00:00:00Z
 ---
 
+2026-08-29부터 [Tauri updater 전환](./2026-08-tauri-signed-updater.md)이 이 결정을 대체한다.
+
 ## 결정
 
 product의 데스크톱 앱은 자동 업데이트를 electron-updater가 아니라 dmg 교체 방식으로 만든다. akbun-k8supgradeview의 구현을 새 제품에 포팅하고, 다음 네 가지를 반드시 유지한다.

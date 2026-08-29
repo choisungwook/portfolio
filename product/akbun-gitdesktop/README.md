@@ -1,6 +1,6 @@
 # akbun-gitdesktop
 
-로컬 git 저장소의 commit, branch, worktree, git graph와 GitHub의 PR, issue, project를 한 화면에서 보는 데스크톱 앱이다. Electron + TypeScript + React로 만들었고 macOS를 우선 지원하며 Windows, Linux 빌드도 제공한다.
+로컬 git 저장소의 commit, branch, worktree, git graph와 GitHub의 PR, issue, project를 한 화면에서 보는 데스크톱 앱이다. Rust + Tauri + TypeScript + React로 만들었고 macOS, Windows, Linux 빌드를 제공한다.
 
 UI 언어는 영어다.
 
@@ -34,19 +34,21 @@ UI 언어는 영어다.
 
 ## 테마
 
-Settings의 Appearance에서 System, Light, Dark 중 하나를 고른다. 기본값은 System이고 macOS 다크 모드 설정을 따라가며, 앱이 켜져 있는 동안 시스템 설정이 바뀌어도 즉시 반영한다. 선택 값은 userData의 settings.json에 저장하고, main 프로세스가 Electron nativeTheme.themeSource에도 같은 값을 넣어 창 배경까지 함께 바뀌게 한다.
+Settings의 Appearance에서 System, Light, Dark 중 하나를 고른다. 기본값은 System이고 운영체제 설정이 바뀌면 즉시 반영한다. 선택 값은 Tauri app data의 settings.json에 저장하고 Rust command가 window theme을 함께 바꾼다.
+
+처음 실행할 때 Electron 버전의 repos.json과 settings.json이 있으면 기존 app data 경로에서 읽어 저장소 목록과 설정을 이어서 사용한다.
 
 ## 설계 원칙: git CLI + gh CLI
 
-git 라이브러리를 쓰지 않고 git command를 직접 실행한다. main 프로세스에서 execFile로 git을 호출하고 결과를 IPC로 renderer에 전달한다. gh CLI는 항상 쓰는 것이 아니라 GitHub의 PR, issue, project를 조회할 때만 실행한다. gh가 없어도 나머지 기능은 모두 동작하며, GitHub 탭 세 개만 사용할 수 없다.
+git 라이브러리를 쓰지 않고 git command를 직접 실행한다. Rust command가 git을 호출하고 결과를 Tauri IPC로 React 화면에 전달한다. gh CLI는 GitHub의 PR, issue, project를 조회할 때만 실행한다. gh가 없어도 나머지 기능은 모두 동작하며, GitHub 탭 세 개만 사용할 수 없다.
 
 앱을 켜면 상단 바가 git과 gh 설치 여부를 chip으로 보여 준다. git이 없으면 앱이 동작하지 않으므로 경고 배너로 강조하고, gh가 없거나 로그인이 안 되어 있으면 GitHub 탭만 사용할 수 없다고 알린다. Settings의 Command line tools에서 각 CLI의 버전과 경로, gh 로그인 상태를 확인하고 다시 검사할 수 있다.
 
-main 프로세스의 코드도 이 경계를 따라 나뉜다. git command는 `src/main/git.ts`, gh command는 `src/main/github.ts`다. CLI 탐지만 `git.ts`에 함께 둔다.
+Rust command는 `src-tauri/src/commands.rs`에 있고, git 출력 파서와 화면 모델은 Tauri에 의존하지 않는 `src-tauri/crates/gitdesktop-core`에 있다. React 화면은 `src/renderer/src/api.ts`의 얇은 어댑터를 통해서만 command를 호출한다.
 
 라이브러리 후보를 검토한 결과다.
 
-- nodegit(libgit2 바인딩): 0.27에서 사실상 개발이 멈췄고, native module이라 Electron 버전마다 리빌드가 필요해 macOS/Windows/Linux 크로스 플랫폼 CI 빌드가 복잡해진다.
+- nodegit(libgit2 바인딩): 0.27에서 사실상 개발이 멈췄고, native module이라 런타임 버전마다 리빌드가 필요해 macOS/Windows/Linux 크로스 플랫폼 CI 빌드가 복잡해진다.
 - isomorphic-git: 순수 JS라 배포는 쉽지만 이 앱의 핵심인 worktree를 지원하지 않는다.
 - simple-git: 결국 git 바이너리를 spawn하는 wrapper라 git 설치 요구사항이 사라지지 않는다. 이 앱이 쓰는 git 명령은 8개뿐이라 30줄짜리 자체 wrapper로 충분하고, 의존성만 늘어난다.
 - PR 조회에 Octokit(REST API) 대신 gh CLI를 쓰는 이유: gh는 사용자가 이미 로그인한 인증을 그대로 재사용한다. Octokit을 쓰면 토큰 입력 UI와 안전한 저장(keytar 등)을 앱이 직접 구현해야 한다.
@@ -88,7 +90,7 @@ issue와 PR의 본문은 GitHub Markdown이지만 렌더링하지 않고 원문 
 의존성 설치와 개발 서버 실행:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -98,36 +100,31 @@ npm run dev
 npm run typecheck
 ```
 
-테스트. 업데이트 기능이 임시 파일을 남기지 않는지 확인한다. node가 TypeScript의 타입을 벗겨 내고 `src/main/update.ts`를 그대로 읽으므로 빌드 없이 돈다:
+React 순수 로직과 Rust 모델 테스트:
 
 ```bash
 npm test
+npm run test:rust
 ```
 
-플랫폼별 설치 파일 빌드:
+Tauri 앱 컴파일 확인:
 
 ```bash
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 ## 업데이트
 
-앱 메뉴 akbun-gitdesktop > Check for Updates…가 GitHub Release API에서 gitdesktop-v 태그의 최신 버전을 찾아 현재 버전과 비교한다. 새 버전이 있으면 dmg를 임시 디렉터리에 받아 교체 스크립트를 분리 프로세스로 띄우고 앱을 종료하며, 스크립트가 .app 번들을 통째로 바꾸고 다시 실행한다.
+Settings 메뉴의 Check for Updates…가 고정 updater release의 latest.json을 읽는다. 새 버전은 Tauri updater가 서명을 검증한 뒤 설치하고 앱을 다시 시작한다.
 
-dmg에 서명이 없어 Squirrel.Mac 기반 자동 업데이트(electron-updater)를 쓸 수 없다. 앱이 fetch로 받은 파일에는 quarantine 속성이 붙지 않아 Gatekeeper를 거치지 않고 교체할 수 있다는 점을 이용한다. 배경은 [knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md](./knowledge/decisions/2026-07-unsigned-desktop-app-self-update.md)에 있다.
+- 공개키: `src-tauri/tauri.conf.json`
+- 개인키: 저장소 밖 백업과 GitHub Actions의 `TAURI_SIGNING_PRIVATE_KEY_GITDESKTOP` secret
+- 배경: [Tauri updater로 전환](./knowledge/decisions/2026-08-tauri-signed-updater.md)
 
-교체는 macOS 패키지 빌드에서만 동작한다. 개발 모드(`npm run dev`)에서는 교체 대상이 Electron.app이고, Windows와 Linux 빌드에는 받을 dmg가 없다. 두 경우 모두 릴리즈 페이지를 여는 버튼만 보여 준다.
-
-용량이 큰 dmg를 다루므로 정리 지점을 세 곳에 둔다. 세 지점은 `test/update-disk-leak.test.js`가 검증하고 PR의 verify job에서 돈다.
-
-1. `downloadDmg`가 내려받기에 실패하면 만든 임시 디렉터리를 지운다.
-2. 교체 스크립트의 trap이 어느 단계에서 실패해도 작업 디렉터리와 mount를 지운다.
-3. 앱 시작 때 `cleanupTempDirs`가 강제 종료로 남은 임시 디렉터리를 지운다.
+개인키를 잃으면 설치된 앱에 다시 업데이트를 전달할 수 없다. GitHub secret은 값을 다시 읽을 수 없으므로 저장소 밖 원본 백업도 유지한다.
 
 ## 릴리즈
 
-PR에서는 같은 workflow의 verify job이 ubuntu에서 typecheck와 테스트만 돌린다. `ELECTRON_SKIP_BINARY_DOWNLOAD`로 electron 바이너리를 받지 않으므로 앱 없이 끝난다.
+PR에서는 React 타입 검사와 순수 로직 테스트, `gitdesktop-core` 테스트만 실행한다. Tauri 앱 crate를 제외해 Ubuntu runner에 GTK와 WebKit 개발 패키지를 설치하지 않는다.
 
-master에 이 디렉터리 변경이 병합되면 GitHub Actions(gitdesktop-release.yml)가 릴리즈를 만든다. 버전은 기존 gitdesktop-v 태그 중 가장 높은 값의 patch를 +1 해서 정하므로, 매 실행마다 새 버전이 나오고 기존 릴리즈를 덮어쓰지 않는다. package.json의 version이 그보다 높으면 그 값을 쓰므로 major, minor는 package.json을 직접 올려서 바꾼다. 태그가 이미 있으면 workflow는 실패한다.
+master에 이 디렉터리 변경이 병합되면 GitHub Actions가 macOS universal dmg, Windows NSIS, Linux AppImage를 만든다. 버전은 `package.json` 한 곳에서 관리하고 `tauri-action`이 `gitdesktop-v<version>` tag와 release를 만든다. 병렬 빌드가 끝나면 latest.json을 `akbun-gitdesktop-updater` 고정 release에 게시한다.
