@@ -52,7 +52,7 @@ bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 설정값을 결과 JSON에도 기록하며 동일 workload를 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq1-tokens512 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=1 -e VLLM_MAX_NUM_BATCHED_TOKENS=512 benchmark python -m benchmark.benchmark_vllm_batching
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq1-tokens512 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=1 -e VLLM_MAX_NUM_BATCHED_TOKENS=512 benchmark python3 -m benchmark.benchmark_vllm_batching
 ```
 
 다음 설정과 port·metric target이 겹치지 않도록 server를 종료합니다.
@@ -69,7 +69,7 @@ docker compose rm -f vllm-bf16
 ```bash
 VLLM_MAX_NUM_SEQS=4 VLLM_MAX_NUM_BATCHED_TOKENS=2048 docker compose --profile bf16 up -d --force-recreate vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq4-tokens2048 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=4 -e VLLM_MAX_NUM_BATCHED_TOKENS=2048 benchmark python -m benchmark.benchmark_vllm_batching
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq4-tokens2048 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=4 -e VLLM_MAX_NUM_BATCHED_TOKENS=2048 benchmark python3 -m benchmark.benchmark_vllm_batching
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -81,7 +81,7 @@ docker compose rm -f vllm-bf16
 ```bash
 VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 docker compose --profile bf16 up -d --force-recreate vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq8-tokens4096 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python -m benchmark.benchmark_vllm_batching
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16-seq8-tokens4096 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_vllm_batching
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -92,7 +92,7 @@ docker compose rm -f vllm-bf16
 
 ```bash
 ls results/performance-bf16-seq*-vllm-batching.json
-docker compose --profile tools run --rm benchmark python -m benchmark.summary
+docker compose --profile tools run --rm benchmark python3 -m benchmark.summary
 ```
 
 | 관찰 | 의미 |

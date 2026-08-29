@@ -18,9 +18,25 @@ def crossover_flops_per_byte(accelerator: Accelerator) -> float:
 
 
 def transformer_projection_intensity(sequence_length: int, hidden_size: int) -> float:
-  """Reproduce the Chapter 5 simplified Transformer projection estimate."""
+  """Reproduce the Chapter 5 simplified Transformer projection estimate.
+
+  This keeps the book's denominator, where the output matrix is counted as
+  h x h. It is what reproduces the printed decode value of 0.5.
+  """
   operations = sequence_length * hidden_size * hidden_size
   moved_values = sequence_length * hidden_size + 2 * hidden_size * hidden_size
+  return operations / moved_values
+
+
+def projection_intensity(sequence_length: int, hidden_size: int) -> float:
+  """Return the projection intensity with the output matrix sized [s, h].
+
+  A [s,h] x [h,h] matmul writes an [s,h] output, not an [h,h] one. Using that
+  size gives 1.0 for decode instead of 0.5. Both land far below any crossover
+  point, so the conclusion does not change, but the arithmetic does.
+  """
+  operations = sequence_length * hidden_size * hidden_size
+  moved_values = 2 * sequence_length * hidden_size + hidden_size * hidden_size
   return operations / moved_values
 
 
@@ -31,17 +47,22 @@ def bottleneck(intensity: float, accelerator: Accelerator) -> str:
   return "memory-bandwidth-bound"
 
 
+ACCELERATORS = [
+  Accelerator("L40S (book)", peak_tflops=362, memory_bandwidth_gbps=864),
+  Accelerator("RTX 5060 Ti (measured)", peak_tflops=50.3, memory_bandwidth_gbps=384),
+]
+
+
 def main() -> None:
-  """Compare simplified L40S prefill and decode workloads."""
-  l40s = Accelerator("L40S", peak_tflops=362, memory_bandwidth_gbps=864)
-  print(f"{l40s.name} crossover={crossover_flops_per_byte(l40s):.1f} FLOPS/B")
-  for sequence_length in [64, 512, 4096]:
-    prefill = transformer_projection_intensity(sequence_length, 4096)
-    decode = transformer_projection_intensity(1, 4096)
-    print(
-      f"sequence={sequence_length}: prefill={prefill:.1f} {bottleneck(prefill, l40s)}, "
-      f"decode={decode:.1f} {bottleneck(decode, l40s)}"
-    )
+  """Show how the same workload changes verdict when the accelerator changes."""
+  for accelerator in ACCELERATORS:
+    crossover = crossover_flops_per_byte(accelerator)
+    print(f"\n{accelerator.name}: crossover={crossover:.0f} FLOPS/B")
+    for sequence_length in [1, 64, 512, 4096]:
+      intensity = projection_intensity(sequence_length, 4096)
+      phase = "decode " if sequence_length == 1 else "prefill"
+      verdict = bottleneck(intensity, accelerator)
+      print(f"  {phase} s={sequence_length:>4}: {intensity:8.1f} FLOPS/B  {verdict}")
 
 
 if __name__ == "__main__":

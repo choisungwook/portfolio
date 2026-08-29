@@ -103,6 +103,10 @@
 93. Amazon Bedrock 모델 호출(Runtime, Mantle, Playground) (26.8.16) - [링크](./aws/bedrock/model-inference/)
 94. Web search tool 실행 위치 비교(Client, LiteLLM, Bedrock, vLLM) (26.8.17) - [링크](./computer_science/ai/web-search-tool/)
 95. LLM serving challenge와 essential optimization Chapter 5-6 핸즈온 (26.8.22) - [링크](./computer_science/ai/study-llmserving/ch5-6/)
+  - [문서 인덱스](./computer_science/ai/study-llmserving/ch5-6/docs/) - chapter별로 무엇을 어떤 순서로 볼지
+  - [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](./computer_science/ai/study-llmserving/ch5-6/docs/02-ch5-theory.md) - weight 외 KV cache·activation 계산
+  - [배치와 시퀀스를 흔들어 KV cache가 차는 과정](./computer_science/ai/study-llmserving/ch5-6/docs/handson/09-kv-cache-batch-sequence.md) - 책 공식과 vLLM 실측 pool 대조
+  - [내 GPU의 crossover를 직접 재고 병목을 만들기](./computer_science/ai/study-llmserving/ch5-6/docs/handson/08-roofline-bottleneck.md) - roofline 실측과 대역폭 병목 증명
 96. SearXNG 프로덕션 주의사항과 봇 탐지 핸즈온 (26.8.23) - [링크](./computer_science/ai/searxng-production/)
 97. Amazon Bedrock Web Search와 AgentCore 핸즈온 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/)
 98. Amazon Bedrock Web Search 유해콘텐스 검색 테스트 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/docs/5-safety-test.md)

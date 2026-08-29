@@ -32,7 +32,12 @@ services:
   model-loader:
     <<: [*runtime, *gpu]
     profiles: [tools]
-    command: ["python", "-m", "model_loader.load_3b"]
+    command: ["python3", "-m", "model_loader.load_3b"]
+
+  gpu-probe:
+    <<: [*runtime, *gpu]
+    profiles: [tools]
+    command: ["python3", "-m", "benchmark.roofline_probe"]
 
   benchmark:
     <<: *runtime
@@ -41,7 +46,7 @@ services:
       MODEL_BASE_URL: http://model-server:8000
       PROMETHEUS_URL: http://prometheus:9090
       SERVED_MODEL_NAME: qwen
-    command: ["python", "-m", "benchmark.summary"]
+    command: ["python3", "-m", "benchmark.summary"]
 
   vllm-bf16:
     <<: *vllm
@@ -63,7 +68,7 @@ services:
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
-      - "0.90"
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.85}"
 
   vllm-gptq:
     <<: *vllm
@@ -83,7 +88,7 @@ services:
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
-      - "0.90"
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.85}"
 
   vllm-fp8:
     <<: *vllm
@@ -103,7 +108,7 @@ services:
       - --enable-chunked-prefill
       - --enable-prefix-caching
       - --gpu-memory-utilization
-      - "0.90"
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.85}"
 
   prometheus:
     image: prom/prometheus:v3.5.0

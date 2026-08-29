@@ -86,6 +86,32 @@ total KV bytes = KV bytes/token × batch size × sequence length
 
 앞의 `2`는 Key와 Value 두 tensor를 뜻합니다. Llama 2 7B의 32 layers, 32 KV heads, head dimension 128, BF16을 대입하면 token당 약 0.5MB입니다. batch 16과 sequence 4096이면 KV cache만 약 32GB가 됩니다.
 
+### "캐시할 토큰 개수"는 예약값이지 실측값이 아닙니다
+
+`batch size × sequence length`를 처음 보면 "지금 몇 개를 캐시하고 있는가"로 읽기 쉽습니다. 그렇지 않습니다. 이 곱은 **모든 slot이 가장 긴 sequence로 가득 찼을 때**를 가정한 최악의 경우이고, 용도는 GPU를 고르기 전에 "이 카드에 이 workload가 들어가는가"를 판단하는 것입니다.
+
+운영 중인 engine은 반대 방향으로 움직입니다. vLLM은 기동할 때 `gpu_memory_utilization × VRAM − weight`만큼을 KV pool로 한 번에 잡고, 그것을 고정 크기 block으로 쪼개 요청에 나눠줍니다. 그래서 실행 중에 물어볼 수 있는 질문은 "이론상 얼마가 필요한가"가 아니라 **"미리 잡아둔 pool이 지금 몇 % 찼는가"**입니다.
+
+| 질문 | 보는 값 | 언제 쓰나 |
+| --- | --- | --- |
+| 이 GPU에 이 workload가 들어가는가 | `KV/token × batch × sequence` | hardware 선택, 용량 계획 |
+| 지금 몇 개를 실제로 캐시 중인가 | `vllm:gpu_cache_usage_perc` | 운영, 병목 판단 |
+| pool이 최대 몇 token을 담는가 | `num_gpu_blocks × block_size` | 두 값을 연결할 때 |
+
+두 값을 같은 것으로 보면 계산이 계속 안 맞습니다. 세 번째 줄이 둘을 잇는 다리입니다.
+
+### 요청이 늘고 길어지면 KV cache가 커지는 이유
+
+KV cache는 "요청 하나당 고정 크기"가 아니라 **살아 있는 모든 요청의 현재 길이를 합한 것**입니다.
+
+```text
+지금 쓰는 KV bytes = KV bytes/token × Σ(각 요청의 현재 token 수)
+```
+
+여기서 두 방향으로 늘어납니다. 동시 요청이 늘면 더하는 항의 개수가 늘고, prompt가 길거나 생성이 길어지면 각 항의 값이 커집니다. 그리고 결정적으로, **decode가 진행되는 동안 각 항이 계속 자랍니다.** token을 하나 만들 때마다 그 token의 Key와 Value가 cache에 쌓이기 때문입니다.
+
+그래서 요청을 받는 순간이 아니라 **가장 긴 요청이 생성을 끝내기 직전**이 peak입니다. 시작할 때 여유가 있어 보여도 그 지점에서 OOM이 날 수 있습니다.
+
 실제 memory budget은 다음 항목을 함께 잡아야 합니다.
 
 ```text
@@ -116,6 +142,42 @@ intensity = M × N × K / (M × K + K × N + M × N)
 
 Roofline은 실제 latency를 맞히는 계산기가 아닙니다. Kernel overhead, cache hit, scheduler, thermal 상태를 제외한 상한 모델입니다. 대신 “연산을 줄일 것인가, data movement를 줄일 것인가”라는 첫 방향을 정하는 데 유용합니다.
 
+### 두 축이 각각 무엇인지부터 고정합니다
+
+Roofline 그래프에서 축을 잘못 읽으면 그림 전체가 의미를 잃습니다.
+
+| 축 | 단위 | 읽는 법 |
+| --- | --- | --- |
+| x | FLOPS/Byte | 1 byte를 옮길 때 연산을 몇 번 하는가. **workload의 성질**이지 hardware 값이 아님 |
+| y | TFLOPS | 그 지점에서 hardware가 **최대로 낼 수 있는** 연산 속도 |
+
+그림은 두 개의 천장으로 이뤄집니다. 왼쪽 대각선은 memory bandwidth 천장으로, 기울기가 곧 bandwidth입니다. x가 작으면 byte당 연산이 적어 아무리 연산 유닛이 놀아도 data가 안 와서 못 씁니다. 오른쪽 수평선은 compute 천장입니다. 두 선이 만나는 x가 crossover이고, `peak FLOPS ÷ memory bandwidth`로 구합니다.
+
+핵심은 **crossover가 카드마다 다르다**는 것입니다. 책의 L40S는 419 FLOPS/B지만, 이 workspace의 RTX 5060 Ti에서 직접 재면 값이 다릅니다.
+
+| 항목 | L40S (책) | RTX 5060 Ti (실측) |
+| --- | ---: | ---: |
+| peak BF16 | 362 TFLOPS | 50.3 TFLOPS |
+| memory bandwidth | 864 GB/s | 384 GB/s |
+| crossover | 419 FLOPS/B | **131 FLOPS/B** |
+
+crossover가 낮다는 것은 연산 성능에 비해 대역폭이 상대적으로 덜 부족하다는 뜻이고, 그만큼 **더 짧은 prompt에서도 compute-bound로 넘어간다**는 뜻입니다. 같은 workload라도 카드가 바뀌면 판정이 뒤집힐 수 있으므로, 병목을 말하기 전에 자기 카드의 crossover를 먼저 구해야 합니다. 구하는 방법은 [roofline과 병목 재현](./handson/08-roofline-bottleneck.md)에 있습니다.
+
+### decode는 sequence가 길어져도 intensity가 오르지 않습니다
+
+prefill과 decode의 차이는 행렬 shape 하나에서 나옵니다. projection 연산을 `[s, h] × [h, h]`로 두면, prefill은 `s`가 prompt 길이만큼 크고 decode는 `s = 1`입니다. 위 공식에 넣으면 결과가 이렇게 갈립니다.
+
+| sequence 길이 | prefill intensity | decode intensity |
+| ---: | ---: | ---: |
+| 8 | 7.9 | 1.0 |
+| 64 | 60.2 | 1.0 |
+| 512 | 341.3 | 1.0 |
+| 4096 | 819.2 | 1.0 |
+
+decode 열이 변하지 않는 것이 이 장의 결론입니다. 몇 번째 token을 만들든 그 순간의 행렬은 항상 `[1, h] × [h, h]`이고, weight 전체를 읽어 곱셈을 `h²`번밖에 하지 않습니다. 그래서 **decode는 구조적으로 memory bandwidth-bound**이고, 이것이 Chapter 6의 batching이 존재하는 이유입니다. batching은 `s = 1`을 `s = batch`로 만들어 같은 weight 읽기를 여러 요청이 나눠 쓰게 합니다.
+
+> 책 Table 5-10은 decode intensity를 0.5로 적습니다. 분모의 출력 행렬 항을 `s×h`가 아니라 `h×h`로 두면 0.5가 나옵니다. `s×h`로 계산하면 1.0입니다. 어느 쪽이든 crossover(이 카드에서 131)보다 두 자릿수 낮아 결론은 같습니다.
+
 ## Prefill과 decode는 같은 모델의 다른 workload입니다
 
 Prefill은 input token 전체를 병렬 처리하고 최초 KV cache를 만듭니다. Decode는 이전 token을 이용해 새 token을 하나씩 생성합니다. 같은 Transformer라도 matrix shape와 data reuse가 달라집니다.
@@ -136,6 +198,21 @@ Prefill은 input token 전체를 병렬 처리하고 최초 KV cache를 만듭�
 - 우선 관찰: Time Per Output Token(TPOT), Output TPS, KV cache usage
 
 여기서 “prefill이 빨라졌으니 decode도 빨라지겠지”라고 보기 쉽습니다. 하지만 prefill 개선은 TTFT에, decode 개선은 TPOT와 output throughput에 주로 나타납니다. 두 단계는 같은 benchmark 하나로 판단하면 안 됩니다.
+
+### TTFT는 감소하는 값이 아니라 한 번 찍히는 값입니다
+
+“첫 token 이후로 응답이 점점 빨라진다”는 인상은 흔하지만, 실제로 빨라지는 것은 없습니다. 이름이 다른 두 지표가 이어 붙어 있을 뿐입니다.
+
+| 구간 | 지표 | 무엇을 재나 | 무엇이 결정하나 |
+| --- | --- | --- | --- |
+| 요청 도착 ~ 첫 token | TTFT | prefill **한 번**의 시간 | prompt 길이, queue 대기, 연산량 |
+| 첫 token ~ 마지막 token | TPOT | token **하나당** 시간 | weight를 읽는 memory bandwidth |
+
+TTFT가 유독 큰 이유는 prefill이 prompt 전체를 한 번에 계산하기 때문입니다. prompt가 2,000 token이면 그 2,000개를 다 처리해야 첫 글자가 나옵니다. 반면 decode는 KV cache 덕분에 **직전 token 하나만** 계산합니다. 이미 계산해 둔 Key와 Value를 다시 쓰므로 앞의 2,000개를 다시 볼 필요가 없습니다.
+
+그래서 “TTFT 800ms, 이후 token당 15ms” 같은 모양이 나옵니다. 15ms는 줄어드는 값이 아니라 처음부터 끝까지 대체로 일정한 값입니다. 오히려 sequence가 길어질수록 attention이 봐야 할 KV가 늘어 아주 조금씩 **늘어납니다.**
+
+TTFT가 체감에서 중요한 이유는 계산이 아니라 화면에 있습니다. streaming 응답에서 첫 글자가 뜨는 순간 사용자는 “멈춘 화면”에서 “진행 중인 화면”으로 넘어갑니다. 총 소요 시간이 같아도 TTFT가 짧으면 더 빠르다고 느낍니다. 그래서 TTFT는 latency SLO에, TPOT와 output TPS는 capacity 계획에 씁니다.
 
 ## 병목에 따라 optimization이 달라집니다
 

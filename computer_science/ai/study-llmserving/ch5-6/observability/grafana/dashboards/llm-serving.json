@@ -6,9 +6,21 @@
   "graphTooltip": 1,
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "targets": [
         {
@@ -21,9 +33,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
       "id": 2,
       "targets": [
         {
@@ -36,9 +60,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
       "id": 3,
       "targets": [
         {
@@ -51,9 +87,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "reqps"}},
-      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
       "id": 4,
       "targets": [
         {
@@ -66,9 +114,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "tps"}},
-      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "tps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      },
       "id": 5,
       "targets": [
         {
@@ -81,23 +141,57 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 8
+      },
       "id": 6,
       "targets": [
-        {"expr": "sum(vllm:num_requests_running)", "legendFormat": "running", "refId": "A"},
-        {"expr": "sum(vllm:num_requests_waiting)", "legendFormat": "waiting", "refId": "B"}
+        {
+          "expr": "sum(vllm:num_requests_running)",
+          "legendFormat": "running",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(vllm:num_requests_waiting)",
+          "legendFormat": "waiting",
+          "refId": "B"
+        }
       ],
       "title": "vLLM Scheduler",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}},
-      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 8
+      },
       "id": 7,
       "targets": [
-        {"expr": "max(vllm:kv_cache_usage_perc)", "legendFormat": "KV cache", "refId": "A"},
+        {
+          "expr": "max(vllm:kv_cache_usage_perc)",
+          "legendFormat": "KV cache",
+          "refId": "A"
+        },
         {
           "expr": "sum(rate(vllm:prefix_cache_hits_total[1m])) / clamp_min(sum(rate(vllm:prefix_cache_queries_total[1m])), 1)",
           "legendFormat": "prefix hit rate",
@@ -108,8 +202,16 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
       "id": 8,
       "targets": [
         {
@@ -122,9 +224,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
       "id": 9,
       "targets": [
         {
@@ -137,9 +251,21 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
       "id": 10,
       "targets": [
         {
@@ -152,46 +278,174 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "decmbytes"}},
-      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
       "id": 11,
       "targets": [
-        {"expr": "max(DCGM_FI_DEV_FB_USED)", "legendFormat": "VRAM used", "refId": "A"}
+        {
+          "expr": "max(DCGM_FI_DEV_FB_USED)",
+          "legendFormat": "VRAM used",
+          "refId": "A"
+        }
       ],
       "title": "GPU VRAM",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"max": 100, "min": 0, "unit": "percent"}},
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
       "id": 12,
       "targets": [
-        {"expr": "max(DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "GPU utilization", "refId": "A"}
+        {
+          "expr": "max(DCGM_FI_DEV_GPU_UTIL)",
+          "legendFormat": "GPU utilization",
+          "refId": "A"
+        }
       ],
       "title": "GPU Utilization",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
-      "fieldConfig": {"defaults": {"unit": "watt"}},
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
       "id": 13,
       "targets": [
-        {"expr": "max(DCGM_FI_DEV_POWER_USAGE)", "legendFormat": "power", "refId": "A"}
+        {
+          "expr": "max(DCGM_FI_DEV_POWER_USAGE)",
+          "legendFormat": "power",
+          "refId": "A"
+        }
       ],
       "title": "GPU Power",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "GPU_UTIL alone says the GPU is busy but not why. When memory busy tracks SM busy and stays high, the workload is waiting on data movement (decode). When SM busy is high and memory busy is lower, the tensor cores are the limit (long prefill).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 14,
+      "title": "Compute vs Bandwidth pressure",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "max(DCGM_FI_DEV_GPU_UTIL)",
+          "legendFormat": "SM busy (compute)",
+          "refId": "A"
+        },
+        {
+          "expr": "max(DCGM_FI_DEV_MEM_COPY_UTIL)",
+          "legendFormat": "memory busy (bandwidth)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "The KV pool is reserved once at startup. When the pool fills, the scheduler stops admitting and requests move from running to waiting. That crossing is the real max batch size for this workload.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 15,
+      "title": "KV pool occupancy vs admitted requests",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "max(vllm:kv_cache_usage_perc or vllm:gpu_cache_usage_perc) * 100",
+          "legendFormat": "KV pool used %",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(vllm:num_requests_running)",
+          "legendFormat": "running",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(vllm:num_requests_waiting)",
+          "legendFormat": "waiting",
+          "refId": "C"
+        }
+      ]
     }
   ],
   "refresh": "5s",
   "schemaVersion": 41,
-  "tags": ["llm", "vllm", "observability"],
+  "tags": [
+    "llm",
+    "vllm",
+    "observability"
+  ],
   "templating": {
     "list": [
       {
-        "current": {"text": "Prometheus", "value": "Prometheus"},
+        "current": {
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
         "hide": 2,
         "label": "Datasource",
         "name": "DS_PROMETHEUS",
@@ -200,7 +454,10 @@
       }
     ]
   },
-  "time": {"from": "now-15m", "to": "now"},
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "timezone": "browser",
   "title": "LLM Serving Chapter 5-6",
   "uid": "llm-serving-ch5-6",

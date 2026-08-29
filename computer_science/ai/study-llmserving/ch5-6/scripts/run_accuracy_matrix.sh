@@ -23,10 +23,10 @@ run_model() {
   bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
   docker compose --profile tools run --rm \
     -e "MODEL_LABEL=$label" \
-    benchmark python -m benchmark.accuracy_smoke
+    benchmark python3 -m benchmark.accuracy_smoke
   docker compose --profile tools run --rm \
     -e "MODEL_LABEL=$label" \
-    benchmark python -m benchmark.accuracy_gsm8k
+    benchmark python3 -m benchmark.accuracy_gsm8k
   docker compose stop "$service"
   docker compose rm -f "$service"
   active_service=""
@@ -35,4 +35,4 @@ run_model() {
 run_model vllm-bf16 bf16 bf16
 run_model vllm-gptq gptq gptq-int4
 run_model vllm-fp8 fp8 fp8
-docker compose --profile tools run --rm benchmark python -m benchmark.summary
+docker compose --profile tools run --rm benchmark python3 -m benchmark.summary

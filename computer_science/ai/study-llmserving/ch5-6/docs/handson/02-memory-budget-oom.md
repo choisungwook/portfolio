@@ -20,8 +20,8 @@ cd computer_science/ai/study-llmserving/ch5-6
 Memory budget과 roofline calculator로 실행 전 가설을 만듭니다.
 
 ```bash
-docker compose --profile tools run --rm benchmark python -m calculators.memory_budget
-docker compose --profile tools run --rm benchmark python -m calculators.roofline
+docker compose --profile tools run --rm benchmark python3 -m calculators.memory_budget
+docker compose --profile tools run --rm benchmark python3 -m calculators.roofline
 ```
 
 | Precision | 7B weight 근사 | 16GB GPU에서의 가설 |
@@ -31,6 +31,18 @@ docker compose --profile tools run --rm benchmark python -m calculators.roofline
 | INT4 | 약 3.5GiB | batch·context 확장 여유 증가 |
 
 여기서 “14.2GiB가 16GB보다 작으니 조금은 남지 않나”라고 묻기 쉽습니다. 남은 공간은 약 1.7GiB뿐이며 CUDA context, allocator, temporary tensor가 먼저 사용합니다. Model이 올라가더라도 request capacity는 거의 남지 않습니다.
+
+같은 명령이 attention 구조별 KV 비용도 함께 출력합니다. 같은 16GB에서 4096-token 요청을 몇 개나 받을 수 있는지가 여기서 갈립니다.
+
+| Model | attention | KV heads | KV/token | 요청 수 |
+| --- | --- | ---: | ---: | ---: |
+| Llama-2-7B | MHA | 32 | 512 KiB | 0 |
+| Qwen2.5-7B | GQA | 4 | 56 KiB | 1 |
+| Qwen2.5-3B | GQA | 2 | 36 KiB | 61 |
+
+**KV 용량은 parameter 수가 아니라 KV head 수가 정합니다.** 이 계산을 실제 vLLM이 잡는 KV pool과 맞춰보는 것은 [배치와 시퀀스 스윕](./09-kv-cache-batch-sequence.md)에서 합니다.
+
+`calculators.roofline`은 같은 workload가 카드에 따라 compute-bound인지 bandwidth-bound인지 다르게 판정되는 것을 보여줍니다. 축을 읽는 법과 이 카드의 실측 crossover는 [roofline과 병목 재현](./08-roofline-bottleneck.md)에 있습니다.
 
 ## 7B BF16의 실패를 확인합니다
 
@@ -43,7 +55,7 @@ docker compose --profile observability up -d prometheus grafana dcgm-exporter
 의도적으로 7B BF16 model load를 시도합니다.
 
 ```bash
-docker compose --profile tools run --rm model-loader python -m model_loader.load_7b_expect_oom
+docker compose --profile tools run --rm model-loader python3 -m model_loader.load_7b_expect_oom
 ```
 
 - 기대 결과: CUDA OOM
@@ -57,7 +69,7 @@ docker compose --profile tools run --rm model-loader python -m model_loader.load
 같은 GPU에 더 작은 model을 올려 비교합니다.
 
 ```bash
-docker compose --profile tools run --rm model-loader python -m model_loader.load_3b
+docker compose --profile tools run --rm model-loader python3 -m model_loader.load_3b
 ```
 
 - 기대 결과: model의 CUDA 이동 성공

@@ -84,7 +84,7 @@ Benchmark는 다음 조건을 고정합니다.
 세 admission 전략을 한 번에 순서대로 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python -m benchmark.benchmark_batch_strategies
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_batch_strategies
 ```
 
 결과를 확인합니다.

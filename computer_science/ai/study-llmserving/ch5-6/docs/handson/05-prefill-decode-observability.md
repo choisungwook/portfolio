@@ -53,7 +53,7 @@ curl http://127.0.0.1:9090/api/v1/targets
 긴 input과 짧은 output workload를 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python -m benchmark.benchmark_long_prefill
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_long_prefill
 ```
 
 Grafana에서 다음 순서로 봅니다.
@@ -71,7 +71,7 @@ TTFT만 증가하고 Queue p95가 안정적이라면 prefill 계산이 유력합
 짧은 input과 긴 output workload를 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python -m benchmark.benchmark_long_decode
+docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_long_decode
 ```
 
 이번에는 다음 순서로 봅니다.
@@ -102,6 +102,8 @@ ls results/performance-bf16-long-*.json
 - waiting request와 GPU utilization 동반 증가: serving capacity 포화 가능
 - waiting request만 증가: scheduler·runtime 병목 추가 확인
 - TPOT와 KV cache usage 동반 증가: decode concurrency와 memory pressure 확인
+
+이 목록은 어느 **단계**가 느린지까지 좁혀줍니다. 그 단계가 연산 때문인지 memory bandwidth 때문인지는 metric만으로 갈리지 않습니다. 실측에서 `DCGM_FI_DEV_GPU_UTIL`과 `DCGM_FI_DEV_MEM_COPY_UTIL`이 거의 같이 움직였기 때문입니다. 그 판별은 대역폭에서 계산한 이론 상한과 실측 token 속도를 대조하는 방법으로 하고, 절차는 [roofline과 병목 재현](./08-roofline-bottleneck.md)에 있습니다.
 
 ## 정리
 
