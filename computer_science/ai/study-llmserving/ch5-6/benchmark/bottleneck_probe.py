@@ -1,11 +1,16 @@
 """Drive vLLM into a bandwidth bottleneck and a compute bottleneck on purpose.
 
 GPU utilization alone cannot separate the two: a stalled memory pipeline and a
-saturated tensor core both report a busy GPU. This module runs two workloads
-built to sit on opposite sides of the roofline and records the indicators that
-do separate them.
+saturated tensor core both report a busy GPU. This module runs workloads built
+to sit on opposite sides of the roofline and records what each one does.
 
-The decode ceiling is the useful one. Generating one token at batch size 1 reads
+Adding MEM_COPY_UTIL does not rescue the classification. On a GeForce card it
+was measured tracking GPU_UTIL closely even in the compute-bound prefill run,
+because both are time-busy ratios rather than bandwidth ratios, and no
+DCGM_FI_PROF_* metric is exposed there. The pair is still collected, but only
+the ceiling ratio below should be read as a verdict.
+
+That ceiling is the useful number. Generating one token at batch size 1 reads
 every model weight once, so bandwidth divided by weight bytes is the highest
 token rate the card can reach no matter how fast its math units are.
 """
@@ -135,11 +140,28 @@ def annotate_decode_ceiling(step: dict[str, object], ceiling_tps: float) -> None
   step["ceiling_ratio"] = per_sequence_tps / ceiling_tps if ceiling_tps else None
 
 
+def require_measured_bandwidth() -> float:
+  """Return the measured bandwidth, refusing to run without it.
+
+  The decode ceiling is the whole point of this module. With bandwidth left at
+  zero the ceiling is zero and every ratio comes back null, which reads like a
+  valid result instead of a missing input.
+  """
+  if MEASURED_BANDWIDTH_GBPS <= 0:
+    raise SystemExit(
+      "MEASURED_BANDWIDTH_GBPS is unset or not positive. "
+      "Run `make ch5-roofline` first and pass its measured bandwidth, "
+      "or use `make ch5-bottleneck` which supplies it."
+    )
+  return MEASURED_BANDWIDTH_GBPS
+
+
 async def main() -> None:
   """Run every scenario and save the bottleneck comparison."""
+  bandwidth_gbps = require_measured_bandwidth()
   await wait_for_health(BASE_URL)
   parameters_billions = float(os.getenv("PARAMETERS_BILLIONS", "3.09"))
-  ceiling = decode_ceiling_tps(MEASURED_BANDWIDTH_GBPS, parameters_billions)
+  ceiling = decode_ceiling_tps(bandwidth_gbps, parameters_billions)
   steps = []
   async with httpx.AsyncClient(timeout=900) as client:
     for scenario in SCENARIOS:
@@ -151,7 +173,7 @@ async def main() -> None:
     "model": MODEL_ID,
     "parameters_billions": parameters_billions,
     "weight_gib": weight_bytes(parameters_billions) / 1024**3,
-    "measured_bandwidth_gbps": MEASURED_BANDWIDTH_GBPS,
+    "measured_bandwidth_gbps": bandwidth_gbps,
     "decode_ceiling_tps": ceiling,
     "scenarios": steps,
   }

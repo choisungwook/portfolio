@@ -60,6 +60,8 @@ Projection 연산을 `[s, h] × [h, h]`로 두고 계산기를 돌립니다.
 make ch5-calculate
 ```
 
+책 예제와 맞추기 위해 hidden size 4096으로 계산한 값입니다. [이론 문서](../02-ch5-theory.md)의 표는 이 workspace가 실제로 서빙하는 Qwen2.5-3B의 2048 기준이라 같은 sequence 길이라도 값이 다릅니다.
+
 | sequence 길이 | intensity | L40S 판정 | RTX 5060 Ti 판정 |
 | ---: | ---: | --- | --- |
 | 1 (decode) | 1.0 | memory bandwidth-bound | memory bandwidth-bound |

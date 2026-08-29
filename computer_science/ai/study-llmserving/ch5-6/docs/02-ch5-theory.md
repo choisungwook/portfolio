@@ -167,6 +167,8 @@ crossover가 낮다는 것은 연산 성능에 비해 대역폭이 상대적으�
 
 prefill과 decode의 차이는 행렬 shape 하나에서 나옵니다. projection 연산을 `[s, h] × [h, h]`로 두면, prefill은 `s`가 prompt 길이만큼 크고 decode는 `s = 1`입니다. 위 공식에 넣으면 결과가 이렇게 갈립니다.
 
+Qwen2.5-3B의 hidden size 2048로 계산한 값입니다.
+
 | sequence 길이 | prefill intensity | decode intensity |
 | ---: | ---: | ---: |
 | 8 | 7.9 | 1.0 |

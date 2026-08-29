@@ -365,7 +365,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "GPU_UTIL alone says the GPU is busy but not why. When memory busy tracks SM busy and stays high, the workload is waiting on data movement (decode). When SM busy is high and memory busy is lower, the tensor cores are the limit (long prefill).",
+      "description": "Both are time-busy ratios, not bandwidth ratios. On this GeForce card they were measured moving together even in a compute-bound prefill run (100% vs 96%), so do NOT use the pair to classify compute-bound versus bandwidth-bound. What this panel is good for is the case where both stay low: the GPU is idle and the problem is client concurrency or the queue. For bottleneck classification compare measured token rate against the bandwidth ceiling - see docs/handson/08-roofline-bottleneck.md.",
       "fieldConfig": {
         "defaults": {
           "unit": "percent"
@@ -378,7 +378,7 @@
         "y": 32
       },
       "id": 14,
-      "title": "Compute vs Bandwidth pressure",
+      "title": "GPU busy vs Memory busy",
       "type": "timeseries",
       "targets": [
         {

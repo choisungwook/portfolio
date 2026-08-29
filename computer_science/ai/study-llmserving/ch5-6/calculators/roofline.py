@@ -54,15 +54,22 @@ ACCELERATORS = [
 
 
 def main() -> None:
-  """Show how the same workload changes verdict when the accelerator changes."""
+  """Show how the same workload changes verdict when the accelerator changes.
+
+  Both intensity definitions are printed. The verdict uses `projection_intensity`
+  because it sizes the output matrix as [s, h]; the book column is there so the
+  printed 0.5 for decode can be traced back to its denominator.
+  """
   for accelerator in ACCELERATORS:
     crossover = crossover_flops_per_byte(accelerator)
     print(f"\n{accelerator.name}: crossover={crossover:.0f} FLOPS/B")
+    print(f"  {'phase':<7} {'s':>5} {'[s,h] out':>10} {'book':>8}  verdict")
     for sequence_length in [1, 64, 512, 4096]:
       intensity = projection_intensity(sequence_length, 4096)
-      phase = "decode " if sequence_length == 1 else "prefill"
+      book = transformer_projection_intensity(sequence_length, 4096)
+      phase = "decode" if sequence_length == 1 else "prefill"
       verdict = bottleneck(intensity, accelerator)
-      print(f"  {phase} s={sequence_length:>4}: {intensity:8.1f} FLOPS/B  {verdict}")
+      print(f"  {phase:<7} {sequence_length:>5} {intensity:10.1f} {book:8.1f}  {verdict}")
 
 
 if __name__ == "__main__":
