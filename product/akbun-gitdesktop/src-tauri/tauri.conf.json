@@ -51,7 +51,7 @@
       "endpoints": [
         "https://github.com/choisungwook/portfolio/releases/download/akbun-gitdesktop-updater/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlDMTU4MzMwMzQ1N0JEQkMKUldTOHZWYzBNSU1Wbk5wWWs4MER5TnMyb3lnQ21yRElibTZad3hnM2FqdTg5NWlJUlRJenVlcnUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFQkYxNTU4Nzk0MUYxNDcKUldSSDhVRjVXQlcvZnVyVmYxMTRqb1hlZ29XT1kveFNUVW9DV3d6cEdRY0s0NVZPWmMvQlpVaysK",
       "windows": {
         "installMode": "passive"
       }
