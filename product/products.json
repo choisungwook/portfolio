@@ -1,6 +1,6 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-23",
+  "updated": "2026-08-29",
   "products": [
     {
       "id": "akbun-macdiskviewer",
@@ -148,9 +148,9 @@
     {
       "id": "akbun-gitdesktop",
       "name": "akbun-gitdesktop",
-      "description": "git graph, 브랜치, worktree, GitHub PR을 보는 Electron 데스크톱 앱",
+      "description": "git graph, 브랜치, worktree, GitHub PR을 보는 Tauri 데스크톱 앱",
       "kind": "desktop",
-      "tags": ["electron", "git", "github"],
+      "tags": ["tauri", "rust", "git", "github"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=gitdesktop",
       "released": "2026-07-25"
     },

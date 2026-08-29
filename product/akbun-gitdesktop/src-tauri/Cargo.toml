@@ -1,0 +1,29 @@
+[workspace]
+members = ["crates/gitdesktop-core"]
+
+[package]
+name = "akbun-gitdesktop"
+version = "0.1.0"
+description = "Git graph desktop viewer for local repositories and worktrees"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "akbun_gitdesktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+gitdesktop-core = { path = "crates/gitdesktop-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+url = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"

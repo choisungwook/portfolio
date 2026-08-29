@@ -9,105 +9,130 @@ on:
   pull_request:
     paths:
       - 'product/akbun-gitdesktop/**'
+      - '.github/workflows/gitdesktop-release.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 defaults:
   run:
     working-directory: product/akbun-gitdesktop
 
 jobs:
-  # PR 검증용. electron 바이너리 없이 typecheck와 테스트만 돌린다.
-  # 업데이트 기능이 임시 파일을 남기지 않는지 확인하는 테스트가 여기서 돈다.
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24'
           cache: npm
           cache-dependency-path: product/akbun-gitdesktop/package-lock.json
 
+      - uses: dtolnay/rust-toolchain@stable
+
       - name: Install dependencies
         run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
+      - name: Run page tests
         run: npm test
+
+      - name: Run Rust model tests
+        run: npm run test:rust
 
   release:
     if: github.event_name != 'pull_request'
-    runs-on: macos-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin --bundles dmg'
+            targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: '--bundles appimage'
+            targets: ''
+          - platform: windows-latest
+            args: '--bundles nsis'
+            targets: ''
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-gitdesktop/package-lock.json
 
-      - name: Compute next version
-        id: version
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-gitdesktop/src-tauri
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
-          latest=$(git tag --list 'gitdesktop-v*' | sed 's/^gitdesktop-v//' | sort -V | tail -n1)
-          package=$(node -p "require('./package.json').version")
-          if [ -z "$latest" ]; then
-            next="$package"
-          else
-            # 마지막 릴리스의 patch를 +1 해서 기존 릴리스를 덮어쓰지 않는다.
-            IFS=. read -r major minor patch <<< "$latest"
-            bumped="$major.$minor.$((patch + 1))"
-            # package.json을 직접 올려 major/minor를 바꿨다면 그 값을 따른다.
-            next=$(printf '%s\n%s\n' "$bumped" "$package" | sort -V | tail -n1)
-          fi
-          echo "version=$next" >> "$GITHUB_OUTPUT"
-          echo "tag=gitdesktop-v$next" >> "$GITHUB_OUTPUT"
-          echo "Releasing gitdesktop-v$next (previous tag: ${latest:-none})"
-
-      - name: Fail if the tag already exists
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "Tag $TAG already exists. Refusing to overwrite a published release."
-            exit 1
-          fi
-
-      - name: Apply version to package.json
-        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build installers
-        run: npm run dist:mac
-
-      - name: Create tag
-        working-directory: .
+      - uses: tauri-apps/tauri-action@action-v1.0.0
         env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          git tag "$TAG"
-          git push origin "$TAG"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_GITDESKTOP }}
+        with:
+          projectPath: product/akbun-gitdesktop
+          tagName: gitdesktop-v__VERSION__
+          releaseName: gitdesktop-v__VERSION__
+          releaseDraft: false
+          prerelease: false
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}
+          releaseBody: |
+            ## About
 
-      - name: Create release with installers
+            - Git graph, branch, worktree, GitHub pull request, issue and project desktop viewer.
+
+            ## Install
+
+            - macOS: download the dmg. The build is ad-hoc signed and not notarized.
+            - Windows: download the exe. No administrator rights needed. If SmartScreen warns, choose More info then Run anyway.
+            - Linux: download the AppImage and make it executable.
+            - Check for Updates in the app fetches newer signed versions.
+
+  publish-updater-manifest:
+    if: github.event_name != 'pull_request'
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Publish updater manifest to the fixed tag
         working-directory: .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            product/akbun-gitdesktop/release/*.dmg
+          version=$(node -p "require('./product/akbun-gitdesktop/package.json').version")
+          gh release download "gitdesktop-v$version" --pattern latest.json --output latest.json --repo ${{ github.repository }}
+          gh release view akbun-gitdesktop-updater --repo ${{ github.repository }} || gh release create akbun-gitdesktop-updater --latest=false --title akbun-gitdesktop-updater --notes "akbun-gitdesktop updater manifest. Do not delete." --repo ${{ github.repository }}
+          gh release upload akbun-gitdesktop-updater latest.json --clobber --repo ${{ github.repository }}
