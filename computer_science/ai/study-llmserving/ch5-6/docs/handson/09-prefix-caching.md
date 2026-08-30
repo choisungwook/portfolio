@@ -1,51 +1,46 @@
-# 같은 내용인데 prefix cache가 빗나가는 이유
+# Prefix cache가 hit하거나 빗나가는 조건
 
-System prompt와 document 내용이 같아도 순서나 whitespace가 달라지면 prefix cache hit가 사라질 수 있습니다. Prefix caching은 의미가 같은 문장을 찾는 기능이 아니라 앞부분의 동일한 token sequence를 재사용하기 때문입니다.
+다음 시나리오를 순서대로 진행합니다.
 
-이 실습은 cold, warm, reordered request를 비교해 TTFT가 언제 줄어드는지 확인합니다.
+1. Cold·warm·reordered request의 prefix cache hit와 TTFT 비교
+2. Cache hit rate와 tenant isolation의 trade-off 판단
 
-## 실습 환경
+공통 환경:
 
-- 선행 실습: [Prefill·decode 병목 관찰](./07-prefill-decode-observability.md)
+- 선행 실습: [Prefill·decode 병목 관측](./07-prefill-decode-observability.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
-- 이후 모든 명령: 위 workspace에서 실행
-- model: `Qwen/Qwen2.5-3B-Instruct`
+- Model: `Qwen/Qwen2.5-3B-Instruct`
+- Prefix caching: 활성화
 
-Repository root에서 workspace로 이동합니다.
+## 시나리오 1. Token 순서가 cache hit와 TTFT를 바꾸는지 확인합니다
+
+### 이론
+
+Prefix caching은 의미가 같은 문장을 찾는 기능이 아닙니다. 앞에서부터 동일한 token sequence의 KV cache block을 재사용합니다.
+
+| Request | 조건 | 예상 결과 |
+| --- | --- | --- |
+| Cold | 긴 static prefix를 처음 계산 | Cache miss, 높은 TTFT |
+| Warm | 같은 token prefix를 다시 요청 | Cache hit, 낮은 TTFT |
+| Reordered | 같은 내용을 다른 순서로 요청 | 공통 prefix 단절, TTFT 재증가 |
+
+Whitespace나 document 순서가 달라져 token sequence가 바뀌면 뒤의 동일 내용도 재사용하지 못할 수 있습니다.
+
+### 실습
+
+Workspace로 이동하고 기존 GPU workload를 정리합니다.
 
 ```bash
 cd computer_science/ai/study-llmserving/ch5-6
-```
-
-## 실습 전 GPU process를 정리합니다
-
-이전 실습과 다른 workload가 사용하는 GPU compute process를 정리합니다.
-
-```bash
 docker compose --profile "*" down --remove-orphans
 nvidia-smi \
   --query-compute-apps=pid,process_name,used_gpu_memory \
   --format=csv,noheader
 ```
 
-두 번째 명령이 process를 출력하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 두 명령을 다시 실행합니다.
+두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-## 세 request가 확인하는 조건
-
-1. Cold request
-   - 긴 static prefix를 처음 계산
-2. Warm request
-   - 같은 token prefix를 다시 요청
-   - KV cache 재사용 예상
-3. Reordered request
-   - 같은 내용을 다른 순서로 요청
-   - token prefix 연속성 상실 예상
-
-Semantic similarity가 아니라 token prefix가 비교 기준이라는 가설을 검증합니다.
-
-## Prefix hit와 TTFT를 함께 측정합니다
-
-관측 stack과 prefix caching이 활성화된 BF16 server를 실행합니다.
+관측 stack과 prefix caching이 활성화된 server를 기동합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
@@ -56,48 +51,53 @@ bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 Cold, warm, reordered request를 순서대로 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python3 -m benchmark.benchmark_prefix_cache
+docker compose --profile tools run --rm \
+  -e MODEL_LABEL=bf16 \
+  benchmark python3 -m benchmark.benchmark_prefix_cache
 ```
 
-Request별 TTFT 결과를 확인합니다.
+Request별 결과를 확인합니다.
 
 ```bash
 cat results/prefix-cache-bf16.json
 ```
 
-Grafana에서는 다음 값을 같은 시간 구간에서 확인합니다.
+Grafana 확인값:
 
 - Prefix Cache Hit Rate: warm request의 hit 증가
 - TTFT p95: cold와 warm의 첫 token 지연 차이
-- KV Cache Usage: cache가 GPU memory에 미친 영향
+- KV Cache Usage: cache block 점유율 변화
 
-여기서 “reordered request도 내용이 같으니 일부는 재사용하지 않나”라고 묻습니다. 앞에서부터 이어지는 공통 token까지만 재사용할 수 있습니다. 문서 순서가 초반에 달라지면 뒤의 동일 내용까지 prefix가 끊깁니다.
+Warm TTFT가 줄고 reordered TTFT가 다시 늘면 token ordering 의존성을 확인한 것입니다.
 
-## Hit rate와 isolation 사이의 trade-off
+## 시나리오 2. Cache hit rate와 tenant isolation을 함께 판단합니다
 
-- static content를 앞에 고정
-  - 얻는 것: 긴 공통 prefix와 높은 hit 가능성
-  - 주의점: dynamic content가 중간에 들어가면 이후 prefix 재사용 중단
-- cache-aware routing
-  - 얻는 것: 같은 cache가 있는 replica로 요청 전달
-  - 주의점: replica load imbalance 가능
-- tenant namespace 분리
-  - 얻는 것: tenant 간 cache 정보 노출 방지
-  - 잃는 것: shared cache hit 감소
+### 이론
+
+| 설계 | 얻는 것 | 주의점 |
+| --- | --- | --- |
+| Static content를 앞에 고정 | 긴 공통 prefix, 높은 hit 가능성 | 중간의 dynamic content 뒤는 재사용 중단 |
+| Cache-aware routing | Cache가 있는 replica에서 높은 hit | Replica load imbalance 가능 |
+| Tenant namespace 분리 | Tenant 간 cache 정보 노출 방지 | Shared cache hit 감소 |
 
 Multi-tenant 환경에서는 hit rate보다 isolation이 우선입니다. Shared prefix의 latency 차이가 cache 존재 여부를 추정하는 side channel이 될 수 있습니다.
 
-## 정리
+### 실습
 
-실험이 끝나면 model server를 종료합니다.
+Prompt template과 routing 정책을 검토합니다.
+
+- System prompt와 static document를 앞에 배치
+- Request별 dynamic content를 뒤에 배치
+- Tenant namespace 또는 cache key 분리 확인
+- Cache-aware routing의 replica 편중 확인
+
+실험 후 model server를 종료합니다.
 
 ```bash
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
 
-Warm TTFT가 줄고 reordered TTFT가 다시 늘면 prefix caching이 token ordering에 의존한다는 가설을 확인한 것입니다. **Cache hit를 높이려면 같은 의미보다 같은 prompt 구조를 유지해야 합니다.**
+참고자료:
 
-## 참고자료
-
-- [vLLM Automatic Prefix Caching](https://docs.vllm.ai/en/stable/features/automatic_prefix_caching.html)
+- [vLLM Automatic Prefix Caching](https://docs.vllm.ai/en/v0.27.1/features/automatic_prefix_caching/)

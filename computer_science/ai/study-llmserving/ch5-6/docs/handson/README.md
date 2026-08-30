@@ -1,74 +1,124 @@
-# LLM serving이 느린 이유를 GPU에서 직접 확인하는 순서
+# LLM serving 병목을 재현하는 시나리오
 
-옵션을 먼저 바꾸면 숫자는 달라져도 원인을 설명하기 어렵습니다. 이 핸즈온은 GPU 확인부터 시작해 memory, KV cache, roofline, scheduling, prefill·decode, quantization, cache 순서로 병목을 좁힙니다. 파일 번호가 학습 순서입니다.
+다음 시나리오를 번호 순서대로 진행합니다.
 
-## 모든 GPU 실습 전에 기준 상태를 만듭니다
+1. Host부터 Grafana까지 GPU 관측 경로 확인
+2. 7B BF16의 memory budget과 OOM 확인
+3. Batch·sequence에 따른 KV cache 변화 확인
+4. GPU roofline 측정과 병목 재현
+5. Latency SLO를 만족하는 vLLM batch 설정 선택
+6. Static·dynamic·continuous admission 전략 비교
+7. Prefill·decode 병목 구분
+8. BF16·W4A16·W8A8 비교
+9. Prefix cache hit 조건 확인
 
-Workspace의 이전 model process를 정리하고 hardware metric 수집 경로를 확인합니다.
+모든 GPU 실습은 [Ubuntu GPU 환경 준비](../01-setup-ubuntu.md)를 완료한 뒤 실행합니다. GPU 기준 상태와 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
 
-```bash
-docker compose --profile "*" down --remove-orphans
-nvidia-smi \
-  --query-compute-apps=pid,process_name,used_gpu_memory \
-  --format=csv,noheader
-docker compose --profile observability up -d prometheus grafana dcgm-exporter
-bash scripts/check_observability.sh
-```
+## 시나리오 1. GPU 실행 경로와 metric 수집 경로를 확인합니다
 
-Desktop GPU는 화면 출력 때문에 baseline VRAM이 0MiB가 아닙니다. 초기화 기준과 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
+### 이론
 
-`nvidia-smi`가 compute process를 출력하면 실습을 진행하지 않습니다. [process 실행 주체 확인과 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 초기화 명령부터 다시 실행합니다.
+- Host driver, container runtime, DCGM Exporter, Prometheus, Grafana의 역할 구분
+- 이후 OOM과 성능 결과를 해석할 hardware baseline 설정
 
-## Chapter 5만 볼 때
+### 실습
 
-Chapter 5는 "이 GPU에 이 model이 들어가는가, 느리다면 연산인가 대역폭인가"를 다룹니다. 이론을 먼저 읽고 세 실습을 순서대로 합니다.
+- [Host부터 Grafana까지 GPU 관측 경로 확인](./01-gpu-environment.md)
 
-| 순서 | 문서 | 답하는 질문 |
-| ---: | --- | --- |
-| 0 | [Chapter 5 이론](../02-ch5-theory.md) | weight 말고 무엇이 VRAM을 쓰는가 |
-| 1 | [02 메모리 예산과 OOM](./02-memory-budget-oom.md) | 계산상 들어가는데 왜 OOM이 나는가 |
-| 2 | [03 KV cache 배치·시퀀스](./03-kv-cache-batch-sequence.md) | 캐시할 토큰 개수를 어떻게 세고, 최대 배치는 무엇이 정하는가 |
-| 3 | [04 roofline과 병목 재현](./04-roofline-bottleneck.md) | 연산집약도 축은 무엇이고, 병목이 연산인가 대역폭인가 |
+## 시나리오 2. Model load와 serving memory budget의 차이를 확인합니다
 
-03과 04는 문서에 적힌 Docker Compose 명령으로 KV cache, roofline, bottleneck을 직접 측정합니다. 실행 전에 [01 GPU 환경](./01-gpu-environment.md)이 필요합니다.
+### 이론
 
-## Chapter 6만 볼 때
+- Weight 외 CUDA runtime, activation, allocator, KV cache가 사용하는 VRAM 확인
+- Model load 성공과 API serving 가능 조건 구분
 
-Chapter 6는 "Chapter 5에서 찾은 병목마다 어떤 optimization이 붙는가"를 다룹니다.
+### 실습
 
-| 순서 | 문서 | 답하는 질문 |
-| ---: | --- | --- |
-| 0 | [Chapter 6 이론](../04-ch6-theory.md) | optimization을 무엇을 기준으로 고르는가 |
-| 1 | [05 batching](./05-vllm-batching.md) | batch를 키우면 latency도 좋아지는가 |
-| 2 | [06 batching 전략](./06-batch-strategies.md) | static·dynamic·continuous는 어디서 갈리는가 |
-| 3 | [07 prefill·decode 관측](./07-prefill-decode-observability.md) | 느린 단계가 prefill인가 decode인가 |
-| 4 | [08 quantization](./08-quantization.md) | VRAM이 가장 적은 model이 가장 빠른가 |
-| 5 | [09 prefix caching](./09-prefix-caching.md) | 같은 내용인데 cache가 왜 빗나가는가 |
+- [16GB GPU에서 7B BF16 serving이 실패하는 이유](./02-memory-budget-oom.md)
 
-품질 검증의 한계는 [GSM8K 20문항의 범위](../06-gsm8k-deep-dive.md)에 있습니다.
+## 시나리오 3. Batch와 sequence가 KV cache를 채우는 과정을 확인합니다
 
-07은 Chapter 5의 병목 개념을 metric으로 관측해 Chapter 6 optimization과 연결합니다.
+### 이론
 
-## 전체 순서
+- Attention 구조로 token당 KV cache 크기 계산
+- Scheduler 제한과 KV cache 제한으로 최대 동시성 계산
+- KV cache metric과 전체 GPU VRAM metric의 범위 구분
 
-환경부터 순서대로 다 할 때의 번호 순입니다.
+### 실습
 
-| # | 문서 | Chapter |
-| ---: | --- | --- |
-| 1 | [GPU가 보여도 container에서 못 쓰는 이유](./01-gpu-environment.md) | 환경 |
-| 2 | [16GB GPU에서 7B BF16이 OOM 나는 이유](./02-memory-budget-oom.md) | 5 |
-| 3 | [배치와 시퀀스를 흔들어 KV cache가 차는 과정](./03-kv-cache-batch-sequence.md) | 5 |
-| 4 | [내 GPU의 crossover를 직접 재고 병목을 만들기](./04-roofline-bottleneck.md) | 5 |
-| 5 | [Batch를 키우면 throughput과 latency가 어떻게 바뀌는가](./05-vllm-batching.md) | 6 |
-| 6 | [Static·dynamic·continuous batching의 성능 차이](./06-batch-strategies.md) | 6 |
-| 7 | [TTFT와 TPOT만으로 부족한 prefill·decode 병목](./07-prefill-decode-observability.md) | 5→6 |
-| 8 | [VRAM이 줄었다고 빠른 model이 아닌 quantization](./08-quantization.md) | 6 |
-| 9 | [같은 내용이어도 prefix cache가 빗나가는 조건](./09-prefix-caching.md) | 6 |
+- [배치와 시퀀스에 따라 KV cache가 차는 과정](./03-kv-cache-batch-sequence.md)
 
-공통 metric의 수집 이유와 해석은 [GPU 사용률이 높은데 LLM이 느릴 때 무엇을 봐야 할까](../prometheus.md)에서 설명합니다.
+## 시나리오 4. Compute와 memory bandwidth 병목을 구분합니다
 
-## 참고자료
+### 이론
 
-- [Chapter 5 이론](../02-ch5-theory.md)
-- [Chapter 6 이론](../04-ch6-theory.md)
+- Arithmetic intensity와 hardware crossover 계산
+- Batch 1 decode의 bandwidth 기반 token/s 상한 계산
+- GPU utilization metric만으로 병목을 단정할 수 없는 이유 확인
+
+### 실습
+
+- [GPU roofline을 측정하고 병목 재현](./04-roofline-bottleneck.md)
+
+## 시나리오 5. Latency SLO를 만족하는 batch 설정을 찾습니다
+
+### 이론
+
+- `max_num_seqs`와 `max_num_batched_tokens`의 역할 확인
+- Throughput, Queue, TTFT, E2E latency의 trade-off 판단
+
+### 실습
+
+- [Latency SLO를 만족하는 vLLM batch 설정 찾기](./05-vllm-batching.md)
+
+## 시나리오 6. Request admission 전략을 비교합니다
+
+### 이론
+
+- Client-side static·dynamic·continuous admission 구분
+- vLLM 내부 continuous scheduler와 client admission의 범위 구분
+
+### 실습
+
+- [Static·dynamic·continuous admission 전략 비교](./06-batch-strategies.md)
+
+## 시나리오 7. Prefill과 decode 지연 원인을 분리합니다
+
+### 이론
+
+- Queue·prefill·decode lifecycle metric 구분
+- TTFT·TPOT와 server 내부 metric 연결
+
+### 실습
+
+- [Prefill과 decode 병목을 metric으로 구분](./07-prefill-decode-observability.md)
+
+## 시나리오 8. Quantization을 성능과 품질로 평가합니다
+
+### 이론
+
+- W4A16과 W8A8이 줄이는 data와 유리한 workload 구분
+- VRAM, latency, throughput, accuracy를 함께 사용한 선택 기준 설정
+
+### 실습
+
+- [BF16·W4A16·W8A8의 성능과 품질 비교](./08-quantization.md)
+
+## 시나리오 9. Prefix cache hit 조건을 확인합니다
+
+### 이론
+
+- Semantic similarity와 동일 token prefix 구분
+- Cache hit rate와 tenant isolation trade-off 확인
+
+### 실습
+
+- [Prefix cache가 hit하거나 빗나가는 조건](./09-prefix-caching.md)
+
+관련 문서:
+
+- [Memory와 roofline 이론](../02-ch5-theory.md)
+- [LLM serving optimization 이론](../04-ch6-theory.md)
+- [LLM serving metric 해석](../prometheus.md)
+- [GSM8K 20문항 점수의 한계](../06-gsm8k-deep-dive.md)
 - [Quiz](../quiz.md)
