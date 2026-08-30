@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  calculateModelLoad,
   calculateVram,
   DEFAULT_INPUT,
   DEFAULT_MODEL,
   detectModelBytes,
+  detectModelFormat,
   modelFromConfig,
   validateInput,
 } from '../src/lib/calculator.js';
@@ -36,6 +38,16 @@ test('shows that the default 7B BF16 serving estimate exceeds 16 GiB', () => {
   assert.ok(result.totalGib > 16);
   assert.ok(result.overflowGib > 0);
   assert.equal(result.remainingGib, 0);
+});
+
+test('separates model loading from workload memory', () => {
+  const modelLoad = calculateModelLoad(DEFAULT_INPUT, DEFAULT_MODEL);
+  const workload = calculateVram(DEFAULT_INPUT, DEFAULT_MODEL);
+
+  assert.equal(modelLoad.fits, true);
+  assert.equal(workload.fits, false);
+  assert.ok(modelLoad.totalGib < workload.totalGib);
+  assert.equal(modelLoad.totalGib, workload.modelGib);
 });
 
 test('lower model precision can make the same model fit', () => {
@@ -101,8 +113,13 @@ test('requires manual parameters for an unsupported architecture', () => {
 
 test('detects common model precisions from config', () => {
   assert.equal(detectModelBytes(QWEN_CONFIG), 2);
+  assert.equal(detectModelFormat(QWEN_CONFIG), 'bf16');
   assert.equal(detectModelBytes({ quantization_config: { bits: 8 } }), 1);
   assert.equal(detectModelBytes({ quantization_config: { bits: 4 } }), 0.5);
+  assert.equal(detectModelFormat({ quantization_config: { quant_method: 'awq', bits: 4 } }), 'awq4');
+  assert.equal(detectModelFormat({ quantization_config: { quant_method: 'gptq', bits: 4 } }), 'gptq4');
+  assert.equal(detectModelFormat({ quantization_config: { quant_method: 'gguf', format: 'Q5_K_M' } }), 'gguf-q5');
+  assert.equal(detectModelFormat({ torch_dtype: 'float32' }), 'fp32');
 });
 
 test('rejects invalid workload and missing parameter count', () => {

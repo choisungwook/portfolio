@@ -1,6 +1,6 @@
 # akbun-caculatorllm
 
-A simple single-GPU VRAM estimator for LLMs. Load a Hugging Face model ID or upload its `config.json`, then compare model weights, KV cache, and extra runtime memory with the selected GPU capacity.
+A simple single-GPU VRAM estimator for LLMs. It first checks whether model weights fit, then shows how a workload adds KV cache and extra runtime memory.
 
 The page is a static Vite build deployed to Cloudflare. Uploaded files and calculations stay in the browser. Loading a model ID reads public Hugging Face metadata and `config.json`.
 
@@ -9,11 +9,14 @@ The page is a static Vite build deployed to Cloudflare. Uploaded files and calcu
 | Feature | How it works |
 | --- | --- |
 | Model input | Loads a public Hugging Face model ID or a local `config.json` |
+| Load Model | Compares model weights alone with the selected GPU |
+| Run a Workload | Reuses the same model and GPU, then adds KV cache and extra memory |
 | Model memory | Uses exact Hugging Face parameter metadata when available, otherwise estimates supported decoder-only shapes from config |
+| Weight format | Supports common floating-point, integer, AWQ, GPTQ, NF4, and GGUF sizes plus custom bits |
 | KV cache | Calculates key and value memory from layers, KV heads, head dimension, precision, context, and concurrent requests |
 | Extra memory | Adds a visible adjustable reserve; the default is 20% of model plus KV memory |
-| Result | Compares the total with one GPU and shows Fits or Out of memory |
-| Visualization | Stacks model, KV cache, and extra memory as liquids; OOM spills over the jar |
+| Result | Shows Needed, Available, and Free or Over for both calculations |
+| Visualization | Uses one jar for model loading and another for the workload; OOM spills over the jar |
 | Evidence | Shows every formula with the current values substituted |
 
 ## Directory layout

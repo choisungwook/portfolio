@@ -9,6 +9,24 @@ export const DEFAULT_INPUT = Object.freeze({
   alphaPercent: 20,
 });
 
+export const MODEL_FORMATS = Object.freeze({
+  fp32: { label: 'FP32', bytes: 4 },
+  bf16: { label: 'BF16', bytes: 2 },
+  fp16: { label: 'FP16', bytes: 2 },
+  fp8: { label: 'FP8', bytes: 1 },
+  int8: { label: 'INT8', bytes: 1 },
+  int4: { label: 'INT4', bytes: 0.5 },
+  awq4: { label: 'AWQ 4-bit', bytes: 0.5 },
+  gptq4: { label: 'GPTQ 4-bit', bytes: 0.5 },
+  nf4: { label: 'bitsandbytes NF4', bytes: 0.5 },
+  'gguf-q8': { label: 'GGUF Q8', bytes: 1 },
+  'gguf-q6': { label: 'GGUF Q6', bytes: 0.75 },
+  'gguf-q5': { label: 'GGUF Q5', bytes: 0.625 },
+  'gguf-q4': { label: 'GGUF Q4', bytes: 0.5 },
+  'gguf-q3': { label: 'GGUF Q3', bytes: 0.375 },
+  'gguf-q2': { label: 'GGUF Q2', bytes: 0.25 },
+});
+
 export const DEFAULT_MODEL = Object.freeze({
   id: 'Qwen/Qwen2.5-7B-Instruct',
   parameterCount: 7_615_616_512,
@@ -119,24 +137,61 @@ export function modelFromConfig(config, exactParameterCount = null, fallbackId =
   };
 }
 
-export function detectModelBytes(config) {
-  const bits = firstNumber(config.quantization_config ?? {}, ['bits']);
-  if (bits === 4) return 0.5;
-  if (bits === 8) return 1;
+export function detectModelFormat(config) {
+  const quantization = config.quantization_config ?? {};
+  const method = String(quantization.quant_method ?? '').trim().toLowerCase();
+  const quantizationType = String(
+    quantization.quantization_type ?? quantization.format ?? config.quantization_type ?? '',
+  ).trim().toLowerCase();
+  const bits = firstNumber(quantization, ['bits']);
+
+  if (method.includes('awq')) return 'awq4';
+  if (method.includes('gptq')) return 'gptq4';
+  if (method.includes('bitsandbytes') && (bits === 4 || quantization.load_in_4bit)) return 'nf4';
+
+  const ggufMatch = `${method} ${quantizationType}`.match(/(?:^|[^0-9])q([2-8])(?:[^0-9]|$)/);
+  if (ggufMatch && ['2', '3', '4', '5', '6', '8'].includes(ggufMatch[1])) {
+    return `gguf-q${ggufMatch[1]}`;
+  }
+
+  if (bits === 4) return 'int4';
+  if (bits === 8) return 'int8';
 
   const dtype = String(config.torch_dtype ?? config.dtype ?? '').toLowerCase();
-  if (dtype.includes('int4') || dtype.includes('4bit')) return 0.5;
-  if (dtype.includes('float8') || dtype.includes('fp8') || dtype.includes('int8')) return 1;
-  return 2;
+  if (dtype.includes('float32') || dtype === 'fp32') return 'fp32';
+  if (dtype.includes('bfloat16') || dtype === 'bf16') return 'bf16';
+  if (dtype.includes('float16') || dtype === 'fp16') return 'fp16';
+  if (dtype.includes('float8') || dtype.includes('fp8')) return 'fp8';
+  if (dtype.includes('int8')) return 'int8';
+  if (dtype.includes('int4') || dtype.includes('4bit')) return 'int4';
+  return 'bf16';
 }
 
-export function validateInput(input, model) {
+export function detectModelBytes(config) {
+  return MODEL_FORMATS[detectModelFormat(config)].bytes;
+}
+
+function validateModelLoad(input, model) {
   const errors = [];
   const positive = [
     ['GPU VRAM', input.gpuGib],
+    ['Model format', input.modelBytes],
+  ];
+
+  for (const [name, value] of positive) {
+    if (!Number.isFinite(value) || value <= 0) errors.push(`${name} must be greater than zero.`);
+  }
+  if (!Number.isFinite(model.parameterCount) || model.parameterCount <= 0) {
+    errors.push('Enter the model parameter count in Advanced.');
+  }
+  return errors;
+}
+
+export function validateInput(input, model) {
+  const errors = validateModelLoad(input, model);
+  const positive = [
     ['Max context', input.contextTokens],
     ['Concurrent requests', input.concurrentRequests],
-    ['Model precision', input.modelBytes],
     ['KV cache precision', input.kvBytes],
     ['Layers', model.layers],
     ['KV heads', model.kvHeads],
@@ -151,10 +206,27 @@ export function validateInput(input, model) {
   if (!Number.isFinite(input.alphaPercent) || input.alphaPercent < 0 || input.alphaPercent > 200) {
     errors.push('Extra memory must be from 0% to 200%.');
   }
-  if (!Number.isFinite(model.parameterCount) || model.parameterCount <= 0) {
-    errors.push('Enter the model parameter count in Advanced.');
-  }
   return errors;
+}
+
+export function calculateModelLoad(input, model) {
+  const errors = validateModelLoad(input, model);
+  if (errors.length) return { errors };
+
+  const modelBytes = model.parameterCount * input.modelBytes;
+  const capacityBytes = input.gpuGib * GIB;
+  const remainingBytes = capacityBytes - modelBytes;
+
+  return {
+    errors: [],
+    modelGib: modelBytes / GIB,
+    totalGib: modelBytes / GIB,
+    capacityGib: input.gpuGib,
+    remainingGib: Math.max(0, remainingBytes / GIB),
+    overflowGib: Math.max(0, -remainingBytes / GIB),
+    fits: modelBytes <= capacityBytes,
+    utilization: modelBytes / capacityBytes,
+  };
 }
 
 export function calculateVram(input, model) {

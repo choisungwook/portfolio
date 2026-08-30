@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.3.0
+
+- Split the estimator into Load Model and Run a Workload calculations.
+- Reused one model and GPU selection across both calculations.
+- Added separate jars, results, and formulas for model-only and workload memory.
+- Added FP32, BF16, FP16, FP8, INT8, INT4, AWQ, GPTQ, NF4, GGUF, and custom-bit weight formats.
+- Made VRAM capacity and Needed, Available, Free, or Over values more prominent.
+- Fixed the OOM result layout and added a fully stacked mobile layout.
+- Simplified the header and removed the introductory helper copy.
+
 ## 0.2.0
 
 - Replaced throughput planning with a simple single-GPU VRAM estimator.

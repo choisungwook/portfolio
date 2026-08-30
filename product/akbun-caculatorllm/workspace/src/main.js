@@ -1,9 +1,11 @@
 import './styles.css';
 import {
+  calculateModelLoad,
   calculateVram,
   DEFAULT_INPUT,
   DEFAULT_MODEL,
-  detectModelBytes,
+  detectModelFormat,
+  MODEL_FORMATS,
   modelFromConfig,
 } from './lib/calculator.js';
 
@@ -23,13 +25,24 @@ const compactInteger = (value) => new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 }).format(value);
 
+function selectedModelBytes() {
+  const format = byId('model-format').value;
+  if (format === 'custom') return Number(byId('custom-model-bits').value) / 8;
+  return MODEL_FORMATS[format].bytes;
+}
+
+function selectedFormatLabel() {
+  const option = byId('model-format').selectedOptions[0];
+  return option.textContent.split(' · ')[0];
+}
+
 function readInput() {
   const selectedGpu = byId('gpu-gib').value;
   return {
     gpuGib: Number(selectedGpu === 'custom' ? byId('custom-gpu-gib').value : selectedGpu),
     contextTokens: Number(byId('context-tokens').value),
     concurrentRequests: Number(byId('concurrent-requests').value),
-    modelBytes: Number(byId('model-bytes').value),
+    modelBytes: selectedModelBytes(),
     kvBytes: Number(byId('kv-bytes').value),
     alphaPercent: Number(byId('alpha-percent').value),
   };
@@ -49,6 +62,11 @@ function setText(id, value) {
   byId(id).textContent = value;
 }
 
+function toggleCustomFields() {
+  byId('custom-gpu-field').hidden = byId('gpu-gib').value !== 'custom';
+  byId('custom-model-bits-field').hidden = byId('model-format').value !== 'custom';
+}
+
 function setModel(nextModel, config = null) {
   model = nextModel;
   manualParameterOverride = false;
@@ -56,9 +74,10 @@ function setModel(nextModel, config = null) {
     byId('parameter-billions').value = number(model.parameterCount / 1e9, 3);
   } else {
     byId('parameter-billions').value = '';
-    byId('advanced-settings').open = true;
+    byId('model-advanced-settings').open = true;
   }
-  if (config) byId('model-bytes').value = String(detectModelBytes(config));
+  if (config) byId('model-format').value = detectModelFormat(config);
+  toggleCustomFields();
   setText('parameter-source', `${model.parameterSource}.`);
   setText(
     'model-shape',
@@ -70,8 +89,7 @@ function setModel(nextModel, config = null) {
 function setLayer(labelId, liquidId, gib, capacityGib, scale, lowerDisplayPercent) {
   const rawPercent = (gib / capacityGib) * 100;
   const displayPercent = rawPercent * scale;
-  const liquid = byId(liquidId);
-  liquid.style.flexBasis = `${displayPercent}%`;
+  byId(liquidId).style.flexBasis = `${displayPercent}%`;
 
   const label = byId(labelId);
   label.style.bottom = `${13 + ((lowerDisplayPercent + (displayPercent / 2)) * 0.7)}%`;
@@ -79,69 +97,121 @@ function setLayer(labelId, liquidId, gib, capacityGib, scale, lowerDisplayPercen
   return lowerDisplayPercent + displayPercent;
 }
 
-function renderJar(input, result) {
+function setJarState(prefix, result) {
+  const stage = byId(`${prefix}-jar-stage`);
+  stage.classList.toggle('oom', !result.fits);
+  stage.classList.toggle('fits', result.fits);
+  byId(`${prefix}-overflow-label`).hidden = result.fits;
+  stage.querySelector('.jar-image').alt = `Glass jar showing ${number(result.utilization * 100, 0)}% of GPU VRAM used`;
+}
+
+function renderLoadJar(input, result) {
+  const rawTotalPercent = result.utilization * 100;
+  const displayTotalPercent = Math.min(rawTotalPercent, 128);
+  const scale = rawTotalPercent > 0 ? displayTotalPercent / rawTotalPercent : 1;
+
+  setLayer(
+    'load-model-layer-label',
+    'load-model-liquid',
+    result.modelGib,
+    input.gpuGib,
+    scale,
+    0,
+  );
+  setText('load-jar-model', `${number(result.modelGib, 1)} GiB`);
+  setText('load-legend-model', `${number(result.modelGib, 1)} GiB`);
+  setText('load-capacity-label', `${number(input.gpuGib, input.gpuGib % 1 ? 1 : 0)} GiB`);
+  setJarState('load', result);
+}
+
+function renderWorkloadJar(input, result) {
   const rawTotalPercent = result.utilization * 100;
   const displayTotalPercent = Math.min(rawTotalPercent, 128);
   const scale = rawTotalPercent > 0 ? displayTotalPercent / rawTotalPercent : 1;
   let lowerDisplayPercent = 0;
 
-  lowerDisplayPercent = setLayer('extra-layer-label', 'extra-liquid', result.alphaGib, input.gpuGib, scale, lowerDisplayPercent);
-  lowerDisplayPercent = setLayer('kv-layer-label', 'kv-liquid', result.kvGib, input.gpuGib, scale, lowerDisplayPercent);
-  setLayer('model-layer-label', 'model-liquid', result.modelGib, input.gpuGib, scale, lowerDisplayPercent);
+  lowerDisplayPercent = setLayer(
+    'workload-extra-layer-label',
+    'workload-extra-liquid',
+    result.alphaGib,
+    input.gpuGib,
+    scale,
+    lowerDisplayPercent,
+  );
+  lowerDisplayPercent = setLayer(
+    'workload-kv-layer-label',
+    'workload-kv-liquid',
+    result.kvGib,
+    input.gpuGib,
+    scale,
+    lowerDisplayPercent,
+  );
+  setLayer(
+    'workload-model-layer-label',
+    'workload-model-liquid',
+    result.modelGib,
+    input.gpuGib,
+    scale,
+    lowerDisplayPercent,
+  );
 
-  setText('jar-model', `${number(result.modelGib, 1)} GiB`);
-  setText('jar-kv', `${number(result.kvGib, 1)} GiB`);
-  setText('jar-extra', `${number(result.alphaGib, 1)} GiB`);
-  setText('capacity-label', `${number(input.gpuGib, input.gpuGib % 1 ? 1 : 0)} GiB`);
-
-  const stage = byId('jar-stage');
-  stage.classList.toggle('oom', !result.fits);
-  byId('overflow-label').hidden = result.fits;
-  stage.querySelector('.jar-image').alt = `Glass jar showing ${number(result.utilization * 100, 0)}% of GPU VRAM used`;
+  setText('workload-jar-model', `${number(result.modelGib, 1)} GiB`);
+  setText('workload-jar-kv', `${number(result.kvGib, 1)} GiB`);
+  setText('workload-jar-extra', `${number(result.alphaGib, 1)} GiB`);
+  setText('workload-legend-model', `${number(result.modelGib, 1)} GiB`);
+  setText('workload-legend-kv', `${number(result.kvGib, 1)} GiB`);
+  setText('workload-legend-extra', `${number(result.alphaGib, 1)} GiB`);
+  setText('workload-capacity-label', `${number(input.gpuGib, input.gpuGib % 1 ? 1 : 0)} GiB`);
+  setJarState('workload', result);
 }
 
-function renderResult(input, result) {
-  const fitStatus = byId('fit-status');
+function renderResult(prefix, result, mode) {
+  const fitStatus = byId(`${prefix}-fit-status`);
   fitStatus.textContent = result.fits ? 'Fits' : 'Out of memory';
   fitStatus.className = result.fits ? 'fits' : 'oom';
-  byId('jar-stage').classList.toggle('fits', result.fits);
 
-  setText('total-needed', `${number(result.totalGib, 1)} GiB`);
-  setText('total-available', `${number(result.capacityGib, 1)} GiB`);
-  setText('difference-label', result.fits ? 'Free' : 'Over');
-  setText('difference-value', `${number(result.fits ? result.remainingGib : result.overflowGib, 1)} GiB`);
+  setText(`${prefix}-total-needed`, `${number(result.totalGib, 1)} GiB`);
+  setText(`${prefix}-total-available`, `${number(result.capacityGib, 1)} GiB`);
+  setText(`${prefix}-difference-label`, result.fits ? 'Free' : 'Over');
+  setText(`${prefix}-difference-value`, `${number(result.fits ? result.remainingGib : result.overflowGib, 1)} GiB`);
+
+  const differenceMetric = byId(`${prefix}-difference-value`).closest('.difference-metric');
+  differenceMetric.classList.toggle('is-over', !result.fits);
+  differenceMetric.classList.toggle('is-free', result.fits);
+
+  const subject = mode === 'load' ? 'The model weights' : 'The workload';
+  const verb = mode === 'load' ? 'need' : 'needs';
   setText(
-    'plain-verdict',
+    `${prefix}-plain-verdict`,
     result.fits
-      ? `The model can load with ${number(result.remainingGib, 1)} GiB left for variance.`
-      : `The estimate is ${number(result.overflowGib, 1)} GiB larger than this GPU.`,
+      ? `${subject} fit with ${number(result.remainingGib, 1)} GiB free.`
+      : `${subject} ${verb} ${number(result.overflowGib, 1)} GiB more VRAM.`,
   );
-
-  renderJar(input, result);
 }
 
-function renderFormulae(input, result) {
+function renderFormulae(input, loadResult, workloadResult) {
   const parameterBillions = model.parameterCount / 1e9;
   setText(
-    'model-formula',
-    `${number(parameterBillions, 3)}B parameters × ${number(input.modelBytes, 1)} bytes ÷ 1,073,741,824`,
+    'load-model-formula',
+    `${number(parameterBillions, 3)}B parameters × ${number(input.modelBytes, 3)} bytes (${selectedFormatLabel()}) ÷ 1,073,741,824`,
   );
+  setText('load-model-result', `${number(loadResult.modelGib, 2)} GiB`);
+  setText('workload-model-result', `${number(loadResult.modelGib, 2)} GiB`);
   setText(
-    'kv-formula',
+    'workload-kv-formula',
     `2 (K + V) × ${compactInteger(model.layers)} layers × ${compactInteger(model.kvHeads)} KV heads × ${compactInteger(model.headDim)} head dim × ${number(input.kvBytes, 1)} bytes × ${compactInteger(input.contextTokens)} tokens × ${compactInteger(input.concurrentRequests)} ${input.concurrentRequests === 1 ? 'request' : 'requests'}`,
   );
   setText(
-    'extra-formula',
-    `(${number(result.modelGib, 2)} GiB model + ${number(result.kvGib, 2)} GiB KV) × ${number(input.alphaPercent, 0)}%`,
+    'workload-extra-formula',
+    `(${number(workloadResult.modelGib, 2)} GiB model + ${number(workloadResult.kvGib, 2)} GiB KV) × ${number(input.alphaPercent, 0)}%`,
   );
   setText(
-    'total-formula',
-    `${number(result.modelGib, 2)} GiB + ${number(result.kvGib, 2)} GiB + ${number(result.alphaGib, 2)} GiB`,
+    'workload-total-formula',
+    `${number(workloadResult.modelGib, 2)} GiB + ${number(workloadResult.kvGib, 2)} GiB + ${number(workloadResult.alphaGib, 2)} GiB`,
   );
-  setText('model-result', `${number(result.modelGib, 2)} GiB`);
-  setText('kv-result', `${number(result.kvGib, 2)} GiB`);
-  setText('extra-result', `${number(result.alphaGib, 2)} GiB`);
-  setText('total-result', `${number(result.totalGib, 2)} GiB`);
+  setText('workload-kv-result', `${number(workloadResult.kvGib, 2)} GiB`);
+  setText('workload-extra-result', `${number(workloadResult.alphaGib, 2)} GiB`);
+  setText('workload-total-result', `${number(workloadResult.totalGib, 2)} GiB`);
 }
 
 function update() {
@@ -154,16 +224,27 @@ function update() {
         : null,
     };
   }
+
   const input = readInput();
-  const result = calculateVram(input, model);
-  if (result.errors.length) {
-    renderError(result.errors[0]);
+  const loadResult = calculateModelLoad(input, model);
+  if (loadResult.errors.length) {
+    renderError(loadResult.errors[0]);
+    return;
+  }
+
+  renderLoadJar(input, loadResult);
+  renderResult('load', loadResult, 'load');
+
+  const workloadResult = calculateVram(input, model);
+  if (workloadResult.errors.length) {
+    renderError(workloadResult.errors[0]);
     return;
   }
 
   clearError();
-  renderResult(input, result);
-  renderFormulae(input, result);
+  renderWorkloadJar(input, workloadResult);
+  renderResult('workload', workloadResult, 'workload');
+  renderFormulae(input, loadResult, workloadResult);
 }
 
 async function fetchJson(url) {
@@ -235,7 +316,11 @@ form.addEventListener('input', (event) => {
 });
 
 byId('gpu-gib').addEventListener('change', () => {
-  byId('custom-gpu-field').hidden = byId('gpu-gib').value !== 'custom';
+  toggleCustomFields();
+  update();
+});
+byId('model-format').addEventListener('change', () => {
+  toggleCustomFields();
   update();
 });
 
@@ -251,9 +336,8 @@ byId('config-file').addEventListener('change', (event) => {
   if (file) loadConfigFile(file);
 });
 
-setModel({ ...DEFAULT_MODEL });
 Object.entries(DEFAULT_INPUT).forEach(([key, value]) => {
   const input = form.elements.namedItem(key);
   if (input) input.value = String(value);
 });
-update();
+setModel({ ...DEFAULT_MODEL });

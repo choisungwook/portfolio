@@ -20,7 +20,7 @@ Run the DOM-free calculation tests:
 npm test
 ```
 
-The tests cover model memory, KV cache, extra memory, Fits and OOM states, precision changes, config-derived parameter estimates, exact Hugging Face metadata, and input validation.
+The tests cover separate model-load and workload totals, model memory, KV cache, extra memory, Fits and OOM states, weight formats, config-derived parameter estimates, exact Hugging Face metadata, and input validation.
 
 ## Build
 
@@ -71,7 +71,7 @@ npm run deploy
 
 **Treat uploaded config as a shape description.** A `config.json` normally does not contain an exact parameter total. The calculator estimates common decoder-only shapes and asks for manual input when the structure is unsupported.
 
-**Choose serving precision explicitly.** Checkpoints and runtime quantization can differ. Use the precision that the server will load.
+**Choose the loaded weight format explicitly.** Checkpoints and runtime quantization can differ. Use the format that the server will load.
 
 **Use concurrency as a memory reservation assumption.** KV cache assumes every concurrent request reaches the selected maximum context.
 
