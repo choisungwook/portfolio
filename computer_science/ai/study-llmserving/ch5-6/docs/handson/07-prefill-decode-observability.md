@@ -1,135 +1,146 @@
-# TTFT와 TPOT만으로 prefill·decode 병목을 구분할 수 있을까
+# Prefill과 decode 병목을 metric으로 구분
 
-TTFT가 느리면 prefill 문제처럼 보이지만 scheduler queue가 원인일 수 있습니다. TPOT가 느려도 decode compute보다 KV cache pressure가 원인일 수 있습니다. 이 실습은 사용자 지표와 vLLM 내부 metric, GPU metric을 연결해 병목을 한 단계씩 좁힙니다.
+다음 시나리오를 순서대로 진행합니다.
 
-## 실습 환경
+1. Long-prefill workload에서 첫 token 지연 분석
+2. Long-decode workload에서 token 생성 지연 분석
+3. 같은 E2E latency의 원인을 lifecycle metric으로 구분
 
-- 선행 실습: [Static·dynamic·continuous 전략 비교](./06-batch-strategies.md)
+공통 환경:
+
+- 선행 실습: [Admission 전략 비교](./06-batch-strategies.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
-- 이후 모든 명령: 위 workspace에서 실행
-- runtime: vLLM `v0.27.1`
-- model: `Qwen/Qwen2.5-3B-Instruct`
+- Runtime: vLLM `v0.27.1`
+- Model: `Qwen/Qwen2.5-3B-Instruct`
+- Scheduler: `max_num_seqs 8`, `max_num_batched_tokens 4096`
 
-Repository root에서 workspace로 이동합니다.
+## 시나리오 1. Long-prefill의 첫 token 지연을 분석합니다
+
+### 이론
+
+긴 input과 짧은 output은 prefill 비중이 큽니다. TTFT가 증가해도 queue time이 함께 증가하면 prompt 계산만의 문제로 단정할 수 없습니다.
+
+가설:
+
+- Queue p95 안정, Prefill p95·TTFT 증가: 긴 prompt 계산 비용
+- Queue p95·TTFT 동반 증가: scheduler 대기 포함
+- Peak VRAM 증가: 긴 context의 memory 영향
+
+### 실습
+
+Workspace로 이동하고 기존 GPU workload를 정리합니다.
 
 ```bash
 cd computer_science/ai/study-llmserving/ch5-6
-```
-
-## 실습 전 GPU process를 정리합니다
-
-이전 실습과 다른 workload가 사용하는 GPU compute process를 정리합니다.
-
-```bash
 docker compose --profile "*" down --remove-orphans
 nvidia-smi \
   --query-compute-apps=pid,process_name,used_gpu_memory \
   --format=csv,noheader
 ```
 
-두 번째 명령이 process를 출력하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 두 명령을 다시 실행합니다.
+두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-## 두 workload가 다른 metric을 움직인다는 가설
-
-- long-prefill
-  - 조건: 긴 input, 짧은 output
-  - 가설: Prefill p95와 TTFT 증가
-- long-decode
-  - 조건: 짧은 input, 긴 output
-  - 가설: Decode p95, TPOT, KV cache usage 증가
-- 고정 조건
-  - 같은 BF16 model
-  - 같은 scheduler 설정
-  - 같은 GPU
-
-Workload 외 조건을 고정해야 metric 차이를 prefill과 decode의 차이로 해석할 수 있습니다.
-
-## Server와 metric target을 준비합니다
-
-관측 stack과 BF16 server를 실행합니다.
+관측 stack과 server를 기동합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
-VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 docker compose --profile bf16 up -d --force-recreate vllm-bf16
+VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
+  docker compose --profile bf16 up -d --force-recreate vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-```
-
-Benchmark 전에 metric endpoint와 Prometheus target을 확인합니다.
-
-```bash
 curl http://127.0.0.1:8000/metrics
 curl http://127.0.0.1:9090/api/v1/targets
 ```
 
-## Long-prefill은 첫 token이 늦어진 이유를 보여줍니다
-
-긴 input과 짧은 output workload를 실행합니다.
+Long-prefill workload를 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_long_prefill
+docker compose --profile tools run --rm \
+  -e MODEL_LABEL=bf16 \
+  -e PRECISION=BF16 \
+  -e VLLM_MAX_NUM_SEQS=8 \
+  -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
+  benchmark python3 -m benchmark.benchmark_long_prefill
 ```
 
-Grafana에서 다음 순서로 봅니다.
+Grafana 확인 순서:
 
-1. Queue p95로 scheduler 대기를 제외합니다.
-2. Prefill p95로 prompt 계산 시간을 확인합니다.
-3. TTFT p95로 사용자 첫 응답 지연과 연결합니다.
-4. GPU utilization·power로 workload 강도를 확인합니다.
-5. Peak VRAM으로 context가 memory에 미친 영향을 확인합니다.
+1. Queue p95
+2. Prefill p95
+3. TTFT p95
+4. GPU utilization·power
+5. Peak VRAM
 
-TTFT만 증가하고 Queue p95가 안정적이라면 prefill 계산이 유력합니다. Queue와 TTFT가 함께 증가한다면 prompt 계산만의 문제로 단정할 수 없습니다.
+## 시나리오 2. Long-decode의 token 생성 지연을 분석합니다
 
-## Long-decode는 token 생성 비용을 보여줍니다
+### 이론
 
-짧은 input과 긴 output workload를 실행합니다.
+짧은 input과 긴 output은 decode 비중이 큽니다. 낮은 concurrency에서 TPOT가 좋아도 request가 늘면 waiting queue와 KV cache 사용률이 증가할 수 있습니다.
+
+가설:
+
+- Decode p95·TPOT 증가: output 생성 비용 증가
+- Output TPS 정체·waiting 증가: serving capacity 포화
+- TPOT·KV cache 사용률 동반 증가: decode concurrency와 memory pressure
+
+### 실습
+
+Long-decode workload를 실행합니다.
 
 ```bash
-docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 -e VLLM_MAX_NUM_SEQS=8 -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 benchmark python3 -m benchmark.benchmark_long_decode
+docker compose --profile tools run --rm \
+  -e MODEL_LABEL=bf16 \
+  -e PRECISION=BF16 \
+  -e VLLM_MAX_NUM_SEQS=8 \
+  -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
+  benchmark python3 -m benchmark.benchmark_long_decode
 ```
 
-이번에는 다음 순서로 봅니다.
+Grafana 확인 순서:
 
-1. Decode p95로 output 생성 구간을 확인합니다.
-2. TPOT p95로 token 사이 사용자 체감 속도를 확인합니다.
-3. Output TPS로 GPU 전체 decode 처리량을 확인합니다.
-4. running·waiting request로 scheduler 포화를 확인합니다.
-5. KV cache usage와 VRAM으로 memory pressure를 확인합니다.
+1. Decode p95
+2. TPOT p95
+3. Output TPS
+4. Running·waiting request
+5. KV cache 사용률·VRAM
 
-여기서 “TPOT가 낮으면 decode가 해결된 것 아닌가”라고 묻습니다. Concurrency가 낮을 때 TPOT가 좋아도 요청이 늘어 waiting queue가 쌓일 수 있습니다. TPOT와 Output TPS, waiting request를 함께 봐야 합니다.
+## 시나리오 3. 같은 E2E latency의 원인을 구분합니다
 
-## 같은 E2E latency라도 원인은 다릅니다
+### 이론
 
-두 결과를 확인합니다.
+TTFT와 TPOT는 사용자가 겪은 결과입니다. Queue, prefill, decode, KV cache metric은 지연이 발생한 단계를 보여 줍니다.
+
+| Workload | 우선 확인 metric | 병목 가설 |
+| --- | --- | --- |
+| Long-prefill | Queue·Prefill·TTFT p95 | Scheduler 대기 또는 prompt 계산 |
+| Long-decode | Decode·TPOT·Output TPS | Weight·KV cache data movement |
+
+Lifecycle metric은 느린 단계를 좁히지만 compute와 memory bandwidth 원인을 직접 판정하지는 못합니다. 그 판정은 [roofline과 병목 재현](./04-roofline-bottleneck.md)의 이론 상한과 실측 token 속도를 사용합니다.
+
+### 실습
+
+두 결과 파일을 확인합니다.
 
 ```bash
 ls results/performance-bf16-long-*.json
 ```
 
-| Workload | 우선 확인 metric | 병목 가설 |
-| --- | --- | --- |
-| long-prefill | Queue·Prefill·TTFT p95 | scheduler 대기 또는 prompt 계산 |
-| long-decode | Decode·TPOT·Output TPS | weight·KV cache data movement |
+판단 순서:
 
-- Prefill p95와 TTFT 동반 증가: 긴 prompt 계산 비용
-- Decode p95와 TPOT 동반 증가: 긴 output 생성 비용
-- waiting request와 GPU utilization 동반 증가: serving capacity 포화 가능
-- waiting request만 증가: scheduler·runtime 병목 추가 확인
-- TPOT와 KV cache usage 동반 증가: decode concurrency와 memory pressure 확인
+1. Queue 증가 여부 확인
+2. Prefill 또는 decode 시간 증가 확인
+3. TTFT 또는 TPOT와 연결
+4. Running·waiting으로 scheduler 포화 확인
+5. KV cache와 VRAM으로 memory pressure 확인
+6. Roofline과 token/s 상한으로 compute·bandwidth 방향 확인
 
-이 목록은 어느 **단계**가 느린지까지 좁혀줍니다. 그 단계가 연산 때문인지 memory bandwidth 때문인지는 metric만으로 갈리지 않습니다. 실측에서 `DCGM_FI_DEV_GPU_UTIL`과 `DCGM_FI_DEV_MEM_COPY_UTIL`이 거의 같이 움직였기 때문입니다. 그 판별은 대역폭에서 계산한 이론 상한과 실측 token 속도를 대조하는 방법으로 하고, 절차는 [roofline과 병목 재현](./04-roofline-bottleneck.md)에 있습니다.
-
-## 정리
-
-실험이 끝나면 model server만 종료해 metric과 model cache를 유지합니다.
+실험 후 model server를 종료합니다.
 
 ```bash
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
 
-TTFT와 TPOT는 사용자가 겪은 결과를 알려 줍니다. Queue, prefill, decode, KV cache metric은 그 결과가 생긴 단계를 알려 줍니다. **병목은 단일 숫자가 아니라 서로 연결된 metric의 움직임으로 판단해야 합니다.**
+참고자료:
 
-## 참고자료
-
-- [GPU 사용률이 높은데 LLM이 느릴 때 무엇을 봐야 할까](../prometheus.md)
-- [vLLM Metrics](https://docs.vllm.ai/en/stable/usage/metrics/)
+- [LLM serving metric 해석](../prometheus.md)
+- [vLLM v0.27.1 metrics](https://docs.vllm.ai/en/v0.27.1/usage/metrics/)
