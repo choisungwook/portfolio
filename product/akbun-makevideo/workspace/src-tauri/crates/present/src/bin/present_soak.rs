@@ -29,8 +29,10 @@ use makevideo_compositor::source::{
 use makevideo_compositor::{Backend, Compositor};
 use makevideo_present::schedule::DEFAULT_RESYNC;
 use makevideo_present::sink::OffscreenSink;
-use makevideo_present::soak::{measure, ProjectInfo, Run, Scenario, ScenarioReport};
-use makevideo_present::transport::{Setup, Transport};
+use makevideo_present::soak::{
+    measure, measure_video_replacement, ProjectInfo, Run, Scenario, ScenarioReport,
+};
+use makevideo_present::transport::{Setup, Transport, VideoSetup};
 use makevideo_render::{ffmpeg, Project, TrackKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -169,6 +171,7 @@ fn run_scenario(
     settings: &Settings,
     compositor: &Arc<Compositor>,
     scenario: &Scenario,
+    replace_after: Option<u64>,
 ) -> ScenarioReport {
     let (width, height) = ffmpeg::output_size(&project.settings, settings.preset);
     let (mut transport, consumer) = Transport::start(Setup {
@@ -184,7 +187,25 @@ fn run_scenario(
     });
     let clock = Arc::clone(transport.audio().clock());
     let mut sink = OffscreenSink::new(Arc::clone(compositor), width, height);
-    measure(&mut transport, consumer, clock, &mut sink, scenario)
+    match replace_after {
+        Some(after) => measure_video_replacement(
+            &mut transport,
+            consumer,
+            clock,
+            &mut sink,
+            scenario,
+            VideoSetup {
+                project,
+                width,
+                height,
+                frame_buffering: FrameBuffering::new(settings.frame_depth, settings.frame_lead),
+                frame_readers: Arc::new(FrameReaders::new(&ffmpeg_path(), None)),
+                resync_after: settings.resync,
+            },
+            after,
+        ),
+        None => measure(&mut transport, consumer, clock, &mut sink, scenario),
+    }
 }
 
 fn run() -> Result<Run, String> {
@@ -215,10 +236,28 @@ fn run() -> Result<Run, String> {
         &settings,
         &compositor,
         &Scenario::new("continuous-playback", frames).noting("videoTracks", "1".into()),
+        None,
+    ));
+
+    // Rebuild only the video half while the old one keeps following the audio
+    // clock. The candidate is cold on purpose; its first accepted frame is the
+    // generation handoff, and every visible frame before that must still come
+    // from the advancing old path.
+    let replace_after = (frames / 3).min(frames.saturating_sub(1));
+    scenarios.push(run_scenario(
+        &one,
+        &settings,
+        &compositor,
+        &Scenario::new("live-reconfiguration", frames)
+            .noting("videoTracks", "1".into())
+            .noting("replacementAfterFrames", replace_after.to_string()),
+        Some(replace_after),
     ));
 
     // Seeks, which is where the two halves landing in different places shows.
-    let every = (settings.seek_every_seconds * rate.as_f64()).round().max(1.0) as u64;
+    let every = (settings.seek_every_seconds * rate.as_f64())
+        .round()
+        .max(1.0) as u64;
     scenarios.push(run_scenario(
         &one,
         &settings,
@@ -226,6 +265,7 @@ fn run() -> Result<Run, String> {
         &Scenario::new("repeated-seek", frames)
             .seeking(every, 0)
             .noting("videoTracks", "1".into()),
+        None,
     ));
 
     // And once per track count: a layer is a decoder and a draw call, so this
@@ -238,6 +278,7 @@ fn run() -> Result<Run, String> {
             &compositor,
             &Scenario::new("increasing-track-count", frames)
                 .noting("videoTracks", visible.to_string()),
+            None,
         ));
     }
 
@@ -256,11 +297,7 @@ fn run() -> Result<Run, String> {
     config.insert("compositor".into(), compositor.adapter().to_string());
     config.insert("gpu".into(), compositor.is_gpu().to_string());
 
-    let report = Run::new(
-        ProjectInfo::new(width, height, rate),
-        config,
-        scenarios,
-    );
+    let report = Run::new(ProjectInfo::new(width, height, rate), config, scenarios);
     if let Some(path) = &settings.report {
         let json = serde_json::to_string_pretty(&report)
             .map_err(|error| format!("cannot write the report: {error}"))?;

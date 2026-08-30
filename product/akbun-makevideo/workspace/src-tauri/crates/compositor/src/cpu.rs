@@ -129,6 +129,14 @@ fn draw(frame: &mut [u8], width: u32, height: u32, source: &Source<'_>, placemen
 /// the render pipeline.
 #[inline]
 fn blend_pixel(destination: &mut [u8], texel: [u8; 4], opacity: f32) {
+    // Decoded video is normally opaque. Avoid four floating-point blend
+    // operations per pixel for the overwhelmingly common full-opacity path;
+    // four FHD tracks otherwise spend most of their frame budget multiplying
+    // values whose result is simply the source byte.
+    if texel[3] == 255 && opacity >= 1.0 {
+        destination.copy_from_slice(&texel);
+        return;
+    }
     let source_alpha = (texel[3] as f32 / 255.0) * opacity;
     if source_alpha <= 0.0 {
         return;

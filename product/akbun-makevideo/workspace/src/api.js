@@ -122,6 +122,7 @@ if (!window.__TAURI__) {
     // browser there was never a graphics surface to lose.
     playbackAttach: async () => ({ engine: 'media-element', fellBack: null, status: null }),
     playbackRelease: async () => {},
+    playbackRefresh: async () => null,
     playbackPlay: async () => null,
     playbackPause: async () => null,
     playbackSeek: async () => null,
@@ -288,6 +289,7 @@ window.api = {
   // frames never do. See wiki/architecture/viewport.md.
   playbackAttach: (place, frame) => invoke('playback_attach', { place, frame }),
   playbackRelease: () => invoke('playback_release'),
+  playbackRefresh: () => invoke('playback_refresh'),
   playbackPlay: () => invoke('playback_play'),
   playbackPause: () => invoke('playback_pause'),
   playbackSeek: (frame) => invoke('playback_seek', { frame }),

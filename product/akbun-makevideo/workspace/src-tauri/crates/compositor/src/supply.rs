@@ -16,7 +16,7 @@
 //! the queues have to survive being read at exactly one frame per frame period,
 //! which is the only rate at which a buffer can run dry.
 
-use crate::source::{FrameSource, Supply};
+use crate::source::{FrameSource, Supply, MAX_FORWARD_SEEK};
 use makevideo_render::Rate;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -65,9 +65,15 @@ pub struct Scenario {
     /// How many frames to pull. Reaching the end of the timeline wraps back to
     /// the start, which is counted as a seek.
     pub frames: u64,
-    /// Seek back to `seek_to` every this many frames.
+    /// Seek every this many delivered frames.
     pub seek_every: Option<u64>,
+    /// Absolute target used by [`Scenario::seeking`]. Kept for report
+    /// compatibility with existing backward-seek runs.
     pub seek_to: i64,
+    /// Positive offset from the source's current position. Absent from old
+    /// scenario JSON, so existing report consumers still see the same fields.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seek_by: Option<i64>,
     /// How long past its due time a frame may still arrive before the run is
     /// called stalled and abandoned.
     pub stall_grace_ms: u64,
@@ -81,6 +87,7 @@ impl Scenario {
             frames,
             seek_every: None,
             seek_to: 0,
+            seek_by: None,
             stall_grace_ms: 2_000,
             metadata: BTreeMap::new(),
         }
@@ -89,12 +96,25 @@ impl Scenario {
     pub fn seeking(mut self, every: u64, to: i64) -> Scenario {
         self.seek_every = Some(every);
         self.seek_to = to;
+        self.seek_by = None;
+        self
+    }
+
+    pub fn seeking_forward(mut self, every: u64, by: i64) -> Scenario {
+        self.seek_every = Some(every);
+        self.seek_by = Some(by.clamp(1, MAX_FORWARD_SEEK));
         self
     }
 
     pub fn noting(mut self, key: &str, value: String) -> Scenario {
         self.metadata.insert(key.to_string(), value);
         self
+    }
+
+    fn seek_target(&self, current: i64) -> i64 {
+        self.seek_by
+            .map(|by| current.saturating_add(by))
+            .unwrap_or(self.seek_to)
     }
 }
 
@@ -252,7 +272,7 @@ pub fn measure(source: &mut FrameSource, scenario: &Scenario) -> ScenarioReport 
                 }
                 if let Some(every) = scenario.seek_every {
                     if delivered % every == 0 {
-                        source.seek(scenario.seek_to);
+                        source.seek(scenario.seek_target(source.position()));
                         seeks += 1;
                         due = Instant::now();
                         shown_at = None;
@@ -500,12 +520,26 @@ mod tests {
     }
 
     #[test]
-    fn a_seek_is_counted_and_its_first_frame_is_a_startup_delay() {
+    fn a_backward_seek_is_counted_and_its_first_frame_is_a_startup_delay() {
         let mut source = source(Duration::from_millis(1));
         let report = measure(
             &mut source,
-            &Scenario::new("repeated-seek", 20).seeking(5, 0),
+            &Scenario::new("repeated-backward-seek", 20).seeking(5, 0),
         );
+        assert_eq!(report.metrics.seeks, 4);
+        assert_eq!(report.metrics.total_frames, 20);
+        assert!(report.metrics.startup_delay_p99_ms.is_some());
+        assert!(!report.metrics.stalled, "{report:?}");
+    }
+
+    #[test]
+    fn a_short_forward_seek_uses_each_current_position_as_its_origin() {
+        let scenario = Scenario::new("repeated-short-forward-seek", 20).seeking_forward(5, 12);
+        assert_eq!(scenario.seek_target(5), 17);
+        assert_eq!(scenario.seek_target(22), 34);
+
+        let mut source = source(Duration::from_millis(1));
+        let report = measure(&mut source, &scenario);
         assert_eq!(report.metrics.seeks, 4);
         assert_eq!(report.metrics.total_frames, 20);
         assert!(report.metrics.startup_delay_p99_ms.is_some());

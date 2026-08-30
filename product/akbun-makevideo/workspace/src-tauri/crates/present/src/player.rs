@@ -120,6 +120,12 @@ enum Mode {
     Paused,
 }
 
+enum PendingDisplay {
+    PausedFrame(Frame),
+    ExactFrame { frame: Frame, due: i128 },
+    Clear,
+}
+
 /// Where the audio clock is, as a frame index on the project rate.
 ///
 /// **Floor, not nearest.** Frame *n* is the current frame from the instant it
@@ -180,11 +186,29 @@ pub struct Scheduler {
     mode: Mode,
     /// A frame that should be on screen while paused and is not there yet.
     still: Option<i64>,
+    /// The exact frame requested or last shown while paused. `FrameSource`
+    /// points at the next frame after a successful take, so it cannot be used
+    /// as the visible paused position or as the target of a same-frame redraw.
+    paused_at: i64,
+    /// The pixels last shown while paused. Guide-only redraws reuse them, so
+    /// changing an editor overlay never seeks or reopens a decoder.
+    paused_frame: Option<Frame>,
     /// Set while a seek has been asked of the audio engine and not yet
     /// answered. Nothing is judged late during it: the clock is standing still
     /// at the old position and would make every frame look impossibly early,
     /// then impossibly late the moment it moves.
     settling: bool,
+    /// The logical seek target remains exact while an earlier neighbor may be
+    /// shown temporarily. Cleared only when that exact frame is consumed.
+    seeking_exact: Option<i64>,
+    /// A playing seek cannot leave an unrelated old frame on screen while
+    /// audio and decoding settle. Cleared before any retained or new frame is
+    /// allowed to reach the sink.
+    clear_before_seek: bool,
+    /// A fully decoded frame whose sink had no drawable. Keeping its pixels
+    /// avoids reopening ffmpeg on every timeout and lets an occluded candidate
+    /// commit internally, then present this same frame when the view returns.
+    pending_display: Option<PendingDisplay>,
     /// The sound has run out, so the clock will never advance again.
     ///
     /// Without this the last frames of a timeline can never be shown. The clock
@@ -212,7 +236,12 @@ impl Scheduler {
             // played still shows the top of the timeline.
             mode: Mode::Paused,
             still: Some(0),
+            paused_at: 0,
+            paused_frame: None,
             settling: false,
+            seeking_exact: None,
+            clear_before_seek: false,
+            pending_display: None,
             sound_over: false,
         }
     }
@@ -233,28 +262,63 @@ impl Scheduler {
         self.mode == Mode::Playing
     }
 
+    pub fn required_exact(&self) -> Option<i64> {
+        self.seeking_exact
+    }
+
     /// Where the picture is. Playing, that is the clock; paused, it is the
     /// frame that was asked for, because the clock is not moving.
     pub fn position(&self) -> i64 {
         match self.mode {
             Mode::Playing => clock_frame(&self.clock, self.rate).clamp(0, self.source.frames()),
-            Mode::Paused => self.source.position().clamp(0, self.source.frames()),
+            Mode::Paused => self.paused_at,
         }
     }
 
     pub fn buffered_bytes(&self) -> usize {
         self.source.buffered_bytes()
+            + self
+                .paused_frame
+                .as_ref()
+                .map(frame_bytes)
+                .unwrap_or_default()
+            + self
+                .pending_display
+                .as_ref()
+                .map(pending_display_bytes)
+                .unwrap_or_default()
     }
 
     pub fn buffer_ceiling(&self) -> usize {
-        self.source.buffer_ceiling()
+        self.source.buffer_ceiling() + self.source.frame_ceiling()
     }
 
     /// Start following the clock. The caller starts the sound; this only stops
     /// holding the still.
     pub fn play(&mut self) {
+        self.source.resume_decoders();
         self.mode = Mode::Playing;
-        self.still = None;
+        // A paused seek may still be decoding its exact frame. Playing does
+        // not cancel that user request: keep T exact once, then catch up to
+        // the audio clock. A frame already waiting on the sink is promoted by
+        // the branch below; `still` is the not-yet-decoded half of the same
+        // promise.
+        let waiting_still = self.still.take();
+        self.paused_frame = None;
+        match self.pending_display.take() {
+            Some(PendingDisplay::PausedFrame(frame)) => {
+                let due = frame_due_samples(frame.frame, self.rate);
+                self.seeking_exact = Some(frame.frame);
+                self.pending_display = Some(PendingDisplay::ExactFrame { frame, due });
+            }
+            pending => self.pending_display = pending,
+        }
+        if self.seeking_exact.is_none() {
+            self.seeking_exact = waiting_still;
+        }
+        if self.seeking_exact.is_some() {
+            self.clear_before_seek = true;
+        }
     }
 
     /// Stop following the clock and leave the frame under the playhead on
@@ -266,6 +330,9 @@ impl Scheduler {
     pub fn pause(&mut self, frame: i64) {
         self.mode = Mode::Paused;
         self.settling = false;
+        self.seeking_exact = None;
+        self.clear_before_seek = false;
+        self.pending_display = None;
         self.sound_over = false;
         self.show_still(frame);
     }
@@ -280,10 +347,16 @@ impl Scheduler {
     pub fn seek(&mut self, frame: i64) {
         let target = frame.clamp(0, self.source.frames());
         self.sound_over = false;
+        self.pending_display = None;
         match self.mode {
             Mode::Playing => {
                 self.source.seek(target);
+                self.seeking_exact = Some(target);
                 self.settling = true;
+                // The old visible frame may be anywhere on the timeline. It
+                // is not a valid seek neighbor, so remove it before waiting
+                // for current-generation T-2, T-1 or exact T.
+                self.clear_before_seek = true;
             }
             Mode::Paused => self.show_still(target),
         }
@@ -292,6 +365,37 @@ impl Scheduler {
     /// The audio engine has finished its half of a seek.
     pub fn settled(&mut self) {
         self.settling = false;
+    }
+
+    /// Keep a playing scheduler from judging frames against a clock whose
+    /// asynchronous seek has not landed yet.
+    pub fn wait_for_settle(&mut self) {
+        self.settling = true;
+    }
+
+    /// Align a replacement path to the current audio clock without promising
+    /// to display the now-stale starting frame. User seeks use [`Self::seek`]
+    /// and retain their exact-frame guarantee.
+    pub fn align_playback(&mut self, frame: i64) {
+        let target = frame.clamp(0, self.source.frames());
+        self.sound_over = false;
+        self.pending_display = None;
+        self.seeking_exact = None;
+        self.clear_before_seek = false;
+        self.settling = false;
+        self.source.seek(target);
+    }
+
+    pub fn redraw(&mut self) {
+        if self.mode != Mode::Paused || self.pending_display.is_some() {
+            return;
+        }
+        if let Some(frame) = self.paused_frame.take() {
+            self.pending_display = Some(PendingDisplay::PausedFrame(frame));
+            self.still = None;
+        } else {
+            self.show_still(self.paused_at);
+        }
     }
 
     /// Tell the scheduler whether the sound is over.
@@ -305,12 +409,21 @@ impl Scheduler {
 
     fn show_still(&mut self, frame: i64) {
         let target = frame.clamp(0, self.source.frames());
-        self.source.seek(target);
+        self.paused_at = target;
+        self.paused_frame = None;
+        self.source.seek_exact(target);
         self.still = Some(target);
     }
 
     /// One step.
     pub fn tick(&mut self, sink: &mut dyn Sink) -> Tick {
+        self.source.maintain_decoders();
+        if self.clear_before_seek {
+            return self.clear_seek_surface(sink);
+        }
+        if self.pending_display.is_some() {
+            return self.retry_pending_display(sink);
+        }
         match self.mode {
             Mode::Paused => self.tick_paused(sink),
             Mode::Playing => self.tick_playing(sink),
@@ -323,8 +436,20 @@ impl Scheduler {
         };
         match self.source.take() {
             Supply::Ready(frame) => {
-                self.still = None;
-                self.draw(sink, &frame, None)
+                let tick = self.draw(sink, &frame, None);
+                if present_waiting(&tick) {
+                    self.pending_display = Some(PendingDisplay::PausedFrame(frame));
+                    self.still = None;
+                    // The decoded pixels are retained for the surface retry,
+                    // so no decoder needs to stay hot while the window is
+                    // hidden or temporarily unable to present.
+                    self.source.idle_decoders();
+                } else {
+                    self.paused_frame = Some(frame);
+                    self.still = None;
+                    self.source.idle_decoders();
+                }
+                tick
             }
             Supply::Starved => {
                 self.counters.starved.fetch_add(1, Ordering::Relaxed);
@@ -332,14 +457,23 @@ impl Scheduler {
             }
             // Past the end: there is no frame to hold, so the monitor goes
             // black rather than keeping whatever was last drawn.
-            Supply::End => {
-                self.still = None;
-                let _ = target;
-                match sink.clear() {
-                    Ok(()) => Tick::Ended,
-                    Err(reason) => self.fail(reason),
+            Supply::End => match sink.clear() {
+                Ok(()) => {
+                    self.still = None;
+                    Tick::Ended
                 }
-            }
+                Err(reason) => {
+                    let tick = self.sink_failure(reason);
+                    if present_waiting(&tick) {
+                        self.pending_display = Some(PendingDisplay::Clear);
+                        self.still = None;
+                    } else {
+                        self.still = None;
+                    }
+                    let _ = target;
+                    tick
+                }
+            },
         }
     }
 
@@ -349,7 +483,14 @@ impl Scheduler {
         }
         let clock = clock_frame(&self.clock, self.rate);
         let next = self.source.position();
-        let decision = step(next, clock, self.resync_after);
+        // A seek neighbor is only a temporary picture. The requested exact
+        // frame must reach the sink once even if decode time lets the audio
+        // clock move past the ordinary resync threshold in the meantime.
+        let decision = if self.seeking_exact.is_some() {
+            Step::Present
+        } else {
+            step(next, clock, self.resync_after)
+        };
         // Holding for a clock that has stopped is waiting for ever. When the
         // sound is over what is left of the picture is due now, so the timeline
         // ends on its last frame rather than one before it.
@@ -368,26 +509,110 @@ impl Scheduler {
             }
             Step::Skip => match self.source.take() {
                 Supply::Ready(frame) => {
+                    if self.seeking_exact == Some(frame.frame) {
+                        let due = frame_due_samples(frame.frame, self.rate);
+                        let tick = self.draw(sink, &frame, Some(due));
+                        if present_waiting(&tick) {
+                            self.pending_display = Some(PendingDisplay::ExactFrame { frame, due });
+                        } else {
+                            self.seeking_exact = None;
+                        }
+                        return tick;
+                    }
                     self.counters.skipped.fetch_add(1, Ordering::Relaxed);
                     Tick::Skipped { frame: frame.frame }
                 }
-                Supply::Starved => {
-                    self.counters.starved.fetch_add(1, Ordering::Relaxed);
-                    Tick::Starved
-                }
+                Supply::Starved => self.starved_or_neighbor(sink),
                 Supply::End => Tick::Ended,
             },
             Step::Present => match self.source.take() {
                 Supply::Ready(frame) => {
+                    if self.seeking_exact == Some(frame.frame) {
+                        let due = frame_due_samples(frame.frame, self.rate);
+                        let tick = self.draw(sink, &frame, Some(due));
+                        if present_waiting(&tick) {
+                            self.pending_display = Some(PendingDisplay::ExactFrame { frame, due });
+                        } else {
+                            self.seeking_exact = None;
+                        }
+                        return tick;
+                    }
                     let due = frame_due_samples(frame.frame, self.rate);
                     self.draw(sink, &frame, Some(due))
                 }
-                Supply::Starved => {
-                    self.counters.starved.fetch_add(1, Ordering::Relaxed);
-                    Tick::Starved
-                }
+                Supply::Starved => self.starved_or_neighbor(sink),
                 Supply::End => Tick::Ended,
             },
+        }
+    }
+
+    fn starved_or_neighbor(&mut self, sink: &mut dyn Sink) -> Tick {
+        self.counters.starved.fetch_add(1, Ordering::Relaxed);
+        let Some(target) = self.seeking_exact else {
+            return Tick::Starved;
+        };
+        let Some(frame) = self
+            .source
+            .take_neighbor_before(target, makevideo_compositor::source::SEEK_NEIGHBOR_FRAMES)
+        else {
+            return Tick::Starved;
+        };
+        let due = frame_due_samples(frame.frame, self.rate);
+        self.draw(sink, &frame, Some(due))
+    }
+
+    fn retry_pending_display(&mut self, sink: &mut dyn Sink) -> Tick {
+        let pending = self
+            .pending_display
+            .take()
+            .expect("pending display was checked before retry");
+        match pending {
+            PendingDisplay::PausedFrame(frame) => {
+                let tick = self.draw(sink, &frame, None);
+                if present_waiting(&tick) {
+                    self.pending_display = Some(PendingDisplay::PausedFrame(frame));
+                } else {
+                    self.paused_frame = Some(frame);
+                    self.still = None;
+                    self.source.idle_decoders();
+                }
+                tick
+            }
+            PendingDisplay::ExactFrame { frame, due } => {
+                let tick = self.draw(sink, &frame, Some(due));
+                if present_waiting(&tick) {
+                    self.pending_display = Some(PendingDisplay::ExactFrame { frame, due });
+                } else {
+                    self.seeking_exact = None;
+                }
+                tick
+            }
+            PendingDisplay::Clear => match sink.clear() {
+                Ok(()) => Tick::Ended,
+                Err(reason) => {
+                    let tick = self.sink_failure(reason);
+                    if present_waiting(&tick) {
+                        self.pending_display = Some(PendingDisplay::Clear);
+                    }
+                    tick
+                }
+            },
+        }
+    }
+
+    fn clear_seek_surface(&mut self, sink: &mut dyn Sink) -> Tick {
+        match sink.clear() {
+            Ok(()) => {
+                self.clear_before_seek = false;
+                Tick::Idle
+            }
+            Err(reason) => {
+                let tick = self.sink_failure(reason);
+                if !present_waiting(&tick) {
+                    self.clear_before_seek = false;
+                }
+                tick
+            }
         }
     }
 
@@ -397,7 +622,7 @@ impl Scheduler {
     fn draw(&mut self, sink: &mut dyn Sink, frame: &Frame, due: Option<i128>) -> Tick {
         let started = std::time::Instant::now();
         if let Err(reason) = sink.show(frame) {
-            return self.fail(reason);
+            return self.sink_failure(reason);
         }
         self.counters.presented.fetch_add(1, Ordering::Relaxed);
         let present_ms = started.elapsed().as_secs_f64() * 1000.0;
@@ -416,6 +641,16 @@ impl Scheduler {
         Tick::Failed { reason }
     }
 
+    fn sink_failure(&self, reason: String) -> Tick {
+        if reason == crate::transport::PRESENT_DEFERRED
+            || reason == crate::transport::PRESENT_HIDDEN
+        {
+            Tick::Failed { reason }
+        } else {
+            self.fail(reason)
+        }
+    }
+
     /// How long until `next` is due, capped so a command is never waited out.
     fn until_due(&self, next: i64, clock: i64) -> Duration {
         if next <= clock {
@@ -429,14 +664,46 @@ impl Scheduler {
     }
 }
 
+fn present_waiting(tick: &Tick) -> bool {
+    matches!(
+        tick,
+        Tick::Failed { reason }
+            if reason == crate::transport::PRESENT_DEFERRED
+                || reason == crate::transport::PRESENT_HIDDEN
+    )
+}
+
+fn pending_display_bytes(pending: &PendingDisplay) -> usize {
+    let frame = match pending {
+        PendingDisplay::PausedFrame(frame) | PendingDisplay::ExactFrame { frame, .. } => frame,
+        PendingDisplay::Clear => return 0,
+    };
+    frame_bytes(frame)
+}
+
+fn frame_bytes(frame: &Frame) -> usize {
+    frame
+        .layers
+        .iter()
+        .map(|layer| layer.pixels.len())
+        .sum::<usize>()
+        + frame
+            .visuals
+            .iter()
+            .map(|layer| layer.pixels.len())
+            .sum::<usize>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::schedule::DEFAULT_RESYNC;
-    use makevideo_compositor::source::{Buffering, FrameReader, Open, Readers};
+    use makevideo_compositor::source::{Buffering, CancelRead, FrameReader, Open, Readers};
     use makevideo_render::{
         Asset, AssetKind, Clip, Project, ProjectSettings, Track, TrackKind, FORMAT_VERSION,
     };
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::{Condvar, Mutex};
 
     /// Hands back frames instantly, so what a test measures is the scheduler
     /// and never a decoder.
@@ -454,6 +721,90 @@ mod tests {
     impl Readers for Always {
         fn open(&self, _request: &Open) -> Option<Box<dyn FrameReader>> {
             Some(Box::new(Instant0))
+        }
+    }
+
+    struct CountingReaders(Arc<AtomicUsize>);
+
+    impl Readers for CountingReaders {
+        fn open(&self, _request: &Open) -> Option<Box<dyn FrameReader>> {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            Some(Box::new(Instant0))
+        }
+    }
+
+    #[derive(Default)]
+    struct GateState {
+        through: i64,
+        cancelled: bool,
+    }
+
+    #[derive(Default)]
+    struct Gate {
+        state: Mutex<GateState>,
+        wake: Condvar,
+    }
+
+    impl Gate {
+        fn allow(&self, through: i64) {
+            let mut state = self.state.lock().unwrap();
+            state.through = state.through.max(through);
+            self.wake.notify_all();
+        }
+
+        fn cancel(&self) {
+            self.state.lock().unwrap().cancelled = true;
+            self.wake.notify_all();
+        }
+    }
+
+    struct GatedReader {
+        next: i64,
+        remaining: i64,
+        gate: Arc<Gate>,
+    }
+
+    impl FrameReader for GatedReader {
+        fn read(&mut self, buffer: &mut [u8]) -> bool {
+            if self.remaining <= 0 {
+                return false;
+            }
+            let mut state = self.gate.state.lock().unwrap();
+            while self.next > state.through && !state.cancelled {
+                state = self.gate.wake.wait(state).unwrap();
+            }
+            if state.cancelled {
+                return false;
+            }
+            drop(state);
+            buffer.fill(self.next as u8);
+            self.next += 1;
+            self.remaining -= 1;
+            true
+        }
+
+        fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
+            Some(Arc::new(GateCancel(Arc::clone(&self.gate))))
+        }
+    }
+
+    struct GateCancel(Arc<Gate>);
+
+    impl CancelRead for GateCancel {
+        fn cancel(&self) {
+            self.0.cancel();
+        }
+    }
+
+    struct GatedReaders(Arc<Gate>);
+
+    impl Readers for GatedReaders {
+        fn open(&self, request: &Open) -> Option<Box<dyn FrameReader>> {
+            Some(Box::new(GatedReader {
+                next: request.in_frame,
+                remaining: request.frames,
+                gate: Arc::clone(&self.0),
+            }))
         }
     }
 
@@ -493,6 +844,27 @@ mod tests {
 
         fn clear(&mut self) -> Result<(), String> {
             Err("the surface is gone".into())
+        }
+    }
+
+    struct DeferExactOnce {
+        exact: i64,
+        deferred: bool,
+        shown: Vec<i64>,
+    }
+
+    impl Sink for DeferExactOnce {
+        fn show(&mut self, frame: &Frame) -> Result<(), String> {
+            if frame.frame == self.exact && !self.deferred {
+                self.deferred = true;
+                return Err(crate::transport::PRESENT_DEFERRED.into());
+            }
+            self.shown.push(frame.frame);
+            Ok(())
+        }
+
+        fn clear(&mut self) -> Result<(), String> {
+            Ok(())
         }
     }
 
@@ -592,7 +964,267 @@ mod tests {
         ));
         assert_eq!(scheduler.tick(&mut sink), Tick::Idle);
         assert_eq!(sink.shown, vec![0, 120]);
-        assert_eq!(scheduler.position(), 121);
+        assert_eq!(scheduler.position(), 120);
+
+        scheduler.seek(scheduler.position());
+        assert!(matches!(
+            settle(&mut scheduler, &mut sink),
+            Tick::Presented { frame: 120, .. }
+        ));
+        assert_eq!(sink.shown, vec![0, 120, 120]);
+        assert_eq!(scheduler.position(), 120);
+    }
+
+    #[test]
+    fn a_playing_seek_clears_the_unrelated_old_picture_before_waiting() {
+        let gate = Arc::new(Gate::default());
+        let (mut scheduler, _clock) = scheduler(Arc::new(GatedReaders(Arc::clone(&gate))));
+        let mut sink = Recorder::default();
+        settle(&mut scheduler, &mut sink);
+        assert_eq!(sink.shown, vec![0]);
+
+        scheduler.play();
+        scheduler.seek(20);
+        assert_eq!(scheduler.tick(&mut sink), Tick::Idle);
+        assert_eq!(sink.cleared, 1);
+        assert_eq!(sink.shown, vec![0]);
+        assert_eq!(scheduler.tick(&mut sink), Tick::Idle);
+        assert_eq!(sink.cleared, 1, "the seek clear happens exactly once");
+    }
+
+    #[test]
+    fn paused_redraw_reuses_the_visible_pixels_without_reopening_a_decoder() {
+        let opens = Arc::new(AtomicUsize::new(0));
+        let (mut scheduler, _clock) = scheduler(Arc::new(CountingReaders(Arc::clone(&opens))));
+        let mut sink = Recorder::default();
+        settle(&mut scheduler, &mut sink);
+        let opened = opens.load(Ordering::Relaxed);
+
+        scheduler.redraw();
+        assert!(matches!(
+            scheduler.tick(&mut sink),
+            Tick::Presented { frame: 0, .. }
+        ));
+        assert_eq!(opens.load(Ordering::Relaxed), opened);
+        assert_eq!(sink.shown, vec![0, 0]);
+    }
+
+    #[test]
+    fn a_paused_seek_waits_for_the_exact_frame_without_showing_a_neighbor() {
+        let gate = Arc::new(Gate::default());
+        let (mut scheduler, _clock) = scheduler(Arc::new(GatedReaders(Arc::clone(&gate))));
+        let mut sink = Recorder::default();
+        settle(&mut scheduler, &mut sink);
+        sink.shown.clear();
+
+        scheduler.seek(20);
+        gate.allow(19);
+        for _ in 0..50 {
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            sink.shown.is_empty(),
+            "no earlier frame may be shown paused"
+        );
+        gate.allow(20);
+        assert!(matches!(
+            settle(&mut scheduler, &mut sink),
+            Tick::Presented { frame: 20, .. }
+        ));
+        assert_eq!(sink.shown, vec![20]);
+    }
+
+    #[test]
+    fn play_keeps_a_paused_exact_frame_that_waited_for_a_drawable() {
+        let (mut scheduler, clock) = scheduler(Arc::new(Always));
+        let mut initial = Recorder::default();
+        settle(&mut scheduler, &mut initial);
+        scheduler.seek(20);
+
+        let mut sink = DeferExactOnce {
+            exact: 20,
+            deferred: false,
+            shown: Vec::new(),
+        };
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let tick = scheduler.tick(&mut sink);
+            if matches!(
+                tick,
+                Tick::Failed { ref reason }
+                    if reason == crate::transport::PRESENT_DEFERRED
+            ) {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(
+            scheduler.source.decoder_lifecycle(),
+            makevideo_compositor::source::DecoderLifecycle::Idle,
+            "retained pixels let a hidden paused surface idle its decoder"
+        );
+        assert_eq!(
+            scheduler.buffer_ceiling(),
+            scheduler.source.buffer_ceiling() + scheduler.source.frame_ceiling()
+        );
+        assert!(scheduler.buffered_bytes() <= scheduler.buffer_ceiling());
+
+        scheduler.play();
+        park(&clock, 20);
+        assert_eq!(scheduler.tick(&mut sink), Tick::Idle);
+        assert!(matches!(
+            scheduler.tick(&mut sink),
+            Tick::Presented { frame: 20, .. }
+        ));
+        assert_eq!(sink.shown, vec![20]);
+        assert_eq!(scheduler.counters.failures.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn play_keeps_a_paused_exact_frame_that_is_still_decoding() {
+        let gate = Arc::new(Gate::default());
+        let (mut scheduler, clock) = scheduler(Arc::new(GatedReaders(Arc::clone(&gate))));
+        let mut initial = Recorder::default();
+        settle(&mut scheduler, &mut initial);
+        let mut sink = Recorder::default();
+
+        scheduler.seek(20);
+        scheduler.play();
+        park(&clock, 35);
+        scheduler.settled();
+        assert_eq!(scheduler.required_exact(), Some(20));
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        for _ in 0..50 {
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(sink.shown.is_empty(), "paused exact seek has no neighbor");
+
+        gate.allow(20);
+        while !sink.shown.contains(&20) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "exact frame was cancelled by play"
+            );
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(sink.shown, vec![20]);
+    }
+
+    #[test]
+    fn a_seek_neighbor_is_replaced_by_exact_even_after_the_clock_advances() {
+        let gate = Arc::new(Gate::default());
+        let (mut scheduler, clock) = scheduler(Arc::new(GatedReaders(Arc::clone(&gate))));
+        let mut sink = Recorder::default();
+        settle(&mut scheduler, &mut sink);
+        sink.shown.clear();
+
+        scheduler.play();
+        scheduler.seek(20);
+        park(&clock, 20);
+        scheduler.settled();
+        gate.allow(18);
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while sink.shown.is_empty() {
+            assert!(std::time::Instant::now() < deadline, "no neighbor arrived");
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(sink.shown, vec![18]);
+
+        // The target is now late. It must still replace the temporary
+        // neighbor once, before ordinary skip-late catch-up resumes.
+        park(&clock, 36);
+        gate.allow(20);
+        while !sink.shown.contains(&20) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "exact frame was skipped"
+            );
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(sink.shown, vec![18, 20]);
+
+        gate.allow(36);
+        while !sink.shown.contains(&36) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "clock frame did not arrive"
+            );
+            scheduler.tick(&mut sink);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(sink.shown.last(), Some(&36));
+        assert!(
+            !(21..36).any(|frame| sink.shown.contains(&frame)),
+            "frames between exact 20 and clock 36 are skipped"
+        );
+    }
+
+    #[test]
+    fn a_transient_timeout_retries_exact_before_resyncing_to_a_far_clock() {
+        let (mut scheduler, clock) = scheduler(Arc::new(Always));
+        let mut initial = Recorder::default();
+        settle(&mut scheduler, &mut initial);
+        scheduler.play();
+        scheduler.seek(20);
+        park(&clock, 35);
+        scheduler.settled();
+
+        let mut sink = DeferExactOnce {
+            exact: 20,
+            deferred: false,
+            shown: Vec::new(),
+        };
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let tick = scheduler.tick(&mut sink);
+            if matches!(
+                tick,
+                Tick::Failed { ref reason }
+                    if reason == crate::transport::PRESENT_DEFERRED
+            ) {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "exact frame was never tried"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(scheduler.seeking_exact, Some(20));
+        assert!(!sink.shown.contains(&20));
+
+        while !sink.shown.contains(&20) {
+            scheduler.tick(&mut sink);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "exact frame was not retried after timeout"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(scheduler.seeking_exact, None);
+        assert_eq!(scheduler.counters.failures.load(Ordering::Relaxed), 0);
+
+        let clock_frame = clock_frame(&clock, Rate::fps(30));
+        while !sink.shown.contains(&clock_frame) {
+            scheduler.tick(&mut sink);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "playback did not catch up after the exact frame"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            !(21..clock_frame).any(|frame| sink.shown.contains(&frame)),
+            "catch-up frames must be skipped, not presented"
+        );
     }
 
     /// The rule the issue is about. The clock is ten frames on, the source is

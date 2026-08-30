@@ -440,7 +440,7 @@ function createPreview(options) {
     }
   }
 
-  function clear() {
+  function clearTimeline() {
     for (const entry of pool.values()) {
       entry.element.pause && entry.element.pause();
       if (entry.kind === 'video' && qualityMonitor) qualityMonitor.unwatchVideo(entry.element);
@@ -448,6 +448,10 @@ function createPreview(options) {
       entry.element.remove();
     }
     pool.clear();
+  }
+
+  function clear() {
+    clearTimeline();
     positionFrames = 0;
     starting = false;
     playing = false;
@@ -556,6 +560,7 @@ function createPreview(options) {
     total: totalFrames,
     mode: () => mode,
     prune,
+    clearTimeline,
     clear,
     showAsset,
     showTimeline,

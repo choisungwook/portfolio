@@ -245,6 +245,34 @@ let visualDrag = null;
 let editorOverlayActive = false;
 let stageResizeObserver = null;
 
+const persistLatestSettings = globalThis.latestLib.createLatestPersistence({
+  save: (settings) => window.api.saveSettings(settings),
+  optimistic: (settings) => {
+    // Every settings entry point contributes to the next full snapshot. A
+    // toolbar click during a slow sheet save must not silently drop the sheet
+    // fields simply because its backend answer is still pending.
+    state.settings = { ...settings };
+  },
+  confirmed: () => state.boot,
+  recover: () => window.api.bootstrap(),
+  confirm: async (boot) => {
+    state.boot = boot;
+    await applySettings(boot.settings);
+    updateToolWarning();
+  },
+  restore: (boot) => {
+    state.boot = boot;
+    return applySettings(boot.settings);
+  },
+  fail: async (error) => {
+    reportError(error, 'settings:persist');
+    await window.api.message(`That setting could not be saved.\n\n${error}`, {
+      title: 'Settings',
+      kind: 'error',
+    });
+  },
+});
+
 // --- helpers ---------------------------------------------------------------
 
 function errorText(error) {
@@ -1220,7 +1248,8 @@ function editorOverlayWanted() {
   return Boolean(
     preview &&
     preview.mode() === 'timeline' &&
-    (G.visible(state.settings) || (state.selectedVisualItemId && !preview.isPlaying()))
+    ((G.visible(state.settings) && !preview.usesNativeMonitor()) ||
+      (state.selectedVisualItemId && !preview.isPlaying()))
   );
 }
 
@@ -1240,7 +1269,8 @@ function syncEditorOverlay() {
 function renderStageOverlay() {
   const canvas = dom.stageOverlay;
   const item = selectedVisualItem();
-  const showGuides = G.visible(state.settings);
+  const showGuides = G.visible(state.settings) &&
+    (!preview || !preview.usesNativeMonitor());
   if (!canvas || (!item && !showGuides)) {
     if (canvas) canvas.width = 0;
     return;
@@ -2007,32 +2037,25 @@ async function setClipLut(clipId) {
  *
  *  These are one-click toggles, so blocking on the write would make the button
  *  feel slow for something that has already visibly happened. What must not
- *  happen is an unhandled rejection: the toggle is put back and the reason is
- *  shown, so a setting that did not persist does not silently look as though it
- *  did. `bootstrap` is the source of truth on the next launch either way.
+ *  happen is an unhandled rejection: the whole toolbar is put back to the last
+ *  backend-confirmed boot settings and the reason is shown. An earlier
+ *  optimistic value may itself have been superseded, so it is not a rollback
+ *  point. `bootstrap` is the source of truth on the next launch either way.
  */
-async function persistSettings(revert) {
-  try {
-    state.boot = await window.api.saveSettings(state.settings);
-    state.settings = state.boot.settings;
-  } catch (error) {
-    reportError(error, 'settings:persist');
-    if (revert) revert();
-    await window.api.message(`That setting could not be saved.\n\n${error}`, {
-      title: 'Settings',
-      kind: 'error',
-    });
-  }
+function persistSettings(settings = state.settings, callbacks) {
+  return persistLatestSettings({ ...settings }, callbacks);
+}
+
+function persistSettingsInBackground() {
+  void persistSettings().catch((error) => {
+    reportError(error, 'settings:persist:callback');
+  });
 }
 
 function toggleSnap() {
-  const previous = state.settings.snap;
-  state.settings.snap = !previous;
+  state.settings.snap = !state.settings.snap;
   dom.btnMagnet.classList.toggle('on', state.settings.snap);
-  persistSettings(() => {
-    state.settings.snap = previous;
-    dom.btnMagnet.classList.toggle('on', previous);
-  });
+  persistSettingsInBackground();
 }
 
 // --- dragging clips --------------------------------------------------------
@@ -2821,13 +2844,13 @@ function accelerationNote() {
   return `No usable hardware encoder. ${reasons}`;
 }
 
-/** Whether the setting says to stay off the graphics device.
+/** Whether the setting says to composite the project frame on the CPU.
  *
  *  Mirrors `stays_on_cpu` in Rust, and for the same reason: this one answer
- *  decides the exact frame, the playback engine and the render, and asking the
- *  question three different ways is how those three drift apart. Only "cpu" is
- *  cpu — a settings file written before this was two choices can still hold
- *  "auto" or "ffmpeg", and both of those meant the graphics device. */
+ *  decides the exact frame and the render, and asking the question in several
+ *  places is how those answers drift apart. The native monitor stays attached
+ *  for both choices; CPU composition still uploads its finished picture to the
+ *  display. Only "cpu" is cpu — older "auto" and "ffmpeg" values mean GPU. */
 function staysOnCpu() {
   return state.settings.compositor === 'cpu';
 }
@@ -2839,7 +2862,10 @@ function staysOnCpu() {
 function compositorNote(setting) {
   const found = (state.boot && state.boot.compositor) || {};
   if (setting === 'cpu') {
-    return 'Nothing opens the graphics device. Playback is stacked <video> elements, the exact frame is not asked for, and the render is drawn by the ffmpeg filter graph. ffmpeg is still what decodes and encodes either way.';
+    if (state.playbackNotice) {
+      return `The CPU combines the layers, but the native monitor could not start: ${state.playbackNotice}. The older preview is playing instead.`;
+    }
+    return 'The CPU combines the layers while the native monitor keeps playing. A graphics device only displays the finished picture; ffmpeg still decodes, renders and encodes.';
   }
   const both =
     'The stage and the render come out of the same shader, so what is on screen is what lands in the file. Playback draws straight onto a surface in the window with the audio clock deciding when.';
@@ -2882,8 +2908,8 @@ async function fillGraphicsDevices() {
     select.appendChild(new Option(`${chosen} — not on this machine`, chosen));
   }
   select.value = chosen;
-  // The sheet's own pending choice, not the saved one. Picking CPU should grey
-  // this out at once rather than after Apply.
+  // The sheet's own pending choice, not the saved one. CPU composition uses an
+  // automatic presentation device, so there is no compositor device to pick.
   const onCpu = el('as-compositor').value === 'cpu';
   select.disabled = onCpu;
   const drawing = (state.boot && state.boot.compositor && state.boot.compositor.device) || 'nothing yet';
@@ -2892,8 +2918,8 @@ async function fillGraphicsDevices() {
     return;
   }
   note.textContent = onCpu
-    ? 'The CPU setting never opens a graphics device, so this is not used.'
-    : `Drawing on ${drawing}. Changing this restarts the monitor.`;
+    ? 'The CPU combines the frame; an automatic graphics device only displays the result.'
+    : `Drawing on ${drawing}. A change switches after the replacement picture is ready.`;
 }
 
 function fillAppSheet() {
@@ -2982,12 +3008,9 @@ function collectShortcutOverrides() {
 }
 
 function applySettings(next) {
-  const wasCompositor = state.settings.compositor;
-  const wasDevice = state.settings.gpuDevice;
-  const wasPreviewQuality = state.settings.previewQuality;
-  const usedProxies = state.settings.proxyEnabled;
-  const usedGuides = G.visible(state.settings);
-  state.settings = next;
+  // Never alias state.boot.settings: toolbar changes are optimistic, while the
+  // boot copy is the last backend-confirmed rollback point.
+  state.settings = { ...next };
   renderShortcutLabels();
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
@@ -2995,34 +3018,19 @@ function applySettings(next) {
   dom.btnMagnet.classList.toggle('on', next.snap);
   syncEditorOverlay();
   renderStageOverlay();
-  // A session captures its compositor and its engine when it starts, so both of
-  // the things this setting decides need the running one taken down and asked
-  // for again rather than hoping the next command notices.
-  //
-  // This is also what attaches the first time. The page's own compositor value
-  // is not one the setting can hold, so bootstrap landing *is* a change and
-  // lands here — which is why there is no separate attach after it.
-  let monitorUpdate = null;
-  if (
-    wasCompositor !== next.compositor ||
-    wasDevice !== next.gpuDevice ||
-    wasPreviewQuality !== next.previewQuality
-  ) {
-    monitorUpdate = attachMonitor(true);
-  } else if (usedGuides !== G.visible(next)) {
-    monitorUpdate = attachMonitor(true);
-  } else if (usedProxies !== next.proxyEnabled) {
-    if (preview.usesNativeMonitor()) monitorUpdate = attachMonitor(true);
-    else preview.redraw();
-  }
-  return monitorUpdate || Promise.resolve();
+  drawStageVisuals();
+  // Rust applies settings to an active session before saveSettings returns.
+  // The idempotent attach is only needed when there is no native monitor yet,
+  // including the first bootstrap and a change away from media elements.
+  if (!preview.usesNativeMonitor()) return attachMonitor(false);
+  return Promise.resolve();
 }
 
 /** Ask Rust for a monitor, or give the one that is running a new box.
  *
  *  Called when a project opens, when the playback setting changes and when the
- *  window settles after a layout. `restart` takes down whatever is there first,
- *  which is what a settings change needs and a resize must not do. */
+ *  window settles after a layout. `restart` is reserved for a different
+ *  project; settings are reconfigured inside the running Rust session. */
 async function attachMonitor(restart) {
   if (!preview) return;
   if (restart) {
@@ -3030,6 +3038,11 @@ async function attachMonitor(restart) {
     await preview.release();
   }
   await preview.attach();
+  // Attaching decides whether guides belong to Rust or the page. Re-evaluate
+  // after the answer so native guides never leave the surface hidden behind an
+  // exact DOM frame, while a media-element fallback still draws them here.
+  syncEditorOverlay();
+  renderStageOverlay();
   updateToolWarning();
   updateMonitorZoomUi();
   // Which engine is running decides who draws the text and shape layers, and
@@ -3416,16 +3429,9 @@ function wireTransport() {
   let monitorPan = null;
   dom.btnPlay.addEventListener('click', () => preview.toggle());
   dom.previewQuality.addEventListener('change', () => {
-    const previous = state.settings.previewQuality;
     state.settings.previewQuality = dom.previewQuality.value;
     preview.setQuality(state.settings.previewQuality);
-    void persistSettings(() => {
-      state.settings.previewQuality = previous;
-      dom.previewQuality.value = previous;
-      preview.setQuality(previous);
-    }).then(() => {
-      if (preview.usesNativeMonitor()) return attachMonitor(true);
-    });
+    persistSettingsInBackground();
   });
   dom.stage.addEventListener('wheel', (event) => {
     if (!event.metaKey) return;
@@ -3529,18 +3535,15 @@ function wireSheets() {
       logRotationUnit: el('as-log-unit').value,
     });
     closeSheet('app-settings');
-    try {
-      state.boot = await window.api.saveSettings(next);
-    } catch (error) {
-      reportError(error, 'settings:save');
-      await window.api.message(`Those settings could not be saved.\n\n${error}`, {
-        title: 'Settings',
-        kind: 'error',
-      });
-      return;
-    }
-    applySettings(state.boot.settings);
-    updateToolWarning();
+    await persistSettings(next, {
+      fail: async (error) => {
+        reportError(error, 'settings:save');
+        await window.api.message(`Those settings could not be saved.\n\n${error}`, {
+          title: 'Settings',
+          kind: 'error',
+        });
+      },
+    });
   });
   el('shortcut-save').addEventListener('click', async () => {
     const error = el('shortcut-error');
@@ -3552,16 +3555,14 @@ function wireSheets() {
       error.hidden = false;
       return;
     }
-    try {
-      state.boot = await window.api.saveSettings(Object.assign({}, state.settings, { shortcutOverrides }));
-    } catch (cause) {
-      reportError(cause, 'settings:shortcuts');
-      error.textContent = `Those shortcuts could not be saved. ${cause}`;
-      error.hidden = false;
-      return;
-    }
-    closeSheet('shortcut-settings');
-    applySettings(state.boot.settings);
+    await persistSettings(Object.assign({}, state.settings, { shortcutOverrides }), {
+      confirm: () => closeSheet('shortcut-settings'),
+      fail: (cause) => {
+        reportError(cause, 'settings:shortcuts');
+        error.textContent = `Those shortcuts could not be saved. ${cause}`;
+        error.hidden = false;
+      },
+    });
   });
   el('proxy-generate').addEventListener('click', async () => {
     if (!state.path) return;
@@ -3580,17 +3581,15 @@ function wireSheets() {
       proxyEnabled: el('proxy-enabled').checked,
     });
     closeSheet('proxy-settings');
-    try {
-      state.boot = await window.api.saveSettings(next);
-    } catch (error) {
-      reportError(error, 'settings:proxy');
-      await window.api.message(`The proxy setting could not be saved.\n\n${error}`, {
-        title: 'Proxy Media',
-        kind: 'error',
-      });
-      return;
-    }
-    applySettings(state.boot.settings);
+    await persistSettings(next, {
+      fail: async (error) => {
+        reportError(error, 'settings:proxy');
+        await window.api.message(`The proxy setting could not be saved.\n\n${error}`, {
+          title: 'Proxy Media',
+          kind: 'error',
+        });
+      },
+    });
   });
   el('as-workspace-pick').addEventListener('click', async () => {
     const folder = await window.api.pickFolder('Workspace folder');
@@ -3716,7 +3715,6 @@ async function boot() {
     wrap: dom.stageWrap,
     api: window.api,
     getProject: () => state.project,
-    pageOverlayActive: () => G.visible(state.settings),
     onNotice: (reason) => {
       state.playbackNotice = reason;
       updateToolWarning();

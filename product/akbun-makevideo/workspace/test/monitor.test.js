@@ -70,8 +70,68 @@ test('the native monitor yields to the editor-only selection pass', async () => 
   assert.deepStrictEqual(visibility, [true, false, true]);
 });
 
+test('a rejected visibility change is retried while the same cover remains', async () => {
+  const visibility = [];
+  let rejectedHide = false;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({ mode: () => 'timeline', total: () => 1 }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async (visible) => {
+        visibility.push(visible);
+        if (!visible && !rejectedHide) {
+          rejectedHide = true;
+          throw new Error('view was being replaced');
+        }
+      },
+    },
+  });
+
+  await monitor.attach();
+  monitor.setVisible(false);
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.place();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(visibility, [true, false, false]);
+});
+
+test('visibility changes reach the backend in the order the page chose them', async () => {
+  const visibility = [];
+  let finishHide;
+  const hideAnswer = new Promise((resolve) => {
+    finishHide = resolve;
+  });
+  const monitor = createMonitor({
+    preview: strictPreviewStub({ mode: () => 'timeline', total: () => 1 }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: (visible) => {
+        visibility.push(visible);
+        return visible || visibility.length === 1 ? Promise.resolve() : hideAnswer;
+      },
+    },
+  });
+
+  await monitor.attach();
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.setVisible(false);
+  monitor.setVisible(true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepStrictEqual(visibility, [true, false]);
+
+  finishHide();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepStrictEqual(visibility, [true, false, true]);
+});
+
 test('a page overlay keeps the preview in the webview', async () => {
   let attached = 0;
+  let released = 0;
   const seeks = [];
   let overlayActive = false;
   const monitor = createMonitor({
@@ -90,6 +150,9 @@ test('a page overlay keeps the preview in the webview', async () => {
         attached += 1;
         return { engine: 'native' };
       },
+      playbackRelease: async () => {
+        released += 1;
+      },
       playbackSeek: async () => {},
       playbackVisible: async () => {},
     },
@@ -97,10 +160,12 @@ test('a page overlay keeps the preview in the webview', async () => {
   });
 
   await monitor.attach();
-  monitor.seek(1);
+  await monitor.seek(1);
   overlayActive = true;
   assert.strictEqual(await monitor.attach(), false);
   assert.strictEqual(attached, 1);
+  assert.strictEqual(released, 1);
+  assert.strictEqual(monitor.usesNativeMonitor(), false);
   assert.deepStrictEqual(seeks, [1]);
 });
 
@@ -209,6 +274,33 @@ test('the same box twice is one command, so a drag is not a command per frame', 
   assert.strictEqual(places.length, 1);
 });
 
+test('a rejected placement is retried for the unchanged box', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  let attempts = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({ mode: () => 'timeline', total: () => 1 }),
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async () => {},
+      playbackPlace: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('surface was busy');
+      },
+    },
+  });
+
+  await monitor.attach();
+  panel.moveTo(100, 0);
+  monitor.place();
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.place();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.strictEqual(attempts, 2);
+});
+
 test('a backing scale change places the unchanged viewport again', async () => {
   const previousWindow = global.window;
   global.window = { devicePixelRatio: 1 };
@@ -268,6 +360,46 @@ test('slow native placement keeps only the newest measured box', async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.strictEqual(places.length, 2);
   assert.strictEqual(places[1].stage.x - attachedAt.stage.x, 300);
+});
+
+test('release discards an old pending placement before the replacement attach', async () => {
+  const panel = movablePanel({ left: 0, top: 0, width: 640, height: 360 });
+  const places = [];
+  let finishFirst;
+  const firstPlace = new Promise((resolve) => {
+    finishFirst = resolve;
+  });
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 1,
+    }),
+    wrap: panel.element,
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackVisible: async () => {},
+      playbackPlace: async (place) => {
+        places.push(place);
+        if (places.length === 1) await firstPlace;
+      },
+    },
+  });
+
+  await monitor.attach();
+  panel.moveTo(100, 0);
+  monitor.place();
+  panel.moveTo(200, 0);
+  monitor.place();
+
+  await monitor.release();
+  panel.moveTo(300, 0);
+  await monitor.attach();
+  finishFirst();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.strictEqual(places.length, 1);
 });
 
 test('the placement keeps the project shape as the panel changes', async () => {
@@ -331,7 +463,47 @@ test('a panel dragged shut takes the view off screen, and reopening puts it back
 
   panel.resizeTo(640, 360);
   monitor.place();
+  await new Promise((resolve) => setImmediate(resolve));
   assert.deepStrictEqual(visibility, [true, false, true]);
+});
+
+test('a stale visibility command is corrected on the replacement session', async () => {
+  let finishHidden;
+  const hiddenAnswer = new Promise((resolve) => {
+    finishHidden = resolve;
+  });
+  let delayedHidden = true;
+  const visibility = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 1,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackVisible: (visible) => {
+        visibility.push(visible);
+        if (!visible && delayedHidden) {
+          delayedHidden = false;
+          return hiddenAnswer;
+        }
+        return Promise.resolve();
+      },
+    },
+  });
+
+  await monitor.attach();
+  monitor.setVisible(false);
+  await monitor.release();
+  await monitor.attach();
+  finishHidden();
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.place();
+
+  assert.deepStrictEqual(visibility, [true, false, true, true]);
 });
 
 // A panel with no room in it used to be a permanent fallback to the media
@@ -367,6 +539,1097 @@ test('an attach with no room to draw in is finished once there is', async () => 
   panel.resizeTo(640, 360);
   assert.strictEqual(await monitor.attach(), true);
   assert.strictEqual(attached, 1);
+});
+
+test('release invalidates a late native attach answer', async () => {
+  let answerAttach;
+  const attachAnswer = new Promise((resolve) => {
+    answerAttach = resolve;
+  });
+  const mediaCalls = [];
+  const notices = [];
+  const monitor = createMonitor({
+    preview: {
+      mode: () => 'timeline',
+      total: () => 1,
+      pause: () => mediaCalls.push('pause'),
+      clear: () => mediaCalls.push('clear'),
+      clearExact: () => mediaCalls.push('clearExact'),
+    },
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: () => attachAnswer,
+      playbackRelease: async () => {},
+      playbackVisible: async () => {},
+    },
+    onNotice: (notice) => notices.push(notice),
+  });
+
+  const pendingAttach = monitor.attach();
+  await monitor.release();
+  answerAttach({ engine: 'native', fellBack: 'late answer' });
+
+  assert.strictEqual(await pendingAttach, false);
+  assert.strictEqual(monitor.usesNativeMonitor(), false);
+  assert.deepStrictEqual(mediaCalls, []);
+  assert.deepStrictEqual(notices, []);
+});
+
+test('concurrent releases share one backend release before a new attach', async () => {
+  let finishRelease;
+  const releaseAnswer = new Promise((resolve) => {
+    finishRelease = resolve;
+  });
+  let attached = 0;
+  let released = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 1,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attached += 1;
+        return { engine: 'native' };
+      },
+      playbackRelease: () => {
+        released += 1;
+        return releaseAnswer;
+      },
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  const first = monitor.release();
+  const second = monitor.release();
+  assert.strictEqual(released, 1);
+  finishRelease();
+  await Promise.all([first, second]);
+  await monitor.attach();
+
+  assert.strictEqual(attached, 2);
+  assert.strictEqual(monitor.usesNativeMonitor(), true);
+});
+
+test('an idempotent native attach adopts backend status when no input raced it', async () => {
+  let attaches = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => 0,
+      isPlaying: () => false,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attaches += 1;
+        return attaches === 1
+          ? { engine: 'native', status: { position: 12, playing: true } }
+          : { engine: 'native', status: { position: 19, playing: false } };
+      },
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  assert.strictEqual(monitor.position(), 12);
+  assert.strictEqual(monitor.isPlaying(), true);
+  await monitor.attach();
+  assert.strictEqual(monitor.position(), 19);
+  assert.strictEqual(monitor.isPlaying(), false);
+});
+
+test('a rejected idempotent attach keeps the existing native session as the only owner', async () => {
+  let attaches = 0;
+  const mediaSeeks = [];
+  let mediaPlays = 0;
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => 0,
+      isPlaying: () => false,
+      seek: (target) => mediaSeeks.push(target),
+      play: () => {
+        mediaPlays += 1;
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attaches += 1;
+        if (attaches === 2) throw new Error('placement request failed');
+        return { engine: 'native', status: { ...backend } };
+      },
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        backend.position = target;
+        return { ...backend };
+      },
+      playbackPlay: async () => {
+        backend.playing = true;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  await monitor.seek(42);
+  await monitor.play();
+
+  assert.strictEqual(await monitor.attach(), true);
+  assert.strictEqual(monitor.usesNativeMonitor(), true);
+  assert.strictEqual(monitor.position(), 42);
+  assert.strictEqual(monitor.isPlaying(), true);
+  assert.deepStrictEqual(mediaSeeks, []);
+  assert.strictEqual(mediaPlays, 0);
+});
+
+test('an idempotent timeline attach does not stop the asset preview', async () => {
+  let mode = 'timeline';
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => mode,
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      seek: (target) => {
+        mediaPosition = target;
+      },
+      play: () => {
+        mediaPlaying = true;
+      },
+      pause: () => {
+        mediaPlaying = false;
+      },
+      clear: () => {
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+      showAsset: () => {
+        mode = 'asset';
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({
+        engine: 'native',
+        status: { position: 0, playing: false },
+      }),
+      playbackVisible: async () => {},
+      playbackPause: async () => ({ position: 0, playing: false }),
+    },
+  });
+
+  await monitor.attach();
+  monitor.showAsset({ id: 'asset' });
+  monitor.seek(37);
+  monitor.play();
+  await monitor.attach();
+
+  assert.strictEqual(monitor.position(), 37);
+  assert.strictEqual(monitor.isPlaying(), true);
+  assert.deepStrictEqual({ position: mediaPosition, playing: mediaPlaying }, {
+    position: 37,
+    playing: true,
+  });
+});
+
+test('an asset preview cannot restart a paused fallback timeline during native attach', async () => {
+  let mode = 'timeline';
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  let attaches = 0;
+  let clearedTimeline = 0;
+  const calls = [];
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => mode,
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      seek: (target) => {
+        mediaPosition = target;
+      },
+      play: () => {
+        mediaPlaying = true;
+      },
+      pause: () => {
+        mediaPlaying = false;
+      },
+      showAsset: () => {
+        mediaPlaying = false;
+        mediaPosition = 0;
+        mode = 'asset';
+      },
+      clearTimeline: () => {
+        clearedTimeline += 1;
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async (_place, frame) => {
+        attaches += 1;
+        if (attaches === 1) return { engine: 'media-element' };
+        backend.position = frame;
+        backend.playing = false;
+        return { engine: 'native', status: { ...backend } };
+      },
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        calls.push(`seek:${target}`);
+        backend.position = target;
+        return { ...backend };
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        backend.playing = true;
+        return { ...backend };
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  assert.strictEqual(await monitor.attach(), false);
+  monitor.seek(12);
+  monitor.play();
+  monitor.showAsset({ id: 'asset' });
+  assert.strictEqual(await monitor.attach(), true);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(calls, ['seek:12', 'pause']);
+  assert.deepStrictEqual(backend, { position: 12, playing: false });
+  assert.strictEqual(mediaPlaying, false);
+  assert.strictEqual(clearedTimeline, 1);
+});
+
+test('returning from an asset resets the native timeline before it plays', async () => {
+  let mode = 'timeline';
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  const calls = [];
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => mode,
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      pause: () => {
+        mediaPlaying = false;
+      },
+      clear: () => {
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+      showAsset: () => {
+        mode = 'asset';
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+      showTimeline: () => {
+        mode = 'timeline';
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({
+        engine: 'native',
+        status: { ...backend },
+      }),
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        calls.push(`seek:${target}`);
+        backend.position = target;
+        return { ...backend };
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        backend.playing = true;
+        return { ...backend };
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  await monitor.seek(42);
+  monitor.showAsset({ id: 'asset' });
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.showTimeline();
+  await new Promise((resolve) => setImmediate(resolve));
+  await monitor.play();
+
+  assert.deepStrictEqual(calls, ['seek:42', 'pause', 'seek:0', 'pause', 'play']);
+  assert.deepStrictEqual(backend, { position: 0, playing: true });
+  assert.strictEqual(monitor.position(), 0);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('returning from an asset queues its reset behind an in-flight native seek', async () => {
+  let mode = 'timeline';
+  let answerOldSeek;
+  const oldSeekAnswer = new Promise((resolve) => {
+    answerOldSeek = resolve;
+  });
+  const calls = [];
+  let seekCalls = 0;
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => mode,
+      total: () => 100,
+      showAsset: () => {
+        mode = 'asset';
+      },
+      showTimeline: () => {
+        mode = 'timeline';
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native', status: { ...backend } }),
+      playbackVisible: async () => {},
+      playbackSeek: (target) => {
+        calls.push(`seek:${target}`);
+        seekCalls += 1;
+        if (seekCalls === 1) return oldSeekAnswer;
+        backend.position = target;
+        return Promise.resolve({ ...backend });
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  const oldSeek = monitor.seek(42);
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.showAsset({ id: 'asset' });
+  monitor.showTimeline();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepStrictEqual(calls, ['seek:42']);
+
+  backend.position = 42;
+  answerOldSeek({ ...backend });
+  await oldSeek;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(calls, ['seek:42', 'pause', 'seek:0', 'pause']);
+  assert.deepStrictEqual(backend, { position: 0, playing: false });
+  assert.strictEqual(monitor.position(), 0);
+  assert.strictEqual(monitor.isPlaying(), false);
+});
+
+test('release for a replacement keeps the native playhead instead of the cleared preview', async () => {
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  const attachedFrames = [];
+  const replacementCalls = [];
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      seek: (target) => { mediaPosition = target; },
+      play: () => { mediaPlaying = true; },
+      pause: () => { mediaPlaying = false; },
+      clear: () => {
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async (_place, frame) => {
+        attachedFrames.push(frame);
+        backend.position = frame;
+        backend.playing = false;
+        return { engine: 'native', status: { ...backend } };
+      },
+      playbackRelease: async () => {},
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        replacementCalls.push(`seek:${target}`);
+        backend.position = target;
+        return { ...backend };
+      },
+      playbackPlay: async () => {
+        replacementCalls.push('play');
+        backend.playing = true;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  await monitor.seek(42);
+  await monitor.play();
+  replacementCalls.length = 0;
+  await monitor.release();
+  assert.strictEqual(monitor.position(), 42);
+  assert.strictEqual(monitor.isPlaying(), true);
+  await monitor.attach();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(attachedFrames, [0, 42]);
+  assert.deepStrictEqual(replacementCalls, ['seek:42', 'play']);
+  assert.deepStrictEqual(backend, { position: 42, playing: true });
+});
+
+test('a pending seek cannot make a replacement forget that playback was running', async () => {
+  let answerOldSeek;
+  const oldSeekAnswer = new Promise((resolve) => {
+    answerOldSeek = resolve;
+  });
+  const calls = [];
+  let seekCalls = 0;
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => 0,
+      isPlaying: () => false,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async (_place, frame) => {
+        calls.push(`attach:${frame}`);
+        backend.position = frame;
+        backend.playing = false;
+        return { engine: 'native', status: { ...backend } };
+      },
+      playbackRelease: async () => {
+        calls.push('release');
+        backend.playing = false;
+      },
+      playbackVisible: async () => {},
+      playbackSeek: (target) => {
+        calls.push(`seek:${target}`);
+        seekCalls += 1;
+        if (seekCalls === 1) return oldSeekAnswer;
+        backend.position = target;
+        return Promise.resolve({ ...backend });
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        backend.playing = true;
+        return { ...backend };
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  await monitor.play();
+  const pendingSeek = monitor.seek(42);
+  await new Promise((resolve) => setImmediate(resolve));
+  await monitor.release();
+  await monitor.attach();
+  answerOldSeek({ position: 42, playing: true });
+  await pendingSeek;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(calls, [
+    'attach:0',
+    'play',
+    'seek:42',
+    'release',
+    'attach:42',
+    'seek:42',
+    'play',
+  ]);
+  assert.deepStrictEqual(backend, { position: 42, playing: true });
+  assert.strictEqual(monitor.position(), 42);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('a paused replacement applies only the newest rapid seek', async () => {
+  let answerOldSeek;
+  const oldSeekAnswer = new Promise((resolve) => {
+    answerOldSeek = resolve;
+  });
+  const calls = [];
+  let seekCalls = 0;
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async (_place, frame) => {
+        calls.push(`attach:${frame}`);
+        backend.position = frame;
+        backend.playing = false;
+        return { engine: 'native', status: { ...backend } };
+      },
+      playbackRelease: async () => {
+        calls.push('release');
+      },
+      playbackVisible: async () => {},
+      playbackSeek: (target) => {
+        calls.push(`seek:${target}`);
+        seekCalls += 1;
+        if (seekCalls === 1) return oldSeekAnswer;
+        backend.position = target;
+        return Promise.resolve({ ...backend });
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  await monitor.attach();
+  const oldSeek = monitor.seek(10);
+  const latestSeek = monitor.seek(20);
+  await new Promise((resolve) => setImmediate(resolve));
+  await monitor.release();
+  await monitor.attach();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(calls, [
+    'attach:0',
+    'seek:10',
+    'release',
+    'attach:20',
+    'seek:20',
+    'pause',
+  ]);
+  assert.deepStrictEqual(backend, { position: 20, playing: false });
+
+  answerOldSeek({ position: 10, playing: false });
+  await Promise.all([oldSeek, latestSeek]);
+  assert.deepStrictEqual(backend, { position: 20, playing: false });
+  assert.strictEqual(monitor.position(), 20);
+  assert.strictEqual(monitor.isPlaying(), false);
+});
+
+test('a rejected replacement attach hands the preserved native state to the preview', async () => {
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  let attaches = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      seek: (target) => { mediaPosition = target; },
+      play: () => { mediaPlaying = true; },
+      pause: () => { mediaPlaying = false; },
+      clear: () => {
+        mediaPosition = 0;
+        mediaPlaying = false;
+      },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => {
+        attaches += 1;
+        if (attaches === 2) throw new Error('native surface unavailable');
+        return { engine: 'native', status: { position: 0, playing: false } };
+      },
+      playbackRelease: async () => {},
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => ({ position: target, playing: false }),
+      playbackPlay: async () => ({ position: 42, playing: true }),
+    },
+  });
+
+  await monitor.attach();
+  await monitor.seek(42);
+  await monitor.play();
+  await monitor.release();
+  assert.strictEqual(await monitor.attach(), false);
+
+  assert.deepStrictEqual({ position: mediaPosition, playing: mediaPlaying }, {
+    position: 42,
+    playing: true,
+  });
+  assert.strictEqual(monitor.position(), 42);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('timeline input and playback progress during attach are reasserted natively', async () => {
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  let answerAttach;
+  const attachAnswer = new Promise((resolve) => {
+    answerAttach = resolve;
+  });
+  const calls = [];
+  const backend = { position: 0, playing: false };
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      play: () => { mediaPlaying = true; },
+      pause: () => { mediaPlaying = false; },
+      seek: (target) => { mediaPosition = target; },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: (_place, frame) => {
+        calls.push(`attach:${frame}`);
+        return attachAnswer;
+      },
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        calls.push(`seek:${target}`);
+        backend.position = target;
+        return { ...backend };
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        backend.playing = true;
+        return { ...backend };
+      },
+      playbackPause: async () => {
+        calls.push('pause');
+        backend.playing = false;
+        return { ...backend };
+      },
+    },
+  });
+
+  const attaching = monitor.attach();
+  monitor.play();
+  monitor.seek(42);
+  assert.deepStrictEqual({ position: mediaPosition, playing: mediaPlaying }, {
+    position: 42,
+    playing: true,
+  });
+  mediaPosition = 57;
+
+  answerAttach({ engine: 'native', status: { position: 0, playing: false } });
+  assert.strictEqual(await attaching, true);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(calls, ['attach:0', 'seek:57', 'play']);
+  assert.deepStrictEqual(backend, { position: 57, playing: true });
+  assert.strictEqual(monitor.position(), 57);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('fallback playback progress becomes the next native attach snapshot', async () => {
+  let mediaPosition = 0;
+  let mediaPlaying = false;
+  const attachedFrames = [];
+  const calls = [];
+  let attaches = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+      position: () => mediaPosition,
+      isPlaying: () => mediaPlaying,
+      play: () => { mediaPlaying = true; },
+      pause: () => { mediaPlaying = false; },
+      seek: (target) => { mediaPosition = target; },
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async (_place, frame) => {
+        attachedFrames.push(frame);
+        attaches += 1;
+        return attaches === 1
+          ? { engine: 'media-element', status: null }
+          : { engine: 'native', status: { position: frame, playing: false } };
+      },
+      playbackVisible: async () => {},
+      playbackSeek: async (target) => {
+        calls.push(`seek:${target}`);
+        return { position: target, playing: false };
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        return { position: mediaPosition, playing: true };
+      },
+      playbackPause: async () => ({ position: mediaPosition, playing: false }),
+    },
+  });
+
+  assert.strictEqual(await monitor.attach(), false);
+  monitor.seek(42);
+  monitor.play();
+  mediaPosition = 57;
+  assert.strictEqual(await monitor.attach(), true);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(attachedFrames, [0, 57]);
+  assert.deepStrictEqual(calls, ['seek:57', 'play']);
+  assert.strictEqual(monitor.position(), 57);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('a late transport answer cannot overwrite a newly attached session', async () => {
+  let answerPause;
+  const pauseAnswer = new Promise((resolve) => {
+    answerPause = resolve;
+  });
+  let pauses = 0;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackPause: () => {
+        pauses += 1;
+        return pauses === 1
+          ? pauseAnswer
+          : Promise.resolve({ position: 5, playing: false });
+      },
+      playbackSeek: async () => {},
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  const oldPause = monitor.pause();
+  await monitor.release();
+  await monitor.attach();
+  const newSeek = monitor.seek(5);
+  answerPause({ position: 77, playing: false });
+  await Promise.all([oldPause, newSeek]);
+
+  assert.strictEqual(monitor.position(), 5);
+});
+
+test('a stale seek command is corrected to the replacement playhead', async () => {
+  let answerOldSeek;
+  const oldSeekAnswer = new Promise((resolve) => {
+    answerOldSeek = resolve;
+  });
+  const seeks = [];
+  const ticks = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackSeek: (target) => {
+        seeks.push(target);
+        if (seeks.length === 1) return oldSeekAnswer;
+        if (seeks.length === 3) {
+          return Promise.resolve({ position: 20, playing: false });
+        }
+        return Promise.resolve({ position: target, playing: false });
+      },
+      playbackVisible: async () => {},
+    },
+    onTick: (position, playing) => ticks.push([position, playing]),
+  });
+
+  await monitor.attach();
+  const oldSeek = monitor.seek(77);
+  await new Promise((resolve) => setImmediate(resolve));
+  monitor.clear();
+  await monitor.release();
+  await monitor.attach();
+  const newSeek = monitor.seek(5);
+  answerOldSeek({ position: 77, playing: false });
+  await Promise.all([oldSeek, newSeek]);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepStrictEqual(seeks, [77, 5]);
+  assert.strictEqual(monitor.position(), 5);
+  assert.ok(!ticks.some(([position]) => position === 20));
+});
+
+test('a newer seek wins while an old session correction is queued', async () => {
+  let answerOldSeek;
+  const oldSeekAnswer = new Promise((resolve) => {
+    answerOldSeek = resolve;
+  });
+  const seeks = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackSeek: (target) => {
+        seeks.push(target);
+        return seeks.length === 1
+          ? oldSeekAnswer
+          : Promise.resolve({ position: target, playing: false });
+      },
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  const oldSeek = monitor.seek(77);
+  await new Promise((resolve) => setImmediate(resolve));
+  await monitor.release();
+  await monitor.attach();
+  const latestSeek = monitor.seek(9);
+  answerOldSeek({ position: 77, playing: false });
+  await Promise.all([oldSeek, latestSeek]);
+
+  assert.deepStrictEqual(seeks, [77, 77, 9]);
+  assert.strictEqual(monitor.position(), 9);
+});
+
+test('a rejected old play is reasserted on the replacement session', async () => {
+  let rejectOldPlay;
+  const oldPlayAnswer = new Promise((_resolve, reject) => {
+    rejectOldPlay = reject;
+  });
+  let plays = 0;
+  let backendPlaying = false;
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackRelease: async () => {},
+      playbackPlay: () => {
+        plays += 1;
+        if (plays === 1) return oldPlayAnswer;
+        backendPlaying = true;
+        return Promise.resolve({ position: 0, playing: true });
+      },
+      playbackVisible: async () => {},
+    },
+  });
+
+  await monitor.attach();
+  const oldPlay = monitor.play();
+  await new Promise((resolve) => setImmediate(resolve));
+  await monitor.release();
+  await monitor.attach();
+  rejectOldPlay(new Error('old session stopped'));
+  await oldPlay;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.strictEqual(plays, 2);
+  assert.strictEqual(backendPlaying, true);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('acknowledged native commands confirm the optimistic transport state', async () => {
+  const ticks = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async () => {},
+      playbackSeek: async () => ({ position: 40, playing: false }),
+      playbackPlay: async () => ({ position: 40, playing: true }),
+      playbackPause: async () => ({ position: 40, playing: false }),
+    },
+    onTick: (position, playing) => ticks.push([position, playing]),
+  });
+
+  await monitor.attach();
+  await monitor.seek(40);
+  assert.deepStrictEqual(ticks.at(-1), [40, false]);
+  assert.strictEqual(monitor.position(), 40);
+
+  await monitor.play();
+  assert.deepStrictEqual(ticks.at(-1), [40, true]);
+  assert.strictEqual(monitor.isPlaying(), true);
+
+  await monitor.pause();
+  assert.deepStrictEqual(ticks.at(-1), [40, false]);
+  assert.strictEqual(monitor.isPlaying(), false);
+});
+
+test('a same-turn seek is applied before the following play', async () => {
+  let answerSeek;
+  const seekAnswer = new Promise((resolve) => {
+    answerSeek = resolve;
+  });
+  const calls = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: async () => ({ engine: 'native' }),
+      playbackVisible: async () => {},
+      playbackSeek: (target) => {
+        calls.push(`seek:${target}`);
+        return seekAnswer;
+      },
+      playbackPlay: async () => {
+        calls.push('play');
+        return { position: 40, playing: true };
+      },
+    },
+  });
+
+  await monitor.attach();
+  const seeking = monitor.seek(40);
+  const playing = monitor.play();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepStrictEqual(calls, ['seek:40']);
+
+  answerSeek({ position: 40, playing: false });
+  await Promise.all([seeking, playing]);
+  assert.deepStrictEqual(calls, ['seek:40', 'play']);
+  assert.strictEqual(monitor.position(), 40);
+  assert.strictEqual(monitor.isPlaying(), true);
+});
+
+test('a status poll started before a seek cannot rewind the new intent', async () => {
+  const previousAnimationFrame = global.requestAnimationFrame;
+  let nextFrame;
+  global.requestAnimationFrame = (callback) => {
+    nextFrame = callback;
+  };
+  let answerStatus;
+  const statusAnswer = new Promise((resolve) => {
+    answerStatus = resolve;
+  });
+
+  try {
+    const monitor = createMonitor({
+      preview: strictPreviewStub({
+        mode: () => 'timeline',
+        total: () => 100,
+      }),
+      wrap: panelStub(),
+      api: {
+        available: true,
+        playbackAttach: async () => ({ engine: 'native' }),
+        playbackVisible: async () => {},
+        playbackStatus: () => statusAnswer,
+        playbackSeek: async () => ({ position: 40, playing: false }),
+      },
+    });
+
+    await monitor.attach();
+    nextFrame();
+    await monitor.seek(40);
+    answerStatus({ position: 3, playing: false });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.strictEqual(monitor.position(), 40);
+  } finally {
+    if (previousAnimationFrame === undefined) delete global.requestAnimationFrame;
+    else global.requestAnimationFrame = previousAnimationFrame;
+  }
+});
+
+test('a status poll cannot outrun an unacknowledged seek command', async () => {
+  const previousAnimationFrame = global.requestAnimationFrame;
+  let nextFrame;
+  global.requestAnimationFrame = (callback) => {
+    nextFrame = callback;
+  };
+  let answerStatus;
+  let answerSeek;
+  const statusAnswer = new Promise((resolve) => {
+    answerStatus = resolve;
+  });
+  const seekAnswer = new Promise((resolve) => {
+    answerSeek = resolve;
+  });
+
+  try {
+    const monitor = createMonitor({
+      preview: strictPreviewStub({
+        mode: () => 'timeline',
+        total: () => 100,
+      }),
+      wrap: panelStub(),
+      api: {
+        available: true,
+        playbackAttach: async () => ({ engine: 'native' }),
+        playbackVisible: async () => {},
+        playbackStatus: () => statusAnswer,
+        playbackSeek: () => seekAnswer,
+      },
+    });
+
+    await monitor.attach();
+    const seeking = monitor.seek(40);
+    nextFrame();
+    answerStatus({ position: 3, playing: false });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.strictEqual(monitor.position(), 40);
+
+    answerSeek({ position: 40, playing: false });
+    await seeking;
+  } finally {
+    if (previousAnimationFrame === undefined) delete global.requestAnimationFrame;
+    else global.requestAnimationFrame = previousAnimationFrame;
+  }
 });
 
 test('a native monitor is used and reports nothing', () => {
@@ -422,8 +1685,9 @@ test('the router answers everything the page asks a preview for', () => {
   assert.deepStrictEqual(missing, []);
 });
 
-test('a ready proxy waits for playback to stop before replacing the native session', async () => {
+test('a ready proxy refreshes a playing native session without replacing it', async () => {
   const calls = [];
+  const ticks = [];
   const preview = {
     mode: () => 'timeline',
     total: () => 100,
@@ -440,6 +1704,10 @@ test('a ready proxy waits for playback to stop before replacing the native sessi
       return { engine: 'native' };
     },
     playbackRelease: async () => calls.push('release'),
+    playbackRefresh: async () => {
+      calls.push('refresh');
+      return { position: 12, playing: true };
+    },
     playbackVisible: async () => {},
     playbackPlay: async () => ({ position: 0, playing: true }),
     playbackPause: async () => {
@@ -452,15 +1720,59 @@ test('a ready proxy waits for playback to stop before replacing the native sessi
     wrap: panelStub(),
     api,
     getProject: () => ({ settings: { rate: { numerator: 30, denominator: 1 } } }),
+    onTick: (position, playing) => ticks.push([position, playing]),
   });
 
   await monitor.attach();
   await monitor.play();
   await monitor.refreshMedia();
-  assert.deepStrictEqual(calls, ['attach']);
+  assert.deepStrictEqual(calls, ['attach', 'refresh']);
+  assert.strictEqual(monitor.position(), 12);
+  assert.strictEqual(monitor.isPlaying(), true);
+  assert.deepStrictEqual(ticks.at(-1), [12, true]);
 
   await monitor.pause();
-  assert.deepStrictEqual(calls, ['attach', 'pause', 'release', 'attach']);
+  assert.deepStrictEqual(calls, ['attach', 'refresh', 'pause']);
+});
+
+test('a proxy ready during attach still reaches the backend session gate', async () => {
+  let answerAttach;
+  let answerRefresh;
+  const attachAnswer = new Promise((resolve) => {
+    answerAttach = resolve;
+  });
+  const refreshAnswer = new Promise((resolve) => {
+    answerRefresh = resolve;
+  });
+  const calls = [];
+  const monitor = createMonitor({
+    preview: strictPreviewStub({
+      mode: () => 'timeline',
+      total: () => 100,
+    }),
+    wrap: panelStub(),
+    api: {
+      available: true,
+      playbackAttach: () => {
+        calls.push('attach');
+        return attachAnswer;
+      },
+      playbackRefresh: () => {
+        calls.push('refresh');
+        return refreshAnswer;
+      },
+      playbackVisible: async () => {},
+    },
+  });
+
+  const attaching = monitor.attach();
+  const refreshing = monitor.refreshMedia();
+  assert.deepStrictEqual(calls, ['attach', 'refresh']);
+
+  answerAttach({ engine: 'native' });
+  answerRefresh({ position: 0, playing: false });
+  assert.strictEqual(await attaching, true);
+  await refreshing;
 });
 
 // Every method createPreview actually returns, and nothing else. A stub that
@@ -469,7 +1781,7 @@ test('a ready proxy waits for playback to stop before replacing the native sessi
 // front of a user opening a project.
 const PREVIEW_API = [
   'layout', 'play', 'pause', 'toggle', 'isPlaying', 'seek', 'position', 'total',
-  'mode', 'prune', 'clear', 'showAsset', 'showTimeline', 'setQuality',
+  'mode', 'prune', 'clearTimeline', 'clear', 'showAsset', 'showTimeline', 'setQuality',
   'setScrubbing', 'setMuteWhileScrubbing', 'showExact', 'clearExact', 'isExact',
 ];
 
@@ -490,8 +1802,8 @@ test('a ready proxy refreshes media elements without calling anything they do no
   });
   const monitor = createMonitor({ preview, stage: null, api: { available: false } });
 
-  // Playing: deferred. Stopped: taken. Neither may reach for a method that is
-  // not on the object, which on a real preview is a TypeError.
+  // A media element notices its changed path in the animation pass. The router
+  // must not reach for a method that is not on the real preview object.
   await monitor.refreshMedia();
   await monitor.pause();
 });
