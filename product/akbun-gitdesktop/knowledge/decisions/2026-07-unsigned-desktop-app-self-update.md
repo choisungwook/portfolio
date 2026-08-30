@@ -17,9 +17,9 @@ product의 데스크톱 앱은 자동 업데이트를 electron-updater가 아니
 * 임시 디렉터리 정리 지점 세 곳(내려받기 실패, 스크립트의 trap, 앱 시작 시 청소)을 모두 남기고, 하나라도 사라지면 실패하는 테스트를 함께 포팅한다.
 * 패키징된 빌드에서만 설치를 제안한다.
 
-이 절차를 [.claude/commands/repo-product-create.md](../../.claude/commands/repo-product-create.md)의 Self update 항목으로 옮겨, 새 제품을 만들 때 매번 다시 판단하지 않게 했다.
+이 절차를 [.claude/commands/repo-product-create.md](../../../../.claude/commands/repo-product-create.md)의 Self update 항목으로 옮겨, 새 제품을 만들 때 매번 다시 판단하지 않게 했다.
 
-2026-08-04에 자리를 한 번 더 옮겼다. 자동 업데이트는 제품 생성 명령이 아니라 stack 규칙([.claude/rules/electron.md](../../.claude/rules/electron.md), [.claude/rules/tauri.md](../../.claude/rules/tauri.md))의 기본 요구사항이다. 생성 명령은 새 제품을 만들 때만 읽히므로, 이미 있는 앱에 업데이트가 빠져 있으면 아무도 그 사실을 만나지 않는다. akbun-gitdesktop이 릴리스를 두 번 냈는데 업데이트 경로가 없었던 것이 그 결과다.
+2026-08-04에 자리를 한 번 더 옮겼다. 자동 업데이트는 제품 생성 명령이 아니라 stack 규칙([.claude/rule-details/electron.md](../../../../.claude/rule-details/electron.md), [.claude/rule-details/tauri.md](../../../../.claude/rule-details/tauri.md))의 기본 요구사항이다. 생성 명령은 새 제품을 만들 때만 읽히므로, 이미 있는 앱에 업데이트가 빠져 있으면 아무도 그 사실을 만나지 않는다. akbun-gitdesktop이 릴리스를 두 번 냈는데 업데이트 경로가 없었던 것이 그 결과다.
 
 ## 이유
 

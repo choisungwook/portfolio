@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 
 작업이 끝난 branch를 master에 넣는 데까지 필요한 command를 순서대로 실행한다. 각 단계의 세부 규칙은 해당 command 파일에 있고, 이 파일은 순서와 단계 사이의 판단만 정한다.
 
-시작 전에 [.claude/rules/github-tools.md](../rules/github-tools.md)로 CLI 환경인지 MCP 환경인지 판별한다. 이후 모든 GitHub 조작은 그 환경의 도구로 한다.
+시작 전에 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)로 CLI 환경인지 MCP 환경인지 판별한다. 이후 모든 GitHub 조작은 그 환경의 도구로 한다.
 
 `$ARGUMENTS`에 resume이 있으면 1~3단계를 건너뛰고 4단계부터 시작한다. PR 번호가 함께 오면 그 PR을, 없으면 현재 branch의 PR을 대상으로 한다.
 

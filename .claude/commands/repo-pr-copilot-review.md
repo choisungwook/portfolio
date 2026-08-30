@@ -14,7 +14,7 @@ PR `$1`(없으면 현재 branch의 PR)에 Copilot code review를 요청한다. �
 
 ## 대상 확인
 
-아래는 CLI 환경 기준이다. shell이 없는 MCP 환경에서는 GitHub MCP의 `request_copilot_review`로 대체한다. 도구 대응은 [.claude/rules/github-tools.md](../rules/github-tools.md)에 있고, 그 환경에서는 GraphQL 재요청이 안 되므로 최초 요청만 된다.
+아래는 CLI 환경 기준이다. shell이 없는 MCP 환경에서는 GitHub MCP의 `request_copilot_review`로 대체한다. 도구 대응은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)에 있고, 그 환경에서는 GraphQL 재요청이 안 되므로 최초 요청만 된다.
 
 `$1`이 없으면 현재 branch의 PR을 쓴다.
 

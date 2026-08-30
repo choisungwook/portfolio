@@ -37,10 +37,12 @@ workspace 루트에 `AGENTS.md`를 만들고 다음을 담는다.
 
 - 이 핸즈온이 무엇인지 한 줄.
 - `@../../AGENTS.md`(루트까지의 상대 경로) 링크. 글로벌 규칙은 여기를 따른다.
-- knowledge 갱신 규칙. 아래 문단을 그대로 넣는다.
+- knowledge 읽기와 갱신 규칙. 아래 문단을 그대로 넣는다.
 
 ```markdown
-## knowledge 갱신
+## knowledge
+
+이 workspace를 고치기 전에 `knowledge/index.md`를 먼저 읽는다. 걸리는 concept가 있으면 그 파일까지 읽는다. 읽지 않으면 이미 버려진 방법을 다시 고른다.
 
 이 workspace의 작업에서 얻은 지식은 `knowledge/`에 계속 반영한다. 추가만이 아니라 수정과 삭제까지 포함한다.
 
@@ -60,7 +62,7 @@ workspace 루트에 `AGENTS.md`를 만들고 다음을 담는다.
 ## VM이 필요할 때
 
 - AWS EC2를 쓰고 기본은 arm 인스턴스(t4g.medium)로 한다. 사용자가 x86을 요청하면 t3.medium을 쓰고 AMI 아키텍처도 함께 바꾼다.
-- terraform 작성 규칙은 [.claude/rules/terraform.md](../rules/terraform.md)를 따른다.
+- terraform 작성 규칙은 [.claude/rule-details/terraform.md](../rule-details/terraform.md)를 따른다.
 
 ## 멈추는 지점
 

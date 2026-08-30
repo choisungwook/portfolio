@@ -114,7 +114,7 @@ curl -s http://localhost:4000/v1/chat/completions \
 
 ## Track B: 폐쇄망 Terraform 사양
 
-위치는 terraform/. [.claude/rules/terraform.md](../../../../.claude/rules/terraform.md)를 따르되, 이 실습은 사용자가 명시적으로 새 VPC를 요청했으므로 default VPC 규칙의 예외다. 설계 근거는 [adr/2026-07-closed-private-subnet-design.md](../adr/2026-07-closed-private-subnet-design.md)에 있다.
+위치는 terraform/. [.claude/rule-details/terraform.md](../../../../.claude/rule-details/terraform.md)를 따르되, 이 실습은 사용자가 명시적으로 새 VPC를 요청했으므로 default VPC 규칙의 예외다. 설계 근거는 [adr/2026-07-closed-private-subnet-design.md](../adr/2026-07-closed-private-subnet-design.md)에 있다.
 
 핵심 제약: private subnet은 IGW·NAT gateway가 전혀 없는 완전 폐쇄 영역이다. 인터넷이 안 되는 엔터프라이즈 조건을 재현하는 것이 목적이므로, 운영·개발에 필요한 통신은 전부 VPC endpoint로만 해결한다.
 
@@ -186,7 +186,7 @@ ECR repository도 terraform으로 만든다(litellm 하나, 필요하면 postgre
 
 ## 구현 시 따라야 할 규칙
 
-- [.claude/rules/terraform.md](../../../../.claude/rules/terraform.md) — provider 버전 웹 검색, default_tags, SSM 접속 패턴
+- [.claude/rule-details/terraform.md](../../../../.claude/rule-details/terraform.md) — provider 버전 웹 검색, default_tags, SSM 접속 패턴
 - [.claude/rules/markdown.md](../../../../.claude/rules/markdown.md) — 헤더·코드블록 규칙
 - [.claude/rules/workflow.md](../../../../.claude/rules/workflow.md) — commit·push·PR·Issue는 사용자 명시 지시 전까지 금지
 - [.claude/commands/repo-handson.md](../../../../.claude/commands/repo-handson.md) — 루트 README 목차 추가 등 핸즈온 표준 절차
