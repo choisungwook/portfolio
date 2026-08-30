@@ -210,8 +210,10 @@ Benchmark는 측정 시작부터 종료까지 Prometheus `/api/v1/query_range`�
 
 ## 관측의 한계
 
-- scrape interval: 5초
-  - 더 짧은 VRAM·utilization spike 누락 가능
+- DCGM·Prometheus GPU interval: 1초
+  - 1초보다 짧은 VRAM·utilization spike 누락 가능
+- Grafana GPU panel: 최근 5초 최대값
+  - 짧은 spike를 보존하지만 vLLM process allocator와 같은 순간값은 아님
 - rate window: 1분
   - 짧은 benchmark에서 지연되거나 흔들리는 값
 - Prometheus metric: aggregate
@@ -227,6 +229,7 @@ GPU 사용률이 높다는 사실은 LLM이 왜 느린지 답하지 못합니다
 
 ## 참고자료
 
+- [GPU 실습 troubleshooting](./troubleshooting.md)
 - [vLLM Metrics](https://docs.vllm.ai/en/stable/usage/metrics/)
 - [Prometheus metric types](https://prometheus.io/docs/concepts/metric_types/)
 - [NVIDIA DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter)

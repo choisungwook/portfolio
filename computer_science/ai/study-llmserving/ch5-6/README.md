@@ -36,6 +36,7 @@ Chapter 5는 hardware 용어 모음이 아닙니다. Chapter 6의 optimization�
 - LAN 접속: [같은 Wi-Fi에서 관측·추론 endpoint 접속](./docs/03-setup-lan-access.md)
 - 전체 실습 순서: [LLM serving이 느린 이유를 GPU에서 직접 확인하는 순서](./docs/handson/)
 - 관측 기준: [GPU 사용률이 높은데 LLM이 느릴 때 무엇을 봐야 할까](./docs/prometheus.md)
+- 문제 해결: [GPU 실습 troubleshooting](./docs/troubleshooting.md)
 
 | 순서 | Ch | 질문 | 확인할 결과 |
 | ---: | :-: | --- | --- |

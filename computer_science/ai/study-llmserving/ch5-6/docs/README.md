@@ -39,6 +39,7 @@
 | 문서 | 하는 일 |
 | --- | --- |
 | [metric 해석](./prometheus.md) | 어떤 지표를 왜 모으고 어떻게 읽는가 |
+| [GPU 실습 troubleshooting](./troubleshooting.md) | VRAM 초기화와 DCGM·Prometheus·Grafana 수집 검증 |
 | [GSM8K 20문항의 범위](./06-gsm8k-deep-dive.md) | 빠른 quality gate로 판단해도 되는 선 |
 | [Quiz](./quiz.md) | Chapter 5·6 핵심 개념 복습 |
 

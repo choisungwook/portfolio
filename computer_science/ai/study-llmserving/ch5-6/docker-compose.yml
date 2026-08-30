@@ -160,6 +160,8 @@ services:
     image: nvidia/dcgm-exporter:4.8.3
     profiles: [observability]
     <<: *gpu
+    environment:
+      DCGM_EXPORTER_INTERVAL: "${DCGM_EXPORTER_INTERVAL_MS:-1000}"
     cap_add:
       - SYS_ADMIN
     ports:
