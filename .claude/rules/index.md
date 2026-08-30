@@ -22,10 +22,7 @@
 
 ## MANDATORY: workspace 지식 로딩
 
-**CRITICAL**: 이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 **반드시 읽는다**. `wiki/`나 `adr/`가 있으면 그 index도 읽는다.
-
-- 여기에는 코드가 기록하지 못한 결정의 이유가 있다. 읽지 않으면 이미 버린 방법을 다시 고른다.
-- 읽은 뒤 어긋나는 사실을 발견하면 그 concept를 고친다. 규칙은 [knowledge.md](knowledge.md)를 따른다.
+**CRITICAL**: 이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. 자세한 규칙은 [knowledge.md](knowledge.md)의 "읽는 시점"에 있다.
 
 ## 항상 주입되는 규칙
 

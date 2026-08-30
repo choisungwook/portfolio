@@ -18,7 +18,7 @@ allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 
 ## 인터뷰 규칙
 
-기준은 [.claude/rules/workflow.md](../rules/workflow.md)의 "인터뷰" 하나다. 여기서는 이 command에만 해당하는 것만 더한다.
+기준은 [AGENTS.md](../../AGENTS.md)의 "인터뷰와 진행" 하나다. 여기서는 이 command에만 해당하는 것만 더한다.
 
 - Issue를 몇 개로 쪼갤지와 실행 순서를 어떻게 매길지는 사용자만 답할 수 있는 것에 든다.
 
