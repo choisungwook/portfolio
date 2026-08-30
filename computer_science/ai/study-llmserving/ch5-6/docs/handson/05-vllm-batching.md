@@ -1,4 +1,35 @@
-# Latency SLO를 만족하는 vLLM batch 설정 찾기
+# `vllm bench serve`로 batch 설정 비교
+
+`vllm bench serve`는 vLLM에 포함된 online serving benchmark client입니다. 별도 Python 부하 생성 코드를 작성하지 않고 OpenAI-compatible endpoint를 측정합니다.
+
+동작 원리:
+
+1. `random` dataset loader가 tokenizer 기준으로 지정한 길이의 synthetic prompt를 생성
+2. 준비 확인 request와 warm-up request를 먼저 전송하고 측정에서 제외
+3. `--request-rate inf`이면 모든 request를 즉시 준비
+4. `--max-concurrency`가 동시에 endpoint로 전송할 request 수를 제한
+5. Streaming response에서 첫 token과 이후 token의 도착 시각을 기록
+6. TTFT·TPOT·E2E percentile과 request·token throughput을 계산
+7. 실행 option과 측정값을 JSON으로 저장
+
+측정값의 의미:
+
+- TTFT: request 전송부터 첫 token 도착까지의 시간. Server queue와 prefill 포함
+- TPOT: 첫 token 이후 output token 한 개를 생성하는 평균 시간. Decode 속도 중심
+- E2E: request 전송부터 마지막 token 도착까지의 전체 시간
+- Request TPS: 초당 완료 request 수
+- Output TPS: 초당 생성 output token 수
+
+이 시나리오의 활용 방법:
+
+- Server preset: latency·balanced·throughput 세 가지
+- Workload: input 256 token, output 64 token, request 100개
+- Client concurrency: 1·4·8
+- Output 고정: `--ignore-eos`
+- 재현성: concurrency 값을 seed로 사용
+- 비교 지표: TTFT p95, TPOT p95, E2E p95, Request TPS, Output TPS
+
+같은 concurrency는 모든 preset에서 같은 seed를 사용합니다. 서로 다른 concurrency는 seed를 바꿔 같은 server에서 이전 prompt의 prefix cache가 재사용되지 않게 합니다.
 
 다음 시나리오를 순서대로 진행합니다.
 
@@ -14,7 +45,8 @@
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - Runtime: vLLM `v0.27.1`
 - Model: `Qwen/Qwen2.5-3B-Instruct`
-- 고정 조건: model, prompt, output limit, concurrency 1·4·8
+- 고정 조건: model, synthetic input·output length, request count, concurrency 1·4·8
+- 측정 요청: concurrency마다 100개
 
 Local client에서 GPU server 주소를 지정합니다.
 
@@ -29,6 +61,22 @@ export GPU_SERVER_IP="<GPU-SERVER-IP>"
 | Latency 우선 | 1 | 512 | Queue 감소, throughput 제한 |
 | 균형 | 4 | 2048 | 작은 concurrency와 token budget 수용 |
 | Throughput 우선 | 8 | 4096 | 동시 처리 증가, queue·VRAM 증가 가능 |
+
+## 측정 범위
+
+`--request-rate inf`와 `--max-concurrency`를 함께 사용해 sequence slot이 계속 차는 closed-loop 부하를 만듭니다.
+
+- 용도: 세 scheduler preset의 latency·throughput 상대 비교
+- 측정: TTFT·TPOT·E2E p50/p95, Request TPS, Output TPS
+- 장점: vLLM version과 함께 배포되는 benchmark client·결과 형식 사용
+- 한계: 실제 request arrival rate에 대한 운영 capacity를 증명하지 않음
+- 한계: 두 scheduler option을 동시에 바꾸므로 개별 option의 인과관계를 분리하지 않음
+
+SLO 값과 target concurrency는 측정 전에 정합니다. 결과를 본 뒤 기준을 바꾸지 않습니다.
+
+`random`은 실제 대화 dataset이 아닙니다. Prompt 내용이 아니라 input·output token 길이와 scheduler 설정의 영향을 통제하기 위한 synthetic dataset입니다.
+
+운영 SLO를 검증할 때는 `--request-rate inf` 대신 예상 RPS를 지정하고, 실제 request trace 또는 대표 dataset으로 다시 측정합니다.
 
 ## 시나리오 1. Latency 우선 설정을 측정합니다
 
@@ -66,15 +114,36 @@ Local client에서 준비 완료를 확인합니다.
 bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
 ```
 
-GPU server에서 benchmark를 실행하고 server를 종료합니다.
+GPU server에서 benchmark를 실행하고 server를 종료합니다. Bash와 Docker Compose만 사용하므로 Ubuntu에서도 같은 명령으로 실행됩니다.
 
 ```bash
-docker compose --profile tools run --rm \
-  -e MODEL_LABEL=bf16-seq1-tokens512 \
-  -e PRECISION=BF16 \
-  -e VLLM_MAX_NUM_SEQS=1 \
-  -e VLLM_MAX_NUM_BATCHED_TOKENS=512 \
-  benchmark python3 -m benchmark.benchmark_vllm_batching
+for concurrency in 1 4 8; do
+  docker compose --profile tools run --rm benchmark \
+    vllm bench serve \
+    --backend vllm \
+    --base-url http://model-server:8000 \
+    --model Qwen/Qwen2.5-3B-Instruct \
+    --served-model-name qwen \
+    --dataset-name random \
+    --input-len 256 \
+    --output-len 64 \
+    --random-range-ratio 0 \
+    --ignore-eos \
+    --temperature 0 \
+    --ready-check-timeout-sec 600 \
+    --num-warmups 5 \
+    --num-prompts 100 \
+    --request-rate inf \
+    --max-concurrency "${concurrency}" \
+    --seed "${concurrency}" \
+    --percentile-metrics ttft,tpot,e2el \
+    --metric-percentiles 50,95 \
+    --label bf16-seq1-tokens512 \
+    --metadata precision=BF16 max_num_seqs=1 max_num_batched_tokens=512 \
+    --save-result \
+    --result-dir results/vllm-batching \
+    --result-filename "bf16-seq1-tokens512-c${concurrency}.json"
+done
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -103,12 +172,33 @@ bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
 GPU server에서 같은 workload를 실행하고 server를 종료합니다.
 
 ```bash
-docker compose --profile tools run --rm \
-  -e MODEL_LABEL=bf16-seq4-tokens2048 \
-  -e PRECISION=BF16 \
-  -e VLLM_MAX_NUM_SEQS=4 \
-  -e VLLM_MAX_NUM_BATCHED_TOKENS=2048 \
-  benchmark python3 -m benchmark.benchmark_vllm_batching
+for concurrency in 1 4 8; do
+  docker compose --profile tools run --rm benchmark \
+    vllm bench serve \
+    --backend vllm \
+    --base-url http://model-server:8000 \
+    --model Qwen/Qwen2.5-3B-Instruct \
+    --served-model-name qwen \
+    --dataset-name random \
+    --input-len 256 \
+    --output-len 64 \
+    --random-range-ratio 0 \
+    --ignore-eos \
+    --temperature 0 \
+    --ready-check-timeout-sec 600 \
+    --num-warmups 5 \
+    --num-prompts 100 \
+    --request-rate inf \
+    --max-concurrency "${concurrency}" \
+    --seed "${concurrency}" \
+    --percentile-metrics ttft,tpot,e2el \
+    --metric-percentiles 50,95 \
+    --label bf16-seq4-tokens2048 \
+    --metadata precision=BF16 max_num_seqs=4 max_num_batched_tokens=2048 \
+    --save-result \
+    --result-dir results/vllm-batching \
+    --result-filename "bf16-seq4-tokens2048-c${concurrency}.json"
+done
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -137,12 +227,33 @@ bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
 GPU server에서 동일 workload를 실행하고 server를 종료합니다.
 
 ```bash
-docker compose --profile tools run --rm \
-  -e MODEL_LABEL=bf16-seq8-tokens4096 \
-  -e PRECISION=BF16 \
-  -e VLLM_MAX_NUM_SEQS=8 \
-  -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
-  benchmark python3 -m benchmark.benchmark_vllm_batching
+for concurrency in 1 4 8; do
+  docker compose --profile tools run --rm benchmark \
+    vllm bench serve \
+    --backend vllm \
+    --base-url http://model-server:8000 \
+    --model Qwen/Qwen2.5-3B-Instruct \
+    --served-model-name qwen \
+    --dataset-name random \
+    --input-len 256 \
+    --output-len 64 \
+    --random-range-ratio 0 \
+    --ignore-eos \
+    --temperature 0 \
+    --ready-check-timeout-sec 600 \
+    --num-warmups 5 \
+    --num-prompts 100 \
+    --request-rate inf \
+    --max-concurrency "${concurrency}" \
+    --seed "${concurrency}" \
+    --percentile-metrics ttft,tpot,e2el \
+    --metric-percentiles 50,95 \
+    --label bf16-seq8-tokens4096 \
+    --metadata precision=BF16 max_num_seqs=8 max_num_batched_tokens=4096 \
+    --save-result \
+    --result-dir results/vllm-batching \
+    --result-filename "bf16-seq8-tokens4096-c${concurrency}.json"
+done
 docker compose stop vllm-bf16
 docker compose rm -f vllm-bf16
 ```
@@ -151,7 +262,7 @@ docker compose rm -f vllm-bf16
 
 ### 이론
 
-가장 큰 batch가 항상 운영 capacity를 높이지는 않습니다. Queue와 E2E p95가 SLO를 넘으면 높은 throughput은 사용자 대기 증가의 결과일 수 있습니다.
+가장 큰 batch가 항상 운영 capacity를 높이지는 않습니다. Queue와 E2E p95가 SLO를 넘으면 높은 throughput은 사용자 대기 증가의 결과일 수 있습니다. 이 실습 결과는 preset 후보를 고르는 근거이며, 최종 운영 capacity는 예상 request rate로 다시 검증합니다.
 
 | 관찰 | 해석 |
 | --- | --- |
@@ -162,18 +273,30 @@ docker compose rm -f vllm-bf16
 
 ### 실습
 
-세 JSON을 하나의 표로 결합합니다.
+아홉 JSON을 하나의 표로 출력합니다.
 
 ```bash
-ls results/performance-bf16-seq*-vllm-batching.json
-docker compose --profile tools run --rm benchmark python3 -m benchmark.summary
+jq -r -s '
+  ["preset", "concurrency", "TTFT p50 ms", "TTFT p95 ms", "TPOT p95 ms", "E2E p95 ms", "Request/s", "Output token/s"],
+  (.[] | [
+    .label,
+    .max_concurrency,
+    .p50_ttft_ms,
+    .p95_ttft_ms,
+    .p95_tpot_ms,
+    .p95_e2el_ms,
+    .request_throughput,
+    .output_throughput
+  ])
+  | @tsv
+' results/vllm-batching/*.json | column -t -s "$(printf '\t')"
 ```
 
 선택 기준:
 
 1. TTFT와 E2E p95가 SLO를 만족하는 설정만 남김
 2. 남은 설정 중 Output TPS가 가장 높은 값 선택
-3. `results/summary.md`에서 scheduler 설정과 결과 연결 확인
+3. 같은 concurrency끼리 세 preset의 결과 비교
 
 Local client에서 같은 시간 구간의 Grafana metric을 확인합니다.
 
@@ -183,5 +306,6 @@ http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
 
 참고자료:
 
+- [vLLM v0.27.1 bench serve options](https://docs.vllm.ai/en/v0.27.1/cli/bench/serve/)
 - [vLLM v0.27.1 serve options](https://docs.vllm.ai/en/v0.27.1/cli/serve/)
 - [vLLM v0.27.1 metrics](https://docs.vllm.ai/en/v0.27.1/usage/metrics/)
