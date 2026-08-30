@@ -31,7 +31,7 @@ ch5-calculate:
 
 ch5-roofline: build
 	$(COMPOSE) --profile tools run --rm gpu-probe
-	uv run --group viz python -m calculators.plot_roofline
+	$(COMPOSE) --profile tools run --rm benchmark python3 -m calculators.plot_roofline
 
 ch5-kv-probe: build observability-up
 	$(COMPOSE) --profile tools run --rm benchmark python3 -m benchmark.kv_cache_probe

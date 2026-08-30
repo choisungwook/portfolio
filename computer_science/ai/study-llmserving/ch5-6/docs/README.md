@@ -11,7 +11,7 @@
 | 2 | [03 KV cache 배치·시퀀스](./handson/03-kv-cache-batch-sequence.md) | 캐시할 토큰 개수를 어떻게 세고, 최대 배치는 무엇이 정하는가 |
 | 3 | [04 roofline과 병목 재현](./handson/04-roofline-bottleneck.md) | 연산집약도 축은 무엇이고, 병목이 연산인가 대역폭인가 |
 
-메모리 이야기(02 → 03)를 끝내고 속도 이야기(04)로 넘어가는 순서입니다. 03과 04는 `make ch5-kv-probe`, `make ch5-roofline`, `make ch5-bottleneck`으로 직접 측정합니다.
+메모리 이야기(02 → 03)를 끝내고 속도 이야기(04)로 넘어가는 순서입니다. 03과 04는 문서에 적힌 Docker Compose 명령으로 KV cache, roofline, bottleneck을 직접 측정합니다.
 
 ## Chapter 6 — 병목마다 어떤 optimization이 붙는가
 

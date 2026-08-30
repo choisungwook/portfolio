@@ -7,7 +7,10 @@ GPU 실습 결과가 예상과 다르면 model option보다 먼저 GPU 기준 �
 Workspace container를 모두 내리고 남은 GPU compute process를 확인합니다.
 
 ```bash
-make gpu-reset
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
 ```
 
 - workspace의 container와 network만 정리
@@ -59,10 +62,13 @@ kubectl scale deployment/<WORKLOAD> --replicas=0 -n <NAMESPACE>
 종료 후 다시 초기화합니다.
 
 ```bash
-make gpu-reset
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
 ```
 
-`No GPU compute process remains`가 출력되면 GPU 실습을 시작합니다. 계속 process가 출력되면 같은 확인 절차를 반복하되 `kill -KILL`, 전체 PID 일괄 종료, container runtime 전체 중지는 사용하지 않습니다.
+Compute process 목록이 비어 있으면 GPU 실습을 시작합니다. 계속 process가 출력되면 같은 확인 절차를 반복하되 `kill -KILL`, 전체 PID 일괄 종료, container runtime 전체 중지는 사용하지 않습니다.
 
 ## 관측 경로가 유효한지 한 번에 확인합니다
 
@@ -75,7 +81,8 @@ nvidia-smi → DCGM Exporter → Prometheus → Grafana datasource
 자동 점검을 실행합니다.
 
 ```bash
-make observability-check
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+bash scripts/check_observability.sh
 ```
 
 성공 조건:
@@ -130,8 +137,12 @@ curl -s http://127.0.0.1:9090/api/v1/targets | \
 실행 중인 Prometheus와 DCGM Exporter는 Git pull만으로 설정을 다시 읽지 않을 수 있습니다. 기준 상태부터 다시 만듭니다.
 
 ```bash
-make gpu-reset
-make observability-check
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+bash scripts/check_observability.sh
 ```
 
 Prometheus volume은 유지되므로 이전 시계열도 남습니다. Grafana time range를 실습 실행 시각 전후로 좁혀 새 결과만 확인합니다.
