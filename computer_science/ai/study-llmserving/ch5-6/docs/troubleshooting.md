@@ -38,6 +38,32 @@ cat /proc/<PID>/cgroup
 - container·Kubernetes process: process를 직접 kill하지 않고 소유한 workload에서 종료
 - 소유자를 모르는 process: 종료하지 않고 실습 관리자에게 확인
 
+본인이 실행한 일반 process에는 정상 종료 신호를 보냅니다.
+
+```bash
+kill -TERM <PID>
+```
+
+본인이 실행한 container는 container runtime에서 종료합니다.
+
+```bash
+docker stop <CONTAINER>
+```
+
+본인이 실행한 Kubernetes workload는 controller의 replica를 0으로 줄입니다. Pod만 삭제하면 controller가 다시 생성할 수 있습니다.
+
+```bash
+kubectl scale deployment/<WORKLOAD> --replicas=0 -n <NAMESPACE>
+```
+
+종료 후 다시 초기화합니다.
+
+```bash
+make gpu-reset
+```
+
+`No GPU compute process remains`가 출력되면 GPU 실습을 시작합니다. 계속 process가 출력되면 같은 확인 절차를 반복하되 `kill -KILL`, 전체 PID 일괄 종료, container runtime 전체 중지는 사용하지 않습니다.
+
 ## 관측 경로가 유효한지 한 번에 확인합니다
 
 관측 stack을 기동하고 네 구간을 대조합니다.

@@ -17,6 +17,16 @@ Repository root에서 workspace로 이동합니다.
 cd computer_science/ai/study-llmserving/ch5-6
 ```
 
+## 실습 전 GPU process를 정리합니다
+
+이전 실습과 다른 workload가 사용하는 GPU compute process를 정리합니다.
+
+```bash
+make gpu-reset
+```
+
+명령이 남은 process를 출력하고 실패하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`을 다시 실행합니다.
+
 ## 먼저 비교 범위를 구분합니다
 
 vLLM online server의 내부 scheduler는 iteration마다 running request와 waiting request에 token budget을 배분하는 continuous batching 방식입니다. Static batching과 dynamic batching은 vLLM의 serve option이 아닙니다.

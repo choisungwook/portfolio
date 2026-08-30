@@ -15,14 +15,45 @@ Repository root에서 workspace로 이동합니다.
 cd computer_science/ai/study-llmserving/ch5-6
 ```
 
-이전 model process를 정리하고 OOM 순간의 hardware metric이 수집되는지 확인합니다.
+## GPU를 사용하는 기존 process를 먼저 종료합니다
+
+다른 process가 VRAM을 사용하면 OOM 원인이 7B model인지 기존 workload인지 구분할 수 없습니다. Workspace container를 정리하고 남은 GPU compute process를 확인합니다.
+
+```bash
+make gpu-reset
+```
+
+`GPU compute processes remain`이 출력되면 각 PID의 실행 주체를 확인합니다.
+
+```bash
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
+ps -fp <PID>
+cat /proc/<PID>/cgroup
+```
+
+본인이 실행한 일반 process만 정상 종료 신호를 보냅니다.
+
+```bash
+kill -TERM <PID>
+```
+
+Container나 Kubernetes가 관리하는 process는 PID를 직접 종료하지 않습니다. 본인이 실행한 workload를 해당 도구로 종료합니다.
+
+```bash
+docker stop <CONTAINER>
+kubectl scale deployment/<WORKLOAD> --replicas=0 -n <NAMESPACE>
+```
+
+소유자를 모르는 process, Xorg, desktop session은 종료하지 않습니다. 종료 후 기준 상태와 OOM 순간의 hardware metric 수집 경로를 다시 확인합니다.
 
 ```bash
 make gpu-reset
 make observability-check
 ```
 
-Desktop baseline VRAM과 Grafana 값이 예상과 다르면 [GPU 실습 troubleshooting](../troubleshooting.md)부터 확인합니다.
+`make gpu-reset`이 성공하고 compute process 목록이 비어 있어야 실습을 시작합니다. Desktop baseline VRAM과 Grafana 값이 예상과 다르면 [GPU 실습 troubleshooting](../troubleshooting.md)을 확인합니다.
 
 ## 먼저 OOM 가설을 계산합니다
 
