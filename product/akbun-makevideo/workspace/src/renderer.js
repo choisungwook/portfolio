@@ -2046,10 +2046,16 @@ function persistSettings(settings = state.settings, callbacks) {
   return persistLatestSettings({ ...settings }, callbacks);
 }
 
+function persistSettingsInBackground() {
+  void persistSettings().catch((error) => {
+    reportError(error, 'settings:persist:callback');
+  });
+}
+
 function toggleSnap() {
   state.settings.snap = !state.settings.snap;
   dom.btnMagnet.classList.toggle('on', state.settings.snap);
-  void persistSettings();
+  persistSettingsInBackground();
 }
 
 // --- dragging clips --------------------------------------------------------
@@ -3425,7 +3431,7 @@ function wireTransport() {
   dom.previewQuality.addEventListener('change', () => {
     state.settings.previewQuality = dom.previewQuality.value;
     preview.setQuality(state.settings.previewQuality);
-    void persistSettings();
+    persistSettingsInBackground();
   });
   dom.stage.addEventListener('wheel', (event) => {
     if (!event.metaKey) return;
