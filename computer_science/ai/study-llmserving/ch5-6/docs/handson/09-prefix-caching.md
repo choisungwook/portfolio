@@ -8,9 +8,16 @@
 공통 환경:
 
 - 선행 실습: [Prefill·decode 병목 관측](./07-prefill-decode-observability.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - Model: `Qwen/Qwen2.5-3B-Instruct`
 - Prefix caching: 활성화
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 ## 시나리오 1. Token 순서가 cache hit와 TTFT를 바꾸는지 확인합니다
 
@@ -40,12 +47,17 @@ nvidia-smi \
 
 두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-관측 stack과 prefix caching이 활성화된 server를 기동합니다.
+GPU server에서 관측 stack과 prefix caching이 활성화된 server를 기동합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
 docker compose --profile bf16 up -d vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
 ```
 
 Cold, warm, reordered request를 순서대로 실행합니다.
@@ -60,6 +72,12 @@ Request별 결과를 확인합니다.
 
 ```bash
 cat results/prefix-cache-bf16.json
+```
+
+Local client에서 Grafana dashboard를 엽니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
 ```
 
 Grafana 확인값:

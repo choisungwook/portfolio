@@ -9,6 +9,7 @@
 공통 환경:
 
 - 환경 준비: [Ubuntu GPU 환경 준비](../01-setup-ubuntu.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - OS: Ubuntu 24.04 LTS
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
@@ -85,13 +86,13 @@ nvidia-smi → DCGM Exporter → Prometheus → Grafana
 
 ### 실습
 
-Benchmark image를 build합니다.
+GPU server에서 benchmark image를 build합니다.
 
 ```bash
 docker compose --profile tools build benchmark
 ```
 
-관측 stack을 기동하고 수집 경로를 자동 점검합니다.
+GPU server에서 관측 stack을 기동하고 수집 경로를 자동 점검합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
@@ -99,18 +100,24 @@ bash scripts/check_observability.sh
 docker compose ps
 ```
 
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
+
 접속 정보:
 
-- Prometheus: `http://127.0.0.1:9090`
-- Grafana: `http://127.0.0.1:3000`
+- Prometheus: `http://${GPU_SERVER_IP}:9090`
+- Grafana: `http://${GPU_SERVER_IP}:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6`
 - Grafana 계정: `admin` / `admin`
 - Dashboard: provisioned LLM serving dashboard
 
-원본 metric과 target을 직접 확인합니다.
+Local client에서 원본 metric과 target을 직접 확인합니다.
 
 ```bash
-curl http://127.0.0.1:9400/metrics
-curl http://127.0.0.1:9090/api/v1/targets
+curl "http://${GPU_SERVER_IP}:9400/metrics"
+curl "http://${GPU_SERVER_IP}:9090/api/v1/targets"
 ```
 
 완료 조건:

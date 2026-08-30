@@ -9,10 +9,17 @@
 공통 환경:
 
 - 선행 실습: [Admission 전략 비교](./06-batch-strategies.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - Runtime: vLLM `v0.27.1`
 - Model: `Qwen/Qwen2.5-3B-Instruct`
 - Scheduler: `max_num_seqs 8`, `max_num_batched_tokens 4096`
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 ## 시나리오 1. Long-prefill의 첫 token 지연을 분석합니다
 
@@ -40,15 +47,20 @@ nvidia-smi \
 
 두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-관측 stack과 server를 기동합니다.
+GPU server에서 관측 stack과 server를 기동합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
 VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
   docker compose --profile bf16 up -d --force-recreate vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/metrics
-curl http://127.0.0.1:9090/api/v1/targets
+```
+
+Local client에서 준비 상태와 metric 수집을 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+curl "http://${GPU_SERVER_IP}:8000/metrics"
+curl "http://${GPU_SERVER_IP}:9090/api/v1/targets"
 ```
 
 Long-prefill workload를 실행합니다.
@@ -60,6 +72,12 @@ docker compose --profile tools run --rm \
   -e VLLM_MAX_NUM_SEQS=8 \
   -e VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
   benchmark python3 -m benchmark.benchmark_long_prefill
+```
+
+Local client에서 Grafana dashboard를 엽니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
 ```
 
 Grafana 확인 순서:

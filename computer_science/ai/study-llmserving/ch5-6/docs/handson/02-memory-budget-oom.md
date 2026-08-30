@@ -10,8 +10,15 @@
 공통 환경:
 
 - 선행 실습: [Host부터 Grafana까지 GPU 관측 경로 확인](./01-gpu-environment.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 ## 시나리오 1. 7B BF16의 memory budget을 계산합니다
 
@@ -74,7 +81,8 @@ docker compose --profile tools run --rm \
 - 기대 결과: CUDA OOM
 - 저장 결과: `results/ch5-7b-bf16-oom.json`
 - OOM이 아닌 오류: network, model format, kernel 문제 확인
-- Grafana: GPU VRAM panel의 최근 5초 최대값 확인
+- Grafana: `http://${GPU_SERVER_IP}:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6`
+- Grafana GPU VRAM panel의 최근 5초 최대값 확인
 
 실패 자체보다 계산한 weight와 실제 GPU memory 사이의 runtime 비용을 확인하는 것이 목적입니다.
 
@@ -116,11 +124,21 @@ docker compose --profile tools run --rm model-loader python3 -m model_loader.loa
 - 저장 결과: `results/ch5-3b-bf16-load.json`
 - 확인값: elapsed time, peak allocated VRAM, peak reserved VRAM
 
-같은 model을 vLLM으로 기동하고 KV cache pool을 확인합니다.
+GPU server에서 같은 model을 vLLM으로 기동합니다.
 
 ```bash
 docker compose --profile bf16 up -d vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 KV cache pool log를 확인합니다.
+
+```bash
 docker compose --profile bf16 logs vllm-bf16 | grep -i "KV cache"
 ```
 

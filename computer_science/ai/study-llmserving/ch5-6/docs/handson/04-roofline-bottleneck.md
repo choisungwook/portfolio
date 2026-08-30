@@ -10,9 +10,16 @@
 공통 환경:
 
 - 선행 실습: [KV cache 배치·시퀀스 실습](./03-kv-cache-batch-sequence.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
 - 이론: [Memory와 roofline 이론](../02-ch5-theory.md)
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 ## 시나리오 1. GPU의 roofline 천장을 측정합니다
 
@@ -149,10 +156,10 @@ GeForce GPU에서는 `DCGM_FI_PROF_DRAM_ACTIVE` 같은 profiling metric이 노�
 
 ### 실습
 
-DCGM Exporter가 profiling metric을 노출하는지 확인합니다.
+Local client에서 DCGM Exporter가 profiling metric을 노출하는지 확인합니다.
 
 ```bash
-curl -s localhost:9400/metrics | grep "^# HELP" | grep PROF
+curl -s "http://${GPU_SERVER_IP}:9400/metrics" | grep "^# HELP" | grep PROF
 ```
 
 아무것도 출력되지 않으면 다음 근거를 함께 사용합니다.
@@ -162,7 +169,13 @@ curl -s localhost:9400/metrics | grep "^# HELP" | grep PROF
 - 실측 token/s와 이론 상한의 거리
 - Running, waiting, queue metric
 
-Grafana의 `Compute vs Bandwidth pressure` panel은 두 값이 함께 낮아 GPU가 쉬는 상황을 찾는 용도로 사용합니다.
+Local client에서 Grafana dashboard를 엽니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
+```
+
+`Compute vs Bandwidth pressure` panel은 두 값이 함께 낮아 GPU가 쉬는 상황을 찾는 용도로 사용합니다.
 
 정리:
 
