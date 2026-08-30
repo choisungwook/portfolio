@@ -1,61 +1,116 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculate, DEFAULT_INPUT, validateInput } from '../src/lib/calculator.js';
+import {
+  calculateVram,
+  DEFAULT_INPUT,
+  DEFAULT_MODEL,
+  detectModelBytes,
+  modelFromConfig,
+  validateInput,
+} from '../src/lib/calculator.js';
 
-test('calculates replicas and leaves an incomplete tensor-parallel group unused', () => {
-  const result = calculate({ ...DEFAULT_INPUT, totalGpus: 5, tensorParallel: 2 });
-  assert.equal(result.replicas, 2);
-  assert.equal(result.allocatedGpus, 4);
-  assert.equal(result.unusedGpus, 1);
+const QWEN_CONFIG = {
+  _name_or_path: 'Qwen/Qwen2.5-7B-Instruct',
+  model_type: 'qwen2',
+  hidden_size: 3584,
+  intermediate_size: 18944,
+  num_attention_heads: 28,
+  num_hidden_layers: 28,
+  num_key_value_heads: 4,
+  tie_word_embeddings: false,
+  torch_dtype: 'bfloat16',
+  vocab_size: 152064,
+};
+
+test('calculates model, KV cache, alpha, and total VRAM', () => {
+  const result = calculateVram(DEFAULT_INPUT, DEFAULT_MODEL);
+  assert.equal(result.errors.length, 0);
+  assert.ok(Math.abs(result.kvGib - 0.4375) < 1e-12);
+  assert.ok(Math.abs(result.alphaGib - ((result.modelGib + result.kvGib) * 0.2)) < 1e-12);
+  assert.ok(Math.abs(result.totalGib - (result.modelGib + result.kvGib + result.alphaGib)) < 1e-12);
 });
 
-test('takes the smaller prefill or decode request budget', () => {
-  const result = calculate(DEFAULT_INPUT);
-  assert.equal(result.prefillRps, 6.5625);
-  assert.equal(result.decodeRps, 4.25);
-  assert.equal(result.maxRps, 4.25);
-  assert.equal(result.bottleneck, 'decode');
-  assert.equal(result.totalTps, 5440);
+test('shows that the default 7B BF16 serving estimate exceeds 16 GiB', () => {
+  const result = calculateVram(DEFAULT_INPUT, DEFAULT_MODEL);
+  assert.equal(result.fits, false);
+  assert.ok(result.totalGib > 16);
+  assert.ok(result.overflowGib > 0);
+  assert.equal(result.remainingGib, 0);
 });
 
-test('applies safety reserve to capacity but reports raw target utilization', () => {
-  const result = calculate(DEFAULT_INPUT);
-  assert.equal(result.safeFactor, 0.8);
-  assert.equal(result.safePrefillTps, 6720);
-  assert.equal(result.safeDecodeTps, 1088);
-  assert.ok(Math.abs(result.prefillUtilization - (1536 / 8400)) < 1e-12);
-  assert.ok(Math.abs(result.decodeUtilization - (384 / 1360)) < 1e-12);
-  assert.equal(result.targetFits, true);
+test('lower model precision can make the same model fit', () => {
+  const result = calculateVram({ ...DEFAULT_INPUT, modelBytes: 0.5 }, DEFAULT_MODEL);
+  assert.equal(result.fits, true);
+  assert.ok(result.remainingGib > 0);
+  assert.equal(result.overflowGib, 0);
 });
 
-test('estimates latency from per-replica rates and measured concurrency', () => {
-  const result = calculate(DEFAULT_INPUT);
-  assert.ok(Math.abs(result.ttftMs - 243.8095238) < 0.001);
-  assert.ok(Math.abs(result.itlMs - 23.5294117) < 0.001);
-  assert.ok(Math.abs(result.generationMs - 6000) < 0.001);
-  assert.ok(Math.abs(result.e2eMs - 6268.8095238) < 0.001);
+test('uses exact Hugging Face parameter metadata when available', () => {
+  const model = modelFromConfig(QWEN_CONFIG, 7_615_616_512);
+  assert.equal(model.parameterCount, 7_615_616_512);
+  assert.equal(model.parameterSource, 'Hugging Face metadata');
+  assert.equal(model.headDim, 128);
 });
 
-test('rounds context to a KV block and calculates standard KV memory', () => {
-  const result = calculate({ ...DEFAULT_INPUT, promptTokens: 1025, outputTokens: 256 });
-  assert.equal(result.contextTokens, 1281);
-  assert.equal(result.roundedContextTokens, 1296);
-  assert.equal(result.kvBytesPerToken, 131072);
-  assert.equal(result.kvRequestMib, 162);
-  assert.equal(result.kvSequencesPerReplica, 151);
-  assert.equal(result.kvSequencesSystem, 302);
+test('estimates common decoder-only parameter counts from config.json', () => {
+  const model = modelFromConfig(QWEN_CONFIG);
+  assert.equal(model.parameterSource, 'Estimated from config.json');
+  assert.ok(model.parameterCount > 7e9);
+  assert.ok(model.parameterCount < 9e9);
 });
 
-test('recommends enough complete replicas for a target above current capacity', () => {
-  const result = calculate({ ...DEFAULT_INPUT, targetRps: 10 });
-  assert.equal(result.targetFits, false);
-  assert.equal(result.recommendedReplicas, 5);
-  assert.equal(result.recommendedGpus, 10);
+test('normalizes supported model types before estimating parameters', () => {
+  const model = modelFromConfig({
+    model_type: ' QWEN2 ',
+    num_hidden_layers: 28,
+    num_attention_heads: 28,
+    num_key_value_heads: 4,
+    hidden_size: 3584,
+    intermediate_size: 18_944,
+    vocab_size: 152_064,
+    tie_word_embeddings: false,
+  });
+
+  assert.equal(model.modelType, 'qwen2');
+  assert.ok(model.parameterCount > 7_000_000_000);
 });
 
-test('rejects invalid numeric and topology inputs', () => {
-  assert.deepEqual(validateInput({ ...DEFAULT_INPUT, tensorParallel: 8 }), ['Tensor parallel cannot exceed total GPUs']);
-  assert.match(validateInput({ ...DEFAULT_INPUT, reservePercent: 100 })[0], /reservePercent/);
-  assert.match(validateInput({ ...DEFAULT_INPUT, promptTokens: 0 })[0], /promptTokens/);
-  assert.match(validateInput({ ...DEFAULT_INPUT, totalGpus: 1.5 })[0], /whole number/);
+test('rejects fractional inferred head dimensions', () => {
+  assert.throws(
+    () => modelFromConfig({
+      model_type: 'llama',
+      num_hidden_layers: 2,
+      num_attention_heads: 3,
+      hidden_size: 10,
+      intermediate_size: 20,
+      vocab_size: 100,
+    }),
+    /head dimension/,
+  );
+});
+
+test('requires manual parameters for an unsupported architecture', () => {
+  const model = modelFromConfig({
+    ...QWEN_CONFIG,
+    model_type: 'custom_model',
+    tie_word_embeddings: true,
+  });
+  assert.equal(model.parameterCount, null);
+  assert.equal(model.parameterSource, 'Manual input required');
+});
+
+test('detects common model precisions from config', () => {
+  assert.equal(detectModelBytes(QWEN_CONFIG), 2);
+  assert.equal(detectModelBytes({ quantization_config: { bits: 8 } }), 1);
+  assert.equal(detectModelBytes({ quantization_config: { bits: 4 } }), 0.5);
+});
+
+test('rejects invalid workload and missing parameter count', () => {
+  const errors = validateInput(
+    { ...DEFAULT_INPUT, contextTokens: 0, concurrentRequests: 1.5 },
+    { ...DEFAULT_MODEL, parameterCount: null },
+  );
+  assert.match(errors.join(' '), /Max context/);
+  assert.match(errors.join(' '), /whole number/);
+  assert.match(errors.join(' '), /parameter count/);
 });

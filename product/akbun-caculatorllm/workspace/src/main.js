@@ -1,225 +1,259 @@
 import './styles.css';
-import { calculate, DEFAULT_INPUT, PRESETS } from './lib/calculator.js';
-
-const STORAGE_KEY = 'akbun-caculatorllm.input.v1';
-const form = document.getElementById('calculator-form');
-const inputs = [...form.querySelectorAll('input')];
-const errorBanner = document.getElementById('error-banner');
-let lastResult = null;
-let lastInput = null;
+import {
+  calculateVram,
+  DEFAULT_INPUT,
+  DEFAULT_MODEL,
+  detectModelBytes,
+  modelFromConfig,
+} from './lib/calculator.js';
 
 const byId = (id) => document.getElementById(id);
-const number = (value, digits = 0) => new Intl.NumberFormat('en-US', {
+const form = byId('calculator-form');
+const errorBanner = byId('error-banner');
+const loadStatus = byId('load-status');
+let model = { ...DEFAULT_MODEL };
+let manualParameterOverride = false;
+
+const number = (value, digits = 2) => new Intl.NumberFormat('en-US', {
   maximumFractionDigits: digits,
   minimumFractionDigits: digits,
 }).format(value);
 
-function compact(value, digits = 1) {
-  return new Intl.NumberFormat('en-US', {
-    notation: value >= 10000 ? 'compact' : 'standard',
-    maximumFractionDigits: digits,
-  }).format(value);
-}
-
-function duration(ms) {
-  if (ms < 1000) return `${number(ms, ms < 10 ? 1 : 0)} ms`;
-  return `${number(ms / 1000, 2)} s`;
-}
+const compactInteger = (value) => new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+}).format(value);
 
 function readInput() {
-  return Object.fromEntries(inputs.map((input) => [input.name, Number(input.value)]));
+  const selectedGpu = byId('gpu-gib').value;
+  return {
+    gpuGib: Number(selectedGpu === 'custom' ? byId('custom-gpu-gib').value : selectedGpu),
+    contextTokens: Number(byId('context-tokens').value),
+    concurrentRequests: Number(byId('concurrent-requests').value),
+    modelBytes: Number(byId('model-bytes').value),
+    kvBytes: Number(byId('kv-bytes').value),
+    alphaPercent: Number(byId('alpha-percent').value),
+  };
 }
 
-function writeInput(values) {
-  for (const input of inputs) {
-    if (values[input.name] !== undefined) input.value = values[input.name];
-  }
-}
-
-function loadInput() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (stored && typeof stored === 'object') writeInput({ ...DEFAULT_INPUT, ...stored });
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-}
-
-function utilizationClass(value) {
-  if (value > 1) return 'danger';
-  if (value > 0.8) return 'warning';
-  return 'healthy';
-}
-
-function setFill(id, value) {
-  const element = byId(id);
-  const percent = Math.max(0, Math.min(100, value * 100));
-  element.style.width = `${percent}%`;
-  element.className = utilizationClass(value);
-}
-
-function renderError(errors) {
+function renderError(message) {
+  errorBanner.textContent = message;
   errorBanner.hidden = false;
-  errorBanner.textContent = errors[0];
-  document.querySelectorAll('.results-panel article, .interpretation').forEach((element) => {
-    element.classList.add('results-disabled');
-  });
 }
 
 function clearError() {
+  errorBanner.textContent = '';
   errorBanner.hidden = true;
-  document.querySelectorAll('.results-disabled').forEach((element) => {
-    element.classList.remove('results-disabled');
-  });
+}
+
+function setText(id, value) {
+  byId(id).textContent = value;
+}
+
+function setModel(nextModel, config = null) {
+  model = nextModel;
+  manualParameterOverride = false;
+  if (Number.isFinite(model.parameterCount)) {
+    byId('parameter-billions').value = number(model.parameterCount / 1e9, 3);
+  } else {
+    byId('parameter-billions').value = '';
+    byId('advanced-settings').open = true;
+  }
+  if (config) byId('model-bytes').value = String(detectModelBytes(config));
+  setText('parameter-source', `${model.parameterSource}.`);
+  setText(
+    'model-shape',
+    `${model.layers} layers · ${model.kvHeads} KV heads · ${number(model.headDim, 0)} head dimension · ${model.modelType}`,
+  );
+  update();
+}
+
+function setLayer(labelId, liquidId, gib, capacityGib, scale, lowerDisplayPercent) {
+  const rawPercent = (gib / capacityGib) * 100;
+  const displayPercent = rawPercent * scale;
+  const liquid = byId(liquidId);
+  liquid.style.flexBasis = `${displayPercent}%`;
+
+  const label = byId(labelId);
+  label.style.bottom = `${13 + ((lowerDisplayPercent + (displayPercent / 2)) * 0.7)}%`;
+  label.hidden = displayPercent < 10;
+  return lowerDisplayPercent + displayPercent;
+}
+
+function renderJar(input, result) {
+  const rawTotalPercent = result.utilization * 100;
+  const displayTotalPercent = Math.min(rawTotalPercent, 128);
+  const scale = rawTotalPercent > 0 ? displayTotalPercent / rawTotalPercent : 1;
+  let lowerDisplayPercent = 0;
+
+  lowerDisplayPercent = setLayer('extra-layer-label', 'extra-liquid', result.alphaGib, input.gpuGib, scale, lowerDisplayPercent);
+  lowerDisplayPercent = setLayer('kv-layer-label', 'kv-liquid', result.kvGib, input.gpuGib, scale, lowerDisplayPercent);
+  setLayer('model-layer-label', 'model-liquid', result.modelGib, input.gpuGib, scale, lowerDisplayPercent);
+
+  setText('jar-model', `${number(result.modelGib, 1)} GiB`);
+  setText('jar-kv', `${number(result.kvGib, 1)} GiB`);
+  setText('jar-extra', `${number(result.alphaGib, 1)} GiB`);
+  setText('capacity-label', `${number(input.gpuGib, input.gpuGib % 1 ? 1 : 0)} GiB`);
+
+  const stage = byId('jar-stage');
+  stage.classList.toggle('oom', !result.fits);
+  byId('overflow-label').hidden = result.fits;
+  stage.querySelector('.jar-image').alt = `Glass jar showing ${number(result.utilization * 100, 0)}% of GPU VRAM used`;
+}
+
+function renderResult(input, result) {
+  const fitStatus = byId('fit-status');
+  fitStatus.textContent = result.fits ? 'Fits' : 'Out of memory';
+  fitStatus.className = result.fits ? 'fits' : 'oom';
+  byId('jar-stage').classList.toggle('fits', result.fits);
+
+  setText('total-needed', `${number(result.totalGib, 1)} GiB`);
+  setText('total-available', `${number(result.capacityGib, 1)} GiB`);
+  setText('difference-label', result.fits ? 'Free' : 'Over');
+  setText('difference-value', `${number(result.fits ? result.remainingGib : result.overflowGib, 1)} GiB`);
+  setText(
+    'plain-verdict',
+    result.fits
+      ? `The model can load with ${number(result.remainingGib, 1)} GiB left for variance.`
+      : `The estimate is ${number(result.overflowGib, 1)} GiB larger than this GPU.`,
+  );
+
+  renderJar(input, result);
 }
 
 function renderFormulae(input, result) {
-  byId('rps-formula').innerHTML = `
-    <p><strong>Safe prefill RPS</strong><code>(${number(input.prefillTps)} × ${result.replicas} replicas × ${number(result.safeFactor, 2)}) ÷ ${number(input.promptTokens)} = ${number(result.prefillRps, 2)} req/s</code></p>
-    <p><strong>Safe decode RPS</strong><code>(${number(input.decodeTps)} × ${result.replicas} replicas × ${number(result.safeFactor, 2)}) ÷ ${number(input.outputTokens)} = ${number(result.decodeRps, 2)} req/s</code></p>
-    <p>The lower of the two budgets is the sustainable limit.</p>`;
-
-  byId('latency-formula').innerHTML = `
-    <p><strong>TTFT estimate</strong><code>${number(input.promptTokens)} prompt tokens ÷ ${number(input.prefillTps)} prefill tok/s = ${duration(result.ttftMs)}</code></p>
-    <p><strong>Inter-token latency</strong><code>${number(input.decodeConcurrency)} active sequences ÷ ${number(input.decodeTps)} decode tok/s = ${duration(result.itlMs)}</code></p>
-    <p><strong>Generation time</strong><code>(${number(input.outputTokens)} − 1) × ${duration(result.itlMs)} = ${duration(result.generationMs)}</code></p>
-    <p>TTFT is an optimistic service-time estimate. Actual batching, scheduling, prefix caching, token-length variance, and queueing alter latency.</p>`;
-
-  byId('kv-formula').innerHTML = `
-    <p><strong>Bytes per token</strong><code>2 (K + V) × ${number(input.layers)} layers × ${number(input.kvHeads)} KV heads × ${number(input.headDim)} head dim × ${number(input.kvBytes, 2)} bytes = ${compact(result.kvBytesPerToken)} bytes</code></p>
-    <p><strong>Request allocation</strong><code>ceil(${number(result.contextTokens)} ÷ ${number(input.blockSize)}) × ${number(input.blockSize)} = ${number(result.roundedContextTokens)} tokens = ${number(result.kvRequestMib, 1)} MiB</code></p>
-    <p><strong>Sequence ceiling</strong><code>floor(${number(input.kvCacheGib, 1)} GiB ÷ ${number(result.kvRequestMib, 1)} MiB) × ${result.replicas} replicas = ${number(result.kvSequencesSystem)} sequences</code></p>`;
-}
-
-function renderInterpretation(input, result) {
-  const targetText = result.targetFits
-    ? `The ${number(input.targetRps, 2)} req/s target fits with ${number((1 - result.targetSafeRatio) * 100, 0)}% safe-capacity headroom.`
-    : `The target exceeds safe capacity. At least ${result.recommendedReplicas} replicas (${result.recommendedGpus} GPUs at TP=${input.tensorParallel}) are estimated for this workload.`;
-  const unusedText = result.unusedGpus
-    ? `${result.unusedGpus} GPU cannot form a complete TP=${input.tensorParallel} replica and is excluded.`
-    : `All ${result.allocatedGpus} GPUs form complete serving replicas.`;
-  byId('interpretation').innerHTML = `
-    <span class="note-icon dark" aria-hidden="true">→</span>
-    <div><strong>${result.bottleneck === 'prefill' ? 'Prompt processing' : 'Token generation'} is the limiting budget.</strong><p>${targetText} ${unusedText}</p></div>`;
-}
-
-function render(input, result) {
-  clearError();
-  lastInput = input;
-  lastResult = result;
-
-  byId('max-rps').textContent = number(result.maxRps, 2);
-  byId('bottleneck-badge').textContent = `${result.bottleneck.toUpperCase()} BOUND`;
-  byId('target-status').textContent = result.targetFits ? 'Target fits' : 'Target exceeds capacity';
-  byId('target-status').className = result.targetFits ? 'fit' : 'miss';
-  byId('target-ratio').textContent = `${number(result.targetSafeRatio * 100, 0)}% of safe capacity`;
-  byId('target-fill').style.width = `${Math.min(100, result.targetSafeRatio * 100)}%`;
-  byId('target-fill').className = result.targetFits ? '' : 'over';
-  byId('target-marker').style.left = `${Math.min(100, result.targetSafeRatio * 100)}%`;
-
-  byId('total-tps').textContent = compact(result.totalTps);
-  byId('requests-hour').textContent = compact(result.requestsPerHour);
-  byId('replicas').textContent = String(result.replicas);
-  byId('replicas-note').textContent = `${result.allocatedGpus} GPUs allocated${result.unusedGpus ? ` · ${result.unusedGpus} unused` : ''}`;
-  byId('tps-gpu').textContent = compact(result.tpsPerGpu);
-
-  byId('prefill-util').textContent = `${number(result.prefillUtilization * 100, 0)}%`;
-  byId('decode-util').textContent = `${number(result.decodeUtilization * 100, 0)}%`;
-  byId('prefill-util').className = utilizationClass(result.prefillUtilization);
-  byId('decode-util').className = utilizationClass(result.decodeUtilization);
-  setFill('prefill-fill', result.prefillUtilization);
-  setFill('decode-fill', result.decodeUtilization);
-  byId('prefill-capacity').textContent = `${number(result.rawPrefillTps)} tok/s raw · ${number(result.safePrefillTps)} safe`;
-  byId('decode-capacity').textContent = `${number(result.rawDecodeTps)} tok/s raw · ${number(result.safeDecodeTps)} safe`;
-  const targetVerdict = byId('target-verdict');
-  targetVerdict.textContent = result.targetFits ? 'READY' : 'OVER TARGET';
-  targetVerdict.className = `verdict ${result.targetFits ? '' : 'danger'}`;
-
-  byId('ttft').textContent = duration(result.ttftMs);
-  byId('itl').textContent = duration(result.itlMs);
-  byId('e2e').textContent = duration(result.e2eMs);
-  byId('output-speed').textContent = `${number(result.outputSpeed, 1)} tok/s`;
-  const latencyTotal = result.e2eMs || 1;
-  byId('ttft-segment').style.flexGrow = Math.max(0.03, result.ttftMs / latencyTotal);
-  byId('decode-segment').style.flexGrow = Math.max(0.03, result.generationMs / latencyTotal);
-  byId('overhead-segment').style.flexGrow = Math.max(0.03, input.overheadMs / latencyTotal);
-
-  byId('kv-sequences').textContent = number(result.kvSequencesSystem);
-  byId('kv-request').textContent = `${number(result.kvRequestMib, 1)} MiB`;
-  byId('kv-pressure').textContent = `${number(result.kvPressure * 100, 0)}%`;
-  byId('kv-pressure').className = `kv-pressure ${utilizationClass(result.kvPressure)}`;
-  byId('kv-summary').textContent = `Target traffic implies about ${number(result.targetConcurrency, 1)} in-flight inference requests. The memory estimate allows ${number(result.kvSequencesPerReplica)} full-length sequences per replica before runtime overhead.`;
-
-  renderFormulae(input, result);
-  renderInterpretation(input, result);
+  const parameterBillions = model.parameterCount / 1e9;
+  setText(
+    'model-formula',
+    `${number(parameterBillions, 3)}B parameters × ${number(input.modelBytes, 1)} bytes ÷ 1,073,741,824`,
+  );
+  setText(
+    'kv-formula',
+    `2 (K + V) × ${compactInteger(model.layers)} layers × ${compactInteger(model.kvHeads)} KV heads × ${compactInteger(model.headDim)} head dim × ${number(input.kvBytes, 1)} bytes × ${compactInteger(input.contextTokens)} tokens × ${compactInteger(input.concurrentRequests)} ${input.concurrentRequests === 1 ? 'request' : 'requests'}`,
+  );
+  setText(
+    'extra-formula',
+    `(${number(result.modelGib, 2)} GiB model + ${number(result.kvGib, 2)} GiB KV) × ${number(input.alphaPercent, 0)}%`,
+  );
+  setText(
+    'total-formula',
+    `${number(result.modelGib, 2)} GiB + ${number(result.kvGib, 2)} GiB + ${number(result.alphaGib, 2)} GiB`,
+  );
+  setText('model-result', `${number(result.modelGib, 2)} GiB`);
+  setText('kv-result', `${number(result.kvGib, 2)} GiB`);
+  setText('extra-result', `${number(result.alphaGib, 2)} GiB`);
+  setText('total-result', `${number(result.totalGib, 2)} GiB`);
 }
 
 function update() {
+  if (manualParameterOverride || !Number.isFinite(model.parameterCount)) {
+    const parameterBillions = Number(byId('parameter-billions').value);
+    model = {
+      ...model,
+      parameterCount: Number.isFinite(parameterBillions) && parameterBillions > 0
+        ? parameterBillions * 1e9
+        : null,
+    };
+  }
   const input = readInput();
-  const result = calculate(input);
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(input)); } catch { /* private mode */ }
+  const result = calculateVram(input, model);
   if (result.errors.length) {
-    lastResult = null;
-    renderError(result.errors);
+    renderError(result.errors[0]);
     return;
   }
-  render(input, result);
+
+  clearError();
+  renderResult(input, result);
+  renderFormulae(input, result);
 }
 
-function summaryText(input, result) {
-  return [
-    'akbun caculatorllm — serving capacity estimate',
-    `Workload: ${number(input.promptTokens)} prompt + ${number(input.outputTokens)} output tokens`,
-    `Deployment: ${result.replicas} replicas, TP=${input.tensorParallel}, ${result.allocatedGpus} GPUs, ${input.reservePercent}% reserve`,
-    `Sustainable load: ${number(result.maxRps, 2)} req/s (${result.bottleneck} bound)`,
-    `Throughput: ${number(result.totalTps)} total tok/s · ${number(result.requestsPerHour)} req/hour`,
-    `Latency estimate: TTFT ${duration(result.ttftMs)} · ITL ${duration(result.itlMs)} · E2E ${duration(result.e2eMs)}`,
-    `Target: ${number(input.targetRps, 2)} req/s · ${result.targetFits ? 'fits safe capacity' : 'exceeds safe capacity'}`,
-    `KV cache: ${number(result.kvSequencesSystem)} full-length sequences · ${number(result.kvRequestMib, 1)} MiB/request`,
-    'Assumption: measured rates match the production workload; this is not a benchmark or queueing simulation.',
-  ].join('\n');
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Hugging Face returned ${response.status}.`);
+  return response.json();
 }
 
-form.addEventListener('input', () => {
-  document.querySelectorAll('.preset').forEach((button) => button.classList.remove('active'));
-  update();
-});
+async function loadHuggingFaceModel() {
+  const modelId = byId('model-id').value.trim();
+  if (!modelId || !modelId.includes('/')) {
+    renderError('Enter a Hugging Face model ID such as Qwen/Qwen2.5-7B-Instruct.');
+    return;
+  }
 
-document.querySelectorAll('.preset').forEach((button) => {
-  button.addEventListener('click', () => {
-    writeInput(PRESETS[button.dataset.preset]);
-    document.querySelectorAll('.preset').forEach((item) => item.classList.toggle('active', item === button));
-    update();
-  });
-});
+  const path = modelId.split('/').map(encodeURIComponent).join('/');
+  const button = byId('load-model');
+  button.disabled = true;
+  button.textContent = 'Loading…';
+  loadStatus.textContent = 'Reading config.json and model metadata…';
+  clearError();
 
-document.getElementById('reset-button').addEventListener('click', () => {
-  writeInput(DEFAULT_INPUT);
-  document.querySelectorAll('.preset').forEach((button) => button.classList.toggle('active', button.dataset.preset === 'chat'));
-  update();
-});
-
-document.querySelectorAll('[data-formula-toggle]').forEach((button) => {
-  button.addEventListener('click', () => {
-    const target = byId(button.dataset.formulaToggle);
-    const open = target.hidden;
-    target.hidden = !open;
-    button.setAttribute('aria-expanded', String(open));
-    button.textContent = open ? 'Hide calculation' : button.dataset.formulaToggle === 'latency-formula' ? 'Show assumptions' : button.dataset.formulaToggle === 'kv-formula' ? 'Show memory formula' : 'Show calculation';
-  });
-});
-
-document.getElementById('copy-button').addEventListener('click', async (event) => {
-  if (!lastResult) return;
-  const button = event.currentTarget;
   try {
-    await navigator.clipboard.writeText(summaryText(lastInput, lastResult));
-    button.textContent = 'Copied';
-    setTimeout(() => { button.textContent = 'Copy summary'; }, 1400);
-  } catch {
-    button.textContent = 'Copy unavailable';
+    const config = await fetchJson(`https://huggingface.co/${path}/resolve/main/config.json`);
+    let exactParameterCount = null;
+    try {
+      const metadata = await fetchJson(`https://huggingface.co/api/models/${path}`);
+      exactParameterCount = Number(metadata.safetensors?.total) || null;
+    } catch {
+      exactParameterCount = null;
+    }
+    const nextModel = modelFromConfig(config, exactParameterCount, modelId);
+    nextModel.id = modelId;
+    byId('model-id').value = modelId;
+    setModel(nextModel, config);
+    loadStatus.textContent = `${modelId} loaded.`;
+  } catch (error) {
+    renderError(error instanceof Error ? error.message : 'Could not load this model.');
+    loadStatus.textContent = 'Model not loaded.';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Load';
+  }
+}
+
+async function loadConfigFile(file) {
+  clearError();
+  loadStatus.textContent = `Reading ${file.name}…`;
+  try {
+    const config = JSON.parse(await file.text());
+    const nextModel = modelFromConfig(config, null, file.name);
+    byId('model-id').value = config._name_or_path || file.name;
+    setModel(nextModel, config);
+    loadStatus.textContent = `${file.name} loaded.`;
+  } catch (error) {
+    renderError(error instanceof Error ? error.message : 'Could not read config.json.');
+    loadStatus.textContent = 'Config not loaded.';
+  }
+}
+
+form.addEventListener('input', (event) => {
+  if (event.target.id === 'model-id' || event.target.id === 'config-file') return;
+  if (event.target.id === 'parameter-billions') {
+    manualParameterOverride = true;
+    model.parameterSource = 'Manual input';
+    setText('parameter-source', 'Manual input.');
+  }
+  update();
+});
+
+byId('gpu-gib').addEventListener('change', () => {
+  byId('custom-gpu-field').hidden = byId('gpu-gib').value !== 'custom';
+  update();
+});
+
+byId('load-model').addEventListener('click', loadHuggingFaceModel);
+byId('model-id').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    loadHuggingFaceModel();
   }
 });
+byId('config-file').addEventListener('change', (event) => {
+  const [file] = event.target.files;
+  if (file) loadConfigFile(file);
+});
 
-loadInput();
+setModel({ ...DEFAULT_MODEL });
+Object.entries(DEFAULT_INPUT).forEach(([key, value]) => {
+  const input = form.elements.namedItem(key);
+  if (input) input.value = String(value);
+});
 update();
