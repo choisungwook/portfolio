@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.4.0
+
+- Reworked the heading hierarchy around the estimator, model, stages, and results.
+- Placed each desktop memory visualization and result side by side.
+- Kept the stage content stacked on mobile screens.
+
 ## 0.3.0
 
 - Split the estimator into Load Model and Run a Workload calculations.

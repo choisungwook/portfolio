@@ -20,15 +20,14 @@
 
   <main>
     <section class="intro" aria-labelledby="page-title">
-      <p class="eyebrow">SINGLE-GPU LLM VRAM ESTIMATOR</p>
-      <h1 id="page-title">Will it fit?</h1>
+      <h1 id="page-title">SINGLE-GPU LLM VRAM ESTIMATOR</h1>
+      <h2>Will it fit?</h2>
     </section>
 
     <form id="calculator-form" novalidate>
       <section class="page-section model-information" aria-labelledby="model-information-title">
         <div class="section-heading">
-          <p class="section-number">MODEL</p>
-          <h2 id="model-information-title">Model information</h2>
+          <h1 id="model-information-title">Model information</h1>
         </div>
 
         <div class="model-information-grid">
@@ -118,9 +117,9 @@
       </section>
 
       <section class="page-section memory-panel" aria-labelledby="load-model-title">
-        <div class="section-heading">
-          <p class="section-number">01 · MODEL WEIGHTS ONLY</p>
-          <h2 id="load-model-title">Load Model</h2>
+        <div class="section-heading stage-heading">
+          <h1 id="load-model-title">01 · MODEL WEIGHTS ONLY</h1>
+          <h2>Load Model</h2>
         </div>
 
         <div class="result-layout">
@@ -143,7 +142,7 @@
           </div>
 
           <div class="status-column">
-            <p class="result-kicker">LOAD RESULT</p>
+            <h2 class="result-kicker">LOAD RESULT</h2>
             <h3 id="load-fit-status">Fits</h3>
             <dl class="result-totals">
               <div><dt>Needed</dt><dd id="load-total-needed">0 GiB</dd></div>
@@ -156,9 +155,9 @@
       </section>
 
       <section class="page-section memory-panel workload-panel" aria-labelledby="workload-title">
-        <div class="section-heading">
-          <p class="section-number">02 · MODEL + WORKLOAD MEMORY</p>
-          <h2 id="workload-title">Run a Workload</h2>
+        <div class="section-heading stage-heading">
+          <h1 id="workload-title">02 · MODEL + WORKLOAD MEMORY</h1>
+          <h2>Run a Workload</h2>
         </div>
 
         <div class="workload-layout">
@@ -218,7 +217,7 @@
           </div>
 
           <div class="status-column">
-            <p class="result-kicker">WORKLOAD RESULT</p>
+            <h2 class="result-kicker">WORKLOAD RESULT</h2>
             <h3 id="workload-fit-status">Out of memory</h3>
             <dl class="result-totals">
               <div><dt>Needed</dt><dd id="workload-total-needed">0 GiB</dd></div>
