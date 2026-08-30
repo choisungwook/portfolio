@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.5.0
+
+- Kept a single H1 for the page title and shifted section headings down one level.
+- Removed redundant action, formula, and tagline labels.
+- Kept the highlighted page title on one line at every responsive size.
+
 ## 0.4.0
 
 - Reworked the heading hierarchy around the estimator, model, stages, and results.
