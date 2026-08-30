@@ -45,7 +45,7 @@ LiteLLM을 전혀 모르는 사람을 위한 3시간 학습 가이드와 실습 
 - 폐쇄망 트랙에 인터넷 경로(IGW 라우트, NAT, public IP)를 추가하지 않는다. 이 조건이 핸즈온의 존재 이유다.
 - LiteLLM은 일부 기능이 enterprise tier다. 문서를 쓸 때 OSS/enterprise 경계를 docs.litellm.ai에서 확인해 명시한다.
 - API key(.env, terraform.tfvars)는 커밋하지 않는다. 예시 파일(.env.example, terraform.tfvars.example)만 둔다.
-- Terraform은 [.claude/rules/terraform.md](../../../.claude/rules/terraform.md)를 따르되, 새 VPC 생성은 사용자가 명시 요청한 예외다.
+- Terraform은 [.claude/rule-details/terraform.md](../../../.claude/rule-details/terraform.md)를 따르되, 새 VPC 생성은 사용자가 명시 요청한 예외다.
 - commit·push·PR·Issue는 사용자가 명시적으로 지시할 때만 한다.
 
 ## 미완 작업

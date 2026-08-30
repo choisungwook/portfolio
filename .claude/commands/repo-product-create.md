@@ -40,7 +40,7 @@ product/<name>/
 
 ## Choosing the stack
 
-Default to Tauri, in plain JavaScript with no build step, following .claude/rules/tauri.md. Reuse akbun-folderview. It ships an installer under 10 MB against roughly 90 MB for the same app in Electron, the page is ordinary HTML and CSS, and the release action produces the installer, the signature and the update manifest in one step.
+Default to Tauri, in plain JavaScript with no build step, following .claude/rule-details/tauri.md. Reuse akbun-folderview. It ships an installer under 10 MB against roughly 90 MB for the same app in Electron, the page is ordinary HTML and CSS, and the release action produces the installer, the signature and the update manifest in one step.
 
 Choose Electron instead when one of these is true, and record which one in an ADR:
 
@@ -55,7 +55,7 @@ Swift is a third option and almost always the wrong one. akbun-mactaskbar went n
 
 ## Self update in Electron
 
-Only for the Electron path; Tauri uses the updater plugin described in .claude/rules/tauri.md.
+Only for the Electron path; Tauri uses the updater plugin described in .claude/rule-details/tauri.md.
 
 On macOS, Squirrel.Mac cannot install an unsigned build, so copy the working implementation instead of inventing one: akbun-k8supgradeview/workspace/src/main/update.ts with its main.ts update flow and its disk leak test. akbun-mactaskbar/workspace/src/update.js is the same code as plain JavaScript.
 
@@ -73,5 +73,5 @@ Reach it from the app menu or the tray context menu as "Check for Updates…".
 
 ## Rules
 
-- Follow .claude/rules/product.md, markdown.md, and the stack rules: tauri.md by default, electron.md when the reasons above apply.
+- Follow .claude/rule-details/product.md, markdown.md, and the stack rules: tauri.md by default, electron.md when the reasons above apply.
 - Do not commit, push, or create Issues/PRs unless the user explicitly asks; /repo-pr-create handles that.

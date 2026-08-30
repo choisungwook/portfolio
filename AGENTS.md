@@ -5,9 +5,18 @@
 - 핸즈온 실습과 공부 노트 저장소다. 문서는 핸즈온 절차와 그에 필요한 이론만 담는다. 원리를 이해하고 재현할 수 있으면 충분하다.
 - 이 저장소는 공개되므로 코드와 문서에 문맥상 민감한 정보를 쓰지 않는다. 실습은 기술 자체로 성립하도록 쓴다.
 
-## 코드 규칙
+## 규칙 로딩
 
-코드 작성 규칙은 `.claude/rules/`에 있다. 작업 대상에 해당하는 파일을 따른다.
+규칙은 두 곳에 나뉘어 있다. 컨텍스트를 예산으로 다루기 위해서다.
+
+- `.claude/rules/`는 매 세션 자동으로 주입된다. 글쓰기 철학, Markdown, knowledge, 작업 흐름처럼 거의 모든 작업에 걸리는 규칙만 둔다.
+- `.claude/rule-details/`는 자동으로 주입되지 않는다. Terraform, Kubernetes, Tauri, Electron, Python, product, GitHub 도구처럼 특정 작업에만 걸리는 규칙이다.
+
+**MANDATORY**: 작업이 `.claude/rule-details/`의 어느 영역에 닿으면, 그 영역의 파일을 **파일을 편집하기 전에 읽는다**. 어느 작업에 어느 파일이 걸리는지는 [.claude/rules/index.md](./.claude/rules/index.md)의 표에 있다.
+
+- 규칙을 읽지 않고 한 작업은 그 자체로 결함이다. 규칙에 적힌 것은 대부분 이미 밟은 지뢰다.
+- 편집한 뒤에 읽는 것은 늦다. 그때는 이미 규칙과 어긋난 코드가 있다.
+- 이전 세션에서 읽은 것은 이번 세션에서 읽은 것이 아니다. 기억으로 대신하지 않는다.
 
 ## 문서 작성 규칙
 
@@ -34,6 +43,8 @@
 
 ## 지식 축적
 
+**MANDATORY**: 이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. `wiki/`나 `adr/`가 있으면 그 index도 읽는다. 여기에는 코드와 git history가 기록하지 못한 결정의 이유가 있고, 읽지 않으면 이미 버려진 방법을 다시 고른다.
+
 작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 작업한 디렉터리 안의 `knowledge/`에 기록해 다음 작업의 컨텍스트로 재사용한다. workspace마다 자기 `knowledge/`를 가지며 루트에는 두지 않는다. 형식 템플릿은 [templates/knowledge/](./templates/knowledge/index.md)이고, 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
 
 ## 검증
@@ -56,8 +67,10 @@
 
 ## 작업 흐름
 
+단계가 3개를 넘는 작업은 실행 계획을 `.claude/work/<branch>.md`에 남기고, 단계를 끝낸 그 인터랙션에서 체크박스를 갱신한다. 세션이 끊긴 뒤 재개하는 유일한 진입점이다. 형식과 삭제 시점은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)의 "작업 상태 파일"에 있다.
+
 PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓰기 전에 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
 
 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다.
 
-GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rules/github-tools.md](./.claude/rules/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.
+GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.

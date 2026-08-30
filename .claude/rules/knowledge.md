@@ -25,7 +25,7 @@ PR을 만들기 직전에 이번 작업에서 남길 지식이 있는지 검토�
 
 - 코드, git history, 핸즈온 문서가 이미 기록하는 내용
 - 이번 작업에만 유효한 일회성 정보와 대화 맥락
-- `.claude/rules/`에 이미 규칙으로 존재하는 내용 (규칙의 "이유"는 decision으로 기록할 수 있다)
+- `.claude/rules/`나 `.claude/rule-details/`에 이미 규칙으로 존재하는 내용 (규칙의 "이유"는 decision으로 기록할 수 있다)
 
 ## Concept 작성 형식
 

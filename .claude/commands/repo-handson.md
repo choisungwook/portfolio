@@ -60,7 +60,7 @@ workspace 루트에 `AGENTS.md`를 만들고 다음을 담는다.
 ## VM이 필요할 때
 
 - AWS EC2를 쓰고 기본은 arm 인스턴스(t4g.medium)로 한다. 사용자가 x86을 요청하면 t3.medium을 쓰고 AMI 아키텍처도 함께 바꾼다.
-- terraform 작성 규칙은 [.claude/rules/terraform.md](../rules/terraform.md)를 따른다.
+- terraform 작성 규칙은 [.claude/rule-details/terraform.md](../rule-details/terraform.md)를 따른다.
 
 ## 멈추는 지점
 

@@ -21,4 +21,4 @@ timestamp: 2026-08-16T12:10:00Z
 
 ## Citations
 
-1. [.claude/rules/tauri.md](../../../../.claude/rules/tauri.md) - 순수 모델은 별도 crate에 두고 파일 형식 이름을 그대로 사용
+1. [.claude/rule-details/tauri.md](../../../../.claude/rule-details/tauri.md) - 순수 모델은 별도 crate에 두고 파일 형식 이름을 그대로 사용
