@@ -341,7 +341,10 @@ pub fn create_branch(repo_path: String, name: String, start_point: String) -> Re
 pub fn delete_branches(repo_path: String, names: Vec<String>) -> BranchDeletionResult {
     let mut result = BranchDeletionResult::default();
     for name in names {
-        let deletion = run_git(&repo_path, &["branch".into(), "-D".into(), name.clone()]);
+        let deletion = run_git(
+            &repo_path,
+            &["branch".into(), "-D".into(), "--".into(), name.clone()],
+        );
         match deletion {
             Ok(_) => result.deleted.push(name),
             Err(error) => result.failed.push(BranchDeletionFailure { name, error }),
