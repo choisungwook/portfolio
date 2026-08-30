@@ -16,13 +16,17 @@ Repository root에서 workspace로 이동합니다.
 cd computer_science/ai/study-llmserving/ch5-6
 ```
 
-이전 실습의 model process를 정리하고 desktop baseline을 확인합니다.
+## 실습 전 GPU process를 정리합니다
+
+이전 실습과 다른 workload가 사용하는 GPU compute process를 정리하고 desktop baseline을 확인합니다.
 
 ```bash
 make gpu-reset
 ```
 
-VRAM이 0MiB가 아니어도 compute process가 없으면 정상입니다. 상세 판정은 [GPU 실습 troubleshooting](../troubleshooting.md)에 있습니다.
+명령이 남은 process를 출력하고 실패하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`을 다시 실행합니다.
+
+VRAM이 0MiB가 아니어도 compute process가 없으면 정상입니다.
 
 ## 먼저 host의 기준값을 고정합니다
 

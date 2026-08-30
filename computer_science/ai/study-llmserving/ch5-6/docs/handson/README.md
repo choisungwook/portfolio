@@ -13,6 +13,8 @@ make observability-check
 
 Desktop GPU는 화면 출력 때문에 baseline VRAM이 0MiB가 아닙니다. 초기화 기준과 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
 
+`make gpu-reset`이 남은 compute process를 출력하고 실패하면 실습을 진행하지 않습니다. [process 실행 주체 확인과 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`부터 다시 실행합니다.
+
 ## Chapter 5만 볼 때
 
 Chapter 5는 "이 GPU에 이 model이 들어가는가, 느리다면 연산인가 대역폭인가"를 다룹니다. 이론을 먼저 읽고 세 실습을 순서대로 합니다.
