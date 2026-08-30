@@ -33,9 +33,15 @@ function firstNumber(config, keys) {
   return null;
 }
 
+function normalizeModelType(value) {
+  return String(value ?? 'unknown').trim().toLowerCase();
+}
+
 function isGatedMlp(config) {
   const activation = String(config.hidden_act ?? config.activation_function ?? '').toLowerCase();
-  return GATED_MODEL_TYPES.has(config.model_type) || activation.includes('silu') || activation.includes('swish');
+  return GATED_MODEL_TYPES.has(normalizeModelType(config.model_type))
+    || activation.includes('silu')
+    || activation.includes('swish');
 }
 
 export function estimateParameterCount(config, shape) {
@@ -66,8 +72,11 @@ export function modelFromConfig(config, exactParameterCount = null, fallbackId =
   const attentionHeads = firstNumber(config, ['num_attention_heads', 'n_head']);
   const hiddenSize = firstNumber(config, ['hidden_size', 'n_embd', 'd_model']);
   const kvHeads = firstNumber(config, ['num_key_value_heads', 'n_head_kv']) ?? attentionHeads;
-  const headDim = firstNumber(config, ['head_dim'])
-    ?? (hiddenSize && attentionHeads ? hiddenSize / attentionHeads : null);
+  const explicitHeadDim = firstNumber(config, ['head_dim']);
+  const inferredHeadDim = hiddenSize && attentionHeads && hiddenSize % attentionHeads === 0
+    ? hiddenSize / attentionHeads
+    : null;
+  const headDim = explicitHeadDim ?? inferredHeadDim;
 
   const missing = [
     ['layers', layers],
@@ -75,7 +84,7 @@ export function modelFromConfig(config, exactParameterCount = null, fallbackId =
     ['KV heads', kvHeads],
     ['hidden size', hiddenSize],
     ['head dimension', headDim],
-  ].filter(([, value]) => !Number.isFinite(value) || value <= 0).map(([name]) => name);
+  ].filter(([, value]) => !Number.isInteger(value) || value <= 0).map(([name]) => name);
 
   if (missing.length) {
     throw new Error(`config.json is missing ${missing.join(', ')}.`);
@@ -88,7 +97,7 @@ export function modelFromConfig(config, exactParameterCount = null, fallbackId =
     kvHeads,
     hiddenSize,
     headDim,
-    modelType: String(config.model_type ?? 'unknown'),
+    modelType: normalizeModelType(config.model_type),
   };
   const embeddedParameterCount = firstNumber(config, [
     'num_parameters', 'parameter_count', 'n_params', 'num_params',

@@ -59,6 +59,36 @@ test('estimates common decoder-only parameter counts from config.json', () => {
   assert.ok(model.parameterCount < 9e9);
 });
 
+test('normalizes supported model types before estimating parameters', () => {
+  const model = modelFromConfig({
+    model_type: ' QWEN2 ',
+    num_hidden_layers: 28,
+    num_attention_heads: 28,
+    num_key_value_heads: 4,
+    hidden_size: 3584,
+    intermediate_size: 18_944,
+    vocab_size: 152_064,
+    tie_word_embeddings: false,
+  });
+
+  assert.equal(model.modelType, 'qwen2');
+  assert.ok(model.parameterCount > 7_000_000_000);
+});
+
+test('rejects fractional inferred head dimensions', () => {
+  assert.throws(
+    () => modelFromConfig({
+      model_type: 'llama',
+      num_hidden_layers: 2,
+      num_attention_heads: 3,
+      hidden_size: 10,
+      intermediate_size: 20,
+      vocab_size: 100,
+    }),
+    /head dimension/,
+  );
+});
+
 test('requires manual parameters for an unsupported architecture', () => {
   const model = modelFromConfig({
     ...QWEN_CONFIG,
