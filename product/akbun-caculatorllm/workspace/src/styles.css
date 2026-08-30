@@ -49,27 +49,17 @@ main { width: min(1500px, 100%); margin: 0 auto; }
   padding: clamp(38px, 5vw, 76px) clamp(18px, 5vw, 76px) clamp(34px, 4vw, 62px);
 }
 
-.section-number {
-  margin: 0 0 12px;
-  font: 500 .66rem 'DM Mono', monospace;
-  letter-spacing: .14em;
-}
-
 .intro h1 {
+  width: fit-content;
   margin: 0;
-  max-width: 1200px;
-  font-size: clamp(3rem, 6.5vw, 6.2rem);
+  padding: .1em .14em .14em;
+  border: 1px solid var(--ink);
+  background: var(--acid);
+  font-size: clamp(1rem, 5.2vw, 4.8rem);
   font-weight: 800;
   line-height: .9;
   letter-spacing: -.07em;
-}
-
-.intro h2 {
-  margin: 18px 0 0;
-  font-size: clamp(1.45rem, 2.4vw, 2.35rem);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -.045em;
+  white-space: nowrap;
 }
 
 .page-section {
@@ -79,7 +69,7 @@ main { width: min(1500px, 100%); margin: 0 auto; }
 
 .page-section:nth-child(even) { background: var(--surface); }
 .section-heading { margin-bottom: clamp(32px, 5vw, 62px); }
-.model-information .section-heading h1,
+.model-information .section-heading h2,
 .calculation-ledger .section-heading h2 {
   max-width: 1100px;
   margin: 0;
@@ -89,29 +79,13 @@ main { width: min(1500px, 100%); margin: 0 auto; }
   letter-spacing: -.07em;
 }
 
-.stage-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 28px;
-}
-
-.stage-heading h1 {
+.stage-heading h2 {
   max-width: 1000px;
   margin: 0;
   font-size: clamp(2.45rem, 5.2vw, 5rem);
   font-weight: 800;
   line-height: .92;
   letter-spacing: -.065em;
-}
-
-.stage-heading h2 {
-  margin: 0 0 .18em;
-  font-size: clamp(1.35rem, 2.2vw, 2.15rem);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -.045em;
-  text-align: right;
 }
 
 .model-information-grid {
@@ -390,15 +364,15 @@ main { width: min(1500px, 100%); margin: 0 auto; }
   line-height: 1;
   letter-spacing: -.04em;
 }
-.status-column h3 {
+.status-column h4 {
   margin: 0 0 28px;
   font-size: clamp(2.5rem, 5vw, 4.4rem);
   line-height: .95;
   letter-spacing: -.06em;
   white-space: nowrap;
 }
-.status-column h3.fits { color: var(--success); }
-.status-column h3.oom { color: var(--danger); }
+.status-column h4.fits { color: var(--success); }
+.status-column h4.oom { color: var(--danger); }
 .result-totals {
   margin: 0;
   display: grid;
@@ -450,9 +424,7 @@ main { width: min(1500px, 100%); margin: 0 auto; }
 }
 
 @media (max-width: 900px) {
-  .stage-heading, .result-layout, .workload-layout { grid-template-columns: 1fr; }
-  .stage-heading { align-items: start; gap: 14px; }
-  .stage-heading h2 { margin: 0; text-align: left; }
+  .result-layout, .workload-layout { grid-template-columns: 1fr; }
   .workload-settings { grid-column: auto; }
 }
 
@@ -467,7 +439,7 @@ main { width: min(1500px, 100%); margin: 0 auto; }
   .jar-stage { width: min(112%, 430px); margin-left: 50%; transform: translateX(-50%); }
   .capacity-title { font-size: .63rem; }
   .capacity-title strong { font-size: .9rem; }
-  .status-column h3 { font-size: clamp(2.1rem, 11vw, 3.1rem); white-space: normal; }
+  .status-column h4 { font-size: clamp(2.1rem, 11vw, 3.1rem); white-space: normal; }
   .memory-legend > div { padding: 10px 7px; gap: 3px 6px; }
   .memory-legend strong { font-size: .58rem; }
   .memory-legend output { font-size: .64rem; }

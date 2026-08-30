@@ -21,13 +21,12 @@
   <main>
     <section class="intro" aria-labelledby="page-title">
       <h1 id="page-title">SINGLE-GPU LLM VRAM ESTIMATOR</h1>
-      <h2>Will it fit?</h2>
     </section>
 
     <form id="calculator-form" novalidate>
       <section class="page-section model-information" aria-labelledby="model-information-title">
         <div class="section-heading">
-          <h1 id="model-information-title">Model information</h1>
+          <h2 id="model-information-title">Model information</h2>
         </div>
 
         <div class="model-information-grid">
@@ -116,10 +115,9 @@
         </details>
       </section>
 
-      <section class="page-section memory-panel" aria-labelledby="load-model-title load-model-action-title">
+      <section class="page-section memory-panel" aria-labelledby="load-model-title">
         <div class="section-heading stage-heading">
-          <h1 id="load-model-title">01 · MODEL WEIGHTS ONLY</h1>
-          <h2 id="load-model-action-title">Load Model</h2>
+          <h2 id="load-model-title">01 · MODEL WEIGHTS ONLY</h2>
         </div>
 
         <div class="result-layout">
@@ -142,8 +140,8 @@
           </div>
 
           <div class="status-column">
-            <h2 class="result-kicker">LOAD RESULT</h2>
-            <h3 id="load-fit-status">Fits</h3>
+            <h3 class="result-kicker">LOAD RESULT</h3>
+            <h4 id="load-fit-status">Fits</h4>
             <dl class="result-totals">
               <div><dt>Needed</dt><dd id="load-total-needed">0 GiB</dd></div>
               <div><dt>Available</dt><dd id="load-total-available">16 GiB</dd></div>
@@ -154,10 +152,9 @@
         </div>
       </section>
 
-      <section class="page-section memory-panel workload-panel" aria-labelledby="workload-title workload-action-title">
+      <section class="page-section memory-panel workload-panel" aria-labelledby="workload-title">
         <div class="section-heading stage-heading">
-          <h1 id="workload-title">02 · MODEL + WORKLOAD MEMORY</h1>
-          <h2 id="workload-action-title">Run a Workload</h2>
+          <h2 id="workload-title">02 · MODEL + WORKLOAD MEMORY</h2>
         </div>
 
         <div class="workload-layout">
@@ -217,8 +214,8 @@
           </div>
 
           <div class="status-column">
-            <h2 class="result-kicker">WORKLOAD RESULT</h2>
-            <h3 id="workload-fit-status">Out of memory</h3>
+            <h3 class="result-kicker">WORKLOAD RESULT</h3>
+            <h4 id="workload-fit-status">Out of memory</h4>
             <dl class="result-totals">
               <div><dt>Needed</dt><dd id="workload-total-needed">0 GiB</dd></div>
               <div><dt>Available</dt><dd id="workload-total-available">16 GiB</dd></div>
@@ -231,7 +228,6 @@
 
       <section class="page-section calculation-ledger" aria-labelledby="calculation-title">
         <div class="section-heading">
-          <p class="section-number">FORMULAS</p>
           <h2 id="calculation-title">How It Is Calculated</h2>
         </div>
 
