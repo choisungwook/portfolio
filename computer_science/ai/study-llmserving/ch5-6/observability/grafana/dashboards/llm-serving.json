@@ -365,7 +365,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Both are time-busy ratios, not bandwidth ratios. On this GeForce card they were measured moving together even in a compute-bound prefill run (100% vs 96%), so do NOT use the pair to classify compute-bound versus bandwidth-bound. What this panel is good for is the case where both stay low: the GPU is idle and the problem is client concurrency or the queue. For bottleneck classification compare measured token rate against the bandwidth ceiling - see docs/handson/08-roofline-bottleneck.md.",
+      "description": "Both are time-busy ratios, not bandwidth ratios. On this GeForce card they were measured moving together even in a compute-bound prefill run (100% vs 96%), so do NOT use the pair to classify compute-bound versus bandwidth-bound. What this panel is good for is the case where both stay low: the GPU is idle and the problem is client concurrency or the queue. For bottleneck classification compare measured token rate against the bandwidth ceiling - see docs/handson/04-roofline-bottleneck.md.",
       "fieldConfig": {
         "defaults": {
           "unit": "percent"

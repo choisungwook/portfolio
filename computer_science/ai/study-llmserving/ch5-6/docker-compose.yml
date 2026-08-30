@@ -48,6 +48,26 @@ services:
       SERVED_MODEL_NAME: qwen
     command: ["python3", "-m", "benchmark.summary"]
 
+  vllm-7b-bf16-expect-failure:
+    <<: *vllm
+    profiles: [oom]
+    command:
+      - vllm
+      - serve
+      - Qwen/Qwen2.5-7B-Instruct
+      - --served-model-name
+      - qwen
+      - --dtype
+      - bfloat16
+      - --max-model-len
+      - "4096"
+      - --max-num-seqs
+      - "1"
+      - --max-num-batched-tokens
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.85"
+
   vllm-bf16:
     <<: *vllm
     profiles: [bf16]

@@ -6,7 +6,7 @@ W4A16은 weight를 크게 줄이고, W8A8은 activation compute까지 줄일 수
 
 ## 실습 환경
 
-- 선행 실습: [Prefill·decode 병목 관찰](./05-prefill-decode-observability.md)
+- 선행 실습: [Prefill·decode 병목 관찰](./07-prefill-decode-observability.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - 이후 모든 명령: 위 workspace에서 실행
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB

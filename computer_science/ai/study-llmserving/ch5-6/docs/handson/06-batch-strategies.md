@@ -4,7 +4,7 @@ Output 길이가 다른 request를 고정 batch로 묶으면 짧은 request가 �
 
 ## 실습 환경
 
-- 선행 실습: [vLLM scheduler 제한값 비교](./03-vllm-batching.md)
+- 선행 실습: [vLLM scheduler 제한값 비교](./05-vllm-batching.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - 이후 모든 명령: 위 workspace에서 실행
 - runtime: vLLM `v0.27.1`

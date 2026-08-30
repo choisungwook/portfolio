@@ -4,7 +4,7 @@ TTFT가 느리면 prefill 문제처럼 보이지만 scheduler queue가 원인일
 
 ## 실습 환경
 
-- 선행 실습: [Static·dynamic·continuous 전략 비교](./04-batch-strategies.md)
+- 선행 실습: [Static·dynamic·continuous 전략 비교](./06-batch-strategies.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - 이후 모든 명령: 위 workspace에서 실행
 - runtime: vLLM `v0.27.1`
@@ -103,7 +103,7 @@ ls results/performance-bf16-long-*.json
 - waiting request만 증가: scheduler·runtime 병목 추가 확인
 - TPOT와 KV cache usage 동반 증가: decode concurrency와 memory pressure 확인
 
-이 목록은 어느 **단계**가 느린지까지 좁혀줍니다. 그 단계가 연산 때문인지 memory bandwidth 때문인지는 metric만으로 갈리지 않습니다. 실측에서 `DCGM_FI_DEV_GPU_UTIL`과 `DCGM_FI_DEV_MEM_COPY_UTIL`이 거의 같이 움직였기 때문입니다. 그 판별은 대역폭에서 계산한 이론 상한과 실측 token 속도를 대조하는 방법으로 하고, 절차는 [roofline과 병목 재현](./08-roofline-bottleneck.md)에 있습니다.
+이 목록은 어느 **단계**가 느린지까지 좁혀줍니다. 그 단계가 연산 때문인지 memory bandwidth 때문인지는 metric만으로 갈리지 않습니다. 실측에서 `DCGM_FI_DEV_GPU_UTIL`과 `DCGM_FI_DEV_MEM_COPY_UTIL`이 거의 같이 움직였기 때문입니다. 그 판별은 대역폭에서 계산한 이론 상한과 실측 token 속도를 대조하는 방법으로 하고, 절차는 [roofline과 병목 재현](./04-roofline-bottleneck.md)에 있습니다.
 
 ## 정리
 

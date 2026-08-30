@@ -159,7 +159,7 @@ GPU utilization이 높다고 compute-bound로 단정할 수는 없습니다. Mem
 
 이유는 지표의 정의에 있습니다. 둘 다 **"그 시간 동안 바빴는가"**를 재는 시간 비율이지 "대역폭의 몇 %를 썼는가"가 아닙니다. 후자를 재려면 `DCGM_FI_PROF_DRAM_ACTIVE` 같은 profiling 지표가 필요한데 GeForce 계열에는 노출되지 않습니다.
 
-그래서 판별은 지표가 아니라 산수로 합니다. [roofline과 병목 재현](./handson/08-roofline-bottleneck.md)에서 하듯 **측정한 대역폭에서 나오는 이론 상한과 실제 token 생성 속도를 비교**합니다. 실측에서 batch 1 decode가 상한의 101%, batch 16에서도 96%로 나왔고, 이것이 대역폭 병목의 훨씬 확실한 증거입니다.
+그래서 판별은 지표가 아니라 산수로 합니다. [roofline과 병목 재현](./handson/04-roofline-bottleneck.md)에서 하듯 **측정한 대역폭에서 나오는 이론 상한과 실제 token 생성 속도를 비교**합니다. 실측에서 batch 1 decode가 상한의 101%, batch 16에서도 96%로 나왔고, 이것이 대역폭 병목의 훨씬 확실한 증거입니다.
 
 두 지표를 여전히 대시보드에 두는 이유는 세 번째 경우를 잡기 위해서입니다. 둘 다 낮으면 GPU가 노는 것이고, 그때는 client 동시성이나 queue를 봐야 합니다.
 
