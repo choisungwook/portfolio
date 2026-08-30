@@ -6,7 +6,7 @@
 2. 7B BF16의 memory budget과 OOM 확인
 3. Batch·sequence에 따른 KV cache 변화 확인
 4. GPU roofline 측정과 병목 재현
-5. Latency SLO를 만족하는 vLLM batch 설정 선택
+5. `vllm bench serve`로 batch 설정 비교
 6. Static·dynamic·continuous admission 전략 비교
 7. Prefill·decode 병목 구분
 8. BF16·W4A16·W8A8 비교
@@ -83,7 +83,7 @@ export GPU_SERVER_IP="<GPU-SERVER-IP>"
 
 ### 실습
 
-- [Latency SLO를 만족하는 vLLM batch 설정 찾기](./05-vllm-batching.md)
+- [`vllm bench serve`로 batch 설정 비교](./05-vllm-batching.md)
 
 ## 시나리오 6. Request admission 전략을 비교합니다
 
