@@ -10,7 +10,9 @@
 //! preview and the render read the same document rather than being handed a
 //! copy of the timeline along with the request.
 
-use crate::playback::{Config as PlaybackConfig, Session, Status as PlaybackStatus};
+use crate::playback::{
+    Config as PlaybackConfig, Session, Status as PlaybackStatus, EXPLICIT_RECONFIGURE_PENDING,
+};
 use crate::viewport::MonitorPlace;
 use makevideo_compositor::{Backend, Compositor};
 // Aliased because this file also spawns processes, and two things called
@@ -20,6 +22,7 @@ use makevideo_edit::{
     VisualTransform,
 };
 use makevideo_present::fallback::{choose, Choice};
+use makevideo_present::surface::Guides;
 use makevideo_render::accel::{self, Acceleration};
 use makevideo_render::{ffmpeg, probe, tools, workspace, Asset, AssetKind, Project, Rate};
 use serde::{Deserialize, Serialize};
@@ -28,7 +31,7 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -70,14 +73,14 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
-    /// Whether the graphics device is used at all: "gpu" or "cpu". This is the
-    /// only axis, and it decides three things at once — what draws the exact
-    /// frame, which engine plays, and what draws the render.
+    /// Whether the graphics device or CPU composites: "gpu" or "cpu". Both
+    /// play through the persistent native monitor; CPU frames use a small GPU
+    /// presenter only for the final upload.
     ///
     /// | | exact frame | playback | render |
     /// | --- | --- | --- | --- |
     /// | gpu | the compositor | native monitor | the compositor, filter graph if it fails |
-    /// | cpu | not asked for | media elements | the filter graph |
+    /// | cpu | software compositor | native monitor | the filter graph |
     ///
     /// ffmpeg is needed either way: it decodes for both and encodes for both.
     /// What changes is who puts the layers on top of each other.
@@ -87,10 +90,8 @@ pub struct Settings {
     /// device quietly draws with the software compositor rather than refusing.
     pub compositor: String,
     /// Which graphics adapter to draw on, by the name `graphics_devices`
-    /// reports. Empty is whatever wgpu picks, which is the right answer on a
-    /// machine with one GPU. A name this machine does not have is also the
-    /// automatic pick, so a settings file survives being carried to another
-    /// machine or unplugging an eGPU.
+    /// reports. Empty is whatever wgpu picks. A live change to a missing named
+    /// adapter is rejected and the active path and saved setting are kept.
     pub gpu_device: String,
     /// Use ready proxy files for preview and playback. Proxy creation remains
     /// automatic so disabling this changes only which media is read.
@@ -145,6 +146,12 @@ pub struct AppState {
     /// whether the timeline moved while it was working.
     pub document: Arc<Mutex<Document>>,
     pub settings: Mutex<Settings>,
+    /// Serialises only generation allocation and the final disk/state commit.
+    /// Candidate preparation stays outside it so a later request can supersede
+    /// one still waiting for its first frame.
+    pub settings_transaction: Mutex<()>,
+    pub settings_generation: AtomicU64,
+    pub playback_settings: PlaybackSettingsGate,
     /// The running ffmpeg, so Cancel has something to kill. Shared with the
     /// thread that reads its progress.
     pub render: Arc<Mutex<Option<Child>>>,
@@ -160,11 +167,82 @@ pub struct AppState {
     pub compositor: Mutex<Vec<((Backend, String), Arc<Compositor>)>>,
     /// The native monitor, when one is running. `None` is either the media
     /// element preview or nothing open yet, and the page is told which.
-    pub playback: Mutex<Option<Session>>,
+    pub playback: Mutex<Option<Arc<Session>>>,
+    /// Invalidates a session that was being built when release/delete ran.
+    /// The registry lock cannot cover `Session::start`, because surface and
+    /// decoder startup must not block transport/status commands.
+    pub playback_epoch: AtomicU64,
     pub proxies: Arc<Mutex<ProxyState>>,
     pub proxy_workers: Mutex<Vec<JoinHandle<()>>>,
     pub waveforms: Arc<Mutex<WaveformState>>,
     pub waveform_workers: Mutex<Vec<JoinHandle<()>>>,
+}
+
+#[derive(Default)]
+pub struct PlaybackSettingsGate {
+    state: Mutex<PlaybackGateState>,
+    idle: Condvar,
+}
+
+#[derive(Default)]
+struct PlaybackGateState {
+    settings: usize,
+    attaching: bool,
+}
+
+#[derive(Clone, Copy)]
+enum PlaybackLease {
+    Settings,
+    Attach,
+}
+
+impl PlaybackSettingsGate {
+    fn enter(&self) -> PlaybackSettingsGuard<'_> {
+        let mut state = self.state.lock().unwrap();
+        while state.attaching {
+            state = self.idle.wait(state).unwrap();
+        }
+        state.settings += 1;
+        PlaybackSettingsGuard {
+            gate: self,
+            lease: PlaybackLease::Settings,
+        }
+    }
+
+    fn enter_attach(&self) -> PlaybackSettingsGuard<'_> {
+        let mut state = self.state.lock().unwrap();
+        while state.settings != 0 || state.attaching {
+            state = self.idle.wait(state).unwrap();
+        }
+        state.attaching = true;
+        PlaybackSettingsGuard {
+            gate: self,
+            lease: PlaybackLease::Attach,
+        }
+    }
+
+    fn wait(&self) {
+        let mut state = self.state.lock().unwrap();
+        while state.settings != 0 || state.attaching {
+            state = self.idle.wait(state).unwrap();
+        }
+    }
+}
+
+struct PlaybackSettingsGuard<'a> {
+    gate: &'a PlaybackSettingsGate,
+    lease: PlaybackLease,
+}
+
+impl Drop for PlaybackSettingsGuard<'_> {
+    fn drop(&mut self) {
+        let mut state = self.gate.state.lock().unwrap();
+        match self.lease {
+            PlaybackLease::Settings => state.settings -= 1,
+            PlaybackLease::Attach => state.attaching = false,
+        }
+        self.gate.idle.notify_all();
+    }
 }
 
 #[derive(Debug, Default)]
@@ -407,18 +485,11 @@ pub struct CompositorInfo {
     pub fell_back: bool,
 }
 
-/// Which playback engine the compositor setting implies.
-///
-/// Not a setting of its own any more. The native monitor draws on a graphics
-/// surface, so "stay off the graphics device" and "play on one" was a pair a
-/// user could ask for and never get — `Session::start` refused it and the app
-/// fell back, which is a choice that reads as broken rather than as declined.
-fn wanted_engine(settings: &Settings) -> &'static str {
-    if stays_on_cpu(settings) {
-        "media-element"
-    } else {
-        "native"
-    }
+/// CPU and GPU composition both use the persistent native monitor. The CPU
+/// path uploads one finished RGBA layer through a presentation-only GPU; media
+/// elements are only the startup fallback when no native presenter exists.
+fn wanted_engine(_settings: &Settings) -> &'static str {
+    "native"
 }
 
 /// Whether the setting asks to stay off the graphics device.
@@ -441,6 +512,18 @@ fn wanted_backend(setting: &str) -> Backend {
     }
 }
 
+fn explicit_playback_backend(settings: &Settings) -> Backend {
+    if stays_on_cpu(settings) {
+        Backend::Cpu
+    } else {
+        Backend::Gpu
+    }
+}
+
+fn automatic_playback_backend(settings: &Settings) -> Backend {
+    wanted_backend(&settings.compositor)
+}
+
 /// The adapter name a setting asks for, or `None` for whatever wgpu picks.
 fn wanted_device(setting: &str) -> Option<&str> {
     let name = setting.trim();
@@ -460,10 +543,119 @@ fn compositor(state: &State<AppState>, backend: Backend, device: Option<&str>) -
     if let Some((_, existing)) = made.iter().find(|(kind, _)| *kind == key) {
         return Arc::clone(existing);
     }
+    if let Some(existing) = made
+        .iter()
+        .find(|(cached, existing)| {
+            lenient_cache_matches(
+                backend,
+                device,
+                cached,
+                existing.is_gpu(),
+                existing.adapter(),
+            )
+        })
+        .map(|(_, existing)| Arc::clone(existing))
+    {
+        made.push((key, Arc::clone(&existing)));
+        return existing;
+    }
     let built =
         Arc::new(Compositor::with_device(backend, device).unwrap_or_else(|_| Compositor::new()));
     made.push((key, Arc::clone(&built)));
     built
+}
+
+/// A playback compositor that honours an explicit choice. Unlike the general
+/// preview/render helper above, a named GPU that is absent is an error: a live
+/// reconfiguration must roll back instead of silently moving to another card.
+fn strict_compositor(
+    state: &State<AppState>,
+    backend: Backend,
+    device: Option<&str>,
+) -> Result<Arc<Compositor>, String> {
+    let mut made = state.compositor.lock().unwrap();
+    // Cache keys describe what originally requested a compositor, not what
+    // adapter it actually opened. Reuse an Auto compositor that already owns
+    // the requested GPU so a no-op explicit choice stays the same Arc and the
+    // native surface keeps its zero-copy path.
+    if let Some(existing) = made
+        .iter()
+        .find(|(cached, existing)| {
+            strict_cache_matches(
+                backend,
+                device,
+                cached,
+                existing.is_gpu(),
+                existing.adapter(),
+            )
+        })
+        .map(|(_, existing)| Arc::clone(existing))
+    {
+        validate_strict_compositor(backend, device, &existing)?;
+        let key = (backend, device.unwrap_or_default().to_string());
+        if !made.iter().any(|(cached, _)| *cached == key) {
+            made.push((key, Arc::clone(&existing)));
+        }
+        return Ok(existing);
+    }
+    let built = Arc::new(Compositor::with_device(backend, device)?);
+    validate_strict_compositor(backend, device, &built)?;
+    let key = (backend, device.unwrap_or_default().to_string());
+    made.push((key, Arc::clone(&built)));
+    Ok(built)
+}
+
+fn lenient_cache_matches(
+    backend: Backend,
+    device: Option<&str>,
+    cached: &(Backend, String),
+    is_gpu: bool,
+    adapter: &str,
+) -> bool {
+    match (backend, device) {
+        (Backend::Auto, Some(name)) => is_gpu && adapter == name,
+        (Backend::Auto, None) => is_gpu && cached.1.is_empty() && cached.0 == Backend::Gpu,
+        (Backend::Gpu, Some(name)) => is_gpu && adapter == name,
+        (Backend::Gpu, None) => is_gpu && cached.1.is_empty(),
+        (Backend::Cpu, None) => !is_gpu,
+        (Backend::Cpu, Some(_)) => false,
+    }
+}
+
+fn strict_cache_matches(
+    backend: Backend,
+    device: Option<&str>,
+    cached: &(Backend, String),
+    is_gpu: bool,
+    adapter: &str,
+) -> bool {
+    match (backend, device) {
+        (Backend::Gpu, Some(name)) => is_gpu && adapter == name,
+        (Backend::Gpu, None) => is_gpu && cached.1.is_empty(),
+        (Backend::Cpu, None) => !is_gpu,
+        _ => false,
+    }
+}
+
+fn validate_strict_compositor(
+    backend: Backend,
+    device: Option<&str>,
+    compositor: &Compositor,
+) -> Result<(), String> {
+    if backend == Backend::Gpu && !compositor.is_gpu() {
+        return Err("the requested graphics compositor is not available".into());
+    }
+    if backend == Backend::Cpu && compositor.is_gpu() {
+        return Err("the requested CPU compositor is not available".into());
+    }
+    if let Some(name) = device {
+        if name != compositor.adapter() {
+            return Err(format!(
+                "graphics device `{name}` is not available; the current setting was kept"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The compositor the settings ask for.
@@ -649,7 +841,11 @@ pub fn delete_project(
         dir.join(workspace::PROJECT_FILE)
     };
 
+    state.playback_epoch.fetch_add(1, Ordering::SeqCst);
     let session = state.playback.lock().unwrap().take();
+    if let Some(session) = session.as_ref() {
+        session.stop();
+    }
     drop(session);
     stop_proxy_workers(&app, &state);
     stop_waveform_workers(&app, &state);
@@ -760,15 +956,180 @@ pub async fn preview_frame(
     Ok(tauri::ipc::Response::new(payload))
 }
 
+enum PlaybackRollback {
+    None,
+    Video,
+    Guides(Guides),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlaybackChange {
+    None,
+    Video,
+    Guides,
+}
+
+fn playback_change(
+    before: &Settings,
+    after: &Settings,
+    has_unconfirmed_settings: bool,
+) -> PlaybackChange {
+    if has_unconfirmed_settings || playback_video_settings_changed(before, after) {
+        PlaybackChange::Video
+    } else if playback_guides_changed(before, after) {
+        PlaybackChange::Guides
+    } else {
+        PlaybackChange::None
+    }
+}
+
+fn restore_confirmed_playback(
+    latest: &AtomicU64,
+    generation: u64,
+    session: Option<&Arc<Session>>,
+    rollback: &PlaybackRollback,
+) -> Option<String> {
+    match (session, rollback) {
+        (Some(session), PlaybackRollback::Video) => {
+            restore_if_current(latest, generation, || {
+                // Read at rollback time. An automatic proxy refresh may have
+                // updated the confirmed paths while this settings candidate
+                // was building, and the unpersisted candidate never changes
+                // the confirmed snapshot.
+                session.reconfigure(generation, session.confirmed_config())?;
+                session.confirm_settings_generation(generation);
+                Ok(())
+            })
+        }
+        (Some(session), PlaybackRollback::Guides(guides)) => {
+            restore_if_current(latest, generation, || {
+                session.set_guides(generation, *guides)?;
+                session.confirm_settings_generation(generation);
+                Ok(())
+            })
+        }
+        _ => None,
+    }
+}
+
+fn restore_if_current(
+    latest: &AtomicU64,
+    generation: u64,
+    restore: impl FnOnce() -> Result<(), String>,
+) -> Option<String> {
+    if latest.load(Ordering::Relaxed) != generation {
+        return None;
+    }
+    match restore() {
+        Ok(()) => None,
+        Err(_) if latest.load(Ordering::Relaxed) != generation => None,
+        Err(reason) => Some(reason),
+    }
+}
+
+fn playback_settings_error(error: String, rollback_error: Option<String>) -> String {
+    match rollback_error {
+        Some(reason) => format!(
+            "{error}; the saved setting was kept, but restoring playback also failed: {reason}"
+        ),
+        None => error,
+    }
+}
+
 #[tauri::command]
 pub fn save_settings(
     app: AppHandle,
     state: State<AppState>,
     settings: Settings,
 ) -> Result<Bootstrap, String> {
-    crate::store::prepare_log_dir(&app, &settings)?;
+    let _playback_settings = state.playback_settings.enter();
+    let session = playback_session(&state);
+    let generation = {
+        let _commit = state.settings_transaction.lock().unwrap();
+        let generation = state.settings_generation.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Some(session) = session.as_ref() {
+            session.reserve_settings_generation(generation);
+        }
+        generation
+    };
+    let before = state.settings.lock().unwrap().clone();
+    let change = if let Some(session) = session.as_ref() {
+        playback_change(&before, &settings, session.has_unconfirmed_settings())
+    } else {
+        PlaybackChange::None
+    };
+    let rollback = match (session.as_ref(), change) {
+        (Some(_), PlaybackChange::Video) => PlaybackRollback::Video,
+        (Some(session), PlaybackChange::Guides) => {
+            PlaybackRollback::Guides(session.confirmed_config().guides)
+        }
+        _ => PlaybackRollback::None,
+    };
+
+    if let Err(error) = crate::store::prepare_log_dir(&app, &settings) {
+        let rollback_error = restore_confirmed_playback(
+            &state.settings_generation,
+            generation,
+            session.as_ref(),
+            &rollback,
+        );
+        return Err(playback_settings_error(error, rollback_error));
+    }
+
+    let apply = if let Some(session) = session.as_ref() {
+        if change == PlaybackChange::Video {
+            let graphics_changed = before.compositor != settings.compositor
+                || before.gpu_device != settings.gpu_device;
+            let new_config = if graphics_changed {
+                explicit_playback_config(&app, &state, &settings)
+            } else {
+                automatic_playback_config(&app, &state, &settings)
+            };
+            new_config.and_then(|config| session.reconfigure(generation, config).map(|_| ()))
+        } else if change == PlaybackChange::Guides {
+            session
+                .set_guides(generation, playback_guides(&settings))
+                .map(|_| ())
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    };
+    if let Err(error) = apply {
+        let rollback_error = restore_confirmed_playback(
+            &state.settings_generation,
+            generation,
+            session.as_ref(),
+            &rollback,
+        );
+        return Err(playback_settings_error(error, rollback_error));
+    }
+
+    if state.settings_generation.load(Ordering::Relaxed) != generation {
+        return Err("a newer settings change superseded this one".into());
+    }
+    let transaction = state.settings_transaction.lock().unwrap();
+    if state.settings_generation.load(Ordering::Relaxed) != generation {
+        return Err("a newer settings change superseded this one".into());
+    }
+    if let Err(error) = crate::store::save_settings(&app, &settings) {
+        let rollback_error = restore_confirmed_playback(
+            &state.settings_generation,
+            generation,
+            session.as_ref(),
+            &rollback,
+        );
+        return Err(playback_settings_error(error, rollback_error));
+    }
+    if change != PlaybackChange::None {
+        let session = session
+            .as_ref()
+            .expect("a playback change only exists with an active session");
+        session.confirm_settings_generation(generation);
+    }
+
     apply_theme(&app, &settings.theme);
-    crate::store::save_settings(&app, &settings)?;
     {
         let mut current = state.settings.lock().unwrap();
         // Pointing at a different ffmpeg means a different set of encoders, so
@@ -778,7 +1139,9 @@ pub fn save_settings(
         }
         *current = settings;
     }
-    Ok(bootstrap(app, state))
+    let response = bootstrap(app, state.clone());
+    drop(transaction);
+    Ok(response)
 }
 
 #[tauri::command]
@@ -2246,11 +2609,13 @@ pub fn playback_attach(
     place: MonitorPlace,
     frame: i64,
 ) -> PlaybackChoice {
+    let _attach = state.playback_settings.enter_attach();
+    let attach_epoch = state.playback_epoch.load(Ordering::SeqCst);
     let settings = state.settings.lock().unwrap().clone();
     // Already running: place it and hand back what it is doing. The page asks
     // again on every layout change, and tearing the session down to build the
     // same one would restart the decoders every time somebody dragged a panel.
-    if let Some(session) = state.playback.lock().unwrap().as_ref() {
+    if let Some(session) = playback_session(&state) {
         session.place(place);
         return PlaybackChoice::from(Choice::native(), Some(session.status()));
     }
@@ -2264,15 +2629,35 @@ pub fn playback_attach(
         return PlaybackChoice::from(choose(wanted, Ok(())), None);
     }
 
-    let started = start_session(&window, &state, &settings, place, frame);
-    let (session, outcome) = match started {
-        Ok(session) => (Some(session), Ok(())),
-        Err(reason) => (None, Err(reason)),
+    let session = match start_session(&window, &state, &settings, place, frame) {
+        Ok(session) => Arc::new(session),
+        Err(reason) => {
+            if let Some(existing) = playback_session(&state) {
+                return PlaybackChoice::from(Choice::native(), Some(existing.status()));
+            }
+            return PlaybackChoice::from(choose(wanted, Err(reason)), None);
+        }
     };
-    let choice = choose(wanted, outcome);
-    let status = session.as_ref().map(|session| session.status());
-    *state.playback.lock().unwrap() = session;
-    PlaybackChoice::from(choice, status)
+    match store_if_current(
+        &state.playback,
+        &state.playback_epoch,
+        attach_epoch,
+        Arc::clone(&session),
+    ) {
+        Ok(()) => PlaybackChoice::from(Choice::native(), Some(session.status())),
+        Err(rejected) => {
+            rejected.stop();
+            if state.playback_epoch.load(Ordering::SeqCst) == attach_epoch {
+                if let Some(existing) = playback_session(&state) {
+                    return PlaybackChoice::from(Choice::native(), Some(existing.status()));
+                }
+            }
+            PlaybackChoice::from(
+                Choice::fallback("playback attach was cancelled before it became active"),
+                None,
+            )
+        }
+    }
 }
 
 fn start_session(
@@ -2285,29 +2670,7 @@ fn start_session(
     if !place.is_visible() {
         return Err("the monitor has no room on screen yet".into());
     }
-    let project = state.document.lock().unwrap().project().clone();
-    let ffmpeg = find_tool(&window.app_handle().clone(), "ffmpeg", &settings.ffmpeg_dir)
-        .ok_or("ffmpeg was not found, so nothing can be decoded")?;
-    // The monitor draws the project's own frame, the same one the render
-    // writes. What differs is only how big the view showing it is, which the
-    // surface handles by scaling on presentation.
-    let compositor = settings_compositor(state, settings);
-    let proxy_paths = if settings.proxy_enabled {
-        ready_proxy_paths(&state.proxies.lock().unwrap())
-    } else {
-        HashMap::new()
-    };
-    let hwaccel = acceleration(state, Some(&ffmpeg))
-        .available
-        .and_then(|candidate| candidate.hwaccel);
-    let (preview_width, preview_height) = native_preview_dimensions(
-        project.settings.width,
-        project.settings.height,
-        &settings.preview_quality,
-    );
-    let config = PlaybackConfig::new(compositor, ffmpeg, preview_width, preview_height)
-        .with_proxies(proxy_paths)
-        .with_hwaccel(hwaccel);
+    let config = automatic_playback_config(&window.app_handle(), state, settings)?;
     Session::start(
         window,
         Arc::clone(&state.document),
@@ -2315,6 +2678,106 @@ fn start_session(
         place,
         frame.max(0),
     )
+}
+
+fn explicit_playback_config(
+    app: &AppHandle,
+    state: &State<AppState>,
+    settings: &Settings,
+) -> Result<PlaybackConfig, String> {
+    let backend = explicit_playback_backend(settings);
+    let device = if backend == Backend::Gpu {
+        wanted_device(&settings.gpu_device)
+    } else {
+        None
+    };
+    let compositor = strict_compositor(state, backend, device)?;
+    let presenter = if compositor.is_gpu() {
+        Arc::clone(&compositor)
+    } else {
+        strict_compositor(state, Backend::Gpu, None)?
+    };
+    build_playback_config(app, state, settings, compositor, presenter)
+}
+
+fn automatic_playback_config(
+    app: &AppHandle,
+    state: &State<AppState>,
+    settings: &Settings,
+) -> Result<PlaybackConfig, String> {
+    let compositor = compositor(
+        state,
+        automatic_playback_backend(settings),
+        wanted_device(&settings.gpu_device),
+    );
+    let presenter = if compositor.is_gpu() {
+        Arc::clone(&compositor)
+    } else {
+        strict_compositor(state, Backend::Gpu, None)?
+    };
+    build_playback_config(app, state, settings, compositor, presenter)
+}
+
+fn build_playback_config(
+    app: &AppHandle,
+    state: &State<AppState>,
+    settings: &Settings,
+    compositor: Arc<Compositor>,
+    presenter: Arc<Compositor>,
+) -> Result<PlaybackConfig, String> {
+    let project = state.document.lock().unwrap().project().clone();
+    let ffmpeg = find_tool(app, "ffmpeg", &settings.ffmpeg_dir)
+        .ok_or("ffmpeg was not found, so nothing can be decoded")?;
+    let proxy_paths = if settings.proxy_enabled {
+        ready_proxy_paths(&state.proxies.lock().unwrap())
+    } else {
+        HashMap::new()
+    };
+    let current_ffmpeg_dir = state.settings.lock().unwrap().ffmpeg_dir.clone();
+    let probe = if current_ffmpeg_dir == settings.ffmpeg_dir {
+        acceleration(state, Some(&ffmpeg))
+    } else {
+        detect_acceleration(&ffmpeg)
+    };
+    let hwaccel = probe.available.and_then(|candidate| candidate.hwaccel);
+    let (preview_width, preview_height) = native_preview_dimensions(
+        project.settings.width,
+        project.settings.height,
+        &settings.preview_quality,
+    );
+    let config = PlaybackConfig::new(compositor, ffmpeg, preview_width, preview_height)
+        .with_presenter(presenter)
+        .with_hwaccel(hwaccel)
+        .with_guides(playback_guides(settings));
+    Ok(if settings.proxy_enabled {
+        config.with_proxies(proxy_paths)
+    } else {
+        config
+    })
+}
+
+fn playback_video_settings_changed(before: &Settings, after: &Settings) -> bool {
+    before.preview_quality != after.preview_quality
+        || before.compositor != after.compositor
+        || before.gpu_device != after.gpu_device
+        || before.proxy_enabled != after.proxy_enabled
+        || before.ffmpeg_dir != after.ffmpeg_dir
+}
+
+fn playback_guides_changed(before: &Settings, after: &Settings) -> bool {
+    before.show_action_safe_area != after.show_action_safe_area
+        || before.show_title_safe_area != after.show_title_safe_area
+        || before.show_rule_of_thirds != after.show_rule_of_thirds
+        || before.show_center_lines != after.show_center_lines
+}
+
+fn playback_guides(settings: &Settings) -> Guides {
+    Guides {
+        action_safe_area: settings.show_action_safe_area,
+        title_safe_area: settings.show_title_safe_area,
+        rule_of_thirds: settings.show_rule_of_thirds,
+        center_lines: settings.show_center_lines,
+    }
 }
 
 fn native_preview_dimensions(width: u32, height: u32, quality: &str) -> (u32, u32) {
@@ -2336,23 +2799,53 @@ fn native_preview_dimensions(width: u32, height: u32, quality: &str) -> (u32, u3
 pub fn playback_release(state: State<AppState>) {
     // Dropped outside the lock: taking the session down joins its thread, and
     // holding the lock through that would block every other command.
+    state.playback_epoch.fetch_add(1, Ordering::SeqCst);
     let session = state.playback.lock().unwrap().take();
+    if let Some(session) = session.as_ref() {
+        session.stop();
+    }
     drop(session);
 }
 
+/// Refresh ready proxy paths without releasing the native session. The same
+/// first-present transaction used by settings changes keeps audio and the old
+/// video path live until the refreshed path is visible.
 #[tauri::command]
-pub fn playback_play(state: State<AppState>) -> Option<PlaybackStatus> {
-    with_session(&state, |session| session.play())
+pub fn playback_refresh(state: State<AppState>) -> Result<Option<PlaybackStatus>, String> {
+    loop {
+        state.playback_settings.wait();
+        let Some(session) = playback_session(&state) else {
+            return Ok(None);
+        };
+        let proxy_paths = ready_proxy_paths(&state.proxies.lock().unwrap());
+        match session.refresh_proxies(proxy_paths) {
+            Ok(status) => return Ok(Some(status)),
+            Err(reason) if proxy_refresh_should_retry(&reason) => continue,
+            Err(reason) => return Err(reason),
+        }
+    }
+}
+
+fn proxy_refresh_should_retry(reason: &str) -> bool {
+    reason == EXPLICIT_RECONFIGURE_PENDING
 }
 
 #[tauri::command]
-pub fn playback_pause(state: State<AppState>) -> Option<PlaybackStatus> {
-    with_session(&state, |session| session.pause())
+pub fn playback_play(state: State<AppState>) -> Result<Option<PlaybackStatus>, String> {
+    with_session_result(&state, |session| session.play())
 }
 
 #[tauri::command]
-pub fn playback_seek(state: State<AppState>, frame: i64) -> Option<PlaybackStatus> {
-    with_session(&state, |session| session.seek(frame.max(0)))
+pub fn playback_pause(state: State<AppState>) -> Result<Option<PlaybackStatus>, String> {
+    with_session_result(&state, |session| session.pause())
+}
+
+#[tauri::command]
+pub fn playback_seek(
+    state: State<AppState>,
+    frame: i64,
+) -> Result<Option<PlaybackStatus>, String> {
+    with_session_result(&state, |session| session.seek(frame.max(0)))
 }
 
 /// The timeline changed. A stopped playhead redraws its frame; a playing one
@@ -2387,37 +2880,295 @@ pub fn playback_visible(state: State<AppState>, visible: bool) -> Option<Playbac
 /// draw it, which is its own animation frame.
 #[tauri::command]
 pub fn playback_status(state: State<AppState>) -> Option<PlaybackStatus> {
-    state
-        .playback
-        .lock()
-        .unwrap()
-        .as_ref()
-        .map(|session| session.status())
+    playback_session(&state).map(|session| session.status())
 }
 
 fn with_session<F>(state: &State<AppState>, act: F) -> Option<PlaybackStatus>
 where
     F: FnOnce(&Session),
 {
-    let running = state.playback.lock().unwrap();
-    let session = running.as_ref()?;
-    act(session);
+    let session = playback_session(state)?;
+    act(&session);
     Some(session.status())
+}
+
+fn with_session_result<F>(
+    state: &State<AppState>,
+    act: F,
+) -> Result<Option<PlaybackStatus>, String>
+where
+    F: FnOnce(&Session) -> Result<(), String>,
+{
+    let Some(session) = playback_session(state) else {
+        return Ok(None);
+    };
+    act(&session)?;
+    Ok(Some(session.status()))
+}
+
+fn playback_session(state: &State<AppState>) -> Option<Arc<Session>> {
+    clone_arc(&state.playback)
+}
+
+fn clone_arc<T>(slot: &Mutex<Option<Arc<T>>>) -> Option<Arc<T>> {
+    slot.lock().unwrap().as_ref().map(Arc::clone)
+}
+
+fn store_if_current<T>(
+    slot: &Mutex<Option<Arc<T>>>,
+    epoch: &AtomicU64,
+    started_at: u64,
+    value: Arc<T>,
+) -> Result<(), Arc<T>> {
+    let mut slot = slot.lock().unwrap();
+    if epoch.load(Ordering::SeqCst) != started_at || slot.is_some() {
+        return Err(value);
+    }
+    *slot = Some(value);
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        native_preview_dimensions, process_metrics_rows, process_tree_rss_bytes, srt_contents,
-        srt_cues, srt_frame, srt_timestamp, wanted_device, Settings,
+        automatic_playback_backend, clone_arc, explicit_playback_backend, lenient_cache_matches,
+        native_preview_dimensions, playback_change, playback_guides_changed,
+        playback_video_settings_changed, process_metrics_rows, process_tree_rss_bytes,
+        proxy_refresh_should_retry, restore_if_current, srt_contents, srt_cues, srt_frame,
+        srt_timestamp, store_if_current, strict_cache_matches, validate_strict_compositor,
+        wanted_device, PlaybackChange, PlaybackSettingsGate, Settings,
     };
+    use makevideo_compositor::{Backend, Compositor};
     use makevideo_render::Rate;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::mpsc::channel;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     #[test]
     fn an_unset_graphics_device_is_the_automatic_pick() {
         assert_eq!(wanted_device(""), None);
         assert_eq!(wanted_device("   "), None);
         assert_eq!(wanted_device("Apple M3 Pro"), Some("Apple M3 Pro"));
+    }
+
+    #[test]
+    fn startup_is_lenient_but_an_explicit_live_gpu_choice_is_strict() {
+        let settings = Settings::default();
+        assert_eq!(automatic_playback_backend(&settings), Backend::Auto);
+        assert_eq!(explicit_playback_backend(&settings), Backend::Gpu);
+
+        let mut cpu = settings;
+        cpu.compositor = "cpu".into();
+        assert_eq!(automatic_playback_backend(&cpu), Backend::Cpu);
+        assert_eq!(explicit_playback_backend(&cpu), Backend::Cpu);
+    }
+
+    #[test]
+    fn strict_validation_rechecks_a_cached_compositor() {
+        let cpu = Compositor::with_backend(Backend::Cpu).unwrap();
+        assert!(validate_strict_compositor(Backend::Gpu, None, &cpu).is_err());
+        assert!(validate_strict_compositor(Backend::Cpu, Some("missing adapter"), &cpu).is_err());
+        assert!(validate_strict_compositor(Backend::Cpu, None, &cpu).is_ok());
+    }
+
+    #[test]
+    fn named_gpu_reuses_the_actual_default_adapter_and_creates_an_alias() {
+        let default_key = (Backend::Auto, String::new());
+        assert!(strict_cache_matches(
+            Backend::Gpu,
+            Some("Apple M3"),
+            &default_key,
+            true,
+            "Apple M3",
+        ));
+        assert!(lenient_cache_matches(
+            Backend::Auto,
+            Some("Apple M3"),
+            &default_key,
+            true,
+            "Apple M3",
+        ));
+    }
+
+    #[test]
+    fn clearing_a_named_gpu_uses_only_the_default_cache_identity() {
+        let named_key = (Backend::Gpu, "Discrete GPU".into());
+        let default_key = (Backend::Auto, String::new());
+        assert!(!strict_cache_matches(
+            Backend::Gpu,
+            None,
+            &named_key,
+            true,
+            "Discrete GPU",
+        ));
+        assert!(strict_cache_matches(
+            Backend::Gpu,
+            None,
+            &default_key,
+            true,
+            "Default GPU",
+        ));
+        assert!(!lenient_cache_matches(
+            Backend::Auto,
+            None,
+            &named_key,
+            true,
+            "Discrete GPU",
+        ));
+    }
+
+    #[test]
+    fn automatic_refresh_waits_for_every_explicit_settings_transaction() {
+        let gate = Arc::new(PlaybackSettingsGate::default());
+        let first = gate.enter();
+        let second = gate.enter();
+        let (sent, received) = channel();
+        let waiting = Arc::clone(&gate);
+        let thread = std::thread::spawn(move || {
+            waiting.wait();
+            let _ = sent.send(());
+        });
+
+        assert!(received.recv_timeout(Duration::from_millis(10)).is_err());
+        drop(first);
+        assert!(received.recv_timeout(Duration::from_millis(10)).is_err());
+        drop(second);
+        assert_eq!(received.recv_timeout(Duration::from_secs(1)), Ok(()));
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn explicit_settings_wait_until_an_attach_snapshot_is_stored() {
+        let gate = Arc::new(PlaybackSettingsGate::default());
+        let attach = gate.enter_attach();
+        let (sent, received) = channel();
+        let waiting = Arc::clone(&gate);
+        let thread = std::thread::spawn(move || {
+            let _settings = waiting.enter();
+            let _ = sent.send(());
+        });
+
+        assert!(received.recv_timeout(Duration::from_millis(10)).is_err());
+        drop(attach);
+        assert_eq!(received.recv_timeout(Duration::from_secs(1)), Ok(()));
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn attach_waits_until_the_latest_settings_transaction_finishes() {
+        let gate = Arc::new(PlaybackSettingsGate::default());
+        let settings = gate.enter();
+        let (sent, received) = channel();
+        let waiting = Arc::clone(&gate);
+        let thread = std::thread::spawn(move || {
+            let _attach = waiting.enter_attach();
+            let _ = sent.send(());
+        });
+
+        assert!(received.recv_timeout(Duration::from_millis(10)).is_err());
+        drop(settings);
+        assert_eq!(received.recv_timeout(Duration::from_secs(1)), Ok(()));
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn proxy_refresh_waits_for_an_attaching_session_before_lookup() {
+        let gate = Arc::new(PlaybackSettingsGate::default());
+        let attach = gate.enter_attach();
+        let (sent, received) = channel();
+        let waiting = Arc::clone(&gate);
+        let thread = std::thread::spawn(move || {
+            waiting.wait();
+            let _ = sent.send(());
+        });
+
+        assert!(received.recv_timeout(Duration::from_millis(10)).is_err());
+        drop(attach);
+        assert_eq!(received.recv_timeout(Duration::from_secs(1)), Ok(()));
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn an_auto_refresh_retries_the_explicit_priority_race() {
+        assert!(proxy_refresh_should_retry(
+            crate::playback::EXPLICIT_RECONFIGURE_PENDING
+        ));
+        assert!(!proxy_refresh_should_retry("candidate surface refused"));
+    }
+
+    #[test]
+    fn guide_only_changes_do_not_choose_the_video_replacement_path() {
+        let before = Settings::default();
+        let mut after = before.clone();
+        after.show_rule_of_thirds = true;
+        assert!(playback_guides_changed(&before, &after));
+        assert!(!playback_video_settings_changed(&before, &after));
+
+        after.preview_quality = "full".into();
+        assert!(playback_video_settings_changed(&before, &after));
+    }
+
+    #[test]
+    fn reverting_to_confirmed_settings_replaces_an_unconfirmed_live_candidate() {
+        let mut confirmed = Settings::default();
+        confirmed.preview_quality = "full".into();
+        let mut first = confirmed.clone();
+        first.preview_quality = "half".into();
+
+        assert_eq!(
+            playback_change(&confirmed, &first, false),
+            PlaybackChange::Video
+        );
+        assert_eq!(
+            playback_change(&confirmed, &confirmed, false),
+            PlaybackChange::None
+        );
+        assert_eq!(
+            playback_change(&confirmed, &confirmed, true),
+            PlaybackChange::Video
+        );
+    }
+
+    #[test]
+    fn cloning_a_playback_handle_releases_the_registry_lock_before_waiting() {
+        let slot = Mutex::new(Some(Arc::new(7)));
+        let handle = clone_arc(&slot).unwrap();
+        assert!(slot.try_lock().is_ok());
+        assert_eq!(*handle, 7);
+    }
+
+    #[test]
+    fn release_epoch_prevents_a_late_attach_from_repopulating_the_registry() {
+        let slot = Mutex::new(None);
+        let epoch = AtomicU64::new(4);
+        let started_at = epoch.load(std::sync::atomic::Ordering::SeqCst);
+        epoch.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let rejected = store_if_current(&slot, &epoch, started_at, Arc::new(7));
+        assert!(rejected.is_err());
+        assert!(slot.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn newest_failed_setting_restores_confirmed_playback_after_older_commit() {
+        let latest = AtomicU64::new(2);
+        let live = AtomicU64::new(1);
+        assert_eq!(
+            restore_if_current(&latest, 2, || {
+                live.store(0, std::sync::atomic::Ordering::Relaxed);
+                Ok(())
+            }),
+            None
+        );
+        assert_eq!(live.load(std::sync::atomic::Ordering::Relaxed), 0);
+
+        latest.store(3, std::sync::atomic::Ordering::Relaxed);
+        let _ = restore_if_current(&latest, 2, || {
+            live.store(9, std::sync::atomic::Ordering::Relaxed);
+            Ok(())
+        });
+        assert_eq!(live.load(std::sync::atomic::Ordering::Relaxed), 0);
     }
 
     #[test]

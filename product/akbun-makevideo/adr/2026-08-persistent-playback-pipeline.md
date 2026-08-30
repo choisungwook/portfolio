@@ -1,5 +1,7 @@
 # Keep the playback pipeline through pause
 
+> Runtime setting reconfiguration is superseded by [2026-08-live-playback-reconfiguration.md](./2026-08-live-playback-reconfiguration.md). Play and pause still follow this record.
+
 ## Decision
 
 - Native monitor는 session 하나당 decoder, audio mixer, output device를 한 번만 생성

@@ -26,3 +26,5 @@
 | [2026-08-program-monitor-transform.md](./2026-08-program-monitor-transform.md) | Transform Visual Items in project space through an editor-only monitor pass |
 | [2026-08-edit-point-navigation.md](./2026-08-edit-point-navigation.md) | Visible clip boundaries drive previous and next edit navigation |
 | [2026-08-persistent-playback-pipeline.md](./2026-08-persistent-playback-pipeline.md) | Play and pause keep one decoder and audio pipeline alive |
+| [2026-08-live-playback-reconfiguration.md](./2026-08-live-playback-reconfiguration.md) | Playback settings switch after the replacement picture is ready |
+| [2026-08-reusable-seek-decoder.md](./2026-08-reusable-seek-decoder.md) | Short forward seeks reuse a decoder and may show two earlier frames |

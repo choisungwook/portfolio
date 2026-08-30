@@ -19,11 +19,12 @@
 //!
 //! [`OffscreenSink`]: crate::sink::OffscreenSink
 
-use crate::player::Tick;
-use crate::transport::Transport;
+use crate::player::{clock_frame, Sink, Tick, IDLE};
+use crate::transport::{Transport, VideoReplacement, VideoSetup};
 use makevideo_audio::engine::Feed;
 use makevideo_audio::realtime::{Clock, Consumer, CHANNELS, ENGINE_HZ};
 use makevideo_audio::soak::BUFFER_FRAMES;
+use makevideo_compositor::source::Frame;
 use makevideo_render::Rate;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -238,6 +239,183 @@ fn within(value: Option<f64>, limit: f64) -> bool {
     value.map(|value| value <= limit).unwrap_or(true)
 }
 
+fn startup_caught_up(late_ms: f64, rate: Rate) -> bool {
+    late_ms < 1_000.0 / rate.as_f64()
+}
+
+fn pace_driver(tick: &Tick) {
+    match tick {
+        Tick::Held { wait } if !wait.is_zero() => std::thread::sleep(*wait),
+        Tick::Starved => std::thread::sleep(Duration::from_millis(1)),
+        Tick::Idle | Tick::Failed { .. } => std::thread::sleep(IDLE),
+        _ => {}
+    }
+}
+
+/// One successful change to what the viewer can actually see.
+///
+/// A frame number alone is ambiguous during a live replacement: old and new
+/// video paths can both draw frame 120. The generation makes the handoff itself
+/// visible to the meter without changing the scheduler's public tick format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VisibleIdentity {
+    generation: u64,
+    frame: Option<i64>,
+}
+
+fn visible_within_seek_window(visible: Option<VisibleIdentity>, target: i64) -> bool {
+    let Some(frame) = visible.and_then(|identity| identity.frame) else {
+        return true;
+    };
+    frame >= target.saturating_sub(2) && frame <= target
+}
+
+/// Fails when time moves but the visible identity does not.
+///
+/// A picture normally remains visible throughout its own frame period, so two
+/// project frames of slack are allowed. The third frame with the same identity
+/// is a frozen picture, even if transport ticks or audio callbacks continue.
+struct VisibleContinuity {
+    current: Option<(VisibleIdentity, i64)>,
+    failed: bool,
+}
+
+impl VisibleContinuity {
+    const MAX_STATIC_FRAMES: i64 = 2;
+
+    fn new() -> VisibleContinuity {
+        VisibleContinuity {
+            current: None,
+            failed: false,
+        }
+    }
+
+    fn observe(&mut self, clock: i64, visible: Option<VisibleIdentity>) -> bool {
+        if self.failed {
+            return false;
+        }
+        let Some(visible) = visible else {
+            return true;
+        };
+        match self.current {
+            Some((identity, began)) if identity.frame == visible.frame && clock >= began => {
+                // Keep the generation for handoff diagnostics, but not as a
+                // new picture. Re-presenting frame 120 through generation 1
+                // after generation 0 showed frame 120 does not buy another
+                // two frames of freeze time.
+                self.current = Some((visible, began));
+                if clock - began > Self::MAX_STATIC_FRAMES {
+                    self.failed = true;
+                }
+            }
+            _ => self.current = Some((visible, clock)),
+        }
+        !self.failed
+    }
+
+    fn reset(&mut self, clock: i64, visible: Option<VisibleIdentity>) {
+        self.current = visible.map(|identity| (identity, clock));
+    }
+}
+
+/// Records identity only after the wrapped sink accepted a draw. That is the
+/// point at which a scheduler frame became a visible frame rather than merely
+/// decoded work.
+struct IdentifiedSink<'a> {
+    sink: &'a mut dyn Sink,
+    generation: u64,
+    visible: Option<VisibleIdentity>,
+}
+
+impl<'a> IdentifiedSink<'a> {
+    fn new(sink: &'a mut dyn Sink) -> IdentifiedSink<'a> {
+        IdentifiedSink {
+            sink,
+            generation: 0,
+            visible: None,
+        }
+    }
+
+    fn generation(&mut self, generation: u64) {
+        self.generation = generation;
+    }
+
+    fn visible(&self) -> Option<VisibleIdentity> {
+        self.visible
+    }
+}
+
+impl Sink for IdentifiedSink<'_> {
+    fn show(&mut self, frame: &Frame) -> Result<(), String> {
+        self.sink.show(frame)?;
+        self.visible = Some(VisibleIdentity {
+            generation: self.generation,
+            frame: Some(frame.frame),
+        });
+        Ok(())
+    }
+
+    fn clear(&mut self) -> Result<(), String> {
+        self.sink.clear()?;
+        self.visible = Some(VisibleIdentity {
+            generation: self.generation,
+            frame: None,
+        });
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct CounterTotals {
+    resyncs: u64,
+    starved: u64,
+    failures: u64,
+}
+
+impl CounterTotals {
+    fn active(transport: &Transport) -> CounterTotals {
+        let counters = transport.scheduler().counters();
+        CounterTotals {
+            resyncs: counters.resyncs(),
+            starved: counters.starved(),
+            failures: counters.failures(),
+        }
+    }
+
+    fn add(&mut self, other: CounterTotals) {
+        self.resyncs += other.resyncs;
+        self.starved += other.starved;
+        self.failures += other.failures;
+    }
+}
+
+struct ReplacementPlan<'a> {
+    setup: Option<VideoSetup<'a>>,
+    after_presented: u64,
+    started: bool,
+    committed: bool,
+    failed: bool,
+}
+
+impl<'a> ReplacementPlan<'a> {
+    fn new(setup: VideoSetup<'a>, after_presented: u64) -> ReplacementPlan<'a> {
+        ReplacementPlan {
+            setup: Some(setup),
+            after_presented,
+            started: false,
+            committed: false,
+            failed: false,
+        }
+    }
+
+    fn start(&mut self, transport: &mut Transport) {
+        if let Some(setup) = self.setup.take() {
+            transport.prepare_video(setup);
+            self.started = true;
+        }
+    }
+}
+
 /// The device, with the driver replaced by a stopwatch.
 ///
 /// Popping one buffer per buffer period is what a real callback does, and it is
@@ -247,6 +425,7 @@ fn within(value: Option<f64>, limit: f64) -> bool {
 /// one thing only it can cause.
 struct Speaker {
     stop: Arc<AtomicBool>,
+    active: Arc<AtomicBool>,
     /// Set by the measuring loop around a seek. While it is on the ring is
     /// being refilled on purpose and a short pop is not the engine failing.
     /// `audio-soak` draws the same line with its own `refill_since`.
@@ -259,6 +438,7 @@ struct Speaker {
 impl Speaker {
     fn start(consumer: Consumer, clock: Arc<Clock>, feed: Arc<Feed>) -> Speaker {
         let stop = Arc::new(AtomicBool::new(false));
+        let active = Arc::new(AtomicBool::new(false));
         let refilling = Arc::new(AtomicBool::new(true));
         let underruns = Arc::new(AtomicU64::new(0));
         let buffers = Arc::new(AtomicU64::new(0));
@@ -269,8 +449,9 @@ impl Speaker {
         clock.set_latency(BUFFER_FRAMES as u64);
 
         let thread = {
-            let (stop, refilling, underruns, buffers) = (
+            let (stop, active, refilling, underruns, buffers) = (
                 Arc::clone(&stop),
+                Arc::clone(&active),
                 Arc::clone(&refilling),
                 Arc::clone(&underruns),
                 Arc::clone(&buffers),
@@ -288,6 +469,13 @@ impl Speaker {
                         // trying to make the time up in a burst of pops, which
                         // would move the clock faster than the world.
                         due = now;
+                    }
+                    // Match the real output callback: a paused or refilling
+                    // device still acknowledges a requested seek flush, but
+                    // does not expose samples or advance the playback clock.
+                    consumer.take_flush();
+                    if !active.load(Ordering::SeqCst) {
+                        continue;
                     }
                     let taken = consumer.pop(&mut buffer);
                     clock.advance(taken as u64);
@@ -312,11 +500,31 @@ impl Speaker {
         };
         Speaker {
             stop,
+            active,
             refilling,
             underruns,
             buffers,
             thread: Some(thread),
         }
+    }
+
+    fn sync(&self, transport: &Transport) {
+        self.active.store(
+            transport.is_playing() && transport.audio_ready(),
+            Ordering::SeqCst,
+        );
+    }
+
+    fn sync_after_tick(&self, transport: &Transport, tick: &Tick) {
+        if matches!(tick, Tick::Ended) {
+            self.mute();
+        } else {
+            self.sync(transport);
+        }
+    }
+
+    fn mute(&self) {
+        self.active.store(false, Ordering::SeqCst);
     }
 }
 
@@ -339,11 +547,47 @@ pub fn measure(
     transport: &mut Transport,
     consumer: Consumer,
     clock: Arc<Clock>,
-    sink: &mut dyn crate::player::Sink,
+    sink: &mut dyn Sink,
     scenario: &Scenario,
 ) -> ScenarioReport {
+    measure_inner(transport, consumer, clock, sink, scenario, None)
+}
+
+/// Measure a video-only live replacement after the old path has already drawn
+/// `after_presented` frames.
+///
+/// The candidate and active scheduler share the audio clock. Until the
+/// candidate presents its first frame, the old scheduler is still ticked into
+/// generation 0; the accepted candidate frame starts generation 1.
+pub fn measure_video_replacement(
+    transport: &mut Transport,
+    consumer: Consumer,
+    clock: Arc<Clock>,
+    sink: &mut dyn Sink,
+    scenario: &Scenario,
+    setup: VideoSetup<'_>,
+    after_presented: u64,
+) -> ScenarioReport {
+    measure_inner(
+        transport,
+        consumer,
+        clock,
+        sink,
+        scenario,
+        Some(ReplacementPlan::new(setup, after_presented)),
+    )
+}
+
+fn measure_inner(
+    transport: &mut Transport,
+    consumer: Consumer,
+    clock: Arc<Clock>,
+    sink: &mut dyn Sink,
+    scenario: &Scenario,
+    mut replacement: Option<ReplacementPlan<'_>>,
+) -> ScenarioReport {
     let rate = transport.scheduler().rate();
-    let limits = Limits::new(rate, transport.scheduler().buffer_ceiling() as u64);
+    let mut limits = Limits::new(rate, transport.video_buffer_ceiling() as u64);
     let grace = Duration::from_millis(scenario.stall_grace_ms);
     // What the timeline being played is worth in wall clock, times the
     // allowance, plus one grace period so a short scenario is not judged by
@@ -351,7 +595,11 @@ pub fn measure(
     let budget = Duration::from_secs_f64(
         scenario.frames as f64 / rate.as_f64() * scenario.budget_multiple.max(1.0),
     ) + grace;
-    let speaker = Speaker::start(consumer, clock, Arc::clone(transport.audio().feed()));
+    let speaker = Speaker::start(
+        consumer,
+        Arc::clone(&clock),
+        Arc::clone(transport.audio().feed()),
+    );
     let started = Instant::now();
 
     let mut intervals: Vec<f64> = Vec::new();
@@ -365,6 +613,11 @@ pub fn measure(
     let mut overran = false;
     let mut last_present: Option<Instant> = None;
     let mut since_seek = 0u64;
+    let mut visible_sink = IdentifiedSink::new(sink);
+    let mut continuity = VisibleContinuity::new();
+    let mut retired_counters = CounterTotals::default();
+    let mut reset_continuity = false;
+    let mut visible_seek_target = None;
 
     // Set while waiting for the first frame of a start or a seek. What it
     // measures is a startup delay, and nothing inside it counts as an interval:
@@ -375,76 +628,175 @@ pub fn measure(
     let mut progress = Instant::now();
 
     transport.play();
+    speaker.sync(transport);
+    if let Some(plan) = replacement.as_mut() {
+        if plan.after_presented == 0 {
+            plan.start(transport);
+        }
+    }
 
     while presented < scenario.frames && !stalled && !overran {
-        let tick = transport.tick(sink);
-        match tick {
-            Tick::Presented { late_ms, .. } => {
-                let at = Instant::now();
-                speaker.refilling.store(false, Ordering::Relaxed);
-                if let Some(began) = waiting_since.take() {
-                    // The first frame of a start or a seek. It is a refill, and
-                    // a refill is reported once — as a startup delay. Charging
-                    // it again as drift and as an interval would make every
-                    // seek look like the scheduler losing the sound, when what
-                    // it did was empty the queues on purpose and fill them from
-                    // the target. The frame supply and audio meters draw the
-                    // same line, and it is the same line the knowledge note
-                    // about a harness not counting its own delay draws.
-                    startups.push(millis(began.elapsed()));
-                } else {
-                    if let Some(previous) = last_present {
-                        intervals.push(millis(at - previous));
+        peak = peak.max(transport.video_buffered_bytes());
+        limits.peak_buffered_bytes = limits
+            .peak_buffered_bytes
+            .max(transport.video_buffer_ceiling() as u64);
+        // A seek requested while processing this batch takes effect on the
+        // next driver turn. Starting there, blank or T-2/T-1/T are the only
+        // legal visible states until exact T has appeared.
+        let enforce_seek_window = visible_seek_target.is_some();
+        let ticks = match replacement.as_mut() {
+            Some(plan) if plan.started && !plan.committed && !plan.failed => {
+                // Match the app loop: the committed path presents first, then
+                // the candidate tries the same FIFO surface. Measuring the
+                // candidate first hides the extra present cost on its commit
+                // turn and can miss a real handoff hitch.
+                visible_sink.generation(0);
+                let active_tick = transport.tick(&mut visible_sink);
+                speaker.sync_after_tick(transport, &active_tick);
+                let active_visible = visible_sink.visible();
+                let active_before = CounterTotals::active(transport);
+                pace_driver(&active_tick);
+                visible_sink.generation(1);
+                match transport.tick_video_replacement(&mut visible_sink) {
+                    VideoReplacement::Committed(tick) => {
+                        retired_counters.add(active_before);
+                        plan.committed = true;
+                        vec![
+                            (active_tick, active_visible, true),
+                            (tick, visible_sink.visible(), false),
+                        ]
                     }
-                    drift.push(late_ms.abs());
-                    lateness.push(late_ms);
+                    VideoReplacement::Failed(reason) => {
+                        plan.failed = true;
+                        vec![
+                            (active_tick, active_visible, true),
+                            (Tick::Failed { reason }, visible_sink.visible(), false),
+                        ]
+                    }
+                    VideoReplacement::Pending => {
+                        visible_sink.generation(0);
+                        vec![(active_tick, active_visible, true)]
+                    }
                 }
-                last_present = Some(at);
-                presented += 1;
-                since_seek += 1;
-                progress = at;
-                peak = peak.max(transport.scheduler().buffered_bytes());
-
-                if let Some(every) = scenario.seek_every {
-                    if since_seek >= every {
+            }
+            Some(plan) => {
+                visible_sink.generation(u64::from(plan.committed));
+                let tick = transport.tick(&mut visible_sink);
+                speaker.sync_after_tick(transport, &tick);
+                vec![(tick, visible_sink.visible(), false)]
+            }
+            None => {
+                let tick = transport.tick(&mut visible_sink);
+                speaker.sync_after_tick(transport, &tick);
+                vec![(tick, visible_sink.visible(), false)]
+            }
+        };
+        for (tick, visible, already_paced) in ticks {
+            if !already_paced {
+                pace_driver(&tick);
+            }
+            match tick {
+                Tick::Presented { late_ms, .. } => {
+                    let at = Instant::now();
+                    // The exact first frame is deliberately presented even when a
+                    // cold multi-track decoder lets the audio clock move past it.
+                    // Keep that catch-up inside startup until the visible frame is
+                    // within one frame of the clock; otherwise frame 1 is counted
+                    // as a steady-state drop immediately after frame 0.
+                    let caught_up = startup_caught_up(late_ms, rate);
+                    if waiting_since.is_some() && !caught_up {
                         speaker.refilling.store(true, Ordering::Relaxed);
-                        transport.seek(scenario.seek_to);
-                        seeks += 1;
-                        since_seek = 0;
-                        last_present = None;
-                        waiting_since = Some(Instant::now());
+                    } else if let Some(began) = waiting_since.take() {
+                        speaker.refilling.store(false, Ordering::Relaxed);
+                        // The first frame of a start or a seek. It is a refill, and
+                        // a refill is reported once — as a startup delay. Charging
+                        // it again as drift and as an interval would make every
+                        // seek look like the scheduler losing the sound, when what
+                        // it did was empty the queues on purpose and fill them from
+                        // the target. The frame supply and audio meters draw the
+                        // same line, and it is the same line the knowledge note
+                        // about a harness not counting its own delay draws.
+                        startups.push(millis(began.elapsed()));
+                    } else {
+                        speaker.refilling.store(false, Ordering::Relaxed);
+                        if let Some(previous) = last_present {
+                            intervals.push(millis(at - previous));
+                        }
+                        drift.push(late_ms.abs());
+                        lateness.push(late_ms);
+                    }
+                    last_present = Some(at);
+                    presented += 1;
+                    since_seek += 1;
+                    progress = at;
+                    peak = peak.max(transport.video_buffered_bytes());
+
+                    if let Some(every) = scenario.seek_every {
+                        if since_seek >= every {
+                            speaker.refilling.store(true, Ordering::Relaxed);
+                            speaker.mute();
+                            transport.seek(scenario.seek_to);
+                            visible_seek_target = Some(
+                                scenario.seek_to.clamp(0, transport.frames()),
+                            );
+                            seeks += 1;
+                            since_seek = 0;
+                            last_present = None;
+                            waiting_since = Some(Instant::now());
+                            reset_continuity = true;
+                        }
+                    }
+                }
+                Tick::Skipped { .. } => {
+                    if waiting_since.is_some() {
+                        skipped_refilling += 1;
+                    } else {
+                        skipped += 1;
+                    }
+                    progress = Instant::now();
+                }
+                Tick::Resynced { .. } | Tick::Failed { .. } => {
+                    progress = Instant::now();
+                }
+                Tick::Held { .. } | Tick::Starved | Tick::Idle => {}
+                // A soak longer than the timeline wraps rather than stopping, and a
+                // wrap is a seek: both halves are thrown away and refilled.
+                Tick::Ended => {
+                    speaker.refilling.store(true, Ordering::Relaxed);
+                    speaker.mute();
+                    transport.seek(0);
+                    visible_seek_target = Some(0);
+                    seeks += 1;
+                    since_seek = 0;
+                    last_present = None;
+                    waiting_since = Some(Instant::now());
+                    progress = Instant::now();
+                    reset_continuity = true;
+                }
+            }
+            let clock_now = clock_frame(&clock, rate);
+            if reset_continuity {
+                continuity.reset(clock_now, visible);
+                reset_continuity = false;
+            } else if !continuity.observe(clock_now, visible) {
+                stalled = true;
+            }
+            if enforce_seek_window {
+                if let Some(target) = visible_seek_target {
+                    if !visible_within_seek_window(visible, target) {
+                        stalled = true;
+                    } else if visible.and_then(|identity| identity.frame) == Some(target) {
+                        visible_seek_target = None;
                     }
                 }
             }
-            Tick::Skipped { .. } => {
-                if waiting_since.is_some() {
-                    skipped_refilling += 1;
-                } else {
-                    skipped += 1;
-                }
-                progress = Instant::now();
+        }
+        if let Some(plan) = replacement.as_mut() {
+            if !plan.started && presented >= plan.after_presented {
+                plan.start(transport);
             }
-            Tick::Resynced { .. } | Tick::Failed { .. } => {
-                progress = Instant::now();
-            }
-            Tick::Held { wait } => {
-                if !wait.is_zero() {
-                    std::thread::sleep(wait);
-                }
-            }
-            Tick::Starved | Tick::Idle => {
-                std::thread::sleep(Duration::from_millis(1));
-            }
-            // A soak longer than the timeline wraps rather than stopping, and a
-            // wrap is a seek: both halves are thrown away and refilled.
-            Tick::Ended => {
-                speaker.refilling.store(true, Ordering::Relaxed);
-                transport.seek(0);
-                seeks += 1;
-                since_seek = 0;
-                last_present = None;
-                waiting_since = Some(Instant::now());
-                progress = Instant::now();
+            if plan.failed {
+                stalled = true;
             }
         }
         if progress.elapsed() >= grace {
@@ -455,14 +807,28 @@ pub fn measure(
         }
     }
 
+    let replacement_failed = replacement
+        .as_ref()
+        .map(|plan| plan.failed)
+        .unwrap_or(false);
+    if replacement
+        .as_ref()
+        .map(|plan| !plan.committed)
+        .unwrap_or(false)
+    {
+        stalled = true;
+    }
+
     let counters = transport.scheduler().counters();
     let metrics = Metrics {
         presented_frames: presented,
         skipped_frames: skipped,
         skipped_while_refilling: skipped_refilling,
-        resyncs: counters.resyncs(),
-        starved_polls: counters.starved(),
-        draw_failures: counters.failures(),
+        resyncs: retired_counters.resyncs + counters.resyncs(),
+        starved_polls: retired_counters.starved + counters.starved(),
+        draw_failures: retired_counters.failures
+            + counters.failures()
+            + u64::from(replacement_failed),
         present_interval_p50_ms: percentile(&intervals, 0.5),
         present_interval_p99_ms: percentile(&intervals, 0.99),
         av_drift_p50_ms: percentile(&drift, 0.5),
@@ -501,8 +867,7 @@ pub fn measure(
             && (metrics.underruns as f64) / (metrics.audio_buffers as f64) <= limits.underrun_rate,
         // A run that drew nothing has no percentiles, and every `within` above
         // would wave it through on `None`. This is the check that refuses it.
-        drew_every_frame: metrics.presented_frames >= scenario.frames
-            && metrics.draw_failures == 0,
+        drew_every_frame: metrics.presented_frames >= scenario.frames && metrics.draw_failures == 0,
         not_stalled: !metrics.stalled,
         finished_in_time: !metrics.overran,
     };
@@ -591,6 +956,7 @@ mod tests {
     use crate::sink::CountingSink;
     use crate::transport::Setup;
     use makevideo_audio::engine::Options as AudioOptions;
+    use makevideo_audio::realtime::Ring;
     use makevideo_audio::source::{
         Buffering as AudioBuffering, Open as AudioOpen, PcmReader, Readers as AudioReaders,
     };
@@ -602,6 +968,28 @@ mod tests {
     };
 
     struct Paced(Duration);
+
+    #[test]
+    fn an_inactive_speaker_flushes_without_advancing_the_clock() {
+        let (producer, consumer) = Ring::new(BUFFER_FRAMES * 2);
+        let samples = vec![0.0; BUFFER_FRAMES * CHANNELS];
+        assert_eq!(producer.push(&samples), BUFFER_FRAMES);
+        let clock = Arc::new(Clock::new());
+        let speaker = Speaker::start(
+            consumer,
+            Arc::clone(&clock),
+            Arc::new(Feed::default()),
+        );
+        let flush = producer.request_flush();
+        let deadline = Instant::now() + Duration::from_millis(100);
+        while producer.flushed() < flush && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+
+        assert_eq!(producer.flushed(), flush);
+        assert_eq!(clock.played_frames(), 0);
+        drop(speaker);
+    }
 
     impl FrameReader for Paced {
         fn read(&mut self, buffer: &mut [u8]) -> bool {
@@ -618,6 +1006,30 @@ mod tests {
     impl FrameReaders for Pace {
         fn open(&self, _request: &FrameOpen) -> Option<Box<dyn FrameReader>> {
             Some(Box::new(Paced(self.0)))
+        }
+    }
+
+    struct FirstDelayed {
+        delay: Option<Duration>,
+    }
+
+    impl FrameReader for FirstDelayed {
+        fn read(&mut self, buffer: &mut [u8]) -> bool {
+            if let Some(delay) = self.delay.take() {
+                std::thread::sleep(delay);
+            }
+            buffer.fill(7);
+            true
+        }
+    }
+
+    struct DelayFirst(Duration);
+
+    impl FrameReaders for DelayFirst {
+        fn open(&self, _request: &FrameOpen) -> Option<Box<dyn FrameReader>> {
+            Some(Box::new(FirstDelayed {
+                delay: Some(self.0),
+            }))
         }
     }
 
@@ -699,6 +1111,39 @@ mod tests {
         measure(&mut transport, consumer, clock, &mut sink, scenario)
     }
 
+    fn run_replacement(first_frame_delay: Duration, scenario: &Scenario) -> ScenarioReport {
+        let project = project();
+        let (mut transport, consumer) = Transport::start(Setup {
+            project: &project,
+            width: 16,
+            height: 16,
+            frame_buffering: FrameBuffering::new(6, 15),
+            frame_readers: Arc::new(Pace(Duration::from_millis(1))),
+            audio_buffering: AudioBuffering::default(),
+            audio_readers: Arc::new(Quiet),
+            audio: AudioOptions::default(),
+            resync_after: DEFAULT_RESYNC,
+        });
+        let clock = Arc::clone(transport.audio().clock());
+        let mut sink = CountingSink::default();
+        measure_video_replacement(
+            &mut transport,
+            consumer,
+            clock,
+            &mut sink,
+            scenario,
+            VideoSetup {
+                project: &project,
+                width: 16,
+                height: 16,
+                frame_buffering: FrameBuffering::new(6, 15),
+                frame_readers: Arc::new(DelayFirst(first_frame_delay)),
+                resync_after: DEFAULT_RESYNC,
+            },
+            10,
+        )
+    }
+
     #[test]
     fn a_source_that_keeps_up_presents_every_frame_in_time() {
         let report = run(
@@ -762,6 +1207,82 @@ mod tests {
         assert!(report.metrics.startup_delay_p99_ms.is_some());
     }
 
+    fn visible(generation: u64, frame: i64) -> Option<VisibleIdentity> {
+        Some(VisibleIdentity {
+            generation,
+            frame: Some(frame),
+        })
+    }
+
+    #[test]
+    fn an_advancing_clock_with_one_fixed_visible_frame_fails() {
+        let mut continuity = VisibleContinuity::new();
+        assert!(continuity.observe(100, visible(0, 100)));
+        assert!(continuity.observe(102, visible(0, 100)));
+        assert!(
+            !continuity.observe(103, visible(0, 100)),
+            "the audio clock crossed three frames while the screen stayed fixed"
+        );
+    }
+
+    #[test]
+    fn a_generation_handoff_on_the_same_frame_does_not_restart_the_freeze_window() {
+        let mut continuity = VisibleContinuity::new();
+        assert!(continuity.observe(100, visible(0, 100)));
+        assert!(continuity.observe(101, visible(0, 100)));
+        assert!(continuity.observe(102, visible(1, 100)));
+        assert!(
+            !continuity.observe(103, visible(1, 100)),
+            "a new generation showing the same frame is still one frozen picture"
+        );
+    }
+
+    #[test]
+    fn old_video_may_keep_advancing_until_the_candidate_commits() {
+        let mut continuity = VisibleContinuity::new();
+        let observations = [
+            (40, visible(0, 40)),
+            (41, visible(0, 41)),
+            (42, visible(0, 42)),
+            (43, visible(0, 43)),
+            // The same project frame in a new generation is the first-frame
+            // commit, not a frozen copy of the old one.
+            (43, visible(1, 43)),
+            (44, visible(1, 44)),
+        ];
+        assert!(observations
+            .into_iter()
+            .all(|(clock, identity)| continuity.observe(clock, identity)));
+    }
+
+    #[test]
+    fn a_playing_seek_accepts_only_blank_or_two_frames_before_exact() {
+        assert!(visible_within_seek_window(None, 20));
+        assert!(visible_within_seek_window(
+            Some(VisibleIdentity {
+                generation: 0,
+                frame: None,
+            }),
+            20,
+        ));
+        for frame in [18, 19, 20] {
+            assert!(visible_within_seek_window(visible(0, frame), 20));
+        }
+        assert!(!visible_within_seek_window(visible(0, 17), 20));
+        assert!(!visible_within_seek_window(visible(0, 21), 20));
+    }
+
+    #[test]
+    fn a_delayed_replacement_passes_while_the_old_video_keeps_moving() {
+        let report = run_replacement(
+            Duration::from_millis(20),
+            &Scenario::new("live-reconfiguration", 60),
+        );
+        assert_eq!(report.metrics.presented_frames, 60, "{report:?}");
+        assert!(!report.metrics.stalled, "{report:?}");
+        assert!(report.evaluation.pass, "{report:?}");
+    }
+
     #[test]
     fn the_percentiles_pick_the_same_element_the_other_meters_do() {
         let values: Vec<f64> = (1..=100).map(|value| value as f64).collect();
@@ -769,6 +1290,13 @@ mod tests {
         assert_eq!(percentile(&values, 0.99), Some(99.0));
         assert_eq!(percentile(&values, 1.0), Some(100.0));
         assert_eq!(percentile(&[], 0.5), None);
+    }
+
+    #[test]
+    fn startup_ends_only_when_the_picture_is_less_than_one_frame_late() {
+        let rate = Rate::fps(30);
+        assert!(startup_caught_up(33.0, rate));
+        assert!(!startup_caught_up(34.0, rate));
     }
 
     /// Every `within` says yes to `None`, so a run that drew nothing at all

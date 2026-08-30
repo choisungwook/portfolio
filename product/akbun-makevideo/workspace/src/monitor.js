@@ -89,17 +89,91 @@ function createMonitor(options) {
   let covered = false;
   let editing = false;
   let lastVisible = null;
+  let sendingVisibility = null;
+  let pendingVisibility = null;
   let lastPlace = null;
   let polling = false;
   let position = 0;
   let playing = false;
   let attaching = null;
+  let releasing = null;
+  let attachmentEpoch = 0;
   let attachWanted = false;
   let placing = null;
   let pendingPlace = null;
   let mediaRefreshPending = false;
   let refreshingMedia = null;
+  let transportIntent = 0;
+  let transportAcknowledged = 0;
+  let transportVersion = 0;
+  let transportQueue = Promise.resolve();
+  let transportCommand = null;
+  let transportPending = 0;
+  let transportNeedsSnapshot = false;
+  let previewOwnsTimeline = true;
   let viewport = GEO.fittedViewport();
+
+  function acknowledgeTransport(intent) {
+    transportAcknowledged = Math.max(transportAcknowledged, intent);
+  }
+
+  function scheduleTransport(command, completesIntent = true) {
+    transportCommand = command;
+    const intent = transportIntent;
+    const version = transportVersion;
+    transportPending += 1;
+    const run = transportQueue.catch(() => {}).then(async () => {
+      while (version === transportVersion) {
+        if (!native) return;
+        const epoch = attachmentEpoch;
+        try {
+          const status = await command();
+          if (version !== transportVersion) return;
+          if (epoch !== attachmentEpoch) continue;
+          if (completesIntent) {
+            acknowledgeTransport(intent);
+            if (intent === transportIntent) takeForEpoch(status, epoch);
+          }
+          return;
+        } catch (_error) {
+          if (version !== transportVersion) return;
+          // A command rejected by a session being replaced still belongs on
+          // the replacement. A same-session rejection cannot apply later:
+          // Rust answers only after apply or after the command channel closes.
+          if (epoch !== attachmentEpoch) continue;
+          if (completesIntent) acknowledgeTransport(intent);
+          return;
+        }
+      }
+    });
+    const request = run.finally(() => {
+      transportPending -= 1;
+    });
+    transportQueue = request;
+    return request;
+  }
+
+  function settleLocalTransport() {
+    transportVersion += 1;
+    transportCommand = null;
+    transportNeedsSnapshot = false;
+    acknowledgeTransport(transportIntent);
+  }
+
+  function queueTransportSnapshot(target, shouldPlay) {
+    transportNeedsSnapshot = false;
+    void scheduleTransport(() => api.playbackSeek(target), false);
+    void scheduleTransport(() =>
+      shouldPlay ? api.playbackPlay() : api.playbackPause()
+    );
+  }
+
+  function scheduleTransportSnapshot(target, shouldPlay) {
+    transportVersion += 1;
+    transportQueue = Promise.resolve();
+    transportCommand = null;
+    queueTransportSnapshot(target, shouldPlay);
+  }
 
   function timelineMode() {
     return preview.mode() === 'timeline';
@@ -124,6 +198,80 @@ function createMonitor(options) {
     return preview.total();
   }
 
+  function boundedPosition(value, fallback = position) {
+    const numeric = Number(value);
+    const candidate = Number.isFinite(numeric) ? numeric : fallback;
+    const duration = Number(total());
+    const end = Number.isFinite(duration) ? Math.max(duration, 0) : Math.max(candidate, 0);
+    return Math.max(0, Math.min(Math.round(candidate), end));
+  }
+
+  function previewPosition(fallback = position) {
+    const value = typeof preview.position === 'function' ? preview.position() : fallback;
+    return boundedPosition(value, fallback);
+  }
+
+  function previewPlaying(fallback = playing) {
+    const value = typeof preview.isPlaying === 'function' ? preview.isPlaying() : fallback;
+    return typeof value === 'boolean' ? value : fallback;
+  }
+
+  function rememberPreviewIntent(target, active) {
+    if (!timelineMode()) return;
+    transportIntent += 1;
+    position = boundedPosition(target);
+    playing = Boolean(active);
+    transportNeedsSnapshot = true;
+  }
+
+  function capturePreviewTransport() {
+    if (!timelineMode() || !previewOwnsTimeline) return;
+    const nextPosition = previewPosition();
+    const nextPlaying = previewPlaying();
+    if (nextPosition !== position || nextPlaying !== playing) {
+      transportIntent += 1;
+      position = nextPosition;
+      playing = nextPlaying;
+      transportNeedsSnapshot = true;
+    }
+  }
+
+  function handTimelineToPreview() {
+    if (!timelineMode() || previewOwnsTimeline) return;
+    previewOwnsTimeline = true;
+    preview.seek(position);
+    if (playing) preview.play();
+    else preview.pause();
+  }
+
+  async function flushVisibility(epoch) {
+    while (epoch === attachmentEpoch && pendingVisibility) {
+      const next = pendingVisibility.value;
+      pendingVisibility = null;
+      try {
+        await api.playbackVisible(next);
+        if (epoch !== attachmentEpoch) {
+          lastVisible = null;
+          return;
+        }
+      } catch (_error) {
+        if (epoch === attachmentEpoch && lastVisible === next) lastVisible = null;
+      }
+    }
+  }
+
+  function queueVisibility(wanted) {
+    pendingVisibility = { value: wanted };
+    if (sendingVisibility) return;
+    const epoch = attachmentEpoch;
+    const request = flushVisibility(epoch).finally(() => {
+      if (sendingVisibility !== request) return;
+      sendingVisibility = null;
+      if (pendingVisibility) queueVisibility(pendingVisibility.value);
+    });
+    sendingVisibility = request;
+  }
+
   /** Send the view's visibility only when it actually changes. The renderer
    *  asks on every timeline redraw, and one command per redraw would be a
    *  round trip for every keystroke that moves a clip.
@@ -142,7 +290,7 @@ function createMonitor(options) {
     });
     if (wanted === lastVisible) return;
     lastVisible = wanted;
-    api.playbackVisible(wanted).catch(() => {});
+    queueVisibility(wanted);
   }
 
   /** The stage box as it is right now, from the panel and the project.
@@ -181,15 +329,25 @@ function createMonitor(options) {
    *  reason, which is the whole point of keeping that preview. */
   async function attach() {
     if (!api || !api.available) return false;
+    const requestedAt = attachmentEpoch;
+    if (releasing) {
+      await releasing;
+      if (requestedAt !== attachmentEpoch) return false;
+    }
     attachWanted = true;
     if (options.pageOverlayActive && options.pageOverlayActive()) {
       attachWanted = false;
-      native = false;
-      lastPlace = null;
-      lastVisible = null;
-      preview.seek(position);
+      if (native || attaching) {
+        await release();
+      } else {
+        native = false;
+        lastPlace = null;
+        lastVisible = null;
+      }
+      handTimelineToPreview();
       return false;
     }
+    if (!native) capturePreviewTransport();
     const place = currentPlace();
     // No room yet. The window is still being laid out, or the panel is dragged
     // shut. Giving up here permanently was a silent fallback to the media
@@ -201,36 +359,79 @@ function createMonitor(options) {
     // opens, and a second attach mid-flight would start a session the first one
     // is about to replace.
     if (attaching) return attaching;
+    const startedNonnative = !native;
+    const attachIntent = transportIntent;
+    const epoch = (attachmentEpoch += 1);
     attaching = (async () => {
       try {
         const answer = await api.playbackAttach(place, Math.round(position));
+        if (epoch !== attachmentEpoch) return false;
         const choice = readChoice(answer);
+        if (choice.native && startedNonnative) capturePreviewTransport();
         native = choice.native;
         lastPlace = native ? place : null;
         if (native) {
-          // The stacked elements are not what is on screen any more, and every
-          // one of them holds a decoder.
-          preview.pause();
-          preview.clear();
-          preview.clearExact();
+          const snapshotPosition = position;
+          const snapshotPlaying = playing;
+          const intentChanged = attachIntent !== transportIntent;
+          const replacementHasUnacknowledgedTransport =
+            startedNonnative &&
+            !previewOwnsTimeline &&
+            transportAcknowledged < transportIntent;
+          const needsSnapshot =
+            transportNeedsSnapshot ||
+            (startedNonnative && snapshotPlaying) ||
+            replacementHasUnacknowledgedTransport;
+          if (!needsSnapshot && !intentChanged && answer.status) {
+            takeForEpoch(answer.status, epoch);
+          }
+          if (timelineMode()) {
+            // The stacked timeline elements are not what is on screen any
+            // more, and every one of them holds a decoder. An asset preview is
+            // still a media element on both engines and must keep playing.
+            preview.pause();
+            preview.clear();
+            preview.clearExact();
+          } else if (typeof preview.clearTimeline === 'function') {
+            preview.clearTimeline();
+          }
+          previewOwnsTimeline = false;
+          if (needsSnapshot) {
+            scheduleTransportSnapshot(snapshotPosition, snapshotPlaying);
+          } else if (
+            transportPending === 0 &&
+            transportAcknowledged < transportIntent &&
+            transportCommand
+          ) {
+            void scheduleTransport(transportCommand);
+          }
+        } else {
+          handTimelineToPreview();
         }
         lastVisible = null;
         syncVisibility();
         if (onNotice) onNotice(choice.notice);
         return native;
       } catch (error) {
-        native = false;
+        if (epoch !== attachmentEpoch) return false;
+        if (startedNonnative) {
+          native = false;
+          handTimelineToPreview();
+        }
         if (onNotice) onNotice(String(error));
-        return false;
+        return native;
       } finally {
-        attaching = null;
+        if (epoch === attachmentEpoch) attaching = null;
       }
     })();
     return attaching;
   }
 
   async function release() {
-    if (!api || !api.available) return;
+    // Forget an attach immediately. Its native answer can arrive after the
+    // release command, but it belongs to the session the page just discarded.
+    attachmentEpoch += 1;
+    attaching = null;
     native = false;
     // Including a want that was still waiting for room. Releasing is the page
     // saying it does not have a monitor any more, and the retry would hand it
@@ -238,22 +439,45 @@ function createMonitor(options) {
     attachWanted = false;
     lastPlace = null;
     lastVisible = null;
+    pendingVisibility = null;
     covered = false;
+    polling = 0;
+    pendingPlace = null;
+    // An already sent placement still belongs to the old backend session.
+    // Forget its queue owner so the replacement session can place itself now;
+    // the old completion checks both this promise identity and the epoch.
+    placing = null;
+    if (!api || !api.available) return;
+    if (releasing) return releasing;
+    const request = (async () => {
+      try {
+        await api.playbackRelease();
+      } catch (error) {
+        // Nothing to do about it and nothing depends on it: the session is
+        // already forgotten here, and dropping it is what its own thread does.
+      }
+    })();
+    releasing = request;
     try {
-      await api.playbackRelease();
-    } catch (error) {
-      // Nothing to do about it and nothing depends on it: the session is
-      // already forgotten here, and dropping it is what its own thread does.
+      await request;
+    } finally {
+      if (releasing === request) releasing = null;
     }
   }
 
   async function applyMediaRefresh() {
-    if (!mediaRefreshPending || refreshingMedia || currentlyPlaying()) return refreshingMedia;
+    if (!mediaRefreshPending || refreshingMedia) return refreshingMedia;
     mediaRefreshPending = false;
+    const epoch = attachmentEpoch;
+    const intent = transportIntent;
+    const acknowledged = transportAcknowledged;
     refreshingMedia = (async () => {
-      if (drivingNatively()) {
-        await release();
-        await attach();
+      // The backend waits for an in-flight attach before looking up the
+      // session. Calling while attach is pending matters: otherwise a proxy
+      // that becomes ready between the attach snapshot and its answer is lost.
+      if (api && api.available) {
+        const status = await api.playbackRefresh();
+        if (intent === transportIntent && intent <= acknowledged) takeForEpoch(status, epoch);
       }
       // Nothing for the media elements. Their pool is keyed by the path
       // `playbackPath` hands back, and the animation frame compares it on every
@@ -265,14 +489,10 @@ function createMonitor(options) {
       await refreshingMedia;
     } finally {
       refreshingMedia = null;
-      if (mediaRefreshPending && !currentlyPlaying()) {
+      if (mediaRefreshPending) {
         void applyMediaRefresh().catch(() => {});
       }
     }
-  }
-
-  function currentlyPlaying() {
-    return drivingNatively() ? playing : preview.isPlaying();
   }
 
   /** Tell Rust where the box is now, and whether there is still room for it.
@@ -281,13 +501,18 @@ function createMonitor(options) {
    *  one command per pixel the box actually moved rather than one per frame.
    *  Returns the box it measured, so the frame loop can use it again without a
    *  second layout read. */
-  async function flushPlace() {
-    while (pendingPlace) {
+  async function flushPlace(epoch) {
+    while (epoch === attachmentEpoch && pendingPlace) {
       const next = pendingPlace;
       pendingPlace = null;
       try {
         await api.playbackPlace(next);
+        if (epoch !== attachmentEpoch) {
+          lastPlace = null;
+          return;
+        }
       } catch (_error) {
+        if (epoch === attachmentEpoch && samePlace(lastPlace, next)) lastPlace = null;
         // A later frame will measure again. Placement failure must not stop
         // playback or leave an unhandled rejection in the page.
       }
@@ -297,10 +522,13 @@ function createMonitor(options) {
   function queuePlace(next) {
     pendingPlace = next;
     if (placing) return;
-    placing = flushPlace().finally(() => {
+    const epoch = attachmentEpoch;
+    const request = flushPlace(epoch).finally(() => {
+      if (placing !== request) return;
       placing = null;
       if (pendingPlace) queuePlace(pendingPlace);
     });
+    placing = request;
   }
 
   function place() {
@@ -328,16 +556,23 @@ function createMonitor(options) {
    *  answer cannot queue up behind itself. */
   function poll() {
     if (!drivingNatively() || polling) return;
-    polling = true;
+    const epoch = attachmentEpoch;
+    const intent = transportIntent;
+    const acknowledged = transportAcknowledged;
+    polling = epoch;
     api
       .playbackStatus()
       .then((status) => {
-        polling = false;
+        if (polling === epoch) polling = 0;
         if (!status) return;
-        take(status);
+        if (intent !== transportIntent) return;
+        // A poll started after a click can still outrun the native command.
+        // Ignore it until a later poll starts after that command answers.
+        if (intent > acknowledged) return;
+        takeForEpoch(status, epoch);
       })
       .catch(() => {
-        polling = false;
+        if (polling === epoch) polling = 0;
       });
   }
 
@@ -351,6 +586,11 @@ function createMonitor(options) {
     // Reaching the end stops the monitor on its own, and the page's play button
     // has to notice.
     if (wasPlaying && !playing && onTick) onTick(position, false);
+  }
+
+  function takeForEpoch(status, epoch) {
+    if (epoch !== attachmentEpoch) return;
+    take(status);
   }
 
   /** The box is re-measured on every animation frame, and `place()` compares
@@ -383,12 +623,12 @@ function createMonitor(options) {
     place,
     usesNativeMonitor: drivingNatively,
 
-    /** Use newly generated proxy paths without replacing a live decoder.
+    /** Use newly generated proxy paths without replacing the native session.
      *
      *  A native session captures its proxy map when it starts, while media
-     *  elements capture their paths when they are drawn. Replacing either
-     *  during playback stops the current stream, so defer the refresh until
-     *  playback is stopped. */
+     *  elements capture their paths when they are drawn. Rust prepares the new
+     *  native source while the old one keeps playing; media elements notice a
+     *  changed path in their animation pass without an explicit refresh. */
     refreshMedia() {
       mediaRefreshPending = true;
       return applyMediaRefresh();
@@ -421,31 +661,35 @@ function createMonitor(options) {
     },
 
     play() {
-      const start = () => {
-        if (!drivingNatively()) return preview.play();
-        if (total() <= 0) return;
-        if (position >= total()) position = 0;
-        playing = true;
-        if (onTick) onTick(position, true);
-        return api.playbackPlay().then(take).catch(() => {});
-      };
-      return mediaRefreshPending ? Promise.resolve(applyMediaRefresh()).then(start) : start();
+      if (!drivingNatively()) {
+        handTimelineToPreview();
+        const result = preview.play();
+        if (timelineMode()) {
+          const active = Math.max(Number(total()) || 0, 0) > 0;
+          rememberPreviewIntent(previewPosition(position), active);
+        }
+        return result;
+      }
+      if (total() <= 0) return;
+      if (position >= total()) position = 0;
+      transportIntent += 1;
+      playing = true;
+      if (onTick) onTick(position, true);
+      return scheduleTransport(() => api.playbackPlay());
     },
 
     async pause() {
       if (!drivingNatively()) {
-        await Promise.resolve(preview.pause());
-        await applyMediaRefresh();
+        handTimelineToPreview();
+        const result = preview.pause();
+        if (timelineMode()) rememberPreviewIntent(previewPosition(position), false);
+        await Promise.resolve(result);
         return;
       }
+      transportIntent += 1;
       playing = false;
       if (onTick) onTick(position, false);
-      try {
-        take(await api.playbackPause());
-      } catch (_error) {
-        return;
-      }
-      await applyMediaRefresh();
+      await scheduleTransport(() => api.playbackPause());
     },
 
     toggle() {
@@ -453,15 +697,25 @@ function createMonitor(options) {
     },
 
     isPlaying() {
-      return currentlyPlaying();
+      return drivingNatively() || (timelineMode() && !previewOwnsTimeline)
+        ? playing
+        : preview.isPlaying();
     },
 
     seek(frames) {
-      if (!drivingNatively()) return preview.seek(frames);
+      if (!drivingNatively()) {
+        handTimelineToPreview();
+        const result = preview.seek(frames);
+        if (timelineMode()) {
+          rememberPreviewIntent(boundedPosition(frames), previewPlaying(playing));
+        }
+        return result;
+      }
       const target = Math.max(0, Math.min(Math.round(frames), Math.max(total(), 0)));
+      transportIntent += 1;
       position = target;
       if (onTick) onTick(position, playing);
-      return api.playbackSeek(target).catch(() => {});
+      return scheduleTransport(() => api.playbackSeek(target));
     },
 
     /** The timeline changed under a stopped playhead. A playing one is left
@@ -477,7 +731,9 @@ function createMonitor(options) {
     },
 
     position() {
-      return drivingNatively() ? position : preview.position();
+      return drivingNatively() || (timelineMode() && !previewOwnsTimeline)
+        ? position
+        : preview.position();
     },
 
     total,
@@ -485,25 +741,45 @@ function createMonitor(options) {
     prune: preview.prune,
 
     clear() {
+      transportIntent += 1;
+      settleLocalTransport();
       position = 0;
       playing = false;
       preview.clear();
+      if (!native) previewOwnsTimeline = true;
     },
 
     showAsset(asset) {
+      const leavingTimeline = timelineMode();
+      if (leavingTimeline && !native) capturePreviewTransport();
+      if (leavingTimeline) {
+        transportIntent += 1;
+        playing = false;
+        if (native) {
+          void scheduleTransport(() => api.playbackPause());
+        } else {
+          transportNeedsSnapshot = true;
+        }
+      }
       // An asset preview is a media element in the page on both engines, so
       // the monitor stops playing *and* gets out of the way. Without the
       // second half the asset plays behind a native view still showing the
       // last timeline frame, because that view is over the webview.
-      if (native) api.playbackPause().catch(() => {});
       preview.showAsset(asset);
       syncVisibility();
     },
 
     showTimeline() {
+      transportIntent += 1;
       preview.showTimeline();
       position = 0;
       playing = false;
+      previewOwnsTimeline = !native;
+      if (native) {
+        queueTransportSnapshot(position, playing);
+      } else {
+        settleLocalTransport();
+      }
       place();
       syncVisibility();
     },

@@ -226,3 +226,85 @@ test('an asset measured after it was shown still gets its own shape', async (con
   assert.strictEqual(stage.style.width, '600px', 'the square asset fills the height');
   assert.strictEqual(stage.style.height, '600px');
 });
+
+test('clearing the timeline pool keeps the asset preview alive', (context) => {
+  const original = {
+    document: global.document,
+    window: global.window,
+    timelineLib: global.timelineLib,
+    requestAnimationFrame: global.requestAnimationFrame,
+    performance: global.performance,
+  };
+  context.after(() => Object.assign(global, original));
+
+  const elements = [];
+  global.requestAnimationFrame = () => 0;
+  global.performance = { now: () => 0 };
+  global.document = {
+    createElement(tagName) {
+      const element = fakeMedia(tagName.toUpperCase(), () => Promise.resolve());
+      element.removed = false;
+      element.sourceRemoved = false;
+      element.remove = () => {
+        element.removed = true;
+      };
+      element.removeAttribute = (name) => {
+        if (name === 'src') element.sourceRemoved = true;
+      };
+      elements.push(element);
+      return element;
+    },
+  };
+  global.window = { api: { fileUrl: (path) => path } };
+
+  const timelineAsset = { id: 'timeline', path: '/timeline.mp4', kind: 'video' };
+  const shownAsset = { id: 'shown', path: '/shown.mp4', kind: 'video' };
+  const track = {
+    id: 'v1',
+    kind: 'video',
+    hidden: false,
+    muted: false,
+    clips: [{
+      id: 'c1',
+      assetId: timelineAsset.id,
+      start: 0,
+      in: 0,
+      out: 30,
+      opacity: 1,
+      volume: 1,
+    }],
+  };
+  const project = {
+    settings: { width: 1920, height: 1080, rate: T.fps(30) },
+    tracks: [track],
+    assets: [timelineAsset, shownAsset],
+  };
+  global.timelineLib = {
+    tracksOf: (value, kind) => value.tracks.filter((item) => item.kind === kind),
+    clipsAt: (_value, frame) => frame < 30
+      ? [{ track, clip: track.clips[0], sourceFrame: frame }]
+      : [],
+    findAsset: (_value, assetId) => project.assets.find((asset) => asset.id === assetId),
+    projectDurationFrames: () => 30,
+  };
+
+  const preview = require('../src/preview.js').createPreview({
+    stage: { style: {} },
+    inner: { style: {}, appendChild() {} },
+    wrap: null,
+    exactCanvas: null,
+    getProject: () => project,
+    onTick: () => {},
+  });
+
+  preview.seek(0);
+  preview.showAsset(shownAsset);
+  const [timelineElement, assetElement] = elements;
+  preview.clearTimeline();
+
+  assert.strictEqual(timelineElement.removed, true);
+  assert.strictEqual(timelineElement.sourceRemoved, true);
+  assert.strictEqual(assetElement.removed, false);
+  assert.strictEqual(assetElement.sourceRemoved, false);
+  assert.strictEqual(preview.mode(), 'asset');
+});

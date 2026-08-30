@@ -69,6 +69,45 @@ pub fn item_rasters(project: &Project, width: u32, height: u32) -> Vec<ItemRaste
     each_visual_item(project, width, height, None)
 }
 
+/// Timeline spans and logical RGBA bytes for text and shape layers.
+///
+/// The source memory meter needs the same dimensions as rasterization without
+/// eagerly rasterizing every visual in a project just to calculate a bound.
+pub(crate) fn byte_spans(project: &Project, width: u32, height: u32) -> Vec<(i64, i64, usize)> {
+    let scale_x = width as f32 / project.settings.width.max(1) as f32;
+    let scale_y = height as f32 / project.settings.height.max(1) as f32;
+    let mut spans = Vec::new();
+    for track in project.tracks.iter().filter(|track| track.contributes()) {
+        if !matches!(
+            track.kind,
+            makevideo_render::TrackKind::Video | makevideo_render::TrackKind::Subtitle
+        ) {
+            continue;
+        }
+        for item in &track.visual_items {
+            if !matches!(
+                &item.content,
+                VisualContent::Text { .. } | VisualContent::Shape { .. }
+            ) {
+                continue;
+            }
+            let transform = visual_transform(project, track, item);
+            let (item_width, item_height) = visual_dimensions(transform, scale_x, scale_y);
+            let end = item.end_frame();
+            if end > item.start {
+                spans.push((
+                    item.start,
+                    end,
+                    (item_width as usize)
+                        .saturating_mul(item_height as usize)
+                        .saturating_mul(4),
+                ));
+            }
+        }
+    }
+    spans
+}
+
 /// The one walk both entry points share: tracks in project order, items in
 /// z order within a track, which is also the paint order. `at` narrows it to
 /// the items covering one frame.
@@ -94,20 +133,8 @@ fn each_visual_item(
             .collect();
         items.sort_by_key(|item| item.z_index);
         for item in items {
-            let transform = if track.kind == makevideo_render::TrackKind::Subtitle {
-                makevideo_render::VisualTransform {
-                    x: 96.0,
-                    y: project.settings.height as f32 * 0.78,
-                    width: project.settings.width as f32 - 192.0,
-                    height: project.settings.height as f32 * 0.16,
-                    rotation: 0.0,
-                    opacity: 1.0,
-                }
-            } else {
-                item.transform
-            };
-            let item_width = (transform.width * scale_x).round().max(1.0) as u32;
-            let item_height = (transform.height * scale_y).round().max(1.0) as u32;
+            let transform = visual_transform(project, track, item);
+            let (item_width, item_height) = visual_dimensions(transform, scale_x, scale_y);
             let pixels = match &item.content {
                 VisualContent::Text { text, style } => {
                     let style = track.subtitle_style.as_ref().unwrap_or(style);
@@ -155,6 +182,36 @@ fn each_visual_item(
         }
     }
     layers
+}
+
+fn visual_transform(
+    project: &Project,
+    track: &makevideo_render::Track,
+    item: &makevideo_render::VisualItem,
+) -> makevideo_render::VisualTransform {
+    if track.kind == makevideo_render::TrackKind::Subtitle {
+        makevideo_render::VisualTransform {
+            x: 96.0,
+            y: project.settings.height as f32 * 0.78,
+            width: project.settings.width as f32 - 192.0,
+            height: project.settings.height as f32 * 0.16,
+            rotation: 0.0,
+            opacity: 1.0,
+        }
+    } else {
+        item.transform
+    }
+}
+
+fn visual_dimensions(
+    transform: makevideo_render::VisualTransform,
+    scale_x: f32,
+    scale_y: f32,
+) -> (u32, u32) {
+    (
+        (transform.width * scale_x).round().max(1.0) as u32,
+        (transform.height * scale_y).round().max(1.0) as u32,
+    )
 }
 
 /// Write an RGBA raster as a PAM still, for handing to ffmpeg as an overlay

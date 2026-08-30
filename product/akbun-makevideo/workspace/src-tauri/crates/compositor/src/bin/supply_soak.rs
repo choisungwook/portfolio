@@ -10,7 +10,7 @@
 //! supply layer has a pass mark now, and it is checked by running it rather
 //! than by watching it.
 
-use makevideo_compositor::source::{Buffering, FfmpegReaders, FrameSource};
+use makevideo_compositor::source::{Buffering, FfmpegReaders, FrameSource, MAX_FORWARD_SEEK};
 use makevideo_compositor::supply::{measure, ProjectInfo, Run, Scenario, ScenarioReport};
 use makevideo_render::{ffmpeg, layout, Project, TrackKind};
 use std::collections::BTreeMap;
@@ -149,17 +149,31 @@ fn run() -> Result<Run, String> {
     ));
     drop(source);
 
-    // Seeks, which is where a refill that is too slow shows. Both are the same
-    // operation inside the source: empty the queues, fill them from the target.
+    // A backward seek takes the refill path: the old forward reader cannot
+    // produce an earlier frame, so queues are rebuilt from zero.
     let mut source = build(&with_video_tracks(&project, 1), &options);
     let every = (options.seek_every_seconds * rate.as_f64())
         .round()
         .max(1.0) as u64;
     scenarios.push(measure(
         &mut source,
-        &Scenario::new("repeated-seek", frames)
+        &Scenario::new("repeated-backward-seek", frames)
             .seeking(every, 0)
             .noting("videoTracks", "1".into()),
+    ));
+    drop(source);
+
+    // A nearby forward target stays inside the live-reader reuse window. Its
+    // report is separate from the backward refill so a regression cannot hide
+    // in their combined percentile.
+    let short_forward = 12.min(MAX_FORWARD_SEEK);
+    let mut source = build(&with_video_tracks(&project, 1), &options);
+    scenarios.push(measure(
+        &mut source,
+        &Scenario::new("repeated-short-forward-seek", frames)
+            .seeking_forward(every, short_forward)
+            .noting("videoTracks", "1".into())
+            .noting("seekFrames", short_forward.to_string()),
     ));
     drop(source);
 

@@ -198,9 +198,11 @@ impl Engine {
         let thread_feed = Arc::clone(&feed);
         let feeder = std::thread::spawn(move || {
             let mut block = vec![0.0f32; BLOCK_FRAMES * CHANNELS];
+            let mut seeks_received = 0u64;
             // A flush that has been asked for and not yet answered, with where
-            // the source landed. While this is set, nothing may be pushed.
-            let mut awaiting: Option<(u64, i64)> = None;
+            // the source landed and how many seeks it represents. While this
+            // is set, nothing may be pushed.
+            let mut awaiting: Option<(u64, i64, u64)> = None;
             thread_clock.restart(0);
             loop {
                 match commands.try_recv() {
@@ -211,7 +213,8 @@ impl Engine {
                         // while the callback catches up.
                         let request = producer.request_flush();
                         source.seek(sample);
-                        awaiting = Some((request, source.position()));
+                        seeks_received += 1;
+                        awaiting = Some((request, source.position(), seeks_received));
                         thread_feed.ended.store(false, Ordering::Relaxed);
                         // The ring is about to be empty, so what it held before
                         // the seek is not a low water mark for what comes after.
@@ -221,7 +224,7 @@ impl Engine {
                     Err(TryRecvError::Empty) => {}
                 }
 
-                if let Some((request, position)) = awaiting {
+                if let Some((request, position, completed_seeks)) = awaiting {
                     if producer.flushed() < request {
                         std::thread::sleep(POLL);
                         continue;
@@ -231,7 +234,12 @@ impl Engine {
                     // these are last, so anyone who sees `seeks_done` move can
                     // trust everything above it.
                     thread_clock.restart(position.max(0) as u64);
-                    thread_feed.seeks_done.fetch_add(1, Ordering::SeqCst);
+                    // Several seeks can be coalesced into one callback flush.
+                    // Publish the number represented by the newest target,
+                    // rather than counting that one flush as one seek.
+                    thread_feed
+                        .seeks_done
+                        .store(completed_seeks, Ordering::SeqCst);
                     awaiting = None;
                 }
 
@@ -486,6 +494,34 @@ mod tests {
         }
         assert_eq!(clock.position_samples(), 48_000);
         assert_eq!(rest.len() / CHANNELS, 24_000, "exactly what was left");
+    }
+
+    #[test]
+    fn rapid_seeks_coalesced_by_one_flush_all_settle_on_the_latest_target() {
+        let project = one_clip_project();
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
+        assert!(engine.wait_until_ready(2_048, Instant::now() + Duration::from_secs(10)));
+
+        engine.seek_sample(12_000);
+        engine.seek_sample(24_000);
+        // Let the feeder receive both commands before the consumer answers.
+        // One callback then acknowledges both flush requests at once.
+        std::thread::sleep(Duration::from_millis(50));
+        consumer.take_flush();
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !engine.settled() && Instant::now() < deadline {
+            consumer.take_flush();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(engine.settled(), "coalesced seeks never settled");
+        assert_eq!(clock.position_samples(), 24_000);
+        assert_eq!(engine.feed().seeks_done(), 2);
     }
 
     #[test]

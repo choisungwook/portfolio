@@ -22,10 +22,11 @@
 use crate::{lut::Lut, Placement as Draw, Source};
 use makevideo_render::layout::{self, Placement, Rect};
 use makevideo_render::{ffmpeg, AssetKind, Project, Rate, RationalTime};
+use std::collections::VecDeque;
 use std::io::Read;
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::mpsc::{sync_channel, Receiver, TryRecvError};
+use std::sync::mpsc::{sync_channel, Receiver, TryRecvError, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -45,8 +46,44 @@ pub const DEFAULT_DEPTH: usize = 6;
 /// frame is late by all of it, so it is done half a second early instead.
 pub const DEFAULT_LEAD: i64 = 15;
 
+/// A decoder already moving forward is cheaper to keep than an ffmpeg process
+/// is to restart. Beyond this distance the queued work is no longer a useful
+/// head start, so the old seek path remains the safer bound.
+pub const MAX_FORWARD_SEEK: i64 = 24;
+
+/// While a seek is still decoding its exact target, playback may use only a
+/// project frame immediately behind it. Paused stills never use this path.
+pub const SEEK_NEIGHBOR_FRAMES: i64 = 2;
+
+/// How long a paused decoder keeps its process and bounded queue warm.
+/// Resuming inside this window avoids another process spawn; after it, the
+/// isolated child is released instead of occupying memory indefinitely.
+pub const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// How long `take_by` sleeps between attempts while it waits.
 const POLL: Duration = Duration::from_micros(500);
+
+trait LifecycleClock: Send + Sync {
+    fn now(&self) -> Duration;
+}
+
+struct SystemClock {
+    started: Instant,
+}
+
+impl SystemClock {
+    fn new() -> SystemClock {
+        SystemClock {
+            started: Instant::now(),
+        }
+    }
+}
+
+impl LifecycleClock for SystemClock {
+    fn now(&self) -> Duration {
+        self.started.elapsed()
+    }
+}
 
 /// Raw frames for one clip, in order, already scaled to the size they will be
 /// drawn at.
@@ -147,6 +184,7 @@ impl Readers for FfmpegReaders {
 
 struct FfmpegReader {
     child: Arc<Mutex<Child>>,
+    cancelled: Arc<AtomicBool>,
     stdout: ChildStdout,
     fallback: Option<(String, Vec<String>)>,
     began: bool,
@@ -160,14 +198,15 @@ impl FfmpegReader {
     ) -> Option<FfmpegReader> {
         let (child, stdout) = Self::spawn(ffmpeg, args)?;
         Some(FfmpegReader {
-            child,
+            child: Arc::new(Mutex::new(child)),
+            cancelled: Arc::new(AtomicBool::new(false)),
             stdout,
             fallback,
             began: false,
         })
     }
 
-    fn spawn(ffmpeg: &str, args: &[String]) -> Option<(Arc<Mutex<Child>>, ChildStdout)> {
+    fn spawn(ffmpeg: &str, args: &[String]) -> Option<(Child, ChildStdout)> {
         let mut child = Command::new(ffmpeg)
             .args(args)
             .stdin(Stdio::null())
@@ -178,22 +217,26 @@ impl FfmpegReader {
             .spawn()
             .ok()?;
         let stdout = child.stdout.take()?;
-        Some((Arc::new(Mutex::new(child)), stdout))
+        Some((child, stdout))
     }
 
     fn retry_with_software(&mut self) -> bool {
         let Some((ffmpeg, args)) = self.fallback.take() else {
             return false;
         };
-        {
-            let mut child = self.child.lock().unwrap();
-            let _ = child.kill();
-            let _ = child.wait();
+        // Keep the stable slot locked through replacement. A cancellation
+        // racing the fallback then waits and kills the new child, rather than
+        // returning after killing only the child that just failed.
+        let mut current = self.child.lock().unwrap();
+        let _ = current.kill();
+        let _ = current.wait();
+        if self.cancelled.load(Ordering::SeqCst) {
+            return false;
         }
         let Some((child, stdout)) = Self::spawn(&ffmpeg, &args) else {
             return false;
         };
-        self.child = child;
+        *current = child;
         self.stdout = stdout;
         true
     }
@@ -201,10 +244,12 @@ impl FfmpegReader {
 
 struct FfmpegCancel {
     child: Arc<Mutex<Child>>,
+    cancelled: Arc<AtomicBool>,
 }
 
 impl CancelRead for FfmpegCancel {
     fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
         let _ = self.child.lock().unwrap().kill();
     }
 }
@@ -225,6 +270,7 @@ impl FrameReader for FfmpegReader {
     fn cancellation(&self) -> Option<Arc<dyn CancelRead>> {
         Some(Arc::new(FfmpegCancel {
             child: Arc::clone(&self.child),
+            cancelled: Arc::clone(&self.cancelled),
         }))
     }
 }
@@ -343,6 +389,57 @@ pub enum Supply {
     End,
 }
 
+/// Resource state of this source's decoder processes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecoderLifecycle {
+    Running,
+    Idle,
+    Released,
+}
+
+struct DecodedFrame {
+    generation: u64,
+    frame: i64,
+    pixels: Vec<u8>,
+}
+
+#[derive(Clone, Copy)]
+struct DecoderDemand {
+    generation: u64,
+    first_frame: i64,
+}
+
+struct DecoderControl {
+    demand: Mutex<DecoderDemand>,
+    wake: std::sync::Condvar,
+}
+
+impl DecoderControl {
+    fn new(generation: u64, first_frame: i64) -> DecoderControl {
+        DecoderControl {
+            demand: Mutex::new(DecoderDemand {
+                generation,
+                first_frame,
+            }),
+            wake: std::sync::Condvar::new(),
+        }
+    }
+
+    fn retarget(&self, generation: u64, first_frame: i64) {
+        let mut demand = self.demand.lock().unwrap();
+        *demand = DecoderDemand {
+            generation,
+            first_frame,
+        };
+        self.wake.notify_all();
+    }
+
+    fn notify(&self) {
+        let _demand = self.demand.lock().unwrap();
+        self.wake.notify_all();
+    }
+}
+
 impl Supply {
     pub fn frame(self) -> Option<Frame> {
         match self {
@@ -357,16 +454,22 @@ struct Stream {
     placement: Placement,
     lut: Option<Arc<Lut>>,
     frame_bytes: usize,
-    receiver: Option<Receiver<Vec<u8>>>,
+    receiver: Option<Receiver<DecodedFrame>>,
+    /// Frames retained from an existing queue across a short forward seek.
+    /// Their generation is promoted only after their absolute project frame
+    /// proves they are still valid for the new target.
+    ready: VecDeque<DecodedFrame>,
     /// The frame taken out of the queue but not yet handed over, because some
     /// other clip was not ready. This is what makes a starved poll consume
     /// nothing.
-    pending: Option<Vec<u8>>,
-    /// What is sitting in the queue, so the memory can be reported without
-    /// draining it.
-    queued: Arc<AtomicUsize>,
+    pending: Option<DecodedFrame>,
+    /// Every decoded frame not yet consumed, whether it is in the channel, in
+    /// `ready`, or in `pending`. Sharing the count with the producer keeps a
+    /// retargeted queue within the same memory bound while it is being drained.
+    buffered: Arc<AtomicUsize>,
     decoder: Option<JoinHandle<()>>,
     cancellation: Arc<DecoderCancellation>,
+    control: Arc<DecoderControl>,
     /// The source could not be opened or has run out. Its clip stops drawing.
     dead: bool,
 }
@@ -393,6 +496,10 @@ impl DecoderCancellation {
             reader.cancel();
         }
     }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
 }
 
 impl Stream {
@@ -414,12 +521,23 @@ pub struct FrameSource {
     rate: Rate,
     frames: i64,
     position: i64,
+    generation: u64,
+    /// A tolerant seek consumes at most two earlier project frames while it
+    /// waits for the exact target. The latest complete one is offered to the
+    /// playback scheduler, but never returned by `take` itself.
+    seek_probe: Option<i64>,
+    seek_neighbor: Option<Frame>,
+    lifecycle_clock: Arc<dyn LifecycleClock>,
+    idle_timeout: Duration,
+    idle_since: Option<Duration>,
     /// The edit this source was built from, kept for the text and shape items.
     /// They are rasterized per frame (and cached by content) rather than
     /// decoded, so they have no stream of their own.
     project: Project,
     width: u32,
     height: u32,
+    video_frame_ceiling: usize,
+    visual_frame_ceiling: usize,
 }
 
 impl FrameSource {
@@ -433,24 +551,47 @@ impl FrameSource {
         buffering: Buffering,
         readers: Arc<dyn Readers>,
     ) -> FrameSource {
+        Self::new_with_clock(
+            project,
+            width,
+            height,
+            buffering,
+            readers,
+            Arc::new(SystemClock::new()),
+            DEFAULT_IDLE_TIMEOUT,
+        )
+    }
+
+    fn new_with_clock(
+        project: &Project,
+        width: u32,
+        height: u32,
+        buffering: Buffering,
+        readers: Arc<dyn Readers>,
+        lifecycle_clock: Arc<dyn LifecycleClock>,
+        idle_timeout: Duration,
+    ) -> FrameSource {
         let streams = layout::placements(project, width, height)
             .into_iter()
             .map(|placement| Stream {
                 frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
-                lut: project.clip(&placement.clip_id)
+                lut: project
+                    .clip(&placement.clip_id)
                     .and_then(|clip| clip.lut_path.as_deref())
                     .and_then(|path| Lut::from_cube_file(path).ok())
                     .map(Arc::new),
                 placement,
                 receiver: None,
+                ready: VecDeque::new(),
                 pending: None,
-                queued: Arc::new(AtomicUsize::new(0)),
+                buffered: Arc::new(AtomicUsize::new(0)),
                 decoder: None,
                 cancellation: Arc::new(DecoderCancellation::default()),
+                control: Arc::new(DecoderControl::new(0, 0)),
                 dead: false,
             })
             .collect();
-        FrameSource {
+        let mut source = FrameSource {
             readers,
             streams,
             retiring: Vec::new(),
@@ -458,10 +599,24 @@ impl FrameSource {
             rate: project.rate(),
             frames: layout::frame_count(project),
             position: 0,
+            generation: 0,
+            seek_probe: None,
+            seek_neighbor: None,
+            lifecycle_clock,
+            idle_timeout,
+            idle_since: None,
             project: project.clone(),
             width,
             height,
-        }
+            video_frame_ceiling: 0,
+            visual_frame_ceiling: 0,
+        };
+        // Immutable project/layout bounds are sampled every playback tick.
+        // Calculate them once instead of allocating and sweeping events at
+        // frame rate, which matters on the already-busy multi-track CPU path.
+        source.video_frame_ceiling = source.calculate_video_frame_ceiling();
+        source.visual_frame_ceiling = source.calculate_visual_frame_ceiling();
+        source
     }
 
     pub fn rate(&self) -> Rate {
@@ -480,30 +635,51 @@ impl FrameSource {
 
     /// Frames sitting decoded, over every clip.
     pub fn buffered_frames(&self) -> usize {
-        self.streams
+        let decoded = self
+            .streams
             .iter()
-            .map(|stream| {
-                stream.queued.load(Ordering::SeqCst) + usize::from(stream.pending.is_some())
-            })
-            .sum()
+            .map(|stream| stream.buffered.load(Ordering::SeqCst))
+            .sum::<usize>();
+        decoded
+            + self
+                .seek_neighbor
+                .as_ref()
+                .map(|frame| frame.layers.len())
+                .unwrap_or(0)
     }
 
     /// What those frames cost, which is the number the buffering settings are
     /// really trading against.
     pub fn buffered_bytes(&self) -> usize {
-        self.streams
+        let decoded = self
+            .streams
             .iter()
-            .map(|stream| {
-                (stream.queued.load(Ordering::SeqCst) + usize::from(stream.pending.is_some()))
-                    * stream.frame_bytes
-            })
-            .sum()
+            .map(|stream| stream.buffered.load(Ordering::SeqCst) * stream.frame_bytes)
+            .sum::<usize>();
+        decoded
+            + self
+                .seek_neighbor
+                .as_ref()
+                .map(|frame| {
+                    frame
+                        .layers
+                        .iter()
+                        .map(|layer| layer.pixels.len())
+                        .sum::<usize>()
+                        + frame
+                            .visuals
+                            .iter()
+                            .map(|layer| layer.pixels.len())
+                            .sum::<usize>()
+                })
+                .unwrap_or(0)
     }
 
     /// The most the queues can hold at one instant: every clip that can be
-    /// buffering at the same time, full, plus the one frame each can be holding
-    /// in its pending slot. The supply meter holds the source to this, which is
-    /// what turns "bounded memory" from a claim into a check.
+    /// buffering at the same time, full, plus one pending frame per stream and
+    /// one complete project-frame neighbor retained during a seek. The supply
+    /// meter holds the source to this, which is what turns "bounded memory"
+    /// from a claim into a check.
     ///
     /// Summing every clip in the project instead would be a bound nothing could
     /// ever reach — a hundred clips one after another are never buffering
@@ -511,6 +687,17 @@ impl FrameSource {
     /// exists from `lead` frames before it appears until the playhead leaves
     /// it, so what is wanted is the heaviest overlap of those spans.
     pub fn buffer_ceiling(&self) -> usize {
+        (self.buffering.depth + 2) * self.video_frame_ceiling + self.visual_frame_ceiling
+    }
+
+    /// Largest simultaneous decoded video payload for one project frame.
+    /// Schedulers that retain a frame after decode use one extra copy of this
+    /// bound beyond the source's own queues.
+    pub fn frame_ceiling(&self) -> usize {
+        self.video_frame_ceiling + self.visual_frame_ceiling
+    }
+
+    fn calculate_video_frame_ceiling(&self) -> usize {
         // (position, starting, bytes). An end is applied before a start at the
         // same position, because that is the order `tend` does it in.
         let mut events: Vec<(i64, u8, usize)> = Vec::new();
@@ -534,7 +721,27 @@ impl FrameSource {
                 live -= bytes;
             }
         }
-        (self.buffering.depth + 1) * worst
+        worst
+    }
+
+    fn calculate_visual_frame_ceiling(&self) -> usize {
+        let mut events: Vec<(i64, u8, usize)> =
+            crate::text::byte_spans(&self.project, self.width, self.height)
+                .into_iter()
+                .flat_map(|(from, until, bytes)| [(from, 1, bytes), (until, 0, bytes)])
+                .collect();
+        events.sort_by_key(|(position, starting, _)| (*position, *starting));
+
+        let (mut live, mut worst) = (0usize, 0usize);
+        for (_, starting, bytes) in events {
+            if starting == 1 {
+                live += bytes;
+                worst = worst.max(live);
+            } else {
+                live -= bytes;
+            }
+        }
+        worst
     }
 
     /// The clips with a decoder running, in paint order.
@@ -546,59 +753,202 @@ impl FrameSource {
             .collect()
     }
 
-    /// Move the playhead. Every queue is thrown away and refilled from the
-    /// target, which is the whole of seeking: playing and paused take the same
-    /// path, so there is one behaviour to get right and one to test.
-    ///
-    /// Returns without waiting for anything. The decoders start immediately and
-    /// the first frame arrives when it arrives; `take` says `Starved` until
-    /// then.
-    pub fn seek(&mut self, frame: i64) {
-        for index in 0..self.streams.len() {
-            self.retire(index);
-            // A fresh decoder is a fresh attempt: a clip whose source ran out
-            // before the old position may well have frames at the new one.
-            self.streams[index].dead = false;
+    /// Whether decoder processes are being used, retained briefly while
+    /// paused, or fully released.
+    pub fn decoder_lifecycle(&self) -> DecoderLifecycle {
+        if !self.has_decoder_pipeline() {
+            DecoderLifecycle::Released
+        } else if self.idle_since.is_some() {
+            DecoderLifecycle::Idle
+        } else {
+            DecoderLifecycle::Running
         }
-        self.position = frame.clamp(0, self.frames);
-        self.tend();
+    }
+
+    /// Keep live decoders warm while no frame is being requested.
+    pub fn idle_decoders(&mut self) {
+        if self.has_decoder_pipeline() && self.idle_since.is_none() {
+            self.idle_since = Some(self.lifecycle_clock.now());
+        }
+    }
+
+    /// A new frame request makes retained decoders active again.
+    pub fn resume_decoders(&mut self) {
+        self.idle_since = None;
+    }
+
+    /// Release decoders whose idle window has elapsed. This does not redraw or
+    /// clear a sink, so the last exact paused frame remains visible.
+    pub fn maintain_decoders(&mut self) {
+        let Some(since) = self.idle_since else {
+            return;
+        };
+        if self.lifecycle_clock.now().saturating_sub(since) < self.idle_timeout {
+            return;
+        }
+        for index in 0..self.streams.len() {
+            if self.stream_has_pipeline(index) {
+                self.retire(index);
+            }
+        }
         self.reap();
+    }
+
+    /// Move the playhead. A short forward move keeps a live decoder and advances
+    /// it to the target; a backward or large move keeps the isolated-process
+    /// restart path.
+    ///
+    /// While the exact frame is on its way, up to two complete project frames
+    /// immediately before it are made available through [`Self::take_neighbor_before`].
+    /// They never come back from [`Self::take`], so callers that require an exact
+    /// frame do not have to defend against an approximation.
+    pub fn seek(&mut self, frame: i64) {
+        self.seek_with_tolerance(frame, SEEK_NEIGHBOR_FRAMES);
+    }
+
+    /// Seek without exposing an approximate frame. Paused stills use this path,
+    /// while retaining the cheap forward-decoder reuse.
+    pub fn seek_exact(&mut self, frame: i64) {
+        self.seek_with_tolerance(frame, 0);
+    }
+
+    fn seek_with_tolerance(&mut self, frame: i64, tolerance: i64) {
+        self.resume_decoders();
+        let target = frame.clamp(0, self.frames);
+        let old_position = self.position;
+        let reuse = target >= old_position && target - old_position <= MAX_FORWARD_SEEK;
+        self.generation = self.generation.wrapping_add(1);
+        self.release_seek_neighbor();
+
+        let mut first = (target - tolerance.max(0)).max(0);
+        if reuse {
+            // Frames before the consumer's current position are already gone.
+            first = first.max(old_position);
+        }
+        if target >= self.frames || first >= target {
+            self.seek_probe = None;
+        } else {
+            self.seek_probe = Some(first);
+        }
+
+        if reuse {
+            for index in 0..self.streams.len() {
+                if self.stream_has_pipeline(index) {
+                    let wanted = first.max(self.streams[index].placement.start_frame);
+                    self.retarget(index, wanted);
+                }
+            }
+        } else {
+            for index in 0..self.streams.len() {
+                self.retire(index);
+                // A fresh decoder is a fresh attempt: a clip whose source ran
+                // out before the old position may have frames at the new one.
+                self.streams[index].dead = false;
+            }
+        }
+
+        self.position = target;
+        self.tend_at(self.seek_probe.unwrap_or(target));
+        self.reap();
+    }
+
+    /// Take the newest complete frame behind an in-progress seek target.
+    /// Exact and future frames are never returned here.
+    pub fn take_neighbor_before(&mut self, target: i64, tolerance: i64) -> Option<Frame> {
+        if self.position != target {
+            return None;
+        }
+        let neighbor = self.seek_neighbor.take()?;
+        let distance = target - neighbor.frame;
+        if distance > 0 && distance <= tolerance.max(0) {
+            Some(neighbor)
+        } else {
+            None
+        }
     }
 
     /// One poll. Never blocks and never decodes.
     pub fn take(&mut self) -> Supply {
+        self.resume_decoders();
         self.reap();
-        // Before the end check, so the last clip's decoder is retired by
-        // reaching the end of the timeline rather than by dropping the source.
-        self.tend();
         if self.position >= self.frames {
+            // Before returning, retire the last clip by reaching the timeline
+            // end rather than waiting for the whole source to drop.
+            self.tend_at(self.position);
             return Supply::End;
         }
 
-        let frame = self.position;
+        loop {
+            let frame = self.seek_probe.unwrap_or(self.position);
+            self.tend_at(frame);
+            match self.take_frame(frame) {
+                Supply::Ready(ready) if frame < self.position => {
+                    self.release_seek_neighbor();
+                    self.seek_neighbor = Some(ready);
+                    let next = frame + 1;
+                    self.seek_probe = (next < self.position).then_some(next);
+                }
+                Supply::Ready(ready) => {
+                    self.seek_probe = None;
+                    self.release_seek_neighbor();
+                    self.position += 1;
+                    return Supply::Ready(ready);
+                }
+                supply => return supply,
+            }
+        }
+    }
+
+    fn take_frame(&mut self, frame: i64) -> Supply {
         let mut starved = false;
         let mut finished = Vec::new();
         for stream in self.streams.iter_mut() {
             if !stream.wants(frame) || stream.dead || stream.pending.is_some() {
                 continue;
             }
-            match stream.receiver.as_ref().map(|queue| queue.try_recv()) {
-                Some(Ok(pixels)) => {
-                    stream.queued.fetch_sub(1, Ordering::SeqCst);
-                    stream.pending = Some(pixels);
+            loop {
+                let received = stream
+                    .ready
+                    .pop_front()
+                    .map(Ok)
+                    .or_else(|| stream.receiver.as_ref().map(|queue| queue.try_recv()));
+                if matches!(&received, Some(Ok(_))) {
+                    stream.control.notify();
                 }
-                Some(Err(TryRecvError::Disconnected)) => {
-                    // Empty and closed. The source is over, so the clip stops
-                    // drawing rather than holding the playhead.
-                    stream.dead = true;
-                    stream.receiver = None;
-                    // Its thread has already ended, so the handle is retired
-                    // here rather than at the end of the clip. Otherwise a
-                    // source that died on frame 10 of a ten minute clip is
-                    // reported as decoding for the other ten minutes.
-                    finished.extend(stream.decoder.take());
+                match received {
+                    Some(Ok(decoded))
+                        if decoded.generation != self.generation || decoded.frame < frame =>
+                    {
+                        stream.buffered.fetch_sub(1, Ordering::SeqCst);
+                        stream.control.notify();
+                    }
+                    Some(Ok(decoded)) if decoded.frame == frame => {
+                        stream.pending = Some(decoded);
+                        break;
+                    }
+                    Some(Ok(decoded)) => {
+                        // It is newer than the requested project frame. Keep it
+                        // for its own turn and never draw it early.
+                        stream.ready.push_front(decoded);
+                        starved = true;
+                        break;
+                    }
+                    Some(Err(TryRecvError::Disconnected)) => {
+                        // Empty and closed. The source is over, so the clip
+                        // stops drawing rather than holding the playhead.
+                        stream.dead = true;
+                        stream.receiver = None;
+                        // Its thread already ended, so retire the handle where
+                        // it died rather than reporting it for the rest of the
+                        // clip.
+                        finished.extend(stream.decoder.take());
+                        break;
+                    }
+                    Some(Err(TryRecvError::Empty)) | None => {
+                        starved = true;
+                        break;
+                    }
                 }
-                Some(Err(TryRecvError::Empty)) | None => starved = true,
             }
         }
         self.retiring.append(&mut finished);
@@ -611,18 +961,42 @@ impl FrameSource {
             .iter_mut()
             .filter(|stream| stream.wants(frame))
             .filter_map(|stream| {
-                stream.pending.take().map(|pixels| Layer {
-                    clip_id: stream.placement.clip_id.clone(),
-                    pixels,
-                    dst: stream.placement.dst,
-                    opacity: stream.placement.opacity,
-                    lut: stream.lut.clone(),
+                stream.pending.take().map(|decoded| {
+                    stream.buffered.fetch_sub(1, Ordering::SeqCst);
+                    stream.control.notify();
+                    Layer {
+                        clip_id: stream.placement.clip_id.clone(),
+                        pixels: decoded.pixels,
+                        dst: stream.placement.dst,
+                        opacity: stream.placement.opacity,
+                        lut: stream.lut.clone(),
+                    }
                 })
             })
             .collect();
-        self.position += 1;
         let visuals = crate::text::layers_at(&self.project, frame, self.width, self.height);
-        Supply::Ready(Frame { frame, layers, visuals })
+        Supply::Ready(Frame {
+            frame,
+            layers,
+            visuals,
+        })
+    }
+
+    fn has_decoder_pipeline(&self) -> bool {
+        (0..self.streams.len()).any(|index| self.stream_has_pipeline(index))
+            || self.retiring.iter().any(|decoder| !decoder.is_finished())
+    }
+
+    fn stream_has_pipeline(&self, index: usize) -> bool {
+        let stream = &self.streams[index];
+        stream.decoder.is_some()
+            || stream.receiver.is_some()
+            || !stream.ready.is_empty()
+            || stream.pending.is_some()
+    }
+
+    fn release_seek_neighbor(&mut self) {
+        self.seek_neighbor = None;
     }
 
     /// Poll until the frame is there or `deadline` passes. `Starved` coming
@@ -644,14 +1018,17 @@ impl FrameSource {
 
     /// Start the decoders that are about to be needed and stop the ones that
     /// are done.
-    fn tend(&mut self) {
-        let position = self.position;
+    fn tend_at(&mut self, position: i64) {
         let lead = self.buffering.lead;
         for index in 0..self.streams.len() {
             let stream = &self.streams[index];
             let over = position >= stream.placement.end_frame();
             if over {
-                if stream.decoder.is_some() || stream.pending.is_some() {
+                if stream.decoder.is_some()
+                    || stream.receiver.is_some()
+                    || !stream.ready.is_empty()
+                    || stream.pending.is_some()
+                {
                     self.retire(index);
                 }
                 continue;
@@ -660,13 +1037,13 @@ impl FrameSource {
                 && !stream.dead
                 && position + lead >= stream.placement.start_frame
             {
-                self.start(index);
+                self.start(index, position);
             }
         }
     }
 
-    fn start(&mut self, index: usize) {
-        let (rate, frames, position) = (self.rate, self.frames, self.position);
+    fn start(&mut self, index: usize, position: i64) {
+        let (rate, frames, generation) = (self.rate, self.frames, self.generation);
         let readers = Arc::clone(&self.readers);
         let depth = self.buffering.depth;
         let stream = &mut self.streams[index];
@@ -690,11 +1067,14 @@ impl FrameSource {
         };
 
         let frame_bytes = stream.frame_bytes;
-        let (sender, receiver) = sync_channel::<Vec<u8>>(depth);
-        let queued = Arc::new(AtomicUsize::new(0));
-        let counter = Arc::clone(&queued);
+        let (sender, receiver) = sync_channel::<DecodedFrame>(depth);
+        let buffer_limit = depth + 1;
+        let buffered = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&buffered);
         let cancellation = Arc::new(DecoderCancellation::default());
         let decoder_cancellation = Arc::clone(&cancellation);
+        let control = Arc::new(DecoderControl::new(generation, first));
+        let decoder_control = Arc::clone(&control);
         let decoder = std::thread::spawn(move || {
             let Some(mut reader) = readers.open(&request) else {
                 // Dropping the sender closes the queue, which is how the
@@ -704,24 +1084,94 @@ impl FrameSource {
             if decoder_cancellation.attach(reader.cancellation()) {
                 return;
             }
+            let mut frame = first;
             loop {
                 let mut buffer = vec![0u8; frame_bytes];
                 if !reader.read(&mut buffer) {
                     break;
                 }
-                counter.fetch_add(1, Ordering::SeqCst);
-                // Blocks once the queue is full, which is what bounds the
-                // memory: a decoder that gets ahead simply waits.
-                if sender.send(buffer).is_err() {
-                    counter.fetch_sub(1, Ordering::SeqCst);
-                    break;
+                let mut pixels = Some(buffer);
+                loop {
+                    if decoder_cancellation.is_cancelled() {
+                        return;
+                    }
+                    let demand = decoder_control.demand.lock().unwrap();
+                    if frame < demand.first_frame {
+                        break;
+                    }
+                    if counter.load(Ordering::SeqCst) >= buffer_limit {
+                        drop(decoder_control.wake.wait(demand).unwrap());
+                        continue;
+                    }
+                    let decoded = DecodedFrame {
+                        generation: demand.generation,
+                        frame,
+                        pixels: pixels.take().unwrap(),
+                    };
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    match sender.try_send(decoded) {
+                        Ok(()) => break,
+                        Err(TrySendError::Full(decoded)) => {
+                            counter.fetch_sub(1, Ordering::SeqCst);
+                            pixels = Some(decoded.pixels);
+                            drop(decoder_control.wake.wait(demand).unwrap());
+                        }
+                        Err(TrySendError::Disconnected(_)) => {
+                            counter.fetch_sub(1, Ordering::SeqCst);
+                            return;
+                        }
+                    }
                 }
+                frame += 1;
             }
         });
         stream.receiver = Some(receiver);
-        stream.queued = queued;
+        stream.ready.clear();
+        stream.pending = None;
+        stream.buffered = buffered;
         stream.decoder = Some(decoder);
         stream.cancellation = cancellation;
+        stream.control = control;
+    }
+
+    fn retarget(&mut self, index: usize, first_frame: i64) {
+        let generation = self.generation;
+        let stream = &mut self.streams[index];
+        stream.control.retarget(generation, first_frame);
+
+        let mut decoded = Vec::new();
+        decoded.extend(stream.pending.take());
+        decoded.extend(stream.ready.drain(..));
+        let mut disconnected = false;
+        if let Some(receiver) = stream.receiver.as_ref() {
+            loop {
+                match receiver.try_recv() {
+                    Ok(frame) => decoded.push(frame),
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        disconnected = true;
+                        break;
+                    }
+                }
+            }
+        }
+        stream.control.notify();
+
+        decoded.sort_by_key(|frame| frame.frame);
+        for mut frame in decoded {
+            if frame.frame < first_frame {
+                stream.buffered.fetch_sub(1, Ordering::SeqCst);
+                stream.control.notify();
+                continue;
+            }
+            frame.generation = generation;
+            stream.ready.push_back(frame);
+        }
+        if disconnected {
+            if let Some(handle) = stream.decoder.take() {
+                self.retiring.push(handle);
+            }
+        }
     }
 
     /// Drop a clip's queue and interrupt a decoder blocked in a read. Nothing is
@@ -729,9 +1179,12 @@ impl FrameSource {
     fn retire(&mut self, index: usize) {
         let stream = &mut self.streams[index];
         stream.cancellation.cancel();
+        stream.control.notify();
         stream.receiver = None;
+        stream.ready.clear();
         stream.pending = None;
-        stream.queued = Arc::new(AtomicUsize::new(0));
+        stream.buffered = Arc::new(AtomicUsize::new(0));
+        stream.control = Arc::new(DecoderControl::new(self.generation, self.position));
         let decoder = stream.decoder.take();
         if let Some(handle) = decoder {
             self.retiring.push(handle);
@@ -770,6 +1223,7 @@ impl Drop for FrameSource {
 mod tests {
     use super::*;
     use makevideo_render::{Asset, Clip, ProjectSettings, Track, TrackKind, FORMAT_VERSION};
+    use std::sync::atomic::AtomicU64;
     use std::sync::Condvar;
 
     /// A source that hands back frames tagged with the clip and the frame
@@ -879,6 +1333,23 @@ mod tests {
     struct BlockingReaders {
         stopped: Arc<(Mutex<bool>, Condvar)>,
         reading: Arc<AtomicBool>,
+    }
+
+    #[derive(Default)]
+    struct FakeLifecycleClock {
+        millis: AtomicU64,
+    }
+
+    impl FakeLifecycleClock {
+        fn advance(&self, millis: u64) {
+            self.millis.fetch_add(millis, Ordering::SeqCst);
+        }
+    }
+
+    impl LifecycleClock for FakeLifecycleClock {
+        fn now(&self) -> Duration {
+            Duration::from_millis(self.millis.load(Ordering::SeqCst))
+        }
     }
 
     impl Readers for BlockingReaders {
@@ -1016,9 +1487,29 @@ mod tests {
                 end_arrow: false,
             },
         });
-        let mut source = source(&with_shape, Buffering::default(), Arc::new(Fakes::default()));
+        let mut source = source(
+            &with_shape,
+            Buffering::default(),
+            Arc::new(Fakes::default()),
+        );
         let covered = next(&mut source);
         assert_eq!(covered.sources().len(), 2, "the clip and the shape");
+        let video_bytes = 16 * 16 * 4;
+        let visual_bytes = 8 * 8 * 4;
+        assert_eq!(covered.visuals[0].pixels.len(), visual_bytes);
+        assert_eq!(source.frame_ceiling(), video_bytes + visual_bytes);
+        assert_eq!(
+            source.buffer_ceiling(),
+            (source.buffering.depth + 2) * video_bytes + visual_bytes
+        );
+        let decoded_bytes = source.buffered_bytes();
+        source.seek_neighbor = Some(covered);
+        assert_eq!(
+            source.buffered_bytes(),
+            decoded_bytes + video_bytes + visual_bytes,
+            "a retained seek frame counts both clip and visual pixels"
+        );
+        source.seek_neighbor = None;
         let after = next(&mut source);
         assert_eq!(after.sources().len(), 1, "the shape has ended");
     }
@@ -1202,7 +1693,11 @@ mod tests {
         );
         let one_frame = 16 * 16 * 4;
         let sequential = source(&sequence, Buffering::new(3, 0), Arc::new(Fakes::default()));
-        assert_eq!(sequential.buffer_ceiling(), 4 * one_frame);
+        assert_eq!(
+            sequential.buffer_ceiling(),
+            5 * one_frame,
+            "depth, pending, and one retained seek neighbor"
+        );
 
         // Two tracks that overlap are two queues at once, and a lead makes the
         // next clip's queue overlap the one before it.
@@ -1214,9 +1709,9 @@ mod tests {
             vec![asset("a1"), asset("a2")],
         );
         let overlapping = source(&stacked, Buffering::new(3, 0), Arc::new(Fakes::default()));
-        assert_eq!(overlapping.buffer_ceiling(), 8 * one_frame);
+        assert_eq!(overlapping.buffer_ceiling(), 10 * one_frame);
         let led = source(&sequence, Buffering::new(3, 5), Arc::new(Fakes::default()));
-        assert_eq!(led.buffer_ceiling(), 8 * one_frame, "the lead overlaps");
+        assert_eq!(led.buffer_ceiling(), 10 * one_frame, "the lead overlaps");
     }
 
     #[test]
@@ -1265,7 +1760,7 @@ mod tests {
     }
 
     #[test]
-    fn seeking_throws_the_queues_away_and_refills_from_the_target() {
+    fn a_short_forward_seek_reuses_the_live_decoder() {
         let project = one_clip();
         let readers = Arc::new(Fakes::default());
         let mut source = source(&project, Buffering::new(6, 0), Arc::clone(&readers));
@@ -1279,12 +1774,185 @@ mod tests {
         assert_eq!(
             source_frame(&frame, "c1"),
             20,
-            "the frames buffered before the seek must not be shown"
+            "queued frames before the target must not be shown"
         );
         let opened = readers.opens();
-        assert_eq!(opened.len(), 2, "a seek is a new decoder");
-        assert_eq!(opened[1].in_frame, 20);
-        assert_eq!(opened[1].frames, 10, "what is left of the clip");
+        assert_eq!(opened.len(), 1, "the live decoder advances in place");
+    }
+
+    #[test]
+    fn a_large_forward_seek_reopens_the_decoder() {
+        let project = one_clip();
+        let readers = Arc::new(Fakes::default());
+        let mut source = source(&project, Buffering::new(2, 0), Arc::clone(&readers));
+        next(&mut source);
+
+        source.seek_exact(MAX_FORWARD_SEEK + 2);
+        assert_eq!(next(&mut source).frame, MAX_FORWARD_SEEK + 2);
+        let opened = readers.opens();
+        assert_eq!(opened.len(), 2);
+        assert_eq!(opened[1].in_frame, MAX_FORWARD_SEEK + 2);
+    }
+
+    #[test]
+    fn a_seek_offers_only_real_frames_one_or_two_behind_the_target() {
+        let project = one_clip();
+        let mut source = source(&project, Buffering::new(3, 0), Arc::new(Fakes::default()));
+        source.position = 20;
+        source.generation = 7;
+        source.seek_probe = Some(18);
+        let (_sender, receiver) = sync_channel(3);
+        source.streams[0].receiver = Some(receiver);
+
+        for expected in [18, 19] {
+            source.streams[0].ready.push_back(DecodedFrame {
+                generation: 7,
+                frame: expected,
+                pixels: vec![expected as u8; 16 * 16 * 4],
+            });
+            source.streams[0].buffered.fetch_add(1, Ordering::SeqCst);
+            assert!(matches!(source.take(), Supply::Starved));
+            assert_eq!(
+                source.buffered_frames(),
+                1,
+                "the retained neighbor is included in source accounting"
+            );
+            let neighbor = source
+                .take_neighbor_before(20, SEEK_NEIGHBOR_FRAMES)
+                .expect("current-generation neighbor");
+            assert_eq!(source.buffered_frames(), 0);
+            assert_eq!(neighbor.frame, expected);
+            assert_eq!(source_frame(&neighbor, "c1"), expected as u8);
+            assert_eq!(source.position(), 20, "the logical target stays exact");
+        }
+
+        source.streams[0].ready.push_back(DecodedFrame {
+            generation: 7,
+            frame: 20,
+            pixels: vec![20; 16 * 16 * 4],
+        });
+        source.streams[0].buffered.fetch_add(1, Ordering::SeqCst);
+        let Supply::Ready(exact) = source.take() else {
+            panic!("exact frame did not replace the neighbor");
+        };
+        assert_eq!(exact.frame, 20);
+        assert_eq!(source_frame(&exact, "c1"), 20);
+        assert_eq!(source.buffered_frames(), 0);
+    }
+
+    #[test]
+    fn neighbor_boundary_rejects_three_behind_and_future_frames() {
+        let project = one_clip();
+        let mut source = source(&project, Buffering::default(), Arc::new(Fakes::default()));
+        source.position = 20;
+        for allowed in [19, 18] {
+            source.seek_neighbor = Some(Frame {
+                frame: allowed,
+                layers: Vec::new(),
+                visuals: Vec::new(),
+            });
+            assert_eq!(
+                source
+                    .take_neighbor_before(20, SEEK_NEIGHBOR_FRAMES)
+                    .map(|frame| frame.frame),
+                Some(allowed)
+            );
+        }
+        for forbidden in [17, 20, 21] {
+            source.seek_neighbor = Some(Frame {
+                frame: forbidden,
+                layers: Vec::new(),
+                visuals: Vec::new(),
+            });
+            assert!(source
+                .take_neighbor_before(20, SEEK_NEIGHBOR_FRAMES)
+                .is_none());
+        }
+    }
+
+    #[test]
+    fn a_stale_generation_cannot_become_an_exact_or_neighbor_frame() {
+        let project = one_clip();
+        let mut source = source(&project, Buffering::default(), Arc::new(Fakes::default()));
+        source.generation = 2;
+        source.position = 10;
+        source.streams[0].ready.push_back(DecodedFrame {
+            generation: 1,
+            frame: 10,
+            pixels: vec![10; 16 * 16 * 4],
+        });
+        source.streams[0].buffered.store(1, Ordering::SeqCst);
+
+        assert!(matches!(source.take_frame(10), Supply::Starved));
+        assert_eq!(source.streams[0].buffered.load(Ordering::SeqCst), 0);
+        assert!(source
+            .take_neighbor_before(10, SEEK_NEIGHBOR_FRAMES)
+            .is_none());
+    }
+
+    #[test]
+    fn an_idle_decoder_is_released_after_the_timeout_and_can_reopen() {
+        let project = one_clip();
+        let readers = Arc::new(Fakes::default());
+        let clock = Arc::new(FakeLifecycleClock::default());
+        let lifecycle_clock: Arc<dyn LifecycleClock> = clock.clone();
+        let mut source = FrameSource::new_with_clock(
+            &project,
+            16,
+            16,
+            Buffering::new(2, 0),
+            Arc::clone(&readers) as Arc<dyn Readers>,
+            lifecycle_clock,
+            Duration::from_millis(100),
+        );
+        assert_eq!(source.decoder_lifecycle(), DecoderLifecycle::Released);
+        next(&mut source);
+        assert_eq!(source.decoder_lifecycle(), DecoderLifecycle::Running);
+
+        source.seek_neighbor = Some(Frame {
+            frame: 0,
+            layers: vec![Layer {
+                clip_id: "c1".into(),
+                pixels: vec![0; 16 * 16 * 4],
+                dst: source.streams[0].placement.dst,
+                opacity: 1.0,
+                lut: None,
+            }],
+            visuals: Vec::new(),
+        });
+        source.idle_decoders();
+        assert_eq!(source.decoder_lifecycle(), DecoderLifecycle::Idle);
+        clock.advance(99);
+        source.maintain_decoders();
+        assert_eq!(source.decoder_lifecycle(), DecoderLifecycle::Idle);
+        clock.advance(1);
+        source.maintain_decoders();
+        let release_deadline = Instant::now() + Duration::from_secs(1);
+        while source.decoder_lifecycle() != DecoderLifecycle::Released {
+            assert!(
+                Instant::now() < release_deadline,
+                "the cancelled decoder thread did not release"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+            source.maintain_decoders();
+        }
+        assert!(source.decoding().is_empty());
+        assert_eq!(
+            source.buffered_frames(),
+            1,
+            "the neighbor is a separate slot"
+        );
+        assert_eq!(
+            source
+                .take_neighbor_before(1, SEEK_NEIGHBOR_FRAMES)
+                .map(|frame| frame.frame),
+            Some(0)
+        );
+        assert_eq!(source.buffered_frames(), 0);
+
+        source.seek_exact(5);
+        assert_eq!(source.decoder_lifecycle(), DecoderLifecycle::Running);
+        assert!(wait_for(|| readers.opens().len() == 2));
     }
 
     #[test]
@@ -1323,6 +1991,7 @@ mod tests {
         }
         source.seek(0);
         assert_eq!(next(&mut source).layers.len(), 1, "it draws again");
+        assert_eq!(readers.opens().len(), 2, "backward seek reopens");
     }
 
     #[test]

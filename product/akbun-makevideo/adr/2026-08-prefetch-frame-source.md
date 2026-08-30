@@ -6,7 +6,7 @@ Decode each clip on its own thread into a bounded queue of finished frames, and 
 
 Keep ffmpeg as a separate process per clip. Revisit linking it as a library only if a measurement says the process route cannot reach the target rate.
 
-Define seek as one operation: throw every queue away and refill from the target. Playing and paused take that same path.
+The rule that every seek throws every queue away is superseded by [2026-08-reusable-seek-decoder.md](./2026-08-reusable-seek-decoder.md). Short forward seeks now keep a live decoder, while backward and large seeks still restart it.
 
 Leave the behaviour of a broken source as it is — the clip stops drawing and the rest of the timeline runs on.
 

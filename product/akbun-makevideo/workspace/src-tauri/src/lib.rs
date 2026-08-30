@@ -4,7 +4,7 @@ mod store;
 mod viewport;
 
 use commands::AppState;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
@@ -36,11 +36,15 @@ pub fn run() {
             app.manage(AppState {
                 document: Arc::new(Mutex::new(document)),
                 settings: Mutex::new(settings),
+                settings_transaction: Mutex::new(()),
+                settings_generation: AtomicU64::new(0),
+                playback_settings: commands::PlaybackSettingsGate::default(),
                 render: Arc::new(Mutex::new(None)),
                 cancelled: Arc::new(AtomicBool::new(false)),
                 accel: Mutex::new(None),
                 compositor: Mutex::new(Vec::new()),
                 playback: Mutex::new(None),
+                playback_epoch: AtomicU64::new(0),
                 proxies: Arc::new(Mutex::new(commands::ProxyState::default())),
                 proxy_workers: Mutex::new(Vec::new()),
                 waveforms: Arc::new(Mutex::new(commands::WaveformState::default())),
@@ -78,6 +82,7 @@ pub fn run() {
             commands::cancel_render,
             commands::preview_frame,
             commands::playback_attach,
+            commands::playback_refresh,
             commands::playback_release,
             commands::playback_play,
             commands::playback_pause,

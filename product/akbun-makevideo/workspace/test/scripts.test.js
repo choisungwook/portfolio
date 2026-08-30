@@ -10,7 +10,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   const context = vm.createContext({});
   const names = [
     'time.js', 'geometry.js', 'timeline.js', 'shortcuts.js', 'quality.js',
-    'preview.js', 'transform.js', 'guides.js', 'monitor.js', 'panel.js',
+    'preview.js', 'transform.js', 'guides.js', 'monitor.js', 'panel.js', 'latest.js',
   ];
   for (const name of names) {
     const file = path.join(__dirname, '..', 'src', name);
@@ -25,6 +25,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.previewLib);
   assert.ok(context.monitorLib);
   assert.ok(context.panelLib);
+  assert.ok(context.latestLib);
 });
 
 // Each of these is loaded with a `<script>` tag and reached through its one
@@ -44,6 +45,7 @@ test('every library the page loads is a script tag on the page', () => {
   assert.ok(loaded.indexOf('geometry.js') < loaded.indexOf('preview.js'));
   assert.ok(loaded.indexOf('geometry.js') < loaded.indexOf('monitor.js'));
   assert.ok(loaded.indexOf('preview.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('latest.js') < loaded.indexOf('renderer.js'));
 });
 
 test('the editor exposes one toggleable selected panel from the title bar', () => {
