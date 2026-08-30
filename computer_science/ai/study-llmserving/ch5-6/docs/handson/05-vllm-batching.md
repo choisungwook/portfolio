@@ -4,7 +4,7 @@ Batch를 크게 잡으면 GPU가 여러 request를 함께 처리할 수 있습�
 
 ## 실습 환경
 
-- 선행 실습: [GPU 환경 확인](./01-gpu-environment.md)
+- 선행 실습: [내 GPU의 crossover를 직접 재고 병목을 일부러 만들기](./04-roofline-bottleneck.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - 이후 모든 명령: 위 workspace에서 실행
 - runtime: vLLM `v0.27.1`

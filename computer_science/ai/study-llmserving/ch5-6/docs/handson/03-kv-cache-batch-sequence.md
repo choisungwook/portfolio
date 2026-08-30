@@ -4,7 +4,7 @@ Chapter 5는 KV cache 크기를 `token당 bytes × 최대 배치 × 최대 시�
 
 ## 실습 환경
 
-- 선행 실습: [내 GPU의 crossover를 직접 재고 병목을 일부러 만들기](./08-roofline-bottleneck.md)
+- 선행 실습: [16GB GPU에서 7B BF16이 OOM 나는 이유](./02-memory-budget-oom.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
 - Model: Qwen2.5-3B-Instruct BF16, `max-model-len 4096`
@@ -45,6 +45,13 @@ make ch5-calculate
 ## 2. 공식을 뒤집으면 vLLM의 자체 계산과 맞습니다
 
 vLLM은 기동할 때 KV pool을 미리 잡고 그 크기를 log에 남깁니다.
+
+02번에서 실행한 3B BF16 server가 내려갔다면 다시 기동하고 health check를 확인합니다.
+
+```bash
+make vllm-bf16
+bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
 
 ```bash
 docker compose --profile bf16 logs vllm-bf16 | grep -i "KV cache"
@@ -130,7 +137,7 @@ make ch5-kv-probe
 
 TTFT가 300배 흔들리는 동안 TPOT는 15.9 ms에서 28.3 ms로 완만하게만 늘었습니다. 두 지표는 서로 다른 것을 재고 있습니다. TTFT는 prefill과 queue를, TPOT는 token 하나를 만드는 비용을 잽니다.
 
-짧은 prompt에서 TPOT 15.9 ms는 초당 62.9 token이고, 이 값은 [08번 실습](./08-roofline-bottleneck.md)에서 memory bandwidth로 계산한 이론 상한 62.1 token/s와 거의 같습니다. **decode가 대역폭에 붙어 있다는 증거입니다.**
+짧은 prompt에서 TPOT 15.9 ms는 초당 62.9 token이고, 이 값은 [04번 실습](./04-roofline-bottleneck.md)에서 memory bandwidth로 계산한 이론 상한 62.1 token/s와 거의 같습니다. **decode가 대역폭에 붙어 있다는 증거입니다.**
 
 ## 5. 천장을 옮기면 공식이 다시 맞습니다
 

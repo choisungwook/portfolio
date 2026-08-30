@@ -4,7 +4,7 @@
 
 ## 실습 환경
 
-- 선행 실습: [16GB GPU에서 7B BF16이 OOM 나는 이유](./02-memory-budget-oom.md)
+- 선행 실습: [배치와 시퀀스를 흔들어 KV cache가 차는 과정](./03-kv-cache-batch-sequence.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
 - 이론: [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](../02-ch5-theory.md)

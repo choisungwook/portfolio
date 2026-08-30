@@ -161,7 +161,7 @@ Roofline 그래프에서 축을 잘못 읽으면 그림 전체가 의미를 잃�
 | memory bandwidth | 864 GB/s | 384 GB/s |
 | crossover | 419 FLOPS/B | **131 FLOPS/B** |
 
-crossover가 낮다는 것은 연산 성능에 비해 대역폭이 상대적으로 덜 부족하다는 뜻이고, 그만큼 **더 짧은 prompt에서도 compute-bound로 넘어간다**는 뜻입니다. 같은 workload라도 카드가 바뀌면 판정이 뒤집힐 수 있으므로, 병목을 말하기 전에 자기 카드의 crossover를 먼저 구해야 합니다. 구하는 방법은 [roofline과 병목 재현](./handson/08-roofline-bottleneck.md)에 있습니다.
+crossover가 낮다는 것은 연산 성능에 비해 대역폭이 상대적으로 덜 부족하다는 뜻이고, 그만큼 **더 짧은 prompt에서도 compute-bound로 넘어간다**는 뜻입니다. 같은 workload라도 카드가 바뀌면 판정이 뒤집힐 수 있으므로, 병목을 말하기 전에 자기 카드의 crossover를 먼저 구해야 합니다. 구하는 방법은 [roofline과 병목 재현](./handson/04-roofline-bottleneck.md)에 있습니다.
 
 ### decode는 sequence가 길어져도 intensity가 오르지 않습니다
 

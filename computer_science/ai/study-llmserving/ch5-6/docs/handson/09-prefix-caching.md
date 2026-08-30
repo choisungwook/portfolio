@@ -6,7 +6,7 @@ System prompt와 document 내용이 같아도 순서나 whitespace가 달라지�
 
 ## 실습 환경
 
-- 선행 실습: [Prefill·decode 병목 관찰](./05-prefill-decode-observability.md)
+- 선행 실습: [Prefill·decode 병목 관찰](./07-prefill-decode-observability.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - 이후 모든 명령: 위 workspace에서 실행
 - model: `Qwen/Qwen2.5-3B-Instruct`
