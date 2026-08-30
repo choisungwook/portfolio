@@ -169,29 +169,19 @@ export default function BranchPanel({
       ? `\n\nExcluded from deletion:\n${excluded.map((branch) => branch.name).join('\n')}`
       : ''
     const names = deletableBranches.map((branch) => branch.name)
-    if (!window.confirm(`Delete ${branchLabel(names.length)}?\n\n${names.join('\n')}${excludedDetail}`)) return
+    if (!window.confirm(
+      `Force delete ${branchLabel(names.length)}?\n\n${names.join('\n')}` +
+      `\n\nCommits not merged into another branch may be lost.${excludedDetail}`
+    )) return
 
-    const safelyDeleted = await window.gitdesktop.deleteBranches(repoPath, names, false)
-    if (!safelyDeleted.ok) {
-      onError(safelyDeleted.error)
+    const deletion = await window.gitdesktop.deleteBranches(repoPath, names)
+    if (!deletion.ok) {
+      onError(deletion.error)
       return
     }
 
-    const deleted = [...safelyDeleted.data.deleted]
-    const failures = [...safelyDeleted.data.failed]
-    const unmerged = safelyDeleted.data.unmerged
-    if (
-      unmerged.length > 0 &&
-      window.confirm(`Force delete ${branchLabel(unmerged.length)} not fully merged?\n\n${unmerged.join('\n')}`)
-    ) {
-      const forciblyDeleted = await window.gitdesktop.deleteBranches(repoPath, unmerged, true)
-      if (forciblyDeleted.ok) {
-        deleted.push(...forciblyDeleted.data.deleted)
-        failures.push(...forciblyDeleted.data.failed)
-      } else {
-        failures.push(...unmerged.map((name) => ({ name, error: forciblyDeleted.error })))
-      }
-    }
+    const deleted = deletion.data.deleted
+    const failures = deletion.data.failed
 
     const deletedSet = new Set(deleted)
     const remaining = selectedNames.filter((name) => !deletedSet.has(name))

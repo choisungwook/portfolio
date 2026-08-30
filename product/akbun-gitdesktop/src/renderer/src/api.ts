@@ -105,8 +105,8 @@ const api = {
   getDefaultBranch: (repoPath: string) => call<string>('get_default_branch', { repoPath }),
   createBranch: (repoPath: string, name: string, startPoint: string) =>
     call<void>('create_branch', { repoPath, name, startPoint }),
-  deleteBranches: (repoPath: string, names: string[], force: boolean) =>
-    call<BranchDeletionResult>('delete_branches', { repoPath, names, force }),
+  deleteBranches: (repoPath: string, names: string[]) =>
+    call<BranchDeletionResult>('delete_branches', { repoPath, names }),
   createWorktree: (repoPath: string, worktreePath: string, branch: string, createNewBranch: boolean) =>
     call<void>('create_worktree', { repoPath, worktreePath, branch, createNewBranch }),
   removeWorktree,

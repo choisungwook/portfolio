@@ -337,57 +337,14 @@ pub fn create_branch(repo_path: String, name: String, start_point: String) -> Re
     run_git(&repo_path, &args).map(|_| ())
 }
 
-fn is_branch_merged(repo_path: &str, name: &str) -> Result<bool, String> {
-    let reference = run_git(
-        repo_path,
-        &[
-            "for-each-ref".into(),
-            format!("--format=%(refname){FIELD_SEPARATOR}%(upstream)"),
-            format!("refs/heads/{name}"),
-        ],
-    )?;
-    if reference.trim().is_empty() {
-        return Err(format!("Local branch not found: {name}"));
-    }
-    let upstream = reference.trim().split(FIELD_SEPARATOR).nth(1).unwrap_or("");
-    let target = if upstream.is_empty() {
-        "HEAD"
-    } else {
-        upstream
-    };
-    let merged = run_git(
-        repo_path,
-        &[
-            "branch".into(),
-            "--merged".into(),
-            target.into(),
-            "--format=%(refname:short)".into(),
-        ],
-    )?;
-    Ok(merged.lines().any(|branch| branch == name))
-}
-
 #[tauri::command]
-pub fn delete_branches(repo_path: String, names: Vec<String>, force: bool) -> BranchDeletionResult {
+pub fn delete_branches(repo_path: String, names: Vec<String>) -> BranchDeletionResult {
     let mut result = BranchDeletionResult::default();
     for name in names {
-        let deletion = run_git(
-            &repo_path,
-            &[
-                "branch".into(),
-                if force { "-D" } else { "-d" }.into(),
-                name.clone(),
-            ],
-        );
+        let deletion = run_git(&repo_path, &["branch".into(), "-D".into(), name.clone()]);
         match deletion {
             Ok(_) => result.deleted.push(name),
-            Err(error) => {
-                if !force && is_branch_merged(&repo_path, &name).is_ok_and(|merged| !merged) {
-                    result.unmerged.push(name);
-                } else {
-                    result.failed.push(BranchDeletionFailure { name, error });
-                }
-            }
+            Err(error) => result.failed.push(BranchDeletionFailure { name, error }),
         }
     }
     result
