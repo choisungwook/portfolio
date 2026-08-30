@@ -2,6 +2,17 @@
 
 옵션을 먼저 바꾸면 숫자는 달라져도 원인을 설명하기 어렵습니다. 이 핸즈온은 GPU 확인부터 시작해 memory, KV cache, roofline, scheduling, prefill·decode, quantization, cache 순서로 병목을 좁힙니다. 파일 번호가 학습 순서입니다.
 
+## 모든 GPU 실습 전에 기준 상태를 만듭니다
+
+Workspace의 이전 model process를 정리하고 hardware metric 수집 경로를 확인합니다.
+
+```bash
+make gpu-reset
+make observability-check
+```
+
+Desktop GPU는 화면 출력 때문에 baseline VRAM이 0MiB가 아닙니다. 초기화 기준과 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
+
 ## Chapter 5만 볼 때
 
 Chapter 5는 "이 GPU에 이 model이 들어가는가, 느리다면 연산인가 대역폭인가"를 다룹니다. 이론을 먼저 읽고 세 실습을 순서대로 합니다.

@@ -15,6 +15,15 @@ Repository root에서 workspace로 이동합니다.
 cd computer_science/ai/study-llmserving/ch5-6
 ```
 
+이전 model process를 정리하고 OOM 순간의 hardware metric이 수집되는지 확인합니다.
+
+```bash
+make gpu-reset
+make observability-check
+```
+
+Desktop baseline VRAM과 Grafana 값이 예상과 다르면 [GPU 실습 troubleshooting](../troubleshooting.md)부터 확인합니다.
+
 ## 먼저 OOM 가설을 계산합니다
 
 Memory budget과 roofline calculator로 실행 전 가설을 만듭니다.
@@ -124,3 +133,4 @@ docker compose --profile bf16 logs vllm-bf16 | grep -i "KV cache"
 ## 참고자료
 
 - [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](../02-ch5-theory.md)
+- [GPU 실습 troubleshooting](../troubleshooting.md)

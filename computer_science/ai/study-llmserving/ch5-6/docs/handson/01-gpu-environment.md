@@ -16,6 +16,14 @@ Repository root에서 workspace로 이동합니다.
 cd computer_science/ai/study-llmserving/ch5-6
 ```
 
+이전 실습의 model process를 정리하고 desktop baseline을 확인합니다.
+
+```bash
+make gpu-reset
+```
+
+VRAM이 0MiB가 아니어도 compute process가 없으면 정상입니다. 상세 판정은 [GPU 실습 troubleshooting](../troubleshooting.md)에 있습니다.
+
 ## 먼저 host의 기준값을 고정합니다
 
 이 값은 이후 OOM과 성능 결과를 해석할 hardware 기준입니다.
@@ -56,10 +64,10 @@ docker run --rm --gpus all nvidia/cuda:12.9.1-base-ubuntu24.04 nvidia-smi
 docker compose --profile tools build benchmark
 ```
 
-Prometheus, Grafana, DCGM Exporter를 실행합니다.
+Prometheus, Grafana, DCGM Exporter를 실행하고 수집 경로를 자동 점검합니다.
 
 ```bash
-docker compose --profile observability up -d prometheus grafana dcgm-exporter
+make observability-check
 docker compose ps
 ```
 
@@ -68,7 +76,7 @@ docker compose ps
 - Grafana 계정: `admin` / `admin`
 - dashboard: `LLM serving / LLM Serving Chapter 5-6`
 
-Prometheus와 GPU exporter 연결을 확인합니다.
+원본 metric을 직접 확인할 때만 다음 명령을 사용합니다.
 
 ```bash
 curl http://127.0.0.1:9090/api/v1/targets
@@ -87,4 +95,5 @@ curl http://127.0.0.1:9400/metrics
 ## 참고자료
 
 - [Ubuntu GPU 환경 준비](../01-setup-ubuntu.md)
+- [GPU 실습 troubleshooting](../troubleshooting.md)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/)

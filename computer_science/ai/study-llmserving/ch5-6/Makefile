@@ -2,7 +2,7 @@ COMPOSE := docker compose
 MODEL_LABEL ?= bf16
 MEASURED_BANDWIDTH_GBPS ?= 384
 
-.PHONY: setup build gpu-check observability-up ch5-calculate ch5-roofline ch5-kv-probe \
+.PHONY: setup build gpu-check gpu-reset observability-up observability-check ch5-calculate ch5-roofline ch5-kv-probe \
 	ch5-bottleneck ch5-oom ch5-load \
 	vllm-bf16 vllm-gptq vllm-fp8 \
 	quant-benchmark accuracy smoke gsm8k prefix-test summary down clean test lint format
@@ -16,8 +16,14 @@ build:
 gpu-check:
 	docker run --rm --gpus all nvidia/cuda:12.9.1-base-ubuntu24.04 nvidia-smi
 
+gpu-reset:
+	bash scripts/reset_gpu.sh
+
 observability-up:
 	$(COMPOSE) --profile observability up -d prometheus grafana dcgm-exporter
+
+observability-check: observability-up
+	bash scripts/check_observability.sh
 
 ch5-calculate:
 	uv run python -m calculators.memory_budget
