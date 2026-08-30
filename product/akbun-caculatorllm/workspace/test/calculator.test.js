@@ -118,6 +118,8 @@ test('detects common model precisions from config', () => {
   assert.equal(detectModelBytes({ quantization_config: { bits: 4 } }), 0.5);
   assert.equal(detectModelFormat({ quantization_config: { quant_method: 'awq', bits: 4 } }), 'awq4');
   assert.equal(detectModelFormat({ quantization_config: { quant_method: 'gptq', bits: 4 } }), 'gptq4');
+  assert.equal(detectModelFormat({ quantization_config: { quant_method: 'awq', bits: 8 } }), 'int8');
+  assert.equal(detectModelFormat({ quantization_config: { quant_method: 'gptq', bits: 8 } }), 'int8');
   assert.equal(detectModelFormat({ quantization_config: { quant_method: 'gguf', format: 'Q5_K_M' } }), 'gguf-q5');
   assert.equal(detectModelFormat({ torch_dtype: 'float32' }), 'fp32');
 });

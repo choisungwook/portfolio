@@ -181,10 +181,11 @@ function renderResult(prefix, result, mode) {
 
   const subject = mode === 'load' ? 'The model weights' : 'The workload';
   const verb = mode === 'load' ? 'need' : 'needs';
+  const fitVerb = mode === 'load' ? 'fit' : 'fits';
   setText(
     `${prefix}-plain-verdict`,
     result.fits
-      ? `${subject} fit with ${number(result.remainingGib, 1)} GiB free.`
+      ? `${subject} ${fitVerb} with ${number(result.remainingGib, 1)} GiB free.`
       : `${subject} ${verb} ${number(result.overflowGib, 1)} GiB more VRAM.`,
   );
 }

@@ -145,8 +145,8 @@ export function detectModelFormat(config) {
   ).trim().toLowerCase();
   const bits = firstNumber(quantization, ['bits']);
 
-  if (method.includes('awq')) return 'awq4';
-  if (method.includes('gptq')) return 'gptq4';
+  if (method.includes('awq') && (bits === null || bits === 4)) return 'awq4';
+  if (method.includes('gptq') && (bits === null || bits === 4)) return 'gptq4';
   if (method.includes('bitsandbytes') && (bits === 4 || quantization.load_in_4bit)) return 'nf4';
 
   const ggufMatch = `${method} ${quantizationType}`.match(/(?:^|[^0-9])q([2-8])(?:[^0-9]|$)/);
