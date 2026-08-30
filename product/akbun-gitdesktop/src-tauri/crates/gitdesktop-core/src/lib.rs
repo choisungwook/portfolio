@@ -49,7 +49,6 @@ pub struct BranchDeletionFailure {
 #[serde(rename_all = "camelCase")]
 pub struct BranchDeletionResult {
   pub deleted: Vec<String>,
-  pub unmerged: Vec<String>,
   pub failed: Vec<BranchDeletionFailure>,
 }
 

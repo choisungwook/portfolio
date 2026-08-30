@@ -32,7 +32,6 @@ export interface BranchDeletionFailure {
 
 export interface BranchDeletionResult {
   deleted: string[]
-  unmerged: string[]
   failed: BranchDeletionFailure[]
 }
 
