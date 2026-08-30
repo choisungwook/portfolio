@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Estimate whether an LLM model, KV cache, and runtime overhead fit in one GPU.">
+  <meta name="description" content="Compare the VRAM needed to load an LLM with the VRAM needed to run a workload.">
   <meta name="theme-color" content="#f1f0e9">
   <meta property="og:type" content="website">
   <meta property="og:title" content="akbun caculatorllm — LLM VRAM estimator">
-  <meta property="og:description" content="Load a Hugging Face config and see whether the model fits in one GPU.">
+  <meta property="og:description" content="See the difference between loading a model and running a workload on one GPU.">
   <meta property="og:image" content="https://caculatorllm.akbun.com/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://caculatorllm.akbun.com/og.png">
@@ -15,157 +15,261 @@
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="/" aria-label="akbun caculatorllm home">
-      <span class="brand-mark" aria-hidden="true">a</span>
-      <span>akbun caculatorllm</span>
-    </a>
-    <div class="header-meta"><span class="privacy-dot" aria-hidden="true"></span>Local calculation</div>
+    <a class="brand" href="/" aria-label="akbun caculatorllm home">akbun caculatorllm</a>
   </header>
 
   <main>
     <section class="intro" aria-labelledby="page-title">
-      <div>
-        <p class="eyebrow">SINGLE-GPU LLM VRAM ESTIMATOR</p>
-        <h1 id="page-title">Will it fit?</h1>
-      </div>
-      <p>Load a Hugging Face model or upload its <code>config.json</code>. See how the model, KV cache, and extra memory fill one GPU.</p>
+      <p class="eyebrow">SINGLE-GPU LLM VRAM ESTIMATOR</p>
+      <h1 id="page-title">Will it fit?</h1>
     </section>
 
-    <section class="estimator" aria-label="VRAM estimator">
-      <form class="controls" id="calculator-form" novalidate>
-        <div class="model-loader">
-          <label class="field model-field" for="model-id">
-            <span>Hugging Face model</span>
-            <input id="model-id" name="modelId" type="text" value="Qwen/Qwen2.5-7B-Instruct" autocomplete="off" spellcheck="false">
-          </label>
-          <button class="primary-button" id="load-model" type="button">Load</button>
+    <form id="calculator-form" novalidate>
+      <section class="page-section model-information" aria-labelledby="model-information-title">
+        <div class="section-heading">
+          <p class="section-number">MODEL</p>
+          <h2 id="model-information-title">Model information</h2>
         </div>
 
-        <label class="upload-button" for="config-file">
-          <span>Upload config.json</span>
-          <input id="config-file" type="file" accept="application/json,.json">
-        </label>
+        <div class="model-information-grid">
+          <div class="model-source">
+            <div class="model-loader">
+              <label class="field model-field" for="model-id">
+                <span>Hugging Face model</span>
+                <input id="model-id" name="modelId" type="text" value="Qwen/Qwen2.5-7B-Instruct" autocomplete="off" spellcheck="false">
+              </label>
+              <button class="primary-button" id="load-model" type="button">Load</button>
+            </div>
 
-        <div id="load-status" class="load-status" role="status" aria-live="polite">Qwen2.5-7B example loaded.</div>
-        <div id="error-banner" class="error-banner" role="alert" hidden></div>
+            <label class="upload-button" for="config-file">
+              <span>Upload config.json</span>
+              <input id="config-file" type="file" accept="application/json,.json">
+            </label>
 
-        <div class="field-list">
-          <label class="field" for="gpu-gib">
-            <span>GPU VRAM</span>
-            <select id="gpu-gib" name="gpuGib">
-              <option value="8">8 GiB</option>
-              <option value="12">12 GiB</option>
-              <option value="16" selected>16 GiB</option>
-              <option value="24">24 GiB</option>
-              <option value="48">48 GiB</option>
-              <option value="80">80 GiB</option>
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <label class="field custom-field" id="custom-gpu-field" for="custom-gpu-gib" hidden>
-            <span>Custom GPU VRAM</span>
-            <span class="unit-input"><input id="custom-gpu-gib" type="number" min="1" step="0.1" value="16" inputmode="decimal"><i>GiB</i></span>
-          </label>
-          <label class="field" for="context-tokens">
-            <span>Max context</span>
-            <span class="unit-input"><input id="context-tokens" name="contextTokens" type="number" min="1" step="1" value="8192" inputmode="numeric"><i>tokens</i></span>
-          </label>
-          <label class="field" for="concurrent-requests">
-            <span>Concurrent requests</span>
-            <input id="concurrent-requests" name="concurrentRequests" type="number" min="1" step="1" value="1" inputmode="numeric">
-          </label>
-          <label class="field" for="model-bytes">
-            <span>Model precision</span>
-            <select id="model-bytes" name="modelBytes">
-              <option value="2" selected>BF16 / FP16</option>
-              <option value="1">FP8 / INT8</option>
-              <option value="0.5">INT4</option>
-            </select>
-          </label>
-        </div>
+            <div id="load-status" class="load-status" role="status" aria-live="polite">Qwen2.5-7B example loaded.</div>
+            <div id="error-banner" class="error-banner" role="alert" hidden></div>
+          </div>
 
-        <details class="advanced" id="advanced-settings">
-          <summary><span>Advanced</span><span>KV precision and estimate</span></summary>
-          <div class="advanced-body">
-            <label class="field" for="kv-bytes">
-              <span>KV cache precision</span>
-              <select id="kv-bytes" name="kvBytes">
-                <option value="2" selected>BF16 / FP16</option>
-                <option value="1">FP8</option>
+          <div class="model-fields">
+            <label class="field" for="gpu-gib">
+              <span>GPU VRAM</span>
+              <select id="gpu-gib" name="gpuGib">
+                <option value="8">8 GiB</option>
+                <option value="12">12 GiB</option>
+                <option value="16" selected>16 GiB</option>
+                <option value="24">24 GiB</option>
+                <option value="48">48 GiB</option>
+                <option value="80">80 GiB</option>
+                <option value="custom">Custom</option>
               </select>
             </label>
-            <label class="field" for="alpha-percent">
-              <span>Extra memory</span>
-              <span class="unit-input"><input id="alpha-percent" name="alphaPercent" type="number" min="0" max="200" step="1" value="20" inputmode="decimal"><i>%</i></span>
+
+            <label class="field" id="custom-gpu-field" for="custom-gpu-gib" hidden>
+              <span>Custom GPU VRAM</span>
+              <span class="unit-input"><input id="custom-gpu-gib" type="number" min="1" step="0.1" value="16" inputmode="decimal"><i>GiB</i></span>
             </label>
-            <label class="field wide" for="parameter-billions">
+
+            <label class="field" for="model-format">
+              <span>Weight format</span>
+              <select id="model-format" name="modelFormat">
+                <optgroup label="Floating point">
+                  <option value="fp32">FP32 · 4 bytes</option>
+                  <option value="bf16" selected>BF16 · 2 bytes</option>
+                  <option value="fp16">FP16 · 2 bytes</option>
+                  <option value="fp8">FP8 · 1 byte</option>
+                </optgroup>
+                <optgroup label="Integer and 4-bit">
+                  <option value="int8">INT8 · 1 byte</option>
+                  <option value="int4">INT4 · about 0.5 byte</option>
+                  <option value="awq4">AWQ 4-bit · about 0.5 byte</option>
+                  <option value="gptq4">GPTQ 4-bit · about 0.5 byte</option>
+                  <option value="nf4">bitsandbytes NF4 · about 0.5 byte</option>
+                </optgroup>
+                <optgroup label="GGUF estimates">
+                  <option value="gguf-q8">GGUF Q8 · about 1 byte</option>
+                  <option value="gguf-q6">GGUF Q6 · about 0.75 byte</option>
+                  <option value="gguf-q5">GGUF Q5 · about 0.625 byte</option>
+                  <option value="gguf-q4">GGUF Q4 · about 0.5 byte</option>
+                  <option value="gguf-q3">GGUF Q3 · about 0.375 byte</option>
+                  <option value="gguf-q2">GGUF Q2 · about 0.25 byte</option>
+                </optgroup>
+                <option value="custom">Custom bits per parameter</option>
+              </select>
+            </label>
+
+            <label class="field" id="custom-model-bits-field" for="custom-model-bits" hidden>
+              <span>Custom weight size</span>
+              <span class="unit-input"><input id="custom-model-bits" type="number" min="0.1" step="0.1" value="4" inputmode="decimal"><i>bits</i></span>
+            </label>
+          </div>
+        </div>
+
+        <details class="advanced" id="model-advanced-settings">
+          <summary><span>Advanced model details</span><span>Parameters and shape</span></summary>
+          <div class="advanced-body">
+            <label class="field" for="parameter-billions">
               <span>Parameters</span>
               <span class="unit-input"><input id="parameter-billions" type="number" min="0.001" step="0.001" value="7.616" inputmode="decimal"><i>billion</i></span>
               <small id="parameter-source">From Hugging Face metadata.</small>
             </label>
-            <div class="model-shape wide" id="model-shape"></div>
+            <div class="model-shape" id="model-shape"></div>
           </div>
         </details>
-      </form>
+      </section>
 
-      <section class="visual-result" aria-labelledby="result-title" aria-live="polite">
-        <div class="jar-column">
-          <div class="capacity-title">GPU VRAM (<span id="capacity-label">16 GiB</span>)</div>
-          <div class="jar-stage" id="jar-stage">
-            <div class="liquid-stack" aria-hidden="true">
-              <div class="liquid extra-liquid" id="extra-liquid"></div>
-              <div class="liquid kv-liquid" id="kv-liquid"></div>
-              <div class="liquid model-liquid" id="model-liquid"></div>
+      <section class="page-section memory-panel" aria-labelledby="load-model-title">
+        <div class="section-heading">
+          <p class="section-number">01 · MODEL WEIGHTS ONLY</p>
+          <h2 id="load-model-title">Load Model</h2>
+        </div>
+
+        <div class="result-layout">
+          <div class="jar-column">
+            <div class="capacity-title">VRAM CAPACITY <strong id="load-capacity-label">16 GiB</strong></div>
+            <div class="jar-stage" id="load-jar-stage">
+              <div class="liquid-stack" aria-hidden="true">
+                <div class="liquid model-liquid" id="load-model-liquid"></div>
+              </div>
+              <img class="jar-image" src="/assets/vram-jar.png" alt="Glass jar showing model weight memory">
+              <div class="capacity-line" aria-hidden="true"></div>
+              <div class="overflow-label" id="load-overflow-label" hidden>OOM</div>
+              <div class="jar-labels" aria-hidden="true">
+                <div id="load-model-layer-label"><strong>Model weights</strong><span id="load-jar-model">0 GiB</span></div>
+              </div>
             </div>
-            <img class="jar-image" src="/assets/vram-jar.png" alt="Glass jar showing VRAM usage">
-            <div class="capacity-line" aria-hidden="true"></div>
-            <div class="overflow-label" id="overflow-label" hidden>OOM</div>
-            <div class="jar-labels" aria-hidden="true">
-              <div id="model-layer-label"><strong>Model</strong><span id="jar-model">0 GiB</span></div>
-              <div id="kv-layer-label"><strong>KV cache</strong><span id="jar-kv">0 GiB</span></div>
-              <div id="extra-layer-label"><strong>Extra memory</strong><span id="jar-extra">0 GiB</span></div>
+            <div class="memory-legend one-item" aria-label="Load model memory">
+              <div><span class="legend-swatch model-swatch"></span><strong>Model weights</strong><output id="load-legend-model">0 GiB</output></div>
             </div>
           </div>
-        </div>
 
-        <div class="status-column">
-          <p class="result-kicker" id="result-title">RESULT</p>
-          <h2 id="fit-status">Out of memory</h2>
-          <dl class="result-totals">
-            <div><dt>Needed</dt><dd id="total-needed">0 GiB</dd></div>
-            <div><dt>Available</dt><dd id="total-available">16 GiB</dd></div>
-            <div><dt id="difference-label">Over</dt><dd id="difference-value">0 GiB</dd></div>
-          </dl>
-          <p class="plain-verdict" id="plain-verdict"></p>
+          <div class="status-column">
+            <p class="result-kicker">LOAD RESULT</p>
+            <h3 id="load-fit-status">Fits</h3>
+            <dl class="result-totals">
+              <div><dt>Needed</dt><dd id="load-total-needed">0 GiB</dd></div>
+              <div><dt>Available</dt><dd id="load-total-available">16 GiB</dd></div>
+              <div class="difference-metric"><dt id="load-difference-label">Free</dt><dd id="load-difference-value">0 GiB</dd></div>
+            </dl>
+            <p class="plain-verdict" id="load-plain-verdict"></p>
+          </div>
         </div>
       </section>
 
-      <section class="calculation-ledger" aria-label="How it is calculated">
-        <div class="ledger-heading">
-          <p class="eyebrow">HOW IT IS CALCULATED</p>
+      <section class="page-section memory-panel workload-panel" aria-labelledby="workload-title">
+        <div class="section-heading">
+          <p class="section-number">02 · MODEL + WORKLOAD MEMORY</p>
+          <h2 id="workload-title">Run a Workload</h2>
         </div>
-        <div class="formula-row">
-          <span class="formula-dot model-dot" aria-hidden="true"></span>
-          <div><strong>Model</strong><code id="model-formula"></code></div>
-          <output id="model-result">0 GiB</output>
-        </div>
-        <div class="formula-row">
-          <span class="formula-dot kv-dot" aria-hidden="true"></span>
-          <div><strong>KV cache</strong><code id="kv-formula"></code></div>
-          <output id="kv-result">0 GiB</output>
-        </div>
-        <div class="formula-row">
-          <span class="formula-dot extra-dot" aria-hidden="true"></span>
-          <div><strong>Extra memory</strong><code id="extra-formula"></code></div>
-          <output id="extra-result">0 GiB</output>
-        </div>
-        <div class="formula-row total-row">
-          <span aria-hidden="true"></span>
-          <div><strong>Total needed</strong><code id="total-formula"></code></div>
-          <output id="total-result">0 GiB</output>
+
+        <div class="workload-layout">
+          <div class="workload-settings">
+            <h3>Workload settings</h3>
+            <div class="field-list">
+              <label class="field" for="context-tokens">
+                <span>Max context</span>
+                <span class="unit-input"><input id="context-tokens" name="contextTokens" type="number" min="1" step="1" value="8192" inputmode="numeric"><i>tokens</i></span>
+              </label>
+              <label class="field" for="concurrent-requests">
+                <span>Concurrent requests</span>
+                <input id="concurrent-requests" name="concurrentRequests" type="number" min="1" step="1" value="1" inputmode="numeric">
+              </label>
+            </div>
+
+            <details class="advanced" id="workload-advanced-settings">
+              <summary><span>Advanced workload details</span><span>KV and extra memory</span></summary>
+              <div class="advanced-body two-columns">
+                <label class="field" for="kv-bytes">
+                  <span>KV cache format</span>
+                  <select id="kv-bytes" name="kvBytes">
+                    <option value="2" selected>BF16 / FP16 · 2 bytes</option>
+                    <option value="1">FP8 · 1 byte</option>
+                  </select>
+                </label>
+                <label class="field" for="alpha-percent">
+                  <span>Extra memory</span>
+                  <span class="unit-input"><input id="alpha-percent" name="alphaPercent" type="number" min="0" max="200" step="1" value="20" inputmode="decimal"><i>%</i></span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div class="jar-column">
+            <div class="capacity-title">VRAM CAPACITY <strong id="workload-capacity-label">16 GiB</strong></div>
+            <div class="jar-stage" id="workload-jar-stage">
+              <div class="liquid-stack" aria-hidden="true">
+                <div class="liquid extra-liquid" id="workload-extra-liquid"></div>
+                <div class="liquid kv-liquid" id="workload-kv-liquid"></div>
+                <div class="liquid model-liquid" id="workload-model-liquid"></div>
+              </div>
+              <img class="jar-image" src="/assets/vram-jar.png" alt="Glass jar showing model and workload memory">
+              <div class="capacity-line" aria-hidden="true"></div>
+              <div class="overflow-label" id="workload-overflow-label" hidden>OOM</div>
+              <div class="jar-labels" aria-hidden="true">
+                <div id="workload-model-layer-label"><strong>Model weights</strong><span id="workload-jar-model">0 GiB</span></div>
+                <div id="workload-kv-layer-label"><strong>KV cache</strong><span id="workload-jar-kv">0 GiB</span></div>
+                <div id="workload-extra-layer-label"><strong>Extra memory</strong><span id="workload-jar-extra">0 GiB</span></div>
+              </div>
+            </div>
+            <div class="memory-legend" aria-label="Workload memory breakdown">
+              <div><span class="legend-swatch model-swatch"></span><strong>Model</strong><output id="workload-legend-model">0 GiB</output></div>
+              <div><span class="legend-swatch kv-swatch"></span><strong>KV cache</strong><output id="workload-legend-kv">0 GiB</output></div>
+              <div><span class="legend-swatch extra-swatch"></span><strong>Extra</strong><output id="workload-legend-extra">0 GiB</output></div>
+            </div>
+          </div>
+
+          <div class="status-column">
+            <p class="result-kicker">WORKLOAD RESULT</p>
+            <h3 id="workload-fit-status">Out of memory</h3>
+            <dl class="result-totals">
+              <div><dt>Needed</dt><dd id="workload-total-needed">0 GiB</dd></div>
+              <div><dt>Available</dt><dd id="workload-total-available">16 GiB</dd></div>
+              <div class="difference-metric"><dt id="workload-difference-label">Over</dt><dd id="workload-difference-value">0 GiB</dd></div>
+            </dl>
+            <p class="plain-verdict" id="workload-plain-verdict"></p>
+          </div>
         </div>
       </section>
-    </section>
+
+      <section class="page-section calculation-ledger" aria-labelledby="calculation-title">
+        <div class="section-heading">
+          <p class="section-number">FORMULAS</p>
+          <h2 id="calculation-title">How It Is Calculated</h2>
+        </div>
+
+        <section class="formula-group" aria-labelledby="load-formula-title">
+          <h3 id="load-formula-title">Load Model</h3>
+          <div class="formula-row">
+            <span class="formula-dot model-dot" aria-hidden="true"></span>
+            <div><strong>Model weights</strong><code id="load-model-formula"></code></div>
+            <output id="load-model-result">0 GiB</output>
+          </div>
+        </section>
+
+        <section class="formula-group" aria-labelledby="workload-formula-title">
+          <h3 id="workload-formula-title">Run a Workload</h3>
+          <div class="formula-row">
+            <span class="formula-dot model-dot" aria-hidden="true"></span>
+            <div><strong>Model weights</strong><code>From the Load Model result</code></div>
+            <output id="workload-model-result">0 GiB</output>
+          </div>
+          <div class="formula-row">
+            <span class="formula-dot kv-dot" aria-hidden="true"></span>
+            <div><strong>KV cache</strong><code id="workload-kv-formula"></code></div>
+            <output id="workload-kv-result">0 GiB</output>
+          </div>
+          <div class="formula-row">
+            <span class="formula-dot extra-dot" aria-hidden="true"></span>
+            <div><strong>Extra memory</strong><code id="workload-extra-formula"></code></div>
+            <output id="workload-extra-result">0 GiB</output>
+          </div>
+          <div class="formula-row total-row">
+            <span aria-hidden="true"></span>
+            <div><strong>Total needed</strong><code id="workload-total-formula"></code></div>
+            <output id="workload-total-result">0 GiB</output>
+          </div>
+        </section>
+      </section>
+    </form>
   </main>
 
   <script type="module" src="/src/main.js"></script>

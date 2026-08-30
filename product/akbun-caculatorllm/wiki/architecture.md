@@ -18,10 +18,11 @@ The arithmetic module imports nothing and does not touch the DOM.
 1. Load exact Hugging Face parameter metadata when a model ID is available.
 2. Normalize the model shape from `config.json`.
 3. Estimate parameters only for supported decoder-only shapes when exact metadata is absent.
-4. Read GPU, context, concurrency, precision, and extra-memory inputs.
-5. Calculate model weights, KV cache, extra memory, and total needed VRAM.
-6. Compare the total with one GPU.
-7. Render Fits or Out of memory, liquid layers, and substituted formulas.
+4. Read the GPU and weight format.
+5. Calculate model weights and compare them with one GPU for Load Model.
+6. Read context, concurrency, KV format, and extra-memory inputs.
+7. Reuse the same model and GPU to calculate the Run a Workload total.
+8. Render separate Fits or Out of memory results, jars, and substituted formulas.
 
 Unsupported model shapes require a manual parameter count. The calculator does not silently invent one.
 
@@ -31,7 +32,7 @@ Unsupported model shapes require a manual parameter count. The calculator does n
 model GiB = parameter count × model bytes/parameter ÷ 1,073,741,824
 ```
 
-Model precision is editable because config metadata does not always describe the serving-time quantization.
+Weight format is editable because config metadata does not always describe the serving-time precision or quantization. Common floating-point, integer, AWQ, GPTQ, NF4, and GGUF sizes are available, with custom bits for formats not listed.
 
 ## KV cache
 
@@ -42,12 +43,21 @@ KV GiB = KV bytes/token × max context × concurrent requests ÷ 1,073,741,824
 
 The leading `2` represents key and value. The estimate assumes ordinary decoder-only attention and a fully allocated maximum context for every concurrent request.
 
-## Extra memory and result
+## Two results
+
+```text
+load model total GiB = model GiB
+load model fits = model GiB <= GPU GiB
+```
+
+The first result answers only whether the model weights fit. It does not include a KV cache or runtime reserve.
+
+## Extra memory and workload result
 
 ```text
 extra GiB = (model GiB + KV GiB) × extra percent
 total GiB = model GiB + KV GiB + extra GiB
-fits = total GiB <= GPU GiB
+workload fits = total GiB <= GPU GiB
 ```
 
 The default extra-memory value is 20%. It is an adjustable planning reserve for activations, workspaces, runtime allocations, and fragmentation, not an exact runtime measurement.
