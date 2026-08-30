@@ -7,13 +7,17 @@
 Workspace의 이전 model process를 정리하고 hardware metric 수집 경로를 확인합니다.
 
 ```bash
-make gpu-reset
-make observability-check
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+bash scripts/check_observability.sh
 ```
 
 Desktop GPU는 화면 출력 때문에 baseline VRAM이 0MiB가 아닙니다. 초기화 기준과 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
 
-`make gpu-reset`이 남은 compute process를 출력하고 실패하면 실습을 진행하지 않습니다. [process 실행 주체 확인과 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`부터 다시 실행합니다.
+`nvidia-smi`가 compute process를 출력하면 실습을 진행하지 않습니다. [process 실행 주체 확인과 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 초기화 명령부터 다시 실행합니다.
 
 ## Chapter 5만 볼 때
 
@@ -26,7 +30,7 @@ Chapter 5는 "이 GPU에 이 model이 들어가는가, 느리다면 연산인가
 | 2 | [03 KV cache 배치·시퀀스](./03-kv-cache-batch-sequence.md) | 캐시할 토큰 개수를 어떻게 세고, 최대 배치는 무엇이 정하는가 |
 | 3 | [04 roofline과 병목 재현](./04-roofline-bottleneck.md) | 연산집약도 축은 무엇이고, 병목이 연산인가 대역폭인가 |
 
-03과 04는 `make ch5-kv-probe`, `make ch5-roofline`, `make ch5-bottleneck`으로 직접 측정합니다. 실행 전에 [01 GPU 환경](./01-gpu-environment.md)이 필요합니다.
+03과 04는 문서에 적힌 Docker Compose 명령으로 KV cache, roofline, bottleneck을 직접 측정합니다. 실행 전에 [01 GPU 환경](./01-gpu-environment.md)이 필요합니다.
 
 ## Chapter 6만 볼 때
 

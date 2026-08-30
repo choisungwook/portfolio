@@ -44,7 +44,7 @@
 ## GPU 초기화 안전선
 
 - 실습 기준은 VRAM `0 MiB`가 아니라 **실습 compute process가 없는 baseline**이다.
-- `make gpu-reset`은 이 workspace의 Compose resource만 내린다.
+- 문서의 `docker compose --profile "*" down --remove-orphans`는 이 workspace의 Compose resource만 내린다.
 - 다른 workspace나 container orchestrator의 GPU process가 남으면 목록을 출력하고 실패해야 한다.
 - 소유권을 확인하지 않은 PID, Xorg, desktop session을 자동 종료하지 않는다.
 - 외부 process를 직접 kill하는 기능을 `gpu-reset`에 추가하지 않는다.
@@ -66,7 +66,7 @@
 - `docs/prometheus.md`
 - `docs/troubleshooting.md`
 
-`make observability-check`는 다음 경로를 검증한다.
+`bash scripts/check_observability.sh`는 다음 경로를 검증한다.
 
 ```text
 nvidia-smi → DCGM Exporter → Prometheus → Grafana datasource
@@ -103,14 +103,25 @@ git diff --check
 GPU 동작을 바꾸면 가능한 환경에서 다음 순서로 추가 검증한다.
 
 ```bash
-make gpu-reset
-make observability-check
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+bash scripts/check_observability.sh
 docker compose --profile oom run --rm vllm-7b-bf16-expect-failure
 ```
 
 - expected OOM 명령의 non-zero exit는 정상 결과다.
 - OOM 전후 `dcgm-exporter UP`과 Prometheus의 VRAM peak를 확인한다.
 - 검증용 GPU server의 주소, hostname, 사용자명, SSH alias, 절대 경로를 저장소에 기록하지 않는다.
+
+## 핸즈온 명령 표기
+
+- `docs/handson/`에서는 Make target으로 실행 단계를 숨기지 않는다.
+- Service 기동·종료·benchmark는 실제 `docker compose` 명령을 적는다.
+- GPU process 확인과 HTTP health check처럼 Compose 밖의 검증만 `nvidia-smi`, `bash`, `curl`을 직접 사용한다.
+- Makefile은 개발자 편의용으로 유지할 수 있지만 핸즈온의 유일한 실행 경로로 삼지 않는다.
 
 ## 공개 저장소 개인정보 규칙
 

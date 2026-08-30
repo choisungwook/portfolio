@@ -20,10 +20,13 @@ cd computer_science/ai/study-llmserving/ch5-6
 다른 process가 VRAM을 사용하면 OOM 원인이 7B model인지 기존 workload인지 구분할 수 없습니다. Workspace container를 정리하고 남은 GPU compute process를 확인합니다.
 
 ```bash
-make gpu-reset
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
 ```
 
-`GPU compute processes remain`이 출력되면 각 PID의 실행 주체를 확인합니다.
+두 번째 명령이 process를 출력하면 각 PID의 실행 주체를 확인합니다.
 
 ```bash
 nvidia-smi \
@@ -49,11 +52,15 @@ kubectl scale deployment/<WORKLOAD> --replicas=0 -n <NAMESPACE>
 소유자를 모르는 process, Xorg, desktop session은 종료하지 않습니다. 종료 후 기준 상태와 OOM 순간의 hardware metric 수집 경로를 다시 확인합니다.
 
 ```bash
-make gpu-reset
-make observability-check
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+bash scripts/check_observability.sh
 ```
 
-`make gpu-reset`이 성공하고 compute process 목록이 비어 있어야 실습을 시작합니다. Desktop baseline VRAM과 Grafana 값이 예상과 다르면 [GPU 실습 troubleshooting](../troubleshooting.md)을 확인합니다.
+Compute process 목록이 비어 있고 관측 경로 점검이 성공해야 실습을 시작합니다. Desktop baseline VRAM과 Grafana 값이 예상과 다르면 [GPU 실습 troubleshooting](../troubleshooting.md)을 확인합니다.
 
 ## 먼저 OOM 가설을 계산합니다
 
@@ -140,7 +147,7 @@ docker compose --profile tools run --rm model-loader python3 -m model_loader.loa
 같은 serving 설정에서 model만 3B로 바꿔 API server와 KV pool이 준비되는지 확인합니다.
 
 ```bash
-make vllm-bf16
+docker compose --profile bf16 up -d vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 docker compose --profile bf16 logs vllm-bf16 | grep -i "KV cache"
 ```

@@ -20,10 +20,13 @@ cd computer_science/ai/study-llmserving/ch5-6
 이전 실습과 다른 workload가 사용하는 GPU compute process를 정리합니다.
 
 ```bash
-make gpu-reset
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
 ```
 
-명령이 남은 process를 출력하고 실패하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`을 다시 실행합니다.
+두 번째 명령이 process를 출력하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 두 명령을 다시 실행합니다.
 
 ## 1. 먼저 token 하나의 비용을 구합니다
 
@@ -42,7 +45,9 @@ Qwen2.5-3B-Instruct는 layers 36, KV heads 2, head dimension 128, BF16입니다.
 책 예제의 Llama-2-7B는 같은 계산으로 **512 KiB**가 나옵니다. 14배 차이입니다. parameter 수가 2배 차이인데 KV는 14배 차이가 나는 이유는 KV head 수에 있습니다. Llama-2-7B는 attention head 32개마다 KV head도 32개인 MHA이고, Qwen2.5-3B는 attention head 16개가 KV head 2개를 나눠 쓰는 GQA입니다.
 
 ```bash
-make ch5-calculate
+docker compose --profile tools build benchmark
+docker compose --profile tools run --rm benchmark python3 -m calculators.memory_budget
+docker compose --profile tools run --rm benchmark python3 -m calculators.roofline
 ```
 
 | Model | attention | KV heads | KV/token | 같은 16GB에서 4096-token 요청 |
@@ -59,7 +64,7 @@ vLLM은 기동할 때 KV pool을 미리 잡고 그 크기를 log에 남깁니다
 02번에서 실행한 3B BF16 server가 내려갔다면 다시 기동하고 health check를 확인합니다.
 
 ```bash
-make vllm-bf16
+docker compose --profile bf16 up -d vllm-bf16
 bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 ```
 
@@ -104,7 +109,9 @@ VRAM 전체가 어떻게 갈라지는지도 여기서 맞춰볼 수 있습니다
 동시 요청 수와 prompt 길이를 바꿔가며, 공식이 예측한 pool 점유율과 서버가 보고하는 실제 점유율을 나란히 놓습니다.
 
 ```bash
-make ch5-kv-probe
+docker compose --profile tools build benchmark
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+docker compose --profile tools run --rm benchmark python3 -m benchmark.kv_cache_probe
 ```
 
 `max_num_seqs 8` 기본 설정에서의 결과입니다.
@@ -155,7 +162,7 @@ TTFT가 300배 흔들리는 동안 TPOT는 15.9 ms에서 28.3 ms로 완만하게
 
 ```bash
 VLLM_MAX_NUM_SEQS=64 docker compose --profile bf16 up -d --force-recreate vllm-bf16
-make ch5-kv-probe
+docker compose --profile tools run --rm benchmark python3 -m benchmark.kv_cache_probe
 ```
 
 이 설정에서는 `gpu-memory-utilization`이 0.85라 pool이 173,328 tokens(5.95 GiB)로 조금 작아집니다. 예측값은 그 pool 기준입니다.

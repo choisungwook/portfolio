@@ -20,10 +20,13 @@ cd computer_science/ai/study-llmserving/ch5-6
 이전 실습과 다른 workload가 사용하는 GPU compute process를 정리합니다.
 
 ```bash
-make gpu-reset
+docker compose --profile "*" down --remove-orphans
+nvidia-smi \
+  --query-compute-apps=pid,process_name,used_gpu_memory \
+  --format=csv,noheader
 ```
 
-명령이 남은 process를 출력하고 실패하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 `make gpu-reset`을 다시 실행합니다.
+두 번째 명령이 process를 출력하면 실습을 진행하지 않습니다. [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행한 뒤 두 명령을 다시 실행합니다.
 
 ## 1. 축이 무엇인지부터 고정합니다
 
@@ -47,7 +50,9 @@ crossover = peak FLOPS ÷ memory bandwidth
 사양표를 믿지 않고 측정합니다. 큰 정사각 행렬 곱으로 peak 연산 성능을, 큰 device 복사로 memory bandwidth를 잽니다.
 
 ```bash
-make ch5-roofline
+docker compose --profile tools build benchmark
+docker compose --profile tools run --rm gpu-probe
+docker compose --profile tools run --rm benchmark python3 -m calculators.plot_roofline
 ```
 
 측정 결과입니다.
@@ -67,7 +72,8 @@ crossover가 131이라는 것은 이 카드가 연산 성능 대비 대역폭이
 Projection 연산을 `[s, h] × [h, h]`로 두고 계산기를 돌립니다.
 
 ```bash
-make ch5-calculate
+docker compose --profile tools run --rm benchmark python3 -m calculators.memory_budget
+docker compose --profile tools run --rm benchmark python3 -m calculators.roofline
 ```
 
 책 예제와 맞추기 위해 hidden size 4096으로 계산한 값입니다. [이론 문서](../02-ch5-theory.md)의 표는 이 workspace가 실제로 서빙하는 Qwen2.5-3B의 2048 기준이라 같은 sequence 길이라도 값이 다릅니다.
@@ -118,8 +124,12 @@ Qwen2.5-3B BF16의 weight는 vLLM이 보고한 값으로 5.79 GiB입니다.
 vLLM을 띄우고 서로 반대쪽에 있는 workload를 던집니다.
 
 ```bash
-make vllm-bf16
-make ch5-bottleneck
+docker compose --profile bf16 up -d vllm-bf16
+docker compose --profile observability up -d prometheus grafana dcgm-exporter
+docker compose --profile tools build benchmark
+docker compose --profile tools run --rm \
+  -e MEASURED_BANDWIDTH_GBPS=384 \
+  benchmark python3 -m benchmark.bottleneck_probe
 ```
 
 실험이 만드는 네 상황입니다.

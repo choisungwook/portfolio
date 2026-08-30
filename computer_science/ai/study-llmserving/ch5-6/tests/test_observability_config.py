@@ -32,3 +32,16 @@ def test_gpu_utilization_panel_uses_rolling_peak() -> None:
   """Keep brief GPU busy samples visible in Grafana."""
   panel = dashboard_panel(12)
   assert panel["targets"][0]["expr"] == "max(max_over_time(DCGM_FI_DEV_GPU_UTIL[5s]))"
+
+
+def test_handson_exposes_compose_commands_without_make_targets() -> None:
+  """Keep environment and benchmark commands visible in every hands-on document."""
+  for document_path in (ROOT / "docs/handson").glob("*.md"):
+    document = document_path.read_text(encoding="utf-8")
+    assert "make " not in document
+
+
+def test_runtime_image_can_render_roofline_plot() -> None:
+  """Install the plotting dependency used by the documented Compose command."""
+  dockerfile = (ROOT / "docker/Dockerfile").read_text(encoding="utf-8")
+  assert '"matplotlib>=3.10"' in dockerfile
