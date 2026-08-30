@@ -1,151 +1,177 @@
 const GIB = 1024 ** 3;
-const MIB = 1024 ** 2;
 
 export const DEFAULT_INPUT = Object.freeze({
-  promptTokens: 1024,
-  outputTokens: 256,
-  targetRps: 1.5,
-  totalGpus: 4,
-  tensorParallel: 2,
-  reservePercent: 20,
-  prefillTps: 4200,
-  decodeTps: 680,
-  decodeConcurrency: 16,
-  overheadMs: 25,
-  kvCacheGib: 24,
-  layers: 32,
-  kvHeads: 8,
-  headDim: 128,
+  gpuGib: 16,
+  contextTokens: 8192,
+  concurrentRequests: 1,
+  modelBytes: 2,
   kvBytes: 2,
-  blockSize: 16,
+  alphaPercent: 20,
 });
 
-export const PRESETS = Object.freeze({
-  chat: { promptTokens: 1024, outputTokens: 256, targetRps: 1.5 },
-  rag: { promptTokens: 4096, outputTokens: 512, targetRps: 0.5 },
-  agent: { promptTokens: 8192, outputTokens: 1024, targetRps: 0.2 },
+export const DEFAULT_MODEL = Object.freeze({
+  id: 'Qwen/Qwen2.5-7B-Instruct',
+  parameterCount: 7_615_616_512,
+  parameterSource: 'Hugging Face metadata',
+  layers: 28,
+  attentionHeads: 28,
+  kvHeads: 4,
+  hiddenSize: 3584,
+  headDim: 128,
+  modelType: 'qwen2',
 });
 
-const POSITIVE_FIELDS = [
-  'promptTokens', 'outputTokens', 'totalGpus', 'tensorParallel', 'prefillTps',
-  'decodeTps', 'decodeConcurrency', 'kvCacheGib', 'layers', 'kvHeads',
-  'headDim', 'kvBytes', 'blockSize',
-];
+const GATED_MODEL_TYPES = new Set([
+  'gemma', 'gemma2', 'gemma3', 'llama', 'mistral', 'mixtral', 'phi3',
+  'qwen2', 'qwen3',
+]);
 
-const INTEGER_FIELDS = [
-  'promptTokens', 'outputTokens', 'totalGpus', 'tensorParallel',
-  'decodeConcurrency', 'layers', 'kvHeads', 'headDim', 'blockSize',
-];
+function firstNumber(config, keys) {
+  for (const key of keys) {
+    if (Number.isFinite(Number(config[key]))) return Number(config[key]);
+  }
+  return null;
+}
 
-export function validateInput(input) {
+function isGatedMlp(config) {
+  const activation = String(config.hidden_act ?? config.activation_function ?? '').toLowerCase();
+  return GATED_MODEL_TYPES.has(config.model_type) || activation.includes('silu') || activation.includes('swish');
+}
+
+export function estimateParameterCount(config, shape) {
+  const vocabSize = firstNumber(config, ['vocab_size', 'padded_vocab_size']);
+  const intermediateSize = firstNumber(config, ['intermediate_size', 'n_inner', 'ffn_dim']);
+  if (!vocabSize || !intermediateSize || !GATED_MODEL_TYPES.has(shape.modelType)) return null;
+
+  const kvWidth = shape.kvHeads * shape.headDim;
+  const embeddings = vocabSize * shape.hiddenSize;
+  const outputHead = config.tie_word_embeddings === false ? embeddings : 0;
+  const attentionPerLayer = (2 * shape.hiddenSize * shape.hiddenSize)
+    + (2 * shape.hiddenSize * kvWidth);
+  const mlpMultiplier = isGatedMlp(config) ? 3 : 2;
+  const mlpPerLayer = mlpMultiplier * shape.hiddenSize * intermediateSize;
+  const normsPerLayer = 2 * shape.hiddenSize;
+  const finalNorm = shape.hiddenSize;
+
+  return Math.round(
+    embeddings
+    + outputHead
+    + shape.layers * (attentionPerLayer + mlpPerLayer + normsPerLayer)
+    + finalNorm,
+  );
+}
+
+export function modelFromConfig(config, exactParameterCount = null, fallbackId = 'Uploaded config.json') {
+  const layers = firstNumber(config, ['num_hidden_layers', 'n_layer', 'num_layers']);
+  const attentionHeads = firstNumber(config, ['num_attention_heads', 'n_head']);
+  const hiddenSize = firstNumber(config, ['hidden_size', 'n_embd', 'd_model']);
+  const kvHeads = firstNumber(config, ['num_key_value_heads', 'n_head_kv']) ?? attentionHeads;
+  const headDim = firstNumber(config, ['head_dim'])
+    ?? (hiddenSize && attentionHeads ? hiddenSize / attentionHeads : null);
+
+  const missing = [
+    ['layers', layers],
+    ['attention heads', attentionHeads],
+    ['KV heads', kvHeads],
+    ['hidden size', hiddenSize],
+    ['head dimension', headDim],
+  ].filter(([, value]) => !Number.isFinite(value) || value <= 0).map(([name]) => name);
+
+  if (missing.length) {
+    throw new Error(`config.json is missing ${missing.join(', ')}.`);
+  }
+
+  const shape = {
+    id: config._name_or_path || fallbackId,
+    layers,
+    attentionHeads,
+    kvHeads,
+    hiddenSize,
+    headDim,
+    modelType: String(config.model_type ?? 'unknown'),
+  };
+  const embeddedParameterCount = firstNumber(config, [
+    'num_parameters', 'parameter_count', 'n_params', 'num_params',
+  ]);
+  const parameterCount = exactParameterCount
+    ?? embeddedParameterCount
+    ?? estimateParameterCount(config, shape);
+
+  return {
+    ...shape,
+    parameterCount,
+    parameterSource: exactParameterCount
+      ? 'Hugging Face metadata'
+      : embeddedParameterCount
+        ? 'config.json'
+        : parameterCount
+          ? 'Estimated from config.json'
+          : 'Manual input required',
+  };
+}
+
+export function detectModelBytes(config) {
+  const bits = firstNumber(config.quantization_config ?? {}, ['bits']);
+  if (bits === 4) return 0.5;
+  if (bits === 8) return 1;
+
+  const dtype = String(config.torch_dtype ?? config.dtype ?? '').toLowerCase();
+  if (dtype.includes('int4') || dtype.includes('4bit')) return 0.5;
+  if (dtype.includes('float8') || dtype.includes('fp8') || dtype.includes('int8')) return 1;
+  return 2;
+}
+
+export function validateInput(input, model) {
   const errors = [];
-  for (const field of [...POSITIVE_FIELDS, 'targetRps', 'reservePercent', 'overheadMs']) {
-    if (!Number.isFinite(input[field])) errors.push(`${field} must be a number`);
+  const positive = [
+    ['GPU VRAM', input.gpuGib],
+    ['Max context', input.contextTokens],
+    ['Concurrent requests', input.concurrentRequests],
+    ['Model precision', input.modelBytes],
+    ['KV cache precision', input.kvBytes],
+    ['Layers', model.layers],
+    ['KV heads', model.kvHeads],
+    ['Head dimension', model.headDim],
+  ];
+
+  for (const [name, value] of positive) {
+    if (!Number.isFinite(value) || value <= 0) errors.push(`${name} must be greater than zero.`);
   }
-  for (const field of POSITIVE_FIELDS) {
-    if (Number.isFinite(input[field]) && input[field] <= 0) errors.push(`${field} must be greater than zero`);
+  if (!Number.isInteger(input.contextTokens)) errors.push('Max context must be a whole number.');
+  if (!Number.isInteger(input.concurrentRequests)) errors.push('Concurrent requests must be a whole number.');
+  if (!Number.isFinite(input.alphaPercent) || input.alphaPercent < 0 || input.alphaPercent > 200) {
+    errors.push('Extra memory must be from 0% to 200%.');
   }
-  for (const field of INTEGER_FIELDS) {
-    if (Number.isFinite(input[field]) && !Number.isInteger(input[field])) errors.push(`${field} must be a whole number`);
+  if (!Number.isFinite(model.parameterCount) || model.parameterCount <= 0) {
+    errors.push('Enter the model parameter count in Advanced.');
   }
-  if (input.targetRps < 0) errors.push('targetRps cannot be negative');
-  if (input.reservePercent < 0 || input.reservePercent > 95) errors.push('reservePercent must be from 0 to 95');
-  if (input.overheadMs < 0) errors.push('overheadMs cannot be negative');
-  if (input.tensorParallel > input.totalGpus) errors.push('Tensor parallel cannot exceed total GPUs');
   return errors;
 }
 
-export function calculate(input) {
-  const errors = validateInput(input);
+export function calculateVram(input, model) {
+  const errors = validateInput(input, model);
   if (errors.length) return { errors };
 
-  const replicas = Math.floor(input.totalGpus / input.tensorParallel);
-  const allocatedGpus = replicas * input.tensorParallel;
-  const unusedGpus = input.totalGpus - allocatedGpus;
-  const safeFactor = 1 - (input.reservePercent / 100);
-
-  const rawPrefillTps = input.prefillTps * replicas;
-  const rawDecodeTps = input.decodeTps * replicas;
-  const safePrefillTps = rawPrefillTps * safeFactor;
-  const safeDecodeTps = rawDecodeTps * safeFactor;
-
-  const prefillRps = safePrefillTps / input.promptTokens;
-  const decodeRps = safeDecodeTps / input.outputTokens;
-  const maxRps = Math.min(prefillRps, decodeRps);
-  const bottleneck = prefillRps <= decodeRps ? 'prefill' : 'decode';
-  const totalTps = maxRps * (input.promptTokens + input.outputTokens);
-  const requestsPerHour = maxRps * 3600;
-  const tpsPerGpu = totalTps / allocatedGpus;
-
-  const prefillUtilization = (input.targetRps * input.promptTokens) / rawPrefillTps;
-  const decodeUtilization = (input.targetRps * input.outputTokens) / rawDecodeTps;
-  const targetSafeRatio = maxRps === 0 ? Infinity : input.targetRps / maxRps;
-  const targetFits = input.targetRps <= maxRps;
-  const perReplicaSafeRps = Math.min(
-    (input.prefillTps * safeFactor) / input.promptTokens,
-    (input.decodeTps * safeFactor) / input.outputTokens,
-  );
-  const recommendedReplicas = Math.max(1, Math.ceil(input.targetRps / perReplicaSafeRps));
-  const recommendedGpus = recommendedReplicas * input.tensorParallel;
-
-  // These latency figures intentionally use the measured aggregate rates. TTFT
-  // is an optimistic service-time estimate. TPOT divides aggregate decode rate
-  // by the concurrency at which that rate was measured.
-  const ttftMs = (input.promptTokens / input.prefillTps) * 1000;
-  const itlMs = (input.decodeConcurrency / input.decodeTps) * 1000;
-  const generationMs = Math.max(0, input.outputTokens - 1) * itlMs;
-  const inferenceMs = ttftMs + generationMs;
-  const e2eMs = inferenceMs + input.overheadMs;
-  const outputSpeed = input.outputTokens / (inferenceMs / 1000);
-  const targetConcurrency = input.targetRps * (inferenceMs / 1000);
-
-  // A standard decoder-only attention cache stores both key and value for each
-  // layer, KV head and head dimension. Token allocation rounds to cache blocks.
-  const contextTokens = input.promptTokens + input.outputTokens;
-  const roundedContextTokens = Math.ceil(contextTokens / input.blockSize) * input.blockSize;
-  const kvBytesPerToken = 2 * input.layers * input.kvHeads * input.headDim * input.kvBytes;
-  const kvBytesPerRequest = kvBytesPerToken * roundedContextTokens;
-  const kvSequencesPerReplica = Math.floor((input.kvCacheGib * GIB) / kvBytesPerRequest);
-  const kvSequencesSystem = kvSequencesPerReplica * replicas;
-  const kvPressure = kvSequencesSystem === 0 ? Infinity : targetConcurrency / kvSequencesSystem;
+  const modelBytes = model.parameterCount * input.modelBytes;
+  const kvBytesPerToken = 2 * model.layers * model.kvHeads * model.headDim * input.kvBytes;
+  const kvBytes = kvBytesPerToken * input.contextTokens * input.concurrentRequests;
+  const baseBytes = modelBytes + kvBytes;
+  const alphaBytes = baseBytes * (input.alphaPercent / 100);
+  const totalBytes = baseBytes + alphaBytes;
+  const capacityBytes = input.gpuGib * GIB;
+  const remainingBytes = capacityBytes - totalBytes;
 
   return {
     errors: [],
-    replicas,
-    allocatedGpus,
-    unusedGpus,
-    safeFactor,
-    rawPrefillTps,
-    rawDecodeTps,
-    safePrefillTps,
-    safeDecodeTps,
-    prefillRps,
-    decodeRps,
-    maxRps,
-    bottleneck,
-    totalTps,
-    requestsPerHour,
-    tpsPerGpu,
-    prefillUtilization,
-    decodeUtilization,
-    targetSafeRatio,
-    targetFits,
-    recommendedReplicas,
-    recommendedGpus,
-    ttftMs,
-    itlMs,
-    generationMs,
-    inferenceMs,
-    e2eMs,
-    outputSpeed,
-    targetConcurrency,
-    contextTokens,
-    roundedContextTokens,
+    modelGib: modelBytes / GIB,
+    kvGib: kvBytes / GIB,
+    alphaGib: alphaBytes / GIB,
+    totalGib: totalBytes / GIB,
+    capacityGib: input.gpuGib,
+    remainingGib: Math.max(0, remainingBytes / GIB),
+    overflowGib: Math.max(0, -remainingBytes / GIB),
+    fits: totalBytes <= capacityBytes,
+    utilization: totalBytes / capacityBytes,
     kvBytesPerToken,
-    kvBytesPerRequest,
-    kvRequestMib: kvBytesPerRequest / MIB,
-    kvSequencesPerReplica,
-    kvSequencesSystem,
-    kvPressure,
   };
 }

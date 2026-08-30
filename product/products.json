@@ -1,6 +1,6 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-29",
+  "updated": "2026-08-30",
   "products": [
     {
       "id": "akbun-macdiskviewer",
@@ -14,7 +14,7 @@
     {
       "id": "akbun-caculatorllm",
       "name": "akbun-caculatorllm",
-      "description": "Measured prefill and decode throughput into LLM serving RPS, latency, and KV cache capacity",
+      "description": "Single-GPU LLM VRAM estimator using Hugging Face config, model weights, KV cache, and extra memory",
       "kind": "web",
       "tags": ["vite", "llm", "cloudflare"],
       "site": "https://caculatorllm.akbun.com",

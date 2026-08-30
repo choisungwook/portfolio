@@ -16,7 +16,7 @@
 | [envelope_encryption_simulator](./envelope_encryption_simulator/) | KMS 봉투암호화 암복호화 과정을 보여주는 시뮬레이터 |
 | [hprof-oom-analyzer](./hprof-oom-analyzer/) | JVM heap dump(hprof)에서 OOM 원인을 찾는 데스크톱 도구 |
 | [akbun-k8supgradeview](./akbun-k8supgradeview/) | EKS 업그레이드 작업용 노드/파드 조회 Electron 데스크톱 앱 |
-| [akbun-caculatorllm](./akbun-caculatorllm/) | Measured prefill and decode throughput into LLM serving RPS, latency, and KV cache capacity |
+| [akbun-caculatorllm](./akbun-caculatorllm/) | Single-GPU LLM VRAM estimator using Hugging Face config, model weights, KV cache, and extra memory |
 | [akbun-rendermermaid](./akbun-rendermermaid/) | mermaid 코드를 왼쪽에 쓰면 오른쪽에 렌더링하고 PNG로 저장하는 웹 페이지 |
 | [akbun-requesthttp](./akbun-requesthttp/) | HTTP(S) 요청, 응답 확인, 폴더 관리, 공통 변수, curl 변환, .http 가져오기를 갖춘 데스크톱 HTTP 클라이언트 |
 | [akbun-openapiviewer](./akbun-openapiviewer/) | OpenAPI 스펙을 붙여넣거나 파일로 열어 API 목록과 상세를 탐색하는 웹 페이지 |

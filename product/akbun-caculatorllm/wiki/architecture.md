@@ -1,76 +1,61 @@
 # Architecture
 
-One static page, no backend, database, account, or external runtime API. Vite bundles the page and Cloudflare serves the generated assets. Inputs are read and stored only in the browser.
+One static page, no backend, database, or account. Vite bundles the page and Cloudflare serves the generated assets. Local `config.json` files and calculations stay in the browser. A model ID triggers read-only requests to public Hugging Face endpoints.
 
 ## Modules
 
 | File | Responsibility | Verification |
-|---|---|---|
-| `src/lib/calculator.js` | Input validation, replica topology, capacity, latency, and KV cache arithmetic | Node unit tests |
-| `src/main.js` | DOM reads, formatting, local storage, presets, formula text, and event wiring | Production build and manual interaction |
-| `src/styles.css` | Responsive two-panel layout, result hierarchy, utilization states, and mobile breakpoints | Manual viewport check |
-| `index.html` | Accessible input and result structure, source links, metadata, and static copy | Production build |
+| --- | --- | --- |
+| `src/lib/calculator.js` | Config normalization, parameter estimation, input validation, and VRAM arithmetic | Node unit tests |
+| `src/main.js` | Hugging Face loading, file upload, formatting, jar layers, formulas, and events | Browser interaction and production build |
+| `src/styles.css` | Responsive layout, layered liquids, and OOM overflow animation | Browser viewport checks |
+| `index.html` | Accessible inputs, result structure, formulas, and metadata | Production build |
 
-The arithmetic module imports nothing and does not touch the DOM. This keeps the formulas testable without a browser or a deployed site.
+The arithmetic module imports nothing and does not touch the DOM.
 
 ## Calculation flow
 
-Every input event follows one path:
+1. Load exact Hugging Face parameter metadata when a model ID is available.
+2. Normalize the model shape from `config.json`.
+3. Estimate parameters only for supported decoder-only shapes when exact metadata is absent.
+4. Read GPU, context, concurrency, precision, and extra-memory inputs.
+5. Calculate model weights, KV cache, extra memory, and total needed VRAM.
+6. Compare the total with one GPU.
+7. Render Fits or Out of memory, liquid layers, and substituted formulas.
 
-1. Read every numeric field.
-2. Validate positive values, integer-only topology fields, reserve range, and tensor parallel size.
-3. Derive complete replicas as `floor(total GPUs / tensor parallel size)`.
-4. Calculate raw and reserve-adjusted prefill and decode capacity.
-5. Convert each token budget to requests per second.
-6. Use the smaller request budget as sustainable RPS.
-7. Derive throughput, target utilization, latency, and KV cache estimates.
-8. Render all results and store the input object in `localStorage`.
+Unsupported model shapes require a manual parameter count. The calculator does not silently invent one.
 
-Invalid input keeps the last rendered values dimmed and shows the first actionable validation error.
-
-## Capacity model
-
-Each request consumes two independent budgets:
+## Model memory
 
 ```text
-safe prefill RPS = prefill tokens/s × replicas × safe factor ÷ prompt tokens/request
-safe decode RPS  = decode tokens/s × replicas × safe factor ÷ output tokens/request
-maximum RPS      = min(safe prefill RPS, safe decode RPS)
+model GiB = parameter count × model bytes/parameter ÷ 1,073,741,824
 ```
 
-The model assumes each replica has the same measured throughput and traffic is distributed evenly. It does not predict throughput from GPU specifications or model parameter count because kernel choice, quantization, context length, batching, and scheduler behavior make that estimate too weak for capacity planning.
+Model precision is editable because config metadata does not always describe the serving-time quantization.
 
-Prefill throughput can be derived from a vLLM serving benchmark as total token throughput minus output token throughput. The benchmark must use a workload and concurrency close to production.
-
-## Latency model
-
-The latency section is deliberately an approximation, not a queueing simulator:
+## KV cache
 
 ```text
-TTFT service estimate = prompt tokens ÷ per-replica prefill tokens/s
-inter-token latency   = measured decode concurrency ÷ per-replica decode tokens/s
-generation time       = (output tokens - 1) × inter-token latency
-end-to-end estimate   = TTFT + generation time + user-supplied overhead
+KV bytes/token = 2 × layers × KV heads × head dimension × KV bytes/element
+KV GiB = KV bytes/token × max context × concurrent requests ÷ 1,073,741,824
 ```
 
-The first generated token ends TTFT, so generation time uses `output tokens - 1`. The user-supplied overhead can represent queue, load balancer, and network time, but the calculator does not derive it from utilization.
+The leading `2` represents key and value. The estimate assumes ordinary decoder-only attention and a fully allocated maximum context for every concurrent request.
 
-Actual latency changes with continuous batching, token-length variance, queue depth, prefix caching, speculative decoding, and scheduler policy. The UI labels the section as an estimate and exposes these assumptions beside the result.
-
-## KV cache model
-
-The memory estimate uses the ordinary decoder-only attention shape:
+## Extra memory and result
 
 ```text
-bytes/token = 2 × layers × KV heads × head dimension × bytes/element
-allocated tokens/request = ceil((prompt + output) ÷ block size) × block size
-sequences/replica = floor(KV cache bytes ÷ bytes/request)
+extra GiB = (model GiB + KV GiB) × extra percent
+total GiB = model GiB + KV GiB + extra GiB
+fits = total GiB <= GPU GiB
 ```
 
-The leading `2` represents key and value. The calculation does not model runtime metadata, hybrid attention groups, MLA, sliding windows, CPU offload, prefix sharing, or fragmentation beyond token-block rounding. The displayed ceiling is therefore directional and should be checked against vLLM cache metrics.
+The default extra-memory value is 20%. It is an adjustable planning reserve for activations, workspaces, runtime allocations, and fragmentation, not an exact runtime measurement.
 
-## Browser state
+## Trust limits
 
-The current input object is stored under `akbun-caculatorllm.input.v1`. Calculation results are derived again after reload and are not stored. The versioned key allows a future incompatible input schema to start cleanly.
-
-Copy summary writes a plain-text report to the clipboard. No network request carries user input.
+- Single GPU only; no tensor parallel or multi-GPU partitioning.
+- No CPU or disk offload.
+- No prefix sharing, sliding-window reduction, MLA compression, or paged-cache fragmentation model.
+- Exact Hugging Face parameter totals are preferred over config-derived estimates.
+- Real runtime allocation remains the final check.
