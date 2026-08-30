@@ -11,9 +11,17 @@
 공통 환경:
 
 - 선행 실습: [16GB GPU에서 7B BF16이 OOM 나는 이유](./02-memory-budget-oom.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
 - Model: Qwen2.5-3B-Instruct BF16, `max-model-len 4096`
+
+명령 실행 위치를 구분합니다.
+
+- GPU server: Docker Compose 기동과 log 확인
+- Local client: `<GPU-SERVER-IP>`를 사용한 health·metric 확인과 Grafana 접속
+- `0.0.0.0`은 server의 listen address이므로 client URL로 사용하지 않음
+- `127.0.0.1`은 명령을 실행한 host 자신을 가리키므로 GPU server 내부 확인에만 사용
 
 ## 시나리오 1. Attention 구조로 token당 KV cache 크기를 계산합니다
 
@@ -84,29 +92,46 @@ pool bytes = pool tokens × KV bytes/token
 
 ### 실습
 
-Server와 관측 stack을 기동합니다.
+GPU server에서 server와 관측 stack을 기동합니다.
 
 ```bash
 docker compose --profile bf16 up -d vllm-bf16
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 ```
 
-vLLM 원본 metric을 확인합니다.
+Local client에서 GPU server의 API가 준비될 때까지 기다립니다.
 
 ```bash
-curl -s http://127.0.0.1:8000/metrics \
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+최초 기동은 model load, compile, CUDA graph capture 때문에 수 분 걸릴 수 있습니다. 준비 전에는 Prometheus의 `model-server` target이 `DOWN`이고 Grafana의 vLLM panel에 새 sample이 없습니다.
+
+Local client에서 vLLM 원본 metric을 확인합니다.
+
+```bash
+curl -s "http://${GPU_SERVER_IP}:8000/metrics" \
   | grep -E 'vllm:(kv_cache_usage_perc|cache_config_info|num_requests_(running|waiting))'
 ```
 
-Prometheus에서 현재 KV cache 사용률을 percent로 조회합니다.
+Prometheus target과 현재 KV cache 사용률을 확인합니다.
 
 ```bash
-curl -sG http://127.0.0.1:9090/api/v1/query \
+curl -sG "http://${GPU_SERVER_IP}:9090/api/v1/query" \
+  --data-urlencode 'query=up{job="model-server"}'
+
+curl -sG "http://${GPU_SERVER_IP}:9090/api/v1/query" \
   --data-urlencode 'query=max(vllm:kv_cache_usage_perc) * 100'
 ```
 
-vLLM log의 pool 계산도 확인합니다.
+- `up{job="model-server"}`가 `1`이면 vLLM metric 수집 정상
+- 실행 중인 요청이 없을 때 active block 사용률인 `vllm:kv_cache_usage_perc`는 `0`이 정상
+- 완료된 요청의 block은 free queue로 반환되지만 prefix cache의 내용과 hash는 eviction 전까지 재사용될 수 있음
+- Startup dummy workload는 실제 KV block을 할당하지 않으므로 이 metric에 나타나지 않음
+- 실제 변화는 시나리오 3의 benchmark를 실행하는 동안 Grafana에서 확인
+
+GPU server에서 vLLM log의 pool 계산도 확인합니다.
 
 ```bash
 docker compose --profile bf16 logs vllm-bf16 | grep -i "KV cache"
@@ -141,7 +166,7 @@ KV cache 사용률이 낮은데 `running`이 고정되고 `waiting`이 증가하
 
 ### 실습
 
-`max_num_seqs 8`에서 동시성과 prompt 길이를 변경합니다.
+GPU server에서 `max_num_seqs 8`로 동시성과 prompt 길이를 변경합니다.
 
 ```bash
 docker compose --profile tools run --rm benchmark python3 -m benchmark.kv_cache_probe
@@ -167,6 +192,16 @@ docker compose --profile tools run --rm benchmark python3 -m benchmark.kv_cache_
 - Output TPS는 거의 고정되고 TPOT는 완만하게 증가
 
 Grafana의 `KV pool occupancy vs admitted requests` panel에서 KV pool used %, running, waiting을 같은 시간축으로 확인합니다.
+
+Local client browser에서 dashboard를 엽니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
+```
+
+- 시간 범위: `Last 15 minutes`
+- 새로 고침: `5s`
+- benchmark가 끝난 뒤에는 KV cache가 해제되므로 실행 시간 구간을 확인
 
 ## 시나리오 4. Scheduler 제한을 높여 KV cache 제한에 접근합니다
 

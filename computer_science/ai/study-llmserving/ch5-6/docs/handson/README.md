@@ -14,6 +14,20 @@
 
 모든 GPU 실습은 [Ubuntu GPU 환경 준비](../01-setup-ubuntu.md)를 완료한 뒤 실행합니다. GPU 기준 상태와 metric 불일치 판별은 [GPU 실습 troubleshooting](../troubleshooting.md)을 따릅니다.
 
+## 실행 위치
+
+- GPU server: Docker Compose, benchmark, log, `nvidia-smi` 실행
+- Local client: health·metric API 확인과 Grafana 접속
+- Local client에서 endpoint 확인 전에 GPU server 주소 설정
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
+
+- LAN 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
+- `127.0.0.1`은 명령을 실행한 host 자신이므로 원격 접속에 사용하지 않음
+- `0.0.0.0`은 server listen address이므로 client URL에 사용하지 않음
+
 ## 시나리오 1. GPU 실행 경로와 metric 수집 경로를 확인합니다
 
 ### 이론

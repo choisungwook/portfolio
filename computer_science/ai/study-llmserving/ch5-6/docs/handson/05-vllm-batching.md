@@ -10,10 +10,17 @@
 공통 환경:
 
 - 선행 실습: [GPU roofline과 병목 재현](./04-roofline-bottleneck.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - Runtime: vLLM `v0.27.1`
 - Model: `Qwen/Qwen2.5-3B-Instruct`
 - 고정 조건: model, prompt, output limit, concurrency 1·4·8
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 비교 설정:
 
@@ -45,13 +52,23 @@ nvidia-smi \
 
 두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-관측 stack과 latency 우선 server를 실행합니다.
+GPU server에서 관측 stack과 latency 우선 server를 실행합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
 VLLM_MAX_NUM_SEQS=1 VLLM_MAX_NUM_BATCHED_TOKENS=512 \
   docker compose --profile bf16 up -d --force-recreate vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 benchmark를 실행하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm \
   -e MODEL_LABEL=bf16-seq1-tokens512 \
   -e PRECISION=BF16 \
@@ -70,12 +87,22 @@ Sequence 4와 token budget 2048은 일부 data reuse를 허용하면서 과도�
 
 ### 실습
 
-같은 workload를 균형 설정에서 실행합니다.
+GPU server에서 균형 설정을 기동합니다.
 
 ```bash
 VLLM_MAX_NUM_SEQS=4 VLLM_MAX_NUM_BATCHED_TOKENS=2048 \
   docker compose --profile bf16 up -d --force-recreate vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 같은 workload를 실행하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm \
   -e MODEL_LABEL=bf16-seq4-tokens2048 \
   -e PRECISION=BF16 \
@@ -94,12 +121,22 @@ docker compose rm -f vllm-bf16
 
 ### 실습
 
-가장 큰 설정에서 동일 workload를 실행합니다.
+GPU server에서 가장 큰 설정을 기동합니다.
 
 ```bash
 VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
   docker compose --profile bf16 up -d --force-recreate vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 동일 workload를 실행하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm \
   -e MODEL_LABEL=bf16-seq8-tokens4096 \
   -e PRECISION=BF16 \
@@ -137,6 +174,12 @@ docker compose --profile tools run --rm benchmark python3 -m benchmark.summary
 1. TTFT와 E2E p95가 SLO를 만족하는 설정만 남김
 2. 남은 설정 중 Output TPS가 가장 높은 값 선택
 3. `results/summary.md`에서 scheduler 설정과 결과 연결 확인
+
+Local client에서 같은 시간 구간의 Grafana metric을 확인합니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
+```
 
 참고자료:
 

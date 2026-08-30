@@ -10,10 +10,17 @@
 공통 환경:
 
 - 선행 실습: [vLLM batch 설정 비교](./05-vllm-batching.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - Runtime: vLLM `v0.27.1`
 - Model: `Qwen/Qwen2.5-3B-Instruct`
 - Workload: output limit 32~256 token의 request 24개
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 ## 시나리오 1. Client admission과 vLLM scheduler를 구분합니다
 
@@ -64,19 +71,19 @@ Benchmark의 `batch_size=8`은 client cohort 크기이고 `max_num_seqs=8`은 se
 
 ### 실습
 
-관측 stack과 server를 기동합니다.
+GPU server에서 관측 stack과 server를 기동합니다.
 
 ```bash
 docker compose --profile observability up -d prometheus grafana dcgm-exporter
 VLLM_MAX_NUM_SEQS=8 VLLM_MAX_NUM_BATCHED_TOKENS=4096 \
   docker compose --profile bf16 up -d --force-recreate vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
 ```
 
-Scheduler metric을 확인합니다.
+Local client에서 준비 상태와 scheduler metric을 확인합니다.
 
 ```bash
-curl -s http://127.0.0.1:8000/metrics \
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+curl -s "http://${GPU_SERVER_IP}:8000/metrics" \
   | grep -E 'vllm:num_requests_(running|waiting)|vllm:request_queue_time_seconds'
 ```
 
@@ -141,7 +148,11 @@ cat results/batch-strategies-bf16.json
 
 ### 실습
 
-Grafana와 결과 JSON을 같은 시간 구간에서 비교합니다.
+Local client에서 Grafana를 열고 결과 JSON과 같은 시간 구간을 비교합니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
+```
 
 - Scheduler: 빈 running slot이 다시 채워지는지 확인
 - Queue p95: server scheduler 대기 확인

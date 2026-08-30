@@ -10,11 +10,18 @@
 공통 환경:
 
 - 선행 실습: [Prefill·decode 병목 관측](./07-prefill-decode-observability.md)
+- LAN 접속 준비: [같은 Wi-Fi에서 LLM serving endpoint 접속](../03-setup-lan-access.md)
 - 실행 workspace: `computer_science/ai/study-llmserving/ch5-6`
 - GPU: NVIDIA GeForce RTX 5060 Ti 16GB
 - 성능 workload: long-prefill, long-decode
 - Quality gate: smoke 20문항, GSM8K 앞 20문항
 - 비교 지표: TTFT, TPOT, RPS, Output TPS, Peak VRAM, accuracy
+
+Local client에서 GPU server 주소를 지정합니다.
+
+```bash
+export GPU_SERVER_IP="<GPU-SERVER-IP>"
+```
 
 비교 model:
 
@@ -44,11 +51,21 @@ nvidia-smi \
 
 두 번째 명령이 process를 출력하면 [실행 주체 확인과 안전한 종료 절차](../troubleshooting.md#실습-전-gpu-기준-상태를-만듭니다)를 수행합니다.
 
-기본값 `VLLM_GPU_MEMORY_UTILIZATION=0.85`에서 BF16을 측정합니다.
+GPU server에서 기본값 `VLLM_GPU_MEMORY_UTILIZATION=0.85`로 BF16 server를 기동합니다.
 
 ```bash
 docker compose --profile bf16 up -d vllm-bf16
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 BF16을 측정하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python3 -m benchmark.benchmark_long_prefill
 docker compose --profile tools run --rm -e MODEL_LABEL=bf16 -e PRECISION=BF16 benchmark python3 -m benchmark.benchmark_long_decode
 docker compose --profile tools run --rm -e MODEL_LABEL=bf16 benchmark python3 -m benchmark.accuracy_smoke
@@ -65,11 +82,21 @@ W4A16은 weight를 줄여 VRAM과 decode의 weight bandwidth를 낮추는 것이
 
 ### 실습
 
-같은 workload와 quality gate를 GPTQ model에 적용합니다.
+GPU server에서 GPTQ model을 기동합니다.
 
 ```bash
 docker compose --profile gptq up -d vllm-gptq
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 같은 workload와 quality gate를 적용하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python3 -m benchmark.benchmark_long_prefill
 docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 -e PRECISION=W4A16 benchmark python3 -m benchmark.benchmark_long_decode
 docker compose --profile tools run --rm -e MODEL_LABEL=gptq-int4 benchmark python3 -m benchmark.accuracy_smoke
@@ -92,11 +119,21 @@ W8A8은 weight와 activation compute를 줄여 long-prefill을 개선하는 것�
 
 ### 실습
 
-같은 조건을 FP8 model에 적용합니다.
+GPU server에서 FP8 model을 기동합니다.
 
 ```bash
 docker compose --profile fp8 up -d vllm-fp8
-bash scripts/wait_for_health.sh http://127.0.0.1:8000/health
+```
+
+Local client에서 준비 완료를 확인합니다.
+
+```bash
+bash scripts/wait_for_health.sh "http://${GPU_SERVER_IP}:8000/health"
+```
+
+GPU server에서 같은 조건을 적용하고 server를 종료합니다.
+
+```bash
 docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python3 -m benchmark.benchmark_long_prefill
 docker compose --profile tools run --rm -e MODEL_LABEL=fp8 -e PRECISION=W8A8 benchmark python3 -m benchmark.benchmark_long_decode
 docker compose --profile tools run --rm -e MODEL_LABEL=fp8 benchmark python3 -m benchmark.accuracy_smoke
@@ -140,6 +177,12 @@ docker compose --profile tools run --rm benchmark python3 -m benchmark.summary
 2. 목표 workload의 TTFT 또는 TPOT 비교
 3. Output TPS와 Peak VRAM trade-off 확인
 4. GPU kernel 지원과 운영 SLO를 포함해 최종 선택
+
+Local client에서 model별 실행 시간 구간의 Grafana metric을 비교합니다.
+
+```text
+http://<GPU-SERVER-IP>:3000/d/llm-serving-ch5-6/llm-serving-chapter-5-6
+```
 
 참고자료:
 
