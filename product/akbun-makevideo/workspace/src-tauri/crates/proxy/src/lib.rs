@@ -5,19 +5,146 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 pub const FOLDER: &str = "proxies";
-pub const LONG_EDGE: u32 = 1280;
+pub const LONG_EDGE: u32 = 1920;
 pub const SOURCE_LONG_EDGE: u32 = 1920;
 pub const DECODE_THREADS: u32 = 2;
+pub const KEYFRAME_SAMPLE_SECONDS: u32 = 30;
+pub const MAX_KEYFRAME_INTERVAL_MS: u64 = 2_000;
+pub const FORCED_KEYFRAME_INTERVAL_SECONDS: f32 = 0.5;
+pub const MANIFEST_VERSION: u32 = 2;
+pub const DIRECT_PLAY_CODECS: &[&str] = &["h264"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
+    #[serde(default)]
+    pub version: u32,
     pub source_path: String,
     pub source_modified_ms: u64,
 }
 
-pub fn needs_proxy(asset: &Asset) -> bool {
-    asset.kind == AssetKind::Video && asset.width.max(asset.height) > SOURCE_LONG_EDGE
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceProbe {
+    pub codec: String,
+    pub keyframe_interval_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Assessment {
+    pub needs_proxy: bool,
+    pub reason: String,
+}
+
+pub fn probe_args(path: &str) -> Vec<String> {
+    vec![
+        "-v".into(),
+        "error".into(),
+        "-select_streams".into(),
+        "v:0".into(),
+        "-read_intervals".into(),
+        format!("0%+{KEYFRAME_SAMPLE_SECONDS}"),
+        "-show_entries".into(),
+        "stream=codec_name:packet=pts_time,flags".into(),
+        "-of".into(),
+        "default=noprint_wrappers=1".into(),
+        path.into(),
+    ]
+}
+
+pub fn parse_probe(text: &str) -> SourceProbe {
+    let mut codec = String::new();
+    let mut packet_time_ms = None;
+    let mut first_packet_ms = None;
+    let mut last_packet_ms = None;
+    let mut keyframes = Vec::new();
+
+    for line in text.lines() {
+        let Some((key, value)) = line.trim().split_once('=') else {
+            continue;
+        };
+        match key {
+            "codec_name" if codec.is_empty() => codec = value.trim().to_ascii_lowercase(),
+            "pts_time" => {
+                packet_time_ms = seconds_to_millis(value);
+                if let Some(time) = packet_time_ms {
+                    first_packet_ms = Some(first_packet_ms.map_or(time, |first: u64| first.min(time)));
+                    last_packet_ms = Some(last_packet_ms.map_or(time, |last: u64| last.max(time)));
+                }
+            }
+            "flags" if value.contains('K') => {
+                if let Some(time) = packet_time_ms {
+                    keyframes.push(time);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    keyframes.sort_unstable();
+    keyframes.dedup();
+    let mut keyframe_interval_ms = keyframes
+        .windows(2)
+        .map(|pair| pair[1].saturating_sub(pair[0]))
+        .max();
+    if let (Some(last_keyframe), Some(last_packet)) = (keyframes.last(), last_packet_ms) {
+        let trailing = last_packet.saturating_sub(*last_keyframe);
+        keyframe_interval_ms = Some(keyframe_interval_ms.unwrap_or(0).max(trailing));
+    } else if let (Some(first), Some(last)) = (first_packet_ms, last_packet_ms) {
+        keyframe_interval_ms = Some(last.saturating_sub(first));
+    }
+
+    SourceProbe {
+        codec,
+        keyframe_interval_ms,
+    }
+}
+
+fn seconds_to_millis(value: &str) -> Option<u64> {
+    let seconds = value.parse::<f64>().ok()?;
+    (seconds.is_finite() && seconds >= 0.0).then(|| (seconds * 1000.0).round() as u64)
+}
+
+pub fn assess(asset: &Asset, probe: &SourceProbe) -> Assessment {
+    if asset.kind != AssetKind::Video {
+        return Assessment {
+            needs_proxy: false,
+            reason: "not video media".into(),
+        };
+    }
+
+    let long_edge = asset.width.max(asset.height);
+    let codec = if probe.codec.is_empty() {
+        "unknown"
+    } else {
+        probe.codec.as_str()
+    };
+    let keyframe_text = probe
+        .keyframe_interval_ms
+        .map(|interval| format!("{:.1}s keyframes", interval as f64 / 1000.0))
+        .unwrap_or_else(|| "unknown keyframes".into());
+    let facts = format!("{long_edge}px · {codec} · {keyframe_text}");
+    let mut causes = Vec::new();
+    if long_edge > SOURCE_LONG_EDGE {
+        causes.push(format!("{long_edge}px long edge"));
+    }
+    if !DIRECT_PLAY_CODECS.contains(&codec) {
+        causes.push(format!("{codec} codec"));
+    }
+    if probe
+        .keyframe_interval_ms
+        .is_some_and(|interval| interval > MAX_KEYFRAME_INTERVAL_MS)
+    {
+        causes.push(keyframe_text);
+    }
+    let needs_proxy = !causes.is_empty();
+    Assessment {
+        needs_proxy,
+        reason: if needs_proxy {
+            format!("proxy for {}", causes.join(", "))
+        } else {
+            format!("original playback: {facts}")
+        },
+    }
 }
 
 pub fn source_modified_ms(path: &str) -> Option<u64> {
@@ -55,7 +182,9 @@ pub fn valid_proxy(project_path: &str, asset: &Asset) -> Option<String> {
     let manifest: Manifest =
         serde_json::from_str(&std::fs::read_to_string(manifest_path).ok()?).ok()?;
     let current = source_modified_ms(&asset.path)?;
-    (manifest.source_path == asset.path && manifest.source_modified_ms == current)
+    (manifest.version == MANIFEST_VERSION
+        && manifest.source_path == asset.path
+        && manifest.source_modified_ms == current)
         .then(|| media.to_string_lossy().to_string())
 }
 
@@ -63,6 +192,7 @@ pub fn write_manifest(project_path: &str, asset: &Asset) -> Result<(), String> {
     let source_modified_ms = source_modified_ms(&asset.path)
         .ok_or_else(|| format!("cannot read the modification time of {}", asset.path))?;
     let manifest = Manifest {
+        version: MANIFEST_VERSION,
         source_path: asset.path.clone(),
         source_modified_ms,
     };
@@ -93,7 +223,7 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path, encoder: Option<&str>) -> Vec<S
         "0:a?".into(),
         "-vf".into(),
         format!(
-            "scale='if(gte(iw,ih),{},-2)':'if(gte(iw,ih),-2,{})'",
+            "scale='if(gte(iw,ih),min(iw,{}),-2)':'if(gte(iw,ih),-2,min(ih,{}))'",
             LONG_EDGE, LONG_EDGE
         ),
     ];
@@ -115,6 +245,8 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path, encoder: Option<&str>) -> Vec<S
         ]);
     }
     args.extend([
+        "-force_key_frames".into(),
+        format!("expr:gte(t,n_forced*{FORCED_KEYFRAME_INTERVAL_SECONDS})"),
         "-pix_fmt".into(),
         "yuv420p".into(),
         "-c:a".into(),
@@ -160,10 +292,34 @@ mod tests {
     }
 
     #[test]
-    fn only_video_above_fhd_gets_a_proxy() {
-        assert!(needs_proxy(&asset(AssetKind::Video, 3840, 2160)));
-        assert!(!needs_proxy(&asset(AssetKind::Video, 1920, 1080)));
-        assert!(!needs_proxy(&asset(AssetKind::Image, 4000, 3000)));
+    fn proxy_decision_uses_resolution_codec_and_keyframe_interval() {
+        let direct = SourceProbe {
+            codec: "h264".into(),
+            keyframe_interval_ms: Some(2_000),
+        };
+        let long_gop = SourceProbe {
+            keyframe_interval_ms: Some(2_001),
+            ..direct.clone()
+        };
+        let hevc = SourceProbe {
+            codec: "hevc".into(),
+            ..direct.clone()
+        };
+
+        assert!(assess(&asset(AssetKind::Video, 3840, 2160), &direct).needs_proxy);
+        assert!(assess(&asset(AssetKind::Video, 1920, 1080), &hevc).needs_proxy);
+        assert!(assess(&asset(AssetKind::Video, 1920, 1080), &long_gop).needs_proxy);
+        assert!(!assess(&asset(AssetKind::Video, 1920, 1080), &direct).needs_proxy);
+        assert!(!assess(&asset(AssetKind::Image, 4000, 3000), &hevc).needs_proxy);
+    }
+
+    #[test]
+    fn packet_probe_reports_codec_and_largest_observed_keyframe_gap() {
+        let probe = parse_probe(
+            "pts_time=0.000000\nflags=K__\npts_time=1.000000\nflags=___\npts_time=0.900000\nflags=___\npts_time=2.500000\nflags=K__\npts_time=4.000000\nflags=___\ncodec_name=hevc\n",
+        );
+        assert_eq!(probe.codec, "hevc");
+        assert_eq!(probe.keyframe_interval_ms, Some(2_500));
     }
 
     #[test]
@@ -193,7 +349,10 @@ mod tests {
             Path::new("proxy.mp4"),
             None,
         );
-        assert!(args.iter().any(|arg| arg.contains("1280")));
+        assert!(args.iter().any(|arg| arg.contains("1920")));
+        assert!(args.windows(2).any(|pair| {
+            pair[0] == "-force_key_frames" && pair[1] == "expr:gte(t,n_forced*0.5)"
+        }));
         assert!(args.windows(2).any(|pair| pair == ["-map", "0:a?"]));
         assert!(args
             .windows(2)
@@ -244,6 +403,18 @@ mod tests {
         write_manifest(project_path.to_str().unwrap(), &asset).unwrap();
 
         assert!(valid_proxy(project_path.to_str().unwrap(), &asset).is_some());
+        let old_manifest = format!(
+            "{{\"sourcePath\":{:?},\"sourceModifiedMs\":{}}}",
+            asset.path,
+            source_modified_ms(&asset.path).unwrap()
+        );
+        std::fs::write(
+            manifest_path(project_path.to_str().unwrap(), &asset.id).unwrap(),
+            old_manifest,
+        )
+        .unwrap();
+        assert!(valid_proxy(project_path.to_str().unwrap(), &asset).is_none());
+        write_manifest(project_path.to_str().unwrap(), &asset).unwrap();
         asset.path = root.join("other.mov").to_string_lossy().to_string();
         assert!(valid_proxy(project_path.to_str().unwrap(), &asset).is_none());
         let _ = std::fs::remove_dir_all(root);

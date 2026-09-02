@@ -58,14 +58,18 @@ The stage box stays the same size on screen. `#stage-inner` is laid out at `scal
 
 ## Playback proxies
 
-- 동영상 장변이 1920px보다 크면 프로젝트의 `proxies/` 폴더에 1280px 프록시 생성
-- 생성 중 asset 행에 진행률 표시
+- 장변 1920px 초과, H.264가 아닌 코덱, 키프레임 간격 2초 초과 중 하나에 해당하면 프록시 생성
+- 첫 30초 video packet의 codec과 keyframe flag로 판정
+- 프로젝트의 `proxies/` 폴더에 최대 장변 1920px H.264 프록시 생성
+- 프록시 키프레임을 0.5초 간격으로 강제
+- asset 행에 판정 근거와 진행률 표시
 - 준비 전 원본 재생, 준비 후 프록시 재생
 - 재생 중 준비된 프록시는 현재 재생을 유지하고 정지 후 다음 세션부터 사용
 - 프록시 작업은 재생 중 새 인코딩을 시작하지 않고 정지 뒤 다음 작업부터 재개
+- 실행 중 인코딩은 재생 중 일시정지하고 보류 이유와 남은 작업 수 표시
 - 프록시 인코더는 2개 스레드로 제한
 - Playback → Proxy Media…에서 프록시 재생 사용 여부와 생성 상태 확인
-- 원본 경로·수정 시각 불일치 시 재생성
+- 원본 경로·수정 시각·프록시 정책 버전 불일치 시 재생성
 - export와 정지 상태 exact frame은 원본 사용
 
 ## Native monitor pause

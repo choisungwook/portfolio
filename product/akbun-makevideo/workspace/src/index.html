@@ -553,7 +553,7 @@
         <input type="checkbox" id="proxy-enabled" />
         Use proxy media for playback
       </label>
-      <p class="dim small-text">Missing proxies are created automatically in the background at a 1280px long edge. Rendering always uses the original media.</p>
+      <p class="dim small-text">Media with a long edge above 1920px, a non-H.264 codec, or keyframes over 2 seconds apart gets a 1920px proxy with 0.5-second keyframes. Rendering always uses the original media.</p>
       <p id="proxy-summary" class="proxy-summary"></p>
       <div class="sheet-actions split-actions">
         <button id="proxy-generate" type="button">Generate Missing</button>
