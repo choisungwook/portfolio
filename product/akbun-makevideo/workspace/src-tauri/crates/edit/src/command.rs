@@ -2193,6 +2193,9 @@ fn validate_visual_content(project: &Project, content: &VisualContent) -> Result
         VisualContent::Shape { visual_style, .. } => Some(visual_style),
         VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
     };
+    if let Some(style) = style {
+        style.validate().map_err(str::to_string)?;
+    }
     for paint in style.into_iter().flat_map(|style| &style.fills) {
         let Some(asset_id) = paint.asset_id() else {
             continue;

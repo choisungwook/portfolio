@@ -31,6 +31,41 @@ static CACHE: OnceLock<Mutex<RasterCache>> = OnceLock::new();
 static FONT_DATABASE: OnceLock<Database> = OnceLock::new();
 static FONTS: OnceLock<Mutex<HashMap<String, Font>>> = OnceLock::new();
 static FFMPEG: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+static VIDEO_DECODERS: OnceLock<Mutex<PaintVideoDecoderCache>> = OnceLock::new();
+
+const VIDEO_DECODER_LIMIT: usize = 8;
+
+struct PaintVideoDecoder {
+    child: std::process::Child,
+    stdout: std::process::ChildStdout,
+    next_frame: i64,
+    frame_bytes: usize,
+}
+
+impl PaintVideoDecoder {
+    fn read(&mut self, frame: i64) -> Option<Vec<u8>> {
+        use std::io::Read;
+        if frame != self.next_frame {
+            return None;
+        }
+        let mut pixels = vec![0; self.frame_bytes];
+        self.stdout.read_exact(&mut pixels).ok()?;
+        self.next_frame += 1;
+        Some(pixels)
+    }
+}
+
+impl Drop for PaintVideoDecoder {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+struct PaintVideoDecoderCache {
+    entries: HashMap<String, PaintVideoDecoder>,
+    oldest: VecDeque<String>,
+}
 
 /// Keep media paints on the same ffmpeg executable as the decoder pipeline.
 /// Settings can replace it while the app is running, so this is updateable.
@@ -152,18 +187,19 @@ fn each_visual_item(
                     let style = track.subtitle_style.as_ref().unwrap_or(style);
                     let paint_frame = at.unwrap_or(item.start);
                     let relative_frame = paint_frame - item.start;
-                    let media = resolve_media_paints(
-                        project,
-                        &style.visual_style,
-                        relative_frame,
-                        item_width,
-                        item_height,
-                    );
                     let key = format!(
                         "text\u{0}{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
                         media_cache_token(project, &style.visual_style, relative_frame)
                     );
                     cached(&key, || {
+                        let media = resolve_media_paints(
+                            project,
+                            &style.visual_style,
+                            &item.id,
+                            relative_frame,
+                            item_width,
+                            item_height,
+                        );
                         rasterize(text, style, item_width, item_height, scale, &media)
                     })
                 }
@@ -176,28 +212,31 @@ fn each_visual_item(
                 } => {
                     let paint_frame = at.unwrap_or(item.start);
                     let relative_frame = paint_frame - item.start;
-                    let media = resolve_media_paints(
-                        project,
-                        visual_style,
-                        relative_frame,
-                        item_width,
-                        item_height,
-                    );
                     let key = format!(
                         "shape\u{0}{shape:?}\u{0}{visual_style:?}\u{0}{corner_radius}\u{0}{start_arrow}\u{0}{end_arrow}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
                         media_cache_token(project, visual_style, relative_frame)
                     );
-                    cached(&key, || rasterize_shape(
-                        *shape,
-                        visual_style,
-                        &media,
-                        scale,
-                        *corner_radius * scale,
-                        *start_arrow,
-                        *end_arrow,
-                        item_width,
-                        item_height,
-                    ))
+                    cached(&key, || {
+                        let media = resolve_media_paints(
+                            project,
+                            visual_style,
+                            &item.id,
+                            relative_frame,
+                            item_width,
+                            item_height,
+                        );
+                        rasterize_shape(
+                            *shape,
+                            visual_style,
+                            &media,
+                            scale,
+                            *corner_radius * scale,
+                            *start_arrow,
+                            *end_arrow,
+                            item_width,
+                            item_height,
+                        )
+                    })
                 }
                 VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => continue,
             };
@@ -285,6 +324,7 @@ fn media_cache_token(project: &Project, style: &VisualStyle, frame: i64) -> Stri
 fn resolve_media_paints(
     project: &Project,
     style: &VisualStyle,
+    item_id: &str,
     relative_frame: i64,
     width: u32,
     height: u32,
@@ -292,7 +332,8 @@ fn resolve_media_paints(
     style
         .fills
         .iter()
-        .map(|paint| {
+        .enumerate()
+        .map(|(paint_index, paint)| {
             let asset_id = paint.asset_id()?;
             let asset = project.asset(asset_id)?;
             let frame = match paint {
@@ -308,8 +349,17 @@ fn resolve_media_paints(
                 asset.path
             );
             let pixels = cached(&key, || {
-                decode_paint_frame(&asset.path, asset.kind, frame, project, width, height)
-                    .unwrap_or_default()
+                decode_paint_frame(
+                    &asset.path,
+                    asset.kind,
+                    item_id,
+                    paint_index,
+                    frame,
+                    project,
+                    width,
+                    height,
+                )
+                .unwrap_or_default()
             });
             (!pixels.is_empty()).then_some(pixels)
         })
@@ -319,19 +369,27 @@ fn resolve_media_paints(
 fn decode_paint_frame(
     path: &str,
     kind: makevideo_render::AssetKind,
+    item_id: &str,
+    paint_index: usize,
     frame: i64,
     project: &Project,
     width: u32,
     height: u32,
 ) -> Option<Vec<u8>> {
     let ffmpeg = ffmpeg_path()?;
-    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
     if kind == makevideo_render::AssetKind::Video {
-        args.extend([
-            "-ss".into(),
-            format!("{:.9}", frame as f64 / project.rate().as_f64()),
-        ]);
+        return decode_video_paint_frame(
+            &ffmpeg,
+            path,
+            item_id,
+            paint_index,
+            frame,
+            project,
+            width,
+            height,
+        );
     }
+    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
     args.extend([
         "-i".into(),
         path.into(),
@@ -356,6 +414,95 @@ fn decode_paint_frame(
     let expected = width as usize * height as usize * 4;
     (output.status.success() && output.stdout.len() >= expected)
         .then(|| output.stdout[..expected].to_vec())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decode_video_paint_frame(
+    ffmpeg: &str,
+    path: &str,
+    item_id: &str,
+    paint_index: usize,
+    frame: i64,
+    project: &Project,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
+    let rate = project.rate();
+    let key = format!(
+        "{ffmpeg}\u{0}{path}\u{0}{item_id}\u{0}{paint_index}\u{0}{width}x{height}\u{0}{}/{}",
+        rate.num(),
+        rate.den()
+    );
+    let cache = VIDEO_DECODERS.get_or_init(|| {
+        Mutex::new(PaintVideoDecoderCache {
+            entries: HashMap::new(),
+            oldest: VecDeque::new(),
+        })
+    });
+    let mut cache = cache.lock().unwrap();
+    if let Some(decoder) = cache.entries.get_mut(&key) {
+        if let Some(pixels) = decoder.read(frame) {
+            return Some(pixels);
+        }
+    }
+    cache.entries.remove(&key);
+    cache.oldest.retain(|entry| entry != &key);
+    while cache.entries.len() >= VIDEO_DECODER_LIMIT {
+        let oldest = cache.oldest.pop_front()?;
+        cache.entries.remove(&oldest);
+    }
+    let mut decoder = spawn_video_paint_decoder(ffmpeg, path, frame, project, width, height)?;
+    let pixels = decoder.read(frame)?;
+    cache.oldest.push_back(key.clone());
+    cache.entries.insert(key, decoder);
+    Some(pixels)
+}
+
+fn spawn_video_paint_decoder(
+    ffmpeg: &str,
+    path: &str,
+    frame: i64,
+    project: &Project,
+    width: u32,
+    height: u32,
+) -> Option<PaintVideoDecoder> {
+    let rate = project.rate();
+    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
+    if frame > 0 {
+        args.extend([
+            "-ss".into(),
+            format!("{:.9}", frame as f64 / rate.as_f64()),
+        ]);
+    }
+    args.extend([
+        "-i".into(),
+        path.into(),
+        "-vf".into(),
+        format!(
+            "fps={}/{},scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}",
+            rate.num(),
+            rate.den()
+        ),
+        "-pix_fmt".into(),
+        "rgba".into(),
+        "-f".into(),
+        "rawvideo".into(),
+        "pipe:1".into(),
+    ]);
+    let mut child = std::process::Command::new(ffmpeg)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let stdout = child.stdout.take()?;
+    Some(PaintVideoDecoder {
+        child,
+        stdout,
+        next_frame: frame,
+        frame_bytes: width as usize * height as usize * 4,
+    })
 }
 
 fn ffmpeg_path() -> Option<String> {

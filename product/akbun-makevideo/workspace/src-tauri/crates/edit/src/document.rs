@@ -1277,7 +1277,7 @@ mod tests {
                 track_id: video_track(&document),
                 content: VisualContent::Shape {
                     shape: Default::default(),
-                    visual_style: Default::default(),
+                    visual_style: VisualStyle::shape_default(),
                     corner_radius: 0.0,
                     start_arrow: false,
                     end_arrow: false,
@@ -1301,6 +1301,37 @@ mod tests {
     }
 
     #[test]
+    fn a_visual_style_without_a_fill_is_rejected_before_it_changes_the_project() {
+        let mut document = document();
+        let error = document
+            .apply(Command::AddVisualItem {
+                track_id: video_track(&document),
+                content: VisualContent::Shape {
+                    shape: Default::default(),
+                    visual_style: VisualStyle::default(),
+                    corner_radius: 0.0,
+                    start_arrow: false,
+                    end_arrow: false,
+                },
+                start: 0,
+                duration: 30,
+                transform: VisualTransform {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 100.0,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                },
+                z_index: 0,
+                id: None,
+            })
+            .unwrap_err();
+        assert!(error.contains("no fills"), "{error}");
+        assert!(document.project().tracks[0].visual_items.is_empty());
+    }
+
+    #[test]
     fn duplicate_visual_item_ids_are_rejected_without_changing_the_project() {
         let mut document = document();
         let track_id = video_track(&document);
@@ -1308,7 +1339,7 @@ mod tests {
             track_id,
             content: VisualContent::Shape {
                 shape: Default::default(),
-                visual_style: Default::default(),
+                visual_style: VisualStyle::shape_default(),
                 corner_radius: 0.0,
                 start_arrow: false,
                 end_arrow: false,

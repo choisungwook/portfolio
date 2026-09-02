@@ -101,6 +101,7 @@ stdin. Closing that stdin is what tells ffmpeg the video is over. See
 - GPU and CPU composition receive identical RGBA pixels.
 - Static visual items become one PAM still per item on the filter graph route.
 - A video paint changes every frame and always takes the composited route, including under the CPU setting.
+- Each video paint keeps one decoder per visual item and fill layer; sequential frames reuse it and a seek restarts it.
 - A video-paint render does not fall back to a graph that would freeze the paint.
 
 The render differs from playback in one thing only: when a frame is not ready

@@ -1614,6 +1614,7 @@ function drawShapeContent(context, content, width, height, scale) {
   const stroke = content.stroke || null;
   const strokeWidth = Math.max(0, ((stroke && stroke.width) || 0) * scale);
   const kind = content.shape || 'rectangle';
+  if (kind === 'line' && strokeWidth <= 0) return;
   const shadow = content.shadow || null;
   if (shadow) {
     context.shadowColor = shadow.color || 'transparent';
@@ -1624,7 +1625,6 @@ function drawShapeContent(context, content, width, height, scale) {
   if (kind === 'line') {
     // A line is all stroke: a bar through the middle, plus the arrow heads.
     // Nothing is drawn at width zero, the same rule the Rust rasterizer has.
-    if (strokeWidth <= 0) return;
     const middle = height / 2;
     const half = strokeWidth / 2;
     const arrow = Math.max(strokeWidth * 1.5, 8);

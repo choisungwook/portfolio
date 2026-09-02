@@ -2,7 +2,7 @@
 
 ## 2026-09-02
 
-* [filter graph 렌더는 정적 visual만 rasterize한 still로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 갱신. video paint가 정적 overlay로 굳지 않도록 CPU 설정에서도 프레임 합성 경로를 사용함.
+* [filter graph 렌더는 정적 visual만 rasterize한 still로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 갱신. video paint가 정적 overlay로 굳지 않도록 CPU 설정에서도 프레임 합성 경로를 사용하고 장기 decoder를 재사용함.
 
 ## 2026-09-01
 

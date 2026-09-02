@@ -462,6 +462,9 @@ impl VisualStyle {
     }
 
     fn validate(&self) -> Result<(), &'static str> {
+        if self.fills.is_empty() {
+            return Err("has no fills");
+        }
         for paint in &self.fills {
             match paint {
                 Paint::LinearGradient { start, end, stops } => {
