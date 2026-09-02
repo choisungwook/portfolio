@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-02
+
+* [filter graph 렌더는 정적 visual만 rasterize한 still로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 갱신. video paint가 정적 overlay로 굳지 않도록 CPU 설정에서도 프레임 합성 경로를 사용하고 장기 decoder를 재사용함.
+
 ## 2026-09-01
 
 * [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](decisions/2026-09-proxy-targets-decode-and-seek-cost.md) 결정 기록. 1080p 비직접 재생 코덱과 긴 GOP 원본을 판정 대상에 넣고 프록시에 0.5초 키프레임을 강제함.

@@ -39,7 +39,7 @@ if (!window.__TAURI__) {
   };
   const emptyDocument = () => ({
     project: {
-      version: 2,
+      version: 3,
       settings: { width: 1920, height: 1080, rate: { num: 30, den: 1 } },
       assets: [],
       markers: [],

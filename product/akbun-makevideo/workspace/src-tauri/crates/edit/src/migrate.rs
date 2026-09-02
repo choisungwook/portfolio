@@ -253,11 +253,51 @@ mod tests {
     #[test]
     fn an_early_shape_without_style_opens_with_editable_defaults() {
         let content: crate::VisualContent = serde_json::from_str(r#"{"kind":"shape"}"#).unwrap();
-        assert!(matches!(content, crate::VisualContent::Shape {
-            shape: crate::ShapeKind::Rectangle,
-            stroke_width: 4.0,
+        let crate::VisualContent::Shape {
+            shape,
+            visual_style,
             ..
-        }));
+        } = content else {
+            panic!("expected a shape");
+        };
+        assert_eq!(shape, crate::ShapeKind::Rectangle);
+        assert_eq!(visual_style.stroke.unwrap().width, 4.0);
+    }
+
+    #[test]
+    fn legacy_shape_and_text_colours_become_paints_and_old_fields_are_not_written() {
+        let shape: crate::VisualContent = serde_json::from_str(
+            r##"{"kind":"shape","shape":"rectangle","fill":"#112233","stroke":"#445566","strokeWidth":7,"cornerRadius":12}"##,
+        )
+        .unwrap();
+        let crate::VisualContent::Shape {
+            shape: kind,
+            visual_style,
+            ..
+        } = &shape else {
+            panic!("expected a shape");
+        };
+        assert_eq!(*kind, crate::ShapeKind::RoundedRectangle);
+        assert_eq!(visual_style.fills, vec![crate::Paint::solid("#112233")]);
+        assert_eq!(visual_style.stroke.as_ref().unwrap().width, 7.0);
+        let written = serde_json::to_string(&shape).unwrap();
+        assert!(written.contains(r##""fills":[{"kind":"solid","color":"#112233"}]"##));
+        assert!(!written.contains(r##""fill":"#112233""##));
+        assert!(!written.contains("strokeWidth"));
+
+        let text: crate::VisualContent = serde_json::from_str(
+            r##"{"kind":"text","text":"title","style":{"color":"#abcdef","strokeColor":"#010203","strokeWidth":2,"shadowColor":"#00000080","shadowX":3,"shadowY":4}}"##,
+        )
+        .unwrap();
+        let crate::VisualContent::Text { style, .. } = &text else {
+            panic!("expected text");
+        };
+        assert_eq!(style.visual_style.fills, vec![crate::Paint::solid("#abcdef")]);
+        assert_eq!(style.visual_style.stroke.as_ref().unwrap().width, 2.0);
+        assert_eq!(style.visual_style.shadow.as_ref().unwrap().x, 3.0);
+        let written = serde_json::to_string(&text).unwrap();
+        assert!(!written.contains("strokeColor"));
+        assert!(!written.contains("shadowColor"));
     }
 
     #[test]
@@ -271,7 +311,7 @@ mod tests {
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();
         let written = serde_json::to_string(&project).unwrap();
-        assert!(written.contains(r#""version":2"#), "{written}");
+        assert!(written.contains(r#""version":3"#), "{written}");
         assert!(
             written.contains(r#""rate":{"num":60,"den":1}"#),
             "{written}"

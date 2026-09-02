@@ -331,7 +331,7 @@ function tickStepFrames(pxPerSecond, rate) {
  *  over the real one. Nothing is edited through it. */
 function blankProject() {
   return {
-    version: 2,
+    version: 3,
     settings: { width: 1920, height: 1080, rate: T.fps(30) },
     assets: [],
     tracks: [],

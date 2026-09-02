@@ -2390,12 +2390,17 @@ pub fn start_render(
         .as_ref()
         .map(|hardware| hardware.label.clone())
         .unwrap_or_else(|| "CPU".into());
-    // On the CPU setting the filter graph draws. Not the software compositor:
-    // it is there so a preview frame can be drawn without a graphics device,
-    // and putting every frame of a whole render through it would take hours to
-    // produce what ffmpeg composites in minutes.
+    let dynamic_paint = project.uses_video_paint();
+    // On the CPU setting the filter graph normally draws, because putting a
+    // whole render through the software compositor is much slower. A video
+    // paint is different: it changes every frame, so it must use that
+    // compositor instead of turning one raster into a frozen overlay still.
     let gpu = if stays_on_cpu(&settings) {
-        None
+        if dynamic_paint {
+            Some(strict_compositor(&state, Backend::Cpu, None)?)
+        } else {
+            None
+        }
     } else {
         Some(settings_compositor(&state, &settings))
     };
@@ -2405,7 +2410,12 @@ pub fn start_render(
     // graph as an overlay input. Written even when the composited route goes
     // first: the fallback runs after a failure, which is the wrong moment to
     // start writing files.
-    let visual_dir = write_visual_stills(&project, preset)?;
+    makevideo_compositor::text::set_ffmpeg_path(&program);
+    let visual_dir = if dynamic_paint {
+        None
+    } else {
+        write_visual_stills(&project, preset)?
+    };
     let visuals = visual_dir
         .as_ref()
         .map(|prepared| prepared.inputs.clone())
@@ -2426,11 +2436,15 @@ pub fn start_render(
                 args: ffmpeg::build_args(&project, &path, preset, Some(hardware), &visuals)?,
             });
         }
-        let plain = ffmpeg::build_args(&project, &path, preset, None, &visuals)?;
-        routes.push(Route::Graph {
-            label: "ffmpeg filter graph, CPU encoder".into(),
-            args: plain,
-        });
+        // A filter graph only accepts static visual rasters. Do not turn a
+        // failed dynamic render into a successful export with frozen paint.
+        if !dynamic_paint {
+            let plain = ffmpeg::build_args(&project, &path, preset, None, &visuals)?;
+            routes.push(Route::Graph {
+                label: "ffmpeg filter graph, CPU encoder".into(),
+                args: plain,
+            });
+        }
         Ok(())
     })();
     if let Err(error) = built {

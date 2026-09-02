@@ -136,6 +136,7 @@ where
     F: FnMut(u64, u64),
 {
     let project = options.project;
+    crate::text::set_ffmpeg_path(options.ffmpeg);
     let rate = project.rate();
     // The progress bar is the only thing here that still speaks milliseconds,
     // because that is what a progress bar is for.
@@ -273,6 +274,7 @@ pub fn preview_frame(
     width: u32,
     height: u32,
 ) -> Result<Vec<u8>, String> {
+    crate::text::set_ffmpeg_path(ffmpeg_path);
     let rate = project.rate();
     let layers = layout::layers_at(project, frame, width, height);
 
