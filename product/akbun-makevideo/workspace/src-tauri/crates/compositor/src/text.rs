@@ -6,9 +6,11 @@ use crate::Placement;
 use fontdb::{Database, Family, Query};
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle as LayoutTextStyle};
 use fontdue::{Font, FontSettings};
-use makevideo_render::{Project, ShapeKind, TextAlign, TextStyle, VisualContent};
+use makevideo_render::{
+    GradientStop, Paint, Project, ShapeKind, TextAlign, TextStyle, VisualContent, VisualStyle,
+};
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 const CACHE_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
@@ -28,6 +30,16 @@ struct RasterCache {
 static CACHE: OnceLock<Mutex<RasterCache>> = OnceLock::new();
 static FONT_DATABASE: OnceLock<Database> = OnceLock::new();
 static FONTS: OnceLock<Mutex<HashMap<String, Font>>> = OnceLock::new();
+static FFMPEG: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+
+/// Keep media paints on the same ffmpeg executable as the decoder pipeline.
+/// Settings can replace it while the app is running, so this is updateable.
+pub fn set_ffmpeg_path(path: &str) {
+    *FFMPEG
+        .get_or_init(|| RwLock::new(None))
+        .write()
+        .unwrap() = Some(path.to_string());
+}
 
 /// One item's raster at the output size, with where it sits and the frames it
 /// covers. The pixels are the same ones `layers_at` composites — an item is
@@ -138,28 +150,48 @@ fn each_visual_item(
             let pixels = match &item.content {
                 VisualContent::Text { text, style } => {
                     let style = track.subtitle_style.as_ref().unwrap_or(style);
-                    let key = format!(
-                        "text\u{0}{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
+                    let paint_frame = at.unwrap_or(item.start);
+                    let relative_frame = paint_frame - item.start;
+                    let media = resolve_media_paints(
+                        project,
+                        &style.visual_style,
+                        relative_frame,
+                        item_width,
+                        item_height,
                     );
-                    cached(&key, || rasterize(text, style, item_width, item_height, scale))
+                    let key = format!(
+                        "text\u{0}{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
+                        media_cache_token(project, &style.visual_style, relative_frame)
+                    );
+                    cached(&key, || {
+                        rasterize(text, style, item_width, item_height, scale, &media)
+                    })
                 }
                 VisualContent::Shape {
                     shape,
-                    fill,
-                    stroke,
-                    stroke_width,
+                    visual_style,
                     corner_radius,
                     start_arrow,
                     end_arrow,
                 } => {
+                    let paint_frame = at.unwrap_or(item.start);
+                    let relative_frame = paint_frame - item.start;
+                    let media = resolve_media_paints(
+                        project,
+                        visual_style,
+                        relative_frame,
+                        item_width,
+                        item_height,
+                    );
                     let key = format!(
-                        "shape\u{0}{shape:?}\u{0}{fill}\u{0}{stroke}\u{0}{stroke_width}\u{0}{corner_radius}\u{0}{start_arrow}\u{0}{end_arrow}\u{0}{item_width}x{item_height}\u{0}{scale:.4}"
+                        "shape\u{0}{shape:?}\u{0}{visual_style:?}\u{0}{corner_radius}\u{0}{start_arrow}\u{0}{end_arrow}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
+                        media_cache_token(project, visual_style, relative_frame)
                     );
                     cached(&key, || rasterize_shape(
                         *shape,
-                        fill,
-                        stroke,
-                        *stroke_width * scale,
+                        visual_style,
+                        &media,
+                        scale,
                         *corner_radius * scale,
                         *start_arrow,
                         *end_arrow,
@@ -233,12 +265,117 @@ pub fn write_pam(
     file.flush()
 }
 
+fn media_cache_token(project: &Project, style: &VisualStyle, frame: i64) -> String {
+    style
+        .fills
+        .iter()
+        .filter_map(|paint| {
+            let asset = project.asset(paint.asset_id()?)?;
+            let frame = if matches!(paint, Paint::Video { .. }) {
+                frame.max(0) % asset.duration_frames(project.rate()).max(1)
+            } else {
+                0
+            };
+            Some(format!("{}:{frame}", asset.path))
+        })
+        .collect::<Vec<_>>()
+        .join("\u{0}")
+}
+
+fn resolve_media_paints(
+    project: &Project,
+    style: &VisualStyle,
+    relative_frame: i64,
+    width: u32,
+    height: u32,
+) -> Vec<Option<Arc<[u8]>>> {
+    style
+        .fills
+        .iter()
+        .map(|paint| {
+            let asset_id = paint.asset_id()?;
+            let asset = project.asset(asset_id)?;
+            let frame = match paint {
+                Paint::Image { .. } => 0,
+                Paint::Video { .. } => {
+                    let duration = asset.duration_frames(project.rate()).max(1);
+                    relative_frame.max(0) % duration
+                }
+                _ => return None,
+            };
+            let key = format!(
+                "paint-media\u{0}{}\u{0}{frame}\u{0}{width}x{height}",
+                asset.path
+            );
+            let pixels = cached(&key, || {
+                decode_paint_frame(&asset.path, asset.kind, frame, project, width, height)
+                    .unwrap_or_default()
+            });
+            (!pixels.is_empty()).then_some(pixels)
+        })
+        .collect()
+}
+
+fn decode_paint_frame(
+    path: &str,
+    kind: makevideo_render::AssetKind,
+    frame: i64,
+    project: &Project,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
+    let ffmpeg = ffmpeg_path()?;
+    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
+    if kind == makevideo_render::AssetKind::Video {
+        args.extend([
+            "-ss".into(),
+            format!("{:.9}", frame as f64 / project.rate().as_f64()),
+        ]);
+    }
+    args.extend([
+        "-i".into(),
+        path.into(),
+        "-frames:v".into(),
+        "1".into(),
+        "-vf".into(),
+        format!(
+            "scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+        ),
+        "-pix_fmt".into(),
+        "rgba".into(),
+        "-f".into(),
+        "rawvideo".into(),
+        "pipe:1".into(),
+    ]);
+    let output = std::process::Command::new(&ffmpeg)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    let expected = width as usize * height as usize * 4;
+    (output.status.success() && output.stdout.len() >= expected)
+        .then(|| output.stdout[..expected].to_vec())
+}
+
+fn ffmpeg_path() -> Option<String> {
+    let configured = FFMPEG.get_or_init(|| RwLock::new(None));
+    if let Some(path) = configured.read().unwrap().clone() {
+        return Some(path);
+    }
+    let path = std::env::var("PATH").unwrap_or_default();
+    let home = std::env::var("HOME").unwrap_or_default();
+    makevideo_render::tools::candidate_paths("ffmpeg", "", &path, &home)
+        .into_iter()
+        .find(|candidate| std::path::Path::new(candidate).is_file())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn rasterize_shape(
     shape: ShapeKind,
-    fill: &str,
-    stroke: &str,
-    stroke_width: f32,
+    style: &VisualStyle,
+    media: &[Option<Arc<[u8]>>],
+    scale: f32,
     corner_radius: f32,
     start_arrow: bool,
     end_arrow: bool,
@@ -246,23 +383,86 @@ fn rasterize_shape(
     height: u32,
 ) -> Vec<u8> {
     let mut pixels = vec![0; width as usize * height as usize * 4];
-    let fill = colour(fill, [79, 140, 255, 204]);
-    let stroke = colour(stroke, [255, 255, 255, 255]);
+    let stroke_width = style.stroke.as_ref().map(|stroke| stroke.width).unwrap_or(0.0) * scale;
     let edge = stroke_width.max(0.0) / 2.0;
+    let mask = shape_mask(
+        shape,
+        corner_radius,
+        edge,
+        start_arrow,
+        end_arrow,
+        width,
+        height,
+    );
+    if let Some(shadow) = &style.shadow {
+        draw_shadow(&mut pixels, &mask, width, height, shadow, scale);
+    }
     for y in 0..height {
         for x in 0..width {
-            let point = (x as f32 + 0.5, y as f32 + 0.5);
-            let (inside, outlined) = match shape {
-                ShapeKind::Rectangle => rounded_rectangle(point, width as f32, height as f32, corner_radius, edge),
-                ShapeKind::Ellipse => ellipse(point, width as f32, height as f32, edge),
-                ShapeKind::Line => line(point, width as f32, height as f32, edge, start_arrow, end_arrow),
-            };
+            let (inside, outlined) = mask[(y * width + x) as usize];
             if inside {
-                put_pixel(&mut pixels, width, x, y, if outlined { stroke } else { fill });
+                let color = if shape == ShapeKind::Line || outlined {
+                    style
+                        .stroke
+                        .as_ref()
+                        .map(|stroke| colour(&stroke.color, [0, 0, 0, 0]))
+                        .unwrap_or([0, 0, 0, 0])
+                } else {
+                    paint_stack(
+                        &style.fills,
+                        media,
+                        x as f32 + 0.5,
+                        y as f32 + 0.5,
+                        width,
+                        height,
+                    )
+                };
+                blend_at(&mut pixels, width, x, y, color);
             }
         }
     }
     pixels
+}
+
+fn shape_mask(
+    shape: ShapeKind,
+    corner_radius: f32,
+    edge: f32,
+    start_arrow: bool,
+    end_arrow: bool,
+    width: u32,
+    height: u32,
+) -> Vec<(bool, bool)> {
+    let mut mask = Vec::with_capacity(width as usize * height as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let point = (x as f32 + 0.5, y as f32 + 0.5);
+            mask.push(match shape {
+                ShapeKind::Rectangle => {
+                    rounded_rectangle(point, width as f32, height as f32, 0.0, edge)
+                }
+                ShapeKind::RoundedRectangle => rounded_rectangle(
+                    point,
+                    width as f32,
+                    height as f32,
+                    corner_radius,
+                    edge,
+                ),
+                ShapeKind::Ellipse => ellipse(point, width as f32, height as f32, edge),
+                ShapeKind::Line => line(
+                    point,
+                    width as f32,
+                    height as f32,
+                    edge,
+                    start_arrow,
+                    end_arrow,
+                ),
+                ShapeKind::Polygon => polygon(point, width as f32, height as f32, 6, 1.0, edge),
+                ShapeKind::Star => polygon(point, width as f32, height as f32, 10, 0.45, edge),
+            });
+        }
+    }
+    mask
 }
 
 fn rounded_rectangle(point: (f32, f32), width: f32, height: f32, radius: f32, edge: f32) -> (bool, bool) {
@@ -295,9 +495,224 @@ fn line(point: (f32, f32), width: f32, height: f32, radius: f32, start_arrow: bo
     (body || (start_arrow && arrow(0.0, false)) || (end_arrow && arrow(width, true)), true)
 }
 
-fn put_pixel(pixels: &mut [u8], width: u32, x: u32, y: u32, color: [u8; 4]) {
+fn polygon(
+    point: (f32, f32),
+    width: f32,
+    height: f32,
+    vertices: usize,
+    inner_ratio: f32,
+    edge: f32,
+) -> (bool, bool) {
+    let outer = width.min(height) / 2.0;
+    let center = (width / 2.0, height / 2.0);
+    let points: Vec<(f32, f32)> = (0..vertices)
+        .map(|index| {
+            let angle = -std::f32::consts::FRAC_PI_2
+                + index as f32 * std::f32::consts::TAU / vertices as f32;
+            let radius = if vertices > 6 && index % 2 == 1 {
+                outer * inner_ratio
+            } else {
+                outer
+            };
+            (center.0 + angle.cos() * radius, center.1 + angle.sin() * radius)
+        })
+        .collect();
+    let mut inside = false;
+    let mut distance = f32::MAX;
+    for index in 0..points.len() {
+        let a = points[index];
+        let b = points[(index + 1) % points.len()];
+        if (a.1 > point.1) != (b.1 > point.1)
+            && point.0 < (b.0 - a.0) * (point.1 - a.1) / (b.1 - a.1) + a.0
+        {
+            inside = !inside;
+        }
+        distance = distance.min(segment_distance(point, a, b));
+    }
+    (inside, inside && distance <= edge)
+}
+
+fn segment_distance(point: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
+    let delta = (b.0 - a.0, b.1 - a.1);
+    let length = delta.0 * delta.0 + delta.1 * delta.1;
+    if length <= f32::EPSILON {
+        return (point.0 - a.0).hypot(point.1 - a.1);
+    }
+    let amount = (((point.0 - a.0) * delta.0 + (point.1 - a.1) * delta.1) / length)
+        .clamp(0.0, 1.0);
+    (point.0 - (a.0 + delta.0 * amount)).hypot(point.1 - (a.1 + delta.1 * amount))
+}
+
+fn draw_shadow(
+    pixels: &mut [u8],
+    mask: &[(bool, bool)],
+    width: u32,
+    height: u32,
+    shadow: &makevideo_render::Shadow,
+    scale: f32,
+) {
+    let color = colour(&shadow.color, [0, 0, 0, 0]);
+    if color[3] == 0 {
+        return;
+    }
+    let offset_x = (shadow.x * scale).round() as i32;
+    let offset_y = (shadow.y * scale).round() as i32;
+    let blur = (shadow.blur * scale).round().clamp(0.0, 32.0) as i32;
+    for y in 0..height as i32 {
+        for x in 0..width as i32 {
+            let source_x = x - offset_x;
+            let source_y = y - offset_y;
+            let mut covered = 0u32;
+            let mut samples = 0u32;
+            for dy in -blur..=blur {
+                for dx in -blur..=blur {
+                    samples += 1;
+                    let sx = source_x + dx;
+                    let sy = source_y + dy;
+                    if sx >= 0
+                        && sy >= 0
+                        && sx < width as i32
+                        && sy < height as i32
+                        && mask[(sy as u32 * width + sx as u32) as usize].0
+                    {
+                        covered += 1;
+                    }
+                }
+            }
+            if covered == 0 {
+                continue;
+            }
+            let mut sampled = color;
+            sampled[3] = ((color[3] as u32 * covered + samples / 2) / samples) as u8;
+            blend_at(pixels, width, x as u32, y as u32, sampled);
+        }
+    }
+}
+
+fn paint_stack(
+    paints: &[Paint],
+    media: &[Option<Arc<[u8]>>],
+    x: f32,
+    y: f32,
+    width: u32,
+    height: u32,
+) -> [u8; 4] {
+    let mut result = [0, 0, 0, 0];
+    for (index, paint) in paints.iter().enumerate() {
+        blend(
+            &mut result,
+            sample_paint(
+                paint,
+                media.get(index).and_then(Option::as_deref),
+                x,
+                y,
+                width,
+                height,
+            ),
+        );
+    }
+    result
+}
+
+fn sample_paint(
+    paint: &Paint,
+    media: Option<&[u8]>,
+    x: f32,
+    y: f32,
+    width: u32,
+    height: u32,
+) -> [u8; 4] {
+    match paint {
+        Paint::Solid { color } => colour(color, [0, 0, 0, 0]),
+        Paint::LinearGradient { start, end, stops } => {
+            let start = (start.x * width as f32, start.y * height as f32);
+            let end = (end.x * width as f32, end.y * height as f32);
+            let delta = (end.0 - start.0, end.1 - start.1);
+            let length = delta.0 * delta.0 + delta.1 * delta.1;
+            let position = if length <= f32::EPSILON {
+                0.0
+            } else {
+                ((x - start.0) * delta.0 + (y - start.1) * delta.1) / length
+            };
+            gradient(stops, position)
+        }
+        Paint::RadialGradient {
+            center,
+            radius,
+            stops,
+        } => {
+            let center = (center.x * width as f32, center.y * height as f32);
+            let radius = radius.max(0.001) * width.max(height) as f32;
+            gradient(stops, (x - center.0).hypot(y - center.1) / radius)
+        }
+        Paint::Image { .. } | Paint::Video { .. } => media
+            .and_then(|pixels| {
+                let x = x.floor().clamp(0.0, width.saturating_sub(1) as f32) as u32;
+                let y = y.floor().clamp(0.0, height.saturating_sub(1) as f32) as u32;
+                let index = ((y * width + x) * 4) as usize;
+                pixels
+                    .get(index..index + 4)
+                    .map(|pixel| [pixel[0], pixel[1], pixel[2], pixel[3]])
+            })
+            .unwrap_or([0, 0, 0, 0]),
+    }
+}
+
+fn gradient(stops: &[GradientStop], position: f32) -> [u8; 4] {
+    if stops.is_empty() {
+        return [0, 0, 0, 0];
+    }
+    let mut stops: Vec<_> = stops.iter().collect();
+    stops.sort_by(|left, right| left.position.total_cmp(&right.position));
+    let position = position.clamp(0.0, 1.0);
+    let first = stops[0];
+    if position <= first.position {
+        return colour(&first.color, [0, 0, 0, 0]);
+    }
+    for pair in stops.windows(2) {
+        if position <= pair[1].position {
+            let span = (pair[1].position - pair[0].position).max(f32::EPSILON);
+            let amount = ((position - pair[0].position) / span).clamp(0.0, 1.0);
+            let from = colour(&pair[0].color, [0, 0, 0, 0]);
+            let to = colour(&pair[1].color, [0, 0, 0, 0]);
+            let mut result = [0; 4];
+            for channel in 0..4 {
+                result[channel] = (from[channel] as f32
+                    + (to[channel] as f32 - from[channel] as f32) * amount)
+                    .round() as u8;
+            }
+            return result;
+        }
+    }
+    colour(&stops.last().unwrap().color, [0, 0, 0, 0])
+}
+
+fn blend_at(pixels: &mut [u8], width: u32, x: u32, y: u32, color: [u8; 4]) {
     let index = ((y * width + x) * 4) as usize;
-    pixels[index..index + 4].copy_from_slice(&color);
+    blend(&mut pixels[index..index + 4], color);
+}
+
+fn blend(destination: &mut [u8], source: [u8; 4]) {
+    let source_alpha = source[3] as f32 / 255.0;
+    if source_alpha <= 0.0 {
+        return;
+    }
+    let destination_alpha = destination[3] as f32 / 255.0;
+    let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+    for channel in 0..3 {
+        destination[channel] = if output_alpha <= f32::EPSILON {
+            0
+        } else {
+            ((source[channel] as f32 * source_alpha
+                + destination[channel] as f32
+                    * destination_alpha
+                    * (1.0 - source_alpha))
+                / output_alpha)
+                .round()
+                .clamp(0.0, 255.0) as u8
+        };
+    }
+    destination[3] = (output_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
 }
 
 fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Arc<[u8]> {
@@ -336,7 +751,14 @@ fn cached(key: &str, build: impl FnOnce() -> Vec<u8>) -> Arc<[u8]> {
     pixels
 }
 
-fn rasterize(text: &str, style: &TextStyle, width: u32, height: u32, scale: f32) -> Vec<u8> {
+fn rasterize(
+    text: &str,
+    style: &TextStyle,
+    width: u32,
+    height: u32,
+    scale: f32,
+    media: &[Option<Arc<[u8]>>],
+) -> Vec<u8> {
     let mut pixels = vec![0; width as usize * height as usize * 4];
     let Some(font) = load_font(&style.font_family) else {
         return pixels;
@@ -358,19 +780,54 @@ fn rasterize(text: &str, style: &TextStyle, width: u32, height: u32, scale: f32)
         &[font.clone()],
         &LayoutTextStyle::new(text, (style.font_size * scale).max(1.0), 0),
     );
-    let color = colour(&style.color, [255, 255, 255, 255]);
-    let shadow = colour(&style.shadow_color, [0, 0, 0, 0]);
-    let stroke = colour(&style.stroke_color, [0, 0, 0, 0]);
-    let stroke_radius = (style.stroke_width * scale).round().max(0.0) as i32;
-    let shadow_x = (style.shadow_x * scale).round() as i32;
-    let shadow_y = (style.shadow_y * scale).round() as i32;
+    let visual_style = &style.visual_style;
+    let shadow = visual_style
+        .shadow
+        .as_ref()
+        .map(|shadow| colour(&shadow.color, [0, 0, 0, 0]))
+        .unwrap_or([0, 0, 0, 0]);
+    let stroke = visual_style
+        .stroke
+        .as_ref()
+        .map(|stroke| colour(&stroke.color, [0, 0, 0, 0]))
+        .unwrap_or([0, 0, 0, 0]);
+    let stroke_radius = visual_style
+        .stroke
+        .as_ref()
+        .map(|stroke| (stroke.width * scale).round().max(0.0) as i32)
+        .unwrap_or(0);
+    let shadow_x = visual_style
+        .shadow
+        .as_ref()
+        .map(|shadow| (shadow.x * scale).round() as i32)
+        .unwrap_or(0);
+    let shadow_y = visual_style
+        .shadow
+        .as_ref()
+        .map(|shadow| (shadow.y * scale).round() as i32)
+        .unwrap_or(0);
+    let shadow_blur = visual_style
+        .shadow
+        .as_ref()
+        .map(|shadow| (shadow.blur * scale).round().clamp(0.0, 32.0) as i32)
+        .unwrap_or(0);
 
     for glyph in layout.glyphs() {
         let (metrics, bitmap) = font.rasterize_config(glyph.key);
         let x = glyph.x.round() as i32;
         let y = glyph.y.round() as i32;
         if shadow[3] > 0 {
-            draw_bitmap(&mut pixels, width, height, x + shadow_x, y + shadow_y, &metrics, &bitmap, shadow);
+            draw_bitmap_shadow(
+                &mut pixels,
+                width,
+                height,
+                x + shadow_x,
+                y + shadow_y,
+                &metrics,
+                &bitmap,
+                shadow,
+                shadow_blur,
+            );
         }
         if stroke_radius > 0 && stroke[3] > 0 {
             for offset_y in -stroke_radius..=stroke_radius {
@@ -381,7 +838,19 @@ fn rasterize(text: &str, style: &TextStyle, width: u32, height: u32, scale: f32)
                 }
             }
         }
-        draw_bitmap(&mut pixels, width, height, x, y, &metrics, &bitmap, color);
+        for (paint_index, paint) in visual_style.fills.iter().enumerate() {
+            draw_bitmap_paint(
+                &mut pixels,
+                width,
+                height,
+                x,
+                y,
+                &metrics,
+                &bitmap,
+                paint,
+                media.get(paint_index).and_then(Option::as_deref),
+            );
+        }
     }
     pixels
 }
@@ -492,13 +961,103 @@ fn draw_bitmap(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn draw_bitmap_shadow(
+    pixels: &mut [u8],
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    metrics: &fontdue::Metrics,
+    bitmap: &[u8],
+    color: [u8; 4],
+    blur: i32,
+) {
+    if blur == 0 {
+        draw_bitmap(pixels, width, height, x, y, metrics, bitmap, color);
+        return;
+    }
+    let diameter = (blur * 2 + 1) as u32;
+    let samples = diameter * diameter;
+    let mut sample = color;
+    sample[3] = ((color[3] as u32 + samples / 2) / samples).max(1) as u8;
+    for offset_y in -blur..=blur {
+        for offset_x in -blur..=blur {
+            draw_bitmap(
+                pixels,
+                width,
+                height,
+                x + offset_x,
+                y + offset_y,
+                metrics,
+                bitmap,
+                sample,
+            );
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_bitmap_paint(
+    pixels: &mut [u8],
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    metrics: &fontdue::Metrics,
+    bitmap: &[u8],
+    paint: &Paint,
+    media: Option<&[u8]>,
+) {
+    for row in 0..metrics.height as i32 {
+        for column in 0..metrics.width as i32 {
+            let target_x = x + column;
+            let target_y = y + row;
+            if target_x < 0 || target_y < 0 || target_x >= width as i32 || target_y >= height as i32 {
+                continue;
+            }
+            let coverage = bitmap[(row as usize) * metrics.width + column as usize] as u16;
+            if coverage == 0 {
+                continue;
+            }
+            let mut color = sample_paint(
+                paint,
+                media,
+                target_x as f32 + 0.5,
+                target_y as f32 + 0.5,
+                width,
+                height,
+            );
+            color[3] = (color[3] as u16 * coverage / 255) as u8;
+            blend_at(
+                pixels,
+                width,
+                target_x as u32,
+                target_y as u32,
+                color,
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use makevideo_render::{
-        Project, ProjectSettings, Rate, ShapeKind as Shape, Track, TrackKind, VisualContent as Content,
-        VisualItem, VisualTransform, FORMAT_VERSION,
+        Paint, Project, ProjectSettings, Rate, ShapeKind as Shape, Stroke, Track, TrackKind,
+        VisualContent as Content, VisualItem, VisualStyle, VisualTransform, FORMAT_VERSION,
     };
+
+    fn shape_style(fill: &str, stroke: &str, width: f32) -> VisualStyle {
+        VisualStyle {
+            fills: vec![Paint::solid(fill)],
+            stroke: (width > 0.0).then(|| Stroke {
+                color: stroke.into(),
+                width,
+            }),
+            shadow: None,
+        }
+    }
 
     fn project_with_shape() -> Project {
         Project {
@@ -530,9 +1089,7 @@ mod tests {
                     },
                     content: Content::Shape {
                         shape: Shape::Rectangle,
-                        fill: "#ff0000".into(),
-                        stroke: "#ffffff".into(),
-                        stroke_width: 1.0,
+                        visual_style: shape_style("#ff0000", "#ffffff", 1.0),
                         corner_radius: 0.0,
                         start_arrow: false,
                         end_arrow: false,
@@ -583,9 +1140,9 @@ mod tests {
         let width = 40;
         let pixels = rasterize_shape(
             ShapeKind::Rectangle,
-            "#00000000",
-            "#ff0000",
-            8.0,
+            &shape_style("#00000000", "#ff0000", 8.0),
+            &[],
+            1.0,
             0.0,
             false,
             false,
@@ -607,9 +1164,9 @@ mod tests {
     fn shapes_rasterize_fill_outline_and_line_arrows() {
         let rectangle = rasterize_shape(
             ShapeKind::Rectangle,
-            "#112233",
-            "#ffffff",
-            2.0,
+            &shape_style("#112233", "#ffffff", 2.0),
+            &[],
+            1.0,
             4.0,
             false,
             false,
@@ -621,9 +1178,9 @@ mod tests {
 
         let line = rasterize_shape(
             ShapeKind::Line,
-            "#00000000",
-            "#ff0000",
-            3.0,
+            &shape_style("#00000000", "#ff0000", 3.0),
+            &[],
+            1.0,
             0.0,
             true,
             true,
@@ -635,9 +1192,9 @@ mod tests {
 
         let no_stroke = rasterize_shape(
             ShapeKind::Line,
-            "#00000000",
-            "#ff0000",
-            0.0,
+            &shape_style("#00000000", "#ff0000", 0.0),
+            &[],
+            1.0,
             0.0,
             true,
             true,
@@ -645,5 +1202,55 @@ mod tests {
             12,
         );
         assert!(no_stroke.chunks_exact(4).all(|pixel| pixel[3] == 0));
+    }
+
+    #[test]
+    fn gradients_interpolate_and_multiple_fills_stack_bottom_to_top() {
+        let gradient = Paint::LinearGradient {
+            start: makevideo_render::PaintPoint { x: 0.0, y: 0.5 },
+            end: makevideo_render::PaintPoint { x: 1.0, y: 0.5 },
+            stops: vec![
+                GradientStop {
+                    position: 0.0,
+                    color: "#ff0000".into(),
+                },
+                GradientStop {
+                    position: 1.0,
+                    color: "#0000ff".into(),
+                },
+            ],
+        };
+        assert_eq!(sample_paint(&gradient, None, 0.0, 5.0, 10, 10), [255, 0, 0, 255]);
+        let middle = sample_paint(&gradient, None, 5.0, 5.0, 10, 10);
+        assert!((middle[0] as i16 - middle[2] as i16).abs() <= 1, "{middle:?}");
+
+        let paints = [Paint::solid("#ff0000"), Paint::solid("#0000ff80")];
+        let stacked = paint_stack(&paints, &[], 5.0, 5.0, 10, 10);
+        assert!(stacked[0] >= 126 && stacked[0] <= 128, "{stacked:?}");
+        assert!(stacked[2] >= 127 && stacked[2] <= 129, "{stacked:?}");
+        assert_eq!(stacked[3], 255);
+    }
+
+    #[test]
+    fn polygon_star_and_rounded_rectangle_have_distinct_geometry() {
+        let style = shape_style("#ffffff", "#000000", 0.0);
+        for shape in [ShapeKind::Polygon, ShapeKind::Star, ShapeKind::RoundedRectangle] {
+            let pixels = rasterize_shape(shape, &style, &[], 1.0, 5.0, false, false, 30, 30);
+            assert_eq!(&pixels[(15 * 30 + 15) * 4..(15 * 30 + 15) * 4 + 4], &[255; 4]);
+            assert_eq!(pixels[3], 0, "{shape:?} keeps its corner transparent");
+        }
+    }
+
+    #[test]
+    fn a_media_paint_samples_the_decoded_rgba_frame() {
+        let paint = Paint::Image {
+            asset_id: "image".into(),
+        };
+        let pixels = [
+            255, 0, 0, 255, 0, 255, 0, 255,
+            0, 0, 255, 255, 255, 255, 255, 255,
+        ];
+        assert_eq!(sample_paint(&paint, Some(&pixels), 1.5, 0.5, 2, 2), [0, 255, 0, 255]);
+        assert_eq!(sample_paint(&paint, Some(&pixels), 0.5, 1.5, 2, 2), [0, 0, 255, 255]);
     }
 }

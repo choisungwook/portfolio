@@ -96,6 +96,13 @@ render takes a frame, composes it, and writes the result to the encoder's
 stdin. Closing that stdin is what tells ffmpeg the video is over. See
 [frame-source.md](./frame-source.md).
 
+- Text and shapes become raster layers before either backend receives them.
+- One rasterizer calculates paint stacks, media paints, stroke, shadow and shape geometry.
+- GPU and CPU composition receive identical RGBA pixels.
+- Static visual items become one PAM still per item on the filter graph route.
+- A video paint changes every frame and always takes the composited route, including under the CPU setting.
+- A video-paint render does not fall back to a graph that would freeze the paint.
+
 The render differs from playback in one thing only: when a frame is not ready
 it waits, because a file has no deadline. It waits in short spans so Cancel is
 still answered promptly.

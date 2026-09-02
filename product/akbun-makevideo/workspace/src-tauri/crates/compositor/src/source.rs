@@ -1462,7 +1462,9 @@ mod tests {
     /// text visible *during* playback rather than only on the paused still.
     #[test]
     fn a_visual_item_rides_on_the_frames_it_covers() {
-        use makevideo_render::{ShapeKind, VisualContent, VisualItem, VisualTransform};
+        use makevideo_render::{
+            Paint, ShapeKind, Stroke, VisualContent, VisualItem, VisualStyle, VisualTransform,
+        };
         let mut with_shape = one_clip();
         with_shape.tracks[0].visual_items.push(VisualItem {
             id: "s1".into(),
@@ -1479,9 +1481,14 @@ mod tests {
             },
             content: VisualContent::Shape {
                 shape: ShapeKind::Rectangle,
-                fill: "#ff0000".into(),
-                stroke: "#ffffff".into(),
-                stroke_width: 1.0,
+                visual_style: VisualStyle {
+                    fills: vec![Paint::solid("#ff0000")],
+                    stroke: Some(Stroke {
+                        color: "#ffffff".into(),
+                        width: 1.0,
+                    }),
+                    shadow: None,
+                },
                 corner_radius: 0.0,
                 start_arrow: false,
                 end_arrow: false,

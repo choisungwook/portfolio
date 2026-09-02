@@ -266,21 +266,36 @@
               <label class="row">Text <input id="text-value" type="text" /></label>
               <label class="row">Font <input id="text-font" type="text" list="font-options" placeholder="sans-serif" /></label>
               <label class="row">Size <input id="text-size" type="number" min="8" max="512" /></label>
-              <label class="row">Color <input id="text-color" type="color" /></label>
+              <label class="row">Fill <select id="text-fill-kind"><option value="solid">Solid</option><option value="linearGradient">Linear gradient</option><option value="radialGradient">Radial gradient</option><option value="image">Image</option><option value="video">Video</option></select></label>
+              <label class="row">Fill color <input id="text-color" type="color" /></label>
+              <label class="row">Fill end <input id="text-fill-end-color" type="color" /></label>
+              <label class="row">Fill media <select id="text-fill-asset"></select></label>
+              <div class="field-pair"><button id="text-add-fill" class="small" type="button">+ Fill layer</button><button id="text-remove-fill" class="small" type="button">Remove top fill</button></div>
               <label class="row">Align <select id="text-align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
               <label class="row">Outline <input id="text-stroke-color" type="color" /></label>
               <label class="row">Outline width <input id="text-stroke-width" type="number" min="0" max="32" step="1" /></label>
-              <label class="row">Shadow <input id="text-shadow-color" type="color" /></label>
+              <label class="row check"><input id="text-shadow-enabled" type="checkbox" /> Shadow</label>
+              <label class="row">Shadow color <input id="text-shadow-color" type="color" /></label>
+              <div class="field-pair"><label>Shadow X <input id="text-shadow-x" type="number" step="1" /></label><label>Shadow Y <input id="text-shadow-y" type="number" step="1" /></label></div>
+              <label class="row">Shadow blur <input id="text-shadow-blur" type="number" min="0" step="1" /></label>
             </div>
           </div>
           <div id="shape-panel" hidden>
             <h3>Shape</h3>
             <div id="shape-inspector">
-              <label class="row">Type <select id="shape-kind"><option value="rectangle">Rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line / Arrow</option></select></label>
-              <label class="row">Fill <input id="shape-fill" type="color" /></label>
+              <label class="row">Type <select id="shape-kind"><option value="rectangle">Rectangle</option><option value="roundedRectangle">Rounded rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line / Arrow</option><option value="polygon">Polygon</option><option value="star">Star</option></select></label>
+              <label class="row">Fill <select id="shape-fill-kind"><option value="solid">Solid</option><option value="linearGradient">Linear gradient</option><option value="radialGradient">Radial gradient</option><option value="image">Image</option><option value="video">Video</option></select></label>
+              <label class="row">Fill color <input id="shape-fill" type="color" /></label>
+              <label class="row">Fill end <input id="shape-fill-end-color" type="color" /></label>
+              <label class="row">Fill media <select id="shape-fill-asset"></select></label>
+              <div class="field-pair"><button id="shape-add-fill" class="small" type="button">+ Fill layer</button><button id="shape-remove-fill" class="small" type="button">Remove top fill</button></div>
               <label class="row">Outline <input id="shape-stroke" type="color" /></label>
               <label class="row">Outline width <input id="shape-stroke-width" type="number" min="0" max="128" step="1" /></label>
               <label class="row">Corner radius <input id="shape-corner-radius" type="number" min="0" max="2048" step="1" /></label>
+              <label class="row check"><input id="shape-shadow-enabled" type="checkbox" /> Shadow</label>
+              <label class="row">Shadow color <input id="shape-shadow-color" type="color" /></label>
+              <div class="field-pair"><label>Shadow X <input id="shape-shadow-x" type="number" step="1" /></label><label>Shadow Y <input id="shape-shadow-y" type="number" step="1" /></label></div>
+              <label class="row">Shadow blur <input id="shape-shadow-blur" type="number" min="0" step="1" /></label>
               <label class="row check"><input id="shape-start-arrow" type="checkbox" /> Start arrow</label>
               <label class="row check"><input id="shape-end-arrow" type="checkbox" /> End arrow</label>
             </div>

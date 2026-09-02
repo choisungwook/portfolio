@@ -162,17 +162,36 @@ const dom = {
   textValue: el('text-value'),
   textFont: el('text-font'),
   textSize: el('text-size'),
+  textFillKind: el('text-fill-kind'),
   textColor: el('text-color'),
+  textFillEndColor: el('text-fill-end-color'),
+  textFillAsset: el('text-fill-asset'),
+  textAddFill: el('text-add-fill'),
+  textRemoveFill: el('text-remove-fill'),
   textAlign: el('text-align'),
   textStrokeColor: el('text-stroke-color'),
   textStrokeWidth: el('text-stroke-width'),
   textShadowColor: el('text-shadow-color'),
+  textShadowEnabled: el('text-shadow-enabled'),
+  textShadowX: el('text-shadow-x'),
+  textShadowY: el('text-shadow-y'),
+  textShadowBlur: el('text-shadow-blur'),
   shapePanel: el('shape-panel'),
   shapeKind: el('shape-kind'),
+  shapeFillKind: el('shape-fill-kind'),
   shapeFill: el('shape-fill'),
+  shapeFillEndColor: el('shape-fill-end-color'),
+  shapeFillAsset: el('shape-fill-asset'),
+  shapeAddFill: el('shape-add-fill'),
+  shapeRemoveFill: el('shape-remove-fill'),
   shapeStroke: el('shape-stroke'),
   shapeStrokeWidth: el('shape-stroke-width'),
   shapeCornerRadius: el('shape-corner-radius'),
+  shapeShadowEnabled: el('shape-shadow-enabled'),
+  shapeShadowColor: el('shape-shadow-color'),
+  shapeShadowX: el('shape-shadow-x'),
+  shapeShadowY: el('shape-shadow-y'),
+  shapeShadowBlur: el('shape-shadow-blur'),
   shapeStartArrow: el('shape-start-arrow'),
   shapeEndArrow: el('shape-end-arrow'),
   subtitlePanel: el('subtitle-panel'),
@@ -1457,37 +1476,151 @@ function drawTextContent(context, text, style, width, height, scale) {
   context.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
   context.textBaseline = 'alphabetic';
   const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
-  const strokeWidth = Math.max(0, (style.strokeWidth || 0) * scale);
-  const shadowColor = style.shadowColor || '';
+  const stroke = style.stroke || null;
+  const strokeWidth = Math.max(0, ((stroke && stroke.width) || 0) * scale);
+  const shadow = style.shadow || null;
+  const fills = style.fills && style.fills.length
+    ? style.fills
+    : [{ kind: 'solid', color: '#ffffff' }];
   const lines = wrapVisualText(context, text, width);
   for (let index = 0; index < lines.length; index += 1) {
     const baseline = index * size * 1.2 + size;
     if (baseline - size > height) break;
-    if (shadowColor) {
-      context.shadowColor = shadowColor;
-      context.shadowOffsetX = (style.shadowX ?? 2) * scale;
-      context.shadowOffsetY = (style.shadowY ?? 2) * scale;
+    if (shadow) {
+      context.shadowColor = shadow.color || 'transparent';
+      context.shadowOffsetX = (shadow.x || 0) * scale;
+      context.shadowOffsetY = (shadow.y || 0) * scale;
+      context.shadowBlur = Math.max(0, shadow.blur || 0) * scale;
     }
-    if (strokeWidth > 0 && style.strokeColor) {
+    if (strokeWidth > 0 && stroke.color) {
       // The Rust pass dilates by the radius, so the visible rim is the radius
       // wide; a canvas stroke straddles the edge, so it is doubled to match.
       context.lineWidth = strokeWidth * 2;
       context.lineJoin = 'round';
-      context.strokeStyle = style.strokeColor;
+      context.strokeStyle = stroke.color;
       context.strokeText(lines[index], anchorX, baseline);
     }
-    context.fillStyle = style.color || '#ffffff';
-    context.fillText(lines[index], anchorX, baseline);
+    for (const fill of fills) {
+      context.fillStyle = canvasPaint(context, fill, width, height);
+      context.fillText(lines[index], anchorX, baseline);
+      context.shadowColor = 'transparent';
+    }
     context.shadowColor = 'transparent';
     context.shadowOffsetX = 0;
     context.shadowOffsetY = 0;
+    context.shadowBlur = 0;
   }
 }
 
+function orderedStops(stops) {
+  const values = stops && stops.length ? stops : [
+    { position: 0, color: '#ffffff' },
+    { position: 1, color: '#000000' },
+  ];
+  return [...values].sort((a, b) => a.position - b.position);
+}
+
+const fillMediaElements = new Map();
+
+function mediaPaintPattern(context, paint, width, height) {
+  const asset = L.findAsset(state.project, paint.assetId);
+  if (!asset || asset.kind !== paint.kind) return '#00000000';
+  const key = `${paint.kind}:${asset.id}`;
+  let media = fillMediaElements.get(key);
+  if (!media) {
+    media = paint.kind === 'video' ? document.createElement('video') : new Image();
+    media.src = window.api.fileUrl(asset.path);
+    if (paint.kind === 'video') {
+      media.muted = true;
+      media.preload = 'auto';
+      media.playsInline = true;
+    }
+    media.addEventListener('loadeddata', drawStageVisuals);
+    media.addEventListener('load', drawStageVisuals);
+    fillMediaElements.set(key, media);
+  }
+  const sourceWidth = media.videoWidth || media.naturalWidth || 0;
+  const sourceHeight = media.videoHeight || media.naturalHeight || 0;
+  if (paint.kind === 'video' && media.readyState >= 1 && Number.isFinite(media.duration) && media.duration > 0) {
+    const time = (preview.position() / T.rateToNumber(rate())) % media.duration;
+    if (Math.abs(media.currentTime - time) > 0.05) media.currentTime = time;
+  }
+  if (!sourceWidth || !sourceHeight) return '#00000000';
+  const pattern = context.createPattern(media, 'no-repeat');
+  if (!pattern) return '#00000000';
+  if (pattern.setTransform && typeof DOMMatrix !== 'undefined') {
+    pattern.setTransform(new DOMMatrix().scale(width / sourceWidth, height / sourceHeight));
+  }
+  return pattern;
+}
+
+function canvasPaint(context, paint, width, height) {
+  if (!paint || paint.kind === 'solid') return (paint && paint.color) || '#00000000';
+  if (paint.kind === 'linearGradient') {
+    const start = paint.start || { x: 0, y: 0.5 };
+    const end = paint.end || { x: 1, y: 0.5 };
+    const gradient = context.createLinearGradient(
+      start.x * width, start.y * height, end.x * width, end.y * height,
+    );
+    for (const stop of orderedStops(paint.stops)) {
+      gradient.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
+    }
+    return gradient;
+  }
+  if (paint.kind === 'radialGradient') {
+    const center = paint.center || { x: 0.5, y: 0.5 };
+    const radius = Math.max(0.001, paint.radius || 0.5) * Math.max(width, height);
+    const gradient = context.createRadialGradient(
+      center.x * width, center.y * height, 0,
+      center.x * width, center.y * height, radius,
+    );
+    for (const stop of orderedStops(paint.stops)) {
+      gradient.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
+    }
+    return gradient;
+  }
+  if (paint.kind === 'image' || paint.kind === 'video') {
+    return mediaPaintPattern(context, paint, width, height);
+  }
+  return '#00000000';
+}
+
+function beginShapePath(context, kind, width, height, radius) {
+  context.beginPath();
+  if (kind === 'ellipse') {
+    context.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+    return;
+  }
+  if (kind === 'polygon' || kind === 'star') {
+    const points = kind === 'star' ? 10 : 6;
+    const outer = Math.min(width, height) / 2;
+    const inner = kind === 'star' ? outer * 0.45 : outer;
+    for (let index = 0; index < points; index += 1) {
+      const angle = -Math.PI / 2 + index * Math.PI * 2 / points;
+      const distance = kind === 'star' && index % 2 ? inner : outer;
+      const x = width / 2 + Math.cos(angle) * distance;
+      const y = height / 2 + Math.sin(angle) * distance;
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+    return;
+  }
+  if (kind === 'roundedRectangle') context.roundRect(0, 0, width, height, radius);
+  else context.rect(0, 0, width, height);
+}
+
 function drawShapeContent(context, content, width, height, scale) {
-  const stroke = content.stroke || '#ffffff';
-  const strokeWidth = Math.max(0, (content.strokeWidth ?? 4) * scale);
+  const stroke = content.stroke || null;
+  const strokeWidth = Math.max(0, ((stroke && stroke.width) || 0) * scale);
   const kind = content.shape || 'rectangle';
+  const shadow = content.shadow || null;
+  if (shadow) {
+    context.shadowColor = shadow.color || 'transparent';
+    context.shadowOffsetX = (shadow.x || 0) * scale;
+    context.shadowOffsetY = (shadow.y || 0) * scale;
+    context.shadowBlur = Math.max(0, shadow.blur || 0) * scale;
+  }
   if (kind === 'line') {
     // A line is all stroke: a bar through the middle, plus the arrow heads.
     // Nothing is drawn at width zero, the same rule the Rust rasterizer has.
@@ -1495,7 +1628,7 @@ function drawShapeContent(context, content, width, height, scale) {
     const middle = height / 2;
     const half = strokeWidth / 2;
     const arrow = Math.max(strokeWidth * 1.5, 8);
-    context.fillStyle = stroke;
+    context.fillStyle = stroke.color;
     context.fillRect(half, middle - half, Math.max(0, width - strokeWidth), strokeWidth);
     const head = (tipX, direction) => {
       context.beginPath();
@@ -1507,28 +1640,41 @@ function drawShapeContent(context, content, width, height, scale) {
     };
     if (content.startArrow) head(0, 1);
     if (content.endArrow) head(width, -1);
+    context.shadowColor = 'transparent';
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.shadowBlur = 0;
     return;
   }
-  context.beginPath();
-  if (kind === 'ellipse') {
-    context.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
-  } else {
-    const radius = Math.min(Math.max(0, (content.cornerRadius ?? 0) * scale), Math.min(width, height) / 2);
-    context.roundRect(0, 0, width, height, radius);
+  const radius = Math.min(
+    Math.max(0, (content.cornerRadius ?? 0) * scale),
+    Math.min(width, height) / 2,
+  );
+  const fills = content.fills && content.fills.length
+    ? content.fills
+    : [{ kind: 'solid', color: '#4f8cffcc' }];
+  for (const fill of fills) {
+    beginShapePath(context, kind, width, height, radius);
+    context.fillStyle = canvasPaint(context, fill, width, height);
+    context.fill();
+    context.shadowColor = 'transparent';
   }
-  context.fillStyle = content.fill || '#4f8cffcc';
-  context.fill();
   if (strokeWidth > 0) {
     // The Rust outline is a band half the width lying inside the edge, so the
     // stroke is clipped to the shape — which throws away its outer half and
     // leaves the same half-width rim.
     context.save();
+    beginShapePath(context, kind, width, height, radius);
     context.clip();
     context.lineWidth = strokeWidth;
-    context.strokeStyle = stroke;
+    context.strokeStyle = stroke.color;
     context.stroke();
     context.restore();
   }
+  context.shadowColor = 'transparent';
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+  context.shadowBlur = 0;
 }
 
 function beginVisualDrag(event) {
@@ -1670,36 +1816,52 @@ function addMarker(frame = Math.round(preview.position())) {
   return edit({ op: 'addMarker', frame, name: '', color: '#e6a700' });
 }
 
-/** The video track a new text or shape lands on: the one it was dropped on,
- *  else the targeted track, else the first video track. */
+/** A drag names its destination. A click does not: Rust then reuses a
+ *  clip-free top overlay track, creates one, or falls back at the track cap. */
 function visualTargetTrack(placement) {
-  if (placement) {
-    const track = L.findTrack(state.project, placement.trackId);
-    return track && track.kind === 'video' ? track : null;
-  }
-  const target = state.targetTrackId && L.findTrack(state.project, state.targetTrackId);
-  return target && target.kind === 'video' ? target : L.tracksOf(state.project, 'video')[0];
+  if (!placement) return null;
+  const track = L.findTrack(state.project, placement.trackId);
+  return track && track.kind === 'video' ? track : null;
 }
 
 /** Add a visual item and select what Rust made of it. `placement` is
- *  `{ trackId, frame }` from a drop; without one the item lands on the
- *  targeted track at the playhead. */
+ *  `{ trackId, frame }` from a drop; without one Rust chooses the top overlay
+ *  track at the playhead. */
 async function addVisualItem(placement, content, transform) {
   const track = visualTargetTrack(placement);
-  if (!track) return;
-  const known = new Set((track.visualItems || []).map((item) => item.id));
-  await edit({
-    op: 'addVisualItem',
-    trackId: track.id,
+  if (placement && !track) return;
+  const known = new Set();
+  for (const candidate of state.project.tracks) {
+    for (const item of candidate.visualItems || []) known.add(item.id);
+  }
+  const videos = L.tracksOf(state.project, 'video');
+  const top = videos[videos.length - 1];
+  const reusable = top && !top.clips.length && (top.visualItems || []).every((item) =>
+    item.content && (item.content.kind === 'text' || item.content.kind === 'shape'));
+  const atLimit = !placement && videos.length >= L.MAX_TRACKS_PER_KIND && !reusable;
+  const command = {
+    op: placement ? 'addVisualItem' : 'addOverlayVisualItem',
+    ...(placement ? { trackId: track.id } : {}),
     content,
     start: placement ? Math.round(placement.frame) : Math.round(preview.position()),
     duration: L.defaultVisualItemFrames(rate()),
     transform: { ...transform, rotation: 0, opacity: 1 },
     zIndex: 0,
-  });
-  const liveTrack = L.findTrack(state.project, track.id);
-  const item = (liveTrack && liveTrack.visualItems || []).find((entry) => !known.has(entry.id));
+  };
+  const done = await edit(command);
+  if (done === null) return;
+  let item = null;
+  for (const candidate of state.project.tracks) {
+    item = (candidate.visualItems || []).find((entry) => !known.has(entry.id));
+    if (item) break;
+  }
   if (item) selectVisualItem(item.id);
+  if (atLimit) {
+    await window.api.message(
+      `The ${L.MAX_TRACKS_PER_KIND}-video-track limit was reached. The layer was added to the top video track.`,
+      { title: 'Layer added to existing track', kind: 'warning' },
+    );
+  }
 }
 
 function addText(placement) {
@@ -1707,8 +1869,10 @@ function addText(placement) {
     kind: 'text',
     text: 'Title',
     style: {
-      fontFamily: 'sans-serif', fontSize: 64, color: '#ffffff', align: 'center',
-      strokeColor: '', strokeWidth: 0, shadowColor: '#00000080', shadowX: 2, shadowY: 2,
+      fontFamily: 'sans-serif', fontSize: 64, align: 'center',
+      fills: [{ kind: 'solid', color: '#ffffff' }],
+      stroke: null,
+      shadow: { color: '#00000080', x: 2, y: 2, blur: 0 },
     },
   }, {
     x: state.project.settings.width * 0.1,
@@ -1720,8 +1884,10 @@ function addText(placement) {
 
 function addShape(placement) {
   return addVisualItem(placement, {
-    kind: 'shape', shape: 'rectangle', fill: '#4f8cffcc', stroke: '#ffffff',
-    strokeWidth: 4, cornerRadius: 20, startArrow: false, endArrow: false,
+    kind: 'shape', shape: 'roundedRectangle',
+    fills: [{ kind: 'solid', color: '#4f8cffcc' }],
+    stroke: { color: '#ffffff', width: 4 }, shadow: null,
+    cornerRadius: 20, startArrow: false, endArrow: false,
   }, {
     x: state.project.settings.width * 0.3,
     y: state.project.settings.height * 0.3,
@@ -1774,6 +1940,74 @@ function hexColor(value, fallback) {
 function preserveAlpha(color, previous) {
   const alpha = /^#[0-9a-fA-F]{8}$/.test(previous || '') ? previous.slice(7) : '';
   return `${color}${alpha}`;
+}
+
+function topPaint(style, fallback) {
+  return style && style.fills && style.fills.length
+    ? style.fills[style.fills.length - 1]
+    : { kind: 'solid', color: fallback };
+}
+
+function paintColors(paint, fallback) {
+  if (!paint || paint.kind === 'solid') return [(paint && paint.color) || fallback, fallback];
+  const stops = orderedStops(paint.stops);
+  return [stops[0].color, stops[stops.length - 1].color];
+}
+
+function fillAssetOptions(select, kind, selected) {
+  select.textContent = '';
+  const wanted = kind === 'video' ? 'video' : 'image';
+  for (const asset of state.project.assets.filter((entry) => entry.kind === wanted)) {
+    const option = document.createElement('option');
+    option.value = asset.id;
+    option.textContent = asset.name || baseName(asset.path);
+    option.selected = asset.id === selected;
+    select.appendChild(option);
+  }
+  select.disabled = kind !== 'image' && kind !== 'video';
+}
+
+function showFillEditor(kindInput, colorInput, endInput, assetInput, style, fallback) {
+  const paint = topPaint(style, fallback);
+  const [start, end] = paintColors(paint, fallback);
+  kindInput.value = paint.kind;
+  colorInput.value = hexColor(start, fallback.slice(0, 7));
+  endInput.value = hexColor(end, '#000000');
+  const assetId = paint.assetId || '';
+  fillAssetOptions(assetInput, paint.kind, assetId);
+  endInput.disabled = paint.kind !== 'linearGradient' && paint.kind !== 'radialGradient';
+  colorInput.disabled = paint.kind === 'image' || paint.kind === 'video';
+}
+
+function paintFromEditor(kind, color, endColor, assetId, previous) {
+  if (kind === 'image' || kind === 'video') {
+    const asset = state.project.assets.find((entry) => entry.id === assetId && entry.kind === kind)
+      || state.project.assets.find((entry) => entry.kind === kind);
+    return { kind, assetId: asset ? asset.id : '' };
+  }
+  if (kind === 'linearGradient') {
+    return {
+      kind,
+      start: (previous && previous.kind === kind && previous.start) || { x: 0, y: 0.5 },
+      end: (previous && previous.kind === kind && previous.end) || { x: 1, y: 0.5 },
+      stops: [
+        { position: 0, color: preserveAlpha(color, paintColors(previous, color)[0]) },
+        { position: 1, color: preserveAlpha(endColor, paintColors(previous, endColor)[1]) },
+      ],
+    };
+  }
+  if (kind === 'radialGradient') {
+    return {
+      kind,
+      center: (previous && previous.kind === kind && previous.center) || { x: 0.5, y: 0.5 },
+      radius: (previous && previous.kind === kind && previous.radius) || 0.5,
+      stops: [
+        { position: 0, color: preserveAlpha(color, paintColors(previous, color)[0]) },
+        { position: 1, color: preserveAlpha(endColor, paintColors(previous, endColor)[1]) },
+      ],
+    };
+  }
+  return { kind: 'solid', color: preserveAlpha(color, paintColors(previous, color)[0]) };
 }
 
 function inspectorMessage(tab, item, clipTargets) {
@@ -1845,12 +2079,21 @@ function renderInspector() {
   }
   if (shape) {
     dom.shapeKind.value = shape.shape || 'rectangle';
-    dom.shapeFill.value = hexColor(shape.fill, '#4f8cff');
-    dom.shapeStroke.value = hexColor(shape.stroke, '#ffffff');
-    dom.shapeStrokeWidth.value = shape.strokeWidth ?? 4;
+    showFillEditor(
+      dom.shapeFillKind, dom.shapeFill, dom.shapeFillEndColor, dom.shapeFillAsset,
+      shape, '#4f8cffcc',
+    );
+    dom.shapeRemoveFill.disabled = !shape.fills || shape.fills.length <= 1;
+    dom.shapeStroke.value = hexColor(shape.stroke && shape.stroke.color, '#ffffff');
+    dom.shapeStrokeWidth.value = shape.stroke ? shape.stroke.width : 0;
     dom.shapeCornerRadius.value = shape.cornerRadius ?? 0;
     dom.shapeStartArrow.checked = Boolean(shape.startArrow);
     dom.shapeEndArrow.checked = Boolean(shape.endArrow);
+    dom.shapeShadowEnabled.checked = Boolean(shape.shadow);
+    dom.shapeShadowColor.value = hexColor(shape.shadow && shape.shadow.color, '#000000');
+    dom.shapeShadowX.value = shape.shadow ? shape.shadow.x : 0;
+    dom.shapeShadowY.value = shape.shadow ? shape.shadow.y : 0;
+    dom.shapeShadowBlur.value = shape.shadow ? shape.shadow.blur : 0;
   }
   if (!text) return;
   if (subtitle) {
@@ -1860,18 +2103,26 @@ function renderInspector() {
     const subtitleStyle = track.subtitleStyle || {};
     dom.subtitleFont.value = subtitleStyle.fontFamily || 'sans-serif';
     dom.subtitleSize.value = subtitleStyle.fontSize || 64;
-    dom.subtitleColor.value = hexColor(subtitleStyle.color, '#ffffff');
+    dom.subtitleColor.value = hexColor(paintColors(topPaint(subtitleStyle, '#ffffff'), '#ffffff')[0], '#ffffff');
     return;
   }
   const style = text.style || {};
   dom.textValue.value = text.text || '';
   dom.textFont.value = style.fontFamily || 'sans-serif';
   dom.textSize.value = style.fontSize || 64;
-  dom.textColor.value = hexColor(style.color, '#ffffff');
+  showFillEditor(
+    dom.textFillKind, dom.textColor, dom.textFillEndColor, dom.textFillAsset,
+    style, '#ffffff',
+  );
+  dom.textRemoveFill.disabled = !style.fills || style.fills.length <= 1;
   dom.textAlign.value = style.align || 'center';
-  dom.textStrokeColor.value = hexColor(style.strokeColor, '#000000');
-  dom.textStrokeWidth.value = style.strokeWidth || 0;
-  dom.textShadowColor.value = hexColor(style.shadowColor, '#000000');
+  dom.textStrokeColor.value = hexColor(style.stroke && style.stroke.color, '#000000');
+  dom.textStrokeWidth.value = style.stroke ? style.stroke.width : 0;
+  dom.textShadowEnabled.checked = Boolean(style.shadow);
+  dom.textShadowColor.value = hexColor(style.shadow && style.shadow.color, '#000000');
+  dom.textShadowX.value = style.shadow ? style.shadow.x : 0;
+  dom.textShadowY.value = style.shadow ? style.shadow.y : 0;
+  dom.textShadowBlur.value = style.shadow ? style.shadow.blur : 0;
 }
 
 function updateSelectedTransform(event) {
@@ -1898,12 +2149,39 @@ function updateSelectedTransform(event) {
 function updateSelectedShape() {
   const item = selectedVisualItem();
   if (!item || item.content.kind !== 'shape') return;
+  const fills = [...(item.content.fills || [])];
+  const first = topPaint(item.content, '#4f8cffcc');
+  const paint = paintFromEditor(
+    dom.shapeFillKind.value,
+    dom.shapeFill.value,
+    dom.shapeFillEndColor.value,
+    dom.shapeFillAsset.value,
+    first,
+  );
+  if ((paint.kind === 'image' || paint.kind === 'video') && !paint.assetId) {
+    window.api.message(`Import a matching ${paint.kind} asset before using that fill.`, {
+      title: 'Fill media unavailable', kind: 'warning',
+    });
+    renderInspector();
+    return;
+  }
+  fills[Math.max(0, fills.length - 1)] = paint;
+  const strokeWidth = Math.max(0, Number(dom.shapeStrokeWidth.value) || 0);
+  const previousShadow = item.content.shadow || {};
   const content = {
     kind: 'shape',
     shape: dom.shapeKind.value,
-    fill: preserveAlpha(dom.shapeFill.value, item.content.fill),
-    stroke: preserveAlpha(dom.shapeStroke.value, item.content.stroke),
-    strokeWidth: Math.max(0, Number(dom.shapeStrokeWidth.value) || 0),
+    fills,
+    stroke: strokeWidth > 0 ? {
+      color: preserveAlpha(dom.shapeStroke.value, item.content.stroke && item.content.stroke.color),
+      width: strokeWidth,
+    } : null,
+    shadow: dom.shapeShadowEnabled.checked ? {
+      color: preserveAlpha(dom.shapeShadowColor.value, previousShadow.color),
+      x: Number(dom.shapeShadowX.value) || 0,
+      y: Number(dom.shapeShadowY.value) || 0,
+      blur: Math.max(0, Number(dom.shapeShadowBlur.value) || 0),
+    } : null,
     cornerRadius: Math.max(0, Number(dom.shapeCornerRadius.value) || 0),
     startArrow: dom.shapeStartArrow.checked,
     endArrow: dom.shapeEndArrow.checked,
@@ -1911,6 +2189,21 @@ function updateSelectedShape() {
   edit({ op: 'setVisualContent', itemId: item.id, content })
     .then(() => selectVisualItem(item.id))
     .catch((error) => reportError(error, 'shape:edit'));
+}
+
+function changeSelectedFillLayers(kind, add) {
+  const item = selectedVisualItem();
+  if (!item || item.content.kind !== kind) return;
+  const owner = kind === 'text' ? (item.content.style || {}) : item.content;
+  const fills = [...(owner.fills || [])];
+  if (add) fills.push({ kind: 'solid', color: kind === 'text' ? '#ffffff80' : '#4f8cff80' });
+  else if (fills.length > 1) fills.pop();
+  const content = kind === 'text'
+    ? { ...item.content, style: { ...owner, fills } }
+    : { ...item.content, fills };
+  edit({ op: 'setVisualContent', itemId: item.id, content })
+    .then(() => selectVisualItem(item.id))
+    .catch((error) => reportError(error, `${kind}:fills`));
 }
 
 function updateSelectedSubtitle() {
@@ -1932,7 +2225,13 @@ function updateSubtitleStyle() {
     ...(track.subtitleStyle || {}),
     fontFamily: dom.subtitleFont.value || 'sans-serif',
     fontSize: Math.max(8, Number(dom.subtitleSize.value) || 64),
-    color: dom.subtitleColor.value,
+    fills: [{
+      kind: 'solid',
+      color: preserveAlpha(
+        dom.subtitleColor.value,
+        paintColors(topPaint(track.subtitleStyle, '#ffffff'), '#ffffff')[0],
+      ),
+    }],
   };
   edit({ op: 'setSubtitleStyle', trackId: track.id, style }).catch((error) => reportError(error, 'subtitle:style'));
 }
@@ -1940,15 +2239,42 @@ function updateSubtitleStyle() {
 function updateSelectedText() {
   const item = selectedVisualItem();
   if (!item || item.content.kind !== 'text') return;
+  const previousStyle = item.content.style || {};
+  const fills = [...(previousStyle.fills || [])];
+  const first = topPaint(previousStyle, '#ffffff');
+  const paint = paintFromEditor(
+    dom.textFillKind.value,
+    dom.textColor.value,
+    dom.textFillEndColor.value,
+    dom.textFillAsset.value,
+    first,
+  );
+  if ((paint.kind === 'image' || paint.kind === 'video') && !paint.assetId) {
+    window.api.message(`Import a matching ${paint.kind} asset before using that fill.`, {
+      title: 'Fill media unavailable', kind: 'warning',
+    });
+    renderInspector();
+    return;
+  }
+  fills[Math.max(0, fills.length - 1)] = paint;
+  const strokeWidth = Math.max(0, Number(dom.textStrokeWidth.value) || 0);
+  const previousShadow = previousStyle.shadow || {};
   const style = {
     ...(item.content.style || {}),
     fontFamily: dom.textFont.value || 'sans-serif',
     fontSize: Math.max(8, Number(dom.textSize.value) || 64),
-    color: dom.textColor.value,
+    fills,
     align: dom.textAlign.value,
-    strokeColor: Number(dom.textStrokeWidth.value) > 0 ? dom.textStrokeColor.value : '',
-    strokeWidth: Math.max(0, Number(dom.textStrokeWidth.value) || 0),
-    shadowColor: preserveAlpha(dom.textShadowColor.value, item.content.style && item.content.style.shadowColor),
+    stroke: strokeWidth > 0 ? {
+      color: preserveAlpha(dom.textStrokeColor.value, previousStyle.stroke && previousStyle.stroke.color),
+      width: strokeWidth,
+    } : null,
+    shadow: dom.textShadowEnabled.checked ? {
+      color: preserveAlpha(dom.textShadowColor.value, previousShadow.color),
+      x: Number(dom.textShadowX.value) || 0,
+      y: Number(dom.textShadowY.value) || 0,
+      blur: Math.max(0, Number(dom.textShadowBlur.value) || 0),
+    } : null,
   };
   Promise.resolve(window.api.fontAvailable(style.fontFamily))
     .then((available) => {
@@ -3350,14 +3676,19 @@ function wireTimeline() {
     }
   });
   for (const input of [
-    dom.textValue, dom.textFont, dom.textSize, dom.textColor, dom.textAlign,
-    dom.textStrokeColor, dom.textStrokeWidth, dom.textShadowColor,
+    dom.textValue, dom.textFont, dom.textSize, dom.textFillKind, dom.textColor,
+    dom.textFillEndColor, dom.textFillAsset, dom.textAlign, dom.textStrokeColor,
+    dom.textStrokeWidth, dom.textShadowEnabled, dom.textShadowColor,
+    dom.textShadowX, dom.textShadowY, dom.textShadowBlur,
   ]) {
     input.addEventListener('change', updateSelectedText);
   }
   for (const input of [
-    dom.shapeKind, dom.shapeFill, dom.shapeStroke, dom.shapeStrokeWidth,
-    dom.shapeCornerRadius, dom.shapeStartArrow, dom.shapeEndArrow,
+    dom.shapeKind, dom.shapeFillKind, dom.shapeFill, dom.shapeFillEndColor,
+    dom.shapeFillAsset, dom.shapeStroke, dom.shapeStrokeWidth,
+    dom.shapeCornerRadius, dom.shapeShadowEnabled, dom.shapeShadowColor,
+    dom.shapeShadowX, dom.shapeShadowY, dom.shapeShadowBlur,
+    dom.shapeStartArrow, dom.shapeEndArrow,
   ]) {
     input.addEventListener('change', updateSelectedShape);
   }
@@ -3369,6 +3700,10 @@ function wireTimeline() {
   }
   dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
   dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
+  dom.textAddFill.addEventListener('click', () => changeSelectedFillLayers('text', true));
+  dom.textRemoveFill.addEventListener('click', () => changeSelectedFillLayers('text', false));
+  dom.shapeAddFill.addEventListener('click', () => changeSelectedFillLayers('shape', true));
+  dom.shapeRemoveFill.addEventListener('click', () => changeSelectedFillLayers('shape', false));
   for (const input of [
     dom.transformX, dom.transformY, dom.transformWidth, dom.transformHeight,
     dom.transformRotation, dom.transformOpacity, dom.transformOpacityValue,

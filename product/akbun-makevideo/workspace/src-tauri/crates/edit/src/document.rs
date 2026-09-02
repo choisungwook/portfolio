@@ -256,8 +256,8 @@ impl Document {
 mod tests {
     use super::*;
     use crate::{
-        Asset, AssetKind, Clip, Command, Edge, ProjectSettings, Rate, TrackKind, VisualContent,
-        TextStyle, VisualTransform,
+        Asset, AssetKind, Clip, Command, Edge, Paint, ProjectSettings, Rate, TrackKind,
+        VisualContent, VisualStyle, TextStyle, VisualTransform,
     };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
@@ -771,16 +771,48 @@ mod tests {
         add(&mut document, 0);
         add(&mut document, 300);
         document
+            .apply(Command::AddVisualItem {
+                track_id: video_track(&document),
+                content: VisualContent::Shape {
+                    shape: Default::default(),
+                    visual_style: VisualStyle {
+                        fills: vec![Paint::Video {
+                            asset_id: "v".into(),
+                        }],
+                        stroke: None,
+                        shadow: None,
+                    },
+                    corner_radius: 0.0,
+                    start_arrow: false,
+                    end_arrow: false,
+                },
+                start: 0,
+                duration: 30,
+                transform: VisualTransform {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 100.0,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                },
+                z_index: 0,
+                id: None,
+            })
+            .unwrap();
+        document
             .apply(Command::RemoveAsset {
                 asset_id: "v".into(),
             })
             .unwrap();
         assert!(document.project().assets.is_empty());
         assert!(clips(&document).is_empty());
+        assert!(document.project().tracks[0].visual_items.is_empty());
 
         document.undo().unwrap();
         assert_eq!(document.project().assets.len(), 1);
         assert_eq!(clips(&document).len(), 2);
+        assert_eq!(document.project().tracks[0].visual_items.len(), 1);
     }
 
     #[test]
@@ -1245,9 +1277,7 @@ mod tests {
                 track_id: video_track(&document),
                 content: VisualContent::Shape {
                     shape: Default::default(),
-                    fill: "#4f8cffcc".into(),
-                    stroke: "#ffffff".into(),
-                    stroke_width: 4.0,
+                    visual_style: Default::default(),
                     corner_radius: 0.0,
                     start_arrow: false,
                     end_arrow: false,
@@ -1278,9 +1308,7 @@ mod tests {
             track_id,
             content: VisualContent::Shape {
                 shape: Default::default(),
-                fill: "#4f8cffcc".into(),
-                stroke: "#ffffff".into(),
-                stroke_width: 4.0,
+                visual_style: Default::default(),
                 corner_radius: 0.0,
                 start_arrow: false,
                 end_arrow: false,
@@ -1304,6 +1332,112 @@ mod tests {
 
         assert!(error.contains("already in this project"), "{error}");
         assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+    }
+
+    fn overlay_command(text: &str) -> Command {
+        Command::AddOverlayVisualItem {
+            content: VisualContent::Text {
+                text: text.into(),
+                style: TextStyle::default(),
+            },
+            start: 0,
+            duration: 30,
+            transform: VisualTransform {
+                x: 10.0,
+                y: 10.0,
+                width: 100.0,
+                height: 40.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: None,
+        }
+    }
+
+    #[test]
+    fn an_overlay_gets_a_top_track_and_one_undo_removes_both() {
+        let mut document = document();
+        add(&mut document, 0);
+
+        document.apply(overlay_command("title")).unwrap();
+
+        let videos: Vec<_> = document
+            .project()
+            .tracks_of(TrackKind::Video)
+            .collect();
+        assert_eq!(videos.len(), 2);
+        assert_eq!(videos[0].clips.len(), 1);
+        assert!(videos[1].clips.is_empty());
+        assert_eq!(videos[1].visual_items.len(), 1);
+        let item_id = videos[1].visual_items[0].id.clone();
+
+        document.undo().unwrap();
+        assert_eq!(document.project().tracks_of(TrackKind::Video).count(), 1);
+        assert!(document.project().visual_item(&item_id).is_none());
+        assert_eq!(document.project().tracks[0].clips.len(), 1);
+
+        document.redo().unwrap();
+        let videos: Vec<_> = document
+            .project()
+            .tracks_of(TrackKind::Video)
+            .collect();
+        assert_eq!(videos.len(), 2);
+        assert_eq!(videos[1].visual_items[0].id, item_id);
+    }
+
+    #[test]
+    fn consecutive_overlays_reuse_the_clip_free_top_track() {
+        let mut document = document();
+        add(&mut document, 0);
+        document.apply(overlay_command("one")).unwrap();
+        document.apply(overlay_command("two")).unwrap();
+
+        let videos: Vec<_> = document
+            .project()
+            .tracks_of(TrackKind::Video)
+            .collect();
+        assert_eq!(videos.len(), 2);
+        assert_eq!(videos[1].visual_items.len(), 2);
+    }
+
+    #[test]
+    fn the_track_limit_falls_back_to_the_top_video_track() {
+        let mut document = document();
+        add(&mut document, 0);
+        for _ in 1..crate::MAX_TRACKS_PER_KIND {
+            document
+                .apply(Command::AddTrack {
+                    track_kind: TrackKind::Video,
+                    id: None,
+                })
+                .unwrap();
+            let top = document
+                .project()
+                .tracks_of(TrackKind::Video)
+                .last()
+                .unwrap()
+                .id
+                .clone();
+            document
+                .apply(Command::AddClip {
+                    track_id: top,
+                    asset_id: "v".into(),
+                    start: 0,
+                    id: None,
+                    link_group: None,
+                })
+                .unwrap();
+        }
+
+        document.apply(overlay_command("top")).unwrap();
+
+        let videos: Vec<_> = document
+            .project()
+            .tracks_of(TrackKind::Video)
+            .collect();
+        assert_eq!(videos.len(), crate::MAX_TRACKS_PER_KIND);
+        assert_eq!(videos.last().unwrap().visual_items.len(), 1);
     }
 
     #[test]

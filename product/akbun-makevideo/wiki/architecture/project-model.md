@@ -4,7 +4,7 @@ One JSON object, written to a `.akbunvideo` file and read back by both sides.
 
 ```text
 project
-  version                                  the storage format, 2 today
+  version                                  the storage format, 3 today
   settings { width, height, rate }         the canvas, and the timebase
     rate   { num, den }                    frames per second, 30000/1001 for 29.97
   assets[] { id, path, name, kind,         kind is video | audio | image
@@ -22,14 +22,17 @@ project
 - Video tracks composite in array order: track 1 is the bottom layer. The timeline draws them reversed so V1 sits at the bottom of the screen, which is where every other editor puts it.
 - Visual items belong to video tracks. Their coordinates and size are project pixels, not Program Monitor pixels. Items on one track draw by ascending `zIndex`, then `id`; track array order remains the primary layer order.
 - `content.kind` is `text`, `shape`, `image` or `videoOverlay`. Image and video overlay content names an asset; content-specific fields stay inside `content`, not beside the shared transform.
+- Text and shape content share `fills[]`, `stroke` and `shadow`. Fills paint bottom to top and each paint is solid, linear gradient, radial gradient, image or video.
+- Rectangle, rounded rectangle, ellipse, line, polygon and star use the same transform and visual style. Rounded rectangle alone reads `cornerRadius`; line alone reads its arrow flags.
+- Clicking Text or Shape creates or reuses a clip-free top video track. At the four-video-track limit it uses the existing top video track instead. Track creation and item creation are one undo step.
 - Selection borders, transform handles and guides are editor state and never appear in `visualItems`.
 - `hidden` on a video track removes it from the preview, the render **and** the timeline length. `muted` silences a track but keeps its picture.
 
 ## Versions
 
-Version 1 was the first format: every time in whole milliseconds (`startMs`, `inMs`, `outMs`) and `settings.fps` as a single integer. Version 2 is the shape above.
+Version 1 stored every time in whole milliseconds (`startMs`, `inMs`, `outMs`) and `settings.fps` as a single integer. Version 2 introduced frame counts and visual items. Version 3 is the shape above: text and shapes use paint stacks and shared stroke and shadow objects.
 
-A version 1 file still opens. `crates/edit/src/migrate.rs` converts it once as it is read, and what gets written back is version 2 only, with the millisecond keys gone rather than carried along beside the frame counts that replaced them. Which format a clip is in is read off the clip rather than taken from the header, because the two use different keys and a header can be wrong. A version 2 track without `visualItems` opens with an empty list.
+Version 1 and 2 files still open. `crates/edit/src/migrate.rs` converts timeline fields as they are read. The visual-content deserializer converts legacy `color`, `fill`, `strokeColor`, `strokeWidth` and shadow fields into the version 3 style. Saving writes version 3 fields only. Which time format a clip uses is read off the clip rather than trusted from the header, because the keys differ and a header can be wrong. A track without `visualItems` opens with an empty list.
 
 A version 1 file whose `fps` says `29.97` opens on 30000/1001, because that is what the number meant. Believing the decimal is how the approximation gets back in.
 

@@ -292,6 +292,7 @@ pub struct Config {
 
 impl Config {
     pub fn new(compositor: Arc<Compositor>, ffmpeg: String, width: u32, height: u32) -> Config {
+        makevideo_compositor::text::set_ffmpeg_path(&ffmpeg);
         Config {
             presenter: Arc::clone(&compositor),
             compositor,

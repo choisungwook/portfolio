@@ -250,6 +250,19 @@ pub enum Command {
         #[serde(default)]
         id: Option<String>,
     },
+    /// Add text or a shape above the picture. A clip-free top video track is
+    /// reused; otherwise a new top track and the item are one undo step. At
+    /// the track limit the existing top video track is the fallback.
+    #[serde(rename_all = "camelCase")]
+    AddOverlayVisualItem {
+        content: VisualContent,
+        start: i64,
+        duration: i64,
+        transform: VisualTransform,
+        z_index: i32,
+        #[serde(default)]
+        id: Option<String>,
+    },
     #[serde(rename_all = "camelCase")]
     SetVisualTransform {
         item_id: String,
@@ -445,6 +458,7 @@ impl Command {
             Command::SetClipGain { .. } => "Clip levels",
             Command::SetClipLut { .. } => "Clip LUT",
             Command::AddVisualItem { .. } => "Add visual item",
+            Command::AddOverlayVisualItem { .. } => "Add visual item",
             Command::SetVisualTransform { .. } => "Transform visual item",
             Command::SetVisualTiming { .. } => "Time visual item",
             Command::SetVisualZIndex { .. } => "Reorder visual item",
@@ -590,6 +604,16 @@ impl Command {
             } => add_visual_item(
                 project, ids, track_id, content, start, duration, transform, z_index, id,
             ),
+            Command::AddOverlayVisualItem {
+                content,
+                start,
+                duration,
+                transform,
+                z_index,
+                id,
+            } => add_overlay_visual_item(
+                project, ids, content, start, duration, transform, z_index, id,
+            ),
             Command::SetVisualTransform { item_id, transform } => {
                 set_visual_transform(project, item_id, transform)
             }
@@ -714,7 +738,7 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
         }
         track.clips.retain(|clip| clip.asset_id != asset_id);
         for item in &track.visual_items {
-            if item.content.asset_id() == Some(asset_id.as_str()) {
+            if item.content.references_asset(&asset_id) {
                 orphan_items.push(VisualItemAt {
                     track_id: track.id.clone(),
                     item: item.clone(),
@@ -723,7 +747,7 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
         }
         track
             .visual_items
-            .retain(|item| item.content.asset_id() != Some(asset_id.as_str()));
+            .retain(|item| !item.content.references_asset(&asset_id));
     }
     Ok(Applied {
         resolved: Command::RemoveAsset { asset_id },
@@ -1982,6 +2006,76 @@ fn add_visual_item(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+fn add_overlay_visual_item(
+    project: &mut Project,
+    ids: &mut Ids,
+    content: VisualContent,
+    start: i64,
+    duration: i64,
+    transform: VisualTransform,
+    z_index: i32,
+    id: Option<String>,
+) -> Result<Applied, String> {
+    if !matches!(content, VisualContent::Text { .. } | VisualContent::Shape { .. }) {
+        return Err("only text and shapes use an overlay track".into());
+    }
+    let videos: Vec<_> = project
+        .tracks
+        .iter()
+        .filter(|track| track.kind == TrackKind::Video)
+        .collect();
+    let reusable = videos.last().filter(|track| {
+        track.clips.is_empty()
+            && track.visual_items.iter().all(|item| {
+                matches!(item.content, VisualContent::Text { .. } | VisualContent::Shape { .. })
+            })
+    });
+    if let Some(track) = reusable {
+        return add_visual_item(
+            project,
+            ids,
+            track.id.clone(),
+            content,
+            start,
+            duration,
+            transform,
+            z_index,
+            id,
+        );
+    }
+    if videos.len() >= crate::MAX_TRACKS_PER_KIND {
+        let track_id = videos
+            .last()
+            .map(|track| track.id.clone())
+            .ok_or("there is no video track for that visual item")?;
+        return add_visual_item(
+            project, ids, track_id, content, start, duration, transform, z_index, id,
+        );
+    }
+
+    let track_id = ids.make('t');
+    transaction(
+        project,
+        ids,
+        vec![
+            Command::AddTrack {
+                track_kind: TrackKind::Video,
+                id: Some(track_id.clone()),
+            },
+            Command::AddVisualItem {
+                track_id,
+                content,
+                start,
+                duration,
+                transform,
+                z_index,
+                id,
+            },
+        ],
+    )
+}
+
 fn set_visual_transform(
     project: &mut Project,
     item_id: String,
@@ -2078,21 +2172,47 @@ fn set_visual_content(
 }
 
 fn validate_visual_content(project: &Project, content: &VisualContent) -> Result<(), String> {
-    let Some(asset_id) = content.asset_id() else {
-        return Ok(());
-    };
-    let asset = project
-        .asset(asset_id)
-        .ok_or("that visual item asset is not in this project")?;
-    match (content, asset.kind) {
-        (VisualContent::Image { .. }, crate::AssetKind::Image)
-        | (VisualContent::VideoOverlay { .. }, crate::AssetKind::Video) => Ok(()),
-        (VisualContent::Image { .. }, _) => Err("an image item needs an image asset".into()),
-        (VisualContent::VideoOverlay { .. }, _) => {
-            Err("a video overlay needs a video asset".into())
+    if let Some(asset_id) = content.asset_id() {
+        let asset = project
+            .asset(asset_id)
+            .ok_or("that visual item asset is not in this project")?;
+        match (content, asset.kind) {
+            (VisualContent::Image { .. }, crate::AssetKind::Image)
+            | (VisualContent::VideoOverlay { .. }, crate::AssetKind::Video)
+            | (VisualContent::Text { .. } | VisualContent::Shape { .. }, _) => {}
+            (VisualContent::Image { .. }, _) => {
+                return Err("an image item needs an image asset".into())
+            }
+            (VisualContent::VideoOverlay { .. }, _) => {
+                return Err("a video overlay needs a video asset".into())
+            }
         }
-        (VisualContent::Text { .. } | VisualContent::Shape { .. }, _) => Ok(()),
     }
+    let style = match content {
+        VisualContent::Text { style, .. } => Some(&style.visual_style),
+        VisualContent::Shape { visual_style, .. } => Some(visual_style),
+        VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
+    };
+    for paint in style.into_iter().flat_map(|style| &style.fills) {
+        let Some(asset_id) = paint.asset_id() else {
+            continue;
+        };
+        let asset = project
+            .asset(asset_id)
+            .ok_or("that paint asset is not in this project")?;
+        match (paint, asset.kind) {
+            (crate::Paint::Image { .. }, crate::AssetKind::Image)
+            | (crate::Paint::Video { .. }, crate::AssetKind::Video) => {}
+            (crate::Paint::Image { .. }, _) => {
+                return Err("an image paint needs an image asset".into())
+            }
+            (crate::Paint::Video { .. }, _) => {
+                return Err("a video paint needs a video asset".into())
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn remove_visual_item(project: &mut Project, item_id: String) -> Result<Applied, String> {

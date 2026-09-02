@@ -23,6 +23,11 @@ there is a test asserting they are identical.
 
 One input per clip rather than per asset. That costs an extra decoder when the same file is used twice, and buys input level seeking (`-ss` before `-i`, so ffmpeg skips to the in point instead of decoding everything before it) and a uniform way to give a still a length.
 
+- Static text and shapes add one alpha-capable PAM input per visual item.
+- The shared visual rasterizer creates the pixels.
+- `overlay` enables each input only for its frame range.
+- A project with a video paint bypasses this graph and uses per-frame composition.
+
 The graph:
 
 ```text
