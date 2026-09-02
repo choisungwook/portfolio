@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-01
+
+* [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](decisions/2026-09-proxy-targets-decode-and-seek-cost.md) 결정 기록. 1080p 비직접 재생 코덱과 긴 GOP 원본을 판정 대상에 넣고 프록시에 0.5초 키프레임을 강제함.
+
 ## 2026-08-23
 
 * [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](decisions/2026-08-harness-does-not-count-its-own-delay.md) 결정을 루트 knowledge에서 옮겨 옴. akbun-makevideo의 프레임 공급 계측에서 나온 판단이라 여기에 둠.

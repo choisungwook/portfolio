@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](2026-09-proxy-targets-decode-and-seek-cost.md) - 코덱과 키프레임 간격을 해상도와 함께 판정하고 프록시에 짧은 GOP를 강제한 결정.
 * [Inspector는 타임라인에서 선택한 미디어 트랙을 따른다](2026-08-inspector-follows-timeline-media.md) - 연결된 clip의 속성을 Video와 Audio 탭으로 분리하고 선택한 트랙 탭을 먼저 보여 주는 결정.
 * [native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다](2026-08-native-monitor-is-a-window-overlay.md) - GPU surface를 WebKit hierarchy에서 분리하고 실제 view 사이 좌표 변환을 AppKit에 맡긴 결정.
 * [첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다](2026-08-first-video-defines-default-canvas-shape.md) - 첫 영상 비율을 채택하되 기본 긴 변 해상도를 유지하는 결정.

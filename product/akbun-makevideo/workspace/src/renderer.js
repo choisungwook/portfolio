@@ -438,9 +438,14 @@ function assetSummary(asset) {
   if (asset.kind === 'video' && !asset.hasAudio) bits.push('silent');
   const proxy = state.proxies[asset.id];
   if (proxy) {
-    if (proxy.state === 'ready') bits.push('proxy ready');
-    else if (proxy.state === 'failed') bits.push('proxy failed');
-    else bits.push(`proxy ${proxy.percent || 0}%`);
+    if (proxy.state === 'original') bits.push(proxy.reason || 'original playback');
+    else if (proxy.state === 'ready') bits.push(`proxy ready · ${proxy.reason}`);
+    else if (proxy.state === 'failed') bits.push(`proxy failed · ${proxy.reason}`);
+    else if (proxy.state === 'inspecting') bits.push(`proxy inspecting · ${proxy.reason}`);
+    else if (proxy.state === 'waiting') bits.push(`proxy waiting · ${proxy.reason}`);
+    else if (proxy.state === 'paused') bits.push(`proxy paused at ${proxy.percent || 0}% · ${proxy.reason}`);
+    else bits.push(`proxy ${proxy.percent || 0}% · ${proxy.reason}`);
+    if (proxy.message) bits.push(proxy.message);
   }
   return bits.join(' · ');
 }
@@ -461,12 +466,20 @@ function adoptProxyStatuses(statuses) {
 function proxySummary() {
   const statuses = Object.values(state.proxies);
   if (!state.path) return 'Save the project before creating proxies.';
-  if (!statuses.length) return 'No 4K media needs a proxy.';
+  if (!statuses.length) return 'No video media to assess.';
+  const candidates = statuses.filter((status) => status.state !== 'original');
+  if (!candidates.length) return 'All video media can play directly.';
   const count = (name) => statuses.filter((status) => status.state === name).length;
   const ready = count('ready');
-  const active = count('queued') + count('generating');
+  const remaining = count('inspecting') + count('queued') + count('waiting') + count('generating') + count('paused');
+  const held = count('waiting') + count('paused');
   const failed = count('failed');
-  return [`${ready} ready`, active ? `${active} generating` : '', failed ? `${failed} failed` : '']
+  return [
+    `${ready} ready`,
+    remaining ? `${remaining} remaining` : '',
+    held ? `${held} paused for playback` : '',
+    failed ? `${failed} failed` : '',
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -478,13 +491,20 @@ function renderProxySummary() {
 
 function renderProxyProgress() {
   const statuses = Object.values(state.proxies);
-  const active = statuses.filter((status) => status.state === 'queued' || status.state === 'generating');
+  const active = statuses.filter((status) =>
+    ['inspecting', 'queued', 'waiting', 'generating', 'paused'].includes(status.state));
   if (!active.length) {
     dom.proxyProgress.hidden = true;
     return;
   }
+  const held = active.filter((status) => status.state === 'waiting' || status.state === 'paused');
+  const inspecting = active.filter((status) => status.state === 'inspecting');
   const percent = Math.round(active.reduce((total, status) => total + (status.percent || 0), 0) / active.length);
-  dom.proxyProgress.textContent = `Proxy ${percent}% · ${active.length} processing`;
+  dom.proxyProgress.textContent = held.length
+    ? `Proxy paused for playback · ${active.length} remaining`
+    : inspecting.length
+      ? `Inspecting proxy media · ${active.length} remaining`
+      : `Proxy ${percent}% · ${active.length} remaining`;
   dom.proxyProgress.hidden = false;
 }
 
@@ -520,7 +540,8 @@ async function refreshDebug() {
       window.api.playbackStatus(),
       dom.debugLog.hidden ? Promise.resolve(null) : window.api.readErrorLog(),
     ]);
-    const active = Object.values(state.proxies).filter((status) => status.state === 'queued' || status.state === 'generating');
+    const active = Object.values(state.proxies).filter((status) =>
+      ['inspecting', 'queued', 'waiting', 'generating', 'paused'].includes(status.state));
     dom.debugMetrics.textContent = [
       `Process tree CPU: ${Number.isFinite(metrics.cpuPercent) ? `${metrics.cpuPercent.toFixed(1)}%` : 'unavailable'}`,
       `Process tree memory: ${byteText(metrics.memoryBytes)}`,

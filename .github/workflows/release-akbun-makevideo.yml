@@ -50,6 +50,12 @@ jobs:
       - name: Run render model tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render
 
+      # Proxy eligibility and ffmpeg arguments are pure policy. Keep this
+      # separate from the app crate so codec and GOP regressions need no GTK,
+      # WebKit or media binaries on the runner.
+      - name: Run proxy policy tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-proxy
+
       # The compositor has a software backend that needs nothing, so this runs
       # the whole pipeline on a machine with no graphics stack at all. It is
       # also what proves wgpu is genuinely optional rather than optional on

@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -274,7 +274,26 @@ pub struct ProxyStatus {
     state: String,
     percent: u8,
     path: String,
+    reason: String,
     message: String,
+}
+
+fn proxy_status_entry(
+    asset_id: impl Into<String>,
+    state: &str,
+    percent: u8,
+    path: impl Into<String>,
+    reason: impl Into<String>,
+    message: impl Into<String>,
+) -> ProxyStatus {
+    ProxyStatus {
+        asset_id: asset_id.into(),
+        state: state.into(),
+        percent,
+        path: path.into(),
+        reason: reason.into(),
+        message: message.into(),
+    }
 }
 
 fn proxy_statuses(proxies: &ProxyState) -> Vec<ProxyStatus> {
@@ -1165,6 +1184,44 @@ fn probe_asset(ffprobe: Option<&String>, path: &str) -> probe::Probed {
     probe::parse(&String::from_utf8_lossy(&output.stdout))
 }
 
+fn probe_proxy_source(ffprobe: &str, path: &str) -> makevideo_proxy::SourceProbe {
+    let Ok(output) = Command::new(ffprobe)
+        .args(makevideo_proxy::probe_args(path))
+        .output()
+    else {
+        return makevideo_proxy::SourceProbe::default();
+    };
+    makevideo_proxy::parse_probe(&String::from_utf8_lossy(&output.stdout))
+}
+
+const PROXY_PROBE_CONCURRENCY: usize = 4;
+
+async fn assess_proxy_assets(
+    ffprobe_path: String,
+    assets: Vec<Asset>,
+) -> Result<Vec<(Asset, makevideo_proxy::Assessment)>, String> {
+    let mut assessed = Vec::with_capacity(assets.len());
+    for batch in assets.chunks(PROXY_PROBE_CONCURRENCY) {
+        let mut probes = Vec::with_capacity(batch.len());
+        for asset in batch.iter().cloned() {
+            let ffprobe_path = ffprobe_path.clone();
+            probes.push(tauri::async_runtime::spawn_blocking(move || {
+                let source = probe_proxy_source(&ffprobe_path, &asset.path);
+                let assessment = makevideo_proxy::assess(&asset, &source);
+                (asset, assessment)
+            }));
+        }
+        for probe in probes {
+            assessed.push(
+                probe
+                    .await
+                    .map_err(|error| format!("the proxy inspection job did not finish: {error}"))?,
+            );
+        }
+    }
+    Ok(assessed)
+}
+
 /// Files dropped on the window or picked in the dialog. Anything whose
 /// extension is not media is skipped rather than imported as a broken row.
 ///
@@ -1225,8 +1282,8 @@ fn make_proxy(
     ffmpeg_path: &str,
     asset: &Asset,
     encoder: Option<&str>,
+    reason: &str,
 ) -> Result<String, String> {
-    wait_for_playback_pause(app);
     let output = makevideo_proxy::media_path(project_path, &asset.id)?;
     let temporary = output.with_extension("part.mp4");
     let args = makevideo_proxy::ffmpeg_args(asset, &temporary, encoder);
@@ -1238,7 +1295,17 @@ fn make_proxy(
         .spawn()
         .map_err(|error| format!("cannot start ffmpeg: {error}"))?;
     let done = Arc::new(AtomicBool::new(false));
-    let monitor = monitor_proxy_playback(app.clone(), child.id(), Arc::clone(&done));
+    let progress = Arc::new(AtomicU8::new(0));
+    let monitor = monitor_proxy_playback(
+        app.clone(),
+        child.id(),
+        Arc::clone(&done),
+        Arc::clone(proxies),
+        project_path.to_string(),
+        asset.id.clone(),
+        reason.to_string(),
+        Arc::clone(&progress),
+    );
     if let Some(stdout) = child.stdout.take() {
         let mut last_percent = 0;
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -1253,17 +1320,12 @@ fn make_proxy(
                 if !makevideo_proxy::progress_percent_changed(&mut last_percent, percent) {
                     continue;
                 }
+                progress.store(percent, Ordering::Relaxed);
                 if !set_proxy_status(
                     app,
                     proxies,
                     project_path,
-                    ProxyStatus {
-                        asset_id: asset.id.clone(),
-                        state: "generating".into(),
-                        percent,
-                        path: String::new(),
-                        message: String::new(),
-                    },
+                    proxy_status_entry(&asset.id, "generating", percent, "", reason, ""),
                 ) {
                     let _ = child.kill();
                     let _ = child.wait();
@@ -1292,38 +1354,90 @@ fn make_proxy(
     Ok(output.to_string_lossy().to_string())
 }
 
-/// Jobs queued for proxying wait until playback stops. A job already encoding
-/// pauses while playback runs, then resumes without leaving partial media.
-fn wait_for_playback_pause(app: &AppHandle) {
+fn playback_is_running(app: &AppHandle) -> bool {
+    app.state::<AppState>()
+        .playback
+        .lock()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|session| session.status().playing)
+}
+
+/// Jobs queued for proxying wait until playback stops. The waiting state is
+/// emitted once so the page can explain why zero-percent work is not moving.
+fn wait_for_playback_pause(
+    app: &AppHandle,
+    proxies: &Arc<Mutex<ProxyState>>,
+    project_path: &str,
+    asset_id: &str,
+    reason: &str,
+) -> Result<(), String> {
+    let mut reported = false;
     loop {
-        let playing = app
-            .state::<AppState>()
-            .playback
-            .lock()
-            .unwrap()
-            .as_ref()
-            .is_some_and(|session| session.status().playing);
-        if !playing {
-            return;
+        if !playback_is_running(app) {
+            return Ok(());
+        }
+        if !reported {
+            if !set_proxy_status(
+                app,
+                proxies,
+                project_path,
+                proxy_status_entry(
+                    asset_id,
+                    "waiting",
+                    0,
+                    "",
+                    reason,
+                    "playback is active; generation starts after playback stops",
+                ),
+            ) {
+                return Err("the project changed".into());
+            }
+            reported = true;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
 }
 
-fn monitor_proxy_playback(app: AppHandle, pid: u32, done: Arc<AtomicBool>) -> JoinHandle<()> {
+/// An encoder that was already running is suspended while playback owns the
+/// decode budget. Its state and last percentage stay visible until it resumes.
+#[allow(clippy::too_many_arguments)]
+fn monitor_proxy_playback(
+    app: AppHandle,
+    pid: u32,
+    done: Arc<AtomicBool>,
+    proxies: Arc<Mutex<ProxyState>>,
+    project_path: String,
+    asset_id: String,
+    reason: String,
+    progress: Arc<AtomicU8>,
+) -> JoinHandle<()> {
     std::thread::spawn(move || {
         let mut proxy_paused = false;
         while !done.load(Ordering::Relaxed) {
-            let should_pause_proxy = app
-                .state::<AppState>()
-                .playback
-                .lock()
-                .unwrap()
-                .as_ref()
-                .is_some_and(|session| session.status().playing);
+            let should_pause_proxy = playback_is_running(&app);
             if should_pause_proxy != proxy_paused {
                 let _ = set_proxy_process_paused(pid, should_pause_proxy);
                 proxy_paused = should_pause_proxy;
+                let state = if proxy_paused { "paused" } else { "generating" };
+                let message = if proxy_paused {
+                    "playback is active; generation resumes after playback stops"
+                } else {
+                    ""
+                };
+                let _ = set_proxy_status(
+                    &app,
+                    &proxies,
+                    &project_path,
+                    proxy_status_entry(
+                        &asset_id,
+                        state,
+                        progress.load(Ordering::Relaxed),
+                        "",
+                        &reason,
+                        message,
+                    ),
+                );
             }
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -1361,57 +1475,77 @@ pub async fn start_proxies(
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
     let ffmpeg_path = find_tool(&app, "ffmpeg", &configured)
         .ok_or("ffmpeg was not found, so proxies cannot be created")?;
+    let ffprobe_path = find_tool(&app, "ffprobe", &configured)
+        .ok_or("ffprobe was not found, so proxy media cannot be assessed")?;
     let acceleration = acceleration(&state, Some(&ffmpeg_path)).available;
     let project = state.document.lock().unwrap().project().clone();
-    let mut jobs = Vec::new();
+    let video_assets = project
+        .assets
+        .iter()
+        .filter(|asset| asset.kind == AssetKind::Video)
+        .cloned()
+        .collect::<Vec<_>>();
     {
         let mut proxies = state.proxies.lock().unwrap();
         if proxies.project_path != project_path {
             proxies.project_path = project_path.clone();
             proxies.entries.clear();
         }
-        let wanted: HashSet<String> = project
-            .assets
+        let video_asset_ids: HashSet<String> = video_assets
             .iter()
-            .filter(|asset| makevideo_proxy::needs_proxy(asset))
             .map(|asset| asset.id.clone())
             .collect();
-        proxies.entries.retain(|id, _| wanted.contains(id));
-        for asset in project
-            .assets
-            .iter()
-            .filter(|asset| wanted.contains(&asset.id))
-        {
-            if let Some(path) = makevideo_proxy::valid_proxy(&project_path, asset) {
-                allow_asset_file(&app, &path);
-                proxies.entries.insert(
-                    asset.id.clone(),
-                    ProxyStatus {
-                        asset_id: asset.id.clone(),
-                        state: "ready".into(),
-                        percent: 100,
-                        path,
-                        message: String::new(),
-                    },
-                );
-            } else if !matches!(
+        proxies.entries.retain(|id, _| video_asset_ids.contains(id));
+        for asset in &video_assets {
+            proxies.entries.entry(asset.id.clone()).or_insert_with(|| {
+                proxy_status_entry(
+                    &asset.id,
+                    "inspecting",
+                    0,
+                    "",
+                    "checking resolution, codec, and keyframe interval",
+                    "",
+                )
+            });
+        }
+    }
+    emit_proxy_status(&app, &state.proxies);
+
+    let assessed = assess_proxy_assets(ffprobe_path, video_assets).await?;
+    let mut jobs = Vec::new();
+    {
+        let mut proxies = state.proxies.lock().unwrap();
+        if proxies.project_path != project_path {
+            return Ok(proxy_statuses(&proxies));
+        }
+        for (asset, assessment) in assessed {
+            if matches!(
                 proxies
                     .entries
                     .get(&asset.id)
                     .map(|status| status.state.as_str()),
-                Some("queued" | "generating")
+                Some("queued" | "waiting" | "generating" | "paused")
             ) {
+                continue;
+            }
+            if !assessment.needs_proxy {
                 proxies.entries.insert(
                     asset.id.clone(),
-                    ProxyStatus {
-                        asset_id: asset.id.clone(),
-                        state: "queued".into(),
-                        percent: 0,
-                        path: String::new(),
-                        message: String::new(),
-                    },
+                    proxy_status_entry(&asset.id, "original", 100, "", assessment.reason, ""),
                 );
-                jobs.push(asset.clone());
+            } else if let Some(path) = makevideo_proxy::valid_proxy(&project_path, &asset) {
+                allow_asset_file(&app, &path);
+                proxies.entries.insert(
+                    asset.id.clone(),
+                    proxy_status_entry(&asset.id, "ready", 100, path, assessment.reason, ""),
+                );
+            } else {
+                let reason = assessment.reason;
+                proxies.entries.insert(
+                    asset.id.clone(),
+                    proxy_status_entry(&asset.id, "queued", 0, "", &reason, ""),
+                );
+                jobs.push((asset, reason));
             }
         }
     }
@@ -1422,35 +1556,37 @@ pub async fn start_proxies(
         let worker = std::thread::spawn(move || {
             if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
                 if let Err(error) = std::fs::create_dir_all(&dir) {
-                    for asset in jobs {
+                    for (asset, reason) in jobs {
                         set_proxy_status(
                             &app,
                             &proxies,
                             &project_path,
-                            ProxyStatus {
-                                asset_id: asset.id,
-                                state: "failed".into(),
-                                percent: 0,
-                                path: String::new(),
-                                message: error.to_string(),
-                            },
+                            proxy_status_entry(
+                                asset.id,
+                                "failed",
+                                0,
+                                "",
+                                reason,
+                                error.to_string(),
+                            ),
                         );
                     }
                     return;
                 }
             }
-            for asset in jobs {
+            for (asset, reason) in jobs {
+                if let Err(message) =
+                    wait_for_playback_pause(&app, &proxies, &project_path, &asset.id, &reason)
+                {
+                    if message == "the project changed" {
+                        return;
+                    }
+                }
                 if !set_proxy_status(
                     &app,
                     &proxies,
                     &project_path,
-                    ProxyStatus {
-                        asset_id: asset.id.clone(),
-                        state: "generating".into(),
-                        percent: 0,
-                        path: String::new(),
-                        message: String::new(),
-                    },
+                    proxy_status_entry(&asset.id, "generating", 0, "", &reason, ""),
                 ) {
                     return;
                 }
@@ -1461,6 +1597,7 @@ pub async fn start_proxies(
                     &ffmpeg_path,
                     &asset,
                     acceleration.as_ref().map(|item| item.encoder.as_str()),
+                    &reason,
                 ) {
                     Ok(path) => {
                         allow_asset_file(&app, &path);
@@ -1468,13 +1605,7 @@ pub async fn start_proxies(
                             &app,
                             &proxies,
                             &project_path,
-                            ProxyStatus {
-                                asset_id: asset.id,
-                                state: "ready".into(),
-                                percent: 100,
-                                path,
-                                message: String::new(),
-                            },
+                            proxy_status_entry(asset.id, "ready", 100, path, reason, ""),
                         );
                     }
                     Err(message) if message == "the project changed" => return,
@@ -1483,13 +1614,7 @@ pub async fn start_proxies(
                             &app,
                             &proxies,
                             &project_path,
-                            ProxyStatus {
-                                asset_id: asset.id,
-                                state: "failed".into(),
-                                percent: 0,
-                                path: String::new(),
-                                message,
-                            },
+                            proxy_status_entry(asset.id, "failed", 0, "", reason, message),
                         );
                     }
                 }
