@@ -1194,6 +1194,34 @@ fn probe_proxy_source(ffprobe: &str, path: &str) -> makevideo_proxy::SourceProbe
     makevideo_proxy::parse_probe(&String::from_utf8_lossy(&output.stdout))
 }
 
+const PROXY_PROBE_CONCURRENCY: usize = 4;
+
+async fn assess_proxy_assets(
+    ffprobe_path: String,
+    assets: Vec<Asset>,
+) -> Result<Vec<(Asset, makevideo_proxy::Assessment)>, String> {
+    let mut assessed = Vec::with_capacity(assets.len());
+    for batch in assets.chunks(PROXY_PROBE_CONCURRENCY) {
+        let mut probes = Vec::with_capacity(batch.len());
+        for asset in batch.iter().cloned() {
+            let ffprobe_path = ffprobe_path.clone();
+            probes.push(tauri::async_runtime::spawn_blocking(move || {
+                let source = probe_proxy_source(&ffprobe_path, &asset.path);
+                let assessment = makevideo_proxy::assess(&asset, &source);
+                (asset, assessment)
+            }));
+        }
+        for probe in probes {
+            assessed.push(
+                probe
+                    .await
+                    .map_err(|error| format!("the proxy inspection job did not finish: {error}"))?,
+            );
+        }
+    }
+    Ok(assessed)
+}
+
 /// Files dropped on the window or picked in the dialog. Anything whose
 /// extension is not media is skipped rather than imported as a broken row.
 ///
@@ -1451,27 +1479,45 @@ pub async fn start_proxies(
         .ok_or("ffprobe was not found, so proxy media cannot be assessed")?;
     let acceleration = acceleration(&state, Some(&ffmpeg_path)).available;
     let project = state.document.lock().unwrap().project().clone();
-    let assessed = project
+    let video_assets = project
         .assets
         .iter()
         .filter(|asset| asset.kind == AssetKind::Video)
-        .map(|asset| {
-            let source = probe_proxy_source(&ffprobe_path, &asset.path);
-            (asset.clone(), makevideo_proxy::assess(asset, &source))
-        })
+        .cloned()
         .collect::<Vec<_>>();
-    let mut jobs = Vec::new();
     {
         let mut proxies = state.proxies.lock().unwrap();
         if proxies.project_path != project_path {
             proxies.project_path = project_path.clone();
             proxies.entries.clear();
         }
-        let video_assets: HashSet<String> = assessed
+        let video_asset_ids: HashSet<String> = video_assets
             .iter()
-            .map(|(asset, _)| asset.id.clone())
+            .map(|asset| asset.id.clone())
             .collect();
-        proxies.entries.retain(|id, _| video_assets.contains(id));
+        proxies.entries.retain(|id, _| video_asset_ids.contains(id));
+        for asset in &video_assets {
+            proxies.entries.entry(asset.id.clone()).or_insert_with(|| {
+                proxy_status_entry(
+                    &asset.id,
+                    "inspecting",
+                    0,
+                    "",
+                    "checking resolution, codec, and keyframe interval",
+                    "",
+                )
+            });
+        }
+    }
+    emit_proxy_status(&app, &state.proxies);
+
+    let assessed = assess_proxy_assets(ffprobe_path, video_assets).await?;
+    let mut jobs = Vec::new();
+    {
+        let mut proxies = state.proxies.lock().unwrap();
+        if proxies.project_path != project_path {
+            return Ok(proxy_statuses(&proxies));
+        }
         for (asset, assessment) in assessed {
             if matches!(
                 proxies
