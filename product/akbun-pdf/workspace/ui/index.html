@@ -24,6 +24,12 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9H4z" /><path d="M4 7.5v-2h6l2 2" /></svg>
             <span>PDF 열기</span>
           </button>
+          <button class="icon-button" type="button" aria-label="다른 이름으로 저장" title="다른 이름으로 저장" data-action="save" data-document-control>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 16h8" /></svg>
+          </button>
+          <button class="icon-button" type="button" aria-label="문서 닫기" title="문서 닫기" data-action="close" data-document-control>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
         </div>
 
         <div class="toolbar__group toolbar__group--page" aria-label="페이지 이동">
@@ -48,6 +54,9 @@
           <button class="icon-button" type="button" aria-label="확대" data-action="zoom-in">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M10.5 6.8v7.4M6.8 10.5h7.4M15 15l4 4" /></svg>
           </button>
+          <button class="fit-button" type="button" data-action="actual-size" data-document-control>실제</button>
+          <button class="fit-button" type="button" data-action="fit-width" data-document-control>너비</button>
+          <button class="fit-button" type="button" data-action="fit-page" data-document-control>페이지</button>
         </div>
 
         <div class="toolbar__spacer"></div>
@@ -61,7 +70,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3z" /><path d="M9 9h6M9 12h4" /></svg>
             <span>메모</span>
           </button>
-          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+          <button class="tool-button" type="button" data-action="find" data-document-control>
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l4 4" /></svg>
             <span>찾기</span>
           </button>
@@ -74,6 +83,20 @@
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 8a7 7 0 1 0 0 8M19 4v4h-4" /></svg>
         </button>
       </header>
+
+      <section class="search-panel" data-role="search-panel" aria-label="문서 찾기" hidden>
+        <input type="search" data-role="search-input" aria-label="찾을 텍스트" placeholder="한글 또는 영문 찾기" autocomplete="off" />
+        <span class="search-status" data-role="search-status">검색어를 입력하세요.</span>
+        <button class="icon-button" type="button" aria-label="이전 결과" data-action="previous-result">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 14 5-5 5 5" /></svg>
+        </button>
+        <button class="icon-button" type="button" aria-label="다음 결과" data-action="next-result">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
+        </button>
+        <button class="icon-button" type="button" aria-label="찾기 닫기" data-action="close-find">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg>
+        </button>
+      </section>
 
       <div class="workspace">
         <aside class="pages-panel" aria-label="페이지 썸네일">
@@ -91,6 +114,8 @@
             <div class="thumbnail-skeleton"></div>
           </div>
         </aside>
+
+        <div class="panel-resizer panel-resizer--pages" data-resize-panel="pages" aria-hidden="true"></div>
 
         <main class="viewer" aria-live="polite">
           <section class="state-card state-card--empty" data-visible-phase="empty">
@@ -162,12 +187,14 @@
           </section>
         </main>
 
+        <div class="panel-resizer panel-resizer--outline" data-resize-panel="outline" aria-hidden="true"></div>
+
         <aside class="outline-panel" aria-label="문서 목차">
           <div class="panel-heading">
             <span>목차</span>
           </div>
           <nav class="outline-list" data-role="outline-list"></nav>
-          <div class="outline-empty" data-visible-phase="empty loading error">
+          <div class="outline-empty" data-role="outline-empty" data-visible-phase="empty loading ready error">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h12M6 10h8M6 15h10M6 20h7" /></svg>
             <span>목차가 없습니다.</span>
           </div>

@@ -4,12 +4,11 @@
 
 ## 현재 범위
 
-- 상단 도구 모음, 페이지 썸네일, PDF 화면, 목차의 기본 레이아웃
-- 빈 화면, 불러오는 중, 문서 열림, 오류 상태
+- PDF 열기·닫기와 원본 byte 보존 저장
+- 페이지 썸네일, 계층형 목차, 페이지 바로가기와 보기 맞춤
+- 한글·영문 정규화 검색, 점진적 인덱싱과 결과 강조
 - UI, Tauri adapter, 순수 Rust core, DTO contract 경계
 - macOS, Windows, Linux 릴리스와 앱 내 자동 업데이트 골격
-
-PDF 열기와 원본 보존 저장은 [Issue #1146](https://github.com/choisungwook/portfolio/issues/1146)에서 연결.
 
 ## 디렉터리
 

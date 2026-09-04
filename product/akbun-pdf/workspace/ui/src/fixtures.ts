@@ -2,6 +2,7 @@ import type { DocumentPhase, DocumentState } from "./types";
 
 const emptyState: DocumentState = {
   phase: "empty",
+  documentId: null,
   title: "akbun-pdf",
   currentPage: 0,
   pageCount: 0,
@@ -27,6 +28,7 @@ export function fixtureFor(phase: DocumentPhase): DocumentState {
   if (phase === "ready") {
     return {
       phase,
+      documentId: "preview-document",
       title: "product-principles.pdf",
       currentPage: 1,
       pageCount: 8,
@@ -36,11 +38,11 @@ export function fixtureFor(phase: DocumentPhase): DocumentState {
         label: `${index + 1}페이지`,
       })),
       outline: [
-        { id: "intro", title: "들어가며", page: 1, depth: 0 },
-        { id: "focus", title: "문서에 집중하기", page: 2, depth: 0 },
-        { id: "hierarchy", title: "시각적 위계", page: 3, depth: 1 },
-        { id: "navigation", title: "빠른 탐색", page: 5, depth: 0 },
-        { id: "offline", title: "오프라인 작업", page: 7, depth: 0 },
+        { id: "intro", title: "들어가며", page: 1, top: null, depth: 0 },
+        { id: "focus", title: "문서에 집중하기", page: 2, top: null, depth: 0 },
+        { id: "hierarchy", title: "시각적 위계", page: 3, top: null, depth: 1 },
+        { id: "navigation", title: "빠른 탐색", page: 5, top: null, depth: 0 },
+        { id: "offline", title: "오프라인 작업", page: 7, top: null, depth: 0 },
       ],
       errorMessage: null,
     };

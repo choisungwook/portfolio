@@ -17,6 +17,8 @@
   --workspace: #ecebe7;
   --paper: #fffefd;
   --shadow: 0 18px 60px rgba(42, 39, 34, 0.14), 0 2px 8px rgba(42, 39, 34, 0.08);
+  --pages-width: 196px;
+  --outline-width: 240px;
 }
 
 * {
@@ -41,6 +43,10 @@ button,
 input {
   color: inherit;
   font: inherit;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 button {
@@ -143,6 +149,7 @@ svg {
 
 .icon-button,
 .zoom-label,
+.fit-button,
 .tool-button,
 .button {
   display: inline-flex;
@@ -257,7 +264,21 @@ svg {
 .workspace {
   display: grid;
   min-height: 0;
-  grid-template-columns: 196px minmax(340px, 1fr) 240px;
+  grid-template-columns: var(--pages-width) 4px minmax(340px, 1fr) 4px var(--outline-width);
+}
+
+.panel-resizer {
+  position: relative;
+  z-index: 4;
+  background: var(--line);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.panel-resizer::after {
+  position: absolute;
+  inset: 0 -3px;
+  content: "";
 }
 
 .pages-panel,
@@ -699,6 +720,7 @@ kbd {
 }
 
 .thumbnail__page {
+  position: relative;
   display: flex;
   aspect-ratio: 1 / 1.414;
   flex-direction: column;
@@ -840,6 +862,10 @@ body[data-phase="ready"] [data-role="outline-list"] {
   display: block;
 }
 
+body[data-phase="ready"] [data-role="outline-empty"]:not([hidden]) {
+  display: flex;
+}
+
 body[data-phase="empty"] [data-visible-phase~="empty"].panel-placeholder,
 body[data-phase="error"] [data-visible-phase~="error"].panel-placeholder,
 body[data-phase="empty"] [data-visible-phase~="empty"].outline-empty,
@@ -850,19 +876,24 @@ body[data-phase="loading"] [data-visible-phase~="loading"].thumbnail-skeletons {
 }
 
 body.pages-collapsed .workspace {
-  grid-template-columns: 0 minmax(340px, 1fr) 240px;
+  grid-template-columns: 0 0 minmax(340px, 1fr) 4px var(--outline-width);
 }
 
 body.outline-collapsed .workspace {
-  grid-template-columns: 196px minmax(340px, 1fr) 0;
+  grid-template-columns: var(--pages-width) 4px minmax(340px, 1fr) 0 0;
 }
 
 body.pages-collapsed.outline-collapsed .workspace {
-  grid-template-columns: 0 minmax(340px, 1fr) 0;
+  grid-template-columns: 0 0 minmax(340px, 1fr) 0 0;
 }
 
 body.pages-collapsed .pages-panel,
 body.outline-collapsed .outline-panel {
+  visibility: hidden;
+}
+
+body.pages-collapsed .panel-resizer--pages,
+body.outline-collapsed .panel-resizer--outline {
   visibility: hidden;
 }
 
@@ -890,11 +921,18 @@ body.outline-collapsed .outline-panel {
   }
 
   .workspace {
-    grid-template-columns: 172px minmax(340px, 1fr) 210px;
+    --pages-width: 172px;
+    --outline-width: 210px;
   }
 
   .pdf-page {
     width: min(560px, calc(100vw - 440px));
+  }
+}
+
+@media (max-width: 1220px) {
+  .fit-button {
+    display: none;
   }
 }
 
