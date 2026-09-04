@@ -200,6 +200,7 @@
         baseName,
         dom,
         edit,
+        getPreview: () => preview,
         liveSelection,
         orderedStops: stageController.orderedStops,
         reportError,

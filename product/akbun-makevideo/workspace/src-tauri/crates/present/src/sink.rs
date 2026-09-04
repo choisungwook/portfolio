@@ -37,7 +37,7 @@ pub struct OffscreenSink {
 #[cfg(feature = "gpu")]
 struct GpuTarget {
     view: wgpu::TextureView,
-    pipeline: wgpu::RenderPipeline,
+    pipelines: makevideo_compositor::gpu::Pipelines,
     /// Held because dropping the texture would take the view with it.
     _texture: wgpu::Texture,
 }
@@ -62,7 +62,7 @@ impl OffscreenSink {
             });
             GpuTarget {
                 view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                pipeline: gpu.pipeline_for(makevideo_compositor::gpu::FRAME_FORMAT),
+                pipelines: gpu.pipelines_for(makevideo_compositor::gpu::FRAME_FORMAT),
                 _texture: texture,
             }
         });
@@ -80,7 +80,7 @@ impl OffscreenSink {
         if let (Some(gpu), Some(target)) = (self.compositor.gpu(), self.target.as_ref()) {
             gpu.draw_onto(
                 &target.view,
-                &target.pipeline,
+                &target.pipelines,
                 self.width,
                 self.height,
                 layers,

@@ -10,7 +10,9 @@
 //! index on the project rate. Floats would let the two callers round
 //! differently, which is exactly the divergence this removes.
 
-use crate::{Asset, AssetKind, Clip, Project, Rate, RationalTime, Track, TrackKind};
+use crate::{
+    Asset, AssetKind, BlendMode, Clip, KeyframeTrack, Project, Rate, RationalTime, Track, TrackKind,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -36,6 +38,8 @@ pub struct Placement {
     pub in_frame: i64,
     pub dst: Rect,
     pub opacity: f32,
+    pub speed: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl Placement {
@@ -76,6 +80,11 @@ pub struct AudioPlacement {
     /// Where it starts inside the source, in frames of the project rate.
     pub in_frame: i64,
     pub volume: f32,
+    pub volume_keyframes: KeyframeTrack,
+    pub fade_in: i64,
+    pub fade_out: i64,
+    pub speed: f32,
+    pub preserve_pitch: bool,
 }
 
 impl AudioPlacement {
@@ -93,6 +102,22 @@ impl AudioPlacement {
 
     pub fn duration(&self, rate: Rate) -> RationalTime {
         RationalTime::new(self.duration_frames, rate)
+    }
+
+    pub fn volume_at(&self, frame: i64) -> f32 {
+        let mut volume = self
+            .volume_keyframes
+            .value_at(frame, self.volume)
+            .clamp(0.0, 1.0);
+        let offset = frame.saturating_sub(self.start_frame);
+        if self.fade_in > 0 {
+            volume *= (offset as f32 / self.fade_in as f32).clamp(0.0, 1.0);
+        }
+        let remaining = self.end_frame().saturating_sub(frame + 1);
+        if self.fade_out > 0 {
+            volume *= (remaining as f32 / self.fade_out as f32).clamp(0.0, 1.0);
+        }
+        volume
     }
 }
 
@@ -166,6 +191,11 @@ pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
                     duration_frames: clip.duration_frames(),
                     in_frame: clip.in_point,
                     volume: clip.volume.max(0.0),
+                    volume_keyframes: clip.volume_keyframes.clone(),
+                    fade_in: clip.fade_in,
+                    fade_out: clip.fade_out,
+                    speed: clip.speed,
+                    preserve_pitch: clip.preserve_pitch,
                 });
             }
         }
@@ -184,6 +214,7 @@ pub struct Layer {
     pub source_frame: i64,
     pub dst: Rect,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl Layer {
@@ -259,6 +290,8 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
                 in_frame: clip.in_point,
                 dst: fit_rect(asset.width, asset.height, out_width, out_height),
                 opacity: clip.opacity.clamp(0.0, 1.0),
+                speed: clip.speed,
+                blend_mode: clip.blend_mode,
             });
         }
     }
@@ -273,13 +306,15 @@ pub fn layers_at(project: &Project, frame: i64, out_width: u32, out_height: u32)
         .into_iter()
         .filter(|placement| placement.covers(frame))
         .map(|placement| Layer {
-            source_frame: placement.in_frame + (frame - placement.start_frame),
+            source_frame: placement.in_frame
+                + ((frame - placement.start_frame) as f64 * placement.speed as f64).floor() as i64,
             clip_id: placement.clip_id,
             asset_id: placement.asset_id,
             path: placement.path,
             kind: placement.kind,
             dst: placement.dst,
             opacity: placement.opacity,
+            blend_mode: placement.blend_mode,
         })
         .collect()
 }
@@ -335,6 +370,12 @@ mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -374,7 +415,10 @@ mod tests {
         let mut source = asset("a", AssetKind::Video, 1920, 1080);
         source.has_audio = true;
         let project = project(
-            vec![video_track("V1", vec![video]), audio_track("A1", vec![audio])],
+            vec![
+                video_track("V1", vec![video]),
+                audio_track("A1", vec![audio]),
+            ],
             vec![source],
         );
 
@@ -639,7 +683,10 @@ mod tests {
                 video_track("V1", vec![clip("c1", "a1", 60, 0, 120)]),
                 video_track("V2", vec![clip("c2", "a1", 0, 0, 120)]),
             ],
-            vec![sounding("a1", AssetKind::Video), sounding("a2", AssetKind::Audio)],
+            vec![
+                sounding("a1", AssetKind::Video),
+                sounding("a2", AssetKind::Audio),
+            ],
         );
         assert_eq!(audible(&project), vec!["c1", "c2", "c3"]);
     }

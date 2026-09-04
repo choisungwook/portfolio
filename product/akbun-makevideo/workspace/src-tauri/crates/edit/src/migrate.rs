@@ -12,8 +12,8 @@
 //! for the next format after this one.
 
 use crate::{
-    Asset, Clip, Marker, Project, ProjectSettings, Rate, RationalTime, Track, TrackKind,
-    VisualItem, FORMAT_VERSION,
+    Asset, BlendMode, Clip, KeyframeTrack, Marker, Project, ProjectSettings, Rate, RationalTime,
+    Track, TrackKind, VisualItem, FORMAT_VERSION,
 };
 use serde::Deserialize;
 
@@ -86,6 +86,22 @@ struct WireClip {
     volume: f32,
     #[serde(default = "one")]
     opacity: f32,
+    #[serde(default = "one")]
+    speed: f32,
+    #[serde(default = "true_value")]
+    preserve_pitch: bool,
+    #[serde(default)]
+    fade_in: i64,
+    #[serde(default)]
+    fade_out: i64,
+    #[serde(default)]
+    volume_keyframes: KeyframeTrack,
+    #[serde(default)]
+    blend_mode: BlendMode,
+}
+
+fn true_value() -> bool {
+    true
 }
 
 /// A frame count if the file already had one, otherwise the nearest frame to
@@ -146,6 +162,12 @@ impl From<WireProject> for Project {
                             out_point: frames(clip.out_point, clip.out_ms, rate),
                             volume: clip.volume,
                             opacity: clip.opacity,
+                            speed: clip.speed,
+                            preserve_pitch: clip.preserve_pitch,
+                            fade_in: clip.fade_in,
+                            fade_out: clip.fade_out,
+                            volume_keyframes: clip.volume_keyframes,
+                            blend_mode: clip.blend_mode,
                         })
                         .collect(),
                 })
@@ -201,10 +223,12 @@ mod tests {
     #[test]
     fn todays_format_passes_straight_through() {
         let text = r#"{
-            "version": 2,
+            "version": 4,
             "settings": {"width": 1080, "height": 1920, "rate": {"num": 24000, "den": 1001}},
             "tracks": [{"id": "V1", "kind": "video", "clips": [
-                {"id": "c1", "assetId": "a1", "linkGroup": "g1", "start": 12, "in": 3, "out": 48, "volume": 0.5}
+                {"id": "c1", "assetId": "a1", "linkGroup": "g1", "start": 12, "in": 3, "out": 48,
+                 "volume": 0.5, "speed": 2.0, "preservePitch": false, "fadeIn": 3, "fadeOut": 4,
+                 "blendMode": "multiply", "volumeKeyframes": {"keyframes": [{"frame": 12, "value": 0.25, "easing": "linear"}]}}
             ]}]
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();
@@ -212,6 +236,11 @@ mod tests {
         let clip = &project.tracks[0].clips[0];
         assert_eq!((clip.start, clip.in_point, clip.out_point), (12, 3, 48));
         assert_eq!(clip.volume, 0.5);
+        assert_eq!(clip.speed, 2.0);
+        assert!(!clip.preserve_pitch);
+        assert_eq!((clip.fade_in, clip.fade_out), (3, 4));
+        assert_eq!(clip.blend_mode, BlendMode::Multiply);
+        assert_eq!(clip.volume_keyframes.keyframes[0].value, 0.25);
         assert_eq!(clip.link_group.as_deref(), Some("g1"));
     }
 
@@ -257,7 +286,8 @@ mod tests {
             shape,
             visual_style,
             ..
-        } = content else {
+        } = content
+        else {
             panic!("expected a shape");
         };
         assert_eq!(shape, crate::ShapeKind::Rectangle);
@@ -274,7 +304,8 @@ mod tests {
             shape: kind,
             visual_style,
             ..
-        } = &shape else {
+        } = &shape
+        else {
             panic!("expected a shape");
         };
         assert_eq!(*kind, crate::ShapeKind::RoundedRectangle);
@@ -292,7 +323,10 @@ mod tests {
         let crate::VisualContent::Text { style, .. } = &text else {
             panic!("expected text");
         };
-        assert_eq!(style.visual_style.fills, vec![crate::Paint::solid("#abcdef")]);
+        assert_eq!(
+            style.visual_style.fills,
+            vec![crate::Paint::solid("#abcdef")]
+        );
         assert_eq!(style.visual_style.stroke.as_ref().unwrap().width, 2.0);
         assert_eq!(style.visual_style.shadow.as_ref().unwrap().x, 3.0);
         let written = serde_json::to_string(&text).unwrap();
@@ -311,7 +345,7 @@ mod tests {
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();
         let written = serde_json::to_string(&project).unwrap();
-        assert!(written.contains(r#""version":3"#), "{written}");
+        assert!(written.contains(r#""version":4"#), "{written}");
         assert!(
             written.contains(r#""rate":{"num":60,"den":1}"#),
             "{written}"

@@ -20,10 +20,12 @@
 //! get one and nothing rounds to store one; the makevideo-time crate says why
 //! that matters.
 
+pub mod animation;
 pub mod command;
 pub mod document;
 pub mod migrate;
 
+pub use animation::{Easing, Keyframe, KeyframeTrack, VisualAnimation, VisualProperty};
 pub use command::{ClipAt, Command, Edge, MarkerAt, VisualItemAt};
 pub use document::{Document, DocumentState};
 pub use makevideo_time::{Rate, RationalTime};
@@ -34,7 +36,7 @@ use std::collections::{HashMap, HashSet};
 /// What `version` a project file written today holds. Version 1 measured
 /// everything in whole milliseconds; `migrate` turns one of those into this on
 /// the way in, so a project saved before this existed still opens.
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 /// Four of each is as many as the timeline header has room to name, and a
 /// timeline that needs a fifth video track is asking for a different app.
@@ -59,6 +61,19 @@ pub fn min_clip_frames(rate: Rate) -> i64 {
 /// version still opens instead of failing at the first unknown clip.
 fn one() -> f32 {
     1.0
+}
+
+fn true_value() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BlendMode {
+    #[default]
+    Normal,
+    Multiply,
+    Screen,
 }
 
 /// An asset's identity is its path, hashed. Importing the same file twice
@@ -372,7 +387,11 @@ pub struct GradientStop {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum Paint {
     Solid {
         color: String,
@@ -411,9 +430,9 @@ impl Paint {
     pub fn asset_id(&self) -> Option<&str> {
         match self {
             Paint::Image { asset_id } | Paint::Video { asset_id } => Some(asset_id),
-            Paint::Solid { .. }
-            | Paint::LinearGradient { .. }
-            | Paint::RadialGradient { .. } => None,
+            Paint::Solid { .. } | Paint::LinearGradient { .. } | Paint::RadialGradient { .. } => {
+                None
+            }
         }
     }
 }
@@ -468,7 +487,10 @@ impl VisualStyle {
         for paint in &self.fills {
             match paint {
                 Paint::LinearGradient { start, end, stops } => {
-                    if ![start.x, start.y, end.x, end.y].into_iter().all(f32::is_finite) {
+                    if ![start.x, start.y, end.x, end.y]
+                        .into_iter()
+                        .all(f32::is_finite)
+                    {
                         return Err("has a non-finite linear gradient");
                     }
                     validate_stops(stops)?;
@@ -478,7 +500,9 @@ impl VisualStyle {
                     radius,
                     stops,
                 } => {
-                    if ![center.x, center.y, *radius].into_iter().all(f32::is_finite)
+                    if ![center.x, center.y, *radius]
+                        .into_iter()
+                        .all(f32::is_finite)
                         || *radius <= 0.0
                     {
                         return Err("has an invalid radial gradient");
@@ -648,8 +672,15 @@ pub enum VisualContent {
         #[serde(default)]
         end_arrow: bool,
     },
-    Image { asset_id: String },
-    VideoOverlay { asset_id: String },
+    Image {
+        asset_id: String,
+    },
+    VideoOverlay {
+        asset_id: String,
+    },
+    Adjustment {
+        lut_path: String,
+    },
 }
 
 impl VisualContent {
@@ -658,7 +689,9 @@ impl VisualContent {
             VisualContent::Image { asset_id } | VisualContent::VideoOverlay { asset_id } => {
                 Some(asset_id)
             }
-            VisualContent::Text { .. } | VisualContent::Shape { .. } => None,
+            VisualContent::Text { .. }
+            | VisualContent::Shape { .. }
+            | VisualContent::Adjustment { .. } => None,
         }
     }
 
@@ -669,7 +702,9 @@ impl VisualContent {
         let style = match self {
             VisualContent::Text { style, .. } => Some(&style.visual_style),
             VisualContent::Shape { visual_style, .. } => Some(visual_style),
-            VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
+            VisualContent::Image { .. }
+            | VisualContent::VideoOverlay { .. }
+            | VisualContent::Adjustment { .. } => None,
         };
         style.is_some_and(|style| {
             style
@@ -683,6 +718,7 @@ impl VisualContent {
         let style = match self {
             VisualContent::Text { style, .. } => Some(&style.visual_style),
             VisualContent::Shape { visual_style, .. } => Some(visual_style),
+            VisualContent::Adjustment { .. } => return true,
             VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
         };
         style.is_some_and(|style| {
@@ -713,7 +749,11 @@ impl Default for ShapeKind {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 enum WireVisualContent {
     Text {
         text: String,
@@ -735,8 +775,15 @@ enum WireVisualContent {
         #[serde(default)]
         end_arrow: bool,
     },
-    Image { asset_id: String },
-    VideoOverlay { asset_id: String },
+    Image {
+        asset_id: String,
+    },
+    VideoOverlay {
+        asset_id: String,
+    },
+    Adjustment {
+        lut_path: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -777,9 +824,7 @@ impl<'de> Deserialize<'de> for VisualContent {
                 } else {
                     let width = stroke_width.unwrap_or(4.0);
                     VisualStyle {
-                        fills: vec![Paint::solid(
-                            fill.unwrap_or_else(|| "#4f8cffcc".into()),
-                        )],
+                        fills: vec![Paint::solid(fill.unwrap_or_else(|| "#4f8cffcc".into()))],
                         stroke: (width > 0.0).then(|| Stroke {
                             color: stroke
                                 .and_then(|value| match value {
@@ -809,6 +854,9 @@ impl<'de> Deserialize<'de> for VisualContent {
             WireVisualContent::VideoOverlay { asset_id } => {
                 Ok(VisualContent::VideoOverlay { asset_id })
             }
+            WireVisualContent::Adjustment { lut_path } => {
+                Ok(VisualContent::Adjustment { lut_path })
+            }
         }
     }
 }
@@ -821,6 +869,10 @@ pub struct VisualItem {
     pub start: i64,
     pub duration: i64,
     pub transform: VisualTransform,
+    #[serde(default)]
+    pub animation: VisualAnimation,
+    #[serde(default)]
+    pub blend_mode: BlendMode,
     /// Higher values draw later within the track. Track array order remains
     /// the primary layer order.
     pub z_index: i32,
@@ -834,6 +886,23 @@ impl VisualItem {
 
     pub fn contains_frame(&self, frame: i64) -> bool {
         self.start <= frame && frame < self.end_frame()
+    }
+
+    pub fn transform_at(&self, frame: i64) -> VisualTransform {
+        VisualTransform {
+            x: self.animation.x.value_at(frame, self.transform.x),
+            y: self.animation.y.value_at(frame, self.transform.y),
+            width: self.animation.width.value_at(frame, self.transform.width),
+            height: self.animation.height.value_at(frame, self.transform.height),
+            rotation: self
+                .animation
+                .rotation
+                .value_at(frame, self.transform.rotation),
+            opacity: self
+                .animation
+                .opacity
+                .value_at(frame, self.transform.opacity),
+        }
     }
 }
 
@@ -857,6 +926,18 @@ pub struct Clip {
     pub volume: f32,
     #[serde(default = "one")]
     pub opacity: f32,
+    #[serde(default = "one")]
+    pub speed: f32,
+    #[serde(default = "true_value")]
+    pub preserve_pitch: bool,
+    #[serde(default)]
+    pub fade_in: i64,
+    #[serde(default)]
+    pub fade_out: i64,
+    #[serde(default)]
+    pub volume_keyframes: KeyframeTrack,
+    #[serde(default)]
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -875,8 +956,15 @@ fn default_marker_color() -> String {
 }
 
 impl Clip {
-    pub fn duration_frames(&self) -> i64 {
+    pub fn source_duration_frames(&self) -> i64 {
         (self.out_point - self.in_point).max(0)
+    }
+
+    pub fn duration_frames(&self) -> i64 {
+        if !self.speed.is_finite() || self.speed <= 0.0 {
+            return self.source_duration_frames();
+        }
+        ((self.source_duration_frames() as f64 / self.speed as f64).round() as i64).max(1)
     }
 
     pub fn end_frame(&self) -> i64 {
@@ -899,6 +987,27 @@ impl Clip {
 
     pub fn end_time(&self, rate: Rate) -> RationalTime {
         RationalTime::new(self.end_frame(), rate)
+    }
+
+    pub fn source_frame_at(&self, frame: i64) -> i64 {
+        let offset = (frame - self.start).max(0) as f64 * self.speed.max(0.0001) as f64;
+        (self.in_point + offset.floor() as i64).min(self.out_point.saturating_sub(1))
+    }
+
+    pub fn volume_at(&self, frame: i64) -> f32 {
+        let mut volume = self
+            .volume_keyframes
+            .value_at(frame, self.volume)
+            .clamp(0.0, 1.0);
+        let offset = frame.saturating_sub(self.start);
+        if self.fade_in > 0 {
+            volume *= (offset as f32 / self.fade_in as f32).clamp(0.0, 1.0);
+        }
+        let remaining = self.end_frame().saturating_sub(frame + 1);
+        if self.fade_out > 0 {
+            volume *= (remaining as f32 / self.fade_out as f32).clamp(0.0, 1.0);
+        }
+        volume
     }
 }
 
@@ -944,12 +1053,18 @@ impl Project {
     }
 
     pub fn uses_video_paint(&self) -> bool {
-        self.tracks.iter().filter(|track| track.contributes()).any(|track| {
-            track
-                .visual_items
-                .iter()
-                .any(|item| item.content.uses_video_paint())
-        })
+        self.tracks
+            .iter()
+            .filter(|track| track.contributes())
+            .any(|track| {
+                track.clips.iter().any(|clip| {
+                    (clip.speed - 1.0).abs() > f32::EPSILON || clip.blend_mode != BlendMode::Normal
+                }) || track.visual_items.iter().any(|item| {
+                    item.content.uses_video_paint()
+                        || item.blend_mode != BlendMode::Normal
+                        || item.animation != VisualAnimation::default()
+                })
+            })
     }
 
     pub fn track(&self, id: &str) -> Option<&Track> {
@@ -1146,6 +1261,24 @@ impl Project {
                 if clip.out_point <= clip.in_point {
                     return Err(format!("clip {name} would have no length"));
                 }
+                if !clip.speed.is_finite() || !(0.1..=16.0).contains(&clip.speed) {
+                    return Err(format!("clip {name} has an invalid speed"));
+                }
+                if clip.fade_in < 0
+                    || clip.fade_out < 0
+                    || clip.fade_in > clip.duration_frames()
+                    || clip.fade_out > clip.duration_frames()
+                {
+                    return Err(format!("clip {name} has an invalid audio fade"));
+                }
+                if !clip.volume_keyframes.is_valid(
+                    clip.start,
+                    clip.end_frame().saturating_sub(1),
+                    0.0,
+                    1.0,
+                ) {
+                    return Err(format!("clip {name} has invalid volume keyframes"));
+                }
                 if let Some(limit) = self.source_limit(clip) {
                     if clip.out_point > limit {
                         return Err(format!(
@@ -1165,7 +1298,10 @@ impl Project {
                 return Err("visual items do not belong on audio tracks".into());
             }
             if track.kind == TrackKind::Subtitle
-                && track.visual_items.iter().any(|item| !matches!(item.content, VisualContent::Text { .. }))
+                && track
+                    .visual_items
+                    .iter()
+                    .any(|item| !matches!(item.content, VisualContent::Text { .. }))
             {
                 return Err("subtitle tracks only hold text".into());
             }
@@ -1210,10 +1346,36 @@ impl Project {
                         "visual item {name} has opacity outside 0 through 1"
                     ));
                 }
+                let last_frame = item.end_frame().saturating_sub(1);
+                let unbounded = -f32::MAX..=f32::MAX;
+                for track in [
+                    &item.animation.x,
+                    &item.animation.y,
+                    &item.animation.rotation,
+                ] {
+                    if !track.is_valid(item.start, last_frame, *unbounded.start(), *unbounded.end())
+                    {
+                        return Err(format!("visual item {name} has invalid keyframes"));
+                    }
+                }
+                for track in [&item.animation.width, &item.animation.height] {
+                    if !track.is_valid(item.start, last_frame, 1.0, f32::MAX) {
+                        return Err(format!("visual item {name} has invalid size keyframes"));
+                    }
+                }
+                if !item
+                    .animation
+                    .opacity
+                    .is_valid(item.start, last_frame, 0.0, 1.0)
+                {
+                    return Err(format!("visual item {name} has invalid opacity keyframes"));
+                }
                 let style = match &item.content {
                     VisualContent::Text { style, .. } => Some(&style.visual_style),
                     VisualContent::Shape { visual_style, .. } => Some(visual_style),
-                    VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
+                    VisualContent::Image { .. }
+                    | VisualContent::VideoOverlay { .. }
+                    | VisualContent::Adjustment { .. } => None,
                 };
                 if let Some(error) = style.and_then(|style| style.validate().err()) {
                     return Err(format!("visual item {name} {error}"));
@@ -1280,6 +1442,16 @@ impl Project {
                     clip.out_point = clip.out_point.min(source);
                 }
                 clip.out_point = clip.out_point.max(clip.in_point + 1);
+                clip.speed = finite_or(clip.speed, 1.0).clamp(0.1, 16.0);
+                let duration = clip.duration_frames();
+                clip.fade_in = clip.fade_in.clamp(0, duration);
+                clip.fade_out = clip.fade_out.clamp(0, duration);
+                clip.volume_keyframes.repair(
+                    clip.start,
+                    clip.end_frame().saturating_sub(1),
+                    0.0,
+                    1.0,
+                );
             }
             track.sort();
             // Sorted, so one pass right pushes every overlap out of the way in
@@ -1301,6 +1473,25 @@ impl Project {
                     item.transform.height = finite_or(item.transform.height, 1.0).max(1.0);
                     item.transform.rotation = finite_or(item.transform.rotation, 0.0);
                     item.transform.opacity = finite_or(item.transform.opacity, 1.0).clamp(0.0, 1.0);
+                    let last_frame = item.end_frame().saturating_sub(1);
+                    item.animation
+                        .x
+                        .repair(item.start, last_frame, -f32::MAX, f32::MAX);
+                    item.animation
+                        .y
+                        .repair(item.start, last_frame, -f32::MAX, f32::MAX);
+                    item.animation
+                        .rotation
+                        .repair(item.start, last_frame, -f32::MAX, f32::MAX);
+                    item.animation
+                        .width
+                        .repair(item.start, last_frame, 1.0, f32::MAX);
+                    item.animation
+                        .height
+                        .repair(item.start, last_frame, 1.0, f32::MAX);
+                    item.animation
+                        .opacity
+                        .repair(item.start, last_frame, 0.0, 1.0);
                 }
             }
         }
@@ -1380,6 +1571,12 @@ mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -1403,6 +1600,8 @@ mod tests {
                 rotation: 0.0,
                 opacity: 1.0,
             },
+            animation: Default::default(),
+            blend_mode: Default::default(),
             z_index,
             content: VisualContent::Shape {
                 shape: ShapeKind::Rectangle,
@@ -1446,6 +1645,49 @@ mod tests {
         assert!(audio_track.accepts(&video(1000)));
         assert!(!audio_track.accepts(&silent));
         assert!(!audio_track.accepts(&still));
+    }
+
+    #[test]
+    fn speed_derives_timeline_duration_without_changing_the_source_range() {
+        let mut clip = clip("c1", 10, 20, 140);
+        clip.speed = 2.0;
+        assert_eq!(clip.source_duration_frames(), 120);
+        assert_eq!(clip.duration_frames(), 60);
+        assert_eq!(clip.end_frame(), 70);
+        assert_eq!(clip.source_frame_at(25), 50);
+    }
+
+    #[test]
+    fn a_visual_transform_reads_all_property_tracks_at_one_frame() {
+        let mut item = visual_item("i1", 0, 30, 0);
+        item.animation.x.keyframes = vec![
+            Keyframe {
+                frame: 0,
+                value: 0.0,
+                easing: Easing::Linear,
+            },
+            Keyframe {
+                frame: 20,
+                value: 200.0,
+                easing: Easing::Linear,
+            },
+        ];
+        item.animation.opacity.keyframes = vec![
+            Keyframe {
+                frame: 0,
+                value: 0.0,
+                easing: Easing::EaseIn,
+            },
+            Keyframe {
+                frame: 20,
+                value: 1.0,
+                easing: Easing::Linear,
+            },
+        ];
+        let transform = item.transform_at(10);
+        assert_eq!(transform.x, 100.0);
+        assert_eq!(transform.opacity, 0.25);
+        assert_eq!(transform.width, item.transform.width);
     }
 
     #[test]

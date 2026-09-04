@@ -13,7 +13,7 @@
 //! replace.
 
 use crate::player::Sink;
-use makevideo_compositor::gpu::GpuCompositor;
+use makevideo_compositor::gpu::{GpuCompositor, Pipelines};
 use makevideo_compositor::source::Frame;
 use makevideo_compositor::{Compositor, Placement, Source};
 use makevideo_render::layout::Rect;
@@ -69,7 +69,7 @@ const WANTED: [wgpu::TextureFormat; 2] = [
 pub struct SurfaceSink {
     compositor: Arc<Compositor>,
     surface: wgpu::Surface<'static>,
-    pipeline: wgpu::RenderPipeline,
+    pipelines: Pipelines,
     config: wgpu::SurfaceConfiguration,
     /// The project frame. The surface is the size of the view on screen, and
     /// the layers are laid out inside a frame of this size, so the two are not
@@ -134,11 +134,11 @@ impl SurfaceSink {
             desired_maximum_frame_latency: 2,
         };
         surface.configure(gpu.device(), &config);
-        let pipeline = gpu.pipeline_for(format);
+        let pipelines = gpu.pipelines_for(format);
         Ok(SurfaceSink {
             compositor,
             surface,
-            pipeline,
+            pipelines,
             config,
             width,
             height,
@@ -243,7 +243,7 @@ impl SurfaceSink {
         let view = texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        gpu.draw_onto(&view, &self.pipeline, self.width, self.height, layers)?;
+        gpu.draw_onto(&view, &self.pipelines, self.width, self.height, layers)?;
         gpu.queue().present(texture);
         self.outcome = PresentOutcome::Presented;
         Ok(())
@@ -266,6 +266,8 @@ impl Sink for SurfaceSink {
                     Placement {
                         dst: guide.dst,
                         opacity: 1.0,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment: false,
                     },
                 )
             }));
@@ -292,6 +294,8 @@ impl Sink for SurfaceSink {
                             Placement {
                                 dst: guide.dst,
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         )
                     })

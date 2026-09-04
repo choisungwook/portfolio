@@ -153,12 +153,27 @@ const dom = {
   transformRotation: el('transform-rotation'),
   transformOpacity: el('transform-opacity'),
   transformOpacityValue: el('transform-opacity-value'),
+  visualBlendMode: el('visual-blend-mode'),
+  addTransformKeyframes: el('add-transform-keyframes'),
   clipPanel: el('clip-panel'),
   clipSummary: el('clip-summary'),
   clipVideoPanel: el('clip-video-panel'),
   clipAudioPanel: el('clip-audio-panel'),
   clipOpacity: el('clip-opacity'),
   clipVolume: el('clip-volume'),
+  clipBlendMode: el('clip-blend-mode'),
+  clipSpeed: el('clip-speed'),
+  clipPreservePitch: el('clip-preserve-pitch'),
+  clipFadeIn: el('clip-fade-in'),
+  clipFadeOut: el('clip-fade-out'),
+  addVolumeKeyframe: el('add-volume-keyframe'),
+  keyframePanel: el('keyframe-panel'),
+  keyframeSummary: el('keyframe-summary'),
+  keyframeFrame: el('keyframe-frame'),
+  keyframeValue: el('keyframe-value'),
+  keyframeEasing: el('keyframe-easing'),
+  keyframeUpdate: el('keyframe-update'),
+  keyframeDelete: el('keyframe-delete'),
   fontOptions: el('font-options'),
   textPanel: el('text-panel'),
   textValue: el('text-value'),
@@ -244,6 +259,7 @@ const state = {
   waveforms: {},
   selectedClipId: null,
   selectedVisualItemId: null,
+  selectedKeyframe: null,
   activePanel: null,
   inspectorTab: 'video',
   selectedAssetId: null,
@@ -977,6 +993,25 @@ function clipElement(track, clip) {
     }
   }
   node.append(left, label, right);
+  for (const key of (clip.volumeKeyframes && clip.volumeKeyframes.keyframes) || []) {
+    node.appendChild(keyframeDot('volume', clip.id, 'volume', key, clip.start, width, 0));
+  }
+  return node;
+}
+
+function keyframeDot(type, layerId, property, key, start, width, row) {
+  const node = document.createElement('button');
+  node.type = 'button';
+  node.className = 'keyframe-dot';
+  node.dataset.keyframeType = type;
+  node.dataset.layerId = layerId;
+  node.dataset.keyframeProperty = property;
+  node.dataset.keyframeFrame = String(key.frame);
+  node.dataset.keyframeValue = String(key.value);
+  node.dataset.keyframeEasing = key.easing || 'linear';
+  node.style.left = `${Math.max(0, Math.min(width, L.framesToPx(key.frame - start, rate(), state.pxPerSecond)))}px`;
+  node.style.top = `${4 + row * 5}px`;
+  node.title = `${property} · ${key.frame}`;
   return node;
 }
 
@@ -988,7 +1023,7 @@ function visualElement(track, item) {
   // A project should always contain content, but keep an incomplete saved
   // visual item from taking down the whole timeline while it is repaired.
   const content = item.content || {};
-  const kind = content.kind === 'shape' ? 'shape' : 'text';
+  const kind = content.kind === 'shape' ? 'shape' : content.kind === 'adjustment' ? 'adjustment' : 'text';
   node.className = track.kind === 'subtitle' ? 'clip subtitle' : `clip visual ${kind}`;
   node.dataset.visualItemId = item.id;
   node.style.left = `${L.framesToPx(item.start, rate(), state.pxPerSecond)}px`;
@@ -998,12 +1033,21 @@ function visualElement(track, item) {
   label.className = 'clip-name';
   label.textContent = kind === 'shape'
     ? `Shape — ${content.shape || 'rectangle'}`
-    : content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
+    : kind === 'adjustment'
+      ? `Adjustment — ${baseName(content.lutPath || '')}`
+      : content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
   const left = document.createElement('span');
   left.className = 'handle left';
   const right = document.createElement('span');
   right.className = 'handle right';
   node.append(left, label, right);
+  const properties = ['x', 'y', 'width', 'height', 'rotation', 'opacity'];
+  for (const [row, property] of properties.entries()) {
+    const keys = item.animation && item.animation[property] && item.animation[property].keyframes;
+    for (const key of keys || []) {
+      node.appendChild(keyframeDot('visual', item.id, property, key, item.start, parseFloat(node.style.width), row));
+    }
+  }
   return node;
 }
 
@@ -1467,6 +1511,51 @@ async function setClipLut(clipId) {
   await edit({ op: 'setClipLut', clipId, lutPath: path });
 }
 
+async function addAdjustmentLayer(track, frame) {
+  if (!track || track.kind !== 'video') return;
+  const path = await window.api.pickLut();
+  if (!path) return;
+  await window.api.validateLut(path);
+  await edit({
+    op: 'addVisualItem',
+    trackId: track.id,
+    content: { kind: 'adjustment', lutPath: path },
+    start: frame,
+    duration: L.defaultVisualItemFrames(rate()),
+    transform: {
+      x: 0, y: 0, width: state.project.settings.width,
+      height: state.project.settings.height, rotation: 0, opacity: 1,
+    },
+    zIndex: 0,
+  });
+}
+
+async function addVisualKeyframesAt(item, frame) {
+  const at = Math.max(item.start, Math.min(item.start + item.duration - 1, Math.round(frame)));
+  const transform = L.visualTransformAt(item, at);
+  await edit(...['x', 'y', 'width', 'height', 'rotation', 'opacity'].map((property) => ({
+    op: 'setVisualKeyframe', itemId: item.id, property, frame: at,
+    value: transform[property], easing: 'linear',
+  })));
+  state.selectedKeyframe = {
+    type: 'visual', layerId: item.id, property: 'x', frame: at,
+    value: transform.x, easing: 'linear',
+  };
+  inspectorController.render();
+}
+
+async function addVolumeKeyframeAt(clip, frame) {
+  const at = Math.max(clip.start, Math.min(L.clipEnd(clip) - 1, Math.round(frame)));
+  const value = L.clipVolumeAt(clip, at);
+  await edit({
+    op: 'setClipVolumeKeyframe', clipId: clip.id, frame: at, value, easing: 'linear',
+  });
+  state.selectedKeyframe = {
+    type: 'volume', layerId: clip.id, property: 'volume', frame: at, value, easing: 'linear',
+  };
+  inspectorController.render();
+}
+
 /** Persist a setting changed from a toolbar or the transport, where there is no
  *  sheet to report into.
  *
@@ -1609,6 +1698,7 @@ function loadDocument(doc, path) {
   state.savedRevision = doc.revision;
   state.selectedClipId = null;
   state.selectedVisualItemId = null;
+  state.selectedKeyframe = null;
   state.selectedAssetId = null;
   state.sourceSelection = null;
   state.targetTrackId = null;
@@ -2274,6 +2364,25 @@ function wireTimeline() {
   });
   inspectorController.wire();
   dom.lanes.addEventListener('pointerdown', (event) => {
+    const keyframe = event.target.closest('[data-keyframe-type]');
+    if (keyframe) {
+      if (keyframe.dataset.keyframeType === 'visual') {
+        stageController.selectVisualItem(keyframe.dataset.layerId);
+      } else {
+        stageController.selectClip(keyframe.dataset.layerId);
+      }
+      state.selectedKeyframe = {
+        type: keyframe.dataset.keyframeType,
+        layerId: keyframe.dataset.layerId,
+        property: keyframe.dataset.keyframeProperty,
+        frame: Number(keyframe.dataset.keyframeFrame),
+        value: Number(keyframe.dataset.keyframeValue),
+        easing: keyframe.dataset.keyframeEasing,
+      };
+      inspectorController.render();
+      event.stopPropagation();
+      return;
+    }
     const visual = event.target.closest('[data-visual-item-id]');
     if (visual) {
       timelineInteractions.beginVisualItemDrag(event, visual);
@@ -2293,7 +2402,10 @@ function wireTimeline() {
     const visual = event.target.closest('[data-visual-item-id]');
     if (visual) {
       stageController.selectVisualItem(visual.dataset.visualItemId);
+      const found = L.findVisualItem(state.project, visual.dataset.visualItemId);
+      const frame = frameAtClientX(event.clientX);
       openTimelineContextMenu(event, [
+        { label: 'Add Transform Keyframes Here', run: () => addVisualKeyframesAt(found.item, frame) },
         { label: 'Delete Layer', run: () => inspectorController.removeSelectedVisualItem() },
       ]);
       return;
@@ -2301,7 +2413,10 @@ function wireTimeline() {
     const clip = event.target.closest('.clip');
     if (clip) {
       stageController.selectClip(clip.dataset.clipId);
+      const found = L.findClip(state.project, clip.dataset.clipId);
+      const frame = frameAtClientX(event.clientX);
       openTimelineContextMenu(event, [
+        { label: 'Add Volume Keyframe Here', run: () => addVolumeKeyframeAt(found.clip, frame) },
         { label: 'Apply 3D LUT…', run: () => setClipLut(clip.dataset.clipId) },
         ...(L.findClip(state.project, clip.dataset.clipId).clip.lutPath
           ? [{ label: 'Remove 3D LUT', run: () => edit({ op: 'setClipLut', clipId: clip.dataset.clipId, lutPath: null }) }]
@@ -2314,15 +2429,23 @@ function wireTimeline() {
     const lane = event.target.closest('.lane');
     if (!lane) return;
     const track = L.findTrack(state.project, lane.dataset.trackId);
-    const gap = L.gapAt(track, frameAtClientX(event.clientX));
-    if (!gap) return;
+    const frame = frameAtClientX(event.clientX);
+    const gap = L.gapAt(track, frame);
+    const actions = [
+      ...(track.kind === 'video'
+        ? [{ label: 'Add Adjustment Layer…', run: () => addAdjustmentLayer(track, Math.round(frame)) }]
+        : []),
+      ...(gap
+        ? [{
+          label: 'Ripple Delete Gap',
+          run: () => edit({ op: 'rippleDeleteGap', trackId: track.id, start: gap.start, end: gap.end }),
+        }]
+        : []),
+    ];
+    if (!actions.length) return;
     stageController.selectClip(null);
-    openTimelineContextMenu(event, [
-      {
-        label: 'Ripple Delete Gap',
-        run: () => edit({ op: 'rippleDeleteGap', trackId: track.id, start: gap.start, end: gap.end }),
-      },
-    ]);
+    stageController.selectVisualItem(null);
+    openTimelineContextMenu(event, actions);
   });
 
   window.addEventListener('pointermove', (event) => {

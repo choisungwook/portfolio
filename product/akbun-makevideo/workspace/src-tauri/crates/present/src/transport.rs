@@ -796,6 +796,12 @@ mod tests {
                     out_point: 300,
                     volume: 1.0,
                     opacity: 1.0,
+                    speed: 1.0,
+                    preserve_pitch: true,
+                    fade_in: 0,
+                    fade_out: 0,
+                    volume_keyframes: Default::default(),
+                    blend_mode: Default::default(),
                 }],
                 visual_items: Vec::new(),
                 muted: false,
@@ -1034,10 +1040,8 @@ mod tests {
     fn pause_after_audio_settles_still_keeps_exact_video_and_audio_at_the_target() {
         let project = project();
         let gate = Arc::new(NumberGate::new(18));
-        let (mut transport, consumer) = transport_with_frames(
-            &project,
-            Arc::new(NumberedGateFrames(Arc::clone(&gate))),
-        );
+        let (mut transport, consumer) =
+            transport_with_frames(&project, Arc::new(NumberedGateFrames(Arc::clone(&gate))));
         let clock = Arc::clone(transport.audio().clock());
         let shown = Arc::new(Mutex::new(Vec::new()));
         let mut sink = FrameNumbers(Arc::clone(&shown));

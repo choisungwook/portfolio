@@ -54,7 +54,9 @@ function minClipFrames(rate) {
 }
 
 function clipDuration(clip) {
-  return Math.max(0, clip.out - clip.in);
+  const speed = Number.isFinite(clip.speed) && clip.speed > 0 ? clip.speed : 1;
+  const source = Math.max(0, clip.out - clip.in);
+  return source > 0 ? Math.max(1, Math.round(source / speed)) : 0;
 }
 
 function clipEnd(clip) {
@@ -207,14 +209,63 @@ function clipsAt(project, frame) {
   for (const track of project.tracks) {
     for (const clip of track.clips) {
       if (at < clip.start || at >= clipEnd(clip)) continue;
+      const speed = Number.isFinite(clip.speed) && clip.speed > 0 ? clip.speed : 1;
       active.push({
         track,
         clip,
-        sourceFrame: clip.in + (at - clip.start),
+        sourceFrame: clip.in + Math.floor((at - clip.start) * speed),
       });
     }
   }
   return active;
+}
+
+function easedAmount(amount, easing) {
+  const value = Math.max(0, Math.min(1, amount));
+  if (easing === 'easeIn') return value * value;
+  if (easing === 'easeOut') return 1 - (1 - value) * (1 - value);
+  if (easing === 'easeInOut') {
+    return value < 0.5 ? 2 * value * value : 1 - ((-2 * value + 2) ** 2) / 2;
+  }
+  if (easing === 'hold') return 0;
+  return value;
+}
+
+function keyframeValue(track, frame, fallback) {
+  const keys = track && Array.isArray(track.keyframes) ? track.keyframes : [];
+  if (!keys.length) return fallback;
+  if (frame <= keys[0].frame) return keys[0].value;
+  for (let index = 0; index < keys.length - 1; index += 1) {
+    const left = keys[index];
+    const right = keys[index + 1];
+    if (frame > right.frame) continue;
+    if (frame === right.frame) return right.value;
+    const amount = easedAmount((frame - left.frame) / Math.max(1, right.frame - left.frame), left.easing);
+    return left.value + (right.value - left.value) * amount;
+  }
+  return keys[keys.length - 1].value;
+}
+
+function visualTransformAt(item, frame) {
+  const base = item.transform;
+  const animation = item.animation || {};
+  return {
+    x: keyframeValue(animation.x, frame, base.x),
+    y: keyframeValue(animation.y, frame, base.y),
+    width: keyframeValue(animation.width, frame, base.width),
+    height: keyframeValue(animation.height, frame, base.height),
+    rotation: keyframeValue(animation.rotation, frame, base.rotation),
+    opacity: keyframeValue(animation.opacity, frame, base.opacity),
+  };
+}
+
+function clipVolumeAt(clip, frame) {
+  let volume = Math.max(0, Math.min(1, keyframeValue(clip.volumeKeyframes, frame, clip.volume ?? 1)));
+  const offset = frame - clip.start;
+  if (clip.fadeIn > 0) volume *= Math.max(0, Math.min(1, offset / clip.fadeIn));
+  const remaining = clipEnd(clip) - frame - 1;
+  if (clip.fadeOut > 0) volume *= Math.max(0, Math.min(1, remaining / clip.fadeOut));
+  return volume;
 }
 
 /** The internal empty range under a pointer, or null for a clip, leading
@@ -335,7 +386,7 @@ function tickStepFrames(pxPerSecond, rate) {
  *  over the real one. Nothing is edited through it. */
 function blankProject() {
   return {
-    version: 3,
+    version: 4,
     settings: { width: 1920, height: 1080, rate: T.fps(30) },
     assets: [],
     tracks: [],
@@ -367,6 +418,9 @@ const exported = {
   previousEditPoint,
   nextEditPoint,
   clipsAt,
+  keyframeValue,
+  visualTransformAt,
+  clipVolumeAt,
   gapAt,
   rateOf,
   snapTargets,

@@ -792,7 +792,9 @@ impl Sink for MonitorSink<'_> {
                     h: self.height,
                 },
                 opacity: 1.0,
+                blend_mode: makevideo_render::BlendMode::Normal,
                 lut: None,
+                track_order: 0,
             }],
             visuals: Vec::new(),
         };
@@ -1523,8 +1525,8 @@ mod tests {
 
         let mut ready_paths = HashMap::new();
         ready_paths.insert("asset".into(), "/proxy/r1.mov".into());
-        let refreshed = Config::new(compositor, "ffmpeg".into(), 960, 540)
-            .with_proxies(ready_paths);
+        let refreshed =
+            Config::new(compositor, "ffmpeg".into(), 960, 540).with_proxies(ready_paths);
         shared.set_confirmed_proxy_paths(&refreshed);
 
         let rollback = shared.confirmed_config.lock().unwrap().clone().unwrap();

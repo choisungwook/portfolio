@@ -28,3 +28,4 @@
 | [2026-08-persistent-playback-pipeline.md](./2026-08-persistent-playback-pipeline.md) | Play and pause keep one decoder and audio pipeline alive |
 | [2026-08-live-playback-reconfiguration.md](./2026-08-live-playback-reconfiguration.md) | Playback settings switch after the replacement picture is ready |
 | [2026-08-reusable-seek-decoder.md](./2026-08-reusable-seek-decoder.md) | Short forward seeks reuse a decoder and may show two earlier frames |
+| [2026-09-playback-speed-and-audio-curves.md](./2026-09-playback-speed-and-audio-curves.md) | Clip duration is derived from speed; pitch preservation defaults on and fades stay separate from keyframes |

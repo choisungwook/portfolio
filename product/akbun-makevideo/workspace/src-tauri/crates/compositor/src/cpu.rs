@@ -15,6 +15,7 @@
 //! honest; if the shader changes and this does not, that test fails.
 
 use crate::{Placement, Source};
+use makevideo_render::BlendMode;
 
 #[derive(Default)]
 pub struct CpuCompositor;
@@ -45,6 +46,12 @@ impl CpuCompositor {
         }
 
         for (source, placement) in layers {
+            if placement.adjustment {
+                if let Some(lut) = source.lut {
+                    apply_adjustment(&mut frame, lut);
+                }
+                continue;
+            }
             let expected = (source.width as usize) * (source.height as usize) * 4;
             if source.rgba.len() < expected {
                 return Err(format!(
@@ -120,7 +127,12 @@ fn draw(frame: &mut [u8], width: u32, height: u32, source: &Source<'_>, placemen
                     texel[channel] = round_unorm(corrected[channel] * 255.0);
                 }
             }
-            blend_pixel(&mut frame[frame_index..frame_index + 4], texel, opacity);
+            blend_pixel(
+                &mut frame[frame_index..frame_index + 4],
+                texel,
+                opacity,
+                placement.blend_mode,
+            );
         }
     }
 }
@@ -128,12 +140,12 @@ fn draw(frame: &mut [u8], width: u32, height: u32, source: &Source<'_>, placemen
 /// One source-over blend, matching `composite.wgsl` and the blend state set on
 /// the render pipeline.
 #[inline]
-fn blend_pixel(destination: &mut [u8], texel: [u8; 4], opacity: f32) {
+fn blend_pixel(destination: &mut [u8], texel: [u8; 4], opacity: f32, mode: BlendMode) {
     // Decoded video is normally opaque. Avoid four floating-point blend
     // operations per pixel for the overwhelmingly common full-opacity path;
     // four FHD tracks otherwise spend most of their frame budget multiplying
     // values whose result is simply the source byte.
-    if texel[3] == 255 && opacity >= 1.0 {
+    if mode == BlendMode::Normal && texel[3] == 255 && opacity >= 1.0 {
         destination.copy_from_slice(&texel);
         return;
     }
@@ -143,11 +155,31 @@ fn blend_pixel(destination: &mut [u8], texel: [u8; 4], opacity: f32) {
     }
     let keep = 1.0 - source_alpha;
     for channel in 0..3 {
-        let mixed = texel[channel] as f32 * source_alpha + destination[channel] as f32 * keep;
+        let source = texel[channel] as f32;
+        let backdrop = destination[channel] as f32;
+        let blended = match mode {
+            BlendMode::Normal => source,
+            BlendMode::Multiply => source * backdrop / 255.0,
+            BlendMode::Screen => 255.0 - (255.0 - source) * (255.0 - backdrop) / 255.0,
+        };
+        let mixed = blended * source_alpha + backdrop * keep;
         destination[channel] = round_unorm(mixed);
     }
     let existing = destination[3] as f32 / 255.0;
     destination[3] = round_unorm((source_alpha + existing * keep) * 255.0);
+}
+
+fn apply_adjustment(frame: &mut [u8], lut: &crate::lut::Lut) {
+    for pixel in frame.chunks_exact_mut(4) {
+        let corrected = lut.sample([
+            pixel[0] as f32 / 255.0,
+            pixel[1] as f32 / 255.0,
+            pixel[2] as f32 / 255.0,
+        ]);
+        for channel in 0..3 {
+            pixel[channel] = round_unorm(corrected[channel] * 255.0);
+        }
+    }
 }
 
 /// How a unorm8 render target rounds, so the two backends land on the same

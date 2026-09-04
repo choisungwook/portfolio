@@ -5,6 +5,7 @@
 //! that test is what catches the other half being left behind.
 
 use crate::{lut::Lut, Placement, Source};
+use makevideo_render::BlendMode;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -20,6 +21,8 @@ struct LayerUniform {
     lut_size: f32,
     domain_min: [f32; 4],
     domain_max: [f32; 4],
+    blend_mode: u32,
+    padding: [u32; 3],
 }
 
 impl LayerUniform {
@@ -49,11 +52,20 @@ pub struct GpuCompositor {
     shader: wgpu::ShaderModule,
     pipeline_layout: wgpu::PipelineLayout,
     pipeline: wgpu::RenderPipeline,
+    multiply_pipeline: wgpu::RenderPipeline,
+    screen_pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     identity_lut: Lut,
     lut_textures: Mutex<HashMap<LutKey, wgpu::Texture>>,
     adapter: String,
+}
+
+pub struct Pipelines {
+    format: wgpu::TextureFormat,
+    normal: wgpu::RenderPipeline,
+    multiply: wgpu::RenderPipeline,
+    screen: wgpu::RenderPipeline,
 }
 
 /// Every copy out of a texture has its rows padded to this, so the readback
@@ -201,7 +213,27 @@ impl GpuCompositor {
             immediate_size: 0,
         });
 
-        let pipeline = make_pipeline(&device, &shader, &pipeline_layout, FRAME_FORMAT);
+        let pipeline = make_pipeline(
+            &device,
+            &shader,
+            &pipeline_layout,
+            FRAME_FORMAT,
+            BlendMode::Normal,
+        );
+        let multiply_pipeline = make_pipeline(
+            &device,
+            &shader,
+            &pipeline_layout,
+            FRAME_FORMAT,
+            BlendMode::Multiply,
+        );
+        let screen_pipeline = make_pipeline(
+            &device,
+            &shader,
+            &pipeline_layout,
+            FRAME_FORMAT,
+            BlendMode::Screen,
+        );
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("source"),
@@ -220,6 +252,8 @@ impl GpuCompositor {
             shader,
             pipeline_layout,
             pipeline,
+            multiply_pipeline,
+            screen_pipeline,
             layout,
             sampler,
             identity_lut: Lut::identity(),
@@ -257,8 +291,31 @@ impl GpuCompositor {
     /// `Bgra8Unorm` — and a render pipeline is tied to the format of what it
     /// draws into, so the viewport builds its own with this rather than
     /// re-declaring the pipeline next to a second copy of the blend state.
-    pub fn pipeline_for(&self, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
-        make_pipeline(&self.device, &self.shader, &self.pipeline_layout, format)
+    pub fn pipelines_for(&self, format: wgpu::TextureFormat) -> Pipelines {
+        Pipelines {
+            format,
+            normal: make_pipeline(
+                &self.device,
+                &self.shader,
+                &self.pipeline_layout,
+                format,
+                BlendMode::Normal,
+            ),
+            multiply: make_pipeline(
+                &self.device,
+                &self.shader,
+                &self.pipeline_layout,
+                format,
+                BlendMode::Multiply,
+            ),
+            screen: make_pipeline(
+                &self.device,
+                &self.shader,
+                &self.pipeline_layout,
+                format,
+                BlendMode::Screen,
+            ),
+        }
     }
 
     /// Draw the layers into `view`, which must be `width` x `height` and must
@@ -272,18 +329,196 @@ impl GpuCompositor {
     pub fn draw_onto(
         &self,
         view: &wgpu::TextureView,
-        pipeline: &wgpu::RenderPipeline,
+        pipelines: &Pipelines,
         width: u32,
         height: u32,
         layers: &[(Source<'_>, Placement)],
     ) -> Result<(), String> {
+        if layers.iter().any(|(_, placement)| placement.adjustment) {
+            return self.draw_adjusted_onto(view, pipelines, width, height, layers);
+        }
         let bindings = self.bind(width, height, layers)?;
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame"),
             });
-        self.pass(&mut encoder, view, pipeline, &bindings);
+        self.pass(
+            &mut encoder,
+            view,
+            &pipelines.normal,
+            &pipelines.multiply,
+            &pipelines.screen,
+            &bindings,
+            layers,
+            true,
+        );
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+
+    fn draw_adjusted_onto(
+        &self,
+        view: &wgpu::TextureView,
+        pipelines: &Pipelines,
+        width: u32,
+        height: u32,
+        layers: &[(Source<'_>, Placement)],
+    ) -> Result<(), String> {
+        let make_target = |label| {
+            self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(label),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: pipelines.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+        };
+        let first = make_target("adjustment A");
+        let second = make_target("adjustment B");
+        let first_view = first.create_view(&wgpu::TextureViewDescriptor::default());
+        let second_view = second.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut on_first = true;
+        let mut initialized = false;
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("adjusted frame"),
+            });
+
+        for (source, placement) in layers {
+            let current = if on_first { &first_view } else { &second_view };
+            if placement.adjustment {
+                if !initialized {
+                    self.pass(
+                        &mut encoder,
+                        current,
+                        &pipelines.normal,
+                        &pipelines.multiply,
+                        &pipelines.screen,
+                        &[],
+                        &[],
+                        true,
+                    );
+                }
+                let next = if on_first { &second_view } else { &first_view };
+                let full = Placement {
+                    dst: makevideo_render::layout::Rect {
+                        x: 0,
+                        y: 0,
+                        w: width,
+                        h: height,
+                    },
+                    opacity: 1.0,
+                    blend_mode: BlendMode::Normal,
+                    adjustment: false,
+                };
+                let binding = self.binding_for_view(
+                    width,
+                    height,
+                    current,
+                    source.lut.unwrap_or(&self.identity_lut),
+                    &full,
+                );
+                let adjusted = [(
+                    Source {
+                        rgba: &[],
+                        width: 0,
+                        height: 0,
+                        lut: None,
+                    },
+                    full,
+                )];
+                self.pass(
+                    &mut encoder,
+                    next,
+                    &pipelines.normal,
+                    &pipelines.multiply,
+                    &pipelines.screen,
+                    &[binding],
+                    &adjusted,
+                    true,
+                );
+                on_first = !on_first;
+                initialized = true;
+                continue;
+            }
+
+            let one = [(
+                Source {
+                    rgba: source.rgba,
+                    width: source.width,
+                    height: source.height,
+                    lut: source.lut,
+                },
+                *placement,
+            )];
+            let bindings = self.bind(width, height, &one)?;
+            self.pass(
+                &mut encoder,
+                current,
+                &pipelines.normal,
+                &pipelines.multiply,
+                &pipelines.screen,
+                &bindings,
+                &one,
+                !initialized,
+            );
+            initialized = true;
+        }
+
+        let current = if on_first { &first_view } else { &second_view };
+        if !initialized {
+            self.pass(
+                &mut encoder,
+                current,
+                &pipelines.normal,
+                &pipelines.multiply,
+                &pipelines.screen,
+                &[],
+                &[],
+                true,
+            );
+        }
+        let full = Placement {
+            dst: makevideo_render::layout::Rect {
+                x: 0,
+                y: 0,
+                w: width,
+                h: height,
+            },
+            opacity: 1.0,
+            blend_mode: BlendMode::Normal,
+            adjustment: false,
+        };
+        let binding = self.binding_for_view(width, height, current, &self.identity_lut, &full);
+        let flattened = [(
+            Source {
+                rgba: &[],
+                width: 0,
+                height: 0,
+                lut: None,
+            },
+            full,
+        )];
+        self.pass(
+            &mut encoder,
+            view,
+            &pipelines.normal,
+            &pipelines.multiply,
+            &pipelines.screen,
+            &[binding],
+            &flattened,
+            true,
+        );
         self.queue.submit(Some(encoder.finish()));
         Ok(())
     }
@@ -365,6 +600,12 @@ impl GpuCompositor {
                     lut.domain_max()[2],
                     0.0,
                 ],
+                blend_mode: match placement.blend_mode {
+                    BlendMode::Normal => 0,
+                    BlendMode::Multiply => 1,
+                    BlendMode::Screen => 2,
+                },
+                padding: [0; 3],
             };
             let buffer = self
                 .device
@@ -401,6 +642,75 @@ impl GpuCompositor {
         Ok(bindings)
     }
 
+    fn binding_for_view(
+        &self,
+        width: u32,
+        height: u32,
+        texture_view: &wgpu::TextureView,
+        lut: &Lut,
+        placement: &Placement,
+    ) -> wgpu::BindGroup {
+        let uniform = LayerUniform {
+            rect: [
+                placement.dst.x as f32,
+                placement.dst.y as f32,
+                placement.dst.w as f32,
+                placement.dst.h as f32,
+            ],
+            frame: [width as f32, height as f32],
+            opacity: placement.opacity.clamp(0.0, 1.0),
+            lut_size: lut.size() as f32,
+            domain_min: [
+                lut.domain_min()[0],
+                lut.domain_min()[1],
+                lut.domain_min()[2],
+                0.0,
+            ],
+            domain_max: [
+                lut.domain_max()[0],
+                lut.domain_max()[1],
+                lut.domain_max()[2],
+                0.0,
+            ],
+            blend_mode: match placement.blend_mode {
+                BlendMode::Normal => 0,
+                BlendMode::Multiply => 1,
+                BlendMode::Screen => 2,
+            },
+            padding: [0; 3],
+        };
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("layer"),
+                contents: uniform.bytes(),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let lut_view = self.lut_view(lut);
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("layer"),
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&lut_view),
+                },
+            ],
+        })
+    }
+
     fn lut_view(&self, lut: &Lut) -> wgpu::TextureView {
         let key = LutKey::from(lut);
         let mut textures = self.lut_textures.lock().unwrap();
@@ -433,7 +743,11 @@ impl GpuCompositor {
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         pipeline: &wgpu::RenderPipeline,
+        multiply_pipeline: &wgpu::RenderPipeline,
+        screen_pipeline: &wgpu::RenderPipeline,
         bindings: &[wgpu::BindGroup],
+        layers: &[(Source<'_>, Placement)],
+        clear: bool,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("composite"),
@@ -444,12 +758,16 @@ impl GpuCompositor {
                 ops: wgpu::Operations {
                     // Opaque black, the same base the filter graph starts
                     // from, so a frame with nothing on it matches.
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 1.0,
-                    }),
+                    load: if clear {
+                        wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        })
+                    } else {
+                        wgpu::LoadOp::Load
+                    },
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -458,8 +776,12 @@ impl GpuCompositor {
             occlusion_query_set: None,
             multiview_mask: None,
         });
-        pass.set_pipeline(pipeline);
-        for binding in bindings {
+        for (binding, (_, placement)) in bindings.iter().zip(layers) {
+            pass.set_pipeline(match placement.blend_mode {
+                BlendMode::Normal => pipeline,
+                BlendMode::Multiply => multiply_pipeline,
+                BlendMode::Screen => screen_pipeline,
+            });
             pass.set_bind_group(0, binding, &[]);
             pass.draw(0..6, 0..1);
         }
@@ -474,6 +796,7 @@ impl GpuCompositor {
         if width == 0 || height == 0 {
             return Err("the output frame has no size".into());
         }
+        let adjusted = layers.iter().any(|(_, placement)| placement.adjustment);
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("frame"),
             size: wgpu::Extent3d {
@@ -489,7 +812,11 @@ impl GpuCompositor {
             view_formats: &[],
         });
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
-        let bindings = self.bind(width, height, layers)?;
+        let bindings = if adjusted {
+            Vec::new()
+        } else {
+            self.bind(width, height, layers)?
+        };
 
         let padded_row = ((width * 4).div_ceil(ROW_ALIGN)) * ROW_ALIGN;
         let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -504,7 +831,21 @@ impl GpuCompositor {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame"),
             });
-        self.pass(&mut encoder, &view, &self.pipeline, &bindings);
+        if adjusted {
+            let pipelines = self.pipelines_for(FRAME_FORMAT);
+            self.draw_adjusted_onto(&view, &pipelines, width, height, layers)?;
+        } else {
+            self.pass(
+                &mut encoder,
+                &view,
+                &self.pipeline,
+                &self.multiply_pipeline,
+                &self.screen_pipeline,
+                &bindings,
+                layers,
+                true,
+            );
+        }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
                 texture: &target,
@@ -572,7 +913,25 @@ fn make_pipeline(
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
     format: wgpu::TextureFormat,
+    blend_mode: BlendMode,
 ) -> wgpu::RenderPipeline {
+    let color = match blend_mode {
+        BlendMode::Normal => wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::SrcAlpha,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        },
+        BlendMode::Multiply => wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::Dst,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        },
+        BlendMode::Screen => wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::OneMinusSrc,
+            operation: wgpu::BlendOperation::Add,
+        },
+    };
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("composite"),
         layout: Some(layout),
@@ -588,11 +947,7 @@ fn make_pipeline(
             targets: &[Some(wgpu::ColorTargetState {
                 format,
                 blend: Some(wgpu::BlendState {
-                    color: wgpu::BlendComponent {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
+                    color,
                     alpha: wgpu::BlendComponent {
                         src_factor: wgpu::BlendFactor::One,
                         dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,

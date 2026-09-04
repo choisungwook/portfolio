@@ -316,7 +316,9 @@ impl Engine {
     /// Move playback to an engine sample.
     pub fn seek_sample(&self, sample: i64) {
         self.seeks_asked.fetch_add(1, Ordering::SeqCst);
-        let _ = self.control.send(Command::Seek(sample.clamp(0, self.total)));
+        let _ = self
+            .control
+            .send(Command::Seek(sample.clamp(0, self.total)));
     }
 
     /// Whether the feeder has carried out every seek asked of it.
@@ -422,8 +424,12 @@ mod tests {
         // 48000 frames of it and the clock has to end on 48000, because the
         // clock is a count of what was played and not a stopwatch.
         let project = one_clip_project();
-        let (engine, consumer, clock) =
-            Engine::start(&project, Buffering::default(), level_readers(0.5), options());
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(0.5),
+            options(),
+        );
 
         let mut played = Vec::new();
         let deadline = Instant::now() + Duration::from_secs(20);
@@ -449,8 +455,12 @@ mod tests {
         // throws away a fifth of a second of work and every play button waits
         // that long before anything is heard.
         let project = one_clip_project();
-        let (engine, _consumer, _clock) =
-            Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+        let (engine, _consumer, _clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
         assert!(engine.wait_until_ready(2_048, Instant::now() + Duration::from_secs(10)));
         std::thread::sleep(Duration::from_millis(50));
         assert!(
@@ -466,8 +476,12 @@ mod tests {
         // ring was flushed, the position here would come back a ring's worth
         // past 24000 and stay wrong for the rest of the session.
         let project = one_clip_project();
-        let (engine, consumer, clock) =
-            Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
         assert!(engine.wait_until_ready(2_048, Instant::now() + Duration::from_secs(10)));
 
         let mut played = Vec::new();
@@ -527,8 +541,12 @@ mod tests {
     #[test]
     fn the_clock_reads_as_a_frame_of_the_project_rate() {
         let project = one_clip_project();
-        let (engine, consumer, clock) =
-            Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
         engine.seek_frame(15);
         let deadline = Instant::now() + Duration::from_secs(10);
         while clock.position(engine.rate()).value() != 15 && Instant::now() < deadline {
@@ -543,8 +561,12 @@ mod tests {
     #[test]
     fn a_seek_past_the_end_lands_on_the_end_rather_than_running_off_it() {
         let project = one_clip_project();
-        let (engine, consumer, clock) =
-            Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
         engine.seek_sample(9_000_000);
         let deadline = Instant::now() + Duration::from_secs(10);
         while clock.position_samples() != 48_000 && Instant::now() < deadline {
@@ -564,8 +586,12 @@ mod tests {
         // landed, while the clock had already been moved to the new position —
         // a clock permanently ahead of the sound, with nothing to correct it.
         let project = one_clip_project();
-        let (engine, consumer, clock) =
-            Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+        let (engine, consumer, clock) = Engine::start(
+            &project,
+            Buffering::default(),
+            level_readers(1.0),
+            options(),
+        );
         assert!(engine.wait_until_ready(2_048, Instant::now() + Duration::from_secs(10)));
         let before = engine.buffered_frames();
 
@@ -604,8 +630,12 @@ mod tests {
         let project = one_clip_project();
         let (done, finished) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
-            let (engine, _consumer, _clock) =
-                Engine::start(&project, Buffering::default(), level_readers(1.0), options());
+            let (engine, _consumer, _clock) = Engine::start(
+                &project,
+                Buffering::default(),
+                level_readers(1.0),
+                options(),
+            );
             drop(engine);
             let _ = done.send(());
         });

@@ -96,6 +96,7 @@ fn decode_layer(
         width: layer.dst.w,
         height: layer.dst.h,
         rate,
+        speed: 1.0,
         hwaccel: None,
     });
     let output = Command::new(ffmpeg_path)
@@ -312,6 +313,8 @@ pub fn preview_frame(
                     Draw {
                         dst: layer.dst,
                         opacity: layer.opacity,
+                        blend_mode: layer.blend_mode,
+                        adjustment: false,
                     },
                 )
             })
@@ -325,7 +328,7 @@ pub fn preview_frame(
                 rgba: &layer.pixels,
                 width: layer.width,
                 height: layer.height,
-                lut: None,
+                lut: layer.lut.as_deref(),
             },
             layer.placement,
         )

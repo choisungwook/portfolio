@@ -269,9 +269,20 @@ function createPreview(options) {
           seekFailed = true;
         }
       }
+      const clipSpeed = Number.isFinite(clip.speed) && clip.speed > 0 ? clip.speed : 1;
       entry.element.playbackRate =
-        playing && !isReference && !needsHardSeek ? playbackRateForDrift(drift) : 1;
-      entry.element.volume = clamp01(clip.volume);
+        playing && !isReference && !needsHardSeek
+          ? clipSpeed * playbackRateForDrift(drift)
+          : clipSpeed;
+      entry.element.preservesPitch = clip.preservePitch !== false;
+      if ('webkitPreservesPitch' in entry.element) {
+        entry.element.webkitPreservesPitch = clip.preservePitch !== false;
+      }
+      entry.element.volume = clamp01(
+        typeof L.clipVolumeAt === 'function'
+          ? L.clipVolumeAt(clip, Math.floor(positionFrames))
+          : clip.volume
+      );
       entry.element.muted =
         (track.kind === 'video' && track.muted) || (scrubbing && muteWhileScrubbing);
       if (
