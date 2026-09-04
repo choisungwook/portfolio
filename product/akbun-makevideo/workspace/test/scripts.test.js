@@ -35,7 +35,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.appInitLib);
 });
 
-test('renderer reaches program monitor private state through its controller', () => {
+test('renderer resets program monitor state only through its controller', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer.js'), 'utf8');
 
   assert.doesNotMatch(source, /\beditorOverlayActive\b/);
