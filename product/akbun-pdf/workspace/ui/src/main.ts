@@ -93,7 +93,7 @@ async function saveCurrentDocument(): Promise<void> {
     if (!report) return;
     const size = new Intl.NumberFormat("ko-KR").format(report.savedSize);
     showToast(report.unchanged
-      ? `원본 스트림 ${report.streamCount}개와 파일 크기 보존 · ${size} bytes`
+      ? `원본 byte와 파일 크기 보존 · ${size} bytes`
       : "저장 결과가 원본과 달라 저장을 확인해야 합니다.");
   } catch (error) {
     showToast(`저장 실패 · ${String(error)}`);
@@ -103,6 +103,7 @@ async function saveCurrentDocument(): Promise<void> {
 function applyZoom(mode: FitMode, requested = state.zoom): void {
   const zoom = viewer.zoom(mode, requested);
   updateState({ ...state, zoom });
+  if (!searchPanel.hidden) refreshSearchResults();
 }
 
 function openFind(): void {

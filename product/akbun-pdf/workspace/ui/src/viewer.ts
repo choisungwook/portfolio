@@ -15,15 +15,13 @@ export class PdfViewer {
   private scale = 1;
   private generation = 0;
   private currentPage = 1;
-  private scrollFrame = 0;
+  private visiblePages = new Map<number, number>();
 
   constructor(
     private stage: HTMLElement,
     private viewport: HTMLElement,
     private callbacks: ViewerCallbacks,
-  ) {
-    this.viewport.addEventListener("scroll", () => this.scheduleCurrentPage());
-  }
+  ) {}
 
   async open(adapter: PdfDocumentAdapter): Promise<void> {
     if (this.adapter) await this.close();
@@ -45,6 +43,7 @@ export class PdfViewer {
     this.generation += 1;
     this.observer?.disconnect();
     this.observer = null;
+    this.visiblePages.clear();
     this.search.clear();
     this.stage.classList.remove("document-stage--pdf");
     this.stage.replaceChildren();
@@ -122,11 +121,17 @@ export class PdfViewer {
 
   private observePages(): void {
     this.observer = new IntersectionObserver((entries) => {
-      entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+      entries.forEach((entry) => {
         const page = Number((entry.target as HTMLElement).dataset.pdfPage);
-        void this.renderPage(page, this.generation);
+        if (entry.isIntersecting) {
+          this.visiblePages.set(page, entry.intersectionRatio);
+          void this.renderPage(page, this.generation);
+        } else {
+          this.visiblePages.delete(page);
+        }
       });
-    }, { root: this.viewport, rootMargin: "80% 0px" });
+      this.selectMostVisiblePage();
+    }, { root: this.viewport, threshold: [0, 0.25, 0.5, 0.75, 1] });
     this.stage.querySelectorAll("[data-pdf-page]").forEach((page) => this.observer?.observe(page));
   }
 
@@ -179,23 +184,16 @@ export class PdfViewer {
     });
   }
 
-  private scheduleCurrentPage(): void {
-    if (this.scrollFrame) return;
-    this.scrollFrame = window.requestAnimationFrame(() => {
-      this.scrollFrame = 0;
-      const center = this.viewport.getBoundingClientRect().top + this.viewport.clientHeight / 2;
-      let nearest = this.currentPage;
-      let distance = Number.POSITIVE_INFINITY;
-      this.stage.querySelectorAll<HTMLElement>("[data-pdf-page]").forEach((surface) => {
-        const rect = surface.getBoundingClientRect();
-        const wanted = Math.abs(rect.top + rect.height / 2 - center);
-        if (wanted < distance) {
-          distance = wanted;
-          nearest = Number(surface.dataset.pdfPage);
-        }
-      });
-      this.setCurrentPage(nearest);
-    });
+  private selectMostVisiblePage(): void {
+    let page = this.currentPage;
+    let ratio = -1;
+    for (const [candidate, visibleRatio] of this.visiblePages) {
+      if (visibleRatio > ratio) {
+        page = candidate;
+        ratio = visibleRatio;
+      }
+    }
+    this.setCurrentPage(page);
   }
 
   private setCurrentPage(page: number): void {

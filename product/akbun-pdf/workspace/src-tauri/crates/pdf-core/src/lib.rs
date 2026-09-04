@@ -61,9 +61,6 @@ pub struct PreservationReport {
     pub saved_size: usize,
     pub original_hash: String,
     pub saved_hash: String,
-    pub original_stream_hash: String,
-    pub saved_stream_hash: String,
-    pub stream_count: usize,
     pub unchanged: bool,
 }
 
@@ -165,31 +162,6 @@ impl DocumentStore {
         Ok(&self.session(document_id)?.bytes)
     }
 
-    pub fn preservation_report(
-        &self,
-        document_id: &str,
-        saved: &[u8],
-    ) -> Result<PreservationReport, String> {
-        let original = self.bytes(document_id)?;
-        let original_hash = stable_hash(original);
-        let saved_hash = stable_hash(saved);
-        let (original_stream_hash, stream_count) = content_stream_hash(original);
-        let (saved_stream_hash, saved_stream_count) = content_stream_hash(saved);
-        Ok(PreservationReport {
-            original_size: original.len(),
-            saved_size: saved.len(),
-            unchanged: original.len() == saved.len()
-                && original_hash == saved_hash
-                && original_stream_hash == saved_stream_hash
-                && stream_count == saved_stream_count,
-            original_hash,
-            saved_hash,
-            original_stream_hash,
-            saved_stream_hash,
-            stream_count,
-        })
-    }
-
     pub fn close(&mut self) -> DocumentState {
         self.session = None;
         DocumentState::empty()
@@ -217,35 +189,16 @@ fn stable_hash(bytes: &[u8]) -> String {
     format!("{hash:016x}")
 }
 
-fn content_stream_hash(bytes: &[u8]) -> (String, usize) {
-    let mut hash = 0xcbf29ce484222325_u64;
-    let mut count = 0;
-    let mut cursor = 0;
-    while let Some(start_offset) = find_bytes(&bytes[cursor..], b"stream") {
-        let mut start = cursor + start_offset + b"stream".len();
-        if bytes.get(start) == Some(&b'\r') {
-            start += 1;
-        }
-        if bytes.get(start) == Some(&b'\n') {
-            start += 1;
-        }
-        let Some(end_offset) = find_bytes(&bytes[start..], b"endstream") else {
-            break;
-        };
-        let end = start + end_offset;
-        hash = bytes[start..end].iter().fold(hash, |value, byte| {
-            (value ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
-        count += 1;
-        cursor = end + b"endstream".len();
+pub fn preservation_report(original: &[u8], saved: &[u8]) -> PreservationReport {
+    let original_hash = stable_hash(original);
+    let saved_hash = stable_hash(saved);
+    PreservationReport {
+        original_size: original.len(),
+        saved_size: saved.len(),
+        unchanged: original.len() == saved.len() && original_hash == saved_hash,
+        original_hash,
+        saved_hash,
     }
-    (format!("{hash:016x}"), count)
-}
-
-fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
 }
 
 #[cfg(test)]
@@ -280,12 +233,10 @@ mod tests {
         let opened = store.open("sample.pdf".into(), PDF.to_vec()).unwrap();
         let id = opened.state.document_id.as_deref().unwrap();
         let saved = store.bytes(id).unwrap().to_vec();
-        let report = store.preservation_report(id, &saved).unwrap();
+        let report = preservation_report(store.bytes(id).unwrap(), &saved);
         assert!(report.unchanged);
         assert_eq!(report.original_size, report.saved_size);
         assert_eq!(report.original_hash, report.saved_hash);
-        assert_eq!(report.original_stream_hash, report.saved_stream_hash);
-        assert_eq!(report.stream_count, 1);
         assert!(String::from_utf8(saved)
             .unwrap()
             .contains("stream\nhello\nendstream"));

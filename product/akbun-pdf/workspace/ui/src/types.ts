@@ -35,9 +35,6 @@ export interface PreservationReport {
   savedSize: number;
   originalHash: string;
   savedHash: string;
-  originalStreamHash: string;
-  savedStreamHash: string;
-  streamCount: number;
   unchanged: boolean;
 }
 

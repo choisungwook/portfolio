@@ -44,6 +44,6 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 - Rust core가 원본 byte와 documentId 세션 보관
 - 새 문서 열기와 닫기에서 이전 byte 즉시 해제
 - PDF.js document와 Worker는 UI viewer가 소유하고 같은 시점에 destroy
-- 변경 없는 저장은 원본 byte를 그대로 기록한 뒤 크기와 해시 비교
+- 변경 없는 저장은 원본 전체 byte를 그대로 기록한 뒤 크기와 해시 비교
 - 페이지 텍스트는 PDF.js Worker에서 순서대로 추출하고 준비된 페이지부터 검색
 - 검색 캐시는 문서 닫기와 교체에서 즉시 제거

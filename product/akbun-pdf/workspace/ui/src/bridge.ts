@@ -17,15 +17,22 @@ declare global {
   }
 }
 
+function isTauriRuntime(): boolean {
+  const internals = window.__TAURI_INTERNALS__;
+  if (typeof internals !== "object" || internals === null) return false;
+  const metadata = (internals as { metadata?: { currentWindow?: { label?: unknown } } }).metadata;
+  return typeof metadata?.currentWindow?.label === "string";
+}
+
 export async function getInitialState(): Promise<DocumentState> {
   const phase = previewPhase(window.location.search);
   if (phase) return fixtureFor(phase);
-  if (!window.__TAURI_INTERNALS__) return fixtureFor("empty");
+  if (!isTauriRuntime()) return fixtureFor("empty");
   return invoke<DocumentState>("get_document_state");
 }
 
 export async function chooseAndOpenDocument(): Promise<OpenDocumentPayload | null> {
-  if (!window.__TAURI_INTERNALS__) throw new Error("Tauri 앱에서 PDF를 열어주세요.");
+  if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 열어주세요.");
   const path = await open({
     multiple: false,
     filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
@@ -47,7 +54,7 @@ export function failDocumentOpen(documentId: string, error: unknown): Promise<Do
 }
 
 export function closeDocument(): Promise<DocumentState> {
-  if (!window.__TAURI_INTERNALS__) return Promise.resolve(fixtureFor("empty"));
+  if (!isTauriRuntime()) return Promise.resolve(fixtureFor("empty"));
   return invoke("close_document");
 }
 
@@ -55,6 +62,7 @@ export async function chooseAndSaveDocument(
   documentId: string,
   title: string,
 ): Promise<PreservationReport | null> {
+  if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 저장해 주세요.");
   const path = await save({
     defaultPath: title,
     filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
@@ -64,7 +72,7 @@ export async function chooseAndSaveDocument(
 }
 
 export async function checkForUpdates(): Promise<string> {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return "브라우저 미리보기에서는 업데이트를 확인하지 않습니다.";
   }
 
