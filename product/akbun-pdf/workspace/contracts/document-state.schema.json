@@ -3,9 +3,10 @@
   "$id": "https://akbun.io/pdf/contracts/document-state.schema.json",
   "title": "DocumentState",
   "type": "object",
-  "required": ["phase", "title", "currentPage", "pageCount", "zoom", "thumbnails", "outline", "errorMessage"],
+  "required": ["phase", "documentId", "title", "currentPage", "pageCount", "zoom", "thumbnails", "outline", "errorMessage"],
   "properties": {
     "phase": { "enum": ["empty", "loading", "ready", "error"] },
+    "documentId": { "type": ["string", "null"] },
     "title": { "type": "string" },
     "currentPage": { "type": "integer", "minimum": 0 },
     "pageCount": { "type": "integer", "minimum": 0 },
@@ -26,11 +27,12 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "title", "page", "depth"],
+        "required": ["id", "title", "page", "top", "depth"],
         "properties": {
           "id": { "type": "string" },
           "title": { "type": "string" },
           "page": { "type": "integer", "minimum": 1 },
+          "top": { "type": ["number", "null"] },
           "depth": { "type": "integer", "minimum": 0 }
         },
         "additionalProperties": false

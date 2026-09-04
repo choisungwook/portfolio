@@ -1,15 +1,19 @@
 mod commands;
 
-use pdf_core::DocumentState;
+use std::sync::{Mutex, MutexGuard};
+
+use pdf_core::DocumentStore;
 
 #[derive(Default)]
 pub struct AppState {
-    document: DocumentState,
+    store: Mutex<DocumentStore>,
 }
 
 impl AppState {
-    fn document(&self) -> DocumentState {
-        self.document.clone()
+    fn store(&self) -> Result<MutexGuard<'_, DocumentStore>, String> {
+        self.store
+            .lock()
+            .map_err(|_| "문서 상태 잠금에 실패했습니다.".into())
     }
 }
 
@@ -37,7 +41,14 @@ pub fn run() {
             let _ = app;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::get_document_state])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_document_state,
+            commands::open_document,
+            commands::complete_document_open,
+            commands::fail_document_open,
+            commands::save_document,
+            commands::close_document,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running akbun-pdf");
 }

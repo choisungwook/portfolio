@@ -1,0 +1,133 @@
+.fit-button {
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.fit-button:hover:not(:disabled) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.fit-button:disabled {
+  cursor: default;
+  opacity: 0.34;
+}
+
+.document-stage--pdf {
+  display: flex !important;
+  min-width: max-content;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.pdf-page--canvas {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: auto;
+  overflow: hidden;
+  transform: none;
+  transition: width 120ms ease, height 120ms ease;
+}
+
+.pdf-page--canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: white;
+}
+
+.pdf-page__number {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #666;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+}
+
+.search-highlights {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.search-highlight {
+  position: absolute;
+  margin: 0;
+  border-radius: 2px;
+  background: rgba(255, 210, 46, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(187, 142, 0, 0.18);
+}
+
+.search-highlight--current {
+  background: rgba(232, 89, 44, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(177, 52, 15, 0.5);
+}
+
+.thumbnail__page canvas {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.search-panel {
+  position: fixed;
+  z-index: 12;
+  top: 66px;
+  right: calc(var(--outline-width) + 18px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--toolbar);
+  box-shadow: 0 10px 32px rgba(40, 36, 30, 0.17);
+  backdrop-filter: blur(16px);
+}
+
+.search-panel input {
+  width: 230px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  font-size: 12px;
+  user-select: text;
+}
+
+.search-status {
+  min-width: 120px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .workspace,
+  body.pages-collapsed .workspace,
+  body.outline-collapsed .workspace,
+  body.pages-collapsed.outline-collapsed .workspace {
+    grid-template-columns: 160px 4px minmax(340px, 1fr) 0 0;
+  }
+
+  .panel-resizer--outline {
+    display: none;
+  }
+
+  .search-panel {
+    right: 14px;
+  }
+}

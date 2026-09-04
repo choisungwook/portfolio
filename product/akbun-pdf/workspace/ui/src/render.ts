@@ -1,6 +1,8 @@
 import type { DocumentState, OutlineItem, Thumbnail } from "./types";
 
 let toastTimer: number | undefined;
+let thumbnailDocument = "";
+let thumbnailCount = -1;
 
 function element<T extends Element>(selector: string): T {
   const match = document.querySelector<T>(selector);
@@ -24,6 +26,9 @@ function makeThumbnail(item: Thumbnail, selected: boolean): HTMLButtonElement {
     <i class="thumbnail__line thumbnail__line--short"></i>
     <i class="thumbnail__shape"></i>
   `;
+  const canvas = document.createElement("canvas");
+  canvas.dataset.thumbnailCanvas = String(item.page);
+  preview.append(canvas);
 
   const number = document.createElement("span");
   number.className = "thumbnail__number";
@@ -37,6 +42,7 @@ function makeOutlineItem(item: OutlineItem, selected: boolean): HTMLButtonElemen
   button.className = `outline-item${selected ? " outline-item--selected" : ""}`;
   button.type = "button";
   button.dataset.page = String(item.page);
+  if (item.top !== null) button.dataset.top = String(item.top);
   button.style.setProperty("--depth", String(item.depth));
 
   const title = document.createElement("span");
@@ -57,7 +63,7 @@ function renderControls(state: DocumentState): void {
   element<HTMLElement>("[data-role='zoom']").textContent = `${Math.round(state.zoom * 100)}%`;
 
   document.querySelectorAll<HTMLButtonElement>(
-    "[data-action='previous-page'], [data-action='next-page'], [data-action='zoom-in'], [data-action='zoom-out'], [data-action='reset-zoom']",
+    "[data-action='previous-page'], [data-action='next-page'], [data-action='zoom-in'], [data-action='zoom-out'], [data-action='reset-zoom'], [data-document-control]",
   ).forEach((button) => {
     button.disabled = !ready;
   });
@@ -65,9 +71,18 @@ function renderControls(state: DocumentState): void {
 
 function renderThumbnails(state: DocumentState): void {
   const list = element<HTMLElement>("[data-role='thumbnail-list']");
-  list.replaceChildren(...state.thumbnails.map((item) => (
-    makeThumbnail(item, item.page === state.currentPage)
-  )));
+  const documentId = state.documentId ?? "";
+  if (documentId !== thumbnailDocument || state.pageCount !== thumbnailCount) {
+    list.replaceChildren(...state.thumbnails.map((item) => (
+      makeThumbnail(item, item.page === state.currentPage)
+    )));
+    thumbnailDocument = documentId;
+    thumbnailCount = state.pageCount;
+  } else {
+    list.querySelectorAll<HTMLElement>("[data-page]").forEach((item) => {
+      item.classList.toggle("thumbnail--selected", Number(item.dataset.page) === state.currentPage);
+    });
+  }
   element<HTMLElement>("[data-role='thumbnail-count']").textContent = String(state.pageCount);
 }
 
@@ -76,6 +91,9 @@ function renderOutline(state: DocumentState): void {
   list.replaceChildren(...state.outline.map((item) => (
     makeOutlineItem(item, item.page === state.currentPage)
   )));
+  const empty = element<HTMLElement>("[data-role='outline-empty']");
+  empty.hidden = state.phase === "ready" && state.outline.length > 0;
+  list.hidden = state.phase === "ready" && state.outline.length === 0;
 }
 
 export function renderDocument(state: DocumentState): void {
@@ -83,7 +101,8 @@ export function renderDocument(state: DocumentState): void {
   element<HTMLElement>("[data-role='title']").textContent = state.title || "akbun-pdf";
   element<HTMLElement>("[data-role='error-message']").textContent = state.errorMessage
     ?? "파일이 손상되었거나 지원하지 않는 형식입니다.";
-  element<HTMLElement>(".pdf-page").style.setProperty("--document-zoom", String(state.zoom));
+  document.querySelector<HTMLElement>(".pdf-page:not(.pdf-page--canvas)")
+    ?.style.setProperty("--document-zoom", String(state.zoom));
   renderControls(state);
   renderThumbnails(state);
   renderOutline(state);

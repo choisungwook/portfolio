@@ -22,7 +22,11 @@ defaults:
 jobs:
   verify:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
 

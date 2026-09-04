@@ -11,6 +11,31 @@
           "name": "get_document_state",
           "request": null,
           "response": "DocumentState"
+        },
+        {
+          "name": "open_document",
+          "request": { "path": "string" },
+          "response": "OpenDocumentPayload"
+        },
+        {
+          "name": "complete_document_open",
+          "request": { "documentId": "string", "pageCount": "integer", "outline": "OutlineItem[]" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "fail_document_open",
+          "request": { "documentId": "string", "message": "string" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "save_document",
+          "request": { "documentId": "string", "path": "string" },
+          "response": "PreservationReport"
+        },
+        {
+          "name": "close_document",
+          "request": null,
+          "response": "DocumentState"
         }
       ]
     }
