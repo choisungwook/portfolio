@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [page controller는 의존성과 공개 경계를 선언한다](2026-09-page-controllers-declare-boundaries.md) - no-build classic script를 factory controller로 나누고 생성 시 의존성과 반환 API를 명시한 결정.
 * [Source monitor의 in-out은 재생 경계다](2026-09-source-monitor-range-is-playback-boundary.md) - asset preview를 선택 구간 안으로 제한하고 scrub bar에서 구간 밖을 구분한 결정.
 * [타임라인 드래그 중 compositor 상태 전환을 미룬다](2026-09-timeline-drag-defers-compositor.md) - drag 시작 경로에서 exact frame 재합성과 반복 배치 읽기를 제외한 결정.
 * [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](2026-09-proxy-targets-decode-and-seek-cost.md) - 코덱과 키프레임 간격을 해상도와 함께 판정하고 프록시에 짧은 GOP를 강제한 결정.

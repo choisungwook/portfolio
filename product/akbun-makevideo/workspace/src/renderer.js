@@ -262,9 +262,11 @@ let preview = null;
 let mediaPreview = null;
 let sourcePreview = null;
 let qualityMonitor = null;
-let visualDrag = null;
-let editorOverlayActive = false;
 let stageResizeObserver = null;
+let stageController = null;
+let inspectorController = null;
+let shortcutController = null;
+let timelineInteractions = null;
 
 const persistLatestSettings = globalThis.latestLib.createLatestPersistence({
   save: (settings) => window.api.saveSettings(settings),
@@ -293,6 +295,18 @@ const persistLatestSettings = globalThis.latestLib.createLatestPersistence({
     });
   },
 });
+
+function setRuntime(runtime) {
+  preview = runtime.preview;
+  mediaPreview = runtime.mediaPreview;
+  sourcePreview = runtime.sourcePreview;
+  qualityMonitor = runtime.qualityMonitor;
+  stageController = runtime.stageController;
+  inspectorController = runtime.inspectorController;
+  shortcutController = runtime.shortcutController;
+  timelineInteractions = runtime.timelineInteractions;
+  stageResizeObserver = runtime.stageResizeObserver;
+}
 
 // --- helpers ---------------------------------------------------------------
 
@@ -553,6 +567,9 @@ function playbackDebugLines(status) {
 }
 
 function clipDragDebugLines() {
+  const clipDragMetrics = timelineInteractions
+    ? timelineInteractions.metrics
+    : {};
   const text = (value) => Number.isFinite(value) ? `${value.toFixed(1)} ms` : 'not measured';
   return [
     `Timeline drag next frame: ${text(clipDragMetrics.nextFrameMs)} last, ${text(clipDragMetrics.peakNextFrameMs)} peak`,
@@ -1096,12 +1113,12 @@ function updateMonitorZoomUi() {
 }
 
 function renderTimeline() {
-  if (state.selectedVisualItemId && !selectedVisualItem()) selectVisualItem(null);
+  if (state.selectedVisualItemId && !stageController.selectedVisualItem()) stageController.selectVisualItem(null);
   renderHeads();
   renderRuler();
   renderLanes();
   renderMarkerList();
-  renderInspector();
+  inspectorController.render();
   updatePlayhead(preview ? preview.position() : 0);
   dom.duration.textContent = L.formatTimecode(L.projectDurationFrames(state.project), rate());
   dom.btnMagnet.classList.toggle('on', Boolean(state.settings && state.settings.snap));
@@ -1111,8 +1128,8 @@ function renderTimeline() {
   updateLinkUi();
   updateHistoryUi();
   updateMonitorZoomUi();
-  renderStageOverlay();
-  scheduleExactFrame();
+  stageController.renderStageOverlay();
+  stageController.scheduleExactFrame();
   if (preview) preview.redraw();
 }
 
@@ -1154,9 +1171,9 @@ function updatePlayhead(frame) {
   dom.playhead.style.left = `${L.framesToPx(frame, rate(), state.pxPerSecond)}px`;
   dom.clock.textContent = L.formatTimecode(frame, rate());
   dom.stageHint.hidden = L.projectDurationFrames(state.project) > 0 || preview.mode() === 'asset';
-  syncEditorOverlay();
-  renderStageOverlay();
-  drawStageVisuals();
+  stageController.syncEditorOverlay();
+  stageController.renderStageOverlay();
+  stageController.drawStageVisuals();
 }
 
 function seekPreviousEdit() {
@@ -1189,577 +1206,6 @@ function followPlayhead(frame) {
   const left = dom.scroll.scrollLeft;
   const right = left + dom.scroll.clientWidth;
   if (x < left || x > right - 40) dom.scroll.scrollLeft = Math.max(0, x - dom.scroll.clientWidth * 0.3);
-}
-
-// --- the exact frame -------------------------------------------------------
-
-let exactTimer = null;
-let exactToken = 0;
-
-function setStageMode(mode) {
-  if (!dom.stageMode) return;
-  // The badge exists to say which of two pictures is on screen. On the native
-  // monitor there is only one — the same compositor draws the stopped frame and
-  // the playing ones — so there is nothing to tell apart and nothing to show.
-  const known = (mode === 'exact' || mode === 'live') &&
-    (!preview.usesNativeMonitor() || editorOverlayActive);
-  dom.stageMode.hidden = !known || L.projectDurationFrames(state.project) <= 0;
-  dom.stageMode.textContent = mode === 'exact' ? 'exact frame' : 'live preview';
-  dom.stageMode.classList.toggle('exact', mode === 'exact');
-}
-
-/** Ask Rust for the frame the render would produce here. It costs an ffmpeg
- *  call per visible clip, so it is only ever asked for when the playhead has
- *  stopped, and a newer request cancels an older one by token. */
-async function requestExactFrame() {
-  if (!window.api.available) return;
-  if (preview.usesNativeMonitor() && !editorOverlayActive) return;
-  if (preview.isPlaying() || preview.mode() !== 'timeline') return;
-  if (L.projectDurationFrames(state.project) <= 0) return;
-  if (staysOnCpu()) return;
-  const token = (exactToken += 1);
-  const box = dom.stageInner.getBoundingClientRect();
-  const maxWidth = Math.max(160, Math.round(box.width));
-  try {
-    const drawn = await window.api.previewFrame(Math.round(preview.position()), maxWidth);
-    if (token !== exactToken || preview.isPlaying()) return;
-    setStageMode(preview.showExact(drawn) ? 'exact' : 'live');
-    // The exact frame already contains the text and shape layers, drawn by
-    // the same Rust code the render uses; the page's copy comes off.
-    drawStageVisuals();
-  } catch (error) {
-    // No graphics device, no ffmpeg, or a source that will not decode. The
-    // stacked elements are still showing something, so this is not worth a
-    // dialog; the badge keeps saying "live".
-    setStageMode('live');
-  }
-}
-
-function scheduleExactFrame() {
-  if (!window.api.available) return;
-  window.clearTimeout(exactTimer);
-  if (preview.usesNativeMonitor() && !editorOverlayActive) return;
-  if (preview.isPlaying() || preview.mode() !== 'timeline') return;
-  exactTimer = window.setTimeout(requestExactFrame, 180);
-}
-
-// --- selection and editing -------------------------------------------------
-
-function selectClip(clipId) {
-  state.selectedClipId = clipId;
-  const targets = clipId ? I.clipTargets(state.project, clipId) : null;
-  if (targets) state.inspectorTab = I.activeTab(targets);
-  // One selection at a time, so the inspector always shows the thing that was
-  // picked last rather than whichever kind happens to win a tie.
-  if (clipId && state.selectedVisualItemId) selectVisualItem(null);
-  for (const node of dom.lanes.querySelectorAll('.clip')) {
-    node.classList.toggle('selected', node.dataset.clipId === clipId);
-  }
-  updateLinkUi();
-  renderInspector();
-}
-
-function selectedVisualItem() {
-  if (!state.selectedVisualItemId) return null;
-  for (const track of state.project.tracks) {
-    const item = (track.visualItems || []).find((entry) => entry.id === state.selectedVisualItemId);
-    if (item) return item;
-  }
-  return null;
-}
-
-function projectPointAt(event) {
-  const box = dom.stage.getBoundingClientRect();
-  if (box.width < 1 || box.height < 1) return null;
-  return X.projectPoint(
-    { x: event.clientX - box.left, y: event.clientY - box.top },
-    box,
-    state.project.settings
-  );
-}
-
-function overlayScale() {
-  const box = dom.stage.getBoundingClientRect();
-  return Math.min(
-    box.width / Math.max(1, state.project.settings.width),
-    box.height / Math.max(1, state.project.settings.height)
-  );
-}
-
-function selectVisualItem(itemId) {
-  state.selectedVisualItemId = itemId || null;
-  if (itemId) state.inspectorTab = 'video';
-  if (itemId && state.selectedClipId) selectClip(null);
-  for (const node of dom.lanes.querySelectorAll('[data-visual-item-id]')) {
-    node.classList.toggle('selected', node.dataset.visualItemId === state.selectedVisualItemId);
-  }
-  renderInspector();
-  syncEditorOverlay();
-  renderStageOverlay();
-}
-
-function editorOverlayWanted() {
-  return Boolean(
-    preview &&
-    preview.mode() === 'timeline' &&
-    ((G.visible(state.settings) && !preview.usesNativeMonitor()) ||
-      (state.selectedVisualItemId && !preview.isPlaying()))
-  );
-}
-
-function syncEditorOverlay() {
-  const active = editorOverlayWanted();
-  dom.stage.classList.toggle('editing', Boolean(state.selectedVisualItemId));
-  if (active === editorOverlayActive) return;
-  if (drag) {
-    drag.syncOverlayAfterEnd = true;
-    return;
-  }
-  editorOverlayActive = active;
-  preview.setEditing(active);
-  if (active) scheduleExactFrame();
-  else {
-    preview.clearExact();
-    preview.redraw();
-  }
-}
-
-function renderStageOverlay() {
-  const canvas = dom.stageOverlay;
-  const item = selectedVisualItem();
-  const showGuides = G.visible(state.settings) &&
-    (!preview || !preview.usesNativeMonitor());
-  if (!canvas || (!item && !showGuides)) {
-    if (canvas) canvas.width = 0;
-    return;
-  }
-  const box = dom.stage.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(box.width * ratio));
-  const height = Math.max(1, Math.round(box.height * ratio));
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-  const context = canvas.getContext('2d');
-  if (!context) return;
-  context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  context.clearRect(0, 0, box.width, box.height);
-  if (showGuides) G.draw(context, state.settings, box.width, box.height);
-  if (!item) return;
-  const transform = item.transform;
-  const center = X.displayPoint(X.centre(transform), box, state.project.settings);
-  const size = {
-    x: (transform.width * box.width) / state.project.settings.width,
-    y: (transform.height * box.height) / state.project.settings.height,
-  };
-  const scale = overlayScale();
-  const handleRadius = 5;
-  context.save();
-  context.translate(center.x, center.y);
-  context.rotate((transform.rotation * Math.PI) / 180);
-  context.strokeStyle = '#4e9bff';
-  context.lineWidth = 1.5;
-  context.setLineDash([5, 3]);
-  context.strokeRect(-size.x / 2, -size.y / 2, size.x, size.y);
-  context.setLineDash([]);
-  context.beginPath();
-  context.moveTo(0, -size.y / 2);
-  context.lineTo(0, -size.y / 2 - 24);
-  context.stroke();
-  context.restore();
-  const handles = X.handlePoints(transform, 24 / scale);
-  for (const [name, point] of Object.entries(handles)) {
-    const at = X.displayPoint(point, box, state.project.settings);
-    context.beginPath();
-    context.arc(at.x, at.y, name === 'rotate' ? 6 : handleRadius, 0, Math.PI * 2);
-    context.fillStyle = name === 'rotate' ? '#4e9bff' : '#ffffff';
-    context.fill();
-    context.strokeStyle = '#4e9bff';
-    context.lineWidth = 1.5;
-    context.stroke();
-  }
-}
-
-// --- text and shape layers on the stage -------------------------------------
-
-/** Draw the text and shape layers over the stacked media elements.
- *
- *  This is the page's approximation of the Rust compositor, and it exists for
- *  the one display the Rust picture cannot reach: the media element engine
- *  while it is playing. The paused stage shows the exact frame — the Rust
- *  picture, which already contains these layers — and the native monitor
- *  composites them in Rust, so both of those clear this canvas instead.
- *
- *  Like the preview itself, this is an approximation of the render: line
- *  breaks and glyph metrics come from the browser rather than from fontdue.
- *  Rotation is deliberately not drawn, because the Rust compositor does not
- *  draw it either, and the preview's job is to look like the render. */
-function drawStageVisuals() {
-  const canvas = dom.stageVisuals;
-  if (!canvas) return;
-  const clear = () => {
-    if (canvas.width > 0 || canvas.height > 0) {
-      canvas.width = 0;
-      canvas.height = 0;
-    }
-  };
-  if (!preview || preview.mode() !== 'timeline') return clear();
-  if (preview.usesNativeMonitor() && !editorOverlayActive) return clear();
-  if (preview.isExact()) return clear();
-  const box = dom.stage.getBoundingClientRect();
-  if (box.width < 1 || box.height < 1) return clear();
-  const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(box.width * ratio));
-  const height = Math.max(1, Math.round(box.height * ratio));
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) return;
-  const settings = state.project.settings;
-  const scales = {
-    x: box.width / Math.max(1, settings.width),
-    y: box.height / Math.max(1, settings.height),
-  };
-  scales.font = Math.min(scales.x, scales.y);
-  context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  context.clearRect(0, 0, box.width, box.height);
-  const frame = Math.floor(preview.position());
-  // Tracks in project order: V1 first, which is the bottom layer, the same
-  // order the Rust compositor takes them in.
-  for (const track of state.project.tracks) {
-    if (track.hidden) continue;
-    if (track.kind !== 'video' && track.kind !== 'subtitle') continue;
-    const items = (track.visualItems || [])
-      .filter((item) => item.start <= frame && frame < item.start + item.duration)
-      .sort((a, b) => a.zIndex - b.zIndex);
-    for (const item of items) drawVisualItem(context, track, item, scales);
-  }
-}
-
-function drawVisualItem(context, track, item, scales) {
-  const settings = state.project.settings;
-  // A subtitle ignores its own transform and sits in the lower third, exactly
-  // as compositor/text.rs places it.
-  const transform = track.kind === 'subtitle'
-    ? { x: 96, y: settings.height * 0.78, width: settings.width - 192, height: settings.height * 0.16, opacity: 1 }
-    : item.transform;
-  const x = transform.x * scales.x;
-  const y = transform.y * scales.y;
-  const width = Math.max(1, transform.width * scales.x);
-  const height = Math.max(1, transform.height * scales.y);
-  context.save();
-  context.globalAlpha = Math.max(0, Math.min(1, transform.opacity ?? 1));
-  context.translate(x, y);
-  context.beginPath();
-  context.rect(0, 0, width, height);
-  context.clip();
-  const content = item.content || {};
-  if (content.kind === 'shape') {
-    drawShapeContent(context, content, width, height, scales.font);
-  } else if (content.kind === 'text') {
-    const style = (track.kind === 'subtitle' && track.subtitleStyle) || content.style || {};
-    drawTextContent(context, content.text || '', style, width, height, scales.font);
-  }
-  context.restore();
-}
-
-function cssFontFamily(family) {
-  const generic = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'];
-  return generic.includes(family) ? family : `"${String(family).replace(/"/g, '')}"`;
-}
-
-function wrapVisualText(context, text, maxWidth) {
-  const lines = [];
-  for (const paragraph of String(text).split('\n')) {
-    let line = '';
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && context.measureText(candidate).width > maxWidth) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = candidate;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-function drawTextContent(context, text, style, width, height, scale) {
-  const size = Math.max(1, (style.fontSize || 64) * scale);
-  context.font = `${size}px ${cssFontFamily(style.fontFamily || 'sans-serif')}`;
-  const align = style.align || 'center';
-  context.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
-  context.textBaseline = 'alphabetic';
-  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
-  const stroke = style.stroke || null;
-  const strokeWidth = Math.max(0, ((stroke && stroke.width) || 0) * scale);
-  const shadow = style.shadow || null;
-  const fills = style.fills && style.fills.length
-    ? style.fills
-    : [{ kind: 'solid', color: '#ffffff' }];
-  const lines = wrapVisualText(context, text, width);
-  for (let index = 0; index < lines.length; index += 1) {
-    const baseline = index * size * 1.2 + size;
-    if (baseline - size > height) break;
-    if (shadow) {
-      context.shadowColor = shadow.color || 'transparent';
-      context.shadowOffsetX = (shadow.x || 0) * scale;
-      context.shadowOffsetY = (shadow.y || 0) * scale;
-      context.shadowBlur = Math.max(0, shadow.blur || 0) * scale;
-    }
-    if (strokeWidth > 0 && stroke.color) {
-      // The Rust pass dilates by the radius, so the visible rim is the radius
-      // wide; a canvas stroke straddles the edge, so it is doubled to match.
-      context.lineWidth = strokeWidth * 2;
-      context.lineJoin = 'round';
-      context.strokeStyle = stroke.color;
-      context.strokeText(lines[index], anchorX, baseline);
-    }
-    for (const fill of fills) {
-      context.fillStyle = canvasPaint(context, fill, width, height);
-      context.fillText(lines[index], anchorX, baseline);
-      context.shadowColor = 'transparent';
-    }
-    context.shadowColor = 'transparent';
-    context.shadowOffsetX = 0;
-    context.shadowOffsetY = 0;
-    context.shadowBlur = 0;
-  }
-}
-
-function orderedStops(stops) {
-  const values = stops && stops.length ? stops : [
-    { position: 0, color: '#ffffff' },
-    { position: 1, color: '#000000' },
-  ];
-  return [...values].sort((a, b) => a.position - b.position);
-}
-
-const fillMediaElements = new Map();
-
-function mediaPaintPattern(context, paint, width, height) {
-  const asset = L.findAsset(state.project, paint.assetId);
-  if (!asset || asset.kind !== paint.kind) return '#00000000';
-  const key = `${paint.kind}:${asset.id}`;
-  let media = fillMediaElements.get(key);
-  if (!media) {
-    media = paint.kind === 'video' ? document.createElement('video') : new Image();
-    media.src = window.api.fileUrl(asset.path);
-    if (paint.kind === 'video') {
-      media.muted = true;
-      media.preload = 'auto';
-      media.playsInline = true;
-    }
-    media.addEventListener('loadeddata', drawStageVisuals);
-    media.addEventListener('load', drawStageVisuals);
-    fillMediaElements.set(key, media);
-  }
-  const sourceWidth = media.videoWidth || media.naturalWidth || 0;
-  const sourceHeight = media.videoHeight || media.naturalHeight || 0;
-  if (paint.kind === 'video' && media.readyState >= 1 && Number.isFinite(media.duration) && media.duration > 0) {
-    const time = (preview.position() / T.rateToNumber(rate())) % media.duration;
-    if (Math.abs(media.currentTime - time) > 0.05) media.currentTime = time;
-  }
-  if (!sourceWidth || !sourceHeight) return '#00000000';
-  const pattern = context.createPattern(media, 'no-repeat');
-  if (!pattern) return '#00000000';
-  if (pattern.setTransform && typeof DOMMatrix !== 'undefined') {
-    pattern.setTransform(new DOMMatrix().scale(width / sourceWidth, height / sourceHeight));
-  }
-  return pattern;
-}
-
-function canvasPaint(context, paint, width, height) {
-  if (!paint || paint.kind === 'solid') return (paint && paint.color) || '#00000000';
-  if (paint.kind === 'linearGradient') {
-    const start = paint.start || { x: 0, y: 0.5 };
-    const end = paint.end || { x: 1, y: 0.5 };
-    const gradient = context.createLinearGradient(
-      start.x * width, start.y * height, end.x * width, end.y * height,
-    );
-    for (const stop of orderedStops(paint.stops)) {
-      gradient.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
-    }
-    return gradient;
-  }
-  if (paint.kind === 'radialGradient') {
-    const center = paint.center || { x: 0.5, y: 0.5 };
-    const radius = Math.max(0.001, paint.radius || 0.5) * Math.max(width, height);
-    const gradient = context.createRadialGradient(
-      center.x * width, center.y * height, 0,
-      center.x * width, center.y * height, radius,
-    );
-    for (const stop of orderedStops(paint.stops)) {
-      gradient.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
-    }
-    return gradient;
-  }
-  if (paint.kind === 'image' || paint.kind === 'video') {
-    return mediaPaintPattern(context, paint, width, height);
-  }
-  return '#00000000';
-}
-
-function beginShapePath(context, kind, width, height, radius) {
-  context.beginPath();
-  if (kind === 'ellipse') {
-    context.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
-    return;
-  }
-  if (kind === 'polygon' || kind === 'star') {
-    const points = kind === 'star' ? 10 : 6;
-    const outer = Math.min(width, height) / 2;
-    const inner = kind === 'star' ? outer * 0.45 : outer;
-    for (let index = 0; index < points; index += 1) {
-      const angle = -Math.PI / 2 + index * Math.PI * 2 / points;
-      const distance = kind === 'star' && index % 2 ? inner : outer;
-      const x = width / 2 + Math.cos(angle) * distance;
-      const y = height / 2 + Math.sin(angle) * distance;
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    }
-    context.closePath();
-    return;
-  }
-  if (kind === 'roundedRectangle') context.roundRect(0, 0, width, height, radius);
-  else context.rect(0, 0, width, height);
-}
-
-function drawShapeContent(context, content, width, height, scale) {
-  const stroke = content.stroke || null;
-  const strokeWidth = Math.max(0, ((stroke && stroke.width) || 0) * scale);
-  const kind = content.shape || 'rectangle';
-  if (kind === 'line' && strokeWidth <= 0) return;
-  const shadow = content.shadow || null;
-  if (shadow) {
-    context.shadowColor = shadow.color || 'transparent';
-    context.shadowOffsetX = (shadow.x || 0) * scale;
-    context.shadowOffsetY = (shadow.y || 0) * scale;
-    context.shadowBlur = Math.max(0, shadow.blur || 0) * scale;
-  }
-  if (kind === 'line') {
-    // A line is all stroke: a bar through the middle, plus the arrow heads.
-    // Nothing is drawn at width zero, the same rule the Rust rasterizer has.
-    const middle = height / 2;
-    const half = strokeWidth / 2;
-    const arrow = Math.max(strokeWidth * 1.5, 8);
-    context.fillStyle = stroke.color;
-    context.fillRect(half, middle - half, Math.max(0, width - strokeWidth), strokeWidth);
-    const head = (tipX, direction) => {
-      context.beginPath();
-      context.moveTo(tipX, middle);
-      context.lineTo(tipX + direction * arrow, middle - arrow * 0.65);
-      context.lineTo(tipX + direction * arrow, middle + arrow * 0.65);
-      context.closePath();
-      context.fill();
-    };
-    if (content.startArrow) head(0, 1);
-    if (content.endArrow) head(width, -1);
-    context.shadowColor = 'transparent';
-    context.shadowOffsetX = 0;
-    context.shadowOffsetY = 0;
-    context.shadowBlur = 0;
-    return;
-  }
-  const radius = Math.min(
-    Math.max(0, (content.cornerRadius ?? 0) * scale),
-    Math.min(width, height) / 2,
-  );
-  const fills = content.fills && content.fills.length
-    ? content.fills
-    : [{ kind: 'solid', color: '#4f8cffcc' }];
-  for (const fill of fills) {
-    beginShapePath(context, kind, width, height, radius);
-    context.fillStyle = canvasPaint(context, fill, width, height);
-    context.fill();
-    context.shadowColor = 'transparent';
-  }
-  if (strokeWidth > 0) {
-    // The Rust outline is a band half the width lying inside the edge, so the
-    // stroke is clipped to the shape — which throws away its outer half and
-    // leaves the same half-width rim.
-    context.save();
-    beginShapePath(context, kind, width, height, radius);
-    context.clip();
-    context.lineWidth = strokeWidth;
-    context.strokeStyle = stroke.color;
-    context.stroke();
-    context.restore();
-  }
-  context.shadowColor = 'transparent';
-  context.shadowOffsetX = 0;
-  context.shadowOffsetY = 0;
-  context.shadowBlur = 0;
-}
-
-function beginVisualDrag(event) {
-  if (event.button !== 0 || preview.isPlaying()) return false;
-  const point = projectPointAt(event);
-  if (!point) return false;
-  const scale = overlayScale();
-  const hit = X.hitItem(
-    state.project,
-    Math.round(preview.position()),
-    point,
-    state.selectedVisualItemId,
-    { handleRadius: 8 / scale, rotateOffset: 24 / scale }
-  );
-  if (!hit) {
-    selectVisualItem(null);
-    return false;
-  }
-  if (hit.item.id !== state.selectedVisualItemId) selectVisualItem(hit.item.id);
-  visualDrag = {
-    itemId: hit.item.id,
-    action: hit.action === 'resize' ? hit.handle : hit.action,
-    initial: { ...hit.item.transform },
-    start: point,
-    next: { ...hit.item.transform },
-  };
-  dom.stage.setPointerCapture(event.pointerId);
-  event.preventDefault();
-  return true;
-}
-
-function updateVisualDrag(event) {
-  if (!visualDrag) return;
-  const point = projectPointAt(event);
-  if (!point) return;
-  visualDrag.next = X.transformForDrag(
-    visualDrag.initial,
-    visualDrag.action,
-    visualDrag.start,
-    point
-  );
-  const item = selectedVisualItem();
-  if (item) item.transform = visualDrag.next;
-  renderStageOverlay();
-  // The page's own copy of the layer moves with the handles. Without this the
-  // dashed box slides away from the shape it is supposed to be around, until
-  // the drag ends and the redraw catches up.
-  drawStageVisuals();
-}
-
-async function endVisualDrag(event) {
-  if (!visualDrag) return;
-  const finished = visualDrag;
-  visualDrag = null;
-  if (dom.stage.hasPointerCapture(event.pointerId)) dom.stage.releasePointerCapture(event.pointerId);
-  if (JSON.stringify(finished.initial) === JSON.stringify(finished.next)) return;
-  await edit({ op: 'setVisualTransform', itemId: finished.itemId, transform: finished.next });
-  selectVisualItem(finished.itemId);
-}
-
-function cancelVisualDrag() {
-  if (!visualDrag) return;
-  const item = selectedVisualItem();
-  if (item) item.transform = visualDrag.initial;
-  visualDrag = null;
-  renderStageOverlay();
-  drawStageVisuals();
 }
 
 function closeTimelineContextMenu() {
@@ -1808,7 +1254,7 @@ function selectAsset(assetId) {
   if (sourcePreview) sourcePreview.showAsset(asset);
   renderAssets();
   renderSourceMonitor();
-  renderInspector();
+  inspectorController.render();
 }
 
 /** The selection is an id, and clips go away underneath it: opening a project,
@@ -1873,7 +1319,7 @@ async function addVisualItem(placement, content, transform) {
     item = (candidate.visualItems || []).find((entry) => !known.has(entry.id));
     if (item) break;
   }
-  if (item) selectVisualItem(item.id);
+  if (item) stageController.selectVisualItem(item.id);
   if (atLimit) {
     await window.api.message(
       `The ${L.MAX_TRACKS_PER_KIND}-video-track limit was reached. The layer was added to the top video track.`,
@@ -1930,7 +1376,7 @@ async function addSubtitle() {
     zIndex: 0,
   });
   const item = (L.findTrack(state.project, track.id).visualItems || []).find((entry) => !known.has(entry.id));
-  if (item) selectVisualItem(item.id);
+  if (item) stageController.selectVisualItem(item.id);
 }
 
 async function importSrt() {
@@ -1950,424 +1396,10 @@ async function exportSrt() {
   await window.api.exportSrt(track.id, path);
 }
 
-function hexColor(value, fallback) {
-  const match = /^#([0-9a-fA-F]{6})(?:[0-9a-fA-F]{2})?$/.exec(value || '');
-  return match ? `#${match[1]}` : fallback;
-}
-
-function preserveAlpha(color, previous) {
-  const alpha = /^#[0-9a-fA-F]{8}$/.test(previous || '') ? previous.slice(7) : '';
-  return `${color}${alpha}`;
-}
-
-function topPaint(style, fallback) {
-  return style && style.fills && style.fills.length
-    ? style.fills[style.fills.length - 1]
-    : { kind: 'solid', color: fallback };
-}
-
-function paintColors(paint, fallback) {
-  if (!paint || paint.kind === 'solid') return [(paint && paint.color) || fallback, fallback];
-  const stops = orderedStops(paint.stops);
-  return [stops[0].color, stops[stops.length - 1].color];
-}
-
-function fillAssetOptions(select, kind, selected) {
-  select.textContent = '';
-  const wanted = kind === 'video' ? 'video' : 'image';
-  for (const asset of state.project.assets.filter((entry) => entry.kind === wanted)) {
-    const option = document.createElement('option');
-    option.value = asset.id;
-    option.textContent = asset.name || baseName(asset.path);
-    option.selected = asset.id === selected;
-    select.appendChild(option);
-  }
-  select.disabled = kind !== 'image' && kind !== 'video';
-}
-
-function showFillEditor(kindInput, colorInput, endInput, assetInput, style, fallback) {
-  const paint = topPaint(style, fallback);
-  const [start, end] = paintColors(paint, fallback);
-  kindInput.value = paint.kind;
-  colorInput.value = hexColor(start, fallback.slice(0, 7));
-  endInput.value = hexColor(end, '#000000');
-  const assetId = paint.assetId || '';
-  fillAssetOptions(assetInput, paint.kind, assetId);
-  endInput.disabled = paint.kind !== 'linearGradient' && paint.kind !== 'radialGradient';
-  colorInput.disabled = paint.kind === 'image' || paint.kind === 'video';
-}
-
-function paintFromEditor(kind, color, endColor, assetId, previous) {
-  if (kind === 'image' || kind === 'video') {
-    const asset = state.project.assets.find((entry) => entry.id === assetId && entry.kind === kind)
-      || state.project.assets.find((entry) => entry.kind === kind);
-    return { kind, assetId: asset ? asset.id : '' };
-  }
-  if (kind === 'linearGradient') {
-    return {
-      kind,
-      start: (previous && previous.kind === kind && previous.start) || { x: 0, y: 0.5 },
-      end: (previous && previous.kind === kind && previous.end) || { x: 1, y: 0.5 },
-      stops: [
-        { position: 0, color: preserveAlpha(color, paintColors(previous, color)[0]) },
-        { position: 1, color: preserveAlpha(endColor, paintColors(previous, endColor)[1]) },
-      ],
-    };
-  }
-  if (kind === 'radialGradient') {
-    return {
-      kind,
-      center: (previous && previous.kind === kind && previous.center) || { x: 0.5, y: 0.5 },
-      radius: (previous && previous.kind === kind && previous.radius) || 0.5,
-      stops: [
-        { position: 0, color: preserveAlpha(color, paintColors(previous, color)[0]) },
-        { position: 1, color: preserveAlpha(endColor, paintColors(previous, endColor)[1]) },
-      ],
-    };
-  }
-  return { kind: 'solid', color: preserveAlpha(color, paintColors(previous, color)[0]) };
-}
-
-function inspectorMessage(tab, item, clipTargets) {
-  if (tab === 'effects') return 'No effect is selected.';
-  if (tab === 'transition') return 'No transition is selected.';
-  if (tab === 'image') {
-    const asset = L.findAsset(state.project, state.selectedAssetId);
-    return asset && asset.kind === 'image'
-      ? `Image — ${asset.name || baseName(asset.path)}`
-      : 'Select an image asset to inspect it.';
-  }
-  if (tab === 'file') {
-    const selected = clipTargets && clipTargets.selected;
-    const asset = selected
-      ? L.findAsset(state.project, selected.clip.assetId)
-      : L.findAsset(state.project, state.selectedAssetId);
-    return asset ? `File — ${asset.name || baseName(asset.path)}` : 'Select an asset or clip to inspect its file.';
-  }
-  if (tab === 'audio') return 'Select a clip with audio properties.';
-  return item ? 'No video properties are available.' : 'Select a clip or a layer to edit its properties.';
-}
-
-/** The inspector beside the preview. One switch over what is selected: a text,
- *  shape or subtitle layer, else the selected clip, else the empty hint. */
-function renderInspector() {
-  const item = selectedVisualItem();
-  const text = item && item.content && item.content.kind === 'text' ? item.content : null;
-  const shape = item && item.content && item.content.kind === 'shape' ? item.content : null;
-  const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
-  const subtitle = track && track.kind === 'subtitle';
-  const clipTargets = !item && liveSelection()
-    ? I.clipTargets(state.project, liveSelection())
-    : null;
-  const clip = clipTargets && clipTargets.selected;
-  const tab = state.inspectorTab || 'video';
-  const video = tab === 'video';
-  const audio = tab === 'audio';
-  const hasProperties = (video && Boolean(item || (clipTargets && clipTargets.video))) ||
-    (audio && Boolean(clipTargets && clipTargets.audio));
-  dom.textPanel.hidden = !video || !text || subtitle;
-  dom.subtitlePanel.hidden = !video || !text || !subtitle;
-  dom.shapePanel.hidden = !video || !shape;
-  dom.clipPanel.hidden = !clip || (!video && !audio);
-  dom.transformPanel.hidden = !video || !item;
-  dom.inspectorEmpty.hidden = hasProperties;
-  dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets);
-  for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
-    const active = button.dataset.inspectorTab === tab;
-    button.setAttribute('aria-pressed', String(active));
-    button.tabIndex = active ? 0 : -1;
-  }
-  if (item) {
-    const transform = item.transform;
-    dom.transformX.value = transform.x;
-    dom.transformY.value = transform.y;
-    dom.transformWidth.value = transform.width;
-    dom.transformHeight.value = transform.height;
-    dom.transformRotation.value = transform.rotation;
-    dom.transformOpacity.value = transform.opacity;
-    dom.transformOpacityValue.value = transform.opacity;
-  }
-  if (clip) {
-    const asset = L.findAsset(state.project, clip.clip.assetId);
-    dom.clipSummary.textContent = `${asset ? asset.name || baseName(asset.path) : 'missing file'} · ${clip.track.name}`;
-    dom.clipVideoPanel.hidden = !video || !clipTargets.video;
-    dom.clipAudioPanel.hidden = !audio || !clipTargets.audio;
-    if (clipTargets.video) dom.clipOpacity.value = String(clipTargets.video.clip.opacity ?? 1);
-    if (clipTargets.audio) dom.clipVolume.value = String(clipTargets.audio.clip.volume ?? 1);
-  }
-  if (shape) {
-    dom.shapeKind.value = shape.shape || 'rectangle';
-    showFillEditor(
-      dom.shapeFillKind, dom.shapeFill, dom.shapeFillEndColor, dom.shapeFillAsset,
-      shape, '#4f8cffcc',
-    );
-    dom.shapeRemoveFill.disabled = !shape.fills || shape.fills.length <= 1;
-    dom.shapeStroke.value = hexColor(shape.stroke && shape.stroke.color, '#ffffff');
-    dom.shapeStrokeWidth.value = shape.stroke ? shape.stroke.width : 0;
-    dom.shapeCornerRadius.value = shape.cornerRadius ?? 0;
-    dom.shapeStartArrow.checked = Boolean(shape.startArrow);
-    dom.shapeEndArrow.checked = Boolean(shape.endArrow);
-    dom.shapeShadowEnabled.checked = Boolean(shape.shadow);
-    dom.shapeShadowColor.value = hexColor(shape.shadow && shape.shadow.color, '#000000');
-    dom.shapeShadowX.value = shape.shadow ? shape.shadow.x : 0;
-    dom.shapeShadowY.value = shape.shadow ? shape.shadow.y : 0;
-    dom.shapeShadowBlur.value = shape.shadow ? shape.shadow.blur : 0;
-  }
-  if (!text) return;
-  if (subtitle) {
-    dom.subtitleValue.value = text.text || '';
-    dom.subtitleStart.value = item.start;
-    dom.subtitleEnd.value = item.start + item.duration;
-    const subtitleStyle = track.subtitleStyle || {};
-    dom.subtitleFont.value = subtitleStyle.fontFamily || 'sans-serif';
-    dom.subtitleSize.value = subtitleStyle.fontSize || 64;
-    dom.subtitleColor.value = hexColor(paintColors(topPaint(subtitleStyle, '#ffffff'), '#ffffff')[0], '#ffffff');
-    return;
-  }
-  const style = text.style || {};
-  dom.textValue.value = text.text || '';
-  dom.textFont.value = style.fontFamily || 'sans-serif';
-  dom.textSize.value = style.fontSize || 64;
-  showFillEditor(
-    dom.textFillKind, dom.textColor, dom.textFillEndColor, dom.textFillAsset,
-    style, '#ffffff',
-  );
-  dom.textRemoveFill.disabled = !style.fills || style.fills.length <= 1;
-  dom.textAlign.value = style.align || 'center';
-  dom.textStrokeColor.value = hexColor(style.stroke && style.stroke.color, '#000000');
-  dom.textStrokeWidth.value = style.stroke ? style.stroke.width : 0;
-  dom.textShadowEnabled.checked = Boolean(style.shadow);
-  dom.textShadowColor.value = hexColor(style.shadow && style.shadow.color, '#000000');
-  dom.textShadowX.value = style.shadow ? style.shadow.x : 0;
-  dom.textShadowY.value = style.shadow ? style.shadow.y : 0;
-  dom.textShadowBlur.value = style.shadow ? style.shadow.blur : 0;
-}
-
-function updateSelectedTransform(event) {
-  const item = selectedVisualItem();
-  if (!item) return;
-  if (event && event.target === dom.transformOpacity) {
-    dom.transformOpacityValue.value = dom.transformOpacity.value;
-  } else if (event && event.target === dom.transformOpacityValue) {
-    dom.transformOpacity.value = dom.transformOpacityValue.value;
-  }
-  const transform = {
-    x: Number(dom.transformX.value),
-    y: Number(dom.transformY.value),
-    width: Math.max(1, Number(dom.transformWidth.value) || 1),
-    height: Math.max(1, Number(dom.transformHeight.value) || 1),
-    rotation: Number(dom.transformRotation.value),
-    opacity: Math.max(0, Math.min(1, Number(dom.transformOpacityValue.value) || 0)),
-  };
-  edit({ op: 'setVisualTransform', itemId: item.id, transform })
-    .then(() => selectVisualItem(item.id))
-    .catch((error) => reportError(error, 'transform:edit'));
-}
-
-function updateSelectedShape() {
-  const item = selectedVisualItem();
-  if (!item || item.content.kind !== 'shape') return;
-  const fills = [...(item.content.fills || [])];
-  const first = topPaint(item.content, '#4f8cffcc');
-  const paint = paintFromEditor(
-    dom.shapeFillKind.value,
-    dom.shapeFill.value,
-    dom.shapeFillEndColor.value,
-    dom.shapeFillAsset.value,
-    first,
-  );
-  if ((paint.kind === 'image' || paint.kind === 'video') && !paint.assetId) {
-    window.api.message(`Import a matching ${paint.kind} asset before using that fill.`, {
-      title: 'Fill media unavailable', kind: 'warning',
-    });
-    renderInspector();
-    return;
-  }
-  fills[Math.max(0, fills.length - 1)] = paint;
-  const strokeWidth = Math.max(0, Number(dom.shapeStrokeWidth.value) || 0);
-  const previousShadow = item.content.shadow || {};
-  const content = {
-    kind: 'shape',
-    shape: dom.shapeKind.value,
-    fills,
-    stroke: strokeWidth > 0 ? {
-      color: preserveAlpha(dom.shapeStroke.value, item.content.stroke && item.content.stroke.color),
-      width: strokeWidth,
-    } : null,
-    shadow: dom.shapeShadowEnabled.checked ? {
-      color: preserveAlpha(dom.shapeShadowColor.value, previousShadow.color),
-      x: Number(dom.shapeShadowX.value) || 0,
-      y: Number(dom.shapeShadowY.value) || 0,
-      blur: Math.max(0, Number(dom.shapeShadowBlur.value) || 0),
-    } : null,
-    cornerRadius: Math.max(0, Number(dom.shapeCornerRadius.value) || 0),
-    startArrow: dom.shapeStartArrow.checked,
-    endArrow: dom.shapeEndArrow.checked,
-  };
-  edit({ op: 'setVisualContent', itemId: item.id, content })
-    .then(() => selectVisualItem(item.id))
-    .catch((error) => reportError(error, 'shape:edit'));
-}
-
-function changeSelectedFillLayers(kind, add) {
-  const item = selectedVisualItem();
-  if (!item || item.content.kind !== kind) return;
-  const owner = kind === 'text' ? (item.content.style || {}) : item.content;
-  const fills = [...(owner.fills || [])];
-  if (add) fills.push({ kind: 'solid', color: kind === 'text' ? '#ffffff80' : '#4f8cff80' });
-  else if (fills.length > 1) fills.pop();
-  const content = kind === 'text'
-    ? { ...item.content, style: { ...owner, fills } }
-    : { ...item.content, fills };
-  edit({ op: 'setVisualContent', itemId: item.id, content })
-    .then(() => selectVisualItem(item.id))
-    .catch((error) => reportError(error, `${kind}:fills`));
-}
-
-function updateSelectedSubtitle() {
-  const item = selectedVisualItem();
-  if (!item || item.content.kind !== 'text') return;
-  const start = Math.max(0, Math.round(Number(dom.subtitleStart.value) || 0));
-  const end = Math.max(start + 1, Math.round(Number(dom.subtitleEnd.value) || start + 1));
-  edit(
-    { op: 'setVisualContent', itemId: item.id, content: { ...item.content, text: dom.subtitleValue.value } },
-    { op: 'setVisualTiming', itemId: item.id, start, duration: end - start },
-  ).catch((error) => reportError(error, 'subtitle:edit'));
-}
-
-function updateSubtitleStyle() {
-  const item = selectedVisualItem();
-  const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
-  if (!track || track.kind !== 'subtitle') return;
-  const style = {
-    ...(track.subtitleStyle || {}),
-    fontFamily: dom.subtitleFont.value || 'sans-serif',
-    fontSize: Math.max(8, Number(dom.subtitleSize.value) || 64),
-    fills: [{
-      kind: 'solid',
-      color: preserveAlpha(
-        dom.subtitleColor.value,
-        paintColors(topPaint(track.subtitleStyle, '#ffffff'), '#ffffff')[0],
-      ),
-    }],
-  };
-  edit({ op: 'setSubtitleStyle', trackId: track.id, style }).catch((error) => reportError(error, 'subtitle:style'));
-}
-
-function updateSelectedText() {
-  const item = selectedVisualItem();
-  if (!item || item.content.kind !== 'text') return;
-  const previousStyle = item.content.style || {};
-  const fills = [...(previousStyle.fills || [])];
-  const first = topPaint(previousStyle, '#ffffff');
-  const paint = paintFromEditor(
-    dom.textFillKind.value,
-    dom.textColor.value,
-    dom.textFillEndColor.value,
-    dom.textFillAsset.value,
-    first,
-  );
-  if ((paint.kind === 'image' || paint.kind === 'video') && !paint.assetId) {
-    window.api.message(`Import a matching ${paint.kind} asset before using that fill.`, {
-      title: 'Fill media unavailable', kind: 'warning',
-    });
-    renderInspector();
-    return;
-  }
-  fills[Math.max(0, fills.length - 1)] = paint;
-  const strokeWidth = Math.max(0, Number(dom.textStrokeWidth.value) || 0);
-  const previousShadow = previousStyle.shadow || {};
-  const style = {
-    ...(item.content.style || {}),
-    fontFamily: dom.textFont.value || 'sans-serif',
-    fontSize: Math.max(8, Number(dom.textSize.value) || 64),
-    fills,
-    align: dom.textAlign.value,
-    stroke: strokeWidth > 0 ? {
-      color: preserveAlpha(dom.textStrokeColor.value, previousStyle.stroke && previousStyle.stroke.color),
-      width: strokeWidth,
-    } : null,
-    shadow: dom.textShadowEnabled.checked ? {
-      color: preserveAlpha(dom.textShadowColor.value, previousShadow.color),
-      x: Number(dom.textShadowX.value) || 0,
-      y: Number(dom.textShadowY.value) || 0,
-      blur: Math.max(0, Number(dom.textShadowBlur.value) || 0),
-    } : null,
-  };
-  Promise.resolve(window.api.fontAvailable(style.fontFamily))
-    .then((available) => {
-      if (!available) {
-        return window.api.message(
-          `"${style.fontFamily}" is not installed. A sans-serif fallback will be used.`,
-          { title: 'Font unavailable', kind: 'warning' },
-        );
-      }
-    })
-    .then(() => edit({
-      op: 'setVisualContent',
-      itemId: item.id,
-      content: { kind: 'text', text: dom.textValue.value, style },
-    }))
-    .then(() => selectVisualItem(item.id))
-    .catch((error) => reportError(error, 'text:edit'));
-}
-
-async function removeSelectedVisualItem() {
-  const item = selectedVisualItem();
-  if (!item) return;
-  const done = await edit({ op: 'removeVisualItem', itemId: item.id });
-  if (done) selectVisualItem(null);
-}
-
-/** Resolve both halves of a linked timeline selection for the Inspector tabs. */
-function selectedClipTargets() {
-  const clipId = liveSelection();
-  return clipId ? I.clipTargets(state.project, clipId) : null;
-}
-
-function updateSelectedVideoOpacity() {
-  const targets = selectedClipTargets();
-  if (!targets || !targets.video) return;
-  edit({
-    op: 'setClipGain',
-    clipId: targets.video.clip.id,
-    opacity: Math.max(0, Math.min(1, Number(dom.clipOpacity.value) || 0)),
-  }).catch((error) => reportError(error, 'clip:opacity'));
-}
-
-function updateSelectedAudioVolume() {
-  const targets = selectedClipTargets();
-  if (!targets || !targets.audio) return;
-  edit({
-    op: 'setClipGain',
-    clipId: targets.audio.clip.id,
-    volume: Math.max(0, Math.min(1, Number(dom.clipVolume.value) || 0)),
-  }).catch((error) => reportError(error, 'clip:volume'));
-}
-
-function activateInspectorTab(tab) {
-  state.inspectorTab = tab;
-  activateSelectedPanel('inspector');
-  renderInspector();
-}
-
-function moveInspectorTab(event) {
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-  const offset = event.key === 'ArrowRight' ? 1 : -1;
-  const nextName = P.adjacentTab(event.currentTarget.dataset.inspectorTab, offset);
-  const next = dom.panelTabBar.querySelector(`[data-inspector-tab="${nextName}"]`);
-  activateInspectorTab(nextName);
-  next.focus();
-  event.preventDefault();
-}
-
-/** Delete, or delete and close the gap behind it. Ripple is destructive in a
- *  way the timeline used to avoid on purpose, because until now there was no
- *  way back from it. */
 async function deleteSelected(ripple) {
   // Selections are exclusive, so a selected layer is the thing the user is
   // looking at; a gap cannot ripple behind one, so both buttons remove it.
-  if (selectedVisualItem()) return removeSelectedVisualItem();
+  if (stageController.selectedVisualItem()) return inspectorController.removeSelectedVisualItem();
   const clipId = liveSelection();
   if (!clipId) return;
   // edit() answers null when the edit was refused. The empty array a delete
@@ -2421,509 +1453,6 @@ function toggleSnap() {
   state.settings.snap = !state.settings.snap;
   dom.btnMagnet.classList.toggle('on', state.settings.snap);
   persistSettingsInBackground();
-}
-
-// --- dragging clips --------------------------------------------------------
-
-let drag = null;
-const clipDragMetrics = {
-  nextFrameMs: null,
-  peakNextFrameMs: null,
-  firstMoveQueueMs: null,
-  peakFirstMoveQueueMs: null,
-};
-
-function measureClipDragNextFrame(startedAt) {
-  window.requestAnimationFrame(() => {
-    const elapsed = Math.max(0, performance.now() - startedAt);
-    clipDragMetrics.nextFrameMs = elapsed;
-    clipDragMetrics.peakNextFrameMs = Math.max(clipDragMetrics.peakNextFrameMs || 0, elapsed);
-  });
-}
-
-function measureFirstClipMove(current, event) {
-  if (current.firstMoveMeasured) return;
-  current.firstMoveMeasured = true;
-  const handledAt = performance.now();
-  let queuedAt = Number(event.timeStamp);
-  if (queuedAt > handledAt && Number.isFinite(performance.timeOrigin)) {
-    queuedAt -= performance.timeOrigin;
-  }
-  if (!Number.isFinite(queuedAt) || queuedAt < 0 || queuedAt > handledAt) return;
-  const elapsed = handledAt - queuedAt;
-  clipDragMetrics.firstMoveQueueMs = elapsed;
-  clipDragMetrics.peakFirstMoveQueueMs = Math.max(
-    clipDragMetrics.peakFirstMoveQueueMs || 0,
-    elapsed,
-  );
-}
-
-function clipDragLanes() {
-  return [...dom.lanes.querySelectorAll('.lane')].map((node) => {
-    const box = node.getBoundingClientRect();
-    return { node, top: box.top, bottom: box.bottom };
-  });
-}
-
-function beginClipDrag(event, node) {
-  const startedAt = performance.now();
-  const clipId = node.dataset.clipId;
-  const found = L.findClip(state.project, clipId);
-  if (!found) return;
-  const box = node.getBoundingClientRect();
-  const offsetX = event.clientX - box.left;
-  const mode =
-    offsetX <= HANDLE_PX ? 'trim-start' : offsetX >= box.width - HANDLE_PX ? 'trim-end' : 'move';
-
-  drag = {
-    mode,
-    clipId,
-    node,
-    grabFrames: L.pxToFrames(offsetX, rate(), state.pxPerSecond),
-    startFrame: found.clip.start,
-    endFrame: L.clipEnd(found.clip),
-    durationFrames: L.clipDuration(found.clip),
-    trackId: found.track.id,
-    targetTrackId: found.track.id,
-    nextStart: found.clip.start,
-    nextEdge: found.clip.start,
-    moved: false,
-    lanes: clipDragLanes(),
-    firstMoveMeasured: false,
-    syncOverlayAfterEnd: false,
-  };
-  selectClip(clipId);
-  document.body.classList.add(mode === 'move' ? 'dragging' : 'trimming');
-  measureClipDragNextFrame(startedAt);
-  event.preventDefault();
-}
-
-function updateClipDrag(event) {
-  measureFirstClipMove(drag, event);
-  const pointer = frameAtClientX(event.clientX);
-  const tolerance = snapTolerance();
-
-  if (drag.mode === 'move') {
-    const wanted = Math.max(0, pointer - drag.grabFrames);
-    drag.nextStart = L.snapClipStart(state.project, wanted, drag.durationFrames, tolerance, {
-      exceptClipId: drag.clipId,
-      extra: [preview.position()],
-    });
-    drag.node.style.left = `${L.framesToPx(drag.nextStart, rate(), state.pxPerSecond)}px`;
-
-    // The lane under the pointer decides the target track, but only if it can
-    // play this asset; otherwise the clip stays where it came from.
-    const laneIndex = L.laneIndexAtY(drag.lanes, event.clientY);
-    const lane = laneIndex >= 0 ? drag.lanes[laneIndex].node : null;
-    const found = L.findClip(state.project, drag.clipId);
-    const asset = found && L.findAsset(state.project, found.clip.assetId);
-    const track = lane && L.findTrack(state.project, lane.dataset.trackId);
-    for (const bound of drag.lanes) bound.node.classList.remove('drop-target');
-    if (track && L.canAccept(track, asset)) {
-      drag.targetTrackId = track.id;
-      lane.classList.add('drop-target');
-      if (drag.node.parentElement !== lane) lane.appendChild(drag.node);
-    }
-  } else {
-    const snapped = L.snapTime(state.project, pointer, tolerance, {
-      exceptClipId: drag.clipId,
-      extra: [preview.position()],
-    });
-    const shortest = L.minClipFrames(rate());
-    drag.nextEdge = snapped;
-    if (drag.mode === 'trim-start') {
-      const at = Math.min(snapped, drag.endFrame - shortest);
-      drag.node.style.left = `${L.framesToPx(Math.max(0, at), rate(), state.pxPerSecond)}px`;
-      drag.node.style.width = `${Math.max(2, L.framesToPx(drag.endFrame - at, rate(), state.pxPerSecond))}px`;
-    } else {
-      const at = Math.max(snapped, drag.startFrame + shortest);
-      drag.node.style.width = `${Math.max(2, L.framesToPx(at - drag.startFrame, rate(), state.pxPerSecond))}px`;
-    }
-  }
-  drag.moved = true;
-}
-
-/** The pointer came up, so the drag becomes a command. This is the only moment
- *  in a drag that Rust hears about, which is what keeps a mouse move off the
- *  IPC boundary. Rust may put the clip somewhere other than where it is being
- *  drawn — pushed right past a clip it would have overlapped — and the redraw
- *  is what settles it. */
-async function endClipDrag() {
-  const current = drag;
-  drag = null;
-  document.body.classList.remove('dragging', 'trimming');
-  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
-  if (!current) return;
-  try {
-    if (!current.moved) {
-      renderTimeline();
-      return;
-    }
-    return await edit(
-      current.mode === 'move'
-        ? {
-            op: 'moveClip',
-            clipId: current.clipId,
-            trackId: current.targetTrackId,
-            start: current.nextStart,
-          }
-        : {
-            op: 'trimClip',
-            clipId: current.clipId,
-            edge: current.mode === 'trim-start' ? 'start' : 'end',
-            frame: current.nextEdge,
-          }
-    );
-  } finally {
-    if (current.syncOverlayAfterEnd) syncEditorOverlay();
-  }
-}
-
-// --- dragging text and shape layers on the timeline -------------------------
-
-let visualTimingDrag = null;
-
-function beginVisualItemDrag(event, node) {
-  if (event.button !== 0) return;
-  const found = L.findVisualItem(state.project, node.dataset.visualItemId);
-  if (!found) return;
-  selectVisualItem(found.item.id);
-  const box = node.getBoundingClientRect();
-  const offsetX = event.clientX - box.left;
-  const mode =
-    offsetX <= HANDLE_PX ? 'trim-start' : offsetX >= box.width - HANDLE_PX ? 'trim-end' : 'move';
-  visualTimingDrag = {
-    mode,
-    itemId: found.item.id,
-    node,
-    grabFrames: L.pxToFrames(offsetX, rate(), state.pxPerSecond),
-    nextStart: found.item.start,
-    nextEnd: found.item.start + found.item.duration,
-    moved: false,
-  };
-  document.body.classList.add(mode === 'move' ? 'dragging' : 'trimming');
-  event.preventDefault();
-}
-
-function updateVisualItemDrag(event) {
-  const current = visualTimingDrag;
-  const pointer = frameAtClientX(event.clientX);
-  const tolerance = snapTolerance();
-  const duration = current.nextEnd - current.nextStart;
-  if (current.mode === 'move') {
-    const wanted = Math.max(0, pointer - current.grabFrames);
-    current.nextStart = L.snapClipStart(state.project, wanted, duration, tolerance, {
-      extra: [preview.position()],
-    });
-    current.nextEnd = current.nextStart + duration;
-    current.node.style.left = `${L.framesToPx(current.nextStart, rate(), state.pxPerSecond)}px`;
-  } else {
-    const snapped = L.snapTime(state.project, pointer, tolerance, { extra: [preview.position()] });
-    if (current.mode === 'trim-start') {
-      current.nextStart = Math.max(0, Math.min(snapped, current.nextEnd - 1));
-      current.node.style.left = `${L.framesToPx(current.nextStart, rate(), state.pxPerSecond)}px`;
-    } else {
-      current.nextEnd = Math.max(current.nextStart + 1, snapped);
-    }
-    const width = L.framesToPx(current.nextEnd - current.nextStart, rate(), state.pxPerSecond);
-    current.node.style.width = `${Math.max(2, width)}px`;
-  }
-  current.moved = true;
-}
-
-function endVisualItemDrag() {
-  const current = visualTimingDrag;
-  visualTimingDrag = null;
-  document.body.classList.remove('dragging', 'trimming');
-  if (!current) return;
-  if (!current.moved) {
-    renderTimeline();
-    return;
-  }
-  return edit({
-    op: 'setVisualTiming',
-    itemId: current.itemId,
-    start: current.nextStart,
-    duration: current.nextEnd - current.nextStart,
-  });
-}
-
-// --- dragging the toolbar's Text and Shape buttons onto a track --------------
-
-let toolDrag = null;
-/** Set for the moment between a dragged release and the click the browser
- *  sends after it. Read and reset by the buttons' own click handlers. */
-let toolDragJustEnded = false;
-
-function tookToolDragClick() {
-  const dragged = toolDragJustEnded;
-  toolDragJustEnded = false;
-  return dragged;
-}
-
-/** The + Text and + Shape buttons drag like assets do: pointer events, a
- *  ghost, and a lane that lights up. A plain click never grows a ghost, ends
- *  here doing nothing, and the button's own click handler adds the layer at
- *  the playhead as before. */
-function beginToolDrag(event, kind) {
-  if (event.button !== 0) return;
-  toolDrag = { kind, startX: event.clientX, startY: event.clientY, ghost: null, dragged: false };
-}
-
-/** Put the page back and report the drag, if it had got as far as a ghost.
- *
- *  Every way a drag can end comes through here — the pointer coming up, the
- *  sequence being cancelled, the window losing focus mid-drag — so a ghost is
- *  never left stuck to a cursor with no button held. Without it the next
- *  release over a lane would add a layer nobody asked for. */
-function clearToolDrag() {
-  const current = toolDrag;
-  toolDrag = null;
-  if (!current || !current.ghost) return null;
-  current.ghost.remove();
-  document.body.classList.remove('dragging');
-  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
-  return current;
-}
-
-function updateToolDrag(event) {
-  if (!toolDrag.ghost) {
-    const travelled =
-      Math.abs(event.clientX - toolDrag.startX) + Math.abs(event.clientY - toolDrag.startY);
-    if (travelled < 4) return;
-    toolDrag.ghost = document.createElement('div');
-    toolDrag.ghost.className = 'drag-ghost';
-    toolDrag.ghost.textContent = toolDrag.kind === 'text' ? 'Text' : 'Shape';
-    document.body.appendChild(toolDrag.ghost);
-    document.body.classList.add('dragging');
-  }
-  toolDrag.ghost.style.left = `${event.clientX + 12}px`;
-  toolDrag.ghost.style.top = `${event.clientY + 12}px`;
-  const lane = laneAtPoint(event.clientX, event.clientY);
-  const track = lane && L.findTrack(state.project, lane.dataset.trackId);
-  const accepts = Boolean(track && track.kind === 'video');
-  for (const node of dom.lanes.querySelectorAll('.lane')) {
-    node.classList.toggle('drop-target', node === lane && accepts);
-  }
-}
-
-async function endToolDrag(event) {
-  const current = clearToolDrag();
-  if (!current) return;
-  // A drag that grew a ghost is never also a click, even when it ends back on
-  // the button — the browser fires one anyway, and without this the cancelled
-  // drag would add a layer at the playhead.
-  toolDragJustEnded = true;
-  const lane = laneAtPoint(event.clientX, event.clientY);
-  const track = lane && L.findTrack(state.project, lane.dataset.trackId);
-  if (!track || track.kind !== 'video') return;
-  const frame = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
-  const add = current.kind === 'text' ? addText : addShape;
-  await add({ trackId: track.id, frame });
-}
-
-// --- scrubbing -------------------------------------------------------------
-
-let scrubbing = false;
-
-function scrubTo(clientX) {
-  const tolerance = snapTolerance();
-  preview.seek(L.snapTime(state.project, frameAtClientX(clientX), tolerance));
-}
-
-function beginScrub(event) {
-  if (event.target.closest('[data-marker-id]')) return;
-  scrubbing = true;
-  preview.setScrubbing(true);
-  scrubTo(event.clientX);
-  event.preventDefault();
-}
-
-// --- dropping --------------------------------------------------------------
-
-/** One addClip per asset, all asking for the same frame.
- *
- *  They come out end to end rather than on top of each other because a clip
- *  never overlaps another one: the second lands after the first, the third
- *  after the second. The page does not have to work out where any of them go,
- *  which is exactly the arithmetic it no longer owns. */
-function dropCommands(trackId, assets, atFrame) {
-  const track = L.findTrack(state.project, trackId);
-  if (!track) return [];
-  const commands = [];
-  const accepted = assets.filter((asset) => L.canAccept(track, asset));
-  if (track.kind === 'video') {
-    const firstVideo = accepted.find((asset) => asset.kind === 'video');
-    const settings = L.settingsForFirstVideo(state.project, firstVideo, {
-      width: state.settings.defaultWidth,
-      height: state.settings.defaultHeight,
-    });
-    if (settings) commands.push({ op: 'setSettings', settings });
-  }
-  for (const asset of accepted) {
-    if (track.kind === 'video' && asset.kind === 'video' && asset.hasAudio) {
-      const videoIndex = L.tracksOf(state.project, 'video').findIndex((item) => item.id === trackId);
-      const audio = L.tracksOf(state.project, 'audio')[videoIndex];
-      if (!audio) return null;
-      const linkGroup = `g${crypto.randomUUID()}`;
-      commands.push(
-        { op: 'addClip', trackId, assetId: asset.id, start: atFrame, linkGroup },
-        { op: 'addClip', trackId: audio.id, assetId: asset.id, start: atFrame, linkGroup }
-      );
-      continue;
-    }
-    commands.push({ op: 'addClip', trackId, assetId: asset.id, start: atFrame });
-  }
-  return commands;
-}
-
-function laneAtPoint(x, y) {
-  const under = document.elementFromPoint(x, y);
-  if (!under || !under.closest) return null;
-  return under.closest('.lane');
-}
-
-function sourcePanelAtPoint(x, y) {
-  const under = document.elementFromPoint(x, y);
-  if (!under || !under.closest) return null;
-  return under.closest('#source-panel');
-}
-
-function selectMadeOnTrack(made, trackId) {
-  if (!made || !made.length) return;
-  const selected = made.find((clipId) => {
-    const found = L.findClip(state.project, clipId);
-    return found && found.track.id === trackId;
-  });
-  selectClip(selected || made[0]);
-}
-
-/** Dragging an asset out of the panel and onto a lane runs on pointer events
- *  rather than HTML5 drag and drop.
- *
- *  The webview that shows this page is also the view that catches files dropped
- *  from Finder, and that handler reports every drag event as handled — including
- *  a drag that started inside the page and carries no file at all. WebKit never
- *  gets it, so `dragover` and `drop` do not fire and a `draggable` asset lands
- *  nowhere. Pointer events are not routed through it. */
-let assetDrag = null;
-
-function beginAssetDrag(event) {
-  if (event.button !== 0) return;
-  const item = event.target.closest('.asset');
-  if (!item || event.target.closest('[data-remove]')) return;
-  const asset = L.findAsset(state.project, item.dataset.id);
-  if (!asset) return;
-  assetDrag = { asset, startX: event.clientX, startY: event.clientY, ghost: null };
-}
-
-function updateAssetDrag(event) {
-  // A few pixels of slack, so a click that wobbles still reads as a click.
-  if (!assetDrag.ghost) {
-    const travelled =
-      Math.abs(event.clientX - assetDrag.startX) + Math.abs(event.clientY - assetDrag.startY);
-    if (travelled < 4) return;
-    assetDrag.ghost = document.createElement('div');
-    assetDrag.ghost.className = 'drag-ghost';
-    assetDrag.ghost.textContent = assetDrag.asset.name || baseName(assetDrag.asset.path);
-    document.body.appendChild(assetDrag.ghost);
-    document.body.classList.add('dragging');
-  }
-  assetDrag.ghost.style.left = `${event.clientX + 12}px`;
-  assetDrag.ghost.style.top = `${event.clientY + 12}px`;
-  const lane = laneAtPoint(event.clientX, event.clientY);
-  const sourcePanel = sourcePanelAtPoint(event.clientX, event.clientY);
-  for (const node of dom.lanes.querySelectorAll('.lane')) {
-    node.classList.toggle('drop-target', node === lane);
-  }
-  dom.sourcePanel.classList.toggle('drop-target', Boolean(sourcePanel) && !lane);
-}
-
-/** Put the page back the way it was and report the drag that was running, if it
- *  had got as far as showing a ghost.
- *
- *  A drag does not always end in a pointerup: the pointer sequence can be
- *  cancelled, or the window can lose focus mid-drag and the button come up
- *  somewhere else entirely. Every one of those paths comes through here, so a
- *  ghost is never left stuck to the cursor. */
-function clearAssetDrag() {
-  const current = assetDrag;
-  assetDrag = null;
-  if (!current || !current.ghost) return null;
-  current.ghost.remove();
-  document.body.classList.remove('dragging');
-  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
-  dom.sourcePanel.classList.remove('drop-target');
-  return current;
-}
-
-async function endAssetDrag(event) {
-  const current = clearAssetDrag();
-  if (!current) return;
-
-  const lane = laneAtPoint(event.clientX, event.clientY);
-  if (sourcePanelAtPoint(event.clientX, event.clientY)) {
-    selectAsset(current.asset.id);
-    return;
-  }
-  if (!lane) return;
-  const at = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
-  const commands = dropCommands(lane.dataset.trackId, [current.asset], at);
-  if (!commands) {
-    await window.api.message('Add the matching audio track before placing this video.', {
-      title: 'Linked clip needs an audio track',
-    });
-    return;
-  }
-  const made = await edit(...commands);
-  selectMadeOnTrack(made, lane.dataset.trackId);
-}
-
-async function handleOsDrop(payload) {
-  if (payload.type === 'over') {
-    const point = payload.position || { x: 0, y: 0 };
-    const ratio = window.devicePixelRatio || 1;
-    const lane = laneAtPoint(point.x / ratio, point.y / ratio);
-    const sourcePanel = sourcePanelAtPoint(point.x / ratio, point.y / ratio);
-    for (const node of dom.lanes.querySelectorAll('.lane')) {
-      node.classList.toggle('drop-target', node === lane);
-    }
-    dom.sourcePanel.classList.toggle('drop-target', Boolean(sourcePanel) && !lane);
-    dom.assetsPanel.classList.toggle('drop-target', !lane && !sourcePanel);
-    return;
-  }
-  for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
-  dom.assetsPanel.classList.remove('drop-target');
-  dom.sourcePanel.classList.remove('drop-target');
-  if (payload.type !== 'drop') return;
-
-  // The event carries physical pixels; elementFromPoint wants CSS pixels.
-  const point = payload.position || { x: 0, y: 0 };
-  const ratio = window.devicePixelRatio || 1;
-  const x = point.x / ratio;
-  const y = point.y / ratio;
-  const lane = laneAtPoint(x, y);
-  const sourcePanel = sourcePanelAtPoint(x, y);
-
-  const found = await probePaths(payload.paths || []);
-  if (!found.length) return;
-  // The import and the clips it turns into are one thing the user did, so they
-  // go over as one transaction and come back on one press of undo.
-  const at = L.snapTime(state.project, frameAtClientX(x), snapTolerance());
-  const commands = lane ? dropCommands(lane.dataset.trackId, found, at) : [];
-  if (lane && !commands) {
-    await window.api.message('Add the matching audio track before placing this video.', {
-      title: 'Linked clip needs an audio track',
-    });
-    return;
-  }
-  const made = await edit(
-    { op: 'addAssets', assets: found },
-    ...commands
-  );
-  if (sourcePanel) selectAsset(found[0].id);
-  else if (lane) selectMadeOnTrack(made, lane.dataset.trackId);
-  for (const asset of found) hydrateDuration(asset);
 }
 
 // --- render ----------------------------------------------------------------
@@ -3372,66 +1901,18 @@ function fillProxySheet() {
   el('proxy-generate').disabled = !state.path || !window.api.available;
 }
 
-function shortcutMap() {
-  return K.resolved(state.settings.shortcutOverrides);
-}
-
-function renderShortcutLabels() {
-  const byAction = new Map(shortcutMap().map((shortcut) => [shortcut.action, shortcut]));
-  for (const node of document.querySelectorAll('[data-shortcut]')) {
-    const shortcut = byAction.get(node.dataset.shortcut);
-    node.textContent = shortcut ? K.formatKeys(shortcut.keys) : '';
-  }
-}
-
-function fillShortcutSheet() {
-  const list = el('shortcut-list');
-  list.textContent = '';
-  for (const shortcut of shortcutMap()) {
-    const row = document.createElement('label');
-    row.className = 'shortcut-row';
-    row.textContent = shortcut.label;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.dataset.shortcutAction = shortcut.action;
-    input.value = K.inputKeys(shortcut.keys);
-    input.setAttribute('aria-label', `${shortcut.label} shortcut`);
-    row.appendChild(input);
-    list.appendChild(row);
-  }
-  const error = el('shortcut-error');
-  error.hidden = true;
-  error.textContent = '';
-}
-
-function collectShortcutOverrides() {
-  const keysByAction = {};
-  for (const input of el('shortcut-list').querySelectorAll('[data-shortcut-action]')) {
-    const keys = K.parseKeys(input.value);
-    if (!keys) throw new Error(`Use a key such as Cmd+S for ${input.previousSibling.textContent}.`);
-    keysByAction[input.dataset.shortcutAction] = keys;
-  }
-  const updated = K.resolved(K.overridesFor(keysByAction));
-  const conflicts = K.conflicts(updated);
-  if (conflicts.length) {
-    const conflict = conflicts[0];
-    throw new Error(`${K.formatKeys([conflict.key])} is used by ${conflict.first.label} and ${conflict.second.label}.`);
-  }
-  return K.overridesFor(keysByAction);
-}
-
 function applySettings(next) {
   // Never alias state.boot.settings: toolbar changes are optimistic, while the
   // boot copy is the last backend-confirmed rollback point.
   state.settings = { ...next };
-  renderShortcutLabels();
+  shortcutController.renderLabels();
   preview.setQuality(next.previewQuality);
   preview.setMuteWhileScrubbing(next.previewMuteWhileScrubbing);
   dom.previewQuality.value = next.previewQuality;
   dom.btnMagnet.classList.toggle('on', next.snap);
-  syncEditorOverlay();
-  renderStageOverlay();
-  drawStageVisuals();
+  stageController.syncEditorOverlay();
+  stageController.renderStageOverlay();
+  stageController.drawStageVisuals();
   // Rust applies settings to an active session before saveSettings returns.
   // The idempotent attach is only needed when there is no native monitor yet,
   // including the first bootstrap and a change away from media elements.
@@ -3454,15 +1935,15 @@ async function attachMonitor(restart) {
   // Attaching decides whether guides belong to Rust or the page. Re-evaluate
   // after the answer so native guides never leave the surface hidden behind an
   // exact DOM frame, while a media-element fallback still draws them here.
-  syncEditorOverlay();
-  renderStageOverlay();
+  stageController.syncEditorOverlay();
+  stageController.renderStageOverlay();
   updateToolWarning();
   updateMonitorZoomUi();
   // Which engine is running decides who draws the text and shape layers, and
   // the answer only arrives here. Switching to the media elements has to put
   // the page's own copy back on the stage; switching away has to take it off.
-  drawStageVisuals();
-  scheduleExactFrame();
+  stageController.drawStageVisuals();
+  stageController.scheduleExactFrame();
   // The note carries the fallback reason when a monitor refused to start, and
   // that is only known once the attach has answered.
   el('as-compositor-note').textContent = compositorNote(state.settings.compositor);
@@ -3528,7 +2009,7 @@ const actions = {
     openSheet('app-settings');
   },
   'shortcut-settings': () => {
-    fillShortcutSheet();
+    shortcutController.fillSheet();
     openSheet('shortcut-settings');
   },
   'quality-soak': async () => {
@@ -3606,10 +2087,6 @@ function wireSelectedPanel() {
     const button = event.target.closest('[data-panel-action]');
     if (button) toggleSelectedPanel(button.dataset.panelAction);
   });
-  for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
-    button.addEventListener('click', () => activateInspectorTab(button.dataset.inspectorTab));
-    button.addEventListener('keydown', moveInspectorTab);
-  }
   dom.btnRefreshDebug.addEventListener('click', () => void refreshDebug());
   dom.btnToggleLogs.addEventListener('click', () => {
     dom.debugLog.hidden = !dom.debugLog.hidden;
@@ -3641,18 +2118,18 @@ function wireAssets() {
     if (!item) return;
     selectAsset(item.dataset.id);
   });
-  dom.assetList.addEventListener('pointerdown', beginAssetDrag);
+  dom.assetList.addEventListener('pointerdown', timelineInteractions.beginAssetDrag);
   window.addEventListener('pointermove', (event) => {
-    if (assetDrag) updateAssetDrag(event);
+    timelineInteractions.updateAssetDrag(event);
   });
-  window.addEventListener('pointerup', endAssetDrag);
+  window.addEventListener('pointerup', timelineInteractions.endAssetDrag);
   window.addEventListener('pointercancel', () => {
-    clearAssetDrag();
-    clearToolDrag();
+    timelineInteractions.clearAssetDrag();
+    timelineInteractions.clearToolDrag();
   });
   window.addEventListener('blur', () => {
-    clearAssetDrag();
-    clearToolDrag();
+    timelineInteractions.clearAssetDrag();
+    timelineInteractions.clearToolDrag();
   });
 }
 
@@ -3671,13 +2148,13 @@ function wireTimeline() {
   // Wrapped so the click event never arrives as a placement, and skipped
   // entirely when it is the click that follows a drag.
   dom.btnAddText.addEventListener('click', () => {
-    if (!tookToolDragClick()) addText();
+    if (!timelineInteractions.tookToolDragClick()) addText();
   });
   dom.btnAddShape.addEventListener('click', () => {
-    if (!tookToolDragClick()) addShape();
+    if (!timelineInteractions.tookToolDragClick()) addShape();
   });
-  dom.btnAddText.addEventListener('pointerdown', (event) => beginToolDrag(event, 'text'));
-  dom.btnAddShape.addEventListener('pointerdown', (event) => beginToolDrag(event, 'shape'));
+  dom.btnAddText.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, 'text'));
+  dom.btnAddShape.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, 'shape'));
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
@@ -3705,7 +2182,7 @@ function wireTimeline() {
     edit({ op: 'setTrackFlags', trackId: track.id, [flag]: !track[flag] });
   });
 
-  dom.ruler.addEventListener('pointerdown', beginScrub);
+  dom.ruler.addEventListener('pointerdown', timelineInteractions.beginScrub);
   dom.ruler.addEventListener('click', (event) => {
     const marker = event.target.closest('[data-marker-id]');
     const found = marker && L.findMarker(state.project, marker.dataset.markerId);
@@ -3741,69 +2218,35 @@ function wireTimeline() {
       edit({ op: 'setMarker', markerId: marker.id, name: name.value });
     }
   });
-  for (const input of [
-    dom.textValue, dom.textFont, dom.textSize, dom.textFillKind, dom.textColor,
-    dom.textFillEndColor, dom.textFillAsset, dom.textAlign, dom.textStrokeColor,
-    dom.textStrokeWidth, dom.textShadowEnabled, dom.textShadowColor,
-    dom.textShadowX, dom.textShadowY, dom.textShadowBlur,
-  ]) {
-    input.addEventListener('change', updateSelectedText);
-  }
-  for (const input of [
-    dom.shapeKind, dom.shapeFillKind, dom.shapeFill, dom.shapeFillEndColor,
-    dom.shapeFillAsset, dom.shapeStroke, dom.shapeStrokeWidth,
-    dom.shapeCornerRadius, dom.shapeShadowEnabled, dom.shapeShadowColor,
-    dom.shapeShadowX, dom.shapeShadowY, dom.shapeShadowBlur,
-    dom.shapeStartArrow, dom.shapeEndArrow,
-  ]) {
-    input.addEventListener('change', updateSelectedShape);
-  }
-  for (const input of [dom.subtitleValue, dom.subtitleStart, dom.subtitleEnd]) {
-    input.addEventListener('change', updateSelectedSubtitle);
-  }
-  for (const input of [dom.subtitleFont, dom.subtitleSize, dom.subtitleColor]) {
-    input.addEventListener('change', updateSubtitleStyle);
-  }
-  dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
-  dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
-  dom.textAddFill.addEventListener('click', () => changeSelectedFillLayers('text', true));
-  dom.textRemoveFill.addEventListener('click', () => changeSelectedFillLayers('text', false));
-  dom.shapeAddFill.addEventListener('click', () => changeSelectedFillLayers('shape', true));
-  dom.shapeRemoveFill.addEventListener('click', () => changeSelectedFillLayers('shape', false));
-  for (const input of [
-    dom.transformX, dom.transformY, dom.transformWidth, dom.transformHeight,
-    dom.transformRotation, dom.transformOpacity, dom.transformOpacityValue,
-  ]) {
-    input.addEventListener('change', updateSelectedTransform);
-  }
+  inspectorController.wire();
   dom.lanes.addEventListener('pointerdown', (event) => {
     const visual = event.target.closest('[data-visual-item-id]');
     if (visual) {
-      beginVisualItemDrag(event, visual);
+      timelineInteractions.beginVisualItemDrag(event, visual);
       return;
     }
     const clip = event.target.closest('.clip');
     if (clip) {
-      beginClipDrag(event, clip);
+      timelineInteractions.beginClipDrag(event, clip);
       return;
     }
-    selectClip(null);
-    selectVisualItem(null);
-    beginScrub(event);
+    stageController.selectClip(null);
+    stageController.selectVisualItem(null);
+    timelineInteractions.beginScrub(event);
   });
   dom.lanes.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     const visual = event.target.closest('[data-visual-item-id]');
     if (visual) {
-      selectVisualItem(visual.dataset.visualItemId);
+      stageController.selectVisualItem(visual.dataset.visualItemId);
       openTimelineContextMenu(event, [
-        { label: 'Delete Layer', run: () => removeSelectedVisualItem() },
+        { label: 'Delete Layer', run: () => inspectorController.removeSelectedVisualItem() },
       ]);
       return;
     }
     const clip = event.target.closest('.clip');
     if (clip) {
-      selectClip(clip.dataset.clipId);
+      stageController.selectClip(clip.dataset.clipId);
       openTimelineContextMenu(event, [
         { label: 'Apply 3D LUT…', run: () => setClipLut(clip.dataset.clipId) },
         ...(L.findClip(state.project, clip.dataset.clipId).clip.lutPath
@@ -3819,7 +2262,7 @@ function wireTimeline() {
     const track = L.findTrack(state.project, lane.dataset.trackId);
     const gap = L.gapAt(track, frameAtClientX(event.clientX));
     if (!gap) return;
-    selectClip(null);
+    stageController.selectClip(null);
     openTimelineContextMenu(event, [
       {
         label: 'Ripple Delete Gap',
@@ -3829,71 +2272,10 @@ function wireTimeline() {
   });
 
   window.addEventListener('pointermove', (event) => {
-    if (drag) updateClipDrag(event);
-    else if (visualTimingDrag) updateVisualItemDrag(event);
-    else if (toolDrag) updateToolDrag(event);
-    else if (scrubbing) scrubTo(event.clientX);
+    timelineInteractions.pointerMove(event);
   });
   window.addEventListener('pointerup', (event) => {
-    if (drag) endClipDrag().catch((error) => reportError(error, 'clip:drag'));
-    if (visualTimingDrag) endVisualItemDrag();
-    if (toolDrag) {
-      endToolDrag(event).catch((error) => reportError(error, 'tool-drop'));
-    }
-    if (scrubbing) {
-      scrubbing = false;
-      preview.setScrubbing(false);
-    }
-  });
-}
-
-function wireTransport() {
-  let monitorPan = null;
-  dom.btnPlay.addEventListener('click', () => preview.toggle());
-  dom.previewQuality.addEventListener('change', () => {
-    state.settings.previewQuality = dom.previewQuality.value;
-    preview.setQuality(state.settings.previewQuality);
-    persistSettingsInBackground();
-  });
-  dom.stage.addEventListener('wheel', (event) => {
-    if (!event.metaKey) return;
-    const box = dom.stage.getBoundingClientRect();
-    const cursor = { x: event.clientX - box.left, y: event.clientY - box.top };
-    const changed = event.deltaY < 0 ? preview.zoomIn(cursor) : preview.zoomOut(cursor);
-    if (changed) {
-      event.preventDefault();
-      updateMonitorZoomUi();
-    }
-  }, { passive: false });
-  dom.stage.addEventListener('pointerdown', (event) => {
-    if (beginVisualDrag(event)) return;
-    const zoom = preview.zoomState();
-    if (event.button !== 0 || !zoom.available || zoom.zoom <= 1) return;
-    monitorPan = { x: event.clientX, y: event.clientY };
-    dom.stage.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  });
-  dom.stage.addEventListener('pointermove', (event) => {
-    if (visualDrag) {
-      updateVisualDrag(event);
-      return;
-    }
-    if (!monitorPan) return;
-    preview.panBy(event.clientX - monitorPan.x, event.clientY - monitorPan.y);
-    monitorPan = { x: event.clientX, y: event.clientY };
-  });
-  dom.stage.addEventListener('pointerup', (event) => {
-    if (visualDrag) {
-      endVisualDrag(event).catch((error) => reportError(error, 'visual-item:transform'));
-      return;
-    }
-    if (!monitorPan) return;
-    monitorPan = null;
-    dom.stage.releasePointerCapture(event.pointerId);
-  });
-  dom.stage.addEventListener('pointercancel', () => {
-    cancelVisualDrag();
-    monitorPan = null;
+    timelineInteractions.pointerUp(event, reportError);
   });
 }
 
@@ -3971,7 +2353,7 @@ function wireSheets() {
     const error = el('shortcut-error');
     let shortcutOverrides;
     try {
-      shortcutOverrides = collectShortcutOverrides();
+      shortcutOverrides = shortcutController.collectOverrides();
     } catch (cause) {
       error.textContent = cause.message;
       error.hidden = false;
@@ -4043,28 +2425,6 @@ function wireSheets() {
   });
 }
 
-function wireKeyboard() {
-  window.addEventListener('keydown', (event) => {
-    const target = event.target;
-    const typing =
-      target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
-    if (typing) return;
-    if (event.key === 'Escape') {
-      closeMenus();
-      closeTimelineContextMenu();
-      for (const sheet of document.querySelectorAll('.overlay')) {
-        if (sheet.id !== 'render-overlay' || !state.rendering) sheet.hidden = true;
-      }
-      return;
-    }
-    const action = K.actionFor(event, shortcutMap());
-    if (!action) return;
-    event.preventDefault();
-    const run = actions[action];
-    if (run) Promise.resolve().then(run).catch((error) => reportError(error, `shortcut:${action}`));
-  });
-}
-
 function updateToolWarning() {
   dom.toolWarning.hidden = Boolean(state.boot && state.boot.ffmpeg);
   if (!dom.playbackWarning) return;
@@ -4085,179 +2445,6 @@ function subscribe(source, register, handler) {
   }
 }
 
-async function boot() {
-  state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
-
-  sourcePreview = globalThis.previewLib.createPreview({
-    stage: dom.sourceStage,
-    inner: dom.sourceStageInner,
-    wrap: dom.sourceStageWrap,
-    getProject: () => state.project,
-    getAssetPlaybackRange: () => {
-      const asset = selectedSourceAsset();
-      return asset && state.sourceSelection
-        ? S.playbackRange(state.sourceSelection, S.sourceLimitFrames(asset, rate()))
-        : null;
-    },
-    playbackPath,
-    onTick: (frame, playing) => {
-      dom.sourceClock.textContent = sourceTime(frame);
-      dom.sourceSeek.value = String(Math.round(frame));
-      dom.sourcePlay.textContent = playing ? '❚❚' : '▶';
-    },
-  });
-
-  qualityMonitor = globalThis.qualityLib.createQualityMonitor({});
-  mediaPreview = globalThis.previewLib.createPreview({
-    stage: dom.stage,
-    inner: dom.stageInner,
-    exactCanvas: dom.stageExact,
-    wrap: dom.stageWrap,
-    getProject: () => state.project,
-    playbackPath,
-    qualityMonitor,
-    onTick: (frame, playing) => {
-      updatePlayhead(frame);
-      followPlayhead(frame);
-      dom.btnPlay.textContent = playing ? '❚❚' : '▶';
-      if (playing) {
-        // Playing is the stacked elements; the composited frame cannot keep up
-        // and would only freeze one moment over moving video.
-        preview.clearExact();
-        setStageMode('live');
-      } else {
-        scheduleExactFrame();
-      }
-    },
-  });
-
-  // Everything below still says `preview`, and on the media element engine that
-  // is exactly what it is. On the native one the router forwards the transport
-  // to Rust instead and leaves the rest — the asset preview, the quality
-  // setting, the element pool — where it was.
-  preview = globalThis.monitorLib.createMonitor({
-    preview: mediaPreview,
-    stage: dom.stage,
-    // The panel is what the native place is computed from, so the view and the
-    // page's own stage come out of one calculation rather than two.
-    wrap: dom.stageWrap,
-    api: window.api,
-    getProject: () => state.project,
-    onNotice: (reason) => {
-      state.playbackNotice = reason;
-      updateToolWarning();
-    },
-    onTick: (frame, playing) => {
-      updatePlayhead(frame);
-      followPlayhead(frame);
-      dom.btnPlay.textContent = playing ? '❚❚' : '▶';
-      // Nothing to schedule and nothing to badge: the monitor draws the frame
-      // under a stopped playhead with the same compositor it plays with.
-      setStageMode(null);
-    },
-  });
-
-  if (typeof ResizeObserver === 'function') {
-    stageResizeObserver = new ResizeObserver(() => {
-      renderStageOverlay();
-      drawStageVisuals();
-      preview.place();
-    });
-    stageResizeObserver.observe(dom.stage);
-  }
-
-  await applySettings(state.settings);
-  globalThis.makevideoQuality = globalThis.qualityLib.createQualityHarness({
-    monitor: qualityMonitor,
-    preview,
-    getProject: () => state.project,
-    // The harness hides and mutes tracks to measure what each one costs, and
-    // that is an edit like any other, so it goes over the same wire.
-    setTrackFlags: (trackId, flags) => edit(Object.assign({ op: 'setTrackFlags', trackId }, flags)),
-    memoryBytes: window.api.processMemoryBytes,
-    saveReport: window.api.saveQualityReport,
-  });
-  updateToolWarning();
-
-  wireMenus();
-  wireSelectedPanel();
-  wireAssets();
-  wireTimeline();
-  wireTransport();
-  wireSheets();
-  wireKeyboard();
-
-  subscribe('events:render-progress', window.api.onRenderProgress, onRenderProgress);
-  subscribe('events:render-done', window.api.onRenderDone, onRenderDone);
-  subscribe('events:render-fallback', window.api.onRenderFallback, onRenderFallback);
-  subscribe('events:proxy-status', window.api.onProxyStatus, onProxyStatus);
-  subscribe('events:waveform-status', window.api.onWaveformStatus, onWaveformStatus);
-  subscribe('events:file-drop', window.api.onFileDrop, (payload) => {
-    Promise.resolve(handleOsDrop(payload)).catch((error) => reportError(error, 'file-drop'));
-  });
-  subscribe('events:close-requested', window.api.onCloseRequested, async (event) => {
-    if (isDirty()) {
-      if (event && event.preventDefault) event.preventDefault();
-      if (!(await confirmDiscard('Quit'))) return;
-    }
-    window.api.closeWindow();
-  });
-  window.addEventListener('resize', () => {
-    renderTimeline();
-    // The window moving or resizing moves the stage, and the native view is
-    // placed in the window rather than laid out by the page.
-    if (preview) preview.place();
-  });
-
-  refresh();
-
-  try {
-    adopt(await window.api.editState());
-    state.savedRevision = state.doc.revision;
-    refresh();
-  } catch (error) {
-    reportError(error, 'edit-state');
-  }
-
-  try {
-    state.boot = await window.api.bootstrap();
-    state.settings = { ...DEFAULT_SETTINGS, ...state.boot.settings };
-    await applySettings(state.settings);
-    updateToolWarning();
-    refresh();
-  } catch (error) {
-    reportError(error, 'bootstrap');
-    dom.toolWarning.hidden = false;
-    dom.toolWarning.textContent = 'Initialization failed';
-    dom.toolWarning.title = 'Open Settings to inspect the error log location';
-  }
-
-  // The system's font families, for the text inspectors' pickers. Off the
-  // boot path on purpose: reading every font file's name takes long enough to
-  // notice, and nothing before the first font edit needs the list.
-  Promise.resolve(window.api.listFonts())
-    .then((families) => {
-      if (!dom.fontOptions || !Array.isArray(families)) return;
-      dom.fontOptions.textContent = '';
-      for (const family of families) {
-        const option = document.createElement('option');
-        option.value = family;
-        dom.fontOptions.appendChild(option);
-      }
-    })
-    .catch(() => {});
-
-  if (state.boot.qualityProject && state.boot.qualityReport) {
-    window.setTimeout(async () => {
-      if (!(await openProjectPath(state.boot.qualityProject))) return;
-      const config = state.boot.qualitySmoke ? qualitySmokeConfig() : undefined;
-      const report = await globalThis.makevideoQuality.runAll(config);
-      await window.api.writeQualityReport(state.boot.qualityReport, report);
-      window.api.closeWindow();
-    }, 250);
-  }
-}
-
 // One name, so diagnostics in Web Inspector do not shadow anything else on the page.
 globalThis.makevideo = {
   state,
@@ -4266,5 +2453,68 @@ globalThis.makevideo = {
   lib: L,
 };
 
-boot().catch((error) => reportError(error, 'ui-initialization'));
+const appInitializer = globalThis.appInitLib.createAppInitializer({
+  DEFAULT_SETTINGS,
+  G,
+  HANDLE_PX,
+  I,
+  K,
+  L,
+  P,
+  S,
+  T,
+  X,
+  actions,
+  activateSelectedPanel,
+  addShape,
+  addText,
+  adopt,
+  applySettings,
+  baseName,
+  closeMenus,
+  closeTimelineContextMenu,
+  confirmDiscard,
+  dom,
+  edit,
+  el,
+  followPlayhead,
+  frameAtClientX,
+  hydrateDuration,
+  isDirty,
+  liveSelection,
+  onProxyStatus,
+  onRenderDone,
+  onRenderFallback,
+  onRenderProgress,
+  onWaveformStatus,
+  openProjectPath,
+  persistSettingsInBackground,
+  playbackPath,
+  probePaths,
+  qualitySmokeConfig,
+  rate,
+  refresh,
+  renderTimeline,
+  reportError,
+  selectAsset,
+  selectedSourceAsset,
+  setRuntime,
+  snapTolerance,
+  sourceTime,
+  state,
+  staysOnCpu,
+  subscribe,
+  updateLinkUi,
+  updateMonitorZoomUi,
+  updatePlayhead,
+  updateToolWarning,
+  wireAssets,
+  wireMenus,
+  wireSelectedPanel,
+  wireSheets,
+  wireTimeline,
+  zoomToPxPerSecond,
+});
+
+appInitializer.start().catch((error) => reportError(error, 'ui-initialization'));
 })();
