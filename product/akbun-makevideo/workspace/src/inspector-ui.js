@@ -504,6 +504,7 @@
       if (!selected) return;
       const frame = Math.max(0, Math.round(Number(dom.keyframeFrame.value) || 0));
       const value = Number(dom.keyframeValue.value);
+      if (dom.keyframeValue.value.trim() === '' || !Number.isFinite(value)) return;
       const command = selected.type === 'volume'
         ? { op: 'setClipVolumeKeyframe', clipId: selected.layerId, frame, value, easing: dom.keyframeEasing.value }
         : { op: 'setVisualKeyframe', itemId: selected.layerId, property: selected.property, frame, value, easing: dom.keyframeEasing.value };

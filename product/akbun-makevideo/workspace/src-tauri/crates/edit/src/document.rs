@@ -721,6 +721,28 @@ mod tests {
     }
 
     #[test]
+    fn playback_speed_refuses_to_overlap_the_clip_next_door() {
+        let mut document = document();
+        let first = add(&mut document, 0);
+        add(&mut document, 300);
+        let before = serde_json::to_string(document.project()).unwrap();
+        let error = document
+            .apply(Command::SetClipPlayback {
+                clip_id: first,
+                speed: Some(0.5),
+                preserve_pitch: None,
+                fade_in: None,
+                fade_out: None,
+            })
+            .unwrap_err();
+        assert!(
+            error.contains("has no room for that playback speed"),
+            "{error}"
+        );
+        assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+    }
+
+    #[test]
     fn a_trim_may_not_reach_past_the_end_of_the_source() {
         let mut document = document();
         let clip = add(&mut document, 0);

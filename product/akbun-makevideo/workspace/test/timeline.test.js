@@ -341,6 +341,9 @@ test('clip speed derives timeline length and source frame', () => {
   assert.equal(L.clipDuration(fast), 60);
   const project = projectOf([VIDEO], [track('V1', 'video', 'V1', [fast])]);
   assert.equal(L.clipsAt(project, 25)[0].sourceFrame, 30);
+  fast.speed = -2;
+  assert.equal(L.clipDuration(fast), 120);
+  assert.equal(L.clipsAt(project, 25)[0].sourceFrame, 15);
 });
 
 test('keyframes use the outgoing easing and static values remain fallbacks', () => {

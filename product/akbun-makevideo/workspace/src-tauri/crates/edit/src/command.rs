@@ -2083,6 +2083,29 @@ fn set_clip_playback(
     if entries.is_empty() {
         return Err("that clip is not on the timeline".into());
     }
+    if let Some(value) = speed {
+        if !value.is_finite() || !(0.1..=16.0).contains(&value) {
+            return Err("clip speed must be between 0.1 and 16".into());
+        }
+        for entry in &entries {
+            let mut candidate = entry.clip.clone();
+            candidate.speed = value;
+            let track = project
+                .track(&entry.track_id)
+                .expect("a linked placement has a track");
+            if track.free_start(
+                candidate.start,
+                candidate.duration_frames(),
+                Some(&candidate.id),
+            ) != candidate.start
+            {
+                return Err(format!(
+                    "{} has no room for that playback speed",
+                    track.name
+                ));
+            }
+        }
+    }
     let previous = entries.clone();
     let ids: HashSet<String> = entries.into_iter().map(|entry| entry.clip.id).collect();
     for track in &mut project.tracks {
@@ -2091,9 +2114,6 @@ fn set_clip_playback(
                 continue;
             }
             if let Some(value) = speed {
-                if !value.is_finite() || !(0.1..=16.0).contains(&value) {
-                    return Err("clip speed must be between 0.1 and 16".into());
-                }
                 clip.speed = value;
             }
             if let Some(value) = preserve_pitch {

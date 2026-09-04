@@ -209,10 +209,11 @@ function clipsAt(project, frame) {
   for (const track of project.tracks) {
     for (const clip of track.clips) {
       if (at < clip.start || at >= clipEnd(clip)) continue;
+      const speed = Number.isFinite(clip.speed) && clip.speed > 0 ? clip.speed : 1;
       active.push({
         track,
         clip,
-        sourceFrame: clip.in + Math.floor((at - clip.start) * (clip.speed || 1)),
+        sourceFrame: clip.in + Math.floor((at - clip.start) * speed),
       });
     }
   }
