@@ -102,6 +102,7 @@
           <li><button id="menu-monitor-zoom-in" data-action="monitor-zoom-in">Zoom In</button></li>
           <li><button id="menu-monitor-zoom-out" data-action="monitor-zoom-out">Zoom Out</button></li>
           <li><button id="menu-monitor-fit" data-action="monitor-fit">Fit Monitor</button></li>
+          <li><button data-action="monitor-fullscreen">Program Monitor Full Screen<kbd data-shortcut="monitor-fullscreen"></kbd></button></li>
           <li class="sep"></li>
           <li><button data-action="proxy-media">Proxy Media…</button></li>
         </ul>
@@ -318,8 +319,15 @@
         </div>
         <section id="shape-tool-view" class="selected-panel-view" hidden>
           <h3>Shape</h3>
-          <p class="dim small-text">Add at the playhead, or drag the button onto a video track.</p>
-          <button id="btn-add-shape" type="button">+ Shape</button>
+          <p class="dim small-text">Add at the playhead, or drag a shape onto a video track.</p>
+          <div class="shape-picker" role="group" aria-label="Add shape">
+            <button type="button" data-add-shape="rectangle"><span class="shape-icon rectangle" aria-hidden="true"></span>Rectangle</button>
+            <button type="button" data-add-shape="roundedRectangle"><span class="shape-icon rounded" aria-hidden="true"></span>Rounded rectangle</button>
+            <button type="button" data-add-shape="ellipse"><span class="shape-icon ellipse" aria-hidden="true"></span>Ellipse</button>
+            <button type="button" data-add-shape="line"><span class="shape-icon line" aria-hidden="true"></span>Line</button>
+            <button type="button" data-add-shape="polygon"><span class="shape-icon polygon" aria-hidden="true"></span>Polygon</button>
+            <button type="button" data-add-shape="star"><span class="shape-icon star" aria-hidden="true"></span>Star</button>
+          </div>
         </section>
         <section id="marker-tool-view" class="selected-panel-view" hidden>
           <div class="selected-panel-actions">

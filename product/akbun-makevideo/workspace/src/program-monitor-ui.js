@@ -5,6 +5,10 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.programMonitorUiLib = exported;
 })(globalThis, function () {
+  function visualTransformFor(item, drag) {
+    return drag && drag.itemId === item.id ? drag.next : item.transform;
+  }
+
   function createProgramMonitorUi(deps) {
     const {
       G,
@@ -29,6 +33,30 @@
     } = deps;
     let visualDrag = null;
     let editorOverlayActive = false;
+
+    function resizeProgramMonitor() {
+      window.requestAnimationFrame(() => {
+        getPreview().layout();
+        renderStageOverlay();
+        drawStageVisuals();
+      });
+    }
+
+    function setFullscreen(active) {
+      const before = document.body.classList.contains('program-monitor-fullscreen');
+      if (before === active) return false;
+      document.body.classList.toggle('program-monitor-fullscreen', active);
+      resizeProgramMonitor();
+      return true;
+    }
+
+    function toggleFullscreen() {
+      return setFullscreen(!document.body.classList.contains('program-monitor-fullscreen'));
+    }
+
+    function exitFullscreen() {
+      return setFullscreen(false);
+    }
 
     // --- the exact frame -------------------------------------------------------
 
@@ -107,6 +135,10 @@
       return null;
     }
 
+    function visualTransform(item) {
+      return visualTransformFor(item, visualDrag);
+    }
+
     function projectPointAt(event) {
       const box = dom.stage.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) return null;
@@ -183,7 +215,7 @@
       context.clearRect(0, 0, box.width, box.height);
       if (showGuides) G.draw(context, state.settings, box.width, box.height);
       if (!item) return;
-      const transform = item.transform;
+      const transform = visualTransform(item);
       const center = X.displayPoint(X.centre(transform), box, state.project.settings);
       const size = {
         x: (transform.width * box.width) / state.project.settings.width,
@@ -279,7 +311,7 @@
       // as compositor/text.rs places it.
       const transform = track.kind === 'subtitle'
         ? { x: 96, y: settings.height * 0.78, width: settings.width - 192, height: settings.height * 0.16, opacity: 1 }
-        : item.transform;
+        : visualTransform(item);
       const x = transform.x * scales.x;
       const y = transform.y * scales.y;
       const width = Math.max(1, transform.width * scales.x);
@@ -555,6 +587,8 @@
         start: point,
         next: { ...hit.item.transform },
       };
+      getPreview().clearExact();
+      drawStageVisuals();
       dom.stage.setPointerCapture(event.pointerId);
       event.preventDefault();
       return true;
@@ -570,8 +604,6 @@
         visualDrag.start,
         point
       );
-      const item = selectedVisualItem();
-      if (item) item.transform = visualDrag.next;
       renderStageOverlay();
       // The page's own copy of the layer moves with the handles. Without this the
       // dashed box slides away from the shape it is supposed to be around, until
@@ -584,18 +616,26 @@
       const finished = visualDrag;
       visualDrag = null;
       if (dom.stage.hasPointerCapture(event.pointerId)) dom.stage.releasePointerCapture(event.pointerId);
-      if (JSON.stringify(finished.initial) === JSON.stringify(finished.next)) return;
-      await edit({ op: 'setVisualTransform', itemId: finished.itemId, transform: finished.next });
-      selectVisualItem(finished.itemId);
+      if (JSON.stringify(finished.initial) === JSON.stringify(finished.next)) {
+        drawStageVisuals();
+        scheduleExactFrame();
+        return;
+      }
+      try {
+        await edit({ op: 'setVisualTransform', itemId: finished.itemId, transform: finished.next });
+        selectVisualItem(finished.itemId);
+      } finally {
+        drawStageVisuals();
+        scheduleExactFrame();
+      }
     }
 
     function cancelVisualDrag() {
       if (!visualDrag) return;
-      const item = selectedVisualItem();
-      if (item) item.transform = visualDrag.initial;
       visualDrag = null;
       renderStageOverlay();
       drawStageVisuals();
+      scheduleExactFrame();
     }
 
 
@@ -653,6 +693,7 @@
     return {
       drawStageVisuals,
       editorOverlayWanted,
+      exitFullscreen,
       orderedStops,
       renderStageOverlay,
       scheduleExactFrame,
@@ -661,9 +702,10 @@
       selectVisualItem,
       setStageMode,
       syncEditorOverlay,
+      toggleFullscreen,
       wireTransport,
     };
   }
 
-  return { createProgramMonitorUi };
+  return { createProgramMonitorUi, visualTransformFor };
 });

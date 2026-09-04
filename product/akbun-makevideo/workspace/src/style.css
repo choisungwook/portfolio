@@ -90,6 +90,36 @@ body.trimming * {
   cursor: ew-resize !important;
 }
 
+body.program-monitor-fullscreen {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.program-monitor-fullscreen #menubar,
+body.program-monitor-fullscreen #assets-panel,
+body.program-monitor-fullscreen #source-panel,
+body.program-monitor-fullscreen #selected-panel,
+body.program-monitor-fullscreen #lower {
+  display: none;
+}
+
+body.program-monitor-fullscreen #panels {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.program-monitor-fullscreen #upper,
+body.program-monitor-fullscreen #upper.panel-open {
+  grid-template-columns: minmax(0, 1fr);
+  border-bottom: 0;
+}
+
+body.program-monitor-fullscreen #monitor-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.program-monitor-fullscreen #preview-panel {
+  grid-column: 1;
+}
+
 /* The icon symbols are markup, not layout. */
 .icon-defs {
   position: absolute;
@@ -109,6 +139,58 @@ body.trimming * {
 
 .small-text {
   font-size: 12px;
+}
+
+.shape-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shape-picker button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px;
+  text-align: left;
+}
+
+.shape-icon {
+  display: block;
+  width: 24px;
+  height: 18px;
+  border: 2px solid currentColor;
+}
+
+.shape-icon.rounded {
+  border-radius: 6px;
+}
+
+.shape-icon.ellipse {
+  border-radius: 50%;
+}
+
+.shape-icon.line {
+  height: 2px;
+  border-width: 1px 0 0;
+  transform: rotate(-20deg);
+}
+
+.shape-icon.polygon,
+.shape-icon.star {
+  border: 0;
+  background: currentColor;
+}
+
+.shape-icon.polygon {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+
+.shape-icon.star {
+  clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 92%, 50% 70%, 21% 92%, 32% 56%, 2% 35%, 39% 34%);
 }
 
 button {

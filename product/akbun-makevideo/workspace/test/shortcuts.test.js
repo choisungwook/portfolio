@@ -10,6 +10,13 @@ test('split keeps both built-in shortcuts', () => {
   assert.deepEqual(split.keys, ['Meta+KeyB', 'Meta+KeyD']);
 });
 
+test('Cmd+F expands the Program Monitor', () => {
+  const fullscreen = shortcuts.resolved({})
+    .find((shortcut) => shortcut.action === 'monitor-fullscreen');
+
+  assert.deepEqual(fullscreen.keys, ['Meta+KeyF']);
+});
+
 test('only changed shortcuts are saved as overrides', () => {
   const overrides = shortcuts.overridesFor({
     split: ['Meta+KeyB', 'Meta+KeyD'],

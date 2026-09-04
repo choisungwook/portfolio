@@ -128,7 +128,7 @@ const dom = {
   btnRipple: el('btn-ripple'),
   btnLink: el('btn-link'),
   btnAddText: el('btn-add-text'),
-  btnAddShape: el('btn-add-shape'),
+  shapeButtons: [...document.querySelectorAll('[data-add-shape]')],
   btnAddMarker: el('btn-add-marker'),
   btnAddVideo: el('btn-add-video'),
   btnAddAudio: el('btn-add-audio'),
@@ -793,6 +793,34 @@ function setSourceMark(which) {
   renderSourceMonitor();
 }
 
+function sourceDragPayload() {
+  const asset = selectedSourceAsset();
+  if (!asset || !state.sourceSelection) return null;
+  const video = dom.sourceVideo.checked && !dom.sourceVideo.disabled;
+  const audio = dom.sourceAudio.checked && !dom.sourceAudio.disabled;
+  if (!video && !audio) return null;
+  return {
+    asset,
+    selection: { ...state.sourceSelection },
+    video,
+    audio,
+    rippleAllTracks: dom.sourceRipple.value === 'all',
+  };
+}
+
+async function insertSourceAt(source, trackId, start) {
+  const command = S.commandFor('insert', state.project, source.asset, source.selection, {
+    video: source.video,
+    audio: source.audio,
+    targetTrackId: trackId,
+    start,
+    rippleAllTracks: source.rippleAllTracks,
+  });
+  if (!command) return;
+  const made = await edit(command);
+  selectMadeOnTrack(made, trackId);
+}
+
 async function placeSource(mode) {
   const asset = selectedSourceAsset();
   if (!asset || !state.sourceSelection) return;
@@ -1346,18 +1374,28 @@ function addText(placement) {
   });
 }
 
-function addShape(placement) {
+function shapeTransform(shape) {
+  const square = shape === 'ellipse' || shape === 'polygon' || shape === 'star';
+  const line = shape === 'line';
+  const width = state.project.settings.width * 0.4;
+  const height = state.project.settings.height * (line ? 0.08 : square ? 0.35 : 0.25);
+  return {
+    x: (state.project.settings.width - width) / 2,
+    y: (state.project.settings.height - height) / 2,
+    width,
+    height,
+  };
+}
+
+function addShape(shape, placement) {
   return addVisualItem(placement, {
-    kind: 'shape', shape: 'roundedRectangle',
+    kind: 'shape', shape,
     fills: [{ kind: 'solid', color: '#4f8cffcc' }],
     stroke: { color: '#ffffff', width: 4 }, shadow: null,
-    cornerRadius: 20, startArrow: false, endArrow: false,
-  }, {
-    x: state.project.settings.width * 0.3,
-    y: state.project.settings.height * 0.3,
-    width: state.project.settings.width * 0.4,
-    height: state.project.settings.height * 0.25,
-  });
+    cornerRadius: shape === 'roundedRectangle' ? 20 : 0,
+    startArrow: false,
+    endArrow: false,
+  }, shapeTransform(shape));
 }
 
 async function addSubtitle() {
@@ -1993,6 +2031,7 @@ const actions = {
   'monitor-zoom-in': () => { preview.zoomIn(); updateMonitorZoomUi(); },
   'monitor-zoom-out': () => { preview.zoomOut(); updateMonitorZoomUi(); },
   'monitor-fit': () => { preview.fit(); updateMonitorZoomUi(); },
+  'monitor-fullscreen': () => stageController.toggleFullscreen(),
   'render-fhd': () => startRender('fhd'),
   'render-4k': () => startRender('4k'),
   'cancel-render': () => window.api.cancelRender(),
@@ -2119,16 +2158,25 @@ function wireAssets() {
     selectAsset(item.dataset.id);
   });
   dom.assetList.addEventListener('pointerdown', timelineInteractions.beginAssetDrag);
+  dom.sourceStage.addEventListener('pointerdown', timelineInteractions.beginSourceDrag);
+  dom.sourceStage.addEventListener('dragstart', (event) => event.preventDefault());
   window.addEventListener('pointermove', (event) => {
     timelineInteractions.updateAssetDrag(event);
+    timelineInteractions.updateSourceDrag(event);
   });
   window.addEventListener('pointerup', timelineInteractions.endAssetDrag);
+  window.addEventListener('pointerup', (event) => {
+    timelineInteractions.endSourceDrag(event)
+      .catch((error) => reportError(error, 'source:drop'));
+  });
   window.addEventListener('pointercancel', () => {
     timelineInteractions.clearAssetDrag();
+    timelineInteractions.clearSourceDrag();
     timelineInteractions.clearToolDrag();
   });
   window.addEventListener('blur', () => {
     timelineInteractions.clearAssetDrag();
+    timelineInteractions.clearSourceDrag();
     timelineInteractions.clearToolDrag();
   });
 }
@@ -2150,11 +2198,20 @@ function wireTimeline() {
   dom.btnAddText.addEventListener('click', () => {
     if (!timelineInteractions.tookToolDragClick()) addText();
   });
-  dom.btnAddShape.addEventListener('click', () => {
-    if (!timelineInteractions.tookToolDragClick()) addShape();
-  });
-  dom.btnAddText.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, 'text'));
-  dom.btnAddShape.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, 'shape'));
+  for (const button of dom.shapeButtons) {
+    button.addEventListener('click', () => {
+      if (!timelineInteractions.tookToolDragClick()) addShape(button.dataset.addShape);
+    });
+    button.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, {
+      kind: 'shape',
+      shape: button.dataset.addShape,
+      label: button.textContent.trim(),
+    }));
+  }
+  dom.btnAddText.addEventListener('pointerdown', (event) => timelineInteractions.beginToolDrag(event, {
+    kind: 'text',
+    label: 'Text',
+  }));
   dom.btnAddMarker.addEventListener('click', () => addMarker());
   dom.btnAddVideo.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'video' }));
   dom.btnAddAudio.addEventListener('click', () => edit({ op: 'addTrack', trackKind: 'audio' }));
@@ -2480,6 +2537,7 @@ const appInitializer = globalThis.appInitLib.createAppInitializer({
   followPlayhead,
   frameAtClientX,
   hydrateDuration,
+  insertSourceAt,
   isDirty,
   liveSelection,
   onProxyStatus,
@@ -2500,6 +2558,7 @@ const appInitializer = globalThis.appInitLib.createAppInitializer({
   selectedSourceAsset,
   setRuntime,
   snapTolerance,
+  sourceDragPayload,
   sourceTime,
   state,
   staysOnCpu,

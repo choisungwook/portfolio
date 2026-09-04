@@ -164,6 +164,7 @@ function createPreview(options) {
       const image = document.createElement('img');
       image.src = window.api.fileUrl(path);
       image.className = 'stage-media';
+      image.draggable = false;
       return { element: image, kind: 'image' };
     }
     // An audio element fed an mp4 plays its sound and nothing else, which is
@@ -172,6 +173,7 @@ function createPreview(options) {
     element.src = window.api.fileUrl(path);
     element.preload = 'auto';
     element.className = 'stage-media';
+    element.draggable = false;
     element.playsInline = true;
     if (wantsPicture && qualityMonitor) qualityMonitor.watchVideo(element);
     return { element, kind: wantsPicture ? 'video' : 'audio' };

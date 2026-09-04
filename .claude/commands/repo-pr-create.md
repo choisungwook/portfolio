@@ -17,7 +17,8 @@ allowed-tools: Bash, Read, Glob, Grep
 8. 7의 Issue를 모두 6의 root issue 하위로 건다. sub-issue 등록 형식은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)에 있다.
 9. root issue와 새 Issue를 project에 담는다. scope 부족으로 실패하면 안내만 하고 넘어간다.
 10. PR을 만든다. [.github/pull_request_template.md](../../.github/pull_request_template.md)를 읽고 그 섹션과 형식을 그대로 따른다. Issue가 여럿이어도 PR은 하나다. 본문 끝에 Issue #<number> 형식으로 7의 Issue를 모두 링크한다. target branch는 master다.
-11. Issue와 PR에 작업 유형 label(feat, docs, fix 등)과 기술 label을 함께 붙인다.
+11. GitHub에서 PR body를 다시 읽어 실제 줄바꿈과 Issue 링크를 검증한다. 깨졌으면 같은 body 파일로 수정하고 다시 검증한다.
+12. Issue와 PR에 작업 유형 label(feat, docs, fix 등)과 기술 label을 함께 붙인다.
 
 ## 환경
 
@@ -41,3 +42,12 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 - PR에는 구현하면서 어려웠던 점과 감수하는 리스크를 쓴다. 쓸 내용이 없는 섹션은 헤더째 지운다.
 - PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
 - 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
+
+## body 전달과 검증
+
+- 여러 줄 body는 UTF-8 Markdown 파일로 만든다.
+- CLI 환경은 `gh issue create --body-file <파일>`과 `gh pr create --body-file <파일>`을 사용한다.
+- 여러 줄 body를 `--body` 인자나 이스케이프한 `\n` 문자열로 전달하지 않는다.
+- PR 생성 직후 `gh pr view "$PR" --json body -q .body`로 저장된 body를 다시 읽는다.
+- 재조회한 body에 문자 그대로의 `\n`이 있거나 템플릿 헤더와 Issue 링크가 없으면 `gh pr edit "$PR" --body-file <파일>`로 고친다.
+- 수정 뒤에도 검증에 실패하면 리뷰 요청 전에 멈춘다.

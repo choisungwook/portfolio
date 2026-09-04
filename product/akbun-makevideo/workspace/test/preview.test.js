@@ -82,6 +82,7 @@ test('asset seek and playback stay inside the selected range', async (context) =
     onTick: () => {},
   });
   preview.showAsset({ id: 'v', kind: 'video', path: '/v.mp4', durationMs: 10000 });
+  assert.strictEqual(media.draggable, false, 'the browser must not start a file drag');
 
   preview.seek(0);
   assert.strictEqual(preview.position(), 60);

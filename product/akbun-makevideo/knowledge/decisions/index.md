@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다](2026-09-program-monitor-fullscreen-preserves-layout.md) - Cmd+F와 Esc가 layout 상태를 바꾸지 않고 Program Monitor 표시만 전환하는 결정.
 * [page controller는 의존성과 공개 경계를 선언한다](2026-09-page-controllers-declare-boundaries.md) - no-build classic script를 factory controller로 나누고 생성 시 의존성과 반환 API를 명시한 결정.
 * [Source monitor의 in-out은 재생 경계다](2026-09-source-monitor-range-is-playback-boundary.md) - asset preview를 선택 구간 안으로 제한하고 scrub bar에서 구간 밖을 구분한 결정.
 * [타임라인 드래그 중 compositor 상태 전환을 미룬다](2026-09-timeline-drag-defers-compositor.md) - drag 시작 경로에서 exact frame 재합성과 반복 배치 읽기를 제외한 결정.
