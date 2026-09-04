@@ -1,5 +1,7 @@
 import type { DocumentState, OutlineItem, Thumbnail } from "./types";
 
+let toastTimer: number | undefined;
+
 function element<T extends Element>(selector: string): T {
   const match = document.querySelector<T>(selector);
   if (!match) throw new Error(`missing element: ${selector}`);
@@ -89,9 +91,11 @@ export function renderDocument(state: DocumentState): void {
 
 export function showToast(text: string): void {
   const toast = element<HTMLElement>("[data-role='toast']");
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
   toast.textContent = text;
   toast.hidden = false;
-  window.setTimeout(() => {
+  toastTimer = window.setTimeout(() => {
     toast.hidden = true;
+    toastTimer = undefined;
   }, 2600);
 }

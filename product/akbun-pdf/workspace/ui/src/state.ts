@@ -2,22 +2,28 @@ import type { DocumentPhase, DocumentState } from "./types";
 
 const previewPhases = new Set<DocumentPhase>(["empty", "loading", "ready", "error"]);
 
+function finiteOr(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export function previewPhase(search: string): DocumentPhase | null {
   const value = new URLSearchParams(search).get("state") as DocumentPhase | null;
   return value && previewPhases.has(value) ? value : null;
 }
 
 export function normalizeState(state: DocumentState): DocumentState {
-  const pageCount = Math.max(0, Math.floor(state.pageCount));
+  const pageCount = Math.max(0, Math.floor(finiteOr(state.pageCount, 0)));
+  const wantedPage = finiteOr(state.currentPage, pageCount === 0 ? 0 : 1);
   const currentPage = pageCount === 0
     ? 0
-    : Math.min(pageCount, Math.max(1, Math.floor(state.currentPage)));
+    : Math.min(pageCount, Math.max(1, Math.floor(wantedPage)));
+  const zoom = finiteOr(state.zoom, 1);
 
   return {
     ...state,
     currentPage,
     pageCount,
-    zoom: Math.min(4, Math.max(0.25, state.zoom)),
+    zoom: Math.min(4, Math.max(0.25, zoom)),
   };
 }
 

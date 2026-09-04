@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const sourceExtensions = new Set([".css", ".html", ".js", ".mjs", ".rs", ".ts"]);
 const ignoredDirectories = new Set(["dist", "gen", "node_modules", "target"]);
 

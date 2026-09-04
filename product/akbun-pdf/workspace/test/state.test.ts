@@ -15,6 +15,20 @@ describe("document state", () => {
     expect(changeZoom({ ...ready, zoom: 4 }, 0.1).zoom).toBe(4);
   });
 
+  it("replaces non-finite control input with safe defaults", () => {
+    const ready = fixtureFor("ready");
+    const normalized = normalizeState({
+      ...ready,
+      currentPage: Number.NaN,
+      pageCount: Number.POSITIVE_INFINITY,
+      zoom: Number.NaN,
+    });
+
+    expect(normalized.currentPage).toBe(0);
+    expect(normalized.pageCount).toBe(0);
+    expect(normalized.zoom).toBe(1);
+  });
+
   it("accepts only known visual preview states", () => {
     expect(previewPhase("?state=loading")).toBe("loading");
     expect(previewPhase("?state=unknown")).toBeNull();
