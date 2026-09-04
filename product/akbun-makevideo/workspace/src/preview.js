@@ -359,8 +359,16 @@ function createPreview(options) {
     } else {
       syncAsset();
       const bounds = assetPlaybackBounds();
-      if (positionFrames >= bounds.end && transportActive()) {
-        positionFrames = bounds.end;
+      const mediaPosition = positionFrames;
+      positionFrames = Math.max(bounds.start, Math.min(mediaPosition, bounds.end));
+      if (positionFrames !== mediaPosition && assetElement.currentTime !== undefined) {
+        try {
+          assetElement.currentTime = positionSeconds();
+        } catch (error) {
+          // Retried on the next frame.
+        }
+      }
+      if (mediaPosition >= bounds.end && transportActive()) {
         pause();
       }
     }

@@ -72,12 +72,13 @@ test('asset seek and playback stay inside the selected range', async (context) =
     tracks: [],
     assets: [],
   };
+  let selectedRange = { start: 60, end: 240 };
   const preview = require('../src/preview.js').createPreview({
     stage: { style: {} },
     inner: { style: {}, appendChild() {} },
     wrap: null,
     getProject: () => project,
-    getAssetPlaybackRange: () => ({ start: 60, end: 240 }),
+    getAssetPlaybackRange: () => selectedRange,
     onTick: () => {},
   });
   preview.showAsset({ id: 'v', kind: 'video', path: '/v.mp4', durationMs: 10000 });
@@ -95,6 +96,12 @@ test('asset seek and playback stay inside the selected range', async (context) =
   frames.shift()();
   assert.strictEqual(preview.position(), 240);
   assert.strictEqual(preview.isPlaying(), false, 'out pauses without rewinding');
+
+  selectedRange = { start: 90, end: 180 };
+  media.currentTime = 9;
+  frames.shift()();
+  assert.strictEqual(preview.position(), 180, 'paused playhead stays inside a changed range');
+  assert.strictEqual(media.currentTime, 6, 'paused media seeks back inside a changed range');
 });
 
 class FakeClassList {
