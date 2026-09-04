@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>akbun-pdf</title>
+  </head>
+  <body data-phase="empty">
+    <div id="app" class="app-shell">
+      <header class="toolbar" aria-label="문서 도구 모음">
+        <div class="toolbar__brand">
+          <button class="icon-button" type="button" aria-label="페이지 패널 접기" data-action="toggle-pages">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM9 5.5v13" /></svg>
+          </button>
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28"><path d="M7 3.5h10l4 4v17H7z" /><path d="M17 3.5v5h4M10.5 14h7M10.5 18h5" /></svg>
+          </span>
+          <span class="document-title" data-role="title">akbun-pdf</span>
+        </div>
+
+        <div class="toolbar__group toolbar__group--document">
+          <button class="button button--primary" type="button" data-action="open">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9H4z" /><path d="M4 7.5v-2h6l2 2" /></svg>
+            <span>PDF 열기</span>
+          </button>
+        </div>
+
+        <div class="toolbar__group toolbar__group--page" aria-label="페이지 이동">
+          <button class="icon-button" type="button" aria-label="이전 페이지" data-action="previous-page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" /></svg>
+          </button>
+          <div class="page-control">
+            <input data-role="current-page" aria-label="현재 페이지" inputmode="numeric" value="0" />
+            <span>/</span>
+            <span data-role="page-count">0</span>
+          </div>
+          <button class="icon-button" type="button" aria-label="다음 페이지" data-action="next-page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" /></svg>
+          </button>
+        </div>
+
+        <div class="toolbar__group toolbar__group--zoom" aria-label="확대/축소">
+          <button class="icon-button" type="button" aria-label="축소" data-action="zoom-out">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M6.8 10.5h7.4M15 15l4 4" /></svg>
+          </button>
+          <button class="zoom-label" type="button" data-action="reset-zoom"><span data-role="zoom">100%</span></button>
+          <button class="icon-button" type="button" aria-label="확대" data-action="zoom-in">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M10.5 6.8v7.4M6.8 10.5h7.4M15 15l4 4" /></svg>
+          </button>
+        </div>
+
+        <div class="toolbar__spacer"></div>
+
+        <div class="toolbar__group toolbar__group--tools" aria-label="문서 작업">
+          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 16 8.7-8.7 2 2L8 18H6zM13.5 8.5l2 2M5 20h14" /></svg>
+            <span>형광펜</span>
+          </button>
+          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3z" /><path d="M9 9h6M9 12h4" /></svg>
+            <span>메모</span>
+          </button>
+          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l4 4" /></svg>
+            <span>찾기</span>
+          </button>
+        </div>
+
+        <button class="icon-button" type="button" aria-label="목차 패널 접기" data-action="toggle-outline">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM15 5.5v13M7 9h5M7 12h5M7 15h3" /></svg>
+        </button>
+        <button class="icon-button" type="button" aria-label="업데이트 확인" title="업데이트 확인" data-action="check-update">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 8a7 7 0 1 0 0 8M19 4v4h-4" /></svg>
+        </button>
+      </header>
+
+      <div class="workspace">
+        <aside class="pages-panel" aria-label="페이지 썸네일">
+          <div class="panel-heading">
+            <span>페이지</span>
+            <span class="panel-count" data-role="thumbnail-count">0</span>
+          </div>
+          <div class="thumbnail-list" data-role="thumbnail-list"></div>
+          <div class="panel-placeholder" data-visible-phase="empty error">
+            <span>문서를 열면 페이지가 표시됩니다.</span>
+          </div>
+          <div class="thumbnail-skeletons" data-visible-phase="loading" aria-label="페이지 불러오는 중">
+            <div class="thumbnail-skeleton"></div>
+            <div class="thumbnail-skeleton"></div>
+            <div class="thumbnail-skeleton"></div>
+          </div>
+        </aside>
+
+        <main class="viewer" aria-live="polite">
+          <section class="state-card state-card--empty" data-visible-phase="empty">
+            <div class="state-illustration state-illustration--empty" aria-hidden="true">
+              <div class="paper-stack paper-stack--back"></div>
+              <div class="paper-stack paper-stack--front">
+                <span>PDF</span>
+                <i></i><i></i><i></i>
+              </div>
+            </div>
+            <h1>읽을 문서를 열어보세요</h1>
+            <p>PDF를 열면 페이지, 목차, 텍스트 계층을 한곳에서 탐색할 수 있습니다.</p>
+            <button class="button button--large button--primary" type="button" data-action="open">PDF 열기</button>
+            <span class="shortcut-hint"><kbd>⌘</kbd><kbd>O</kbd>로도 열 수 있어요</span>
+          </section>
+
+          <section class="loading-state" data-visible-phase="loading">
+            <div class="loading-page" aria-hidden="true">
+              <span class="loading-line loading-line--title"></span>
+              <span class="loading-line"></span>
+              <span class="loading-line"></span>
+              <span class="loading-block"></span>
+              <span class="loading-line"></span>
+            </div>
+            <div class="loading-copy">
+              <span class="spinner" aria-hidden="true"></span>
+              <div><strong>문서를 불러오는 중</strong><span>페이지와 목차를 준비하고 있습니다.</span></div>
+            </div>
+          </section>
+
+          <section class="document-stage" data-visible-phase="ready">
+            <article class="pdf-page" aria-label="PDF 페이지 미리보기">
+              <div class="sample-document">
+                <header>
+                  <span class="sample-kicker">FIELD NOTES · 2026</span>
+                  <span class="sample-page-number">01</span>
+                </header>
+                <h1>Designing calm<br />document tools</h1>
+                <p class="sample-lead">좋은 문서 도구는 기능을 앞세우지 않습니다. 읽는 흐름을 지키고, 필요한 순간에만 조용히 모습을 드러냅니다.</p>
+                <div class="sample-rule"></div>
+                <section class="sample-grid">
+                  <div>
+                    <span class="sample-label">01 · FOCUS</span>
+                    <h2>문서가 중심에 남도록</h2>
+                    <p>페이지 주변의 도구는 낮은 대비로 배치하고, 현재 위치와 상태만 명확하게 드러냅니다.</p>
+                  </div>
+                  <div class="sample-figure">
+                    <span class="sample-orbit sample-orbit--one"></span>
+                    <span class="sample-orbit sample-orbit--two"></span>
+                    <span class="sample-dot"></span>
+                  </div>
+                </section>
+                <section class="sample-note">
+                  <span class="sample-note__number">02</span>
+                  <div><strong>Structure before decoration</strong><p>페이지, 본문, 목차의 관계가 먼저 읽히면 인터페이스는 설명 없이도 작동합니다.</p></div>
+                </section>
+                <footer>AKBUN PDF · PRODUCT PRINCIPLES</footer>
+              </div>
+            </article>
+          </section>
+
+          <section class="state-card state-card--error" data-visible-phase="error">
+            <div class="state-illustration state-illustration--error" aria-hidden="true">
+              <svg viewBox="0 0 64 64"><path d="M18 6h20l10 10v42H18z" /><path d="M38 6v12h10M27 30l12 12M39 30 27 42" /></svg>
+            </div>
+            <h1>문서를 열 수 없습니다</h1>
+            <p data-role="error-message">파일이 손상되었거나 지원하지 않는 형식입니다.</p>
+            <button class="button button--large button--primary" type="button" data-action="open">다른 PDF 열기</button>
+          </section>
+        </main>
+
+        <aside class="outline-panel" aria-label="문서 목차">
+          <div class="panel-heading">
+            <span>목차</span>
+          </div>
+          <nav class="outline-list" data-role="outline-list"></nav>
+          <div class="outline-empty" data-visible-phase="empty loading error">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h12M6 10h8M6 15h10M6 20h7" /></svg>
+            <span>목차가 없습니다.</span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="toast" role="status" data-role="toast" hidden></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

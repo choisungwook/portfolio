@@ -1,0 +1,40 @@
+# Architecture
+
+## 경계
+
+```text
+ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
+ │                               │                    │
+ PDF.js·DOM                      Tauri command        PDF 상태·저장·변환
+```
+
+| 경계 | 책임 | 금지 |
+|---|---|---|
+| `ui` | PDF.js 렌더링, 텍스트 계층, 탐색·보기 상태 | 파일 경로와 PDF 내부 객체 보관 |
+| `src-tauri/src` | OS·파일 시스템 연결, command와 plugin 등록 | PDF 규칙 구현 |
+| `pdf-core` | 문서 상태, 변경 목록, 저장·구조 편집 | Tauri 타입 의존 |
+| `contracts` | 명령과 직렬화 DTO의 공개 이름 | Rust 내부 타입 노출 |
+
+## 문서 상태
+
+- `empty`: 열린 문서 없음
+- `loading`: 파일을 받고 페이지·목차 준비 중
+- `ready`: 페이지와 탐색 정보 표시
+- `error`: 복구 가능한 오류와 다시 열기 동작 표시
+- 상태 변경 command는 부분 patch 대신 전체 `DocumentState` 반환
+- `currentPage`는 문서 없음일 때만 0, 열린 문서에서는 1부터 시작
+
+## UI 구성
+
+- 상단: 열기, 페이지 이동, 배율, 향후 편집 도구, updater
+- 왼쪽: 페이지 썸네일과 현재 페이지
+- 가운데: PDF.js canvas와 text layer가 들어갈 문서 surface
+- 오른쪽: PDF outline 기반 목차
+- 개발 미리보기는 URL의 `state` query로 네 상태를 독립 확인
+
+## 확장 방향
+
+- PDF 열기·저장: adapter가 경로를 받고 core에는 byte와 문서 식별자만 전달
+- 주석: PDF 표준 주석 객체를 core 변경 목록에 기록
+- OCR: 선택한 페이지의 raster와 결과 text layer만 교환
+- 페이지 보정: 선택 페이지에만 기울기·원근 변환 적용

@@ -140,6 +140,7 @@
 - [셸을 감싸는 터미널 작업 공간 macOS 데스크톱 앱 (akbun-terminal)](./product/akbun-terminal/) (26.8.19)
 - [Single-GPU LLM VRAM estimator using Hugging Face config (akbun-caculatorllm)](./product/akbun-caculatorllm/) (26.8.19)
 - [macOS 전체 디스크와 Git 저장소·AI Agent worktree 용량을 추적하는 데스크톱 앱 (akbun-macdiskviewer)](./product/akbun-macdiskviewer/) (26.8.22)
+- [오프라인 PDF 탐색, 주석, OCR, 페이지 편집 데스크톱 앱 (akbun-pdf)](./product/akbun-pdf/) (26.9.4)
 
 ## Dockerfile
 

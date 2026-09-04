@@ -1,0 +1,145 @@
+name: release-akbun-pdf
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-pdf/**'
+  pull_request:
+    paths:
+      - 'product/akbun-pdf/**'
+      - '.github/workflows/release-akbun-pdf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-pdf/workspace
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-pdf/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check UI and pure Rust core
+        run: npm run check
+
+  release:
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin --bundles app,dmg'
+            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: '--bundles appimage,deb'
+            rust-targets: ''
+          - platform: windows-latest
+            args: '--bundles nsis'
+            rust-targets: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-pdf/workspace/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-pdf/workspace/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PDF }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PDF_PASSWORD }}
+        with:
+          projectPath: product/akbun-pdf/workspace
+          tagName: akbun-pdf-v__VERSION__
+          releaseName: akbun-pdf-v__VERSION__
+          releaseDraft: false
+          prerelease: false
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}
+          releaseBody: |
+            ## About
+
+            - Offline PDF workspace for reading, search, annotation, OCR, and page editing.
+
+            ## Install
+
+            - macOS builds are unsigned. After copying the app to Applications, run `xattr -cr /Applications/akbun-pdf.app` once.
+            - Windows builds are unsigned. Select More info, then Run anyway in SmartScreen.
+            - Use the update button in the app for later releases.
+
+  publish-updater-manifest:
+    if: github.event_name != 'pull_request'
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-pdf-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-pdf-updater \
+            --title "akbun-pdf updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-pdf-updater "$RUNNER_TEMP/latest.json" --clobber
