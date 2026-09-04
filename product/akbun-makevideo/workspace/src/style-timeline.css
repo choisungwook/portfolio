@@ -1,0 +1,563 @@
+/* --- timeline ------------------------------------------------------------ */
+
+#lower {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--bg);
+}
+
+#timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+button.icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+}
+
+button.icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+button.icon.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.sep-v {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+#timeline {
+  display: grid;
+  grid-template-columns: var(--head-width) minmax(0, 1fr);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#timeline-heads {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.ruler-spacer {
+  height: var(--ruler-height);
+  border-bottom: 1px solid var(--border);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.head.video {
+  height: var(--lane-video);
+}
+
+.head.audio {
+  height: var(--lane-audio);
+}
+
+.head.subtitle, .lane.subtitle {
+  height: var(--lane-video);
+}
+
+.head-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.head-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.head-buttons button {
+  padding: 0 5px;
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.head-buttons button.on {
+  background: var(--select);
+  border-color: var(--select);
+  color: #201800;
+}
+
+.head-buttons button.target.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+#timeline-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#timeline-content {
+  position: relative;
+  min-width: 100%;
+}
+
+#ruler {
+  position: relative;
+  height: var(--ruler-height);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  cursor: ew-resize;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  padding-left: 4px;
+  border-left: 1px solid var(--grid);
+  font-size: 10px;
+  line-height: var(--ruler-height);
+  color: var(--dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: currentColor;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.marker::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* --- selected panel ------------------------------------------------------ */
+
+#selected-panel[hidden] {
+  display: none;
+}
+
+#selected-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+}
+
+#panel-tab-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 0;
+  padding: 5px 6px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+#panel-tab-bar button {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 9px;
+}
+
+#panel-tab-bar button[aria-pressed='true'] {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--accent);
+}
+
+.selected-panel-view {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.selected-panel-view[hidden] {
+  display: none;
+}
+
+.selected-panel-view h3 {
+  margin: 2px 0 10px;
+  font-size: 13px;
+}
+
+.selected-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.selected-panel-actions h3 {
+  margin: 0;
+}
+
+#inspector-view {
+  padding: 0;
+}
+
+#inspector-body {
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+#inspector-body h3 {
+  margin: 2px 0 10px;
+  font-size: 13px;
+}
+
+#inspector-body .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* The flex rule above beats the `hidden` attribute's UA display, the same trap
+   the debug panel fell into, so hidden has to win again explicitly. */
+#inspector-body .row[hidden] {
+  display: none;
+}
+
+#inspector-body .row.check {
+  justify-content: flex-start;
+}
+
+#inspector-body .row input[type='text'],
+#inspector-body .row input[type='number'],
+#inspector-body .row textarea,
+#inspector-body .row select,
+#inspector-body .row input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 168px;
+}
+
+#inspector-body .field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#inspector-body .field-pair label {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+#inspector-body .field-pair input,
+#inspector-body .compact-number {
+  min-width: 0;
+  width: 100%;
+}
+
+#inspector-body .compact-number {
+  flex: 0 0 62px;
+}
+
+#marker-list {
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+}
+
+.marker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px auto;
+  grid-template-areas:
+    'time color remove'
+    'name name name';
+  gap: 6px;
+  align-items: center;
+}
+
+.marker-row [data-marker-seek] {
+  grid-area: time;
+}
+
+.marker-row [data-marker-color] {
+  grid-area: color;
+}
+
+.marker-row [data-marker-name] {
+  grid-area: name;
+  min-width: 0;
+  width: 100%;
+}
+
+.marker-row [data-marker-remove] {
+  grid-area: remove;
+}
+
+.marker-row button {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+#lanes {
+  position: relative;
+}
+
+.lane {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  background-image: linear-gradient(var(--grid), var(--grid));
+  background-size: 1px 100%;
+  background-repeat: repeat-x;
+  background-position: 0 0;
+}
+
+.lane.video {
+  height: var(--lane-video);
+}
+
+.lane.audio {
+  height: var(--lane-audio);
+}
+
+.lane.off {
+  opacity: 0.4;
+}
+
+.lane.muted .clip.audio {
+  opacity: 0.5;
+}
+
+.lane.drop-target {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* What follows the pointer while an asset is on its way to a lane. */
+.drag-ghost {
+  position: fixed;
+  z-index: 400;
+  padding: 3px 8px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--fg);
+  font-size: 12px;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.keyframe-dot {
+  position: absolute;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 1px solid #201600;
+  border-radius: 1px;
+  background: #f6b73c;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.clip.adjustment {
+  background: #68568a;
+}
+
+.clip.video {
+  background: var(--clip-video);
+  border: 1px solid var(--clip-video-edge);
+  color: #10203a;
+}
+
+.clip.audio {
+  background: var(--clip-audio);
+  border: 1px solid var(--clip-audio-edge);
+  color: #0f2a1a;
+}
+
+/* A text or shape layer on a video track: a band across the lower half of the
+   lane, so it never covers the clip underneath. Sharing the whole lane height
+   would put every layer over its clip's body and trim handles, and the clip
+   could then not be selected or trimmed at all where a layer sits. */
+.clip.visual {
+  top: 50%;
+  bottom: 3px;
+  background: var(--clip-visual);
+  border: 1px solid var(--clip-visual-edge);
+  color: #2a1c4e;
+  font-size: 10px;
+}
+
+.clip.visual .clip-name {
+  font-size: 10px;
+}
+
+.clip-waveform {
+  position: absolute;
+  inset: 50% 8px auto;
+  width: calc(100% - 16px);
+  height: 32px;
+  transform: translateY(-50%);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .clip.video,
+  .clip.audio,
+  .clip.visual {
+    color: var(--fg);
+  }
+}
+
+.clip.selected {
+  outline: 2px solid var(--select);
+  outline-offset: -2px;
+}
+
+.clip.linked::after {
+  content: "⌁";
+  position: absolute;
+  right: 8px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.clip.missing,
+.clip.lut-unavailable {
+  background: repeating-linear-gradient(45deg, #b1443a, #b1443a 6px, #8f342c 6px, #8f342c 12px);
+  color: #fff;
+}
+
+.clip-name {
+  position: relative;
+  z-index: 1;
+  padding: 0 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.handle.left {
+  left: 0;
+}
+
+.handle.right {
+  right: 0;
+}
+
+#playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--select);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.playhead-grip {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 13px;
+  height: 11px;
+  background: var(--select);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.timeline-context-menu {
+  position: fixed;
+  z-index: 350;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.timeline-context-menu[hidden] {
+  display: none;
+}
+
+.timeline-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+
+.timeline-context-menu button:hover,
+.timeline-context-menu button:focus-visible {
+  background: var(--select);
+  color: #201800;
+}

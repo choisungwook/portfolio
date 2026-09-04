@@ -1,0 +1,340 @@
+/* --- preview ------------------------------------------------------------- */
+
+#preview-panel {
+  display: grid;
+  grid-column: 2;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#monitor-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+#source-panel {
+  display: grid;
+  grid-column: 1;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+
+/* Both monitors on the same rows.
+   Left to themselves the two panels each fit a picture into whatever their own
+   chrome left over, and the Source Monitor's chrome is two rows to the Program
+   Monitor's one — so the two pictures started and ended on different lines.
+   Sharing the parent's rows makes the header row, the stage row and the chrome
+   rows one height each, which is what puts the two pictures on the same line.
+   A WebView without subgrid drops only the subgrid declaration — `grid-row`
+   still applies — and each panel keeps the rows it declares above, which is the
+   old layout rather than a broken one. */
+#source-panel,
+#preview-panel {
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+}
+
+/* The Program Monitor has nothing to put in the fourth row, so its transport
+   takes both and centres itself in them rather than leaving a blank strip. */
+#transport {
+  grid-row: 3 / 5;
+}
+
+.monitor-stage-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--stage);
+}
+
+.monitor-stage {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.monitor-stage-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+#source-hint {
+  position: absolute;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #d8dade;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.monitor-transport,
+#source-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+#source-actions {
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+#source-actions button,
+#source-actions select,
+.monitor-transport button {
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+#source-range {
+  flex: 1 1 100%;
+}
+
+#source-seek-wrap {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  flex: 1 1 100%;
+  height: 30px;
+}
+
+#source-seek {
+  width: 100%;
+  margin: 0;
+}
+
+#source-marker-layer {
+  position: absolute;
+  inset: 0 7px 2px;
+  pointer-events: none;
+}
+
+.source-range-shade {
+  position: absolute;
+  top: 12px;
+  bottom: 1px;
+  background: color-mix(in srgb, var(--stage) 62%, transparent);
+  border-radius: 2px;
+}
+
+.source-range-shade.before {
+  left: 0;
+}
+
+.source-range-shade.after {
+  right: 0;
+}
+
+.source-boundary-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translateX(-1px);
+}
+
+.source-boundary-marker::before {
+  position: absolute;
+  top: 0;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: var(--panel);
+  content: attr(data-label);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 11px;
+}
+
+.source-boundary-marker.in {
+  color: var(--mark-in);
+}
+
+.source-boundary-marker.in::before {
+  left: 0;
+}
+
+.source-boundary-marker.out {
+  color: var(--mark-out);
+}
+
+.source-boundary-marker.out::before {
+  top: auto;
+  right: 0;
+  bottom: 0;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  border-radius: 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  background: var(--panel-2);
+}
+
+.segmented button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+#stage-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+  background: var(--stage);
+  overflow: hidden;
+}
+
+#stage {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+#stage:active {
+  cursor: grabbing;
+}
+
+#stage-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.stage-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+  background: transparent;
+}
+
+.stage-media.on {
+  display: block;
+}
+
+/* The exact frame sits over the stacked elements rather than replacing them,
+   so playback can resume without rebuilding the pool. */
+#stage-exact {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  z-index: 60;
+}
+
+#stage-exact.on {
+  display: block;
+}
+
+/* Text and shape layers during playback, drawn by the page. Under the exact
+   frame on purpose: the exact frame already contains them, composited by the
+   same Rust code the render uses. */
+#stage-visuals {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 55;
+  pointer-events: none;
+}
+
+#stage-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 70;
+  pointer-events: none;
+}
+
+#stage.editing #stage-overlay {
+  pointer-events: auto;
+}
+
+#stage-mode {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #d8dade;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+#stage-mode.exact {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+audio.stage-media {
+  display: none !important;
+}
+
+#stage-hint {
+  position: absolute;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #d8dade;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+#transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+#btn-play {
+  min-width: 42px;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 12px;
+}

@@ -1,0 +1,162 @@
+/* --- overlays ------------------------------------------------------------ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 12, 16, 0.45);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.sheet {
+  width: min(460px, 90vw);
+  max-height: 90vh;
+  padding: 18px 20px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.sheet h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.sheet .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sheet .row.check {
+  justify-content: flex-start;
+}
+
+.sheet .row input[type='text'],
+.sheet .row input[type='number'],
+.sheet .row textarea,
+.sheet .row select {
+  min-width: 190px;
+}
+
+.sheet .row .row-input.compact input {
+  flex: 0 1 140px;
+  min-width: 100px;
+}
+
+.sheet .row .row-input.compact {
+  justify-content: flex-start;
+}
+
+.sheet .row .row-input.compact select {
+  flex: 0 0 90px;
+  min-width: 90px;
+}
+
+.row-input {
+  display: flex;
+  gap: 6px;
+}
+
+.row-input input {
+  min-width: 150px;
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
+#op-list {
+  max-height: 260px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+#op-list:empty {
+  display: none;
+}
+
+.project-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.project-row:last-child {
+  border-bottom: none;
+}
+
+.project-row:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.project-when {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.project-row:hover .project-when {
+  color: inherit;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sheet-actions.split-actions {
+  justify-content: flex-start;
+}
+
+.proxy-summary {
+  min-height: 18px;
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+
+.progress {
+  height: 8px;
+  margin-bottom: 10px;
+  border-radius: 99px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+#render-bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+
+#render-status {
+  margin: 0;
+  font-size: 12px;
+  word-break: break-all;
+}

@@ -6,13 +6,27 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
+test('page source files stay below the module boundary limit', () => {
+  const sourceDir = path.join(__dirname, '..', 'src');
+  const oversized = fs.readdirSync(sourceDir)
+    .filter((name) => name.endsWith('.js') || name.endsWith('.css'))
+    .map((name) => ({
+      name,
+      lines: fs.readFileSync(path.join(sourceDir, name), 'utf8').split('\n').length - 1,
+    }))
+    .filter((file) => file.lines > 1000);
+
+  assert.deepStrictEqual(oversized, []);
+});
+
 test('classic page scripts do not leak conflicting declarations', () => {
   const context = vm.createContext({});
   const names = [
     'time.js', 'geometry.js', 'timeline.js', 'shortcuts.js', 'quality.js',
     'preview.js', 'transform.js', 'guides.js', 'monitor.js', 'panel.js', 'latest.js',
     'program-monitor-ui.js', 'inspector-ui.js', 'keyboard-ui.js',
-    'timeline-interactions.js', 'app-init.js',
+    'timeline-interactions.js', 'app-init.js', 'renderer-assets-ui.js',
+    'renderer-timeline-ui.js', 'renderer-project-ui.js', 'renderer-wiring.js',
   ];
   for (const name of names) {
     const file = path.join(__dirname, '..', 'src', name);
@@ -33,10 +47,17 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.keyboardUiLib);
   assert.ok(context.timelineInteractionsLib);
   assert.ok(context.appInitLib);
+  assert.ok(context.rendererAssetsUiLib);
+  assert.ok(context.rendererTimelineUiLib);
+  assert.ok(context.rendererProjectUiLib);
+  assert.ok(context.rendererWiringLib);
 });
 
 test('renderer resets program monitor state only through its controller', () => {
-  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer.js'), 'utf8');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'renderer-project-ui.js'),
+    'utf8',
+  );
 
   assert.doesNotMatch(source, /\beditorOverlayActive\b/);
   assert.doesNotMatch(source, /\bvisualDrag\b/);
@@ -66,6 +87,10 @@ test('every library the page loads is a script tag on the page', () => {
   assert.ok(loaded.indexOf('keyboard-ui.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('timeline-interactions.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('app-init.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('renderer-assets-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('renderer-timeline-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('renderer-project-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('renderer-wiring.js') < loaded.indexOf('renderer.js'));
 });
 
 test('the editor exposes one toggleable selected panel from the title bar', () => {
