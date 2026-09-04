@@ -29,8 +29,53 @@
         },
         {
           "name": "save_document",
+          "request": { "documentId": "string" },
+          "response": "SaveResult"
+        },
+        {
+          "name": "save_document_as",
           "request": { "documentId": "string", "path": "string" },
-          "response": "PreservationReport"
+          "response": "SaveResult"
+        },
+        {
+          "name": "reorder_page",
+          "request": { "documentId": "string", "fromPage": "integer", "toPage": "integer" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "delete_page",
+          "request": { "documentId": "string", "page": "integer" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "rotate_page",
+          "request": { "documentId": "string", "page": "integer", "degrees": "integer" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "upsert_annotation",
+          "request": { "documentId": "string", "annotation": "AnnotationDraft" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "delete_annotation",
+          "request": { "documentId": "string", "annotationId": "string" },
+          "response": "DocumentState"
+        },
+        {
+          "name": "add_merge_files",
+          "request": { "paths": "string[]" },
+          "response": "MergeFile[]"
+        },
+        {
+          "name": "save_merged_document",
+          "request": { "fileIds": "string[]", "path": "string" },
+          "response": "MergeReport"
+        },
+        {
+          "name": "clear_merge_files",
+          "request": null,
+          "response": null
         },
         {
           "name": "close_document",

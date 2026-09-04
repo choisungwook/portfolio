@@ -1,8 +1,7 @@
 import type { DocumentState, OutlineItem, Thumbnail } from "./types";
 
 let toastTimer: number | undefined;
-let thumbnailDocument = "";
-let thumbnailCount = -1;
+let thumbnailSignature = "";
 
 function element<T extends Element>(selector: string): T {
   const match = document.querySelector<T>(selector);
@@ -16,6 +15,7 @@ function makeThumbnail(item: Thumbnail, selected: boolean): HTMLButtonElement {
   button.type = "button";
   button.dataset.page = String(item.page);
   button.ariaLabel = item.label;
+  button.draggable = true;
 
   const preview = document.createElement("span");
   preview.className = "thumbnail__page";
@@ -71,13 +71,15 @@ function renderControls(state: DocumentState): void {
 
 function renderThumbnails(state: DocumentState): void {
   const list = element<HTMLElement>("[data-role='thumbnail-list']");
-  const documentId = state.documentId ?? "";
-  if (documentId !== thumbnailDocument || state.pageCount !== thumbnailCount) {
+  const signature = [
+    state.documentId,
+    ...state.thumbnails.map((item) => `${item.sourcePage}:${item.rotation}`),
+  ].join("|");
+  if (signature !== thumbnailSignature || list.childElementCount !== state.pageCount) {
     list.replaceChildren(...state.thumbnails.map((item) => (
       makeThumbnail(item, item.page === state.currentPage)
     )));
-    thumbnailDocument = documentId;
-    thumbnailCount = state.pageCount;
+    thumbnailSignature = signature;
   } else {
     list.querySelectorAll<HTMLElement>("[data-page]").forEach((item) => {
       item.classList.toggle("thumbnail--selected", Number(item.dataset.page) === state.currentPage);
@@ -98,7 +100,9 @@ function renderOutline(state: DocumentState): void {
 
 export function renderDocument(state: DocumentState): void {
   document.body.dataset.phase = state.phase;
-  element<HTMLElement>("[data-role='title']").textContent = state.title || "akbun-pdf";
+  document.body.classList.toggle("document-dirty", state.dirty);
+  const title = state.title || "akbun-pdf";
+  element<HTMLElement>("[data-role='title']").textContent = state.dirty ? `${title} •` : title;
   element<HTMLElement>("[data-role='error-message']").textContent = state.errorMessage
     ?? "파일이 손상되었거나 지원하지 않는 형식입니다.";
   document.querySelector<HTMLElement>(".pdf-page:not(.pdf-page--canvas)")

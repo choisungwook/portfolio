@@ -24,7 +24,10 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9H4z" /><path d="M4 7.5v-2h6l2 2" /></svg>
             <span>PDF 열기</span>
           </button>
-          <button class="icon-button" type="button" aria-label="다른 이름으로 저장" title="다른 이름으로 저장" data-action="save" data-document-control>
+          <button class="icon-button" type="button" aria-label="PDF 합치기" title="PDF 합치기" data-action="merge">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h8v14H5zM11 7h8v13h-8M8 9h2M14 12h2" /></svg>
+          </button>
+          <button class="icon-button" type="button" aria-label="저장" title="저장" data-action="save" data-document-control>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v6h8V4M8 16h8" /></svg>
           </button>
           <button class="icon-button" type="button" aria-label="문서 닫기" title="문서 닫기" data-action="close" data-document-control>
@@ -62,11 +65,11 @@
         <div class="toolbar__spacer"></div>
 
         <div class="toolbar__group toolbar__group--tools" aria-label="문서 작업">
-          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+          <button class="tool-button" type="button" data-action="highlight" data-document-control>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 16 8.7-8.7 2 2L8 18H6zM13.5 8.5l2 2M5 20h14" /></svg>
             <span>형광펜</span>
           </button>
-          <button class="tool-button" type="button" disabled title="후속 이슈에서 제공">
+          <button class="tool-button" type="button" data-action="note" data-document-control>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3z" /><path d="M9 9h6M9 12h4" /></svg>
             <span>메모</span>
           </button>
@@ -102,7 +105,12 @@
         <aside class="pages-panel" aria-label="페이지 썸네일">
           <div class="panel-heading">
             <span>페이지</span>
-            <span class="panel-count" data-role="thumbnail-count">0</span>
+            <div class="panel-heading__actions">
+              <span class="panel-count" data-role="thumbnail-count">0</span>
+              <button class="mini-button" type="button" title="반시계 방향 회전" aria-label="반시계 방향 회전" data-action="rotate-left" data-document-control>↶</button>
+              <button class="mini-button" type="button" title="시계 방향 회전" aria-label="시계 방향 회전" data-action="rotate-right" data-document-control>↷</button>
+              <button class="mini-button mini-button--danger" type="button" title="선택 페이지 삭제" aria-label="선택 페이지 삭제" data-action="delete-page" data-document-control>×</button>
+            </div>
           </div>
           <div class="thumbnail-list" data-role="thumbnail-list"></div>
           <div class="panel-placeholder" data-visible-phase="empty error">
@@ -200,6 +208,48 @@
           </div>
         </aside>
       </div>
+
+      <dialog class="editor-dialog" data-role="annotation-dialog">
+        <form method="dialog" data-role="annotation-form">
+          <header>
+            <strong data-role="annotation-title">주석</strong>
+            <button class="icon-button" type="button" aria-label="닫기" data-action="close-annotation">×</button>
+          </header>
+          <label>
+            <span>색상</span>
+            <input type="color" value="#ffd54f" data-role="annotation-color" />
+          </label>
+          <label>
+            <span>내용</span>
+            <textarea rows="5" data-role="annotation-contents" placeholder="메모 내용을 입력하세요."></textarea>
+          </label>
+          <footer>
+            <button class="button button--danger" type="button" data-action="delete-annotation">삭제</button>
+            <span></span>
+            <button class="button" type="button" data-action="close-annotation">취소</button>
+            <button class="button button--primary" type="submit">적용</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <dialog class="editor-dialog merge-dialog" data-role="merge-dialog">
+        <div>
+          <header>
+            <div><strong>PDF 합치기</strong><span>파일 전체를 표시된 순서대로 새 PDF에 저장합니다.</span></div>
+            <button class="icon-button" type="button" aria-label="닫기" data-action="close-merge">×</button>
+          </header>
+          <div class="merge-toolbar">
+            <button class="button" type="button" data-action="add-merge-files">PDF 추가</button>
+            <span data-role="merge-summary">0개 파일 · 0페이지</span>
+          </div>
+          <div class="merge-list" data-role="merge-list"></div>
+          <footer>
+            <span></span>
+            <button class="button" type="button" data-action="close-merge">취소</button>
+            <button class="button button--primary" type="button" data-action="save-merge">새 파일로 저장</button>
+          </footer>
+        </div>
+      </dialog>
 
       <div class="toast" role="status" data-role="toast" hidden></div>
     </div>
