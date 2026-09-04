@@ -485,7 +485,7 @@ function frameAtClientX(clientX) {
 // --- assets ---------------------------------------------------------------
 
 const assetUi = globalThis.rendererAssetsUiLib.createRendererAssetsUi({
-  L, T, S, P, state, dom, el, baseName, rate, edit, reportError, errorText,
+  L, T, S, P, state, dom, el, baseName, rate, edit, adopt, reportError, errorText,
   renderLanes: (...args) => renderLanes(...args),
   refresh: (...args) => refresh(...args),
 });
@@ -526,7 +526,8 @@ function importViaDialog(...args) { return assetUi.importViaDialog(...args); }
 // --- timeline -------------------------------------------------------------
 
 const timelineUi = globalThis.rendererTimelineUiLib.createRendererTimelineUi({
-  L, T, S, P, state, dom, el, baseName, rate, displayTracks, contentFrames, edit, reportError,
+  L, T, S, P, state, dom, el, baseName, rate, displayTracks, contentFrames, edit, adopt,
+  reportError,
   playbackPath: (...args) => playbackPath(...args),
   renderAssets: (...args) => renderAssets(...args),
   renderSourceMonitor: (...args) => renderSourceMonitor(...args),
@@ -580,7 +581,8 @@ function addVolumeKeyframeAt(...args) { return timelineUi.addVolumeKeyframeAt(..
 // --- project, render and settings -----------------------------------------
 
 const projectUi = globalThis.rendererProjectUiLib.createRendererProjectUi({
-  L, T, DEFAULT_SETTINGS, state, dom, el, adopt, reportError, errorText,
+  L, T, DEFAULT_SETTINGS, state, dom, el, adopt, edit, hydrateDuration, isDirty,
+  reportError, errorText,
   projectDir, projectName, persistLatestSettings,
   refresh: (...args) => refresh(...args),
   prepareDerivedMedia: (...args) => prepareDerivedMedia(...args),

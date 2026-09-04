@@ -17,6 +17,7 @@
       baseName,
       rate,
       edit,
+      adopt,
       reportError,
       errorText,
     } = deps;

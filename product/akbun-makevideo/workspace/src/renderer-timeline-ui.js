@@ -19,6 +19,7 @@
       displayTracks,
       contentFrames,
       edit,
+      adopt,
       reportError,
     } = deps;
     let preview = null;
