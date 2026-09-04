@@ -4,24 +4,30 @@ One JSON object, written to a `.akbunvideo` file and read back by both sides.
 
 ```text
 project
-  version                                  the storage format, 3 today
+  version                                  the storage format, 4 today
   settings { width, height, rate }         the canvas, and the timebase
     rate   { num, den }                    frames per second, 30000/1001 for 29.97
   assets[] { id, path, name, kind,         kind is video | audio | image
              durationMs, width, height, hasAudio }
   tracks[] { id, kind, name, muted, hidden,
-             clips[] { id, assetId, start, in, out, volume, opacity },
+             clips[] { id, assetId, start, in, out, volume, opacity,
+                       speed, preservePitch, fadeIn, fadeOut,
+                       volumeKeyframes, blendMode },
              visualItems[] { id, start, duration, zIndex,
                transform { x, y, width, height, rotation, opacity },
+               animation { x, y, width, height, rotation, opacity },
+               blendMode,
                content { kind, ... } } }
 ```
 
-- `start`, `in` and `out` are frame indexes on `settings.rate`. `start` is the position on the timeline; `in`/`out` are the span taken out of the source, so a clip's length is `out - in` and its end is `start + (out - in)`. No division appears anywhere in that, which is the point — see [rational time](../../adr/2026-08-rational-time.md).
+- `start`, `in` and `out` are frame indexes on `settings.rate`. `start` is the position on the timeline; `in`/`out` are the source span. A clip's timeline length is `(out - in) / speed`, rounded to the nearest frame.
+- Keyframes use absolute project frames. The left keyframe owns the easing to the next one; `hold` switches exactly on the right keyframe.
 - `durationMs` on an asset is the one time left in milliseconds. It is what ffprobe measured about a file rather than a position on the timeline, and it becomes frames the moment a clip is made from it.
 - An asset's `id` is a hash of its path, so importing the same file twice updates one row instead of adding a second, and a project reopened next week still points its clips at the same assets.
 - Video tracks composite in array order: track 1 is the bottom layer. The timeline draws them reversed so V1 sits at the bottom of the screen, which is where every other editor puts it.
 - Visual items belong to video tracks. Their coordinates and size are project pixels, not Program Monitor pixels. Items on one track draw by ascending `zIndex`, then `id`; track array order remains the primary layer order.
-- `content.kind` is `text`, `shape`, `image` or `videoOverlay`. Image and video overlay content names an asset; content-specific fields stay inside `content`, not beside the shared transform.
+- `content.kind` is `text`, `shape`, `image`, `videoOverlay` or `adjustment`. An adjustment item applies its LUT to the layers already painted below it.
+- Clip and visual-item `blendMode` is `normal`, `multiply` or `screen`.
 - Text and shape content share `fills[]`, `stroke` and `shadow`. Fills paint bottom to top and each paint is solid, linear gradient, radial gradient, image or video.
 - Rectangle, rounded rectangle, ellipse, line, polygon and star use the same transform and visual style. Rounded rectangle alone reads `cornerRadius`; line alone reads its arrow flags.
 - Clicking Text or Shape creates or reuses a clip-free top video track. At the four-video-track limit it uses the existing top video track instead. Track creation and item creation are one undo step.
@@ -30,9 +36,9 @@ project
 
 ## Versions
 
-Version 1 stored every time in whole milliseconds (`startMs`, `inMs`, `outMs`) and `settings.fps` as a single integer. Version 2 introduced frame counts and visual items. Version 3 is the shape above: text and shapes use paint stacks and shared stroke and shadow objects.
+Version 1 stored every time in whole milliseconds (`startMs`, `inMs`, `outMs`) and `settings.fps` as a single integer. Version 2 introduced frame counts and visual items. Version 3 introduced paint stacks and shared stroke and shadow objects. Version 4 adds animation, playback speed, audio fades, volume curves, blend modes and adjustment layers.
 
-Version 1 and 2 files still open. `crates/edit/src/migrate.rs` converts timeline fields as they are read. The visual-content deserializer converts legacy `color`, `fill`, `strokeColor`, `strokeWidth` and shadow fields into the version 3 style. Saving writes version 3 fields only. Which time format a clip uses is read off the clip rather than trusted from the header, because the keys differ and a header can be wrong. A track without `visualItems` opens with an empty list.
+Older files still open. `crates/edit/src/migrate.rs` converts timeline fields as they are read, and supplies version 4 defaults for missing fields. The visual-content deserializer converts legacy paint fields into the current style. Saving writes version 4 fields only.
 
 A version 1 file whose `fps` says `29.97` opens on 30000/1001, because that is what the number meant. Believing the decimal is how the approximation gets back in.
 

@@ -121,6 +121,7 @@ pub struct Open {
     pub width: u32,
     pub height: u32,
     pub rate: Rate,
+    pub speed: f32,
 }
 
 /// Opens the readers.
@@ -152,10 +153,14 @@ impl Readers for FfmpegReaders {
             path: &request.path,
             kind: request.kind,
             in_time: RationalTime::new(request.in_frame, request.rate),
-            duration: RationalTime::new(request.frames, request.rate),
+            duration: RationalTime::new(
+                (request.frames as f64 * request.speed as f64).ceil() as i64,
+                request.rate,
+            ),
             width: request.width,
             height: request.height,
             rate: request.rate,
+            speed: request.speed,
             // A still has nothing to decode, so no hint for it.
             hwaccel: if request.kind == AssetKind::Video {
                 self.hwaccel.as_deref()
@@ -168,10 +173,14 @@ impl Readers for FfmpegReaders {
                 path: &request.path,
                 kind: request.kind,
                 in_time: RationalTime::new(request.in_frame, request.rate),
-                duration: RationalTime::new(request.frames, request.rate),
+                duration: RationalTime::new(
+                    (request.frames as f64 * request.speed as f64).ceil() as i64,
+                    request.rate,
+                ),
                 width: request.width,
                 height: request.height,
                 rate: request.rate,
+                speed: request.speed,
                 hwaccel: None,
             });
             (self.ffmpeg.clone(), software)
@@ -316,7 +325,9 @@ pub struct Layer {
     pub pixels: Vec<u8>,
     pub dst: Rect,
     pub opacity: f32,
+    pub blend_mode: makevideo_render::BlendMode,
     pub lut: Option<Arc<Lut>>,
+    pub track_order: usize,
 }
 
 /// Everything on screen at one instant, bottom layer first.
@@ -343,13 +354,17 @@ impl std::fmt::Debug for Frame {
 }
 
 impl Frame {
-    /// The layers as the compositor takes them: clips bottom first, then the
-    /// text and shape items over all of them.
+    /// The layers as the compositor takes them: track order first, then the
+    /// visual items on each track in z order.
     pub fn sources(&self) -> Vec<(Source<'_>, Draw)> {
-        self.layers
+        let mut sources: Vec<_> = self
+            .layers
             .iter()
             .map(|layer| {
                 (
+                    layer.track_order,
+                    0_u8,
+                    0_i32,
                     Source {
                         rgba: &layer.pixels,
                         width: layer.dst.w,
@@ -359,20 +374,30 @@ impl Frame {
                     Draw {
                         dst: layer.dst,
                         opacity: layer.opacity,
+                        blend_mode: layer.blend_mode,
+                        adjustment: false,
                     },
                 )
             })
             .chain(self.visuals.iter().map(|layer| {
                 (
+                    layer.track_order,
+                    1_u8,
+                    layer.z_index,
                     Source {
                         rgba: &layer.pixels,
                         width: layer.width,
                         height: layer.height,
-                        lut: None,
+                        lut: layer.lut.as_deref(),
                     },
                     layer.placement,
                 )
             }))
+            .collect();
+        sources.sort_by_key(|entry| (entry.0, entry.1, entry.2));
+        sources
+            .into_iter()
+            .map(|(_, _, _, source, placement)| (source, placement))
             .collect()
     }
 }
@@ -452,6 +477,7 @@ impl Supply {
 /// One clip and the thread filling its queue.
 struct Stream {
     placement: Placement,
+    track_order: usize,
     lut: Option<Arc<Lut>>,
     frame_bytes: usize,
     receiver: Option<Receiver<DecodedFrame>>,
@@ -573,22 +599,30 @@ impl FrameSource {
     ) -> FrameSource {
         let streams = layout::placements(project, width, height)
             .into_iter()
-            .map(|placement| Stream {
-                frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
-                lut: project
-                    .clip(&placement.clip_id)
-                    .and_then(|clip| clip.lut_path.as_deref())
-                    .and_then(|path| Lut::from_cube_file(path).ok())
-                    .map(Arc::new),
-                placement,
-                receiver: None,
-                ready: VecDeque::new(),
-                pending: None,
-                buffered: Arc::new(AtomicUsize::new(0)),
-                decoder: None,
-                cancellation: Arc::new(DecoderCancellation::default()),
-                control: Arc::new(DecoderControl::new(0, 0)),
-                dead: false,
+            .map(|placement| {
+                let track_order = project
+                    .tracks
+                    .iter()
+                    .position(|track| track.clips.iter().any(|clip| clip.id == placement.clip_id))
+                    .unwrap_or(0);
+                Stream {
+                    frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
+                    lut: project
+                        .clip(&placement.clip_id)
+                        .and_then(|clip| clip.lut_path.as_deref())
+                        .and_then(|path| Lut::from_cube_file(path).ok())
+                        .map(Arc::new),
+                    placement,
+                    receiver: None,
+                    ready: VecDeque::new(),
+                    pending: None,
+                    buffered: Arc::new(AtomicUsize::new(0)),
+                    decoder: None,
+                    cancellation: Arc::new(DecoderCancellation::default()),
+                    control: Arc::new(DecoderControl::new(0, 0)),
+                    dead: false,
+                    track_order,
+                }
             })
             .collect();
         let mut source = FrameSource {
@@ -969,7 +1003,9 @@ impl FrameSource {
                         pixels: decoded.pixels,
                         dst: stream.placement.dst,
                         opacity: stream.placement.opacity,
+                        blend_mode: stream.placement.blend_mode,
                         lut: stream.lut.clone(),
+                        track_order: stream.track_order,
                     }
                 })
             })
@@ -1059,11 +1095,13 @@ impl FrameSource {
         let request = Open {
             path: placement.path.clone(),
             kind: placement.kind,
-            in_frame: placement.in_frame + (first - placement.start_frame),
+            in_frame: placement.in_frame
+                + ((first - placement.start_frame) as f64 * placement.speed as f64).floor() as i64,
             frames: wanted,
             width: placement.dst.w,
             height: placement.dst.h,
             rate,
+            speed: placement.speed,
         };
 
         let frame_bytes = stream.frame_bytes;
@@ -1385,6 +1423,12 @@ mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -1479,6 +1523,8 @@ mod tests {
                 rotation: 0.0,
                 opacity: 1.0,
             },
+            animation: Default::default(),
+            blend_mode: Default::default(),
             content: VisualContent::Shape {
                 shape: ShapeKind::Rectangle,
                 visual_style: VisualStyle {
@@ -1923,7 +1969,9 @@ mod tests {
                 pixels: vec![0; 16 * 16 * 4],
                 dst: source.streams[0].placement.dst,
                 opacity: 1.0,
+                blend_mode: makevideo_render::BlendMode::Normal,
                 lut: None,
+                track_order: 0,
             }],
             visuals: Vec::new(),
         });
@@ -2030,6 +2078,59 @@ mod tests {
             .collect();
         assert_eq!(ids, vec!["c1", "c2"]);
         assert_eq!(frame.sources().len(), 2);
+    }
+
+    #[test]
+    fn visual_items_stay_on_their_track_in_the_paint_order() {
+        let dst = Rect {
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+        };
+        let frame = Frame {
+            frame: 0,
+            layers: vec![
+                Layer {
+                    clip_id: "bottom".into(),
+                    pixels: vec![1, 0, 0, 255],
+                    dst,
+                    opacity: 1.0,
+                    blend_mode: makevideo_render::BlendMode::Normal,
+                    lut: None,
+                    track_order: 0,
+                },
+                Layer {
+                    clip_id: "top".into(),
+                    pixels: vec![3, 0, 0, 255],
+                    dst,
+                    opacity: 1.0,
+                    blend_mode: makevideo_render::BlendMode::Normal,
+                    lut: None,
+                    track_order: 1,
+                },
+            ],
+            visuals: vec![crate::text::RasterLayer {
+                pixels: Arc::from(vec![2, 0, 0, 255]),
+                width: 1,
+                height: 1,
+                lut: None,
+                placement: Draw {
+                    dst,
+                    opacity: 1.0,
+                    blend_mode: makevideo_render::BlendMode::Normal,
+                    adjustment: false,
+                },
+                track_order: 0,
+                z_index: 0,
+            }],
+        };
+        let order: Vec<u8> = frame
+            .sources()
+            .into_iter()
+            .map(|(source, _)| source.rgba[0])
+            .collect();
+        assert_eq!(order, vec![1, 2, 3]);
     }
 
     #[test]

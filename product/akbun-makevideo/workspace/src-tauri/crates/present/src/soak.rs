@@ -736,9 +736,8 @@ fn measure_inner(
                             speaker.refilling.store(true, Ordering::Relaxed);
                             speaker.mute();
                             transport.seek(scenario.seek_to);
-                            visible_seek_target = Some(
-                                scenario.seek_to.clamp(0, transport.frames()),
-                            );
+                            visible_seek_target =
+                                Some(scenario.seek_to.clamp(0, transport.frames()));
                             seeks += 1;
                             since_seek = 0;
                             last_present = None;
@@ -975,11 +974,7 @@ mod tests {
         let samples = vec![0.0; BUFFER_FRAMES * CHANNELS];
         assert_eq!(producer.push(&samples), BUFFER_FRAMES);
         let clock = Arc::new(Clock::new());
-        let speaker = Speaker::start(
-            consumer,
-            Arc::clone(&clock),
-            Arc::new(Feed::default()),
-        );
+        let speaker = Speaker::start(consumer, Arc::clone(&clock), Arc::new(Feed::default()));
         let flush = producer.request_flush();
         let deadline = Instant::now() + Duration::from_millis(100);
         while producer.flushed() < flush && Instant::now() < deadline {
@@ -1083,6 +1078,12 @@ mod tests {
                     out_point: 300,
                     volume: 1.0,
                     opacity: 1.0,
+                    speed: 1.0,
+                    preserve_pitch: true,
+                    fade_in: 0,
+                    fade_out: 0,
+                    volume_keyframes: Default::default(),
+                    blend_mode: Default::default(),
                 }],
                 visual_items: Vec::new(),
                 muted: false,

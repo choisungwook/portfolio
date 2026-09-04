@@ -1295,6 +1295,22 @@ button.icon.on {
   cursor: grab;
 }
 
+.keyframe-dot {
+  position: absolute;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 1px solid #201600;
+  border-radius: 1px;
+  background: #f6b73c;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.clip.adjustment {
+  background: #68568a;
+}
+
 .clip.video {
   background: var(--clip-video);
   border: 1px solid var(--clip-video-edge);

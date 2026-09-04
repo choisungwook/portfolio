@@ -10,7 +10,7 @@ no way to keep agreeing.
 `crates/compositor` is one implementation of drawing a frame, used by both. It
 takes decoded RGBA in and gives one composited frame out, and it knows nothing
 about files or ffmpeg. `crates/compositor/src/composite.wgsl` is the shader —
-one file, one draw call per layer, ordinary source-over alpha blending.
+one file, one draw call per layer, with Normal, Multiply and Screen blending.
 
 ## wgpu is optional, and the CPU draws the same picture
 
@@ -103,6 +103,9 @@ stdin. Closing that stdin is what tells ffmpeg the video is over. See
 - A video paint changes every frame and always takes the composited route, including under the CPU setting.
 - Each video paint keeps one decoder per visual item and fill layer; sequential frames reuse it and a seek restarts it.
 - A video-paint render does not fall back to a graph that would freeze the paint.
+- Visual transforms are evaluated from property keyframes at the requested project frame before either backend draws.
+- Normal, Multiply and Screen use matching CPU formulas and GPU blend states.
+- An adjustment visual applies its LUT to the composite below it. The GPU path swaps through an intermediate texture only when an adjustment is present.
 
 The render differs from playback in one thing only: when a frame is not ready
 it waits, because a file has no deadline. It waits in short spans so Cancel is

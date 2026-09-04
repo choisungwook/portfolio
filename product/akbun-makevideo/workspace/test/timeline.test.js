@@ -335,6 +335,41 @@ test('a clip with nothing left of it has no negative length', () => {
   assert.strictEqual(L.clipEnd(clip('c1', 'v', 100, 30, 10)), 100);
 });
 
+test('clip speed derives timeline length and source frame', () => {
+  const fast = clip('c1', 'v', 10, 0, 120);
+  fast.speed = 2;
+  assert.equal(L.clipDuration(fast), 60);
+  const project = projectOf([VIDEO], [track('V1', 'video', 'V1', [fast])]);
+  assert.equal(L.clipsAt(project, 25)[0].sourceFrame, 30);
+});
+
+test('keyframes use the outgoing easing and static values remain fallbacks', () => {
+  const track = { keyframes: [
+    { frame: 0, value: 0, easing: 'easeIn' },
+    { frame: 10, value: 100, easing: 'linear' },
+  ] };
+  assert.equal(L.keyframeValue(track, 5, -1), 25);
+  assert.equal(L.keyframeValue({ keyframes: [
+    { frame: 0, value: 0, easing: 'hold' },
+    { frame: 10, value: 100, easing: 'linear' },
+  ] }, 10, -1), 100);
+  assert.equal(L.keyframeValue(null, 5, 7), 7);
+});
+
+test('volume curves and fades share the timeline frame', () => {
+  const audio = clip('a1', 'm', 0, 0, 20);
+  audio.volume = 1;
+  audio.fadeIn = 10;
+  audio.fadeOut = 5;
+  audio.volumeKeyframes = { keyframes: [
+    { frame: 0, value: 0.5, easing: 'linear' },
+    { frame: 10, value: 1, easing: 'linear' },
+  ] };
+  assert.equal(L.clipVolumeAt(audio, 0), 0);
+  assert.equal(L.clipVolumeAt(audio, 10), 1);
+  assert.equal(L.clipVolumeAt(audio, 19), 0);
+});
+
 test('a new text or shape layer runs four seconds of the project rate', () => {
   assert.strictEqual(L.DEFAULT_VISUAL_ITEM_SECONDS, 4);
   assert.strictEqual(L.defaultVisualItemFrames(T.fps(30)), 120);

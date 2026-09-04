@@ -28,8 +28,8 @@
 //! many times to press undo, and neither can the app.
 
 use crate::{
-    min_clip_frames, Asset, Clip, Marker, Project, ProjectSettings, Rate, Track, TrackKind,
-    TextStyle, VisualContent, VisualItem, VisualTransform,
+    min_clip_frames, Asset, BlendMode, Clip, Easing, Keyframe, Marker, Project, ProjectSettings,
+    Rate, TextStyle, Track, TrackKind, VisualContent, VisualItem, VisualProperty, VisualTransform,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -121,7 +121,10 @@ pub enum Command {
         hidden: Option<bool>,
     },
     #[serde(rename_all = "camelCase")]
-    SetSubtitleStyle { track_id: String, style: TextStyle },
+    SetSubtitleStyle {
+        track_id: String,
+        style: TextStyle,
+    },
     /// Drop an asset onto a track. `start` is where it was asked for; where it
     /// lands is that or the first free frame after it.
     #[serde(rename_all = "camelCase")]
@@ -240,6 +243,36 @@ pub enum Command {
         lut_path: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
+    SetClipPlayback {
+        clip_id: String,
+        #[serde(default)]
+        speed: Option<f32>,
+        #[serde(default)]
+        preserve_pitch: Option<bool>,
+        #[serde(default)]
+        fade_in: Option<i64>,
+        #[serde(default)]
+        fade_out: Option<i64>,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetClipVolumeKeyframe {
+        clip_id: String,
+        frame: i64,
+        value: f32,
+        #[serde(default)]
+        easing: Easing,
+    },
+    #[serde(rename_all = "camelCase")]
+    RemoveClipVolumeKeyframe {
+        clip_id: String,
+        frame: i64,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetLayerBlendMode {
+        layer_id: String,
+        blend_mode: BlendMode,
+    },
+    #[serde(rename_all = "camelCase")]
     AddVisualItem {
         track_id: String,
         content: VisualContent,
@@ -267,6 +300,21 @@ pub enum Command {
     SetVisualTransform {
         item_id: String,
         transform: VisualTransform,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetVisualKeyframe {
+        item_id: String,
+        property: VisualProperty,
+        frame: i64,
+        value: f32,
+        #[serde(default)]
+        easing: Easing,
+    },
+    #[serde(rename_all = "camelCase")]
+    RemoveVisualKeyframe {
+        item_id: String,
+        property: VisualProperty,
+        frame: i64,
     },
     #[serde(rename_all = "camelCase")]
     SetVisualTiming {
@@ -457,9 +505,17 @@ impl Command {
             Command::RippleDeleteGap { .. } => "Ripple delete gap",
             Command::SetClipGain { .. } => "Clip levels",
             Command::SetClipLut { .. } => "Clip LUT",
+            Command::SetClipPlayback { .. } => "Clip playback",
+            Command::SetClipVolumeKeyframe { .. } | Command::RemoveClipVolumeKeyframe { .. } => {
+                "Volume keyframe"
+            }
+            Command::SetLayerBlendMode { .. } => "Blend mode",
             Command::AddVisualItem { .. } => "Add visual item",
             Command::AddOverlayVisualItem { .. } => "Add visual item",
             Command::SetVisualTransform { .. } => "Transform visual item",
+            Command::SetVisualKeyframe { .. } | Command::RemoveVisualKeyframe { .. } => {
+                "Visual keyframe"
+            }
             Command::SetVisualTiming { .. } => "Time visual item",
             Command::SetVisualZIndex { .. } => "Reorder visual item",
             Command::SetVisualContent { .. } => "Edit visual item",
@@ -500,7 +556,9 @@ impl Command {
                 muted,
                 hidden,
             } => set_track_flags(project, track_id, muted, hidden),
-            Command::SetSubtitleStyle { track_id, style } => set_subtitle_style(project, track_id, style),
+            Command::SetSubtitleStyle { track_id, style } => {
+                set_subtitle_style(project, track_id, style)
+            }
             Command::AddClip {
                 track_id,
                 asset_id,
@@ -593,6 +651,26 @@ impl Command {
                 opacity,
             } => set_clip_gain(project, clip_id, volume, opacity),
             Command::SetClipLut { clip_id, lut_path } => set_clip_lut(project, clip_id, lut_path),
+            Command::SetClipPlayback {
+                clip_id,
+                speed,
+                preserve_pitch,
+                fade_in,
+                fade_out,
+            } => set_clip_playback(project, clip_id, speed, preserve_pitch, fade_in, fade_out),
+            Command::SetClipVolumeKeyframe {
+                clip_id,
+                frame,
+                value,
+                easing,
+            } => set_clip_volume_keyframe(project, clip_id, frame, value, easing),
+            Command::RemoveClipVolumeKeyframe { clip_id, frame } => {
+                remove_clip_volume_keyframe(project, clip_id, frame)
+            }
+            Command::SetLayerBlendMode {
+                layer_id,
+                blend_mode,
+            } => set_layer_blend_mode(project, layer_id, blend_mode),
             Command::AddVisualItem {
                 track_id,
                 content,
@@ -617,6 +695,18 @@ impl Command {
             Command::SetVisualTransform { item_id, transform } => {
                 set_visual_transform(project, item_id, transform)
             }
+            Command::SetVisualKeyframe {
+                item_id,
+                property,
+                frame,
+                value,
+                easing,
+            } => set_visual_keyframe(project, item_id, property, frame, value, easing),
+            Command::RemoveVisualKeyframe {
+                item_id,
+                property,
+                frame,
+            } => remove_visual_keyframe(project, item_id, property, frame),
             Command::SetVisualTiming {
                 item_id,
                 start,
@@ -857,16 +947,28 @@ fn set_track_flags(
     })
 }
 
-fn set_subtitle_style(project: &mut Project, track_id: String, style: TextStyle) -> Result<Applied, String> {
-    let track = project.track_mut(&track_id).ok_or("that track is not on the timeline")?;
+fn set_subtitle_style(
+    project: &mut Project,
+    track_id: String,
+    style: TextStyle,
+) -> Result<Applied, String> {
+    let track = project
+        .track_mut(&track_id)
+        .ok_or("that track is not on the timeline")?;
     if track.kind != TrackKind::Subtitle {
         return Err("subtitle style belongs on a subtitle track".into());
     }
     let previous = track.subtitle_style.clone().unwrap_or_default();
     track.subtitle_style = Some(style.clone());
     Ok(Applied {
-        resolved: Command::SetSubtitleStyle { track_id: track_id.clone(), style },
-        inverse: Command::SetSubtitleStyle { track_id, style: previous },
+        resolved: Command::SetSubtitleStyle {
+            track_id: track_id.clone(),
+            style,
+        },
+        inverse: Command::SetSubtitleStyle {
+            track_id,
+            style: previous,
+        },
     })
 }
 
@@ -907,6 +1009,12 @@ fn add_clip(
         out_point: duration,
         volume: 1.0,
         opacity: 1.0,
+        speed: 1.0,
+        preserve_pitch: true,
+        fade_in: 0,
+        fade_out: 0,
+        volume_keyframes: Default::default(),
+        blend_mode: Default::default(),
     });
     track.sort();
     Ok(Applied {
@@ -938,7 +1046,11 @@ fn insert_source(
         validate_source_range(project, &asset_id, in_point, out_point)?;
         let duration = out_point - in_point;
         let mut shifted: HashSet<String> = if ripple_all_tracks {
-            project.tracks.iter().map(|track| track.id.clone()).collect()
+            project
+                .tracks
+                .iter()
+                .map(|track| track.id.clone())
+                .collect()
         } else {
             targets.iter().cloned().collect()
         };
@@ -951,23 +1063,19 @@ fn insert_source(
             for clip in &mut track.clips {
                 if clip.start >= start {
                     clip.start += duration;
+                    clip.volume_keyframes.shift_frames(duration);
                 }
             }
             for item in &mut track.visual_items {
                 if item.start >= start {
                     item.start += duration;
+                    item.animation.shift_frames(duration);
                 }
             }
             track.sort();
         }
         add_source_clips(
-            project,
-            ids,
-            &asset_id,
-            &targets,
-            start,
-            in_point,
-            out_point,
+            project, ids, &asset_id, &targets, start, in_point, out_point,
         )?;
         project.validate()?;
         Ok(timeline_applied(&before, project))
@@ -997,13 +1105,7 @@ fn overwrite_source(
             .ok_or("that source range is too long")?;
         carve_overwrite(project, ids, &targets, start, end);
         add_source_clips(
-            project,
-            ids,
-            &asset_id,
-            &targets,
-            start,
-            in_point,
-            out_point,
+            project, ids, &asset_id, &targets, start, in_point, out_point,
         )?;
         project.validate()?;
         Ok(timeline_applied(&before, project))
@@ -1038,13 +1140,7 @@ fn append_source(
             .max()
             .unwrap_or(0);
         add_source_clips(
-            project,
-            ids,
-            &asset_id,
-            &targets,
-            start,
-            in_point,
-            out_point,
+            project, ids, &asset_id, &targets, start, in_point, out_point,
         )?;
         project.validate()?;
         Ok(timeline_applied(&before, project))
@@ -1137,6 +1233,12 @@ fn add_source_clips(
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         };
         let track = project
             .track_mut(track_id)
@@ -1159,11 +1261,11 @@ fn expand_linked_tracks(project: &Project, from: i64, tracks: &mut HashSet<Strin
             .collect();
         let before = tracks.len();
         for track in &project.tracks {
-            if track
-                .clips
-                .iter()
-                .any(|clip| clip.link_group.as_ref().is_some_and(|group| groups.contains(group)))
-            {
+            if track.clips.iter().any(|clip| {
+                clip.link_group
+                    .as_ref()
+                    .is_some_and(|group| groups.contains(group))
+            }) {
                 tracks.insert(track.id.clone());
             }
         }
@@ -1173,12 +1275,7 @@ fn expand_linked_tracks(project: &Project, from: i64, tracks: &mut HashSet<Strin
     }
 }
 
-fn split_for_insert(
-    project: &mut Project,
-    ids: &mut Ids,
-    at: i64,
-    tracks: &HashSet<String>,
-) {
+fn split_for_insert(project: &mut Project, ids: &mut Ids, at: i64, tracks: &HashSet<String>) {
     let mut units = Vec::new();
     let mut seen = HashSet::new();
     for track in &project.tracks {
@@ -1222,13 +1319,7 @@ fn split_for_insert(
     }
 }
 
-fn carve_overwrite(
-    project: &mut Project,
-    ids: &mut Ids,
-    targets: &[String],
-    start: i64,
-    end: i64,
-) {
+fn carve_overwrite(project: &mut Project, ids: &mut Ids, targets: &[String], start: i64, end: i64) {
     let target_set: HashSet<&str> = targets.iter().map(String::as_str).collect();
     let mut units = Vec::new();
     let mut seen = HashSet::new();
@@ -1339,14 +1430,10 @@ fn visual_item_entries(project: &Project) -> Vec<VisualItemAt> {
         .tracks
         .iter()
         .flat_map(|track| {
-            track
-                .visual_items
-                .iter()
-                .cloned()
-                .map(|item| VisualItemAt {
-                    track_id: track.id.clone(),
-                    item,
-                })
+            track.visual_items.iter().cloned().map(|item| VisualItemAt {
+                track_id: track.id.clone(),
+                item,
+            })
         })
         .collect()
 }
@@ -1449,7 +1536,9 @@ fn move_clip(
         track.clips.retain(|candidate| candidate.id != clip_id);
     }
     let start = project.tracks[target].free_start(start, duration, None);
+    let delta = start - clip.start;
     clip.start = start;
+    clip.volume_keyframes.shift_frames(delta);
     project.tracks[target].clips.push(clip);
     project.tracks[target].sort();
     Ok(Applied {
@@ -1522,6 +1611,7 @@ fn move_linked_clips(
             .expect("planned from this set")
             .clip
             .clone();
+        clip.volume_keyframes.shift_frames(*wanted - clip.start);
         clip.start = *wanted;
         project
             .track_mut(destination)
@@ -1600,24 +1690,36 @@ fn trim_one(project: &mut Project, clip_id: &str, edge: Edge, frame: i64) -> Res
     let clip = &mut project.tracks[track_index].clips[clip_index];
     let at = match edge {
         Edge::Start => {
-            let earliest = (clip.start - clip.in_point).max(0).max(previous_end);
+            let available = (clip.in_point as f64 / clip.speed as f64).floor() as i64;
+            let earliest = (clip.start - available).max(0).max(previous_end);
             let latest = (clip.end_frame() - shortest).max(earliest);
             let at = frame.clamp(earliest, latest);
-            clip.in_point += at - clip.start;
+            let source_delta = ((at - clip.start) as f64 * clip.speed as f64).round() as i64;
+            clip.in_point += source_delta;
             clip.start = at;
+            clip.volume_keyframes
+                .keyframes
+                .retain(|key| key.frame >= at);
             at
         }
         Edge::End => {
             let earliest = clip.start + shortest;
             let source = limit
-                .map(|limit| clip.start + (limit - clip.in_point))
+                .map(|limit| {
+                    clip.start + ((limit - clip.in_point) as f64 / clip.speed as f64).floor() as i64
+                })
                 .unwrap_or(i64::MAX);
             let latest = source.min(next_start).max(earliest);
             let at = frame.clamp(earliest, latest);
-            clip.out_point = clip.in_point + (at - clip.start);
+            clip.out_point =
+                clip.in_point + ((at - clip.start) as f64 * clip.speed as f64).round() as i64;
+            clip.volume_keyframes.keyframes.retain(|key| key.frame < at);
             at
         }
     };
+    let duration = clip.duration_frames();
+    clip.fade_in = clip.fade_in.min(duration);
+    clip.fade_out = clip.fade_out.min(duration);
     project.tracks[track_index].sort();
     Ok(at)
 }
@@ -1674,20 +1776,33 @@ fn split_at(
                         .clone()
                 })
             });
+            let source_offset = (offset as f64 * clip.speed as f64).round() as i64;
+            let mut right_keyframes = clip.volume_keyframes.clone();
+            right_keyframes.keyframes.retain(|key| key.frame >= frame);
             created.push(Clip {
                 id: id.clone(),
                 asset_id: clip.asset_id.clone(),
                 link_group: link_group.clone(),
                 lut_path: clip.lut_path.clone(),
                 start: frame,
-                in_point: clip.in_point + offset,
+                in_point: clip.in_point + source_offset,
                 out_point: clip.out_point,
                 volume: clip.volume,
                 opacity: clip.opacity,
+                speed: clip.speed,
+                preserve_pitch: clip.preserve_pitch,
+                fade_in: 0,
+                fade_out: clip.fade_out,
+                volume_keyframes: right_keyframes,
+                blend_mode: clip.blend_mode,
             });
             made.push(id);
             made_groups.push(link_group);
-            clip.out_point = clip.in_point + offset;
+            clip.out_point = clip.in_point + source_offset;
+            clip.fade_out = 0;
+            clip.volume_keyframes
+                .keyframes
+                .retain(|key| key.frame < frame);
         }
         if !created.is_empty() {
             track.clips.extend(created);
@@ -1894,6 +2009,7 @@ fn shift_clips_left(project: &mut Project, moved_ids: &HashSet<String>, amount: 
         for clip in &mut track.clips {
             if moved_ids.contains(&clip.id) {
                 clip.start -= amount;
+                clip.volume_keyframes.shift_frames(-amount);
             }
         }
         track.sort();
@@ -1955,6 +2071,167 @@ fn set_clip_lut(
     })
 }
 
+fn set_clip_playback(
+    project: &mut Project,
+    clip_id: String,
+    speed: Option<f32>,
+    preserve_pitch: Option<bool>,
+    fade_in: Option<i64>,
+    fade_out: Option<i64>,
+) -> Result<Applied, String> {
+    let entries = project.linked_placements(&clip_id);
+    if entries.is_empty() {
+        return Err("that clip is not on the timeline".into());
+    }
+    let previous = entries.clone();
+    let ids: HashSet<String> = entries.into_iter().map(|entry| entry.clip.id).collect();
+    for track in &mut project.tracks {
+        for clip in &mut track.clips {
+            if !ids.contains(&clip.id) {
+                continue;
+            }
+            if let Some(value) = speed {
+                if !value.is_finite() || !(0.1..=16.0).contains(&value) {
+                    return Err("clip speed must be between 0.1 and 16".into());
+                }
+                clip.speed = value;
+            }
+            if let Some(value) = preserve_pitch {
+                clip.preserve_pitch = value;
+            }
+            if let Some(value) = fade_in {
+                clip.fade_in = value.max(0);
+            }
+            if let Some(value) = fade_out {
+                clip.fade_out = value.max(0);
+            }
+            let duration = clip.duration_frames();
+            clip.fade_in = clip.fade_in.min(duration);
+            clip.fade_out = clip.fade_out.min(duration);
+            clip.volume_keyframes
+                .retain_frames(clip.start, clip.end_frame());
+        }
+        track.sort();
+    }
+    Ok(Applied {
+        resolved: Command::SetClipPlayback {
+            clip_id,
+            speed,
+            preserve_pitch,
+            fade_in,
+            fade_out,
+        },
+        inverse: Command::RestoreClips { entries: previous },
+    })
+}
+
+fn set_clip_volume_keyframe(
+    project: &mut Project,
+    clip_id: String,
+    frame: i64,
+    value: f32,
+    easing: Easing,
+) -> Result<Applied, String> {
+    let (track, index) = project
+        .locate(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let clip = &mut project.tracks[track].clips[index];
+    if frame < clip.start || frame >= clip.end_frame() {
+        return Err("a volume keyframe must be inside its clip".into());
+    }
+    if !value.is_finite() {
+        return Err("a volume keyframe needs a finite value".into());
+    }
+    let previous = clip.volume_keyframes.set(Keyframe {
+        frame,
+        value: value.clamp(0.0, 1.0),
+        easing,
+    });
+    let inverse = previous.map_or_else(
+        || Command::RemoveClipVolumeKeyframe {
+            clip_id: clip_id.clone(),
+            frame,
+        },
+        |key| Command::SetClipVolumeKeyframe {
+            clip_id: clip_id.clone(),
+            frame: key.frame,
+            value: key.value,
+            easing: key.easing,
+        },
+    );
+    Ok(Applied {
+        resolved: Command::SetClipVolumeKeyframe {
+            clip_id,
+            frame,
+            value: value.clamp(0.0, 1.0),
+            easing,
+        },
+        inverse,
+    })
+}
+
+fn remove_clip_volume_keyframe(
+    project: &mut Project,
+    clip_id: String,
+    frame: i64,
+) -> Result<Applied, String> {
+    let (track, index) = project
+        .locate(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let removed = project.tracks[track].clips[index]
+        .volume_keyframes
+        .remove(frame)
+        .ok_or("there is no volume keyframe at that frame")?;
+    Ok(Applied {
+        resolved: Command::RemoveClipVolumeKeyframe {
+            clip_id: clip_id.clone(),
+            frame,
+        },
+        inverse: Command::SetClipVolumeKeyframe {
+            clip_id,
+            frame,
+            value: removed.value,
+            easing: removed.easing,
+        },
+    })
+}
+
+fn set_layer_blend_mode(
+    project: &mut Project,
+    layer_id: String,
+    blend_mode: BlendMode,
+) -> Result<Applied, String> {
+    if let Some((track, clip)) = project.locate(&layer_id) {
+        let previous = project.tracks[track].clips[clip].blend_mode;
+        project.tracks[track].clips[clip].blend_mode = blend_mode;
+        return Ok(Applied {
+            resolved: Command::SetLayerBlendMode {
+                layer_id: layer_id.clone(),
+                blend_mode,
+            },
+            inverse: Command::SetLayerBlendMode {
+                layer_id,
+                blend_mode: previous,
+            },
+        });
+    }
+    let (track, item) = project
+        .locate_visual_item(&layer_id)
+        .ok_or("that layer is not on the timeline")?;
+    let previous = project.tracks[track].visual_items[item].blend_mode;
+    project.tracks[track].visual_items[item].blend_mode = blend_mode;
+    Ok(Applied {
+        resolved: Command::SetLayerBlendMode {
+            layer_id: layer_id.clone(),
+            blend_mode,
+        },
+        inverse: Command::SetLayerBlendMode {
+            layer_id,
+            blend_mode: previous,
+        },
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn add_visual_item(
     project: &mut Project,
@@ -1971,7 +2248,10 @@ fn add_visual_item(
     let track_index = project
         .track_index(&track_id)
         .ok_or("that track is not in this project")?;
-    if !matches!(project.tracks[track_index].kind, TrackKind::Video | TrackKind::Subtitle) {
+    if !matches!(
+        project.tracks[track_index].kind,
+        TrackKind::Video | TrackKind::Subtitle
+    ) {
         return Err("visual items do not belong on audio tracks".into());
     }
     if project.tracks[track_index].kind == TrackKind::Subtitle
@@ -1988,6 +2268,8 @@ fn add_visual_item(
         start,
         duration,
         transform,
+        animation: Default::default(),
+        blend_mode: Default::default(),
         z_index,
         content: content.clone(),
     };
@@ -2017,7 +2299,10 @@ fn add_overlay_visual_item(
     z_index: i32,
     id: Option<String>,
 ) -> Result<Applied, String> {
-    if !matches!(content, VisualContent::Text { .. } | VisualContent::Shape { .. }) {
+    if !matches!(
+        content,
+        VisualContent::Text { .. } | VisualContent::Shape { .. }
+    ) {
         return Err("only text and shapes use an overlay track".into());
     }
     let videos: Vec<_> = project
@@ -2028,7 +2313,10 @@ fn add_overlay_visual_item(
     let reusable = videos.last().filter(|track| {
         track.clips.is_empty()
             && track.visual_items.iter().all(|item| {
-                matches!(item.content, VisualContent::Text { .. } | VisualContent::Shape { .. })
+                matches!(
+                    item.content,
+                    VisualContent::Text { .. } | VisualContent::Shape { .. }
+                )
             })
     });
     if let Some(track) = reusable {
@@ -2098,6 +2386,90 @@ fn set_visual_transform(
     })
 }
 
+fn set_visual_keyframe(
+    project: &mut Project,
+    item_id: String,
+    property: VisualProperty,
+    frame: i64,
+    value: f32,
+    easing: Easing,
+) -> Result<Applied, String> {
+    let (track, index) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let item = &mut project.tracks[track].visual_items[index];
+    if frame < item.start || frame >= item.end_frame() {
+        return Err("a visual keyframe must be inside its item".into());
+    }
+    if !value.is_finite() {
+        return Err("a visual keyframe needs a finite value".into());
+    }
+    let value = match property {
+        VisualProperty::Width | VisualProperty::Height => value.max(1.0),
+        VisualProperty::Opacity => value.clamp(0.0, 1.0),
+        _ => value,
+    };
+    let previous = item.animation.track_mut(property).set(Keyframe {
+        frame,
+        value,
+        easing,
+    });
+    let inverse = previous.map_or_else(
+        || Command::RemoveVisualKeyframe {
+            item_id: item_id.clone(),
+            property,
+            frame,
+        },
+        |key| Command::SetVisualKeyframe {
+            item_id: item_id.clone(),
+            property,
+            frame: key.frame,
+            value: key.value,
+            easing: key.easing,
+        },
+    );
+    Ok(Applied {
+        resolved: Command::SetVisualKeyframe {
+            item_id,
+            property,
+            frame,
+            value,
+            easing,
+        },
+        inverse,
+    })
+}
+
+fn remove_visual_keyframe(
+    project: &mut Project,
+    item_id: String,
+    property: VisualProperty,
+    frame: i64,
+) -> Result<Applied, String> {
+    let (track, index) = project
+        .locate_visual_item(&item_id)
+        .ok_or("that visual item is not on the timeline")?;
+    let removed = project.tracks[track].visual_items[index]
+        .animation
+        .track_mut(property)
+        .remove(frame)
+        .ok_or("there is no visual keyframe at that frame")?;
+    Ok(Applied {
+        resolved: Command::RemoveVisualKeyframe {
+            item_id: item_id.clone(),
+            property,
+            frame,
+        },
+        inverse: Command::SetVisualKeyframe {
+            item_id,
+            property,
+            frame,
+            value: removed.value,
+            easing: removed.easing,
+        },
+    })
+}
+
 fn set_visual_timing(
     project: &mut Project,
     item_id: String,
@@ -2110,8 +2482,10 @@ fn set_visual_timing(
     let previous = &project.tracks[track].visual_items[item];
     let (was_start, was_duration) = (previous.start, previous.duration);
     let item = &mut project.tracks[track].visual_items[item];
+    item.animation.shift_frames(start - item.start);
     item.start = start;
     item.duration = duration;
+    item.animation.retain_frames(start, item.end_frame());
     Ok(Applied {
         resolved: Command::SetVisualTiming {
             item_id: item_id.clone(),
@@ -2186,12 +2560,15 @@ fn validate_visual_content(project: &Project, content: &VisualContent) -> Result
             (VisualContent::VideoOverlay { .. }, _) => {
                 return Err("a video overlay needs a video asset".into())
             }
+            (VisualContent::Adjustment { .. }, _) => {}
         }
     }
     let style = match content {
         VisualContent::Text { style, .. } => Some(&style.visual_style),
         VisualContent::Shape { visual_style, .. } => Some(visual_style),
-        VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => None,
+        VisualContent::Image { .. }
+        | VisualContent::VideoOverlay { .. }
+        | VisualContent::Adjustment { .. } => None,
     };
     if let Some(style) = style {
         style.validate().map_err(str::to_string)?;
@@ -2274,6 +2651,15 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
             // A clip that rounds away to nothing on a slower rate keeps the one
             // frame that makes it a clip at all.
             clip.out_point = rescale(clip.out_point, from, to).max(clip.in_point + 1);
+            clip.fade_in = rescale(clip.fade_in, from, to).max(0);
+            clip.fade_out = rescale(clip.fade_out, from, to).max(0);
+            clip.volume_keyframes
+                .map_frames(|frame| rescale(frame, from, to));
+            let duration = clip.duration_frames();
+            clip.fade_in = clip.fade_in.min(duration);
+            clip.fade_out = clip.fade_out.min(duration);
+            clip.volume_keyframes
+                .retain_frames(clip.start, clip.end_frame());
         }
         for item in &mut track.visual_items {
             restore_items.push(VisualItemAt {
@@ -2282,6 +2668,8 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
             });
             item.start = rescale(item.start, from, to);
             item.duration = rescale(item.duration, from, to).max(1);
+            item.animation.map_frames(|frame| rescale(frame, from, to));
+            item.animation.retain_frames(item.start, item.end_frame());
         }
         track.sort();
     }

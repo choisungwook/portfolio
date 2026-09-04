@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-05
+
+* [clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다](decisions/2026-09-clip-speed-derives-duration.md) 결정 기록. source trim을 유지하고 preview와 render의 duration·pitch·fade 해석을 통일함.
+
 ## 2026-09-04
 
 * [Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다](decisions/2026-09-program-monitor-fullscreen-preserves-layout.md) 결정 기록. 전체 화면 진입 전 panel과 timeline 상태를 CSS 전환으로 유지함.

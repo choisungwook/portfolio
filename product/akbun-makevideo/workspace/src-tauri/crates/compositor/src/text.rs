@@ -18,7 +18,10 @@ pub struct RasterLayer {
     pub pixels: Arc<[u8]>,
     pub width: u32,
     pub height: u32,
+    pub lut: Option<Arc<crate::lut::Lut>>,
     pub placement: Placement,
+    pub track_order: usize,
+    pub z_index: i32,
 }
 
 struct RasterCache {
@@ -70,10 +73,7 @@ struct PaintVideoDecoderCache {
 /// Keep media paints on the same ffmpeg executable as the decoder pipeline.
 /// Settings can replace it while the app is running, so this is updateable.
 pub fn set_ffmpeg_path(path: &str) {
-    *FFMPEG
-        .get_or_init(|| RwLock::new(None))
-        .write()
-        .unwrap() = Some(path.to_string());
+    *FFMPEG.get_or_init(|| RwLock::new(None)).write().unwrap() = Some(path.to_string());
 }
 
 /// One item's raster at the output size, with where it sits and the frames it
@@ -87,6 +87,10 @@ pub struct ItemRaster {
     pub x: i32,
     pub y: i32,
     pub opacity: f32,
+    pub blend_mode: makevideo_render::BlendMode,
+    pub adjustment_lut: Option<Arc<crate::lut::Lut>>,
+    pub track_order: usize,
+    pub z_index: i32,
     pub start_frame: i64,
     pub end_frame: i64,
 }
@@ -98,6 +102,7 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
             pixels: raster.pixels,
             width: raster.width,
             height: raster.height,
+            lut: raster.adjustment_lut,
             placement: Placement {
                 dst: makevideo_render::layout::Rect {
                     x: raster.x,
@@ -106,7 +111,11 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
                     h: raster.height,
                 },
                 opacity: raster.opacity,
+                blend_mode: raster.blend_mode,
+                adjustment: raster.width == 0 || raster.height == 0,
             },
+            track_order: raster.track_order,
+            z_index: raster.z_index,
         })
         .collect()
 }
@@ -114,6 +123,9 @@ pub fn layers_at(project: &Project, frame: i64, width: u32, height: u32) -> Vec<
 /// Every text and shape item in the project, rasterized once each.
 pub fn item_rasters(project: &Project, width: u32, height: u32) -> Vec<ItemRaster> {
     each_visual_item(project, width, height, None)
+        .into_iter()
+        .filter(|item| item.adjustment_lut.is_none())
+        .collect()
 }
 
 /// Timeline spans and logical RGBA bytes for text and shape layers.
@@ -138,7 +150,7 @@ pub(crate) fn byte_spans(project: &Project, width: u32, height: u32) -> Vec<(i64
             ) {
                 continue;
             }
-            let transform = visual_transform(project, track, item);
+            let transform = visual_transform(project, track, item, item.start);
             let (item_width, item_height) = visual_dimensions(transform, scale_x, scale_y);
             let end = item.end_frame();
             if end > item.start {
@@ -169,8 +181,16 @@ fn each_visual_item(
     let scale_y = height as f32 / project.settings.height.max(1) as f32;
     let scale = scale_x.min(scale_y);
 
-    for track in project.tracks.iter().filter(|track| track.contributes()) {
-        if !matches!(track.kind, makevideo_render::TrackKind::Video | makevideo_render::TrackKind::Subtitle) {
+    for (track_order, track) in project
+        .tracks
+        .iter()
+        .enumerate()
+        .filter(|(_, track)| track.contributes())
+    {
+        if !matches!(
+            track.kind,
+            makevideo_render::TrackKind::Video | makevideo_render::TrackKind::Subtitle
+        ) {
             continue;
         }
         let mut items: Vec<_> = track
@@ -180,12 +200,12 @@ fn each_visual_item(
             .collect();
         items.sort_by_key(|item| item.z_index);
         for item in items {
-            let transform = visual_transform(project, track, item);
+            let paint_frame = at.unwrap_or(item.start);
+            let transform = visual_transform(project, track, item, paint_frame);
             let (item_width, item_height) = visual_dimensions(transform, scale_x, scale_y);
             let pixels = match &item.content {
                 VisualContent::Text { text, style } => {
                     let style = track.subtitle_style.as_ref().unwrap_or(style);
-                    let paint_frame = at.unwrap_or(item.start);
                     let relative_frame = paint_frame - item.start;
                     let key = format!(
                         "text\u{0}{text}\u{0}{style:?}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
@@ -210,7 +230,6 @@ fn each_visual_item(
                     start_arrow,
                     end_arrow,
                 } => {
-                    let paint_frame = at.unwrap_or(item.start);
                     let relative_frame = paint_frame - item.start;
                     let key = format!(
                         "shape\u{0}{shape:?}\u{0}{visual_style:?}\u{0}{corner_radius}\u{0}{start_arrow}\u{0}{end_arrow}\u{0}{item_width}x{item_height}\u{0}{scale:.4}\u{0}{}",
@@ -238,6 +257,25 @@ fn each_visual_item(
                         )
                     })
                 }
+                VisualContent::Adjustment { lut_path } => {
+                    layers.push(ItemRaster {
+                        pixels: Arc::from([]),
+                        width: 0,
+                        height: 0,
+                        x: 0,
+                        y: 0,
+                        opacity: 1.0,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment_lut: crate::lut::Lut::from_cube_file(lut_path)
+                            .ok()
+                            .map(Arc::new),
+                        track_order,
+                        z_index: item.z_index,
+                        start_frame: item.start,
+                        end_frame: item.end_frame(),
+                    });
+                    continue;
+                }
                 VisualContent::Image { .. } | VisualContent::VideoOverlay { .. } => continue,
             };
             layers.push(ItemRaster {
@@ -247,6 +285,10 @@ fn each_visual_item(
                 x: (transform.x * scale_x).round() as i32,
                 y: (transform.y * scale_y).round() as i32,
                 opacity: transform.opacity.clamp(0.0, 1.0),
+                blend_mode: item.blend_mode,
+                adjustment_lut: None,
+                track_order,
+                z_index: item.z_index,
                 start_frame: item.start,
                 end_frame: item.end_frame(),
             });
@@ -259,6 +301,7 @@ fn visual_transform(
     project: &Project,
     track: &makevideo_render::Track,
     item: &makevideo_render::VisualItem,
+    frame: i64,
 ) -> makevideo_render::VisualTransform {
     if track.kind == makevideo_render::TrackKind::Subtitle {
         makevideo_render::VisualTransform {
@@ -270,7 +313,7 @@ fn visual_transform(
             opacity: 1.0,
         }
     } else {
-        item.transform
+        item.transform_at(frame)
     }
 }
 
@@ -389,7 +432,11 @@ fn decode_paint_frame(
             height,
         );
     }
-    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
+    let mut args = vec![
+        "-hide_banner".to_string(),
+        "-loglevel".into(),
+        "error".into(),
+    ];
     args.extend([
         "-i".into(),
         path.into(),
@@ -467,12 +514,13 @@ fn spawn_video_paint_decoder(
     height: u32,
 ) -> Option<PaintVideoDecoder> {
     let rate = project.rate();
-    let mut args = vec!["-hide_banner".to_string(), "-loglevel".into(), "error".into()];
+    let mut args = vec![
+        "-hide_banner".to_string(),
+        "-loglevel".into(),
+        "error".into(),
+    ];
     if frame > 0 {
-        args.extend([
-            "-ss".into(),
-            format!("{:.9}", frame as f64 / rate.as_f64()),
-        ]);
+        args.extend(["-ss".into(), format!("{:.9}", frame as f64 / rate.as_f64())]);
     }
     args.extend([
         "-i".into(),
@@ -530,7 +578,12 @@ fn rasterize_shape(
     height: u32,
 ) -> Vec<u8> {
     let mut pixels = vec![0; width as usize * height as usize * 4];
-    let stroke_width = style.stroke.as_ref().map(|stroke| stroke.width).unwrap_or(0.0) * scale;
+    let stroke_width = style
+        .stroke
+        .as_ref()
+        .map(|stroke| stroke.width)
+        .unwrap_or(0.0)
+        * scale;
     let edge = stroke_width.max(0.0) / 2.0;
     let mask = shape_mask(
         shape,
@@ -588,13 +641,9 @@ fn shape_mask(
                 ShapeKind::Rectangle => {
                     rounded_rectangle(point, width as f32, height as f32, 0.0, edge)
                 }
-                ShapeKind::RoundedRectangle => rounded_rectangle(
-                    point,
-                    width as f32,
-                    height as f32,
-                    corner_radius,
-                    edge,
-                ),
+                ShapeKind::RoundedRectangle => {
+                    rounded_rectangle(point, width as f32, height as f32, corner_radius, edge)
+                }
                 ShapeKind::Ellipse => ellipse(point, width as f32, height as f32, edge),
                 ShapeKind::Line => line(
                     point,
@@ -612,7 +661,13 @@ fn shape_mask(
     mask
 }
 
-fn rounded_rectangle(point: (f32, f32), width: f32, height: f32, radius: f32, edge: f32) -> (bool, bool) {
+fn rounded_rectangle(
+    point: (f32, f32),
+    width: f32,
+    height: f32,
+    radius: f32,
+    edge: f32,
+) -> (bool, bool) {
     let radius = radius.clamp(0.0, width.min(height) / 2.0);
     let dx = (point.0 - width / 2.0).abs() - (width / 2.0 - radius);
     let dy = (point.1 - height / 2.0).abs() - (height / 2.0 - radius);
@@ -628,7 +683,14 @@ fn ellipse(point: (f32, f32), width: f32, height: f32, edge: f32) -> (bool, bool
     (distance <= 1.0, distance >= 1.0 - outline)
 }
 
-fn line(point: (f32, f32), width: f32, height: f32, radius: f32, start_arrow: bool, end_arrow: bool) -> (bool, bool) {
+fn line(
+    point: (f32, f32),
+    width: f32,
+    height: f32,
+    radius: f32,
+    start_arrow: bool,
+    end_arrow: bool,
+) -> (bool, bool) {
     if radius <= 0.0 {
         return (false, false);
     }
@@ -636,10 +698,17 @@ fn line(point: (f32, f32), width: f32, height: f32, radius: f32, start_arrow: bo
     let body = (point.1 - centre).abs() <= radius && point.0 >= radius && point.0 <= width - radius;
     let arrow_size = (radius * 3.0).max(8.0);
     let arrow = |tip_x: f32, points_left: bool| {
-        let dx = if points_left { tip_x - point.0 } else { point.0 - tip_x };
+        let dx = if points_left {
+            tip_x - point.0
+        } else {
+            point.0 - tip_x
+        };
         dx >= 0.0 && dx <= arrow_size && (point.1 - centre).abs() <= dx * 0.65 + 0.5
     };
-    (body || (start_arrow && arrow(0.0, false)) || (end_arrow && arrow(width, true)), true)
+    (
+        body || (start_arrow && arrow(0.0, false)) || (end_arrow && arrow(width, true)),
+        true,
+    )
 }
 
 fn polygon(
@@ -661,7 +730,10 @@ fn polygon(
             } else {
                 outer
             };
-            (center.0 + angle.cos() * radius, center.1 + angle.sin() * radius)
+            (
+                center.0 + angle.cos() * radius,
+                center.1 + angle.sin() * radius,
+            )
         })
         .collect();
     let mut inside = false;
@@ -685,8 +757,7 @@ fn segment_distance(point: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
     if length <= f32::EPSILON {
         return (point.0 - a.0).hypot(point.1 - a.1);
     }
-    let amount = (((point.0 - a.0) * delta.0 + (point.1 - a.1) * delta.1) / length)
-        .clamp(0.0, 1.0);
+    let amount = (((point.0 - a.0) * delta.0 + (point.1 - a.1) * delta.1) / length).clamp(0.0, 1.0);
     (point.0 - (a.0 + delta.0 * amount)).hypot(point.1 - (a.1 + delta.1 * amount))
 }
 
@@ -851,9 +922,7 @@ fn blend(destination: &mut [u8], source: [u8; 4]) {
             0
         } else {
             ((source[channel] as f32 * source_alpha
-                + destination[channel] as f32
-                    * destination_alpha
-                    * (1.0 - source_alpha))
+                + destination[channel] as f32 * destination_alpha * (1.0 - source_alpha))
                 / output_alpha)
                 .round()
                 .clamp(0.0, 255.0) as u8
@@ -980,7 +1049,16 @@ fn rasterize(
             for offset_y in -stroke_radius..=stroke_radius {
                 for offset_x in -stroke_radius..=stroke_radius {
                     if offset_x * offset_x + offset_y * offset_y <= stroke_radius * stroke_radius {
-                        draw_bitmap(&mut pixels, width, height, x + offset_x, y + offset_y, &metrics, &bitmap, stroke);
+                        draw_bitmap(
+                            &mut pixels,
+                            width,
+                            height,
+                            x + offset_x,
+                            y + offset_y,
+                            &metrics,
+                            &bitmap,
+                            stroke,
+                        );
                     }
                 }
             }
@@ -1027,10 +1105,16 @@ fn load_font(family: &str) -> Option<Font> {
         return Some(font);
     }
     let database = FONT_DATABASE.get_or_init(load_font_database);
-    let id = requested_font_id(database, family)
-        .or_else(|| database.query(&Query { families: &[Family::SansSerif], ..Query::default() }))?;
+    let id = requested_font_id(database, family).or_else(|| {
+        database.query(&Query {
+            families: &[Family::SansSerif],
+            ..Query::default()
+        })
+    })?;
     let font = database
-        .with_face_data(id, |data, _index| Font::from_bytes(data, FontSettings::default()).ok())
+        .with_face_data(id, |data, _index| {
+            Font::from_bytes(data, FontSettings::default()).ok()
+        })
         .flatten()?;
     cache.lock().unwrap().insert(family.into(), font.clone());
     Some(font)
@@ -1049,26 +1133,38 @@ fn requested_font_id(database: &Database, family: &str) -> Option<fontdb::ID> {
         "cursive" => Family::Cursive,
         "fantasy" => Family::Fantasy,
         "monospace" => Family::Monospace,
-        _ => return database.query(&Query { families: &[Family::Name(family)], ..Query::default() }),
+        _ => {
+            return database.query(&Query {
+                families: &[Family::Name(family)],
+                ..Query::default()
+            })
+        }
     };
-    database.query(&Query { families: &[generic], ..Query::default() })
+    database.query(&Query {
+        families: &[generic],
+        ..Query::default()
+    })
 }
 
 fn colour(value: &str, fallback: [u8; 4]) -> [u8; 4] {
     let value = value.trim().strip_prefix('#').unwrap_or(value.trim());
     let rgb = match value.len() {
-        6 => u32::from_str_radix(value, 16).ok().map(|value| [
-            ((value >> 16) & 0xff) as u8,
-            ((value >> 8) & 0xff) as u8,
-            (value & 0xff) as u8,
-            255,
-        ]),
-        8 => u32::from_str_radix(value, 16).ok().map(|value| [
-            ((value >> 24) & 0xff) as u8,
-            ((value >> 16) & 0xff) as u8,
-            ((value >> 8) & 0xff) as u8,
-            (value & 0xff) as u8,
-        ]),
+        6 => u32::from_str_radix(value, 16).ok().map(|value| {
+            [
+                ((value >> 16) & 0xff) as u8,
+                ((value >> 8) & 0xff) as u8,
+                (value & 0xff) as u8,
+                255,
+            ]
+        }),
+        8 => u32::from_str_radix(value, 16).ok().map(|value| {
+            [
+                ((value >> 24) & 0xff) as u8,
+                ((value >> 16) & 0xff) as u8,
+                ((value >> 8) & 0xff) as u8,
+                (value & 0xff) as u8,
+            ]
+        }),
         _ => None,
     };
     rgb.unwrap_or(fallback)
@@ -1088,7 +1184,8 @@ fn draw_bitmap(
         for column in 0..metrics.width as i32 {
             let target_x = x + column;
             let target_y = y + row;
-            if target_x < 0 || target_y < 0 || target_x >= width as i32 || target_y >= height as i32 {
+            if target_x < 0 || target_y < 0 || target_x >= width as i32 || target_y >= height as i32
+            {
                 continue;
             }
             let coverage = bitmap[(row as usize) * metrics.width + column as usize] as u16;
@@ -1103,7 +1200,8 @@ fn draw_bitmap(
                     + pixels[index + channel] as u16 * keep)
                     / 255) as u8;
             }
-            pixels[index + 3] = (alpha as u16 + pixels[index + 3] as u16 * keep / 255).min(255) as u8;
+            pixels[index + 3] =
+                (alpha as u16 + pixels[index + 3] as u16 * keep / 255).min(255) as u8;
         }
     }
 }
@@ -1160,7 +1258,8 @@ fn draw_bitmap_paint(
         for column in 0..metrics.width as i32 {
             let target_x = x + column;
             let target_y = y + row;
-            if target_x < 0 || target_y < 0 || target_x >= width as i32 || target_y >= height as i32 {
+            if target_x < 0 || target_y < 0 || target_x >= width as i32 || target_y >= height as i32
+            {
                 continue;
             }
             let coverage = bitmap[(row as usize) * metrics.width + column as usize] as u16;
@@ -1176,13 +1275,7 @@ fn draw_bitmap_paint(
                 height,
             );
             color[3] = (color[3] as u16 * coverage / 255) as u8;
-            blend_at(
-                pixels,
-                width,
-                target_x as u32,
-                target_y as u32,
-                color,
-            );
+            blend_at(pixels, width, target_x as u32, target_y as u32, color);
         }
     }
 }
@@ -1234,6 +1327,8 @@ mod tests {
                         rotation: 0.0,
                         opacity: 0.8,
                     },
+                    animation: Default::default(),
+                    blend_mode: Default::default(),
                     content: Content::Shape {
                         shape: Shape::Rectangle,
                         visual_style: shape_style("#ff0000", "#ffffff", 1.0),
@@ -1299,7 +1394,10 @@ mod tests {
         let opaque_at = |x: u32| pixels[((10 * width + x) * 4 + 3) as usize] > 0;
         assert!(opaque_at(0), "the edge itself is outlined");
         assert!(opaque_at(3), "3px in is still inside a 4px rim");
-        assert!(!opaque_at(5), "5px in is past it, and the fill is transparent");
+        assert!(
+            !opaque_at(5),
+            "5px in is past it, and the fill is transparent"
+        );
     }
 
     #[test]
@@ -1320,7 +1418,10 @@ mod tests {
             20,
             12,
         );
-        assert_eq!(&rectangle[(6 * 20 + 10) * 4..(6 * 20 + 10) * 4 + 4], &[0x11, 0x22, 0x33, 255]);
+        assert_eq!(
+            &rectangle[(6 * 20 + 10) * 4..(6 * 20 + 10) * 4 + 4],
+            &[0x11, 0x22, 0x33, 255]
+        );
         assert_eq!(&rectangle[(10) * 4..(10) * 4 + 4], &[255, 255, 255, 255]);
 
         let line = rasterize_shape(
@@ -1335,7 +1436,10 @@ mod tests {
             12,
         );
         assert_eq!(&line[(6 * 30) * 4..(6 * 30) * 4 + 4], &[255, 0, 0, 255]);
-        assert_eq!(&line[(6 * 30 + 29) * 4..(6 * 30 + 29) * 4 + 4], &[255, 0, 0, 255]);
+        assert_eq!(
+            &line[(6 * 30 + 29) * 4..(6 * 30 + 29) * 4 + 4],
+            &[255, 0, 0, 255]
+        );
 
         let no_stroke = rasterize_shape(
             ShapeKind::Line,
@@ -1367,9 +1471,15 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(sample_paint(&gradient, None, 0.0, 5.0, 10, 10), [255, 0, 0, 255]);
+        assert_eq!(
+            sample_paint(&gradient, None, 0.0, 5.0, 10, 10),
+            [255, 0, 0, 255]
+        );
         let middle = sample_paint(&gradient, None, 5.0, 5.0, 10, 10);
-        assert!((middle[0] as i16 - middle[2] as i16).abs() <= 1, "{middle:?}");
+        assert!(
+            (middle[0] as i16 - middle[2] as i16).abs() <= 1,
+            "{middle:?}"
+        );
 
         let paints = [Paint::solid("#ff0000"), Paint::solid("#0000ff80")];
         let stacked = paint_stack(&paints, &[], 5.0, 5.0, 10, 10);
@@ -1381,9 +1491,16 @@ mod tests {
     #[test]
     fn polygon_star_and_rounded_rectangle_have_distinct_geometry() {
         let style = shape_style("#ffffff", "#000000", 0.0);
-        for shape in [ShapeKind::Polygon, ShapeKind::Star, ShapeKind::RoundedRectangle] {
+        for shape in [
+            ShapeKind::Polygon,
+            ShapeKind::Star,
+            ShapeKind::RoundedRectangle,
+        ] {
             let pixels = rasterize_shape(shape, &style, &[], 1.0, 5.0, false, false, 30, 30);
-            assert_eq!(&pixels[(15 * 30 + 15) * 4..(15 * 30 + 15) * 4 + 4], &[255; 4]);
+            assert_eq!(
+                &pixels[(15 * 30 + 15) * 4..(15 * 30 + 15) * 4 + 4],
+                &[255; 4]
+            );
             assert_eq!(pixels[3], 0, "{shape:?} keeps its corner transparent");
         }
     }
@@ -1394,10 +1511,15 @@ mod tests {
             asset_id: "image".into(),
         };
         let pixels = [
-            255, 0, 0, 255, 0, 255, 0, 255,
-            0, 0, 255, 255, 255, 255, 255, 255,
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
         ];
-        assert_eq!(sample_paint(&paint, Some(&pixels), 1.5, 0.5, 2, 2), [0, 255, 0, 255]);
-        assert_eq!(sample_paint(&paint, Some(&pixels), 0.5, 1.5, 2, 2), [0, 0, 255, 255]);
+        assert_eq!(
+            sample_paint(&paint, Some(&pixels), 1.5, 0.5, 2, 2),
+            [0, 255, 0, 255]
+        );
+        assert_eq!(
+            sample_paint(&paint, Some(&pixels), 0.5, 1.5, 2, 2),
+            [0, 0, 255, 255]
+        );
     }
 }

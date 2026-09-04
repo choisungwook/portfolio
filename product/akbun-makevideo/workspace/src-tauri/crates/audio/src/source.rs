@@ -16,7 +16,7 @@
 //! and the waiting all happen on the feeder thread, ahead of the sound. See
 //! [`crate::realtime`] for the rule that makes that mandatory.
 
-use crate::mix::{add_into, regions, total_samples, Region};
+use crate::mix::{add_into_region, regions, total_samples, Region};
 use crate::realtime::{CHANNELS, ENGINE_HZ};
 use makevideo_render::{ffmpeg, Project, RationalTime};
 use std::io::Read;
@@ -82,6 +82,8 @@ pub struct Open {
     /// Sample frames wanted, which bounds what the mixer will take however many
     /// ffmpeg decides to hand over.
     pub frames: i64,
+    pub speed: f32,
+    pub preserve_pitch: bool,
 }
 
 /// Opens the readers.
@@ -110,6 +112,8 @@ impl Readers for FfmpegReaders {
             path: &request.path,
             in_time: request.in_time,
             duration: request.duration,
+            speed: request.speed,
+            preserve_pitch: request.preserve_pitch,
         });
         let mut child = Command::new(&self.ffmpeg)
             .args(&args)
@@ -458,11 +462,12 @@ impl MixSource {
             if take > 0 {
                 let from = stream.consumed;
                 let until = from + take * CHANNELS;
-                add_into(
+                add_into_region(
                     &mut out[..frames * CHANNELS],
                     offset,
                     &stream.pending[from..until],
-                    stream.region.volume,
+                    stream.next,
+                    &stream.region,
                 );
                 stream.consumed = until;
                 if stream.consumed == stream.pending.len() {
@@ -608,11 +613,17 @@ impl MixSource {
         let request = Open {
             path: region.path.clone(),
             in_time: RationalTime::new(
-                region.in_time.to_samples(ENGINE_HZ) + into_clip,
+                region.in_time.to_samples(ENGINE_HZ)
+                    + (into_clip as f64 * region.speed as f64).round() as i64,
                 engine_rate,
             ),
-            duration: RationalTime::new(wanted, engine_rate),
+            duration: RationalTime::new(
+                (wanted as f64 * region.speed as f64).ceil() as i64,
+                engine_rate,
+            ),
             frames: wanted,
+            speed: region.speed,
+            preserve_pitch: region.preserve_pitch,
         };
 
         stream.next = from;
@@ -872,6 +883,12 @@ pub(crate) mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -1059,7 +1076,10 @@ pub(crate) mod tests {
         // past the point where the lead reaches it.
         for _ in 0..40 {
             assert_eq!(next(&mut source, &mut out), Supply::Ready);
-            assert!(out.iter().all(|sample| *sample == 0.0), "the clip is silent");
+            assert!(
+                out.iter().all(|sample| *sample == 0.0),
+                "the clip is silent"
+            );
         }
         assert!(source.position() < 48_000, "the clip has not started");
         assert_eq!(source.decoding(), vec!["c1"], "but its decoder has");
@@ -1082,7 +1102,10 @@ pub(crate) mod tests {
         let mut source = source(&project, Buffering::new(8, 48_000), Arc::clone(&readers));
         let mut out = block(BLOCK_FRAMES);
         next(&mut source, &mut out);
-        assert!(wait_for(|| !readers.opens().is_empty()), "no decoder started");
+        assert!(
+            wait_for(|| !readers.opens().is_empty()),
+            "no decoder started"
+        );
         let open = readers.opens()[0].clone();
         // Frame 45 of 30 fps is a second and a half in.
         assert_eq!(open.in_time.seconds_text(6), "1.500000");
@@ -1287,7 +1310,11 @@ pub(crate) mod tests {
         let mut mixed = 0i64;
         while let Supply::Ready = next(&mut source, &mut out) {
             let frames = (source.position() - mixed) as usize;
-            for (index, sample) in out[..frames * CHANNELS].iter().step_by(CHANNELS).enumerate() {
+            for (index, sample) in out[..frames * CHANNELS]
+                .iter()
+                .step_by(CHANNELS)
+                .enumerate()
+            {
                 let at = mixed + index as i64;
                 let expected = if at < 24_000 { 1.0 } else { 2.0 };
                 assert!(
@@ -1342,7 +1369,11 @@ pub(crate) mod tests {
         let overlapping = source(&stacked, Buffering::new(3, 0), Arc::new(Fakes::default()));
         assert_eq!(overlapping.buffer_ceiling(), 2 * one_clip_full);
         // A lead makes the next clip's queue overlap the one before it.
-        let led = source(&sequence, Buffering::new(3, 4_800), Arc::new(Fakes::default()));
+        let led = source(
+            &sequence,
+            Buffering::new(3, 4_800),
+            Arc::new(Fakes::default()),
+        );
         assert_eq!(led.buffer_ceiling(), 2 * one_clip_full, "the lead overlaps");
     }
 

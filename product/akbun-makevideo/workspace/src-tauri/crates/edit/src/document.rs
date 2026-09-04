@@ -256,8 +256,8 @@ impl Document {
 mod tests {
     use super::*;
     use crate::{
-        Asset, AssetKind, Clip, Command, Edge, Paint, ProjectSettings, Rate, TrackKind,
-        VisualContent, VisualStyle, TextStyle, VisualTransform,
+        Asset, AssetKind, Clip, Command, Edge, Paint, ProjectSettings, Rate, TextStyle, TrackKind,
+        VisualContent, VisualStyle, VisualTransform,
     };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
@@ -690,6 +690,12 @@ mod tests {
                         out_point: 9_000,
                         volume: 1.0,
                         opacity: 1.0,
+                        speed: 1.0,
+                        preserve_pitch: true,
+                        fade_in: 0,
+                        fade_out: 0,
+                        volume_keyframes: Default::default(),
+                        blend_mode: Default::default(),
                     },
                 }],
             })
@@ -1393,10 +1399,7 @@ mod tests {
 
         document.apply(overlay_command("title")).unwrap();
 
-        let videos: Vec<_> = document
-            .project()
-            .tracks_of(TrackKind::Video)
-            .collect();
+        let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
         assert_eq!(videos.len(), 2);
         assert_eq!(videos[0].clips.len(), 1);
         assert!(videos[1].clips.is_empty());
@@ -1409,10 +1412,7 @@ mod tests {
         assert_eq!(document.project().tracks[0].clips.len(), 1);
 
         document.redo().unwrap();
-        let videos: Vec<_> = document
-            .project()
-            .tracks_of(TrackKind::Video)
-            .collect();
+        let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
         assert_eq!(videos.len(), 2);
         assert_eq!(videos[1].visual_items[0].id, item_id);
     }
@@ -1424,10 +1424,7 @@ mod tests {
         document.apply(overlay_command("one")).unwrap();
         document.apply(overlay_command("two")).unwrap();
 
-        let videos: Vec<_> = document
-            .project()
-            .tracks_of(TrackKind::Video)
-            .collect();
+        let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
         assert_eq!(videos.len(), 2);
         assert_eq!(videos[1].visual_items.len(), 2);
     }
@@ -1463,10 +1460,7 @@ mod tests {
 
         document.apply(overlay_command("top")).unwrap();
 
-        let videos: Vec<_> = document
-            .project()
-            .tracks_of(TrackKind::Video)
-            .collect();
+        let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
         assert_eq!(videos.len(), crate::MAX_TRACKS_PER_KIND);
         assert_eq!(videos.last().unwrap().visual_items.len(), 1);
     }
@@ -1578,8 +1572,14 @@ mod tests {
 
         let video = document.project().tracks[0].clips.last().unwrap();
         let audio = document.project().tracks[1].clips.last().unwrap();
-        assert_eq!((video.start, video.in_point, video.out_point), (300, 60, 120));
-        assert_eq!((audio.start, audio.in_point, audio.out_point), (300, 60, 120));
+        assert_eq!(
+            (video.start, video.in_point, video.out_point),
+            (300, 60, 120)
+        );
+        assert_eq!(
+            (audio.start, audio.in_point, audio.out_point),
+            (300, 60, 120)
+        );
         assert!(video.link_group.is_some());
         assert_eq!(video.link_group, audio.link_group);
     }

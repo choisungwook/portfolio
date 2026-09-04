@@ -20,7 +20,7 @@
 //!   and not near it. A single missing sample fails it.
 
 use crate::engine::Engine;
-use crate::realtime::{Clock, Consumer, ENGINE_HZ, CHANNELS};
+use crate::realtime::{Clock, Consumer, CHANNELS, ENGINE_HZ};
 use makevideo_render::Rate;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -227,7 +227,8 @@ pub fn measure(
 
     let mut intervals: Vec<f64> = Vec::new();
     let mut startups: Vec<f64> = Vec::new();
-    let (mut buffers, mut played, mut underruns, mut silent, mut seeks) = (0u64, 0u64, 0u64, 0u64, 0u64);
+    let (mut buffers, mut played, mut underruns, mut silent, mut seeks) =
+        (0u64, 0u64, 0u64, 0u64, 0u64);
     let mut ended_on_the_sample: Option<bool> = None;
     let mut stalled = false;
     let mut buffer = vec![0.0f32; BUFFER_FRAMES * CHANNELS];
@@ -469,9 +470,9 @@ impl Run {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::Options;
     use crate::source::tests::{level_readers, one_clip_project};
     use crate::source::{Buffering, Readers};
-    use crate::engine::Options;
     use std::sync::Arc;
     use std::time::Duration as StdDuration;
 
@@ -497,7 +498,10 @@ mod tests {
     struct Slow;
 
     impl Readers for Slow {
-        fn open(&self, _request: &crate::source::Open) -> Option<Box<dyn crate::source::PcmReader>> {
+        fn open(
+            &self,
+            _request: &crate::source::Open,
+        ) -> Option<Box<dyn crate::source::PcmReader>> {
             Some(Box::new(Molasses))
         }
     }
@@ -506,7 +510,10 @@ mod tests {
     fn a_mix_that_keeps_up_plays_without_a_hole_in_it() {
         // A quarter of a second of a one second timeline, so no wrap and no
         // seek: the plainest case there is, and the one that has to be clean.
-        let report = run(level_readers(1.0), &Scenario::new("continuous-playback", 12_000));
+        let report = run(
+            level_readers(1.0),
+            &Scenario::new("continuous-playback", 12_000),
+        );
         assert!(!report.metrics.stalled, "{report:?}");
         assert_eq!(report.metrics.underruns, 0, "{:?}", report.metrics);
         assert!(report.metrics.played_frames >= 12_000);
@@ -517,7 +524,10 @@ mod tests {
     fn playing_the_timeline_through_lands_on_its_last_sample() {
         // The whole point of counting samples instead of milliseconds. One
         // sample short and this fails, which is what makes it worth having.
-        let report = run(level_readers(1.0), &Scenario::new("continuous-playback", 50_000));
+        let report = run(
+            level_readers(1.0),
+            &Scenario::new("continuous-playback", 50_000),
+        );
         assert_eq!(
             report.metrics.ended_on_the_sample,
             Some(true),
@@ -532,7 +542,10 @@ mod tests {
         // A harness that cannot fail is not measuring anything. 200 ms a block
         // against a 21 ms budget drains the ring and every buffer after that is
         // a hole.
-        let report = run(Arc::new(Slow), &Scenario::new("continuous-playback", 24_000));
+        let report = run(
+            Arc::new(Slow),
+            &Scenario::new("continuous-playback", 24_000),
+        );
         assert!(!report.evaluation.pass, "{report:?}");
         assert!(
             report.metrics.stalled || report.metrics.underruns > 0,

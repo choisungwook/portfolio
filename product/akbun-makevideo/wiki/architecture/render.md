@@ -42,8 +42,8 @@ per video clip:
   [prev][vN]overlay=x=0:y=0:eof_action=pass:enable='between(t,START,END)'[ovK]
 
 per audio clip:
-  [N:a]aformat=fltp:48000:stereo,asetpts=PTS-STARTPTS,
-       volume=VOL,adelay=<samples>S:all=1[aN]
+  [N:a]aformat=fltp:48000:stereo,<speed/pitch filter>,asetpts=PTS-STARTPTS,
+       volume=<keyframes × fades>,adelay=<samples>S:all=1[aN]
   [a0][a1]…amix=inputs=N:normalize=0:dropout_transition=0[aout]
 ```
 

@@ -16,6 +16,7 @@ struct Layer {
     lut_size: f32,
     domain_min: vec4<f32>,
     domain_max: vec4<f32>,
+    blend_mode: u32,
 };
 
 @group(0) @binding(0) var<uniform> layer: Layer;
@@ -74,5 +75,10 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let texel = textureSample(source, source_sampler, in.uv);
-    return vec4<f32>(sample_lut(texel.rgb), texel.a * layer.opacity);
+    let alpha = texel.a * layer.opacity;
+    let colour = sample_lut(texel.rgb);
+    if layer.blend_mode == 1u || layer.blend_mode == 2u {
+        return vec4<f32>(colour * alpha, alpha);
+    }
+    return vec4<f32>(colour, alpha);
 }

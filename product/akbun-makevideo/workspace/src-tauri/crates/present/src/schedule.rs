@@ -150,7 +150,11 @@ mod tests {
     #[test]
     fn a_threshold_below_two_still_walks_the_first_late_frame() {
         for threshold in [-4, 0, 1, 2] {
-            assert_eq!(step(99, 100, threshold), Step::Skip, "threshold {threshold}");
+            assert_eq!(
+                step(99, 100, threshold),
+                Step::Skip,
+                "threshold {threshold}"
+            );
         }
         assert_eq!(step(98, 100, 0), Step::Resync(100));
         assert_eq!(step(98, 100, 2), Step::Resync(100));

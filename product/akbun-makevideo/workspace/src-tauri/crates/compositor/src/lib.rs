@@ -33,7 +33,7 @@ pub mod source;
 pub mod supply;
 pub mod text;
 
-use makevideo_render::layout::Rect;
+use makevideo_render::{layout::Rect, BlendMode};
 
 /// A decoded source frame, already scaled to the size it will be drawn at.
 pub struct Source<'a> {
@@ -48,6 +48,8 @@ pub struct Source<'a> {
 pub struct Placement {
     pub dst: Rect,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+    pub adjustment: bool,
 }
 
 /// Which half does the drawing.
@@ -262,6 +264,8 @@ mod tests {
                         Placement {
                             dst: full(16),
                             opacity: 1.0,
+                            blend_mode: makevideo_render::BlendMode::Normal,
+                            adjustment: false,
                         },
                     )],
                 )
@@ -294,6 +298,8 @@ mod tests {
                         Placement {
                             dst: full(1),
                             opacity: 1.0,
+                            blend_mode: makevideo_render::BlendMode::Normal,
+                            adjustment: false,
                         },
                     )],
                 )
@@ -334,6 +340,8 @@ mod tests {
                             Placement {
                                 dst: bottom,
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                         (
@@ -346,6 +354,8 @@ mod tests {
                             Placement {
                                 dst: top,
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                     ],
@@ -385,6 +395,8 @@ mod tests {
                             Placement {
                                 dst: full(8),
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                         (
@@ -397,6 +409,8 @@ mod tests {
                             Placement {
                                 dst: full(8),
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                     ],
@@ -426,6 +440,8 @@ mod tests {
                             Placement {
                                 dst: full(8),
                                 opacity: 1.0,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                         (
@@ -438,6 +454,8 @@ mod tests {
                             Placement {
                                 dst: full(8),
                                 opacity: 0.5,
+                                blend_mode: makevideo_render::BlendMode::Normal,
+                                adjustment: false,
                             },
                         ),
                     ],
@@ -448,6 +466,104 @@ mod tests {
             assert!((120..=136).contains(&g), "{name}: green was {g}");
             assert!((120..=136).contains(&b), "{name}: blue was {b}");
             assert_eq!(a, 255, "{name}: the frame stays opaque");
+        }
+    }
+
+    #[test]
+    fn multiply_and_screen_match_on_both_backends() {
+        let bottom = solid(1, 1, [100, 200, 50, 255]);
+        let top = solid(1, 1, [128, 128, 128, 255]);
+        for (mode, expected) in [
+            (BlendMode::Multiply, [50, 100, 25, 255]),
+            (BlendMode::Screen, [178, 228, 153, 255]),
+        ] {
+            for (name, compositor) in backends() {
+                let frame = compositor
+                    .compose(
+                        1,
+                        1,
+                        &[
+                            (
+                                Source {
+                                    rgba: &bottom,
+                                    width: 1,
+                                    height: 1,
+                                    lut: None,
+                                },
+                                Placement {
+                                    dst: full(1),
+                                    opacity: 1.0,
+                                    blend_mode: BlendMode::Normal,
+                                    adjustment: false,
+                                },
+                            ),
+                            (
+                                Source {
+                                    rgba: &top,
+                                    width: 1,
+                                    height: 1,
+                                    lut: None,
+                                },
+                                Placement {
+                                    dst: full(1),
+                                    opacity: 1.0,
+                                    blend_mode: mode,
+                                    adjustment: false,
+                                },
+                            ),
+                        ],
+                    )
+                    .unwrap();
+                assert_eq!(pixel(&frame, 1, 0, 0), expected, "{name} {mode:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn an_adjustment_lut_changes_the_composite_below_it() {
+        let source = solid(1, 1, [128, 64, 192, 255]);
+        let lut = lut::Lut::from_cube(
+            "LUT_3D_SIZE 2\n0 0 0\n0 0 0\n0 0 0\n0 0 0\n0 0 0\n0 0 0\n0 0 0\n0 0 0\n",
+        )
+        .unwrap();
+        for (name, compositor) in backends() {
+            let frame = compositor
+                .compose(
+                    1,
+                    1,
+                    &[
+                        (
+                            Source {
+                                rgba: &source,
+                                width: 1,
+                                height: 1,
+                                lut: None,
+                            },
+                            Placement {
+                                dst: full(1),
+                                opacity: 1.0,
+                                blend_mode: BlendMode::Normal,
+                                adjustment: false,
+                            },
+                        ),
+                        (
+                            Source {
+                                rgba: &[],
+                                width: 0,
+                                height: 0,
+                                lut: Some(&lut),
+                            },
+                            Placement {
+                                dst: full(1),
+                                opacity: 1.0,
+                                blend_mode: BlendMode::Normal,
+                                adjustment: true,
+                            },
+                        ),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(pixel(&frame, 1, 0, 0), [0, 0, 0, 255], "{name}");
         }
     }
 
@@ -474,6 +590,8 @@ mod tests {
                                 h: 4,
                             },
                             opacity: 1.0,
+                            blend_mode: makevideo_render::BlendMode::Normal,
+                            adjustment: false,
                         },
                     )],
                 )
@@ -501,6 +619,8 @@ mod tests {
                     Placement {
                         dst: full(8),
                         opacity: 1.0,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment: false,
                     },
                 )],
             );
@@ -544,6 +664,8 @@ mod tests {
                                 h: 8,
                             },
                             opacity: 1.0,
+                            blend_mode: makevideo_render::BlendMode::Normal,
+                            adjustment: false,
                         },
                     )],
                 )
@@ -587,6 +709,8 @@ mod tests {
                     Placement {
                         dst: bottom,
                         opacity: 1.0,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment: false,
                     },
                 ),
                 (
@@ -599,6 +723,8 @@ mod tests {
                     Placement {
                         dst: top,
                         opacity: 0.65,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment: false,
                     },
                 ),
                 (
@@ -611,6 +737,8 @@ mod tests {
                     Placement {
                         dst: small,
                         opacity: 0.5,
+                        blend_mode: makevideo_render::BlendMode::Normal,
+                        adjustment: false,
                     },
                 ),
             ]

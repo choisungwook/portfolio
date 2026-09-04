@@ -200,7 +200,7 @@ pub fn build_args(
     ];
 
     for item in &items {
-        let length = secs(item.clip.duration(rate));
+        let length = secs(RationalTime::new(item.clip.source_duration_frames(), rate));
         if item.kind == AssetKind::Image {
             // A still has no timeline of its own, so the input options are what
             // give it one. No -hwaccel: there is nothing to decode.
@@ -233,7 +233,10 @@ pub fn build_args(
         args.extend(["-framerate".into(), fps.clone()]);
         // Frames until the item's own end: overlay stops drawing a secondary
         // input that has ended, and enable= only hides, it does not feed.
-        args.extend(["-t".into(), secs(layout::frame_time(visual.end_frame, rate))]);
+        args.extend([
+            "-t".into(),
+            secs(layout::frame_time(visual.end_frame, rate)),
+        ]);
         args.extend(["-i".into(), visual.path.clone()]);
     }
 
@@ -269,8 +272,9 @@ pub fn build_args(
             "[{index}:v]format=yuva420p,\
              scale={width}:{height}:force_original_aspect_ratio=decrease,\
              pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black@0,\
-             fps={fps},setpts=PTS-STARTPTS{opacity},\
-             tpad=start_duration={start}:start_mode=add:color=black@0[v{index}]"
+             setpts=(PTS-STARTPTS)/{:.6},fps={fps}{opacity},\
+             tpad=start_duration={start}:start_mode=add:color=black@0[v{index}]",
+            item.clip.speed
         ));
         chains.push(format!(
             "[{last_video}][v{index}]overlay=x=0:y=0:eof_action=pass:enable='between(t,{start},{end})'[ov{layer}]"
@@ -354,12 +358,60 @@ fn audio_chain(item: &Item, input: usize, rate: Rate) -> String {
     // quieter or louder than what was heard by up to 5e-4 — and round a clip
     // set below 0.0005 to silence. Six is past what an f32 in 0..1 can tell
     // apart, so the two mixes agree exactly.
+    let speed = speed_audio_filter(item.clip.speed, item.clip.preserve_pitch);
+    let volume = volume_expression(item.clip, rate);
     format!(
-        "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo,\
-         asetpts=PTS-STARTPTS,volume={:.6},adelay={}S:all=1[a{input}]",
-        item.clip.volume.max(0.0),
+        "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo\
+         {speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
         item.clip.start_time(rate).to_samples(AUDIO_HZ)
     )
+}
+
+fn volume_expression(clip: &Clip, rate: Rate) -> String {
+    let keys = &clip.volume_keyframes.keyframes;
+    let mut expression = if keys.is_empty() {
+        format!("{:.6}", clip.volume.clamp(0.0, 1.0))
+    } else {
+        let last = keys.last().expect("checked");
+        let mut tail = format!("{:.6}", last.value.clamp(0.0, 1.0));
+        for pair in keys.windows(2).rev() {
+            let left = pair[0];
+            let right = pair[1];
+            let left_time = RationalTime::new(left.frame - clip.start, rate).to_seconds();
+            let right_time = RationalTime::new(right.frame - clip.start, rate).to_seconds();
+            let amount = format!(
+                "max(0,min(1,(t-{left_time:.9})/{:.9}))",
+                (right_time - left_time).max(1e-9)
+            );
+            let eased = match left.easing {
+                crate::Easing::Linear => amount.clone(),
+                crate::Easing::EaseIn => format!("({amount})*({amount})"),
+                crate::Easing::EaseOut => format!("1-(1-({amount}))*(1-({amount}))"),
+                crate::Easing::EaseInOut => format!(
+                    "if(lt({amount},0.5),2*({amount})*({amount}),1-pow(-2*({amount})+2,2)/2)"
+                ),
+                crate::Easing::Hold => "0".into(),
+            };
+            let segment = format!(
+                "{:.6}+({:.6}-{:.6})*({eased})",
+                left.value, right.value, left.value
+            );
+            tail = format!("if(lt(t,{right_time:.9}),{segment},{tail})");
+        }
+        let first_time = RationalTime::new(keys[0].frame - clip.start, rate).to_seconds();
+        format!("if(lt(t,{first_time:.9}),{:.6},{tail})", keys[0].value)
+    };
+    if clip.fade_in > 0 {
+        let duration = RationalTime::new(clip.fade_in, rate).to_seconds();
+        expression = format!("({expression})*min(1,max(0,t/{duration:.9}))");
+    }
+    if clip.fade_out > 0 {
+        let start = RationalTime::new(clip.duration_frames() - clip.fade_out, rate).to_seconds();
+        let duration = RationalTime::new(clip.fade_out, rate).to_seconds();
+        expression =
+            format!("({expression})*min(1,max(0,({start:.9}+{duration:.9}-t)/{duration:.9}))");
+    }
+    expression
 }
 
 /// normalize=0 keeps a single clip at its own level instead of dividing it by
@@ -408,7 +460,12 @@ fn video_codec_args(
             ]);
         }
     }
-    args.extend(["-pix_fmt".into(), "yuv420p".into(), "-r".into(), rate.ratio_text()]);
+    args.extend([
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-r".into(),
+        rate.ratio_text(),
+    ]);
     args
 }
 
@@ -442,6 +499,7 @@ pub struct Decode<'a> {
     pub width: u32,
     pub height: u32,
     pub rate: Rate,
+    pub speed: f32,
     pub hwaccel: Option<&'a str>,
 }
 
@@ -461,6 +519,7 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
         width,
         height,
         rate,
+        speed,
         hwaccel,
     } = *request;
     let fps = rate.ratio_text();
@@ -487,7 +546,7 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
     // otherwise drift out of step with the timeline.
     args.extend([
         "-vf".into(),
-        format!("scale={width}:{height},fps={fps}"),
+        format!("scale={width}:{height},setpts=PTS/{speed:.6},fps={fps}"),
         "-f".into(),
         "rawvideo".into(),
         "-pix_fmt".into(),
@@ -504,6 +563,32 @@ pub struct DecodeAudio<'a> {
     /// counts: ffmpeg's `-ss` and `-t` take seconds.
     pub in_time: RationalTime,
     pub duration: RationalTime,
+    pub speed: f32,
+    pub preserve_pitch: bool,
+}
+
+fn speed_audio_filter(speed: f32, preserve_pitch: bool) -> String {
+    if (speed - 1.0).abs() <= f32::EPSILON {
+        return String::new();
+    }
+    if !preserve_pitch {
+        return format!(",asetrate={AUDIO_HZ}*{speed:.6},aresample={AUDIO_HZ}");
+    }
+    let mut remaining = speed.max(0.1);
+    let mut stages = Vec::new();
+    while remaining > 2.0 {
+        stages.push(2.0);
+        remaining /= 2.0;
+    }
+    while remaining < 0.5 {
+        stages.push(0.5);
+        remaining /= 0.5;
+    }
+    stages.push(remaining);
+    stages
+        .into_iter()
+        .map(|value| format!(",atempo={value:.6}"))
+        .collect()
 }
 
 /// Decode one clip's sound to raw interleaved f32 at `AUDIO_HZ`, in stereo.
@@ -524,6 +609,7 @@ pub struct DecodeAudio<'a> {
 /// and leaving it out is what lets the mixer be tested on samples that are
 /// still the ones the file holds.
 pub fn audio_decoder_args(request: &DecodeAudio<'_>) -> Vec<String> {
+    let speed = speed_audio_filter(request.speed, request.preserve_pitch);
     vec![
         "-hide_banner".into(),
         "-nostdin".into(),
@@ -539,7 +625,7 @@ pub fn audio_decoder_args(request: &DecodeAudio<'_>) -> Vec<String> {
         // the picture to throw it away would cost more than the mixing does.
         "-vn".into(),
         "-af".into(),
-        format!("aformat=sample_fmts=flt:sample_rates={AUDIO_HZ}:channel_layouts=stereo"),
+        format!("aformat=sample_fmts=flt:sample_rates={AUDIO_HZ}:channel_layouts=stereo{speed}"),
         "-f".into(),
         "f32le".into(),
         "-ac".into(),
@@ -575,7 +661,10 @@ pub fn mix_reference_args(project: &Project, output: &str) -> Option<Vec<String>
     ];
     for item in &audio {
         args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
-        args.extend(["-t".into(), secs(item.clip.duration(rate))]);
+        args.extend([
+            "-t".into(),
+            secs(RationalTime::new(item.clip.source_duration_frames(), rate)),
+        ]);
         args.extend(["-i".into(), item.path.to_string()]);
     }
 
@@ -643,7 +732,10 @@ pub fn encoder_args(
     let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
     for item in &audio {
         args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
-        args.extend(["-t".into(), secs(item.clip.duration(rate))]);
+        args.extend([
+            "-t".into(),
+            secs(RationalTime::new(item.clip.source_duration_frames(), rate)),
+        ]);
         args.extend(["-i".into(), item.path.to_string()]);
     }
 
@@ -760,6 +852,12 @@ mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -768,10 +866,10 @@ mod tests {
             id: id.into(),
             kind,
             name: id.into(),
-        clips,
-        visual_items: Vec::new(),
-        subtitle_style: None,
-        muted: false,
+            clips,
+            visual_items: Vec::new(),
+            subtitle_style: None,
+            muted: false,
             hidden: false,
         }
     }
@@ -851,8 +949,14 @@ mod tests {
             start_frame: 90,
             end_frame: 120,
         }];
-        let args =
-            build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &visuals).unwrap();
+        let args = build_args(
+            &one_video_project(),
+            "/out.mp4",
+            Preset::Fhd,
+            None,
+            &visuals,
+        )
+        .unwrap();
         let text = joined(&args);
         // A looped still that lives until its own end, like an image clip.
         assert!(
@@ -861,7 +965,9 @@ mod tests {
         );
         let filter = filter_of(&args);
         assert!(
-            filter.contains("overlay=x=96:y=54:eof_action=pass:enable='between(t,3.000000,4.000000)'"),
+            filter.contains(
+                "overlay=x=96:y=54:eof_action=pass:enable='between(t,3.000000,4.000000)'"
+            ),
             "{filter}"
         );
         // Above the clip layer, and the last thing before the output format.
@@ -883,8 +989,14 @@ mod tests {
             start_frame: 0,
             end_frame: 30,
         }];
-        let args =
-            build_args(&one_video_project(), "/out.mp4", Preset::Fhd, None, &visuals).unwrap();
+        let args = build_args(
+            &one_video_project(),
+            "/out.mp4",
+            Preset::Fhd,
+            None,
+            &visuals,
+        )
+        .unwrap();
         assert!(
             filter_of(&args).contains("colorchannelmixer=aa=0.500"),
             "{}",
@@ -916,7 +1028,11 @@ mod tests {
         assert!(filter.contains("fps=30000/1001"), "{filter}");
         assert!(joined(&args).contains("-r 30000/1001"), "{}", joined(&args));
         // 150 frames of 29.97 is 5.005 seconds, not 5.
-        assert!(joined(&args).contains("-t 5.005000 -movflags"), "{}", joined(&args));
+        assert!(
+            joined(&args).contains("-t 5.005000 -movflags"),
+            "{}",
+            joined(&args)
+        );
     }
 
     #[test]
@@ -1079,8 +1195,14 @@ mod tests {
     #[test]
     fn hardware_swaps_the_encoder_for_a_bitrate_target() {
         let hardware = videotoolbox();
-        let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
+        let args = build_args(
+            &one_video_project(),
+            "/o.mp4",
+            Preset::Fhd,
+            Some(&hardware),
+            &[],
+        )
+        .unwrap();
         let text = joined(&args);
         assert!(text.contains("-c:v h264_videotoolbox"), "{text}");
         // -crf and -preset are libx264 options and would be silently ignored.
@@ -1093,8 +1215,14 @@ mod tests {
     #[test]
     fn hardware_decode_is_asked_for_per_video_input() {
         let hardware = videotoolbox();
-        let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
+        let args = build_args(
+            &one_video_project(),
+            "/o.mp4",
+            Preset::Fhd,
+            Some(&hardware),
+            &[],
+        )
+        .unwrap();
         assert!(joined(&args).contains("-hwaccel videotoolbox -ss 1.000000"));
     }
 
@@ -1115,8 +1243,14 @@ mod tests {
             hwaccel: None,
             label: "NVIDIA NVENC".into(),
         };
-        let args =
-            build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
+        let args = build_args(
+            &one_video_project(),
+            "/o.mp4",
+            Preset::Fhd,
+            Some(&hardware),
+            &[],
+        )
+        .unwrap();
         let text = joined(&args);
         assert!(text.contains("-c:v h264_nvenc"), "{text}");
         assert!(!text.contains("-hwaccel"), "{text}");
@@ -1130,7 +1264,14 @@ mod tests {
         // re-running rather than by rebuilding the project.
         let hardware = videotoolbox();
         let cpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None, &[]).unwrap();
-        let gpu = build_args(&one_video_project(), "/o.mp4", Preset::Fhd, Some(&hardware), &[]).unwrap();
+        let gpu = build_args(
+            &one_video_project(),
+            "/o.mp4",
+            Preset::Fhd,
+            Some(&hardware),
+            &[],
+        )
+        .unwrap();
         assert_eq!(filter_of(&cpu), filter_of(&gpu));
     }
 
@@ -1156,6 +1297,7 @@ mod tests {
             width: 1440,
             height: 1080,
             rate,
+            speed: 1.0,
             hwaccel: None,
         })
         .join(" ");
@@ -1165,8 +1307,46 @@ mod tests {
         );
         // The size comes from layout::fit_rect, and fps= is what keeps the
         // frame count in step with the timeline.
-        assert!(args.contains("-vf scale=1440:1080,fps=30"), "{args}");
+        assert!(
+            args.contains("-vf scale=1440:1080,setpts=PTS/1.000000,fps=30"),
+            "{args}"
+        );
         assert!(args.ends_with("-f rawvideo -pix_fmt rgba -"), "{args}");
+    }
+
+    #[test]
+    fn speed_uses_the_selected_pitch_policy() {
+        assert_eq!(
+            speed_audio_filter(2.5, true),
+            ",atempo=2.000000,atempo=1.250000"
+        );
+        assert_eq!(
+            speed_audio_filter(2.0, false),
+            ",asetrate=48000*2.000000,aresample=48000"
+        );
+    }
+
+    #[test]
+    fn volume_keyframes_and_fades_become_one_expression() {
+        let mut clip = clip("c1", "a1", 30, 0, 60);
+        clip.fade_in = 5;
+        clip.fade_out = 5;
+        clip.volume_keyframes.keyframes = vec![
+            crate::Keyframe {
+                frame: 30,
+                value: 0.25,
+                easing: crate::Easing::Linear,
+            },
+            crate::Keyframe {
+                frame: 45,
+                value: 1.0,
+                easing: crate::Easing::EaseOut,
+            },
+        ];
+        let expression = volume_expression(&clip, Rate::fps(30));
+        assert!(expression.contains("0.250000+(1.000000-0.250000)"));
+        assert!(expression.contains("t/0.166666667"));
+        assert!(expression.contains("-t)/0.166666667"));
     }
 
     #[test]
@@ -1180,6 +1360,7 @@ mod tests {
             width: 640,
             height: 480,
             rate,
+            speed: 1.0,
             hwaccel: None,
         })
         .join(" ");
@@ -1198,6 +1379,7 @@ mod tests {
             width: 800,
             height: 600,
             rate,
+            speed: 1.0,
             hwaccel: None,
         })
         .join(" ");
@@ -1217,6 +1399,7 @@ mod tests {
             width: 640,
             height: 480,
             rate,
+            speed: 1.0,
             hwaccel: Some("videotoolbox"),
         })
         .join(" ");
@@ -1308,6 +1491,8 @@ mod tests {
             path: "/media/a1.mp4",
             in_time: RationalTime::new(30, rate),
             duration: RationalTime::new(90, rate),
+            speed: 1.0,
+            preserve_pitch: true,
         })
         .join(" ");
         assert!(
@@ -1316,7 +1501,10 @@ mod tests {
         );
         assert!(args.contains("sample_rates=48000"), "{args}");
         assert!(args.contains("channel_layouts=stereo"), "{args}");
-        assert!(args.contains("-vn"), "a video input is opened for its sound");
+        assert!(
+            args.contains("-vn"),
+            "a video input is opened for its sound"
+        );
         assert!(args.ends_with("-f f32le -ac 2 -ar 48000 -"), "{args}");
         // Volume belongs to the mixer, so what arrives is still what the file
         // holds.
@@ -1330,13 +1518,17 @@ mod tests {
         let filter = filter_of(&args);
         // Character for character what build_args puts in the file, which is
         // what makes a difference in the samples a difference in the mixing.
-        let exported = filter_of(&build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None, &[]).unwrap());
+        let exported =
+            filter_of(&build_args(&one_video_project(), "/o.mp4", Preset::Fhd, None, &[]).unwrap());
         assert!(exported.contains("adelay=96000S:all=1"), "{exported}");
         assert!(filter.contains("adelay=96000S:all=1"), "{filter}");
         assert!(filter.contains("amix=inputs=1:normalize=0"), "{filter}");
         assert!(text.contains("-map [aout]"), "{text}");
         assert!(text.contains("-f f32le -ac 2 -ar 48000"), "{text}");
-        assert!(text.contains("-t 5.000000"), "the timeline bounds it: {text}");
+        assert!(
+            text.contains("-t 5.000000"),
+            "the timeline bounds it: {text}"
+        );
         assert!(!text.contains("-c:a"), "nothing is encoded: {text}");
         assert_eq!(args.last().unwrap(), "/tmp/mix.f32");
     }
@@ -1349,7 +1541,10 @@ mod tests {
         let project = Project {
             version: crate::FORMAT_VERSION,
             settings: settings(1920, 1080),
-            assets: vec![asset("a1", AssetKind::Video, true), asset("a2", AssetKind::Audio, true)],
+            assets: vec![
+                asset("a1", AssetKind::Video, true),
+                asset("a2", AssetKind::Audio, true),
+            ],
             tracks: vec![
                 track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 60)]),
                 track("A1", TrackKind::Audio, vec![clip("c2", "a2", 30, 0, 60)]),

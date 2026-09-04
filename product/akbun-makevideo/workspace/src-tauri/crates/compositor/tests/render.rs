@@ -126,6 +126,12 @@ fn clip(id: &str, asset_id: &str, start: i64, out_point: i64) -> Clip {
         out_point,
         volume: 1.0,
         opacity: 1.0,
+        speed: 1.0,
+        preserve_pitch: true,
+        fade_in: 0,
+        fade_out: 0,
+        volume_keyframes: Default::default(),
+        blend_mode: Default::default(),
     }
 }
 
@@ -134,10 +140,10 @@ fn track(id: &str, kind: TrackKind, clips: Vec<Clip>) -> Track {
         id: id.into(),
         kind,
         name: id.into(),
-            clips,
-            visual_items: Vec::new(),
-            subtitle_style: None,
-            muted: false,
+        clips,
+        visual_items: Vec::new(),
+        subtitle_style: None,
+        muted: false,
         hidden: false,
     }
 }
@@ -233,11 +239,7 @@ fn two_tracks_composite_the_way_the_timeline_says() {
         ],
         tracks: vec![
             track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 60)]),
-            track(
-                "V2",
-                TrackKind::Video,
-                vec![clip("c2", "narrow", 30, 60)],
-            ),
+            track("V2", TrackKind::Video, vec![clip("c2", "narrow", 30, 60)]),
         ],
         markers: Vec::new(),
     };
@@ -379,11 +381,7 @@ fn the_preview_frame_matches_the_rendered_frame() {
         ],
         tracks: vec![
             track("V1", TrackKind::Video, vec![clip("c1", "wide", 0, 90)]),
-            track(
-                "V2",
-                TrackKind::Video,
-                vec![clip("c2", "narrow", 30, 60)],
-            ),
+            track("V2", TrackKind::Video, vec![clip("c2", "narrow", 30, 60)]),
         ],
         markers: Vec::new(),
     };
@@ -392,9 +390,8 @@ fn the_preview_frame_matches_the_rendered_frame() {
 
     let compositor = Compositor::new();
     let (out_w, out_h) = output_size();
-    let preview =
-        pipeline::preview_frame(&compositor, &ffmpeg_path(), &project, 45, out_w, out_h)
-            .expect("a preview frame");
+    let preview = pipeline::preview_frame(&compositor, &ffmpeg_path(), &project, 45, out_w, out_h)
+        .expect("a preview frame");
     assert_eq!(preview.len(), (out_w * out_h * 4) as usize);
 
     for (x, what) in [(out_w / 2, "the middle"), (8, "the left edge")] {

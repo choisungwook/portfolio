@@ -15,6 +15,7 @@
       baseName,
       dom,
       edit,
+      getPreview,
       liveSelection,
       orderedStops,
       reportError,
@@ -136,6 +137,7 @@
       const tab = state.inspectorTab || 'video';
       const video = tab === 'video';
       const audio = tab === 'audio';
+      const selectedKeyframe = state.selectedKeyframe;
       const hasProperties = (video && Boolean(item || (clipTargets && clipTargets.video))) ||
         (audio && Boolean(clipTargets && clipTargets.audio));
       dom.textPanel.hidden = !video || !text || subtitle;
@@ -143,6 +145,7 @@
       dom.shapePanel.hidden = !video || !shape;
       dom.clipPanel.hidden = !clip || (!video && !audio);
       dom.transformPanel.hidden = !video || !item;
+      dom.keyframePanel.hidden = !selectedKeyframe;
       dom.inspectorEmpty.hidden = hasProperties;
       dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets);
       for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
@@ -151,7 +154,8 @@
         button.tabIndex = active ? 0 : -1;
       }
       if (item) {
-        const transform = item.transform;
+        const preview = getPreview();
+        const transform = L.visualTransformAt(item, preview ? preview.position() : item.start);
         dom.transformX.value = transform.x;
         dom.transformY.value = transform.y;
         dom.transformWidth.value = transform.width;
@@ -159,6 +163,7 @@
         dom.transformRotation.value = transform.rotation;
         dom.transformOpacity.value = transform.opacity;
         dom.transformOpacityValue.value = transform.opacity;
+        dom.visualBlendMode.value = item.blendMode || 'normal';
       }
       if (clip) {
         const asset = L.findAsset(state.project, clip.clip.assetId);
@@ -166,7 +171,21 @@
         dom.clipVideoPanel.hidden = !video || !clipTargets.video;
         dom.clipAudioPanel.hidden = !audio || !clipTargets.audio;
         if (clipTargets.video) dom.clipOpacity.value = String(clipTargets.video.clip.opacity ?? 1);
-        if (clipTargets.audio) dom.clipVolume.value = String(clipTargets.audio.clip.volume ?? 1);
+        if (clipTargets.video) dom.clipBlendMode.value = clipTargets.video.clip.blendMode || 'normal';
+        if (clipTargets.audio) {
+          const audioClip = clipTargets.audio.clip;
+          dom.clipVolume.value = String(audioClip.volume ?? 1);
+          dom.clipSpeed.value = String(audioClip.speed ?? 1);
+          dom.clipPreservePitch.checked = audioClip.preservePitch !== false;
+          dom.clipFadeIn.value = String(audioClip.fadeIn || 0);
+          dom.clipFadeOut.value = String(audioClip.fadeOut || 0);
+        }
+      }
+      if (selectedKeyframe) {
+        dom.keyframeSummary.textContent = `${selectedKeyframe.property} · ${selectedKeyframe.type === 'volume' ? 'audio' : 'visual'}`;
+        dom.keyframeFrame.value = selectedKeyframe.frame;
+        dom.keyframeValue.value = selectedKeyframe.value;
+        dom.keyframeEasing.value = selectedKeyframe.easing || 'linear';
       }
       if (shape) {
         dom.shapeKind.value = shape.shape || 'rectangle';
@@ -418,6 +437,97 @@
       }).catch((error) => reportError(error, 'clip:volume'));
     }
 
+    function currentFrame() {
+      const preview = getPreview();
+      return Math.max(0, Math.round(preview ? preview.position() : 0));
+    }
+
+    function addTransformKeyframes() {
+      const item = selectedVisualItem();
+      if (!item) return;
+      const frame = Math.max(item.start, Math.min(item.start + item.duration - 1, currentFrame()));
+      const transform = L.visualTransformAt(item, frame);
+      const commands = ['x', 'y', 'width', 'height', 'rotation', 'opacity'].map((property) => ({
+        op: 'setVisualKeyframe',
+        itemId: item.id,
+        property,
+        frame,
+        value: transform[property],
+        easing: 'linear',
+      }));
+      edit(...commands).then(() => {
+        state.selectedKeyframe = {
+          type: 'visual', layerId: item.id, property: 'x', frame,
+          value: transform.x, easing: 'linear',
+        };
+        renderInspector();
+      }).catch((error) => reportError(error, 'keyframe:add'));
+    }
+
+    function addVolumeKeyframe() {
+      const targets = selectedClipTargets();
+      if (!targets || !targets.audio) return;
+      const clip = targets.audio.clip;
+      const frame = Math.max(clip.start, Math.min(L.clipEnd(clip) - 1, currentFrame()));
+      const value = L.clipVolumeAt(clip, frame);
+      edit({
+        op: 'setClipVolumeKeyframe', clipId: clip.id, frame, value, easing: 'linear',
+      }).then(() => {
+        state.selectedKeyframe = {
+          type: 'volume', layerId: clip.id, property: 'volume', frame, value, easing: 'linear',
+        };
+        renderInspector();
+      }).catch((error) => reportError(error, 'volume-keyframe:add'));
+    }
+
+    function updatePlayback() {
+      const targets = selectedClipTargets();
+      if (!targets || !targets.audio) return;
+      edit({
+        op: 'setClipPlayback',
+        clipId: targets.audio.clip.id,
+        speed: Math.max(0.1, Math.min(16, Number(dom.clipSpeed.value) || 1)),
+        preservePitch: dom.clipPreservePitch.checked,
+        fadeIn: Math.max(0, Math.round(Number(dom.clipFadeIn.value) || 0)),
+        fadeOut: Math.max(0, Math.round(Number(dom.clipFadeOut.value) || 0)),
+      }).catch((error) => reportError(error, 'clip:playback'));
+    }
+
+    function updateLayerBlend(layerId, value) {
+      if (!layerId) return;
+      edit({ op: 'setLayerBlendMode', layerId, blendMode: value })
+        .catch((error) => reportError(error, 'layer:blend'));
+    }
+
+    function updateKeyframe() {
+      const selected = state.selectedKeyframe;
+      if (!selected) return;
+      const frame = Math.max(0, Math.round(Number(dom.keyframeFrame.value) || 0));
+      const value = Number(dom.keyframeValue.value);
+      const command = selected.type === 'volume'
+        ? { op: 'setClipVolumeKeyframe', clipId: selected.layerId, frame, value, easing: dom.keyframeEasing.value }
+        : { op: 'setVisualKeyframe', itemId: selected.layerId, property: selected.property, frame, value, easing: dom.keyframeEasing.value };
+      const remove = selected.type === 'volume'
+        ? { op: 'removeClipVolumeKeyframe', clipId: selected.layerId, frame: selected.frame }
+        : { op: 'removeVisualKeyframe', itemId: selected.layerId, property: selected.property, frame: selected.frame };
+      edit(remove, command).then(() => {
+        state.selectedKeyframe = { ...selected, frame, value, easing: dom.keyframeEasing.value };
+        renderInspector();
+      }).catch((error) => reportError(error, 'keyframe:update'));
+    }
+
+    function deleteKeyframe() {
+      const selected = state.selectedKeyframe;
+      if (!selected) return;
+      const command = selected.type === 'volume'
+        ? { op: 'removeClipVolumeKeyframe', clipId: selected.layerId, frame: selected.frame }
+        : { op: 'removeVisualKeyframe', itemId: selected.layerId, property: selected.property, frame: selected.frame };
+      edit(command).then(() => {
+        state.selectedKeyframe = null;
+        renderInspector();
+      }).catch((error) => reportError(error, 'keyframe:delete'));
+    }
+
     function activateInspectorTab(tab) {
       state.inspectorTab = tab;
       activateSelectedPanel('inspector');
@@ -464,6 +574,21 @@
       }
       dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
       dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
+      dom.visualBlendMode.addEventListener('change', () => {
+        const item = selectedVisualItem();
+        updateLayerBlend(item && item.id, dom.visualBlendMode.value);
+      });
+      dom.clipBlendMode.addEventListener('change', () => {
+        const targets = selectedClipTargets();
+        updateLayerBlend(targets && targets.video && targets.video.clip.id, dom.clipBlendMode.value);
+      });
+      for (const input of [dom.clipSpeed, dom.clipPreservePitch, dom.clipFadeIn, dom.clipFadeOut]) {
+        input.addEventListener('change', updatePlayback);
+      }
+      dom.addTransformKeyframes.addEventListener('click', addTransformKeyframes);
+      dom.addVolumeKeyframe.addEventListener('click', addVolumeKeyframe);
+      dom.keyframeUpdate.addEventListener('click', updateKeyframe);
+      dom.keyframeDelete.addEventListener('click', deleteKeyframe);
       dom.textAddFill.addEventListener('click', () => changeSelectedFillLayers('text', true));
       dom.textRemoveFill.addEventListener('click', () => changeSelectedFillLayers('text', false));
       dom.shapeAddFill.addEventListener('click', () => changeSelectedFillLayers('shape', true));

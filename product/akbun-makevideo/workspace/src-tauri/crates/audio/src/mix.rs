@@ -36,6 +36,12 @@ pub struct Region {
     pub in_time: RationalTime,
     pub duration: RationalTime,
     pub volume: f32,
+    pub volume_keyframes: makevideo_render::KeyframeTrack,
+    pub fade_in_samples: i64,
+    pub fade_out_samples: i64,
+    pub speed: f32,
+    pub preserve_pitch: bool,
+    pub rate: makevideo_render::Rate,
 }
 
 impl Region {
@@ -45,6 +51,25 @@ impl Region {
 
     pub fn covers(&self, sample: i64) -> bool {
         sample >= self.start_sample && sample < self.end_sample
+    }
+
+    pub fn gain_at(&self, sample: i64) -> f32 {
+        let timeline_frame = ((sample as f64 * self.rate.num() as f64)
+            / (ENGINE_HZ as f64 * self.rate.den() as f64))
+            .floor() as i64;
+        let mut gain = self
+            .volume_keyframes
+            .value_at(timeline_frame, self.volume)
+            .clamp(0.0, 1.0);
+        let offset = sample.saturating_sub(self.start_sample);
+        if self.fade_in_samples > 0 {
+            gain *= (offset as f32 / self.fade_in_samples as f32).clamp(0.0, 1.0);
+        }
+        let remaining = self.end_sample.saturating_sub(sample + 1);
+        if self.fade_out_samples > 0 {
+            gain *= (remaining as f32 / self.fade_out_samples as f32).clamp(0.0, 1.0);
+        }
+        gain
     }
 }
 
@@ -65,6 +90,12 @@ fn region(placement: &AudioPlacement, rate: makevideo_render::Rate) -> Region {
         in_time: placement.in_time(rate),
         duration: placement.duration(rate),
         volume: placement.volume,
+        volume_keyframes: placement.volume_keyframes.clone(),
+        fade_in_samples: RationalTime::new(placement.fade_in, rate).to_samples(ENGINE_HZ),
+        fade_out_samples: RationalTime::new(placement.fade_out, rate).to_samples(ENGINE_HZ),
+        speed: placement.speed,
+        preserve_pitch: placement.preserve_pitch,
+        rate,
         clip_id: placement.clip_id.clone(),
         path: placement.path.clone(),
         kind: placement.kind,
@@ -98,12 +129,33 @@ pub fn add_into(out: &mut [f32], offset: usize, input: &[f32], volume: f32) {
     }
 }
 
+pub fn add_into_region(
+    out: &mut [f32],
+    offset: usize,
+    input: &[f32],
+    first_sample: i64,
+    region: &Region,
+) {
+    let start = offset * CHANNELS;
+    if start >= out.len() {
+        return;
+    }
+    for (frame, samples) in input.chunks_exact(CHANNELS).enumerate() {
+        let target = start + frame * CHANNELS;
+        if target + CHANNELS > out.len() {
+            break;
+        }
+        let gain = region.gain_at(first_sample + frame as i64);
+        for channel in 0..CHANNELS {
+            out[target + channel] += samples[channel] * gain;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use makevideo_render::{
-        Asset, Clip, ProjectSettings, Rate, Track, TrackKind, FORMAT_VERSION,
-    };
+    use makevideo_render::{Asset, Clip, ProjectSettings, Rate, Track, TrackKind, FORMAT_VERSION};
 
     fn asset(id: &str, kind: AssetKind) -> Asset {
         Asset {
@@ -129,6 +181,12 @@ mod tests {
             out_point,
             volume: 1.0,
             opacity: 1.0,
+            speed: 1.0,
+            preserve_pitch: true,
+            fade_in: 0,
+            fade_out: 0,
+            volume_keyframes: Default::default(),
+            blend_mode: Default::default(),
         }
     }
 
@@ -209,7 +267,8 @@ mod tests {
         assert_eq!(regions.len(), 3);
         for pair in regions.windows(2) {
             assert_eq!(
-                pair[0].end_sample, pair[1].start_sample,
+                pair[0].end_sample,
+                pair[1].start_sample,
                 "a gap or an overlap of {} samples",
                 pair[1].start_sample - pair[0].end_sample
             );

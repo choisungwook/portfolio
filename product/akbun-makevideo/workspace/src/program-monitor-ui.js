@@ -124,6 +124,7 @@
     // --- selection and editing -------------------------------------------------
 
     function selectClip(clipId) {
+      if (state.selectedClipId !== clipId) state.selectedKeyframe = null;
       state.selectedClipId = clipId;
       const targets = clipId ? I.clipTargets(state.project, clipId) : null;
       if (targets) state.inspectorTab = I.activeTab(targets);
@@ -147,7 +148,9 @@
     }
 
     function visualTransform(item) {
-      return visualTransformFor(item, visualDrag);
+      if (visualDrag && visualDrag.itemId === item.id) return visualDrag.next;
+      const preview = getPreview();
+      return L.visualTransformAt(item, preview ? preview.position() : item.start);
     }
 
     function projectPointAt(event) {
@@ -169,6 +172,7 @@
     }
 
     function selectVisualItem(itemId) {
+      if (state.selectedVisualItemId !== itemId) state.selectedKeyframe = null;
       state.selectedVisualItemId = itemId || null;
       if (itemId) state.inspectorTab = 'video';
       if (itemId && state.selectedClipId) selectClip(null);

@@ -11,6 +11,9 @@
 - Store media paints by asset id and keep solid and gradient paints self-contained
 - Add clicked text and shapes to a clip-free top video track; reuse it until the four-track limit, then use the existing top video track
 - Apply top-track creation and item creation as one edit command and one undo step
+- Animate each shared transform property with project-frame keyframes and outgoing easing
+- Give clips and visual items Normal, Multiply and Screen blend modes
+- Represent an adjustment layer as a timed visual item whose LUT affects only content already painted below it
 
 ## Reason
 
@@ -20,6 +23,8 @@
 - Editor-only decorations cannot leak into an exported frame
 - A shared style keeps Inspector, migration and rasterization from implementing the same visual properties twice
 - A dedicated top track makes overlays visible without changing an explicitly dragged target track
+- Per-property tracks keep static transform values as backward-compatible fallbacks
+- A timed visual item gives adjustment layers the same ordering, selection and undo rules as every other overlay
 
 ## Tradeoffs
 

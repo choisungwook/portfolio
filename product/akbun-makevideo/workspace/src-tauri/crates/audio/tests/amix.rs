@@ -95,6 +95,12 @@ fn clip(id: &str, asset_id: &str, start: i64, in_point: i64, out_point: i64, vol
         out_point,
         volume,
         opacity: 1.0,
+        speed: 1.0,
+        preserve_pitch: true,
+        fade_in: 0,
+        fade_out: 0,
+        volume_keyframes: Default::default(),
+        blend_mode: Default::default(),
     }
 }
 
@@ -230,7 +236,10 @@ fn the_mix_that_plays_is_the_mix_that_renders() {
     );
 
     let shared = reference.len().min(played.len());
-    assert!(shared > 3 * ENGINE_HZ as usize, "the test mixed almost nothing");
+    assert!(
+        shared > 3 * ENGINE_HZ as usize,
+        "the test mixed almost nothing"
+    );
     let level = rms(&played[..shared]);
     assert!(
         level > 0.1,
