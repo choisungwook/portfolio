@@ -83,6 +83,10 @@
 
 PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓰기 전에 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
 
+여러 줄인 Issue와 PR body는 UTF-8 Markdown 파일로 만든 뒤 `--body-file`로 전달한다. `--body`에 이스케이프한 줄바꿈을 넣지 않는다. 생성 직후 GitHub에서 body를 다시 읽어 실제 줄바꿈과 Issue 링크를 확인하고, 깨졌으면 리뷰 전에 고친다.
+
 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다.
+
+squash merge commit 제목 끝에는 `(#<PR 번호>)`를 붙인다. commit에서 원본 PR을 바로 열 수 있게 하는 추적 정보다.
 
 GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.

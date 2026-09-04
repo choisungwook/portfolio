@@ -123,3 +123,6 @@ body 형식의 기준은 [.github/pull_request_template.md](../../.github/pull_r
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
 - 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
+- 여러 줄 body는 UTF-8 Markdown 파일과 `--body-file`로 전달한다. 이스케이프한 줄바꿈을 `--body`로 넘기지 않는다.
+- 생성 직후 GitHub에서 body를 다시 읽어 실제 줄바꿈, 템플릿 헤더, Issue 링크를 확인한다. 깨졌으면 리뷰 요청 전에 고친다.
+- squash merge commit 제목 끝에는 `(#<PR 번호>)`를 붙여 commit에서 PR을 추적할 수 있게 한다.
