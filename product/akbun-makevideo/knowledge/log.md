@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-09-04
+
+* [Source monitor의 in-out은 재생 경계다](decisions/2026-09-source-monitor-range-is-playback-boundary.md) 결정 기록. 선택 범위를 asset preview의 seek와 재생 경계로 사용함.
+* [타임라인 드래그 중 compositor 상태 전환을 미룬다](decisions/2026-09-timeline-drag-defers-compositor.md) 결정 기록. pointer-down에서 exact frame 재합성과 반복 배치 읽기를 제외하고 지연 수치를 노출함.
+
 ## 2026-09-02
 
 * [filter graph 렌더는 정적 visual만 rasterize한 still로 굽는다](decisions/2026-08-graph-render-overlays-rasterized-stills.md) 결정 갱신. video paint가 정적 overlay로 굳지 않도록 CPU 설정에서도 프레임 합성 경로를 사용하고 장기 decoder를 재사용함.

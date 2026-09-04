@@ -55,6 +55,14 @@ function clamp01(value) {
   return Math.min(1, Math.max(0, value));
 }
 
+function playbackBounds(total, requested) {
+  const end = Math.max(0, Number(total) || 0);
+  if (!requested) return { start: 0, end };
+  const start = Math.max(0, Math.min(Number(requested.start) || 0, end));
+  const selectedEnd = Math.max(start, Math.min(Number(requested.end) || 0, end));
+  return { start, end: selectedEnd };
+}
+
 function createPreview(options) {
   const { stage, inner, wrap, exactCanvas, getProject, onTick, qualityMonitor } = options;
   const playbackPath = options.playbackPath || ((asset) => asset.path);
@@ -307,6 +315,13 @@ function createPreview(options) {
     return project ? L.projectDurationFrames(project) : 0;
   }
 
+  function assetPlaybackBounds() {
+    const requested = typeof options.getAssetPlaybackRange === 'function'
+      ? options.getAssetPlaybackRange()
+      : null;
+    return playbackBounds(totalFrames(), requested);
+  }
+
   function transportActive() {
     return playing || starting;
   }
@@ -341,7 +356,22 @@ function createPreview(options) {
         clock = readyClock;
         clockOrigin = performance.now() - positionSeconds() * 1000;
       }
-    } else syncAsset();
+    } else {
+      syncAsset();
+      const bounds = assetPlaybackBounds();
+      const mediaPosition = positionFrames;
+      positionFrames = Math.max(bounds.start, Math.min(mediaPosition, bounds.end));
+      if (positionFrames !== mediaPosition && assetElement.currentTime !== undefined) {
+        try {
+          assetElement.currentTime = positionSeconds();
+        } catch (error) {
+          // Retried on the next frame.
+        }
+      }
+      if (mediaPosition >= bounds.end && transportActive()) {
+        pause();
+      }
+    }
 
     // Reported when it lands on a new frame, which is also how often the
     // playhead and the clock can actually change.
@@ -358,6 +388,15 @@ function createPreview(options) {
     if (totalFrames() <= 0) return;
     clearExact();
     if (mode === 'timeline' && positionFrames >= totalFrames()) positionFrames = 0;
+    if (mode === 'asset') {
+      const bounds = assetPlaybackBounds();
+      if (positionFrames < bounds.start || positionFrames >= bounds.end) {
+        positionFrames = bounds.start;
+        if (assetElement && assetElement.currentTime !== undefined) {
+          assetElement.currentTime = positionSeconds();
+        }
+      }
+    }
     if (qualityMonitor) qualityMonitor.playbackRequested();
     starting = true;
     if (onTick) onTick(positionFrames, transportActive());
@@ -405,7 +444,10 @@ function createPreview(options) {
    *  dragging the playhead does not feel notched. */
   function seek(frames) {
     if (qualityMonitor && qualityMonitor.isRunning()) qualityMonitor.discontinuity();
-    positionFrames = Math.max(0, Math.min(frames, Math.max(totalFrames(), 0)));
+    const bounds = mode === 'asset'
+      ? assetPlaybackBounds()
+      : { start: 0, end: Math.max(totalFrames(), 0) };
+    positionFrames = Math.max(bounds.start, Math.min(frames, bounds.end));
     clockOrigin = performance.now() - positionSeconds() * 1000;
     clock = null;
     timelineDiscontinuity = mode === 'timeline';
@@ -481,7 +523,8 @@ function createPreview(options) {
     assetElement.classList.add('on');
     assetElement.style.zIndex = '50';
     inner.appendChild(assetElement);
-    positionFrames = 0;
+    positionFrames = assetPlaybackBounds().start;
+    if (assetElement.currentTime !== undefined) assetElement.currentTime = positionSeconds();
     layout();
   }
 
@@ -576,6 +619,7 @@ if (typeof module !== 'undefined' && module.exports) {
     QUALITY,
     timelineTimeFromMedia,
     playbackRateForDrift,
+    playbackBounds,
     HARD_SYNC_THRESHOLD,
   };
 } else {

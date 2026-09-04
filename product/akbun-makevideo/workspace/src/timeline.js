@@ -296,6 +296,10 @@ function pxToFrames(px, rate, pxPerSecond) {
   return T.secondsToFrames(px / pxPerSecond, rate);
 }
 
+function laneIndexAtY(bounds, y) {
+  return bounds.findIndex((bound) => y >= bound.top && y < bound.bottom);
+}
+
 function waveformBucketRange(clip, rate, bucketsPerSecond) {
   const secondsPerFrame = rate.den / rate.num;
   return {
@@ -370,6 +374,7 @@ const exported = {
   snapClipStart,
   framesToPx,
   pxToFrames,
+  laneIndexAtY,
   waveformBucketRange,
   formatTimecode,
   formatRulerLabel,

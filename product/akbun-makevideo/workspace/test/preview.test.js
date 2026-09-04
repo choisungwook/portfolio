@@ -5,6 +5,7 @@ const assert = require('node:assert');
 const {
   timelineTimeFromMedia,
   playbackRateForDrift,
+  playbackBounds,
   HARD_SYNC_THRESHOLD,
 } = require('../src/preview.js');
 const T = require('../src/time.js');
@@ -35,6 +36,72 @@ test('follower drift is corrected without large playback rate changes', () => {
   assert.strictEqual(playbackRateForDrift(10), 1.05);
   assert.strictEqual(playbackRateForDrift(-10), 0.95);
   assert.strictEqual(HARD_SYNC_THRESHOLD, 1);
+});
+
+test('asset playback bounds treat no range and the full range alike', () => {
+  assert.deepStrictEqual(playbackBounds(300, null), { start: 0, end: 300 });
+  assert.deepStrictEqual(playbackBounds(300, { start: 0, end: 300 }), { start: 0, end: 300 });
+  assert.deepStrictEqual(playbackBounds(300, { start: 60, end: 240 }), { start: 60, end: 240 });
+});
+
+test('asset seek and playback stay inside the selected range', async (context) => {
+  const original = {
+    document: global.document,
+    window: global.window,
+    timelineLib: global.timelineLib,
+    requestAnimationFrame: global.requestAnimationFrame,
+    performance: global.performance,
+  };
+  context.after(() => Object.assign(global, original));
+
+  const frames = [];
+  let media;
+  global.document = {
+    createElement(tagName) {
+      media = fakeMedia(tagName.toUpperCase(), () => Promise.resolve());
+      return media;
+    },
+  };
+  global.window = { api: { fileUrl: (path) => path } };
+  global.timelineLib = { tracksOf: () => [], clipsAt: () => [], projectDurationFrames: () => 0 };
+  global.requestAnimationFrame = (callback) => frames.push(callback);
+  global.performance = { now: () => 0 };
+
+  const project = {
+    settings: { width: 1920, height: 1080, rate: T.fps(30) },
+    tracks: [],
+    assets: [],
+  };
+  let selectedRange = { start: 60, end: 240 };
+  const preview = require('../src/preview.js').createPreview({
+    stage: { style: {} },
+    inner: { style: {}, appendChild() {} },
+    wrap: null,
+    getProject: () => project,
+    getAssetPlaybackRange: () => selectedRange,
+    onTick: () => {},
+  });
+  preview.showAsset({ id: 'v', kind: 'video', path: '/v.mp4', durationMs: 10000 });
+
+  preview.seek(0);
+  assert.strictEqual(preview.position(), 60);
+  assert.strictEqual(media.currentTime, 2);
+  preview.seek(300);
+  assert.strictEqual(preview.position(), 240);
+  assert.strictEqual(media.currentTime, 8);
+
+  await preview.play();
+  assert.strictEqual(preview.position(), 60, 'play at out restarts from in');
+  media.currentTime = 8;
+  frames.shift()();
+  assert.strictEqual(preview.position(), 240);
+  assert.strictEqual(preview.isPlaying(), false, 'out pauses without rewinding');
+
+  selectedRange = { start: 90, end: 180 };
+  media.currentTime = 9;
+  frames.shift()();
+  assert.strictEqual(preview.position(), 180, 'paused playhead stays inside a changed range');
+  assert.strictEqual(media.currentTime, 6, 'paused media seeks back inside a changed range');
 });
 
 class FakeClassList {

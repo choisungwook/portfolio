@@ -39,6 +39,22 @@ function markerPercent(frame, limit) {
   return position / end * 100;
 }
 
+function playbackRange(selection, limit) {
+  const end = Math.max(0, Math.round(Number(limit) || 0));
+  if (!selection || end === 0) return { start: 0, end };
+  const start = Math.max(0, Math.min(Math.round(selection.inPoint), end));
+  const selectedEnd = Math.max(start, Math.min(Math.round(selection.outPoint), end));
+  return { start, end: selectedEnd };
+}
+
+function rangeShade(selection, limit) {
+  const range = playbackRange(selection, limit);
+  return {
+    beforePercent: markerPercent(range.start, limit),
+    afterPercent: 100 - markerPercent(range.end, limit),
+  };
+}
+
 function targetTrack(project, kind, preferredId) {
   const preferred = project.tracks.find(
     (track) => track.id === preferredId && track.kind === kind
@@ -75,6 +91,8 @@ const exported = {
   markIn,
   markOut,
   markerPercent,
+  playbackRange,
+  rangeShade,
   targetTrack,
   commandFor,
 };
