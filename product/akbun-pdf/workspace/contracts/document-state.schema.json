@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akbun.io/pdf/contracts/document-state.schema.json",
+  "title": "DocumentState",
+  "type": "object",
+  "required": ["phase", "title", "currentPage", "pageCount", "zoom", "thumbnails", "outline", "errorMessage"],
+  "properties": {
+    "phase": { "enum": ["empty", "loading", "ready", "error"] },
+    "title": { "type": "string" },
+    "currentPage": { "type": "integer", "minimum": 0 },
+    "pageCount": { "type": "integer", "minimum": 0 },
+    "zoom": { "type": "number", "minimum": 0.25, "maximum": 4 },
+    "thumbnails": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "label"],
+        "properties": {
+          "page": { "type": "integer", "minimum": 1 },
+          "label": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "outline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "page", "depth"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "page": { "type": "integer", "minimum": 1 },
+          "depth": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "errorMessage": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

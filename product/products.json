@@ -1,7 +1,16 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-08-30",
+  "updated": "2026-09-04",
   "products": [
+    {
+      "id": "akbun-pdf",
+      "name": "akbun-pdf",
+      "description": "오프라인에서 PDF 탐색, 주석, OCR, 페이지 편집을 제공하는 Tauri 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "rust", "pdf", "ocr", "offline"],
+      "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-pdf",
+      "released": "2026-09-04"
+    },
     {
       "id": "akbun-macdiskviewer",
       "name": "akbun-macdiskviewer",

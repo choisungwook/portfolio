@@ -1,0 +1,34 @@
+{
+  "name": "akbun-pdf",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Offline desktop PDF reader, organizer, annotator, and OCR workspace",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "start": "tauri dev",
+    "dist": "tauri build",
+    "test": "vitest run --config vitest.config.ts",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p pdf-core",
+    "check:size": "node scripts/check-source-size.mjs",
+    "check": "npm run test && npm run build && npm run test:rust && npm run check:size",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0",
+    "pdfjs-dist": "^6.3.289"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "typescript": "~7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  }
+}

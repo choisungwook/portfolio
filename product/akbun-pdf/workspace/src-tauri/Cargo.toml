@@ -1,0 +1,28 @@
+[package]
+name = "akbun-pdf"
+version = "0.1.0"
+description = "Offline desktop PDF reader and editor"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+[workspace]
+members = ["crates/pdf-core"]
+resolver = "2"
+
+[lib]
+name = "akbun_pdf_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+pdf-core = { path = "crates/pdf-core" }
+tauri-plugin-dialog = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"

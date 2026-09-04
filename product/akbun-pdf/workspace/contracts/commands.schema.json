@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://akbun.io/pdf/contracts/commands.schema.json",
+  "title": "CommandContract",
+  "type": "object",
+  "required": ["commands"],
+  "properties": {
+    "commands": {
+      "const": [
+        {
+          "name": "get_document_state",
+          "request": null,
+          "response": "DocumentState"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}
