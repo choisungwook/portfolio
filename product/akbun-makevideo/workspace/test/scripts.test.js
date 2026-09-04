@@ -54,6 +54,9 @@ test('every library the page loads is a script tag on the page', () => {
   assert.ok(loaded.indexOf('preview.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('latest.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('program-monitor-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('inspector-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('keyboard-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('timeline-interactions.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('app-init.js') < loaded.indexOf('renderer.js'));
 });
 
