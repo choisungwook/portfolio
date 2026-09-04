@@ -15,7 +15,9 @@
       edit,
       frameAtClientX,
       getPreview,
+      getSourceDrag,
       hydrateDuration,
+      insertSourceAt,
       probePaths,
       rate,
       renderTimeline,
@@ -271,9 +273,9 @@
      *  ghost, and a lane that lights up. A plain click never grows a ghost, ends
      *  here doing nothing, and the button's own click handler adds the layer at
      *  the playhead as before. */
-    function beginToolDrag(event, kind) {
+    function beginToolDrag(event, tool) {
       if (event.button !== 0) return;
-      toolDrag = { kind, startX: event.clientX, startY: event.clientY, ghost: null, dragged: false };
+      toolDrag = { tool, startX: event.clientX, startY: event.clientY, ghost: null };
     }
 
     /** Put the page back and report the drag, if it had got as far as a ghost.
@@ -299,7 +301,7 @@
         if (travelled < 4) return;
         toolDrag.ghost = document.createElement('div');
         toolDrag.ghost.className = 'drag-ghost';
-        toolDrag.ghost.textContent = toolDrag.kind === 'text' ? 'Text' : 'Shape';
+        toolDrag.ghost.textContent = toolDrag.tool.label;
         document.body.appendChild(toolDrag.ghost);
         document.body.classList.add('dragging');
       }
@@ -324,8 +326,8 @@
       const track = lane && L.findTrack(state.project, lane.dataset.trackId);
       if (!track || track.kind !== 'video') return;
       const frame = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
-      const add = current.kind === 'text' ? addText : addShape;
-      await add({ trackId: track.id, frame });
+      if (current.tool.kind === 'text') await addText({ trackId: track.id, frame });
+      else await addShape(current.tool.shape, { trackId: track.id, frame });
     }
 
     // --- scrubbing -------------------------------------------------------------
@@ -413,6 +415,7 @@
      *  gets it, so `dragover` and `drop` do not fire and a `draggable` asset lands
      *  nowhere. Pointer events are not routed through it. */
     let assetDrag = null;
+    let sourceDrag = null;
 
     function beginAssetDrag(event) {
       if (event.button !== 0) return;
@@ -484,6 +487,67 @@
       }
       const made = await edit(...commands);
       selectMadeOnTrack(made, lane.dataset.trackId);
+    }
+
+    function sourceLaneAtPoint(source, x, y) {
+      const lane = laneAtPoint(x, y);
+      const track = lane && L.findTrack(state.project, lane.dataset.trackId);
+      if (!track || !L.canAccept(track, source.asset)) return null;
+      if (track.kind === 'video' && !source.video) return null;
+      if (track.kind === 'audio' && !source.audio) return null;
+      return lane;
+    }
+
+    function beginSourceDrag(event) {
+      if (event.button !== 0) return;
+      const source = getSourceDrag();
+      if (!source) return;
+      sourceDrag = {
+        source,
+        startX: event.clientX,
+        startY: event.clientY,
+        ghost: null,
+      };
+      event.preventDefault();
+    }
+
+    function updateSourceDrag(event) {
+      if (!sourceDrag) return;
+      if (!sourceDrag.ghost) {
+        const travelled =
+          Math.abs(event.clientX - sourceDrag.startX) + Math.abs(event.clientY - sourceDrag.startY);
+        if (travelled < 4) return;
+        sourceDrag.ghost = document.createElement('div');
+        sourceDrag.ghost.className = 'drag-ghost';
+        sourceDrag.ghost.textContent = sourceDrag.source.asset.name || baseName(sourceDrag.source.asset.path);
+        document.body.appendChild(sourceDrag.ghost);
+        document.body.classList.add('dragging');
+      }
+      sourceDrag.ghost.style.left = `${event.clientX + 12}px`;
+      sourceDrag.ghost.style.top = `${event.clientY + 12}px`;
+      const lane = sourceLaneAtPoint(sourceDrag.source, event.clientX, event.clientY);
+      for (const node of dom.lanes.querySelectorAll('.lane')) {
+        node.classList.toggle('drop-target', node === lane);
+      }
+    }
+
+    function clearSourceDrag() {
+      const current = sourceDrag;
+      sourceDrag = null;
+      if (!current || !current.ghost) return null;
+      current.ghost.remove();
+      document.body.classList.remove('dragging');
+      for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+      return current;
+    }
+
+    async function endSourceDrag(event) {
+      const current = clearSourceDrag();
+      if (!current) return;
+      const lane = sourceLaneAtPoint(current.source, event.clientX, event.clientY);
+      if (!lane) return;
+      const frame = L.snapTime(state.project, frameAtClientX(event.clientX), snapTolerance());
+      await insertSourceAt(current.source, lane.dataset.trackId, frame);
     }
 
     async function handleOsDrop(payload) {
@@ -561,18 +625,22 @@
       beginAssetDrag,
       beginClipDrag,
       beginScrub,
+      beginSourceDrag,
       beginToolDrag,
       beginVisualItemDrag,
       clearAssetDrag,
+      clearSourceDrag,
       clearToolDrag,
       deferOverlaySync,
       endAssetDrag,
+      endSourceDrag,
       handleOsDrop,
       metrics: clipDragMetrics,
       pointerMove,
       pointerUp,
       tookToolDragClick,
       updateAssetDrag,
+      updateSourceDrag,
     };
   }
 

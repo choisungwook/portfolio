@@ -80,3 +80,18 @@ test('the editor exposes one toggleable selected panel from the title bar', () =
   );
   assert.doesNotMatch(page, /id="project-name"|id="btn-debug"|id="marker-panel"/);
 });
+
+test('the shape panel exposes every supported shape directly', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.html'), 'utf8');
+  const shapes = [...page.matchAll(/data-add-shape="([^"]+)"/g)].map((match) => match[1]);
+
+  assert.deepStrictEqual(shapes, [
+    'rectangle',
+    'roundedRectangle',
+    'ellipse',
+    'line',
+    'polygon',
+    'star',
+  ]);
+  assert.match(page, /data-action="monitor-fullscreen"/);
+});

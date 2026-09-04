@@ -2,8 +2,9 @@
 
 ## 2026-09-04
 
+* [Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다](decisions/2026-09-program-monitor-fullscreen-preserves-layout.md) 결정 기록. 전체 화면 진입 전 panel과 timeline 상태를 CSS 전환으로 유지함.
 * [page controller는 의존성과 공개 경계를 선언한다](decisions/2026-09-page-controllers-declare-boundaries.md) 결정 기록. classic script 전역을 factory 하나로 제한하고 의존성을 생성 시점에 전달함.
-* [Source monitor의 in-out은 재생 경계다](decisions/2026-09-source-monitor-range-is-playback-boundary.md) 결정 기록. 선택 범위를 asset preview의 seek와 재생 경계로 사용함.
+* [Source monitor의 in-out은 재생 경계다](decisions/2026-09-source-monitor-range-is-playback-boundary.md) 결정 갱신. 선택 범위를 preview 재생 경계와 timeline drag 삽입 범위로 사용함.
 * [타임라인 드래그 중 compositor 상태 전환을 미룬다](decisions/2026-09-timeline-drag-defers-compositor.md) 결정 기록. pointer-down에서 exact frame 재합성과 반복 배치 읽기를 제외하고 지연 수치를 노출함.
 
 ## 2026-09-02

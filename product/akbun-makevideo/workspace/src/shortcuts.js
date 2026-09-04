@@ -58,6 +58,7 @@ const SHORTCUTS = [
   { action: 'next-edit', label: 'Next Edit', keys: ['ArrowDown', 'PageDown'] },
   { action: 'timeline-start', label: 'Timeline Start', keys: ['Home'] },
   { action: 'timeline-end', label: 'Timeline End', keys: ['End'] },
+  { action: 'monitor-fullscreen', label: 'Program Monitor Full Screen', keys: ['Meta+KeyF'] },
 ];
 
 function normalizeKey(value) {

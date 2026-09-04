@@ -13,6 +13,7 @@
       closeTimelineContextMenu,
       document,
       el,
+      exitProgramMonitorFullscreen,
       reportError,
       state,
       window,
@@ -72,6 +73,10 @@
         const target = event.target;
         const typing =
           target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
+        if (event.key === 'Escape' && exitProgramMonitorFullscreen()) {
+          event.preventDefault();
+          return;
+        }
         if (typing) return;
         if (event.key === 'Escape') {
           closeMenus();
