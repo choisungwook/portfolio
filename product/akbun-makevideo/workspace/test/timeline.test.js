@@ -310,6 +310,18 @@ test('pixels and frames convert both ways', () => {
   assert.strictEqual(L.pxToFrames(100, rate, 50), 60);
 });
 
+test('a drag finds its lane from cached vertical boundaries', () => {
+  const bounds = [
+    { top: 100, bottom: 164 },
+    { top: 164, bottom: 228 },
+  ];
+  assert.strictEqual(L.laneIndexAtY(bounds, 100), 0);
+  assert.strictEqual(L.laneIndexAtY(bounds, 163.9), 0);
+  assert.strictEqual(L.laneIndexAtY(bounds, 164), 1);
+  assert.strictEqual(L.laneIndexAtY(bounds, 99), -1);
+  assert.strictEqual(L.laneIndexAtY(bounds, 228), -1);
+});
+
 test('a trimmed clip reads only its source interval from the waveform', () => {
   const media = clip('c1', 'v', 900, 150, 450);
   assert.deepStrictEqual(L.waveformBucketRange(media, T.fps(30), 100), {

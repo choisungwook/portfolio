@@ -51,6 +51,22 @@ test('source boundary markers stay on the seek range', () => {
   assert.strictEqual(S.markerPercent(400, 300), 100);
 });
 
+test('source playback and shade use the selected interval', () => {
+  assert.deepStrictEqual(S.playbackRange(null, 300), { start: 0, end: 300 });
+  assert.deepStrictEqual(
+    S.playbackRange({ inPoint: 0, outPoint: 300 }, 300),
+    { start: 0, end: 300 }
+  );
+  assert.deepStrictEqual(
+    S.playbackRange({ inPoint: 60, outPoint: 240 }, 300),
+    { start: 60, end: 240 }
+  );
+  assert.deepStrictEqual(
+    S.rangeShade({ inPoint: 60, outPoint: 240 }, 300),
+    { beforePercent: 20, afterPercent: 20 }
+  );
+});
+
 test('placement names a target per media kind and keeps the chosen range', () => {
   assert.deepStrictEqual(
     S.commandFor('insert', project, video, { inPoint: 30, outPoint: 120 }, {

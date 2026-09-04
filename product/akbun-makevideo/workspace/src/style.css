@@ -596,6 +596,22 @@ select {
   pointer-events: none;
 }
 
+.source-range-shade {
+  position: absolute;
+  top: 12px;
+  bottom: 1px;
+  background: color-mix(in srgb, var(--stage) 62%, transparent);
+  border-radius: 2px;
+}
+
+.source-range-shade.before {
+  left: 0;
+}
+
+.source-range-shade.after {
+  right: 0;
+}
+
 .source-boundary-marker {
   position: absolute;
   top: 0;

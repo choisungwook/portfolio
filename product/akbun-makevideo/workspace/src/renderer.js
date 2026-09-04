@@ -94,6 +94,8 @@ const dom = {
   sourceMarkOut: el('source-mark-out'),
   sourceSeek: el('source-seek'),
   sourceMarkerLayer: el('source-marker-layer'),
+  sourceBeforeRange: el('source-before-range'),
+  sourceAfterRange: el('source-after-range'),
   sourceInMarker: el('source-in-marker'),
   sourceOutMarker: el('source-out-marker'),
   sourceRange: el('source-range'),
@@ -550,6 +552,14 @@ function playbackDebugLines(status) {
   ];
 }
 
+function clipDragDebugLines() {
+  const text = (value) => Number.isFinite(value) ? `${value.toFixed(1)} ms` : 'not measured';
+  return [
+    `Timeline drag next frame: ${text(clipDragMetrics.nextFrameMs)} last, ${text(clipDragMetrics.peakNextFrameMs)} peak`,
+    `Timeline drag first move queue: ${text(clipDragMetrics.firstMoveQueueMs)} last, ${text(clipDragMetrics.peakFirstMoveQueueMs)} peak`,
+  ];
+}
+
 async function refreshDebug() {
   if (dom.debugPanel.hidden || debugRefreshInFlight) return;
   debugRefreshInFlight = true;
@@ -567,6 +577,7 @@ async function refreshDebug() {
       `Timeline: ${state.project.tracks.length} tracks, ${state.project.assets.length} assets`,
       `Proxy jobs: ${active.length} active, ${Object.keys(state.proxies).length} known`,
       `Compositor: ${state.settings.compositor || 'not read yet'}`,
+      ...clipDragDebugLines(),
       ...playbackDebugLines(playback),
       `IPC proxy updates: percentage-throttled`,
     ].join('\n');
@@ -727,6 +738,9 @@ function renderSourceMonitor() {
   if (selection) {
     dom.sourceInMarker.style.left = `${S.markerPercent(selection.inPoint, limit)}%`;
     dom.sourceOutMarker.style.left = `${S.markerPercent(selection.outPoint, limit)}%`;
+    const shade = S.rangeShade(selection, limit);
+    dom.sourceBeforeRange.style.width = `${shade.beforePercent}%`;
+    dom.sourceAfterRange.style.width = `${shade.afterPercent}%`;
   }
   dom.sourceRange.textContent = selection
     ? `${sourceTime(selection.inPoint)} – ${sourceTime(selection.outPoint)}`
@@ -1297,6 +1311,10 @@ function syncEditorOverlay() {
   const active = editorOverlayWanted();
   dom.stage.classList.toggle('editing', Boolean(state.selectedVisualItemId));
   if (active === editorOverlayActive) return;
+  if (drag) {
+    drag.syncOverlayAfterEnd = true;
+    return;
+  }
   editorOverlayActive = active;
   preview.setEditing(active);
   if (active) scheduleExactFrame();
@@ -2408,8 +2426,47 @@ function toggleSnap() {
 // --- dragging clips --------------------------------------------------------
 
 let drag = null;
+const clipDragMetrics = {
+  nextFrameMs: null,
+  peakNextFrameMs: null,
+  firstMoveQueueMs: null,
+  peakFirstMoveQueueMs: null,
+};
+
+function measureClipDragNextFrame(startedAt) {
+  window.requestAnimationFrame(() => {
+    const elapsed = Math.max(0, performance.now() - startedAt);
+    clipDragMetrics.nextFrameMs = elapsed;
+    clipDragMetrics.peakNextFrameMs = Math.max(clipDragMetrics.peakNextFrameMs || 0, elapsed);
+  });
+}
+
+function measureFirstClipMove(current, event) {
+  if (current.firstMoveMeasured) return;
+  current.firstMoveMeasured = true;
+  const handledAt = performance.now();
+  let queuedAt = Number(event.timeStamp);
+  if (queuedAt > handledAt && Number.isFinite(performance.timeOrigin)) {
+    queuedAt -= performance.timeOrigin;
+  }
+  if (!Number.isFinite(queuedAt) || queuedAt < 0 || queuedAt > handledAt) return;
+  const elapsed = handledAt - queuedAt;
+  clipDragMetrics.firstMoveQueueMs = elapsed;
+  clipDragMetrics.peakFirstMoveQueueMs = Math.max(
+    clipDragMetrics.peakFirstMoveQueueMs || 0,
+    elapsed,
+  );
+}
+
+function clipDragLanes() {
+  return [...dom.lanes.querySelectorAll('.lane')].map((node) => {
+    const box = node.getBoundingClientRect();
+    return { node, top: box.top, bottom: box.bottom };
+  });
+}
 
 function beginClipDrag(event, node) {
+  const startedAt = performance.now();
   const clipId = node.dataset.clipId;
   const found = L.findClip(state.project, clipId);
   if (!found) return;
@@ -2418,7 +2475,6 @@ function beginClipDrag(event, node) {
   const mode =
     offsetX <= HANDLE_PX ? 'trim-start' : offsetX >= box.width - HANDLE_PX ? 'trim-end' : 'move';
 
-  selectClip(clipId);
   drag = {
     mode,
     clipId,
@@ -2432,12 +2488,18 @@ function beginClipDrag(event, node) {
     nextStart: found.clip.start,
     nextEdge: found.clip.start,
     moved: false,
+    lanes: clipDragLanes(),
+    firstMoveMeasured: false,
+    syncOverlayAfterEnd: false,
   };
+  selectClip(clipId);
   document.body.classList.add(mode === 'move' ? 'dragging' : 'trimming');
+  measureClipDragNextFrame(startedAt);
   event.preventDefault();
 }
 
 function updateClipDrag(event) {
+  measureFirstClipMove(drag, event);
   const pointer = frameAtClientX(event.clientX);
   const tolerance = snapTolerance();
 
@@ -2451,12 +2513,12 @@ function updateClipDrag(event) {
 
     // The lane under the pointer decides the target track, but only if it can
     // play this asset; otherwise the clip stays where it came from.
-    const under = document.elementFromPoint(event.clientX, event.clientY);
-    const lane = under && under.closest ? under.closest('.lane') : null;
+    const laneIndex = L.laneIndexAtY(drag.lanes, event.clientY);
+    const lane = laneIndex >= 0 ? drag.lanes[laneIndex].node : null;
     const found = L.findClip(state.project, drag.clipId);
     const asset = found && L.findAsset(state.project, found.clip.assetId);
     const track = lane && L.findTrack(state.project, lane.dataset.trackId);
-    for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
+    for (const bound of drag.lanes) bound.node.classList.remove('drop-target');
     if (track && L.canAccept(track, asset)) {
       drag.targetTrackId = track.id;
       lane.classList.add('drop-target');
@@ -2486,31 +2548,35 @@ function updateClipDrag(event) {
  *  IPC boundary. Rust may put the clip somewhere other than where it is being
  *  drawn — pushed right past a clip it would have overlapped — and the redraw
  *  is what settles it. */
-function endClipDrag() {
+async function endClipDrag() {
   const current = drag;
   drag = null;
   document.body.classList.remove('dragging', 'trimming');
   for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
   if (!current) return;
-  if (!current.moved) {
-    renderTimeline();
-    return;
+  try {
+    if (!current.moved) {
+      renderTimeline();
+      return;
+    }
+    return await edit(
+      current.mode === 'move'
+        ? {
+            op: 'moveClip',
+            clipId: current.clipId,
+            trackId: current.targetTrackId,
+            start: current.nextStart,
+          }
+        : {
+            op: 'trimClip',
+            clipId: current.clipId,
+            edge: current.mode === 'trim-start' ? 'start' : 'end',
+            frame: current.nextEdge,
+          }
+    );
+  } finally {
+    if (current.syncOverlayAfterEnd) syncEditorOverlay();
   }
-  return edit(
-    current.mode === 'move'
-      ? {
-          op: 'moveClip',
-          clipId: current.clipId,
-          trackId: current.targetTrackId,
-          start: current.nextStart,
-        }
-      : {
-          op: 'trimClip',
-          clipId: current.clipId,
-          edge: current.mode === 'trim-start' ? 'start' : 'end',
-          frame: current.nextEdge,
-        }
-  );
 }
 
 // --- dragging text and shape layers on the timeline -------------------------
@@ -3769,7 +3835,7 @@ function wireTimeline() {
     else if (scrubbing) scrubTo(event.clientX);
   });
   window.addEventListener('pointerup', (event) => {
-    if (drag) endClipDrag();
+    if (drag) endClipDrag().catch((error) => reportError(error, 'clip:drag'));
     if (visualTimingDrag) endVisualItemDrag();
     if (toolDrag) {
       endToolDrag(event).catch((error) => reportError(error, 'tool-drop'));
@@ -4027,6 +4093,12 @@ async function boot() {
     inner: dom.sourceStageInner,
     wrap: dom.sourceStageWrap,
     getProject: () => state.project,
+    getAssetPlaybackRange: () => {
+      const asset = selectedSourceAsset();
+      return asset && state.sourceSelection
+        ? S.playbackRange(state.sourceSelection, S.sourceLimitFrames(asset, rate()))
+        : null;
+    },
     playbackPath,
     onTick: (frame, playing) => {
       dom.sourceClock.textContent = sourceTime(frame);
