@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { visualTransformFor } = require('../src/program-monitor-ui.js');
+const { createProgramMonitorUi, visualTransformFor } = require('../src/program-monitor-ui.js');
 
 test('a drag preview leaves the project transform untouched', () => {
   const item = {
@@ -21,4 +21,27 @@ test('a drag preview leaves the project transform untouched', () => {
     opacity: 1,
   });
   assert.strictEqual(visualTransformFor(item, null), item.transform);
+});
+
+test('loading a document resets program monitor editing state through its controller', () => {
+  const calls = [];
+  const controller = createProgramMonitorUi({
+    dom: {
+      stage: {
+        classList: {
+          remove: (name) => calls.push(['remove', name]),
+        },
+      },
+    },
+    getPreview: () => ({
+      setEditing: (active) => calls.push(['setEditing', active]),
+    }),
+  });
+
+  controller.resetDocumentUi();
+
+  assert.deepStrictEqual(calls, [
+    ['remove', 'editing'],
+    ['setEditing', false],
+  ]);
 });

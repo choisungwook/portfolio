@@ -1603,10 +1603,7 @@ async function confirmDiscard(what) {
  *  page keeps alongside it. The history belongs to the document, so opening a
  *  project starts with nothing to undo. */
 function loadDocument(doc, path) {
-  if (preview) preview.setEditing(false);
-  editorOverlayActive = false;
-  dom.stage.classList.remove('editing');
-  visualDrag = null;
+  stageController.resetDocumentUi();
   adopt(doc);
   state.path = path || null;
   state.savedRevision = doc.revision;

@@ -35,6 +35,14 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.appInitLib);
 });
 
+test('renderer reaches program monitor private state through its controller', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer.js'), 'utf8');
+
+  assert.doesNotMatch(source, /\beditorOverlayActive\b/);
+  assert.doesNotMatch(source, /\bvisualDrag\b/);
+  assert.match(source, /stageController\.resetDocumentUi\(\)/);
+});
+
 // Each of these is loaded with a `<script>` tag and reached through its one
 // global. A file left out of index.html is a global that is not there when the
 // file needing it runs, which is a TypeError on the first frame and a dead

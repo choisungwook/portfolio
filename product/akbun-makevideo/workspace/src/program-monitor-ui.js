@@ -63,6 +63,17 @@
     let exactTimer = null;
     let exactToken = 0;
 
+    function resetDocumentUi() {
+      if (exactTimer !== null) window.clearTimeout(exactTimer);
+      exactTimer = null;
+      exactToken += 1;
+      visualDrag = null;
+      editorOverlayActive = false;
+      dom.stage.classList.remove('editing');
+      const preview = getPreview();
+      if (preview) preview.setEditing(false);
+    }
+
     function setStageMode(mode) {
       if (!dom.stageMode) return;
       // The badge exists to say which of two pictures is on screen. On the native
@@ -696,6 +707,7 @@
       exitFullscreen,
       orderedStops,
       renderStageOverlay,
+      resetDocumentUi,
       scheduleExactFrame,
       selectClip,
       selectedVisualItem,
