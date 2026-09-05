@@ -112,7 +112,7 @@ export class PdfViewer {
   goTo(page: number, top: number | null = null): void {
     const target = this.surface(page);
     if (!target) return;
-    const offset = top === null ? 0 : Math.max(0, this.baseSize.height - top) * this.scale;
+    const offset = top === null ? 0 : Math.max(0, target.offsetHeight - top * this.scale);
     this.viewport.scrollTo({ top: target.offsetTop + offset - 28, behavior: "smooth" });
     this.setCurrentPage(page);
     void this.renderPage(page, this.generation);
@@ -134,35 +134,8 @@ export class PdfViewer {
 
   async showAnnotations(annotations: Annotation[]): Promise<void> {
     this.annotations = annotations.map((annotation) => ({ ...annotation, rect: { ...annotation.rect } }));
-    this.stage.querySelectorAll(".pdf-annotation").forEach((node) => node.remove());
-    const adapter = this.adapter;
-    if (!adapter) return;
-    const generation = this.generation;
     const annotationGeneration = ++this.annotationGeneration;
-    for (const annotation of annotations) {
-      const page = this.pages[annotation.page - 1];
-      const layer = this.surface(annotation.page)?.querySelector<HTMLElement>(".annotation-layer");
-      if (!page || !layer) continue;
-      const rect = await adapter.pdfRectToViewport(
-        page.sourcePage,
-        annotation.rect,
-        this.scale,
-        page.rotation,
-      );
-      if (generation !== this.generation || annotationGeneration !== this.annotationGeneration) return;
-      const marker = document.createElement("button");
-      marker.type = "button";
-      marker.className = `pdf-annotation pdf-annotation--${annotation.kind}`;
-      marker.dataset.annotationId = annotation.id;
-      marker.title = annotation.contents || (annotation.kind === "highlight" ? "형광펜" : "메모");
-      marker.style.setProperty("--annotation-color", annotation.color);
-      setRectStyle(marker, rect);
-      marker.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this.callbacks.onEditAnnotation(annotation.id);
-      });
-      layer.append(marker);
-    }
+    await Promise.all(this.pages.map((page) => this.renderAnnotations(page.page, annotationGeneration)));
   }
 
   private createPageSurfaces(): void {
@@ -234,7 +207,37 @@ export class PdfViewer {
     if (generation !== this.generation) return;
     surface.style.width = `${size.width}px`;
     surface.style.height = `${size.height}px`;
-    void this.showAnnotations(this.annotations);
+    await this.renderAnnotations(pageNumber, this.annotationGeneration);
+  }
+
+  private async renderAnnotations(pageNumber: number, annotationGeneration: number): Promise<void> {
+    const adapter = this.adapter;
+    const page = this.pages[pageNumber - 1];
+    const layer = this.surface(pageNumber)?.querySelector<HTMLElement>(".annotation-layer");
+    if (!adapter || !page || !layer) return;
+    const annotations = this.annotations.filter((annotation) => annotation.page === pageNumber);
+    const markers = await Promise.all(annotations.map(async (annotation) => {
+      const rect = await adapter.pdfRectToViewport(
+        page.sourcePage,
+        annotation.rect,
+        this.scale,
+        page.rotation,
+      );
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = `pdf-annotation pdf-annotation--${annotation.kind}`;
+      marker.dataset.annotationId = annotation.id;
+      marker.title = annotation.contents || (annotation.kind === "highlight" ? "형광펜" : "메모");
+      marker.style.setProperty("--annotation-color", annotation.color);
+      setRectStyle(marker, rect);
+      marker.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.callbacks.onEditAnnotation(annotation.id);
+      });
+      return marker;
+    }));
+    if (annotationGeneration !== this.annotationGeneration) return;
+    layer.replaceChildren(...markers);
   }
 
   private async renderThumbnails(generation: number): Promise<void> {

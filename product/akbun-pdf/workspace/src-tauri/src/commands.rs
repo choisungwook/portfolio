@@ -186,7 +186,6 @@ pub fn save_merged_document(
     };
     let (bytes, report) = merge_documents(&inputs)?;
     atomic_write(Path::new(&path), &bytes)?;
-    verify_saved_bytes(Path::new(&path), &bytes)?;
     Ok(report)
 }
 
@@ -209,21 +208,12 @@ fn save_to_path(
 ) -> Result<SaveResult, String> {
     let (bytes, report) = state.store()?.rendered_bytes(document_id)?;
     atomic_write(path, &bytes)?;
-    verify_saved_bytes(path, &bytes)?;
     let document_state = state.store()?.commit_saved(document_id, bytes.clone())?;
     Ok(SaveResult {
         state: document_state,
         bytes,
         report,
     })
-}
-
-fn verify_saved_bytes(path: &Path, expected: &[u8]) -> Result<(), String> {
-    let saved = fs::read(path).map_err(|error| error.to_string())?;
-    if saved != expected {
-        return Err("저장 후 파일 검증에 실패했습니다.".into());
-    }
-    Ok(())
 }
 
 fn file_title(path: &Path) -> String {

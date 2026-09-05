@@ -37,6 +37,49 @@ fn sample_pdf(labels: &[&str]) -> Vec<u8> {
     bytes
 }
 
+fn sample_pdf_with_outlines() -> Vec<u8> {
+    let bytes = sample_pdf(&["first", "second"]);
+    let mut document = Document::load_mem(&bytes).unwrap();
+    let pages = document.get_pages();
+    let outline_root = document.new_object_id();
+    let first_outline = document.new_object_id();
+    let second_outline = document.new_object_id();
+    document.objects.insert(
+        outline_root,
+        Object::Dictionary(dictionary! {
+            "Type" => "Outlines",
+            "First" => first_outline,
+            "Last" => second_outline,
+            "Count" => 2,
+        }),
+    );
+    document.objects.insert(
+        first_outline,
+        Object::Dictionary(dictionary! {
+            "Title" => Object::string_literal("First"),
+            "Parent" => outline_root,
+            "Next" => second_outline,
+            "Dest" => vec![Object::Reference(pages[&1]), Object::Name(b"Fit".to_vec())],
+        }),
+    );
+    document.objects.insert(
+        second_outline,
+        Object::Dictionary(dictionary! {
+            "Title" => Object::string_literal("Second"),
+            "Parent" => outline_root,
+            "Prev" => first_outline,
+            "Dest" => vec![Object::Reference(pages[&2]), Object::Name(b"Fit".to_vec())],
+        }),
+    );
+    document
+        .catalog_mut()
+        .unwrap()
+        .set("Outlines", outline_root);
+    let mut saved = Vec::new();
+    document.save_modern(&mut saved).unwrap();
+    saved
+}
+
 fn ready_store() -> (DocumentStore, String) {
     let mut store = DocumentStore::default();
     let opened = store
@@ -114,6 +157,42 @@ fn outlines_follow_reordered_pages_and_drop_deleted_destinations() {
         .unwrap();
     assert_eq!(store.reorder_page(&id, 2, 1).unwrap().outline[0].page, 1);
     assert!(store.delete_page(&id, 1).unwrap().outline.is_empty());
+}
+
+#[test]
+fn saved_pdf_keeps_outline_items_for_retained_pages() {
+    let mut store = DocumentStore::default();
+    let opened = store
+        .open("outline.pdf".into(), sample_pdf_with_outlines())
+        .unwrap();
+    let id = opened.state.document_id.unwrap();
+    store.complete(&id, 2, Vec::new()).unwrap();
+    store.delete_page(&id, 2).unwrap();
+
+    let (saved, _) = store.rendered_bytes(&id).unwrap();
+    let document = Document::load_mem(&saved).unwrap();
+    let outline_root = document
+        .catalog()
+        .unwrap()
+        .get(b"Outlines")
+        .unwrap()
+        .as_reference()
+        .unwrap();
+    let first = document
+        .get_object(outline_root)
+        .unwrap()
+        .as_dict()
+        .unwrap()
+        .get(b"First")
+        .unwrap()
+        .as_reference()
+        .unwrap();
+    let first_dictionary = document.get_object(first).unwrap().as_dict().unwrap();
+    assert_eq!(
+        first_dictionary.get(b"Title").unwrap().as_str().unwrap(),
+        b"First"
+    );
+    assert!(!first_dictionary.has(b"Next"));
 }
 
 #[test]

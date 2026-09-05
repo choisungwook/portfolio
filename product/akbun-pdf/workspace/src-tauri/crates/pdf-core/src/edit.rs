@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use lopdf::{Document, IncrementalDocument, Object, ObjectId};
 
@@ -55,10 +55,7 @@ pub(crate) fn render_document(
     page_root.set("Count", ordered.len() as i64);
 
     if ordered.len() != original_pages.len() {
-        document
-            .catalog_mut()
-            .map_err(|error| error.to_string())?
-            .remove(b"Outlines");
+        prune_outlines(&mut document, &ordered)?;
     }
     replace_annotations(&mut document, &ordered, annotations)?;
     let streams_preserved = original_streams == page_streams_for_ids(&document, &ordered);
@@ -134,6 +131,162 @@ fn page_streams_for_ids(document: &Document, pages: &[(u32, ObjectId)]) -> Vec<V
         .filter_map(|stream_id| document.get_object(stream_id).ok()?.as_stream().ok())
         .map(|stream| stream.content.clone())
         .collect()
+}
+
+fn prune_outlines(document: &mut Document, pages: &[(u32, ObjectId)]) -> Result<(), String> {
+    let outline_root = document
+        .catalog()
+        .ok()
+        .and_then(|catalog| catalog.get(b"Outlines").ok())
+        .and_then(|object| object.as_reference().ok());
+    let Some(outline_root) = outline_root else {
+        return Ok(());
+    };
+    let first = outline_reference(document, outline_root, b"First")?;
+    let retained_pages = pages
+        .iter()
+        .map(|(_, page_id)| *page_id)
+        .collect::<HashSet<_>>();
+    let mut visited = HashSet::new();
+    let (items, _) = prune_outline_level(
+        document,
+        outline_root,
+        first,
+        &retained_pages,
+        &mut visited,
+    )?;
+    if items.is_empty() {
+        document
+            .catalog_mut()
+            .map_err(|error| error.to_string())?
+            .remove(b"Outlines");
+    }
+    Ok(())
+}
+
+fn prune_outline_level(
+    document: &mut Document,
+    parent: ObjectId,
+    first: Option<ObjectId>,
+    retained_pages: &HashSet<ObjectId>,
+    visited: &mut HashSet<ObjectId>,
+) -> Result<(Vec<ObjectId>, usize), String> {
+    let mut current = first;
+    let mut retained = Vec::new();
+    let mut total = 0;
+    while let Some(item_id) = current {
+        if !visited.insert(item_id) {
+            break;
+        }
+        let next = outline_reference(document, item_id, b"Next")?;
+        let child = outline_reference(document, item_id, b"First")?;
+        let destination = outline_destination_page(document, item_id)?;
+        let (children, child_total) =
+            prune_outline_level(document, item_id, child, retained_pages, visited)?;
+        if destination.is_none_or(|page_id| retained_pages.contains(&page_id)) {
+            retained.push(item_id);
+            total += child_total + 1;
+        } else {
+            retained.extend(children);
+            total += child_total;
+        }
+        current = next;
+    }
+    link_outline_level(document, parent, &retained, total)?;
+    Ok((retained, total))
+}
+
+fn outline_reference(
+    document: &Document,
+    object_id: ObjectId,
+    key: &[u8],
+) -> Result<Option<ObjectId>, String> {
+    let dictionary = document
+        .get_object(object_id)
+        .and_then(Object::as_dict)
+        .map_err(|error| error.to_string())?;
+    Ok(dictionary
+        .get(key)
+        .ok()
+        .and_then(|object| object.as_reference().ok()))
+}
+
+fn outline_destination_page(
+    document: &Document,
+    item_id: ObjectId,
+) -> Result<Option<ObjectId>, String> {
+    let item = document
+        .get_object(item_id)
+        .and_then(Object::as_dict)
+        .map_err(|error| error.to_string())?;
+    if let Ok(destination) = item.get(b"Dest") {
+        return Ok(destination_page(document, destination));
+    }
+    let Some(action) = item.get(b"A").ok().and_then(|object| dereference(document, object)) else {
+        return Ok(None);
+    };
+    let destination = action
+        .as_dict()
+        .ok()
+        .and_then(|dictionary| dictionary.get(b"D").ok());
+    Ok(destination.and_then(|object| destination_page(document, object)))
+}
+
+fn destination_page(document: &Document, destination: &Object) -> Option<ObjectId> {
+    let destination = dereference(document, destination)?;
+    destination
+        .as_array()
+        .ok()?
+        .first()?
+        .as_reference()
+        .ok()
+}
+
+fn dereference(document: &Document, object: &Object) -> Option<Object> {
+    match object {
+        Object::Reference(object_id) => document.get_object(*object_id).ok().cloned(),
+        _ => Some(object.clone()),
+    }
+}
+
+fn link_outline_level(
+    document: &mut Document,
+    parent: ObjectId,
+    items: &[ObjectId],
+    total: usize,
+) -> Result<(), String> {
+    let parent_dictionary = document
+        .get_object_mut(parent)
+        .and_then(Object::as_dict_mut)
+        .map_err(|error| error.to_string())?;
+    if items.is_empty() {
+        parent_dictionary.remove(b"First");
+        parent_dictionary.remove(b"Last");
+        parent_dictionary.remove(b"Count");
+        return Ok(());
+    }
+    parent_dictionary.set("First", items[0]);
+    parent_dictionary.set("Last", items[items.len() - 1]);
+    parent_dictionary.set("Count", total as i64);
+
+    for (index, item_id) in items.iter().enumerate() {
+        let dictionary = document
+            .get_object_mut(*item_id)
+            .and_then(Object::as_dict_mut)
+            .map_err(|error| error.to_string())?;
+        dictionary.set("Parent", parent);
+        if let Some(previous) = index.checked_sub(1).and_then(|value| items.get(value)) {
+            dictionary.set("Prev", *previous);
+        } else {
+            dictionary.remove(b"Prev");
+        }
+        if let Some(next) = items.get(index + 1) {
+            dictionary.set("Next", *next);
+        } else {
+            dictionary.remove(b"Next");
+        }
+    }
+    Ok(())
 }
 
 fn normalize_rotation(rotation: i32) -> i32 {

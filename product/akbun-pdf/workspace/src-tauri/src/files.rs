@@ -41,7 +41,16 @@ fn write_and_replace(temporary: &Path, target: &Path, bytes: &[u8]) -> Result<()
     file.write_all(bytes).map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())?;
     drop(file);
+    verify_file(temporary, bytes)?;
     replace(temporary, target)
+}
+
+fn verify_file(path: &Path, expected: &[u8]) -> Result<(), String> {
+    let saved = fs::read(path).map_err(|error| error.to_string())?;
+    if saved != expected {
+        return Err("임시 저장 파일 검증에 실패했습니다.".into());
+    }
+    Ok(())
 }
 
 #[cfg(not(windows))]
@@ -122,5 +131,14 @@ mod tests {
         fs::remove_file(target.join("original")).unwrap();
         fs::remove_dir(target).unwrap();
         fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn validation_rejects_mismatched_temporary_data() {
+        let path =
+            std::env::temp_dir().join(format!("akbun-pdf-validation-{}.tmp", std::process::id()));
+        fs::write(&path, b"corrupted").unwrap();
+        assert!(verify_file(&path, b"expected").is_err());
+        fs::remove_file(path).unwrap();
     }
 }
