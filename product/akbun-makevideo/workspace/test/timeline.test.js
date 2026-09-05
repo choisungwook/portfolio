@@ -42,6 +42,23 @@ test('the placeholder project is empty and on the defaults', () => {
   assert.deepStrictEqual(project.settings, { width: 1920, height: 1080, rate: T.fps(30) });
   assert.deepStrictEqual(project.tracks, []);
   assert.deepStrictEqual(project.assets, []);
+  assert.deepStrictEqual(project.transitions, []);
+});
+
+test('the realtime source count includes active PIP video layers', () => {
+  const videoTrack = track('t1', 'video', 'V1', [clip('c1', 'v', 0, 0, 300)]);
+  videoTrack.visualItems = [{
+    id: 'p1',
+    start: 30,
+    duration: 60,
+    content: { kind: 'videoOverlay', assetId: 'v' },
+  }];
+  const project = projectOf([VIDEO], [videoTrack]);
+  assert.strictEqual(L.videoSourceCountAt(project, 29), 1);
+  assert.strictEqual(L.videoSourceCountAt(project, 30), 2);
+  assert.strictEqual(L.videoSourceCountAt(project, 90), 1);
+  videoTrack.hidden = true;
+  assert.strictEqual(L.videoSourceCountAt(project, 30), 0);
 });
 
 test('a track only takes what it can play', () => {

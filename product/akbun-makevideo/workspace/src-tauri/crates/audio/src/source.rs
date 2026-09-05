@@ -915,6 +915,7 @@ pub(crate) mod tests {
             },
             assets,
             tracks,
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }

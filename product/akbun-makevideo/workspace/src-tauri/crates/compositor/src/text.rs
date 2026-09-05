@@ -1309,6 +1309,7 @@ mod tests {
             },
             assets: Vec::new(),
             markers: Vec::new(),
+            transitions: Vec::new(),
             tracks: vec![Track {
                 id: "V1".into(),
                 kind: TrackKind::Video,

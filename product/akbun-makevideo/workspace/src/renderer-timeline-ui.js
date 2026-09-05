@@ -156,7 +156,13 @@
       // A project should always contain content, but keep an incomplete saved
       // visual item from taking down the whole timeline while it is repaired.
       const content = item.content || {};
-      const kind = content.kind === 'shape' ? 'shape' : content.kind === 'adjustment' ? 'adjustment' : 'text';
+      const kind = content.kind === 'shape'
+        ? 'shape'
+        : content.kind === 'adjustment'
+          ? 'adjustment'
+          : content.kind === 'videoOverlay'
+            ? 'pip'
+            : 'text';
       node.className = track.kind === 'subtitle' ? 'clip subtitle' : `clip visual ${kind}`;
       node.dataset.visualItemId = item.id;
       node.style.left = `${L.framesToPx(item.start, rate(), state.pxPerSecond)}px`;
@@ -168,6 +174,8 @@
         ? `Shape — ${content.shape || 'rectangle'}`
         : kind === 'adjustment'
           ? `Adjustment — ${baseName(content.lutPath || '')}`
+          : kind === 'pip'
+            ? `PIP — ${(L.findAsset(state.project, content.assetId) || {}).name || 'Video'}`
           : content.text || (track.kind === 'subtitle' ? 'Subtitle' : 'Text');
       const left = document.createElement('span');
       left.className = 'handle left';
@@ -181,6 +189,19 @@
           node.appendChild(keyframeDot('visual', item.id, property, key, item.start, parseFloat(node.style.width), row));
         }
       }
+      return node;
+    }
+
+    function transitionElement(transition) {
+      const incoming = L.findClip(state.project, transition.toClipId);
+      if (!incoming) return null;
+      const node = document.createElement('div');
+      node.className = 'timeline-transition';
+      node.dataset.transitionId = transition.id;
+      node.style.left = `${L.framesToPx(incoming.clip.start - transition.duration, rate(), state.pxPerSecond)}px`;
+      node.style.width = `${Math.max(4, L.framesToPx(transition.duration, rate(), state.pxPerSecond))}px`;
+      node.title = `Dissolve · ${transition.duration} frames`;
+      node.textContent = 'Dissolve';
       return node;
     }
 
@@ -234,6 +255,10 @@
           for (const item of track.visualItems || []) lane.appendChild(visualElement(track, item));
         } else {
           for (const clip of track.clips) lane.appendChild(clipElement(track, clip));
+          for (const transition of (state.project.transitions || []).filter((entry) => entry.trackId === track.id)) {
+            const node = transitionElement(transition);
+            if (node) lane.appendChild(node);
+          }
           // Text and shape layers ride on video tracks beside the clips. Without
           // an element here they exist only on the stage, which is how a layer
           // ends up impossible to move, trim or delete.
@@ -496,7 +521,7 @@
     /** Add a visual item and select what Rust made of it. `placement` is
      *  `{ trackId, frame }` from a drop; without one Rust chooses the top overlay
      *  track at the playhead. */
-    async function addVisualItem(placement, content, transform) {
+    async function addVisualItem(placement, content, transform, duration = L.defaultVisualItemFrames(rate())) {
       const track = visualTargetTrack(placement);
       if (placement && !track) return;
       const known = new Set();
@@ -513,7 +538,7 @@
         ...(placement ? { trackId: track.id } : {}),
         content,
         start: placement ? Math.round(placement.frame) : Math.round(preview.position()),
-        duration: L.defaultVisualItemFrames(rate()),
+        duration,
         transform: { ...transform, rotation: 0, opacity: 1 },
         zIndex: 0,
       };
@@ -529,6 +554,35 @@
         await window.api.message(
           `The ${L.MAX_TRACKS_PER_KIND}-video-track limit was reached. The layer was added to the top video track.`,
           { title: 'Layer added to existing track', kind: 'warning' },
+        );
+      }
+    }
+
+    async function addPip() {
+      const asset = L.findAsset(state.project, state.selectedAssetId);
+      const selection = state.sourceSelection;
+      if (!asset || asset.kind !== 'video' || !selection) return;
+      const width = state.project.settings.width * 0.32;
+      const height = width * (asset.height || 9) / (asset.width || 16);
+      await addVisualItem(null, {
+        kind: 'videoOverlay',
+        assetId: asset.id,
+        inPoint: selection.inPoint,
+        crop: { left: 0, top: 0, right: 0, bottom: 0 },
+        cornerRadius: 24,
+        border: { color: '#ffffff', width: 4 },
+        audioEnabled: Boolean(dom.sourceAudio.checked && asset.hasAudio),
+      }, {
+        x: state.project.settings.width - width - state.project.settings.width * 0.05,
+        y: state.project.settings.height - height - state.project.settings.height * 0.05,
+        width,
+        height,
+      }, Math.max(1, selection.outPoint - selection.inPoint));
+      const item = stageController.selectedVisualItem();
+      if (item && L.videoSourceCountAt(state.project, item.start) > L.MAX_REALTIME_VIDEO_SOURCES) {
+        await window.api.message(
+          `More than ${L.MAX_REALTIME_VIDEO_SOURCES} video sources overlap here. Preview may drop frames; export remains exact.`,
+          { title: 'Playback budget exceeded', kind: 'warning' },
         );
       }
     }
@@ -689,7 +743,7 @@
       inspectorController.render();
     }
 
-    return { setRuntime, renderHeads, clipElement, keyframeDot, visualElement, drawWaveform, renderLanes, renderRuler, renderMarkerList, updateHistoryUi, updateMonitorZoomUi, renderTimeline, checkLutFiles, refresh, updatePlayhead, seekPreviousEdit, seekNextEdit, seekTimelineStart, seekTimelineEnd, seekTimelineOffset, followPlayhead, closeTimelineContextMenu, openTimelineContextMenu, updateLinkUi, selectAsset, liveSelection, splitAtPlayhead, addMarker, visualTargetTrack, addVisualItem, addText, shapeTransform, addShape, addSubtitle, importSrt, exportSrt, deleteSelected, toggleClipLink, setClipLut, addAdjustmentLayer, addVisualKeyframesAt, addVolumeKeyframeAt };
+    return { setRuntime, renderHeads, clipElement, keyframeDot, visualElement, drawWaveform, renderLanes, renderRuler, renderMarkerList, updateHistoryUi, updateMonitorZoomUi, renderTimeline, checkLutFiles, refresh, updatePlayhead, seekPreviousEdit, seekNextEdit, seekTimelineStart, seekTimelineEnd, seekTimelineOffset, followPlayhead, closeTimelineContextMenu, openTimelineContextMenu, updateLinkUi, selectAsset, liveSelection, splitAtPlayhead, addMarker, visualTargetTrack, addVisualItem, addPip, addText, shapeTransform, addShape, addSubtitle, importSrt, exportSrt, deleteSelected, toggleClipLink, setClipLut, addAdjustmentLayer, addVisualKeyframesAt, addVolumeKeyframeAt };
   }
 
   return { createRendererTimelineUi };

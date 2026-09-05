@@ -2,7 +2,16 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { createTimelineInteractions } = require('../src/timeline-interactions.js');
+const {
+  createTimelineInteractions,
+  horizontalWheelDelta,
+} = require('../src/timeline-interactions.js');
+
+test('shift wheel maps vertical wheel motion to horizontal timeline motion', () => {
+  assert.equal(horizontalWheelDelta({ shiftKey: true, deltaY: 72, deltaX: 0 }), 72);
+  assert.equal(horizontalWheelDelta({ shiftKey: true, deltaY: 0, deltaX: -18 }), -18);
+  assert.equal(horizontalWheelDelta({ shiftKey: false, deltaY: 72, deltaX: 0 }), 0);
+});
 
 class FakeClassList {
   constructor() {

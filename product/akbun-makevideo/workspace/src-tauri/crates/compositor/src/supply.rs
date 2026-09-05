@@ -477,6 +477,7 @@ mod tests {
                 muted: false,
                 hidden: false,
             }],
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }

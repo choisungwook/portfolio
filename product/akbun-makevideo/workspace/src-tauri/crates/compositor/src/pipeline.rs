@@ -98,6 +98,8 @@ fn decode_layer(
         rate,
         speed: 1.0,
         hwaccel: None,
+        crop: layer.crop,
+        head_pad_frames: 0,
     });
     let output = Command::new(ffmpeg_path)
         .args(&args)
@@ -111,6 +113,9 @@ fn decode_layer(
     }
     let mut pixels = output.stdout;
     pixels.truncate(wanted);
+    if let Some(style) = &layer.overlay_style {
+        crate::source::apply_overlay_style(&mut pixels, layer.dst.w, layer.dst.h, style);
+    }
     Some(pixels)
 }
 

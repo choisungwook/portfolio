@@ -105,6 +105,7 @@ const dom = {
   sourceInsert: el('source-insert'),
   sourceOverwrite: el('source-overwrite'),
   sourceAppend: el('source-append'),
+  sourcePip: el('source-pip'),
   debugPanel: el('debug-view'),
   debugMetrics: el('debug-metrics'),
   debugLog: el('debug-log'),
@@ -211,6 +212,18 @@ const dom = {
   shapeShadowBlur: el('shape-shadow-blur'),
   shapeStartArrow: el('shape-start-arrow'),
   shapeEndArrow: el('shape-end-arrow'),
+  pipPanel: el('pip-panel'),
+  pipCropLeft: el('pip-crop-left'),
+  pipCropTop: el('pip-crop-top'),
+  pipCropRight: el('pip-crop-right'),
+  pipCropBottom: el('pip-crop-bottom'),
+  pipCornerRadius: el('pip-corner-radius'),
+  pipBorderColor: el('pip-border-color'),
+  pipBorderWidth: el('pip-border-width'),
+  pipAudioEnabled: el('pip-audio-enabled'),
+  transitionPanel: el('transition-panel'),
+  transitionDuration: el('transition-duration'),
+  transitionRemove: el('transition-remove'),
   subtitlePanel: el('subtitle-panel'),
   subtitleValue: el('subtitle-value'),
   subtitleStart: el('subtitle-start'),
@@ -575,6 +588,7 @@ function deleteSelected(...args) { return timelineUi.deleteSelected(...args); }
 function toggleClipLink(...args) { return timelineUi.toggleClipLink(...args); }
 function setClipLut(...args) { return timelineUi.setClipLut(...args); }
 function addAdjustmentLayer(...args) { return timelineUi.addAdjustmentLayer(...args); }
+function addPip(...args) { return timelineUi.addPip(...args); }
 function addVisualKeyframesAt(...args) { return timelineUi.addVisualKeyframesAt(...args); }
 function addVolumeKeyframeAt(...args) { return timelineUi.addVolumeKeyframeAt(...args); }
 
@@ -638,7 +652,7 @@ const wiring = globalThis.rendererWiringLib.createRendererWiring({
   placeSource, renderSourceMonitor, selectAsset, zoomToPxPerSecond, renderTimeline,
   updatePlayhead, toggleSnap, toggleClipLink, addText, addShape, addMarker, edit,
   addSubtitle, importSrt, exportSrt, renderHeads, frameAtClientX, openTimelineContextMenu,
-  addVisualKeyframesAt, addVolumeKeyframeAt, setClipLut, addAdjustmentLayer,
+  addVisualKeyframesAt, addVolumeKeyframeAt, setClipLut, addAdjustmentLayer, addPip,
   persistSettings, closeSheet, fillGraphicsDevices, createProjectFromSheet, openProjectPath,
   adoptProxyStatuses,
 });

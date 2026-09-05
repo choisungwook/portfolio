@@ -21,6 +21,8 @@ describes this one.
 5. A follower seeks only when it is at least one second from the reference.
 6. Everything not live is hidden and paused.
 
+PIP media elements use the visual item's project-space rectangle, crop, radius, border and optional audio. Dissolve playback duplicates the incoming element only during the boundary interval and applies the same opacity ramp and source pre-roll rule as the frame source.
+
 This is not the render. The differences are real and worth knowing:
 
 - The preview composites with CSS `object-fit: contain` and `opacity`; the render composites with `scale`, `pad` and `overlay`. They agree on framing and z-order, and they will not agree on colour management.

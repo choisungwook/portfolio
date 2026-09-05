@@ -11,7 +11,8 @@
 //! differently, which is exactly the divergence this removes.
 
 use crate::{
-    Asset, AssetKind, BlendMode, Clip, KeyframeTrack, Project, Rate, RationalTime, Track, TrackKind,
+    Asset, AssetKind, BlendMode, Clip, Crop, KeyframeTrack, Project, Rate, RationalTime, Stroke,
+    Track, TrackKind, VisualContent,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +41,17 @@ pub struct Placement {
     pub opacity: f32,
     pub speed: f32,
     pub blend_mode: BlendMode,
+    pub crop: Crop,
+    pub overlay_style: Option<OverlayStyle>,
+    pub fade_in: i64,
+    pub fade_out: i64,
+    pub head_pad_frames: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OverlayStyle {
+    pub corner_radius: f32,
+    pub border: Option<Stroke>,
 }
 
 impl Placement {
@@ -59,6 +71,27 @@ impl Placement {
 
     pub fn duration(&self, rate: Rate) -> RationalTime {
         RationalTime::new(self.duration_frames, rate)
+    }
+
+    pub fn opacity_at(&self, frame: i64) -> f32 {
+        let offset = frame.saturating_sub(self.start_frame);
+        let mut opacity = self.opacity;
+        if self.fade_in > 0 {
+            opacity *= ((offset + 1) as f32 / self.fade_in as f32).clamp(0.0, 1.0);
+        }
+        let remaining = self.end_frame().saturating_sub(frame);
+        if self.fade_out > 0 {
+            opacity *= (remaining as f32 / self.fade_out as f32).clamp(0.0, 1.0);
+        }
+        opacity.clamp(0.0, 1.0)
+    }
+
+    pub fn source_frame_at(&self, frame: i64) -> i64 {
+        let offset = frame.saturating_sub(self.start_frame);
+        if offset < self.head_pad_frames {
+            return self.in_frame;
+        }
+        self.in_frame + ((offset - self.head_pad_frames) as f64 * self.speed as f64).floor() as i64
     }
 }
 
@@ -200,6 +233,44 @@ pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
             }
         }
     }
+    for track in project
+        .tracks
+        .iter()
+        .filter(|track| track.kind == TrackKind::Video && track.contributes())
+    {
+        for item in &track.visual_items {
+            let VisualContent::VideoOverlay {
+                asset_id,
+                in_point,
+                audio_enabled: true,
+                ..
+            } = &item.content
+            else {
+                continue;
+            };
+            let Some(asset) = project.asset(asset_id) else {
+                continue;
+            };
+            if !asset.has_audio || item.duration <= 0 {
+                continue;
+            }
+            placements.push(AudioPlacement {
+                clip_id: item.id.clone(),
+                asset_id: asset.id.clone(),
+                path: asset.path.clone(),
+                kind: asset.kind,
+                start_frame: item.start,
+                duration_frames: item.duration,
+                in_frame: *in_point,
+                volume: 1.0,
+                volume_keyframes: KeyframeTrack::default(),
+                fade_in: 0,
+                fade_out: 0,
+                speed: 1.0,
+                preserve_pitch: true,
+            });
+        }
+    }
     placements
 }
 
@@ -215,6 +286,8 @@ pub struct Layer {
     pub dst: Rect,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub crop: Crop,
+    pub overlay_style: Option<OverlayStyle>,
 }
 
 impl Layer {
@@ -280,6 +353,12 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
             if !matches!(asset.kind, AssetKind::Video | AssetKind::Image) {
                 continue;
             }
+            let fade_out = project
+                .transitions
+                .iter()
+                .find(|transition| transition.from_clip_id == clip.id)
+                .map(|transition| transition.duration)
+                .unwrap_or(0);
             placements.push(Placement {
                 clip_id: clip.id.clone(),
                 asset_id: asset.id.clone(),
@@ -292,6 +371,101 @@ pub fn placements(project: &Project, out_width: u32, out_height: u32) -> Vec<Pla
                 opacity: clip.opacity.clamp(0.0, 1.0),
                 speed: clip.speed,
                 blend_mode: clip.blend_mode,
+                crop: Crop::default(),
+                overlay_style: None,
+                fade_in: 0,
+                fade_out,
+                head_pad_frames: 0,
+            });
+        }
+        for transition in project
+            .transitions
+            .iter()
+            .filter(|transition| transition.track_id == track.id)
+        {
+            let Some(incoming) = track.clip(&transition.to_clip_id) else {
+                continue;
+            };
+            let Some(asset) = project.asset(&incoming.asset_id) else {
+                continue;
+            };
+            let source_span = (transition.duration as f64 * incoming.speed as f64).ceil() as i64;
+            let missing_source = (source_span - incoming.in_point).max(0);
+            let head_pad_frames =
+                (missing_source as f64 / incoming.speed.max(0.0001) as f64).ceil() as i64;
+            placements.push(Placement {
+                clip_id: format!("transition:{}", transition.id),
+                asset_id: asset.id.clone(),
+                path: asset.path.clone(),
+                kind: asset.kind,
+                start_frame: incoming.start - transition.duration,
+                duration_frames: transition.duration,
+                in_frame: incoming.in_point.saturating_sub(source_span).max(0),
+                dst: fit_rect(asset.width, asset.height, out_width, out_height),
+                opacity: incoming.opacity.clamp(0.0, 1.0),
+                speed: incoming.speed,
+                blend_mode: incoming.blend_mode,
+                crop: Crop::default(),
+                overlay_style: None,
+                fade_in: transition.duration,
+                fade_out: 0,
+                head_pad_frames,
+            });
+        }
+        let scale_x = out_width as f32 / project.settings.width.max(1) as f32;
+        let scale_y = out_height as f32 / project.settings.height.max(1) as f32;
+        let mut items: Vec<_> = track
+            .visual_items
+            .iter()
+            .filter(|item| matches!(item.content, VisualContent::VideoOverlay { .. }))
+            .collect();
+        items.sort_by_key(|item| item.z_index);
+        for item in items {
+            let VisualContent::VideoOverlay {
+                asset_id,
+                in_point,
+                crop,
+                corner_radius,
+                border,
+                ..
+            } = &item.content
+            else {
+                continue;
+            };
+            let Some(asset) = project.asset(asset_id) else {
+                continue;
+            };
+            let transform = item.transform_at(item.start);
+            let width = even((transform.width * scale_x) as f64).max(2);
+            let height = even((transform.height * scale_y) as f64).max(2);
+            placements.push(Placement {
+                clip_id: item.id.clone(),
+                asset_id: asset.id.clone(),
+                path: asset.path.clone(),
+                kind: asset.kind,
+                start_frame: item.start,
+                duration_frames: item.duration,
+                in_frame: *in_point,
+                dst: Rect {
+                    x: (transform.x * scale_x).round() as i32,
+                    y: (transform.y * scale_y).round() as i32,
+                    w: width,
+                    h: height,
+                },
+                opacity: transform.opacity.clamp(0.0, 1.0),
+                speed: 1.0,
+                blend_mode: item.blend_mode,
+                crop: *crop,
+                overlay_style: Some(OverlayStyle {
+                    corner_radius: *corner_radius * scale_x.min(scale_y),
+                    border: border.clone().map(|mut stroke| {
+                        stroke.width *= scale_x.min(scale_y);
+                        stroke
+                    }),
+                }),
+                fade_in: 0,
+                fade_out: 0,
+                head_pad_frames: 0,
             });
         }
     }
@@ -305,16 +479,21 @@ pub fn layers_at(project: &Project, frame: i64, out_width: u32, out_height: u32)
     placements(project, out_width, out_height)
         .into_iter()
         .filter(|placement| placement.covers(frame))
-        .map(|placement| Layer {
-            source_frame: placement.in_frame
-                + ((frame - placement.start_frame) as f64 * placement.speed as f64).floor() as i64,
-            clip_id: placement.clip_id,
-            asset_id: placement.asset_id,
-            path: placement.path,
-            kind: placement.kind,
-            dst: placement.dst,
-            opacity: placement.opacity,
-            blend_mode: placement.blend_mode,
+        .map(|placement| {
+            let source_frame = placement.source_frame_at(frame);
+            let opacity = placement.opacity_at(frame);
+            Layer {
+                source_frame,
+                clip_id: placement.clip_id,
+                asset_id: placement.asset_id,
+                path: placement.path,
+                kind: placement.kind,
+                dst: placement.dst,
+                opacity,
+                blend_mode: placement.blend_mode,
+                crop: placement.crop,
+                overlay_style: placement.overlay_style,
+            }
         })
         .collect()
 }
@@ -344,7 +523,7 @@ pub fn frame_time(index: i64, rate: Rate) -> RationalTime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Asset, Clip, ProjectSettings, Track};
+    use crate::{Asset, Clip, ProjectSettings, Track, Transition, TransitionKind};
 
     fn asset(id: &str, kind: AssetKind, width: u32, height: u32) -> Asset {
         Asset {
@@ -389,6 +568,7 @@ mod tests {
             },
             assets,
             tracks,
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }
@@ -438,6 +618,69 @@ mod tests {
                 h: 1080
             }
         );
+    }
+
+    #[test]
+    fn a_dissolve_decodes_both_clips_only_before_the_boundary() {
+        let mut incoming = clip("c2", "a2", 60, 30, 90);
+        incoming.opacity = 0.8;
+        let mut project = project(
+            vec![video_track(
+                "V1",
+                vec![clip("c1", "a1", 0, 0, 60), incoming],
+            )],
+            vec![
+                asset("a1", AssetKind::Video, 1920, 1080),
+                asset("a2", AssetKind::Video, 1920, 1080),
+            ],
+        );
+        project.transitions.push(Transition {
+            id: "x1".into(),
+            track_id: "V1".into(),
+            from_clip_id: "c1".into(),
+            to_clip_id: "c2".into(),
+            duration: 15,
+            kind: TransitionKind::Dissolve,
+        });
+
+        assert_eq!(layers_at(&project, 44, 1920, 1080).len(), 1);
+        let start = layers_at(&project, 45, 1920, 1080);
+        assert_eq!(start.len(), 2);
+        assert_eq!(start[1].source_frame, 15);
+        assert!(start[0].opacity > start[1].opacity);
+        let end = layers_at(&project, 59, 1920, 1080);
+        assert_eq!(end.len(), 2);
+        assert_eq!(end[1].source_frame, 29);
+        assert!(end[0].opacity < end[1].opacity);
+        let after = layers_at(&project, 60, 1920, 1080);
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].clip_id, "c2");
+        assert!((after[0].opacity - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_dissolve_without_source_handles_holds_the_first_incoming_frame() {
+        let mut project = project(
+            vec![video_track(
+                "V1",
+                vec![clip("c1", "a1", 0, 0, 60), clip("c2", "a2", 60, 0, 60)],
+            )],
+            vec![
+                asset("a1", AssetKind::Video, 1920, 1080),
+                asset("a2", AssetKind::Video, 1920, 1080),
+            ],
+        );
+        project.transitions.push(Transition {
+            id: "x1".into(),
+            track_id: "V1".into(),
+            from_clip_id: "c1".into(),
+            to_clip_id: "c2".into(),
+            duration: 15,
+            kind: TransitionKind::Dissolve,
+        });
+
+        assert_eq!(layers_at(&project, 45, 1920, 1080)[1].source_frame, 0);
+        assert_eq!(layers_at(&project, 59, 1920, 1080)[1].source_frame, 0);
     }
 
     #[test]

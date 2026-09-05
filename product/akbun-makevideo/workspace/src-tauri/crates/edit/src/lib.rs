@@ -26,7 +26,7 @@ pub mod document;
 pub mod migrate;
 
 pub use animation::{Easing, Keyframe, KeyframeTrack, VisualAnimation, VisualProperty};
-pub use command::{ClipAt, Command, Edge, MarkerAt, VisualItemAt};
+pub use command::{ClipAt, Command, Edge, MarkerAt, TransitionAt, VisualItemAt};
 pub use document::{Document, DocumentState};
 pub use makevideo_time::{Rate, RationalTime};
 
@@ -36,7 +36,7 @@ use std::collections::{HashMap, HashSet};
 /// What `version` a project file written today holds. Version 1 measured
 /// everything in whole milliseconds; `migrate` turns one of those into this on
 /// the way in, so a project saved before this existed still opens.
-pub const FORMAT_VERSION: u32 = 4;
+pub const FORMAT_VERSION: u32 = 5;
 
 /// Four of each is as many as the timeline header has room to name, and a
 /// timeline that needs a fifth video track is asking for a different app.
@@ -99,6 +99,8 @@ pub struct Project {
     pub settings: ProjectSettings,
     pub assets: Vec<Asset>,
     pub tracks: Vec<Track>,
+    #[serde(default)]
+    pub transitions: Vec<Transition>,
     #[serde(default)]
     pub markers: Vec<Marker>,
 }
@@ -345,6 +347,33 @@ pub enum TextAlign {
 impl Default for TextAlign {
     fn default() -> Self {
         TextAlign::Center
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Crop {
+    #[serde(default)]
+    pub left: f32,
+    #[serde(default)]
+    pub top: f32,
+    #[serde(default)]
+    pub right: f32,
+    #[serde(default)]
+    pub bottom: f32,
+}
+
+impl Crop {
+    pub fn is_valid(self) -> bool {
+        [self.left, self.top, self.right, self.bottom]
+            .into_iter()
+            .all(|value| value.is_finite() && (0.0..1.0).contains(&value))
+            && self.left + self.right < 1.0
+            && self.top + self.bottom < 1.0
+    }
+
+    pub fn is_empty(self) -> bool {
+        self == Crop::default()
     }
 }
 
@@ -677,6 +706,16 @@ pub enum VisualContent {
     },
     VideoOverlay {
         asset_id: String,
+        #[serde(default)]
+        in_point: i64,
+        #[serde(default)]
+        crop: Crop,
+        #[serde(default)]
+        corner_radius: f32,
+        #[serde(default)]
+        border: Option<Stroke>,
+        #[serde(default)]
+        audio_enabled: bool,
     },
     Adjustment {
         lut_path: String,
@@ -686,7 +725,7 @@ pub enum VisualContent {
 impl VisualContent {
     pub fn asset_id(&self) -> Option<&str> {
         match self {
-            VisualContent::Image { asset_id } | VisualContent::VideoOverlay { asset_id } => {
+            VisualContent::Image { asset_id } | VisualContent::VideoOverlay { asset_id, .. } => {
                 Some(asset_id)
             }
             VisualContent::Text { .. }
@@ -715,6 +754,9 @@ impl VisualContent {
     }
 
     pub fn uses_video_paint(&self) -> bool {
+        if matches!(self, VisualContent::VideoOverlay { .. }) {
+            return true;
+        }
         let style = match self {
             VisualContent::Text { style, .. } => Some(&style.visual_style),
             VisualContent::Shape { visual_style, .. } => Some(visual_style),
@@ -780,6 +822,16 @@ enum WireVisualContent {
     },
     VideoOverlay {
         asset_id: String,
+        #[serde(default)]
+        in_point: i64,
+        #[serde(default)]
+        crop: Crop,
+        #[serde(default)]
+        corner_radius: f32,
+        #[serde(default)]
+        border: Option<Stroke>,
+        #[serde(default)]
+        audio_enabled: bool,
     },
     Adjustment {
         lut_path: String,
@@ -851,9 +903,21 @@ impl<'de> Deserialize<'de> for VisualContent {
                 })
             }
             WireVisualContent::Image { asset_id } => Ok(VisualContent::Image { asset_id }),
-            WireVisualContent::VideoOverlay { asset_id } => {
-                Ok(VisualContent::VideoOverlay { asset_id })
-            }
+            WireVisualContent::VideoOverlay {
+                asset_id,
+                in_point,
+                crop,
+                corner_radius,
+                border,
+                audio_enabled,
+            } => Ok(VisualContent::VideoOverlay {
+                asset_id,
+                in_point,
+                crop,
+                corner_radius,
+                border,
+                audio_enabled,
+            }),
             WireVisualContent::Adjustment { lut_path } => {
                 Ok(VisualContent::Adjustment { lut_path })
             }
@@ -938,6 +1002,25 @@ pub struct Clip {
     pub volume_keyframes: KeyframeTrack,
     #[serde(default)]
     pub blend_mode: BlendMode,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransitionKind {
+    #[default]
+    Dissolve,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transition {
+    pub id: String,
+    pub track_id: String,
+    pub from_clip_id: String,
+    pub to_clip_id: String,
+    pub duration: i64,
+    #[serde(default)]
+    pub kind: TransitionKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1040,6 +1123,7 @@ impl Project {
                     hidden: false,
                 },
             ],
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }
@@ -1053,18 +1137,21 @@ impl Project {
     }
 
     pub fn uses_video_paint(&self) -> bool {
-        self.tracks
-            .iter()
-            .filter(|track| track.contributes())
-            .any(|track| {
-                track.clips.iter().any(|clip| {
-                    (clip.speed - 1.0).abs() > f32::EPSILON || clip.blend_mode != BlendMode::Normal
-                }) || track.visual_items.iter().any(|item| {
-                    item.content.uses_video_paint()
-                        || item.blend_mode != BlendMode::Normal
-                        || item.animation != VisualAnimation::default()
+        !self.transitions.is_empty()
+            || self
+                .tracks
+                .iter()
+                .filter(|track| track.contributes())
+                .any(|track| {
+                    track.clips.iter().any(|clip| {
+                        (clip.speed - 1.0).abs() > f32::EPSILON
+                            || clip.blend_mode != BlendMode::Normal
+                    }) || track.visual_items.iter().any(|item| {
+                        item.content.uses_video_paint()
+                            || item.blend_mode != BlendMode::Normal
+                            || item.animation != VisualAnimation::default()
+                    })
                 })
-            })
     }
 
     pub fn track(&self, id: &str) -> Option<&Track> {
@@ -1092,6 +1179,12 @@ impl Project {
     pub fn clip(&self, clip_id: &str) -> Option<&Clip> {
         let (track, clip) = self.locate(clip_id)?;
         Some(&self.tracks[track].clips[clip])
+    }
+
+    pub fn transition(&self, transition_id: &str) -> Option<&Transition> {
+        self.transitions
+            .iter()
+            .find(|transition| transition.id == transition_id)
     }
 
     pub fn locate_visual_item(&self, item_id: &str) -> Option<(usize, usize)> {
@@ -1346,6 +1439,40 @@ impl Project {
                         "visual item {name} has opacity outside 0 through 1"
                     ));
                 }
+                if let VisualContent::VideoOverlay {
+                    asset_id,
+                    in_point,
+                    crop,
+                    corner_radius,
+                    border,
+                    ..
+                } = &item.content
+                {
+                    let asset = self
+                        .asset(asset_id)
+                        .ok_or_else(|| format!("visual item {name} references a missing asset"))?;
+                    if asset.kind != AssetKind::Video {
+                        return Err(format!("visual item {name} needs a video asset"));
+                    }
+                    if *in_point < 0
+                        || asset
+                            .source_limit_frames(self.rate())
+                            .is_some_and(|limit| in_point.saturating_add(item.duration) > limit)
+                    {
+                        return Err(format!("visual item {name} reaches past its video source"));
+                    }
+                    if !crop.is_valid() {
+                        return Err(format!("visual item {name} has an invalid crop"));
+                    }
+                    if !corner_radius.is_finite() || *corner_radius < 0.0 {
+                        return Err(format!("visual item {name} has an invalid corner radius"));
+                    }
+                    if border.as_ref().is_some_and(|stroke| {
+                        !stroke.width.is_finite() || stroke.width < 0.0 || stroke.color.is_empty()
+                    }) {
+                        return Err(format!("visual item {name} has an invalid border"));
+                    }
+                }
                 let last_frame = item.end_frame().saturating_sub(1);
                 let unbounded = -f32::MAX..=f32::MAX;
                 for track in [
@@ -1397,6 +1524,47 @@ impl Project {
                 || first.out_point != second.out_point
             {
                 return Err(format!("link group {group} is out of sync"));
+            }
+        }
+        let mut transition_ids = HashSet::new();
+        for transition in &self.transitions {
+            if !transition_ids.insert(transition.id.as_str()) {
+                return Err(format!("transition {} is duplicated", transition.id));
+            }
+            let track = self.track(&transition.track_id).ok_or_else(|| {
+                format!("transition {} references a missing track", transition.id)
+            })?;
+            if track.kind != TrackKind::Video {
+                return Err(format!("transition {} needs a video track", transition.id));
+            }
+            let Some(index) = track
+                .clips
+                .iter()
+                .position(|clip| clip.id == transition.from_clip_id)
+            else {
+                return Err(format!(
+                    "transition {} references a missing clip",
+                    transition.id
+                ));
+            };
+            let Some(next) = track.clips.get(index + 1) else {
+                return Err(format!("transition {} needs adjacent clips", transition.id));
+            };
+            let from = &track.clips[index];
+            if next.id != transition.to_clip_id || from.end_frame() != next.start {
+                return Err(format!(
+                    "transition {} needs touching adjacent clips",
+                    transition.id
+                ));
+            }
+            if transition.duration <= 0
+                || transition.duration > from.duration_frames()
+                || transition.duration > next.duration_frames()
+            {
+                return Err(format!(
+                    "transition {} has an invalid duration",
+                    transition.id
+                ));
             }
         }
         Ok(())
@@ -1495,6 +1663,34 @@ impl Project {
                 }
             }
         }
+        let transitions = std::mem::take(&mut self.transitions);
+        let mut transition_ids = HashSet::new();
+        self.transitions = transitions
+            .into_iter()
+            .filter(|transition| {
+                if !transition_ids.insert(transition.id.clone()) {
+                    return false;
+                }
+                let Some(track) = self.track(&transition.track_id) else {
+                    return false;
+                };
+                let Some(index) = track
+                    .clips
+                    .iter()
+                    .position(|clip| clip.id == transition.from_clip_id)
+                else {
+                    return false;
+                };
+                let Some(next) = track.clips.get(index + 1) else {
+                    return false;
+                };
+                next.id == transition.to_clip_id
+                    && track.clips[index].end_frame() == next.start
+                    && transition.duration > 0
+                    && transition.duration <= track.clips[index].duration_frames()
+                    && transition.duration <= next.duration_frames()
+            })
+            .collect();
         let mut groups: HashMap<String, Vec<(TrackKind, String, i64, i64, i64)>> = HashMap::new();
         for track in &self.tracks {
             for clip in &track.clips {

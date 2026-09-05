@@ -68,6 +68,9 @@ impl Document {
         for marker in &project.markers {
             ids.observe(&marker.id);
         }
+        for transition in &project.transitions {
+            ids.observe(&transition.id);
+        }
         for track in &project.tracks {
             ids.observe(&track.id);
             for clip in &track.clips {
@@ -256,8 +259,8 @@ impl Document {
 mod tests {
     use super::*;
     use crate::{
-        Asset, AssetKind, Clip, Command, Edge, Paint, ProjectSettings, Rate, TextStyle, TrackKind,
-        VisualContent, VisualStyle, VisualTransform,
+        Asset, AssetKind, Clip, Command, Crop, Edge, Paint, ProjectSettings, Rate, Stroke,
+        TextStyle, TrackKind, VisualContent, VisualStyle, VisualTransform,
     };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
@@ -361,6 +364,36 @@ mod tests {
             (clips[0].start, clips[0].in_point, clips[0].out_point),
             (75, 0, 300)
         );
+    }
+
+    #[test]
+    fn a_dissolve_is_a_boundary_object_with_undo_and_clip_cleanup() {
+        let mut document = document();
+        let first = add(&mut document, 0);
+        let second = add(&mut document, 300);
+        document
+            .apply(Command::AddTransition {
+                from_clip_id: first.clone(),
+                to_clip_id: second.clone(),
+                duration: 15,
+                id: None,
+            })
+            .unwrap();
+        assert_eq!(document.project().transitions.len(), 1);
+        assert_eq!(document.project().transitions[0].duration, 15);
+
+        document.undo().unwrap();
+        assert!(document.project().transitions.is_empty());
+        document.redo().unwrap();
+        assert_eq!(document.project().transitions.len(), 1);
+
+        document
+            .apply(Command::RemoveClip { clip_id: second })
+            .unwrap();
+        assert!(document.project().transitions.is_empty());
+        document.undo().unwrap();
+        assert_eq!(document.project().transitions.len(), 1);
+        assert_eq!(clips(&document).len(), 2);
     }
 
     #[test]
@@ -1391,6 +1424,58 @@ mod tests {
 
         assert!(error.contains("already in this project"), "{error}");
         assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+    }
+
+    #[test]
+    fn a_video_overlay_keeps_crop_border_and_audio_as_one_visual_item() {
+        let mut document = document();
+        let track_id = video_track(&document);
+        document
+            .apply(Command::AddVisualItem {
+                track_id,
+                content: VisualContent::VideoOverlay {
+                    asset_id: "v".into(),
+                    in_point: 30,
+                    crop: Crop {
+                        left: 0.1,
+                        top: 0.2,
+                        right: 0.1,
+                        bottom: 0.0,
+                    },
+                    corner_radius: 24.0,
+                    border: Some(Stroke {
+                        color: "#ffffff".into(),
+                        width: 4.0,
+                    }),
+                    audio_enabled: true,
+                },
+                start: 60,
+                duration: 90,
+                transform: VisualTransform {
+                    x: 100.0,
+                    y: 100.0,
+                    width: 640.0,
+                    height: 360.0,
+                    rotation: 0.0,
+                    opacity: 1.0,
+                },
+                z_index: 1,
+                id: None,
+            })
+            .unwrap();
+
+        let item = &document.project().tracks[0].visual_items[0];
+        assert!(matches!(
+            item.content,
+            VisualContent::VideoOverlay {
+                audio_enabled: true,
+                corner_radius: 24.0,
+                ..
+            }
+        ));
+        assert!(document.project().uses_video_paint());
+        document.undo().unwrap();
+        assert!(document.project().tracks[0].visual_items.is_empty());
     }
 
     fn overlay_command(text: &str) -> Command {

@@ -5,6 +5,11 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.timelineInteractionsLib = exported;
 })(globalThis, function () {
+  function horizontalWheelDelta(event) {
+    if (!event.shiftKey) return 0;
+    return event.deltaY || event.deltaX || 0;
+  }
+
   function createTimelineInteractions(deps) {
     const {
       HANDLE_PX,
@@ -621,6 +626,13 @@
       }
     }
 
+    function scrollHorizontally(event) {
+      const delta = horizontalWheelDelta(event);
+      if (!delta) return;
+      dom.scroll.scrollLeft += delta;
+      event.preventDefault();
+    }
+
     return {
       beginAssetDrag,
       beginClipDrag,
@@ -638,11 +650,12 @@
       metrics: clipDragMetrics,
       pointerMove,
       pointerUp,
+      scrollHorizontally,
       tookToolDragClick,
       updateAssetDrag,
       updateSourceDrag,
     };
   }
 
-  return { createTimelineInteractions };
+  return { createTimelineInteractions, horizontalWheelDelta };
 });

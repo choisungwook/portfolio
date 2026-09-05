@@ -29,3 +29,5 @@
 | [2026-08-live-playback-reconfiguration.md](./2026-08-live-playback-reconfiguration.md) | Playback settings switch after the replacement picture is ready |
 | [2026-08-reusable-seek-decoder.md](./2026-08-reusable-seek-decoder.md) | Short forward seeks reuse a decoder and may show two earlier frames |
 | [2026-09-playback-speed-and-audio-curves.md](./2026-09-playback-speed-and-audio-curves.md) | Clip duration is derived from speed; pitch preservation defaults on and fades stay separate from keyframes |
+| [2026-09-pip-video-overlay.md](./2026-09-pip-video-overlay.md) | PIP uses the common visual-item model and warns beyond four simultaneous video sources |
+| [2026-09-dissolve-boundary-object.md](./2026-09-dissolve-boundary-object.md) | Dissolve is a separate adjacent-clip boundary object with interval-only dual decode |

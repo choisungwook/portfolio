@@ -30,7 +30,7 @@ media element 재생과 이후 엔진을 같은 수치로 비교하는 하네스
 - 생성물은 `/tmp/akbun-makevideo-quality`에 저장
 - 대용량 영상은 저장소에 저장하지 않음
 
-합성 영상과 4개 영상·오디오 트랙 프로젝트를 생성한다.
+합성 영상과 4개 영상·오디오 트랙 프로젝트를 생성한다. 첫 영상 트랙은 중앙 경계에 15프레임 디졸브가 있는 두 clip으로 나뉜다.
 
 ```bash
 cd product/akbun-makevideo/workspace
@@ -142,6 +142,15 @@ npm run quality:supply -- /tmp/akbun-makevideo-quality/project.akbunvideo --seco
 
 - 같은 binary로 연속 실행한 두 번이 늦은 프레임 8개와 49개로 갈리고, 4트랙은 아예 첫 프레임이 2초 안에 오지 않아 중단되기도 함
 - 1080p 디코더 4개가 4코어를 채우는 지점이라 측정 대상이 소스가 아니라 머신이 됨. 이 구간은 대상 머신에서 다시 재야 함
+
+### PIP와 디졸브 기준
+
+- PIP도 video track과 같은 decoder placement이므로 동시 video source 수로 제한을 판단함
+- macOS에서 1080p30 source 4개를 6초간 측정한 결과 late frame 0, frame interval p99 33.3 ms, startup delay p99 112.5 ms로 통과함
+- UI는 base clip과 PIP를 합쳐 4개를 넘을 때 실시간 재생 품질 경고를 표시함
+- 같은 실행의 1-track 프로젝트는 4초 경계의 15-frame dissolve를 포함함
+- dissolve 포함 continuous supply는 late frame 0/180, frame interval p99 33.3 ms, supply wait p99 2.3 ms, startup delay p99 58.1 ms로 통과함
+- 측정 명령: `npm run quality:supply -- /tmp/akbun-makevideo-transition-quality/project.akbunvideo --seconds 6`
 
 ## 오디오 엔진 계측
 

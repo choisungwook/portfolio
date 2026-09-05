@@ -102,9 +102,9 @@
       return { kind: 'solid', color: preserveAlpha(color, paintColors(previous, color)[0]) };
     }
 
-    function inspectorMessage(tab, item, clipTargets) {
+    function inspectorMessage(tab, item, clipTargets, transition) {
       if (tab === 'effects') return 'No effect is selected.';
-      if (tab === 'transition') return 'No transition is selected.';
+      if (tab === 'transition') return transition ? '' : 'Select a clip beside a transition.';
       if (tab === 'image') {
         const asset = L.findAsset(state.project, state.selectedAssetId);
         return asset && asset.kind === 'image'
@@ -128,12 +128,17 @@
       const item = selectedVisualItem();
       const text = item && item.content && item.content.kind === 'text' ? item.content : null;
       const shape = item && item.content && item.content.kind === 'shape' ? item.content : null;
+      const pip = item && item.content && item.content.kind === 'videoOverlay' ? item.content : null;
       const track = item && state.project.tracks.find((candidate) => (candidate.visualItems || []).some((entry) => entry.id === item.id));
       const subtitle = track && track.kind === 'subtitle';
       const clipTargets = !item && liveSelection()
         ? I.clipTargets(state.project, liveSelection())
         : null;
       const clip = clipTargets && clipTargets.selected;
+      const transition = !item && liveSelection()
+        ? (state.project.transitions || []).find((entry) =>
+          entry.fromClipId === liveSelection() || entry.toClipId === liveSelection())
+        : null;
       const tab = state.inspectorTab || 'video';
       const video = tab === 'video';
       const audio = tab === 'audio';
@@ -143,11 +148,13 @@
       dom.textPanel.hidden = !video || !text || subtitle;
       dom.subtitlePanel.hidden = !video || !text || !subtitle;
       dom.shapePanel.hidden = !video || !shape;
+      dom.pipPanel.hidden = !video || !pip;
+      dom.transitionPanel.hidden = tab !== 'transition' || !transition;
       dom.clipPanel.hidden = !clip || (!video && !audio);
       dom.transformPanel.hidden = !video || !item;
       dom.keyframePanel.hidden = !selectedKeyframe;
-      dom.inspectorEmpty.hidden = hasProperties;
-      dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets);
+      dom.inspectorEmpty.hidden = hasProperties || Boolean(transition);
+      dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets, transition);
       for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
         const active = button.dataset.inspectorTab === tab;
         button.setAttribute('aria-pressed', String(active));
@@ -205,6 +212,18 @@
         dom.shapeShadowY.value = shape.shadow ? shape.shadow.y : 0;
         dom.shapeShadowBlur.value = shape.shadow ? shape.shadow.blur : 0;
       }
+      if (pip) {
+        const crop = pip.crop || {};
+        dom.pipCropLeft.value = Math.round((crop.left || 0) * 100);
+        dom.pipCropTop.value = Math.round((crop.top || 0) * 100);
+        dom.pipCropRight.value = Math.round((crop.right || 0) * 100);
+        dom.pipCropBottom.value = Math.round((crop.bottom || 0) * 100);
+        dom.pipCornerRadius.value = pip.cornerRadius || 0;
+        dom.pipBorderColor.value = hexColor(pip.border && pip.border.color, '#ffffff');
+        dom.pipBorderWidth.value = pip.border ? pip.border.width : 0;
+        dom.pipAudioEnabled.checked = Boolean(pip.audioEnabled);
+      }
+      if (transition) dom.transitionDuration.value = transition.duration;
       if (!text) return;
       if (subtitle) {
         dom.subtitleValue.value = text.text || '';
@@ -299,6 +318,57 @@
       edit({ op: 'setVisualContent', itemId: item.id, content })
         .then(() => selectVisualItem(item.id))
         .catch((error) => reportError(error, 'shape:edit'));
+    }
+
+    function updateSelectedPip() {
+      const item = selectedVisualItem();
+      if (!item || item.content.kind !== 'videoOverlay') return;
+      const percent = (input) => Math.max(0, Math.min(0.95, (Number(input.value) || 0) / 100));
+      const crop = {
+        left: percent(dom.pipCropLeft),
+        top: percent(dom.pipCropTop),
+        right: percent(dom.pipCropRight),
+        bottom: percent(dom.pipCropBottom),
+      };
+      if (crop.left + crop.right >= 1) crop.right = Math.max(0, 0.99 - crop.left);
+      if (crop.top + crop.bottom >= 1) crop.bottom = Math.max(0, 0.99 - crop.top);
+      const borderWidth = Math.max(0, Number(dom.pipBorderWidth.value) || 0);
+      const content = {
+        ...item.content,
+        crop,
+        cornerRadius: Math.max(0, Number(dom.pipCornerRadius.value) || 0),
+        border: borderWidth > 0 ? {
+          color: preserveAlpha(dom.pipBorderColor.value, item.content.border && item.content.border.color),
+          width: borderWidth,
+        } : null,
+        audioEnabled: dom.pipAudioEnabled.checked,
+      };
+      edit({ op: 'setVisualContent', itemId: item.id, content })
+        .then(() => selectVisualItem(item.id))
+        .catch((error) => reportError(error, 'pip:edit'));
+    }
+
+    function selectedTransition() {
+      const clipId = liveSelection();
+      return (state.project.transitions || []).find((entry) =>
+        entry.fromClipId === clipId || entry.toClipId === clipId) || null;
+    }
+
+    function updateSelectedTransition() {
+      const transition = selectedTransition();
+      if (!transition) return;
+      edit({
+        op: 'setTransitionDuration',
+        transitionId: transition.id,
+        duration: Math.max(1, Math.round(Number(dom.transitionDuration.value) || 1)),
+      }).catch((error) => reportError(error, 'transition:edit'));
+    }
+
+    function removeSelectedTransition() {
+      const transition = selectedTransition();
+      if (!transition) return;
+      edit({ op: 'removeTransition', transitionId: transition.id })
+        .catch((error) => reportError(error, 'transition:remove'));
     }
 
     function changeSelectedFillLayers(kind, add) {
@@ -573,6 +643,14 @@
       for (const input of [dom.subtitleFont, dom.subtitleSize, dom.subtitleColor]) {
         input.addEventListener('change', updateSubtitleStyle);
       }
+      for (const input of [
+        dom.pipCropLeft, dom.pipCropTop, dom.pipCropRight, dom.pipCropBottom,
+        dom.pipCornerRadius, dom.pipBorderColor, dom.pipBorderWidth, dom.pipAudioEnabled,
+      ]) {
+        input.addEventListener('change', updateSelectedPip);
+      }
+      dom.transitionDuration.addEventListener('change', updateSelectedTransition);
+      dom.transitionRemove.addEventListener('click', removeSelectedTransition);
       dom.clipOpacity.addEventListener('change', updateSelectedVideoOpacity);
       dom.clipVolume.addEventListener('change', updateSelectedAudioVolume);
       dom.visualBlendMode.addEventListener('change', () => {

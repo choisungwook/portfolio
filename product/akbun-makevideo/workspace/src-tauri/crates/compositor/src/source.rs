@@ -122,6 +122,8 @@ pub struct Open {
     pub height: u32,
     pub rate: Rate,
     pub speed: f32,
+    pub crop: makevideo_render::Crop,
+    pub head_pad_frames: i64,
 }
 
 /// Opens the readers.
@@ -154,7 +156,9 @@ impl Readers for FfmpegReaders {
             kind: request.kind,
             in_time: RationalTime::new(request.in_frame, request.rate),
             duration: RationalTime::new(
-                (request.frames as f64 * request.speed as f64).ceil() as i64,
+                (((request.frames - request.head_pad_frames).max(1) as f64 * request.speed as f64)
+                    .ceil() as i64)
+                    .max(1),
                 request.rate,
             ),
             width: request.width,
@@ -167,6 +171,8 @@ impl Readers for FfmpegReaders {
             } else {
                 None
             },
+            crop: request.crop,
+            head_pad_frames: request.head_pad_frames,
         };
         let fallback = decode.hwaccel.map(|_| {
             let software = ffmpeg::decoder_args(&ffmpeg::Decode {
@@ -174,7 +180,10 @@ impl Readers for FfmpegReaders {
                 kind: request.kind,
                 in_time: RationalTime::new(request.in_frame, request.rate),
                 duration: RationalTime::new(
-                    (request.frames as f64 * request.speed as f64).ceil() as i64,
+                    (((request.frames - request.head_pad_frames).max(1) as f64
+                        * request.speed as f64)
+                        .ceil() as i64)
+                        .max(1),
                     request.rate,
                 ),
                 width: request.width,
@@ -182,6 +191,8 @@ impl Readers for FfmpegReaders {
                 rate: request.rate,
                 speed: request.speed,
                 hwaccel: None,
+                crop: request.crop,
+                head_pad_frames: request.head_pad_frames,
             });
             (self.ffmpeg.clone(), software)
         });
@@ -478,6 +489,7 @@ impl Supply {
 struct Stream {
     placement: Placement,
     track_order: usize,
+    visual: Option<(i32, makevideo_render::layout::OverlayStyle)>,
     lut: Option<Arc<Lut>>,
     frame_bytes: usize,
     receiver: Option<Receiver<DecodedFrame>>,
@@ -600,15 +612,41 @@ impl FrameSource {
         let streams = layout::placements(project, width, height)
             .into_iter()
             .map(|placement| {
+                let transition = placement
+                    .clip_id
+                    .strip_prefix("transition:")
+                    .and_then(|id| project.transition(id));
+                let source_clip_id = transition
+                    .map(|entry| entry.to_clip_id.as_str())
+                    .unwrap_or(placement.clip_id.as_str());
+                let visual = project.visual_item(&placement.clip_id).map(|item| {
+                    (
+                        item.z_index,
+                        placement
+                            .overlay_style
+                            .clone()
+                            .expect("a video visual has overlay styling"),
+                    )
+                });
                 let track_order = project
                     .tracks
                     .iter()
-                    .position(|track| track.clips.iter().any(|clip| clip.id == placement.clip_id))
+                    .position(|track| {
+                        track.id
+                            == transition
+                                .map(|entry| entry.track_id.as_str())
+                                .unwrap_or("")
+                            || track.clips.iter().any(|clip| clip.id == placement.clip_id)
+                            || track
+                                .visual_items
+                                .iter()
+                                .any(|item| item.id == placement.clip_id)
+                    })
                     .unwrap_or(0);
                 Stream {
                     frame_bytes: (placement.dst.w as usize) * (placement.dst.h as usize) * 4,
                     lut: project
-                        .clip(&placement.clip_id)
+                        .clip(source_clip_id)
                         .and_then(|clip| clip.lut_path.as_deref())
                         .and_then(|path| Lut::from_cube_file(path).ok())
                         .map(Arc::new),
@@ -622,6 +660,7 @@ impl FrameSource {
                     control: Arc::new(DecoderControl::new(0, 0)),
                     dead: false,
                     track_order,
+                    visual,
                 }
             })
             .collect();
@@ -990,27 +1029,54 @@ impl FrameSource {
             return Supply::Starved;
         }
 
-        let layers = self
-            .streams
-            .iter_mut()
-            .filter(|stream| stream.wants(frame))
-            .filter_map(|stream| {
-                stream.pending.take().map(|decoded| {
-                    stream.buffered.fetch_sub(1, Ordering::SeqCst);
-                    stream.control.notify();
-                    Layer {
-                        clip_id: stream.placement.clip_id.clone(),
-                        pixels: decoded.pixels,
+        let mut layers = Vec::new();
+        let mut visuals = Vec::new();
+        for stream in self.streams.iter_mut().filter(|stream| stream.wants(frame)) {
+            let Some(decoded) = stream.pending.take() else {
+                continue;
+            };
+            stream.buffered.fetch_sub(1, Ordering::SeqCst);
+            stream.control.notify();
+            if let Some((z_index, style)) = &stream.visual {
+                let mut pixels = decoded.pixels;
+                apply_overlay_style(
+                    &mut pixels,
+                    stream.placement.dst.w,
+                    stream.placement.dst.h,
+                    style,
+                );
+                visuals.push(crate::text::RasterLayer {
+                    pixels: pixels.into(),
+                    width: stream.placement.dst.w,
+                    height: stream.placement.dst.h,
+                    lut: None,
+                    placement: Draw {
                         dst: stream.placement.dst,
-                        opacity: stream.placement.opacity,
+                        opacity: stream.placement.opacity_at(frame),
                         blend_mode: stream.placement.blend_mode,
-                        lut: stream.lut.clone(),
-                        track_order: stream.track_order,
-                    }
-                })
-            })
-            .collect();
-        let visuals = crate::text::layers_at(&self.project, frame, self.width, self.height);
+                        adjustment: false,
+                    },
+                    track_order: stream.track_order,
+                    z_index: *z_index,
+                });
+            } else {
+                layers.push(Layer {
+                    clip_id: stream.placement.clip_id.clone(),
+                    pixels: decoded.pixels,
+                    dst: stream.placement.dst,
+                    opacity: stream.placement.opacity_at(frame),
+                    blend_mode: stream.placement.blend_mode,
+                    lut: stream.lut.clone(),
+                    track_order: stream.track_order,
+                });
+            }
+        }
+        visuals.extend(crate::text::layers_at(
+            &self.project,
+            frame,
+            self.width,
+            self.height,
+        ));
         Supply::Ready(Frame {
             frame,
             layers,
@@ -1095,13 +1161,14 @@ impl FrameSource {
         let request = Open {
             path: placement.path.clone(),
             kind: placement.kind,
-            in_frame: placement.in_frame
-                + ((first - placement.start_frame) as f64 * placement.speed as f64).floor() as i64,
+            in_frame: placement.source_frame_at(first),
             frames: wanted,
             width: placement.dst.w,
             height: placement.dst.h,
             rate,
             speed: placement.speed,
+            crop: placement.crop,
+            head_pad_frames: (placement.head_pad_frames - (first - placement.start_frame)).max(0),
         };
 
         let frame_bytes = stream.frame_bytes;
@@ -1241,6 +1308,82 @@ impl FrameSource {
             }
         }
     }
+}
+
+pub(crate) fn apply_overlay_style(
+    pixels: &mut [u8],
+    width: u32,
+    height: u32,
+    style: &makevideo_render::layout::OverlayStyle,
+) {
+    let radius = style
+        .corner_radius
+        .clamp(0.0, width.min(height) as f32 / 2.0);
+    let border_width = style
+        .border
+        .as_ref()
+        .map(|border| border.width.clamp(0.0, width.min(height) as f32 / 2.0))
+        .unwrap_or(0.0);
+    let border = style
+        .border
+        .as_ref()
+        .and_then(|stroke| parse_rgba(&stroke.color));
+    if radius <= 0.0 && border_width <= 0.0 {
+        return;
+    }
+    for y in 0..height {
+        for x in 0..width {
+            let index = ((y * width + x) * 4) as usize;
+            if !inside_rounded_rect(x as f32 + 0.5, y as f32 + 0.5, width, height, radius, 0.0) {
+                pixels[index + 3] = 0;
+                continue;
+            }
+            if border_width > 0.0
+                && !inside_rounded_rect(
+                    x as f32 + 0.5,
+                    y as f32 + 0.5,
+                    width,
+                    height,
+                    (radius - border_width).max(0.0),
+                    border_width,
+                )
+            {
+                if let Some(color) = border {
+                    pixels[index..index + 4].copy_from_slice(&color);
+                }
+            }
+        }
+    }
+}
+
+fn inside_rounded_rect(x: f32, y: f32, width: u32, height: u32, radius: f32, inset: f32) -> bool {
+    let left = inset;
+    let top = inset;
+    let right = width as f32 - inset;
+    let bottom = height as f32 - inset;
+    if x < left || y < top || x >= right || y >= bottom {
+        return false;
+    }
+    if radius <= 0.0 {
+        return true;
+    }
+    let cx = x.clamp(left + radius, right - radius);
+    let cy = y.clamp(top + radius, bottom - radius);
+    (x - cx).powi(2) + (y - cy).powi(2) <= radius.powi(2)
+}
+
+fn parse_rgba(value: &str) -> Option<[u8; 4]> {
+    let text = value.strip_prefix('#')?;
+    if text.len() != 6 && text.len() != 8 {
+        return None;
+    }
+    let channel = |at| u8::from_str_radix(&text[at..at + 2], 16).ok();
+    Some([
+        channel(0)?,
+        channel(2)?,
+        channel(4)?,
+        if text.len() == 8 { channel(6)? } else { 255 },
+    ])
 }
 
 impl Drop for FrameSource {
@@ -1442,6 +1585,7 @@ mod tests {
             },
             assets,
             tracks,
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }
@@ -2131,6 +2275,29 @@ mod tests {
             .map(|(source, _)| source.rgba[0])
             .collect();
         assert_eq!(order, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn overlay_style_masks_corners_and_paints_the_border() {
+        let mut pixels = vec![100; 4 * 4 * 4];
+        for alpha in pixels.iter_mut().skip(3).step_by(4) {
+            *alpha = 255;
+        }
+        let style = makevideo_render::layout::OverlayStyle {
+            corner_radius: 2.0,
+            border: Some(makevideo_render::Stroke {
+                color: "#ff0000".into(),
+                width: 1.0,
+            }),
+        };
+
+        apply_overlay_style(&mut pixels, 4, 4, &style);
+
+        assert_eq!(pixels[3], 0, "the rounded corner is transparent");
+        let top_middle = (1 * 4) as usize;
+        assert_eq!(&pixels[top_middle..top_middle + 4], &[255, 0, 0, 255]);
+        let centre = ((2 * 4 + 2) * 4) as usize;
+        assert_eq!(&pixels[centre..centre + 4], &[100, 100, 100, 255]);
     }
 
     #[test]
