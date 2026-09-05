@@ -69,9 +69,14 @@ export function installStreamAsyncIteration(prototype: object = ReadableStream.p
     value: function asyncIterator(this: ReadableStream) {
       const reader = this.getReader();
       return {
-        next: () => reader.read(),
+        next: async () => {
+          const result = await reader.read();
+          if (result.done) reader.releaseLock();
+          return result;
+        },
         return: async (value?: unknown) => {
           await reader.cancel();
+          reader.releaseLock();
           return { done: true, value };
         },
         [Symbol.asyncIterator]() {

@@ -20,6 +20,7 @@ describe("PDF.js runtime assets", () => {
 describe("WebKit ReadableStream fallback", () => {
   it("iterates a stream that lacks the async iterator", async () => {
     class LegacyStream {
+      released = 0;
       private chunks = ["a", "b"];
       getReader() {
         return {
@@ -27,12 +28,17 @@ describe("WebKit ReadableStream fallback", () => {
             ? { done: false, value: this.chunks.shift() }
             : { done: true, value: undefined },
           cancel: async () => undefined,
+          releaseLock: () => {
+            this.released += 1;
+          },
         };
       }
     }
     installStreamAsyncIteration(LegacyStream.prototype);
+    const stream = new LegacyStream();
     const seen: string[] = [];
-    for await (const chunk of new LegacyStream() as unknown as AsyncIterable<string>) seen.push(chunk);
+    for await (const chunk of stream as unknown as AsyncIterable<string>) seen.push(chunk);
     expect(seen).toEqual(["a", "b"]);
+    expect(stream.released).toBe(1);
   });
 });
