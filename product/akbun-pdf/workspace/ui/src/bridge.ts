@@ -1,14 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { fixtureFor } from "./fixtures";
 import { previewPhase } from "./state";
 import type {
+  AnnotationDraft,
   DocumentState,
+  MergeFile,
+  MergeReport,
   OpenDocumentPayload,
   OutlineItem,
-  PreservationReport,
+  SaveResult,
 } from "./types";
 
 declare global {
@@ -58,17 +62,102 @@ export function closeDocument(): Promise<DocumentState> {
   return invoke("close_document");
 }
 
-export async function chooseAndSaveDocument(
+export function saveDocument(documentId: string): Promise<SaveResult> {
+  if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 저장해 주세요.");
+  return invoke("save_document", { documentId });
+}
+
+export async function chooseAndSaveDocumentAs(
   documentId: string,
   title: string,
-): Promise<PreservationReport | null> {
+): Promise<SaveResult | null> {
   if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 저장해 주세요.");
   const path = await save({
     defaultPath: title,
     filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
   });
   if (!path) return null;
-  return invoke("save_document", { documentId, path });
+  return invoke("save_document_as", { documentId, path });
+}
+
+export function reorderPage(
+  documentId: string,
+  fromPage: number,
+  toPage: number,
+): Promise<DocumentState> {
+  return invoke("reorder_page", { documentId, fromPage, toPage });
+}
+
+export function deletePage(documentId: string, page: number): Promise<DocumentState> {
+  return invoke("delete_page", { documentId, page });
+}
+
+export function rotatePage(
+  documentId: string,
+  page: number,
+  degrees: -90 | 90,
+): Promise<DocumentState> {
+  return invoke("rotate_page", { documentId, page, degrees });
+}
+
+export function upsertAnnotation(
+  documentId: string,
+  annotation: AnnotationDraft,
+): Promise<DocumentState> {
+  return invoke("upsert_annotation", { documentId, annotation });
+}
+
+export function deleteAnnotation(
+  documentId: string,
+  annotationId: string,
+): Promise<DocumentState> {
+  return invoke("delete_annotation", { documentId, annotationId });
+}
+
+export async function confirmDiscardChanges(): Promise<boolean> {
+  if (!isTauriRuntime()) return true;
+  return ask("저장하지 않은 변경사항을 버릴까요?", {
+    title: "변경사항이 저장되지 않음",
+    kind: "warning",
+  });
+}
+
+export function installCloseGuard(hasUnsavedChanges: () => boolean): void {
+  if (!isTauriRuntime()) return;
+  const window = getCurrentWindow();
+  void window.onCloseRequested(async (event) => {
+    if (!hasUnsavedChanges()) return;
+    event.preventDefault();
+    if (await confirmDiscardChanges()) await window.destroy();
+  });
+}
+
+export async function chooseAndAddMergeFiles(): Promise<MergeFile[]> {
+  if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 합쳐 주세요.");
+  const selected = await open({
+    multiple: true,
+    filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
+  });
+  if (!selected) return [];
+  const paths = Array.isArray(selected) ? selected : [selected];
+  return invoke("add_merge_files", { paths });
+}
+
+export async function chooseAndSaveMergedDocument(
+  fileIds: string[],
+): Promise<MergeReport | null> {
+  if (!isTauriRuntime()) throw new Error("Tauri 앱에서 PDF를 합쳐 주세요.");
+  const path = await save({
+    defaultPath: "merged.pdf",
+    filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
+  });
+  if (!path) return null;
+  return invoke("save_merged_document", { fileIds, path });
+}
+
+export function clearMergeFiles(): Promise<void> {
+  if (!isTauriRuntime()) return Promise.resolve();
+  return invoke("clear_merge_files");
 }
 
 export async function checkForUpdates(): Promise<string> {

@@ -1,13 +1,14 @@
 import {
   getDocument,
   GlobalWorkerOptions,
+  TextLayer,
   Util,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
   type PDFPageProxy,
 } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import type { OutlineItem, SearchFragment } from "./types";
+import type { OutlineItem, PageRect, PdfRect, SearchFragment } from "./types";
 
 interface PdfOutlineNode {
   title: string;
@@ -47,8 +48,9 @@ export class PdfDocumentAdapter {
     return this.document.numPages;
   }
 
-  async pageSize(page: number, scale = 1): Promise<PageSize> {
-    const viewport = (await this.getPage(page)).getViewport({ scale });
+  async pageSize(page: number, scale = 1, rotation = 0): Promise<PageSize> {
+    const pdfPage = await this.getPage(page);
+    const viewport = pdfPage.getViewport({ scale, rotation: pdfPage.rotate + rotation });
     return { width: viewport.width, height: viewport.height };
   }
 
@@ -59,28 +61,48 @@ export class PdfDocumentAdapter {
     return output;
   }
 
-  async renderPage(canvas: HTMLCanvasElement, pageNumber: number, scale: number): Promise<PageSize> {
+  async renderPage(
+    canvas: HTMLCanvasElement,
+    textContainer: HTMLElement,
+    pageNumber: number,
+    scale: number,
+    rotation = 0,
+  ): Promise<PageSize> {
     const page = await this.getPage(pageNumber);
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale, rotation: page.rotate + rotation });
     const ratio = Math.max(1, window.devicePixelRatio || 1);
     canvas.width = Math.floor(viewport.width * ratio);
     canvas.height = Math.floor(viewport.height * ratio);
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
-    await page.render({
-      canvas,
+    textContainer.replaceChildren();
+    const textLayer = new TextLayer({
+      textContentSource: await page.getTextContent(),
+      container: textContainer,
       viewport,
-      transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
-    }).promise;
+    });
+    await Promise.all([
+      page.render({
+        canvas,
+        viewport,
+        transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
+      }).promise,
+      textLayer.render(),
+    ]);
     page.cleanup();
     return { width: viewport.width, height: viewport.height };
   }
 
-  async renderThumbnail(canvas: HTMLCanvasElement, pageNumber: number, width: number): Promise<void> {
+  async renderThumbnail(
+    canvas: HTMLCanvasElement,
+    pageNumber: number,
+    width: number,
+    rotation = 0,
+  ): Promise<void> {
     const page = await this.getPage(pageNumber);
-    const natural = page.getViewport({ scale: 1 });
+    const natural = page.getViewport({ scale: 1, rotation: page.rotate + rotation });
     const scale = width / natural.width;
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale, rotation: page.rotate + rotation });
     const ratio = Math.max(1, window.devicePixelRatio || 1);
     canvas.width = Math.floor(viewport.width * ratio);
     canvas.height = Math.floor(viewport.height * ratio);
@@ -94,9 +116,47 @@ export class PdfDocumentAdapter {
     page.cleanup();
   }
 
-  async searchFragments(pageNumber: number): Promise<SearchFragment[]> {
+  async viewportRectToPdf(
+    pageNumber: number,
+    rect: PageRect,
+    scale: number,
+    rotation = 0,
+  ): Promise<PdfRect> {
     const page = await this.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale, rotation: page.rotate + rotation });
+    const first = viewport.convertToPdfPoint(rect.x, rect.y);
+    const second = viewport.convertToPdfPoint(rect.x + rect.width, rect.y + rect.height);
+    return {
+      x1: Math.min(first[0], second[0]),
+      y1: Math.min(first[1], second[1]),
+      x2: Math.max(first[0], second[0]),
+      y2: Math.max(first[1], second[1]),
+    };
+  }
+
+  async pdfRectToViewport(
+    pageNumber: number,
+    rect: PdfRect,
+    scale: number,
+    rotation = 0,
+  ): Promise<PageRect> {
+    const page = await this.getPage(pageNumber);
+    const viewport = page.getViewport({ scale, rotation: page.rotate + rotation });
+    const first = viewport.convertToViewportPoint(rect.x1, rect.y1);
+    const second = viewport.convertToViewportPoint(rect.x2, rect.y2);
+    const x = Math.min(first[0], second[0]);
+    const y = Math.min(first[1], second[1]);
+    return {
+      x,
+      y,
+      width: Math.abs(second[0] - first[0]),
+      height: Math.abs(second[1] - first[1]),
+    };
+  }
+
+  async searchFragments(pageNumber: number, rotation = 0): Promise<SearchFragment[]> {
+    const page = await this.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1, rotation: page.rotate + rotation });
     const content = await page.getTextContent();
     return content.items.flatMap((raw) => {
       if (!("str" in raw)) return [];

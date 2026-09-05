@@ -1,94 +1,24 @@
-use serde::{Deserialize, Serialize};
+mod annotations;
+mod edit;
+mod merge;
+mod state;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DocumentState {
-    pub phase: DocumentPhase,
-    pub document_id: Option<String>,
-    pub title: String,
-    pub current_page: u32,
-    pub page_count: u32,
-    pub zoom: f32,
-    pub thumbnails: Vec<Thumbnail>,
-    pub outline: Vec<OutlineItem>,
-    pub error_message: Option<String>,
-}
+pub use merge::{inspect_pdf, merge_documents, MergeReport};
+pub use state::*;
 
-impl Default for DocumentState {
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DocumentPhase {
-    #[default]
-    Empty,
-    Loading,
-    Ready,
-    Error,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Thumbnail {
-    pub page: u32,
-    pub label: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OutlineItem {
-    pub id: String,
-    pub title: String,
-    pub page: u32,
-    pub top: Option<f32>,
-    pub depth: u32,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OpenDocument {
-    pub state: DocumentState,
-    pub bytes: Vec<u8>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreservationReport {
-    pub original_size: usize,
-    pub saved_size: usize,
-    pub original_hash: String,
-    pub saved_hash: String,
-    pub unchanged: bool,
-}
+use annotations::read_annotations;
+use edit::{load_pdf, render_document};
 
 #[derive(Default)]
 pub struct DocumentStore {
     next_id: u64,
+    next_annotation_id: u64,
     session: Option<DocumentSession>,
 }
 
 struct DocumentSession {
     state: DocumentState,
     bytes: Vec<u8>,
-}
-
-impl DocumentState {
-    pub fn empty() -> Self {
-        Self {
-            phase: DocumentPhase::Empty,
-            document_id: None,
-            title: "akbun-pdf".into(),
-            current_page: 0,
-            page_count: 0,
-            zoom: 1.0,
-            thumbnails: Vec::new(),
-            outline: Vec::new(),
-            error_message: None,
-        }
-    }
 }
 
 impl DocumentStore {
@@ -100,10 +30,7 @@ impl DocumentStore {
     }
 
     pub fn open(&mut self, title: String, bytes: Vec<u8>) -> Result<OpenDocument, String> {
-        if !bytes.starts_with(b"%PDF-") {
-            return Err("PDF 파일 형식이 아닙니다.".into());
-        }
-
+        load_pdf(&bytes)?;
         self.next_id += 1;
         let document_id = format!("document-{}", self.next_id);
         let state = DocumentState {
@@ -125,21 +52,25 @@ impl DocumentStore {
         page_count: u32,
         outline: Vec<OutlineItem>,
     ) -> Result<DocumentState, String> {
-        if page_count == 0 {
-            return Err("페이지가 없는 PDF입니다.".into());
-        }
-
         let session = self.session_mut(document_id)?;
+        let document = load_pdf(&session.bytes)?;
+        let parsed_count = document.get_pages().len() as u32;
+        if page_count == 0 || page_count != parsed_count {
+            return Err("PDF 페이지 정보를 확인할 수 없습니다.".into());
+        }
         session.state.phase = DocumentPhase::Ready;
         session.state.current_page = 1;
         session.state.page_count = page_count;
-        session.state.thumbnails = (1..=page_count)
-            .map(|page| Thumbnail {
-                page,
-                label: format!("{page}페이지"),
+        session.state.dirty = false;
+        session.state.thumbnails = thumbnails(page_count);
+        session.state.outline = outline
+            .into_iter()
+            .map(|mut item| {
+                item.source_page = item.page;
+                item
             })
             .collect();
-        session.state.outline = outline;
+        session.state.annotations = read_annotations(&document);
         session.state.error_message = None;
         Ok(session.state.clone())
     }
@@ -151,10 +82,167 @@ impl DocumentStore {
         session.state.page_count = 0;
         session.state.thumbnails.clear();
         session.state.outline.clear();
+        session.state.annotations.clear();
         session.state.error_message = Some(message);
         session.state.document_id = None;
         session.bytes.clear();
         session.bytes.shrink_to_fit();
+        Ok(session.state.clone())
+    }
+
+    pub fn reorder_page(
+        &mut self,
+        document_id: &str,
+        from_page: u32,
+        to_page: u32,
+    ) -> Result<DocumentState, String> {
+        let session = self.ready_session_mut(document_id)?;
+        let from = page_index(from_page, session.state.page_count)?;
+        let to = page_index(to_page, session.state.page_count)?;
+        let selected_source =
+            session.state.thumbnails[session.state.current_page as usize - 1].source_page;
+        if from != to {
+            let page = session.state.thumbnails.remove(from);
+            session.state.thumbnails.insert(to, page);
+            mark_dirty(&mut session.state);
+        }
+        normalize_page_numbers(&mut session.state);
+        if let Some(index) = session
+            .state
+            .thumbnails
+            .iter()
+            .position(|page| page.source_page == selected_source)
+        {
+            session.state.current_page = index as u32 + 1;
+        }
+        Ok(session.state.clone())
+    }
+
+    pub fn delete_page(&mut self, document_id: &str, page: u32) -> Result<DocumentState, String> {
+        let session = self.ready_session_mut(document_id)?;
+        if session.state.page_count <= 1 {
+            return Err("문서에는 페이지가 한 장 이상 있어야 합니다.".into());
+        }
+        let index = page_index(page, session.state.page_count)?;
+        let removed = session.state.thumbnails.remove(index);
+        session
+            .state
+            .annotations
+            .retain(|annotation| annotation.source_page != removed.source_page);
+        mark_dirty(&mut session.state);
+        normalize_page_numbers(&mut session.state);
+        Ok(session.state.clone())
+    }
+
+    pub fn rotate_page(
+        &mut self,
+        document_id: &str,
+        page: u32,
+        degrees: i32,
+    ) -> Result<DocumentState, String> {
+        if !matches!(degrees, -90 | 90) {
+            return Err("페이지는 90도 단위로만 회전할 수 있습니다.".into());
+        }
+        let session = self.ready_session_mut(document_id)?;
+        let index = page_index(page, session.state.page_count)?;
+        session.state.thumbnails[index].rotation =
+            (session.state.thumbnails[index].rotation + degrees).rem_euclid(360);
+        mark_dirty(&mut session.state);
+        Ok(session.state.clone())
+    }
+
+    pub fn upsert_annotation(
+        &mut self,
+        document_id: &str,
+        draft: AnnotationDraft,
+    ) -> Result<DocumentState, String> {
+        let source_page = {
+            let session = self.ready_session(document_id)?;
+            let index = page_index(draft.page, session.state.page_count)?;
+            session.state.thumbnails[index].source_page
+        };
+        let id = draft.id.unwrap_or_else(|| {
+            self.next_annotation_id += 1;
+            format!("annotation-{}", self.next_annotation_id)
+        });
+        let session = self.ready_session_mut(document_id)?;
+        let annotation = Annotation {
+            id: id.clone(),
+            page: draft.page,
+            kind: draft.kind,
+            rect: draft.rect,
+            color: draft.color,
+            contents: draft.contents,
+            source_page,
+        };
+        if let Some(existing) = session
+            .state
+            .annotations
+            .iter_mut()
+            .find(|item| item.id == id)
+        {
+            *existing = annotation;
+        } else {
+            session.state.annotations.push(annotation);
+        }
+        mark_dirty(&mut session.state);
+        Ok(session.state.clone())
+    }
+
+    pub fn delete_annotation(
+        &mut self,
+        document_id: &str,
+        annotation_id: &str,
+    ) -> Result<DocumentState, String> {
+        let session = self.ready_session_mut(document_id)?;
+        let before = session.state.annotations.len();
+        session
+            .state
+            .annotations
+            .retain(|item| item.id != annotation_id);
+        if session.state.annotations.len() == before {
+            return Err("주석을 찾을 수 없습니다.".into());
+        }
+        mark_dirty(&mut session.state);
+        Ok(session.state.clone())
+    }
+
+    pub fn rendered_bytes(
+        &self,
+        document_id: &str,
+    ) -> Result<(Vec<u8>, PreservationReport), String> {
+        let session = self.ready_session(document_id)?;
+        if !session.state.dirty {
+            let bytes = session.bytes.clone();
+            return Ok((
+                bytes.clone(),
+                preservation_report(&bytes, &bytes, true, true),
+            ));
+        }
+        let (saved, streams_preserved) = render_document(
+            &session.bytes,
+            &session.state.thumbnails,
+            &session.state.annotations,
+        )?;
+        let report = preservation_report(&session.bytes, &saved, streams_preserved, true);
+        Ok((saved, report))
+    }
+
+    pub fn commit_saved(
+        &mut self,
+        document_id: &str,
+        bytes: Vec<u8>,
+    ) -> Result<DocumentState, String> {
+        let session = self.ready_session_mut(document_id)?;
+        session.bytes = bytes;
+        session.state.dirty = false;
+        for (index, page) in session.state.thumbnails.iter_mut().enumerate() {
+            page.source_page = index as u32 + 1;
+            page.rotation = 0;
+        }
+        for annotation in &mut session.state.annotations {
+            annotation.source_page = annotation.page;
+        }
         Ok(session.state.clone())
     }
 
@@ -165,6 +253,22 @@ impl DocumentStore {
     pub fn close(&mut self) -> DocumentState {
         self.session = None;
         DocumentState::empty()
+    }
+
+    fn ready_session(&self, document_id: &str) -> Result<&DocumentSession, String> {
+        let session = self.session(document_id)?;
+        if session.state.phase != DocumentPhase::Ready {
+            return Err("문서가 아직 준비되지 않았습니다.".into());
+        }
+        Ok(session)
+    }
+
+    fn ready_session_mut(&mut self, document_id: &str) -> Result<&mut DocumentSession, String> {
+        let session = self.session_mut(document_id)?;
+        if session.state.phase != DocumentPhase::Ready {
+            return Err("문서가 아직 준비되지 않았습니다.".into());
+        }
+        Ok(session)
     }
 
     fn session(&self, document_id: &str) -> Result<&DocumentSession, String> {
@@ -182,6 +286,58 @@ impl DocumentStore {
     }
 }
 
+fn thumbnails(page_count: u32) -> Vec<Thumbnail> {
+    (1..=page_count)
+        .map(|page| Thumbnail {
+            page,
+            source_page: page,
+            rotation: 0,
+            label: format!("{page}페이지"),
+        })
+        .collect()
+}
+
+fn page_index(page: u32, page_count: u32) -> Result<usize, String> {
+    if page == 0 || page > page_count {
+        return Err("페이지 범위를 벗어났습니다.".into());
+    }
+    Ok(page as usize - 1)
+}
+
+fn mark_dirty(state: &mut DocumentState) {
+    state.dirty = true;
+}
+
+fn normalize_page_numbers(state: &mut DocumentState) {
+    state.page_count = state.thumbnails.len() as u32;
+    for (index, thumbnail) in state.thumbnails.iter_mut().enumerate() {
+        thumbnail.page = index as u32 + 1;
+        thumbnail.label = format!("{}페이지", thumbnail.page);
+    }
+    for annotation in &mut state.annotations {
+        if let Some(index) = state
+            .thumbnails
+            .iter()
+            .position(|page| page.source_page == annotation.source_page)
+        {
+            annotation.page = index as u32 + 1;
+        }
+    }
+    state.current_page = state.current_page.min(state.page_count).max(1);
+    for item in &mut state.outline {
+        if let Some(index) = state
+            .thumbnails
+            .iter()
+            .position(|page| page.source_page == item.source_page)
+        {
+            item.page = index as u32 + 1;
+        } else {
+            item.page = 0;
+        }
+    }
+    state.outline.retain(|item| item.page > 0);
+}
+
 fn stable_hash(bytes: &[u8]) -> String {
     let hash = bytes.iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
@@ -189,7 +345,12 @@ fn stable_hash(bytes: &[u8]) -> String {
     format!("{hash:016x}")
 }
 
-pub fn preservation_report(original: &[u8], saved: &[u8]) -> PreservationReport {
+pub fn preservation_report(
+    original: &[u8],
+    saved: &[u8],
+    content_streams_preserved: bool,
+    object_streams_preserved: bool,
+) -> PreservationReport {
     let original_hash = stable_hash(original);
     let saved_hash = stable_hash(saved);
     PreservationReport {
@@ -198,76 +359,10 @@ pub fn preservation_report(original: &[u8], saved: &[u8]) -> PreservationReport 
         unchanged: original.len() == saved.len() && original_hash == saved_hash,
         original_hash,
         saved_hash,
+        content_streams_preserved,
+        object_streams_preserved,
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const PDF: &[u8] = b"%PDF-1.7\n1 0 obj<</Length 5>>stream\nhello\nendstream\nendobj\n%%EOF";
-
-    #[test]
-    fn empty_state_has_no_document_identity_or_pages() {
-        let state = DocumentState::empty();
-        assert_eq!(state.phase, DocumentPhase::Empty);
-        assert_eq!(state.document_id, None);
-        assert_eq!(state.current_page, 0);
-        assert_eq!(state.page_count, 0);
-    }
-
-    #[test]
-    fn opening_a_second_document_releases_the_previous_session() {
-        let mut store = DocumentStore::default();
-        let first = store.open("first.pdf".into(), PDF.to_vec()).unwrap();
-        let second = store.open("second.pdf".into(), PDF.to_vec()).unwrap();
-        assert_ne!(first.state.document_id, second.state.document_id);
-        assert!(store
-            .bytes(first.state.document_id.as_deref().unwrap())
-            .is_err());
-    }
-
-    #[test]
-    fn unchanged_save_preserves_stream_bytes_and_file_size() {
-        let mut store = DocumentStore::default();
-        let opened = store.open("sample.pdf".into(), PDF.to_vec()).unwrap();
-        let id = opened.state.document_id.as_deref().unwrap();
-        let saved = store.bytes(id).unwrap().to_vec();
-        let report = preservation_report(store.bytes(id).unwrap(), &saved);
-        assert!(report.unchanged);
-        assert_eq!(report.original_size, report.saved_size);
-        assert_eq!(report.original_hash, report.saved_hash);
-        assert!(String::from_utf8(saved)
-            .unwrap()
-            .contains("stream\nhello\nendstream"));
-    }
-
-    #[test]
-    fn closing_releases_bytes_and_returns_empty_state() {
-        let mut store = DocumentStore::default();
-        let opened = store.open("sample.pdf".into(), PDF.to_vec()).unwrap();
-        let id = opened.state.document_id.unwrap();
-        assert_eq!(store.close(), DocumentState::empty());
-        assert!(store.bytes(&id).is_err());
-    }
-
-    #[test]
-    fn failed_open_releases_the_original_buffer() {
-        let mut store = DocumentStore::default();
-        let opened = store.open("sample.pdf".into(), PDF.to_vec()).unwrap();
-        let id = opened.state.document_id.unwrap();
-        let failed = store.fail(&id, "broken PDF".into()).unwrap();
-        assert_eq!(failed.phase, DocumentPhase::Error);
-        assert_eq!(failed.document_id, None);
-        assert!(store.bytes(&id).is_err());
-    }
-
-    #[test]
-    fn serialized_state_matches_the_ui_contract() {
-        let value = serde_json::to_value(DocumentState::empty()).unwrap();
-        assert_eq!(value["phase"], "empty");
-        assert_eq!(value["documentId"], serde_json::Value::Null);
-        assert_eq!(value["currentPage"], 0);
-        assert_eq!(value["errorMessage"], serde_json::Value::Null);
-    }
-}
+mod tests;

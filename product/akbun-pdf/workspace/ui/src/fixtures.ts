@@ -7,8 +7,10 @@ const emptyState: DocumentState = {
   currentPage: 0,
   pageCount: 0,
   zoom: 1,
+  dirty: false,
   thumbnails: [],
   outline: [],
+  annotations: [],
   errorMessage: null,
 };
 
@@ -33,8 +35,11 @@ export function fixtureFor(phase: DocumentPhase): DocumentState {
       currentPage: 1,
       pageCount: 8,
       zoom: 1,
+      dirty: false,
       thumbnails: Array.from({ length: 8 }, (_, index) => ({
         page: index + 1,
+        sourcePage: index + 1,
+        rotation: 0,
         label: `${index + 1}페이지`,
       })),
       outline: [
@@ -44,6 +49,7 @@ export function fixtureFor(phase: DocumentPhase): DocumentState {
         { id: "navigation", title: "빠른 탐색", page: 5, top: null, depth: 0 },
         { id: "offline", title: "오프라인 작업", page: 7, top: null, depth: 0 },
       ],
+      annotations: [],
       errorMessage: null,
     };
   }
