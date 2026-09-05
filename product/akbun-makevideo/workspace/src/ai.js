@@ -3,7 +3,7 @@
 (function (root, factory) {
   const exported = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
-  else root.makevideoAi = exported;
+  else root.makevideoAiLib = exported;
 })(globalThis, function () {
   const SESSION_VERSION = 1;
   const MAX_SESSIONS = 3;
@@ -17,7 +17,7 @@
     return new Date().toISOString();
   }
 
-  function safeText(value, limit = 1_000_000) {
+  function safeText(value, limit = SESSION_LIMIT_BYTES) {
     return typeof value === 'string' ? value.slice(0, limit) : '';
   }
 

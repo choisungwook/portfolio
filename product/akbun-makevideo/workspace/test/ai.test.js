@@ -34,6 +34,16 @@ test('normalizes restored sessions as bounded safe data', () => {
   assert.deepEqual(restored.messages[0].images.map((image) => image.id), ['ok']);
 });
 
+test('keeps a valid saved response longer than one million characters', () => {
+  const text = 'a'.repeat(1_000_001);
+  const restored = A.normalizeSession({
+    id: 'large-response',
+    messages: [{ role: 'assistant', text }],
+  });
+
+  assert.equal(restored.messages[0].text.length, text.length);
+});
+
 test('turns a session interrupted by app exit into read-only stopped history', () => {
   const restored = A.restoreInterruptedSession({
     id: 'interrupted',

@@ -5,7 +5,7 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = exported;
   else root.makevideoAiPanel = exported;
 })(globalThis, function () {
-  const A = globalThis.makevideoAi;
+  const A = globalThis.makevideoAiLib;
   const rpcPending = new Map();
   const $ = (id) => document.getElementById(id);
   let options = {};

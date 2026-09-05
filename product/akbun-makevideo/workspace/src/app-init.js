@@ -324,7 +324,7 @@
 
       await globalThis.makevideoAiPanel.initialize({
         project: () => state.project,
-        version: () => state.boot.version,
+        version: () => state.boot?.version || '',
       });
 
       // The system's font families, for the text inspectors' pickers. Off the
