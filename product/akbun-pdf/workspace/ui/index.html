@@ -115,6 +115,13 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 16 8.7-8.7 2 2L8 18H6zM13.5 8.5l2 2M5 20h14" /></svg>
             <span>형광펜</span>
           </button>
+          <div class="highlight-colors" data-role="highlight-colors" aria-label="형광펜 색" hidden>
+            <button class="highlight-color" type="button" style="--swatch: #ffd54f" data-highlight-color="#ffd54f" aria-label="노랑"></button>
+            <button class="highlight-color" type="button" style="--swatch: #a5f3a0" data-highlight-color="#a5f3a0" aria-label="초록"></button>
+            <button class="highlight-color" type="button" style="--swatch: #9fd8ff" data-highlight-color="#9fd8ff" aria-label="파랑"></button>
+            <button class="highlight-color" type="button" style="--swatch: #ffb3d1" data-highlight-color="#ffb3d1" aria-label="분홍"></button>
+            <button class="highlight-color" type="button" style="--swatch: #d7b3ff" data-highlight-color="#d7b3ff" aria-label="보라"></button>
+          </div>
           <button class="tool-button" type="button" data-action="note" data-document-control>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3z" /><path d="M9 9h6M9 12h4" /></svg>
             <span>메모</span>
@@ -133,20 +140,6 @@
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM15 5.5v13M7 9h5M7 12h5M7 15h3" /></svg>
         </button>
       </header>
-
-      <section class="search-panel" data-role="search-panel" aria-label="문서 찾기" hidden>
-        <input type="search" data-role="search-input" aria-label="찾을 텍스트" placeholder="한글 또는 영문 찾기" autocomplete="off" />
-        <span class="search-status" data-role="search-status">검색어를 입력하세요.</span>
-        <button class="icon-button" type="button" aria-label="이전 결과" data-action="previous-result">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 14 5-5 5 5" /></svg>
-        </button>
-        <button class="icon-button" type="button" aria-label="다음 결과" data-action="next-result">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
-        </button>
-        <button class="icon-button" type="button" aria-label="찾기 닫기" data-action="close-find">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg>
-        </button>
-      </section>
 
       <div class="workspace">
         <aside class="pages-panel" aria-label="페이지 썸네일">
@@ -246,8 +239,9 @@
 
         <aside class="outline-panel" aria-label="문서 정보와 AI">
           <div class="context-tabs" role="tablist" aria-label="오른쪽 패널">
-            <button class="context-tab context-tab--active" type="button" role="tab" aria-selected="true" data-ai-action="show-outline">목차</button>
-            <button class="context-tab" type="button" role="tab" aria-selected="false" data-ai-action="open">AI</button>
+            <button class="context-tab context-tab--active" type="button" role="tab" aria-selected="true" data-context-tab="outline" data-ai-action="show-outline">목차</button>
+            <button class="context-tab" type="button" role="tab" aria-selected="false" data-context-tab="find" data-action="find">찾기</button>
+            <button class="context-tab" type="button" role="tab" aria-selected="false" data-context-tab="ai" data-ai-action="open">AI</button>
           </div>
           <section class="outline-view" data-role="outline-view">
             <nav class="outline-list" data-role="outline-list"></nav>
@@ -255,6 +249,20 @@
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h12M6 10h8M6 15h10M6 20h7" /></svg>
               <span>목차가 없습니다.</span>
             </div>
+          </section>
+          <section class="find-view" data-role="find-view" hidden>
+            <div class="find-bar">
+              <input type="search" data-role="search-input" aria-label="찾을 텍스트" placeholder="한글 또는 영문 찾기" autocomplete="off" />
+              <button class="icon-button" type="button" aria-label="이전 결과" data-action="previous-result">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 14 5-5 5 5" /></svg>
+              </button>
+              <button class="icon-button" type="button" aria-label="다음 결과" data-action="next-result">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
+              </button>
+            </div>
+            <span class="search-status" data-role="search-status">검색어를 입력하세요.</span>
+            <div class="find-empty" data-role="find-empty">찾을 단어를 입력하세요.</div>
+            <div class="find-results" data-role="find-results"></div>
           </section>
           <section class="ai-panel" data-role="ai-panel" hidden>
             <header class="ai-panel__header">

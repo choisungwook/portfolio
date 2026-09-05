@@ -112,6 +112,26 @@ export function renderDocument(state: DocumentState): void {
   renderOutline(state);
 }
 
+const contextViews = { outline: "outline-view", find: "find-view", ai: "ai-panel" } as const;
+
+export type ContextTab = keyof typeof contextViews;
+
+export function showContextTab(name: ContextTab): void {
+  for (const [tab, role] of Object.entries(contextViews)) {
+    element<HTMLElement>(`[data-role='${role}']`).hidden = tab !== name;
+  }
+  document.body.classList.toggle("ai-panel-open", name === "ai");
+  document.querySelectorAll<HTMLButtonElement>(".context-tab").forEach((button) => {
+    const active = button.dataset.contextTab === name;
+    button.classList.toggle("context-tab--active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+}
+
+export function isContextTabOpen(name: ContextTab): boolean {
+  return !element<HTMLElement>(`[data-role='${contextViews[name]}']`).hidden;
+}
+
 export function showToast(text: string): void {
   const toast = element<HTMLElement>("[data-role='toast']");
   if (toastTimer !== undefined) window.clearTimeout(toastTimer);

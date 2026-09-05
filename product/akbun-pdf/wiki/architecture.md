@@ -37,10 +37,14 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 - 도구 모음: 열기, 합치기, 저장, 페이지 이동, 배율, 주석 도구
 - 왼쪽: 끌기 재정렬이 가능한 페이지 썸네일과 회전·삭제
 - 가운데: PDF.js canvas, text layer, 검색·주석 layer가 들어가는 문서 surface
-- 오른쪽: PDF outline 기반 목차와 채팅형 AI 패널
+- 오른쪽: 목차, 찾기, AI 세 탭을 한 패널에서 전환
+- 찾기 탭: 입력창, 결과 개수, 페이지 번호와 일치 구간을 강조한 결과 목록
 - AI 페이지 선택: 현재 페이지, 직접 범위, 전체 페이지와 썸네일 다중 선택
 - AI 승인: 문서·페이지·provider·모델을 확인한 뒤 요약 실행
 - 주석: PDF.js text layer의 선택 영역과 페이지 좌표를 PDF user space로 변환
+- 형광펜: 도구를 켜면 색 띠가 열리고, 드래그로 고른 텍스트를 줄 단위로 바로 칠함
+- 메모는 dialog로 내용을 받고, 주석만 바뀐 갱신은 페이지를 다시 그리지 않음
+- 배율: 도구 모음 버튼과 함께 트랙패드 핀치, cmd·ctrl + 휠로 커서 지점 기준 변경
 - 합치기: 열린 문서를 건드리지 않는 별도 dialog와 Rust 입력 저장소
 - 개발 미리보기는 URL의 `state` query로 네 상태를 독립 확인
 
@@ -76,6 +80,7 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 - 페이지 삭제 시 삭제된 페이지를 직접 참조하는 목차 항목만 제거하고 나머지 연결 유지
 - 합치기는 입력 페이지 객체를 새 페이지 트리에 연결하고 항상 새 파일로 저장
 - 페이지 텍스트는 PDF.js Worker에서 순서대로 추출하고 준비된 페이지부터 검색
+- 검색 강조는 조각 전체가 아니라 일치한 글자 구간만 잘라 낸 사각형 사용
 - 검색 캐시는 문서 닫기와 교체에서 즉시 제거
 - PDF.js Worker와 JBIG2·OpenJPEG·QCMS WASM 자산은 Vite가 같은 자산 디렉터리에 번들
 - 열기 중 PDF.js 렌더링 실패 시 Rust 세션과 UI 페이지 surface를 함께 해제

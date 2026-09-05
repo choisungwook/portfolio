@@ -4,14 +4,41 @@
     {
       "name": "akbun-openapiviewer",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "product/akbun-openapiviewer/workspace", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "product/akbun-openapiviewer/workspace",
+        "run",
+        "dev"
+      ],
       "port": 4321
     },
     {
       "name": "akbun-productcatalog",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "product/akbun-productcatalog/workspace", "run", "dev", "--", "--port", "4322"],
+      "runtimeArgs": [
+        "--prefix",
+        "product/akbun-productcatalog/workspace",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "4322"
+      ],
       "port": 4322
+    },
+    {
+      "name": "akbun-pdf",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "product/akbun-pdf/workspace",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "4323"
+      ],
+      "port": 4323
     }
   ]
 }

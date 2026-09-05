@@ -15,6 +15,7 @@ interface ViewerCallbacks {
   onCurrentPage: (page: number) => void;
   onIndexProgress: () => void;
   onCreateAnnotation: (kind: AnnotationKind, page: number, rect: PdfRect) => void;
+  onHighlightSelection: (page: number, rects: PdfRect[]) => void;
   onEditAnnotation: (annotationId: string) => void;
 }
 
@@ -95,6 +96,20 @@ export class PdfViewer {
 
   hasDocument(): boolean {
     return this.adapter !== null;
+  }
+
+  // 확대 지점을 화면 위 같은 자리에 붙잡아 둔다. 없으면 커서 아래 글자가 화면 밖으로 달아난다.
+  zoomAt(requested: number, clientX: number, clientY: number): number {
+    if (!this.adapter) return this.scale;
+    const view = this.viewport.getBoundingClientRect();
+    const before = this.scale;
+    const anchorX = this.viewport.scrollLeft + clientX - view.left;
+    const anchorY = this.viewport.scrollTop + clientY - view.top;
+    const scale = this.zoom("custom", requested);
+    const ratio = scale / before;
+    this.viewport.scrollLeft += anchorX * (ratio - 1);
+    this.viewport.scrollTop += anchorY * (ratio - 1);
+    return scale;
   }
 
   zoom(mode: FitMode, requested = this.scale): number {
@@ -304,21 +319,17 @@ export class PdfViewer {
     const range = selection.getRangeAt(0);
     const textLayer = surface.querySelector(".text-layer");
     if (!textLayer?.contains(range.commonAncestorContainer)) return;
-    const surfaceRect = surface.getBoundingClientRect();
-    const rectangles = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
-    if (rectangles.length === 0) return;
-    const left = Math.max(surfaceRect.left, Math.min(...rectangles.map((rect) => rect.left)));
-    const top = Math.max(surfaceRect.top, Math.min(...rectangles.map((rect) => rect.top)));
-    const right = Math.min(surfaceRect.right, Math.max(...rectangles.map((rect) => rect.right)));
-    const bottom = Math.min(surfaceRect.bottom, Math.max(...rectangles.map((rect) => rect.bottom)));
-    const rect = await adapter.viewportRectToPdf(
+    const bounds = surface.getBoundingClientRect();
+    const rows = groupSelectionRows([...range.getClientRects()], bounds);
+    if (rows.length === 0) return;
+    selection.removeAllRanges();
+    const rects = await Promise.all(rows.map((row) => adapter.viewportRectToPdf(
       page.sourcePage,
-      { x: left - surfaceRect.left, y: top - surfaceRect.top, width: right - left, height: bottom - top },
+      row,
       this.scale,
       page.rotation,
-    );
-    selection.removeAllRanges();
-    this.callbacks.onCreateAnnotation("highlight", pageNumber, rect);
+    )));
+    this.callbacks.onHighlightSelection(pageNumber, rects);
   }
 
   private async createNote(pageNumber: number, event: MouseEvent): Promise<void> {
@@ -374,6 +385,30 @@ export class PdfViewer {
   private surface(page: number): HTMLElement | null {
     return this.stage.querySelector<HTMLElement>(`[data-pdf-page='${page}']`);
   }
+}
+
+// 선택 영역을 통째로 감싸면 여러 줄이 한 덩어리로 칠해진다. 줄마다 나눠 형광펜처럼 보이게 한다.
+export function groupSelectionRows(rectangles: DOMRect[], bounds: DOMRect): PageRect[] {
+  const rows: PageRect[] = [];
+  for (const rect of rectangles) {
+    const left = Math.max(bounds.left, rect.left) - bounds.left;
+    const top = Math.max(bounds.top, rect.top) - bounds.top;
+    const right = Math.min(bounds.right, rect.right) - bounds.left;
+    const bottom = Math.min(bounds.bottom, rect.bottom) - bounds.top;
+    if (right - left <= 0 || bottom - top <= 0) continue;
+    const row = rows.find((item) => Math.abs(item.y + item.height / 2 - (top + bottom) / 2) < (bottom - top) / 2);
+    if (row) {
+      const mergedRight = Math.max(row.x + row.width, right);
+      const mergedBottom = Math.max(row.y + row.height, bottom);
+      row.x = Math.min(row.x, left);
+      row.y = Math.min(row.y, top);
+      row.width = mergedRight - row.x;
+      row.height = mergedBottom - row.y;
+      continue;
+    }
+    rows.push({ x: left, y: top, width: right - left, height: bottom - top });
+  }
+  return rows;
 }
 
 function scaledRect(rect: PageRect, scale: number): PageRect {

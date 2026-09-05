@@ -106,6 +106,9 @@ export interface SearchResult {
   id: string;
   page: number;
   rects: PageRect[];
+  snippet: string;
+  matchStart: number;
+  matchLength: number;
 }
 
 export type FitMode = "custom" | "actual" | "width" | "page";

@@ -87,8 +87,24 @@ export function installStreamAsyncIteration(prototype: object = ReadableStream.p
   });
 }
 
+// text layer의 span 사이에는 빈틈이 있어서 드래그가 그 위를 지나면 선택이 끊긴다.
+// pdf.js viewer와 같은 방법으로, 드래그하는 동안만 layer 전체를 덮는 빈 요소를 깔아 준다.
+export function installTextSelectionRepair(): void {
+  document.addEventListener("pointerdown", (event) => {
+    const layer = (event.target as HTMLElement | null)?.closest?.(".text-layer");
+    layer?.classList.add("text-layer--selecting");
+  });
+  const stop = (): void => {
+    document.querySelectorAll(".text-layer--selecting")
+      .forEach((layer) => layer.classList.remove("text-layer--selecting"));
+  };
+  document.addEventListener("pointerup", stop);
+  window.addEventListener("blur", stop);
+}
+
 export function configurePdfEngine(): void {
   installStreamAsyncIteration();
+  installTextSelectionRepair();
   GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
@@ -152,6 +168,9 @@ export class PdfDocumentAdapter {
       }).promise,
       textLayer.render(),
     ]);
+    const end = document.createElement("div");
+    end.className = "text-layer__end";
+    textContainer.append(end);
     page.cleanup();
     return { width: viewport.width, height: viewport.height };
   }
