@@ -31,3 +31,4 @@
 | [2026-09-playback-speed-and-audio-curves.md](./2026-09-playback-speed-and-audio-curves.md) | Clip duration is derived from speed; pitch preservation defaults on and fades stay separate from keyframes |
 | [2026-09-pip-video-overlay.md](./2026-09-pip-video-overlay.md) | PIP uses the common visual-item model and warns beyond four simultaneous video sources |
 | [2026-09-dissolve-boundary-object.md](./2026-09-dissolve-boundary-object.md) | Dissolve is a separate adjacent-clip boundary object with interval-only dual decode |
+| [2026-09-codex-app-server-ai.md](./2026-09-codex-app-server-ai.md) | AI uses the user's Codex App Server and app-owned bounded sessions |

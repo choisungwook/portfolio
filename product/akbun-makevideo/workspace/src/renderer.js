@@ -76,6 +76,7 @@ const dom = {
   inspectorView: el('inspector-view'),
   shapeToolView: el('shape-tool-view'),
   markerToolView: el('marker-tool-view'),
+  aiView: el('ai-view'),
   toolWarning: el('tool-warning'),
   playbackWarning: el('playback-warning'),
   assetList: el('asset-list'),

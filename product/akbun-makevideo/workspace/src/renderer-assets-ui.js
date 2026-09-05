@@ -203,6 +203,7 @@
       shape: 'Shape',
       marker: 'Marker',
       debug: 'Debug',
+      ai: 'AI',
     };
 
     function activateSelectedPanel(panel) {
@@ -213,6 +214,8 @@
       dom.shapeToolView.hidden = panel !== 'shape';
       dom.markerToolView.hidden = panel !== 'marker';
       dom.debugPanel.hidden = panel !== 'debug';
+      dom.aiView.hidden = panel !== 'ai';
+      dom.panelTabBar.hidden = panel === 'ai';
       dom.selectedPanelTitle.textContent = panel ? PANEL_TITLES[panel] : 'Inspector';
       for (const button of dom.globalActions.querySelectorAll('[data-panel-action]')) {
         const active = button.dataset.panelAction === panel;
@@ -221,6 +224,7 @@
       }
       if (panel === 'debug') startDebug();
       else stopDebug();
+      if (panel === 'ai') void globalThis.makevideoAiPanel.open();
       window.requestAnimationFrame(() => {
         if (preview) preview.layout();
         if (sourcePreview) sourcePreview.layout();

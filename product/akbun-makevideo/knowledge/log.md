@@ -2,6 +2,7 @@
 
 ## 2026-09-05
 
+* [Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다](decisions/2026-09-codex-ai-sessions-are-app-owned.md) 결정 기록. Codex thread와 앱의 세션·이미지 보관 경계를 분리함.
 * [clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다](decisions/2026-09-clip-speed-derives-duration.md) 결정 기록. source trim을 유지하고 preview와 render의 duration·pitch·fade 해석을 통일함.
 
 ## 2026-09-04

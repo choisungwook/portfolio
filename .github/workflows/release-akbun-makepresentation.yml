@@ -6,9 +6,11 @@ on:
       - master
     paths:
       - 'product/akbun-makepresentation/**'
+      - 'crates/akbun-ai/**'
   pull_request:
     paths:
       - 'product/akbun-makepresentation/**'
+      - 'crates/akbun-ai/**'
   workflow_dispatch:
 
 permissions:
@@ -31,6 +33,9 @@ jobs:
 
       - name: Run page tests
         run: npm test
+
+      - name: Run shared AI runtime tests
+        run: cargo test --manifest-path ../../../crates/akbun-ai/Cargo.toml
 
       # makepresentation-deck depends on neither tauri nor a webview, so -p
       # keeps this to serde, zip and quick-xml. Testing the app crate instead

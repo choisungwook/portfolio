@@ -114,6 +114,7 @@ if (!window.__TAURI__) {
     pickRenderOutput: unavailable,
     pickSrtOpen: unavailable,
     pickSrtSave: unavailable,
+    pickAiImageSave: unavailable,
     pickFolder: unavailable,
     listProjects: async () => [],
     previewFrame: unavailable,
@@ -183,6 +184,21 @@ if (!window.__TAURI__) {
     onCloseRequested: () => {},
     closeWindow: () => {},
     checkUpdate: async () => {},
+    aiStartServer: async () => ({ running: false, reason: 'desktop_required' }),
+    aiSendRpc: async () => {
+      throw new Error('AI integration needs the desktop app.');
+    },
+    aiStopServer: async () => {},
+    aiRuntimeDirectory: async () => '',
+    aiListSessions: async () => [],
+    aiLoadSession: async () => null,
+    aiSaveSession: async () => 0,
+    aiDeleteSession: async () => {},
+    aiAttachImage: async () => null,
+    aiCopyImage: async () => {},
+    aiImageUrl: (path) => path,
+    onAiServerMessage: () => Promise.resolve(() => {}),
+    onAiServerState: () => Promise.resolve(() => {}),
     reportError: async (source, text) => console.error(source, text),
   };
   throw new Error('not running under Tauri; using the browser fallback api');
@@ -265,6 +281,11 @@ window.api = {
     }),
   pickSrtOpen: () => openDialog({ title: 'Import SubRip', filters: SRT_FILTERS }),
   pickSrtSave: (defaultName) => saveDialog({ title: 'Export SubRip', defaultPath: defaultName, filters: SRT_FILTERS }),
+  pickAiImageSave: (defaultName) => saveDialog({
+    title: 'Save AI Image',
+    defaultPath: defaultName,
+    filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+  }),
   pickLut: () => openDialog({ title: 'Apply 3D LUT', filters: LUT_FILTERS }),
 
   pickFolder: (title) => openDialog({ title, directory: true, multiple: false }),
@@ -365,6 +386,23 @@ window.api = {
   onCloseRequested: (handler) => getCurrentWindow().onCloseRequested(handler),
   closeWindow: () => getCurrentWindow().destroy(),
   checkUpdate,
+  aiStartServer: () => invoke('ai_start_server'),
+  aiSendRpc: (message) => invoke('ai_send_rpc', { message }),
+  aiStopServer: () => invoke('ai_stop_server'),
+  aiRuntimeDirectory: () => invoke('ai_runtime_directory'),
+  aiListSessions: () => invoke('ai_list_sessions'),
+  aiLoadSession: (sessionId) => invoke('ai_load_session', { sessionId }),
+  aiSaveSession: (sessionId, session) => invoke('ai_save_session', { sessionId, session }),
+  aiDeleteSession: (sessionId) => invoke('ai_delete_session', { sessionId }),
+  aiAttachImage: (sessionId, sourcePath, imageId) =>
+    invoke('ai_attach_image', { sessionId, sourcePath, imageId }),
+  aiCopyImage: (sourcePath, destinationPath) =>
+    invoke('ai_copy_image', { sourcePath, destinationPath }),
+  aiImageUrl: (path) => convertFileSrc(path),
+  onAiServerMessage: (handler) =>
+    listen('ai-server-message', (event) => handler(event.payload)),
+  onAiServerState: (handler) =>
+    listen('ai-server-state', (event) => handler(event.payload)),
 };
 
 function pageErrorText(error) {

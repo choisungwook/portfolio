@@ -1,6 +1,6 @@
 {
   "name": "akbun-makevideo",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "private": true,
   "description": "Desktop video editor: multi track timeline, live preview, ffmpeg render to FHD and 4K",
   "author": "akbun",
@@ -9,6 +9,7 @@
     "start": "tauri dev",
     "build:alpha": "tauri build --debug --bundles app --config src-tauri/tauri.alpha.conf.json",
     "test": "node --test test/*.test.js",
+    "test:ai": "cargo test --manifest-path ../../../crates/akbun-ai/Cargo.toml",
     "test:time": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-time",
     "test:edit": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-edit",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-render",

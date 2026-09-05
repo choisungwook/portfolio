@@ -322,6 +322,11 @@
         dom.toolWarning.title = 'Open Settings to inspect the error log location';
       }
 
+      await globalThis.makevideoAiPanel.initialize({
+        project: () => state.project,
+        version: () => state.boot?.version || '',
+      });
+
       // The system's font families, for the text inspectors' pickers. Off the
       // boot path on purpose: reading every font file's name takes long enough to
       // notice, and nothing before the first font edit needs the list.
