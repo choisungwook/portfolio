@@ -49,13 +49,16 @@
   }
 
   function renderProvider() {
-    const selected = $('as-transcription-provider')?.value;
-    const provider = selected || currentSettings().transcriptionProvider || 'openai';
-    const preset = PROVIDERS[provider] || PROVIDERS.custom;
-    if ($('as-transcription-note')) $('as-transcription-note').textContent = preset.note;
+    const settings = currentSettings();
+    const formProvider = $('as-transcription-provider')?.value
+      || settings.transcriptionProvider
+      || 'openai';
+    const formPreset = PROVIDERS[formProvider] || PROVIDERS.custom;
+    if ($('as-transcription-note')) $('as-transcription-note').textContent = formPreset.note;
     if ($('ai-edit-provider')) {
-      const settings = currentSettings();
-      const model = $('as-transcription-model')?.value || settings.transcriptionModel || preset.model;
+      const provider = settings.transcriptionProvider || 'openai';
+      const preset = PROVIDERS[provider] || PROVIDERS.custom;
+      const model = settings.transcriptionModel || preset.model;
       $('ai-edit-provider').textContent = `${preset.label} · ${model} · mono 16 kHz MP3`;
     }
   }
@@ -99,6 +102,7 @@
   }
 
   function renderCaptions() {
+    if (selectedSection !== 'captions') return;
     const list = $('caption-editor-list');
     if (!list) return;
     const captions = captionItems();

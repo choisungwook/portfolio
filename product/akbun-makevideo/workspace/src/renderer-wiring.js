@@ -545,6 +545,8 @@
         void fillGraphicsDevices();
       });
       el('as-save').addEventListener('click', async () => {
+        const silencePaddingText = el('as-silence-padding').value.trim();
+        const silencePadding = Number(silencePaddingText);
         const next = Object.assign({}, state.settings, {
           previewQuality: el('as-quality').value,
           previewMuteWhileScrubbing: el('as-scrub-mute').checked,
@@ -580,7 +582,12 @@
           ),
           silencePaddingMs: Math.min(
             2000,
-            Math.max(0, Math.round(Number(el('as-silence-padding').value) || 0)),
+            Math.max(
+              0,
+              Math.round(silencePaddingText === '' || !Number.isFinite(silencePadding)
+                ? 120
+                : silencePadding),
+            ),
           ),
         });
         closeSheet('app-settings');
