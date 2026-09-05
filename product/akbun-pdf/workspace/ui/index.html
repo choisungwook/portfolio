@@ -9,10 +9,10 @@
   <body data-phase="empty">
     <div id="app" class="app-shell">
       <header class="menubar" aria-label="애플리케이션 메뉴">
-        <nav class="menus">
+        <nav class="menus" role="menubar">
           <div class="menu">
-            <button class="menu-title" type="button" data-menu="file">파일</button>
-            <ul class="menu-list" data-menu-list="file">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu" data-menu="file">파일</button>
+            <ul id="file-menu" class="menu-list" role="menu" data-menu-list="file">
               <li><button type="button" data-action="open">PDF 열기…<kbd>⌘O</kbd></button></li>
               <li><button type="button" data-action="merge">PDF 합치기…</button></li>
               <li class="menu-separator"></li>
@@ -23,8 +23,8 @@
             </ul>
           </div>
           <div class="menu">
-            <button class="menu-title" type="button" data-menu="edit">편집</button>
-            <ul class="menu-list" data-menu-list="edit">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="edit-menu" data-menu="edit">편집</button>
+            <ul id="edit-menu" class="menu-list" role="menu" data-menu-list="edit">
               <li><button type="button" data-action="find" data-document-control>찾기…<kbd>⌘F</kbd></button></li>
               <li class="menu-separator"></li>
               <li><button type="button" data-action="highlight" data-document-control>형광펜</button></li>
@@ -36,8 +36,8 @@
             </ul>
           </div>
           <div class="menu">
-            <button class="menu-title" type="button" data-menu="view">보기</button>
-            <ul class="menu-list" data-menu-list="view">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" data-menu="view">보기</button>
+            <ul id="view-menu" class="menu-list" role="menu" data-menu-list="view">
               <li><button type="button" data-action="actual-size" data-document-control>실제 크기</button></li>
               <li><button type="button" data-action="fit-width" data-document-control>너비에 맞춤</button></li>
               <li><button type="button" data-action="fit-page" data-document-control>페이지에 맞춤</button></li>
@@ -47,8 +47,8 @@
             </ul>
           </div>
           <div class="menu">
-            <button class="menu-title" type="button" data-menu="help">도움말</button>
-            <ul class="menu-list" data-menu-list="help">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu" data-menu="help">도움말</button>
+            <ul id="help-menu" class="menu-list" role="menu" data-menu-list="help">
               <li><button type="button" data-action="check-update">업데이트 확인…</button></li>
             </ul>
           </div>

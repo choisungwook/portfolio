@@ -25,7 +25,7 @@ import {
 } from "./bridge";
 import { configurePdfEngine, PdfDocumentAdapter } from "./pdf-engine";
 import { renderDocument, showToast } from "./render";
-import { changeZoom, goToPage, normalizeState } from "./state";
+import { changeZoom, errorState, goToPage, normalizeState } from "./state";
 import type {
   AnnotationDraft,
   AnnotationKind,
@@ -130,17 +130,7 @@ async function openDocument(): Promise<void> {
       try {
         updateState(await failDocumentOpen(documentId, error));
       } catch {
-        updateState({
-          ...state,
-          phase: "error",
-          documentId: null,
-          currentPage: 0,
-          pageCount: 0,
-          thumbnails: [],
-          outline: [],
-          annotations: [],
-          errorMessage: String(error),
-        });
+        updateState(errorState(error));
       }
     } else {
       showToast(`열기 실패 · ${String(error)}`);
@@ -404,6 +394,9 @@ function handleAction(action: string): void {
   if (action === "check-update") void checkForUpdates().then(showToast);
 }
 
+document.querySelectorAll(".menu-list button").forEach((item) => item.setAttribute("role", "menuitem"));
+document.querySelectorAll(".menu-separator").forEach((item) => item.setAttribute("role", "separator"));
+
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   const menuTitle = target.closest<HTMLButtonElement>("[data-menu]");
@@ -478,20 +471,19 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelector(".menus")?.addEventListener("pointerover", (event) => {
-  if (!document.querySelector(".menu-list--open")) return;
-  const title = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-menu]");
-  if (title?.dataset.menu) openMenu(title.dataset.menu);
-});
-
 function closeMenus(): void {
-  document.querySelectorAll(".menu-title--open").forEach((item) => item.classList.remove("menu-title--open"));
+  document.querySelectorAll<HTMLButtonElement>("[data-menu]").forEach((item) => {
+    item.classList.remove("menu-title--open");
+    item.ariaExpanded = "false";
+  });
   document.querySelectorAll(".menu-list--open").forEach((item) => item.classList.remove("menu-list--open"));
 }
 
 function openMenu(name: string): void {
   closeMenus();
-  document.querySelector(`[data-menu='${name}']`)?.classList.add("menu-title--open");
+  const title = document.querySelector<HTMLButtonElement>(`[data-menu='${name}']`);
+  title?.classList.add("menu-title--open");
+  if (title) title.ariaExpanded = "true";
   document.querySelector(`[data-menu-list='${name}']`)?.classList.add("menu-list--open");
 }
 
