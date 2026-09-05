@@ -99,6 +99,7 @@ export function installTextSelectionRepair(): void {
       .forEach((layer) => layer.classList.remove("text-layer--selecting"));
   };
   document.addEventListener("pointerup", stop);
+  document.addEventListener("pointercancel", stop);
   window.addEventListener("blur", stop);
 }
 

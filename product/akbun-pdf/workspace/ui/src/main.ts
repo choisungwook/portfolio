@@ -133,7 +133,9 @@ async function highlightSelection(page: number, rects: PdfRect[]): Promise<void>
 
 function markHighlightColor(): void {
   document.querySelectorAll<HTMLElement>("[data-highlight-color]").forEach((swatch) => {
-    swatch.classList.toggle("highlight-color--selected", swatch.dataset.highlightColor === highlightColor);
+    const selected = swatch.dataset.highlightColor === highlightColor;
+    swatch.classList.toggle("highlight-color--selected", selected);
+    swatch.setAttribute("aria-pressed", String(selected));
   });
 }
 
