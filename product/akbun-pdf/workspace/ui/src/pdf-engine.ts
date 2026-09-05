@@ -8,7 +8,13 @@ import {
   type PDFPageProxy,
 } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import type { OutlineItem, PageRect, PdfRect, SearchFragment } from "./types";
+import type {
+  OutlineItem,
+  PageRect,
+  PdfRect,
+  SearchFragment,
+  SummaryPageInput,
+} from "./types";
 
 interface PdfOutlineNode {
   title: string;
@@ -114,6 +120,33 @@ export class PdfDocumentAdapter {
       transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
     }).promise;
     page.cleanup();
+  }
+
+  async summaryInput(
+    pageNumber: number,
+    displayPage: number,
+    rotation = 0,
+  ): Promise<SummaryPageInput> {
+    const page = await this.getPage(pageNumber);
+    const natural = page.getViewport({ scale: 1, rotation: page.rotate + rotation });
+    const scale = Math.min(1.5, 1400 / natural.width);
+    const viewport = page.getViewport({ scale, rotation: page.rotate + rotation });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    const [content] = await Promise.all([
+      page.getTextContent(),
+      page.render({ canvas, viewport }).promise,
+    ]);
+    const text = content.items
+      .flatMap((item) => "str" in item ? [item.str] : [])
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 100_000);
+    const imageDataUrl = canvas.toDataURL("image/png");
+    page.cleanup();
+    return { page: displayPage, text, imageDataUrl };
   }
 
   async viewportRectToPdf(

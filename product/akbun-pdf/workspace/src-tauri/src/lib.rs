@@ -1,3 +1,4 @@
+mod ai;
 mod commands;
 mod files;
 
@@ -74,7 +75,9 @@ pub fn run() {
 
     builder
         .manage(AppState::default())
+        .manage(ai::AiRuntime::default())
         .setup(|app| {
+            ai::setup(app)?;
             #[cfg(debug_assertions)]
             {
                 use tauri::Manager;
@@ -86,6 +89,20 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ai::ai_start_server,
+            ai::ai_send_rpc,
+            ai::ai_stop_server,
+            ai::ai_runtime_directory,
+            ai::ai_load_settings,
+            ai::ai_save_settings,
+            ai::ai_list_conversations,
+            ai::ai_create_conversation,
+            ai::ai_load_conversation,
+            ai::ai_append_message,
+            ai::ai_rename_conversation,
+            ai::ai_delete_conversation,
+            ai::ai_save_page_image,
+            ai::ai_clear_request,
             commands::get_document_state,
             commands::open_document,
             commands::complete_document_open,

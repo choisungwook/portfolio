@@ -7,6 +7,7 @@ import type {
   PageRect,
   PdfRect,
   SearchResult,
+  SummaryPageInput,
   Thumbnail,
 } from "./types";
 
@@ -92,6 +93,10 @@ export class PdfViewer {
     this.stage.dataset.annotationTool = tool ?? "";
   }
 
+  hasDocument(): boolean {
+    return this.adapter !== null;
+  }
+
   zoom(mode: FitMode, requested = this.scale): number {
     if (!this.adapter) return this.scale;
     const horizontalSpace = Math.max(240, this.viewport.clientWidth - 88);
@@ -130,6 +135,24 @@ export class PdfViewer {
         layer.append(highlight);
       });
     });
+  }
+
+  async renderPickerThumbnail(
+    canvas: HTMLCanvasElement,
+    pageNumber: number,
+    width: number,
+  ): Promise<void> {
+    const adapter = this.adapter;
+    const page = this.pages[pageNumber - 1];
+    if (!adapter || !page) throw new Error("요약할 페이지를 찾을 수 없습니다.");
+    await adapter.renderThumbnail(canvas, page.sourcePage, width, page.rotation);
+  }
+
+  async summaryInput(pageNumber: number): Promise<SummaryPageInput> {
+    const adapter = this.adapter;
+    const page = this.pages[pageNumber - 1];
+    if (!adapter || !page) throw new Error("요약할 페이지를 찾을 수 없습니다.");
+    return adapter.summaryInput(page.sourcePage, page.page, page.rotation);
   }
 
   async showAnnotations(annotations: Annotation[]): Promise<void> {

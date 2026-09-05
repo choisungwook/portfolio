@@ -109,3 +109,55 @@ export interface SearchResult {
 }
 
 export type FitMode = "custom" | "actual" | "width" | "page";
+
+export type AiProvider = "codex";
+export type AiModel = "gpt-5.6-luna" | "gpt-5.6-terra" | "gpt-5.6-sol";
+export type AiRole = "user" | "assistant";
+
+export interface AiSettings {
+  version: number;
+  provider: AiProvider;
+  model: AiModel;
+  effort: "low";
+  systemPrompt: string;
+}
+
+export interface AiConversationMeta {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface AiMessage {
+  id: string;
+  role: AiRole;
+  text: string;
+  createdAt: string;
+  pages: number[];
+}
+
+export interface AiConversation {
+  meta: AiConversationMeta;
+  messages: AiMessage[];
+}
+
+export interface AiConnection {
+  state: "checking" | "available" | "unavailable";
+  label: string;
+  detail: string;
+  version: string;
+}
+
+export interface AiTurnInput {
+  type: "text" | "localImage";
+  text?: string;
+  path?: string;
+}
+
+export interface SummaryPageInput {
+  page: number;
+  text: string;
+  imageDataUrl: string;
+}

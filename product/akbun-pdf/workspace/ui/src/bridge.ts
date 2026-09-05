@@ -1,12 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { fixtureFor } from "./fixtures";
+import { defaultAiSettings } from "./ai-settings";
 import { previewPhase } from "./state";
 import type {
   AnnotationDraft,
+  AiConversation,
+  AiConversationMeta,
+  AiMessage,
+  AiSettings,
   DocumentState,
   MergeFile,
   MergeReport,
@@ -26,6 +32,10 @@ function isTauriRuntime(): boolean {
   if (typeof internals !== "object" || internals === null) return false;
   const metadata = (internals as { metadata?: { currentWindow?: { label?: unknown } } }).metadata;
   return typeof metadata?.currentWindow?.label === "string";
+}
+
+export function isDesktopRuntime(): boolean {
+  return isTauriRuntime();
 }
 
 export async function getInitialState(): Promise<DocumentState> {
@@ -160,6 +170,118 @@ export function clearMergeFiles(): Promise<void> {
   return invoke("clear_merge_files");
 }
 
+export function aiStartServer(): Promise<{ version: string; running: boolean }> {
+  if (!isTauriRuntime()) throw new Error("Codex 연결은 데스크톱 앱에서 사용할 수 있습니다.");
+  return invoke("ai_start_server");
+}
+
+export function aiSendRpc(message: unknown): Promise<void> {
+  if (!isTauriRuntime()) throw new Error("Codex 연결은 데스크톱 앱에서 사용할 수 있습니다.");
+  return invoke("ai_send_rpc", { message });
+}
+
+export function aiStopServer(): Promise<void> {
+  if (!isTauriRuntime()) return Promise.resolve();
+  return invoke("ai_stop_server");
+}
+
+export function aiRuntimeDirectory(): Promise<string> {
+  if (!isTauriRuntime()) return Promise.resolve("");
+  return invoke("ai_runtime_directory");
+}
+
+export function onAiServerMessage(handler: (message: unknown) => void): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return Promise.resolve(() => undefined);
+  return listen("ai-server-message", (event) => handler(event.payload));
+}
+
+export function onAiServerState(handler: () => void): Promise<UnlistenFn> {
+  if (!isTauriRuntime()) return Promise.resolve(() => undefined);
+  return listen("ai-server-state", handler);
+}
+
+export async function aiLoadSettings(): Promise<AiSettings> {
+  if (isTauriRuntime()) return invoke("ai_load_settings");
+  try {
+    const stored = localStorage.getItem("akbun-pdf.ai-settings");
+    return stored ? { ...defaultAiSettings(), ...JSON.parse(stored) } : defaultAiSettings();
+  } catch {
+    return defaultAiSettings();
+  }
+}
+
+export async function aiSaveSettings(settings: AiSettings): Promise<AiSettings> {
+  if (isTauriRuntime()) return invoke("ai_save_settings", { settings });
+  localStorage.setItem("akbun-pdf.ai-settings", JSON.stringify(settings));
+  return settings;
+}
+
+export async function aiListConversations(): Promise<AiConversationMeta[]> {
+  if (isTauriRuntime()) return invoke("ai_list_conversations");
+  return previewConversations().map((conversation) => conversation.meta);
+}
+
+export async function aiCreateConversation(
+  id: string,
+  title: string,
+  createdAt: string,
+): Promise<AiConversation> {
+  if (isTauriRuntime()) return invoke("ai_create_conversation", { id, title, createdAt });
+  const conversation: AiConversation = {
+    meta: { id, title, createdAt, updatedAt: createdAt, messageCount: 0 },
+    messages: [],
+  };
+  savePreviewConversation(conversation);
+  return conversation;
+}
+
+export async function aiLoadConversation(id: string): Promise<AiConversation> {
+  if (isTauriRuntime()) return invoke("ai_load_conversation", { id });
+  const conversation = previewConversations().find((item) => item.meta.id === id);
+  if (!conversation) throw new Error("저장한 대화를 찾을 수 없습니다.");
+  return conversation;
+}
+
+export async function aiAppendMessage(
+  conversationId: string,
+  message: AiMessage,
+): Promise<AiConversationMeta> {
+  if (isTauriRuntime()) return invoke("ai_append_message", { conversationId, message });
+  const conversation = await aiLoadConversation(conversationId);
+  conversation.messages.push(message);
+  conversation.meta.updatedAt = message.createdAt;
+  conversation.meta.messageCount = conversation.messages.length;
+  savePreviewConversation(conversation);
+  return conversation.meta;
+}
+
+export async function aiRenameConversation(id: string, title: string): Promise<AiConversationMeta> {
+  if (isTauriRuntime()) return invoke("ai_rename_conversation", { id, title });
+  const conversation = await aiLoadConversation(id);
+  conversation.meta.title = title.trim() || "새 대화";
+  savePreviewConversation(conversation);
+  return conversation.meta;
+}
+
+export async function aiDeleteConversation(id: string): Promise<void> {
+  if (isTauriRuntime()) return invoke("ai_delete_conversation", { id });
+  localStorage.removeItem(`akbun-pdf.ai-conversation.${id}`);
+}
+
+export function aiSavePageImage(
+  requestId: string,
+  page: number,
+  dataUrl: string,
+): Promise<string> {
+  if (!isTauriRuntime()) throw new Error("페이지 요약은 데스크톱 앱에서 사용할 수 있습니다.");
+  return invoke("ai_save_page_image", { requestId, page, dataUrl });
+}
+
+export function aiClearRequest(requestId: string): Promise<void> {
+  if (!isTauriRuntime()) return Promise.resolve();
+  return invoke("ai_clear_request", { requestId });
+}
+
 export async function checkForUpdates(): Promise<string> {
   if (!isTauriRuntime()) {
     return "브라우저 미리보기에서는 업데이트를 확인하지 않습니다.";
@@ -188,4 +310,24 @@ export async function checkForUpdates(): Promise<string> {
     });
     return "업데이트 확인에 실패했습니다.";
   }
+}
+
+function previewConversations(): AiConversation[] {
+  return Object.keys(localStorage)
+    .filter((key) => key.startsWith("akbun-pdf.ai-conversation."))
+    .flatMap((key) => {
+      try {
+        return [JSON.parse(localStorage.getItem(key) ?? "") as AiConversation];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => right.meta.updatedAt.localeCompare(left.meta.updatedAt));
+}
+
+function savePreviewConversation(conversation: AiConversation): void {
+  localStorage.setItem(
+    `akbun-pdf.ai-conversation.${conversation.meta.id}`,
+    JSON.stringify(conversation),
+  );
 }

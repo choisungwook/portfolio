@@ -1,13 +1,13 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-09-04",
+  "updated": "2026-09-05",
   "products": [
     {
       "id": "akbun-pdf",
       "name": "akbun-pdf",
-      "description": "오프라인에서 PDF 탐색, 주석, OCR, 페이지 편집을 제공하는 Tauri 데스크톱 앱",
+      "description": "PDF 탐색, 주석, 페이지 편집과 Codex AI 요약을 제공하는 Tauri 데스크톱 앱",
       "kind": "desktop",
-      "tags": ["tauri", "rust", "pdf", "ocr", "offline"],
+      "tags": ["tauri", "rust", "pdf", "ai", "codex"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-pdf",
       "released": "2026-09-04"
     },
