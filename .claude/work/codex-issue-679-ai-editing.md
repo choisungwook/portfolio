@@ -10,6 +10,7 @@
 - [x] 3. 자막 삽입·무음 제거를 단일 undo 편집 트랜잭션으로 연결
 - [x] 4. Edit > AI 메뉴와 오른쪽 Captions UI, 모델·effort 설정 구현
 - [x] 5. 버전·ADR·knowledge 갱신과 Rust·프런트엔드·브라우저 검증
+- [x] 6. 사람이 익혀야 할 AI audio 아키텍처와 의사결정을 human-wiki에 기록
 
 ## 다음 세션이 알아야 할 것
 
@@ -19,3 +20,4 @@
 - LM Studio 2026-09 공식 OpenAI 호환 endpoint에는 audio transcription이 없어 기본 지원 대상에서 제외
 - 기본 전사 모델은 whisper-1, 오디오 전처리는 mono 16 kHz 저용량 MP3
 - Codex 대화 모델 기본값은 Luna, reasoning effort는 medium
+- `akbun-makepresentation/human-wiki`에 AI audio 학습 문서와 유지 규칙 추가
