@@ -1,10 +1,15 @@
 # akbun-pdf Agent Guide
 
-## 먼저 읽을 문서
+## LLM Wiki 작업 규칙
 
-- 구조 변경 전 `wiki/index.md`와 `wiki/architecture.md`
+- 모든 작업 시작 전 `wiki/index.md`와 작업 영역에 해당하는 wiki 문서
+- 구조 변경 전 `wiki/architecture.md`
 - 구현 결정 변경 전 `adr/index.md`와 관련 ADR
 - 빌드·릴리스 변경 전 `wiki/development.md`
+- 작업 종료 전 `wiki/index.md`와 관련 문서를 실제 코드·계약·테스트 기준으로 갱신
+- 오래됐거나 중복되거나 더 이상 도움이 되지 않는 내용은 과감히 삭제하거나 교체
+- wiki는 현재 상태만 설명하고, 과거 결정과 변경 이력은 ADR에 유지
+- 바뀐 사실이 없으면 날짜나 작업 로그를 만들기 위한 형식적 수정 금지
 
 ## 경계
 
