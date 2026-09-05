@@ -4,8 +4,12 @@
 
 ```text
 ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
- │                               │                    │
- PDF.js·DOM                      Tauri command        PDF 상태·저장·변환
+ │                               │                    PDF 상태·저장·변환
+ │                               ├───────────────> crates/pdf-ai/
+ │                               │                    설정·JSONL·임시 이미지
+ PDF.js·DOM                      Tauri command
+ │
+ └── JSON-RPC 이벤트 ──────> Codex App Server ──> ChatGPT 인증
 ```
 
 | 경계 | 책임 | 금지 |
@@ -13,6 +17,7 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 | `ui` | PDF.js 렌더링, 텍스트 계층, 탐색·보기 상태 | 파일 경로와 PDF 내부 객체 보관 |
 | `src-tauri/src` | OS·파일 시스템 연결, command와 plugin 등록 | PDF 규칙 구현 |
 | `pdf-core` | 문서 상태, 변경 목록, 저장·구조 편집 | Tauri 타입 의존 |
+| `pdf-ai` | AI 설정, JSONL 대화, 요청 이미지 수명 | Tauri와 Codex 프로토콜 의존 |
 | `contracts` | 명령과 직렬화 DTO의 공개 이름 | Rust 내부 타입 노출 |
 
 ## 문서 상태
@@ -31,10 +36,26 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 - 상단: 열기, 합치기, 저장, 페이지 이동, 배율, 주석 도구, updater
 - 왼쪽: 끌기 재정렬이 가능한 페이지 썸네일과 회전·삭제
 - 가운데: PDF.js canvas, text layer, 검색·주석 layer가 들어가는 문서 surface
-- 오른쪽: PDF outline 기반 목차
+- 오른쪽: PDF outline 기반 목차와 채팅형 AI 패널
+- AI 페이지 선택: 현재 페이지, 직접 범위, 전체 페이지와 썸네일 다중 선택
+- AI 승인: 문서·페이지·provider·모델을 확인한 뒤 요약 실행
 - 주석: PDF.js text layer의 선택 영역과 페이지 좌표를 PDF user space로 변환
 - 합치기: 열린 문서를 건드리지 않는 별도 dialog와 Rust 입력 저장소
 - 개발 미리보기는 URL의 `state` query로 네 상태를 독립 확인
+
+## AI 수명과 입력
+
+- 앱 시작 시 설치된 Codex CLI의 App Server를 필요할 때 자식 프로세스로 실행
+- `account/read`의 ChatGPT 인증만 허용하고 API key 인증은 사용하지 않음
+- 기본 모델은 `gpt-5.6-luna`, 추론 수준은 `low`
+- 선택 가능 모델은 Luna, Terra, Sol로 제한
+- 시스템 프롬프트와 대화는 앱 데이터에 저장
+- 대화는 메타데이터 한 줄과 메시지 줄로 구성한 JSONL 파일
+- Codex thread는 휘발성으로 만들고 저장 대화를 열 때 JSONL 메시지를 주입
+- 페이지 입력은 PDF.js 추출 텍스트와 PNG 렌더링 이미지를 함께 사용
+- 6페이지씩 중간 요약하고 여러 묶음이면 최종 종합 turn 실행
+- 요청 이미지는 앱 데이터의 runtime에 저장하고 turn 종료 또는 앱 시작 시 제거
+- OCR과 OpenAI 호환 로컬 endpoint는 별도 기능으로 유지
 
 ## 확장 방향
 

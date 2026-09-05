@@ -10,6 +10,7 @@ npm start
 
 - Node.js 24 LTS
 - Rust stable
+- Codex CLI와 ChatGPT 로그인
 - Linux는 Tauri 2의 WebKitGTK 시스템 패키지 필요
 
 브라우저 UI만 실행:
@@ -35,12 +36,21 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
 ```
 
-- Vitest: 문서 상태 전이, 검색과 범위
+- Vitest: 문서 상태 전이, 검색, 페이지 범위와 다중 선택
 - Vite build: TypeScript와 UI bundle
-- `npm run check`의 Cargo: Tauri 없이 `pdf-core` 테스트
+- `npm run check`의 Cargo: Tauri 없이 `pdf-core`, `pdf-ai` 테스트
 - Tauri lib test: 임시 파일 검증과 원자적 교체 실패 경로
 - Clippy: Rust 전체 target의 warning 차단
 - source size: 자체 작성 코드 파일 1,000줄 미만
+
+## AI 확인
+
+- `?state=ready`에서 AI 탭과 페이지 선택·승인 dialog를 확인
+- 앱에서는 AI 설정의 연결 상태가 ChatGPT 계정과 Codex CLI 버전을 표시
+- 기본값은 GPT-5.6 Luna와 `low`
+- 대화 JSONL과 요청 중 PNG는 OS별 앱 데이터 디렉터리의 `ai/` 아래에 저장
+- 요청 PNG는 응답 완료·중지·오류에서 제거
+- 로컬 LLM endpoint는 #1166에서 구현
 
 ## 자동 업데이트
 

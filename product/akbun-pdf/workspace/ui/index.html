@@ -77,6 +77,10 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l4 4" /></svg>
             <span>찾기</span>
           </button>
+          <button class="tool-button tool-button--ai" type="button" data-ai-action="open">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 14 9l6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>
+            <span>AI</span>
+          </button>
         </div>
 
         <button class="icon-button" type="button" aria-label="목차 패널 접기" data-action="toggle-outline">
@@ -197,15 +201,53 @@
 
         <div class="panel-resizer panel-resizer--outline" data-resize-panel="outline" aria-hidden="true"></div>
 
-        <aside class="outline-panel" aria-label="문서 목차">
-          <div class="panel-heading">
-            <span>목차</span>
+        <aside class="outline-panel" aria-label="문서 정보와 AI">
+          <div class="context-tabs" role="tablist" aria-label="오른쪽 패널">
+            <button class="context-tab context-tab--active" type="button" role="tab" aria-selected="true" data-ai-action="show-outline">목차</button>
+            <button class="context-tab" type="button" role="tab" aria-selected="false" data-ai-action="open">AI</button>
           </div>
-          <nav class="outline-list" data-role="outline-list"></nav>
-          <div class="outline-empty" data-role="outline-empty" data-visible-phase="empty loading ready error">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h12M6 10h8M6 15h10M6 20h7" /></svg>
-            <span>목차가 없습니다.</span>
-          </div>
+          <section class="outline-view" data-role="outline-view">
+            <nav class="outline-list" data-role="outline-list"></nav>
+            <div class="outline-empty" data-role="outline-empty" data-visible-phase="empty loading ready error">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5h12M6 10h8M6 15h10M6 20h7" /></svg>
+              <span>목차가 없습니다.</span>
+            </div>
+          </section>
+          <section class="ai-panel" data-role="ai-panel" hidden>
+            <header class="ai-panel__header">
+              <div>
+                <strong data-role="ai-conversation-title">새 대화</strong>
+                <span data-role="ai-conversation-meta">메시지를 보내면 JSONL로 저장됩니다.</span>
+              </div>
+              <div>
+                <button class="mini-button" type="button" title="저장한 대화" aria-label="저장한 대화" data-ai-action="conversations">☰</button>
+                <button class="mini-button" type="button" title="새 대화" aria-label="새 대화" data-ai-action="new-conversation">＋</button>
+                <button class="mini-button" type="button" title="AI 설정" aria-label="AI 설정" data-ai-action="settings">⚙</button>
+              </div>
+            </header>
+            <div class="ai-connection" data-role="ai-connection" data-state="checking">
+              <span aria-hidden="true"></span>
+              <div><strong data-role="ai-connection-label">Codex 확인 중</strong><small data-role="ai-connection-detail">Codex CLI와 ChatGPT 인증을 확인합니다.</small></div>
+              <button type="button" data-ai-action="refresh">새로고침</button>
+            </div>
+            <div class="ai-messages" data-role="ai-messages">
+              <div class="ai-empty" data-role="ai-empty">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 14 9l6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>
+                <strong>문서와 대화해 보세요</strong>
+                <span>페이지를 골라 요약하거나 질문을 입력할 수 있습니다.</span>
+              </div>
+            </div>
+            <form class="ai-composer" data-role="ai-composer">
+              <div class="ai-progress" data-role="ai-progress" hidden></div>
+              <textarea rows="3" maxlength="20000" data-role="ai-input" placeholder="PDF에 관해 질문하세요."></textarea>
+              <div>
+                <button class="button" type="button" data-ai-action="select-pages" data-summary-control>페이지 요약</button>
+                <span></span>
+                <button class="button" type="button" data-ai-action="stop" data-role="ai-stop" hidden>중지</button>
+                <button class="button button--primary" type="submit" data-role="ai-send">전송</button>
+              </div>
+            </form>
+          </section>
         </aside>
       </div>
 
@@ -248,6 +290,87 @@
             <button class="button" type="button" data-action="close-merge">취소</button>
             <button class="button button--primary" type="button" data-action="save-merge">새 파일로 저장</button>
           </footer>
+        </div>
+      </dialog>
+
+      <dialog class="editor-dialog ai-settings-dialog" data-role="ai-settings-dialog">
+        <form method="dialog" data-role="ai-settings-form">
+          <header>
+            <div><strong>AI 설정</strong><span>Codex 인증과 새 대화의 기본값</span></div>
+            <button class="icon-button" type="button" aria-label="닫기" data-ai-action="close-settings">×</button>
+          </header>
+          <div class="ai-settings-body">
+            <section>
+              <h2>인증</h2>
+              <div class="ai-settings-status" data-role="ai-settings-status" data-state="checking">
+                <span aria-hidden="true"></span>
+                <div><strong data-role="ai-settings-status-label">Codex 확인 중</strong><small data-role="ai-settings-status-detail">Codex CLI와 ChatGPT 인증을 확인합니다.</small></div>
+              </div>
+              <button class="button" type="button" data-ai-action="refresh">연결 상태 새로고침</button>
+              <label><span>Provider</span><select data-role="ai-provider"><option value="codex">Codex ChatGPT 인증</option><option disabled>OpenAI 호환 로컬 endpoint · #1166</option></select></label>
+              <label><span>모델</span><select data-role="ai-model"></select></label>
+              <label><span>추론 수준</span><input value="low" disabled /></label>
+            </section>
+            <section>
+              <div class="ai-settings-section-title"><div><h2>시스템 프롬프트</h2><p>새 AI 대화부터 적용됩니다.</p></div><button class="button" type="button" data-ai-action="use-summary-prompt">요약 프롬프트 넣기</button></div>
+              <textarea rows="9" maxlength="20000" data-role="ai-system-prompt"></textarea>
+            </section>
+          </div>
+          <footer>
+            <span></span><span></span>
+            <button class="button" type="button" data-ai-action="close-settings">취소</button>
+            <button class="button button--primary" type="submit">저장</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <dialog class="editor-dialog ai-conversations-dialog" data-role="ai-conversations-dialog">
+        <div>
+          <header>
+            <div><strong>저장한 대화</strong><span>앱 데이터에 JSONL로 자동 저장됩니다.</span></div>
+            <button class="icon-button" type="button" aria-label="닫기" data-ai-action="close-conversations">×</button>
+          </header>
+          <div class="ai-conversation-list" data-role="ai-conversation-list"></div>
+          <footer><span></span><span></span><button class="button" type="button" data-ai-action="close-conversations">닫기</button></footer>
+        </div>
+      </dialog>
+
+      <dialog class="editor-dialog ai-pages-dialog" data-role="ai-pages-dialog">
+        <div>
+          <header>
+            <div><strong>요약할 페이지 선택</strong><span>전송할 페이지가 주황색 테두리로 표시됩니다.</span></div>
+            <button class="icon-button" type="button" aria-label="닫기" data-ai-action="close-pages">×</button>
+          </header>
+          <div class="ai-page-toolbar">
+            <div class="ai-scope-buttons" role="group" aria-label="페이지 범위">
+              <button class="button" type="button" data-ai-scope="current">현재 페이지</button>
+              <button class="button" type="button" data-ai-scope="direct">직접 지정</button>
+              <button class="button" type="button" data-ai-scope="all">전체 페이지</button>
+            </div>
+            <label><span>페이지</span><input data-role="ai-page-range" placeholder="2, 4-6" /></label>
+            <button class="button" type="button" aria-pressed="false" data-ai-action="selection-mode">선택 모드</button>
+          </div>
+          <p class="ai-page-help">Shift는 연속 선택, Ctrl 또는 Cmd는 개별 다중 선택입니다. 선택 모드에서는 클릭만으로 페이지를 추가하거나 뺍니다.</p>
+          <div class="ai-page-grid" data-role="ai-page-grid"></div>
+          <footer>
+            <span data-role="ai-page-selection">선택 없음</span><span></span>
+            <button class="button" type="button" data-ai-action="close-pages">취소</button>
+            <button class="button button--primary" type="button" data-ai-action="confirm-pages">다음</button>
+          </footer>
+        </div>
+      </dialog>
+
+      <dialog class="editor-dialog ai-confirm-dialog" data-role="ai-confirm-dialog">
+        <div>
+          <header><div><strong>요약할까요?</strong><span>선택한 페이지 내용이 Codex 모델로 전송됩니다.</span></div></header>
+          <dl class="ai-confirm-details">
+            <div><dt>문서</dt><dd data-role="ai-confirm-document">-</dd></div>
+            <div><dt>페이지</dt><dd data-role="ai-confirm-pages">-</dd></div>
+            <div><dt>Provider</dt><dd>Codex ChatGPT 인증</dd></div>
+            <div><dt>모델</dt><dd data-role="ai-confirm-model">GPT-5.6 Luna · low</dd></div>
+          </dl>
+          <p class="ai-confirm-warning">추출 텍스트와 렌더링한 페이지 이미지가 요청 입력으로 사용됩니다. PDF 원본과 OCR 결과는 전송하거나 저장하지 않습니다.</p>
+          <footer><span></span><span></span><button class="button" type="button" data-ai-action="cancel-summary">취소</button><button class="button button--primary" type="button" data-ai-action="run-summary">요약하기</button></footer>
         </div>
       </dialog>
 

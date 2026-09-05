@@ -7,7 +7,7 @@ license = "MIT"
 edition = "2021"
 
 [workspace]
-members = ["crates/pdf-core"]
+members = ["crates/pdf-ai", "crates/pdf-core"]
 resolver = "2"
 
 [lib]
@@ -21,6 +21,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.22"
+pdf-ai = { path = "crates/pdf-ai" }
 pdf-core = { path = "crates/pdf-core" }
 tauri-plugin-dialog = "2"
 

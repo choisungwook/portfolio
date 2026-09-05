@@ -1,6 +1,7 @@
 import "./styles.css";
 import "./viewer.css";
 import "./editor.css";
+import "./ai.css";
 import {
   checkForUpdates,
   chooseAndOpenDocument,
@@ -34,6 +35,7 @@ import type {
   SearchResult,
 } from "./types";
 import { PdfViewer } from "./viewer";
+import { AiPanel } from "./ai-panel";
 
 function element<T extends Element>(selector: string): T {
   const match = document.querySelector<T>(selector);
@@ -78,8 +80,10 @@ const viewer = new PdfViewer(
     },
   },
 );
+const aiPanel = new AiPanel(state, viewer);
 
 renderDocument(state);
+await aiPanel.init();
 installCloseGuard(() => state.dirty);
 restorePanelSizes();
 wirePanelResizers();
@@ -89,6 +93,7 @@ wireMergeDragging();
 function updateState(next: DocumentState): void {
   state = normalizeState(next);
   renderDocument(state);
+  aiPanel.updateDocument(state);
 }
 
 async function applyEditedState(next: DocumentState): Promise<void> {

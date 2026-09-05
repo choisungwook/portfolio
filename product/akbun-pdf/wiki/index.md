@@ -12,9 +12,11 @@
 
 - Tauri adapter가 파일 선택·원자적 저장·OS 연결 담당
 - Rust pdf-core가 문서 세션, 페이지 편집, 표준 주석, PDF 합치기 담당
+- Rust pdf-ai가 AI 설정, JSONL 대화, 요청 중 페이지 이미지 수명 담당
 - Vanilla TypeScript UI가 PDF.js 렌더링, text layer, 탐색과 편집 화면 담당
+- Codex App Server adapter가 기존 ChatGPT 인증과 AI turn 연결 담당
 - UI와 Rust는 contracts의 DocumentState와 command DTO로만 연결
 - 편집은 메모리에 보류하고 저장 시 원본 뒤에 변경 객체만 증분 기록
 - 저장 전 같은 디렉터리의 임시 파일을 검증하고 원본 경로로 교체
 
-파일 경로와 PDF 내부 객체는 UI 상태에 두지 않음. 구조를 바꾸기 전 [architecture.md](./architecture.md), 실행·검증·릴리스를 바꾸기 전 [development.md](./development.md)를 함께 읽음.
+PDF 원본 경로와 내부 객체는 UI 상태에 두지 않음. AI로는 승인한 페이지의 추출 텍스트와 렌더링 이미지 파일 경로만 전달함. 구조를 바꾸기 전 [architecture.md](./architecture.md), 실행·검증·릴리스를 바꾸기 전 [development.md](./development.md)를 함께 읽음.
