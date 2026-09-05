@@ -52,12 +52,43 @@ function videoSourceCountAt(project, frame) {
   for (const track of project.tracks) {
     if (track.kind !== 'video' || track.hidden) continue;
     count += track.clips.filter((clip) => clip.start <= frame && frame < clipEnd(clip)).length;
+    count += (project.transitions || []).filter((transition) => {
+      if (transition.trackId !== track.id) return false;
+      const incoming = track.clips.find((clip) => clip.id === transition.toClipId);
+      return incoming && incoming.start - transition.duration <= frame && frame < incoming.start;
+    }).length;
     count += (track.visualItems || []).filter((item) =>
       item.content && item.content.kind === 'videoOverlay' &&
       item.start <= frame && frame < item.start + item.duration
     ).length;
   }
   return count;
+}
+
+function transitionForClip(project, clipId, frame) {
+  const candidates = (project.transitions || []).filter((transition) =>
+    transition.fromClipId === clipId || transition.toClipId === clipId);
+  if (!candidates.length) return null;
+  if (!Number.isFinite(frame)) {
+    return candidates.find((transition) => transition.fromClipId === clipId) || candidates[0];
+  }
+  return candidates.reduce((best, transition) => {
+    const incoming = findClip(project, transition.toClipId);
+    const bestIncoming = findClip(project, best.toClipId);
+    if (!incoming) return best;
+    if (!bestIncoming) return transition;
+    const distance = Math.abs(incoming.clip.start - frame);
+    const bestDistance = Math.abs(bestIncoming.clip.start - frame);
+    if (distance !== bestDistance) return distance < bestDistance ? transition : best;
+    return transition.fromClipId === clipId ? transition : best;
+  });
+}
+
+function transitionMaxDuration(project, transition) {
+  if (!transition) return 0;
+  const from = findClip(project, transition.fromClipId);
+  const to = findClip(project, transition.toClipId);
+  return from && to ? Math.min(clipDuration(from.clip), clipDuration(to.clip)) : 0;
 }
 
 /** Rounded up, so the constant above is a floor rather than an average: at
@@ -417,6 +448,8 @@ const exported = {
   defaultVisualItemFrames,
   findVisualItem,
   videoSourceCountAt,
+  transitionForClip,
+  transitionMaxDuration,
   minClipFrames,
   blankProject,
   tracksOf,

@@ -2029,13 +2029,31 @@ fn set_transition_duration(
     transition_id: String,
     duration: i64,
 ) -> Result<Applied, String> {
-    let transition = project
+    let transition_index = project
         .transitions
-        .iter_mut()
-        .find(|transition| transition.id == transition_id)
+        .iter()
+        .position(|transition| transition.id == transition_id)
         .ok_or("that transition is not on the timeline")?;
+    let transition = &project.transitions[transition_index];
+    let (track_index, clip_index) = project
+        .locate(&transition.from_clip_id)
+        .ok_or("the first transition clip is not on the timeline")?;
+    let track = &project.tracks[track_index];
+    if track.kind != TrackKind::Video
+        || track.clips.get(clip_index + 1).map(|clip| clip.id.as_str())
+            != Some(transition.to_clip_id.as_str())
+        || track.clips[clip_index].end_frame() != track.clips[clip_index + 1].start
+    {
+        return Err("a transition needs touching adjacent video clips".into());
+    }
+    let max_duration = track.clips[clip_index]
+        .duration_frames()
+        .min(track.clips[clip_index + 1].duration_frames());
+    if duration <= 0 || duration > max_duration {
+        return Err("the transition duration must fit inside both clips".into());
+    }
     let previous = transition.duration;
-    transition.duration = duration;
+    project.transitions[transition_index].duration = duration;
     Ok(Applied {
         resolved: Command::SetTransitionDuration {
             transition_id: transition_id.clone(),

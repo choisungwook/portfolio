@@ -381,6 +381,15 @@ mod tests {
             .unwrap();
         assert_eq!(document.project().transitions.len(), 1);
         assert_eq!(document.project().transitions[0].duration, 15);
+        let transition_id = document.project().transitions[0].id.clone();
+        let error = document
+            .apply(Command::SetTransitionDuration {
+                transition_id,
+                duration: 301,
+            })
+            .unwrap_err();
+        assert!(error.contains("fit inside both clips"), "{error}");
+        assert_eq!(document.project().transitions[0].duration, 15);
 
         document.undo().unwrap();
         assert!(document.project().transitions.is_empty());

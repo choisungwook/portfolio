@@ -432,8 +432,7 @@
           stageController.selectClip(clip.dataset.clipId);
           const found = L.findClip(state.project, clip.dataset.clipId);
           const frame = frameAtClientX(event.clientX);
-          const transition = (state.project.transitions || []).find((entry) =>
-            entry.fromClipId === clip.dataset.clipId || entry.toClipId === clip.dataset.clipId);
+          const transition = L.transitionForClip(state.project, clip.dataset.clipId, frame);
           const index = found.track.clips.findIndex((entry) => entry.id === clip.dataset.clipId);
           const next = found.track.clips[index + 1];
           const canAddTransition = found.track.kind === 'video' && next &&

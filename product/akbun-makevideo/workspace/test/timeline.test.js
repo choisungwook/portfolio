@@ -61,6 +61,28 @@ test('the realtime source count includes active PIP video layers', () => {
   assert.strictEqual(L.videoSourceCountAt(project, 30), 0);
 });
 
+test('dissolves count their extra decoder and resolve the selected boundary by playhead', () => {
+  const videoTrack = track('t1', 'video', 'V1', [
+    clip('c1', 'v', 0, 0, 60),
+    clip('c2', 'v', 60, 60, 120),
+    clip('c3', 'v', 120, 120, 180),
+  ]);
+  const project = projectOf([VIDEO], [videoTrack]);
+  project.transitions = [
+    { id: 'x1', trackId: 't1', fromClipId: 'c1', toClipId: 'c2', duration: 15 },
+    { id: 'x2', trackId: 't1', fromClipId: 'c2', toClipId: 'c3', duration: 10 },
+  ];
+
+  assert.strictEqual(L.videoSourceCountAt(project, 44), 1);
+  assert.strictEqual(L.videoSourceCountAt(project, 45), 2);
+  assert.strictEqual(L.videoSourceCountAt(project, 59), 2);
+  assert.strictEqual(L.videoSourceCountAt(project, 60), 1);
+  assert.strictEqual(L.transitionForClip(project, 'c2', 50).id, 'x1');
+  assert.strictEqual(L.transitionForClip(project, 'c2', 115).id, 'x2');
+  assert.strictEqual(L.transitionForClip(project, 'c2').id, 'x2');
+  assert.strictEqual(L.transitionMaxDuration(project, project.transitions[0]), 60);
+});
+
 test('a track only takes what it can play', () => {
   const video = track('t1', 'video', 'V1');
   const audio = track('t2', 'audio', 'A1');

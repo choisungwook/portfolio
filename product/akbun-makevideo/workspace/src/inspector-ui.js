@@ -136,8 +136,7 @@
         : null;
       const clip = clipTargets && clipTargets.selected;
       const transition = !item && liveSelection()
-        ? (state.project.transitions || []).find((entry) =>
-          entry.fromClipId === liveSelection() || entry.toClipId === liveSelection())
+        ? L.transitionForClip(state.project, liveSelection(), getPreview().position())
         : null;
       const tab = state.inspectorTab || 'video';
       const video = tab === 'video';
@@ -223,7 +222,10 @@
         dom.pipBorderWidth.value = pip.border ? pip.border.width : 0;
         dom.pipAudioEnabled.checked = Boolean(pip.audioEnabled);
       }
-      if (transition) dom.transitionDuration.value = transition.duration;
+      if (transition) {
+        dom.transitionDuration.max = L.transitionMaxDuration(state.project, transition);
+        dom.transitionDuration.value = transition.duration;
+      }
       if (!text) return;
       if (subtitle) {
         dom.subtitleValue.value = text.text || '';
@@ -350,17 +352,20 @@
 
     function selectedTransition() {
       const clipId = liveSelection();
-      return (state.project.transitions || []).find((entry) =>
-        entry.fromClipId === clipId || entry.toClipId === clipId) || null;
+      return L.transitionForClip(state.project, clipId, getPreview().position());
     }
 
     function updateSelectedTransition() {
       const transition = selectedTransition();
       if (!transition) return;
+      const maxDuration = L.transitionMaxDuration(state.project, transition);
       edit({
         op: 'setTransitionDuration',
         transitionId: transition.id,
-        duration: Math.max(1, Math.round(Number(dom.transitionDuration.value) || 1)),
+        duration: Math.max(1, Math.min(
+          maxDuration,
+          Math.round(Number(dom.transitionDuration.value) || 1),
+        )),
       }).catch((error) => reportError(error, 'transition:edit'));
     }
 
