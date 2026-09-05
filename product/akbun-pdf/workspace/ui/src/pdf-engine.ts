@@ -59,7 +59,36 @@ export function sharedAssetDirectory(assetUrls: string[], baseUrl: string): stri
   return [...directories][0];
 }
 
+// WebKit(WKWebView)은 ReadableStream의 비동기 이터레이터를 구현하지 않아
+// pdf.js getTextContent()의 `for await (... of readableStream)`이 TypeError로 끊긴다.
+export function installStreamAsyncIteration(prototype: object = ReadableStream.prototype): void {
+  if (Symbol.asyncIterator in prototype) return;
+  Object.defineProperty(prototype, Symbol.asyncIterator, {
+    configurable: true,
+    writable: true,
+    value: function asyncIterator(this: ReadableStream) {
+      const reader = this.getReader();
+      return {
+        next: async () => {
+          const result = await reader.read();
+          if (result.done) reader.releaseLock();
+          return result;
+        },
+        return: async (value?: unknown) => {
+          await reader.cancel();
+          reader.releaseLock();
+          return { done: true, value };
+        },
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+      };
+    },
+  });
+}
+
 export function configurePdfEngine(): void {
+  installStreamAsyncIteration();
   GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 

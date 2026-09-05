@@ -1,7 +1,7 @@
 {
   "name": "akbun-pdf",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "description": "Desktop PDF reader, organizer, annotator, and Codex summary workspace",
   "author": "akbun",
