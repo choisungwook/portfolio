@@ -8,6 +8,13 @@ import {
   type PDFPageProxy,
 } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import jbig2WasmUrl from "pdfjs-dist/wasm/jbig2.wasm?url";
+import jbig2FallbackUrl from "pdfjs-dist/wasm/jbig2_nowasm_fallback.js?url";
+import openjpegWasmUrl from "pdfjs-dist/wasm/openjpeg.wasm?url";
+import openjpegFallbackUrl from "pdfjs-dist/wasm/openjpeg_nowasm_fallback.js?url";
+import qcmsWasmUrl from "pdfjs-dist/wasm/qcms_bg.wasm?url";
+import quickjsUrl from "pdfjs-dist/wasm/quickjs-eval.js?url";
+import quickjsWasmUrl from "pdfjs-dist/wasm/quickjs-eval.wasm?url";
 import type {
   OutlineItem,
   PageRect,
@@ -34,6 +41,24 @@ export interface PageSize {
   height: number;
 }
 
+const pdfWasmAssetUrls = [
+  jbig2WasmUrl,
+  jbig2FallbackUrl,
+  openjpegWasmUrl,
+  openjpegFallbackUrl,
+  qcmsWasmUrl,
+  quickjsUrl,
+  quickjsWasmUrl,
+];
+
+export function sharedAssetDirectory(assetUrls: string[], baseUrl: string): string {
+  const directories = new Set(assetUrls.map((assetUrl) => (
+    new URL(".", new URL(assetUrl, baseUrl)).href
+  )));
+  if (directories.size !== 1) throw new Error("PDF.js 런타임 자산 경로가 일치하지 않습니다.");
+  return [...directories][0];
+}
+
 export function configurePdfEngine(): void {
   GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
@@ -45,7 +70,10 @@ export class PdfDocumentAdapter {
   ) {}
 
   static async open(bytes: number[]): Promise<PdfDocumentAdapter> {
-    const loadingTask = getDocument({ data: Uint8Array.from(bytes) });
+    const loadingTask = getDocument({
+      data: Uint8Array.from(bytes),
+      wasmUrl: sharedAssetDirectory(pdfWasmAssetUrls, window.document.baseURI),
+    });
     const document = await loadingTask.promise;
     return new PdfDocumentAdapter(loadingTask, document);
   }

@@ -27,6 +27,22 @@ export function normalizeState(state: DocumentState): DocumentState {
   };
 }
 
+export function errorState(error: unknown): DocumentState {
+  return {
+    phase: "error",
+    documentId: null,
+    title: "akbun-pdf",
+    currentPage: 0,
+    pageCount: 0,
+    zoom: 1,
+    dirty: false,
+    thumbnails: [],
+    outline: [],
+    annotations: [],
+    errorMessage: String(error),
+  };
+}
+
 export function goToPage(state: DocumentState, page: number): DocumentState {
   return normalizeState({ ...state, currentPage: page });
 }

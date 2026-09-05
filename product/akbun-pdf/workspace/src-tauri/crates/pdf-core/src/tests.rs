@@ -279,6 +279,18 @@ fn closing_releases_the_document_session() {
 }
 
 #[test]
+fn render_failure_clears_a_ready_document_session() {
+    let (mut store, id) = ready_store();
+    let state = store.fail(&id, "페이지 렌더링 실패".into()).unwrap();
+
+    assert_eq!(state.phase, DocumentPhase::Error);
+    assert_eq!(state.document_id, None);
+    assert_eq!(state.page_count, 0);
+    assert!(state.thumbnails.is_empty());
+    assert!(store.bytes(&id).is_err());
+}
+
+#[test]
 fn serialized_state_matches_the_ui_contract() {
     let value = serde_json::to_value(DocumentState::empty()).unwrap();
     assert_eq!(value["phase"], "empty");

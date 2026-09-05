@@ -8,6 +8,52 @@
   </head>
   <body data-phase="empty">
     <div id="app" class="app-shell">
+      <header class="menubar" aria-label="애플리케이션 메뉴">
+        <nav class="menus" role="menubar">
+          <div class="menu">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu" data-menu="file">파일</button>
+            <ul id="file-menu" class="menu-list" role="menu" data-menu-list="file">
+              <li><button type="button" data-action="open">PDF 열기…<kbd>⌘O</kbd></button></li>
+              <li><button type="button" data-action="merge">PDF 합치기…</button></li>
+              <li class="menu-separator"></li>
+              <li><button type="button" data-action="save" data-document-control>저장<kbd>⌘S</kbd></button></li>
+              <li><button type="button" data-action="save-as" data-document-control>다른 이름으로 저장…<kbd>⇧⌘S</kbd></button></li>
+              <li class="menu-separator"></li>
+              <li><button type="button" data-action="close" data-document-control>문서 닫기</button></li>
+            </ul>
+          </div>
+          <div class="menu">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="edit-menu" data-menu="edit">편집</button>
+            <ul id="edit-menu" class="menu-list" role="menu" data-menu-list="edit">
+              <li><button type="button" data-action="find" data-document-control>찾기…<kbd>⌘F</kbd></button></li>
+              <li class="menu-separator"></li>
+              <li><button type="button" data-action="highlight" data-document-control>형광펜</button></li>
+              <li><button type="button" data-action="note" data-document-control>메모</button></li>
+              <li class="menu-separator"></li>
+              <li><button type="button" data-action="rotate-left" data-document-control>왼쪽으로 회전</button></li>
+              <li><button type="button" data-action="rotate-right" data-document-control>오른쪽으로 회전</button></li>
+              <li><button class="menu-danger" type="button" data-action="delete-page" data-document-control>현재 페이지 삭제</button></li>
+            </ul>
+          </div>
+          <div class="menu">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" data-menu="view">보기</button>
+            <ul id="view-menu" class="menu-list" role="menu" data-menu-list="view">
+              <li><button type="button" data-action="actual-size" data-document-control>실제 크기</button></li>
+              <li><button type="button" data-action="fit-width" data-document-control>너비에 맞춤</button></li>
+              <li><button type="button" data-action="fit-page" data-document-control>페이지에 맞춤</button></li>
+              <li class="menu-separator"></li>
+              <li><button type="button" data-action="toggle-pages">페이지 패널 전환</button></li>
+              <li><button type="button" data-action="toggle-outline">목차 패널 전환</button></li>
+            </ul>
+          </div>
+          <div class="menu">
+            <button class="menu-title" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu" data-menu="help">도움말</button>
+            <ul id="help-menu" class="menu-list" role="menu" data-menu-list="help">
+              <li><button type="button" data-action="check-update">업데이트 확인…</button></li>
+            </ul>
+          </div>
+        </nav>
+      </header>
       <header class="toolbar" aria-label="문서 도구 모음">
         <div class="toolbar__brand">
           <button class="icon-button" type="button" aria-label="페이지 패널 접기" data-action="toggle-pages">
@@ -85,9 +131,6 @@
 
         <button class="icon-button" type="button" aria-label="목차 패널 접기" data-action="toggle-outline">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM15 5.5v13M7 9h5M7 12h5M7 15h3" /></svg>
-        </button>
-        <button class="icon-button" type="button" aria-label="업데이트 확인" title="업데이트 확인" data-action="check-update">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 8a7 7 0 1 0 0 8M19 4v4h-4" /></svg>
         </button>
       </header>
 

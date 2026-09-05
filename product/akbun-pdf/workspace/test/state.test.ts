@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fixtureFor } from "../ui/src/fixtures";
-import { changeZoom, goToPage, normalizeState, previewPhase } from "../ui/src/state";
+import { changeZoom, errorState, goToPage, normalizeState, previewPhase } from "../ui/src/state";
 
 describe("document state", () => {
   it("clamps page navigation to the document", () => {
@@ -32,5 +32,21 @@ describe("document state", () => {
   it("accepts only known visual preview states", () => {
     expect(previewPhase("?state=loading")).toBe("loading");
     expect(previewPhase("?state=unknown")).toBeNull();
+  });
+
+  it("clears previous document fields after an open failure", () => {
+    expect(errorState("render failed")).toEqual({
+      phase: "error",
+      documentId: null,
+      title: "akbun-pdf",
+      currentPage: 0,
+      pageCount: 0,
+      zoom: 1,
+      dirty: false,
+      thumbnails: [],
+      outline: [],
+      annotations: [],
+      errorMessage: "render failed",
+    });
   });
 });

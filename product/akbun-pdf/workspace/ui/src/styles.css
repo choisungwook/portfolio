@@ -71,7 +71,7 @@ svg {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
+  grid-template-rows: 34px 58px minmax(0, 1fr);
   background: var(--workspace);
 }
 

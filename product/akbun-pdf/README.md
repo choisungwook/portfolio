@@ -12,8 +12,9 @@ PDF를 읽고, 찾고, 주석·페이지 편집과 Codex 기반 요약을 수행
 - 한글·영문 정규화 검색, 점진적 인덱싱과 결과 강조
 - 현재·직접 지정·전체 페이지의 텍스트와 이미지를 사용하는 Codex AI 요약
 - ChatGPT 인증, Luna·Terra·Sol 모델 선택과 JSONL 대화 저장
+- 파일·편집·보기·도움말 데스크톱 메뉴와 앱 내 업데이트
 - UI, Tauri adapter, 순수 Rust core, DTO contract 경계
-- macOS, Windows, Linux 릴리스와 앱 내 자동 업데이트 골격
+- macOS, Windows, Linux 릴리스
 
 ## 디렉터리
 
