@@ -33,7 +33,8 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 
 ## UI 구성
 
-- 상단: 열기, 합치기, 저장, 페이지 이동, 배율, 주석 도구, updater
+- 상단 메뉴: 파일, 편집, 보기, 도움말과 updater 진입점
+- 도구 모음: 열기, 합치기, 저장, 페이지 이동, 배율, 주석 도구
 - 왼쪽: 끌기 재정렬이 가능한 페이지 썸네일과 회전·삭제
 - 가운데: PDF.js canvas, text layer, 검색·주석 layer가 들어가는 문서 surface
 - 오른쪽: PDF outline 기반 목차와 채팅형 AI 패널
@@ -76,3 +77,5 @@ ui/ ── DocumentState DTO ──> src-tauri/src/ ──> crates/pdf-core/
 - 합치기는 입력 페이지 객체를 새 페이지 트리에 연결하고 항상 새 파일로 저장
 - 페이지 텍스트는 PDF.js Worker에서 순서대로 추출하고 준비된 페이지부터 검색
 - 검색 캐시는 문서 닫기와 교체에서 즉시 제거
+- PDF.js Worker와 JBIG2·OpenJPEG·QCMS WASM 자산은 Vite가 같은 자산 디렉터리에 번들
+- 열기 중 PDF.js 렌더링 실패 시 Rust 세션과 UI 페이지 surface를 함께 해제

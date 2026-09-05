@@ -38,6 +38,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -
 
 - Vitest: 문서 상태 전이, 검색, 페이지 범위와 다중 선택
 - Vite build: TypeScript와 UI bundle
+- Vite build: PDF.js Worker와 JBIG2·OpenJPEG·QCMS decoder 자산 포함
 - `npm run check`의 Cargo: Tauri 없이 `pdf-core`, `pdf-ai` 테스트
 - Tauri lib test: 임시 파일 검증과 원자적 교체 실패 경로
 - Clippy: Rust 전체 target의 warning 차단
@@ -54,6 +55,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -
 
 ## 자동 업데이트
 
+- 도움말 → 업데이트 확인에서 새 버전 확인·다운로드·설치
 - 공개 키: `src-tauri/tauri.conf.json`
 - 개인 키 백업: `~/.tauri/akbun-pdf.key`
 - GitHub Secret: `TAURI_SIGNING_PRIVATE_KEY_PDF`

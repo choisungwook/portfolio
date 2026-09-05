@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./menu.css";
 import "./viewer.css";
 import "./editor.css";
 import "./ai.css";
@@ -105,14 +106,15 @@ async function applyEditedState(next: DocumentState): Promise<void> {
 
 async function openDocument(): Promise<void> {
   let adapter: PdfDocumentAdapter | null = null;
+  let documentId: string | null = null;
   try {
     if (state.dirty && !await confirmDiscardChanges()) return;
     const opened = await chooseAndOpenDocument();
     if (!opened) return;
+    documentId = opened.state.documentId;
+    if (!documentId) throw new Error("문서 식별자가 없습니다.");
     await viewer.close();
     updateState(opened.state);
-    const documentId = opened.state.documentId;
-    if (!documentId) throw new Error("문서 식별자가 없습니다.");
     adapter = await PdfDocumentAdapter.open(opened.bytes);
     const outline = await adapter.outline();
     const ready = await completeDocumentOpen(documentId, adapter.pageCount, outline);
@@ -122,13 +124,23 @@ async function openDocument(): Promise<void> {
     await viewer.open(viewerAdapter, ready.thumbnails, ready.annotations);
     refreshSearchResults();
   } catch (error) {
-    if (adapter) await adapter.destroy();
-    if (state.phase === "loading" && state.documentId) {
-      await viewer.close();
+    if (documentId) {
+      if (adapter) await adapter.destroy().catch(() => undefined);
+      await viewer.close().catch(() => undefined);
       try {
-        updateState(await failDocumentOpen(state.documentId, error));
+        updateState(await failDocumentOpen(documentId, error));
       } catch {
-        updateState({ ...state, phase: "error", errorMessage: String(error) });
+        updateState({
+          ...state,
+          phase: "error",
+          documentId: null,
+          currentPage: 0,
+          pageCount: 0,
+          thumbnails: [],
+          outline: [],
+          annotations: [],
+          errorMessage: String(error),
+        });
       }
     } else {
       showToast(`열기 실패 · ${String(error)}`);
@@ -364,6 +376,7 @@ function handleAction(action: string): void {
   if (action === "merge") openMerge();
   if (action === "close") void closeCurrentDocument();
   if (action === "save") void saveCurrentDocument();
+  if (action === "save-as") void saveCurrentDocument(true);
   if (action === "previous-page") navigateTo(state.currentPage - 1);
   if (action === "next-page") navigateTo(state.currentPage + 1);
   if (action === "zoom-in") applyZoom("custom", changeZoom(state, 0.1).zoom);
@@ -393,8 +406,18 @@ function handleAction(action: string): void {
 
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
+  const menuTitle = target.closest<HTMLButtonElement>("[data-menu]");
+  if (menuTitle?.dataset.menu) {
+    toggleMenu(menuTitle.dataset.menu);
+    return;
+  }
   const actionTarget = target.closest<HTMLElement>("[data-action]");
-  if (actionTarget?.dataset.action) handleAction(actionTarget.dataset.action);
+  if (actionTarget?.dataset.action) {
+    closeMenus();
+    handleAction(actionTarget.dataset.action);
+  } else if (!target.closest(".menus")) {
+    closeMenus();
+  }
   const removeMerge = target.closest<HTMLElement>("[data-remove-merge]")?.dataset.removeMerge;
   if (removeMerge) {
     mergeFiles = mergeFiles.filter((file) => file.id !== removeMerge);
@@ -432,6 +455,7 @@ annotationDialog.addEventListener("close", () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMenus();
   if (!(event.metaKey || event.ctrlKey)) return;
   const key = event.key.toLowerCase();
   if (key === "o") {
@@ -453,6 +477,29 @@ document.addEventListener("keydown", (event) => {
     input.select();
   }
 });
+
+document.querySelector(".menus")?.addEventListener("pointerover", (event) => {
+  if (!document.querySelector(".menu-list--open")) return;
+  const title = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-menu]");
+  if (title?.dataset.menu) openMenu(title.dataset.menu);
+});
+
+function closeMenus(): void {
+  document.querySelectorAll(".menu-title--open").forEach((item) => item.classList.remove("menu-title--open"));
+  document.querySelectorAll(".menu-list--open").forEach((item) => item.classList.remove("menu-list--open"));
+}
+
+function openMenu(name: string): void {
+  closeMenus();
+  document.querySelector(`[data-menu='${name}']`)?.classList.add("menu-title--open");
+  document.querySelector(`[data-menu-list='${name}']`)?.classList.add("menu-list--open");
+}
+
+function toggleMenu(name: string): void {
+  const open = document.querySelector(`[data-menu-list='${name}']`)?.classList.contains("menu-list--open");
+  if (open) closeMenus();
+  else openMenu(name);
+}
 
 window.addEventListener("beforeunload", (event) => {
   if (!state.dirty) return;
