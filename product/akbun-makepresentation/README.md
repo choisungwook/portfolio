@@ -66,6 +66,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 |---|---|
 | [workspace/](./workspace/) | Source code: the page in src/, the Tauri shell and the deck model crate in src-tauri/ |
 | [wiki/](./wiki/) | What the next agent reads before taking over |
+| [human-wiki/](./human-wiki/) | Architecture and decisions the human maintainer must understand |
 | [adr/](./adr/) | Decision records |
 
 ## Quick start

@@ -62,6 +62,15 @@ const DEFAULT_SETTINGS = {
   logRotationSize: 5,
   logRotationUnit: 'mb',
   shortcutOverrides: {},
+  aiModel: 'gpt-5.6-luna',
+  aiEffort: 'medium',
+  transcriptionProvider: 'openai',
+  transcriptionEndpoint: 'https://api.openai.com/v1',
+  transcriptionModel: 'whisper-1',
+  transcriptionLanguage: 'ko',
+  silenceThresholdDb: -35,
+  silenceMinDurationMs: 450,
+  silencePaddingMs: 120,
 };
 
 const el = (id) => document.getElementById(id);
@@ -562,7 +571,11 @@ function updateHistoryUi(...args) { return timelineUi.updateHistoryUi(...args); 
 function updateMonitorZoomUi(...args) { return timelineUi.updateMonitorZoomUi(...args); }
 function renderTimeline(...args) { return timelineUi.renderTimeline(...args); }
 function checkLutFiles(...args) { return timelineUi.checkLutFiles(...args); }
-function refresh(...args) { return timelineUi.refresh(...args); }
+function refresh(...args) {
+  const result = timelineUi.refresh(...args);
+  globalThis.makevideoAiEditPanel?.renderCaptions();
+  return result;
+}
 function updatePlayhead(...args) { return timelineUi.updatePlayhead(...args); }
 function seekPreviousEdit(...args) { return timelineUi.seekPreviousEdit(...args); }
 function seekNextEdit(...args) { return timelineUi.seekNextEdit(...args); }

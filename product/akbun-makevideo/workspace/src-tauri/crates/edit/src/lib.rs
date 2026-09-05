@@ -26,7 +26,7 @@ pub mod document;
 pub mod migrate;
 
 pub use animation::{Easing, Keyframe, KeyframeTrack, VisualAnimation, VisualProperty};
-pub use command::{ClipAt, Command, Edge, MarkerAt, TransitionAt, VisualItemAt};
+pub use command::{ClipAt, Command, Edge, FrameRange, MarkerAt, TransitionAt, VisualItemAt};
 pub use document::{Document, DocumentState};
 pub use makevideo_time::{Rate, RationalTime};
 

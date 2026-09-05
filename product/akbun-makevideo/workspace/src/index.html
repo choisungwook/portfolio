@@ -85,6 +85,15 @@
           <li><button data-action="split">Split at Playhead<kbd data-shortcut="split"></kbd></button></li>
           <li><button data-action="delete-clip">Delete Clip<kbd data-shortcut="delete-clip"></kbd></button></li>
           <li><button data-action="ripple-delete">Ripple Delete<kbd data-shortcut="ripple-delete"></kbd></button></li>
+          <li class="sep"></li>
+          <li class="menu-submenu">
+            <button type="button" aria-haspopup="menu">AI <span aria-hidden="true">›</span></button>
+            <ul class="menu-submenu-list">
+              <li><button id="menu-ai-captions" data-action="ai-captions">Generate Captions…</button></li>
+              <li><button id="menu-ai-silence" data-action="ai-silence">Remove Silence…</button></li>
+              <li><button id="menu-ai-cancel" data-action="ai-cancel" disabled>Cancel AI Edit</button></li>
+            </ul>
+          </li>
         </ul>
       </div>
 
@@ -388,6 +397,11 @@
           <pre id="debug-log" class="debug-log" hidden></pre>
         </section>
         <section id="ai-view" class="selected-panel-view" hidden>
+          <div class="ai-section-tabs" aria-label="AI panel">
+            <button type="button" data-ai-section="conversations" aria-pressed="true">Conversations</button>
+            <button type="button" data-ai-section="captions" aria-pressed="false">Captions</button>
+          </div>
+          <div id="ai-conversations-view">
           <div id="ai-list-view" class="ai-panel-page">
             <header class="ai-panel-header">
               <div>
@@ -425,6 +439,39 @@
                 <button id="btn-ai-send" type="button" class="primary">Send</button>
               </div>
             </div>
+          </div>
+          </div>
+          <div id="ai-captions-view" class="ai-panel-page" hidden>
+            <header class="ai-panel-header">
+              <div>
+                <h3>Captions</h3>
+                <p>Timestamped speech and silence edits</p>
+              </div>
+            </header>
+            <p id="ai-edit-provider" class="dim small-text"></p>
+            <label class="row">Session credential
+              <span class="row-input">
+                <input id="ai-edit-credential" type="password" autocomplete="off" placeholder="API key, gateway key, or OAuth token" />
+                <button id="btn-ai-credential-clear" type="button" class="small">Clear</button>
+              </span>
+            </label>
+            <p class="dim small-text">Held in memory until the app closes. Local LiteLLM may leave this empty.</p>
+            <div class="ai-edit-actions">
+              <button id="btn-ai-caption-generate" type="button" class="primary">Generate captions</button>
+              <button id="btn-ai-silence-remove" type="button">Remove silence</button>
+              <button id="btn-ai-edit-cancel" type="button" hidden>Cancel</button>
+            </div>
+            <div id="ai-edit-progress" class="ai-edit-progress" hidden>
+              <div class="progress"><div id="ai-edit-progress-bar"></div></div>
+              <p id="ai-edit-status" class="dim small-text" aria-live="polite"></p>
+            </div>
+            <p id="ai-edit-summary" class="ai-panel-status" aria-live="polite"></p>
+            <div class="caption-list-head">
+              <h4>Timeline captions</h4>
+              <span id="caption-count" class="dim small-text"></span>
+            </div>
+            <div id="caption-editor-list" class="caption-editor-list"></div>
+            <p id="caption-editor-empty" class="dim small-text">No captions on the timeline.</p>
           </div>
         </section>
       </aside>
@@ -566,6 +613,47 @@
           </div>
         </div>
         <button id="btn-ai-refresh" type="button">Refresh AI status</button>
+        <label class="row">Conversation model
+          <select id="as-ai-model">
+            <option value="gpt-5.6-luna">GPT-5.6-Luna — default</option>
+          </select>
+        </label>
+        <label class="row">Reasoning effort
+          <select id="as-ai-effort">
+            <option value="medium">Medium — default</option>
+          </select>
+        </label>
+        <h4>Speech recognition</h4>
+        <p class="dim small-text">OpenAI speech APIs are billed separately from ChatGPT. Google, Azure, and gateway credentials are held only for the current app session.</p>
+        <label class="row">Provider
+          <select id="as-transcription-provider">
+            <option value="openai">OpenAI transcription</option>
+            <option value="litellm">LiteLLM gateway</option>
+            <option value="google">Google Cloud Speech-to-Text</option>
+            <option value="azure">Microsoft Azure Speech</option>
+            <option value="custom">Custom OpenAI-compatible</option>
+          </select>
+        </label>
+        <label class="row">Endpoint
+          <input id="as-transcription-endpoint" type="url" />
+        </label>
+        <label class="row">Speech model
+          <input id="as-transcription-model" type="text" />
+        </label>
+        <label class="row">Language
+          <input id="as-transcription-language" type="text" placeholder="ko or ko-KR" />
+        </label>
+        <p id="as-transcription-note" class="dim small-text"></p>
+        <h4>Silence removal</h4>
+        <label class="row">Threshold (dB)
+          <input id="as-silence-threshold" type="number" min="-80" max="-5" step="1" />
+        </label>
+        <label class="row">Minimum silence (ms)
+          <input id="as-silence-duration" type="number" min="100" max="10000" step="50" />
+        </label>
+        <label class="row">Speech edge padding (ms)
+          <input id="as-silence-padding" type="number" min="0" max="2000" step="10" />
+        </label>
       </section>
       <label class="row">Preview quality
         <select id="as-quality">
@@ -698,6 +786,7 @@
 
   <script src="api.js"></script>
   <script src="ai.js"></script>
+  <script src="ai-edit-panel.js"></script>
   <script src="ai-panel.js"></script>
   <script src="time.js"></script>
   <script src="geometry.js"></script>

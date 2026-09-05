@@ -138,6 +138,10 @@ impl Document {
     /// how many times to press undo.
     pub fn apply(&mut self, command: Command) -> Result<(), String> {
         let label = command.label();
+        self.apply_labeled(command, label)
+    }
+
+    fn apply_labeled(&mut self, command: Command, label: &'static str) -> Result<(), String> {
         let Applied { resolved, inverse } = command.perform(&mut self.project, &mut self.ids)?;
 
         // The invariants are checked here rather than inside each command,
@@ -173,6 +177,15 @@ impl Document {
             1 => self.apply(commands.into_iter().next().expect("just checked")),
             _ => self.apply(Command::Transaction { commands }),
         }
+    }
+
+    /// Several generated commands kept as one explicitly named history step.
+    pub fn apply_all_named(
+        &mut self,
+        label: &'static str,
+        commands: Vec<Command>,
+    ) -> Result<(), String> {
+        self.apply_labeled(Command::Transaction { commands }, label)
     }
 
     /// What a file turned out to be, once something could measure it.
@@ -259,8 +272,8 @@ impl Document {
 mod tests {
     use super::*;
     use crate::{
-        Asset, AssetKind, Clip, Command, Crop, Edge, Paint, ProjectSettings, Rate, Stroke,
-        TextStyle, TrackKind, VisualContent, VisualStyle, VisualTransform,
+        Asset, AssetKind, Clip, Command, Crop, Edge, FrameRange, Paint, ProjectSettings, Rate,
+        Stroke, TextStyle, TrackKind, VisualContent, VisualStyle, VisualTransform,
     };
 
     fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
@@ -1731,5 +1744,43 @@ mod tests {
         assert!(document.project().markers.is_empty());
         document.redo().unwrap();
         assert_eq!(document.project().markers[0].frame, 90);
+    }
+
+    #[test]
+    fn removing_silence_cuts_and_ripples_every_track_as_one_undo_step() {
+        let mut document = document();
+        add_linked(&mut document, 0);
+        document
+            .apply(Command::AddMarker {
+                frame: 240,
+                name: "after silence".into(),
+                color: "#ff0000".into(),
+                id: None,
+            })
+            .unwrap();
+        let before = document.project().clone();
+
+        document
+            .apply(Command::RemoveRanges {
+                ranges: vec![FrameRange {
+                    start: 90,
+                    end: 150,
+                }],
+            })
+            .unwrap();
+        let after = document.project().clone();
+        for track in &after.tracks[..2] {
+            assert_eq!(track.clips.len(), 2);
+            assert_eq!(track.clips[0].end_frame(), 90);
+            assert_eq!(track.clips[1].start, 90);
+            assert_eq!(track.clips[1].in_point, 150);
+        }
+        assert_eq!(after.markers[0].frame, 180);
+        assert_eq!(document.state().undo_label, "Remove silence");
+
+        document.undo().unwrap();
+        assert_eq!(document.project(), &before);
+        document.redo().unwrap();
+        assert_eq!(document.project(), &after);
     }
 }

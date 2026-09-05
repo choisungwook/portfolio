@@ -108,6 +108,18 @@ pub struct Settings {
     /// User changes to the page's built-in keyboard shortcuts. Missing actions
     /// keep their code-defined defaults, so new actions reach existing users.
     pub shortcut_overrides: HashMap<String, Vec<String>>,
+    /// Codex App Server model and effort for the subscription-backed AI panel.
+    pub ai_model: String,
+    pub ai_effort: String,
+    /// Speech recognition is a separate media API from the ChatGPT
+    /// subscription. Credentials stay in memory and are never written here.
+    pub transcription_provider: String,
+    pub transcription_endpoint: String,
+    pub transcription_model: String,
+    pub transcription_language: String,
+    pub silence_threshold_db: f32,
+    pub silence_min_duration_ms: u64,
+    pub silence_padding_ms: u64,
 }
 
 impl Default for Settings {
@@ -135,6 +147,15 @@ impl Default for Settings {
             log_rotation_size: 5,
             log_rotation_unit: "mb".into(),
             shortcut_overrides: HashMap::new(),
+            ai_model: "gpt-5.6-luna".into(),
+            ai_effort: "medium".into(),
+            transcription_provider: "openai".into(),
+            transcription_endpoint: "https://api.openai.com/v1".into(),
+            transcription_model: "whisper-1".into(),
+            transcription_language: "ko".into(),
+            silence_threshold_db: -35.0,
+            silence_min_duration_ms: 450,
+            silence_padding_ms: 120,
         }
     }
 }
@@ -409,7 +430,7 @@ fn home_dir(app: &AppHandle) -> String {
 /// The first candidate that is really a file. Every candidate is absolute, so
 /// "not found" means not found rather than "there was a bare name at the end of
 /// the list that always matched".
-fn find_tool(app: &AppHandle, name: &str, configured: &str) -> Option<String> {
+pub(crate) fn find_tool(app: &AppHandle, name: &str, configured: &str) -> Option<String> {
     let path_env = std::env::var("PATH").unwrap_or_default();
     tools::candidate_paths(name, configured, &path_env, &home_dir(app))
         .into_iter()
@@ -846,8 +867,10 @@ fn move_to_trash(path: &Path) -> Result<(), String> {
 pub fn delete_project(
     app: AppHandle,
     state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     project_path: String,
 ) -> Result<(), String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     if state.render.lock().unwrap().is_some() {
         return Err("wait for the active render to finish before deleting the project".into());
     }
@@ -1869,21 +1892,34 @@ pub fn edit_state(state: State<AppState>) -> DocumentState {
 /// that should take one press. Either all of them land or none do, so there is
 /// no state where part of a drop happened.
 #[tauri::command]
-pub fn edit_apply(state: State<AppState>, commands: Vec<Edit>) -> Result<DocumentState, String> {
+pub fn edit_apply(
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+    commands: Vec<Edit>,
+) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let mut document = state.document.lock().unwrap();
     document.apply_all(commands)?;
     Ok(document.state())
 }
 
 #[tauri::command]
-pub fn edit_undo(state: State<AppState>) -> Result<DocumentState, String> {
+pub fn edit_undo(
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let mut document = state.document.lock().unwrap();
     document.undo()?;
     Ok(document.state())
 }
 
 #[tauri::command]
-pub fn edit_redo(state: State<AppState>) -> Result<DocumentState, String> {
+pub fn edit_redo(
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let mut document = state.document.lock().unwrap();
     document.redo()?;
     Ok(document.state())
@@ -1894,11 +1930,13 @@ pub fn edit_redo(state: State<AppState>) -> Result<DocumentState, String> {
 #[tauri::command]
 pub fn describe_asset(
     state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     asset_id: String,
     duration_ms: u64,
     width: u32,
     height: u32,
 ) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let mut document = state.document.lock().unwrap();
     document.describe_asset(&asset_id, duration_ms, width, height)?;
     Ok(document.state())
@@ -1987,9 +2025,11 @@ fn srt_contents(mut cues: Vec<(i64, i64, &str)>, rate: Rate) -> String {
 #[tauri::command]
 pub fn import_srt(
     state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     track_id: String,
     path: String,
 ) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let text =
         std::fs::read_to_string(&path).map_err(|error| format!("cannot read {path}: {error}"))?;
     let mut document = state.document.lock().unwrap();
@@ -2053,7 +2093,11 @@ pub fn export_srt(state: State<AppState>, track_id: String, path: String) -> Res
 
 /// Start again on an empty timeline, at whatever shape new projects are set to.
 #[tauri::command]
-pub fn new_document(state: State<AppState>) -> DocumentState {
+pub fn new_document(
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let settings = state.settings.lock().unwrap().clone();
     let mut document = state.document.lock().unwrap();
     *document = Document::new(ProjectSettings {
@@ -2061,15 +2105,17 @@ pub fn new_document(state: State<AppState>) -> DocumentState {
         height: settings.default_height,
         rate: settings.default_rate,
     });
-    document.state()
+    Ok(document.state())
 }
 
 #[tauri::command]
 pub fn open_project(
     app: AppHandle,
     state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
 ) -> Result<DocumentState, String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let text =
         std::fs::read_to_string(&path).map_err(|error| format!("cannot open {path}: {error}"))?;
     let mut project: Project =
@@ -2112,7 +2158,13 @@ pub fn open_project(
 /// What gets written is the document, not something the page sent along with
 /// the request: there is one copy of the edit and this is the one that saves.
 #[tauri::command]
-pub fn save_project(app: AppHandle, state: State<AppState>, path: String) -> Result<(), String> {
+pub fn save_project(
+    app: AppHandle,
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+    path: String,
+) -> Result<(), String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     let text = {
         let document = state.document.lock().unwrap();
         serde_json::to_string_pretty(document.project()).map_err(|error| error.to_string())?
@@ -2361,9 +2413,11 @@ fn write_visual_stills(
 pub fn start_render(
     app: AppHandle,
     state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
     preset: String,
 ) -> Result<(), String> {
+    crate::ai_edit::ensure_editable(&ai_runtime)?;
     if state.render.lock().unwrap().is_some() {
         return Err("a render is already running".into());
     }

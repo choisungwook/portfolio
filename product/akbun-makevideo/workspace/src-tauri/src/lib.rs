@@ -1,4 +1,5 @@
 mod ai;
+mod ai_edit;
 mod commands;
 mod playback;
 mod store;
@@ -53,6 +54,7 @@ pub fn run() {
                 waveform_workers: Mutex::new(Vec::new()),
             });
             app.manage(ai::AiRuntime::default());
+            app.manage(ai_edit::AiEditRuntime::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -108,6 +110,12 @@ pub fn run() {
             ai::ai_delete_session,
             ai::ai_attach_image,
             ai::ai_copy_image,
+            ai_edit::ai_edit_set_credential,
+            ai_edit::ai_edit_credential_status,
+            ai_edit::ai_edit_status,
+            ai_edit::ai_edit_cancel,
+            ai_edit::ai_edit_start_captions,
+            ai_edit::ai_edit_start_silence_removal,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

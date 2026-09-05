@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [AI media 작업이 분석부터 편집 적용까지 소유한다](2026-09-ai-media-jobs-own-the-apply-boundary.md) - 전사와 무음 분석의 취소, revision 검사, 단일 undo 적용 경계를 정한 결정.
 * [Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다](2026-09-codex-ai-sessions-are-app-owned.md) - Codex thread와 앱의 로컬 대화 저장 경계를 분리한 결정.
 * [PIP와 디졸브는 기존 compositor placement로 합성한다](2026-09-overlays-and-transitions-share-the-compositor.md) - PIP와 디졸브를 기존 preview/export 합성 경로에 연결하는 결정.
 * [clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다](2026-09-clip-speed-derives-duration.md) - source in-out을 유지하고 duration을 speed에서 파생하는 결정.

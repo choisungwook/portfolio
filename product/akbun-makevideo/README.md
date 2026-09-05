@@ -10,7 +10,9 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
 - Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel
-- AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; conversations stay in app-owned bounded storage
+- AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; choose an available subscription model and reasoning effort; conversations stay in app-owned bounded storage
+- AI captions: extract timeline audio as mono 16 kHz 48 kbps MP3, transcribe it through OpenAI, LiteLLM, Google Cloud Speech-to-Text, Azure Speech or a compatible endpoint, then edit timestamped subtitles in the right panel
+- Silence removal: detect configurable quiet ranges with ffmpeg and ripple-delete them across every track as one undoable edit
 - Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
 - Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
@@ -39,7 +41,7 @@ Everything else works without it. An app launched from Finder does not inherit a
 
 Homebrew's ffmpeg is built with VideoToolbox, so GPU encoding works out of the box on a Mac. Settings → Preview & Tools says which encoder was found, or why none was.
 
-AI additionally needs Codex CLI on `PATH` and a ChatGPT login made with `codex login`. The app does not bundle Codex, copy its credentials or support API key authentication.
+AI conversations additionally need Codex CLI on `PATH` and a ChatGPT login made with `codex login`. Speech recognition is billed separately by its provider; its credential is kept only in memory for the app session and is never stored in settings.
 
 ## Shortcuts
 

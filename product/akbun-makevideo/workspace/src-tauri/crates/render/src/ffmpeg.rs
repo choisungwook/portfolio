@@ -753,6 +753,90 @@ pub fn mix_reference_args(project: &Project, output: &str) -> Option<Vec<String>
     Some(args)
 }
 
+/// The audible timeline as a compact speech-recognition input. Speech models
+/// gain nothing from video, stereo, or frequencies above the voice band, so
+/// the temporary file is mono 16 kHz MP3 at 48 kbit/s.
+pub fn analysis_audio_args(project: &Project, output: &str) -> Option<Vec<String>> {
+    let rate = project.rate();
+    let items = collect_items(project);
+    let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
+    if audio.is_empty() {
+        return None;
+    }
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-nostdin".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+    ];
+    for item in &audio {
+        args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
+        args.extend([
+            "-t".into(),
+            secs(RationalTime::new(item.clip.source_duration_frames(), rate)),
+        ]);
+        args.extend(["-i".into(), item.path.to_string()]);
+    }
+
+    let mut chains = Vec::new();
+    let mut labels = Vec::new();
+    for (index, item) in audio.iter().enumerate() {
+        chains.push(audio_chain(item, index, rate));
+        labels.push(format!("[a{index}]"));
+    }
+    chains.push(mix_chain(&labels));
+    args.extend(["-filter_complex".into(), chains.join(";")]);
+    args.extend(["-map".into(), "[aout]".into()]);
+    args.extend([
+        "-t".into(),
+        secs(project.duration()),
+        "-vn".into(),
+        "-ac".into(),
+        "1".into(),
+        "-ar".into(),
+        "16000".into(),
+        "-b:a".into(),
+        "48k".into(),
+        "-map_metadata".into(),
+        "-1".into(),
+        output.into(),
+    ]);
+    Some(args)
+}
+
+pub fn analysis_chunk_args(
+    input: &str,
+    start_ms: u64,
+    duration_ms: u64,
+    output: &str,
+) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-nostdin".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-y".into(),
+        "-ss".into(),
+        format!("{:.3}", start_ms as f64 / 1000.0),
+        "-t".into(),
+        format!("{:.3}", duration_ms as f64 / 1000.0),
+        "-i".into(),
+        input.into(),
+        "-vn".into(),
+        "-ac".into(),
+        "1".into(),
+        "-ar".into(),
+        "16000".into(),
+        "-b:a".into(),
+        "48k".into(),
+        "-map_metadata".into(),
+        "-1".into(),
+        output.into(),
+    ]
+}
+
 /// Encode composited RGBA frames arriving on stdin. Audio is still read from
 /// the source files and mixed by ffmpeg, so only the picture takes the long
 /// way round.
@@ -1662,6 +1746,29 @@ mod tests {
         let mut project = one_video_project();
         project.assets[0].has_audio = false;
         assert!(mix_reference_args(&project, "/tmp/mix.f32").is_none());
+    }
+
+    #[test]
+    fn speech_analysis_uses_a_small_mono_mp3() {
+        let text = joined(&analysis_audio_args(&one_video_project(), "/tmp/analysis.mp3").unwrap());
+        assert!(text.contains("-map [aout]"), "{text}");
+        assert!(text.contains("-ac 1 -ar 16000 -b:a 48k"), "{text}");
+        assert!(text.ends_with("/tmp/analysis.mp3"), "{text}");
+    }
+
+    #[test]
+    fn a_transcription_chunk_is_reencoded_at_exact_millisecond_bounds() {
+        let text = joined(&analysis_chunk_args(
+            "/tmp/analysis.mp3",
+            1250,
+            55_000,
+            "/tmp/chunk.mp3",
+        ));
+        assert!(
+            text.contains("-ss 1.250 -t 55.000 -i /tmp/analysis.mp3"),
+            "{text}"
+        );
+        assert!(text.contains("-ac 1 -ar 16000 -b:a 48k"), "{text}");
     }
 
     #[test]
