@@ -5,7 +5,7 @@ import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { fixtureFor } from "./fixtures";
-import { defaultAiSettings } from "./ai-settings";
+import { defaultAiSettings, normalizeAiSettings } from "./ai-settings";
 import { previewPhase } from "./state";
 import type {
   AnnotationDraft,
@@ -204,7 +204,7 @@ export async function aiLoadSettings(): Promise<AiSettings> {
   if (isTauriRuntime()) return invoke("ai_load_settings");
   try {
     const stored = localStorage.getItem("akbun-pdf.ai-settings");
-    return stored ? { ...defaultAiSettings(), ...JSON.parse(stored) } : defaultAiSettings();
+    return stored ? normalizeAiSettings(JSON.parse(stored)) : defaultAiSettings();
   } catch {
     return defaultAiSettings();
   }
@@ -212,8 +212,9 @@ export async function aiLoadSettings(): Promise<AiSettings> {
 
 export async function aiSaveSettings(settings: AiSettings): Promise<AiSettings> {
   if (isTauriRuntime()) return invoke("ai_save_settings", { settings });
-  localStorage.setItem("akbun-pdf.ai-settings", JSON.stringify(settings));
-  return settings;
+  const normalized = normalizeAiSettings(settings);
+  localStorage.setItem("akbun-pdf.ai-settings", JSON.stringify(normalized));
+  return normalized;
 }
 
 export async function aiListConversations(): Promise<AiConversationMeta[]> {

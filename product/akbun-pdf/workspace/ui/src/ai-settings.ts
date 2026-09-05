@@ -23,3 +23,23 @@ export function defaultAiSettings(): AiSettings {
     systemPrompt: SUMMARY_SYSTEM_PROMPT,
   };
 }
+
+export function normalizeAiSettings(value: unknown): AiSettings {
+  const defaults = defaultAiSettings();
+  if (!value || typeof value !== "object") return defaults;
+  const candidate = value as Record<string, unknown>;
+  const model = typeof candidate.model === "string"
+    && AI_MODELS.some((item) => item.id === candidate.model)
+    ? candidate.model as AiModel
+    : defaults.model;
+  const prompt = typeof candidate.systemPrompt === "string"
+    ? candidate.systemPrompt.trim().slice(0, 20_000)
+    : "";
+  return {
+    version: defaults.version,
+    provider: defaults.provider,
+    model,
+    effort: defaults.effort,
+    systemPrompt: prompt || defaults.systemPrompt,
+  };
+}

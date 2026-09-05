@@ -514,14 +514,14 @@ export class AiPanel {
     batchIndex: number,
     batchCount: number,
   ): Promise<AiTurnInput[]> {
-    const pageInputs: SummaryPageInput[] = [];
+    const pageInputs: Array<Pick<SummaryPageInput, "page" | "text">> = [];
     const imagePaths: string[] = [];
     for (const page of pages) {
       if (this.stopRequested) throw new Error("AI 응답을 중지했습니다.");
       this.setProgress(`${page}페이지 텍스트와 이미지를 준비하는 중`);
       const input = await this.viewer.summaryInput(page);
-      pageInputs.push(input);
       imagePaths.push(await aiSavePageImage(requestId, page, input.imageDataUrl));
+      pageInputs.push({ page: input.page, text: input.text });
     }
     return [
       { type: "text", text: batchSummaryPrompt(this.state.title, pageInputs, batchIndex, batchCount) },
@@ -605,7 +605,12 @@ export class AiPanel {
 
   private async copyMessage(id: string): Promise<void> {
     const message = this.currentConversation?.messages.find((item) => item.id === id);
-    if (message) await navigator.clipboard.writeText(message.text);
+    if (!message) return;
+    try {
+      await navigator.clipboard.writeText(message.text);
+    } catch {
+      return;
+    }
   }
 }
 
@@ -691,7 +696,7 @@ function chunks<T>(items: T[], size: number): T[][] {
 
 function batchSummaryPrompt(
   title: string,
-  pages: SummaryPageInput[],
+  pages: Array<Pick<SummaryPageInput, "page" | "text">>,
   batchIndex: number,
   batchCount: number,
 ): string {
