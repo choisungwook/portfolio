@@ -31,11 +31,15 @@ npm run dev
 
 ```bash
 npm run check
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
 ```
 
-- Vitest: 문서 상태 전이와 범위
+- Vitest: 문서 상태 전이, 검색과 범위
 - Vite build: TypeScript와 UI bundle
-- Cargo: Tauri 없이 `pdf-core`만 테스트
+- `npm run check`의 Cargo: Tauri 없이 `pdf-core` 테스트
+- Tauri lib test: 임시 파일 검증과 원자적 교체 실패 경로
+- Clippy: Rust 전체 target의 warning 차단
 - source size: 자체 작성 코드 파일 1,000줄 미만
 
 ## 자동 업데이트
