@@ -30,6 +30,29 @@ describe("document search", () => {
     expect(results).toHaveLength(300);
   });
 
+  it("highlights only the matched word inside a long fragment", () => {
+    const search = new DocumentSearch();
+    search.begin(1);
+    search.addPage(1, [{ text: "0123456789", rect: { x: 0, y: 0, width: 100, height: 12 } }]);
+    const [result] = search.query("234");
+    expect(result.rects).toEqual([{ x: 20, y: 0, width: 30, height: 12 }]);
+    expect(result.snippet.slice(result.matchStart, result.matchStart + result.matchLength)).toBe("234");
+  });
+
+  it("splits a match that spans two fragments into two rects", () => {
+    const search = new DocumentSearch();
+    search.begin(1);
+    search.addPage(1, [
+      { text: "ab", rect: { x: 0, y: 0, width: 20, height: 10 } },
+      { text: "cd", rect: { x: 30, y: 0, width: 20, height: 10 } },
+    ]);
+    // 조각 사이에 공백 한 칸이 끼므로 "b c"가 두 조각에 걸친 일치가 된다.
+    expect(search.query("b c")[0].rects).toEqual([
+      { x: 10, y: 0, width: 10, height: 10 },
+      { x: 30, y: 0, width: 10, height: 10 },
+    ]);
+  });
+
   it("clears cached text when the document closes", () => {
     const search = new DocumentSearch();
     search.begin(1);

@@ -95,12 +95,16 @@ svg {
 }
 
 .toolbar__brand {
-  min-width: 190px;
+  min-width: 0;
+  flex: 0 1 190px;
   gap: 9px;
 }
 
+/* 형광펜 색 띠가 켜지면 도구 모음이 좁아진다. 글자가 줄바꿈되는 대신 제목이 먼저 줄어들게 한다. */
 .toolbar__group {
+  flex: none;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .toolbar__group + .toolbar__group {

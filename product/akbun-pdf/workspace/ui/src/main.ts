@@ -24,7 +24,7 @@ import {
   upsertAnnotation,
 } from "./bridge";
 import { configurePdfEngine, PdfDocumentAdapter } from "./pdf-engine";
-import { renderDocument, showToast } from "./render";
+import { isContextTabOpen, renderDocument, showContextTab, showToast } from "./render";
 import { changeZoom, errorState, goToPage, normalizeState } from "./state";
 import type {
   AnnotationDraft,
@@ -32,6 +32,7 @@ import type {
   DocumentState,
   FitMode,
   MergeFile,
+  PdfRect,
   SaveResult,
   SearchResult,
 } from "./types";
@@ -53,10 +54,12 @@ let annotationDraft: AnnotationDraft | null = null;
 let mergeFiles: MergeFile[] = [];
 let draggedPage = 0;
 let draggedMergeId = "";
+let highlightColor = localStorage.getItem("akbun-pdf.highlight-color") ?? "#ffd54f";
 
-const searchPanel = element<HTMLElement>("[data-role='search-panel']");
 const searchInput = element<HTMLInputElement>("[data-role='search-input']");
 const searchStatus = element<HTMLElement>("[data-role='search-status']");
+const findResults = element<HTMLElement>("[data-role='find-results']");
+const findEmpty = element<HTMLElement>("[data-role='find-empty']");
 const annotationDialog = element<HTMLDialogElement>("[data-role='annotation-dialog']");
 const mergeDialog = element<HTMLDialogElement>("[data-role='merge-dialog']");
 const viewer = new PdfViewer(
@@ -66,15 +69,9 @@ const viewer = new PdfViewer(
     onCurrentPage: (page) => updateState(goToPage(state, page)),
     onIndexProgress: () => refreshSearchResults(),
     onCreateAnnotation: (kind, page, rect) => {
-      openAnnotationEditor({
-        id: null,
-        page,
-        kind,
-        rect,
-        color: kind === "highlight" ? "#ffd54f" : "#ffb74d",
-        contents: "",
-      });
+      openAnnotationEditor({ id: null, page, kind, rect, color: "#ffb74d", contents: "" });
     },
+    onHighlightSelection: (page, rects) => void highlightSelection(page, rects),
     onEditAnnotation: (annotationId) => {
       const annotation = state.annotations.find((item) => item.id === annotationId);
       if (annotation) openAnnotationEditor({ ...annotation });
@@ -84,6 +81,7 @@ const viewer = new PdfViewer(
 const aiPanel = new AiPanel(state, viewer);
 
 renderDocument(state);
+markHighlightColor();
 await aiPanel.init();
 installCloseGuard(() => state.dirty);
 restorePanelSizes();
@@ -101,7 +99,44 @@ async function applyEditedState(next: DocumentState): Promise<void> {
   updateState(next);
   await viewer.updateDocument(state.thumbnails, state.annotations);
   viewer.goTo(state.currentPage);
-  if (!searchPanel.hidden) refreshSearchResults();
+  if (isContextTabOpen("find")) refreshSearchResults();
+}
+
+// 주석만 바뀌었으면 페이지를 다시 그리지 않는다. 다시 그리면 읽던 자리에서 스크롤이 튄다.
+async function applyAnnotations(action: Promise<DocumentState>): Promise<void> {
+  try {
+    updateState(await action);
+    await viewer.showAnnotations(state.annotations);
+  } catch (error) {
+    showToast(String(error));
+  }
+}
+
+async function highlightSelection(page: number, rects: PdfRect[]): Promise<void> {
+  const documentId = state.documentId;
+  if (!documentId) return;
+  await applyAnnotations((async () => {
+    let next = state;
+    for (const rect of rects) {
+      next = await upsertAnnotation(documentId, {
+        id: null,
+        page,
+        kind: "highlight",
+        rect,
+        color: highlightColor,
+        contents: "",
+      });
+    }
+    return next;
+  })());
+}
+
+function markHighlightColor(): void {
+  document.querySelectorAll<HTMLElement>("[data-highlight-color]").forEach((swatch) => {
+    const selected = swatch.dataset.highlightColor === highlightColor;
+    swatch.classList.toggle("highlight-color--selected", selected);
+    swatch.setAttribute("aria-pressed", String(selected));
+  });
 }
 
 async function openDocument(): Promise<void> {
@@ -198,7 +233,7 @@ async function editPage(action: Promise<DocumentState>): Promise<void> {
 function applyZoom(mode: FitMode, requested = state.zoom): void {
   const zoom = viewer.zoom(mode, requested);
   updateState({ ...state, zoom });
-  if (!searchPanel.hidden) refreshSearchResults();
+  if (isContextTabOpen("find")) refreshSearchResults();
 }
 
 function toggleAnnotationTool(kind: AnnotationKind): void {
@@ -207,7 +242,8 @@ function toggleAnnotationTool(kind: AnnotationKind): void {
   document.querySelectorAll(".tool-button--active").forEach((item) => item.classList.remove("tool-button--active"));
   button.classList.toggle("tool-button--active", active);
   viewer.setTool(active ? kind : null);
-  if (active) showToast(kind === "highlight" ? "텍스트를 드래그해 선택하세요." : "페이지에서 메모 위치를 클릭하세요.");
+  element<HTMLElement>("[data-role='highlight-colors']").hidden = !(active && kind === "highlight");
+  if (active) showToast(kind === "highlight" ? "텍스트를 드래그하면 형광펜이 칠해집니다." : "페이지에서 메모 위치를 클릭하세요.");
 }
 
 function openAnnotationEditor(draft: AnnotationDraft): void {
@@ -232,7 +268,7 @@ async function submitAnnotation(): Promise<void> {
   };
   annotationDialog.close();
   annotationDraft = null;
-  await editPage(upsertAnnotation(state.documentId, draft));
+  await applyAnnotations(upsertAnnotation(state.documentId, draft));
 }
 
 async function removeAnnotation(): Promise<void> {
@@ -240,19 +276,19 @@ async function removeAnnotation(): Promise<void> {
   const id = annotationDraft.id;
   annotationDialog.close();
   annotationDraft = null;
-  await editPage(deleteAnnotation(state.documentId, id));
+  await applyAnnotations(deleteAnnotation(state.documentId, id));
 }
 
 function openFind(): void {
-  if (state.phase !== "ready") return;
-  searchPanel.hidden = false;
+  showContextTab("find");
+  document.body.classList.remove("outline-collapsed");
   searchInput.focus();
   searchInput.select();
   refreshSearchResults();
 }
 
 function closeFind(): void {
-  searchPanel.hidden = true;
+  if (isContextTabOpen("find")) showContextTab("outline");
   searchResults = [];
   selectedResult = -1;
   viewer.showSearchResults([], -1);
@@ -269,16 +305,48 @@ function refreshSearchResults(): void {
     ? `${position} / ${searchResults.length} · ${progress.indexed}/${progress.total} 페이지`
     : `${progress.indexed}/${progress.total} 페이지 준비됨`;
   viewer.showSearchResults(searchResults, selectedResult);
+  renderFindResults();
+}
+
+function renderFindResults(): void {
+  findEmpty.hidden = searchResults.length > 0;
+  findEmpty.textContent = searchInput.value.trim() ? "찾은 결과가 없습니다." : "찾을 단어를 입력하세요.";
+  findResults.replaceChildren(...searchResults.map((result, index) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `find-result${index === selectedResult ? " find-result--selected" : ""}`;
+    item.dataset.findResult = String(index);
+    const page = document.createElement("span");
+    page.className = "find-result__page";
+    page.textContent = `p.${result.page}`;
+    const snippet = document.createElement("span");
+    snippet.className = "find-result__snippet";
+    const mark = document.createElement("mark");
+    mark.textContent = result.snippet.slice(result.matchStart, result.matchStart + result.matchLength);
+    snippet.append(
+      result.snippet.slice(0, result.matchStart),
+      mark,
+      result.snippet.slice(result.matchStart + result.matchLength),
+    );
+    item.append(page, snippet);
+    return item;
+  }));
+}
+
+function selectSearchResult(index: number): void {
+  const result = searchResults[index];
+  if (!result) return;
+  selectedResult = index;
+  viewer.showSearchResults(searchResults, selectedResult);
+  renderFindResults();
+  viewer.goTo(result.page);
+  const progress = viewer.search.progress();
+  searchStatus.textContent = `${selectedResult + 1} / ${searchResults.length} · ${progress.indexed}/${progress.total} 페이지`;
 }
 
 function moveSearchResult(delta: number): void {
   if (searchResults.length === 0) return;
-  selectedResult = (selectedResult + delta + searchResults.length) % searchResults.length;
-  viewer.showSearchResults(searchResults, selectedResult);
-  const result = searchResults[selectedResult];
-  if (result) viewer.goTo(result.page);
-  const progress = viewer.search.progress();
-  searchStatus.textContent = `${selectedResult + 1} / ${searchResults.length} · ${progress.indexed}/${progress.total} 페이지`;
+  selectSearchResult((selectedResult + delta + searchResults.length) % searchResults.length);
 }
 
 function navigateTo(page: number, top: number | null = null): void {
@@ -416,12 +484,30 @@ document.addEventListener("click", (event) => {
     mergeFiles = mergeFiles.filter((file) => file.id !== removeMerge);
     renderMergeFiles();
   }
+  const swatch = target.closest<HTMLElement>("[data-highlight-color]")?.dataset.highlightColor;
+  if (swatch) {
+    highlightColor = swatch;
+    localStorage.setItem("akbun-pdf.highlight-color", swatch);
+    markHighlightColor();
+  }
+  const findResult = target.closest<HTMLElement>("[data-find-result]")?.dataset.findResult;
+  if (findResult) selectSearchResult(Number(findResult));
   const pageTarget = target.closest<HTMLElement>("[data-page]");
   if (pageTarget?.dataset.page) {
     const top = pageTarget.dataset.top ? Number(pageTarget.dataset.top) : null;
     navigateTo(Number(pageTarget.dataset.page), top);
   }
 });
+
+// macOS 트랙패드 핀치는 ctrlKey가 붙은 wheel로 들어온다. cmd + 휠은 metaKey로 들어온다.
+element<HTMLElement>(".viewer").addEventListener("wheel", (event) => {
+  if (!event.ctrlKey && !event.metaKey) return;
+  event.preventDefault();
+  if (state.phase !== "ready") return;
+  const zoom = viewer.zoomAt(state.zoom * Math.exp(-event.deltaY / 320), event.clientX, event.clientY);
+  updateState({ ...state, zoom });
+  if (isContextTabOpen("find")) refreshSearchResults();
+}, { passive: false });
 
 element<HTMLFormElement>("[data-role='annotation-form']").addEventListener("submit", (event) => {
   event.preventDefault();

@@ -28,6 +28,7 @@ import type {
   DocumentState,
   SummaryPageInput,
 } from "./types";
+import { showContextTab } from "./render";
 import type { PdfViewer } from "./viewer";
 
 const SUMMARY_BATCH_SIZE = 6;
@@ -120,7 +121,7 @@ export class AiPanel {
 
   private async handleAction(action: string): Promise<void> {
     if (action === "open") await this.showAi();
-    if (action === "show-outline") this.showOutline();
+    if (action === "show-outline") showContextTab("outline");
     if (action === "settings") await this.openSettings();
     if (action === "close-settings") element<HTMLDialogElement>("[data-role='ai-settings-dialog']").close();
     if (action === "refresh") await this.client.connect(true);
@@ -140,26 +141,8 @@ export class AiPanel {
   }
 
   private async showAi(): Promise<void> {
-    element<HTMLElement>("[data-role='outline-view']").hidden = true;
-    element<HTMLElement>("[data-role='ai-panel']").hidden = false;
-    document.body.classList.add("ai-panel-open");
-    this.markContextTab("AI");
+    showContextTab("ai");
     await this.client.connect();
-  }
-
-  private showOutline(): void {
-    element<HTMLElement>("[data-role='outline-view']").hidden = false;
-    element<HTMLElement>("[data-role='ai-panel']").hidden = true;
-    document.body.classList.remove("ai-panel-open");
-    this.markContextTab("목차");
-  }
-
-  private markContextTab(label: string): void {
-    document.querySelectorAll<HTMLButtonElement>(".context-tab").forEach((button) => {
-      const active = button.textContent?.trim() === label;
-      button.classList.toggle("context-tab--active", active);
-      button.setAttribute("aria-selected", String(active));
-    });
   }
 
   private async openSettings(): Promise<void> {

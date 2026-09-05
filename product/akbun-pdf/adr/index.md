@@ -14,3 +14,4 @@
 | [2026-09-fixed-updater-tag.md](./2026-09-fixed-updater-tag.md) | 제품별 고정 tag에서 updater manifest 제공 |
 | [2026-09-bundle-pdfjs-decoders.md](./2026-09-bundle-pdfjs-decoders.md) | PDF.js 이미지 decoder 자산을 앱에 함께 번들 |
 | [2026-09-webkit-stream-async-iterator.md](./2026-09-webkit-stream-async-iterator.md) | WebKit에 없는 ReadableStream 비동기 이터레이터를 앱 시작 시 보강 |
+| [2026-09-direct-highlight-and-word-search.md](./2026-09-direct-highlight-and-word-search.md) | 형광펜 즉시 적용, 단어 단위 검색 강조와 오른쪽 찾기 패널 |

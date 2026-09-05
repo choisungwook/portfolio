@@ -1,7 +1,7 @@
 .context-tabs {
   display: grid;
   height: 48px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--line);
 }
 
