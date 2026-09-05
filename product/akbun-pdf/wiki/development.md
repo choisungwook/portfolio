@@ -32,7 +32,7 @@ npm run dev
 ```bash
 npm run check
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
 ```
 
 - Vitest: 문서 상태 전이, 검색과 범위
