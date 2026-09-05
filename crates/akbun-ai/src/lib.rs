@@ -1,22 +1,23 @@
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Component, Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub const MAX_SESSIONS: usize = 3;
 pub const SESSION_LIMIT_BYTES: u64 = 128 * 1024 * 1024;
 pub const SESSION_RESERVE_BYTES: u64 = 4 * 1024;
 
-/// A rendered slide handed to the model as turn input. Large enough for a
-/// 1.5x raster of a 16:9 canvas, small enough that a runaway caller cannot
-/// fill the disk one turn at a time.
-pub const MAX_SLIDE_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+/// A rendered app image handed to the model as turn input.
+pub const MAX_RUNTIME_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
-/// How many rendered slides stay on disk. The model reads the file during the
+/// How many rendered inputs stay on disk. The model reads the file during the
 /// turn it was written for, so the previous few are kept rather than deleted
 /// straight away, and everything older goes.
-pub const KEPT_SLIDE_IMAGES: usize = 4;
+pub const KEPT_RUNTIME_IMAGES: usize = 4;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +38,178 @@ pub struct AttachedImage {
     pub file_name: String,
     pub path: String,
     pub size_bytes: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppServerInfo {
+    pub codex_path: String,
+    pub version: String,
+    pub running: bool,
+}
+
+#[derive(Default)]
+pub struct CodexRuntime {
+    process: Mutex<Option<AppServerProcess>>,
+    generation: Arc<AtomicU64>,
+}
+
+struct AppServerProcess {
+    child: Child,
+    stdin: BufWriter<ChildStdin>,
+}
+
+impl Drop for AppServerProcess {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+impl CodexRuntime {
+    pub fn start<Message, Stopped>(
+        &self,
+        working_directory: &Path,
+        on_message: Message,
+        on_stopped: Stopped,
+    ) -> Result<AppServerInfo, String>
+    where
+        Message: Fn(Value) + Send + 'static,
+        Stopped: Fn() + Send + 'static,
+    {
+        let mut process = self
+            .process
+            .lock()
+            .map_err(|_| "cannot lock Codex App Server state".to_string())?;
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        *process = None;
+
+        let codex = find_codex().ok_or_else(|| {
+            "codex_cli_not_found: install Codex CLI and sign in with ChatGPT".to_string()
+        })?;
+        let version = codex_version(&codex)?;
+        let mut child = Command::new(&codex)
+            .args(["app-server", "--listen", "stdio://"])
+            .current_dir(working_directory)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| format!("cannot start Codex App Server: {error}"))?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or("cannot open Codex App Server stdin")?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or("cannot open Codex App Server stdout")?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or("cannot open Codex App Server stderr")?;
+
+        let current_generation = Arc::clone(&self.generation);
+        std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines() {
+                let Ok(line) = line else { break };
+                let payload = serde_json::from_str::<Value>(&line).unwrap_or_else(
+                    |_| json!({ "method": "client/protocolError", "params": { "line": line } }),
+                );
+                on_message(payload);
+            }
+            if current_generation.load(Ordering::SeqCst) == generation {
+                on_stopped();
+            }
+        });
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                if line.is_err() {
+                    break;
+                }
+            }
+        });
+
+        let info = AppServerInfo {
+            codex_path: codex.to_string_lossy().to_string(),
+            version,
+            running: true,
+        };
+        *process = Some(AppServerProcess {
+            child,
+            stdin: BufWriter::new(stdin),
+        });
+        Ok(info)
+    }
+
+    pub fn send_rpc(&self, message: &Value) -> Result<(), String> {
+        let mut process = self
+            .process
+            .lock()
+            .map_err(|_| "cannot lock Codex App Server state".to_string())?;
+        let server = process
+            .as_mut()
+            .ok_or("codex_app_server_not_running: start Codex App Server first")?;
+        if server
+            .child
+            .try_wait()
+            .map_err(|error| format!("cannot inspect Codex App Server: {error}"))?
+            .is_some()
+        {
+            *process = None;
+            return Err("codex_app_server_stopped: restart Codex App Server".into());
+        }
+        serde_json::to_writer(&mut server.stdin, message)
+            .map_err(|error| format!("cannot encode Codex App Server request: {error}"))?;
+        server
+            .stdin
+            .write_all(b"\n")
+            .and_then(|_| server.stdin.flush())
+            .map_err(|error| format!("cannot send Codex App Server request: {error}"))
+    }
+
+    pub fn stop(&self) -> Result<(), String> {
+        let mut process = self
+            .process
+            .lock()
+            .map_err(|_| "cannot lock Codex App Server state".to_string())?;
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        *process = None;
+        Ok(())
+    }
+}
+
+fn find_codex() -> Option<PathBuf> {
+    let executable = if cfg!(windows) { "codex.exe" } else { "codex" };
+    let mut candidates = std::env::var_os("PATH")
+        .map(|value| {
+            std::env::split_paths(&value)
+                .map(|directory| directory.join(executable))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if cfg!(target_os = "macos") {
+        candidates.extend([
+            PathBuf::from("/opt/homebrew/bin/codex"),
+            PathBuf::from("/usr/local/bin/codex"),
+        ]);
+    }
+    candidates.into_iter().find(|path| {
+        fs::metadata(path)
+            .map(|metadata| metadata.is_file())
+            .unwrap_or(false)
+    })
+}
+
+fn codex_version(path: &Path) -> Result<String, String> {
+    let output = Command::new(path)
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("cannot run Codex CLI: {error}"))?;
+    if !output.status.success() {
+        return Err("cannot read Codex CLI version".into());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 #[derive(Clone, Debug)]
@@ -207,42 +380,43 @@ impl AiStore {
         })
     }
 
-    /// Writes a rendered slide into the runtime directory and returns its path.
+    /// Writes a rendered app image into the runtime directory and returns its path.
     ///
     /// It lands in the runtime root rather than in a session because it is turn
     /// input, not conversation content: it must not count against the 128 MiB a
     /// conversation is allowed, and it must survive the conversation being
     /// deleted mid-turn.
-    pub fn save_slide_image(&self, image_id: &str, data: &[u8]) -> Result<PathBuf, String> {
+    pub fn save_runtime_png(&self, image_id: &str, data: &[u8]) -> Result<PathBuf, String> {
         validate_id(image_id)?;
-        if data.len() > MAX_SLIDE_IMAGE_BYTES {
-            return Err("slide_image_too_large: rendered slide exceeds 8 MiB".into());
+        if data.len() > MAX_RUNTIME_IMAGE_BYTES {
+            return Err("runtime_image_too_large: rendered image exceeds 8 MiB".into());
         }
         if !data.starts_with(&[0x89, b'P', b'N', b'G']) {
-            return Err("slide_image_not_png: expected a PNG image".into());
+            return Err("runtime_image_not_png: expected a PNG image".into());
         }
-        let directory = self.slide_images_root();
-        fs::create_dir_all(&directory).map_err(display_error("create AI slide image directory"))?;
+        let directory = self.runtime_images_root();
+        fs::create_dir_all(&directory)
+            .map_err(display_error("create AI runtime image directory"))?;
         let path = directory.join(format!("{image_id}.png"));
         let temporary = directory.join(format!("{image_id}.png.tmp"));
-        fs::write(&temporary, data).map_err(display_error("write AI slide image"))?;
-        fs::rename(&temporary, &path).map_err(display_error("replace AI slide image"))?;
-        self.prune_slide_images()?;
+        fs::write(&temporary, data).map_err(display_error("write AI runtime image"))?;
+        fs::rename(&temporary, &path).map_err(display_error("replace AI runtime image"))?;
+        self.prune_runtime_images()?;
         Ok(path)
     }
 
-    pub fn slide_images_root(&self) -> PathBuf {
-        self.runtime_root().join("slides")
+    pub fn runtime_images_root(&self) -> PathBuf {
+        self.runtime_root().join("images")
     }
 
-    fn prune_slide_images(&self) -> Result<(), String> {
-        let directory = self.slide_images_root();
+    fn prune_runtime_images(&self) -> Result<(), String> {
+        let directory = self.runtime_images_root();
         let mut files = Vec::new();
-        for entry in fs::read_dir(&directory).map_err(display_error("list AI slide images"))? {
-            let entry = entry.map_err(display_error("read AI slide image entry"))?;
+        for entry in fs::read_dir(&directory).map_err(display_error("list AI runtime images"))? {
+            let entry = entry.map_err(display_error("read AI runtime image entry"))?;
             let metadata = entry
                 .metadata()
-                .map_err(display_error("inspect AI slide image"))?;
+                .map_err(display_error("inspect AI runtime image"))?;
             if !metadata.is_file() {
                 continue;
             }
@@ -251,11 +425,11 @@ impl AiStore {
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             files.push((modified, entry.path()));
         }
-        if files.len() <= KEPT_SLIDE_IMAGES {
+        if files.len() <= KEPT_RUNTIME_IMAGES {
             return Ok(());
         }
         files.sort_by(|left, right| right.0.cmp(&left.0));
-        for (_, path) in files.into_iter().skip(KEPT_SLIDE_IMAGES) {
+        for (_, path) in files.into_iter().skip(KEPT_RUNTIME_IMAGES) {
             let _ = fs::remove_file(path);
         }
         Ok(())
@@ -378,7 +552,7 @@ mod tests {
             .as_nanos();
         let sequence = NEXT_STORE_ID.fetch_add(1, Ordering::Relaxed);
         AiStore::new(std::env::temp_dir().join(format!(
-            "makepresentation-ai-{}-{unique}-{sequence}",
+            "akbun-ai-{}-{unique}-{sequence}",
             std::process::id()
         )))
     }
@@ -436,6 +610,12 @@ mod tests {
             .unwrap_err();
         assert!(error.starts_with("session_count_limit:"));
         fs::remove_dir_all(store.root.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn reserves_space_before_the_session_hard_limit() {
+        assert!(ensure_capacity(SESSION_LIMIT_BYTES - SESSION_RESERVE_BYTES).is_ok());
+        assert!(ensure_capacity(SESSION_LIMIT_BYTES - SESSION_RESERVE_BYTES + 1).is_err());
     }
 
     #[test]
@@ -517,10 +697,10 @@ mod tests {
     }
 
     #[test]
-    fn stores_a_rendered_slide_in_the_runtime_directory() {
+    fn stores_a_rendered_image_in_the_runtime_directory() {
         let store = temporary_store();
         store.ensure().unwrap();
-        let path = store.save_slide_image("slide-one", &png(64)).unwrap();
+        let path = store.save_runtime_png("image-one", &png(64)).unwrap();
 
         assert!(path.exists());
         assert!(path.starts_with(store.runtime_root()));
@@ -530,43 +710,43 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_slide_image_that_is_not_a_png() {
+    fn rejects_a_runtime_image_that_is_not_a_png() {
         let store = temporary_store();
         store.ensure().unwrap();
 
         assert!(store
-            .save_slide_image("slide-one", b"<svg/>")
+            .save_runtime_png("image-one", b"<svg/>")
             .unwrap_err()
-            .starts_with("slide_image_not_png:"));
+            .starts_with("runtime_image_not_png:"));
         assert!(store
-            .save_slide_image("../escape", &png(64))
+            .save_runtime_png("../escape", &png(64))
             .unwrap_err()
             .starts_with("invalid_session_id:"));
         assert!(store
-            .save_slide_image("slide-one", &png(MAX_SLIDE_IMAGE_BYTES + 1))
+            .save_runtime_png("image-one", &png(MAX_RUNTIME_IMAGE_BYTES + 1))
             .unwrap_err()
-            .starts_with("slide_image_too_large:"));
+            .starts_with("runtime_image_too_large:"));
     }
 
     #[test]
-    fn keeps_only_the_most_recent_slide_images() {
+    fn keeps_only_the_most_recent_runtime_images() {
         let store = temporary_store();
         store.ensure().unwrap();
-        for index in 0..KEPT_SLIDE_IMAGES + 3 {
+        for index in 0..KEPT_RUNTIME_IMAGES + 3 {
             store
-                .save_slide_image(&format!("slide-{index}"), &png(64))
+                .save_runtime_png(&format!("image-{index}"), &png(64))
                 .unwrap();
             // Coarse filesystem timestamps would otherwise make the sort order
             // arbitrary and the pruning look flaky.
             std::thread::sleep(std::time::Duration::from_millis(15));
         }
 
-        let remaining = fs::read_dir(store.slide_images_root()).unwrap().count();
-        assert_eq!(remaining, KEPT_SLIDE_IMAGES);
+        let remaining = fs::read_dir(store.runtime_images_root()).unwrap().count();
+        assert_eq!(remaining, KEPT_RUNTIME_IMAGES);
         assert!(store
-            .slide_images_root()
-            .join(format!("slide-{}.png", KEPT_SLIDE_IMAGES + 2))
+            .runtime_images_root()
+            .join(format!("image-{}.png", KEPT_RUNTIME_IMAGES + 2))
             .exists());
-        assert!(!store.slide_images_root().join("slide-0.png").exists());
+        assert!(!store.runtime_images_root().join("image-0.png").exists());
     }
 }

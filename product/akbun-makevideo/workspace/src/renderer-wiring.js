@@ -148,6 +148,7 @@
       'app-settings': () => {
         fillAppSheet();
         openSheet('app-settings');
+        void globalThis.makevideoAiPanel.refreshStatus();
       },
       'shortcut-settings': () => {
         shortcutController.fillSheet();

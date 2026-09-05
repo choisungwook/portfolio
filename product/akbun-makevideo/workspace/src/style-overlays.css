@@ -29,6 +29,31 @@
   font-size: 15px;
 }
 
+.settings-ai-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-ai-section h4 {
+  margin: 0 0 4px;
+}
+
+.settings-ai-status {
+  margin: 10px 0;
+  align-items: flex-start;
+}
+
+.settings-ai-status strong {
+  display: block;
+}
+
+.settings-ai-status p {
+  margin: 3px 0 0;
+  color: var(--dim);
+  font-size: 11px;
+}
+
 .sheet .row {
   display: flex;
   align-items: center;

@@ -49,6 +49,10 @@
       <g id="icon-debug">
         <path d="M6 7.5h8v5a4 4 0 0 1-8 0v-5ZM8 7.5V5a2 2 0 0 1 4 0v2.5M3.5 9h2.5M14 9h2.5M3.5 13h2.5M14 13h2.5M6 16l-2 2M14 16l2 2" />
       </g>
+      <g id="icon-ai">
+        <path d="M10 2.5 11.7 7l4.3 1.8-4.3 1.7L10 15l-1.7-4.5L4 8.8 8.3 7 10 2.5Z" />
+        <path d="m15.5 13 .7 1.8L18 15.5l-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
+      </g>
     </defs>
   </svg>
 
@@ -146,6 +150,10 @@
       <button class="global-action" type="button" data-panel-action="debug" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
         <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-debug" /></svg>
         <span>Debug</span>
+      </button>
+      <button class="global-action" type="button" data-panel-action="ai" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-ai" /></svg>
+        <span>AI</span>
       </button>
     </div>
   </header>
@@ -379,6 +387,46 @@
           </div>
           <pre id="debug-log" class="debug-log" hidden></pre>
         </section>
+        <section id="ai-view" class="selected-panel-view" hidden>
+          <div id="ai-list-view" class="ai-panel-page">
+            <header class="ai-panel-header">
+              <div>
+                <h3>Conversations</h3>
+                <p>Saved on this device</p>
+              </div>
+              <button id="btn-ai-new" type="button" class="primary">New</button>
+            </header>
+            <div id="ai-connection-banner" class="ai-connection-banner" data-state="checking">
+              <span class="ai-status-dot" aria-hidden="true"></span>
+              <span id="ai-connection-text">Checking Codex…</span>
+            </div>
+            <p id="ai-list-status" class="ai-panel-status" aria-live="polite"></p>
+            <div id="ai-session-list" class="ai-session-list"></div>
+          </div>
+          <div id="ai-chat-view" class="ai-panel-page ai-chat-view" hidden>
+            <header class="ai-chat-header">
+              <button id="btn-ai-back" type="button">Back</button>
+              <div>
+                <h3 id="ai-chat-title">New conversation</h3>
+                <p id="ai-chat-meta"></p>
+              </div>
+            </header>
+            <div id="ai-messages" class="ai-messages" aria-live="polite"></div>
+            <div id="ai-readonly-notice" class="ai-readonly-notice" hidden></div>
+            <div id="ai-composer" class="ai-composer">
+              <div id="ai-mode-picker" class="ai-mode-picker" role="group" aria-label="AI output">
+                <button type="button" class="active" data-ai-mode="text" aria-pressed="true">Text</button>
+                <button type="button" data-ai-mode="image" aria-pressed="false">Image</button>
+              </div>
+              <textarea id="ai-prompt" rows="4" maxlength="100000" placeholder="Ask for editing advice, narration, captions, or an image…"></textarea>
+              <div class="ai-composer-actions">
+                <span id="ai-turn-status" aria-live="polite"></span>
+                <button id="btn-ai-stop" type="button" hidden>Stop</button>
+                <button id="btn-ai-send" type="button" class="primary">Send</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </aside>
     </section>
 
@@ -507,6 +555,18 @@
   <div id="app-settings" class="overlay" hidden>
     <div class="sheet">
       <h3>Preview &amp; Tools</h3>
+      <section class="settings-ai-section">
+        <h4>AI</h4>
+        <p class="dim small-text">Uses the ChatGPT subscription connected through the installed Codex CLI. API key authentication is not supported.</p>
+        <div id="settings-ai-status" class="settings-ai-status" data-state="checking">
+          <span class="ai-status-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="settings-ai-status-title">Checking Codex…</strong>
+            <p id="settings-ai-status-detail">Looking for Codex CLI and ChatGPT authentication.</p>
+          </div>
+        </div>
+        <button id="btn-ai-refresh" type="button">Refresh AI status</button>
+      </section>
       <label class="row">Preview quality
         <select id="as-quality">
           <option value="full">Full</option>
@@ -637,6 +697,8 @@
   </div>
 
   <script src="api.js"></script>
+  <script src="ai.js"></script>
+  <script src="ai-panel.js"></script>
   <script src="time.js"></script>
   <script src="geometry.js"></script>
   <script src="timeline.js"></script>

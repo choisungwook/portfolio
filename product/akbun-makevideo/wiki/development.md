@@ -23,6 +23,7 @@ None of them need an app binary. The first two need nothing installed at all; th
 
 ```bash
 npm test           # node --test over what the page still computes
+npm run test:ai    # shared Codex process and bounded session store
 npm run test:time  # cargo test -p makevideo-time, needs nothing installed
 npm run test:edit  # cargo test -p makevideo-edit, needs nothing installed
 npm run test:rust  # cargo test -p makevideo-render, needs nothing installed
@@ -47,6 +48,8 @@ sudo apt-get install -y mesa-vulkan-drivers ffmpeg   # what CI does
 What is covered:
 
 - `test/time.test.js` — the rate arithmetic: conversion, rescale, compare, clamp and timecode, over all eight rates the app offers. The mirror of `crates/time`, and the two run the same cases
+- `test/ai.test.js` — app-owned session normalization, JSON byte limits, private project digest and text/image mode prompts
+- `../../../crates/akbun-ai/src/lib.rs` — session count and byte limits, path validation, generated-image copying and runtime image pruning
 - `test/timeline.test.js` — what the page still answers on its own: snapping, what is under the playhead, the timeline length, and the ruler
 - `test/quality.test.js` — quality percentiles, the six acceptance checks and report aggregation
 - `crates/time/src/lib.rs` — the same rate arithmetic on the Rust side, including that ten thousand added frames land exactly on frame ten thousand at every rate
@@ -89,6 +92,8 @@ Two clips of different aspect ratios on two tracks is the case worth checking, b
 
 `globalThis.makevideo` exposes `state`, `refresh()`, `preview()` and the timeline library, which is what the devtools console is for. `lib.rs` opens the devtools automatically in debug builds.
 
+The plain browser shows the AI panel's unavailable state. App Server streaming additionally needs a separately installed Codex CLI logged in with ChatGPT and the Tauri bridge; do not add Codex to the app bundle.
+
 ## Caveats
 
 **Capabilities fail at runtime, not at compile time.** A plugin command missing from `capabilities/default.json` works in every test and breaks on the user's machine. The generated `src-tauri/gen/schemas/desktop-schema.json` lists every valid identifier; it exists after any build and is worth grepping when adding one.
@@ -128,7 +133,7 @@ Each pulls from a different layer at the project rate and exits non-zero when a 
 
 `.github/workflows/release-akbun-makevideo.yml`.
 
-- A pull request runs `verify` on ubuntu: the three test suites and nothing else. It installs `mesa-vulkan-drivers` and `ffmpeg` for the compositor tests. No Rust cache, because neither the render nor the compositor crate pulls in tauri.
+- A pull request runs the page, pure Rust and shared AI runtime tests on Ubuntu. It installs `mesa-vulkan-drivers` and `ffmpeg` for the compositor tests. No Rust cache, because these crates do not pull in Tauri.
 - A push to master builds on macOS and `tauri-apps/tauri-action` creates the release. **GitHub creates the tag from the release**, so there is no `git tag` step to add.
 - The version lives only in `workspace/package.json`; `tauri.conf.json` points at it. The number in `Cargo.toml` is not read by the bundler.
 

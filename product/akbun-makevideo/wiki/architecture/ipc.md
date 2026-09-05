@@ -22,12 +22,22 @@ Every command is in `src-tauri/src/commands.rs`. The page picks paths with nativ
 | `playback_status` | Where the playhead is, and what the monitor has drawn |
 | `start_render` | Spawns ffmpeg, returns immediately, emits `render:progress` then one `render:done` |
 | `cancel_render` | Kills the running ffmpeg |
+| `ai_start_server`, `ai_send_rpc`, `ai_stop_server` | Controls the Codex App Server and forwards JSON-RPC lines |
+| `ai_runtime_directory` | Returns the app-owned writable root used by restricted Codex turns |
+| `ai_list_sessions`, `ai_load_session`, `ai_save_session`, `ai_delete_session` | Reads and writes bounded app-owned conversation JSON |
+| `ai_attach_image`, `ai_copy_image` | Copies a validated generated image into a session or a user-picked path |
 
 ## Nothing carries a project across
 
 `edit_apply` sends commands and `preview_frame` and `start_render` send neither a project nor a timeline. There is one copy of the edit, in `AppState.document`, and everything reads that. The [edit model record](../../adr/2026-08-edit-model-in-rust.md) has the reasoning; the practical effect is that the compositor decides what to decode by reading the timeline rather than by being handed a snapshot taken when somebody pressed a button.
 
 A render takes its own copy and remembers the revision it took, because the app stays editable while it runs. When it finishes, `render:done` carries `edited` if the revision moved, and the dialog says the file is the timeline as it was when the render started.
+
+## AI stays outside the document
+
+The AI panel sends JSON-RPC through the App Server lifecycle commands. Its project digest contains canvas size, frame rate and asset, marker, track and clip counts, but no file paths or media content. The Codex thread is ephemeral; the app saves only its own bounded session JSON and copied generated images.
+
+Generated images are offered through Save rather than imported as project assets. A project references media paths, while deleting an AI session deletes its images, so linking those two lifetimes would create a broken project.
 
 ## No frame crosses this boundary
 

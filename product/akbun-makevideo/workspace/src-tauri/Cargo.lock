@@ -18,9 +18,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "akbun-ai"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "akbun-makevideo"
 version = "0.1.0"
 dependencies = [
+ "akbun-ai",
  "libc",
  "makevideo-audio",
  "makevideo-compositor",

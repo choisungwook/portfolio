@@ -9,7 +9,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
-- Global Action Bar: toggle Inspector, Shape, Marker and Debug in the shared right panel
+- Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel
+- AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; conversations stay in app-owned bounded storage
 - Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
 - Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
@@ -37,6 +38,8 @@ brew install ffmpeg
 Everything else works without it. An app launched from Finder does not inherit a login shell, so `/opt/homebrew/bin` is not on its PATH; the app looks there directly, and Settings → Preview & Tools takes a folder if ffmpeg lives somewhere else.
 
 Homebrew's ffmpeg is built with VideoToolbox, so GPU encoding works out of the box on a Mac. Settings → Preview & Tools says which encoder was found, or why none was.
+
+AI additionally needs Codex CLI on `PATH` and a ChatGPT login made with `codex login`. The app does not bundle Codex, copy its credentials or support API key authentication.
 
 ## Shortcuts
 
@@ -90,6 +93,7 @@ Run the tests, which need neither an app binary nor ffmpeg:
 
 ```bash
 npm test
+npm run test:ai
 npm run test:edit
 npm run test:rust
 npm run test:present

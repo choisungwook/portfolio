@@ -6,9 +6,11 @@ on:
       - master
     paths:
       - 'product/akbun-makevideo/**'
+      - 'crates/akbun-ai/**'
   pull_request:
     paths:
       - 'product/akbun-makevideo/**'
+      - 'crates/akbun-ai/**'
   workflow_dispatch:
 
 permissions:
@@ -31,6 +33,9 @@ jobs:
 
       - name: Run page tests
         run: npm test
+
+      - name: Run shared AI runtime tests
+        run: cargo test --manifest-path ../../../crates/akbun-ai/Cargo.toml
 
       # The time model everything else measures with. It depends on serde and
       # nothing else, so this is seconds.

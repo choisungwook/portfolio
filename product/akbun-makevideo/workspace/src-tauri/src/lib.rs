@@ -1,3 +1,4 @@
+mod ai;
 mod commands;
 mod playback;
 mod store;
@@ -20,6 +21,7 @@ pub fn run() {
 
     builder
         .setup(|app| {
+            ai::setup(app)?;
             let handle = app.handle();
             let settings = store::load_settings(handle);
             commands::apply_theme(handle, &settings.theme);
@@ -50,6 +52,7 @@ pub fn run() {
                 waveforms: Arc::new(Mutex::new(commands::WaveformState::default())),
                 waveform_workers: Mutex::new(Vec::new()),
             });
+            app.manage(ai::AiRuntime::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -95,6 +98,16 @@ pub fn run() {
             commands::process_metrics,
             commands::read_error_log,
             commands::save_quality_report,
+            ai::ai_start_server,
+            ai::ai_send_rpc,
+            ai::ai_stop_server,
+            ai::ai_runtime_directory,
+            ai::ai_list_sessions,
+            ai::ai_load_session,
+            ai::ai_save_session,
+            ai::ai_delete_session,
+            ai::ai_attach_image,
+            ai::ai_copy_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

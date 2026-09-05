@@ -1,5 +1,4 @@
 use akbun_ai::{AiStore, AppServerInfo, AttachedImage, CodexRuntime, SessionSummary};
-use base64::Engine;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -115,27 +114,6 @@ pub fn ai_attach_image(
         .allow_file(&image.path)
         .map_err(|error| format!("cannot allow saved AI image: {error}"))?;
     Ok(image)
-}
-
-/// Stores the rendered slide the page just rasterized and returns its path, so
-/// the next turn can attach it as image input. The model can then see the
-/// slide instead of inferring it from coordinates.
-#[tauri::command]
-pub fn ai_save_slide_image(
-    app: AppHandle,
-    image_id: String,
-    data_url: String,
-) -> Result<String, String> {
-    let encoded = data_url
-        .strip_prefix("data:image/png;base64,")
-        .ok_or("slide image is not a PNG data URL")?;
-    let data = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|error| format!("bad slide image: {error}"))?;
-    let store = store(&app)?;
-    store.ensure()?;
-    let path = store.save_runtime_png(&image_id, &data)?;
-    Ok(path.to_string_lossy().to_string())
 }
 
 fn codex_generated_images(app: &AppHandle) -> Result<PathBuf, String> {

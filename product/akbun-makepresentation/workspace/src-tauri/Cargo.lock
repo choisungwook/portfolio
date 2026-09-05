@@ -18,12 +18,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "akbun-ai"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "akbun-makepresentation"
 version = "0.1.0"
 dependencies = [
+ "akbun-ai",
  "base64 0.22.1",
  "fontdb",
- "makepresentation-ai",
  "makepresentation-deck",
  "serde",
  "serde_json",
@@ -1820,14 +1828,6 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
-
-[[package]]
-name = "makepresentation-ai"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "makepresentation-deck"

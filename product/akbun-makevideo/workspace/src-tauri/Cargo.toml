@@ -54,6 +54,7 @@ makevideo-present = { path = "crates/present" }
 makevideo-audio = { path = "crates/audio" }
 makevideo-proxy = { path = "crates/proxy" }
 makevideo-waveform = { path = "crates/waveform" }
+akbun-ai = { path = "../../../../crates/akbun-ai" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
 # The native Program Monitor is added as a sibling of the WKWebView through

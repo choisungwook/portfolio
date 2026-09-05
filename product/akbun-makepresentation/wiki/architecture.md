@@ -5,7 +5,7 @@
 Two app sides, one JSON model between them, plus an optional external AI process.
 
 - **The page** (`workspace/src/`): plain HTML/CSS/JS served straight from disk, no bundler. It owns the deck in memory, draws it as SVG, and handles every interaction: tools, selection, resize handles, text editing, the property panel, thumbnails, presentation mode.
-- **Rust** (`workspace/src-tauri/`): everything that touches the file system and child processes. The pure deck and AI session stores live in `makepresentation-deck` and `makepresentation-ai`; both depend on neither Tauri nor a webview. The Tauri modules are thin shims over them.
+- **Rust** (`workspace/src-tauri/`): everything that touches the file system and child processes. The deck store lives in `makepresentation-deck`; the Codex process and AI session store are shared with makevideo through the repository-level `akbun-ai` crate. Neither depends on Tauri or a webview, and the Tauri modules are thin shims over them.
 - **Codex App Server**: an optional `codex app-server --listen stdio://` child process discovered from the user's installation. It reuses the Codex CLI ChatGPT login; no executable or credential is copied into the app.
 
 ## The deck model

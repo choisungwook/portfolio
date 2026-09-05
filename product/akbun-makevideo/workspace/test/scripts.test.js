@@ -105,7 +105,7 @@ test('the editor exposes one toggleable selected panel from the title bar', () =
   assert.doesNotMatch(page, /role="tab(?:list|panel)?"/);
   assert.deepStrictEqual(
     [...page.matchAll(/data-panel-action="([^"]+)"/g)].map((match) => match[1]),
-    ['inspector', 'shape', 'marker', 'debug'],
+    ['inspector', 'shape', 'marker', 'debug', 'ai'],
   );
   assert.deepStrictEqual(
     [...page.matchAll(/data-inspector-tab="([^"]+)"/g)].map((match) => match[1]),
