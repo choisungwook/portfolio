@@ -25,6 +25,7 @@ const T =
   typeof module !== 'undefined' && module.exports ? require('./time.js') : globalThis.timeLib;
 
 const MAX_TRACKS_PER_KIND = 4;
+const MAX_REALTIME_VIDEO_SOURCES = 4;
 // Below this a clip is a sliver nobody can grab again. The same number lives in
 // the edit crate, which is the one that enforces it; this copy is what stops a
 // trim from *looking* as though it went further than it will be allowed to.
@@ -44,6 +45,50 @@ function findVisualItem(project, itemId) {
     if (item) return { track, item };
   }
   return null;
+}
+
+function videoSourceCountAt(project, frame) {
+  let count = 0;
+  for (const track of project.tracks) {
+    if (track.kind !== 'video' || track.hidden) continue;
+    count += track.clips.filter((clip) => clip.start <= frame && frame < clipEnd(clip)).length;
+    count += (project.transitions || []).filter((transition) => {
+      if (transition.trackId !== track.id) return false;
+      const incoming = track.clips.find((clip) => clip.id === transition.toClipId);
+      return incoming && incoming.start - transition.duration <= frame && frame < incoming.start;
+    }).length;
+    count += (track.visualItems || []).filter((item) =>
+      item.content && item.content.kind === 'videoOverlay' &&
+      item.start <= frame && frame < item.start + item.duration
+    ).length;
+  }
+  return count;
+}
+
+function transitionForClip(project, clipId, frame) {
+  const candidates = (project.transitions || []).filter((transition) =>
+    transition.fromClipId === clipId || transition.toClipId === clipId);
+  if (!candidates.length) return null;
+  if (!Number.isFinite(frame)) {
+    return candidates.find((transition) => transition.fromClipId === clipId) || candidates[0];
+  }
+  return candidates.reduce((best, transition) => {
+    const incoming = findClip(project, transition.toClipId);
+    const bestIncoming = findClip(project, best.toClipId);
+    if (!incoming) return best;
+    if (!bestIncoming) return transition;
+    const distance = Math.abs(incoming.clip.start - frame);
+    const bestDistance = Math.abs(bestIncoming.clip.start - frame);
+    if (distance !== bestDistance) return distance < bestDistance ? transition : best;
+    return transition.fromClipId === clipId ? transition : best;
+  });
+}
+
+function transitionMaxDuration(project, transition) {
+  if (!transition) return 0;
+  const from = findClip(project, transition.fromClipId);
+  const to = findClip(project, transition.toClipId);
+  return from && to ? Math.min(clipDuration(from.clip), clipDuration(to.clip)) : 0;
 }
 
 /** Rounded up, so the constant above is a floor rather than an average: at
@@ -386,20 +431,25 @@ function tickStepFrames(pxPerSecond, rate) {
  *  over the real one. Nothing is edited through it. */
 function blankProject() {
   return {
-    version: 4,
+    version: 5,
     settings: { width: 1920, height: 1080, rate: T.fps(30) },
     assets: [],
     tracks: [],
+    transitions: [],
     markers: [],
   };
 }
 
 const exported = {
   MAX_TRACKS_PER_KIND,
+  MAX_REALTIME_VIDEO_SOURCES,
   MIN_CLIP_SECONDS,
   DEFAULT_VISUAL_ITEM_SECONDS,
   defaultVisualItemFrames,
   findVisualItem,
+  videoSourceCountAt,
+  transitionForClip,
+  transitionMaxDuration,
   minClipFrames,
   blankProject,
   tracksOf,

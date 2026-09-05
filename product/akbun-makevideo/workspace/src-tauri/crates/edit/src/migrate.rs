@@ -13,7 +13,7 @@
 
 use crate::{
     Asset, BlendMode, Clip, KeyframeTrack, Marker, Project, ProjectSettings, Rate, RationalTime,
-    Track, TrackKind, VisualItem, FORMAT_VERSION,
+    Track, TrackKind, Transition, VisualItem, FORMAT_VERSION,
 };
 use serde::Deserialize;
 
@@ -32,6 +32,8 @@ pub struct WireProject {
     assets: Vec<Asset>,
     #[serde(default)]
     tracks: Vec<WireTrack>,
+    #[serde(default)]
+    transitions: Vec<Transition>,
     #[serde(default)]
     markers: Vec<Marker>,
 }
@@ -137,6 +139,7 @@ impl From<WireProject> for Project {
                 rate,
             },
             assets: wire.assets,
+            transitions: wire.transitions,
             markers: wire.markers,
             tracks: wire
                 .tracks
@@ -273,10 +276,18 @@ mod tests {
         assert_eq!(
             content,
             crate::VisualContent::VideoOverlay {
-                asset_id: "a1".into()
+                asset_id: "a1".into(),
+                in_point: 0,
+                crop: Default::default(),
+                corner_radius: 0.0,
+                border: None,
+                audio_enabled: false,
             }
         );
-        assert_eq!(serde_json::to_string(&content).unwrap(), text);
+        assert_eq!(
+            serde_json::to_string(&content).unwrap(),
+            r#"{"kind":"videoOverlay","assetId":"a1","inPoint":0,"crop":{"left":0.0,"top":0.0,"right":0.0,"bottom":0.0},"cornerRadius":0.0,"border":null,"audioEnabled":false}"#
+        );
     }
 
     #[test]
@@ -345,7 +356,7 @@ mod tests {
         }"#;
         let project: Project = serde_json::from_str(text).unwrap();
         let written = serde_json::to_string(&project).unwrap();
-        assert!(written.contains(r#""version":4"#), "{written}");
+        assert!(written.contains(r#""version":5"#), "{written}");
         assert!(
             written.contains(r#""rate":{"num":60,"den":1}"#),
             "{written}"

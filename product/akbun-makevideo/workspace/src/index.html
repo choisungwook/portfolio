@@ -199,6 +199,7 @@
             <button id="source-insert">Insert</button>
             <button id="source-overwrite">Overwrite</button>
             <button id="source-append">Append</button>
+            <button id="source-pip" title="Place the selected video over the timeline at the playhead">Add PIP</button>
           </div>
         </section>
 
@@ -321,6 +322,20 @@
               <label class="row check"><input id="shape-start-arrow" type="checkbox" /> Start arrow</label>
               <label class="row check"><input id="shape-end-arrow" type="checkbox" /> End arrow</label>
             </div>
+          </div>
+          <div id="pip-panel" hidden>
+            <h3>Picture in Picture</h3>
+            <div class="field-pair"><label>Crop left % <input id="pip-crop-left" type="number" min="0" max="95" step="1" /></label><label>Crop right % <input id="pip-crop-right" type="number" min="0" max="95" step="1" /></label></div>
+            <div class="field-pair"><label>Crop top % <input id="pip-crop-top" type="number" min="0" max="95" step="1" /></label><label>Crop bottom % <input id="pip-crop-bottom" type="number" min="0" max="95" step="1" /></label></div>
+            <label class="row">Corner radius <input id="pip-corner-radius" type="number" min="0" step="1" /></label>
+            <label class="row">Border color <input id="pip-border-color" type="color" /></label>
+            <label class="row">Border width <input id="pip-border-width" type="number" min="0" step="1" /></label>
+            <label class="row check"><input id="pip-audio-enabled" type="checkbox" /> Play overlay audio</label>
+          </div>
+          <div id="transition-panel" hidden>
+            <h3>Dissolve</h3>
+            <label class="row">Duration (frames) <input id="transition-duration" type="number" min="1" step="1" /></label>
+            <button id="transition-remove" type="button">Remove transition</button>
           </div>
           <div id="subtitle-panel" hidden>
             <h3>Subtitle</h3>

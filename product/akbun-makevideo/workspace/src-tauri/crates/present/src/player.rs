@@ -913,6 +913,7 @@ mod tests {
                 hidden: false,
                 subtitle_style: None,
             }],
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }

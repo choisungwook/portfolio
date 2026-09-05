@@ -242,8 +242,12 @@ function createPreview(options) {
       live.add(clip.id);
       entry.element.classList.add('on');
       if (wantsPicture) {
-        entry.element.style.zIndex = String(videoTracks.indexOf(track) + 1);
-        entry.element.style.opacity = String(clamp01(clip.opacity));
+        entry.element.style.zIndex = String((videoTracks.indexOf(track) + 1) * 100);
+        const transition = (project.transitions || []).find((item) => item.fromClipId === clip.id);
+        const transitionOpacity = transition && positionFrames >= L.clipEnd(clip) - transition.duration
+          ? (L.clipEnd(clip) - positionFrames) / transition.duration
+          : 1;
+        entry.element.style.opacity = String(clamp01(clip.opacity * transitionOpacity));
       }
       if (entry.kind === 'image') continue;
 
@@ -251,11 +255,113 @@ function createPreview(options) {
       media.push({ entry, track, clip, target, wasLive });
     }
 
+    for (const track of videoTracks) {
+      if (track.hidden) continue;
+      for (const item of track.visualItems || []) {
+        if (!item.content || item.content.kind !== 'videoOverlay') continue;
+        if (positionFrames < item.start || positionFrames >= item.start + item.duration) continue;
+        const asset = L.findAsset(project, item.content.assetId);
+        if (!asset) continue;
+        const entry = entryFor(item, asset, true);
+        const wasLive = entry.element.classList.contains('on');
+        const transform = L.visualTransformAt(item, positionFrames);
+        const crop = item.content.crop || {};
+        const border = item.content.border;
+        live.add(item.id);
+        entry.element.classList.add('on');
+        Object.assign(entry.element.style, {
+          inset: 'auto',
+          left: `${(transform.x / project.settings.width) * 100}%`,
+          top: `${(transform.y / project.settings.height) * 100}%`,
+          width: `${(transform.width / project.settings.width) * 100}%`,
+          height: `${(transform.height / project.settings.height) * 100}%`,
+          objectFit: 'cover',
+          opacity: String(clamp01(transform.opacity)),
+          zIndex: String((videoTracks.indexOf(track) + 1) * 100 + 50 + (item.zIndex || 0)),
+          clipPath: `inset(${(crop.top || 0) * 100}% ${(crop.right || 0) * 100}% ${(crop.bottom || 0) * 100}% ${(crop.left || 0) * 100}% round ${item.content.cornerRadius || 0}px)`,
+          border: border ? `${border.width}px solid ${border.color}` : '0',
+          boxSizing: 'border-box',
+          borderRadius: `${item.content.cornerRadius || 0}px`,
+        });
+        const clip = {
+          id: item.id,
+          start: item.start,
+          in: item.content.inPoint || 0,
+          out: (item.content.inPoint || 0) + item.duration,
+          speed: 1,
+          preservePitch: true,
+          volume: 1,
+        };
+        const target = T.framesToSeconds(clip.in + positionFrames - item.start, rate());
+        media.push({
+          entry,
+          track,
+          clip,
+          target,
+          wasLive,
+          overlayAudioEnabled: Boolean(item.content.audioEnabled),
+        });
+      }
+    }
+
+    for (const transition of project.transitions || []) {
+      const from = L.findClip(project, transition.fromClipId);
+      const to = L.findClip(project, transition.toClipId);
+      if (!from || !to || from.track.hidden) continue;
+      const start = to.clip.start - transition.duration;
+      if (positionFrames < start || positionFrames >= to.clip.start) continue;
+      const asset = L.findAsset(project, to.clip.assetId);
+      if (!asset) continue;
+      const proxy = { id: `transition:${transition.id}` };
+      const entry = entryFor(proxy, asset, true);
+      const wasLive = entry.element.classList.contains('on');
+      const offset = positionFrames - start;
+      const speed = to.clip.speed || 1;
+      const sourceSpan = Math.ceil(transition.duration * speed);
+      const missingSource = Math.max(0, sourceSpan - to.clip.in);
+      const headPad = Math.ceil(missingSource / speed);
+      const sourceFrame = offset < headPad
+        ? 0
+        : Math.max(0, to.clip.in - sourceSpan) + Math.floor((offset - headPad) * speed);
+      live.add(proxy.id);
+      entry.element.classList.add('on');
+      Object.assign(entry.element.style, {
+        inset: '0',
+        left: '0',
+        top: '0',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        opacity: String(clamp01((to.clip.opacity ?? 1) * ((offset + 1) / transition.duration))),
+        zIndex: String((videoTracks.indexOf(to.track) + 1) * 100 + 1),
+        clipPath: 'none',
+        border: '0',
+        borderRadius: '0',
+      });
+      const clip = {
+        id: proxy.id,
+        start,
+        in: Math.max(0, to.clip.in - sourceSpan),
+        out: to.clip.in,
+        speed,
+        preservePitch: true,
+        volume: 0,
+      };
+      media.push({
+        entry,
+        track: to.track,
+        clip,
+        target: T.framesToSeconds(sourceFrame, rate()),
+        wasLive,
+        overlayAudioEnabled: false,
+      });
+    }
+
     const reference =
       media.find(({ clip }) => clock && clip.id === clock.clip.id) || media[0] || null;
 
     for (const item of media) {
-      const { entry, track, clip, target, wasLive } = item;
+      const { entry, track, clip, target, wasLive, overlayAudioEnabled } = item;
       const drift = target - entry.element.currentTime;
       const isReference = item === reference;
       const needsInitialSeek =
@@ -284,7 +390,9 @@ function createPreview(options) {
           : clip.volume
       );
       entry.element.muted =
-        (track.kind === 'video' && track.muted) || (scrubbing && muteWhileScrubbing);
+        overlayAudioEnabled === false ||
+        (track.kind === 'video' && track.muted) ||
+        (scrubbing && muteWhileScrubbing);
       if (
         qualityMonitor &&
         (playing || starting) &&

@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [PIP와 디졸브는 기존 compositor placement로 합성한다](2026-09-overlays-and-transitions-share-the-compositor.md) - PIP와 디졸브를 기존 preview/export 합성 경로에 연결하는 결정.
 * [clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다](2026-09-clip-speed-derives-duration.md) - source in-out을 유지하고 duration을 speed에서 파생하는 결정.
 * [Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다](2026-09-program-monitor-fullscreen-preserves-layout.md) - Cmd+F와 Esc가 layout 상태를 바꾸지 않고 Program Monitor 표시만 전환하는 결정.
 * [page controller는 의존성과 공개 경계를 선언한다](2026-09-page-controllers-declare-boundaries.md) - no-build classic script를 factory controller로 나누고 생성 시 의존성과 반환 API를 명시한 결정.

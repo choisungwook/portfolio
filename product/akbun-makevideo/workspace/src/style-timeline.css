@@ -401,6 +401,23 @@ button.icon.on {
   cursor: grab;
 }
 
+.timeline-transition {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  z-index: 5;
+  min-width: 4px;
+  overflow: hidden;
+  border: 1px solid #f0b35c;
+  border-radius: 3px;
+  background: repeating-linear-gradient(135deg, #704b24cc 0 4px, #ba7736cc 4px 8px);
+  color: #fff4df;
+  font-size: 9px;
+  line-height: 18px;
+  text-align: center;
+  pointer-events: none;
+}
+
 .keyframe-dot {
   position: absolute;
   z-index: 4;

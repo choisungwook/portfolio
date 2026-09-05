@@ -65,6 +65,7 @@
       addVolumeKeyframeAt,
       setClipLut,
       addAdjustmentLayer,
+      addPip,
       persistSettings,
       closeSheet,
       fillGraphicsDevices,
@@ -244,6 +245,7 @@
       dom.sourceInsert.addEventListener('click', () => placeSource('insert'));
       dom.sourceOverwrite.addEventListener('click', () => placeSource('overwrite'));
       dom.sourceAppend.addEventListener('click', () => placeSource('append'));
+      dom.sourcePip.addEventListener('click', addPip);
       for (const input of [dom.sourceVideo, dom.sourceAudio, dom.sourceRipple]) {
         input.addEventListener('change', renderSourceMonitor);
       }
@@ -283,6 +285,7 @@
     }
 
     function wireTimeline() {
+      dom.scroll.addEventListener('wheel', timelineInteractions.scrollHorizontally, { passive: false });
       dom.zoom.addEventListener('input', () => {
         const at = preview.position();
         state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
@@ -429,12 +432,38 @@
           stageController.selectClip(clip.dataset.clipId);
           const found = L.findClip(state.project, clip.dataset.clipId);
           const frame = frameAtClientX(event.clientX);
+          const transition = L.transitionForClip(state.project, clip.dataset.clipId, frame);
+          const index = found.track.clips.findIndex((entry) => entry.id === clip.dataset.clipId);
+          const next = found.track.clips[index + 1];
+          const canAddTransition = found.track.kind === 'video' && next &&
+            L.clipEnd(found.clip) === next.start;
+          const transitionAction = transition
+            ? [{
+              label: 'Remove Dissolve',
+              run: () => edit({ op: 'removeTransition', transitionId: transition.id }),
+            }]
+            : canAddTransition
+              ? [{
+                label: 'Add Dissolve',
+                run: () => edit({
+                  op: 'addTransition',
+                  fromClipId: found.clip.id,
+                  toClipId: next.id,
+                  duration: Math.max(1, Math.min(
+                    Math.round(T.rateToNumber(rate()) / 2),
+                    L.clipDuration(found.clip),
+                    L.clipDuration(next),
+                  )),
+                }),
+              }]
+              : [];
           openTimelineContextMenu(event, [
             { label: 'Add Volume Keyframe Here', run: () => addVolumeKeyframeAt(found.clip, frame) },
             { label: 'Apply 3D LUT…', run: () => setClipLut(clip.dataset.clipId) },
             ...(L.findClip(state.project, clip.dataset.clipId).clip.lutPath
               ? [{ label: 'Remove 3D LUT', run: () => edit({ op: 'setClipLut', clipId: clip.dataset.clipId, lutPath: null }) }]
               : []),
+            ...transitionAction,
             { label: 'Delete Clip', run: () => deleteSelected(false) },
             { label: 'Ripple Delete', run: () => deleteSelected(true) },
           ]);

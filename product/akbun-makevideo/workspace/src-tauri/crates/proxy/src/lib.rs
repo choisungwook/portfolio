@@ -334,6 +334,7 @@ mod tests {
             },
             assets: vec![original.clone()],
             tracks: Vec::new(),
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         let ready = HashMap::from([(original.id.clone(), "/project/proxies/as1.mp4".into())]);

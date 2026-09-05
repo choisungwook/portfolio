@@ -362,6 +362,7 @@
       for (const button of [dom.sourceInsert, dom.sourceOverwrite, dom.sourceAppend]) {
         button.disabled = !command;
       }
+      dom.sourcePip.disabled = !asset || asset.kind !== 'video' || !selection;
     }
 
     function setSourceMark(which) {

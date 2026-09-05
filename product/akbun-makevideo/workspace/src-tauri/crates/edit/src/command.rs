@@ -29,7 +29,8 @@
 
 use crate::{
     min_clip_frames, Asset, BlendMode, Clip, Easing, Keyframe, Marker, Project, ProjectSettings,
-    Rate, TextStyle, Track, TrackKind, VisualContent, VisualItem, VisualProperty, VisualTransform,
+    Rate, TextStyle, Track, TrackKind, Transition, TransitionKind, VisualContent, VisualItem,
+    VisualProperty, VisualTransform,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -63,6 +64,13 @@ pub struct VisualItemAt {
 pub struct MarkerAt {
     pub index: usize,
     pub marker: Marker,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransitionAt {
+    pub index: usize,
+    pub transition: Transition,
 }
 
 /// An asset and where it sat in the library, so undoing an import does not
@@ -202,6 +210,23 @@ pub enum Command {
     #[serde(rename_all = "camelCase")]
     RemoveClip {
         clip_id: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    AddTransition {
+        from_clip_id: String,
+        to_clip_id: String,
+        duration: i64,
+        #[serde(default)]
+        id: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    SetTransitionDuration {
+        transition_id: String,
+        duration: i64,
+    },
+    #[serde(rename_all = "camelCase")]
+    RemoveTransition {
+        transition_id: String,
     },
     #[serde(rename_all = "camelCase")]
     LinkClips {
@@ -408,6 +433,12 @@ pub enum Command {
     DropMarkers {
         marker_ids: Vec<String>,
     },
+    RestoreTransitions {
+        entries: Vec<TransitionAt>,
+    },
+    DropTransitions {
+        transition_ids: Vec<String>,
+    },
 
     /// One undo step made of several commands, all or nothing.
     #[serde(rename_all = "camelCase")]
@@ -499,6 +530,11 @@ impl Command {
             Command::TrimClip { .. } => "Trim clip",
             Command::SplitAt { .. } => "Split",
             Command::RemoveClip { .. } | Command::DropClips { .. } => "Delete clip",
+            Command::AddTransition { .. } => "Add transition",
+            Command::SetTransitionDuration { .. } => "Edit transition",
+            Command::RemoveTransition { .. } | Command::DropTransitions { .. } => {
+                "Delete transition"
+            }
             Command::LinkClips { .. } => "Link clips",
             Command::UnlinkClips { .. } => "Unlink clips",
             Command::RippleDelete { .. } => "Ripple delete",
@@ -531,6 +567,7 @@ impl Command {
             Command::RestoreTracks { .. } => "Restore track",
             Command::RestoreVisualItems { .. } => "Restore visual items",
             Command::RestoreMarkers { .. } => "Restore markers",
+            Command::RestoreTransitions { .. } => "Restore transitions",
             Command::Transaction { commands } => commands
                 .iter()
                 .find(|command| !command.is_nothing())
@@ -634,6 +671,19 @@ impl Command {
                 link_groups,
             } => Ok(split_at(project, ids, frame, clip_id, given, link_groups)),
             Command::RemoveClip { clip_id } => remove_clip(project, clip_id),
+            Command::AddTransition {
+                from_clip_id,
+                to_clip_id,
+                duration,
+                id,
+            } => add_transition(project, ids, from_clip_id, to_clip_id, duration, id),
+            Command::SetTransitionDuration {
+                transition_id,
+                duration,
+            } => set_transition_duration(project, transition_id, duration),
+            Command::RemoveTransition { transition_id } => {
+                remove_transition(project, transition_id)
+            }
             Command::LinkClips {
                 clip_ids,
                 link_group,
@@ -743,6 +793,10 @@ impl Command {
             Command::DropVisualItems { item_ids } => Ok(drop_visual_items(project, item_ids)),
             Command::RestoreMarkers { entries } => Ok(restore_markers(project, entries)),
             Command::DropMarkers { marker_ids } => Ok(drop_markers(project, marker_ids)),
+            Command::RestoreTransitions { entries } => Ok(restore_transitions(project, entries)),
+            Command::DropTransitions { transition_ids } => {
+                Ok(drop_transitions(project, transition_ids))
+            }
             Command::Transaction { commands } => transaction(project, ids, commands),
         }
     }
@@ -839,6 +893,24 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
             .visual_items
             .retain(|item| !item.content.references_asset(&asset_id));
     }
+    let orphan_ids: Vec<&str> = orphans.iter().map(|entry| entry.clip.id.as_str()).collect();
+    let transitions: Vec<TransitionAt> = project
+        .transitions
+        .iter()
+        .enumerate()
+        .filter(|(_, transition)| {
+            orphan_ids.contains(&transition.from_clip_id.as_str())
+                || orphan_ids.contains(&transition.to_clip_id.as_str())
+        })
+        .map(|(index, transition)| TransitionAt {
+            index,
+            transition: transition.clone(),
+        })
+        .collect();
+    project.transitions.retain(|transition| {
+        !orphan_ids.contains(&transition.from_clip_id.as_str())
+            && !orphan_ids.contains(&transition.to_clip_id.as_str())
+    });
     Ok(Applied {
         resolved: Command::RemoveAsset { asset_id },
         inverse: Command::Transaction {
@@ -849,6 +921,9 @@ fn remove_asset(project: &mut Project, asset_id: String) -> Result<Applied, Stri
                 Command::RestoreClips { entries: orphans },
                 Command::RestoreVisualItems {
                     entries: orphan_items,
+                },
+                Command::RestoreTransitions {
+                    entries: transitions,
                 },
             ],
         },
@@ -908,10 +983,30 @@ fn remove_track(project: &mut Project, track_id: String) -> Result<Applied, Stri
         return Err("only the last track of a kind can be removed".into());
     }
     let track = project.tracks.remove(index);
+    let transitions: Vec<TransitionAt> = project
+        .transitions
+        .iter()
+        .enumerate()
+        .filter(|(_, transition)| transition.track_id == track_id)
+        .map(|(index, transition)| TransitionAt {
+            index,
+            transition: transition.clone(),
+        })
+        .collect();
+    project
+        .transitions
+        .retain(|transition| transition.track_id != track_id);
     Ok(Applied {
         resolved: Command::RemoveTrack { track_id },
-        inverse: Command::RestoreTracks {
-            entries: vec![TrackAt { index, track }],
+        inverse: Command::Transaction {
+            commands: vec![
+                Command::RestoreTracks {
+                    entries: vec![TrackAt { index, track }],
+                },
+                Command::RestoreTransitions {
+                    entries: transitions,
+                },
+            ],
         },
     })
 }
@@ -1838,12 +1933,151 @@ fn remove_clip(project: &mut Project, clip_id: String) -> Result<Applied, String
         return Err("that clip is not on the timeline".into());
     }
     let ids: Vec<&str> = entries.iter().map(|entry| entry.clip.id.as_str()).collect();
+    let transitions: Vec<TransitionAt> = project
+        .transitions
+        .iter()
+        .enumerate()
+        .filter(|(_, transition)| {
+            ids.contains(&transition.from_clip_id.as_str())
+                || ids.contains(&transition.to_clip_id.as_str())
+        })
+        .map(|(index, transition)| TransitionAt {
+            index,
+            transition: transition.clone(),
+        })
+        .collect();
+    let transition_ids: Vec<String> = transitions
+        .iter()
+        .map(|entry| entry.transition.id.clone())
+        .collect();
     for track in &mut project.tracks {
         track.clips.retain(|clip| !ids.contains(&clip.id.as_str()));
     }
+    project
+        .transitions
+        .retain(|transition| !transition_ids.contains(&transition.id));
     Ok(Applied {
         resolved: Command::RemoveClip { clip_id },
-        inverse: Command::RestoreClips { entries },
+        inverse: Command::Transaction {
+            commands: vec![
+                Command::RestoreClips { entries },
+                Command::RestoreTransitions {
+                    entries: transitions,
+                },
+            ],
+        },
+    })
+}
+
+fn add_transition(
+    project: &mut Project,
+    ids: &mut Ids,
+    from_clip_id: String,
+    to_clip_id: String,
+    duration: i64,
+    id: Option<String>,
+) -> Result<Applied, String> {
+    let (track_index, clip_index) = project
+        .locate(&from_clip_id)
+        .ok_or("the first transition clip is not on the timeline")?;
+    let track = &project.tracks[track_index];
+    if track.kind != TrackKind::Video
+        || track.clips.get(clip_index + 1).map(|clip| clip.id.as_str()) != Some(to_clip_id.as_str())
+        || track.clips[clip_index].end_frame() != track.clips[clip_index + 1].start
+    {
+        return Err("a transition needs touching adjacent video clips".into());
+    }
+    if project.transitions.iter().any(|transition| {
+        transition.from_clip_id == from_clip_id && transition.to_clip_id == to_clip_id
+    }) {
+        return Err("that clip boundary already has a transition".into());
+    }
+    let max_duration = track.clips[clip_index]
+        .duration_frames()
+        .min(track.clips[clip_index + 1].duration_frames());
+    if duration <= 0 || duration > max_duration {
+        return Err("the transition duration must fit inside both clips".into());
+    }
+    let id = id.unwrap_or_else(|| ids.make('x'));
+    if project.transition(&id).is_some() {
+        return Err("that transition already exists".into());
+    }
+    let transition = Transition {
+        id: id.clone(),
+        track_id: track.id.clone(),
+        from_clip_id: from_clip_id.clone(),
+        to_clip_id: to_clip_id.clone(),
+        duration,
+        kind: TransitionKind::Dissolve,
+    };
+    project.transitions.push(transition);
+    Ok(Applied {
+        resolved: Command::AddTransition {
+            from_clip_id,
+            to_clip_id,
+            duration,
+            id: Some(id.clone()),
+        },
+        inverse: Command::DropTransitions {
+            transition_ids: vec![id],
+        },
+    })
+}
+
+fn set_transition_duration(
+    project: &mut Project,
+    transition_id: String,
+    duration: i64,
+) -> Result<Applied, String> {
+    let transition_index = project
+        .transitions
+        .iter()
+        .position(|transition| transition.id == transition_id)
+        .ok_or("that transition is not on the timeline")?;
+    let transition = &project.transitions[transition_index];
+    let (track_index, clip_index) = project
+        .locate(&transition.from_clip_id)
+        .ok_or("the first transition clip is not on the timeline")?;
+    let track = &project.tracks[track_index];
+    if track.kind != TrackKind::Video
+        || track.clips.get(clip_index + 1).map(|clip| clip.id.as_str())
+            != Some(transition.to_clip_id.as_str())
+        || track.clips[clip_index].end_frame() != track.clips[clip_index + 1].start
+    {
+        return Err("a transition needs touching adjacent video clips".into());
+    }
+    let max_duration = track.clips[clip_index]
+        .duration_frames()
+        .min(track.clips[clip_index + 1].duration_frames());
+    if duration <= 0 || duration > max_duration {
+        return Err("the transition duration must fit inside both clips".into());
+    }
+    let previous = transition.duration;
+    project.transitions[transition_index].duration = duration;
+    Ok(Applied {
+        resolved: Command::SetTransitionDuration {
+            transition_id: transition_id.clone(),
+            duration,
+        },
+        inverse: Command::SetTransitionDuration {
+            transition_id,
+            duration: previous,
+        },
+    })
+}
+
+fn remove_transition(project: &mut Project, transition_id: String) -> Result<Applied, String> {
+    let index = project
+        .transitions
+        .iter()
+        .position(|transition| transition.id == transition_id)
+        .ok_or("that transition is not on the timeline")?;
+    let transition = project.transitions.remove(index);
+    Ok(Applied {
+        resolved: Command::RemoveTransition { transition_id },
+        inverse: Command::RestoreTransitions {
+            entries: vec![TransitionAt { index, transition }],
+        },
     })
 }
 
@@ -2653,6 +2887,18 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
     let mut restore = Vec::new();
     let mut restore_items = Vec::new();
     let mut restore_markers = Vec::new();
+    let restore_transitions: Vec<TransitionAt> = project
+        .transitions
+        .iter()
+        .enumerate()
+        .map(|(index, transition)| TransitionAt {
+            index,
+            transition: transition.clone(),
+        })
+        .collect();
+    for transition in &mut project.transitions {
+        transition.duration = rescale(transition.duration, from, to).max(1);
+    }
     for (index, marker) in project.markers.iter_mut().enumerate() {
         restore_markers.push(MarkerAt {
             index,
@@ -2704,6 +2950,9 @@ fn set_settings(project: &mut Project, settings: ProjectSettings) -> Applied {
                 },
                 Command::RestoreMarkers {
                     entries: restore_markers,
+                },
+                Command::RestoreTransitions {
+                    entries: restore_transitions,
                 },
             ],
         },
@@ -3043,5 +3292,62 @@ fn drop_markers(project: &mut Project, marker_ids: Vec<String>) -> Applied {
     Applied {
         resolved: Command::DropMarkers { marker_ids },
         inverse: Command::RestoreMarkers { entries: previous },
+    }
+}
+
+fn restore_transitions(project: &mut Project, entries: Vec<TransitionAt>) -> Applied {
+    let mut previous = Vec::new();
+    let mut invented = Vec::new();
+    for entry in &entries {
+        if let Some(index) = project
+            .transitions
+            .iter()
+            .position(|transition| transition.id == entry.transition.id)
+        {
+            previous.push(TransitionAt {
+                index,
+                transition: project.transitions.remove(index),
+            });
+        } else {
+            invented.push(entry.transition.id.clone());
+        }
+        project.transitions.insert(
+            entry.index.min(project.transitions.len()),
+            entry.transition.clone(),
+        );
+    }
+    Applied {
+        resolved: Command::RestoreTransitions { entries },
+        inverse: Command::Transaction {
+            commands: vec![
+                Command::DropTransitions {
+                    transition_ids: invented,
+                },
+                Command::RestoreTransitions { entries: previous },
+            ],
+        },
+    }
+}
+
+fn drop_transitions(project: &mut Project, transition_ids: Vec<String>) -> Applied {
+    let previous = transition_ids
+        .iter()
+        .filter_map(|id| {
+            project
+                .transitions
+                .iter()
+                .position(|transition| transition.id == *id)
+                .map(|index| TransitionAt {
+                    index,
+                    transition: project.transitions[index].clone(),
+                })
+        })
+        .collect();
+    project
+        .transitions
+        .retain(|transition| !transition_ids.contains(&transition.id));
+    Applied {
+        resolved: Command::DropTransitions { transition_ids },
+        inverse: Command::RestoreTransitions { entries: previous },
     }
 }

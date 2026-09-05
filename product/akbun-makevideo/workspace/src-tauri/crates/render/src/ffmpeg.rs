@@ -11,7 +11,7 @@
 
 use crate::accel::Acceleration;
 use crate::layout;
-use crate::{AssetKind, Clip, Project, ProjectSettings, Rate, RationalTime, TrackKind};
+use crate::{AssetKind, Clip, Crop, Project, ProjectSettings, Rate, RationalTime, TrackKind};
 
 /// Everything is resampled to this on the way in, so a sample count means the
 /// same thing in every chain.
@@ -368,17 +368,37 @@ fn audio_chain(item: &Item, input: usize, rate: Rate) -> String {
 }
 
 fn volume_expression(clip: &Clip, rate: Rate) -> String {
-    let keys = &clip.volume_keyframes.keyframes;
+    volume_expression_for(
+        &clip.volume_keyframes,
+        clip.volume,
+        clip.fade_in,
+        clip.fade_out,
+        clip.start,
+        clip.duration_frames(),
+        rate,
+    )
+}
+
+fn volume_expression_for(
+    keyframes: &crate::KeyframeTrack,
+    volume: f32,
+    fade_in: i64,
+    fade_out: i64,
+    start_frame: i64,
+    duration_frames: i64,
+    rate: Rate,
+) -> String {
+    let keys = &keyframes.keyframes;
     let mut expression = if keys.is_empty() {
-        format!("{:.6}", clip.volume.clamp(0.0, 1.0))
+        format!("{:.6}", volume.clamp(0.0, 1.0))
     } else {
         let last = keys.last().expect("checked");
         let mut tail = format!("{:.6}", last.value.clamp(0.0, 1.0));
         for pair in keys.windows(2).rev() {
             let left = pair[0];
             let right = pair[1];
-            let left_time = RationalTime::new(left.frame - clip.start, rate).to_seconds();
-            let right_time = RationalTime::new(right.frame - clip.start, rate).to_seconds();
+            let left_time = RationalTime::new(left.frame - start_frame, rate).to_seconds();
+            let right_time = RationalTime::new(right.frame - start_frame, rate).to_seconds();
             let amount = format!(
                 "max(0,min(1,(t-{left_time:.9})/{:.9}))",
                 (right_time - left_time).max(1e-9)
@@ -398,20 +418,38 @@ fn volume_expression(clip: &Clip, rate: Rate) -> String {
             );
             tail = format!("if(lt(t,{right_time:.9}),{segment},{tail})");
         }
-        let first_time = RationalTime::new(keys[0].frame - clip.start, rate).to_seconds();
+        let first_time = RationalTime::new(keys[0].frame - start_frame, rate).to_seconds();
         format!("if(lt(t,{first_time:.9}),{:.6},{tail})", keys[0].value)
     };
-    if clip.fade_in > 0 {
-        let duration = RationalTime::new(clip.fade_in, rate).to_seconds();
+    if fade_in > 0 {
+        let duration = RationalTime::new(fade_in, rate).to_seconds();
         expression = format!("({expression})*min(1,max(0,t/{duration:.9}))");
     }
-    if clip.fade_out > 0 {
-        let start = RationalTime::new(clip.duration_frames() - clip.fade_out, rate).to_seconds();
-        let duration = RationalTime::new(clip.fade_out, rate).to_seconds();
+    if fade_out > 0 {
+        let start = RationalTime::new(duration_frames - fade_out, rate).to_seconds();
+        let duration = RationalTime::new(fade_out, rate).to_seconds();
         expression =
             format!("({expression})*min(1,max(0,({start:.9}+{duration:.9}-t)/{duration:.9}))");
     }
     expression
+}
+
+fn audio_placement_chain(item: &layout::AudioPlacement, input: usize, rate: Rate) -> String {
+    let speed = speed_audio_filter(item.speed, item.preserve_pitch);
+    let volume = volume_expression_for(
+        &item.volume_keyframes,
+        item.volume,
+        item.fade_in,
+        item.fade_out,
+        item.start_frame,
+        item.duration_frames,
+        rate,
+    );
+    format!(
+        "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo\
+         {speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
+        RationalTime::new(item.start_frame, rate).to_samples(AUDIO_HZ)
+    )
 }
 
 /// normalize=0 keeps a single clip at its own level instead of dividing it by
@@ -501,6 +539,8 @@ pub struct Decode<'a> {
     pub rate: Rate,
     pub speed: f32,
     pub hwaccel: Option<&'a str>,
+    pub crop: Crop,
+    pub head_pad_frames: i64,
 }
 
 /// Decode one clip to raw RGBA at the project frame rate, already scaled to
@@ -521,6 +561,8 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
         rate,
         speed,
         hwaccel,
+        crop,
+        head_pad_frames,
     } = *request;
     let fps = rate.ratio_text();
     let mut args: Vec<String> = vec![
@@ -544,9 +586,28 @@ pub fn decoder_args(request: &Decode<'_>) -> Vec<String> {
     // fps= is what makes the frame count predictable: the reader takes exactly
     // one frame per output frame and a variable frame rate source would
     // otherwise drift out of step with the timeline.
+    let crop_filter = if crop.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "crop=iw*{:.6}:ih*{:.6}:iw*{:.6}:ih*{:.6},",
+            1.0 - crop.left - crop.right,
+            1.0 - crop.top - crop.bottom,
+            crop.left,
+            crop.top,
+        )
+    };
+    let pad_filter = if head_pad_frames > 0 {
+        format!(
+            "tpad=start_mode=clone:start_duration={:.9},",
+            RationalTime::new(head_pad_frames, rate).to_seconds()
+        )
+    } else {
+        String::new()
+    };
     args.extend([
         "-vf".into(),
-        format!("scale={width}:{height},setpts=PTS/{speed:.6},fps={fps}"),
+        format!("{crop_filter}scale={width}:{height},setpts=PTS/{speed:.6},{pad_filter}fps={fps}"),
         "-f".into(),
         "rawvideo".into(),
         "-pix_fmt".into(),
@@ -728,15 +789,17 @@ pub fn encoder_args(
         "pipe:0".into(),
     ];
 
-    let items = collect_items(project);
-    let audio: Vec<&Item> = items.iter().filter(|item| item.audio).collect();
+    let audio = layout::audio_placements(project);
     for item in &audio {
-        args.extend(["-ss".into(), secs(item.clip.in_time(rate))]);
+        args.extend(["-ss".into(), secs(item.in_time(rate))]);
         args.extend([
             "-t".into(),
-            secs(RationalTime::new(item.clip.source_duration_frames(), rate)),
+            secs(RationalTime::new(
+                (item.duration_frames as f64 * item.speed as f64).ceil() as i64,
+                rate,
+            )),
         ]);
-        args.extend(["-i".into(), item.path.to_string()]);
+        args.extend(["-i".into(), item.path.clone()]);
     }
 
     let has_audio = !audio.is_empty();
@@ -745,7 +808,7 @@ pub fn encoder_args(
         let mut labels = Vec::new();
         for (index, item) in audio.iter().enumerate() {
             let input = index + 1;
-            chains.push(audio_chain(item, input, rate));
+            chains.push(audio_placement_chain(item, input, rate));
             labels.push(format!("[a{input}]"));
         }
         chains.push(format!(
@@ -886,6 +949,7 @@ mod tests {
                 TrackKind::Video,
                 vec![clip("c1", "a1", 60, 30, 120)],
             )],
+            transitions: Vec::new(),
             markers: Vec::new(),
         }
     }
@@ -909,6 +973,7 @@ mod tests {
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![track("V1", TrackKind::Video, vec![])],
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         assert!(build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).is_err());
@@ -1092,6 +1157,7 @@ mod tests {
                 track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 120)]),
                 track("V2", TrackKind::Video, vec![clip("c2", "a2", 0, 0, 120)]),
             ],
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap());
@@ -1127,6 +1193,7 @@ mod tests {
                 TrackKind::Audio,
                 vec![clip("c1", "a1", 15, 0, 90)],
             )],
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
@@ -1299,6 +1366,8 @@ mod tests {
             rate,
             speed: 1.0,
             hwaccel: None,
+            crop: Crop::default(),
+            head_pad_frames: 0,
         })
         .join(" ");
         assert!(
@@ -1362,10 +1431,35 @@ mod tests {
             rate,
             speed: 1.0,
             hwaccel: None,
+            crop: Crop::default(),
+            head_pad_frames: 0,
         })
         .join(" ");
         assert!(args.contains("-ss 1.001000 -t 1.001000"), "{args}");
         assert!(args.contains("fps=24000/1001"), "{args}");
+    }
+
+    #[test]
+    fn a_transition_decoder_holds_the_first_frame_for_missing_handles() {
+        let rate = Rate::fps(30);
+        let args = decoder_args(&Decode {
+            path: "/m/a.mp4",
+            kind: AssetKind::Video,
+            in_time: RationalTime::zero(rate),
+            duration: RationalTime::new(1, rate),
+            width: 640,
+            height: 360,
+            rate,
+            speed: 1.0,
+            hwaccel: None,
+            crop: Crop::default(),
+            head_pad_frames: 15,
+        })
+        .join(" ");
+        assert!(
+            args.contains("tpad=start_mode=clone:start_duration=0.500000000"),
+            "{args}"
+        );
     }
 
     #[test]
@@ -1381,6 +1475,8 @@ mod tests {
             rate,
             speed: 1.0,
             hwaccel: None,
+            crop: Crop::default(),
+            head_pad_frames: 0,
         })
         .join(" ");
         assert!(args.contains("-loop 1 -framerate 25 -t 2.000000"), "{args}");
@@ -1401,6 +1497,8 @@ mod tests {
             rate,
             speed: 1.0,
             hwaccel: Some("videotoolbox"),
+            crop: Crop::default(),
+            head_pad_frames: 0,
         })
         .join(" ");
         assert!(args.contains("-hwaccel videotoolbox -ss"), "{args}");
@@ -1475,6 +1573,7 @@ mod tests {
             settings: settings(1920, 1080),
             assets: vec![],
             tracks: vec![],
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         assert!(encoder_args(&project, "/o.mp4", Preset::Fhd, None).is_err());
@@ -1549,6 +1648,7 @@ mod tests {
                 track("V1", TrackKind::Video, vec![clip("c1", "a1", 0, 0, 60)]),
                 track("A1", TrackKind::Audio, vec![clip("c2", "a2", 30, 0, 60)]),
             ],
+            transitions: Vec::new(),
             markers: Vec::new(),
         };
         let filter = filter_of(&mix_reference_args(&project, "/tmp/mix.f32").unwrap());

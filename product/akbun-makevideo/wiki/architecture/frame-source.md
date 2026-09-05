@@ -18,6 +18,8 @@ Nothing here draws, and nothing here is connected to the window yet. It is drive
 | `FrameSource` | The timeline as frames. `take`, `take_by`, `seek` |
 | `Supply` | `Ready`, `Starved` or `End` |
 
+PIP video is another placement with its own normalized crop and overlay style. A dissolve adds a synthetic incoming placement only for the final transition frames of the outgoing clip. If the incoming clip has no earlier source handle, ffmpeg pads its first frame; outside that interval only the ordinary clip decoder remains.
+
 A decoder is opened **on its own thread**, not on the consumer's. Starting one is a process spawn and a file seek, which is tens of milliseconds; doing it on the caller's thread would be a stall on the playhead.
 
 ## A starved poll consumes nothing
