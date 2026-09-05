@@ -26,6 +26,7 @@
     state: 'checking',
     account: null,
     capabilities: { imageGeneration: false },
+    models: [],
     server: null,
     detail: 'Looking for Codex CLI and ChatGPT authentication.',
   };
@@ -82,6 +83,60 @@
       imageButton.title = unavailable ? 'Image generation is unavailable for this account.' : '';
       if (unavailable && selectedMode === 'image') selectMode('text');
     }
+    fillSettings();
+    globalThis.makevideoAiEditPanel?.fillSettings();
+  }
+
+  function currentSettings() {
+    return options.settings?.() || {};
+  }
+
+  function replaceOptions(select, entries, selected) {
+    if (!select) return;
+    select.textContent = '';
+    for (const entry of entries) {
+      const option = document.createElement('option');
+      option.value = entry.value;
+      option.textContent = entry.label;
+      select.appendChild(option);
+    }
+    if (entries.some((entry) => entry.value === selected)) select.value = selected;
+  }
+
+  function modelById(id) {
+    return connection.models.find((model) => model.id === id || model.model === id);
+  }
+
+  function fillEfforts(modelId, wanted) {
+    const model = modelById(modelId);
+    const efforts = (model?.supportedReasoningEfforts || []).map((entry) => ({
+      value: entry.reasoningEffort || entry,
+      label: entry.description
+        ? `${entry.reasoningEffort} — ${entry.description}`
+        : String(entry.reasoningEffort || entry),
+    }));
+    if (!efforts.length) efforts.push({ value: wanted || 'medium', label: wanted || 'medium' });
+    const selected = efforts.some((entry) => entry.value === wanted)
+      ? wanted
+      : efforts.some((entry) => entry.value === 'medium')
+        ? 'medium'
+        : model?.defaultReasoningEffort || efforts[0].value;
+    replaceOptions($('as-ai-effort'), efforts, selected);
+  }
+
+  function fillSettings() {
+    const settings = currentSettings();
+    const modelSelect = $('as-ai-model');
+    const models = connection.models.map((model) => ({
+      value: model.id || model.model,
+      label: `${model.displayName || model.id || model.model}${model.isDefault ? ' — subscription default' : ''}`,
+    }));
+    const wantedModel = settings.aiModel || 'gpt-5.6-luna';
+    if (!models.some((model) => model.value === wantedModel)) {
+      models.unshift({ value: wantedModel, label: `${wantedModel} — saved` });
+    }
+    replaceOptions(modelSelect, models, wantedModel);
+    fillEfforts(modelSelect?.value || wantedModel, settings.aiEffort || 'medium');
   }
 
   async function installListeners() {
@@ -200,9 +255,10 @@
         capabilities: { experimentalApi: true },
       });
       await notify('initialized', {});
-      const [accountResult, capabilities] = await Promise.all([
+      const [accountResult, capabilities, modelResult] = await Promise.all([
         rpc('account/read', { refreshToken: false }),
         rpc('modelProvider/capabilities/read', {}),
+        rpc('model/list', { limit: 100, includeHidden: false }).catch(() => ({ data: [] })),
       ]);
       const account = accountResult?.account || null;
       const available = account?.type === 'chatgpt';
@@ -210,6 +266,7 @@
         state: available ? 'available' : 'unavailable',
         account,
         capabilities: capabilities || { imageGeneration: false },
+        models: modelResult?.data || [],
         server,
         detail: available
           ? ''
@@ -230,15 +287,17 @@
     if (!connection.server) return connect(true);
     try {
       setConnection({ state: 'checking', detail: 'Refreshing ChatGPT authentication.' });
-      const [accountResult, capabilities] = await Promise.all([
+      const [accountResult, capabilities, modelResult] = await Promise.all([
         rpc('account/read', { refreshToken: false }),
         rpc('modelProvider/capabilities/read', {}),
+        rpc('model/list', { limit: 100, includeHidden: false }).catch(() => ({ data: [] })),
       ]);
       const account = accountResult?.account || null;
       setConnection({
         state: account?.type === 'chatgpt' ? 'available' : 'unavailable',
         account,
         capabilities,
+        models: modelResult?.data || [],
         detail: account?.type === 'chatgpt'
           ? ''
           : isApiKeyAuth(account?.type)
@@ -578,7 +637,8 @@
   async function startTurn(activeThreadId, text) {
     const runtime = await window.api.aiRuntimeDirectory();
     const requestedTurn = pendingTurn;
-    const result = await rpc('turn/start', {
+    const settings = currentSettings();
+    const params = {
       threadId: activeThreadId,
       input: [{ type: 'text', text }],
       cwd: runtime,
@@ -588,7 +648,10 @@
         writableRoots: [runtime],
         networkAccess: false,
       },
-    }, 60_000);
+    };
+    if (settings.aiModel) params.model = settings.aiModel;
+    if (settings.aiEffort) params.effort = settings.aiEffort;
+    const result = await rpc('turn/start', params, 60_000);
     requestedTurn.turnId = result?.turn?.id || requestedTurn.turnId;
     if (requestedTurn.stopRequested && requestedTurn.turnId) {
       await rpc('turn/interrupt', { threadId: activeThreadId, turnId: requestedTurn.turnId });
@@ -848,9 +911,13 @@
       if (copy) void copyText(copy.dataset.copyMessage);
       else if (image) void saveImage(image.dataset.saveImage);
     });
+    $('as-ai-model').addEventListener('change', (event) => {
+      fillEfforts(event.target.value, 'medium');
+    });
   }
 
   async function open() {
+    globalThis.makevideoAiEditPanel?.showCurrentSection();
     await loadSessionList();
     await connect();
   }
@@ -863,5 +930,5 @@
     await loadSessionList();
   }
 
-  return { initialize, open, refreshStatus };
+  return { initialize, open, refreshStatus, fillSettings };
 });

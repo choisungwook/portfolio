@@ -32,3 +32,4 @@
 | [2026-09-pip-video-overlay.md](./2026-09-pip-video-overlay.md) | PIP uses the common visual-item model and warns beyond four simultaneous video sources |
 | [2026-09-dissolve-boundary-object.md](./2026-09-dissolve-boundary-object.md) | Dissolve is a separate adjacent-clip boundary object with interval-only dual decode |
 | [2026-09-codex-app-server-ai.md](./2026-09-codex-app-server-ai.md) | AI uses the user's Codex App Server and app-owned bounded sessions |
+| [2026-09-provider-neutral-speech-editing.md](./2026-09-provider-neutral-speech-editing.md) | Speech APIs normalize to timestamped segments; silence detection remains local |

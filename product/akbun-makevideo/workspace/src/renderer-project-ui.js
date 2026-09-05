@@ -507,6 +507,15 @@ function toggleSnap() {
       el('as-log-dir').value = state.settings.logDir;
       el('as-log-size').value = state.settings.logRotationSize;
       el('as-log-unit').value = state.settings.logRotationUnit;
+      el('as-transcription-provider').value = state.settings.transcriptionProvider;
+      el('as-transcription-endpoint').value = state.settings.transcriptionEndpoint;
+      el('as-transcription-model').value = state.settings.transcriptionModel;
+      el('as-transcription-language').value = state.settings.transcriptionLanguage;
+      el('as-silence-threshold').value = state.settings.silenceThresholdDb;
+      el('as-silence-duration').value = state.settings.silenceMinDurationMs;
+      el('as-silence-padding').value = state.settings.silencePaddingMs;
+      globalThis.makevideoAiPanel.fillSettings();
+      globalThis.makevideoAiEditPanel.fillSettings();
       const logDir = state.boot.logDir || 'the operating system application log folder';
       el('as-log-note').textContent = `Only errors are written to ${logDir}/errors.log. The previous file is kept as errors.log.1.`;
     }

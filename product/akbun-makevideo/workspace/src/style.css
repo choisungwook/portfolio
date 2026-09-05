@@ -354,6 +354,31 @@ select {
   background: var(--border);
 }
 
+.menu-submenu {
+  position: relative;
+}
+
+.menu-submenu-list {
+  position: absolute;
+  top: -4px;
+  left: calc(100% - 2px);
+  z-index: 201;
+  display: none;
+  min-width: 220px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.menu-submenu:hover > .menu-submenu-list,
+.menu-submenu:focus-within > .menu-submenu-list {
+  display: block;
+}
+
 /* Next to the ffmpeg warning, and the same kind of thing: a part of the app is
    not running and this says which. Truncated rather than allowed to push the
    project name out of the bar, with the whole reason in the title. */

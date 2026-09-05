@@ -322,10 +322,18 @@
         dom.toolWarning.title = 'Open Settings to inspect the error log location';
       }
 
-      await globalThis.makevideoAiPanel.initialize({
+      const aiOptions = {
         project: () => state.project,
+        settings: () => state.settings,
         version: () => state.boot?.version || '',
-      });
+        edit,
+        syncDocument: async () => {
+          adopt(await window.api.editState());
+          refresh();
+        },
+      };
+      await globalThis.makevideoAiEditPanel.initialize(aiOptions);
+      await globalThis.makevideoAiPanel.initialize(aiOptions);
 
       // The system's font families, for the text inspectors' pickers. Off the
       // boot path on purpose: reading every font file's name takes long enough to

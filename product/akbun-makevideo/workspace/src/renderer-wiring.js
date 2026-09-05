@@ -150,6 +150,15 @@
         openSheet('app-settings');
         void globalThis.makevideoAiPanel.refreshStatus();
       },
+      'ai-captions': () => {
+        if (state.activePanel !== 'ai') toggleSelectedPanel('ai');
+        globalThis.makevideoAiEditPanel.showCaptions('captions');
+      },
+      'ai-silence': () => {
+        if (state.activePanel !== 'ai') toggleSelectedPanel('ai');
+        globalThis.makevideoAiEditPanel.showCaptions('silence');
+      },
+      'ai-cancel': () => window.api.aiEditCancel(),
       'shortcut-settings': () => {
         shortcutController.fillSheet();
         openSheet('shortcut-settings');
@@ -558,6 +567,21 @@
             Math.max(1, Math.floor(Number(el('as-log-size').value) || 5)),
           ),
           logRotationUnit: el('as-log-unit').value,
+          aiModel: el('as-ai-model').value || 'gpt-5.6-luna',
+          aiEffort: el('as-ai-effort').value || 'medium',
+          transcriptionProvider: el('as-transcription-provider').value,
+          transcriptionEndpoint: el('as-transcription-endpoint').value.trim(),
+          transcriptionModel: el('as-transcription-model').value.trim(),
+          transcriptionLanguage: el('as-transcription-language').value.trim(),
+          silenceThresholdDb: Math.min(-5, Math.max(-80, Number(el('as-silence-threshold').value) || -35)),
+          silenceMinDurationMs: Math.min(
+            10000,
+            Math.max(100, Math.round(Number(el('as-silence-duration').value) || 450)),
+          ),
+          silencePaddingMs: Math.min(
+            2000,
+            Math.max(0, Math.round(Number(el('as-silence-padding').value) || 0)),
+          ),
         });
         closeSheet('app-settings');
         await persistSettings(next, {

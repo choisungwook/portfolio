@@ -231,6 +231,47 @@ button.icon.on {
   overflow: hidden;
 }
 
+#ai-view:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-section-tabs {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.ai-section-tabs button {
+  border-color: transparent;
+  background: transparent;
+  font-size: 10px;
+}
+
+.ai-section-tabs button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#ai-conversations-view,
+#ai-captions-view {
+  flex: 1;
+  min-height: 0;
+}
+
+#ai-conversations-view[hidden] {
+  display: none;
+}
+
+#ai-captions-view {
+  padding-bottom: 10px;
+  overflow-y: auto;
+}
+
 .ai-panel-page {
   height: 100%;
   min-height: 0;
@@ -370,6 +411,87 @@ button.icon.on {
 .ai-chat-view {
   display: flex;
   flex-direction: column;
+}
+
+.ai-edit-actions,
+.caption-list-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 10px;
+}
+
+.caption-list-head {
+  justify-content: space-between;
+  margin-top: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.caption-list-head h4 {
+  margin: 0 0 5px;
+}
+
+#ai-captions-view > .row,
+#ai-captions-view > .dim {
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.ai-edit-progress {
+  margin: 10px;
+}
+
+#ai-edit-progress-bar {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+}
+
+.caption-editor-list {
+  display: grid;
+  gap: 7px;
+  padding: 0 10px;
+}
+
+.caption-editor-row {
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+.caption-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.caption-editor-time {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.caption-editor-time input,
+.caption-editor-row textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.caption-editor-row textarea {
+  resize: vertical;
+}
+
+body.ai-editing #timeline-toolbar button,
+body.ai-editing .caption-editor-row input,
+body.ai-editing .caption-editor-row textarea {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .ai-messages {

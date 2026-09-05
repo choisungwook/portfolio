@@ -73,6 +73,13 @@ pub struct TransitionAt {
     pub transition: Transition,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameRange {
+    pub start: i64,
+    pub end: i64,
+}
+
 /// An asset and where it sat in the library, so undoing an import does not
 /// quietly reorder the list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -253,6 +260,12 @@ pub enum Command {
         track_id: String,
         start: i64,
         end: i64,
+    },
+    /// Remove several timeline ranges and close every gap across all tracks.
+    /// The ranges use the timeline state before this command starts.
+    #[serde(rename_all = "camelCase")]
+    RemoveRanges {
+        ranges: Vec<FrameRange>,
     },
     #[serde(rename_all = "camelCase")]
     SetClipGain {
@@ -439,6 +452,11 @@ pub enum Command {
     DropTransitions {
         transition_ids: Vec<String>,
     },
+    RestoreTimeline {
+        tracks: Vec<Track>,
+        transitions: Vec<Transition>,
+        markers: Vec<Marker>,
+    },
 
     /// One undo step made of several commands, all or nothing.
     #[serde(rename_all = "camelCase")]
@@ -539,6 +557,7 @@ impl Command {
             Command::UnlinkClips { .. } => "Unlink clips",
             Command::RippleDelete { .. } => "Ripple delete",
             Command::RippleDeleteGap { .. } => "Ripple delete gap",
+            Command::RemoveRanges { .. } => "Remove silence",
             Command::SetClipGain { .. } => "Clip levels",
             Command::SetClipLut { .. } => "Clip LUT",
             Command::SetClipPlayback { .. } => "Clip playback",
@@ -568,6 +587,7 @@ impl Command {
             Command::RestoreVisualItems { .. } => "Restore visual items",
             Command::RestoreMarkers { .. } => "Restore markers",
             Command::RestoreTransitions { .. } => "Restore transitions",
+            Command::RestoreTimeline { .. } => "Restore timeline",
             Command::Transaction { commands } => commands
                 .iter()
                 .find(|command| !command.is_nothing())
@@ -695,6 +715,7 @@ impl Command {
                 start,
                 end,
             } => ripple_delete_gap(project, track_id, start, end),
+            Command::RemoveRanges { ranges } => remove_ranges(project, ids, ranges),
             Command::SetClipGain {
                 clip_id,
                 volume,
@@ -797,6 +818,11 @@ impl Command {
             Command::DropTransitions { transition_ids } => {
                 Ok(drop_transitions(project, transition_ids))
             }
+            Command::RestoreTimeline {
+                tracks,
+                transitions,
+                markers,
+            } => Ok(restore_timeline(project, tracks, transitions, markers)),
             Command::Transaction { commands } => transaction(project, ids, commands),
         }
     }
@@ -1474,7 +1500,10 @@ fn carve_overwrite(project: &mut Project, ids: &mut Ids, targets: &[String], sta
             let mut pieces = Vec::new();
             if clip.start < start {
                 let mut left = clip.clone();
-                left.out_point = left.in_point + (start - left.start);
+                left.out_point = left.in_point
+                    + ((start - left.start) as f64 * left.speed as f64).round() as i64;
+                left.fade_out = 0;
+                left.volume_keyframes.retain_frames(left.start, start);
                 pieces.push(left);
             }
             if clip.end_frame() > end {
@@ -1483,8 +1512,10 @@ fn carve_overwrite(project: &mut Project, ids: &mut Ids, targets: &[String], sta
                     right.id = ids.make('c');
                     right.link_group = right_group.clone();
                 }
-                right.in_point += end - right.start;
+                right.in_point += ((end - right.start) as f64 * right.speed as f64).round() as i64;
                 right.start = end;
+                right.fade_in = 0;
+                right.volume_keyframes.retain_frames(end, clip.end_frame());
                 pieces.push(right);
             }
             let track = project
@@ -2236,6 +2267,181 @@ fn ripple_delete_gap(
         },
         inverse: Command::RestoreClips { entries: moved },
     })
+}
+
+fn remove_ranges(
+    project: &mut Project,
+    ids: &mut Ids,
+    ranges: Vec<FrameRange>,
+) -> Result<Applied, String> {
+    let ranges = normalized_ranges(ranges, project.duration_frames())?;
+    if ranges.is_empty() {
+        return Ok(Applied {
+            resolved: nothing(),
+            inverse: nothing(),
+        });
+    }
+    let before = (
+        project.tracks.clone(),
+        project.transitions.clone(),
+        project.markers.clone(),
+    );
+    for range in ranges.into_iter().rev() {
+        remove_range(project, ids, range);
+    }
+    retain_valid_transitions(project);
+    project.validate()?;
+    let resolved = Command::RestoreTimeline {
+        tracks: project.tracks.clone(),
+        transitions: project.transitions.clone(),
+        markers: project.markers.clone(),
+    };
+    Ok(Applied {
+        resolved,
+        inverse: Command::RestoreTimeline {
+            tracks: before.0,
+            transitions: before.1,
+            markers: before.2,
+        },
+    })
+}
+
+fn normalized_ranges(
+    mut ranges: Vec<FrameRange>,
+    timeline_end: i64,
+) -> Result<Vec<FrameRange>, String> {
+    if ranges
+        .iter()
+        .any(|range| range.start < 0 || range.end <= range.start)
+    {
+        return Err("a removal range must end after its non-negative start".into());
+    }
+    ranges.sort_by_key(|range| (range.start, range.end));
+    let mut merged: Vec<FrameRange> = Vec::new();
+    for mut range in ranges {
+        range.end = range.end.min(timeline_end);
+        if range.end <= range.start {
+            continue;
+        }
+        if let Some(previous) = merged.last_mut() {
+            if range.start <= previous.end {
+                previous.end = previous.end.max(range.end);
+                continue;
+            }
+        }
+        merged.push(range);
+    }
+    Ok(merged)
+}
+
+fn remove_range(project: &mut Project, ids: &mut Ids, range: FrameRange) {
+    let track_ids = project
+        .tracks
+        .iter()
+        .map(|track| track.id.clone())
+        .collect::<Vec<_>>();
+    carve_overwrite(project, ids, &track_ids, range.start, range.end);
+    let amount = range.end - range.start;
+    for track in &mut project.tracks {
+        for clip in &mut track.clips {
+            if clip.start >= range.end {
+                clip.start -= amount;
+                clip.volume_keyframes.shift_frames(-amount);
+            }
+        }
+        track.sort();
+        remove_visual_range(&mut track.visual_items, ids, range);
+    }
+    for marker in &mut project.markers {
+        marker.frame = if marker.frame >= range.end {
+            marker.frame - amount
+        } else if marker.frame > range.start {
+            range.start
+        } else {
+            marker.frame
+        };
+    }
+    project.markers.sort_by_key(|marker| marker.frame);
+}
+
+fn remove_visual_range(items: &mut Vec<VisualItem>, ids: &mut Ids, range: FrameRange) {
+    let amount = range.end - range.start;
+    let mut kept = Vec::with_capacity(items.len());
+    for mut item in std::mem::take(items) {
+        let original_start = item.start;
+        let original_end = item.end_frame();
+        if original_end <= range.start {
+            kept.push(item);
+            continue;
+        }
+        if original_start >= range.end {
+            item.start -= amount;
+            item.animation.shift_frames(-amount);
+            kept.push(item);
+            continue;
+        }
+        if original_start >= range.start && original_end <= range.end {
+            continue;
+        }
+        if original_start < range.start && original_end > range.end {
+            let mut right = item.clone();
+            item.duration = range.start - original_start;
+            item.animation.retain_frames(original_start, range.start);
+            right.id = ids.make('v');
+            right.start = range.start;
+            right.duration = original_end - range.end;
+            right.animation.retain_frames(range.end, original_end);
+            right.animation.shift_frames(-amount);
+            advance_overlay_source(&mut right.content, range.end - original_start);
+            kept.extend([item, right]);
+            continue;
+        }
+        if original_start < range.start {
+            item.duration = range.start - original_start;
+            item.animation.retain_frames(original_start, range.start);
+            kept.push(item);
+            continue;
+        }
+        let removed_head = range.end - original_start;
+        item.start = range.start;
+        item.duration = original_end - range.end;
+        item.animation.retain_frames(range.end, original_end);
+        item.animation.shift_frames(-amount);
+        advance_overlay_source(&mut item.content, removed_head);
+        kept.push(item);
+    }
+    kept.sort_by_key(|item| (item.start, item.z_index));
+    *items = kept;
+}
+
+fn advance_overlay_source(content: &mut VisualContent, frames: i64) {
+    if let VisualContent::VideoOverlay { in_point, .. } = content {
+        *in_point = in_point.saturating_add(frames);
+    }
+}
+
+fn retain_valid_transitions(project: &mut Project) {
+    let valid = project
+        .transitions
+        .iter()
+        .filter_map(|transition| {
+            let track = project.track(&transition.track_id)?;
+            let index = track
+                .clips
+                .iter()
+                .position(|clip| clip.id == transition.from_clip_id)?;
+            let from = &track.clips[index];
+            let to = track.clips.get(index + 1)?;
+            (to.id == transition.to_clip_id
+                && from.end_frame() == to.start
+                && transition.duration <= from.duration_frames()
+                && transition.duration <= to.duration_frames())
+            .then(|| transition.id.clone())
+        })
+        .collect::<HashSet<_>>();
+    project
+        .transitions
+        .retain(|transition| valid.contains(&transition.id));
 }
 
 fn shift_clips_left(project: &mut Project, moved_ids: &HashSet<String>, amount: i64) {
@@ -3349,5 +3555,26 @@ fn drop_transitions(project: &mut Project, transition_ids: Vec<String>) -> Appli
     Applied {
         resolved: Command::DropTransitions { transition_ids },
         inverse: Command::RestoreTransitions { entries: previous },
+    }
+}
+
+fn restore_timeline(
+    project: &mut Project,
+    tracks: Vec<Track>,
+    transitions: Vec<Transition>,
+    markers: Vec<Marker>,
+) -> Applied {
+    let previous = Command::RestoreTimeline {
+        tracks: std::mem::replace(&mut project.tracks, tracks.clone()),
+        transitions: std::mem::replace(&mut project.transitions, transitions.clone()),
+        markers: std::mem::replace(&mut project.markers, markers.clone()),
+    };
+    Applied {
+        resolved: Command::RestoreTimeline {
+            tracks,
+            transitions,
+            markers,
+        },
+        inverse: previous,
     }
 }

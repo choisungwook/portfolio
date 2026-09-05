@@ -8,6 +8,7 @@ members = [
   "crates/present",
   "crates/proxy",
   "crates/waveform",
+  "crates/analysis",
 ]
 
 [package]
@@ -54,6 +55,7 @@ makevideo-present = { path = "crates/present" }
 makevideo-audio = { path = "crates/audio" }
 makevideo-proxy = { path = "crates/proxy" }
 makevideo-waveform = { path = "crates/waveform" }
+makevideo-analysis = { path = "crates/analysis" }
 akbun-ai = { path = "../../../../crates/akbun-ai" }
 # protocol-asset is what makes asset_protocol_scope() exist. Without the
 # feature the preview shows broken media with no error anywhere.
@@ -67,6 +69,10 @@ wgpu = "30"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.22"
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls-no-provider"] }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "time"] }
 # Project deletion is recoverable. The whole managed project directory goes to
 # Trash so its generated proxies cannot be left behind.
 trash = "5"

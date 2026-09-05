@@ -80,6 +80,15 @@ if (!window.__TAURI__) {
         logRotationSize: 5,
         logRotationUnit: 'mb',
         shortcutOverrides: {},
+        aiModel: 'gpt-5.6-luna',
+        aiEffort: 'medium',
+        transcriptionProvider: 'openai',
+        transcriptionEndpoint: 'https://api.openai.com/v1',
+        transcriptionModel: 'whisper-1',
+        transcriptionLanguage: 'ko',
+        silenceThresholdDb: -35,
+        silenceMinDurationMs: 450,
+        silencePaddingMs: 120,
       },
       workspace: '',
       version: '0.0.0-browser',
@@ -199,6 +208,13 @@ if (!window.__TAURI__) {
     aiImageUrl: (path) => path,
     onAiServerMessage: () => Promise.resolve(() => {}),
     onAiServerState: () => Promise.resolve(() => {}),
+    aiEditSetCredential: unavailable,
+    aiEditCredentialStatus: async () => ({ present: false }),
+    aiEditStatus: async () => ({ id: 0, stage: 'idle', progress: 0, message: '' }),
+    aiEditCancel: async () => ({ id: 0, stage: 'idle', progress: 0, message: '' }),
+    aiEditStartCaptions: unavailable,
+    aiEditStartSilenceRemoval: unavailable,
+    onAiEditStatus: () => Promise.resolve(() => {}),
     reportError: async (source, text) => console.error(source, text),
   };
   throw new Error('not running under Tauri; using the browser fallback api');
@@ -403,6 +419,15 @@ window.api = {
     listen('ai-server-message', (event) => handler(event.payload)),
   onAiServerState: (handler) =>
     listen('ai-server-state', (event) => handler(event.payload)),
+  aiEditSetCredential: (provider, credential) =>
+    invoke('ai_edit_set_credential', { provider, credential }),
+  aiEditCredentialStatus: (provider) => invoke('ai_edit_credential_status', { provider }),
+  aiEditStatus: () => invoke('ai_edit_status'),
+  aiEditCancel: () => invoke('ai_edit_cancel'),
+  aiEditStartCaptions: () => invoke('ai_edit_start_captions'),
+  aiEditStartSilenceRemoval: () => invoke('ai_edit_start_silence_removal'),
+  onAiEditStatus: (handler) =>
+    listen('ai-edit:status', (event) => handler(event.payload)),
 };
 
 function pageErrorText(error) {

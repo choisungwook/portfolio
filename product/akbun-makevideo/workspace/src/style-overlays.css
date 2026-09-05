@@ -67,6 +67,7 @@
 }
 
 .sheet .row input[type='text'],
+.sheet .row input[type='url'],
 .sheet .row input[type='number'],
 .sheet .row textarea,
 .sheet .row select {
