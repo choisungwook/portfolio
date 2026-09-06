@@ -1,0 +1,9 @@
+provider "aws" {
+  region = "ap-northeast-2"
+  default_tags {
+    tags = {
+      ManagedBy = "Terraform"
+      Project   = var.project_name
+    }
+  }
+}

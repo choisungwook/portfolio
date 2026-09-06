@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (git-ignored). Never commit real account IDs or zone IDs.
+allowed_client_cidrs  = ["0.0.0.0/0"]
+availability_zones    = ["ap-northeast-2a"]
+trusted_principal_arn = "arn:aws:iam::123456789012:role/ClientProfileRole"
+
+# S05: own-domain name that must resolve to the STS NLB EIP.
+# route53_zone_id: the authoritative Route 53 zone, or null when you add the A record elsewhere.
+sts_alias_domain = "s01-sts.example.com"
+route53_zone_id  = null

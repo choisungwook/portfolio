@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+mkdir -p /opt/aws-connect-proxy
+printf '%s' '${proxy_code}' | base64 -d > /opt/aws-connect-proxy/connect_proxy.py
+printf '%s' '${routes}' | base64 -d > /opt/aws-connect-proxy/routes.json
+cat > /etc/systemd/system/aws-connect-proxy.service <<'UNIT'
+[Unit]
+Description=AWS endpoint allowlisted CONNECT proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+Environment=PROXY_ROUTES_FILE=/opt/aws-connect-proxy/routes.json
+ExecStart=/usr/bin/python3 /opt/aws-connect-proxy/connect_proxy.py
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now aws-connect-proxy

@@ -1,0 +1,32 @@
+{
+  "memory_id": "memory_s07-AbCdEf1234",
+  "proxy": {
+    "addresses": {
+      "ap-northeast-2a": "203.0.113.30"
+    },
+    "instance_id": "i-0123456789abcdef0",
+    "nlb_dns_name": "memory-s07-proxy-0123456789abcdef.elb.ap-northeast-2.amazonaws.com",
+    "target_group_arn": "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/memory-s07-proxy/0123456789abcdef"
+  },
+  "proxy_url": "https://s07-proxy.example.com:443",
+  "region": "ap-northeast-2",
+  "role_arn": "arn:aws:iam::123456789012:role/memory-s07-client",
+  "services": {
+    "memory": {
+      "endpoint_id": "vpce-0123456789abcdef0",
+      "endpoint_url": "https://vpce-0123456789abcdef0-abcd1234.bedrock-agentcore.ap-northeast-2.vpce.amazonaws.com",
+      "hostname": "bedrock-agentcore.ap-northeast-2.amazonaws.com",
+      "private_ips": {
+        "ap-northeast-2a": "172.31.0.13"
+      }
+    },
+    "sts": {
+      "endpoint_id": "vpce-0123456789abcdef1",
+      "endpoint_url": "https://vpce-0123456789abcdef1-abcd1234.sts.ap-northeast-2.vpce.amazonaws.com",
+      "hostname": "sts.ap-northeast-2.amazonaws.com",
+      "private_ips": {
+        "ap-northeast-2a": "172.31.1.32"
+      }
+    }
+  }
+}

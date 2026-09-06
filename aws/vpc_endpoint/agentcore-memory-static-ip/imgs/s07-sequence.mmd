@@ -1,0 +1,17 @@
+sequenceDiagram
+  participant C as boto3 (AWS_PROFILE=admin)
+  participant N as public NLB (TLS 종료)
+  participant P as EC2 CONNECT proxy
+  participant S as 서울 STS (VPCE)
+  participant M as AgentCore Memory (VPCE)
+  Note over C: admin 체인 AssumeRole은 프록시 설정 없이 공개 STS로 (별도 경로)
+  C->>N: TLS(SNI=s07-proxy.demo.akbun.com) 연결
+  N->>P: 평문 TCP 8080
+  C->>P: CONNECT sts.ap-northeast-2.amazonaws.com:443
+  P->>S: VPCE DNS로 TCP 연결, 200 Connection Established
+  C->>S: 터널 안 TLS(SNI=sts...) + AssumeRole(memory-s07-client)
+  S-->>C: 임시 자격증명 (15분)
+  C->>P: CONNECT bedrock-agentcore.ap-northeast-2.amazonaws.com:443
+  P->>M: VPCE DNS로 TCP 연결
+  C->>M: 터널 안 TLS + CreateEvent / GetEvent / DeleteEvent (SigV4)
+  M-->>C: 응답

@@ -1,0 +1,10 @@
+# The setup guide uses TF_VAR_* for all inputs; this file is a reference only.
+project_name = "memory-s07"
+vpc_id = "vpc-0123456789abcdef0"
+subnets = { ap-northeast-2a = "subnet-0123456789abcdef0" }
+client_cidrs = ["0.0.0.0/0"]
+trusted_principal_arn = "arn:aws:iam::123456789012:role/ExistingClientRole"
+proxy_domain = "s07-proxy.example.com"
+route53_zone_id = null # or the authoritative Route 53 zone ID
+acm_certificate_arn = "arn:aws:acm:ap-northeast-2:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+nlb_private_ips = {}
