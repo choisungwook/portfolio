@@ -164,7 +164,7 @@ credential_process = /opt/aws/aws_signing_helper credential-process --certificat
 
 ```python
 session = boto3.Session(profile_name="app")
-memory = session.client("bedrock-agentcore")   # 갱신은 SDK가 helper를 다시 실행
+memory = session.client("bedrock-agentcore")  # 갱신은 SDK가 helper를 다시 실행
 ```
 
 - 세션·client를 재사용해요. 임시 키를 꺼내 다른 Session에 복사하면 자동 갱신이 끊겨요.

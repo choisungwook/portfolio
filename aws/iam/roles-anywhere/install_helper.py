@@ -28,7 +28,11 @@ RELEASES = {
 
 def install(destination: Path) -> None:
   """Download the official platform binary, verify its published SHA256, then install."""
-  release, expected = RELEASES[(platform.system(), platform.machine())]
+  key = (platform.system(), platform.machine())
+  if key not in RELEASES:
+    supported = ", ".join(f"{s}/{m}" for s, m in RELEASES)
+    raise ValueError(f"No pinned helper for {key[0]}/{key[1]}; supported: {supported}")
+  release, expected = RELEASES[key]
   destination.parent.mkdir(parents=True, exist_ok=True)
   if destination.exists():
     if hashlib.sha256(destination.read_bytes()).hexdigest() != expected:

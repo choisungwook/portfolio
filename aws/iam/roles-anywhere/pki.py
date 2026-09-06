@@ -12,6 +12,7 @@ import argparse
 import os
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -52,6 +53,16 @@ authorityKeyIdentifier = keyid,issuer
 """
 
 
+@contextmanager
+def private_umask():
+  """Create keys 0600 without leaking a restrictive umask into the rest of the process."""
+  previous = os.umask(0o077)
+  try:
+    yield
+  finally:
+    os.umask(previous)
+
+
 def openssl(ca: Path, *arguments: str | Path) -> str:
   """Run OpenSSL against the lab CA directory; never prints key material."""
   result = subprocess.run(
@@ -66,7 +77,11 @@ def openssl(ca: Path, *arguments: str | Path) -> str:
 
 def create_ca(root: Path) -> None:
   """Seven-day private CA with an OpenSSL issuance database (index, serial, crlnumber)."""
-  os.umask(0o077)
+  with private_umask():
+    _create_ca(root)
+
+
+def _create_ca(root: Path) -> None:
   root.mkdir(parents=True, exist_ok=False)
   ca = root / "ca"
   (ca / "newcerts").mkdir(parents=True)
@@ -87,7 +102,11 @@ def create_ca(root: Path) -> None:
 
 def issue_client(root: Path, version: str, common_name: str) -> Path:
   """Two-day leaf certificate with its own key and serial. CN is what the Role trust checks."""
-  os.umask(0o077)
+  with private_umask():
+    return _issue_client(root, version, common_name)
+
+
+def _issue_client(root: Path, version: str, common_name: str) -> Path:
   ca = root / "ca"
   destination = root / "clients" / version
   destination.mkdir(parents=True, exist_ok=False)
