@@ -105,7 +105,7 @@
     $('document-state').textContent = ui.t(state.dirty ? 'Unsaved changes' : 'Example document');
     emptyHelp.querySelector('dl').lastElementChild.textContent = `${deckSize().width} × ${deckSize().height}`;
     emptyHelp.querySelector('dd').textContent = slideRatioLabel();
-    ui.apply();
+    ui.schedule();
   };
 
   const originalRenderThumbs = renderThumbs;
@@ -126,7 +126,6 @@
     document.body.classList.add('proposal');
     $('show-proposal').setAttribute('aria-pressed', 'true');
     $('show-original').setAttribute('aria-pressed', 'false');
-    ui.apply();
     renderAll();
   }
 

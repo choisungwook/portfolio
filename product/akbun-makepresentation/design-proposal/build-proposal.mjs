@@ -56,4 +56,19 @@ html = html.replace('</body>', `
   <script src="i18n.js"></script>
   <script src="prototype.js"></script>
 </body>`);
+const requiredMarkers = [
+  'href="../workspace/src/style.css"',
+  '<script src="../workspace/src/renderer.js"',
+  'href="proposal.css"',
+  '<body class="proposal">',
+  'class="review-bar"',
+  'id="proposal-language"',
+  'id="btn-ai-new" type="button" class="primary">New conversation',
+  '<script src="messages.js"',
+  '<script src="i18n.js"',
+  '<script src="prototype.js"',
+];
+for (const marker of requiredMarkers) {
+  if (!html.includes(marker)) throw new Error(`Proposal generation failed: missing ${marker}. Check workspace/src/index.html.`);
+}
 await writeFile(new URL('index.html', root), html);

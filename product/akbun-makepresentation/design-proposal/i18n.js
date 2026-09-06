@@ -15,6 +15,7 @@
     ['웹툰', 'Webtoon'], ['수채화', 'Watercolor'], ['플랫', 'Flat'],
   ]);
   let language = 'en';
+  let pendingFrame = null;
   try {
     const saved = localStorage.getItem(storageKey);
     if (saved === 'en' || saved === 'ko') language = saved;
@@ -56,6 +57,8 @@
   }
 
   function apply() {
+    if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
+    pendingFrame = null;
     observer.disconnect();
     document.documentElement.lang = language;
     for (const option of document.querySelectorAll('option:not([value])')) {
@@ -70,6 +73,11 @@
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['title', 'aria-label', 'placeholder'] });
   }
 
+  function schedule() {
+    if (pendingFrame !== null) return;
+    pendingFrame = requestAnimationFrame(apply);
+  }
+
   function selectLanguage(next) {
     if (next !== 'en' && next !== 'ko') return;
     language = next;
@@ -78,8 +86,8 @@
     apply();
   }
 
-  const observer = new MutationObserver(apply);
-  globalThis.proposalI18n = { t, apply, selectLanguage };
+  const observer = new MutationObserver(schedule);
+  globalThis.proposalI18n = { t, apply, schedule, selectLanguage };
   for (const select of document.querySelectorAll('[data-language-select]')) {
     select.addEventListener('change', () => selectLanguage(select.value));
   }

@@ -18,6 +18,7 @@
 ## 적용 전 판단
 
 - 실제 앱의 HTML이 바뀌면 시안을 재생성하고 편집·언어 전환을 다시 확인.
+- 생성 결과에 필수 UI·스타일·스크립트가 없으면 기존 HTML을 덮어쓰기 전에 실패.
 - 네이티브 메뉴·대화상자의 번역은 브라우저 문구 전환만으로 검증할 수 없음.
 - [시각 중심 결정](../knowledge/decisions/2026-09-proposal-keeps-slide-focus.md)과 [검증 범위](../design-proposal/verification.md)를 함께 확인.
 
