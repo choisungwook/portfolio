@@ -1,14 +1,12 @@
 mod ai;
+mod clipboard;
 mod commands;
+mod documents;
 
-// The app carries its own File/Edit/View menus in the window, so the system
-// menu bar holds nothing but what macOS insists on: an application menu with
-// Quit, and the standard edit items. Those edit items are not decoration —
-// WKWebView routes Cmd+C, Cmd+V and Cmd+A through them, and without them
-// copy and paste stop working inside the page.
+// WKWebView routes clipboard shortcuts through the standard edit items.
 #[cfg(desktop)]
 fn install_menu(app: &tauri::App) -> tauri::Result<()> {
-    use tauri::menu::{Menu, SubmenuBuilder};
+    use tauri::menu::{Menu, MenuItem, SubmenuBuilder};
 
     let menu = Menu::new(app.handle())?;
     let app_menu = SubmenuBuilder::new(app, "akbun-makepresentation")
@@ -19,6 +17,30 @@ fn install_menu(app: &tauri::App) -> tauri::Result<()> {
         .quit()
         .build()?;
     menu.append(&app_menu)?;
+    let view = SubmenuBuilder::new(app, "View")
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-in",
+            "Zoom In",
+            true,
+            Some("CmdOrCtrl+="),
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-out",
+            "Zoom Out",
+            true,
+            Some("CmdOrCtrl+-"),
+        )?)
+        .item(&MenuItem::with_id(
+            app,
+            "zoom-fit",
+            "Fit to Window",
+            true,
+            Some("CmdOrCtrl+0"),
+        )?)
+        .build()?;
+    menu.append(&view)?;
 
     // Clipboard only. Undo and Redo are deliberately absent: their predefined
     // items own Cmd+Z, and the webview would take it as text undo, so the
@@ -53,6 +75,7 @@ pub fn run() {
             #[cfg(desktop)]
             install_menu(app)?;
 
+            documents::setup(app)?;
             ai::setup(app)?;
 
             // The window is the whole app, so the webview console is where
@@ -68,6 +91,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            documents::initial_document,
+            documents::launch_document,
+            clipboard::write_shape_clipboard,
+            clipboard::read_shape_clipboard,
             ai::ai_start_server,
             ai::ai_send_rpc,
             ai::ai_stop_server,
@@ -87,7 +114,30 @@ pub fn run() {
             commands::load_settings,
             commands::save_settings,
         ])
+        .on_menu_event(|app, event| {
+            use tauri::{Emitter, Manager};
+            if matches!(event.id().as_ref(), "zoom-in" | "zoom-out" | "zoom-fit") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.emit("file-command", event.id().as_ref());
+                }
+            }
+        })
         .manage(ai::AiRuntime::default())
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        if let Err(error) =
+                            documents::launch_document(Some(path.to_string_lossy().into()))
+                        {
+                            use tauri::Emitter;
+                            let _ = _app.emit("document-open-error", error);
+                        }
+                    }
+                }
+            }
+        });
 }

@@ -3,6 +3,7 @@
 akbun-makepresentation 작업 중 내린 의사결정과 이유.
 
 * [객체 잠금은 선택과 변경을 분리](2026-09-locks-preserve-selection.md)
+* [문서 프로세스와 프로필 분리](2026-09-document-process-and-profile-isolation.md)
 * [드래그는 더블클릭 편집보다 우선](2026-08-drag-wins-over-double-click-edit.md)
 * [삭제 단축키의 대상은 편집 영역 포커스로 결정](2026-08-delete-key-follows-editor-focus.md)
 * [Shift 리사이즈는 비율과 선의 축을 유지](2026-08-shift-resize-keeps-line-axis.md)
@@ -18,5 +19,5 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [브라우저 편집기 파일은 변경 이유별로 분리](2026-08-browser-editor-files-follow-change-reasons.md)
 * [슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다](2026-08-the-model-is-told-what-the-slide-is.md)
 * [AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다](2026-08-quick-chips-are-toggles-not-macros.md)
-* [잘라내기는 복사 핸들러를 실행하고 지우는 순서로 만든다](2026-09-cut-runs-the-copy-handler.md)
+* [잘라내기는 시스템 복사 성공 후 원본을 지운다](2026-09-cut-runs-the-copy-handler.md)
 * [슬라이드의 배열 순서가 곧 z 순서다](2026-09-array-order-is-z-order.md)

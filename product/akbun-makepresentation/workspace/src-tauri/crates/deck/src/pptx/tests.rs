@@ -541,3 +541,31 @@ fn round_trip_preserves_locks_and_absent_borders_for_every_shape_kind() {
         }
     }
 }
+
+#[test]
+fn callout_keeps_editable_text_outline_and_tail_after_roundtrip() {
+    let bubble = Shape {
+        kind: "callout".into(), x: 100.0, y: 80.0, w: 300.0, h: 200.0,
+        fill: "none".into(), text: "Speech bubble 말풍선".into(), rotation: 25.0,
+        locked: true, text_align: "center".into(), vertical_align: "center".into(),
+        ..Shape::default()
+    };
+    let mut deck = Deck::default();
+    deck.slides.push(Slide { shapes: vec![bubble.clone()], ..Slide::default() });
+    let mut bytes = Cursor::new(Vec::new());
+    write(&deck, &mut bytes).unwrap();
+    let mut zip = zip::ZipArchive::new(Cursor::new(bytes.get_ref())).unwrap();
+    let mut xml = String::new();
+    std::io::Read::read_to_string(&mut zip.by_name("ppt/slides/slide1.xml").unwrap(), &mut xml).unwrap();
+    assert!(xml.contains("akbun-callout"));
+    assert!(xml.contains("<a:close/>"));
+    assert!(xml.contains("<p:txBody>"));
+    bytes.set_position(0);
+    let opened = read(bytes).unwrap();
+    let shape = &opened.slides[0].shapes[0];
+    assert_eq!(shape.kind, "callout");
+    assert_eq!(shape.text, bubble.text);
+    assert_eq!((shape.w, shape.h, shape.rotation), (300.0, 200.0, 25.0));
+    assert_eq!(shape.fill, "none");
+    assert!(shape.locked);
+}

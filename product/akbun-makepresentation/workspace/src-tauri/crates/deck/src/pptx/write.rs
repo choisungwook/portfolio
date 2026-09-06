@@ -468,6 +468,19 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
     let locks = locks_xml(shape, "spLocks");
     let connection_locks = locks_xml(shape, "cxnSpLocks");
     match shape.kind.as_str() {
+        "callout" => {
+            let points = [(0, 0), (100, 0), (100, 75), (50, 75), (20, 100), (30, 75), (0, 75)];
+            let path = points.iter().enumerate().map(|(i, (x, y))| {
+                let command = if i == 0 { "moveTo" } else { "lnTo" };
+                format!("<a:{command}><a:pt x=\"{x}\" y=\"{y}\"/></a:{command}>")
+            }).collect::<String>();
+            format!(
+                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Speech bubble {id}\" descr=\"akbun-callout\"/><p:cNvSpPr>{locks}</p:cNvSpPr><p:nvPr/></p:nvSpPr>\
+<p:spPr>{}<a:custGeom><a:avLst/><a:gdLst><a:gd name=\"bodyBottom\" fmla=\"*/ h 3 4\"/></a:gdLst><a:ahLst/><a:cxnLst/><a:rect l=\"0\" t=\"0\" r=\"w\" b=\"bodyBottom\"/><a:pathLst><a:path w=\"100\" h=\"100\">{path}<a:close/></a:path></a:pathLst></a:custGeom>{}{}</p:spPr>{}</p:sp>",
+                xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
+                fill_xml(&shape.fill), line_xml(shape), text_body(shape)
+            )
+        }
         "line" | "arrow" => {
             let (x, w) = if shape.w < 0.0 {
                 (shape.x + shape.w, -shape.w)

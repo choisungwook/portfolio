@@ -6,23 +6,57 @@ function isFormField(target) {
     target instanceof HTMLTextAreaElement;
 }
 
-// Cut watches this counter to see whether the clipboard really took the
-// objects. A counter rather than a timestamp: two copies close together can
-// read the same clock, and that would look like a refused clipboard.
 let copyCount = 0;
+let clipboardWrite = Promise.resolve(true);
+
+function clipboardText(shapes) {
+  return shapes.map((shape) => shape.text || '').filter(Boolean).join('\n');
+}
+
+function writeDesktopShapes(shapes) {
+  const snapshot = structuredClone(shapes);
+  clipboardWrite = clipboardWrite.then(async () => {
+    try {
+      const dataUrl = await rasterizeShapes(snapshot);
+      await window.api.writeShapeClipboard(JSON.stringify(snapshot), clipboardText(snapshot), dataUrl);
+      return true;
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Cannot copy objects', kind: 'error' });
+      return false;
+    }
+  });
+  return clipboardWrite;
+}
+
+function copySelection() {
+  const shapes = [...state.selection].sort((a, b) => a - b).map((index) => slide().shapes[index]).filter(Boolean);
+  if (!shapes.length) return Promise.resolve(false);
+  if (window.api.isDesktop) return writeDesktopShapes(shapes);
+  const before = copyCount;
+  document.execCommand('copy');
+  return Promise.resolve(copyCount > before);
+}
 
 document.addEventListener('copy', (event) => {
-  if (isFormField(event.target)) return;
+  if (isFormField(event.target) || event.target.isContentEditable) return;
   const shapes = selectedShapes();
-  if (shapes.length === 0 || !event.clipboardData) return;
+  if (!shapes.length) return;
+  if (window.api.isDesktop) {
+    event.preventDefault();
+    void copySelection();
+    return;
+  }
+  if (!event.clipboardData) return;
   event.clipboardData.setData(SHAPE_CLIPBOARD_TYPE, JSON.stringify(shapes));
-  const text = shapes
-    .filter((shape) => shape.kind === 'text' || shape.kind === 'code')
-    .map((shape) => shape.text)
-    .join('\n');
-  if (text) event.clipboardData.setData('text/plain', text);
+  event.clipboardData.setData('text/plain', clipboardText(shapes));
   copyCount += 1;
   event.preventDefault();
+});
+
+document.addEventListener('cut', (event) => {
+  if (isFormField(event.target) || event.target.isContentEditable || !selectedShapes().length) return;
+  event.preventDefault();
+  void cutSelection();
 });
 
 function readFileDataUrl(file) {
@@ -69,53 +103,42 @@ async function pastedImageShape(file, index) {
 }
 
 document.addEventListener('paste', async (event) => {
-  if (isFormField(event.target) || !event.clipboardData) return;
-
+  if (isFormField(event.target) || event.target.isContentEditable || !event.clipboardData) return;
   const encoded = event.clipboardData.getData(SHAPE_CLIPBOARD_TYPE);
-  const copiedShapes = L.parseClipboardShapes(encoded);
-  if (copiedShapes.length) {
-    event.preventDefault();
-    insertShapes(copiedShapes, PASTE_OFFSET);
-    return;
-  }
-
+  const text = event.clipboardData.getData('text/plain');
   const itemFiles = Array.from(event.clipboardData.items || [])
     .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
-    .map((item) => item.getAsFile())
-    .filter(Boolean);
+    .map((item) => item.getAsFile()).filter(Boolean);
   const directFiles = Array.from(event.clipboardData.files || [])
     .filter((file) => file.type.startsWith('image/'));
   const imageFiles = [...new Set([...itemFiles, ...directFiles])];
-  if (imageFiles.length) {
-    event.preventDefault();
-    try {
-      const shapes = await Promise.all(imageFiles.map(pastedImageShape));
-      insertShapes(shapes, 0);
-    } catch (error) {
-      await window.api.message(String(error), { title: 'Cannot paste image', kind: 'error' });
-    }
-    return;
-  }
-
-  const text = event.clipboardData.getData('text/plain');
-  if (text) {
-    event.preventDefault();
-    insertShapes([pastedTextShape(text)], 0);
+  event.preventDefault();
+  const targetDeck = state.deck;
+  const targetSlide = slide();
+  try {
+    await clipboardWrite;
+    const native = window.api.isDesktop ? await window.api.readShapeClipboard() : null;
+    const copiedShapes = L.parseClipboardShapes(native || encoded);
+    const shapes = copiedShapes.length ? copiedShapes : imageFiles.length
+      ? await Promise.all(imageFiles.map(pastedImageShape)) : text ? [pastedTextShape(text)] : [];
+    if (state.deck !== targetDeck || slide() !== targetSlide || !shapes.length) return;
+    insertShapes(shapes, copiedShapes.length ? PASTE_OFFSET : 0);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot paste objects', kind: 'error' });
   }
 });
 
-// The webview fires a cut event only where the selection is editable, so the
-// canvas never sees one and Cmd+X did nothing. Running the copy handler through
-// execCommand writes the same clipboard data, and the delete after it is what
-// makes the pair a cut.
-function cutSelection() {
-  if (selectedShapes().length === 0) return;
-  const before = copyCount;
-  document.execCommand('copy');
-  // A webview that refuses the clipboard would otherwise turn cut into a
-  // delete with nothing to paste back.
-  if (copyCount === before) return;
-  deleteSelectedShape();
+async function cutSelection() {
+  const targetDeck = state.deck;
+  const targetSlide = slide();
+  const originals = selectedShapes().filter((shape) => !shape.locked);
+  const snapshots = new Map(originals.map((shape) => [shape, JSON.stringify(shape)]));
+  if (!originals.length || !(await copySelection())) return;
+  if (state.deck !== targetDeck || !state.deck.slides.includes(targetSlide)) return;
+  targetSlide.shapes = targetSlide.shapes.filter((shape) => !originals.includes(shape) || shape.locked || JSON.stringify(shape) !== snapshots.get(shape));
+  clearSelection();
+  markDirty();
+  renderAll();
 }
 
 // Cmd+D duplicates the selected shape, or the whole slide when nothing on it

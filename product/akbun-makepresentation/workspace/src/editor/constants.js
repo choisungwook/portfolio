@@ -46,9 +46,9 @@ const DEFAULT_IMAGE_STYLE = Object.freeze({
   dash: 'solid',
 });
 
-const BOXY = new Set(['rect', 'ellipse', 'text', 'image', 'code']);
+const BOXY = new Set(['rect', 'ellipse', 'callout', 'text', 'image', 'code']);
 const SHAPE_KINDS = new Set([
-  'rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'image', 'code',
+  'rect', 'ellipse', 'callout', 'line', 'arrow', 'pen', 'text', 'image', 'code',
 ]);
 
 const CODE_FORMATS = Object.freeze({
@@ -97,7 +97,7 @@ const CODE_KEYWORDS = Object.freeze({
 
 // A shape that can hold text of its own. A text box is the whole shape; a
 // rect or an ellipse draws its text inside the outline.
-const TEXTUAL = new Set(['rect', 'ellipse']);
+const TEXTUAL = new Set(['rect', 'ellipse', 'callout']);
 
 // The five pptx line ends, under their pptx names, so a round trip through
 // `a:headEnd`/`a:tailEnd` is a rename and nothing else.
@@ -112,6 +112,7 @@ const DEFAULT_PRESET_IDS = [
 const PRESET_KIND_LABELS = {
   rect: 'Rectangle',
   ellipse: 'Ellipse',
+  callout: 'Speech bubble',
   line: 'Line',
   arrow: 'Arrow',
   pen: 'Drawing',

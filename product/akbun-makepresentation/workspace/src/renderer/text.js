@@ -118,6 +118,11 @@ textEditor.addEventListener('keydown', (event) => {
     return;
   }
   if (!(event.metaKey || event.ctrlKey)) return;
+  if (event.key.toLowerCase() === 'f') {
+    event.preventDefault();
+    openDeckSearch();
+    return;
+  }
   const style = TEXT_STYLE_KEYS[event.key.toLowerCase()];
   if (style) {
     toggleTextStyle(style);
@@ -129,9 +134,10 @@ textEditor.addEventListener('keydown', (event) => {
 
 // --- keyboard ------------------------------------------------------------------------
 
-const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
+const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', b: 'callout', l: 'line', a: 'arrow', p: 'pen', t: 'text' };
 
 document.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented) return;
   if (settingsDialog.open || slideSizeDialog.open || codeDialog.open || guidelinesDialog.open) return;
   if (event.key === 'Escape' && (!backgroundMenu.hidden || !codeBlockMenu.hidden)) {
     hideToolbarPopovers();

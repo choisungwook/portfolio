@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/deck"]
+members = ["crates/deck", "crates/desktop"]
 
 [package]
 name = "akbun-makepresentation"
@@ -26,6 +26,8 @@ tauri-build = { version = "2", features = [] }
 # The model lives in its own crate so the pull request job can test it without
 # compiling tauri, which would mean installing GTK and WebKit on the runner.
 makepresentation-deck = { path = "crates/deck" }
+makepresentation-desktop = { path = "crates/desktop" }
+clipboard-rs = "0.3.5"
 akbun-ai = { path = "../../../../crates/akbun-ai" }
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"

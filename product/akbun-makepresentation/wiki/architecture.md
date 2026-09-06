@@ -2,7 +2,7 @@
 
 ## Process structure
 
-Two app sides, one JSON model between them, plus an optional external AI process.
+Each document runs in its own OS process with two app sides, one JSON model between them, plus an optional external AI process. Settings and AI sessions belong to the document profile. Opening another file spawns the same executable with a file argument and leaves the current editor intact.
 
 - **The page** (`workspace/src/`): plain HTML/CSS/JS served straight from disk, no bundler. It owns the deck in memory, draws it as SVG, and handles every interaction: tools, selection, resize handles, text editing, the property panel, thumbnails, presentation mode.
 - **Rust** (`workspace/src-tauri/`): everything that touches the file system and child processes. The deck store lives in `makepresentation-deck`; the Codex process and AI session store are shared with makevideo through the repository-level `akbun-ai` crate. Neither depends on Tauri or a webview, and the Tauri modules are thin shims over them.
@@ -14,7 +14,7 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
 
 ```json
 { "slideWidth": 1920, "slideHeight": 1080, "slides": [ { "background": "#ffffff", "shapes": [ {
-  "kind": "rect | ellipse | line | arrow | pen | text | image",
+  "kind": "rect | ellipse | callout | line | arrow | pen | text | image | code",
   "x": 0, "y": 0, "w": 0, "h": 0,
   "points": [[0, 0]],
   "stroke": "#1a1a1a", "strokeWidth": 2, "dash": "solid | dash | dot",
@@ -97,6 +97,8 @@ Filesystem access stays behind narrow commands. Deck and export paths come from 
 
 | Command | In | Out |
 |---|---|---|
+| `initial_document`, `launch_document` | optional path | startup path or separate app process |
+| `write_shape_clipboard`, `read_shape_clipboard` | PNG, text, object JSON | system clipboard / editable object JSON |
 | `open_deck` | path | Deck |
 | `save_deck` | path, Deck | — |
 | `export_pdf` | path, pages `[{dataUrl, width, height}]` | — |
@@ -127,7 +129,7 @@ Every live App Server thread is ephemeral. Before starting it, the page disables
 
 The app owns the durable conversation instead:
 
-- Stored under the Tauri app data directory at `ai/sessions/<session-id>/`.
+- Stored under the Tauri app data directory at `profiles/<profile-id>/ai/sessions/<session-id>/`.
 - Maximum three session directories and 128 MiB per session including images.
 - A closed or restored session is read-only; continuing requires a new conversation.
 - A stopped turn keeps the received delta text and stores the assistant message as stopped.
@@ -175,6 +177,8 @@ Opening a file or starting a new deck clears both stacks, because a history that
 
 ## Zoom
 
+Native View accelerators forward Cmd+=, Cmd+- and Cmd+0 to the current editor. The page also handles Cmd++ and the same shortcuts in text fields.
+
 Zoom is a view setting: it lives in `state`, not in the deck, and nothing about the model changes with it. The stage is a scroller wrapping the slide, and zoom is one CSS variable multiplying the fitted width, so the browser does the scaling and scrollbars appear on their own once the slide outgrows the window.
 
 Its control lives in the status bar along the bottom. Slide numbers are toggled from the Slides menu, away from the drawing tools.
@@ -189,6 +193,6 @@ It lives outside `slide().shapes` while editing, so it cannot be selected or dra
 
 ## App settings
 
-The Tauri shell reads and writes `settings.json` in the app data directory. The page validates the JSON and keeps guideline visibility, guideline margins and custom presets there. Guideline margins are stored as pixels while the last px/cm display unit is stored alongside them.
+The Tauri shell reads and writes `profiles/<profile-id>/settings.json` in the app data directory. A hash of the canonical document path maps to a profile UUID; an exclusive file lock forks the profile if the same document is already open. Save As preserves a separate snapshot for the old path and associates the active profile with the new path. The page validates the JSON and keeps guideline visibility, guideline margins and custom presets there. Guideline margins are stored as pixels while the last px/cm display unit is stored alongside them.
 
 Older versions stored custom presets in localStorage. When no settings file exists, the page imports that list, writes `settings.json`, and removes the old key only after the new file is saved.

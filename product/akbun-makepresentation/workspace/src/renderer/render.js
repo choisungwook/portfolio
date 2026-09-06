@@ -135,7 +135,9 @@ const HANDLE_SLIDE_UNITS = 12;
 // Text is caught by its filled box and everything else by a wide stroke, so
 // the class carries `fill` to tell the two paints apart in css.
 function outlineSvg(shape, kind) {
-  const width = Math.max(16, shape.strokeWidth + 12);
+  if (kind === 'hit' && shape.stroke === 'none' && !['text', 'image', 'code'].includes(shape.kind)) return '';
+  const scale = canvas.getBoundingClientRect().width / deckSize().width || 1;
+  const width = kind === 'hit' ? (Number(shape.strokeWidth) || 0) + 4 / scale : Math.max(16, shape.strokeWidth + 12);
   const b = L.shapeBBox(shape);
   const attrs = `class="${kind}" stroke-width="${width}"`;
   // The same rotation the visible shape gets. Without it a rotated shape
@@ -143,6 +145,8 @@ function outlineSvg(shape, kind) {
   // glow makes that visible.
   return L.rotateSvg(shape, (() => {
     switch (shape.kind) {
+      case 'callout':
+        return `<polygon points="${L.calloutPoints(shape).map((p) => p.join(',')).join(' ')}" ${attrs}/>`;
       case 'line':
       case 'arrow':
         return `<line x1="${shape.x}" y1="${shape.y}" x2="${shape.x + shape.w}" y2="${shape.y + shape.h}" ${attrs}/>`;
@@ -343,7 +347,7 @@ function renderProps() {
   const source = selection.find((shape) => !shape.locked) || shape || state.defaults;
   const kind = shape ? shape.kind : 'defaults';
 
-  const showFill = kind === 'rect' || kind === 'ellipse' || kind === 'defaults';
+  const showFill = L.TEXTUAL.has(kind) || kind === 'defaults';
   const showStroke = kind !== 'text';
   const showText = kind === 'text' || L.TEXTUAL.has(kind) || kind === 'defaults';
 

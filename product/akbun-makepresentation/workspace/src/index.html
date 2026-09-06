@@ -31,6 +31,8 @@
         <button data-command="redo">Redo<span class="accel">⇧⌘Z</span></button>
         <hr />
         <button data-command="cut">Cut<span class="accel">⌘X</span></button>
+        <button data-command="copy">Copy<span class="accel">⌘C</span></button>
+        <button data-command="find">Find in slides…<span class="accel">⌘F</span></button>
         <button data-command="duplicate">Duplicate<span class="accel">⌘D</span></button>
         <button data-command="delete">Delete<span class="accel">⌫</span></button>
         <hr />
@@ -74,6 +76,7 @@
       </button>
       <button data-tool="rect" title="Rectangle (R)">▭</button>
       <button data-tool="ellipse" title="Ellipse (O)">◯</button>
+      <button data-tool="callout" title="Speech bubble (B)" aria-label="Speech bubble">▱…</button>
       <button data-tool="line" title="Line (L)">╱</button>
       <button data-tool="arrow" title="Arrow (A)">➔</button>
       <button data-tool="pen" title="Freehand (P)">✎</button>
@@ -90,6 +93,17 @@
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
     </div>
   </header>
+
+  <section id="deck-search" role="search" aria-label="Find in slides" hidden>
+    <div class="search-controls">
+      <input id="deck-search-input" type="search" placeholder="Find text in all slides…" aria-label="Find text in all slides" />
+      <span id="deck-search-count" role="status"></span>
+      <button id="deck-search-prev" aria-label="Previous result">↑</button>
+      <button id="deck-search-next" aria-label="Next result">↓</button>
+      <button id="deck-search-close" aria-label="Close search">×</button>
+    </div>
+    <div id="deck-search-results"></div>
+  </section>
 
   <main>
     <aside id="slides" tabindex="0" aria-label="Slides">
@@ -606,6 +620,7 @@
   <script src="editor/presets.js"></script>
   <script src="editor/svg.js"></script>
   <script src="editor/utils.js"></script>
+  <script src="editor/search.js"></script>
   <script src="editor.js"></script>
   <script src="settings.js"></script>
   <script src="ai/styles.js"></script>
@@ -615,6 +630,7 @@
   <script src="ai-panel.js"></script>
   <script src="renderer/render.js"></script>
   <script src="renderer/history.js"></script>
+  <script src="renderer/search.js"></script>
   <script src="renderer/canvas.js"></script>
   <script src="renderer/text.js"></script>
   <script src="renderer/presets.js"></script>

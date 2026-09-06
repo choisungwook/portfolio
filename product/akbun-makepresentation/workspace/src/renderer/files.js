@@ -12,6 +12,11 @@ async function confirmDiscard() {
 }
 
 async function newDeck() {
+  if (window.api.isDesktop) {
+    try { await window.api.launchDocument(null); }
+    catch (error) { await window.api.message(String(error), { title: 'Cannot create document', kind: 'error' }); }
+    return;
+  }
   if (!(await confirmDiscard())) return;
   state.deck = L.createDeck();
   state.current = 0;
@@ -24,24 +29,32 @@ async function newDeck() {
 }
 
 async function openFile() {
-  if (!(await confirmDiscard())) return;
   const path = await window.api.pickOpen();
   if (!path) return;
   try {
-    state.deck = await window.api.openDeck(path);
-    state.current = 0;
-    setSlideSelection([0]);
-    clearSelection();
-    state.filePath = path;
-    state.dirty = false;
-    // The number flag has nowhere to live in a .pptx, so an opened file
-    // starts with it off; any numbers baked in on save are plain text boxes.
-    state.showNumbers = false;
-    resetHistory();
-    renderAll();
+    if (window.api.isDesktop) {
+      await window.api.launchDocument(path);
+      return;
+    }
+    if (!(await confirmDiscard())) return;
+    await loadDocument(path);
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
   }
+}
+
+async function loadDocument(path) {
+  state.deck = await window.api.openDeck(path);
+  state.current = 0;
+  setSlideSelection([0]);
+  clearSelection();
+  state.filePath = path;
+  state.dirty = false;
+  // The number flag has nowhere to live in a .pptx, so an opened file
+  // starts with it off; any numbers baked in on save are plain text boxes.
+  state.showNumbers = false;
+  resetHistory();
+  renderAll();
 }
 
 function suggestName(extension) {

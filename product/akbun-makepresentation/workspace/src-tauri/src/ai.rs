@@ -15,10 +15,11 @@ pub struct LoadedSession {
 }
 
 fn store(app: &AppHandle) -> Result<AiStore, String> {
-    app.path()
-        .app_data_dir()
-        .map(AiStore::new)
-        .map_err(|error| format!("cannot locate app data directory: {error}"))
+    Ok(AiStore::new(
+        app.state::<makepresentation_desktop::Profile>()
+            .directory
+            .clone(),
+    ))
 }
 
 pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {

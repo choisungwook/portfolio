@@ -28,6 +28,7 @@
     }
   },
   "bundle": {
+    "fileAssociations": [{ "ext": ["pptx"], "name": "PowerPoint Presentation", "role": "Editor" }],
     "active": true,
     "targets": ["app", "dmg"],
     "createUpdaterArtifacts": true,

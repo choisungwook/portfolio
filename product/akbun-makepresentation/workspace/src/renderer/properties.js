@@ -88,6 +88,7 @@ function setZoom(zoom) {
   // The overlay textarea is placed in screen pixels, so a zoom while a text
   // box is open would leave it behind the glyphs it is meant to cover.
   if (state.editingIndex >= 0) textEditor.blur();
+  renderCanvas();
 }
 
 $('btn-zoom-in').addEventListener('click', () => setZoom(L.zoomIn(state.zoom)));
