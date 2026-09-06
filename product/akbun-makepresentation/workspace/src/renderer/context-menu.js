@@ -256,6 +256,12 @@ async function saveSelectionAsPreset() {
   }
 }
 
+contextMenu.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-order]');
+  if (!button) return;
+  hideContextMenu();
+  reorderSelection(button.dataset.order);
+});
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
 $('context-save-preset').addEventListener('click', saveSelectionAsPreset);
 $('context-group').addEventListener('click', () => {

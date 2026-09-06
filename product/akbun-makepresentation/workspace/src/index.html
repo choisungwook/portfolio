@@ -30,8 +30,14 @@
         <button data-command="undo">Undo<span class="accel">⌘Z</span></button>
         <button data-command="redo">Redo<span class="accel">⇧⌘Z</span></button>
         <hr />
+        <button data-command="cut">Cut<span class="accel">⌘X</span></button>
         <button data-command="duplicate">Duplicate<span class="accel">⌘D</span></button>
         <button data-command="delete">Delete<span class="accel">⌫</span></button>
+        <hr />
+        <button data-command="order-front">Bring to Front</button>
+        <button data-command="order-forward">Bring Forward</button>
+        <button data-command="order-backward">Send Backward</button>
+        <button data-command="order-back">Send to Back</button>
         <hr />
         <button data-command="group">Group</button>
         <button data-command="ungroup">Ungroup</button>
@@ -322,6 +328,10 @@
   <div id="present" hidden></div>
 
   <div id="context-menu" hidden>
+    <button data-order="front">Bring to Front</button>
+    <button data-order="forward">Bring Forward</button>
+    <button data-order="backward">Send Backward</button>
+    <button data-order="back">Send to Back</button>
     <button id="context-group">Group</button>
     <button id="context-ungroup">Ungroup</button>
     <button id="context-save-preset">Save as Preset</button>

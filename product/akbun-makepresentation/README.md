@@ -18,7 +18,8 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Rotate any object from the grip above its resize handles, in quarter turns with Shift
 - Zoom from 50% to 400%, from the status bar or the keyboard
 - Slide numbers, toggled from the Slides menu
-- Undo and redo, multi-object selection, copy and paste, duplicate
+- Undo and redo, multi-object selection, cut, copy and paste, duplicate
+- Stacking order from the Edit menu or the right-click menu: bring to front, bring forward, send backward, send to back. A new object starts in front
 - Paste text and images from the system clipboard
 - Open and save .pptx, export every slide as a .pdf
 - Presentation mode (fullscreen, arrow keys)
@@ -39,6 +40,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 |---|---|
 | Cmd+Z / Shift+Cmd+Z | Undo / redo |
 | Cmd+C, Cmd+V | Copy selected objects, or paste the latest system clipboard text or image |
+| Cmd+X | Cut the selected objects to the clipboard |
 | Cmd+D | Duplicate the selected objects, or the whole slide when nothing is selected |
 | Cmd+S | Save |
 | Cmd+N, Cmd+O | New deck, open a deck |

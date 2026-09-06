@@ -17,3 +17,5 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [브라우저 편집기 파일은 변경 이유별로 분리](2026-08-browser-editor-files-follow-change-reasons.md)
 * [슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다](2026-08-the-model-is-told-what-the-slide-is.md)
 * [AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다](2026-08-quick-chips-are-toggles-not-macros.md)
+* [잘라내기는 복사 핸들러를 실행하고 지우는 순서로 만든다](2026-09-cut-runs-the-copy-handler.md)
+* [슬라이드의 배열 순서가 곧 z 순서다](2026-09-array-order-is-z-order.md)

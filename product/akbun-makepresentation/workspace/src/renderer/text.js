@@ -207,6 +207,9 @@ document.addEventListener('keydown', (event) => {
     else if (key === 'z') undo();
     else if (key === 'y') redo();
     else if (key === 'c' || key === 'v') return;
+    // Copy and paste ride their own document events; cut has none to ride
+    // because the webview only fires one for an editable selection.
+    else if (key === 'x') cutSelection();
     else if (key === 'd') duplicateSelection();
     else if (key === 'arrowup' && slidesHaveFocus()) moveSelectedSlides(-1);
     else if (key === 'arrowdown' && slidesHaveFocus()) moveSelectedSlides(1);

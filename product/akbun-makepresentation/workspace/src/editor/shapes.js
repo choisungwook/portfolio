@@ -196,6 +196,58 @@ function cloneShapes(shapes) {
   });
 }
 
+// Shapes draw in array order, so the last one is the front one. One step swaps
+// the selection with its nearest unselected neighbour; a selected neighbour
+// would only trade places inside the selection and nothing would move.
+const ORDER_MODES = new Set(['front', 'forward', 'backward', 'back']);
+
+function sameOrder(before, after) {
+  return before.every((shape, index) => shape === after[index]);
+}
+
+function reorderShapes(shapes, indices, mode) {
+  const selected = [...new Set(indices)]
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < shapes.length)
+    .sort((left, right) => left - right);
+  if (selected.length === 0 || !ORDER_MODES.has(mode)) return { shapes, indices: selected };
+
+  // A selection already at the edge it is sent to must hand the same array
+  // back, because that is how the caller tells a no-op from a change worth
+  // an undo step.
+  const unchanged = { shapes, indices: selected };
+
+  if (mode === 'front' || mode === 'back') {
+    const taken = new Set(selected);
+    const picked = selected.map((index) => shapes[index]);
+    const rest = shapes.filter((_, index) => !taken.has(index));
+    const base = mode === 'front' ? rest.length : 0;
+    const next = mode === 'front' ? [...rest, ...picked] : [...picked, ...rest];
+    if (sameOrder(shapes, next)) return unchanged;
+    return { shapes: next, indices: picked.map((_, offset) => base + offset) };
+  }
+
+  const next = [...shapes];
+  const step = mode === 'forward' ? 1 : -1;
+  // The one nearest the edge it travels to moves first, so the rest find its
+  // old slot free instead of reading it as blocked.
+  const order = step === 1 ? [...selected].reverse() : selected;
+  const occupied = new Set(selected);
+  const moved = [];
+  for (const index of order) {
+    const target = index + step;
+    if (target < 0 || target >= next.length || occupied.has(target)) {
+      moved.push(index);
+      continue;
+    }
+    [next[index], next[target]] = [next[target], next[index]];
+    occupied.delete(index);
+    occupied.add(target);
+    moved.push(target);
+  }
+  if (sameOrder(shapes, next)) return unchanged;
+  return { shapes: next, indices: moved.sort((left, right) => left - right) };
+}
+
 function setCrop(shape, side, fraction) {
   const value = Math.max(0, Math.min(0.95, fraction));
   const opposite = side === 'left' ? 'cropRight' : side === 'right' ? 'cropLeft' :
@@ -211,6 +263,7 @@ function setCrop(shape, side, fraction) {
     normalizeLineNumbers,
     parseClipboardShapes,
     cloneShapes,
+    reorderShapes,
     setCrop,
     nextGroupId,
   };

@@ -39,6 +39,18 @@
         "4323"
       ],
       "port": 4323
+    },
+    {
+      "name": "akbun-makepresentation",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4324",
+        "--directory",
+        "product/akbun-makepresentation/workspace/src"
+      ],
+      "port": 4324
     }
   ]
 }
