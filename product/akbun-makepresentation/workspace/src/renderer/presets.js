@@ -9,6 +9,20 @@ function deleteSelectedShape() {
   renderAll();
 }
 
+// --- stacking order -------------------------------------------------------------
+
+// A new object is pushed onto the end of the slide, which is the front, so
+// these four only ever have to move what is already there.
+function reorderSelection(mode) {
+  if (state.selection.length === 0) return;
+  const result = L.reorderShapes(slide().shapes, state.selection, mode);
+  if (result.shapes === slide().shapes) return;
+  slide().shapes = result.shapes;
+  selectMany(result.indices);
+  markDirty();
+  renderAll();
+}
+
 // --- copy, paste, duplicate ----------------------------------------------------
 
 const PASTE_OFFSET = 20;

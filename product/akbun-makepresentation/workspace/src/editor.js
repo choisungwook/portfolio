@@ -71,6 +71,7 @@
     ungroupShapes: Geometry.ungroupShapes,
     groupIndicesFor: Geometry.groupIndicesFor,
     cloneShapes: Shapes.cloneShapes,
+    reorderShapes: Shapes.reorderShapes,
     setCrop: Shapes.setCrop,
     handlesFor: Geometry.handlesFor,
     resizeShape: Geometry.resizeShape,

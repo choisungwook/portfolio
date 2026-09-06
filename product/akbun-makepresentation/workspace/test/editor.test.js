@@ -968,3 +968,31 @@ test('code block crop changes its source view without changing its frame', () =>
   assert.strictEqual(shape.w, 700);
   assert.strictEqual(shape.h, 360);
 });
+
+test('reorderShapes moves a selection through the stack', () => {
+  const shapes = ['a', 'b', 'c', 'd'].map((name) => ({ name }));
+  const names = (result) => result.shapes.map((shape) => shape.name);
+
+  const front = L.reorderShapes(shapes, [1], 'front');
+  assert.deepStrictEqual(names(front), ['a', 'c', 'd', 'b']);
+  assert.deepStrictEqual(front.indices, [3]);
+
+  const back = L.reorderShapes(shapes, [1, 2], 'back');
+  assert.deepStrictEqual(names(back), ['b', 'c', 'a', 'd']);
+  assert.deepStrictEqual(back.indices, [0, 1]);
+
+  // Two neighbours travel together instead of the front one blocking the other.
+  const forward = L.reorderShapes(shapes, [1, 2], 'forward');
+  assert.deepStrictEqual(names(forward), ['a', 'd', 'b', 'c']);
+  assert.deepStrictEqual(forward.indices, [2, 3]);
+
+  const backward = L.reorderShapes(shapes, [2], 'backward');
+  assert.deepStrictEqual(names(backward), ['a', 'c', 'b', 'd']);
+  assert.deepStrictEqual(backward.indices, [1]);
+
+  // Already at the edge, or nothing selected: the array is handed back as is.
+  assert.strictEqual(L.reorderShapes(shapes, [3], 'forward').shapes.length, 4);
+  assert.deepStrictEqual(names(L.reorderShapes(shapes, [3], 'forward')), ['a', 'b', 'c', 'd']);
+  assert.strictEqual(L.reorderShapes(shapes, [], 'front').shapes, shapes);
+  assert.strictEqual(L.reorderShapes(shapes, [0], 'sideways').shapes, shapes);
+});

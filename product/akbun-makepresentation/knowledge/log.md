@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-09-06
+
+* **Creation**: [잘라내기는 복사 핸들러를 실행하고 지우는 순서로 만든다](decisions/2026-09-cut-runs-the-copy-handler.md) 결정 기록.
+* **Creation**: [슬라이드의 배열 순서가 곧 z 순서다](decisions/2026-09-array-order-is-z-order.md) 결정 기록.
+
 ## 2026-08-24
 
 * **Creation**: [슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다](decisions/2026-08-the-model-is-told-what-the-slide-is.md) 결정 기록.
