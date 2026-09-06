@@ -1,11 +1,12 @@
 # Agent Guide
 
-- IAM Roles Anywhere의 인증서 인증·SDK 갱신·교체·폐기를 AgentCore Memory로 확인하는 독립 핸즈온.
+- IAM Roles Anywhere 30분 컨셉 핸즈온. 사설 CA → 인증서 인증 → CN 거부 → 교체 → CRL 폐기를 AgentCore Memory로 확인. 2026-09-06 실제 AWS 검증.
 - 공통 규칙: @../../../AGENTS.md
-- 리전: ap-northeast-2. 기본 연결은 public endpoint.
-- client/는 Leaf 인증서로 실행. scripts/의 CRL 관리 도구와 Terraform은 별도 관리 자격증명 사용.
-- CA 개인 키·Leaf 개인 키·발급 DB·helper 바이너리는 ignored runtime/에만 보관.
-- 실습 원리·실행·운영 문서와 실제 AWS 검증 상태를 분리.
+- 리전: ap-northeast-2, public endpoint. 관리 명령은 AWS_PROFILE=admin, 클라이언트 인증은 인증서만.
+- 코드는 루트의 자기완결 파일 4개(pki.py, run.py, crl_aws.py, install_helper.py). 패키지·모듈 분리를 다시 만들지 않는다.
+- CA 개인 키·Leaf 개인 키·발급 DB·helper·lab.json은 ignored runtime/에만 둔다. 문서·예제의 계정은 123456789012.
+- 75분 갱신 관찰·세션 회수·PrivateLink는 범위 밖. docs/2-handson.md "더 해 보기"에만 둔다.
+- 고정 IP 경로는 aws/vpc_endpoint/agentcore-memory-static-ip에서 다룬다. 여기에 네트워크 시나리오를 넣지 않는다.
 
 ## knowledge
 

@@ -14,8 +14,8 @@ timestamp: 2026-09-05T00:00:00Z
 - SDK의 credential_process provider를 유지하고 실제 임시 키를 복사하지 않음.
 - CRL 반영 후에는 새 프로세스의 CreateSession을 확인. 기존 세션 권한 회수와 구분.
 - 발급 DB·CA 키는 관리 환경에 두고 클라이언트 프로세스는 Leaf 자료만 사용.
-- uv 가상환경의 Python과 Terraform 명령으로 로컬 실행. 컨테이너·Make 실행 경로는 제공하지 않음.
-- Terraform과 CRL 스크립트는 선택한 관리 인증 공유. A는 default → base → admin 프로파일, B는 STS 임시 키 환경변수 사용.
+- uv 가상환경의 Python과 Terraform 명령으로 로컬 실행. 코드는 루트의 자기완결 파일 4개([30분 축소 결정](2026-09-thirty-minute-concept-scope.md)).
+- Terraform과 CRL 스크립트는 관리 인증(AWS_PROFILE=admin) 공유. 클라이언트 run.py는 인증서만 사용.
 - 배포 Role과 인증서가 받는 클라이언트 Role은 독립. [관리 인증 분리의 이유](../../../../vpc_endpoint/agentcore-memory-static-ip/knowledge/decisions/2026-09-terraform-management-role.md) 공유.
 
 ## 이유

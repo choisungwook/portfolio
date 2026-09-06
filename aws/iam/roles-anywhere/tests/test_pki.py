@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from scripts.pki import create_ca, issue_client, openssl, revoke_client
+from pki import create_ca, issue_client, openssl, revoke_client
 
 
 def test_leaf_rotation_and_crl_keep_new_key_valid(tmp_path):

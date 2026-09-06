@@ -1,0 +1,9 @@
+{
+  "crl_name": "ra-handson-crl",
+  "memory_id": "ra_handson-AbCdEf1234",
+  "profile_arn": "arn:aws:rolesanywhere:ap-northeast-2:123456789012:profile/00000000-0000-0000-0000-000000000000",
+  "project_name": "ra-handson",
+  "region": "ap-northeast-2",
+  "role_arn": "arn:aws:iam::123456789012:role/ra-handson-client",
+  "trust_anchor_arn": "arn:aws:rolesanywhere:ap-northeast-2:123456789012:trust-anchor/00000000-0000-0000-0000-000000000000"
+}

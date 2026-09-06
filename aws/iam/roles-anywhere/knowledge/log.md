@@ -4,6 +4,9 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-09-06
 
+* **Creation**: [30분 컨셉 범위로 축소](decisions/2026-09-thirty-minute-concept-scope.md) - 문서·코드 통합, 실제 AWS 실행 결과(정책 전파 지연, CN 거부, CRL 즉시 반영).
+* **Update**: [인증서·세션 수명 분리](decisions/2026-09-certificate-lifecycle-boundaries.md) - 자기완결 파일과 admin 프로파일로 문구 갱신.
+
 * **Creation**: [고정 IP 경로의 Roles Anywhere 시나리오 미룸](decisions/2026-09-fixed-ip-scenario-deferred.md) - 네트워크 workspace의 S04·S06·S08 삭제와 인터넷+public NLB+RA의 향후 위치.
 
 * **Update**: [인증서·세션 수명 분리](decisions/2026-09-certificate-lifecycle-boundaries.md) - CRL 관리 명령이 Terraform과 같은 A·B 인증을 사용하도록 프로파일 강제 제거.

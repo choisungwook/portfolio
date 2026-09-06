@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from botocore.exceptions import CredentialRetrievalError
 
-from client.credentials import certificate_session
+from run import certificate_session
 
 
 def test_process_provider_overrides_ambient_keys_refreshes_and_cleans_config(tmp_path, monkeypatch):

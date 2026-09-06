@@ -6,6 +6,7 @@ okf_version: "0.1"
 
 IAM Roles Anywhere 인증서 수명과 SDK 갱신·CRL 실습의 설계 근거다.
 
+* [Roles Anywhere 실습을 30분 컨셉 범위로 축소](decisions/2026-09-thirty-minute-concept-scope.md)
 * [인증서 수명과 AWS 세션 수명 분리](decisions/2026-09-certificate-lifecycle-boundaries.md)
 * [실습 CRL 관리와 정리 범위](decisions/2026-09-crl-management-ownership.md)
 * [고정 IP 경로의 Roles Anywhere 시나리오는 나중에 S01 확장으로](decisions/2026-09-fixed-ip-scenario-deferred.md)
