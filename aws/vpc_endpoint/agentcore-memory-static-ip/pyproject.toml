@@ -1,0 +1,19 @@
+[project]
+name = "agentcore-memory-static-ip"
+version = "0.1.0"
+description = "STS and AgentCore Memory over a public NLB static IP: hosts override, own-domain failure, CONNECT proxy"
+requires-python = ">=3.12"
+dependencies = ["boto3>=1.43.89,<2"]
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.6"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 2
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

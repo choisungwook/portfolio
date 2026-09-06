@@ -1,0 +1,23 @@
+flowchart TB
+  subgraph CLIENT["클라이언트 (hosts 변경 없음)"]
+    C["boto3<br/>AWS_PROFILE=admin<br/>proxies = https://s07-proxy.demo.akbun.com:443"]
+    D["기존 DNS 조회<br/>s07-proxy.demo.akbun.com → NLB EIP"]
+    D -.-> C
+  end
+  I["인터넷<br/>허용 목적지: NLB EIP TCP 443"]
+  subgraph VPC["ap-northeast-2 VPC"]
+    N["public NLB<br/>TLS 443 종료 (ACM *.demo.akbun.com)<br/>AZ별 고정 EIP"]
+    P["EC2 CONNECT proxy<br/>TCP 8080<br/>허용 host: sts / bedrock-agentcore :443"]
+    ES["STS VPCE ENI"]
+    EM["Memory VPCE ENI"]
+    N -->|"바깥 TLS 종료 후 평문 CONNECT"| P
+    P -->|"터널 1: AssumeRole"| ES
+    P -->|"터널 2: Memory 이벤트"| EM
+  end
+  S["서울 STS"]
+  M["서울 AgentCore Memory"]
+  C -->|"바깥 TLS: 프록시 인증서"| I --> N
+  ES --> S
+  EM --> M
+  C -.->|"안쪽 TLS: AWS 인증서·SNI·Host·SigV4 유지 (터널 안, 끝까지 암호화)"| S
+  C -.->|"안쪽 TLS"| M

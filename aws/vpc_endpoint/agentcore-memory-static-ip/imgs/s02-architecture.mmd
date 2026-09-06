@@ -1,0 +1,27 @@
+flowchart TB
+  subgraph APPNET["애플리케이션 네트워크 (온프레미스 / 실습에서는 내 PC)"]
+    C["boto3<br/>AWS URL·SNI·Host·SigV4 그대로<br/>proxies = http://squid:3128"]
+    subgraph SQ["Squid 컨테이너 (forward proxy)"]
+      R["/etc/hosts (--add-host)<br/>sts → EIP A<br/>bedrock-agentcore → EIP B"]
+      P["CONNECT 터널만 허용<br/>ACL: 두 AWS 이름의 443"]
+      R -.-> P
+    end
+    C -->|"CONNECT sts...:443<br/>CONNECT bedrock-agentcore...:443"| P
+  end
+  F["방화벽<br/>허용: Squid → EIP A·B TCP 443"]
+  subgraph VPC["ap-northeast-2 VPC (S01 그대로)"]
+    NS["STS public TCP NLB<br/>EIP A"]
+    NM["Memory public TCP NLB<br/>EIP B"]
+    ES["STS VPCE ENI"]
+    EM["Memory VPCE ENI"]
+    NS --> ES
+    NM --> EM
+  end
+  S["서울 STS"]
+  M["서울 AgentCore Memory"]
+  P -->|"TCP 443"| F
+  F --> NS
+  F --> NM
+  ES --> S
+  EM --> M
+  C -.->|"TLS: 앱 ↔ AWS 끝까지 한 겹<br/>Squid는 바이트 복사만"| S

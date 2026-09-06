@@ -1,0 +1,18 @@
+sequenceDiagram
+  participant A as boto3 (앱)
+  participant Q as Squid (앱 네트워크)
+  participant N as STS NLB (EIP A)
+  participant S as 서울 STS (VPCE)
+  participant M as AgentCore Memory (EIP B → VPCE)
+  Note over A: 자격증명 체인(로그인 갱신·admin AssumeRole)은 프록시를 타지 않음
+  A->>Q: CONNECT sts.ap-northeast-2.amazonaws.com:443
+  Note over Q: /etc/hosts → EIP A, ACL 허용
+  Q->>N: TCP 443
+  Q-->>A: 200 Connection established
+  A->>S: 터널 안 TLS(SNI=sts…) + AssumeRole(memory-static-ip-client)
+  S-->>A: 임시 자격증명 (15분)
+  A->>Q: CONNECT bedrock-agentcore.ap-northeast-2.amazonaws.com:443
+  Q->>M: TCP 443 (EIP B)
+  A->>M: 터널 안 TLS + CreateEvent / GetEvent / DeleteEvent (SigV4)
+  M-->>A: 응답
+  Note over Q: access.log: TCP_TUNNEL/200 CONNECT … HIER_DIRECT/EIP

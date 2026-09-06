@@ -1,0 +1,10 @@
+runtime/
+*.tfplan
+!uv.lock
+!terraform/.terraform.lock.hcl
+!terraform/**/.terraform.lock.hcl
+*.key
+*.pem
+*.crt
+*.csr
+*.srl

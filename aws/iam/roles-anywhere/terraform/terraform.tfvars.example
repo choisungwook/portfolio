@@ -1,0 +1,4 @@
+# The setup guide uses TF_VAR_* for all inputs; this file is a reference only.
+project_name = "ra-handson"
+ca_certificate_path = "../runtime/pki/ca/ca.crt"
+certificate_common_name = "memory-client"

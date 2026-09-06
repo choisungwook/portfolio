@@ -1,0 +1,27 @@
+resource "aws_iam_role" "client" {
+  name = "${var.project_name}-client"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = var.trusted_principal_arn }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "memory" {
+  name = "memory-through-endpoint"
+  role = aws_iam_role.client.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = local.memory_actions
+      Resource = aws_bedrockagentcore_memory.lab.arn
+      Condition = {
+        StringEquals = { "aws:SourceVpce" = aws_vpc_endpoint.api["memory"].id }
+      }
+    }]
+  })
+}
