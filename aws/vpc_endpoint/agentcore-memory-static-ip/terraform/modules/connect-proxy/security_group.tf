@@ -29,11 +29,11 @@ resource "aws_vpc_security_group_ingress_rule" "proxy" {
   to_port                      = 8080
 }
 resource "aws_vpc_security_group_egress_rule" "proxy" {
-  security_group_id = aws_security_group.proxy.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = 443
-  to_port           = 443
+  security_group_id            = aws_security_group.proxy.id
+  referenced_security_group_id = var.endpoint_security_group_id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
 }
 resource "aws_vpc_security_group_ingress_rule" "endpoint" {
   security_group_id            = var.endpoint_security_group_id

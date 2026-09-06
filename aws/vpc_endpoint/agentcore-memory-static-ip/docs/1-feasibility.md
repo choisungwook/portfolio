@@ -17,7 +17,7 @@
 | AgentCore Memory | 요청의 인증·권한 확인 후 이벤트 저장·조회 | 서울 data plane 호출 |
 
 - STS 호출에도 기존 AWS 자격증명이 필요해요. NLB나 IP 허용 목록이 자격증명을 만들어 주지는 않아요.
-- STS endpoint policy는 PoC라서 전체 허용이에요. 같은 컴퓨터의 관리 호출까지 endpoint를 지나기 때문이고, 실무 제한 예시는 Terraform 주석에 있어요.
+- STS endpoint policy는 PoC라서 모든 주체의 sts:*를 허용해요. 같은 컴퓨터의 관리 호출까지 endpoint를 지나기 때문이고, 실무 제한 예시는 Terraform 주석에 있어요.
 - 발급받은 임시 자격증명은 매 Memory 요청의 서명에 사용해요.
 - [서울 STS endpoint](https://docs.aws.amazon.com/general/latest/gr/sts.html): `sts.ap-northeast-2.amazonaws.com`.
 - STS에는 global endpoint도 있어요. 이 실험은 URL과 서명 리전을 명시해 global endpoint 사용을 방지해요.

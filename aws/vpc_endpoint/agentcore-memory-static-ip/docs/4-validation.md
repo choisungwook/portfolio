@@ -62,7 +62,7 @@ terraform -chdir=terraform/labs/s07 test
 | 증상 | 확인할 것 |
 | --- | --- |
 | AWS 세션 만료 | 관리 PC에서 해당 프로파일 로그인 갱신 |
-| no VPC endpoint policy allows sts:... | STS endpoint policy를 좁혔을 때 hosts 블록이 걸린 컴퓨터의 관리 STS 호출·admin 체인 AssumeRole이 NLB → STS VPCE로 들어가 거부된 것. PoC는 전체 허용, 좁히려면 hosts를 빼고 관리 명령 실행 |
+| no VPC endpoint policy allows sts:... | STS endpoint policy를 좁혔을 때 hosts 블록이 걸린 컴퓨터의 관리 STS 호출·admin 체인 AssumeRole이 NLB → STS VPCE로 들어가 거부된 것. PoC는 Principal *·sts:* 허용, 좁히려면 hosts를 빼고 관리 명령 실행 |
 | Terraform 관리 인증 실패 | A의 default → base → admin 설정 또는 B의 STS 키 적재·Expiration, Role trust·배포 권한. [관리 인증](7-terraform-setup.md) 확인 |
 | TF_VAR 값을 바꿔도 이전 값 사용 | terraform.tfvars·auto.tfvars·저장된 plan의 입력값 우선순위 |
 | aws login OAuth 갱신 실패 | aws login --profile default 재실행. A의 다음 자동 갱신과 B의 STS 재발급 모두 원본 로그인에 의존 |

@@ -65,7 +65,7 @@ sequenceDiagram
 - STS는 서울 endpoint를 사용하고, 서명 리전은 `ap-northeast-2`로 지정해요.
 - SigV4 서명은 클라이언트에서 계산해요. 런타임 IAM API 호출은 없어요.
 - Terraform은 IAM 사용자나 키를 만들지 않아요. `trusted_principal_arn`의 기존 주체를 Role trust에서 참조하고, Memory 권한은 client Role에만 있어요.
-- STS endpoint policy는 PoC라서 전체 허용이에요. Memory endpoint policy와 Role의 `aws:SourceVpce` 조건은 유지해요.
+- STS endpoint policy는 PoC라서 모든 주체의 sts:*를 허용해요. Memory endpoint policy와 Role의 `aws:SourceVpce` 조건은 유지해요.
 
 ## 실험
 

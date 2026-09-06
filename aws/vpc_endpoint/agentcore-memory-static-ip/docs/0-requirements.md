@@ -20,7 +20,7 @@
 
 | 시나리오 | 경로 | DNS 변경 | 인증 / 추가 설정 | 판정 |
 | --- | --- | --- | --- | --- |
-| [S01](scenarios/s01/2-experiment.md) | 인터넷 → public TCP NLB → VPCE | 필요 | Terraform 생성 IAM 사용자 키 → STS | 조건부 가능 |
+| [S01](scenarios/s01/2-experiment.md) | 인터넷 → public TCP NLB → VPCE | 필요 | 로컬 AWS 프로파일 주체 → STS AssumeRole | 조건부 가능 |
 | [S02](scenarios/s02/2-experiment.md) | 앱 네트워크 Squid(CONNECT) → public TCP NLB → VPCE | 불필요 (프록시 호스트가 해석) | AWS 클라이언트 프록시 설정, STS | 가능. DNS 변경 불가 시 권장 |
 | [S05](scenarios/s05/2-experiment.md) | 자체 도메인 Route 53 → public TCP NLB → VPCE | 불필요 | endpoint_url만 변경 | 이 구성으로 불가능 |
 | [S07](scenarios/s07/2-experiment.md) | 인터넷 → public TLS NLB → CONNECT proxy → VPCE | 불필요 | boto3 프록시 설정, STS | 동작하지만 비권장 |

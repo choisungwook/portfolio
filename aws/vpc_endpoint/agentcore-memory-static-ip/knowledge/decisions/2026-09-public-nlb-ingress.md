@@ -11,7 +11,7 @@ timestamp: 2026-09-06T00:00:00Z
 - S01·S07 public NLB의 기본 소스 CIDR은 0.0.0.0/0, 허용 포트는 TCP 443.
 - NLB·프록시·endpoint의 SG 참조는 유지.
 - S01·S07의 trusted_principal_arn은 클라이언트 AWS 프로파일 뒤의 기존 IAM 사용자·Role로 제한.
-- 실습 Role trust, Memory endpoint 정책·SourceVpce 조건 유지. STS endpoint 정책은 PoC 동안 전체 허용([프로파일 결정](2026-09-client-profile-principal.md) 참고).
+- 실습 Role trust, Memory endpoint 정책·SourceVpce 조건 유지. STS endpoint 정책은 PoC 동안 Principal *·sts:*([프로파일 결정](2026-09-client-profile-principal.md) 참고).
 
 ## 이유
 

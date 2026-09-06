@@ -9,7 +9,7 @@ timestamp: 2026-09-06T17:00:00Z
 ## 결정
 
 - S01·S07의 client Role trust는 `trusted_principal_arn`의 기존 IAM 사용자·Role을 참조.
-- S01 STS endpoint policy는 PoC 동안 전체 허용(Principal *, Action *). 실무용 제한 정책은 Terraform 주석에 예시 계정 123456789012로 남김. Memory endpoint policy와 Role의 aws:SourceVpce 조건은 유지.
+- S01 STS endpoint policy는 PoC 동안 Principal *, Action sts:*. 실무용 제한 정책은 Terraform 주석에 예시 계정 123456789012로 남김. Memory endpoint policy와 Role의 aws:SourceVpce 조건은 유지.
 - Terraform은 IAM 사용자·액세스 키·사용자 정책을 만들지 않고, `client_credentials` 같은 비밀 output을 두지 않음.
 - 클라이언트 코드는 `AWS_PROFILE`의 프로파일로만 시작. 환경변수 키가 있으면 중단.
 - 로컬 기본값은 admin 프로파일(Role administrator). Role → Role chaining이라 세션은 최대 1시간.

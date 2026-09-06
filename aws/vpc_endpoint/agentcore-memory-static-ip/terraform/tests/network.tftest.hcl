@@ -85,6 +85,7 @@ run "existing_principal_identity" {
     condition = (
       jsondecode(aws_iam_role.client.assume_role_policy).Statement[0].Principal.AWS == var.trusted_principal_arn &&
       jsondecode(aws_vpc_endpoint.api["sts"].policy).Statement[0].Principal == "*" &&
+      jsondecode(aws_vpc_endpoint.api["sts"].policy).Statement[0].Action == "sts:*" &&
       jsondecode(aws_vpc_endpoint.api["memory"].policy).Statement[0].Principal.AWS == aws_iam_role.client.arn
     )
     error_message = "Role trust names the supplied principal; the PoC STS endpoint policy is open while Memory stays restricted to the client role."

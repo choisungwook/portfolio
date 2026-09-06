@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-09-06
 
+* **Update**: [클라이언트는 로컬 AWS 프로파일로 시작](decisions/2026-09-client-profile-principal.md), [public NLB 진입과 AWS 권한 분리](decisions/2026-09-public-nlb-ingress.md) - PR 리뷰 반영. STS endpoint policy Action을 sts:*로, S07 프록시 SG egress를 endpoint SG 참조로 좁힘.
+
 * **Update**: [PoC 범위 축소](decisions/2026-09-poc-scope-s01-s05-s07.md) - S02 번호 재사용(앱 네트워크 Squid) 명시. README를 재실행 순서 인덱스로 재작성.
 
 * **Update**: [AWS 안의 CONNECT proxy는 권장 구성이 아니다](decisions/2026-09-no-connect-proxy-in-aws.md) - 대안 S02(앱 네트워크 Squid) 구현·PASS, 전역 HTTPS_PROXY가 자격증명 체인을 막는 함정 기록.

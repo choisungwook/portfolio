@@ -75,7 +75,7 @@ export AWS_PROFILE=your-client-profile
 | S07 NLB → EC2 프록시 | NLB SG → 프록시 SG, TCP 8080 |
 | S07 프록시 → endpoint | 프록시 SG → endpoint SG, TCP 443 |
 
-- 인터넷에서 NLB에 연결할 수 있어도 IAM 인증은 적용돼요. Memory endpoint 정책은 client Role로 제한하고, STS endpoint 정책은 PoC라서 전체 허용이에요.
+- 인터넷에서 NLB에 연결할 수 있어도 IAM 인증은 적용돼요. Memory endpoint 정책은 client Role로 제한하고, STS endpoint 정책은 PoC라서 모든 주체의 sts:*를 허용해요.
 - S07 프록시는 STS·Memory 호스트의 CONNECT만 처리해요. 외부 연결 자체에는 별도 프록시 인증이 없어요.
 - 클라이언트의 outbound 목적지 IP 제한은 별도 조건이에요. AWS 쪽 NLB 진입을 공개해도 이 실험 조건은 유지돼요.
 

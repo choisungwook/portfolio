@@ -23,7 +23,7 @@ resource "aws_vpc_endpoint" "api" {
 
 locals {
   endpoint_policies = {
-    # PoC: the STS endpoint accepts every principal. With /etc/hosts pointing at the NLB,
+    # PoC: the STS endpoint accepts every principal for STS actions only. With /etc/hosts pointing at the NLB,
     # every STS call from this machine (Terraform, the admin profile's own AssumeRole,
     # the lab AssumeRole) passes through this endpoint, so a narrow policy blocks the
     # management path as well. In production, restrict it to the client principal:
@@ -50,7 +50,7 @@ locals {
       Statement = [{
         Effect    = "Allow"
         Principal = "*"
-        Action    = "*"
+        Action    = "sts:*"
         Resource  = "*"
       }]
     })

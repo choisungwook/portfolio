@@ -46,7 +46,7 @@ PASS STS AssumeRole -> AgentCore Memory through NLB EIPs
 | DELETE_EVENT_OK | 실험 이벤트 정리 |
 
 - Memory Role 정책의 `aws:SourceVpce` 조건은 실험용 Memory endpoint를 지정해요.
-- Memory endpoint 정책은 해당 Memory·client Role·이벤트 API 세 개로 제한해요. STS endpoint 정책은 PoC라서 전체 허용이고, 실무 제한 예시는 Terraform 주석에 있어요.
+- Memory endpoint 정책은 해당 Memory·client Role·이벤트 API 세 개로 제한해요. STS endpoint 정책은 PoC라서 모든 주체의 sts:*를 허용하고, 실무 제한 예시는 Terraform 주석에 있어요.
 - TLS 검증을 끄거나 TCP health check만 성공한 결과는 실험 성공으로 판정하지 않아요.
 
 ## outbound 방화벽 검증

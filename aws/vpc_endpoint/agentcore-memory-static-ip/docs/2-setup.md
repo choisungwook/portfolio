@@ -78,7 +78,7 @@ terraform -chdir=terraform output -json firewall_destination_ips
 - trust는 apply 때 쓰이지 않아요. Python이 NLB를 거쳐 STS에 AssumeRole 할 때 client Role의 trust policy가 이 ARN을 확인해요.
 - 관리 터미널에서 Terraform을 실행할 때는 hosts 실습 블록을 빼요. 넣은 채로 실행하면 관리 STS 호출도 NLB 경로를 타요.
 - `trusted_principal_arn`: 클라이언트 프로파일 뒤에 있는 기존 IAM 사용자·Role ARN. client Role trust가 이 값을 참조해요.
-- STS endpoint policy는 PoC라서 전체 허용이에요. hosts를 바꾼 컴퓨터에서는 admin 프로파일의 체인 AssumeRole과 Terraform의 STS 호출까지 이 endpoint를 지나므로, 좁히면 관리 경로가 같이 막혀요. 실무용 제한 정책은 `terraform/vpc_endpoint.tf`의 주석 예시를 참고해요.
+- STS endpoint policy는 PoC라서 모든 주체의 STS action(sts:*)을 허용해요. hosts를 바꾼 컴퓨터에서는 admin 프로파일의 체인 AssumeRole과 Terraform의 STS 호출까지 이 endpoint를 지나므로, 좁히면 관리 경로가 같이 막혀요. 실무용 제한 정책은 `terraform/vpc_endpoint.tf`의 주석 예시를 참고해요.
 - 발급 대상: `aws_iam_role.client`, 기본 이름 `memory-static-ip-client`. Memory 권한은 이 Role에만 있어요.
 - 프로파일이 Role(예: admin)이면 Role → Role의 chaining이라 세션은 최대 1시간이에요. 코드는 15분을 요청해요.
 - [IAM Principal](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html)은 존재하는 사용자·Role을 지정해야 해요. 예제 ARN을 그대로 입력하면 Invalid principal 오류가 발생해요.
