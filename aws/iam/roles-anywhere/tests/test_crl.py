@@ -1,7 +1,7 @@
 import boto3
 from botocore.stub import Stubber
 
-from scripts.crl import owned_crls
+from crl_aws import owned_crls
 
 ANCHOR = (
   "arn:aws:rolesanywhere:ap-northeast-2:123456789012:"

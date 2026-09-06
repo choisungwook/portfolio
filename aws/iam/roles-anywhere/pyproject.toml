@@ -1,7 +1,7 @@
 [project]
 name = "iam-roles-anywhere-handson"
 version = "0.1.0"
-description = "Certificate authentication, credential refresh and revocation with IAM Roles Anywhere"
+description = "30-minute IAM Roles Anywhere concept lab: private CA, CreateSession, CN trust, CRL revocation"
 requires-python = ">=3.12"
 dependencies = ["boto3>=1.43.89,<2"]
 

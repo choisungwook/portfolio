@@ -1,0 +1,20 @@
+sequenceDiagram
+  participant App as 앱 (boto3)
+  participant H as aws_signing_helper<br/>(credential_process)
+  participant RA as Roles Anywhere<br/>(서울 public endpoint)
+  participant IAM as IAM / STS (AWS 내부)
+  participant M as AgentCore Memory
+  Note over App,H: 클라이언트에 있는 것: Leaf 인증서 + 개인 키. AWS 장기 키 없음
+  App->>H: 자격증명 필요 (첫 호출 또는 만료 직전)
+  H->>H: Leaf 개인 키로 CreateSession 요청에 서명
+  H->>RA: CreateSession(인증서, 서명, trust anchor·profile·role ARN)
+  RA->>RA: ① 체인 검증: trust anchor의 CA가 서명했나<br/>② CRL: 폐기됐나<br/>③ 유효기간·keyUsage
+  RA->>IAM: AssumeRole(role) — 서비스 주체가 수행<br/>PrincipalTag x509Subject/CN 전달
+  IAM->>IAM: ④ Role trust: SourceArn=trust anchor, CN=memory-client?
+  IAM-->>RA: 임시 AccessKey / Secret / SessionToken (1시간)
+  RA-->>H: 자격증명 JSON
+  H-->>App: stdout → boto3 credential provider
+  App->>M: CreateEvent / GetEvent / DeleteEvent (SigV4)
+  M->>M: ⑤ Role 권한 정책: 이 Memory의 이벤트 3개 API만
+  M-->>App: 응답
+  Note over App: 세션 이름 = 인증서 serial (assumed-role/ra-handson-client/1002)

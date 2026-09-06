@@ -1,0 +1,35 @@
+flowchart LR
+  subgraph CLIENT["클라이언트 (AWS 밖)"]
+    K["Leaf 개인 키<br/>clients/v2/client.key"]
+    C["Leaf 인증서<br/>CN=memory-client, serial 1002"]
+    HP["aws_signing_helper"]
+    APP["앱 (boto3)<br/>credential_process 프로파일"]
+    K --> HP
+    C --> HP
+    HP --> APP
+  end
+  subgraph MGMT["관리 환경 (인증서 발급자)"]
+    CA["사설 CA<br/>ca.key (비공개) / ca.crt (공개)"]
+    DB["발급 DB<br/>index.txt · serial · crlnumber"]
+    CRL["revoked.pem (CRL)"]
+    CA --> DB
+    DB --> CRL
+  end
+  subgraph AWS["AWS ap-northeast-2"]
+    TA["Trust anchor<br/>= ca.crt 등록"]
+    CRLA["CRL 리소스<br/>(import/update로 업로드)"]
+    PR["Profile<br/>허용 Role 목록, 세션 1시간"]
+    R["IAM Role ra-handson-client<br/>trust: rolesanywhere.amazonaws.com<br/>+ SourceArn=trust anchor<br/>+ PrincipalTag CN=memory-client"]
+    P["Role 권한 정책<br/>Memory 이벤트 3개 API"]
+    MEM["AgentCore Memory"]
+    TA --- CRLA
+    PR --> R
+    R --> P
+    P --> MEM
+  end
+  CA -.->|"ca.crt만 (Terraform)"| TA
+  CA -.->|"발급"| C
+  CRL -.->|"crl_aws.py"| CRLA
+  HP -->|"CreateSession"| TA
+  TA --> PR
+  APP -->|"SigV4"| MEM

@@ -227,4 +227,4 @@ sequenceDiagram
 - 준비·정리는 각 실험에서 연결한 setup 문서를 사용해요.
 - 최종 성공은 NLB의 target healthy만으로 판정하지 않아요. 허용한 목적지 IP만 사용하는 상태에서 CreateSession과 Memory 이벤트 저장·조회·삭제가 모두 성공해야 해요.
 - 자격증명 갱신 때도 같은 경로를 사용하는지 확인해요. 인증 성공과 STS 진단 호출 실패를 구분해 기록해요.
-- 저장소의 AWS 실통신 검증 상태: [네트워크 실습 검증 결과](../../../vpc_endpoint/agentcore-memory-static-ip/docs/4-validation.md), [Roles Anywhere 실습 검증 결과](5-validation.md).
+- 저장소의 AWS 실통신 검증 상태: [네트워크 실습 검증 결과](../../../vpc_endpoint/agentcore-memory-static-ip/docs/4-validation.md), [Roles Anywhere 실습 검증 결과](3-validation.md).

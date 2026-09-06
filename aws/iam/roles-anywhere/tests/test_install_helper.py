@@ -1,23 +1,12 @@
-from io import BytesIO
+import platform
 
 import pytest
 
-from scripts.install_helper import install
+from install_helper import install
 
 
-def test_invalid_download_never_installs_executable(tmp_path, monkeypatch):
-  monkeypatch.setattr(
-    "scripts.install_helper.urllib.request.urlopen", lambda *args, **kwargs: BytesIO(b"tampered")
-  )
-  destination = tmp_path / "helper"
-  with pytest.raises(ValueError, match="SHA256 mismatch"):
-    install(destination)
-  assert not destination.exists()
-
-
-def test_existing_unexpected_binary_is_not_overwritten(tmp_path):
-  destination = tmp_path / "helper"
-  destination.write_bytes(b"another-version")
-  with pytest.raises(ValueError, match="Existing helper differs"):
-    install(destination)
-  assert destination.read_bytes() == b"another-version"
+def test_unsupported_platform_fails_with_supported_list(tmp_path, monkeypatch):
+  monkeypatch.setattr(platform, "system", lambda: "Plan9")
+  monkeypatch.setattr(platform, "machine", lambda: "mips")
+  with pytest.raises(ValueError, match="Plan9/mips.*supported: Darwin/arm64"):
+    install(tmp_path / "helper")

@@ -112,7 +112,7 @@
 98. Amazon Bedrock Web Search 유해콘텐스 검색 테스트 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/docs/5-safety-test.md)
 99. OpenAI Codex 평가 게이트와 개선 루프 핸즈온 (26.8.25) - [링크](./computer_science/ai/codex-eval-loop/)
 100. STS·AgentCore Memory를 public NLB 고정 IP로 호출하는 hosts·Route 53·프록시 시나리오 (26.9.5) - [링크](./aws/vpc_endpoint/agentcore-memory-static-ip/)
-101. IAM Roles Anywhere 인증 원리·인증서 교체·폐기·운영 핸즈온 (26.9.5) - [링크](./aws/iam/roles-anywhere/)
+101. IAM Roles Anywhere 30분 컨셉: 사설 CA 인증·CN 거부·교체·CRL 폐기 (26.9.6) - [링크](./aws/iam/roles-anywhere/)
 
 ## 직접 만든 제품
 
