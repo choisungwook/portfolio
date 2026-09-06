@@ -4,6 +4,7 @@
 
 ## 반드시 익힐 내용
 
+- [UI 시안과 실제 앱의 경계](./ui-proposal.md)
 - [독립 문서, 검색, 클립보드](./document-workflow.md)
 
 - [객체 잠금, 생성 기본값, 코드 블록 크기](./object-editing.md)
