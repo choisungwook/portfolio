@@ -73,6 +73,29 @@ test('cut removes objects only after a successful native copy', async () => {
   assert.equal(slide.shapes.length, 0);
 });
 
+test('cut copies locked objects while retaining the original selection', async () => {
+  const { context, shape, slide, writes } = editorContext();
+  shape.locked = true;
+  let changed = false;
+  context.clearSelection = () => { changed = true; };
+  context.markDirty = () => { changed = true; };
+  await context.cutSelection();
+  assert.equal(JSON.parse(writes[0][0])[0].locked, true);
+  assert.equal(slide.shapes[0], shape);
+  assert.equal(changed, false);
+});
+
+test('cut copies a mixed selection and deletes only unlocked objects', async () => {
+  const { context, shape, slide, writes } = editorContext();
+  const locked = { ...shape, locked: true };
+  slide.shapes.push(locked);
+  context.state.selection = [0, 1];
+  await context.cutSelection();
+  assert.equal(JSON.parse(writes[0][0]).length, 2);
+  assert.equal(slide.shapes.length, 1);
+  assert.equal(slide.shapes[0], locked);
+});
+
 test('paste restores editable objects from another app instance', async () => {
   const { events, shape, api, inserted } = editorContext();
   api.readShapeClipboard = async () => JSON.stringify([shape]);

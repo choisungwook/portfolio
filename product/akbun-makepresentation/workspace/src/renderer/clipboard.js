@@ -133,7 +133,7 @@ async function cutSelection() {
   const targetSlide = slide();
   const originals = selectedShapes().filter((shape) => !shape.locked);
   const snapshots = new Map(originals.map((shape) => [shape, JSON.stringify(shape)]));
-  if (!originals.length || !(await copySelection())) return;
+  if (!(await copySelection()) || !originals.length) return;
   if (state.deck !== targetDeck || !state.deck.slides.includes(targetSlide)) return;
   targetSlide.shapes = targetSlide.shapes.filter((shape) => !originals.includes(shape) || shape.locked || JSON.stringify(shape) !== snapshots.get(shape));
   clearSelection();
