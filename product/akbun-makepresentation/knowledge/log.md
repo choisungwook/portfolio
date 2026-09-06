@@ -2,6 +2,8 @@
 
 ## 2026-09-06
 
+* **Creation**: [시안의 화면 언어는 영어 기본과 한국어 선택](decisions/2026-09-proposal-ui-language.md) 결정 기록.
+* **Creation**: [UI 시안의 시각 중심은 슬라이드](decisions/2026-09-proposal-keeps-slide-focus.md) 결정 기록.
 * **Creation**: [문서 프로세스와 프로필 분리](decisions/2026-09-document-process-and-profile-isolation.md) 결정 기록.
 * **Update**: 시스템 PNG·텍스트·개체 복사와 비동기 잘라내기 보존 조건, 파일별 설정·AI 세션 저장 경계 반영.
 

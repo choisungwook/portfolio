@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>akbun-makepresentation</title>
+  <link rel="stylesheet" href="../workspace/src/style.css" />
+<link rel="stylesheet" href="proposal.css" />
+</head>
+<body class="proposal">
+  <div class="review-bar" aria-label="Design comparison">
+    <strong>UI proposal</strong>
+    <span class="review-subtitle">A quieter, familiar editor</span>
+    <div class="review-switch" aria-label="Compare views">
+      <button id="show-proposal" aria-pressed="true">Proposed</button>
+      <button id="show-original" aria-pressed="false">Current</button>
+    </div>
+    <button id="show-rationale">Design notes</button>
+    <label class="language-control" for="proposal-language"><span>Language</span>
+      <select id="proposal-language" data-language-select data-i18n-skip>
+        <option value="en">English</option><option value="ko">한국어</option>
+      </select>
+    </label>
+  </div>
+  <header class="document-bar proposal-only">
+    <div class="document-heading"><strong data-i18n-skip>쿠버네티스 네트워크</strong><span id="document-state">Example document</span></div>
+    <div class="document-actions">
+      <button id="proposal-save">Save</button>
+      <button id="proposal-export">Export</button>
+      <button id="proposal-present">Start presentation</button>
+      <button id="proposal-panel" aria-pressed="false" title="Collapse the properties panel to make more room">Hide panel</button>
+    </div>
+  </header>
+  <!-- The menus live in the window rather than in the macOS menu bar, so the
+       app carries its own commands wherever it is on screen. Every item is a
+       data-command, so one handler routes all of them. -->
+  <nav id="menubar">
+    <div class="menu">
+      <button class="menu-title" data-menu="file" aria-haspopup="true" aria-expanded="false">File</button>
+      <div class="menu-panel" data-menu-panel="file" hidden>
+        <button data-command="new">New<span class="accel">⌘N</span></button>
+        <button data-command="open">Open…<span class="accel">⌘O</span></button>
+        <hr />
+        <button data-command="save">Save<span class="accel">⌘S</span></button>
+        <button data-command="save-as">PowerPoint (.pptx)…<span class="accel">⇧⌘S</span></button>
+        <hr />
+        <button data-command="export-pdf">Export PDF…</button>
+        <button data-command="export-png">Export PNG…</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-title" data-menu="edit" aria-haspopup="true" aria-expanded="false">Edit</button>
+      <div class="menu-panel" data-menu-panel="edit" hidden>
+        <button data-command="undo">Undo<span class="accel">⌘Z</span></button>
+        <button data-command="redo">Redo<span class="accel">⇧⌘Z</span></button>
+        <hr />
+        <button data-command="cut">Cut<span class="accel">⌘X</span></button>
+        <button data-command="copy">Copy<span class="accel">⌘C</span></button>
+        <button data-command="find">Find in slides…<span class="accel">⌘F</span></button>
+        <button data-command="duplicate">Duplicate<span class="accel">⌘D</span></button>
+        <button data-command="delete">Delete<span class="accel">⌫</span></button>
+        <hr />
+        <button data-command="order-front">Bring to Front</button>
+        <button data-command="order-forward">Bring Forward</button>
+        <button data-command="order-backward">Send Backward</button>
+        <button data-command="order-back">Send to Back</button>
+        <hr />
+        <button data-command="group">Group</button>
+        <button data-command="ungroup">Ungroup</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-title" data-menu="slides" aria-haspopup="true" aria-expanded="false">Slides</button>
+      <div class="menu-panel" data-menu-panel="slides" hidden>
+        <button data-command="present">Presentation</button>
+        <button data-command="numbers">Slide numbers</button>
+        <hr />
+        <button data-command="slide-size">Slide size…</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-title" data-menu="view" aria-haspopup="true" aria-expanded="false">View</button>
+      <div class="menu-panel" data-menu-panel="view" hidden>
+        <button data-command="guidelines">Guidelines…</button>
+        <hr />
+        <button data-command="zoom-in">Zoom in<span class="accel">⌘+</span></button>
+        <button data-command="zoom-out">Zoom out<span class="accel">⌘-</span></button>
+        <button data-command="zoom-fit">Fit to window<span class="accel">⌘0</span></button>
+      </div>
+    </div>
+    <button class="menubar-command" data-command="settings">Settings</button>
+  </nav>
+
+  <header id="toolbar">
+    <div class="group tools">
+      <button data-tool="select" title="Select (V)" aria-label="Select">
+        <svg viewBox="0 0 18 18" class="toolbar-icon" aria-hidden="true">
+          <path d="M3 2.5 14 10l-4.7.8 2.6 4.4-2.4 1.3-2.6-4.4-3.2 3z" />
+        </svg>
+      </button>
+      <button data-tool="rect" title="Rectangle (R)">▭</button>
+      <button data-tool="ellipse" title="Ellipse (O)">◯</button>
+      <button data-tool="callout" title="Speech bubble (B)" aria-label="Speech bubble">▱…</button>
+      <button data-tool="line" title="Line (L)">╱</button>
+      <button data-tool="arrow" title="Arrow (A)">➔</button>
+      <button data-tool="pen" title="Freehand (P)">✎</button>
+      <button data-tool="text" title="Text (T)">T</button>
+      <button id="btn-code-block" title="Insert an editable code block" aria-haspopup="true" aria-expanded="false">Code Block</button>
+      <button id="btn-background" title="Change the slide background" aria-haspopup="true" aria-expanded="false">
+        <span id="current-background" aria-hidden="true"></span>Background
+      </button>
+      <!-- Named rather than drawn: two overlapping shapes look like one more
+           drawing tool, and nothing about that icon says the word preset. -->
+      <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">Preset</button>
+    </div>
+    <div class="group">
+      <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
+    </div>
+  </header>
+
+  <section id="deck-search" role="search" aria-label="Find in slides" hidden>
+    <div class="search-controls">
+      <input id="deck-search-input" type="search" placeholder="Find text in all slides…" aria-label="Find text in all slides" />
+      <span id="deck-search-count" role="status"></span>
+      <button id="deck-search-prev" aria-label="Previous result">↑</button>
+      <button id="deck-search-next" aria-label="Next result">↓</button>
+      <button id="deck-search-close" aria-label="Close search">×</button>
+    </div>
+    <div id="deck-search-results"></div>
+  </section>
+
+  <main>
+    <aside id="slides" tabindex="0" aria-label="Slides">
+      <div id="thumbs"></div>
+      <div class="slide-actions">
+        <button id="btn-add-slide" title="Add a slide after this one">+ Slide</button>
+        <button id="btn-del-slide" title="Delete this slide">Delete</button>
+        <button id="btn-slide-up" class="icon-action" title="Move selected slides up" aria-label="Move selected slides up">↑</button>
+        <button id="btn-slide-down" class="icon-action" title="Move selected slides down" aria-label="Move selected slides down">↓</button>
+      </div>
+    </aside>
+
+    <section id="stage" tabindex="0" aria-label="Slide editor">
+      <div id="stage-scroll">
+        <div id="stage-inner">
+          <svg id="canvas" viewBox="0 0 1920 1080" tabindex="0" aria-label="Current slide"></svg>
+          <textarea id="text-editor" hidden spellcheck="false"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <aside id="right-panel">
+      <div id="right-panel-tabs" role="tablist" aria-label="Right panel">
+        <button id="right-tab-inspector" class="active" type="button" role="tab" aria-selected="true" aria-controls="props" data-right-panel="inspector">Inspector</button>
+        <button id="right-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-right-panel="ai">AI</button>
+      </div>
+      <section id="props" class="right-panel-page" tabindex="-1" role="tabpanel" aria-labelledby="right-tab-inspector">
+      <p id="props-hint"></p>
+      <section id="props-code" hidden>
+        <div><span id="props-code-format"></span> · <span id="props-code-language"></span></div>
+        <button id="btn-edit-code" type="button">Edit code block…</button>
+      </section>
+      <div id="props-fill" class="prop-row">
+        <label>Shape fill</label>
+        <span><input type="checkbox" id="prop-fill-none" /> none</span>
+        <input type="color" id="prop-fill" />
+      </div>
+      <div id="props-stroke">
+        <div class="prop-row">
+          <label>Line color</label>
+          <label><input type="checkbox" id="prop-stroke-none" /> none</label>
+          <input type="color" id="prop-stroke" />
+        </div>
+        <div class="prop-row">
+          <label>Line width</label>
+          <input type="number" id="prop-width" min="1" max="30" />
+        </div>
+        <div class="prop-row">
+          <label>Line style</label>
+          <select id="prop-dash">
+            <option value="solid">Solid</option>
+            <option value="dash">Dashed</option>
+            <option value="dot">Dotted</option>
+          </select>
+        </div>
+        <!-- The values are the pptx names for the same five ends, so what is
+             picked here is what is written to the file. A freehand stroke uses
+             this row too, in place of the one on/off arrow it used to get. -->
+        <div id="props-arrow-ends">
+          <div class="prop-row">
+            <label for="prop-arrow-start">Start end</label>
+            <select id="prop-arrow-start">
+              <option value="none">None  ─</option>
+              <option value="triangle">Triangle  ◀─</option>
+              <option value="arrow">Open arrow  &lt;─</option>
+              <option value="oval">Circle  ●─</option>
+              <option value="diamond">Diamond  ◆─</option>
+            </select>
+          </div>
+          <div class="prop-row">
+            <label for="prop-arrow-end">Finish end</label>
+            <select id="prop-arrow-end">
+              <option value="none">None  ─</option>
+              <option value="triangle">Triangle  ─▶</option>
+              <option value="arrow">Open arrow  ─&gt;</option>
+              <option value="oval">Circle  ─●</option>
+              <option value="diamond">Diamond  ─◆</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="props-text">
+        <div class="prop-row">
+          <label for="prop-font-family">Font</label>
+          <div id="font-picker" class="font-picker">
+            <button id="prop-font-family" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="font-family-label">Noto Sans KR</span>
+              <span aria-hidden="true">⌄</span>
+            </button>
+            <div id="font-menu" hidden>
+              <input id="font-search" type="search" placeholder="Search fonts" autocomplete="off" />
+              <div id="font-options" role="listbox"></div>
+            </div>
+          </div>
+        </div>
+        <div class="prop-row">
+          <label>Font size</label>
+          <input type="number" id="prop-font-size" min="6" max="200" />
+        </div>
+        <div class="prop-row">
+          <label>Text color</label>
+          <input type="color" id="prop-text-color" />
+        </div>
+        <div class="prop-row">
+          <label>Style</label>
+          <span class="btn-set">
+            <button id="prop-bold" class="glyph" title="Bold (Cmd+B)"><b>B</b></button>
+            <button id="prop-italic" class="glyph" title="Italic (Cmd+I)"><i>I</i></button>
+            <button id="prop-underline" class="glyph" title="Underline (Cmd+U)"><u>U</u></button>
+          </span>
+        </div>
+        <div class="prop-row">
+          <label>Align</label>
+          <span class="btn-set" id="prop-align">
+            <button data-align="left" title="Align left" aria-label="Align left">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M2 7h6M2 11h10" /></svg>
+            </button>
+            <button data-align="center" title="Align center" aria-label="Align center">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M4 7h6M2 11h10" /></svg>
+            </button>
+            <button data-align="right" title="Align right" aria-label="Align right">
+              <svg viewBox="0 0 14 14" class="icon"><path d="M2 3h10M6 7h6M2 11h10" /></svg>
+            </button>
+          </span>
+        </div>
+        <div class="prop-row">
+          <label>Anchor</label>
+          <span class="btn-set" id="prop-vertical-align">
+            <button data-valign="top" title="Anchor to the top of the box" aria-label="Anchor to the top of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 4h6" /></svg>
+            </button>
+            <button data-valign="center" title="Anchor to the middle of the box" aria-label="Anchor to the middle of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 7h6" /></svg>
+            </button>
+            <button data-valign="bottom" title="Anchor to the bottom of the box" aria-label="Anchor to the bottom of the box">
+              <svg viewBox="0 0 14 14" class="icon box"><rect x="2" y="1.5" width="10" height="11" /><path d="M4 10h6" /></svg>
+            </button>
+          </span>
+        </div>
+      </div>
+      <div class="prop-row" id="props-crop">
+        <label id="props-crop-label">Image crop</label>
+        <button id="btn-crop">Crop</button>
+      </div>
+      <div class="prop-row" id="props-shape-align" hidden>
+        <label>Align objects</label>
+        <span class="btn-set shape-align-buttons">
+          <button type="button" data-shape-align="top" title="Align selected objects to the top edge">Top</button>
+          <button type="button" data-shape-align="bottom" title="Align selected objects to the bottom edge">Bottom</button>
+          <button type="button" data-shape-align="left" title="Align selected objects to the left edge">Left</button>
+          <button type="button" data-shape-align="right" title="Align selected objects to the right edge">Right</button>
+        </span>
+      </div>
+      <div class="btn-set">
+        <button id="btn-group">Group</button>
+        <button id="btn-ungroup">Ungroup</button>
+      </div>
+        <button id="btn-delete-shape">Delete shape</button>
+      </section>
+
+      <section id="ai-panel" class="right-panel-page" role="tabpanel" aria-labelledby="right-tab-ai" hidden>
+        <div id="ai-list-view" class="ai-view">
+          <header class="ai-panel-header">
+            <div>
+              <h2>AI conversations</h2>
+              <p>Saved on this device</p>
+            </div>
+            <button id="btn-ai-new" type="button" class="primary">New conversation</button>
+          </header>
+          <div id="ai-connection-banner" class="ai-connection-banner" data-state="checking">
+            <span class="ai-status-dot" aria-hidden="true"></span>
+            <span id="ai-connection-text">Checking Codex…</span>
+          </div>
+          <p id="ai-list-status" class="ai-panel-status" aria-live="polite"></p>
+          <div id="ai-session-list" class="ai-session-list"></div>
+        </div>
+
+        <div id="ai-chat-view" class="ai-view ai-chat-view" hidden>
+          <header class="ai-chat-header">
+            <button id="btn-ai-back" type="button">Back</button>
+            <div>
+              <h2 id="ai-chat-title">New conversation</h2>
+              <p id="ai-chat-meta"></p>
+            </div>
+          </header>
+          <div id="ai-messages" class="ai-messages" aria-live="polite"></div>
+          <div id="ai-readonly-notice" class="ai-readonly-notice" hidden>
+            This conversation is read-only. Start a new conversation to continue.
+          </div>
+          <div id="ai-composer" class="ai-composer">
+            <div id="ai-mode-picker" class="ai-mode-picker" role="tablist" aria-label="AI output">
+              <button type="button" class="active" role="tab" data-ai-mode="text" aria-selected="true">Text</button>
+              <button type="button" role="tab" data-ai-mode="image" aria-selected="false">Image</button>
+              <button type="button" role="tab" data-ai-mode="slide" aria-selected="false">Slide</button>
+            </div>
+            <label id="ai-slide-target-row" class="ai-slide-target" for="ai-slide-target" hidden>
+              Based on
+              <select id="ai-slide-target"></select>
+            </label>
+            <div id="ai-chip-row" class="ai-chip-row" role="group" aria-label="Request modifiers"></div>
+            <div id="ai-diagram-style" class="ai-diagram-style" hidden>
+              <label for="ai-layout">
+                Layout
+                <select id="ai-layout"></select>
+              </label>
+              <label for="ai-palette">
+                Palette
+                <select id="ai-palette"></select>
+              </label>
+              <span id="ai-palette-swatches" class="ai-palette-swatches" aria-hidden="true"></span>
+            </div>
+            <textarea id="ai-prompt" rows="4" maxlength="100000" placeholder="Ask AI…"></textarea>
+            <div class="ai-composer-actions">
+              <span id="ai-turn-status" aria-live="polite"></span>
+              <button id="btn-ai-stop" type="button" hidden>Stop</button>
+              <button id="btn-ai-send" type="button" class="primary">Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <!-- Zoom changes only the view, so it stays away from slide-editing tools. -->
+  <footer id="statusbar">
+    <div id="zoom">
+      <button id="btn-zoom-out" title="Zoom out (Cmd+-)" aria-label="Zoom out (Cmd+-)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4" /></svg>
+      </button>
+      <button id="btn-zoom-level" title="Fit the slide to the window (Cmd+0)">100%</button>
+      <button id="btn-zoom-in" title="Zoom in (Cmd++)" aria-label="Zoom in (Cmd++)">
+        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4M6 4v4" /></svg>
+      </button>
+    </div>
+  </footer>
+
+  <div id="present" hidden></div>
+
+  <div id="context-menu" hidden>
+    <button id="context-lock">Lock</button>
+    <button data-order="front">Bring to Front</button>
+    <button data-order="forward">Bring Forward</button>
+    <button data-order="backward">Send Backward</button>
+    <button data-order="back">Send to Back</button>
+    <button id="context-group">Group</button>
+    <button id="context-ungroup">Ungroup</button>
+    <button id="context-save-preset">Save as Preset</button>
+    <button id="context-save-image">Save as Image</button>
+  </div>
+
+  <div id="slide-context-menu" role="menu" aria-label="Slide actions" hidden>
+    <button id="context-new-slide" type="button" role="menuitem">New Slide</button>
+  </div>
+
+  <div id="preset-menu" role="menu" aria-label="Shape presets" hidden>
+    <section>
+      <h2>Default presets</h2>
+      <div id="default-presets" class="preset-grid"></div>
+    </section>
+    <section id="custom-presets-section">
+      <h2>My presets</h2>
+      <div id="custom-presets" class="preset-grid"></div>
+    </section>
+  </div>
+
+  <div id="background-menu" class="toolbar-popover" role="group" aria-label="Slide background" hidden>
+    <div class="popover-heading">
+      <strong>Slide background</strong>
+      <span id="background-value">#ffffff</span>
+    </div>
+    <div class="background-grid" id="bg-swatches">
+      <label class="background-picker" title="Custom color">
+        <input type="color" id="prop-background" aria-label="Custom background color" />
+        <span aria-hidden="true">＋</span>
+      </label>
+      <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
+      <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
+      <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
+      <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
+      <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
+      <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
+      <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
+      <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
+    </div>
+    <button id="btn-bg-all" type="button">Apply to all slides…</button>
+  </div>
+
+  <div id="code-block-menu" class="toolbar-popover" role="group" aria-label="Code block formats" hidden>
+    <div class="code-menu-heading">
+      <label for="code-menu-language">Language</label>
+      <select id="code-menu-language"></select>
+    </div>
+    <div class="code-format-grid">
+      <button class="code-format-card editor-dark" data-code-format="editor-dark"><span class="code-preview">● ● ●<br />const answer = 42</span><strong>Editor Dark</strong></button>
+      <button class="code-format-card editor-light" data-code-format="editor-light"><span class="code-preview">● ● ●<br />const answer = 42</span><strong>Editor Light</strong></button>
+      <button class="code-format-card terminal" data-code-format="terminal"><span class="code-preview">›_ bash<br />$ make up</span><strong>Terminal</strong></button>
+      <button class="code-format-card minimal" data-code-format="minimal"><span class="code-preview">1  fn main() {<br />2    println!();</span><strong>Minimal</strong></button>
+    </div>
+  </div>
+
+  <dialog id="guidelines-dialog" aria-labelledby="guidelines-title">
+    <form id="guidelines-form" method="dialog">
+      <header>
+        <h1 id="guidelines-title">Guidelines</h1>
+      </header>
+      <div class="guidelines-content">
+        <label class="guidelines-visible">
+          <input id="guidelines-visible" type="checkbox" />
+          Show guidelines
+        </label>
+        <div class="guidelines-fields">
+          <label for="guidelines-unit">Unit</label>
+          <select id="guidelines-unit">
+            <option value="px">Pixels (px)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+          <label for="guidelines-top">Top</label>
+          <input id="guidelines-top" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-bottom">Bottom</label>
+          <input id="guidelines-bottom" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-left">Left</label>
+          <input id="guidelines-left" type="number" min="0" max="10000" step="0.01" required />
+          <label for="guidelines-right">Right</label>
+          <input id="guidelines-right" type="number" min="0" max="10000" step="0.01" required />
+        </div>
+        <p id="guidelines-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-guidelines-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="slide-size-dialog" aria-labelledby="slide-size-title">
+    <form id="slide-size-form" method="dialog">
+      <header>
+        <h1 id="slide-size-title">Slide size</h1>
+      </header>
+      <div class="slide-size-content">
+        <fieldset>
+          <legend>Ratio</legend>
+          <div class="ratio-options">
+            <button type="button" data-slide-ratio="16:9">16:9</button>
+            <button type="button" data-slide-ratio="4:3">4:3</button>
+            <button type="button" data-slide-ratio="3:4">3:4</button>
+            <button type="button" data-slide-ratio="9:16">9:16</button>
+          </div>
+        </fieldset>
+        <div class="slide-size-fields">
+          <label for="slide-size-unit">Unit</label>
+          <select id="slide-size-unit">
+            <option value="px">Pixels (px)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+          <label for="slide-size-width">Width</label>
+          <input id="slide-size-width" type="number" min="64" max="10000" step="0.01" required />
+          <label for="slide-size-height">Height</label>
+          <input id="slide-size-height" type="number" min="64" max="10000" step="0.01" required />
+        </div>
+        <p id="slide-size-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-slide-size-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="code-dialog" aria-labelledby="code-dialog-title">
+    <form id="code-form" method="dialog">
+      <header>
+        <h1 id="code-dialog-title">Edit code block</h1>
+      </header>
+      <div class="code-dialog-content">
+        <div class="code-settings">
+          <label for="code-language">Language</label>
+          <select id="code-language"></select>
+          <label for="code-format">Format</label>
+          <select id="code-format"></select>
+          <label for="code-highlights">Highlighted lines</label>
+          <input id="code-highlights" type="text" placeholder="2, 4-6" />
+          <label for="code-callouts">Number callouts</label>
+          <input id="code-callouts" type="text" placeholder="3, 7" />
+          <label class="code-line-number-option">
+            <input id="code-line-numbers" type="checkbox" /> Show line numbers
+          </label>
+        </div>
+        <div class="code-editor-heading">
+          <label for="code-source">Code</label>
+          <span>
+            <button id="btn-paste-code" type="button">Paste</button>
+            <button id="btn-copy-code" type="button">Copy</button>
+          </span>
+        </div>
+        <textarea id="code-source" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="code-status"></textarea>
+        <p id="code-status" class="settings-status" aria-live="polite"></p>
+      </div>
+      <footer>
+        <button id="btn-code-cancel" type="button">Cancel</button>
+        <button type="submit" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-shell">
+      <header><h1 id="settings-title">Settings</h1></header>
+      <nav aria-label="Settings sections">
+        <button class="active" data-settings-page="general">General</button>
+        <button data-settings-page="ai">AI</button>
+        <button data-settings-page="presets">Presets</button>
+        <button data-settings-page="updates">Updates</button>
+      </nav>
+      <div class="settings-content">
+        <section data-settings-panel="general">
+          <h2>General</h2>
+          <p>Defaults apply to objects created after you save these settings.</p>
+          <div class="settings-general-fields">
+            <label for="settings-default-font">Default font</label>
+            <select id="settings-default-font"></select>
+            <label for="settings-fill">Shape fill</label>
+            <span><label><input id="settings-fill-none" type="checkbox" /> none</label> <input id="settings-fill" type="color" /></span>
+            <label for="settings-text-color">Text color</label>
+            <input id="settings-text-color" type="color" />
+            <label for="settings-snapping">Shape snapping</label>
+            <label class="settings-checkbox">
+              <input id="settings-snapping" type="checkbox" /> Snap matching object edges while dragging
+            </label>
+          </div>
+          <fieldset class="settings-border-fields">
+            <legend>Arrow defaults</legend>
+            <p>New arrows. Lines and freehand start without arrowheads.</p>
+            <label for="settings-arrow-start">Start end</label>
+            <select id="settings-arrow-start"></select>
+            <label for="settings-arrow-end">Finish end</label>
+            <select id="settings-arrow-end"></select>
+          </fieldset>
+          <fieldset class="settings-border-fields">
+            <legend>Shape border</legend>
+            <p>Rectangle, ellipse, line, arrow, and freehand.</p>
+            <label for="settings-shape-border-color">Color</label>
+            <span><label><input id="settings-shape-border-none" type="checkbox" /> none</label> <input id="settings-shape-border-color" type="color" /></span>
+            <label for="settings-shape-border-width">Width</label>
+            <input id="settings-shape-border-width" type="number" min="1" max="30" step="0.5" />
+            <label for="settings-shape-border-dash">Style</label>
+            <select id="settings-shape-border-dash">
+              <option value="solid">Solid</option>
+              <option value="dash">Dashed</option>
+              <option value="dot">Dotted</option>
+            </select>
+          </fieldset>
+          <fieldset class="settings-border-fields">
+            <legend>Image border</legend>
+            <label for="settings-image-border-color">Color</label>
+            <span><label><input id="settings-image-border-none" type="checkbox" /> none</label> <input id="settings-image-border-color" type="color" /></span>
+            <label for="settings-image-border-width">Width</label>
+            <input id="settings-image-border-width" type="number" min="1" max="30" step="0.5" />
+            <label for="settings-image-border-dash">Style</label>
+            <select id="settings-image-border-dash">
+              <option value="solid">Solid</option>
+              <option value="dash">Dashed</option>
+              <option value="dot">Dotted</option>
+            </select>
+          </fieldset>
+          <p id="general-settings-status" class="settings-status" aria-live="polite"></p>
+        </section>
+        <section data-settings-panel="ai" hidden>
+          <h2>AI</h2>
+          <p>Uses the ChatGPT subscription connected through the installed Codex CLI. API key authentication is not supported.</p>
+          <div id="settings-ai-status" class="settings-ai-status" data-state="checking">
+            <span class="ai-status-dot" aria-hidden="true"></span>
+            <div>
+              <strong id="settings-ai-status-title">Checking Codex…</strong>
+              <p id="settings-ai-status-detail">Looking for Codex CLI and ChatGPT authentication.</p>
+            </div>
+          </div>
+          <button id="btn-ai-refresh" type="button">Refresh status</button>
+          <p>System prompts apply to new AI conversations.</p>
+          <div class="settings-ai-prompts">
+            <label for="settings-ai-text-prompt">Text system prompt</label>
+            <textarea id="settings-ai-text-prompt" rows="4" maxlength="20000"></textarea>
+            <label for="settings-ai-image-prompt">Image system prompt</label>
+            <textarea id="settings-ai-image-prompt" rows="4" maxlength="20000"></textarea>
+            <label for="settings-ai-slide-prompt">Slide system prompt</label>
+            <textarea id="settings-ai-slide-prompt" rows="4" maxlength="20000"></textarea>
+          </div>
+        </section>
+        <!-- Checking for a version is something you do now and then, not while
+             drawing, so it sits here rather than next to the tools. -->
+        <section data-settings-panel="updates" hidden>
+          <h2>Updates</h2>
+          <p>Look for a newer version of akbun-makepresentation.</p>
+          <button id="btn-update" type="button">Check for Updates…</button>
+        </section>
+        <section data-settings-panel="presets" hidden>
+          <h2>My presets</h2>
+          <p>Delete saved presets here. Changes apply when you choose OK.</p>
+          <p id="preset-settings-status" class="settings-status" aria-live="polite"></p>
+          <div id="settings-presets" class="settings-preset-list"></div>
+        </section>
+      </div>
+      <footer>
+        <button id="btn-settings-cancel" type="button">Cancel</button>
+        <button id="btn-settings-ok" type="button" class="primary">OK</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <script src="../workspace/src/editor/constants.js"></script>
+  <script src="../workspace/src/editor/shapes.js"></script>
+  <script src="../workspace/src/editor/geometry.js"></script>
+  <script src="../workspace/src/editor/deck.js"></script>
+  <script src="../workspace/src/editor/presets.js"></script>
+  <script src="../workspace/src/editor/svg.js"></script>
+  <script src="../workspace/src/editor/utils.js"></script>
+  <script src="../workspace/src/editor/search.js"></script>
+  <script src="../workspace/src/editor.js"></script>
+  <script src="../workspace/src/settings.js"></script>
+  <script src="../workspace/src/ai/styles.js"></script>
+  <script src="../workspace/src/ai/prompt.js"></script>
+  <script src="../workspace/src/ai.js"></script>
+  <script src="../workspace/src/api.js"></script>
+  <script src="../workspace/src/ai-panel.js"></script>
+  <script src="../workspace/src/renderer/render.js"></script>
+  <script src="../workspace/src/renderer/history.js"></script>
+  <script src="../workspace/src/renderer/search.js"></script>
+  <script src="../workspace/src/renderer/canvas.js"></script>
+  <script src="../workspace/src/renderer/text.js"></script>
+  <script src="../workspace/src/renderer/presets.js"></script>
+  <script src="../workspace/src/renderer/code.js"></script>
+  <script src="../workspace/src/renderer/guidelines.js"></script>
+  <script src="../workspace/src/renderer/slide-size.js"></script>
+  <script src="../workspace/src/renderer/settings.js"></script>
+  <script src="../workspace/src/renderer/clipboard.js"></script>
+  <script src="../workspace/src/renderer/context-menu.js"></script>
+  <script src="../workspace/src/renderer/properties.js"></script>
+  <script src="../workspace/src/renderer/slides.js"></script>
+  <script src="../workspace/src/renderer/files.js"></script>
+  <script src="../workspace/src/renderer/presentation.js"></script>
+  <script src="../workspace/src/renderer.js"></script>
+
+  <dialog id="rationale-dialog" class="review-dialog">
+    <form method="dialog"><button class="dialog-close">Close</button></form>
+    <h1>A familiar editor, easier to use</h1>
+    <p class="review-lead">The slide takes center stage. Tools stay quiet until you need them.</p>
+    <dl class="concept-definitions"><div><dt>UI</dt><dd>The visible interface: buttons, text size, color, and layout.</dd></div><div><dt>UX</dt><dd>The process of finding tools, editing content, and checking the result.</dd></div></dl>
+    <h2>What changed</h2>
+    <table><thead><tr><th>Current interface</th><th>Proposal</th><th>Benefit</th></tr></thead><tbody>
+      <tr><td>Document state appears only in the window title</td><td>Keep the name, state, and save action together</td><td>Know which document you are editing</td></tr>
+      <tr><td>Some tools use symbols alone</td><td>Short, localized labels and shortcut hints</td><td>Recognize tools without hovering over each one</td></tr>
+      <tr><td>Disabled properties remain visible without a selection</td><td>Show slide information and a selection hint</td><td>See what you can do next</td></tr>
+      <tr><td>Wide, fixed side panels</td><td>Narrower panels that can collapse</td><td>More working space in smaller windows</td></tr>
+      <tr><td>Shape and text controls form one long list</td><td>Name the selection and group related settings</td><td>Find the property you want to change</td></tr>
+    </tbody></table>
+    <h2>Try it</h2>
+    <ol><li>Switch between Current and Proposed to compare the same slide.</li><li>Drag the Service shape, or double-click it to edit its text.</li><li>Click empty space to see the selection hint, then hide the panel.</li></ol>
+    <p>This proposal uses the real editor logic. Changes stay in memory and reset on reload. Saving, exporting, and AI generation require the desktop app.</p>
+    <h2>Applied skill</h2>
+    <p><a href="https://github.com/anthropics/skills/tree/41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f/skills/frontend-design" target="_blank" rel="noreferrer">Official Anthropic frontend-design</a> · <span>Verified September 6, 2026</span></p>
+    <p>Product-specific layout, clear wording, and restrained decoration. System fonts and existing editing behavior suit this macOS slide editor.</p>
+  </dialog>
+  <dialog id="desktop-notice" class="review-dialog compact-dialog"><form method="dialog"><button class="dialog-close">Close</button></form><h2>Available in the desktop app</h2><p>Review the layout and editing flow here. Saving, exporting, and AI generation connect in the desktop app.</p></dialog>
+  <script src="messages.js"></script>
+  <script src="i18n.js"></script>
+  <script src="prototype.js"></script>
+</body>
+</html>

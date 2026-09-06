@@ -2,6 +2,8 @@
 
 akbun-makepresentation 작업 중 내린 의사결정과 이유.
 
+* [시안의 화면 언어는 영어 기본과 한국어 선택](2026-09-proposal-ui-language.md)
+* [UI 시안의 시각 중심은 슬라이드](2026-09-proposal-keeps-slide-focus.md)
 * [객체 잠금은 선택과 변경을 분리](2026-09-locks-preserve-selection.md)
 * [문서 프로세스와 프로필 분리](2026-09-document-process-and-profile-isolation.md)
 * [드래그는 더블클릭 편집보다 우선](2026-08-drag-wins-over-double-click-edit.md)
