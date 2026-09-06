@@ -1737,3 +1737,33 @@ button.primary {
   height: 100vh;
   object-fit: contain;
 }
+
+#canvas[data-tool='callout'] { cursor: crosshair; }
+
+#deck-search {
+  position: absolute;
+  z-index: 30;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(660px, calc(100vw - 40px));
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px var(--border);
+}
+
+.search-controls { display: flex; align-items: center; gap: 6px; }
+#deck-search-input { flex: 1; min-width: 100px; }
+#deck-search-count { font-size: 12px; white-space: nowrap; }
+#deck-search-results { max-height: 240px; overflow: auto; margin-top: 8px; }
+#deck-search-results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#deck-search-results button.active { border-color: var(--accent); }

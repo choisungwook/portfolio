@@ -1,21 +1,24 @@
 ---
 type: Decision
-title: 잘라내기는 복사 핸들러를 실행하고 지우는 순서로 만든다
-description: 캔버스에는 cut 이벤트가 오지 않으므로 execCommand로 copy를 일으키고, 복사가 실제로 일어났을 때만 삭제한다.
+title: 잘라내기는 시스템 복사 성공 후 원본을 지운다
+description: 네이티브 클립보드에 PNG·텍스트·개체 JSON을 함께 기록하고 성공한 뒤에만 변경되지 않은 원본을 삭제.
 tags: [desktop, editor, clipboard, javascript]
 timestamp: 2026-09-06T00:00:00Z
 ---
 
 ## 결정
 
-- Cmd+X는 keydown에서 `document.execCommand('copy')`를 부른 뒤 선택 객체를 지운다.
-- copy 핸들러가 clipboardData를 채운 시각을 기록하고, 그 시각이 바뀌지 않으면 삭제하지 않는다.
-- 폼 필드에 포커스가 있으면 keydown이 먼저 빠져나가므로 네이티브 잘라내기가 그대로 동작한다.
+- 데스크톱 복사와 잘라내기는 같은 비동기 시스템 클립보드 기록 경로 사용.
+- PNG·일반 텍스트·편집용 JSON을 한 번에 기록.
+- 브라우저 미리보기에서만 copy 이벤트와 execCommand 사용.
+- PNG를 만드는 동안 원본 객체나 문서가 바뀌면 잘라내기 삭제 생략.
+- 잠긴 개체도 클립보드에 복사하고, 삭제 대상에서만 제외.
+- 입력 필드의 복사·잘라내기는 네이티브 텍스트 동작 유지.
 
 ## 이유
 
-- webview는 편집 가능한 선택에만 cut 이벤트를 보낸다. 캔버스는 편집 영역이 아니라 SVG이므로 Cmd+X가 아무 이벤트도 만들지 않았다.
-- copy 이벤트는 편집 영역이 아니어도 오기 때문에 붙여넣기 규약(`application/x-akbun-makepresentation-shapes`)이 이미 그 핸들러 하나에 있다. 잘라내기가 같은 핸들러를 재사용하면 클립보드 형식이 한 곳에 남는다.
-- 클립보드가 거절당한 webview에서 그냥 지우면 잘라내기가 붙여넣을 수 없는 삭제가 된다. 복사 성공 여부를 확인한 뒤 지우는 것이 이 손실을 막는 유일한 지점이다.
+- 앱 전용 MIME만 기록하면 외부 앱이 도형을 받아들이지 못함.
+- 형식별로 따로 기록하면 뒤의 기록이 앞의 이미지나 JSON을 지움.
+- 비동기 기록 실패를 기다리지 않고 삭제하면 복구할 클립보드가 없는 상태로 원본 손실.
 
-관련: [브라우저 편집기 파일은 변경 이유별로 분리](2026-08-browser-editor-files-follow-change-reasons.md)
+관련: [문서 프로세스와 프로필 분리](2026-09-document-process-and-profile-isolation.md)

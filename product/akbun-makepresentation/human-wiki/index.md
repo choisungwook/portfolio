@@ -4,6 +4,8 @@
 
 ## 반드시 익힐 내용
 
+- [독립 문서, 검색, 클립보드](./document-workflow.md)
+
 - [객체 잠금, 생성 기본값, 코드 블록 크기](./object-editing.md)
 - [AI audio 아키텍처와 의사결정](./ai-audio-architecture.md)
 - [AI 오디오 사용 가이드: 무음 제거와 SRT 만들기](./ai-audio-usage-guide.md)

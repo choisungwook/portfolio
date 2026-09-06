@@ -5,12 +5,14 @@ const history = { past: [], future: [] };
 let committed = structuredClone(state.deck);
 
 function resetHistory() {
+  invalidateDeckSearch();
   history.past.length = 0;
   history.future.length = 0;
   committed = structuredClone(state.deck);
 }
 
 function markDirty() {
+  invalidateDeckSearch();
   history.past.push(committed);
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
   history.future.length = 0;
@@ -22,6 +24,7 @@ function markDirty() {
 }
 
 function restore(deck) {
+  invalidateDeckSearch();
   state.deck = structuredClone(deck);
   state.current = Math.min(state.current, state.deck.slides.length - 1);
   setSlideSelection([state.current]);
@@ -84,7 +87,7 @@ function toPoint(event) {
 function selectedShapeIndexAtPoint(point) {
   for (const index of [...state.selection].reverse()) {
     const shape = slide().shapes[index];
-    if (!canEditText(shape)) continue;
+    if (!canEditText(shape) || (L.TEXTUAL.has(shape.kind) && shape.fill === 'none')) continue;
     if (L.shapeSelectionContainsPoint(shape, point.x, point.y)) return index;
   }
   return -1;

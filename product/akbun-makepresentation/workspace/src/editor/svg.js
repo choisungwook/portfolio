@@ -288,6 +288,7 @@ const TEXT_PADDING = 8;
 // uses, so glyphs do not jump when editing starts or ends.
 function textBox(shape) {
   const b = shapeBBox(shape);
+  if (shape.kind === 'callout') b.h *= 0.75;
   if (!TEXTUAL.has(shape.kind)) return { x: b.x, y: b.y, w: b.w, h: b.h };
   const pad = Math.min(TEXT_PADDING, b.w / 4, b.h / 4);
   return { x: b.x + pad, y: b.y + pad, w: Math.max(0, b.w - pad * 2), h: Math.max(0, b.h - pad * 2) };
@@ -325,6 +326,11 @@ function shapeTextSvg(shape) {
 function renderShapeSvg(shape, options) {
   const hideText = options && options.hideText;
   switch (shape.kind) {
+    case 'callout': {
+      const points = Geometry.calloutPoints(shape).map((p) => p.join(',')).join(' ');
+      const outline = `<polygon points="${points}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      return rotateSvg(shape, outline + (hideText ? '' : shapeTextSvg(shape)));
+    }
     case 'rect': {
       const b = shapeBBox(shape);
       const outline = `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;

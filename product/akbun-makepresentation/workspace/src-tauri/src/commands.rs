@@ -30,9 +30,11 @@ pub fn open_deck(path: String) -> Result<Deck, String> {
 }
 
 #[tauri::command]
-pub fn save_deck(path: String, deck: Deck) -> Result<(), String> {
+pub fn save_deck(app: AppHandle, path: String, deck: Deck) -> Result<(), String> {
     let file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
-    pptx::write(&deck, BufWriter::new(file))
+    pptx::write(&deck, BufWriter::new(file))?;
+    app.state::<makepresentation_desktop::Profile>()
+        .remember_saved_document(std::path::Path::new(&path))
 }
 
 #[derive(Deserialize)]
@@ -80,10 +82,10 @@ pub fn save_png(path: String, data_url: String) -> Result<(), String> {
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|directory| directory.join("settings.json"))
-        .map_err(|e| format!("cannot locate app data directory: {e}"))
+    Ok(app
+        .state::<makepresentation_desktop::Profile>()
+        .directory
+        .join("settings.json"))
 }
 
 #[tauri::command]

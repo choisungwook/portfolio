@@ -1053,3 +1053,35 @@ test('code fitting removes stale frame space after edits and reserves room for c
   L.fitCodeBlock(code);
   assert.ok(code.w > short.w);
 });
+
+test('an unfilled shape is not marquee-selected through its hollow interior', () => {
+  const shape = L.createShape('rect', 100, 100, { fill: 'none', strokeWidth: 2 });
+  shape.w = 200; shape.h = 150;
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 130, y: 130, w: 20, h: 20 }), []);
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 95, y: 130, w: 20, h: 20 }), [0]);
+  shape.fill = '#ffffff';
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 130, y: 130, w: 20, h: 20 }), [0]);
+});
+
+test('marquee tests actual ellipse and rotated rectangle outlines', () => {
+  const shape = L.createShape('ellipse', 100, 100, { fill: 'none', strokeWidth: 0 });
+  shape.w = 200; shape.h = 100;
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 100, y: 100, w: 10, h: 10 }), []);
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 195, y: 95, w: 10, h: 10 }), [0]);
+  shape.kind = 'rect'; shape.rotation = 90;
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 145, y: 100, w: 10, h: 10 }), [0]);
+  assert.deepEqual(L.shapeIndicesInRect([shape], { x: 95, y: 130, w: 10, h: 10 }), []);
+});
+
+test('speech bubbles preserve geometry, text and clipboard round trips', () => {
+  const shape = L.createShape('callout', 10, 20, { fill: '#ffffff' });
+  L.dragShape(shape, 10, 20, 210, 220, false);
+  shape.text = 'Hello';
+  assert.equal(L.TEXTUAL.has(shape.kind), true);
+  assert.equal(L.textBox(shape).h, 134);
+  assert.match(L.renderShapeSvg(shape), /polygon/);
+  assert.match(L.renderShapeSvg(shape), /Hello/);
+  assert.equal(L.shapeSelectionContainsPoint(shape, 200, 210), false);
+  assert.equal(L.shapeSelectionContainsPoint(shape, 110, 100), true);
+  assert.deepEqual(L.parseClipboardShapes(JSON.stringify([shape]))[0], shape);
+});

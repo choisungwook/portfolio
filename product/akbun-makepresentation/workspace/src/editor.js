@@ -59,6 +59,7 @@
     isDegenerate: Geometry.isDegenerate,
     shapeBBox: Geometry.shapeBBox,
     shapeSelectionContainsPoint: Geometry.shapeSelectionContainsPoint,
+    calloutPoints: Geometry.calloutPoints,
     normalizeRect: Geometry.normalizeRect,
     shapeIndicesInRect: Geometry.shapeIndicesInRect,
     toggleSelection: Geometry.toggleSelection,

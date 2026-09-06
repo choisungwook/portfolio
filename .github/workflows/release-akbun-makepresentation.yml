@@ -41,7 +41,7 @@ jobs:
       # keeps this to serde, zip and quick-xml. Testing the app crate instead
       # would need GTK and WebKit installed on the runner.
       - name: Run deck model tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p makepresentation-deck
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makepresentation-deck -p makepresentation-desktop
 
   release:
     if: github.event_name != 'pull_request'

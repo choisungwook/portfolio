@@ -14,6 +14,7 @@ struct Pending {
     is_cxn: bool,
     is_pic: bool,
     tx_box: bool,
+    is_callout: bool,
     x: i64,
     y: i64,
     cx: i64,
@@ -256,6 +257,7 @@ fn handle_element(
                 .and_then(|encoded| base64::engine::general_purpose::STANDARD.decode(encoded).ok())
                 .and_then(|json| serde_json::from_slice::<Shape>(&json).ok());
         }
+        "cNvPr" => p.is_callout = get(b"descr").as_deref() == Some("akbun-callout"),
         "cNvSpPr" => {
             if get(b"txBox").as_deref() == Some("1") {
                 p.tx_box = true;
@@ -597,7 +599,9 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
             Some("line") | Some("straightConnector1")
         );
 
-    if !p.is_pic && p.has_custgeom {
+    if !p.is_pic && p.is_callout {
+        shape.kind = "callout".into();
+    } else if !p.is_pic && p.has_custgeom {
         shape.kind = "pen".into();
         // A freehand stroke names its two ends the same way a line does.
         shape.arrow_start = read_arrow_end(&p.head_end);
@@ -673,7 +677,7 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
     // that names no algn or anchor used to come back anchored top left, so the
     // next line typed into that shape landed somewhere the same shape drawn
     // here never would.
-    if shape.kind == "rect" || shape.kind == "ellipse" {
+    if matches!(shape.kind.as_str(), "rect" | "ellipse" | "callout") {
         if p.text_align.is_none() {
             shape.text_align = "center".into();
         }

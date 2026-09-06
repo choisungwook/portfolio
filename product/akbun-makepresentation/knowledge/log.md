@@ -2,6 +2,9 @@
 
 ## 2026-09-06
 
+* **Creation**: [문서 프로세스와 프로필 분리](decisions/2026-09-document-process-and-profile-isolation.md) 결정 기록.
+* **Update**: 시스템 PNG·텍스트·개체 복사와 비동기 잘라내기 보존 조건, 파일별 설정·AI 세션 저장 경계 반영.
+
 * **Creation**: [객체 잠금은 선택과 변경을 분리](decisions/2026-09-locks-preserve-selection.md) 결정 기록.
 * **Update**: [편집 기본값](decisions/2026-08-editor-defaults-are-local-settings.md)에 색상·화살표·테두리 없음과 생성 시 적용 원칙 추가.
 * **Update**: [코드 블록](decisions/2026-08-code-blocks-keep-source-metadata.md)에 내용 맞춤 측정과 비례 리사이즈 원칙 추가.

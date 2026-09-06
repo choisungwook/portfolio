@@ -1,14 +1,14 @@
 ---
 type: Decision
 title: 편집 기본값은 객체 종류별 로컬 설정으로 관리
-description: 새 객체의 폰트와 테두리를 문서가 아닌 장치별 설정으로 관리.
+description: 새 객체의 폰트와 테두리를 문서가 아닌 파일별 로컬 설정으로 관리.
 tags: [desktop, editor, settings, fonts]
 timestamp: 2026-08-16T00:00:00Z
 ---
 
 ## 결정
 
-- 기본 폰트와 테두리를 앱 데이터 디렉터리의 settings.json에 저장.
+- 기본 폰트와 테두리를 앱 데이터 디렉터리의 profiles/<profile-id>/settings.json에 저장.
 - 도형과 이미지의 테두리 색상·굵기·스타일을 별도로 저장.
 - 도형 테두리 설정은 사각형·원·선·화살표·펜에 공통 적용.
 - Noto Sans KR 가변 폰트와 OFL 라이선스를 앱에 포함.

@@ -11,6 +11,8 @@ const MENU_COMMANDS = {
   redo,
   duplicate: duplicateSelection,
   cut: cutSelection,
+  copy: copySelection,
+  find: openDeckSearch,
   delete: deleteSelectedShape,
   'order-front': () => reorderSelection('front'),
   'order-forward': () => reorderSelection('forward'),
@@ -137,6 +139,12 @@ async function renderAiSlideImage(index) {
 
 async function initialize() {
   populateCodeOptions();
+  try {
+    const path = await window.api.initialDocument();
+    if (path) await loadDocument(path);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
+  }
   try {
     await loadPersistentSettings();
   } catch (error) {

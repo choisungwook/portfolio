@@ -42,6 +42,19 @@
 - 근거: [svg.js:116](../workspace/src/editor/svg.js), [code.js:116](../workspace/src/renderer/code.js).
 - 결정: [코드 블록은 편집 모델과 PPTX 표현을 분리](../knowledge/decisions/2026-08-code-blocks-keep-source-metadata.md).
 
+## 빈 도형 선택과 말풍선
+
+- 채우기가 none이면 윤곽선 가까이 클릭해 선택.
+- 빈 내부만 드래그하면 바깥 도형은 선택하지 않음.
+- 회전한 도형과 원도 실제 윤곽선 위치로 드래그 선택 판정.
+- Speech bubble 또는 B → 캔버스 드래그로 말풍선 생성.
+- 말풍선 선택 후 글자 입력 또는 윤곽선 더블클릭으로 텍스트 편집.
+- 말풍선 꼬리도 도형 크기에 포함해 선택·리사이즈·회전 적용.
+- PPTX에는 텍스트가 붙은 편집 가능한 사용자 도형으로 저장.
+- Cmd++ / Cmd+=와 Cmd+-로 확대·축소, Cmd+0으로 화면 맞춤.
+
+- 근거: [geometry.js:99](../workspace/src/editor/geometry.js), [svg.js:327](../workspace/src/editor/svg.js).
+
 ## 확인 질문
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?

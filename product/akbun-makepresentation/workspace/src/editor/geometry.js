@@ -80,6 +80,7 @@ function shapeSelectionContainsPoint(shape, x, y) {
   const localX = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
   const localY = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
 
+  if (shape.kind === 'callout') return polygonContainsPoint(calloutPoints(shape), localX, localY);
   if (shape.kind === 'ellipse') {
     const nx = (localX - cx) / (box.w / 2);
     const ny = (localY - cy) / (box.h / 2);
@@ -91,6 +92,61 @@ function shapeSelectionContainsPoint(shape, x, y) {
   );
 }
 
+function calloutPoints(shape) {
+  const { x, y, w, h } = shapeBBox(shape);
+  return [[0, 0], [1, 0], [1, 0.75], [0.5, 0.75], [0.2, 1], [0.3, 0.75], [0, 0.75]]
+    .map(([px, py]) => [x + px * w, y + py * h]);
+}
+
+function polygonContainsPoint(points, x, y) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function shapeOutlinePoints(shape) {
+  const b = shapeBBox(shape);
+  let points;
+  if (shape.kind === 'pen') points = shape.points;
+  else if (shape.kind === 'line' || shape.kind === 'arrow') {
+    points = [[shape.x, shape.y], [shape.x + shape.w, shape.y + shape.h]];
+  } else if (shape.kind === 'callout') points = calloutPoints(shape);
+  else if (shape.kind === 'ellipse') {
+    points = Array.from({ length: 96 }, (_, i) => {
+      const angle = i * Math.PI / 48;
+      return [b.x + b.w / 2 * (1 + Math.cos(angle)), b.y + b.h / 2 * (1 + Math.sin(angle))];
+    });
+  } else points = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
+  const angle = (Number(shape.rotation) || 0) * Math.PI / 180;
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  return points.map(([x, y]) => [
+    cx + (x - cx) * Math.cos(angle) - (y - cy) * Math.sin(angle),
+    cy + (x - cx) * Math.sin(angle) + (y - cy) * Math.cos(angle),
+  ]);
+}
+
+function segmentTouchesRect(a, b, rect) {
+  let start = 0, end = 1;
+  for (const [p, d, min, max] of [
+    [a[0], b[0] - a[0], rect.x, rect.x + rect.w],
+    [a[1], b[1] - a[1], rect.y, rect.y + rect.h],
+  ]) {
+    if (d === 0) {
+      if (p < min || p > max) return false;
+    } else {
+      const t0 = (min - p) / d, t1 = (max - p) / d;
+      start = Math.max(start, Math.min(t0, t1));
+      end = Math.min(end, Math.max(t0, t1));
+      if (start > end) return false;
+    }
+  }
+  return true;
+}
+
 function normalizeRect(x0, y0, x1, y1) {
   return {
     x: Math.min(x0, x1),
@@ -100,27 +156,17 @@ function normalizeRect(x0, y0, x1, y1) {
   };
 }
 
-// Touching is enough, the way Figma and Illustrator drag-select. Requiring
-// full containment looked like a bug that swallowed objects: shapes default
-// to no fill, so a drag started in the empty middle of a rectangle begins a
-// marquee, and that marquee can never contain the rectangle it started
-// inside. The text sitting in the rectangle was caught and the rectangle
-// itself was not.
-//
-// Lines keep being tested by their bounding box, so a diagonal one answers to
-// a marquee that only crosses the empty corner of that box. Under a touch
-// rule that errs the forgiving way.
 function shapeIndicesInRect(shapes, rect) {
-  const right = rect.x + rect.w;
-  const bottom = rect.y + rect.h;
   return shapes.reduce((indices, shape, index) => {
-    const box = shapeBBox(shape);
-    const overlaps =
-      box.x <= right &&
-      box.x + box.w >= rect.x &&
-      box.y <= bottom &&
-      box.y + box.h >= rect.y;
-    if (overlaps) indices.push(index);
+    const points = shapeOutlinePoints(shape);
+    const closed = BOXY.has(shape.kind);
+    const filled = closed && (shape.fill !== 'none' || ['text', 'image', 'code'].includes(shape.kind));
+    const padding = shape.stroke === 'none' ? 0 : Math.max(0, Number(shape.strokeWidth) || 0) / 2;
+    const bounds = { x: rect.x - padding, y: rect.y - padding, w: rect.w + padding * 2, h: rect.h + padding * 2 };
+    const segments = closed ? points.length : points.length - 1;
+    const touches = points.some((point, i) => i < segments && segmentTouchesRect(point, points[(i + 1) % points.length], bounds));
+    const contains = filled && polygonContainsPoint(points, rect.x + rect.w / 2, rect.y + rect.h / 2);
+    if (touches || contains) indices.push(index);
     return indices;
   }, []);
 }
@@ -485,6 +531,7 @@ function rotatedBBox(box, degrees) {
     isDegenerate,
     shapeBBox,
     shapeSelectionContainsPoint,
+    calloutPoints,
     normalizeRect,
     shapeIndicesInRect,
     toggleSelection,
