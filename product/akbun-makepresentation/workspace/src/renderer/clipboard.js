@@ -6,8 +6,10 @@ function isFormField(target) {
     target instanceof HTMLTextAreaElement;
 }
 
-// Cut watches this to see whether the clipboard really took the objects.
-let lastCopiedAt = 0;
+// Cut watches this counter to see whether the clipboard really took the
+// objects. A counter rather than a timestamp: two copies close together can
+// read the same clock, and that would look like a refused clipboard.
+let copyCount = 0;
 
 document.addEventListener('copy', (event) => {
   if (isFormField(event.target)) return;
@@ -19,7 +21,7 @@ document.addEventListener('copy', (event) => {
     .map((shape) => shape.text)
     .join('\n');
   if (text) event.clipboardData.setData('text/plain', text);
-  lastCopiedAt = performance.now();
+  copyCount += 1;
   event.preventDefault();
 });
 
@@ -108,11 +110,11 @@ document.addEventListener('paste', async (event) => {
 // makes the pair a cut.
 function cutSelection() {
   if (selectedShapes().length === 0) return;
-  const before = lastCopiedAt;
+  const before = copyCount;
   document.execCommand('copy');
   // A webview that refuses the clipboard would otherwise turn cut into a
   // delete with nothing to paste back.
-  if (lastCopiedAt === before) return;
+  if (copyCount === before) return;
   deleteSelectedShape();
 }
 

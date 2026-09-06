@@ -990,9 +990,12 @@ test('reorderShapes moves a selection through the stack', () => {
   assert.deepStrictEqual(names(backward), ['a', 'c', 'b', 'd']);
   assert.deepStrictEqual(backward.indices, [1]);
 
-  // Already at the edge, or nothing selected: the array is handed back as is.
-  assert.strictEqual(L.reorderShapes(shapes, [3], 'forward').shapes.length, 4);
-  assert.deepStrictEqual(names(L.reorderShapes(shapes, [3], 'forward')), ['a', 'b', 'c', 'd']);
+  // Already at the edge, or nothing selected: the same array is handed back,
+  // which is how the caller knows there is nothing to undo.
+  assert.strictEqual(L.reorderShapes(shapes, [3], 'forward').shapes, shapes);
+  assert.strictEqual(L.reorderShapes(shapes, [0], 'backward').shapes, shapes);
+  assert.strictEqual(L.reorderShapes(shapes, [3], 'front').shapes, shapes);
+  assert.strictEqual(L.reorderShapes(shapes, [0, 1], 'back').shapes, shapes);
   assert.strictEqual(L.reorderShapes(shapes, [], 'front').shapes, shapes);
   assert.strictEqual(L.reorderShapes(shapes, [0], 'sideways').shapes, shapes);
 });

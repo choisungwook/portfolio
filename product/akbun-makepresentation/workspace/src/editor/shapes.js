@@ -201,21 +201,29 @@ function cloneShapes(shapes) {
 // would only trade places inside the selection and nothing would move.
 const ORDER_MODES = new Set(['front', 'forward', 'backward', 'back']);
 
+function sameOrder(before, after) {
+  return before.every((shape, index) => shape === after[index]);
+}
+
 function reorderShapes(shapes, indices, mode) {
   const selected = [...new Set(indices)]
     .filter((index) => Number.isInteger(index) && index >= 0 && index < shapes.length)
     .sort((left, right) => left - right);
   if (selected.length === 0 || !ORDER_MODES.has(mode)) return { shapes, indices: selected };
 
+  // A selection already at the edge it is sent to must hand the same array
+  // back, because that is how the caller tells a no-op from a change worth
+  // an undo step.
+  const unchanged = { shapes, indices: selected };
+
   if (mode === 'front' || mode === 'back') {
     const taken = new Set(selected);
     const picked = selected.map((index) => shapes[index]);
     const rest = shapes.filter((_, index) => !taken.has(index));
     const base = mode === 'front' ? rest.length : 0;
-    return {
-      shapes: mode === 'front' ? [...rest, ...picked] : [...picked, ...rest],
-      indices: picked.map((_, offset) => base + offset),
-    };
+    const next = mode === 'front' ? [...rest, ...picked] : [...picked, ...rest];
+    if (sameOrder(shapes, next)) return unchanged;
+    return { shapes: next, indices: picked.map((_, offset) => base + offset) };
   }
 
   const next = [...shapes];
@@ -236,6 +244,7 @@ function reorderShapes(shapes, indices, mode) {
     occupied.add(target);
     moved.push(target);
   }
+  if (sameOrder(shapes, next)) return unchanged;
   return { shapes: next, indices: moved.sort((left, right) => left - right) };
 }
 
