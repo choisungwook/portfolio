@@ -130,6 +130,7 @@
       <div id="props-stroke">
         <div class="prop-row">
           <label>Line color</label>
+          <label><input type="checkbox" id="prop-stroke-none" /> none</label>
           <input type="color" id="prop-stroke" />
         </div>
         <div class="prop-row">
@@ -328,6 +329,7 @@
   <div id="present" hidden></div>
 
   <div id="context-menu" hidden>
+    <button id="context-lock">Lock</button>
     <button data-order="front">Bring to Front</button>
     <button data-order="forward">Bring Forward</button>
     <button data-order="backward">Send Backward</button>
@@ -509,16 +511,28 @@
           <div class="settings-general-fields">
             <label for="settings-default-font">Default font</label>
             <select id="settings-default-font"></select>
+            <label for="settings-fill">Shape fill</label>
+            <span><label><input id="settings-fill-none" type="checkbox" /> none</label> <input id="settings-fill" type="color" /></span>
+            <label for="settings-text-color">Text color</label>
+            <input id="settings-text-color" type="color" />
             <label for="settings-snapping">Shape snapping</label>
             <label class="settings-checkbox">
               <input id="settings-snapping" type="checkbox" /> Snap matching object edges while dragging
             </label>
           </div>
           <fieldset class="settings-border-fields">
+            <legend>Arrow defaults</legend>
+            <p>New arrows. Lines and freehand start without arrowheads.</p>
+            <label for="settings-arrow-start">Start end</label>
+            <select id="settings-arrow-start"></select>
+            <label for="settings-arrow-end">Finish end</label>
+            <select id="settings-arrow-end"></select>
+          </fieldset>
+          <fieldset class="settings-border-fields">
             <legend>Shape border</legend>
             <p>Rectangle, ellipse, line, arrow, and freehand.</p>
             <label for="settings-shape-border-color">Color</label>
-            <input id="settings-shape-border-color" type="color" />
+            <span><label><input id="settings-shape-border-none" type="checkbox" /> none</label> <input id="settings-shape-border-color" type="color" /></span>
             <label for="settings-shape-border-width">Width</label>
             <input id="settings-shape-border-width" type="number" min="1" max="30" step="0.5" />
             <label for="settings-shape-border-dash">Style</label>
@@ -531,7 +545,7 @@
           <fieldset class="settings-border-fields">
             <legend>Image border</legend>
             <label for="settings-image-border-color">Color</label>
-            <input id="settings-image-border-color" type="color" />
+            <span><label><input id="settings-image-border-none" type="checkbox" /> none</label> <input id="settings-image-border-color" type="color" /></span>
             <label for="settings-image-border-width">Width</label>
             <input id="settings-image-border-width" type="number" min="1" max="30" step="0.5" />
             <label for="settings-image-border-dash">Style</label>

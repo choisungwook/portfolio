@@ -176,7 +176,7 @@ function textLine(shape) {
 
 function shapeLines(shape, index) {
   const b = box(shape);
-  const head = `[${index}] ${shape.kind}`;
+  const head = `[${index}] ${shape.kind}${shape.locked ? ' (locked; preserve unchanged)' : ''}`;
   const lines = [];
   if (shape.kind === 'line' || shape.kind === 'arrow') {
     const x2 = round(shape.x + shape.w);

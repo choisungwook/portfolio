@@ -315,7 +315,16 @@ fn background_xml(background: &str) -> String {
     )
 }
 
+fn locks_xml(shape: &Shape, element: &str) -> String {
+    if !shape.locked {
+        return String::new();
+    }
+    let content_lock = if element == "spLocks" { " noTextEdit=\"1\"" } else { "" };
+    format!("<a:{element} noMove=\"1\" noResize=\"1\" noRot=\"1\"{content_lock}/>")
+}
+
 fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
+    let locks = locks_xml(shape, "picLocks");
     let crop = if shape.crop_left != 0.0
         || shape.crop_top != 0.0
         || shape.crop_right != 0.0
@@ -343,7 +352,7 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
         (format!("Picture {id}"), String::new())
     };
     format!(
-        "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"{name}\"{description}/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>\
+        "<p:pic><p:nvPicPr><p:cNvPr id=\"{id}\" name=\"{name}\"{description}/><p:cNvPicPr>{locks}</p:cNvPicPr><p:nvPr/></p:nvPicPr>\
 <p:blipFill><a:blip r:embed=\"rId{rid}\"/>{crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill>\
 <p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>{}</p:spPr></p:pic>",
         xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
@@ -456,6 +465,8 @@ fn text_body(shape: &Shape) -> String {
 }
 
 fn shape_xml(shape: &Shape, id: u64) -> String {
+    let locks = locks_xml(shape, "spLocks");
+    let connection_locks = locks_xml(shape, "cxnSpLocks");
     match shape.kind.as_str() {
         "line" | "arrow" => {
             let (x, w) = if shape.w < 0.0 {
@@ -469,7 +480,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
                 (shape.y, shape.h)
             };
             format!(
-                "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"{id}\" name=\"Line {id}\"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>\
+                "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"{id}\" name=\"Line {id}\"/><p:cNvCxnSpPr>{connection_locks}</p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"line\"><a:avLst/></a:prstGeom>{}</p:spPr></p:cxnSp>",
                 xfrm(x, y, w, h, shape.w < 0.0, shape.h < 0.0, shape.rotation),
                 line_xml(shape)
@@ -489,7 +500,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
                 ));
             }
             format!(
-                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Freeform {id}\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
+                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Freeform {id}\"/><p:cNvSpPr>{locks}</p:cNvSpPr><p:nvPr/></p:nvSpPr>\
 <p:spPr>{}<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l=\"0\" t=\"0\" r=\"{path_w}\" b=\"{path_h}\"/>\
 <a:pathLst><a:path w=\"{path_w}\" h=\"{path_h}\">{path}</a:path></a:pathLst></a:custGeom>\
 <a:noFill/>{}</p:spPr></p:sp>",
@@ -499,7 +510,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
         }
         "text" => {
             format!(
-                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Text {id}\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr>\
+                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Text {id}\"/><p:cNvSpPr txBox=\"1\">{locks}</p:cNvSpPr><p:nvPr/></p:nvSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>{}</p:sp>",
                 xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
                 text_body(shape)
@@ -517,7 +528,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
                 text_body(shape)
             };
             format!(
-                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Shape {id}\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
+                "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Shape {id}\"/><p:cNvSpPr>{locks}</p:cNvSpPr><p:nvPr/></p:nvSpPr>\
 <p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{}{}</p:spPr>{text}</p:sp>",
                 xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
                 fill_xml(&shape.fill),

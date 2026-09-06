@@ -89,6 +89,8 @@
     escapeXml: Svg.escapeXml,
     wrapTextLines: Svg.wrapTextLines,
     fitTextBox: Svg.fitTextBox,
+    codeBlockLayout: Svg.codeBlockLayout,
+    fitCodeBlock: Svg.fitCodeBlock,
     rotateSvg: Svg.rotateSvg,
     renderShapeSvg: Svg.renderShapeSvg,
     renderSlideSvg: Svg.renderSlideSvg,

@@ -5,7 +5,7 @@
     ? require('./editor.js')
     : globalThis.slidesLib;
 
-  const SETTINGS_VERSION = 4;
+  const SETTINGS_VERSION = 5;
   const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
   const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
   const DEFAULT_AI_SYSTEM_PROMPTS = Object.freeze({
@@ -61,11 +61,7 @@
       version: SETTINGS_VERSION,
       snapping: { enabled: true },
       guidelines: { ...DEFAULT_GUIDELINES },
-      editorDefaults: {
-        fontFamily: DEFAULT_FONT_FAMILY,
-        shapeBorder: { ...DEFAULT_SHAPE_BORDER },
-        imageBorder: { ...DEFAULT_IMAGE_BORDER },
-      },
+      editorDefaults: normalizeEditorDefaults(),
       aiSystemPrompts: { ...DEFAULT_AI_SYSTEM_PROMPTS },
       customPresets: [],
     };
@@ -114,7 +110,7 @@
     const color = String(source.color || '');
     const width = Number(source.width);
     return {
-      color: /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : fallback.color,
+      color: /^(none|#[0-9a-f]{6})$/i.test(color) ? color.toLowerCase() : fallback.color,
       width: Number.isFinite(width) && width >= 1 && width <= 30
         ? Math.round(width * 100) / 100
         : fallback.width,
@@ -125,10 +121,32 @@
   function normalizeEditorDefaults(value) {
     const source = value && typeof value === 'object' ? value : {};
     const fontFamily = String(source.fontFamily || '').trim().slice(0, 200);
+    const fill = String(source.fill || '');
+    const textColor = String(source.textColor || '');
     return {
       fontFamily: fontFamily || DEFAULT_FONT_FAMILY,
+      fill: /^(none|#[0-9a-f]{6})$/i.test(fill) ? fill.toLowerCase() : L.DEFAULT_STYLE.fill,
+      textColor: /^#[0-9a-f]{6}$/i.test(textColor) ? textColor.toLowerCase() : L.DEFAULT_STYLE.textColor,
+      arrowStart: L.ARROW_ENDS.includes(source.arrowStart) ? source.arrowStart : 'none',
+      arrowEnd: L.ARROW_ENDS.includes(source.arrowEnd) ? source.arrowEnd : 'triangle',
       shapeBorder: normalizeBorder(source.shapeBorder, DEFAULT_SHAPE_BORDER),
       imageBorder: normalizeBorder(source.imageBorder, DEFAULT_IMAGE_BORDER),
+    };
+  }
+
+  function creationStyle(kind, defaults) {
+    const value = normalizeEditorDefaults(defaults);
+    const border = kind === 'image' ? value.imageBorder : value.shapeBorder;
+    return {
+      ...L.DEFAULT_STYLE,
+      fontFamily: value.fontFamily,
+      fill: value.fill,
+      textColor: value.textColor,
+      stroke: border.color,
+      strokeWidth: border.width,
+      dash: border.dash,
+      arrowStart: value.arrowStart,
+      arrowEnd: value.arrowEnd,
     };
   }
 
@@ -228,6 +246,7 @@
     normalizeGuidelines,
     normalizeBorder,
     normalizeEditorDefaults,
+    creationStyle,
     normalizeSnapping,
     normalizeAiSystemPrompts,
     normalizeCustomPresets,

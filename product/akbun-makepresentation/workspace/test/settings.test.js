@@ -9,6 +9,10 @@ test('settings use the smaller guideline margins by default', () => {
   const settings = S.defaultAppSettings();
   assert.deepStrictEqual(settings.editorDefaults, {
     fontFamily: 'Noto Sans KR',
+    fill: 'none',
+    textColor: '#1a1a1a',
+    arrowStart: 'none',
+    arrowEnd: 'triangle',
     shapeBorder: { color: '#e03131', width: 2, dash: 'solid' },
     imageBorder: { color: '#000000', width: 2, dash: 'solid' },
   });
@@ -71,6 +75,10 @@ test('settings normalize guidelines and custom presets', () => {
   assert.strictEqual(settings.customPresets[0].id, 'rectangle');
   assert.deepStrictEqual(settings.editorDefaults, {
     fontFamily: 'Noto Sans KR',
+    fill: 'none',
+    textColor: '#1a1a1a',
+    arrowStart: 'none',
+    arrowEnd: 'triangle',
     shapeBorder: { color: '#abcdef', width: 3.5, dash: 'dot' },
     imageBorder: { color: '#000000', width: 2, dash: 'solid' },
   });
@@ -141,4 +149,23 @@ test('an untouched legacy AI prompt is refreshed but a written one is kept', () 
 test('the slide prompt tells the model the measurements outrank its impression', () => {
   assert.match(S.DEFAULT_AI_SYSTEM_PROMPTS.slide, /Trust the measurements/);
   assert.match(S.DEFAULT_AI_SYSTEM_PROMPTS.text, /measured reading/);
+});
+
+test('saved creation colors and arrowheads never inherit an edited shape', () => {
+  const defaults = S.normalizeEditorDefaults({
+    fill: '#abcdef', textColor: '#123456', arrowStart: 'oval', arrowEnd: 'arrow',
+    shapeBorder: { color: 'none', width: 4, dash: 'dot' },
+    imageBorder: { color: '#654321', width: 3, dash: 'dash' },
+  });
+  const first = L.createShape('arrow', 0, 0, S.creationStyle('arrow', defaults));
+  Object.assign(first, { stroke: '#ff0000', fill: '#00ff00', textColor: '#0000ff', arrowEnd: 'diamond' });
+  const next = L.createShape('arrow', 0, 0, S.creationStyle('arrow', defaults));
+  assert.equal(next.stroke, 'none');
+  assert.equal(next.fill, '#abcdef');
+  assert.equal(next.textColor, '#123456');
+  assert.equal(next.arrowStart, 'oval');
+  assert.equal(next.arrowEnd, 'arrow');
+  assert.equal(L.createShape('line', 0, 0, S.creationStyle('line', defaults)).arrowEnd, 'none');
+  assert.equal(S.creationStyle('image', defaults).stroke, '#654321');
+  assert.deepEqual(S.normalizeAppSettings({ editorDefaults: defaults }).editorDefaults, defaults);
 });

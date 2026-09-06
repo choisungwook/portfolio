@@ -368,3 +368,17 @@ test('base instructions tell the model the slide reading is all it gets', () => 
   assert.match(instructions, /You never see the deck file/);
   assert.match(instructions, /Treat that reading as authoritative/);
 });
+
+test('slide patches preserve locked objects while editing unlocked objects', () => {
+  const locked = { ...L.createShape('rect', 10, 20), w: 200, h: 100, locked: true };
+  const unlocked = { ...L.createShape('rect', 50, 60), w: 80, h: 50 };
+  const result = A.applySlidePatch({ shapes: [locked, unlocked] }, {
+    operations: [
+      { op: 'update', index: 0, changes: { x: 999, fill: '#ff0000' } },
+      { op: 'remove', index: 0 },
+      { op: 'update', index: 1, changes: { x: 75 } },
+    ],
+  });
+  assert.deepEqual(result.shapes[0], locked);
+  assert.equal(result.shapes[1].x, 75);
+});

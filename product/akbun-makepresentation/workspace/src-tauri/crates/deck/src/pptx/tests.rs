@@ -510,3 +510,34 @@ let back = read(buffer).unwrap();
 assert_eq!(back.slides.len(), 1);
 assert!(back.slides[0].shapes.is_empty());
 }
+
+#[test]
+fn round_trip_preserves_locks_and_absent_borders_for_every_shape_kind() {
+    for kind in ["rect", "ellipse", "text", "line", "arrow", "pen", "image", "code"] {
+        for locked in [false, true] {
+            let shape = Shape {
+                kind: kind.into(),
+                x: 10.0,
+                y: 20.0,
+                w: 200.0,
+                h: 100.0,
+                points: if kind == "pen" { vec![[10.0, 20.0], [210.0, 120.0]] } else { vec![] },
+                src: if kind == "image" || kind == "code" { TINY_PNG.into() } else { String::new() },
+                text: "content".into(),
+                locked,
+                stroke: "none".into(),
+                ..Shape::default()
+            };
+            let deck = Deck {
+                slides: vec![Slide { shapes: vec![shape], ..Slide::default() }],
+                ..Deck::default()
+            };
+            let mut buffer = Cursor::new(Vec::new());
+            write(&deck, &mut buffer).unwrap();
+            let restored = read(Cursor::new(buffer.into_inner())).unwrap();
+            assert_eq!(restored.slides[0].shapes.len(), 1, "{kind}");
+            assert_eq!(restored.slides[0].shapes[0].locked, locked, "{kind}");
+            assert_eq!(restored.slides[0].shapes[0].stroke, "none", "{kind}");
+        }
+    }
+}

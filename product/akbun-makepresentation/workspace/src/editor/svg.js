@@ -98,26 +98,62 @@ function tokenizeCodeLine(line, language) {
   return tokens;
 }
 
-function codeShapeSvg(shape) {
-  const box = shapeBBox(shape);
-  if (!(box.w > 0) || !(box.h > 0)) return '';
-  const theme = CODE_FORMATS[shape.codeFormat] || CODE_FORMATS['editor-dark'];
+const CODE_FONT = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+let codeMeasureContext;
+
+function measureCodeLine(text, fontSize) {
+  if (typeof document !== 'undefined') {
+    codeMeasureContext ||= document.createElement('canvas').getContext('2d');
+    if (codeMeasureContext) {
+      codeMeasureContext.font = `${fontSize}px ${CODE_FONT}`;
+      return codeMeasureContext.measureText(text).width;
+    }
+  }
+  return Array.from(text).reduce((width, char) =>
+    width + fontSize * (char.codePointAt(0) > 255 ? 1 : 0.62), 0);
+}
+
+function codeBlockLayout(shape) {
   const format = CODE_FORMATS[shape.codeFormat] ? shape.codeFormat : 'editor-dark';
   const language = CODE_LANGUAGES.includes(shape.codeLanguage) ? shape.codeLanguage : 'plaintext';
   const fontSize = Math.max(1, Number(shape.fontSize) || 24);
   const lineHeight = fontSize * 1.48;
   const chromeHeight = format === 'minimal' ? 0 : fontSize * 1.8;
   const top = chromeHeight + fontSize * 0.8;
-  const lines = String(shape.text || '').replace(/\r/g, '').split('\n');
+  const lines = String(shape.text || '').replace(/\r/g, '').replace(/\t/g, '  ').split('\n');
   const showNumbers = shape.showLineNumbers !== false;
   const digits = String(Math.max(1, lines.length)).length;
   const gutter = showNumbers ? fontSize * (digits * 0.62 + 1.4) : 0;
   const left = fontSize * 1.05 + gutter;
-  const right = fontSize * 1.8;
+  const right = fontSize * (normalizeLineNumbers(shape.codeCallouts).length ? 1.8 : 0.8);
+  const contentWidth = lines.reduce((width, line) => Math.max(width, measureCodeLine(line, fontSize)), 0);
+  const headerWidth = format === 'minimal' ? 0
+    : format === 'terminal' ? measureCodeLine(`›_ ${language}`, fontSize * 0.78) + fontSize * 2
+    : fontSize * 6 + measureCodeLine(language, fontSize * 0.68);
+  return {
+    format, language, fontSize, lineHeight, chromeHeight, top, lines, showNumbers, left, right,
+    width: Math.max(left + contentWidth + right, headerWidth),
+    height: top + lines.length * lineHeight + fontSize * 0.5,
+  };
+}
+
+function fitCodeBlock(shape) {
+  if (!shape || shape.kind !== 'code' || shape.locked) return shape;
+  const layout = codeBlockLayout(shape);
+  shape.w = layout.width;
+  shape.h = layout.height;
+  return shape;
+}
+
+function codeShapeSvg(shape) {
+  const box = shapeBBox(shape);
+  if (!(box.w > 0) || !(box.h > 0)) return '';
+  const theme = CODE_FORMATS[shape.codeFormat] || CODE_FORMATS['editor-dark'];
+  const { format, language, fontSize, lineHeight, chromeHeight, top, lines, showNumbers, left, right } = codeBlockLayout(shape);
   const highlights = new Set(normalizeLineNumbers(shape.codeHighlights));
   const callouts = normalizeLineNumbers(shape.codeCallouts);
   const calloutNumbers = new Map(callouts.map((line, index) => [line, index + 1]));
-  const visible = Math.max(1, Math.floor((box.h - top - fontSize * 0.5) / lineHeight));
+  const visible = Math.max(1, Math.floor((box.h - top - fontSize * 0.5) / lineHeight + 1e-6));
   const radius = Math.min(fontSize * 0.75, box.w / 8, box.h / 8);
   const header = format === 'minimal'
     ? ''
@@ -527,6 +563,8 @@ function renderShapesSvg(shapes) {
     tokenizeCodeLine,
     wrapTextLines,
     fitTextBox,
+    codeBlockLayout,
+    fitCodeBlock,
     rotateSvg,
     textBox,
     renderShapeSvg,

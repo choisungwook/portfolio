@@ -102,16 +102,27 @@ function defaultCode(language) {
 function insertCodeBlock(format, language) {
   const { width, height } = deckSize();
   const shape = L.createShape('code', width * 0.11, height * 0.14, newShapeStyle('code'));
-  shape.w = width * 0.78;
-  shape.h = height * 0.7;
   shape.fontSize = Math.max(16, Math.round(Math.min(width / 75, height / 42)));
   shape.codeFormat = format;
   shape.codeLanguage = language;
   shape.text = defaultCode(language);
+  fitCodeBlockForSlide(shape);
   slide().shapes.push(shape);
   selectOnly(slide().shapes.length - 1);
   renderAll();
   openCodeDialog(state.selected, true);
+}
+
+function fitCodeBlockForSlide(shape) {
+  if (shape.locked) return;
+  L.fitCodeBlock(shape);
+  const { width, height } = deckSize();
+  const scale = Math.min(1,
+    Math.max(8, width - shape.x) / shape.w,
+    Math.max(8, height - shape.y) / shape.h);
+  shape.w *= scale;
+  shape.h *= scale;
+  shape.fontSize *= scale;
 }
 
 codeBlockMenu.addEventListener('click', (event) => {
@@ -128,7 +139,7 @@ function lineNumberValue(lines) {
 
 function openCodeDialog(index, isNew) {
   const shape = slide().shapes[index];
-  if (!shape || shape.kind !== 'code') return;
+  if (!shape || shape.locked || shape.kind !== 'code') return;
   hideToolbarPopovers();
   codeEditIndex = index;
   codeEditIsNew = isNew;
@@ -179,6 +190,7 @@ $('code-form').addEventListener('submit', (event) => {
   shape.codeCallouts = L.normalizeLineNumbers($('code-callouts').value);
   shape.showLineNumbers = $('code-line-numbers').checked;
   const changed = codeEditIsNew || JSON.stringify(shape) !== JSON.stringify(codeEditBefore);
+  if (changed) fitCodeBlockForSlide(shape);
   resetCodeEdit();
   codeDialog.close('apply');
   if (changed) markDirty();

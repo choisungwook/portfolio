@@ -10,6 +10,9 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Text boxes with font family, size, color, bold, italic, underline and alignment
 - Text written inside a rectangle or an ellipse, centered, with the same font controls
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
+- Right-click Lock/Unlock: keep selection while preventing object edits, including moves and style changes
+- Settings → General: new-object fill, text color, borders (including none), and arrowhead defaults
+- Editable code blocks fit their source and keep the frame and text in proportion when resized
 - Multi-object group and ungroup from the right-click menu or the panel, with grouped move and duplicate
 - Its own File, Edit and View menus in the window rather than in the system menu bar
 - Configurable TITLE and CONTENT guideline margins, stored per device in px or cm
@@ -45,7 +48,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Cmd+S | Save |
 | Cmd+N, Cmd+O | New deck, open a deck |
 | Cmd+Up / Cmd+Down | Move the current slide one place earlier or later |
-| Cmd+B, Cmd+I, Cmd+U | Bold, italic, underline the selected text box, or the style new ones start with |
+| Cmd+B, Cmd+I, Cmd+U | Bold, italic, underline the selected unlocked text box |
 | Cmd++ / Cmd+- | Zoom in / out |
 | Cmd+0 | Fit the slide to the window |
 | Shift while drawing | Square or circle; lines and arrows snap to 45 degrees |
