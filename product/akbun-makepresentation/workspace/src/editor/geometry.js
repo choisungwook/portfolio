@@ -182,6 +182,7 @@ function alignShapes(shapes, indices, edge) {
     ? Math.min(...boxes.map((box) => box.x))
     : Math.max(...boxes.map((box) => box.x + box.w));
   selected.forEach((index, offset) => {
+    if (shapes[index].locked) return;
     const box = boxes[offset];
     const current = edge === 'top' ? box.y
       : edge === 'bottom' ? box.y + box.h
@@ -232,7 +233,7 @@ function snapMove(shapes, indices, dx, dy, threshold) {
 
 function groupShapes(shapes, indices) {
   const valid = [...new Set(indices)].filter(
-    (index) => Number.isInteger(index) && index >= 0 && index < shapes.length
+    (index) => Number.isInteger(index) && index >= 0 && index < shapes.length && !shapes[index].locked
   );
   if (valid.length < 2) return '';
   const id = nextGroupId();
@@ -244,21 +245,22 @@ function ungroupShapes(shapes, indices) {
   const ids = new Set(indices.map((index) => shapes[index] && shapes[index].groupId).filter(Boolean));
   if (ids.size === 0) return false;
   for (const shape of shapes) {
-    if (ids.has(shape.groupId)) shape.groupId = '';
+    if (ids.has(shape.groupId) && !shape.locked) shape.groupId = '';
   }
   return true;
 }
 
 function groupIndicesFor(shapes, index) {
   const shape = shapes[index];
-  if (!shape || !shape.groupId) return Number.isInteger(index) ? [index] : [];
+  if (!shape || !shape.groupId || shape.locked) return Number.isInteger(index) ? [index] : [];
   return shapes.reduce((indices, candidate, candidateIndex) => {
-    if (candidate.groupId === shape.groupId) indices.push(candidateIndex);
+    if (candidate.groupId === shape.groupId && !candidate.locked) indices.push(candidateIndex);
     return indices;
   }, []);
 }
 
 function handlesFor(shape) {
+  if (shape.locked) return [];
   if (shape.kind === 'line' || shape.kind === 'arrow') {
     return [
       { id: 'start', x: shape.x, y: shape.y },
@@ -367,6 +369,11 @@ function setShapeBox(shape, from, x0, y0, x1, y1) {
 // Resize by dragging a handle. `from` is the shape as it was when the drag
 // started, so repeated calls with a growing delta do not compound.
 function resizeShape(shape, from, handle, dx, dy) {
+  if (shape.locked) return;
+  if (shape.kind === 'code' && from.w > 0 && from.h > 0) {
+    resizeProportional(shape, from, handle, dx, dy);
+    return;
+  }
   if (handle === 'start' || handle === 'end') {
     resizeLineEndpoint(shape, from, handle, dx, dy);
     return;
@@ -413,6 +420,7 @@ function resizeProportional(shape, from, handle, dx, dy) {
 // moving endpoint crosses the fixed one. Every other shape keeps its
 // proportions.
 function resizeShapeConstrained(shape, from, handle, dx, dy) {
+  if (shape.locked) return;
   if (shape.kind === 'line' || shape.kind === 'arrow') {
     resizeLineOnAxis(shape, from, handle, dx, dy);
     return;
@@ -452,6 +460,7 @@ function unrotateDelta(dx, dy, degrees) {
 // box, so a shape at rest reads as -90 degrees here and the +90 brings that
 // back to zero. `constrain` is the Shift key: quarter turns only.
 function rotationTowards(shape, x, y, constrain) {
+  if (shape.locked) return shape.rotation || 0;
   const b = shapeBBox(shape);
   const degrees =
     (Math.atan2(y - (b.y + b.h / 2), x - (b.x + b.w / 2)) * 180) / Math.PI + 90;

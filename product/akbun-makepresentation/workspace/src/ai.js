@@ -301,6 +301,7 @@
     const removed = new Set();
     const additions = [];
     for (const operation of patch.operations) {
+      if (operation.op !== 'add' && sourceSlide.shapes[operation.index]?.locked) continue;
       if (operation.op === 'remove') {
         removed.add(operation.index);
       } else if (operation.op === 'update') {

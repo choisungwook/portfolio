@@ -1,8 +1,8 @@
 'use strict';
 
 function deleteSelectedShape() {
-  if (state.selection.length === 0) return;
-  const descending = [...state.selection].sort((a, b) => b - a);
+  const descending = state.selection.filter((index) => !slide().shapes[index]?.locked).sort((a, b) => b - a);
+  if (!descending.length) return;
   for (const index of descending) slide().shapes.splice(index, 1);
   clearSelection();
   markDirty();
@@ -15,7 +15,9 @@ function deleteSelectedShape() {
 // these four only ever have to move what is already there.
 function reorderSelection(mode) {
   if (state.selection.length === 0) return;
-  const result = L.reorderShapes(slide().shapes, state.selection, mode);
+  const indices = state.selection.filter((index) => !slide().shapes[index]?.locked);
+  if (!indices.length) return;
+  const result = L.reorderShapes(slide().shapes, indices, mode);
   if (result.shapes === slide().shapes) return;
   slide().shapes = result.shapes;
   selectMany(result.indices);

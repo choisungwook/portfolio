@@ -1,7 +1,7 @@
 'use strict';
 
 function applyProp(patch) {
-  const shapes = selectedShapes();
+  const shapes = selectedShapes().filter((shape) => !shape.locked);
   if (shapes.length) {
     for (const shape of shapes) {
       Object.assign(shape, patch);
@@ -15,8 +15,6 @@ function applyProp(patch) {
     markDirty();
     renderCanvas();
     renderThumbs();
-  } else {
-    Object.assign(state.defaults, patch);
   }
   renderProps();
 }
@@ -35,7 +33,7 @@ function ungroupSelection() {
 
 function toggleCrop() {
   const shape = selectedShape();
-  if (!shape || (shape.kind !== 'image' && shape.kind !== 'code')) return;
+  if (!shape || shape.locked || (shape.kind !== 'image' && shape.kind !== 'code')) return;
   state.cropping = state.cropping ? null : { index: state.selected };
   renderAll();
 }
@@ -113,6 +111,9 @@ $('prop-fill-none').addEventListener('change', (e) =>
 );
 $('prop-fill').addEventListener('input', (e) => applyProp({ fill: e.target.value }));
 $('prop-stroke').addEventListener('input', (e) => applyProp({ stroke: e.target.value }));
+$('prop-stroke-none').addEventListener('change', (e) =>
+  applyProp({ stroke: e.target.checked ? 'none' : $('prop-stroke').value })
+);
 $('prop-width').addEventListener('input', (e) =>
   applyProp({ strokeWidth: Math.max(1, Number(e.target.value) || 1) })
 );

@@ -1,7 +1,7 @@
 'use strict';
 
 function canEditText(shape) {
-  return !!shape && (shape.kind === 'text' || L.TEXTUAL.has(shape.kind));
+  return !!shape && !shape.locked && (shape.kind === 'text' || L.TEXTUAL.has(shape.kind));
 }
 
 function styleTextEditor(shape) {
@@ -39,6 +39,7 @@ function styleTextEditor(shape) {
 // is already there.
 function startTextEdit(index, seed) {
   const shape = slide().shapes[index];
+  if (!canEditText(shape)) return;
   textEditBefore = structuredClone(shape);
   state.editingIndex = index;
   renderCanvas();
@@ -239,7 +240,7 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key.startsWith('Arrow')) {
-    const shapes = selectedShapes();
+    const shapes = selectedShapes().filter((shape) => !shape.locked);
     if (shapes.length === 0) return;
     const step = event.shiftKey ? 10 : 1;
     const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;

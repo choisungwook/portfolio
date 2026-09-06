@@ -23,6 +23,7 @@ struct Pending {
     flip_h: bool,
     flip_v: bool,
     rotation: f64,
+    locked: bool,
     prst: Option<String>,
     has_custgeom: bool,
     path_pts: Vec<(i64, i64)>,
@@ -244,6 +245,11 @@ fn handle_element(
 ) {
     let get = |name: &[u8]| attr(e, name);
     match local {
+        "spLocks" | "picLocks" | "cxnSpLocks" => {
+            p.locked = [b"noMove".as_slice(), b"noResize".as_slice(), b"noRot".as_slice()]
+                .iter()
+                .any(|name| matches!(get(name).as_deref(), Some("1" | "true")));
+        }
         "cNvPr" if p.is_pic => {
             p.code_shape = get(b"descr")
                 .and_then(|description| description.strip_prefix("akbun-code:").map(str::to_string))
@@ -571,6 +577,7 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
     shape.text.clear();
     shape.src.clear();
     shape.points.clear();
+    shape.locked = p.locked;
 
     if p.is_pic {
         let embed = p.svg_blip.as_ref().or(p.blip.as_ref())?;
@@ -709,6 +716,7 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
         code.w = shape.w;
         code.h = shape.h;
         code.rotation = shape.rotation;
+        code.locked = shape.locked;
         code.src = shape.src;
         return Some(code);
     }

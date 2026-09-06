@@ -56,9 +56,10 @@ function createShape(kind, x, y, style) {
     cropRight: 0,
     cropBottom: 0,
     rotation: 0,
+    locked: false,
     groupId: '',
-    arrowStart: 'none',
-    arrowEnd: kind === 'arrow' ? 'triangle' : 'none',
+    arrowStart: kind === 'arrow' && ARROW_ENDS.includes(s.arrowStart) ? s.arrowStart : 'none',
+    arrowEnd: kind === 'arrow' ? (ARROW_ENDS.includes(s.arrowEnd) ? s.arrowEnd : 'triangle') : 'none',
     codeFormat: 'editor-dark',
     codeLanguage: 'python',
     codeHighlights: [],
@@ -130,7 +131,7 @@ function normalizeClipboardShape(value) {
       /^data:image\/[a-z0-9.+-]+;base64,/i.test(value.src)) {
     shape.src = value.src;
   }
-  for (const name of ['bold', 'italic', 'underline']) {
+  for (const name of ['bold', 'italic', 'underline', 'locked']) {
     if (typeof value[name] === 'boolean') shape[name] = value[name];
   }
   if (typeof value.groupId === 'string' && value.groupId.length <= 100) {

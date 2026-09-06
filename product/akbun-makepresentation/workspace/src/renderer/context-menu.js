@@ -87,6 +87,10 @@ function showContextMenu(x, y) {
     (index) => slide().shapes[index]?.groupId
   );
   const shapes = selectedShapes();
+  $('context-lock').textContent = shapes.every((shape) => shape.locked) ? 'Unlock' : 'Lock';
+  for (const button of contextMenu.querySelectorAll('[data-order], #context-group, #context-ungroup')) {
+    button.disabled = shapes.every((shape) => shape.locked);
+  }
   $('context-save-preset').hidden = shapes.length !== 1 || shapes[0].kind === 'image';
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;
@@ -263,6 +267,18 @@ contextMenu.addEventListener('click', (event) => {
   reorderSelection(button.dataset.order);
 });
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
+$('context-lock').addEventListener('click', () => {
+  hideContextMenu();
+  const shapes = selectedShapes();
+  if (!shapes.length) return;
+  const locked = !shapes.every((shape) => shape.locked);
+  for (const shape of shapes) shape.locked = locked;
+  state.cropping = null;
+  state.drag = null;
+  markDirty();
+  renderAll();
+  canvas.focus({ preventScroll: true });
+});
 $('context-save-preset').addEventListener('click', saveSelectionAsPreset);
 $('context-group').addEventListener('click', () => {
   hideContextMenu();

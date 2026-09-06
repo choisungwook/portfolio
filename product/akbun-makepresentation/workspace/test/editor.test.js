@@ -999,3 +999,57 @@ test('reorderShapes moves a selection through the stack', () => {
   assert.strictEqual(L.reorderShapes(shapes, [], 'front').shapes, shapes);
   assert.strictEqual(L.reorderShapes(shapes, [0], 'sideways').shapes, shapes);
 });
+
+test('locked shapes stay selectable and retain their lock through clipboard and grouping', () => {
+  const outer = Object.assign(L.createShape('rect', 10, 20), { w: 300, h: 200, locked: true, groupId: 'g' });
+  const inner = Object.assign(L.createShape('rect', 40, 60), { w: 80, h: 60, groupId: 'g' });
+  assert.deepEqual(L.groupIndicesFor([outer, inner], 1), [1]);
+  assert.deepEqual(L.groupIndicesFor([outer, inner], 0), [0]);
+  assert.deepEqual(L.handlesFor(outer), []);
+  assert.equal(L.parseClipboardShapes(JSON.stringify([outer]))[0].locked, true);
+  assert.ok(L.shapeIndicesInRect([outer, inner], { x: 0, y: 0, w: 400, h: 300 }).includes(0));
+  const before = structuredClone(outer);
+  L.resizeShape(outer, before, 'se', 20, 30);
+  L.resizeShapeConstrained(outer, before, 'se', 20, 30);
+  assert.deepEqual(outer, before);
+  assert.equal(L.rotationTowards(outer, 500, 600, false), 0);
+  L.alignShapes([outer, inner], [0, 1], 'right');
+  assert.deepEqual(outer, before);
+  assert.equal(inner.x + inner.w, outer.x + outer.w);
+});
+
+test('code blocks fit short, wide, multiline, Unicode, and tabbed code in every format', () => {
+  for (const codeFormat of Object.keys(L.CODE_FORMATS)) {
+    for (const text of ['x', '가나다라마바사🙂', '\tprint("hello")', Array.from({ length: 35 }, (_, i) => `line_${i} = ${i}`).join('\n')]) {
+      const code = Object.assign(L.createShape('code', 10, 20), { text, codeFormat });
+      L.fitCodeBlock(code);
+      const layout = L.codeBlockLayout(code);
+      assert.equal(code.w, layout.width);
+      assert.equal(code.h, layout.height);
+      assert.ok(!L.renderShapeSvg(code).includes(' lines</text>'));
+      assert.equal(code.fontSize, 24);
+      const before = structuredClone(code);
+      L.resizeShape(code, before, 'se', -code.w / 2, -code.h / 4);
+      assert.ok(Math.abs(code.w / before.w - 0.5) < 1e-8);
+      assert.ok(Math.abs(code.h / before.h - 0.5) < 1e-8);
+      assert.equal(code.fontSize, 12);
+      assert.ok(!L.renderShapeSvg(code).includes(' lines</text>'));
+    }
+  }
+});
+
+test('code fitting removes stale frame space after edits and reserves room for callouts', () => {
+  const code = Object.assign(L.createShape('code', 10, 20), { text: 'x', codeFormat: 'minimal', showLineNumbers: false });
+  L.fitCodeBlock(code);
+  const short = { w: code.w, h: code.h };
+  code.text = 'a'.repeat(100) + '\nsecond line';
+  L.fitCodeBlock(code);
+  assert.ok(code.w > short.w * 5);
+  assert.ok(code.h > short.h);
+  code.text = 'x';
+  L.fitCodeBlock(code);
+  assert.deepEqual({ w: code.w, h: code.h }, short);
+  code.codeCallouts = [1];
+  L.fitCodeBlock(code);
+  assert.ok(code.w > short.w);
+});

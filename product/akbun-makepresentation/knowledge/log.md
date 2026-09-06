@@ -2,6 +2,9 @@
 
 ## 2026-09-06
 
+* **Creation**: [객체 잠금은 선택과 변경을 분리](decisions/2026-09-locks-preserve-selection.md) 결정 기록.
+* **Update**: [편집 기본값](decisions/2026-08-editor-defaults-are-local-settings.md)에 색상·화살표·테두리 없음과 생성 시 적용 원칙 추가.
+* **Update**: [코드 블록](decisions/2026-08-code-blocks-keep-source-metadata.md)에 내용 맞춤 측정과 비례 리사이즈 원칙 추가.
 * **Creation**: [잘라내기는 복사 핸들러를 실행하고 지우는 순서로 만든다](decisions/2026-09-cut-runs-the-copy-handler.md) 결정 기록.
 * **Creation**: [슬라이드의 배열 순서가 곧 z 순서다](decisions/2026-09-array-order-is-z-order.md) 결정 기록.
 

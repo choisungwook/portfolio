@@ -64,32 +64,16 @@ const selectedShapes = () =>
     .filter((index) => index >= 0 && index < slide().shapes.length)
     .map((index) => slide().shapes[index]);
 
-function borderStyle(border) {
-  return {
-    stroke: border.color,
-    strokeWidth: border.width,
-    dash: border.dash,
-  };
-}
-
 function syncConfiguredDefaults() {
-  Object.assign(state.defaults, {
-    ...borderStyle(appSettings.editorDefaults.shapeBorder),
-    fontFamily: appSettings.editorDefaults.fontFamily,
-  });
+  state.defaults = S.creationStyle('rect', appSettings.editorDefaults);
 }
 
 function newShapeStyle(kind) {
-  if (kind === 'image') {
-    return {
-      ...state.defaults,
-      ...borderStyle(appSettings.editorDefaults.imageBorder),
-    };
-  }
-  return state.defaults;
+  return S.creationStyle(kind, appSettings.editorDefaults);
 }
 
 function fitTextBoxForSlide(shape, text) {
+  if (shape.locked) return shape;
   const available = deckSize().width - Math.max(0, Number(shape.x) || 0);
   return L.fitTextBox(shape, text, available);
 }
@@ -199,6 +183,7 @@ function rotateHandleSvg(point) {
 // user can see. Without it a rotated shape lights up in one place and offers
 // its handles in another.
 function selectionSvg(shape, handles) {
+  handles = handles && !shape.locked;
   const parts = [];
   if (!handles || (shape.kind !== 'line' && shape.kind !== 'arrow')) {
     const b = L.shapeBBox(shape);
@@ -354,7 +339,8 @@ function renderThumbs() {
 
 function renderProps() {
   const shape = selectedShape();
-  const source = shape || state.defaults;
+  const selection = selectedShapes();
+  const source = selection.find((shape) => !shape.locked) || shape || state.defaults;
   const kind = shape ? shape.kind : 'defaults';
 
   const showFill = kind === 'rect' || kind === 'ellipse' || kind === 'defaults';
@@ -376,20 +362,28 @@ function renderProps() {
   $('btn-delete-shape').hidden = !shape;
   $('btn-group').hidden = state.selection.length < 2;
   $('btn-ungroup').hidden = !state.selection.some((index) => slide().shapes[index]?.groupId);
-  $('props-crop').hidden = kind !== 'image' && kind !== 'code';
+  $('props-crop').hidden = (kind !== 'image' && kind !== 'code') || !!shape?.locked;
   $('props-crop-label').textContent = kind === 'code' ? 'Code block crop' : 'Image crop';
   $('btn-crop').classList.toggle('active', !!state.cropping);
   $('props-shape-align').hidden = state.selection.length < 2;
   $('props-hint').textContent = state.selection.length > 1
     ? `Selected: ${state.selection.length} objects`
     : shape
-    ? `Selected: ${kind}`
-    : 'No selection — sets style for new shapes';
+    ? `Selected: ${kind}${shape.locked ? ' · Locked' : ''}`
+    : 'New object defaults are in Settings → General';
+
+  for (const control of $('props').querySelectorAll('input, select, button')) {
+    control.disabled = !shape || selection.every((shape) => shape.locked);
+  }
 
   $('prop-fill-none').checked = source.fill === 'none';
   $('prop-fill').value = source.fill === 'none' ? '#ffffff' : source.fill;
-  $('prop-fill').disabled = source.fill === 'none';
+  $('prop-fill').disabled ||= source.fill === 'none';
+  $('prop-stroke-none').checked = source.stroke === 'none';
   $('prop-stroke').value = source.stroke === 'none' ? '#1a1a1a' : source.stroke;
+  for (const id of ['prop-stroke', 'prop-width', 'prop-dash']) {
+    $(id).disabled ||= source.stroke === 'none';
+  }
   $('prop-width').value = source.strokeWidth;
   $('prop-dash').value = source.dash;
   $('prop-font-size').value = source.fontSize;

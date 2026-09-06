@@ -1,11 +1,23 @@
 'use strict';
 
+function shapeIndexAtPointer(event, group) {
+  const index = group ? Number(group.dataset.i) : -1;
+  if (!slide().shapes[index]?.locked) return index;
+  for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
+    const candidate = element.closest('#canvas g[data-i]');
+    if (candidate && !slide().shapes[Number(candidate.dataset.i)]?.locked) {
+      return Number(candidate.dataset.i);
+    }
+  }
+  return index;
+}
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
   const handleEl = event.target.closest('[data-handle]');
   const cropHandle = event.target.closest('[data-crop-handle]');
   const group = event.target.closest('g[data-i]');
-  const hitShape = group ? slide().shapes[Number(group.dataset.i)] : null;
+  const hitShape = slide().shapes[shapeIndexAtPointer(event, group)];
   if (state.editingIndex >= 0) textEditor.blur();
   // WebKit otherwise starts a native text selection alongside marquee and
   // Shift-click selection. That highlight can extend outside the marquee and
@@ -35,7 +47,7 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  if (handleEl && handleEl.dataset.handle === 'rotate' && selectedShape()) {
+  if (handleEl && handleEl.dataset.handle === 'rotate' && selectedShape() && !selectedShape().locked) {
     state.drag = {
       mode: 'rotate',
       from: structuredClone(selectedShape()),
@@ -46,7 +58,7 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  if (handleEl && state.selection.length === 1 && selectedShape()) {
+  if (handleEl && state.selection.length === 1 && selectedShape() && !selectedShape().locked) {
     state.drag = {
       mode: 'resize',
       handle: handleEl.dataset.handle,
@@ -58,7 +70,7 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  if (cropHandle && state.cropping && selectedShape()) {
+  if (cropHandle && state.cropping && selectedShape() && !selectedShape().locked) {
     state.drag = {
       mode: 'crop',
       side: cropHandle.dataset.cropHandle,
@@ -94,17 +106,19 @@ canvas.addEventListener('pointerdown', (event) => {
 
     // Cmd/Ctrl+drag drags a copy and leaves the original where it was, the
     // way PowerPoint does. Add Shift and the copy travels on one axis.
-    const duplicated = event.metaKey || event.ctrlKey;
+    const duplicated = (event.metaKey || event.ctrlKey) && !slide().shapes[index].locked;
     const originalSelection = [...state.selection];
     if (duplicated) {
-      const copies = L.cloneShapes(selectedShapes());
+      const copies = L.cloneShapes(selectedShapes().filter((shape) => !shape.locked));
       const first = slide().shapes.length;
       slide().shapes.push(...copies);
       selectMany(copies.map((_, offset) => first + offset));
     }
     state.drag = {
       mode: 'move',
-      items: state.selection.map((selectedIndex) => ({
+      items: state.selection.filter((selectedIndex) =>
+        !slide().shapes[index].locked && !slide().shapes[selectedIndex].locked
+      ).map((selectedIndex) => ({
         index: selectedIndex,
         from: structuredClone(slide().shapes[selectedIndex]),
       })),
@@ -231,7 +245,7 @@ canvas.addEventListener('pointerup', () => {
   } else if (drag.mode === 'move' && !drag.moved && drag.toggleIndex >= 0) {
     // A Shift-press that never moved: the click half of Shift-click.
     selectMany(L.toggleSelection(state.selection, drag.toggleIndex, slide().shapes.length));
-  } else if (drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'crop' || drag.moved) {
+  } else if (drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'crop' || (drag.moved && drag.items.length)) {
     markDirty();
   } else if (drag.duplicated) {
     // A Cmd+click that never moved keeps the original selection. The copies

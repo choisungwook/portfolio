@@ -35,7 +35,9 @@ function renderSettingsPresets() {
 }
 
 function setBorderSettingsFields(prefix, border) {
-  $(`settings-${prefix}-border-color`).value = border.color;
+  $(`settings-${prefix}-border-none`).checked = border.color === 'none';
+  $(`settings-${prefix}-border-color`).value = border.color === 'none' ? '#000000' : border.color;
+  $(`settings-${prefix}-border-color`).disabled = border.color === 'none';
   $(`settings-${prefix}-border-width`).value = String(border.width);
   $(`settings-${prefix}-border-dash`).value = border.dash;
 }
@@ -53,6 +55,15 @@ function renderGeneralSettings() {
     select.append(option);
   }
   select.value = defaults.fontFamily;
+  $('settings-fill-none').checked = defaults.fill === 'none';
+  $('settings-fill').value = defaults.fill === 'none' ? '#ffffff' : defaults.fill;
+  $('settings-fill').disabled = defaults.fill === 'none';
+  $('settings-text-color').value = defaults.textColor;
+  for (const end of ['start', 'end']) {
+    const select = $(`settings-arrow-${end}`);
+    select.innerHTML = $(`prop-arrow-${end}`).innerHTML;
+    select.value = defaults[end === 'start' ? 'arrowStart' : 'arrowEnd'];
+  }
   $('settings-snapping').checked = appSettings.snapping.enabled;
   setBorderSettingsFields('shape', defaults.shapeBorder);
   setBorderSettingsFields('image', defaults.imageBorder);
@@ -77,7 +88,7 @@ function borderSettingsFromFields(prefix) {
   const width = Number($(`settings-${prefix}-border-width`).value);
   if (!Number.isFinite(width) || width < 1 || width > 30) return null;
   return {
-    color: $(`settings-${prefix}-border-color`).value,
+    color: $(`settings-${prefix}-border-none`).checked ? 'none' : $(`settings-${prefix}-border-color`).value,
     width,
     dash: $(`settings-${prefix}-border-dash`).value,
   };
@@ -89,9 +100,19 @@ function editorDefaultsFromFields() {
   if (!shapeBorder || !imageBorder) return null;
   return {
     fontFamily: $('settings-default-font').value,
+    fill: $('settings-fill-none').checked ? 'none' : $('settings-fill').value,
+    textColor: $('settings-text-color').value,
+    arrowStart: $('settings-arrow-start').value,
+    arrowEnd: $('settings-arrow-end').value,
     shapeBorder,
     imageBorder,
   };
+}
+
+for (const prefix of ['shape-border', 'image-border', 'fill']) {
+  $(`settings-${prefix}-none`).addEventListener('change', (event) => {
+    $(prefix === 'fill' ? 'settings-fill' : `settings-${prefix}-color`).disabled = event.target.checked;
+  });
 }
 
 function openSettings() {

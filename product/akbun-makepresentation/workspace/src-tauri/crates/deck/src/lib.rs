@@ -125,6 +125,8 @@ pub struct Shape {
     pub crop_bottom: f64,
     #[serde(default)]
     pub rotation: f64,
+    #[serde(default)]
+    pub locked: bool,
     /// One of none | triangle | arrow | oval | diamond, which are the pptx
     /// `a:headEnd`/`a:tailEnd` type names, so a round trip is a rename.
     #[serde(default = "default_arrow_end")]
@@ -219,6 +221,7 @@ impl Default for Shape {
             crop_right: 0.0,
             crop_bottom: 0.0,
             rotation: 0.0,
+            locked: false,
             arrow_start: default_arrow_end(),
             arrow_end: default_arrow_end(),
             group_id: String::new(),
