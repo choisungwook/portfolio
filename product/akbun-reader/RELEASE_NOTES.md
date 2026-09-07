@@ -1,15 +1,15 @@
-# 0.5.0
+# Release notes
+
+## 0.5.0
 
 - Rust CLI 로그인·문서 조작·증분 Markdown export 추가
 - 원본 저장일·본문·태그를 보존하는 CSV import와 일일 상한 추가
 - 자동화 토큰 전용 API·로컬 로그인 화면·CLI CI 추가
 
-# 0.4.0
+## 0.4.0
 
 - 원격 MCP 도구 5개와 Bearer 인증 추가
 - SDK·workerd 통합 검증 추가
-
-# Release notes
 
 ## 0.3.1
 
