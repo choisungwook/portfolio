@@ -6,6 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
+| [akbun-snspublisher](./akbun-snspublisher/) | 한 번 쓴 글을 채널별로 검증하고 예약해 X, LinkedIn, Threads, Instagram에 발행하는 Worker 웹 앱 |
 | [akbun-reader](./akbun-reader/) | 아이폰 공유 저장, 태그, RSS 구독, 공개 링크, 여러 기기 읽기, Obsidian 동기화를 갖춘 개인용 읽기 보관함 Worker 웹 앱 |
 | [akbun-pdf](./akbun-pdf/) | PDF 탐색, 주석, 페이지 편집과 Codex AI 요약을 제공하는 Tauri 데스크톱 앱 |
 | [akbun-awsviewer](./akbun-awsviewer/) | AWS profile을 골라 IAM Identity Center로 로그인하고 EC2를 조회 전용으로 보는 macOS 데스크톱 앱 |
