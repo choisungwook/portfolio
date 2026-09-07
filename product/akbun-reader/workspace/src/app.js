@@ -1,54 +1,8 @@
 import { bodyBlocks } from './body.js';
-
-const main = document.querySelector('#main');
-const notice = document.querySelector('#notice');
-const locations = { inbox: '받은 글', later: '나중에', archive: '보관한 글' };
-const state = { location: 'inbox', tag: '', generation: 0 };
-
-/** @param {string} tag @param {string} [content] @param {string} [className] */
-function node(tag, content, className) {
-  const element = document.createElement(tag);
-  if (content !== undefined) element.textContent = content;
-  if (className) element.className = className;
-  return element;
-}
-
-function message(content, error = false) {
-  notice.textContent = content;
-  notice.className = error ? 'error' : '';
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`/api${path}`, {
-    cache: 'no-store', credentials: 'same-origin', ...options,
-    headers: { 'content-type': 'application/json', ...options.headers },
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.generation++;
-    main.replaceChildren(node('h1', '로그인이 필요합니다'), node('p', '페이지를 새로고침해 다시 로그인하세요.'));
-    document.querySelector('#tag-filter').replaceChildren(new Option('모든 태그', ''));
-    document.querySelector('#save-form').reset();
-  }
-  let data;
-  try { data = await response.json(); } catch { throw new Error('응답을 읽지 못했습니다. 페이지를 새로고침해 로그인 상태를 확인하세요.'); }
-  if (!response.ok) throw new Error(data.error || '요청을 처리하지 못했습니다.');
-  return data;
-}
-
-function action(button, callback) {
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    try { await callback(); } catch (error) { message(error.message, true); }
-    finally { button.disabled = false; }
-  });
-  return button;
-}
-
-function heading(title) {
-  const row = node('div', undefined, 'heading');
-  row.append(node('h1', title));
-  return row;
-}
+import { action, api, backButton, beginView, documentItem, emptyState, heading, locations, main, message, node, pager, splitTags, state, views } from './ui.js';
+import './tags.js';
+import './feeds.js';
+import './shares.js';
 
 async function loadTags() {
   const generation = state.generation;
@@ -61,51 +15,27 @@ async function loadTags() {
 }
 
 async function showList() {
-  const generation = ++state.generation;
-  document.body.classList.remove('reading');
-  main.replaceChildren(node('p', '글을 불러오는 중…'));
+  const generation = beginView('글을 불러오는 중…', false);
   for (const button of document.querySelectorAll('#locations button')) {
     button.setAttribute('aria-current', button.dataset.location === state.location ? 'page' : 'false');
   }
-  const result = await api(`/documents?${new URLSearchParams({ location: state.location, tag: state.tag })}`);
+  const load = offset => api(`/documents?${new URLSearchParams({ location: state.location, tag: state.tag, offset: String(offset ?? 0) })}`);
+  const result = await load(0);
   if (generation !== state.generation) return;
   const title = heading(locations[state.location]);
   title.append(action(node('button', '새로고침'), async () => { await showList(); await loadTags(); }));
   const list = node('ul', undefined, 'document-list');
+  const append = page => { for (const document of page.documents) list.append(documentItem(document)); };
+  append(result);
   main.replaceChildren(title, list);
-  function appendDocuments(documents) {
-    for (const document of documents) {
-      const item = node('li');
-      const button = action(node('button', undefined, 'document'), () => showDocument(document.id));
-      button.append(node('h2', document.title));
-      button.append(node('span', `${new URL(document.normalized_url).hostname} / ${document.is_read ? '읽음' : '안 읽음'}`, 'meta'));
-      const pills = node('div', undefined, 'pills');
-      for (const tag of document.tags) pills.append(node('span', tag, 'pill'));
-      button.append(pills); item.append(button); list.append(item);
-    }
-  }
-  appendDocuments(result.documents);
-  if (!result.documents.length) {
-    const empty = node('div', undefined, 'empty');
-    empty.append(node('h2', '아직 담긴 글이 없어요'), node('p', '읽고 싶은 글의 URL을 저장해 보세요. 태그를 선택했다면 다른 태그로도 찾아보세요.'));
-    main.append(empty);
-  }
-  let next = result.next_offset;
-  const more = action(node('button', '더 보기', 'more'), async () => {
-    const page = await api(`/documents?${new URLSearchParams({ location: state.location, tag: state.tag, offset: String(next) })}`);
-    if (generation !== state.generation) return;
-    appendDocuments(page.documents); next = page.next_offset; more.hidden = next === null;
-  });
-  more.hidden = next === null; main.append(more);
+  if (!result.documents.length) main.append(emptyState('아직 담긴 글이 없어요', '읽고 싶은 글의 URL을 저장해 보세요. 태그를 선택했다면 다른 태그로도 찾아보세요.'));
+  main.append(pager(generation, result, load, append));
 }
 
 async function showDocument(id) {
-  const generation = ++state.generation;
-  main.replaceChildren(node('p', '본문을 불러오는 중…'));
+  const generation = beginView('본문을 불러오는 중…');
   const document = await api(`/documents/${encodeURIComponent(id)}`);
   if (generation !== state.generation) return;
-  window.document.body.classList.add('reading');
-  const back = action(node('button', '목록으로'), showList);
   const article = node('article', undefined, 'article');
   article.append(node('h1', document.title));
   const original = node('a', '원문 열기');
@@ -122,6 +52,11 @@ async function showDocument(id) {
   position.value = document.location;
   toolbar.append(position, action(node('button', '이동'), () => update({ location: position.value })), action(node('button', '새로고침'), () => showDocument(id)));
   article.append(toolbar);
+  if (document.tags.length) {
+    const pills = node('div', undefined, 'pills');
+    for (const tag of document.tags) pills.append(action(node('button', tag, 'pill'), () => views.tag(tag)));
+    article.append(pills);
+  }
   if (document.summary.length) {
     const summary = node('section', undefined, 'summary');
     summary.append(node('h2', 'AI 3줄 요약'));
@@ -153,13 +88,11 @@ async function showDocument(id) {
     for (const tag of document.suggested_tags) suggestions.append(action(node('button', `+ ${tag}`), () => update({ approve_tags: [tag] })));
     article.append(suggestions);
   }
-  main.replaceChildren(back, article); main.focus();
+  main.replaceChildren(backButton(), article); main.focus();
 }
 
 async function showSettings() {
-  const generation = ++state.generation;
-  document.body.classList.add('reading');
-  main.replaceChildren(node('p', '설정을 불러오는 중…'));
+  const generation = beginView('설정을 불러오는 중…');
   const [result, ai] = await Promise.all([api('/tokens'), api('/ai')]);
   if (generation !== state.generation) return;
   const content = node('div', undefined, 'settings');
@@ -195,13 +128,17 @@ async function showSettings() {
   for (const step of ['단축어 앱에서 새 단축어를 만들고 공유 시트 표시, 입력 URL을 선택하세요.', `URL 콘텐츠 가져오기: ${location.origin}/automation/documents, POST, JSON 본문 url에 단축어 입력을 넣으세요.`, 'Authorization 헤더에 Bearer 뒤 공백과 발급한 토큰을 넣으세요.', '응답을 알림으로 표시하세요. 통신이 실패하면 같은 URL을 다시 공유하세요. 토큰이 들어 있는 단축어는 타인과 공유하지 마세요.']) steps.append(node('li', step));
   shortcut.append(steps, node('p', '홈 화면 추가: Safari 공유 메뉴 → 홈 화면에 추가. 오프라인 읽기는 지원하지 않습니다.'));
   content.append(tokens, usage, shortcut);
-  main.replaceChildren(action(node('button', '목록으로'), showList), content);
+  main.replaceChildren(backButton(), content);
 }
 
-function splitTags(value) { return [...new Set(value.split(',').map(tag => tag.trim()).filter(Boolean))]; }
+views.list = showList;
+views.document = showDocument;
 for (const [key, label] of Object.entries(locations)) {
   const button = action(node('button', label), async () => { state.location = key; await showList(); });
   button.dataset.location = key; document.querySelector('#locations').append(button);
+}
+for (const [key, label] of [['feeds', 'RSS'], ['tags', '태그'], ['shares', '공개 링크']]) {
+  document.querySelector('#sections').append(action(node('button', label), () => views[key]()));
 }
 document.querySelector('#tag-filter').addEventListener('change', async event => {
   state.tag = event.target.value;

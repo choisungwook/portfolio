@@ -2,16 +2,17 @@
 
 A personal reading archive for one user. Share a URL from an iPhone, tag it, read it on any device, and mirror it into an Obsidian vault. Built to replace a paid read-later subscription at a hosting cost of zero.
 
-One Cloudflare Worker serves the static page, the JSON API, and the MCP endpoint. D1 holds the documents. Cloudflare Access guards the browser; Worker-issued API tokens guard shortcuts, the CLI, and MCP clients.
+One Cloudflare Worker serves the static page, the JSON API, the MCP endpoint, and unauthenticated public share pages. D1 holds the documents and RSS items. Cloudflare Access guards the browser; Worker-issued API tokens guard shortcuts, the CLI, and MCP clients.
 
 ## Status
 
-웹 읽기 보관함·태그·토큰 API·PWA·AI 요약 구현. 배포와 실제 Access 설정은 별도 작업. URL 본문 자동 추출 구현. MCP와 Rust CLI·증분 Markdown export·CSV import 구현. 실제 Access 로그인·원본 데이터 이관 검증은 별도 범위.
+웹 읽기 보관함·태그·토큰 API·PWA·AI 요약 구현. 배포와 실제 Access 설정은 별도 작업. URL 본문 자동 추출 구현. MCP와 Rust CLI·증분 Markdown export·CSV import 구현. RSS 구독·태그 관리·공개 링크 구현. 실제 Access 로그인·원본 데이터 이관·실서버 RSS 수집 검증은 별도 범위.
 
 - [CLI·동기화·CSV import](wiki/cli.md)
 - [원격 MCP](wiki/mcp.md)
 - [공유 URL 추출·CPU 측정](wiki/url-extraction.md)
 - [화면·API·AI 설정](wiki/reader-ui-ai.md)
+- [RSS 구독·태그 관리·공개 링크](wiki/rss-tags-share.md)
 - [로컬 환경 준비](wiki/development.md)
 
 ## Directory layout

@@ -5,6 +5,7 @@ import { version } from '../package.json';
 import type { Env } from './index';
 import { documents, getDocument } from './documents';
 import { HttpError, readJson, tags } from './http';
+import { listTags } from './tags';
 
 const tagSchema = z.array(z.string().trim().min(1).max(80)).max(30);
 const idSchema = z.string().uuid();
@@ -63,11 +64,7 @@ export async function mcp(request: Request, env: Env, ctx: ExecutionContext): Pr
   }));
   server.registerTool('list_tags', {
     description: '보관함의 태그와 문서 수 조회.', inputSchema: {}, annotations: readOnly,
-  }, () => result(async () => {
-    const rows = await env.DB.prepare(`SELECT j.value AS name, count(DISTINCT documents.id) AS count
-      FROM documents, json_each(tags_json) j GROUP BY j.value ORDER BY j.value`).all();
-    return { tags: rows.results };
-  }));
+  }, () => result(() => listTags(env)));
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
   await server.connect(transport);
   try {

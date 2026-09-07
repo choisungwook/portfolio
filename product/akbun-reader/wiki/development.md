@@ -51,6 +51,8 @@ The version in `package.json` is bumped on every change under `workspace/` by re
 - `workers_dev` and `preview_urls` are `false` on purpose. Access policies are per hostname, so any extra hostname is a way around them.
 - `database_id` in `wrangler.json` is a placeholder until the database exists. `wrangler dev` uses a local SQLite file and does not care; `wrangler deploy` will refuse it.
 - Keep `worker/lib/` free of Worker types so `node --test` keeps running it as plain JavaScript.
+- `/public/*` must be excluded from the Access policy (a bypass rule for that path). Without it, public links land on the login screen. The Worker serves this path without any authentication.
+- The cron trigger in `wrangler.json` runs feed collection. `wrangler dev` does not fire it; use the 지금 가져오기 button or `POST /api/feeds/:id/refresh`.
 
 ## 인증 설정
 

@@ -59,6 +59,7 @@ main { padding: 42px 44px; min-width: 0; }
   .layout { display: block; }
   aside { padding: 20px; border-right: 0; border-bottom: 1px solid #d8e3ea; }
   nav { grid-template-columns: repeat(3, 1fr); } nav button { text-align: center; }
+  .sections { margin-top: 12px; padding-top: 12px; }
   .filter { margin: 20px 0; }
   #save-form { grid-template-columns: 1fr 1fr; } #save-form h2 { grid-column: 1 / -1; }
   #save-form label:first-of-type { grid-column: 1 / -1; } #save-form .primary { grid-column: 1 / -1; }
@@ -69,3 +70,25 @@ main { padding: 42px 44px; min-width: 0; }
 }
 .body p { margin: 0 0 14px; line-height: inherit; }
 .body pre { overflow-x: auto; padding: 16px; background: #f4f8fb; font-size: .875rem; }
+.sections { margin-top: 20px; padding-top: 20px; border-top: 1px solid #d8e3ea; }
+.pill:is(button) { min-height: 0; border: 0; padding: 4px 8px; }
+.pill:is(button):hover { background: #d3e3ec; }
+.document-list > li > .pills { margin: 0 0 0 4px; padding: 8px 0 0; }
+.tag-list, .share-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.tag-list li, .share-list li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; background: white; border-radius: 10px; }
+.settings .tag-list li, .settings .share-list li { background: #f4f8fb; }
+.tag-list .toolbar, .share-list .toolbar { margin: 0; }
+.tag-name { border: 0; background: transparent; text-align: left; padding: 4px 0; flex: 1 1 200px; }
+.tag-name .meta { display: inline; margin: 0; }
+.tag-list li > .meta { flex-basis: 100%; margin: 0; }
+.feed-item { padding: 22px 24px; background: white; border-left: 4px solid #7aa5bc; border-radius: 0 10px 10px 0; }
+.feed-item h2 { font-size: 1.2rem; line-height: 1.5; overflow-wrap: anywhere; }
+.feed-item h2 a { text-decoration: none; color: #203f55; }
+.feed-item .toolbar { margin: 14px 0 0; }
+.feed-summary { color: #526c7e; font-size: .9375rem; margin: 10px 0 0; line-height: 1.6; }
+.share { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 24px; padding: 16px 20px; background: #edf6f3; border-radius: 8px; }
+.share .meta { flex: 1 1 240px; margin: 0; }
+.share-url { overflow-wrap: anywhere; font-size: .875rem; flex: 1 1 240px; user-select: all; }
+.public-summary { margin: 10px 0 0; padding-left: 20px; color: #526c7e; font-size: .9375rem; line-height: 1.6; }
+body.public main { max-width: 820px; margin: 0 auto; }
+body.public header .brand { cursor: default; }

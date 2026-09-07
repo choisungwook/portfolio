@@ -2,6 +2,8 @@
 
 ## 2026-09-07
 
+- **Creation**: [RSS 수집·태그 일괄 변경·공개 링크](decisions/2026-09-rss-tags-public-share.md) 결정 기록
+
 - CLI 인증·재실행 가능한 동기화·import 결정 추가
 - 요청 단위 MCP·기존 API 재사용 결정 기록
 - **Creation**: [URL 선저장과 경량 본문 추출](decisions/2026-09-background-extraction.md) 결정·런타임 검증 기록

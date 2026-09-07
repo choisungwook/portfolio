@@ -11,7 +11,13 @@
     "run_worker_first": [
       "/api/*",
       "/mcp",
-      "/automation/*"
+      "/automation/*",
+      "/public/*"
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
     ]
   },
   "d1_databases": [

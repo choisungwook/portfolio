@@ -22,7 +22,7 @@
 | POST /api/documents | url 필수, title·tags·body 선택; 동일 URL이면 기존 문서 반환 |
 | GET /api/documents/:id | 본문·요약·추천·version 포함 |
 | PATCH /api/documents/:id | version 필수; tags·location·is_read 또는 approve_tags 수정 |
-| GET /api/tags | 사용 중인 태그와 문서 수 |
+| GET /api/tags | 사용 중인 태그와 문서 수, 관리 API는 [RSS·태그·공개 링크](rss-tags-share.md) |
 | GET /api/tokens | 토큰 이름·식별자·발급일·폐기일, 원문·해시 제외 |
 | POST /api/tokens | name 입력, token 원문은 이 응답에만 포함 |
 | DELETE /api/tokens/:id | 토큰 폐기 |

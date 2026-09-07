@@ -59,13 +59,16 @@ async function checkDns(url: URL, signal: AbortSignal, fetcher: typeof fetch): P
   if (!addresses.length || addresses.some(answer => !isPublicAddress(answer.data))) throw new Error('blocked_dns');
 }
 
-export async function fetchHtml(input: string, fetcher: typeof fetch = fetch): Promise<string> {
+export interface FetchTextOptions { accept: string; mediaTypes: string[]; maxBytes: number; fetcher?: typeof fetch }
+
+export async function fetchText(input: string, options: FetchTextOptions): Promise<string> {
+  const fetcher = options.fetcher ?? fetch;
   const signal = AbortSignal.timeout(8_000);
   let url = publicUrl(input);
   for (let redirects = 0; redirects <= 3; redirects++) {
     await checkDns(url, signal, fetcher);
     const response = await fetcher(url, {
-      headers: { accept: 'text/html', 'user-agent': 'akbun-reader/0.3' },
+      headers: { accept: options.accept, 'user-agent': 'akbun-reader/0.6' },
       redirect: 'manual', signal,
     });
     if (redirectStatuses.has(response.status)) {
@@ -80,10 +83,14 @@ export async function fetchHtml(input: string, fetcher: typeof fetch = fetch): P
     const contentType = response.headers.get('content-type') ?? '';
     const charset = contentType.match(/charset\s*=\s*["']?([^\s;"']+)/i)?.[1].toLowerCase();
     const mediaType = contentType.split(';')[0].trim().toLowerCase();
-    if (mediaType !== 'text/html' || (charset && !['utf-8', 'utf8', 'us-ascii'].includes(charset))) {
+    if (!options.mediaTypes.includes(mediaType) || (charset && !['utf-8', 'utf8', 'us-ascii'].includes(charset))) {
       await response.body?.cancel(); throw new Error('unsupported_content');
     }
-    return limitedText(response, MAX_HTML_BYTES);
+    return limitedText(response, options.maxBytes);
   }
   throw new Error('redirect_limit');
+}
+
+export function fetchHtml(input: string, fetcher: typeof fetch = fetch): Promise<string> {
+  return fetchText(input, { accept: 'text/html', mediaTypes: ['text/html'], maxBytes: MAX_HTML_BYTES, fetcher });
 }
