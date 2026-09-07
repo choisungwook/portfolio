@@ -40,3 +40,14 @@ test('automation alias requires tokens and cannot mint credentials', async () =>
   assert.equal((await call('me', {authorization:`Bearer ${f.token}`})).status, 200);
   assert.equal((await call('tokens', {authorization:`Bearer ${f.token}`})).status, 403);
 });
+
+test('automation POST keeps request body and records the same import exactly once', async () => {
+  const f = await fixture();
+  for (const status of [201, 200]) {
+    const response = await worker.default.fetch(new Request('https://reader.test/automation/import', {
+      method: 'POST', headers: {authorization:`Bearer ${f.token}`, 'content-type':'application/json'}, body:JSON.stringify(input),
+    }), f.env, f.ctx);
+    assert.equal(response.status, status);
+    assert.equal((await response.json()).document.title, input.title);
+  }
+});
