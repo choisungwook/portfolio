@@ -31,10 +31,11 @@ export default {
       url.pathname = '/api/' + url.pathname.slice('/automation/'.length);
       request = new Request(url, request);
     }
-    if (url.pathname.startsWith('/public/')) return publicView(request, env);
-    if (!url.pathname.startsWith('/api/') && url.pathname !== '/mcp') return env.ASSETS.fetch(request);
+    const isPublic = url.pathname.startsWith('/public/');
+    if (!isPublic && !url.pathname.startsWith('/api/') && url.pathname !== '/mcp') return env.ASSETS.fetch(request);
     if (url.pathname === '/api/health' && request.method === 'GET') return json({ ok: true });
     try {
+      if (isPublic) return await publicView(request, env);
       const identity = await authenticate(request, env);
       if (!identity) return json({ error: '로그인이 필요합니다.' }, 401);
       if ((automation || url.pathname === '/mcp') && identity !== 'token') return json({ error: '자동화 경로는 API 토큰이 필요합니다.' }, 403);

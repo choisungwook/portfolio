@@ -156,6 +156,7 @@ test('public links need browser login to manage, expose only list data and stop 
     const feedData = await (await open(`/public/${feedShare.id}/data`)).json();
     assert.equal(feedData.kind, 'feed'); assert.equal(feedData.items[0].title, '글'); assert.equal(feedData.items[0].document_id, undefined);
     assert.equal((await open('/public/nope')).status, 404);
+    assert.equal((await open(`/public/${share.id}/data?offset=-1`)).status, 400);
     assert.equal((await open(`/public/${'0'.repeat(32)}/data`)).status, 404);
     assert.equal((await worker.default.fetch(new Request(`https://reader.test/public/${share.id}/data`, { method: 'POST' }), f.env, f.ctx)).status, 404);
     assert.equal((await f.request(`/shares/${share.id}`, 'DELETE', undefined, access.headers)).status, 200);
