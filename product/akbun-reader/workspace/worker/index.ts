@@ -43,6 +43,9 @@ export default {
           .bind(new Date().toISOString().slice(0, 7)).first();
         return json({ enabled: Boolean(aiLimits(env)), limits: aiLimits(env), usage: usage ?? { calls: 0, reserved_won: 0 } });
       }
+      if ((url.pathname === '/api/tokens' || url.pathname.startsWith('/api/tokens/')) && identity !== 'browser') {
+        return json({ error: '토큰 관리는 브라우저 로그인 후 이용하세요.' }, 403);
+      }
       if (url.pathname === '/api/tokens' && request.method === 'GET') {
         const result = await env.DB.prepare('SELECT id, name, created_at, revoked_at FROM api_tokens ORDER BY created_at DESC').all();
         return json({ tokens: result.results });

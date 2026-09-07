@@ -3,7 +3,7 @@ import { HttpError, json, readJson, tags, text } from './http';
 import { normalizeUrl } from './lib/normalize-url.js';
 import { enrichDocument } from './ai';
 
-type Row = Record<string, unknown> & { id: string; body: string; tags_json: string; summary_json: string; suggested_tags_json: string };
+type Row = Record<string, unknown> & { id: string; body?: string; tags_json: string; summary_json: string; suggested_tags_json: string };
 function serialize(row: Row) {
   const { tags_json, summary_json, suggested_tags_json, ...document } = row;
   return { ...document, tags: JSON.parse(tags_json), summary: JSON.parse(summary_json), suggested_tags: JSON.parse(suggested_tags_json) };
@@ -59,10 +59,11 @@ export async function documents(request: Request, env: Env, ctx: ExecutionContex
     const offset = Number(url.searchParams.get('offset') || 0);
     if (!Number.isSafeInteger(offset) || offset < 0) throw new HttpError(400, '잘못된 페이지입니다.');
     const tag = url.searchParams.get('tag') || '';
-    const rows = await env.DB.prepare(`SELECT * FROM documents WHERE location = ?
+    const rows = await env.DB.prepare(`SELECT id, normalized_url, title, tags_json, location, is_read, summary_json,
+      suggested_tags_json, ai_status, version, created_at, updated_at FROM documents WHERE location = ?
       AND (? = '' OR EXISTS (SELECT 1 FROM json_each(tags_json) WHERE value = ?))
       ORDER BY created_at DESC, id DESC LIMIT 51 OFFSET ?`).bind(location, tag, tag, offset).all<Row>();
-    return json({ documents: rows.results.slice(0, 50).map(row => { const { body, ...item } = serialize(row); return item; }), next_offset: rows.results.length > 50 ? offset + 50 : null });
+    return json({ documents: rows.results.slice(0, 50).map(serialize), next_offset: rows.results.length > 50 ? offset + 50 : null });
   }
   if (request.method !== 'POST') throw new HttpError(405, '허용되지 않는 요청입니다.');
   const input = await readJson(request);

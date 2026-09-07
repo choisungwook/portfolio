@@ -12,6 +12,7 @@
 
 - 로컬 환경 준비: [개발 환경](development.md)
 - 인증: Access JWT 또는 Authorization Bearer 토큰, 인증 없는 개인 API는 401
+- 토큰 목록·발급·폐기: Access 브라우저 인증만 허용, API 토큰 요청은 403
 - 브라우저 변경 요청: 같은 사이트 Origin 필수
 - 개인 응답: Cache-Control no-store
 

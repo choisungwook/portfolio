@@ -11,14 +11,11 @@ test('API denies missing/forged authentication, cross-origin writes and revoked 
     assert.equal((await f.request(path, 'GET', undefined, { authorization: '', 'Cf-Access-Jwt-Assertion': 'forged' })).status, 401);
   }
   assert.equal((await f.request('/documents', 'POST', article, { origin: 'https://attacker.test' })).status, 403);
-  const issued = await (await f.request('/tokens', 'POST', { name: 'phone' })).json();
-  const stored = await f.env.DB.prepare('SELECT token_hash FROM api_tokens WHERE id = ?').bind(issued.id).first();
-  assert.notEqual(stored.token_hash, issued.token);
-  assert.equal((await f.request('/me', 'GET', undefined, { authorization: `Bearer ${issued.token}` })).status, 200);
-  const listed = await (await f.request('/tokens')).json();
-  assert.equal(JSON.stringify(listed).includes(issued.token), false);
-  assert.equal((await f.request(`/tokens/${issued.id}`, 'DELETE')).status, 200);
-  assert.equal((await f.request('/me', 'GET', undefined, { authorization: `Bearer ${issued.token}` })).status, 401);
+  assert.equal((await f.request('/tokens')).status, 403);
+  assert.equal((await f.request('/tokens', 'POST', { name: 'phone' })).status, 403);
+  assert.equal((await f.request('/tokens/test', 'DELETE')).status, 403);
+  await f.env.DB.prepare("UPDATE api_tokens SET revoked_at = '2026-09-07' WHERE id = 'test'").run();
+  assert.equal((await f.request('/me')).status, 401);
 });
 
 test('save deduplicates normalized URLs, filters tags and rejects stale edits', async () => {
@@ -128,7 +125,17 @@ test('Access validates signature, issuer, audience, owner, expiry and browser or
     const valid = { authorization: '', 'Cf-Access-Jwt-Assertion': await jwt() };
     assert.equal((await f.request('/me', 'GET', undefined, valid)).status, 200);
     assert.equal((await f.request('/tokens', 'POST', { name: 'browser' }, valid)).status, 403);
-    assert.equal((await f.request('/tokens', 'POST', { name: 'browser' }, { ...valid, origin: 'https://reader.test' })).status, 201);
+    const browser = { ...valid, origin: 'https://reader.test' };
+    const response = await f.request('/tokens', 'POST', { name: 'browser' }, browser);
+    assert.equal(response.status, 201);
+    const issued = await response.json();
+    const stored = await f.env.DB.prepare('SELECT token_hash FROM api_tokens WHERE id = ?').bind(issued.id).first();
+    assert.notEqual(stored.token_hash, issued.token);
+    assert.equal((await f.request('/me', 'GET', undefined, { authorization: `Bearer ${issued.token}` })).status, 200);
+    const listed = await (await f.request('/tokens', 'GET', undefined, browser)).json();
+    assert.equal(JSON.stringify(listed).includes(issued.token), false);
+    assert.equal((await f.request(`/tokens/${issued.id}`, 'DELETE', undefined, browser)).status, 200);
+    assert.equal((await f.request('/me', 'GET', undefined, { authorization: `Bearer ${issued.token}` })).status, 401);
     for (const token of [await jwt('guest'), await jwt('owner', 'other'), await jwt('owner', 'reader', '-1h')]) {
       assert.equal((await f.request('/me', 'GET', undefined, { authorization: '', 'Cf-Access-Jwt-Assertion': token })).status, 401);
     }
