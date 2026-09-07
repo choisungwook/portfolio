@@ -32,7 +32,7 @@ export function normalizeUrl(input) {
   }
 
   const kept = [...url.searchParams.entries()].filter(([key]) => !isTrackingParam(key));
-  kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  kept.sort(([aKey, aValue], [bKey, bValue]) => compare(aKey, bKey) || compare(aValue, bValue));
   url.search = '';
   for (const [key, value] of kept) url.searchParams.append(key, value);
 
@@ -41,6 +41,15 @@ export function normalizeUrl(input) {
   }
 
   return url.toString();
+}
+
+/**
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function compare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** @param {string} key */

@@ -9,9 +9,13 @@ function setStatus(text) {
 
 try {
   const response = await fetch('/api/health');
-  /** @type {{ ok: boolean, version: string }} */
-  const body = await response.json();
-  setStatus(body.ok ? `API ok, version ${body.version}` : 'API returned an error');
-} catch {
-  setStatus('API unreachable');
+  if (!response.ok) {
+    setStatus(`API returned HTTP ${response.status}`);
+  } else {
+    /** @type {{ ok: boolean }} */
+    const body = await response.json();
+    setStatus(body.ok ? 'API ok' : 'API reports not ok');
+  }
+} catch (error) {
+  setStatus(`API unreachable: ${error instanceof Error ? error.message : String(error)}`);
 }

@@ -14,7 +14,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/health') {
-      return json({ ok: true, version: '0.1.0' });
+      return json({ ok: true });
     }
 
     if (url.pathname === '/api/normalize' && request.method === 'GET') {

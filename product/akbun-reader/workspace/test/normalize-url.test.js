@@ -7,6 +7,11 @@ test('drops fragment, tracking params, and default port', () => {
   assert.equal(normalizeUrl(input), 'https://example.com/post?a=1&b=2');
 });
 
+test('orders repeated keys by value so input order does not matter', () => {
+  assert.equal(normalizeUrl('https://example.com/?a=2&a=1'), normalizeUrl('https://example.com/?a=1&a=2'));
+  assert.equal(normalizeUrl('https://example.com/?a=2&a=1'), 'https://example.com/?a=1&a=2');
+});
+
 test('keeps the root slash and non-tracking params', () => {
   assert.equal(normalizeUrl('https://example.com/?q=k8s'), 'https://example.com/?q=k8s');
 });
