@@ -1,6 +1,6 @@
 {
   "name": "akbun-reader",
-  "version": "0.2.1",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,14 +9,18 @@
     "deploy": "wrangler deploy",
     "migrate:local": "wrangler d1 migrations apply akbun-reader --local",
     "migrate:remote": "wrangler d1 migrations apply akbun-reader --remote",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "benchmark:extraction": "node scripts/benchmark-extraction.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.1",
+    "miniflare": "5.20260903.0-alpha",
     "typescript": "^7.0.2",
     "wrangler": "^4.129.0"
   },
   "dependencies": {
+    "htmlparser2": "^12.0.0",
+    "ipaddr.js": "^2.5.0",
     "jose": "^6.2.12"
   }
 }

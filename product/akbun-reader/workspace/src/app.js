@@ -129,10 +129,12 @@ async function showDocument(id) {
     for (const line of document.summary) lines.append(node('li', line));
     summary.append(lines); article.append(summary);
   }
+  const extractionStatuses = { pending: '원문에서 본문을 가져오는 중입니다. 잠시 후 새로고침하세요.', failed: '본문을 가져오지 못했습니다. 저장한 원문 링크에서 읽어주세요.' };
+  if (extractionStatuses[document.extraction_status]) article.append(node('p', extractionStatuses[document.extraction_status], 'meta'));
   const statuses = { pending: 'AI 요약 준비 중 · 잠시 후 새로고침하세요.', skipped: 'AI 요약 없음 · 본문 또는 모델 설정이 필요합니다.', limited: '이번 달 AI 사용 상한에 도달했습니다.', failed: 'AI 요약에 실패했습니다. 저장한 글은 유지됩니다.' };
-  if (statuses[document.ai_status]) article.append(node('p', statuses[document.ai_status], 'meta'));
+  if (document.extraction_status !== 'pending' && statuses[document.ai_status]) article.append(node('p', statuses[document.ai_status], 'meta'));
   const body = node('div', undefined, 'body');
-  for (const block of bodyBlocks(document.body || '저장된 본문이 없습니다. 원문 링크에서 읽어주세요.')) body.append(node(block.tag, block.text));
+  for (const block of bodyBlocks(document.body || (document.extraction_status === 'pending' ? '본문을 준비하고 있습니다.' : '저장된 본문이 없습니다. 원문 링크에서 읽어주세요.'))) body.append(node(block.tag, block.text));
   article.append(body);
   const form = node('form');
   const label = node('label', '태그 편집 (쉼표로 구분)');

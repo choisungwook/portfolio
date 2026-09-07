@@ -97,7 +97,7 @@ test('AI provider uses bounded input/output and validates compatible JSON respon
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
     assert.equal(url.href, 'https://model.test/v1/chat/completions');
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     const body = JSON.parse(options.body);
     assert.equal(body.max_tokens, 512);
     assert.equal(JSON.parse(body.messages[1].content).body.length, 12000);

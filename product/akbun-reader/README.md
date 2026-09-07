@@ -6,8 +6,9 @@ One Cloudflare Worker serves the static page, the JSON API, and later the MCP en
 
 ## Status
 
-웹 읽기 보관함·태그·토큰 API·PWA·AI 요약 구현. 배포와 실제 Access 설정은 별도 작업. URL 본문 자동 추출, CLI, MCP, 기존 데이터 이관은 후속 범위.
+웹 읽기 보관함·태그·토큰 API·PWA·AI 요약 구현. 배포와 실제 Access 설정은 별도 작업. URL 본문 자동 추출 구현. CLI, MCP, 기존 데이터 이관은 후속 범위.
 
+- [공유 URL 추출·CPU 측정](wiki/url-extraction.md)
 - [화면·API·AI 설정](wiki/reader-ui-ai.md)
 - [로컬 환경 준비](wiki/development.md)
 

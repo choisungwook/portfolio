@@ -2,6 +2,7 @@ import type { Env } from './index';
 import { HttpError, json, readJson, tags, text } from './http';
 import { normalizeUrl } from './lib/normalize-url.js';
 import { enrichDocument } from './ai';
+import { extractDocument } from './extraction/index';
 
 type Row = Record<string, unknown> & { id: string; body?: string; tags_json: string; summary_json: string; suggested_tags_json: string };
 function serialize(row: Row) {
@@ -60,7 +61,7 @@ export async function documents(request: Request, env: Env, ctx: ExecutionContex
     if (!Number.isSafeInteger(offset) || offset < 0) throw new HttpError(400, '잘못된 페이지입니다.');
     const tag = url.searchParams.get('tag') || '';
     const rows = await env.DB.prepare(`SELECT id, normalized_url, title, tags_json, location, is_read, summary_json,
-      suggested_tags_json, ai_status, version, created_at, updated_at FROM documents WHERE location = ?
+      suggested_tags_json, ai_status, extraction_status, version, created_at, updated_at FROM documents WHERE location = ?
       AND (? = '' OR EXISTS (SELECT 1 FROM json_each(tags_json) WHERE value = ?))
       ORDER BY created_at DESC, id DESC LIMIT 51 OFFSET ?`).bind(location, tag, tag, offset).all<Row>();
     return json({ documents: rows.results.slice(0, 50).map(serialize), next_offset: rows.results.length > 50 ? offset + 50 : null });
@@ -77,10 +78,10 @@ export async function documents(request: Request, env: Env, ctx: ExecutionContex
   const body = input.body === undefined ? '' : text(input.body, '본문', 100_000);
   const tagNames = tags(input.tags ?? []);
   const id = crypto.randomUUID();
-  const inserted = await env.DB.prepare(`INSERT INTO documents(id, normalized_url, title, body, tags_json)
-    VALUES (?, ?, ?, ?, ?) ON CONFLICT(normalized_url) DO NOTHING RETURNING id`)
-    .bind(id, normalized, title, body, JSON.stringify(tagNames)).all();
+  const inserted = await env.DB.prepare(`INSERT INTO documents(id, normalized_url, title, body, tags_json, extraction_status)
+    VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(normalized_url) DO NOTHING RETURNING id`)
+    .bind(id, normalized, title, body, JSON.stringify(tagNames), body ? 'provided' : 'pending').all();
   const row = await env.DB.prepare('SELECT * FROM documents WHERE normalized_url = ?').bind(normalized).first<Row>();
-  if (inserted.results.length) ctx.waitUntil(enrichDocument(id, env));
+  if (inserted.results.length) ctx.waitUntil(body ? enrichDocument(id, env) : extractDocument(id, env));
   return json(serialize(row!), inserted.results.length ? 201 : 200);
 }
