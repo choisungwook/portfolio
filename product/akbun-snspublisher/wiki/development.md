@@ -50,7 +50,7 @@ Bump the version in `package.json` on every change under `workspace/`.
 
 - Every `/api/*` path except `/api/health` is denied by default, locally too.
 - Access: `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `ACCESS_OWNER_SUB` in `.dev.vars` locally and as secrets in production.
-- Tokens: rows in `api_tokens` hold a SHA-256 hash; the Bearer value is the 64-hex original.
+- Tokens: rows in `api_tokens` hold a SHA-256 hash of the original. The header must be exactly `Authorization: Bearer <token>` where the token is 64 lowercase hex characters; uppercase hex, extra spaces, or a different scheme casing fail the regex in `worker/auth.ts` and get 401.
 
 ## Caveats
 
