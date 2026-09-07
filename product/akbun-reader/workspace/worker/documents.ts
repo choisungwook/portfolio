@@ -4,7 +4,7 @@ import { normalizeUrl } from './lib/normalize-url.js';
 import { enrichDocument } from './ai';
 import { extractDocument } from './extraction/index';
 
-type Row = Record<string, unknown> & { id: string; body?: string; tags_json: string; summary_json: string; suggested_tags_json: string };
+type Row = Record<string, unknown> & { id: string; version: number; body?: string; tags_json: string; summary_json: string; suggested_tags_json: string };
 function serialize(row: Row) {
   const { tags_json, summary_json, suggested_tags_json, ...document } = row;
   return { ...document, tags: JSON.parse(tags_json), summary: JSON.parse(summary_json), suggested_tags: JSON.parse(suggested_tags_json) };

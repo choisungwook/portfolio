@@ -2,6 +2,7 @@ import { authenticate, hashToken } from './auth';
 import { documents } from './documents';
 import { HttpError, json, readJson, text } from './http';
 import { aiLimits } from './ai';
+import { mcp } from './mcp';
 
 export interface Env {
   ASSETS: Fetcher;
@@ -20,17 +21,18 @@ export interface Env {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (!url.pathname.startsWith('/api/') && url.pathname !== '/mcp') return env.ASSETS.fetch(request);
     if (url.pathname === '/api/health' && request.method === 'GET') return json({ ok: true });
     try {
       const identity = await authenticate(request, env);
-      if (!identity) return json({ error: '로그인이 필요합니다.' }, 401);
+      if (!identity || (url.pathname === '/mcp' && identity !== 'token')) return json({ error: '로그인이 필요합니다.' }, 401);
       if (!['GET', 'HEAD'].includes(request.method)) {
         const origin = request.headers.get('origin');
         if ((origin && origin !== url.origin) || (identity === 'browser' && origin !== url.origin)) {
           return json({ error: '같은 사이트에서 요청하세요.' }, 403);
         }
       }
+      if (url.pathname === '/mcp') return await mcp(request, env, ctx);
       if (url.pathname === '/api/me' && request.method === 'GET') return json({ authenticated: true });
       if (url.pathname.startsWith('/api/documents')) return await documents(request, env, ctx);
       if (url.pathname === '/api/tags' && request.method === 'GET') {
