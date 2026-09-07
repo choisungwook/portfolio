@@ -13,7 +13,7 @@ test('workerd executes real outbound fetch for extraction and compatible AI with
       import { extractHtml } from './worker/extraction/html.ts';
       import { CompatibleProvider } from './worker/ai.ts';
       export default { async fetch() {
-        const document = extractHtml(await fetchHtml('https://example.com/article'));
+        const document = extractHtml(await fetchHtml('https://example.com:443/article'));
         const provider = new CompatibleProvider({AI_BASE_URL:'https://model.test/v1',AI_API_KEY:'fixture',AI_MODEL:'fixture'});
         return Response.json({document, suggestion: await provider.summarize(document.body, ['reading'])});
       } };`, resolveDir: process.cwd() },
@@ -28,7 +28,7 @@ test('workerd executes real outbound fetch for extraction and compatible AI with
       if (url.hostname === 'cloudflare-dns.com') return Response.json({ Status: 0, Answer: [{ type: 1, data: '93.184.215.14' }] });
       if (url.hostname === 'example.com') {
         assert.equal(request.headers.get('authorization'), null);
-        return new Response('<title>Runtime article</title><article><p>' + 'A long enough reading article. '.repeat(5) + '</p></article>', { headers: { 'content-type': 'text/html' } });
+        return new Response('<title>Runtime article</title><article><p>' + 'A long enough reading article. '.repeat(5) + '</p></article>', { headers: { 'content-type': 'text/html; charset=utf8' } });
       }
       if (url.hostname === 'model.test') return Response.json({ choices: [{ message: { content: JSON.stringify({ summary: ['one', 'two', 'three'], tags: ['reading'] }) } }] });
       throw new Error('Unexpected network destination');

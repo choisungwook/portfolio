@@ -8,7 +8,7 @@ function dns(url) {
   return Response.json({ Status: 0, Answer: url.searchParams.get('type') === 'A' ? [{ type: 1, data: '93.184.215.14' }] : [] });
 }
 function htmlResponse(html = page, headers = {}) {
-  return new Response(html, { headers: { 'content-type': 'text/html; charset="utf-8"', ...headers } });
+  return new Response(html, { headers: { 'content-type': 'text/html ; charset="utf8"', ...headers } });
 }
 
 test('extracts article title, Markdown and text without active content or page chrome', () => {
@@ -33,6 +33,8 @@ test('blocks private and alternative IP syntax, credentials, ports and local nam
     assert.throws(() => worker.publicUrl(url), undefined, url);
   }
   assert.equal(worker.publicUrl('https://example.com/a#fragment').href, 'https://example.com/a');
+  assert.equal(worker.publicUrl('https://example.com:443/a').href, 'https://example.com/a');
+  assert.equal(worker.publicUrl('http://example.com:80/a').href, 'http://example.com/a');
 });
 
 test('checks A and AAAA records, rejects mixed DNS answers and resolver failure', async () => {
@@ -55,7 +57,7 @@ test('redirects are bounded and checked, upstream never receives API credentials
     assert.equal(options.headers.authorization, undefined);
     assert.equal(options.headers.cookie, undefined);
     assert.ok(options.signal);
-    return url.pathname === '/first' ? new Response(null, { status: 302, headers: { location: '/second' } }) : htmlResponse();
+    return url.pathname === '/first' ? new Response(null, { status: 302, headers: { location: 'https://example.com:443/second' } }) : htmlResponse();
   });
   assert.match(fetched, /Learning/); assert.equal(visited.length, 2);
   for (const location of ['http://127.0.0.1/admin', 'http://example.com/downgrade']) {

@@ -79,7 +79,8 @@ export async function fetchHtml(input: string, fetcher: typeof fetch = fetch): P
     if (!response.ok) { await response.body?.cancel(); throw new Error('http_error'); }
     const contentType = response.headers.get('content-type') ?? '';
     const charset = contentType.match(/charset\s*=\s*["']?([^\s;"']+)/i)?.[1].toLowerCase();
-    if (!/^text\/html(?:;|$)/i.test(contentType) || (charset && !['utf-8', 'us-ascii'].includes(charset))) {
+    const mediaType = contentType.split(';')[0].trim().toLowerCase();
+    if (mediaType !== 'text/html' || (charset && !['utf-8', 'utf8', 'us-ascii'].includes(charset))) {
       await response.body?.cancel(); throw new Error('unsupported_content');
     }
     return limitedText(response, MAX_HTML_BYTES);

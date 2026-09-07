@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.3.1
+
+- HTML 응답의 utf8 별칭과 Content-Type 공백 허용
+- 명시적인 기본 포트 URL·리다이렉트 회귀 테스트 추가
+
 ## 0.3.0
 
 - 공유 URL 선저장·비동기 본문 추출·AI 연결
