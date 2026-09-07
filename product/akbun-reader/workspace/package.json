@@ -1,6 +1,6 @@
 {
   "name": "akbun-reader",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,11 @@
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
+    "esbuild": "0.28.1",
     "typescript": "^7.0.2",
     "wrangler": "^4.129.0"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
   }
 }

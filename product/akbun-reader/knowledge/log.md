@@ -1,7 +1,6 @@
 # Knowledge Update Log
 
-concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
+## 2026-09-07
 
-## YYYY-MM-DD
-
-* **Creation**: [제목](decisions/파일명.md) 결정 기록. 무엇을 알게 되어 남기는지 한 문장.
+- **Creation**: [AI 비용 선예약과 문서 단위 태그 변경](decisions/2026-09-reader-ai-reservation.md) 정책 기록
+- **Update**: 토큰 관리의 Access 인증 제한과 유출 토큰 재발급 차단 근거 추가
