@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,14 +7,16 @@ import { build } from 'esbuild';
 
 const directory = mkdtempSync(join(tmpdir(), 'reader-tests-'));
 await build({
-  stdin: { contents: "export { default } from './worker/index.ts'; export * from './worker/ai.ts'; export * from './worker/auth.ts';", resolveDir: process.cwd() },
-  bundle: true, format: 'esm', platform: 'neutral', outfile: join(directory, 'worker.mjs'),
+  stdin: { contents: "export { default } from './worker/index.ts'; export * from './worker/ai.ts'; export * from './worker/auth.ts'; export * from './worker/extraction/html.ts'; export * from './worker/extraction/fetch.ts'; export * from './worker/extraction/index.ts';", resolveDir: process.cwd() },
+  bundle: true, format: 'esm', platform: 'neutral', mainFields: ['module', 'main'], outfile: join(directory, 'worker.mjs'),
 });
 export const worker = await import(pathToFileURL(join(directory, 'worker.mjs')));
 
 export function database() {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(readFileSync(new URL('../migrations/0001_reader.sql', import.meta.url), 'utf8'));
+  for (const file of readdirSync(new URL('../migrations/', import.meta.url)).filter(file => file.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'));
+  }
   function prepare(sql) {
     let values = [];
     return {

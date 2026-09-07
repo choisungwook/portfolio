@@ -25,7 +25,7 @@ export class CompatibleProvider implements SummaryProvider {
     if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) throw new Error('Invalid AI URL');
     endpoint.pathname = `${endpoint.pathname.replace(/\/$/, '')}/chat/completions`;
     const response = await fetch(endpoint, {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
+      method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(20_000),
       headers: { authorization: `Bearer ${this.env.AI_API_KEY}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         model: this.env.AI_MODEL, max_tokens: 512,

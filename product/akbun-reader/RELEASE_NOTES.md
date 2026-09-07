@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.3.0
+
+- 공유 URL 선저장·비동기 본문 추출·AI 연결
+- 사설 주소·DNS·리다이렉트 검사와 응답 크기 제한
+- 추출 상태 UI·단축어 가이드·workerd CPU 측정 도구 추가
+- Workers fetch의 redirect error 호환성 수정
+
 ## 0.2.1
 
 - 토큰 관리를 Access 브라우저 인증으로 제한

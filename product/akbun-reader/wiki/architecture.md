@@ -42,8 +42,9 @@ Deletion and sync delivery APIs remain future work; current changes are create a
 
 1. Client POSTs `{url, tags}` with a Bearer token.
 2. Worker normalizes the URL (`worker/lib/normalize-url.js`) and looks for an existing row.
-3. New URL: store the supplied body and metadata; a DB trigger writes the create change in the same transaction. URL body extraction remains #1212 work.
-4. Respond, then run summary and tag suggestion asynchronously so the shortcut never waits on the model API.
+3. New URL: store metadata immediately; a DB trigger writes the create change in the same transaction.
+4. In waitUntil, fetch bounded HTML and extract text for URL-only saves. Update extraction status and keep the original link on failure.
+5. Run summary and tag suggestion after extraction so the shortcut never waits on the model API.
 
 Extraction failure still saves the URL and title. The free-tier CPU budget per request is 10 ms, so the extractor choice is decided by measurement, not preference.
 
