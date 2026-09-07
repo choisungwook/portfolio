@@ -5,7 +5,7 @@
     {
       "id": "akbun-reader",
       "name": "akbun-reader",
-      "description": "아이폰 공유 저장, 태그, 여러 기기 읽기, Obsidian 동기화를 갖춘 개인용 읽기 보관함 Worker 웹 앱",
+      "description": "아이폰 공유 저장, 태그, RSS 구독, 공개 링크, 여러 기기 읽기, Obsidian 동기화를 갖춘 개인용 읽기 보관함 Worker 웹 앱",
       "kind": "web",
       "tags": ["cloudflare", "d1", "pwa", "rust"],
       "site": "https://reader.akbun.com",

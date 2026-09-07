@@ -7,9 +7,9 @@
 
 - [x] 1. migration 0004: feeds, feed_items, shares
 - [x] 2. worker: rss(fetch·parse·refresh), tags(rename·delete), shares, public 경로, cron
-- [ ] 3. src: ui 분리, tags·feeds·shares 화면, public.html
-- [ ] 4. 테스트 추가, npm test·check 통과
-- [ ] 5. 문서: README, wiki, adr, knowledge, 버전 0.6.0
+- [x] 3. src: ui 분리, tags·feeds·shares 화면, public.html
+- [x] 4. 테스트 추가, npm test·check 통과
+- [x] 5. 문서: README, wiki, adr, knowledge, 버전 0.6.0
 - [ ] 6. repo-pr-ship (Issue·PR·Copilot 리뷰·merge)
 
 ## 다음 세션이 알아야 할 것

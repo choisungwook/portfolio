@@ -15,3 +15,4 @@ Read this wiki and [the ADR index](../adr/index.md) before changing the product.
 - [원격 MCP](mcp.md) - 도구·인증·Access 경로와 검증 범위
 - [CLI·동기화·CSV import](cli.md) - 명령과 메모·원본 데이터 보존
 - [CLI 환경 설정](03-setup.md) - 인증 경로·로컬 실행·launchd 예시
+- [RSS 구독·태그 관리·공개 링크](rss-tags-share.md) - 수집 주기·태그 변경·공개 범위와 Access 우회
