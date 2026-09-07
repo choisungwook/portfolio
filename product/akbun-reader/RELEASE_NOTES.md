@@ -1,3 +1,8 @@
+# 0.4.0
+
+- 원격 MCP 도구 5개와 Bearer 인증 추가
+- SDK·workerd 통합 검증 추가
+
 # Release notes
 
 ## 0.3.1

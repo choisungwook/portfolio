@@ -8,7 +8,10 @@
   "assets": {
     "directory": "./src",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*",
+      "/mcp"
+    ]
   },
   "d1_databases": [
     {

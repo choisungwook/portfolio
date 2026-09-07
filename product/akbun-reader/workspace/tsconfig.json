@@ -8,6 +8,7 @@
     ],
     "types": [],
     "strict": true,
+    "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
