@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import { version } from '../package.json';
 import type { Env } from './index';
 import { documents, getDocument } from './documents';
 import { HttpError, readJson, tags } from './http';
@@ -14,7 +15,7 @@ export async function mcp(request: Request, env: Env, ctx: ExecutionContext): Pr
     return new Response(null, { status: 405, headers: { allow: 'POST', 'cache-control': 'no-store' } });
   }
   const input = await readJson(request);
-  const server = new McpServer({ name: 'akbun-reader', version: '0.4.0' });
+  const server = new McpServer({ name: 'akbun-reader', version });
   async function result(action: () => Promise<unknown>) {
     try {
       return { content: [{ type: 'text' as const, text: JSON.stringify(await action()) }] };

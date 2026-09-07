@@ -25,7 +25,8 @@ export default {
     if (url.pathname === '/api/health' && request.method === 'GET') return json({ ok: true });
     try {
       const identity = await authenticate(request, env);
-      if (!identity || (url.pathname === '/mcp' && identity !== 'token')) return json({ error: '로그인이 필요합니다.' }, 401);
+      if (!identity) return json({ error: '로그인이 필요합니다.' }, 401);
+      if (url.pathname === '/mcp' && identity !== 'token') return json({ error: 'MCP는 API 토큰이 필요합니다.' }, 403);
       if (!['GET', 'HEAD'].includes(request.method)) {
         const origin = request.headers.get('origin');
         if ((origin && origin !== url.origin) || (identity === 'browser' && origin !== url.origin)) {
