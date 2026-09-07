@@ -1,0 +1,22 @@
+{
+  "name": "akbun-snspublisher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "wrangler types && tsc --noEmit && wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply akbun-snspublisher --local",
+    "migrate:remote": "wrangler d1 migrations apply akbun-snspublisher --remote",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.129.0"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  }
+}
