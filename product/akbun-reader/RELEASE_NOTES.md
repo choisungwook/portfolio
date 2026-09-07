@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.2.0
+
+- 웹 읽기 보관함·태그 편집·PWA·토큰 설정 추가
+- AI 3줄 요약·추천 승인·월별 호출 및 비용 상한 추가
+- D1 migration·Access JWT와 토큰 검증 추가
+
 ## 0.1.0
 
 - Product skeleton: Worker entry point, D1 schema migration, static page, tests, and verify workflow.

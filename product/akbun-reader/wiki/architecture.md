@@ -6,9 +6,9 @@ One Worker, one D1 database, one hostname. Every client goes through the API; no
 
 | Component | Role | Status |
 | --- | --- | --- |
-| Worker `worker/index.ts` | Serves `/api/*`; everything else falls through to the assets binding | Skeleton |
-| Assets `src/` | Plain HTML, CSS, and JavaScript. No bundler, so the source is what runs | Skeleton |
-| D1 | Documents, tags, change log, API tokens | Schema only |
+| Worker `worker/index.ts` | Serves `/api/*`; everything else falls through to the assets binding | Implemented |
+| Assets `src/` | Plain HTML, CSS, and JavaScript. No bundler, so the source is what runs | Implemented |
+| D1 | Documents, tags, change log, API tokens | Local migration and APIs implemented |
 | Cloudflare Access | Google login in front of the hostname, one allowed account | Not configured |
 | iOS Shortcut | Share-sheet shortcut that POSTs the URL with a Bearer token | Planned |
 | Rust CLI | Login, list, save, and incremental Markdown export to an Obsidian vault | Planned |
@@ -32,17 +32,17 @@ Both paths end in Worker code. Trusting Access alone leaves the Worker open to a
 | Table | Purpose |
 | --- | --- |
 | `documents` | Source of truth. `normalized_url` is unique so a re-shared page maps to the same row |
-| `tags`, `document_tags` | Tag names and the document-tag relation |
+| `documents.tags_json` | Tags replaced atomically with the document version; global tags use json_each |
 | `changes` | Append-only log with a monotonic `seq`; clients sync by asking for rows after their last applied `seq` |
 | `api_tokens` | Hash, name, last use, and revocation for automation tokens |
 
-Deletion sets `deleted_at` and writes a `delete` change so a client that connects late still removes its copy.
+Deletion and sync delivery APIs remain future work; current changes are create and update records.
 
 ## Save flow
 
 1. Client POSTs `{url, tags}` with a Bearer token.
 2. Worker normalizes the URL (`worker/lib/normalize-url.js`) and looks for an existing row.
-3. New URL: fetch the page with a size limit and a block on private addresses, extract the body to Markdown, strip scripts, insert the document and its `create` change in one batch.
+3. New URL: store the supplied body and metadata; a DB trigger writes the create change in the same transaction. URL body extraction remains #1212 work.
 4. Respond, then run summary and tag suggestion asynchronously so the shortcut never waits on the model API.
 
 Extraction failure still saves the URL and title. The free-tier CPU budget per request is 10 ms, so the extractor choice is decided by measurement, not preference.

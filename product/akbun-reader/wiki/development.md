@@ -51,3 +51,12 @@ The version in `package.json` is bumped on every change under `workspace/` by re
 - `workers_dev` and `preview_urls` are `false` on purpose. Access policies are per hostname, so any extra hostname is a way around them.
 - `database_id` in `wrangler.json` is a placeholder until the database exists. `wrangler dev` uses a local SQLite file and does not care; `wrangler deploy` will refuse it.
 - Keep `worker/lib/` free of Worker types so `node --test` keeps running it as plain JavaScript.
+
+## 인증 설정
+
+- 개인 API는 기본 거절; 로컬도 인증 우회 없음
+- Access 설정: ACCESS_TEAM_DOMAIN, ACCESS_AUD, ACCESS_OWNER_SUB
+- ACCESS_TEAM_DOMAIN: 프로토콜 없는 팀 도메인
+- ACCESS_OWNER_SUB: 허용할 본인 Access JWT의 sub, 실제 값은 secret 또는 .dev.vars에만 저장
+- 테스트는 격리된 SQLite와 합성 JWT·토큰 사용
+- [API와 AI 설정](reader-ui-ai.md)
