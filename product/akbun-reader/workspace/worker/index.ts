@@ -5,6 +5,9 @@ import { aiLimits } from './ai';
 import { mcp } from './mcp';
 import { changes } from './sync';
 import { importDocument } from './import';
+import { feeds, refreshStaleFeeds } from './rss/index';
+import { publicView, shares } from './shares';
+import { tags } from './tags';
 
 export interface Env {
   ASSETS: Fetcher;
@@ -28,6 +31,7 @@ export default {
       url.pathname = '/api/' + url.pathname.slice('/automation/'.length);
       request = new Request(url, request);
     }
+    if (url.pathname.startsWith('/public/')) return publicView(request, env);
     if (!url.pathname.startsWith('/api/') && url.pathname !== '/mcp') return env.ASSETS.fetch(request);
     if (url.pathname === '/api/health' && request.method === 'GET') return json({ ok: true });
     try {
@@ -45,10 +49,11 @@ export default {
       if (url.pathname === '/mcp') return await mcp(request, env, ctx);
       if (url.pathname === '/api/me' && request.method === 'GET') return json({ authenticated: true });
       if (url.pathname.startsWith('/api/documents')) return await documents(request, env, ctx);
-      if (url.pathname === '/api/tags' && request.method === 'GET') {
-        const rows = await env.DB.prepare(`SELECT j.value AS name, count(DISTINCT documents.id) AS count
-          FROM documents, json_each(tags_json) j GROUP BY j.value ORDER BY j.value`).all();
-        return json({ tags: rows.results });
+      if (url.pathname === '/api/tags' || url.pathname.startsWith('/api/tags/')) return await tags(request, env);
+      if (url.pathname === '/api/feed-items' || url.pathname === '/api/feeds' || url.pathname.startsWith('/api/feeds/')) return await feeds(request, env, ctx);
+      if (url.pathname === '/api/shares' || url.pathname.startsWith('/api/shares/')) {
+        if (identity !== 'browser') return json({ error: '공개 링크 관리는 브라우저 로그인 후 이용하세요.' }, 403);
+        return await shares(request, env);
       }
       if (url.pathname === '/api/ai' && request.method === 'GET') {
         const usage = await env.DB.prepare('SELECT calls, reserved_won FROM ai_usage WHERE month = ?')
@@ -83,5 +88,8 @@ export default {
       if (error instanceof HttpError) return json({ error: error.message }, error.status);
       return json({ error: '요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.' }, 500);
     }
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(refreshStaleFeeds(env));
   },
 } satisfies ExportedHandler<Env>;
