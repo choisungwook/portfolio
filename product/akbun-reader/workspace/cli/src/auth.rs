@@ -46,6 +46,26 @@ pub fn login(base: Url) -> Result<()> {
       .iter()
       .find(|h| h.field.equiv("Host"))
       .map(|h| h.value.as_str());
+    if request.method().as_str() == "OPTIONS"
+      && request.url() == "/callback"
+      && origin == Some(base.origin().ascii_serialization().as_str())
+      && host == Some(address.to_string().as_str())
+    {
+      request.respond(
+        Response::empty(204)
+          .with_header(
+            Header::from_bytes(
+              "Access-Control-Allow-Origin",
+              base.origin().ascii_serialization(),
+            )
+            .unwrap(),
+          )
+          .with_header(Header::from_bytes("Access-Control-Allow-Methods", "POST").unwrap())
+          .with_header(Header::from_bytes("Access-Control-Allow-Headers", "Content-Type").unwrap())
+          .with_header(Header::from_bytes("Access-Control-Allow-Private-Network", "true").unwrap()),
+      )?;
+      continue;
+    }
     let content_type = request
       .headers()
       .iter()
@@ -77,6 +97,13 @@ pub fn login(base: Url) -> Result<()> {
     entry(&base)?.set_password(&secret)?;
     request.respond(
       Response::from_string("CLI login complete. You may close this tab.")
+        .with_header(
+          Header::from_bytes(
+            "Access-Control-Allow-Origin",
+            base.origin().ascii_serialization(),
+          )
+          .unwrap(),
+        )
         .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap()),
     )?;
     return Ok(());

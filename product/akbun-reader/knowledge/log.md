@@ -1,5 +1,9 @@
 ## 2026-09-07
 
+- CLI 인증·재실행 가능한 동기화·import 결정 추가
+
+## 2026-09-07
+
 - 요청 단위 MCP·기존 API 재사용 결정 기록
 
 # Knowledge Update Log

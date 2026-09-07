@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - 'product/akbun-reader/**'
+      - '.github/workflows/verify-akbun-reader.yml'
   workflow_dispatch:
 
 permissions:
@@ -38,3 +39,19 @@ jobs:
       # tsc plus a wrangler dry run: bundles the Worker without deploying.
       - name: Type-check and bundle
         run: npm run check
+
+  cli:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: product/akbun-reader/workspace/cli
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Check formatting
+        run: cargo +stable fmt --check
+      - name: Test CLI
+        run: cargo +stable test --locked
+      - name: Lint CLI
+        run: cargo +stable clippy --locked --all-targets -- -D warnings
