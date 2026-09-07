@@ -1,0 +1,40 @@
+name: verify-akbun-reader
+
+# Deployment is a Cloudflare Workers Build on push to master, so there is
+# nothing to release here. This job proves the Worker still type-checks,
+# bundles, and passes its DOM-free tests.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-reader/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-reader/workspace
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-reader/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # worker/lib is pure, so this needs no Cloudflare account and no D1.
+      - name: Run tests
+        run: npm test
+
+      # tsc plus a wrangler dry run: bundles the Worker without deploying.
+      - name: Type-check and bundle
+        run: npm run check

@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1b1b1b;
+  --muted: #6b6b6b;
+  --bg: #fafafa;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #ececec;
+    --muted: #9a9a9a;
+    --bg: #141414;
+  }
+}
+
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.shell {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+}
+
+.muted {
+  color: var(--muted);
+}
