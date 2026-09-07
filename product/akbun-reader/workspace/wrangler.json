@@ -10,7 +10,8 @@
     "binding": "ASSETS",
     "run_worker_first": [
       "/api/*",
-      "/mcp"
+      "/mcp",
+      "/automation/*"
     ]
   },
   "d1_databases": [

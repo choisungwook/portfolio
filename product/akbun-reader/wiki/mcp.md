@@ -28,7 +28,7 @@
 
 - 사이트 전체 Access 정책이 Bearer 요청을 로그인 페이지로 돌리면 자동화 호출 불가
 - /mcp만 별도 Access 애플리케이션의 Bypass 대상으로 구성
-- /api/* 브라우저 경로의 Access 정책은 유지; CLI 자동화 경로는 별도 설계 대상
+- /api/* 브라우저 경로의 Access 정책은 유지; CLI는 토큰 전용 /automation/* 사용, [CLI 설정](03-setup.md) 참고
 - Bypass는 Worker 인증을 우회하지 않음; 매 요청 Worker의 토큰 검증 유지
 - /api/tokens는 Access JWT와 owner sub를 계속 요구하므로 자동화 토큰만으로 발급 불가
 - workers.dev·preview 비활성화 유지

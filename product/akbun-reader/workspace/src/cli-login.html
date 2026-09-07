@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>CLI 로그인 · akbun-reader</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="settings">
+    <h1>CLI 로그인</h1>
+    <p>이 컴퓨터에서 직접 reader auth login을 실행한 경우에만 토큰을 발급하세요.</p>
+    <p id="destination"></p>
+    <button id="login" disabled>CLI 토큰 발급 및 전달</button>
+    <p id="status" role="status"></p>
+    <a href="/">보관함으로</a>
+  </main>
+  <script type="module" src="/cli-login.js"></script>
+</body>
+</html>

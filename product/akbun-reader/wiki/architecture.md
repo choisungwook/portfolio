@@ -6,17 +6,17 @@ One Worker, one D1 database, one hostname. Every client goes through the API; no
 
 | Component | Role | Status |
 | --- | --- | --- |
-| Worker `worker/index.ts` | Serves `/api/*`; everything else falls through to the assets binding | Implemented |
+| Worker `worker/index.ts` | Serves `/api/*`, `/automation/*`, and `/mcp`; everything else falls through to the assets binding | Implemented |
 | Assets `src/` | Plain HTML, CSS, and JavaScript. No bundler, so the source is what runs | Implemented |
 | D1 | Documents, tags, change log, API tokens | Local migration and APIs implemented |
 | Cloudflare Access | Google login in front of the hostname, one allowed account | Not configured |
-| iOS Shortcut | Share-sheet shortcut that POSTs the URL with a Bearer token | Planned |
-| Rust CLI | Login, list, save, and incremental Markdown export to an Obsidian vault | Planned |
-| MCP endpoint | Streamable HTTP under `/mcp`, same Bearer tokens | Planned |
+| iOS Shortcut | Share-sheet shortcut that POSTs the URL with a Bearer token | Configuration guide; device verification pending |
+| Rust CLI | Login, document commands, Markdown export, CSV import | Implemented; live login verification pending |
+| MCP endpoint | Streamable HTTP under `/mcp`, same Bearer tokens | SDK/workerd tested; live client verification pending |
 
 ## Request routing
 
-`run_worker_first` is limited to `/api/*`. A request for a static file never reaches the Worker, which keeps the free-tier request count down and means the page keeps working while the Worker is broken. `/mcp` will be added to that list when it exists.
+`run_worker_first` includes `/api/*`, `/automation/*`, and `/mcp`. A request for a static file never reaches the Worker, which keeps the free-tier request count down and means the page keeps working while the Worker is broken.
 
 ## Authentication, two paths
 
@@ -34,13 +34,13 @@ Both paths end in Worker code. Trusting Access alone leaves the Worker open to a
 | `documents` | Source of truth. `normalized_url` is unique so a re-shared page maps to the same row |
 | `documents.tags_json` | Tags replaced atomically with the document version; global tags use json_each |
 | `changes` | Append-only log with a monotonic `seq`; clients sync by asking for rows after their last applied `seq` |
-| `api_tokens` | Hash, name, last use, and revocation for automation tokens |
+| `api_tokens` | Hash, name, creation, and revocation for automation tokens |
 
-Deletion and sync delivery APIs remain future work; current changes are create and update records.
+The changes endpoint delivers ten changes per page. A delete trigger records database deletions; no document-delete API is exposed. Missing documents are exported as tombstones with local notes retained.
 
 ## Save flow
 
-1. Client POSTs `{url, tags}` with a Bearer token.
+1. Automation client POSTs `{url, tags}` to `/automation/documents` with a Bearer token; the browser uses `/api/documents`.
 2. Worker normalizes the URL (`worker/lib/normalize-url.js`) and looks for an existing row.
 3. New URL: store metadata immediately; a DB trigger writes the create change in the same transaction.
 4. In waitUntil, fetch bounded HTML and extract text for URL-only saves. Update extraction status and keep the original link on failure.

@@ -192,7 +192,7 @@ async function showSettings() {
   usage.append(node('p', ai.enabled ? `이번 달 ${ai.usage.calls}/${ai.limits.calls}회 · 예약 비용 ${ai.usage.reserved_won}/${ai.limits.budget}원` : 'AI가 비활성화되어 있습니다. 모델과 비용 상한을 설정하면 사용할 수 있습니다.'));
   const shortcut = node('section'); shortcut.append(node('h2', 'iPhone 공유 저장'));
   const steps = node('ol');
-  for (const step of ['단축어 앱에서 새 단축어를 만들고 공유 시트 표시, 입력 URL을 선택하세요.', `URL 콘텐츠 가져오기: ${location.origin}/api/documents, POST, JSON 본문 url에 단축어 입력을 넣으세요.`, 'Authorization 헤더에 Bearer 뒤 공백과 발급한 토큰을 넣으세요.', '응답을 알림으로 표시하세요. 통신이 실패하면 같은 URL을 다시 공유하세요. 토큰이 들어 있는 단축어는 타인과 공유하지 마세요.']) steps.append(node('li', step));
+  for (const step of ['단축어 앱에서 새 단축어를 만들고 공유 시트 표시, 입력 URL을 선택하세요.', `URL 콘텐츠 가져오기: ${location.origin}/automation/documents, POST, JSON 본문 url에 단축어 입력을 넣으세요.`, 'Authorization 헤더에 Bearer 뒤 공백과 발급한 토큰을 넣으세요.', '응답을 알림으로 표시하세요. 통신이 실패하면 같은 URL을 다시 공유하세요. 토큰이 들어 있는 단축어는 타인과 공유하지 마세요.']) steps.append(node('li', step));
   shortcut.append(steps, node('p', '홈 화면 추가: Safari 공유 메뉴 → 홈 화면에 추가. 오프라인 읽기는 지원하지 않습니다.'));
   content.append(tokens, usage, shortcut);
   main.replaceChildren(action(node('button', '목록으로'), showList), content);

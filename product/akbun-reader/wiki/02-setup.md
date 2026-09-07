@@ -16,7 +16,7 @@
 
 | 항목 | 설정 |
 | --- | --- |
-| 주소 | Reader 주소 뒤 /api/documents |
+| 주소 | Reader 주소 뒤 /automation/documents |
 | 방식 | POST |
 | Authorization 헤더 | Bearer, 공백 한 칸, 발급한 토큰 |
 | Content-Type 헤더 | application/json |
@@ -40,7 +40,7 @@ JSON 요청의 형태는 아래와 같다. 실제 단축어에서는 url 값에 
 - 재전송으로 같은 문서가 중복 생성되지 않음
 - 401: 웹에서 새 토큰을 발급하고 단축어의 토큰 교체
 - HTML 로그인 화면이 응답하면 Access의 자동화 API 경로 설정 확인
-- 전체 사이트 Access 정책이 Bearer 요청을 앞단에서 차단하면 Worker 코드만으로 해결 불가; #1216에서 경로 정책 검증 필요
+- /automation/*만 별도 Access Bypass 경로로 설정하고 Worker 토큰 검증 유지; [인증 경로 설정](03-setup.md) 참고
 - 본문 실패: Reader에서 원문 링크로 읽기, URL 저장은 유지
 - 토큰이 포함된 단축어 공유 금지, 기기 분실 시 웹 설정에서 해당 토큰 폐기
 
