@@ -15,6 +15,7 @@ STS와 AgentCore Memory의 public NLB 고정 IP 실험에서 유지할 설계 �
 * [public NLB 진입과 AWS 권한 분리](decisions/2026-09-public-nlb-ingress.md)
 * [AWS 호스트명과 TLS 유지](decisions/2026-09-preserve-aws-hostname.md)
 * [DNS 변경 불가와 인증 방식 분리](decisions/2026-09-separate-auth-from-routing.md)
+* [자체 도메인 TLS 재암호화 직결(S06)은 opt-in 실험](decisions/2026-09-own-domain-tls-nlb-s06.md)
 
 AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.1](references/okf-spec-0.1.md)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 

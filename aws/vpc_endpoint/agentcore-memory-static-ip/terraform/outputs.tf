@@ -14,13 +14,19 @@ output "client_config" {
         eips = {
           for az in var.availability_zones : az => aws_eip.nlb["${name}-${az}"].public_ip
         }
+        own_domain_url       = contains(keys(local.tls_services), name) ? "https://${var.tls_alias_domains[name]}" : null
+        tls_target_group_arn = contains(keys(local.tls_services), name) ? aws_lb_target_group.tls[name].arn : null
+        tls_eips = {
+          for az in var.availability_zones : az => aws_eip.tls["${name}-${az}"].public_ip
+          if contains(keys(local.tls_services), name)
+        }
       }
     }
   }
 }
 
 output "firewall_destination_ips" {
-  value = sort([for eip in aws_eip.nlb : eip.public_ip])
+  value = sort(concat([for eip in aws_eip.nlb : eip.public_ip], [for eip in aws_eip.tls : eip.public_ip]))
 }
 
 output "sts_alias_url" {

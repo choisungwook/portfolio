@@ -7,3 +7,8 @@ trusted_principal_arn = "arn:aws:iam::123456789012:role/ClientProfileRole"
 # route53_zone_id: the authoritative Route 53 zone, or null when you add the A record elsewhere.
 sts_alias_domain = "s01-sts.example.com"
 route53_zone_id  = null
+
+# S06 (optional): own-domain TLS NLBs. Both values or neither.
+# acm_certificate_arn: ISSUED Seoul certificate covering both names (a zone wildcard works).
+# acm_certificate_arn = "arn:aws:acm:ap-northeast-2:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+# tls_alias_domains   = { sts = "s06-sts.example.com", memory = "s06-memory.example.com" }

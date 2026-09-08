@@ -7,12 +7,12 @@
 
 | 파일 | 만드는 명령 | 읽는 코드 | 예제 |
 | --- | --- | --- | --- |
-| `runtime/config.json` | `terraform -chdir=terraform output -json client_config \| jq .` | `scenarios/s01_public_dns_sts.py`, `scripts/public_nlb_hosts.py` | [config.json.example](../examples/config.json.example) |
+| `runtime/config.json` | `terraform -chdir=terraform output -json client_config \| jq .` | `scenarios/s01_public_dns_sts.py`, `scenarios/s06_own_domain_tls_nlb.py`, `scripts/public_nlb_hosts.py` | [config.json.example](../examples/config.json.example) |
 | `runtime/hosts.entries` | `python -m scripts.public_nlb_hosts runtime/config.json --az <AZ>` | 사람이 `/etc/hosts`에 붙여 넣음 | [hosts.entries.example](../examples/hosts.entries.example) |
 | `proxy/squid.conf` | 저장소에 포함 (git 추적) | S02 Squid 컨테이너 | 그대로 사용 |
 | `runtime/s07.json` | `terraform -chdir=terraform/labs/s07 output -json lab \| jq .` | `scenarios/s07_public_proxy_sts.py` (`LAB_CONFIG`) | [s07.json.example](../examples/s07.json.example) |
 
-## config.json (S01)
+## config.json (S01·S06)
 
 | 항목 | 의미 | 코드가 쓰는 곳 |
 | --- | --- | --- |
@@ -25,8 +25,12 @@
 | `services.<svc>.nlb_dns_name` | NLB 자체 DNS 이름. 코드는 쓰지 않음 | 콘솔 대조용 |
 | `services.<svc>.target_group_arn` | target health 조회용 | `aws elbv2 describe-target-health` |
 | `services.<svc>.vpc_endpoint_id` | interface endpoint ID | endpoint policy 확인, Memory Role의 `aws:SourceVpce` |
+| `services.<svc>.own_domain_url` | S06 자체 도메인 URL. S06을 끄면 `null` | S06의 boto3 `endpoint_url`. null이면 S06 코드가 시작 전에 중단 |
+| `services.<svc>.tls_eips` | AZ → S06 TLS NLB EIP. S06을 끄면 빈 객체 | 방화벽 허용 목록, 다른 DNS 사업자에 A 레코드를 직접 넣을 때 |
+| `services.<svc>.tls_target_group_arn` | S06 TLS target group. S06을 끄면 `null` | `aws elbv2 describe-target-health` |
 
 - `<svc>`는 `sts`와 `memory` 두 개예요.
+- S06 항목은 `acm_certificate_arn`과 `tls_alias_domains`를 함께 넣고 apply했을 때만 값이 채워져요.
 - AZ를 늘리면 `eips`에 AZ 항목이 늘어요. 한 번 실행에 AZ 하나만 골라요.
 
 ## hosts.entries (S01)

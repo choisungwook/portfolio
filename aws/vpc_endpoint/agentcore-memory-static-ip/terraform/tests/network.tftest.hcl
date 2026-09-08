@@ -106,3 +106,55 @@ run "reject_session_arn" {
   }
   expect_failures = [var.trusted_principal_arn]
 }
+
+run "s06_disabled_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_lb.tls) == 0 && length(aws_eip.tls) == 0 && length(aws_route53_record.tls_alias) == 0
+    error_message = "Without acm_certificate_arn the S06 TLS NLBs must not exist."
+  }
+  assert {
+    condition     = output.client_config.services["sts"].own_domain_url == null
+    error_message = "own_domain_url must be null while S06 is disabled so the S06 client refuses to run."
+  }
+}
+
+run "s06_tls_nlb_first_plan" {
+  command = plan
+  variables {
+    acm_certificate_arn = "arn:aws:acm:ap-northeast-2:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+    tls_alias_domains   = { sts = "s06-sts.example.com", memory = "s06-memory.example.com" }
+  }
+
+  assert {
+    condition     = length(aws_lb.tls) == 2 && length(aws_eip.tls) == 2 && length(aws_lb_target_group_attachment.tls) == 2
+    error_message = "S06 adds one TLS NLB, EIP and ENI attachment per service in a single AZ."
+  }
+  assert {
+    condition = alltrue([
+      for key in ["sts", "memory"] :
+      aws_lb_listener.tls[key].protocol == "TLS" &&
+      aws_lb_listener.tls[key].certificate_arn == var.acm_certificate_arn &&
+      aws_lb_target_group.tls[key].protocol == "TLS" &&
+      aws_lb_target_group.tls[key].port == 443 &&
+      aws_lb_target_group.tls[key].preserve_client_ip == "false"
+    ])
+    error_message = "S06 must terminate TLS with our certificate and re-encrypt to the endpoint ENIs on 443."
+  }
+  assert {
+    condition = (
+      output.client_config.services["sts"].own_domain_url == "https://s06-sts.example.com" &&
+      output.client_config.services["memory"].own_domain_url == "https://s06-memory.example.com"
+    )
+    error_message = "The S06 client reads its endpoint URLs from client_config."
+  }
+}
+
+run "reject_tls_domains_without_certificate" {
+  command = plan
+  variables {
+    tls_alias_domains = { sts = "s06-sts.example.com", memory = "s06-memory.example.com" }
+  }
+  expect_failures = [var.tls_alias_domains]
+}

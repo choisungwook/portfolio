@@ -19,3 +19,17 @@ resource "aws_route53_record" "sts_alias" {
     evaluate_target_health = true
   }
 }
+
+# S06: own-domain names for the TLS NLBs. Same zone rule as above; with another DNS
+# provider add A <tls_alias_domains[svc]> -> TLS NLB EIP records by hand.
+resource "aws_route53_record" "tls_alias" {
+  for_each = var.route53_zone_id == null ? {} : local.tls_services
+  zone_id  = data.aws_route53_zone.lab[0].zone_id
+  name     = var.tls_alias_domains[each.key]
+  type     = "A"
+  alias {
+    name                   = aws_lb.tls[each.key].dns_name
+    zone_id                = aws_lb.tls[each.key].zone_id
+    evaluate_target_health = true
+  }
+}
