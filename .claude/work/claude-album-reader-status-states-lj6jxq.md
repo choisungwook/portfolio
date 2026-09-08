@@ -8,7 +8,7 @@
 - [x] 1. index.html·app.js·ui.js·styles.css에 하단 고정 세그먼트 컨트롤과 목록 항목 이동 버튼 추가
 - [x] 2. package.json 0.7.0, RELEASE_NOTES, wiki/reader-ui-ai.md 갱신
 - [x] 3. npm test·npm run check 통과 확인
-- [ ] 4. commit·push
+- [x] 4. commit·push
 
 ## 다음 세션이 알아야 할 것
 
