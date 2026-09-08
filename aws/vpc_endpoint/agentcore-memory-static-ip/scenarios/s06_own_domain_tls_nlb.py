@@ -180,7 +180,10 @@ def create_probe_event(memory: Any, identifiers: dict) -> dict:
 
 
 def memory_round_trip(memory: Any, memory_id: str) -> None:
-  """Write/read one event, verify its content, and delete it even on a read failure."""
+  """Write/read one event, verify its content, and delete it even on a read failure.
+
+  Any AWS error response (Create, Get or Delete) is a REJECTED verdict, not a FAIL.
+  """
   identifiers = {
     "memoryId": memory_id,
     "actorId": "static-ip-client",
@@ -188,17 +191,25 @@ def memory_round_trip(memory: Any, memory_id: str) -> None:
   }
   try:
     probe = create_probe_event(memory, identifiers)
+    request = {**identifiers, "eventId": probe["event_id"]}
+    try:
+      received = memory.get_event(**request)["event"]
+      if received.get("payload") != probe["payload"]:
+        raise RuntimeError("Memory content did not match the submitted payload")
+      print("GET_EVENT_OK payload_matches=true", flush=True)
+    finally:
+      memory.delete_event(**request)
+      print("DELETE_EVENT_OK", flush=True)
   except ClientError as error:
-    raise OwnHostRejected("Memory CreateEvent", error) from error
-  request = {**identifiers, "eventId": probe["event_id"]}
+    raise OwnHostRejected(f"Memory {error.operation_name}", error) from error
+
+
+def caller_identity(sts: Any) -> str:
+  """GetCallerIdentity with the role session, still through the own domain."""
   try:
-    received = memory.get_event(**request)["event"]
-    if received.get("payload") != probe["payload"]:
-      raise RuntimeError("Memory content did not match the submitted payload")
-    print("GET_EVENT_OK payload_matches=true", flush=True)
-  finally:
-    memory.delete_event(**request)
-    print("DELETE_EVENT_OK", flush=True)
+    return sts.get_caller_identity()["Arn"]
+  except ClientError as error:
+    raise OwnHostRejected("STS GetCallerIdentity", error) from error
 
 
 # ---------------------------------------------------------------- entry point
@@ -213,8 +224,8 @@ def main() -> None:
     verify_own_certificate(url)
   source = initial_session(config.region)
   session = assume_session(api_client(source, "sts", config.sts_url, config.region), config)
-  identity = api_client(session, "sts", config.sts_url, config.region).get_caller_identity()
-  print(f"CALLER_IDENTITY_OK arn={identity['Arn']}", flush=True)
+  arn = caller_identity(api_client(session, "sts", config.sts_url, config.region))
+  print(f"CALLER_IDENTITY_OK arn={arn}", flush=True)
   memory = api_client(session, "bedrock-agentcore", config.memory_url, config.region)
   memory_round_trip(memory, config.memory_id)
   print("PASS own-domain TLS NLB -> STS / AgentCore Memory with own Host header", flush=True)

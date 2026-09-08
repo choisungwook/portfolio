@@ -9,7 +9,7 @@
 | Terraform 관리 인증 A·B | S01의 실제 AWS provider + 모의 CLI·STS로 A의 credential_process → AssumeRole, B의 환경변수 키 사용과 서울 서명 확인 |
 | B의 STS 실패 처리 | Bash·Zsh에서 CLI 실패·토큰 누락 시 부분 키·이전 키가 남지 않는지 확인 |
 | 실제 AWS 관리 인증·로그인 갱신 | 2026-09-06 확인. default(login_session)를 직접 쓰면 짧게 만료됐고, AWS_PROFILE=admin(base credential_process → AssumeRole)은 1시간 세션과 갱신으로 Terraform·CLI·destroy까지 안정적 |
-| Python 테스트 | 35개 통과 |
+| Python 테스트 | 38개 통과 |
 | Terraform 최초 plan·입력 제약 모의 테스트 | S01 9개 + S07 1개 통과. 기존 주체 ARN 참조·세션 ARN 거부·비밀 output 없음, 공개 CIDR·backend 경계, S06 기본 비활성·TLS listener/target group·인증서 없는 도메인 거부 확인 |
 | 로컬 CONNECT 터널 | 실제 socket·TLS 서버로 SNI·Host·Authorization 유지, 허용 외 목적지 거부 확인 |
 | boto3 HTTPS proxy | 바깥 proxy TLS와 안쪽 AWS 모의 TLS 검증, 서울 SigV4·세션 토큰 전달 확인 |

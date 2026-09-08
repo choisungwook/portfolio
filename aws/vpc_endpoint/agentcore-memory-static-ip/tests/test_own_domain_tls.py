@@ -11,6 +11,7 @@ from scenarios.s06_own_domain_tls_nlb import (
   OwnHostRejected,
   api_client,
   assume_session,
+  caller_identity,
   load_config,
   memory_round_trip,
   print_host_header,
@@ -118,3 +119,32 @@ def test_memory_rejection_is_classified_and_nothing_is_left_behind(session):
       memory_round_trip(memory, MEMORY_ID)
     stubber.assert_no_pending_responses()
   assert rejected.value.stage == "Memory CreateEvent"
+
+
+def test_get_event_rejection_still_deletes_and_is_classified(session):
+  memory = api_client(session, "bedrock-agentcore", MEMORY_URL, REGION)
+  identifiers = {"memoryId": MEMORY_ID, "actorId": "static-ip-client", "sessionId": ANY}
+  event = {
+    **identifiers,
+    "sessionId": "probe",
+    "eventId": "0000000001#event",
+    "eventTimestamp": datetime.now(UTC),
+  }
+  with Stubber(memory) as stubber:
+    stubber.add_response("create_event", {"event": event}, ANY)
+    stubber.add_client_error("get_event", "AccessDeniedException", "rejected", 403)
+    stubber.add_response("delete_event", {"eventId": "0000000001#event"}, ANY)
+    with pytest.raises(OwnHostRejected) as rejected:
+      memory_round_trip(memory, MEMORY_ID)
+    stubber.assert_no_pending_responses()
+  assert rejected.value.stage == "Memory GetEvent"
+
+
+def test_caller_identity_rejection_is_classified(session):
+  sts = api_client(session, "sts", STS_URL, REGION)
+  with Stubber(sts) as stubber:
+    stubber.add_client_error("get_caller_identity", "SignatureDoesNotMatch", "rejected", 403)
+    with pytest.raises(OwnHostRejected) as rejected:
+      caller_identity(sts)
+  assert rejected.value.stage == "STS GetCallerIdentity"
+  assert rejected.value.code == "SignatureDoesNotMatch"

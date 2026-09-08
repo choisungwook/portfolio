@@ -75,11 +75,12 @@ python -m scenarios.s06_own_domain_tls_nlb
 | --- | --- | --- |
 | `PASS own-domain TLS NLB -> STS / AgentCore Memory with own Host header` | 0 | AWS가 우리 Host와 SNI 없는 연결을 모두 받았어요. 이 구성으로 호출 가능 |
 | `REJECTED stage=STS AssumeRole code=<Code> ...` | 2 | STS가 응답은 했지만 거부했어요. `SignatureDoesNotMatch`·`InvalidClientTokenId`·`IncompleteSignature`면 Host 수용 문제, `AccessDenied`면 IAM·endpoint 정책부터 확인 |
-| `REJECTED stage=Memory CreateEvent ...` | 2 | STS는 통과했고 Memory 데이터 API만 거부했어요. 서비스마다 다를 수 있다는 뜻이에요 |
+| `REJECTED stage=STS GetCallerIdentity ...` | 2 | AssumeRole은 통과했는데 Role 세션의 호출이 거부됐어요. 드물지만 자격증명 종류에 따라 다를 수 있어요 |
+| `REJECTED stage=Memory <CreateEvent·GetEvent·DeleteEvent> ...` | 2 | STS는 통과했고 Memory 데이터 API가 거부했어요. 서비스마다 다를 수 있다는 뜻이에요. 만든 이벤트는 삭제까지 시도해요 |
 | `FAIL SSLCertVerificationError ...` | 1 | 우리 인증서가 그 이름을 포함하지 않거나 DNS가 TCP NLB(S05 이름)를 가리키고 있어요 |
 | `FAIL ConnectionClosedError` / `EndpointConnectionError` | 1 | NLB→endpoint의 안쪽 TLS가 안 열렸을 가능성. 위 `-noservername` 확인과 target health를 봐요 |
 
-- REJECTED와 FAIL은 구분해요. REJECTED는 AWS까지 도달해서 판정이 난 것이고, FAIL은 그 전에 끊긴 것이라 결론이 아니에요.
+- REJECTED와 FAIL은 구분해요. AWS가 오류 응답을 준 것은 단계와 관계없이 모두 REJECTED이고, FAIL은 그 전에 끊긴 것이라 결론이 아니에요.
 - 결과가 어느 쪽이든 [검증 상태](../../4-validation.md)의 S06 행과 이 문서의 판정 줄을 함께 갱신해요.
 
 ## 결과가 PASS여도 남는 것
