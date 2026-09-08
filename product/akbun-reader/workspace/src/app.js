@@ -24,9 +24,17 @@ async function showList() {
   title.append(action(node('button', '새로고침'), async () => { await showList(); await loadTags(); }));
   const list = node('ul', undefined, 'document-list');
   const move = async (document, location) => {
-    await api(`/documents/${document.id}`, { method: 'PATCH', body: JSON.stringify({ version: document.version, location }) });
+    const item = list.querySelector(`[data-id="${document.id}"]`);
+    const buttons = item ? [...item.querySelectorAll('.move')] : [];
+    for (const button of buttons) button.disabled = true;
+    try {
+      await api(`/documents/${document.id}`, { method: 'PATCH', body: JSON.stringify({ version: document.version, location }) });
+    } catch (error) {
+      for (const button of buttons) button.disabled = false;
+      throw error;
+    }
     if (generation !== state.generation) return;
-    list.querySelector(`[data-id="${document.id}"]`)?.remove();
+    item?.remove();
     message(`${locations[location]} 목록으로 옮겼습니다.`);
     if (!list.childElementCount) await showList();
   };
