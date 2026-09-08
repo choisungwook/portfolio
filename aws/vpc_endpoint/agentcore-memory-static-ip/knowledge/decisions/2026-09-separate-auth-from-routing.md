@@ -9,7 +9,7 @@ timestamp: 2026-09-05T00:00:00Z
 ## 결정
 
 - 인증 방식·DNS 변경·proxy 설정을 독립 조건으로 분류.
-- DNS 변경 불가이면 자체 도메인의 HTTPS CONNECT proxy 사용(S07). 자체 도메인을 AWS API URL로 직접 쓰는 것은 S05의 실패 사례.
+- DNS 변경 불가이면 자체 도메인의 HTTPS CONNECT proxy 사용(S07). 자체 도메인을 AWS API URL로 직접 쓰는 것은 TCP 통과에서는 S05의 실패 사례이고, NLB에서 우리 인증서로 TLS를 종료하는 변형은 [S06](2026-09-own-domain-tls-nlb-s06.md)에서 따로 확인.
 - NLB는 바깥 proxy TLS만 종료. AWS 서비스 TLS·SNI·Host·인증 서명은 터널 안에서 유지.
 - Roles Anywhere 인증은 [독립 기본 실습](../../../../iam/roles-anywhere/README.md)에서 다루고 이 workspace에서는 STS만 사용. 인증서로 HTTPS 서버 이름 검증이 바뀌지 않는다는 점만 여기서 유지.
 

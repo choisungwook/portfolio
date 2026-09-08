@@ -9,8 +9,8 @@
 | Terraform 관리 인증 A·B | S01의 실제 AWS provider + 모의 CLI·STS로 A의 credential_process → AssumeRole, B의 환경변수 키 사용과 서울 서명 확인 |
 | B의 STS 실패 처리 | Bash·Zsh에서 CLI 실패·토큰 누락 시 부분 키·이전 키가 남지 않는지 확인 |
 | 실제 AWS 관리 인증·로그인 갱신 | 2026-09-06 확인. default(login_session)를 직접 쓰면 짧게 만료됐고, AWS_PROFILE=admin(base credential_process → AssumeRole)은 1시간 세션과 갱신으로 Terraform·CLI·destroy까지 안정적 |
-| Python 테스트 | 25개 통과 |
-| Terraform 최초 plan·입력 제약 모의 테스트 | S01 6개 + S07 1개 통과. 기존 주체 ARN 참조·세션 ARN 거부·비밀 output 없음, 공개 CIDR·backend 경계 확인 |
+| Python 테스트 | 38개 통과 |
+| Terraform 최초 plan·입력 제약 모의 테스트 | S01 9개 + S07 1개 통과. 기존 주체 ARN 참조·세션 ARN 거부·비밀 output 없음, 공개 CIDR·backend 경계, S06 기본 비활성·TLS listener/target group·인증서 없는 도메인 거부 확인 |
 | 로컬 CONNECT 터널 | 실제 socket·TLS 서버로 SNI·Host·Authorization 유지, 허용 외 목적지 거부 확인 |
 | boto3 HTTPS proxy | 바깥 proxy TLS와 안쪽 AWS 모의 TLS 검증, 서울 SigV4·세션 토큰 전달 확인 |
 | S05 TLS 이름 불일치 | 2026-09-06 실제 확인. 공개 DNS로 alias가 STS NLB EIP로 해석된 상태에서 EXPECTED_FAILURE TLS hostname mismatch 출력 |
@@ -18,6 +18,7 @@
 | 실제 AWS S01 apply·NLB target health | 2026-09-06 완료. STS·Memory target healthy, S05 alias 레코드 생성 |
 | 실제 S02 Squid 컨테이너 경유 STS·Memory 왕복 호출 | 2026-09-06 PASS. 로컬 DNS 그대로, 컨테이너 /etc/hosts로 EIP 매핑, access.log에 TCP_TUNNEL/200 … HIER_DIRECT/EIP 확인. 전역 HTTPS_PROXY는 로그인 갱신 호출이 403으로 막혀 클라이언트 Config로 한정 |
 | 실제 S01 hosts 실험·STS·Memory 왕복 호출 | 2026-09-06 PASS. AZ 2a, admin 프로파일, DNS·TLS·AssumeRole·CallerIdentity·Create/Get/Delete 전부 EIP 경로로 통과 |
+| S06 자체 도메인 TLS 재암호화 직결 | **미실행**. 2026-09-08 Terraform validate·mock test와 Python 테스트만 통과. 실제 AWS에서 `python -m scenarios.s06_own_domain_tls_nlb`를 돌린 뒤 PASS/REJECTED와 code를 이 행에 기록 |
 | S07 실제 NLB TLS·프록시 EC2 | 2026-09-06 PASS. hosts 변경 없이 ACM 바깥 TLS → EC2 CONNECT proxy → STS·Memory VPCE로 STS_CREDENTIALS_OK·Create/Get/Delete 통과. 자격증명 장시간 갱신은 미실행 |
 
 - 문서상 가능한 설계와 실제 AWS 검증 완료를 구분해요.
@@ -73,7 +74,9 @@ terraform -chdir=terraform/labs/s07 test
 | endpoint service 또는 AZ 미지원 | `python scripts/check_services.py`의 교집합 AZ |
 | NLB unhealthy | endpoint SG의 NLB SG 참조, TCP 443, ENI IP, client IP preservation 비활성화 |
 | DNS mismatch | /etc/hosts 실습 블록·DNS 캐시·선택 AZ와 runtime EIP가 일치하는지 |
-| TLS hostname mismatch | endpoint_url을 NLB·사용자 도메인으로 바꾸지 않았는지 |
+| TLS hostname mismatch | endpoint_url을 NLB·사용자 도메인으로 바꾸지 않았는지. S06이면 ACM SAN에 그 이름이 있는지, DNS가 TLS NLB(tls_eips)를 가리키는지 |
+| S06 REJECTED SignatureDoesNotMatch·InvalidClientTokenId·IncompleteSignature | AWS가 우리 Host를 자기 요청으로 받지 않은 것. 구성 오류가 아니라 실험 결과. [결과 읽는 법](scenarios/s06/2-experiment.md#결과-읽는-법) |
+| S06 FAIL ConnectionClosedError | NLB→endpoint 안쪽 TLS가 안 열린 가능성. S01 EIP로 `openssl s_client -noservername` 확인, TLS target health |
 | TCP/TLS timeout | 현재 클라이언트 공인 IP, NLB ingress, 회사 outbound, target health |
 | AssumeRole AccessDenied | 기존 주체 권한·Role trust·SCP·boundary. STS endpoint 정책을 좁혔다면 그 Principal도 확인 |
 | Memory AccessDenied | 임시 토큰, Memory ARN, Memory endpoint 정책, aws:SourceVpce |

@@ -2,6 +2,11 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-09-08
+
+* **Creation**: [자체 도메인 TLS 재암호화 직결(S06)은 opt-in 실험](decisions/2026-09-own-domain-tls-nlb-s06.md) - root state opt-in, 서비스별 TLS NLB, REJECTED/FAIL 구분, 판정 미확정 상태로 기록.
+* **Update**: [DNS 변경 불가와 인증 방식 분리](decisions/2026-09-separate-auth-from-routing.md), [PoC 범위 축소](decisions/2026-09-poc-scope-s01-s05-s07.md) - S05 실패는 TCP 통과 한정, S06 추가 명시.
+
 ## 2026-09-06
 
 * **Update**: [클라이언트는 로컬 AWS 프로파일로 시작](decisions/2026-09-client-profile-principal.md), [public NLB 진입과 AWS 권한 분리](decisions/2026-09-public-nlb-ingress.md) - PR 리뷰 반영. STS endpoint policy Action을 sts:*로, S07 프록시 SG egress를 endpoint SG 참조로 좁힘.

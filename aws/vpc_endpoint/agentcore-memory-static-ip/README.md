@@ -1,6 +1,6 @@
 # STS·AgentCore Memory 고정 IP 핸즈온
 
-outbound 목적지 IP가 제한된 환경에서, AWS 도메인 이름은 그대로 두고 **우리가 소유한 NLB EIP**로만 STS와 AgentCore Memory를 호출할 수 있는지 확인하는 실습이에요. 2026-09-06에 아래 4개 시나리오를 실제 AWS에서 검증했어요.
+outbound 목적지 IP가 제한된 환경에서, AWS 도메인 이름은 그대로 두고 **우리가 소유한 NLB EIP**로만 STS와 AgentCore Memory를 호출할 수 있는지 확인하는 실습이에요. 2026-09-06에 S01·S02·S05·S07을 실제 AWS에서 검증했고, S06은 코드와 모의 검증까지만 끝나 실제 실행을 기다리고 있어요.
 
 ## 결론 먼저
 
@@ -9,6 +9,7 @@ outbound 목적지 IP가 제한된 환경에서, AWS 도메인 이름은 그대�
 | 클라이언트 DNS(hosts·사내 DNS)를 바꿀 수 있다 | **S01** | AWS 이름 유지, IP만 EIP. 앱 변경 0 |
 | DNS는 못 바꾸고 앱이 프록시 설정을 받는다 | **S02** | 앱 네트워크의 Squid가 이름을 EIP로 해석. AWS 쪽은 S01 그대로 |
 | "우리 도메인을 NLB에 붙이면 되지 않나?" | S05로 실패 확인 | AWS 인증서에 그 이름이 없어 TLS에서 끊김 |
+| "그럼 우리 인증서로 NLB에서 TLS를 끝내고 endpoint로 다시 TLS를 열면?" | S06 (미확정) | 클라이언트 TLS는 통과. AWS가 SNI 없는 연결과 우리 Host를 받는지는 실행해 봐야 알 수 있음 |
 | AWS 안에 프록시를 두는 구성 | S07 (비권장) | IAM이 있는데 프록시 인증 홉이 하나 더 생김 |
 
 - 공통 원리: URL·TLS SNI·HTTP Host·SigV4 host 네 곳에 AWS 이름이 같이 들어가므로, **이름은 절대 바꾸지 않고 이름이 가리키는 IP만 바꾼다.**
@@ -21,6 +22,7 @@ outbound 목적지 IP가 제한된 환경에서, AWS 도메인 이름은 그대�
 | S01 hosts 변경 | `/etc/hosts` 두 줄 | `terraform/` | 가능 | [setup](docs/scenarios/s01/1-setup.md) · [실험](docs/scenarios/s01/2-experiment.md) · [코드 설명](docs/9-s01-code-walkthrough.md) |
 | S02 앱 네트워크 Squid | 프록시 컨테이너 + 앱의 프록시 설정 | S01과 동일 | 가능, DNS 변경 불가 시 권장 | [setup](docs/scenarios/s02/1-setup.md) · [실험](docs/scenarios/s02/2-experiment.md) |
 | S05 자체 도메인 | Route 53 alias 하나 (Terraform이 생성) | S01과 동일 | 예상 실패 | [setup](docs/scenarios/s05/1-setup.md) · [실험](docs/scenarios/s05/2-experiment.md) |
+| S06 자체 도메인 TLS 재암호화 | 앱의 endpoint_url | `terraform/`에 opt-in (ACM 인증서 + 도메인 2개) | 미확정 | [setup](docs/scenarios/s06/1-setup.md) · [실험](docs/scenarios/s06/2-experiment.md) |
 | S07 AWS 안 CONNECT proxy | 앱의 프록시 설정 | `terraform/labs/s07/` (별도 state) | 동작하지만 비권장 | [setup](docs/scenarios/s07/1-setup.md) · [실험](docs/scenarios/s07/2-experiment.md) |
 
 ## 몇 달 뒤에 다시 돌리는 순서
@@ -37,10 +39,11 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars   # 실제 값 
 ```
 
 - `terraform.tfvars`에 넣을 것: `trusted_principal_arn`(admin 프로파일의 Role ARN), `sts_alias_domain`, `route53_zone_id`. 설명은 [S01 준비](docs/2-setup.md#up).
+- S06까지 돌리려면 `acm_certificate_arn`과 `tls_alias_domains`도 함께 넣어요. 비워 두면 S06 리소스는 생기지 않아요. [S06 준비](docs/scenarios/s06/1-setup.md#up)
 - 도구: Terraform, uv, AWS CLI v2, jq, Docker(S02), openssl·dig.
 - 로그인이 짧게 끊기면 `aws login --profile default` 뒤 계속 `AWS_PROFILE=admin`을 써요.
 
-### 1. 인프라 올리기 (S01·S02·S05 공용)
+### 1. 인프라 올리기 (S01·S02·S05·S06 공용)
 
 ```bash
 grep -c amazonaws.com /etc/hosts                      # 0 이어야 함. 남아 있으면 docs/6-hosts-setup.md#down
@@ -90,6 +93,16 @@ python -m scenarios.s05_nlb_endpoint_only
 - 기대 출력 `EXPECTED_FAILURE TLS hostname mismatch; no credentials were sent`.
 - 이름이 안 풀리면 [zone 위임 topic](knowledge/topics/demo-akbun-com-delegation.md).
 
+### 4-1. S06: 자체 도메인 TLS 재암호화 (tfvars에 S06 값을 넣었을 때만)
+
+```bash
+jq -r '.services[] | .own_domain_url, .tls_target_group_arn' runtime/config.json   # null이면 S06 미배포
+python -m scenarios.s06_own_domain_tls_nlb
+```
+
+- 마지막 줄이 `PASS ...`면 호출 가능, `REJECTED stage=... code=...`면 AWS가 우리 Host를 거부한 것, `FAIL`은 AWS에 닿기 전 문제라 결론이 아니에요. [결과 읽는 법](docs/scenarios/s06/2-experiment.md#결과-읽는-법)
+- 결과는 [검증 상태](docs/4-validation.md)의 S06 행에 적어요.
+
 ### 5. 인프라 내리기
 
 ```bash
@@ -115,7 +128,7 @@ terraform -chdir=terraform/labs/s07 destroy && rm -f runtime/s07.json
 | 경로 | 내용 |
 | --- | --- |
 | `scenarios/s0N_*.py` | 시나리오별 실행 코드. 서로 import하지 않는 자기완결 파일 |
-| `terraform/` | S01·S02·S05 공용 인프라. `terraform.tfvars`는 git 제외 |
+| `terraform/` | S01·S02·S05 공용 인프라와 S06 opt-in TLS NLB. `terraform.tfvars`는 git 제외 |
 | `terraform/labs/s07/`, `terraform/modules/` | S07 전용 root와 모듈 |
 | `proxy/squid.conf` | S02 Squid 설정. CONNECT 터널만 허용 |
 | `proxy/connect_proxy.py` | S07 EC2에 배포되는 최소 CONNECT 프록시 |

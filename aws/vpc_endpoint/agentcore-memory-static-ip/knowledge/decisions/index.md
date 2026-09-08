@@ -14,3 +14,4 @@
 * [AWS API 연결 실습의 위치](2026-09-network-lab-location.md) - VPC endpoint 분류와 시나리오 안의 아키텍처 배치.
 * [AWS 호스트명과 TLS 유지](2026-09-preserve-aws-hostname.md) - TCP NLB 분리와 로컬 hosts 설정·원복의 이유.
 * [DNS 변경 불가와 인증 방식 분리](2026-09-separate-auth-from-routing.md) - VPCE·CONNECT proxy 선택과 독립 인증서 실습의 경계.
+* [자체 도메인 TLS 재암호화 직결(S06)은 opt-in 실험](2026-09-own-domain-tls-nlb-s06.md) - root state opt-in, 서비스별 TLS NLB, 판정은 실제 실행 뒤에 기록.

@@ -67,3 +67,33 @@ variable "trusted_principal_arn" {
     error_message = "Provide an existing IAM user/role ARN, not an STS session ARN."
   }
 }
+
+variable "acm_certificate_arn" {
+  description = "S06 only: ISSUED Seoul ACM certificate covering every tls_alias_domains name. null skips the S06 TLS NLBs."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.acm_certificate_arn == null || can(regex("^arn:aws:acm:ap-northeast-2:[0-9]{12}:certificate/", var.acm_certificate_arn))
+    error_message = "Provide a Seoul ACM certificate ARN, or null."
+  }
+}
+
+variable "tls_alias_domains" {
+  description = "S06 only: own-domain name per service key (sts, memory) served by the TLS NLBs. Set together with acm_certificate_arn."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition = alltrue([
+      for name in values(var.tls_alias_domains) : can(regex("^[a-z0-9.-]+\\.[a-z]{2,}$", name))
+    ])
+    error_message = "Provide fully qualified lowercase hostnames."
+  }
+  validation {
+    condition     = length(var.tls_alias_domains) == 0 || toset(keys(var.tls_alias_domains)) == toset(["memory", "sts"])
+    error_message = "Provide names for exactly the sts and memory keys."
+  }
+  validation {
+    condition     = (var.acm_certificate_arn == null) == (length(var.tls_alias_domains) == 0)
+    error_message = "acm_certificate_arn and tls_alias_domains enable S06 together; set both or neither."
+  }
+}

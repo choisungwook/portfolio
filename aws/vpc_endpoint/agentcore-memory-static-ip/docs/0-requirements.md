@@ -23,9 +23,11 @@
 | [S01](scenarios/s01/2-experiment.md) | 인터넷 → public TCP NLB → VPCE | 필요 | 로컬 AWS 프로파일 주체 → STS AssumeRole | 조건부 가능 |
 | [S02](scenarios/s02/2-experiment.md) | 앱 네트워크 Squid(CONNECT) → public TCP NLB → VPCE | 불필요 (프록시 호스트가 해석) | AWS 클라이언트 프록시 설정, STS | 가능. DNS 변경 불가 시 권장 |
 | [S05](scenarios/s05/2-experiment.md) | 자체 도메인 Route 53 → public TCP NLB → VPCE | 불필요 | endpoint_url만 변경 | 이 구성으로 불가능 |
+| [S06](scenarios/s06/2-experiment.md) | 자체 도메인 Route 53 → public TLS NLB(ACM 종료) → TLS 재암호화 → VPCE | 불필요 | endpoint_url만 변경 | 미확정. 실제 AWS 실행 전 |
 | [S07](scenarios/s07/2-experiment.md) | 인터넷 → public TLS NLB → CONNECT proxy → VPCE | 불필요 | boto3 프록시 설정, STS | 동작하지만 비권장 |
 
 - S01·S02·S05는 같은 NLB를 써요. S01은 내 컴퓨터의 hosts가, S02는 프록시 호스트가 AWS 이름을 EIP로 해석하고, S05는 자체 도메인을 써서 실패해요.
+- S06은 같은 endpoint ENI를 향하는 TLS NLB를 서비스별로 하나씩 더 만들어요. 클라이언트 TLS는 우리 인증서로 통과하고, AWS가 SNI 없는 연결과 우리 Host를 받아 주는지가 실험 대상이에요.
 - 블랙박스가 DNS·endpoint·proxy를 모두 고정하면 이 실습의 IP 고정 경로로 전환할 수 없어요.
 - NLB 한 개의 TCP 443 listener는 STS/Memory를 SNI별로 나누지 못해요. 직접 통과 방식은 서비스별 NLB가 필요해요.
 - CONNECT 프록시는 목적지 호스트를 구분하므로 S07은 NLB 한 개로 두 API를 처리해요.
@@ -34,7 +36,7 @@
 
 - 임의의 NLB 도메인이나 자체 CNAME은 AWS 서비스 인증서에 추가되지 않아요. S05가 이것을 확인해요.
 - endpoint 변경 자체가 SigV4를 깨뜨리지는 않아요. 서명한 뒤 프록시가 Host를 바꾸면 서명이 달라져요.
-- NLB에 자체 인증서를 붙인 TLS 재암호화 직결 방식은 AWS 서비스의 Host·SNI 수용까지 검증해야 해요. S07은 CONNECT 터널로 이 문제를 피하는 구조예요.
+- NLB에 자체 인증서를 붙인 TLS 재암호화 직결 방식은 AWS 서비스의 Host·SNI 수용까지 검증해야 해요. S06이 이것을 확인하는 실험이고, S07은 CONNECT 터널로 이 문제를 피하는 구조예요.
 
 ## 최종 목적지 구분
 

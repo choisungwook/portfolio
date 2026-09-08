@@ -9,7 +9,12 @@
       },
       "hostname": "bedrock-agentcore.ap-northeast-2.amazonaws.com",
       "nlb_dns_name": "memory-static-ip-memory-0123456789abcdef.elb.ap-northeast-2.amazonaws.com",
+      "own_domain_url": "https://s06-memory.example.com",
       "target_group_arn": "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/memory-static-ip-memory/0123456789abcdef",
+      "tls_eips": {
+        "ap-northeast-2a": "203.0.113.21"
+      },
+      "tls_target_group_arn": "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/memory-static-ip-tls-memory/0123456789abcdef",
       "vpc_endpoint_id": "vpce-0123456789abcdef0"
     },
     "sts": {
@@ -18,7 +23,12 @@
       },
       "hostname": "sts.ap-northeast-2.amazonaws.com",
       "nlb_dns_name": "memory-static-ip-sts-0123456789abcdef.elb.ap-northeast-2.amazonaws.com",
+      "own_domain_url": "https://s06-sts.example.com",
       "target_group_arn": "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/memory-static-ip-sts/0123456789abcdef",
+      "tls_eips": {
+        "ap-northeast-2a": "203.0.113.11"
+      },
+      "tls_target_group_arn": "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/memory-static-ip-tls-sts/0123456789abcdef",
       "vpc_endpoint_id": "vpce-0123456789abcdef1"
     }
   },
