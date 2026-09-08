@@ -12,6 +12,7 @@ from scenarios.s06_own_domain_tls_nlb import (
   api_client,
   assume_session,
   caller_identity,
+  event_payload,
   load_config,
   memory_round_trip,
   print_host_header,
@@ -129,11 +130,12 @@ def test_get_event_rejection_still_deletes_and_is_classified(session):
     "sessionId": "probe",
     "eventId": "0000000001#event",
     "eventTimestamp": datetime.now(UTC),
+    "payload": event_payload("probe"),
   }
   with Stubber(memory) as stubber:
-    stubber.add_response("create_event", {"event": event}, ANY)
+    stubber.add_response("create_event", {"event": event})
     stubber.add_client_error("get_event", "AccessDeniedException", "rejected", 403)
-    stubber.add_response("delete_event", {"eventId": "0000000001#event"}, ANY)
+    stubber.add_response("delete_event", {"eventId": "0000000001#event"})
     with pytest.raises(OwnHostRejected) as rejected:
       memory_round_trip(memory, MEMORY_ID)
     stubber.assert_no_pending_responses()
