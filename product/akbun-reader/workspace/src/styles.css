@@ -58,8 +58,11 @@ main { padding: 42px 44px; min-width: 0; }
   header { padding: 16px 20px; gap: 12px; } header > span { display: none; }
   .layout { display: block; }
   aside { padding: 20px; border-right: 0; border-bottom: 1px solid #d8e3ea; }
-  nav { grid-template-columns: repeat(3, 1fr); } nav button { text-align: center; }
-  .sections { margin-top: 12px; padding-top: 12px; }
+  #locations { display: none; }
+  .sections { grid-template-columns: repeat(3, 1fr); } .sections button { text-align: center; }
+  body:not(.reading) .location-bar { display: flex; }
+  body:not(.reading) main { padding-bottom: 110px; }
+  .sections { margin-top: 0; padding-top: 0; border-top: 0; }
   .filter { margin: 20px 0; }
   #save-form { grid-template-columns: 1fr 1fr; } #save-form h2 { grid-column: 1 / -1; }
   #save-form label:first-of-type { grid-column: 1 / -1; } #save-form .primary { grid-column: 1 / -1; }
@@ -73,7 +76,14 @@ main { padding: 42px 44px; min-width: 0; }
 .sections { margin-top: 20px; padding-top: 20px; border-top: 1px solid #d8e3ea; }
 .pill:is(button) { min-height: 0; border: 0; padding: 4px 8px; }
 .pill:is(button):hover { background: #d3e3ec; }
-.document-list > li > .pills { margin: 0 0 0 4px; padding: 8px 0 0; }
+.document-footer { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 0 0 0 4px; padding: 8px 0 0; }
+.document-footer .pills { margin: 0; }
+.moves { display: flex; gap: 6px; margin-left: auto; }
+.move { min-height: 0; padding: 5px 10px; font-size: .8125rem; border-radius: 999px; }
+.location-bar { display: none; position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); gap: 4px; padding: 4px; background: #e6eff5; border: 1px solid #d8e3ea; border-radius: 999px; box-shadow: 0 8px 24px rgba(32, 63, 85, .18); z-index: 10; }
+.location-bar button { border: 0; background: transparent; border-radius: 999px; padding: 9px 18px; min-height: 40px; font-weight: 600; white-space: nowrap; }
+.location-bar button[aria-current="page"] { background: #203f55; color: white; }
+
 .tag-list, .share-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .tag-list li, .share-list li { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; background: white; border-radius: 10px; }
 .settings .tag-list li, .settings .share-list li { background: #f4f8fb; }

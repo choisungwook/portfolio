@@ -1,5 +1,5 @@
 import { bodyBlocks } from './body.js';
-import { action, api, backButton, beginView, documentItem, emptyState, heading, locations, main, message, node, pager, splitTags, state, views } from './ui.js';
+import { action, api, backButton, beginView, documentItem, emptyState, heading, locationButtons, locations, main, markLocation, message, node, pager, splitTags, state, views } from './ui.js';
 import './tags.js';
 import './feeds.js';
 import './shares.js';
@@ -16,16 +16,27 @@ async function loadTags() {
 
 async function showList() {
   const generation = beginView('글을 불러오는 중…', false);
-  for (const button of document.querySelectorAll('#locations button')) {
-    button.setAttribute('aria-current', button.dataset.location === state.location ? 'page' : 'false');
-  }
+  markLocation(state.location);
   const load = offset => api(`/documents?${new URLSearchParams({ location: state.location, tag: state.tag, offset: String(offset ?? 0) })}`);
   const result = await load(0);
   if (generation !== state.generation) return;
   const title = heading(locations[state.location]);
   title.append(action(node('button', '새로고침'), async () => { await showList(); await loadTags(); }));
   const list = node('ul', undefined, 'document-list');
-  const append = page => { for (const document of page.documents) list.append(documentItem(document)); };
+  const move = async (document, location) => {
+    await api(`/documents/${document.id}`, { method: 'PATCH', body: JSON.stringify({ version: document.version, location }) });
+    if (generation !== state.generation) return;
+    list.querySelector(`[data-id="${document.id}"]`)?.remove();
+    message(`${locations[location]} 목록으로 옮겼습니다.`);
+    if (!list.childElementCount) await showList();
+  };
+  const append = page => {
+    for (const document of page.documents) {
+      const item = documentItem(document, move);
+      item.dataset.id = document.id;
+      list.append(item);
+    }
+  };
   append(result);
   main.replaceChildren(title, list);
   if (!result.documents.length) main.append(emptyState('아직 담긴 글이 없어요', '읽고 싶은 글의 URL을 저장해 보세요. 태그를 선택했다면 다른 태그로도 찾아보세요.'));
@@ -133,10 +144,9 @@ async function showSettings() {
 
 views.list = showList;
 views.document = showDocument;
-for (const [key, label] of Object.entries(locations)) {
-  const button = action(node('button', label), async () => { state.location = key; await showList(); });
-  button.dataset.location = key; document.querySelector('#locations').append(button);
-}
+const selectLocation = async key => { state.location = key; await showList(); };
+document.querySelector('#locations').append(...locationButtons(selectLocation));
+document.querySelector('#location-bar').append(...locationButtons(selectLocation));
 for (const [key, label] of [['feeds', 'RSS'], ['tags', '태그'], ['shares', '공개 링크']]) {
   document.querySelector('#sections').append(action(node('button', label), () => views[key]()));
 }
