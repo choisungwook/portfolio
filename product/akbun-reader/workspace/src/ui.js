@@ -71,19 +71,46 @@ export function backButton(label = '목록으로', callback = () => views.list()
   return action(node('button', label), callback);
 }
 
-/** 목록 화면과 태그 화면이 같이 쓰는 문서 항목 */
-export function documentItem(document) {
+/** 목록 화면과 태그 화면이 같이 쓰는 문서 항목. onMove(document, location)를 주면 다른 위치로 옮기는 버튼이 붙는다. */
+export function documentItem(document, onMove) {
   const item = node('li');
   const button = action(node('button', undefined, 'document'), () => views.document(document.id));
   button.append(node('h2', document.title));
   button.append(node('span', `${hostname(document.normalized_url)} / ${document.is_read ? '읽음' : '안 읽음'}`, 'meta'));
   item.append(button);
+  const footer = node('div', undefined, 'document-footer');
   if (document.tags.length) {
     const pills = node('div', undefined, 'pills');
     for (const tag of document.tags) pills.append(action(node('button', tag, 'pill'), () => views.tag(tag)));
-    item.append(pills);
+    footer.append(pills);
   }
+  if (onMove) {
+    const moves = node('div', undefined, 'moves');
+    for (const [key, label] of Object.entries(locations)) {
+      if (key === document.location) continue;
+      moves.append(action(node('button', `→ ${label}`, 'move'), () => onMove(document, key)));
+    }
+    footer.append(moves);
+  }
+  if (footer.childElementCount) item.append(footer);
   return item;
+}
+
+/** 사이드바와 하단 바가 같은 위치 버튼을 쓴다. */
+export function locationButtons(onSelect) {
+  const buttons = [];
+  for (const [key, label] of Object.entries(locations)) {
+    const button = action(node('button', label), () => onSelect(key));
+    button.dataset.location = key;
+    buttons.push(button);
+  }
+  return buttons;
+}
+
+export function markLocation(location) {
+  for (const button of document.querySelectorAll('[data-location]')) {
+    button.setAttribute('aria-current', button.dataset.location === location ? 'page' : 'false');
+  }
 }
 
 /** 50개 단위 목록에 더 보기 버튼을 붙인다. loadPage(offset)가 next_offset을 포함한 페이지를 돌려준다. */
