@@ -3,6 +3,14 @@
   "updated": "2026-09-09",
   "products": [
     {
+      "id": "akbun-adsenseview",
+      "name": "akbun-adsenseview",
+      "description": "Google AdSense 수익을 사이트, 글, URL 채널별로 보여주는 로컬 전용 macOS Tauri 데스크톱 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "rust", "svelte", "sqlite", "adsense"],
+      "released": "2026-09-09"
+    },
+    {
       "id": "akbun-wiki",
       "name": "akbun-wiki",
       "description": "akbun-reader 원본을 graphify로 LLM용 wiki로 만들고 API 키 인증으로 제공하는 Python 서비스",

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The page only invokes the app's own commands. Opening the browser and the config folder happen from Rust, so no opener permission is granted to the webview.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
