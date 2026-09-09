@@ -1,0 +1,36 @@
+name: verify-akbun-wiki
+
+# The service is self-hosted by its owner, so there is nothing to release.
+# This job proves the sync, build, and API code still passes its tests.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-wiki/**'
+      - '.github/workflows/verify-akbun-wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-wiki/workspace
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: product/akbun-wiki/workspace/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The reader is an httpx mock and graphify is a fake runner, so no
+      # network, no API key, and no graphify install are needed here.
+      - name: Run tests
+        run: uv run pytest
