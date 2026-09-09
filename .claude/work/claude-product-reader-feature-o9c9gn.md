@@ -11,7 +11,7 @@
 - [x] 4. product/akbun-wiki 생성: reader 동기화(raw markdown), graphify 빌드, SQLite 인덱스, API 키 인증, FastAPI
 - [x] 5. akbun-wiki wiki/adr/knowledge/README, verify workflow
 - [x] 6. product/README.md, 루트 README.md, products.json 갱신
-- [ ] 7. 테스트 통과 확인 후 commit, push
+- [x] 7. 테스트 통과 확인 후 commit, push
 
 ## 다음 세션이 알아야 할 것
 
