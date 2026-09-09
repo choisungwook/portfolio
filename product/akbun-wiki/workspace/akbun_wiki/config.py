@@ -6,6 +6,7 @@ mirror, the graphify output, and the SQLite index.
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .errors import ConfigError
 
@@ -56,9 +57,9 @@ def load_config(env: dict[str, str] | None = None) -> Config:
     ConfigError: when READER_URL or READER_TOKEN is missing or malformed.
   """
   values = os.environ if env is None else env
-  reader_url = values.get("READER_URL", "").rstrip("/")
+  reader_url = reader_origin(values.get("READER_URL", ""))
   reader_token = values.get("READER_TOKEN", "")
-  validate_reader_settings(reader_url, reader_token)
+  validate_reader_token(reader_token)
   config = Config(
     data_dir=Path(values.get("WIKI_DATA_DIR", "data")).resolve(),
     reader_url=reader_url,
@@ -70,11 +71,23 @@ def load_config(env: dict[str, str] | None = None) -> Config:
   return config
 
 
-def validate_reader_settings(reader_url: str, reader_token: str) -> None:
-  """Reject settings that would send the token somewhere unintended."""
-  local = reader_url.startswith("http://127.0.0.1")
-  if not (reader_url.startswith("https://") or local):
+def reader_origin(reader_url: str) -> str:
+  """Reduce READER_URL to a bare origin so the token only ever goes there.
+
+  Accepts https on any host, or plain http on the loopback host 127.0.0.1
+  for local tests. Rejects userinfo, paths, queries, and fragments.
+  """
+  parts = urlsplit(reader_url)
+  loopback = parts.scheme == "http" and parts.hostname == "127.0.0.1"
+  if not (parts.scheme == "https" or loopback) or not parts.hostname:
     raise ConfigError("READER_URL must be an https origin (http://127.0.0.1 is allowed for local tests)")
+  if parts.username or parts.password or parts.path.strip("/") or parts.query or parts.fragment:
+    raise ConfigError("READER_URL must be a bare origin without credentials, path, or query")
+  return f"{parts.scheme}://{parts.netloc}"
+
+
+def validate_reader_token(reader_token: str) -> None:
+  """Reject anything that is not the 64 hex characters the reader issues."""
   if len(reader_token) != READER_TOKEN_PATTERN or not all(c in "0123456789abcdef" for c in reader_token):
     raise ConfigError("READER_TOKEN must be the 64 hex characters shown once by the reader settings page")
 

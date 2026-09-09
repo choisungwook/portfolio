@@ -45,7 +45,9 @@ def test_sync_is_admin_only_and_serves_articles(config: Config, store: IndexStor
   assert client.get("/api/articles/missing", headers=read).status_code == 404
   found = client.get("/api/search", params={"q": "karpenter"}, headers=read).json()["results"]
   assert found[0]["slug"] == "community-1" and "[Karpenter]" in found[0]["snippet"]
-  assert client.get("/api/search", params={"q": ""}, headers=read).status_code == 422
+  invalid = client.get("/api/search", params={"q": ""}, headers=read)
+  assert invalid.status_code == 400 and invalid.headers["cache-control"] == "no-store"
+  assert invalid.json() == {"error": "잘못된 요청입니다: query.q"}
   assert client.get("/api/status", headers=read).json()["article_count"] == 3
 
 

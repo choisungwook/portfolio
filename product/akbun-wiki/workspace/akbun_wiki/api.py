@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .builder import Runner, build_wiki, default_runner
@@ -62,6 +63,12 @@ def register_routes(app: FastAPI) -> None:
   @app.exception_handler(HTTPException)
   async def http_error(_: Request, error: HTTPException) -> JSONResponse:
     return JSONResponse({"error": error.detail}, status_code=error.status_code, headers=NO_STORE)
+
+  @app.exception_handler(RequestValidationError)
+  async def validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
+    first = error.errors()[0] if error.errors() else {}
+    where = ".".join(str(part) for part in first.get("loc", ()))
+    return JSONResponse({"error": f"잘못된 요청입니다: {where or 'input'}"}, status_code=400, headers=NO_STORE)
 
   @app.get("/health")
   def health() -> dict[str, bool]:

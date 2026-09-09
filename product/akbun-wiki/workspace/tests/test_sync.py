@@ -77,6 +77,10 @@ def test_load_config_validates_reader_settings(tmp_path):
   config = load_config(env)
   assert config.reader_url == "https://reader.example" and config.graphify_backend is None
   assert config.wiki_dir == tmp_path / "d" / "raw" / "graphify-out" / "wiki"
-  for broken in ({**env, "READER_URL": "http://reader.example"}, {**env, "READER_TOKEN": "short"}):
+  assert load_config({**env, "READER_URL": "http://127.0.0.1:8787/"}).reader_url == "http://127.0.0.1:8787"
+  for url in ("http://reader.example", "http://127.0.0.1.evil.example", "https://user:pw@reader.example",
+              "https://reader.example/api", "https://reader.example/?x=1", "https://", "reader.example"):
     with pytest.raises(ConfigError):
-      load_config(broken)
+      load_config({**env, "READER_URL": url})
+  with pytest.raises(ConfigError):
+    load_config({**env, "READER_TOKEN": "short"})
