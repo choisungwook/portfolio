@@ -5,7 +5,7 @@
 - 본문: 읽음 표시, 위치 이동, 태그 편집, 원문 링크
 - Markdown: 제목·문단·코드 블록 표시, HTML은 문자 그대로 출력
 - 추천 태그: 버튼을 눌러 승인한 태그만 문서에 추가
-- 설정: 이름 있는 API 토큰 발급·폐기, 월별 AI 사용량, 단축어 안내
+- 설정: 이름·권한(저장·수정 또는 읽기 전용)을 붙인 API 토큰 발급·폐기, 월별 AI 사용량, 단축어 안내
 - 홈 화면: Safari 공유 메뉴에서 홈 화면에 추가
 - 오프라인 읽기·Service Worker·개인 데이터의 브라우저 저장소 보관 제외
 
@@ -14,6 +14,7 @@
 - 로컬 환경 준비: [개발 환경](development.md)
 - 인증: Access JWT 또는 Authorization Bearer 토큰, 인증 없는 개인 API는 401
 - 토큰 목록·발급·폐기: Access 브라우저 인증만 허용, API 토큰 요청은 403
+- 읽기 전용 토큰(scope read): GET·HEAD만 허용, 변경 요청과 /mcp는 403
 - 브라우저 변경 요청: 같은 사이트 Origin 필수
 - 개인 응답: Cache-Control no-store
 
@@ -24,8 +25,8 @@
 | GET /api/documents/:id | 본문·요약·추천·version 포함 |
 | PATCH /api/documents/:id | version 필수; tags·location·is_read 또는 approve_tags 수정 |
 | GET /api/tags | 사용 중인 태그와 문서 수, 관리 API는 [RSS·태그·공개 링크](rss-tags-share.md) |
-| GET /api/tokens | 토큰 이름·식별자·발급일·폐기일, 원문·해시 제외 |
-| POST /api/tokens | name 입력, token 원문은 이 응답에만 포함 |
+| GET /api/tokens | 토큰 이름·식별자·scope·발급일·폐기일, 원문·해시 제외 |
+| POST /api/tokens | name 입력, scope는 read 또는 write(기본), token 원문은 이 응답에만 포함 |
 | DELETE /api/tokens/:id | 토큰 폐기 |
 | GET /api/ai | AI 활성화 여부·월별 호출 수·예약 비용 |
 | GET /api/me | 현재 인증 확인 |

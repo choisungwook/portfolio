@@ -117,16 +117,20 @@ async function showSettings() {
   const content = node('div', undefined, 'settings');
   content.append(heading('설정'));
   const tokens = node('section'); tokens.append(node('h2', 'API 토큰'));
-  tokens.append(node('p', '단축어와 CLI에서 사용할 토큰입니다. 발급한 값은 한 번만 표시됩니다.'));
+  tokens.append(node('p', '단축어와 CLI에서 사용할 토큰입니다. 발급한 값은 한 번만 표시됩니다. 읽기 전용 토큰은 조회 API만 허용하므로 다른 서비스에 건넬 때 사용하세요.'));
   const form = node('form'); const label = node('label', '토큰 이름');
   const input = node('input'); input.required = true; input.maxLength = 80; input.placeholder = '예: iPhone 단축어';
-  label.append(input); const create = node('button', '토큰 발급', 'primary'); create.type = 'submit';
-  form.append(label, create); tokens.append(form);
+  label.append(input); const scopeLabel = node('label', '권한'); const scope = node('select');
+  for (const [value, name] of [['write', '저장·수정 (단축어, CLI, MCP)'], ['read', '읽기 전용 (외부 서비스 동기화)']]) {
+    const option = node('option', name); option.value = value; scope.append(option);
+  }
+  scopeLabel.append(scope); const create = node('button', '토큰 발급', 'primary'); create.type = 'submit';
+  form.append(label, scopeLabel, create); tokens.append(form);
   const secret = node('div'); secret.setAttribute('aria-live', 'polite'); tokens.append(secret);
   form.addEventListener('submit', async event => {
     event.preventDefault(); create.disabled = true;
     try {
-      const created = await api('/tokens', { method: 'POST', body: JSON.stringify({ name: input.value }) });
+      const created = await api('/tokens', { method: 'POST', body: JSON.stringify({ name: input.value, scope: scope.value }) });
       if (generation !== state.generation) return;
       secret.replaceChildren(node('p', '지금 복사하세요. 화면을 나가면 다시 볼 수 없습니다.'), node('code', created.token, 'secret'));
       addToken(created); form.reset();
@@ -134,7 +138,7 @@ async function showSettings() {
   });
   function addToken(token) {
     if (token.revoked_at) return;
-    const row = node('div', undefined, 'token'); row.append(node('span', token.name));
+    const row = node('div', undefined, 'token'); row.append(node('span', token.scope === 'read' ? `${token.name} (읽기 전용)` : token.name));
     row.append(action(node('button', '폐기'), async () => {
       await api(`/tokens/${token.id}`, { method: 'DELETE' }); row.remove(); secret.replaceChildren(); message('토큰을 폐기했습니다.');
     })); tokens.append(row);

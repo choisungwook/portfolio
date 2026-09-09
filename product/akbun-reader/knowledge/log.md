@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-09
+
+- **Creation**: [외부 동기화용 읽기 전용 API 토큰](decisions/2026-09-read-only-token-scope.md) 결정 기록. graphify 빌더에 건네는 토큰의 피해 범위를 조회로 제한
+
 ## 2026-09-07
 
 - **Creation**: [RSS 수집·태그 일괄 변경·공개 링크](decisions/2026-09-rss-tags-public-share.md) 결정 기록

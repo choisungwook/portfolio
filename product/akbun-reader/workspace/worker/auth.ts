@@ -8,13 +8,16 @@ export async function hashToken(token: string): Promise<string> {
   return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function authenticate(request: Request, env: Env): Promise<'browser' | 'token' | null> {
+export type Identity = 'browser' | 'token' | 'read-token';
+
+export async function authenticate(request: Request, env: Env): Promise<Identity | null> {
   const authorization = request.headers.get('authorization');
   if (authorization) {
     if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) return null;
-    const token = await env.DB.prepare('SELECT id FROM api_tokens WHERE token_hash = ? AND revoked_at IS NULL')
-      .bind(await hashToken(authorization.slice(7))).first();
-    return token ? 'token' : null;
+    const token = await env.DB.prepare('SELECT scope FROM api_tokens WHERE token_hash = ? AND revoked_at IS NULL')
+      .bind(await hashToken(authorization.slice(7))).first<{ scope: string }>();
+    if (!token) return null;
+    return token.scope === 'read' ? 'read-token' : 'token';
   }
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD || !env.ACCESS_OWNER_SUB) return null;
   try {
