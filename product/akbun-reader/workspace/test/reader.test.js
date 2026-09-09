@@ -136,6 +136,15 @@ test('Access validates signature, issuer, audience, owner, expiry and browser or
     assert.equal(JSON.stringify(listed).includes(issued.token), false);
     assert.equal((await f.request(`/tokens/${issued.id}`, 'DELETE', undefined, browser)).status, 200);
     assert.equal((await f.request('/me', 'GET', undefined, { authorization: `Bearer ${issued.token}` })).status, 401);
+    assert.equal((await f.request('/tokens', 'POST', { name: 'bad', scope: 'admin' }, browser)).status, 400);
+    const readOnly = await (await f.request('/tokens', 'POST', { name: 'wiki', scope: 'read' }, browser)).json();
+    assert.equal(readOnly.scope, 'read');
+    assert.equal(listed.tokens[0].scope, 'write');
+    const reader = { authorization: `Bearer ${readOnly.token}` };
+    assert.equal((await f.request('/changes?after=0', 'GET', undefined, reader)).status, 200);
+    assert.equal((await f.request('/documents', 'POST', article, reader)).status, 403);
+    assert.equal((await f.request('/documents/any', 'PATCH', { version: 1, is_read: true }, reader)).status, 403);
+    assert.equal((await worker.default.fetch(new Request('https://reader.test/mcp', { method: 'POST', headers: { ...reader, 'content-type': 'application/json' }, body: '{}' }), f.env, f.ctx)).status, 403);
     for (const token of [await jwt('guest'), await jwt('owner', 'other'), await jwt('owner', 'reader', '-1h')]) {
       assert.equal((await f.request('/me', 'GET', undefined, { authorization: '', 'Cf-Access-Jwt-Assertion': token })).status, 401);
     }

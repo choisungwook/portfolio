@@ -1,7 +1,15 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-09-07",
+  "updated": "2026-09-09",
   "products": [
+    {
+      "id": "akbun-wiki",
+      "name": "akbun-wiki",
+      "description": "akbun-reader 원본을 graphify로 LLM용 wiki로 만들고 API 키 인증으로 제공하는 Python 서비스",
+      "kind": "backend",
+      "tags": ["python", "graphify", "llm", "sqlite"],
+      "released": "2026-09-09"
+    },
     {
       "id": "akbun-snspublisher",
       "name": "akbun-snspublisher",

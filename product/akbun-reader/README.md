@@ -2,7 +2,7 @@
 
 A personal reading archive for one user. Share a URL from an iPhone, tag it, read it on any device, and mirror it into an Obsidian vault. Built to replace a paid read-later subscription at a hosting cost of zero.
 
-One Cloudflare Worker serves the static page, the JSON API, the MCP endpoint, and unauthenticated public share pages. D1 holds the documents and RSS items. Cloudflare Access guards the browser; Worker-issued API tokens guard shortcuts, the CLI, and MCP clients.
+One Cloudflare Worker serves the static page, the JSON API, the MCP endpoint, and unauthenticated public share pages. D1 holds the documents and RSS items. Cloudflare Access guards the browser; Worker-issued API tokens guard shortcuts, the CLI, and MCP clients. Read-only tokens let another service, such as [akbun-wiki](../akbun-wiki/), mirror the archive without write access.
 
 ## Status
 

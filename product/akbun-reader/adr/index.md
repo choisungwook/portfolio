@@ -10,3 +10,4 @@ Decision records for akbun-reader in decision-and-reason form.
 - [Plain page, no bundler](2026-09-vanilla-page-no-build.md) - Four screens do not justify a build step; the source is what runs.
 - [The CLI replaces the macOS sync app](2026-09-cli-replaces-mac-app.md) - Incremental Markdown export needs no window.
 - [Public share pages bypass Access on one path](2026-09-public-share-path.md) - A share is a random id in D1; deleting the row revokes it.
+- [Read-only tokens for external mirrors](2026-09-read-only-tokens.md) - A service on another machine gets a credential that can only read.

@@ -38,7 +38,10 @@ export default {
       if (isPublic) return await publicView(request, env);
       const identity = await authenticate(request, env);
       if (!identity) return json({ error: '로그인이 필요합니다.' }, 401);
-      if ((automation || url.pathname === '/mcp') && identity !== 'token') return json({ error: '자동화 경로는 API 토큰이 필요합니다.' }, 403);
+      if ((automation || url.pathname === '/mcp') && identity === 'browser') return json({ error: '자동화 경로는 API 토큰이 필요합니다.' }, 403);
+      if (identity === 'read-token' && (url.pathname === '/mcp' || !['GET', 'HEAD'].includes(request.method))) {
+        return json({ error: '읽기 전용 토큰은 조회만 할 수 있습니다.' }, 403);
+      }
       if (!['GET', 'HEAD'].includes(request.method)) {
         const origin = request.headers.get('origin');
         if ((origin && origin !== url.origin) || (identity === 'browser' && origin !== url.origin)) {
@@ -65,17 +68,19 @@ export default {
         return json({ error: '토큰 관리는 브라우저 로그인 후 이용하세요.' }, 403);
       }
       if (url.pathname === '/api/tokens' && request.method === 'GET') {
-        const result = await env.DB.prepare('SELECT id, name, created_at, revoked_at FROM api_tokens ORDER BY created_at DESC').all();
+        const result = await env.DB.prepare('SELECT id, name, scope, created_at, revoked_at FROM api_tokens ORDER BY created_at DESC').all();
         return json({ tokens: result.results });
       }
       if (url.pathname === '/api/tokens' && request.method === 'POST') {
         const input = await readJson(request);
         const name = text(input.name, '이름', 80);
+        const scope = input.scope === undefined ? 'write' : String(input.scope);
+        if (!['read', 'write'].includes(scope)) throw new HttpError(400, '토큰 범위는 read 또는 write입니다.');
         const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
         const id = crypto.randomUUID();
-        await env.DB.prepare('INSERT INTO api_tokens(id, name, token_hash) VALUES (?, ?, ?)')
-          .bind(id, name, await hashToken(token)).run();
-        return json({ id, name, token }, 201);
+        await env.DB.prepare('INSERT INTO api_tokens(id, name, scope, token_hash) VALUES (?, ?, ?, ?)')
+          .bind(id, name, scope, await hashToken(token)).run();
+        return json({ id, name, scope, token }, 201);
       }
       const tokenMatch = url.pathname.match(/^\/api\/tokens\/([^/]+)$/);
       if (tokenMatch && request.method === 'DELETE') {

@@ -24,7 +24,8 @@ One Worker, one D1 database, one hostname. Every client goes through the API; no
 | Path | Who | Verified by |
 | --- | --- | --- |
 | Browser | The web page | Access issues a JWT after Google login; the Worker checks its signature and audience |
-| Automation | Shortcut, CLI, MCP client | `Authorization: Bearer` token, stored in D1 as a hash |
+| Automation | Shortcut, CLI, MCP client | `Authorization: Bearer` token, stored in D1 as a hash. Scope `write` (default) or `read` |
+| Read-only automation | An external service that mirrors documents, such as the wiki builder | A `read` scope token. GET only; writes and `/mcp` answer 403 |
 | Public | Anyone with a share link | No identity. `/public/<id>` only checks that the 32-hex id exists in `shares`; Access must bypass this path |
 
 Both paths end in Worker code. Trusting Access alone leaves the Worker open to anyone who reaches it without going through Access, which is why `workers_dev` and `preview_urls` are off in `wrangler.json`. Tokens are shown once at creation and revoked individually from the settings page.
@@ -36,7 +37,7 @@ Both paths end in Worker code. Trusting Access alone leaves the Worker open to a
 | `documents` | Source of truth. `normalized_url` is unique so a re-shared page maps to the same row |
 | `documents.tags_json` | Tags replaced atomically with the document version; global tags use json_each |
 | `changes` | Append-only log with a monotonic `seq`; clients sync by asking for rows after their last applied `seq` |
-| `api_tokens` | Hash, name, creation, and revocation for automation tokens |
+| `api_tokens` | Hash, name, scope (`read` or `write`), creation, and revocation for automation tokens |
 | `feeds`, `feed_items` | RSS subscriptions and collected entries, unique per feed and guid, 500 kept per feed; items join `documents` by normalized URL |
 | `shares` | One public link per tag or feed. Deleting the row is what revokes the link |
 

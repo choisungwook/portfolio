@@ -145,6 +145,7 @@
 - [오프라인 PDF 탐색, 주석, OCR, 페이지 편집 데스크톱 앱 (akbun-pdf)](./product/akbun-pdf/) (26.9.4)
 - [개인용 읽기 보관함 웹 앱 (akbun-reader)](./product/akbun-reader/) (26.9.7)
 - [SNS 채널별 검증·예약 발행 웹 앱 (akbun-snspublisher)](./product/akbun-snspublisher/) (26.9.7)
+- [reader 원본을 graphify LLM wiki로 만들어 API로 제공하는 서비스 (akbun-wiki)](./product/akbun-wiki/) (26.9.9)
 
 ## Dockerfile
 
