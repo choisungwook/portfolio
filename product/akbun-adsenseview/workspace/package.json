@@ -1,0 +1,30 @@
+{
+  "name": "akbun-adsenseview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-only macOS desktop viewer for Google AdSense earnings by site, page and URL channel",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "start": "tauri dev",
+    "dist": "tauri build",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p adsense-cache",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "~6.0.3",
+    "vite": "^8.2.2"
+  }
+}

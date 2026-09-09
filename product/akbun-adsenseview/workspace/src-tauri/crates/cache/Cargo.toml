@@ -1,0 +1,15 @@
+[package]
+name = "adsense-cache"
+version = "0.1.0"
+description = "Cache rules for AdSense daily rows: which days to refetch, and the SQLite table behind them"
+edition = "2021"
+license = "MIT"
+
+# No tauri and no HTTP here, so `cargo test -p adsense-cache` compiles only
+# chrono, serde and the bundled SQLite. That is what keeps the pull request job
+# free of GTK and WebKit.
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
