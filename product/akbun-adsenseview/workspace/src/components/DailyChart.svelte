@@ -36,7 +36,10 @@
         },
       },
     });
-    return () => chart?.destroy();
+    return () => {
+      chart?.destroy();
+      chart = undefined;
+    };
   });
 </script>
 

@@ -84,13 +84,21 @@ pub fn sign_out(dir: &Path) {
   let _ = std::fs::remove_file(token_path(dir));
 }
 
+/// A random value Google echoes back, so a redirect that did not start here
+/// is rejected.
+fn random_state() -> Result<String, AppError> {
+  let mut bytes = [0u8; 16];
+  getrandom::fill(&mut bytes).map_err(|error| AppError::other(format!("random: {error}")))?;
+  Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
 /// Open the consent page and wait for Google to redirect back with a code.
 /// Returns the URL to open and a blocking waiter, so the caller can open the
 /// browser from Tauri and wait off the main thread.
 pub fn start_sign_in(client: &ClientSecret) -> Result<(String, TcpListener, String), AppError> {
   let listener = TcpListener::bind("127.0.0.1:0")?;
   let port = listener.local_addr()?.port();
-  let state = format!("{}-{}", now(), std::process::id());
+  let state = random_state()?;
   let redirect = format!("http://127.0.0.1:{port}");
   let mut url = url::Url::parse(AUTH_URL).map_err(|error| AppError::other(error.to_string()))?;
   url.query_pairs_mut()

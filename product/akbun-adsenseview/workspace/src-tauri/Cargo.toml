@@ -29,4 +29,5 @@ serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 reqwest = { version = "0.13", features = ["json", "query", "form"] }
 url = "2"
+getrandom = "0.4"
 rusqlite = { version = "0.40", features = ["bundled"] }
