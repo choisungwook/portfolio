@@ -1,0 +1,488 @@
+/*
+Akbun, an Obsidian theme.
+
+Catppuccin Latte (light) and Mocha (dark), a plain file explorer, a loud
+active file, and colors that are single variables.
+
+Layout of this file:
+  1. Style Settings block. Same ids as the --akbun-* variables below.
+  2. Tunable variables. Edit these to change colors without the plugin.
+  3. Catppuccin palette.
+  4. Mapping onto Obsidian variables.
+  5. Component rules that variables alone cannot express.
+*/
+
+/* @settings
+name: Akbun
+id: akbun
+settings:
+  - id: akbun-headings
+    title: Headings
+    type: heading
+    level: 1
+    collapsed: false
+  - id: akbun-h1-color
+    title: H1 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#8839ef'
+    default-dark: '#cba6f7'
+  - id: akbun-h2-color
+    title: H2 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#1e66f5'
+    default-dark: '#89b4fa'
+  - id: akbun-h3-color
+    title: H3 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#179299'
+    default-dark: '#94e2d5'
+  - id: akbun-h4-color
+    title: H4 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#40a02b'
+    default-dark: '#a6e3a1'
+  - id: akbun-h5-color
+    title: H5 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#df8e1d'
+    default-dark: '#f9e2af'
+  - id: akbun-h6-color
+    title: H6 color
+    type: variable-themed-color
+    format: hex
+    default-light: '#fe640b'
+    default-dark: '#fab387'
+  - id: akbun-heading-weight
+    title: Heading weight
+    type: variable-number-slider
+    default: 700
+    min: 400
+    max: 900
+    step: 100
+  - id: akbun-text
+    title: Text
+    type: heading
+    level: 1
+    collapsed: false
+  - id: akbun-accent
+    title: Accent color
+    description: Buttons, links in the interface, selected items, cursor
+    type: variable-themed-color
+    format: hex
+    default-light: '#8839ef'
+    default-dark: '#cba6f7'
+  - id: akbun-bold-color
+    title: Bold color
+    type: variable-themed-color
+    format: hex
+    default-light: '#ea76cb'
+    default-dark: '#f5c2e7'
+  - id: akbun-italic-color
+    title: Italic color
+    type: variable-themed-color
+    format: hex
+    default-light: '#8839ef'
+    default-dark: '#cba6f7'
+  - id: akbun-link-color
+    title: Link color
+    type: variable-themed-color
+    format: hex
+    default-light: '#1e66f5'
+    default-dark: '#89b4fa'
+  - id: akbun-highlight-color
+    title: Highlight color
+    description: Applied at 35% opacity behind ==highlighted== text
+    type: variable-themed-color
+    format: hex
+    default-light: '#df8e1d'
+    default-dark: '#f9e2af'
+  - id: akbun-explorer
+    title: File explorer
+    type: heading
+    level: 1
+    collapsed: false
+  - id: akbun-explorer-color
+    title: Folder and file color
+    description: One color for every item so nothing competes with the active file
+    type: variable-themed-color
+    format: hex
+    default-light: '#6c6f85'
+    default-dark: '#a6adc8'
+  - id: akbun-active-file-bg
+    title: Active file background
+    type: variable-themed-color
+    format: hex
+    default-light: '#8839ef'
+    default-dark: '#cba6f7'
+  - id: akbun-active-file-color
+    title: Active file text
+    type: variable-themed-color
+    format: hex
+    default-light: '#eff1f5'
+    default-dark: '#1e1e2e'
+  - id: akbun-active-file-marker
+    title: Active file left marker
+    type: variable-themed-color
+    format: hex
+    default-light: '#ea76cb'
+    default-dark: '#f5c2e7'
+  - id: akbun-active-file-weight
+    title: Active file weight
+    type: variable-number-slider
+    default: 700
+    min: 400
+    max: 900
+    step: 100
+*/
+
+/* 2. Tunable variables. Style Settings writes the same names, so the plugin wins when installed. */
+
+body {
+  --akbun-heading-weight: 700;
+  --akbun-active-file-weight: 700;
+}
+
+.theme-light {
+  --akbun-h1-color: #8839ef;
+  --akbun-h2-color: #1e66f5;
+  --akbun-h3-color: #179299;
+  --akbun-h4-color: #40a02b;
+  --akbun-h5-color: #df8e1d;
+  --akbun-h6-color: #fe640b;
+  --akbun-accent: #8839ef;
+  --akbun-bold-color: #ea76cb;
+  --akbun-italic-color: #8839ef;
+  --akbun-link-color: #1e66f5;
+  --akbun-highlight-color: #df8e1d;
+  --akbun-explorer-color: #6c6f85;
+  --akbun-active-file-bg: #8839ef;
+  --akbun-active-file-color: #eff1f5;
+  --akbun-active-file-marker: #ea76cb;
+}
+
+.theme-dark {
+  --akbun-h1-color: #cba6f7;
+  --akbun-h2-color: #89b4fa;
+  --akbun-h3-color: #94e2d5;
+  --akbun-h4-color: #a6e3a1;
+  --akbun-h5-color: #f9e2af;
+  --akbun-h6-color: #fab387;
+  --akbun-accent: #cba6f7;
+  --akbun-bold-color: #f5c2e7;
+  --akbun-italic-color: #cba6f7;
+  --akbun-link-color: #89b4fa;
+  --akbun-highlight-color: #f9e2af;
+  --akbun-explorer-color: #a6adc8;
+  --akbun-active-file-bg: #cba6f7;
+  --akbun-active-file-color: #1e1e2e;
+  --akbun-active-file-marker: #f5c2e7;
+}
+
+/* 3. Catppuccin palette. Latte for light, Mocha for dark. */
+
+.theme-light {
+  --ctp-rosewater: #dc8a78;
+  --ctp-flamingo: #dd7878;
+  --ctp-pink: #ea76cb;
+  --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39;
+  --ctp-maroon: #e64553;
+  --ctp-peach: #fe640b;
+  --ctp-yellow: #df8e1d;
+  --ctp-green: #40a02b;
+  --ctp-teal: #179299;
+  --ctp-sky: #04a5e5;
+  --ctp-sapphire: #209fb5;
+  --ctp-blue: #1e66f5;
+  --ctp-lavender: #7287fd;
+  --ctp-text: #4c4f69;
+  --ctp-subtext1: #5c5f77;
+  --ctp-subtext0: #6c6f85;
+  --ctp-overlay2: #7c7f93;
+  --ctp-overlay1: #8c8fa1;
+  --ctp-overlay0: #9ca0b0;
+  --ctp-surface2: #acb0be;
+  --ctp-surface1: #bcc0cc;
+  --ctp-surface0: #ccd0da;
+  --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef;
+  --ctp-crust: #dce0e8;
+
+  --ctp-red-rgb: 210, 15, 57;
+  --ctp-peach-rgb: 254, 100, 11;
+  --ctp-yellow-rgb: 223, 142, 29;
+  --ctp-green-rgb: 64, 160, 43;
+  --ctp-sky-rgb: 4, 165, 229;
+  --ctp-blue-rgb: 30, 102, 245;
+  --ctp-mauve-rgb: 136, 57, 239;
+  --ctp-pink-rgb: 234, 118, 203;
+}
+
+.theme-dark {
+  --ctp-rosewater: #f5e0dc;
+  --ctp-flamingo: #f2cdcd;
+  --ctp-pink: #f5c2e7;
+  --ctp-mauve: #cba6f7;
+  --ctp-red: #f38ba8;
+  --ctp-maroon: #eba0ac;
+  --ctp-peach: #fab387;
+  --ctp-yellow: #f9e2af;
+  --ctp-green: #a6e3a1;
+  --ctp-teal: #94e2d5;
+  --ctp-sky: #89dceb;
+  --ctp-sapphire: #74c7ec;
+  --ctp-blue: #89b4fa;
+  --ctp-lavender: #b4befe;
+  --ctp-text: #cdd6f4;
+  --ctp-subtext1: #bac2de;
+  --ctp-subtext0: #a6adc8;
+  --ctp-overlay2: #9399b2;
+  --ctp-overlay1: #7f849c;
+  --ctp-overlay0: #6c7086;
+  --ctp-surface2: #585b70;
+  --ctp-surface1: #45475a;
+  --ctp-surface0: #313244;
+  --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825;
+  --ctp-crust: #11111b;
+
+  --ctp-red-rgb: 243, 139, 168;
+  --ctp-peach-rgb: 250, 179, 135;
+  --ctp-yellow-rgb: 249, 226, 175;
+  --ctp-green-rgb: 166, 227, 161;
+  --ctp-sky-rgb: 137, 220, 235;
+  --ctp-blue-rgb: 137, 180, 250;
+  --ctp-mauve-rgb: 203, 166, 247;
+  --ctp-pink-rgb: 245, 194, 231;
+}
+
+/* 4. Mapping onto Obsidian variables. Same mapping in both modes, the palette does the work. */
+
+.theme-light,
+.theme-dark {
+  --background-primary: var(--ctp-base);
+  --background-primary-alt: var(--ctp-mantle);
+  --background-secondary: var(--ctp-mantle);
+  --background-secondary-alt: var(--ctp-crust);
+  --background-modifier-border: var(--ctp-surface0);
+  --background-modifier-border-hover: var(--ctp-surface1);
+  --background-modifier-border-focus: var(--ctp-surface2);
+  --background-modifier-hover: color-mix(in srgb, var(--ctp-surface0) 70%, transparent);
+  --background-modifier-active-hover: var(--ctp-surface1);
+  --background-modifier-form-field: var(--ctp-mantle);
+  --background-modifier-message: var(--ctp-surface0);
+  --background-modifier-error: var(--ctp-red);
+  --background-modifier-error-hover: var(--ctp-maroon);
+  --background-modifier-success: var(--ctp-green);
+
+  --text-normal: var(--ctp-text);
+  --text-muted: var(--ctp-subtext0);
+  --text-faint: var(--ctp-overlay1);
+  --text-on-accent: var(--ctp-base);
+  --text-on-accent-inverted: var(--ctp-text);
+  --text-accent: var(--akbun-accent);
+  --text-accent-hover: var(--ctp-lavender);
+  --text-error: var(--ctp-red);
+  --text-success: var(--ctp-green);
+  --text-warning: var(--ctp-yellow);
+  --text-selection: color-mix(in srgb, var(--ctp-surface2) 60%, transparent);
+  --text-highlight-bg: color-mix(in srgb, var(--akbun-highlight-color) 35%, transparent);
+
+  --interactive-normal: var(--ctp-surface0);
+  --interactive-hover: var(--ctp-surface1);
+  --interactive-accent: var(--akbun-accent);
+  --interactive-accent-hover: var(--ctp-lavender);
+
+  --color-red: var(--ctp-red);
+  --color-orange: var(--ctp-peach);
+  --color-yellow: var(--ctp-yellow);
+  --color-green: var(--ctp-green);
+  --color-cyan: var(--ctp-sky);
+  --color-blue: var(--ctp-blue);
+  --color-purple: var(--ctp-mauve);
+  --color-pink: var(--ctp-pink);
+  --color-red-rgb: var(--ctp-red-rgb);
+  --color-orange-rgb: var(--ctp-peach-rgb);
+  --color-yellow-rgb: var(--ctp-yellow-rgb);
+  --color-green-rgb: var(--ctp-green-rgb);
+  --color-cyan-rgb: var(--ctp-sky-rgb);
+  --color-blue-rgb: var(--ctp-blue-rgb);
+  --color-purple-rgb: var(--ctp-mauve-rgb);
+  --color-pink-rgb: var(--ctp-pink-rgb);
+
+  --h1-color: var(--akbun-h1-color);
+  --h2-color: var(--akbun-h2-color);
+  --h3-color: var(--akbun-h3-color);
+  --h4-color: var(--akbun-h4-color);
+  --h5-color: var(--akbun-h5-color);
+  --h6-color: var(--akbun-h6-color);
+  --h1-weight: var(--akbun-heading-weight);
+  --h2-weight: var(--akbun-heading-weight);
+  --h3-weight: var(--akbun-heading-weight);
+  --h4-weight: var(--akbun-heading-weight);
+  --h5-weight: var(--akbun-heading-weight);
+  --h6-weight: var(--akbun-heading-weight);
+  --inline-title-color: var(--akbun-h1-color);
+
+  --bold-color: var(--akbun-bold-color);
+  --italic-color: var(--akbun-italic-color);
+  --link-color: var(--akbun-link-color);
+  --link-color-hover: var(--ctp-sapphire);
+  --link-external-color: var(--akbun-link-color);
+  --link-external-color-hover: var(--ctp-sapphire);
+  --link-unresolved-color: var(--ctp-peach);
+
+  --code-background: var(--ctp-mantle);
+  --code-normal: var(--ctp-text);
+  --code-comment: var(--ctp-overlay1);
+  --code-function: var(--ctp-blue);
+  --code-important: var(--ctp-peach);
+  --code-keyword: var(--ctp-mauve);
+  --code-operator: var(--ctp-sky);
+  --code-property: var(--ctp-teal);
+  --code-punctuation: var(--ctp-overlay2);
+  --code-string: var(--ctp-green);
+  --code-tag: var(--ctp-red);
+  --code-value: var(--ctp-peach);
+
+  --blockquote-border-color: var(--akbun-accent);
+  --blockquote-color: var(--ctp-subtext1);
+  --hr-color: var(--ctp-surface1);
+  --divider-color: var(--ctp-surface0);
+  --indentation-guide-color: var(--ctp-surface0);
+  --embed-background: var(--ctp-mantle);
+
+  --tag-color: var(--ctp-blue);
+  --tag-color-hover: var(--ctp-sapphire);
+  --tag-background: color-mix(in srgb, var(--ctp-blue) 15%, transparent);
+  --tag-background-hover: color-mix(in srgb, var(--ctp-blue) 25%, transparent);
+
+  --checkbox-color: var(--ctp-green);
+  --checkbox-color-hover: var(--ctp-teal);
+  --checkbox-border-color: var(--ctp-overlay0);
+  --checkbox-border-color-hover: var(--ctp-overlay2);
+  --checkbox-marker-color: var(--ctp-base);
+
+  --table-border-color: var(--ctp-surface1);
+  --table-header-background: var(--ctp-mantle);
+  --table-header-background-hover: var(--ctp-surface0);
+  --table-row-alt-background: var(--ctp-mantle);
+  --table-row-background-hover: var(--ctp-surface0);
+
+  --icon-color: var(--ctp-subtext0);
+  --icon-color-hover: var(--ctp-text);
+  --icon-color-active: var(--ctp-text);
+  --icon-color-focused: var(--ctp-text);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb-bg: color-mix(in srgb, var(--ctp-overlay0) 50%, transparent);
+  --scrollbar-active-thumb-bg: var(--ctp-overlay1);
+
+  --titlebar-background: var(--ctp-mantle);
+  --titlebar-background-focused: var(--ctp-mantle);
+  --titlebar-text-color: var(--ctp-subtext0);
+  --titlebar-text-color-focused: var(--ctp-text);
+  --ribbon-background: var(--ctp-crust);
+  --ribbon-background-active: var(--ctp-mantle);
+  --status-bar-background: var(--ctp-crust);
+  --status-bar-text-color: var(--ctp-subtext0);
+  --status-bar-border-color: var(--ctp-surface0);
+
+  --tab-background-active: var(--ctp-base);
+  --tab-text-color: var(--ctp-subtext0);
+  --tab-text-color-focused: var(--ctp-subtext1);
+  --tab-text-color-focused-active: var(--ctp-text);
+  --tab-text-color-focused-active-current: var(--ctp-text);
+  --tab-outline-color: var(--ctp-surface0);
+
+  --modal-background: var(--ctp-base);
+  --modal-border-color: var(--ctp-surface0);
+  --prompt-border-color: var(--ctp-surface1);
+
+  --metadata-label-text-color: var(--ctp-subtext0);
+  --metadata-input-text-color: var(--ctp-text);
+
+  --graph-line: var(--ctp-surface1);
+  --graph-node: var(--ctp-subtext0);
+  --graph-node-focused: var(--akbun-accent);
+  --graph-node-tag: var(--ctp-green);
+  --graph-node-attachment: var(--ctp-yellow);
+  --graph-node-unresolved: var(--ctp-peach);
+
+  /* File explorer. Every item shares one muted color; only the active file gets the accent. */
+  --nav-item-color: var(--akbun-explorer-color);
+  --nav-item-color-hover: var(--ctp-text);
+  --nav-item-color-active: var(--akbun-active-file-color);
+  --nav-item-color-selected: var(--ctp-text);
+  --nav-item-background-hover: var(--ctp-surface0);
+  --nav-item-background-active: var(--akbun-active-file-bg);
+  --nav-item-background-selected: var(--ctp-surface0);
+  --nav-item-weight-active: var(--akbun-active-file-weight);
+  --nav-collapse-icon-color: var(--ctp-overlay1);
+  --nav-collapse-icon-color-collapsed: var(--ctp-overlay0);
+  --nav-indentation-guide-color: var(--ctp-surface0);
+  --nav-heading-color: var(--ctp-subtext0);
+  --nav-heading-color-hover: var(--ctp-text);
+}
+
+/* 5. Component rules. */
+
+/* Folders and files: one color, one weight. Folder names carry a little more weight so the tree still reads as a tree. */
+.nav-folder-title,
+.nav-file-title {
+  color: var(--nav-item-color);
+}
+
+.nav-folder-title {
+  font-weight: 600;
+}
+
+.nav-file-tag {
+  background-color: transparent;
+  color: var(--ctp-overlay1);
+  font-weight: 400;
+}
+
+/* Active file: filled with the accent, bold, and a marker on the left edge that survives even when the row is narrow. */
+.nav-file-title.is-active,
+.nav-file-title.is-active:hover,
+.tree-item-self.is-active,
+.tree-item-self.is-active:hover {
+  background-color: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+  font-weight: var(--nav-item-weight-active);
+  box-shadow: inset 4px 0 0 var(--akbun-active-file-marker);
+}
+
+.nav-file-title.is-active .nav-file-title-content,
+.nav-file-title.is-active .nav-file-tag,
+.nav-file-title.is-active .tree-item-icon {
+  color: var(--nav-item-color-active);
+}
+
+/* Headings in the editor and the reading view take their color from the variables mapped above; only the inline title needs a rule. */
+.inline-title {
+  color: var(--inline-title-color);
+  font-weight: var(--akbun-heading-weight);
+}
+
+/* Bold and italic in Live Preview and reading view. */
+.cm-strong,
+.markdown-rendered strong {
+  color: var(--bold-color);
+}
+
+.cm-em,
+.markdown-rendered em {
+  color: var(--italic-color);
+}
+
+/* Active tab gets a thin accent line so the open note is obvious in a crowded tab bar. */
+.workspace-tab-header.is-active .workspace-tab-header-inner {
+  box-shadow: inset 0 -2px 0 var(--akbun-accent);
+}

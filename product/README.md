@@ -6,6 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
+| [akbun-obsidian-theme](./akbun-obsidian-theme/) | Catppuccin 팔레트, 색 없는 파일 탐색기, 눈에 띄는 현재 파일, 변수로 조절하는 헤더 색을 갖춘 Obsidian 테마 |
 | [akbun-adsenseview](./akbun-adsenseview/) | Google AdSense 수익을 사이트, 글, URL 채널별로 보여주는 로컬 전용 macOS Tauri 데스크톱 앱 |
 | [akbun-snspublisher](./akbun-snspublisher/) | 한 번 쓴 글을 채널별로 검증하고 예약해 X, LinkedIn, Threads, Instagram에 발행하는 Worker 웹 앱 |
 | [akbun-reader](./akbun-reader/) | 아이폰 공유 저장, 태그, RSS 구독, 공개 링크, 여러 기기 읽기, Obsidian 동기화를 갖춘 개인용 읽기 보관함 Worker 웹 앱 |

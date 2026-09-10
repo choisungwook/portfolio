@@ -1,0 +1,112 @@
+name: release-akbun-obsidian-theme
+
+# Pull requests only verify. A master push creates a release in this
+# repository with manifest.json and theme.css attached, and mirrors the
+# same files to a dedicated repository when a token for it exists. The
+# Obsidian community directory reads manifest.json from a repository root,
+# so only the mirror can be listed there.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-obsidian-theme/workspace/**'
+      - '.github/workflows/release-akbun-obsidian-theme.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-obsidian-theme/workspace/**'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: product/akbun-obsidian-theme/workspace
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      # No dependencies, so no install step. The tests read the files directly.
+      - name: Run theme tests
+        run: npm test
+
+  release:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      MIRROR_REPO: choisungwook/akbun-obsidian-theme
+      MIRROR_TOKEN: ${{ secrets.OBSIDIAN_THEME_REPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read theme version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-obsidian-theme-v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - Obsidian theme on the Catppuccin palette with a plain file explorer and a loud active file.
+
+          ## Install
+
+          - Copy manifest.json and theme.css into `<vault>/.obsidian/themes/Akbun/`.
+          - Pick Akbun under Settings, Appearance, Themes.
+          EOF
+          gh release create "${{ steps.version.outputs.tag }}" manifest.json theme.css \
+            --target "${{ github.sha }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            --generate-notes
+
+      # The mirror holds the same files at its root, which is what the
+      # community directory and BRAT read. Skipped until the token exists.
+      - name: Mirror to the dedicated repository
+        if: steps.check.outputs.exists == 'false' && env.MIRROR_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.MIRROR_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if gh release view "$VERSION" --repo "$MIRROR_REPO" >/dev/null 2>&1; then
+            echo "mirror release $VERSION already exists"
+            exit 0
+          fi
+          git clone "https://x-access-token:${MIRROR_TOKEN}@github.com/${MIRROR_REPO}.git" mirror
+          cp manifest.json theme.css README.md LICENSE mirror/
+          cd mirror
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Release $VERSION"
+          git push origin HEAD
+          gh release create "$VERSION" manifest.json theme.css \
+            --repo "$MIRROR_REPO" \
+            --title "$VERSION" \
+            --generate-notes

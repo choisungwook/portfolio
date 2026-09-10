@@ -1,7 +1,16 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-09-09",
+  "updated": "2026-09-10",
   "products": [
+    {
+      "id": "akbun-obsidian-theme",
+      "name": "akbun-obsidian-theme",
+      "description": "Catppuccin 팔레트, 색 없는 파일 탐색기, 눈에 띄는 현재 파일, 변수로 조절하는 헤더 색을 갖춘 Obsidian 테마",
+      "kind": "skin",
+      "tags": ["obsidian", "css", "catppuccin"],
+      "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-obsidian-theme",
+      "released": "2026-09-10"
+    },
     {
       "id": "akbun-adsenseview",
       "name": "akbun-adsenseview",

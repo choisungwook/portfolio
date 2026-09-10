@@ -1,0 +1,12 @@
+{
+  "name": "akbun-obsidian-theme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Obsidian theme: Catppuccin palette, plain file explorer, loud active file, tunable heading colors",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

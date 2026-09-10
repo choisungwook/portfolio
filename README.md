@@ -147,6 +147,7 @@
 - [SNS 채널별 검증·예약 발행 웹 앱 (akbun-snspublisher)](./product/akbun-snspublisher/) (26.9.7)
 - [Google AdSense 수익을 사이트·글·URL 채널별로 보는 로컬 전용 macOS 데스크톱 앱 (akbun-adsenseview)](./product/akbun-adsenseview/) (26.9.9)
 - [reader 원본을 graphify LLM wiki로 만들어 API로 제공하는 서비스 (akbun-wiki)](./product/akbun-wiki/) (26.9.9)
+- [Catppuccin 팔레트에 색 없는 파일 탐색기와 눈에 띄는 현재 파일을 갖춘 Obsidian 테마 (akbun-obsidian-theme)](./product/akbun-obsidian-theme/) (26.9.10)
 
 ## Dockerfile
 
