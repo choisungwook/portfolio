@@ -25,6 +25,7 @@ LiteLLM을 전혀 모르는 사람을 위한 3시간 학습 가이드와 실습 
 - `install/` — 실습용 gateway 코드 두 종을 묶은 디렉터리. 아래 두 하위 디렉터리로 나뉜다
 - `install/set-model/` — narrative Track A가 가리키는 LiteLLM 실습: proxy + Postgres, gpt·gemini 등록 + spend 로깅까지 켜진 완성 config. `docker compose up`이면 바로 동작하는 preset. UI 로그인용 `UI_USERNAME`/`UI_PASSWORD`를 compose가 주입. README는 엔지니어면 다 아는 설정 설명을 빼고 간결하게 유지한다
 - `install/manual/` — 깡통 gateway. model_list는 비우고 general_settings에 `store_model_in_db: true`만 둬서, 학습자가 웹 UI(/ui)에서 모델·key·team을 손수 등록한다. 절차는 `docs/manual/web-ui-setup.md`. compose 레퍼런스 docker-compose.md도 여기 있다
+- `discussions/` — GitHub Discussion 본문의 저장소 사본. architecture-failure-scenarios.md는 컴포넌트별 장애 시나리오와 현업 결정 사항
 - `clients/` — Track A client 연동 예제(python-client.py, codex-config.toml). 기존 설정을 건드리지 않게 격리해 gateway에 붙인다
 - `terraform/` — 폐쇄망 인프라(Bifrost 워크스페이스와 공용): 완전 폐쇄 private subnet + VPC endpoint 7종 + EC2(AL2023 arm64 t4g.medium) + ECR + Bedrock IAM
 
