@@ -11,7 +11,7 @@
 - [x] 4. README, wiki, adr, knowledge 작성
 - [x] 5. product/README.md, 루트 README.md, products.json 갱신
 - [x] 6. GitHub Issue 생성 (root issue 하위)
-- [ ] 7. commit, push
+- [x] 7. commit, push
 
 ## 다음 세션이 알아야 할 것
 
