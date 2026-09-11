@@ -132,7 +132,9 @@ final class SearchPanelView: NSView, NSTableViewDataSource, NSTableViewDelegate 
 
   @objc private func queryChanged() {
     pending?.cancel()
-    let query = field.stringValue
+    // Trimmed before it is measured, because the core trims too: "a " is a
+    // one-character query there and would otherwise start a whole walk here.
+    let query = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard query.count >= Self.shortest, root != nil else {
       hits = []
       summary.stringValue = query.isEmpty ? "" : "Keep typing…"

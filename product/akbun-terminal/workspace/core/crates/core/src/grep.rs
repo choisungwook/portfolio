@@ -68,33 +68,55 @@ pub fn search(root: &str, files: &[String], query: &str, limit: usize) -> Vec<Hi
             if hits.len() >= limit {
                 break;
             }
-            let Some(column) = find_ignoring_case(line, &needle) else {
+            let Some((start, end)) = find_ignoring_case(line, &needle) else {
                 continue;
             };
+            let blanks = leading_blanks(line);
             hits.push(Hit {
                 path: path.clone(),
                 relative: relative.clone(),
                 line: index as u32 + 1,
                 text: shorten(line),
-                column: column.saturating_sub(leading_blanks(line)),
-                length: query.chars().count(),
+                column: start.saturating_sub(blanks),
+                // From the original line rather than from the query: a folded
+                // match is not always as long as what was typed.
+                length: end.saturating_sub(start),
             });
         }
     }
     hits
 }
 
-/// Where `needle` starts in `line`, counted in characters, ignoring case.
+/// Where `needle` starts and ends in `line`, counted in the line's own
+/// characters, ignoring case.
+///
+/// Lowercasing is done one character at a time, remembering which original
+/// character each lowered character came from. Case folding is not
+/// character-for-character — capital dotted I lowers to two characters — so an
+/// offset counted in the lowered string points at the wrong place in the
+/// original, and that offset is what the marking in the search pane uses.
 ///
 /// The haystack is lowercased per line rather than per file so a file whose
 /// first line matches is not paid for in full.
-fn find_ignoring_case(line: &str, needle: &str) -> Option<usize> {
-    let lowered = line.to_lowercase();
+fn find_ignoring_case(line: &str, needle: &str) -> Option<(usize, usize)> {
+    let mut lowered = String::with_capacity(line.len());
+    let mut origin: Vec<usize> = Vec::new();
+    let mut characters = 0;
+    for (index, character) in line.chars().enumerate() {
+        for folded in character.to_lowercase() {
+            lowered.push(folded);
+            origin.push(index);
+        }
+        characters = index + 1;
+    }
     let byte = lowered.find(needle)?;
-    // Lowercasing can change byte lengths, so the character offset is counted in
-    // the lowered string and used against the original, where the character
-    // count is the same even when the byte count is not.
-    Some(lowered[..byte].chars().count())
+    let start = lowered[..byte].chars().count();
+    let end = start + needle.chars().count();
+    // Past the last lowered character means the match runs to the end of the
+    // line, which is the one offset `origin` cannot name.
+    let first = origin.get(start).copied()?;
+    let last = origin.get(end).copied().unwrap_or(characters);
+    Some((first, last))
 }
 
 fn leading_blanks(line: &str) -> usize {
@@ -158,6 +180,22 @@ mod tests {
         assert_eq!(hit.text, "let TARGET = 2;");
         assert_eq!(hit.column, 4);
         assert_eq!(hit.length, 6);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_fold_that_changes_character_count_still_points_at_the_original() {
+        // Capital dotted I lowers to two characters, so an offset counted in the
+        // lowered line is one past where the match really starts.
+        let directory = scratch();
+        let root = directory.to_string_lossy().to_string();
+        let file = write(&directory, "a.txt", "İİ needle".as_bytes());
+        let hits = search(&root, &[file], "needle", 10);
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        let hit = &hits[0];
+        let characters: Vec<char> = hit.text.chars().collect();
+        let matched: String = characters[hit.column..(hit.column + hit.length)].iter().collect();
+        assert_eq!(matched, "needle", "{hit:?}");
         fs::remove_dir_all(directory).unwrap();
     }
 

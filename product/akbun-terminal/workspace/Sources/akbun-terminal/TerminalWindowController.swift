@@ -256,7 +256,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     selection = (project, workspace)
     // Finished means nobody has looked yet, and this is somebody looking — at
     // the tab that comes forward, not at the others, which keep their bells.
-    clearStatus(of: tabs.activeSession(in: workspace.id), in: workspace.id)
+    // A workspace whose active tab is a file is nobody looking at any shell, so
+    // it clears nothing rather than clearing all of them.
+    if let session = tabs.activeSession(in: workspace.id) {
+      clearStatus(of: session, in: workspace.id)
+    }
     sidebar.select(workspace: workspace.id)
     if changedProject {
       browser.show(project: project)
@@ -309,14 +313,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     showActiveTab()
   }
 
-  /// Takes the finished mark off one tab, or off the whole workspace when there
-  /// is no shell to name. The core owns the rule; this is the click that says
-  /// somebody looked.
-  private func clearStatus(of session: UInt32?, in workspace: UInt64) {
+  /// Takes the finished mark off one tab. The core owns the rule and re-rolls
+  /// the workspace around it; this is the click that says somebody looked.
+  private func clearStatus(of session: UInt32, in workspace: UInt64) {
     try? core.expectOk(.clearStatus(workspace: workspace, session: session))
-    if let session {
-      tabBar.setStatuses([session: .idle])
-    }
+    tabBar.setStatuses([session: .idle])
+    lastSessionStatuses[session] = .idle
     sidebar.setStatus(.idle, for: workspace)
   }
 
@@ -625,9 +627,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     for state in changed {
       sidebar.setStatus(state.status, for: state.workspace)
       let finished = newlyFinished(in: state)
-      lastSessionStatuses.merge(
-        state.sessions.reduce(into: [:]) { $0[$1.session] = $1.status }
-      ) { _, new in new }
+      for judged in state.sessions {
+        lastSessionStatuses[judged.session] = judged.status
+      }
       if state.workspace == selection?.workspace.id {
         tabBar.setStatuses(
           state.sessions.reduce(into: [:]) { $0[$1.session] = $1.status })
@@ -637,6 +639,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
         onWorkspaceFinished?(found.project, found.workspace, tab)
       }
     }
+    // Session ids are never reused, so what is left behind for a closed shell is
+    // dead weight rather than a wrong answer. Dropped here so the map tracks the
+    // shells that exist instead of every shell the window has ever opened.
+    let open = Set(tabs.allSessions)
+    var kept: [UInt32: CoreWorkspaceStatus] = [:]
+    for (session, status) in lastSessionStatuses where open.contains(session) {
+      kept[session] = status
+    }
+    lastSessionStatuses = kept
   }
 
   /// The tab numbers that moved into finished with this answer, one-based.
