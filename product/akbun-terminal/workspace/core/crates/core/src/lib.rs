@@ -8,6 +8,7 @@ pub mod agent;
 pub mod app;
 pub mod browse;
 pub mod git;
+pub mod grep;
 pub mod protocol;
 pub mod screen;
 pub mod search;

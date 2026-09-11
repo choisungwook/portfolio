@@ -121,3 +121,44 @@ fn the_shell_is_told_which_terminal_it_is_talking_to() {
     let seen = wait_for_output(&app, "term-is-xterm-256color");
     assert!(seen.contains("term-is-xterm-256color"), "output was: {seen}");
 }
+
+/// Command shift F all the way through the App, which is where the palette's
+/// cached file list and the content search meet. The unit tests each cover one
+/// half; only this covers the half that reuses the other.
+#[test]
+fn a_project_search_answers_over_the_walked_files() {
+    let directory = std::env::temp_dir().join(format!(
+        "akbun-terminal-search-{}-{:?}",
+        std::process::id(),
+        std::time::SystemTime::now()
+    ));
+    std::fs::create_dir_all(directory.join("src")).expect("should create");
+    std::fs::write(directory.join("src/a.rs"), "fn main() {}\nlet needle = 1;\n").expect("write");
+    std::fs::write(directory.join("README.md"), "nothing here\n").expect("write");
+    let root = directory.to_string_lossy().to_string();
+
+    let app = App::new();
+    let response = dispatch(
+        &app,
+        &format!(r#"{{"type":"search_text","root":"{root}","query":"NEEDLE"}}"#),
+    );
+    let value: serde_json::Value = serde_json::from_str(&response).expect("should be json");
+    assert_eq!(value["type"], "hits", "{response}");
+    let hits = value["hits"].as_array().expect("hits should be a list");
+    assert_eq!(hits.len(), 1, "{response}");
+    assert_eq!(hits[0]["relative"], "src/a.rs");
+    assert_eq!(hits[0]["line"], 2);
+    assert_eq!(hits[0]["text"], "let needle = 1;");
+
+    // The same index answers the palette, so asking it afterwards must still
+    // find the file rather than an emptied list.
+    let response = dispatch(
+        &app,
+        &format!(r#"{{"type":"find_files","root":"{root}","query":"a.rs"}}"#),
+    );
+    let value: serde_json::Value = serde_json::from_str(&response).expect("should be json");
+    assert_eq!(value["type"], "matches", "{response}");
+    assert!(!value["matches"].as_array().expect("list").is_empty(), "{response}");
+
+    std::fs::remove_dir_all(directory).expect("should clean up");
+}

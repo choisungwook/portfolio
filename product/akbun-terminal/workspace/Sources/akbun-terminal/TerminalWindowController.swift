@@ -45,11 +45,16 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private var palette = Palette.system
   /// Applies to every pane in the window, and to the next terminal opened.
   private var zoomLevel = Zoom()
+  /// What each shell was last judged to be, so a finish is reported once rather
+  /// than on every tick that repeats it.
+  private var lastSessionStatuses: [UInt32: CoreWorkspaceStatus] = [:]
   private(set) var browsers = Browsers.none
   /// Called when a workspace finishes its work, so the app can say so outside
   /// its own window. Kept as a closure because the notification permission and
   /// the click that comes back belong to the application, not to one window.
-  var onWorkspaceFinished: ((CoreProject, CoreWorkspace) -> Void)?
+  /// `tab` names the shell that finished, one-based as the strip shows it, so a
+  /// workspace running three agents says which of them wants reading.
+  var onWorkspaceFinished: ((CoreProject, CoreWorkspace, Int) -> Void)?
 
   /// A document belongs to the strip that carries it, so the same file reached
   /// from two workspaces is two tabs with a view each rather than one buffer
@@ -184,6 +189,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     tabBar.onSelect = { [weak self] content in self?.selectTab(content) }
     tabBar.onClose = { [weak self] content in self?.closeTab(content) }
     browser.onOpenFile = { [weak self] entry in self?.open(entry) }
+    browser.onOpenHit = { [weak self] hit in self?.open(hit) }
     browser.onError = { [weak self] error in self?.present(error, whileDoing: "That folder could not be read") }
   }
 
@@ -248,9 +254,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private func selectWorkspace(project: CoreProject, workspace: CoreWorkspace) {
     let changedProject = selection?.project.id != project.id
     selection = (project, workspace)
-    // Finished means nobody has looked yet, and this is somebody looking.
-    try? core.expectOk(.clearStatus(workspace: workspace.id))
-    sidebar.setStatus(.idle, for: workspace.id)
+    // Finished means nobody has looked yet, and this is somebody looking — at
+    // the tab that comes forward, not at the others, which keep their bells.
+    // A workspace whose active tab is a file is nobody looking at any shell, so
+    // it clears nothing rather than clearing all of them.
+    if let session = tabs.activeSession(in: workspace.id) {
+      clearStatus(of: session, in: workspace.id)
+    }
     sidebar.select(workspace: workspace.id)
     if changedProject {
       browser.show(project: project)
@@ -297,7 +307,19 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private func selectTab(_ content: TerminalTabs.Content) {
     guard let workspace = selection?.workspace.id else { return }
     tabs.select(content, in: workspace)
+    if case .shell(let session) = content {
+      clearStatus(of: session, in: workspace)
+    }
     showActiveTab()
+  }
+
+  /// Takes the finished mark off one tab. The core owns the rule and re-rolls
+  /// the workspace around it; this is the click that says somebody looked.
+  private func clearStatus(of session: UInt32, in workspace: UInt64) {
+    try? core.expectOk(.clearStatus(workspace: workspace, session: session))
+    tabBar.setStatuses([session: .idle])
+    lastSessionStatuses[session] = .idle
+    sidebar.setStatus(.idle, for: workspace)
   }
 
   private func closeTab(_ content: TerminalTabs.Content) {
@@ -331,7 +353,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     }
     tabBar.show(true)
     let active = tabs.active(in: workspace)
-    tabBar.render(tabs: tabs.tabs(in: workspace), active: active)
+    let shownTabs = tabs.tabs(in: workspace)
+    tabBar.render(tabs: shownTabs, active: active)
+    // The strip only ever draws one workspace, so switching to another has to
+    // hand it that workspace's judgements. Without this a tab that finished
+    // while its workspace was off screen comes back with no bell on it.
+    tabBar.setStatuses(
+      shownTabs.compactMap(\.session).reduce(into: [:]) {
+        $0[$1] = lastSessionStatuses[$1] ?? .idle
+      })
 
     let shown = active.flatMap { view(for: $0, in: workspace) }
     for subview in contentArea.subviews where subview !== placeholder && subview !== shown?.view {
@@ -385,6 +415,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     openDocument(at: entry.path)
   }
 
+  /// Opens the file a project search result names and goes to its line.
+  private func open(_ hit: CoreHit) {
+    openDocument(at: hit.path)
+    activeDocument?.reveal(line: Int(hit.line))
+  }
+
   private func openDocument(at path: String) {
     guard let selection else { return }
     let key = DocumentKey(workspace: selection.workspace.id, path: path)
@@ -427,8 +463,24 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     activeDocument?.save()
   }
 
+  /// Command F: inside the file on screen. Command shift F: over the files
+  /// nobody has opened. Two questions, so two views rather than one with a mode.
   func beginFind() {
     activeDocument?.beginFind()
+  }
+
+  func beginProjectSearch() {
+    // The pane can be folded away, and a search that answered into a hidden
+    // pane would look like a keystroke that did nothing.
+    if browser.isHidden {
+      toggleFileBrowser()
+    }
+    browser.beginSearch()
+  }
+
+  /// Every open terminal, for a setting that applies to all of them at once.
+  var terminals: [TerminalRendering] {
+    Array(views.values)
   }
 
   func findNext() {
@@ -564,16 +616,55 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   // MARK: Agent status
 
-  /// Paints what the core judged and says so when work finished.
+  /// Paints what the core judged and says so when a shell finished.
+  ///
+  /// The workspace colour and the tab icons come from the same answer, so the
+  /// sidebar can never disagree with the strip beside it. A banner is raised per
+  /// shell rather than per workspace: the second agent finishing is news even
+  /// though the workspace was already green from the first.
   private func applyDetectedStatuses() {
     guard let changed = try? core.detect() else { return }
     for state in changed {
       sidebar.setStatus(state.status, for: state.workspace)
-      guard state.status == .completed, let found = find(workspace: state.workspace) else {
-        continue
+      let finished = newlyFinished(in: state)
+      for judged in state.sessions {
+        lastSessionStatuses[judged.session] = judged.status
       }
-      onWorkspaceFinished?(found.project, found.workspace)
+      if state.workspace == selection?.workspace.id {
+        tabBar.setStatuses(
+          state.sessions.reduce(into: [:]) { $0[$1.session] = $1.status })
+      }
+      guard let found = find(workspace: state.workspace) else { continue }
+      for tab in finished {
+        onWorkspaceFinished?(found.project, found.workspace, tab)
+      }
     }
+    // Session ids are never reused, so what is left behind for a closed shell is
+    // dead weight rather than a wrong answer. Dropped here so the map tracks the
+    // shells that exist instead of every shell the window has ever opened.
+    let open = Set(tabs.allSessions)
+    var kept: [UInt32: CoreWorkspaceStatus] = [:]
+    for (session, status) in lastSessionStatuses where open.contains(session) {
+      kept[session] = status
+    }
+    lastSessionStatuses = kept
+  }
+
+  /// The tab numbers that moved into finished with this answer, one-based.
+  ///
+  /// Comparing against what was last seen rather than trusting the core's "these
+  /// changed" list: that list carries every shell in a workspace whenever any one
+  /// of them moves, so a tab that has been finished for a minute is in it too and
+  /// would ring again on every tick.
+  private func newlyFinished(in state: CoreWorkspaceState) -> [Int] {
+    var numbers: [Int] = []
+    for (index, session) in state.sessions.enumerated() {
+      guard session.status == .completed,
+        lastSessionStatuses[session.session] != .completed
+      else { continue }
+      numbers.append(index + 1)
+    }
+    return numbers
   }
 
   private func find(workspace id: UInt64) -> (project: CoreProject, workspace: CoreWorkspace)? {

@@ -49,6 +49,7 @@ const ROWS: &[Row] = &[
     Row { command: "find", title: "Find…", menu: "Edit", key: "cmd+f" },
     Row { command: "find_next", title: "Find Next", menu: "Edit", key: "cmd+g" },
     Row { command: "find_previous", title: "Find Previous", menu: "Edit", key: "cmd+shift+g" },
+    Row { command: "search_project", title: "Search in Project…", menu: "Edit", key: "cmd+shift+f" },
     Row { command: "zoom_in", title: "Bigger", menu: "View", key: "cmd+plus" },
     Row { command: "zoom_out", title: "Smaller", menu: "View", key: "cmd+minus" },
     Row { command: "zoom_reset", title: "Default Size", menu: "View", key: "cmd+0" },

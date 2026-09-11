@@ -37,9 +37,13 @@ public enum CoreCommand: Encodable {
   case setShortcut(command: String, key: String)
   case resetShortcuts
   case findFiles(root: String, query: String, limit: Int?)
+  /// Every line under `root` holding `query`. Case is ignored by the core.
+  case searchText(root: String, query: String, limit: Int?)
   case loadRules(directory: String)
   case detect
-  case clearStatus(workspace: UInt64)
+  /// `session` names the one tab that was looked at, so the other tabs in the
+  /// workspace keep their finished mark. Without it the whole workspace clears.
+  case clearStatus(workspace: UInt64, session: UInt32?)
   case urlAt(line: String, column: Int)
 
   private enum Key: String, CodingKey {
@@ -129,14 +133,20 @@ public enum CoreCommand: Encodable {
       try container.encode(root, forKey: .root)
       try container.encode(query, forKey: .query)
       try container.encodeIfPresent(limit, forKey: .limit)
+    case .searchText(let root, let query, let limit):
+      try container.encode("search_text", forKey: .type)
+      try container.encode(root, forKey: .root)
+      try container.encode(query, forKey: .query)
+      try container.encodeIfPresent(limit, forKey: .limit)
     case .loadRules(let directory):
       try container.encode("load_rules", forKey: .type)
       try container.encode(directory, forKey: .directory)
     case .detect:
       try container.encode("detect", forKey: .type)
-    case .clearStatus(let workspace):
+    case .clearStatus(let workspace, let session):
       try container.encode("clear_status", forKey: .type)
       try container.encode(workspace, forKey: .workspace)
+      try container.encodeIfPresent(session, forKey: .session)
     case .urlAt(let line, let column):
       try container.encode("url_at", forKey: .type)
       try container.encode(line, forKey: .line)
@@ -170,6 +180,7 @@ public enum CoreResponse: Equatable, Sendable {
   case shortcuts([CoreShortcut])
   case matches([CoreMatch])
   case statuses([CoreWorkspaceState])
+  case hits([CoreHit])
   case url(String?)
   case error(message: String)
 }
@@ -224,11 +235,67 @@ public struct CoreMatch: Decodable, Equatable, Sendable {
 /// One workspace's judged status. Only the ones that moved are sent.
 public struct CoreWorkspaceState: Decodable, Equatable, Sendable {
   public let workspace: UInt64
+  /// The most blocked of the shells under it, which is what the sidebar draws.
   public let status: CoreWorkspaceStatus
+  /// Every shell open in the workspace, so the tab strip can say which one
+  /// finished. Always complete rather than a delta.
+  public let sessions: [CoreSessionState]
 
-  public init(workspace: UInt64, status: CoreWorkspaceStatus) {
+  public init(
+    workspace: UInt64, status: CoreWorkspaceStatus, sessions: [CoreSessionState] = []
+  ) {
     self.workspace = workspace
     self.status = status
+    self.sessions = sessions
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workspace = try container.decode(UInt64.self, forKey: .workspace)
+    status = try container.decode(CoreWorkspaceStatus.self, forKey: .status)
+    sessions = try container.decodeIfPresent([CoreSessionState].self, forKey: .sessions) ?? []
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case workspace, status, sessions
+  }
+}
+
+/// One shell's judged status.
+public struct CoreSessionState: Decodable, Equatable, Sendable {
+  public let session: UInt32
+  public let status: CoreWorkspaceStatus
+
+  public init(session: UInt32, status: CoreWorkspaceStatus) {
+    self.session = session
+    self.status = status
+  }
+}
+
+/// One line a project search found.
+public struct CoreHit: Decodable, Equatable, Sendable {
+  /// Absolute, because opening it is what happens next.
+  public let path: String
+  /// The path with the project folder taken off the front. What is shown.
+  public let relative: String
+  /// One-based, which is what an editor and a person both count from.
+  public let line: UInt32
+  /// The line, with its indentation taken off.
+  public let text: String
+  /// Where the match starts in `text`, in characters.
+  public let column: Int
+  /// How many characters matched.
+  public let length: Int
+
+  public init(
+    path: String, relative: String, line: UInt32, text: String, column: Int, length: Int
+  ) {
+    self.path = path
+    self.relative = relative
+    self.line = line
+    self.text = text
+    self.column = column
+    self.length = length
   }
 }
 
@@ -401,7 +468,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, themes
-    case statuses, url, status, shortcuts, matches, log
+    case statuses, url, status, shortcuts, matches, log, hits
   }
 
   public init(from decoder: Decoder) throws {
@@ -431,6 +498,8 @@ extension CoreResponse: Decodable {
       self = .matches(try container.decode([CoreMatch].self, forKey: .matches))
     case "statuses":
       self = .statuses(try container.decode([CoreWorkspaceState].self, forKey: .statuses))
+    case "hits":
+      self = .hits(try container.decode([CoreHit].self, forKey: .hits))
     case "url":
       self = .url(try container.decodeIfPresent(String.self, forKey: .url))
     case "error":

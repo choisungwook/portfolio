@@ -26,7 +26,10 @@ The core is always built in release, even for tests. One profile keeps one link 
 cd workspace
 cargo test --manifest-path core/Cargo.toml   # protocol, pty round trip, session lifetime
 ./scripts/build-core.sh && swift test        # protocol shape, the bridge, update helpers
+./scripts/bundle.sh                          # the release build, which the two above do not cover
 ```
+
+The third line is not optional after a Swift change. `swift build` and `swift test` compile without the optimiser, and Swift 6.2.3's `CopyPropagation` pass crashes on spellings both of them accept — see [the note on it](../knowledge/decisions/2026-09-release-build-crashes-on-some-swift-spellings.md). The release job builds the same way `bundle.sh` does, so a crash found here is a crash that would otherwise be found after merging.
 
 The core tests need no macOS and no AppKit, which is why CI runs them on the cheap runner. The Swift tests need the archive first; `swift test` without it fails to link.
 
@@ -64,6 +67,8 @@ Bump `workspace/VERSION` in the same commit as any change under `workspace/`. Pa
 | master push | `release` | macOS | both test runs, dmg, tag, release |
 
 Order matters: build first, then tag, then release. A failed build must not leave a tag behind. After merging, check that the release actually appeared; a green pull request says nothing about it.
+
+`bundle.sh` signs the executable before copying it into the .app and never signs the .app itself. That is forced rather than chosen: the SwiftPM resource bundles have to sit in the bundle root for `Bundle.module` to find them, and codesign rejects a bundle root holding anything but `Contents`. The [note on it](../knowledge/decisions/2026-09-app-bundle-is-signed-at-the-executable.md) has what was tried.
 
 The build is unsigned, so a downloaded copy needs the quarantine attribute cleared. The release notes say so, and they are the only place a user will look.
 

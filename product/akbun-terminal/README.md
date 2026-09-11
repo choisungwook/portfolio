@@ -58,6 +58,7 @@ cargo test --manifest-path core/Cargo.toml
 - Previews Markdown with bundled markdown-it, Highlight.js and Mermaid. Raw document HTML and document scripts are disabled.
 - Opens a saved HTML file in the system browser through an independent `Open in Browser` action, with an explicit choice when the buffer is dirty.
 - Finds text in the file on screen with Command F, marking every match and stepping through them with Command G.
+- Finds text anywhere under the project with Command shift F, listing the line and where in it the match fell in the right pane, and opening the file at that line on a click.
 - Opens any file in the project by typing part of its path with Command O, best match first and the typed characters marked.
 - Uses Highlight.js language definitions and shows a file it does not recognise as plain text rather than refusing it.
 - Opens a relative link inside a rendered document in its own tab on click, and sends an http or https link to a browser.
@@ -66,8 +67,10 @@ cargo test --manifest-path core/Cargo.toml
 - Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.
 - Zooms the whole window with Command plus and minus, and back to the default size with Command zero: the terminal, the tab strip, the project tree, the file list and the rendered document all follow one size.
 - Lets the sidebar and the file pane be dragged to any width, and folded away entirely.
-- Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening the workspace takes the green away.
-- Raises a notification when a workspace finishes, and opens that workspace when the notification is clicked.
+- Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening that tab takes the green away.
+- Judges each shell on its own and marks its tab: a turning ring while it works, a bell once it has finished, a warning while it waits. The workspace takes the most blocked of them, so one tab finishing never hides another still working.
+- Raises a notification naming the tab that finished, once per tab, and opens that workspace when it is clicked.
 - Reads those judgements from one JSON file per agent under the app data directory, so a new agent is a new file rather than a new build.
+- Keeps the mouse rather than handing it to the program, so a drag selects text for copying even while an agent CLI is running. `View > Mouse Reporting` hands it back.
 - Offers to copy or open a URL clicked in the terminal, in the system browser or a named one, and refuses anything that is not http or https.
 - Checks for updates from the application menu and replaces the installed bundle in place.

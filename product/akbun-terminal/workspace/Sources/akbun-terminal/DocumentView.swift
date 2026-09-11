@@ -324,6 +324,33 @@ final class DocumentView: NSView {
     reader.textStorage?.setAttributedString(result.text)
   }
 
+  /// Puts the caret on a one-based line and scrolls it into view.
+  ///
+  /// What a project search result means when it is clicked. A markdown file
+  /// being previewed has no text view to put a caret in, so it is switched to
+  /// its source: a line number is a fact about the source and pointing at a
+  /// rendered heading instead would be a different place.
+  func reveal(line: Int) {
+    if currentTextView == nil {
+      toggleEditing()
+    }
+    guard let text = currentTextView else { return }
+    let content = text.string as NSString
+    var start = 0
+    var remaining = max(0, line - 1)
+    while remaining > 0, start < content.length {
+      let found = content.range(
+        of: "\n", options: [], range: NSRange(location: start, length: content.length - start))
+      guard found.location != NSNotFound else { break }
+      start = NSMaxRange(found)
+      remaining -= 1
+    }
+    let range = content.lineRange(for: NSRange(location: min(start, content.length), length: 0))
+    text.setSelectedRange(range)
+    text.scrollRangeToVisible(range)
+    window?.makeFirstResponder(text)
+  }
+
   func beginFind() {
     if let text = currentTextView {
       let selected = text.selectedRange()

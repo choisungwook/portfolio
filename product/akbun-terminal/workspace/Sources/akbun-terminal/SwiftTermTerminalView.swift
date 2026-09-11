@@ -43,6 +43,7 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
     // follow dark and light mode without a palette of its own.
     terminal.configureNativeColors()
     terminal.onPlainClick = { [weak self] point in self?.reportClick(at: point) ?? false }
+    terminal.allowMouseReporting = Self.mouseReporting
     terminal.translatesAutoresizingMaskIntoConstraints = false
     addSubview(terminal)
     NSLayoutConstraint.activate([
@@ -76,6 +77,27 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
   private var terminalHasFocus: Bool {
     guard let responder = window?.firstResponder as? NSView else { return false }
     return responder === terminal || responder.isDescendant(of: terminal)
+  }
+
+  /// Whether a program running in the terminal is handed the mouse.
+  ///
+  /// Off, which is not the emulator's default and is the whole of the fix for
+  /// "I cannot select text". A CLI agent turns mouse tracking on to scroll its
+  /// own transcript, and SwiftTerm then does two things: it stops a drag from
+  /// selecting at all, and it clears any existing selection on every linefeed.
+  /// Between them there is no gesture that puts a block on the screen while an
+  /// agent is running, which is exactly when somebody wants to copy an error.
+  ///
+  /// The cost is that the wheel scrolls this terminal's own scrollback instead
+  /// of the program's, so `View > Mouse Reporting` turns it back on for the
+  /// session where that matters more.
+  static var mouseReporting = false
+
+  static func setMouseReporting(_ allowed: Bool, in views: [TerminalRendering]) {
+    mouseReporting = allowed
+    for view in views {
+      (view as? SwiftTermTerminalView)?.terminal.allowMouseReporting = allowed
+    }
   }
 
   var grid: (cols: UInt16, rows: UInt16) {
@@ -173,14 +195,18 @@ final class SwiftTermTerminalView: NSView, TerminalRendering, @preconcurrency Te
 
 /// A terminal view that reports a plain click before it does anything with it.
 ///
-/// A click that dragged is a selection and a click while a full screen program
-/// is reading the mouse belongs to that program, so neither is offered. What is
-/// left is the gesture a person makes at a URL.
+/// A click that dragged is a selection and a click that a program is actually
+/// being handed belongs to that program, so neither is offered. What is left is
+/// the gesture a person makes at a URL.
 private final class ClickableTerminalView: TerminalView {
   /// Returns whether the click was consumed.
   var onPlainClick: ((NSPoint) -> Bool)?
 
   private var pressedAt: NSPoint?
+
+  private var mouseGoesToProgram: Bool {
+    allowMouseReporting && getTerminal().mouseMode != .off
+  }
 
   override func mouseDown(with event: NSEvent) {
     pressedAt = convert(event.locationInWindow, from: nil)
@@ -191,9 +217,11 @@ private final class ClickableTerminalView: TerminalView {
     let point = convert(event.locationInWindow, from: nil)
     let dragged = pressedAt.map { hypot(point.x - $0.x, point.y - $0.y) > 3 } ?? true
     pressedAt = nil
-    if !dragged, getTerminal().mouseMode == .off, event.clickCount == 1,
-      onPlainClick?(point) == true
-    {
+    // Whether the program asked for the mouse does not decide this any more:
+    // when mouse reporting is off it never sees the click whatever it asked
+    // for, and testing `mouseMode` would have taken the URL menu away from
+    // every screen a CLI agent draws.
+    if !dragged, !mouseGoesToProgram, event.clickCount == 1, onPlainClick?(point) == true {
       return
     }
     super.mouseUp(with: event)
