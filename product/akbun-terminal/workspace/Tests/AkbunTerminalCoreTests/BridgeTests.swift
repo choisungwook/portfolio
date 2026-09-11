@@ -72,7 +72,14 @@ struct BridgeTests {
         // Output has to be drained or the core's queue is the only thing that
         // grows. The screen it judges is kept on the reader thread regardless.
         _ = core.drainEvents()
-        if try core.detect().contains(CoreWorkspaceState(workspace: 42, status: wanted)) {
+        // The workspace's own status and the shell's, rather than the whole
+        // value: the answer also carries a list of every shell in the workspace,
+        // and a test that deep-compares it fails the day a field is added to it
+        // rather than the day the detection breaks.
+        if try core.detect().contains(where: { state in
+          state.workspace == 42 && state.status == wanted
+            && state.sessions.contains(CoreSessionState(session: session, status: wanted))
+        }) {
           return true
         }
         try? await Task.sleep(for: .milliseconds(100))
