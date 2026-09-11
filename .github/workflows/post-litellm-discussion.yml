@@ -1,0 +1,28 @@
+name: post-litellm-discussion
+
+on:
+  push:
+    branches:
+      - claude/litellm-replica-config-guide-ugdfrb
+    paths:
+      - .github/workflows/post-litellm-discussion.yml
+
+permissions:
+  contents: read
+  discussions: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create discussion from mlops/litellm/replica-sizing.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY=$(gh api -H "Accept: application/vnd.github.raw" "repos/${GITHUB_REPOSITORY}/contents/mlops/litellm/replica-sizing.md?ref=${GITHUB_SHA}" | tail -n +3)
+          gh api graphql \
+            -f query='mutation($repo:ID!,$cat:ID!,$title:String!,$body:String!){ createDiscussion(input:{repositoryId:$repo,categoryId:$cat,title:$title,body:$body}){ discussion{ url } } }' \
+            -f repo=MDEwOlJlcG9zaXRvcnkyOTg5MTk2ODg= \
+            -f cat=DIC_kwDOEdEnCM4DC6nX \
+            -f title='LiteLLM Proxy replica 개수 산정 기준과 벤치마크 정리' \
+            -f body="$BODY" --jq .data.createDiscussion.discussion.url
