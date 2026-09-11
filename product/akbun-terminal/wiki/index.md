@@ -17,7 +17,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **The browser reads what is opened, and only that.** `read_directory` answers one level. The outline view asks for children inside `numberOfChildrenOfItem`, which is the moment a folder is opened, so nothing below a closed folder has been read. Hidden files and folders are listed and symlinks are leaves, both decided in the core.
 - **The only document web view is Markdown Preview.** Bundled markdown-it, Highlight.js and Mermaid run in a non-persistent WebKit view. Raw document HTML is disabled, external navigation is intercepted, and HTML files are opened by the system browser instead of executed inside the app.
 - **The menu bar is built from the core.** `shortcuts.rs` is the list of commands, their titles, their menu and their default keys; `AppDelegate` maps an id to a selector and nothing else. A key nobody changed is not in the state file, which is what lets a default move later.
-- **The palette walks once.** `search.rs` keeps the project's file list for a few seconds and scores a query with a dynamic program, not a greedy scan; greedy loses `src/app.rs` for the query `app`. Positions are character offsets, because a path can hold anything.
+- **The palette walks once, and the project search rides on it.** `search.rs` keeps the project's file list for a few seconds and scores a query with a dynamic program, not a greedy scan; greedy loses `src/app.rs` for the query `app`. Positions are character offsets, because a path can hold anything. `grep.rs` reuses that same cached list rather than walking again, and keeps no index of file contents: the shell in the middle of the window writes files constantly, so an index would be stale and a stale hit opens at the wrong line.
 - **A document never supplies application code.** Markdown source is escaped into a text-only element and parsed with raw HTML disabled. Only scripts bundled by the app execute in Preview.
 - **Every file opens, and it opens to be read.** One click on a file gives a tab; a folder still needs the triangle or a double click. Markdown is rendered, everything else is coloured, and Command E is what makes the tab editable. Nothing on screen can be typed into until somebody asks for it.
 - **Syntax colour belongs to a grammar engine, not the core protocol.** HighlighterSwift wraps Highlight.js and returns an attributed string. The app supplies only a filename hint, a theme and the plain-text fallback above half a megabyte.
@@ -25,7 +25,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **The core owns the tree.** The shell supplies the app data directory and folder picker results. Rust validates, stores and returns the complete versioned project state after every mutation.
 - **Judging reads a screen, not a stream.** `screen.rs` keeps an interpreted grid per session, updated on the reader thread. An agent paints over its own question within a second of it being answered, so a search over the raw bytes finds it forever. Only cursor movement and erasing are implemented; colour is dropped.
 - **The phrases are data.** `agent.rs` reads one JSON file per agent from the app data directory and seeds it with the three shipped ones. A wording change in an agent's status line is a file edit, never a build.
-- **Finished is a transition.** It is only reachable from working or asking, and `clear_status` is what ends it. That is what makes the same idle screen mean nothing at launch and mean "look at me" after a run, and what fires the notification exactly once.
+- **Finished is a transition, and it belongs to a shell.** It is only reachable from working or asking, and `clear_status` is what ends it. That is what makes the same idle screen mean nothing at launch and mean "look at me" after a run. Judging is per session; the workspace takes the most blocked of its shells, with finished reported last so one tab going green never hides another still working. `clear_status` names the tab that was looked at, so its siblings keep their bells, and the controller remembers what each shell was last judged to be — the core resends every shell in a workspace whenever any one of them moves, so trusting that list alone would ring the same bell on every tick.
 - **A split view owns its subviews' widths.** Panes are placed with `setPosition` and limited by the delegate. A width constraint is a second opinion about the same number, and whichever one loses is either a pane that opens at nothing or a divider that snaps back.
 - **A thin divider is one point wide.** Nobody can aim at that, which is what made the panes look fixed. `splitView(_:effectiveRect:forDrawnRect:ofDividerAt:)` grows what answers the mouse without touching what is drawn.
 - **Git is asked, never inferred.** `git.rs` runs porcelain status and rolls it up the directory tree, so the colours in the file pane agree with the shell in the middle of the window. The paths are built from `--show-prefix` rather than `--show-toplevel`: a symlink above the project makes the resolved root a different string from the one the browser holds, and a status keyed by a path no row has never shows up. It runs on the run loop every three seconds, the same bet `detect` makes with `ps`; a repository big enough for `git status` to take a visible moment is what would make that wrong.
@@ -33,6 +33,9 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **Ids are never reused.** `next_id` in the state file is a high water mark. Tabs, the agent colour and the finished notification are all keyed by workspace id, so a reused one shows a deleted workspace's state on a new row.
 - **One keystroke is ours, the rest are the emulator's.** A terminal sends the same byte for return whether or not shift was held, so `TerminalKeys` turns shift and return into escape and return for the CLI agents that need a new line. It is a pure function in the core package for the same reason the URL rule is: the emulator behind the seam is expected to be replaced. Anything wider would be a second keyboard layout in front of SwiftTerm's. It is caught as a key equivalent because SwiftTerm's `keyDown` is public rather than open and cannot be overridden from this module.
 - **The URL rule is not the emulator's.** SwiftTerm detects links itself and lives in the half that gets replaced. The view answers where a click landed; `url.rs` decides what may be opened, and only http and https ever are.
+- **The emulator keeps the mouse.** `allowMouseReporting` is off, which is not SwiftTerm's default. With it on, a program that asks for the mouse — every agent CLI does — takes the drag that selects text and clears the selection on every linefeed, so there is no way to copy an error out of a running transcript. `View > Mouse Reporting` hands it back for the window and is deliberately not saved.
+- **Debug green is not release green.** Swift 6.2.3's `CopyPropagation` pass crashes on some spellings that debug builds and `swift test` accept; `TerminalTabBarView.render` is written around one. Verification runs `scripts/bundle.sh`, not `swift build` alone.
+- **The .app is not signed as a bundle.** `Bundle.module` for an executable target looks only at `Bundle.main.bundleURL`, which is the .app's root, so the SwiftPM resource bundles have to sit there — and codesign rejects anything beside `Contents` in the root. `bundle.sh` signs the executable before it copies it in. Signing it afterwards fails too: codesign walks up to the enclosing bundle.
 
 ## Files
 
@@ -47,6 +50,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `core/crates/core/src/theme.rs` | the known colour schemes as a hex table, dark and light |
 | `core/crates/core/src/shortcuts.rs` | the menu commands, their default keys and the rule about clashes |
 | `core/crates/core/src/search.rs` | the project file index and the score that ranks a query's matches |
+| `core/crates/core/src/grep.rs` | Command shift F: the lines under the project holding a query, over that same file list |
 | `core/crates/core/src/screen.rs` | the interpreted screen the judging reads |
 | `core/crates/core/src/agent.rs` | rule files, the process tree walk, and the judgement |
 | `core/crates/core/rules/*.json` | the agent rules this build ships and seeds |
@@ -72,6 +76,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
 | `Sources/akbun-terminal/MarkdownPreviewView.swift` | bundled renderer loading, WebKit navigation policy and preview search |
 | `Sources/akbun-terminal/CommandPaletteView.swift` | the Command O sheet: the list, the keyboard and the marks |
+| `Sources/akbun-terminal/SearchPanelView.swift` | the Command shift F pane: the field, the debounce and the marked result lines |
 | `Sources/akbun-terminal/ShortcutsWindowController.swift` | Settings › Shortcuts, and the recording monitor |
 | `Sources/akbun-terminal/CodeHighlighter.swift` | HighlighterSwift adapter, language hint and plain-text fallback |
 | `Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
@@ -84,4 +89,4 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 
 ## What is not here yet
 
-Windows and Linux, a second window, and search in the scrollback. Command F searches the file in the tab, never the terminal beside it. Domain state belongs in the core; rendering engines and keystrokes belong in the shell.
+Windows and Linux, a second window, and search in the scrollback. Command F searches the file in the tab and Command shift F the files under the project; neither reads the terminal beside them. Domain state belongs in the core; rendering engines and keystrokes belong in the shell.

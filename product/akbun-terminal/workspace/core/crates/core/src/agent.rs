@@ -131,6 +131,28 @@ fn matches(phrases: &[String], screen: &str) -> bool {
     phrases.iter().any(|phrase| screen.contains(phrase.as_str()))
 }
 
+/// One answer for a workspace whose shells disagree.
+///
+/// Judging is per shell, because "which tab finished" is the question a person
+/// actually has when three agents are running side by side. The workspace row in
+/// the sidebar still needs one colour, and the order is the order of who is
+/// blocked: somebody waiting on an answer outranks work in progress, and work in
+/// progress outranks a finish nobody has looked at. A finish is reported last so
+/// one tab going green never hides another tab still working.
+pub fn roll_up(statuses: &[WorkspaceStatus]) -> WorkspaceStatus {
+    for wanted in [
+        WorkspaceStatus::NeedsAttention,
+        WorkspaceStatus::Failed,
+        WorkspaceStatus::Running,
+        WorkspaceStatus::Completed,
+    ] {
+        if statuses.contains(&wanted) {
+            return wanted;
+        }
+    }
+    WorkspaceStatus::Idle
+}
+
 /// Every process name in the tree under `root`, including `root` itself.
 ///
 /// An agent is rarely the shell's own child: it is started through a version
@@ -254,6 +276,17 @@ mod tests {
             ),
             WorkspaceStatus::Completed
         );
+    }
+
+    #[test]
+    fn the_workspace_takes_the_most_blocked_of_its_shells() {
+        use WorkspaceStatus::*;
+        // A tab that finished must not speak for a tab still working.
+        assert_eq!(roll_up(&[Completed, Running]), Running);
+        assert_eq!(roll_up(&[Running, NeedsAttention]), NeedsAttention);
+        assert_eq!(roll_up(&[Idle, Completed]), Completed);
+        assert_eq!(roll_up(&[Idle, Idle]), Idle);
+        assert_eq!(roll_up(&[]), Idle);
     }
 
     #[test]

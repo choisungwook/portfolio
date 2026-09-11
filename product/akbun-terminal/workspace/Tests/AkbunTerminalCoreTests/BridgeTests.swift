@@ -85,6 +85,6 @@ struct BridgeTests {
     // bytes: the running phrase above is still in the stream and has to stop
     // counting the moment it is painted over.
     #expect(try await waitFor(.completed, after: "printf '\\033[2J\\033[H? for shortcuts\\n'\n"))
-    try core.expectOk(.clearStatus(workspace: 42))
+    try core.expectOk(.clearStatus(workspace: 42, session: nil))
   }
 }

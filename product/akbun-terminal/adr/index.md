@@ -25,3 +25,6 @@
 | [Shortcuts are a table in the core](./2026-08-shortcuts-are-a-table-in-the-core.md) | The menu bar built from the core's command list, only changed keys saved, duplicates refused |
 | [Finding a file is the core's job](./2026-08-finding-a-file-is-the-cores-job.md) | A walked index and a scored match in Rust, the in-document find in the Swift core package |
 | [Rendering is delegated without LSP](../knowledge/decisions/2026-08-rendering-is-delegated-without-lsp.md) | Highlight.js for syntax, bundled Markdown engines for Preview, and HTML in the system browser |
+| [Selection beats mouse reporting](./2026-09-selection-beats-mouse-reporting.md) | The emulator keeps the mouse so a drag selects, with a View menu switch to hand it back |
+| [Agent status is judged per shell](./2026-09-agent-status-is-judged-per-shell.md) | One judgement per tab with an icon on it, the workspace taking the most blocked of them |
+| [Project search shares the file pane](./2026-09-project-search-shares-the-file-pane.md) | Command shift F over the project in the right pane, reusing the palette's walk without an index |

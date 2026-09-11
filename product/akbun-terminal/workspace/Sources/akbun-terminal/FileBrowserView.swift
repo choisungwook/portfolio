@@ -30,17 +30,25 @@ final class FileBrowserView: NSView {
   var onOpenFile: ((CoreEntry) -> Void)?
   /// Reading a level failed, which is the shell's to report.
   var onError: ((Error) -> Void)?
+  /// A search result was clicked: open that file at that line.
+  var onOpenHit: ((CoreHit) -> Void)?
 
   private let core: CoreBridge
   private let outline = NSOutlineView()
   private let fileScroll = NSScrollView()
   private let gitTree: GitTreeView
+  private let search: SearchPanelView
   private let mode = NSButton()
+  private let searchMode = NSButton()
   private let title = NSTextField(labelWithString: "Files")
   private let empty = NSTextField(
     wrappingLabelWithString: "Choose a folder for this project to see its files.")
   private var root: String?
-  private var showsGit = false
+  /// Which of the three the pane is showing. A boolean was enough while there
+  /// were two, and turning it into a state rather than a second boolean is what
+  /// keeps "files and git at once" from being representable.
+  private enum Panel { case files, git, search }
+  private var panel = Panel.files
   /// What git said the last time it was asked, by absolute path. Empty for a
   /// project that is not in a repository, which draws every name plainly.
   private var git: [String: CoreGitEntry] = [:]
@@ -72,6 +80,7 @@ final class FileBrowserView: NSView {
   init(core: CoreBridge) {
     self.core = core
     self.gitTree = GitTreeView(core: core)
+    self.search = SearchPanelView(core: core)
     super.init(frame: .zero)
     setUp()
   }
@@ -95,7 +104,13 @@ final class FileBrowserView: NSView {
     mode.action = #selector(selectPanelMode)
     mode.bezelStyle = .accessoryBarAction
     mode.toolTip = "Show Git Tree"
-    let header = NSStackView(views: [title, NSView(), mode, refresh])
+    searchMode.image = NSImage(
+      systemSymbolName: "magnifyingglass", accessibilityDescription: "Search in Project")!
+    searchMode.target = self
+    searchMode.action = #selector(toggleSearchPanel)
+    searchMode.bezelStyle = .accessoryBarAction
+    searchMode.toolTip = "Search in Project"
+    let header = NSStackView(views: [title, NSView(), searchMode, mode, refresh])
     header.orientation = .horizontal
     header.alignment = .centerY
     header.translatesAutoresizingMaskIntoConstraints = false
@@ -122,6 +137,8 @@ final class FileBrowserView: NSView {
     fileScroll.drawsBackground = false
     fileScroll.translatesAutoresizingMaskIntoConstraints = false
     gitTree.translatesAutoresizingMaskIntoConstraints = false
+    search.translatesAutoresizingMaskIntoConstraints = false
+    search.onOpen = { [weak self] hit in self?.onOpenHit?(hit) }
 
     empty.translatesAutoresizingMaskIntoConstraints = false
     applyZoom()
@@ -130,6 +147,7 @@ final class FileBrowserView: NSView {
     addSubview(header)
     addSubview(fileScroll)
     addSubview(gitTree)
+    addSubview(search)
     addSubview(empty)
     NSLayoutConstraint.activate([
       header.topAnchor.constraint(equalTo: topAnchor, constant: 12),
@@ -143,6 +161,10 @@ final class FileBrowserView: NSView {
       gitTree.leadingAnchor.constraint(equalTo: leadingAnchor),
       gitTree.trailingAnchor.constraint(equalTo: trailingAnchor),
       gitTree.bottomAnchor.constraint(equalTo: bottomAnchor),
+      search.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+      search.leadingAnchor.constraint(equalTo: leadingAnchor),
+      search.trailingAnchor.constraint(equalTo: trailingAnchor),
+      search.bottomAnchor.constraint(equalTo: bottomAnchor),
       empty.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 14),
       empty.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
       empty.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
@@ -160,6 +182,7 @@ final class FileBrowserView: NSView {
     outline.indentationPerLevel = CGFloat(zoom.size(13))
     outline.reloadData()
     gitTree.zoom = zoom
+    search.zoom = zoom
   }
 
   private func applyPalette() {
@@ -168,6 +191,7 @@ final class FileBrowserView: NSView {
     empty.textColor = palette.secondaryText
     outline.reloadData()
     gitTree.palette = palette
+    search.palette = palette
   }
 
   /// Points the browser at a project. A project with no folder shows the notice
@@ -182,38 +206,66 @@ final class FileBrowserView: NSView {
     readGitStatus()
     roots = root.map(read) ?? []
     outline.reloadData()
-    if showsGit {
+    search.show(root: root)
+    if panel == .git {
       gitTree.show(root: root)
     }
     showMode()
   }
 
   @objc private func refresh() {
-    if showsGit {
+    if panel == .git {
       gitTree.refresh()
     } else {
       reload()
     }
   }
 
+  /// Brings the search pane forward and puts the keyboard in it. Called by
+  /// Command shift F as well as by the button, so the two cannot drift.
+  func beginSearch() {
+    panel = .search
+    applyModeButton()
+    showMode()
+    search.show(root: root)
+    search.beginSearch()
+  }
+
+  @objc private func toggleSearchPanel() {
+    if panel == .search {
+      panel = .files
+      applyModeButton()
+      showMode()
+    } else {
+      beginSearch()
+    }
+  }
+
   @objc private func selectPanelMode() {
-    showsGit.toggle()
-    let symbol = showsGit ? "folder" : "list.bullet"
-    let help = showsGit ? "Show Files" : "Show Git Tree"
-    mode.title = showsGit ? "Files" : "Git"
-    mode.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)
-    mode.toolTip = help
-    if showsGit {
+    panel = panel == .git ? .files : .git
+    applyModeButton()
+    if panel == .git {
       gitTree.show(root: root)
     }
     showMode()
   }
 
+  private func applyModeButton() {
+    let showsGit = panel == .git
+    let symbol = showsGit ? "folder" : "list.bullet"
+    let help = showsGit ? "Show Files" : "Show Git Tree"
+    mode.title = showsGit ? "Files" : "Git"
+    mode.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)
+    mode.toolTip = help
+    searchMode.state = panel == .search ? .on : .off
+  }
+
   private func showMode() {
-    let files = !showsGit
+    let files = panel == .files
     fileScroll.isHidden = !files || root == nil
     empty.isHidden = !files || root != nil
-    gitTree.isHidden = files
+    gitTree.isHidden = panel != .git
+    search.isHidden = panel != .search
   }
 
   /// Asks git again and repaints, without reading a single directory.
@@ -228,7 +280,7 @@ final class FileBrowserView: NSView {
     if git != before {
       outline.reloadData()
     }
-    if !gitTree.isHidden {
+    if panel == .git {
       gitTree.refresh()
     }
   }

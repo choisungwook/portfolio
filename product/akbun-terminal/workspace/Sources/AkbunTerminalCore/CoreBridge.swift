@@ -179,6 +179,14 @@ public final class CoreBridge {
     return matches
   }
 
+  /// The lines under `root` holding `query`. Never throws, for the same reason
+  /// `findFiles` does not: this runs on every keystroke in a search field.
+  public func searchText(root: String, query: String, limit: Int? = nil) -> [CoreHit] {
+    guard case .hits(let hits) = try? send(.searchText(root: root, query: query, limit: limit))
+    else { return [] }
+    return hits
+  }
+
   /// The workspaces whose agent status moved since the last call. An empty
   /// answer is the normal one, so this is cheap to ask often.
   public func detect() throws -> [CoreWorkspaceState] {

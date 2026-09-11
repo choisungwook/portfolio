@@ -20,9 +20,22 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 ./scripts/build-core.sh
 swift build -c release --disable-sandbox
+
+# arm64 refuses to run an unsigned binary at all, so an ad-hoc signature is the
+# floor even for an unsigned release. It is not a Developer ID, so Gatekeeper
+# still quarantines the download.
+#
+# The executable is signed here rather than inside the .app because codesign
+# walks up to the enclosing bundle and signs that instead, which is the thing
+# that cannot be signed. See the resource bundle note below.
+codesign --force --sign - ".build/release/$NAME"
 cp ".build/release/$NAME" "$APP/Contents/MacOS/$NAME"
-# `Bundle.module` resolves SwiftPM resource bundles from the application bundle
-# root. The manual .app assembly has to preserve that layout.
+# `Bundle.module` looks for a SwiftPM resource bundle at `Bundle.main.bundleURL`
+# and nowhere else, which for an .app is the bundle root. The assembly has to
+# preserve that layout, and it is also why the .app is never signed as a bundle:
+# codesign rejects anything beside `Contents` in the root as unsealed content.
+# Contents/Resources and a symlink back to it were both tried; the first loses
+# the resources at runtime and the second is rejected the same way.
 for resource_bundle in .build/release/*.bundle; do
   if [ -d "$resource_bundle" ]; then
     cp -R "$resource_bundle" "$APP/"
@@ -46,11 +59,6 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-
-# arm64 refuses to run an unsigned binary at all, so an ad-hoc signature is the
-# floor even for an unsigned release. It is not a Developer ID, so Gatekeeper
-# still quarantines the download.
-codesign --force --deep --sign - "$APP"
 
 hdiutil create -volname "$NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
 

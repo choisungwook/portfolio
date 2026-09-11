@@ -11,10 +11,66 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::agent::Rule;
-use crate::protocol::{parse_request, Command, Event, Response, WorkspaceState, PROTOCOL_VERSION};
+use crate::protocol::{
+    parse_request, Command, Event, Response, SessionState, WorkspaceState, PROTOCOL_VERSION,
+};
 use crate::search::Index;
 use crate::session::Session;
 use crate::tree::{TreeStore, WorkspaceStatus};
+
+/// What the last detection tick decided, per shell and per workspace.
+///
+/// Both halves are kept because both are answers somebody already has on
+/// screen: the shell's own status is what the tab strip draws, and the rollup is
+/// what the sidebar draws. Keeping the rollup rather than recomputing it is what
+/// lets a tick report only what moved.
+#[derive(Default)]
+struct Judged {
+    sessions: HashMap<u32, WorkspaceStatus>,
+    workspaces: HashMap<u64, WorkspaceStatus>,
+}
+
+impl Judged {
+    /// Takes the finished colour off what was looked at.
+    ///
+    /// A named session clears that tab alone and then re-rolls the workspace, so
+    /// a workspace whose other tab is still finished stays green. Without a
+    /// session the whole workspace is cleared, which is what happens when it is
+    /// closed rather than read.
+    ///
+    /// `members` is passed in rather than looked up, so that this never takes
+    /// the sessions lock while holding the statuses one. `detect` takes them the
+    /// other way round, and the two orders together are a deadlock waiting for
+    /// the day something calls the core from a second thread.
+    fn clear(&mut self, workspace: u64, session: Option<u32>, members: &[u32]) {
+        let cleared: Vec<u32> = match session {
+            Some(one) if members.contains(&one) => vec![one],
+            Some(_) => return,
+            None => members.to_vec(),
+        };
+        for id in cleared {
+            if self.sessions.get(&id) == Some(&WorkspaceStatus::Completed) {
+                self.sessions.insert(id, WorkspaceStatus::Idle);
+            }
+        }
+        let rolled = crate::agent::roll_up(
+            &members
+                .iter()
+                .map(|id| {
+                    self.sessions
+                        .get(id)
+                        .copied()
+                        .unwrap_or(WorkspaceStatus::Idle)
+                })
+                .collect::<Vec<_>>(),
+        );
+        self.workspaces.insert(workspace, rolled);
+    }
+
+    fn retain(&mut self, alive: &HashSet<u64>) {
+        self.workspaces.retain(|workspace, _| alive.contains(workspace));
+    }
+}
 
 pub struct App {
     sessions: Mutex<HashMap<u32, Session>>,
@@ -23,9 +79,10 @@ pub struct App {
     receiver: Mutex<Receiver<Event>>,
     tree: Mutex<TreeStore>,
     rules: Mutex<Vec<Rule>>,
-    /// The last judgement per workspace. Finished is a transition rather than
-    /// something on screen, so the previous answer is part of the next one.
-    statuses: Mutex<HashMap<u64, WorkspaceStatus>>,
+    /// The last judgement, per shell and rolled up per workspace. Finished is a
+    /// transition rather than something on screen, so the previous answer is
+    /// part of the next one.
+    statuses: Mutex<Judged>,
     /// The files under the project the palette last searched. Kept because a
     /// palette walks the same tree on every keystroke otherwise, and a project
     /// is thousands of files.
@@ -48,7 +105,7 @@ impl App {
             receiver: Mutex::new(receiver),
             tree: Mutex::new(TreeStore::default()),
             rules: Mutex::new(Vec::new()),
-            statuses: Mutex::new(HashMap::new()),
+            statuses: Mutex::new(Judged::default()),
             index: Mutex::new(None),
         }
     }
@@ -153,6 +210,9 @@ impl App {
             Command::FindFiles { root, query, limit } => Response::Matches {
                 matches: self.find_files(&root, &query, limit.unwrap_or(Self::MATCH_LIMIT)),
             },
+            Command::SearchText { root, query, limit } => Response::Hits {
+                hits: self.search_text(&root, &query, limit.unwrap_or(Self::HIT_LIMIT)),
+            },
             Command::LoadRules { directory } => match crate::agent::load(&directory) {
                 Ok(loaded) => match self.rules.lock() {
                     Ok(mut rules) => {
@@ -168,11 +228,18 @@ impl App {
             Command::Detect => Response::Statuses {
                 statuses: self.detect(),
             },
-            Command::ClearStatus { workspace } => {
+            Command::ClearStatus { workspace, session } => {
+                // Sessions first, then statuses — the order `detect` uses.
+                let members: Vec<u32> = match self.sessions.lock() {
+                    Ok(open) => open
+                        .values()
+                        .filter(|shell| shell.workspace() == Some(workspace))
+                        .map(|shell| shell.id())
+                        .collect(),
+                    Err(_) => Vec::new(),
+                };
                 if let Ok(mut statuses) = self.statuses.lock() {
-                    if statuses.get(&workspace) == Some(&WorkspaceStatus::Completed) {
-                        statuses.insert(workspace, WorkspaceStatus::Idle);
-                    }
+                    statuses.clear(workspace, session, &members);
                 }
                 Response::Ok
             }
@@ -206,6 +273,28 @@ impl App {
             .unwrap_or_default()
     }
 
+    /// How many hits a search pane shows. Past this nobody scrolls, and the
+    /// files not opened are what makes the search feel immediate.
+    const HIT_LIMIT: usize = 400;
+
+    /// The lines under `root` holding `query`. Shares the palette's walk, which
+    /// is why this is here rather than in `grep`: the cached list is the App's.
+    fn search_text(&self, root: &str, query: &str, limit: usize) -> Vec<crate::grep::Hit> {
+        let Ok(mut index) = self.index.lock() else {
+            return Vec::new();
+        };
+        let fresh = index
+            .as_ref()
+            .is_some_and(|built| built.is_fresh_for(root, Self::INDEX_AGE));
+        if !fresh {
+            *index = Some(Index::build(root));
+        }
+        index
+            .as_ref()
+            .map(|built| crate::grep::search(root, built.files(), query, limit))
+            .unwrap_or_default()
+    }
+
     /// Drops the judged status of every workspace the tree no longer has.
     ///
     /// The statuses are kept apart from the tree, because they describe what is
@@ -226,12 +315,17 @@ impl App {
             .flat_map(|project| project.workspaces.iter())
             .map(|workspace| workspace.id)
             .collect();
-        statuses.retain(|workspace, _| alive.contains(workspace));
+        statuses.retain(&alive);
     }
 
-    /// Judges every workspace that has a session open and answers with the ones
+    /// Judges every shell that has a workspace and answers with the workspaces
     /// that moved. One process snapshot serves them all, because the cost here
     /// is the snapshot rather than the rules.
+    ///
+    /// Per shell rather than per workspace. Concatenating three tabs' screens
+    /// into one string was cheaper, but it answered the wrong question: with one
+    /// agent still working and another waiting on an answer, the workspace knew
+    /// it was blocked and nobody could tell which tab to open.
     fn detect(&self) -> Vec<WorkspaceState> {
         let (Ok(sessions), Ok(rules), Ok(mut statuses)) =
             (self.sessions.lock(), self.rules.lock(), self.statuses.lock())
@@ -242,38 +336,67 @@ impl App {
             return Vec::new();
         }
 
-        // workspace -> the screens and pids of every shell open in it.
-        let mut open: HashMap<u64, (String, Vec<u32>)> = HashMap::new();
+        // workspace -> its open shells, lowest session id first so the tab strip
+        // and this list are in the same order.
+        let mut open: HashMap<u64, Vec<&Session>> = HashMap::new();
         for session in sessions.values() {
             let Some(workspace) = session.workspace() else {
                 continue;
             };
-            let entry = open.entry(workspace).or_default();
-            entry.0.push_str(&session.screen_text());
-            entry.0.push('\n');
-            if let Some(pid) = session.pid() {
-                entry.1.push(pid);
-            }
+            open.entry(workspace).or_default().push(session);
         }
+        // A shell that has gone takes its judgement with it, or a reused id
+        // would inherit the last tab's colour.
+        let alive: HashSet<u32> = sessions.keys().copied().collect();
+        statuses.sessions.retain(|session, _| alive.contains(session));
         if open.is_empty() {
             return Vec::new();
         }
 
         let snapshot = crate::agent::process_snapshot();
         let mut changed = Vec::new();
-        for (workspace, (screen, pids)) in open {
-            let processes: Vec<String> = pids
-                .iter()
-                .flat_map(|pid| crate::agent::descendant_names(*pid, &snapshot))
-                .collect();
-            let previous = statuses
-                .get(&workspace)
-                .copied()
-                .unwrap_or(WorkspaceStatus::Idle);
-            let status = crate::agent::judge(&rules, &processes, &screen, previous);
-            if status != previous {
-                statuses.insert(workspace, status);
-                changed.push(WorkspaceState { workspace, status });
+        for (workspace, mut shells) in open {
+            shells.sort_by_key(|session| session.id());
+            let mut moved = false;
+            let mut judged = Vec::with_capacity(shells.len());
+            for shell in shells {
+                let processes: Vec<String> = shell
+                    .pid()
+                    .map(|pid| crate::agent::descendant_names(pid, &snapshot))
+                    .unwrap_or_default();
+                let previous = statuses
+                    .sessions
+                    .get(&shell.id())
+                    .copied()
+                    .unwrap_or(WorkspaceStatus::Idle);
+                let status =
+                    crate::agent::judge(&rules, &processes, &shell.screen_text(), previous);
+                if status != previous {
+                    statuses.sessions.insert(shell.id(), status);
+                    moved = true;
+                }
+                judged.push(SessionState {
+                    session: shell.id(),
+                    status,
+                });
+            }
+
+            let rolled = crate::agent::roll_up(
+                &judged.iter().map(|state| state.status).collect::<Vec<_>>(),
+            );
+            let previous = statuses.workspaces.get(&workspace).copied();
+            if previous != Some(rolled) {
+                statuses.workspaces.insert(workspace, rolled);
+                moved = true;
+            }
+            // A tab moving without the rollup moving is still news: the tab
+            // strip draws one icon per shell and would otherwise miss it.
+            if moved {
+                changed.push(WorkspaceState {
+                    workspace,
+                    status: rolled,
+                    sessions: judged,
+                });
             }
         }
         changed

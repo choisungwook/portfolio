@@ -130,6 +130,18 @@ pub enum Command {
         #[serde(default)]
         limit: Option<usize>,
     },
+    /// Every line under `root` that holds `query`, in the order the files are
+    /// walked. Case is ignored, because a person searching for a symbol should
+    /// not have to remember how it was capitalised.
+    ///
+    /// This shares the palette's file list rather than walking again: the walk
+    /// is what costs, and Command O has usually already paid for it.
+    SearchText {
+        root: String,
+        query: String,
+        #[serde(default)]
+        limit: Option<usize>,
+    },
     /// Points the agent rules at a directory, seeding it with the shipped files
     /// when it holds none. Judging answers `idle` for everything until this has
     /// been called.
@@ -141,9 +153,15 @@ pub enum Command {
     /// output, because running the rules per byte would stall a noisy screen.
     Detect,
     /// Takes the finished colour off a workspace. Finished means nobody has
-    /// looked yet, so opening it is what ends the state.
+    /// looked yet, so looking is what ends the state.
+    ///
+    /// `session` names the one tab that was looked at. Without it the whole
+    /// workspace is cleared, which is what closing a workspace means; with it
+    /// the other tabs keep their bells, which is the point of judging per tab.
     ClearStatus {
         workspace: u64,
+        #[serde(default)]
+        session: Option<u32>,
     },
     /// The character under a click. `line` is what the terminal has on that row
     /// and `column` is where the click landed in it.
@@ -169,6 +187,7 @@ pub enum Response {
     Themes { themes: Vec<Theme> },
     Shortcuts { shortcuts: Vec<Shortcut> },
     Matches { matches: Vec<Match> },
+    Hits { hits: Vec<crate::grep::Hit> },
     /// Only the workspaces whose status changed since the last call.
     Statuses { statuses: Vec<WorkspaceState> },
     /// Absent when the click did not land on something this core will open.
@@ -179,6 +198,22 @@ pub enum Response {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceState {
     pub workspace: u64,
+    /// The workspace's own colour: the most blocked of the shells under it.
+    pub status: WorkspaceStatus,
+    /// Every shell open in this workspace and what it is doing, so the tab strip
+    /// can say which one finished rather than only that something did.
+    ///
+    /// Sent whole rather than as a delta. A workspace has a handful of tabs, and
+    /// a list that is always complete is one the shell cannot get out of step
+    /// with.
+    #[serde(default)]
+    pub sessions: Vec<SessionState>,
+}
+
+/// One shell's judgement.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionState {
+    pub session: u32,
     pub status: WorkspaceStatus,
 }
 
@@ -278,13 +313,24 @@ mod tests {
             statuses: vec![WorkspaceState {
                 workspace: 3,
                 status: WorkspaceStatus::NeedsAttention,
+                sessions: vec![SessionState {
+                    session: 7,
+                    status: WorkspaceStatus::Running,
+                }],
             }],
         })
         .unwrap();
         assert_eq!(
             response,
-            r#"{"type":"statuses","statuses":[{"workspace":3,"status":"needs_attention"}]}"#
+            r#"{"type":"statuses","statuses":[{"workspace":3,"status":"needs_attention","sessions":[{"session":7,"status":"running"}]}]}"#
         );
+        // The tab a click cleared travels with the workspace, and an older shell
+        // that names neither still parses.
+        let json = r#"{"v":2,"command":{"type":"clear_status","workspace":3}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::ClearStatus { session, .. } => assert_eq!(session, None),
+            other => panic!("unexpected command: {other:?}"),
+        }
         let response = serde_json::to_string(&Response::Url { url: None }).unwrap();
         assert_eq!(response, r#"{"type":"url","url":null}"#);
     }
@@ -358,6 +404,30 @@ mod tests {
         );
         let json = r#"{"v":2,"command":{"type":"git_status","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
+    }
+
+    #[test]
+    fn text_search_keeps_its_wire_names() {
+        let response = serde_json::to_string(&Response::Hits {
+            hits: vec![crate::grep::Hit {
+                path: "/p/a.rs".to_string(),
+                relative: "a.rs".to_string(),
+                line: 2,
+                text: "let x = 1;".to_string(),
+                column: 4,
+                length: 1,
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"hits","hits":[{"path":"/p/a.rs","relative":"a.rs","line":2,"text":"let x = 1;","column":4,"length":1}]}"#
+        );
+        let json = r#"{"v":2,"command":{"type":"search_text","root":"/p","query":"x"}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::SearchText { limit, .. } => assert_eq!(limit, None),
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 
     #[test]

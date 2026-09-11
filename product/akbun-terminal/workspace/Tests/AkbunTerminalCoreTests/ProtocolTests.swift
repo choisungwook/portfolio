@@ -34,8 +34,15 @@ struct ProtocolTests {
         == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":2}"#)
     #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":2}"#)
     #expect(
-      try json(.clearStatus(workspace: 4))
+      try json(.clearStatus(workspace: 4, session: nil))
         == #"{"command":{"type":"clear_status","workspace":4},"v":2}"#)
+    // The tab that was looked at rides along, so the other tabs keep their bell.
+    #expect(
+      try json(.clearStatus(workspace: 4, session: 9))
+        == #"{"command":{"session":9,"type":"clear_status","workspace":4},"v":2}"#)
+    #expect(
+      try json(.searchText(root: "/p", query: "todo", limit: nil))
+        == #"{"command":{"query":"todo","root":"\/p","type":"search_text"},"v":2}"#)
     #expect(
       try json(.urlAt(line: "see https://a.example", column: 6))
         == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":2}"#)
@@ -49,7 +56,42 @@ struct ProtocolTests {
       Issue.record("expected statuses")
       return
     }
+    // A workspace without a session list is still read, which is what an older
+    // core answering a newer shell looks like.
     #expect(states == [CoreWorkspaceState(workspace: 2, status: .needsAttention)])
+
+    let perTab = #"""
+      {"type":"statuses","statuses":[{"workspace":2,"status":"running","sessions":[{"session":5,"status":"completed"},{"session":6,"status":"running"}]}]}
+      """#
+    guard case .statuses(let judged) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(perTab.utf8))
+    else {
+      Issue.record("expected statuses")
+      return
+    }
+    #expect(
+      judged == [
+        CoreWorkspaceState(
+          workspace: 2, status: .running,
+          sessions: [
+            CoreSessionState(session: 5, status: .completed),
+            CoreSessionState(session: 6, status: .running),
+          ])
+      ])
+
+    let hits = #"""
+      {"type":"hits","hits":[{"path":"/p/a.rs","relative":"a.rs","line":2,"text":"let x = 1;","column":4,"length":1}]}
+      """#
+    guard case .hits(let lines) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(hits.utf8))
+    else {
+      Issue.record("expected hits")
+      return
+    }
+    #expect(
+      lines == [
+        CoreHit(path: "/p/a.rs", relative: "a.rs", line: 2, text: "let x = 1;", column: 4, length: 1)
+      ])
 
     let found = try JSONDecoder().decode(
       CoreResponse.self, from: Data(#"{"type":"url","url":"https://a.example"}"#.utf8))

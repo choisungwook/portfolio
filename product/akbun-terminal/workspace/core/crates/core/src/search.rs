@@ -96,6 +96,12 @@ impl Index {
         self.files.is_empty()
     }
 
+    /// The walked paths, so a content search does not walk the tree a second
+    /// time for the same project.
+    pub fn files(&self) -> &[String] {
+        &self.files
+    }
+
     /// The best `limit` files for `query`, best first.
     ///
     /// An empty query is the list itself, shortest path first, which is what an

@@ -7,6 +7,8 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
   UNUserNotificationCenterDelegate
 {
+  /// The View menu's mouse switch, kept so its tick can follow the setting.
+  private var mouseReporting: NSMenuItem?
   /// The workspace a delivered notification will take the user to.
   private static let workspaceKey = "workspace"
   private var core: CoreBridge?
@@ -92,6 +94,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
 
     let viewMenu = NSMenu(title: "View")
     add(commands(in: "View", from: shortcuts), to: viewMenu)
+    viewMenu.addItem(.separator())
+    // Not in the shortcut table: it is a switch rather than a command, and every
+    // row in that table has to carry a key its own parser accepts.
+    mouseReporting = viewMenu.addItem(
+      withTitle: "Mouse Reporting", action: #selector(toggleMouseReporting), keyEquivalent: "")
+    mouseReporting?.target = self
+    mouseReporting?.state = SwiftTermTerminalView.mouseReporting ? .on : .off
+    mouseReporting?.toolTip =
+      "Hand the mouse to the program in the terminal. Off so a drag selects text."
     let viewItem = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
     viewItem.submenu = viewMenu
 
@@ -154,6 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     "zoom_out": #selector(AppDelegate.zoomOut),
     "zoom_reset": #selector(AppDelegate.zoomReset),
     "toggle_file_browser": #selector(AppDelegate.toggleFileBrowser),
+    "search_project": #selector(AppDelegate.searchProject),
   ]
 
   private static func flags(_ modifiers: ShortcutKey.Modifiers) -> NSEvent.ModifierFlags {
@@ -245,14 +257,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     let centre = UNUserNotificationCenter.current()
     centre.delegate = self
     centre.requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    controller.onWorkspaceFinished = { project, workspace in
+    controller.onWorkspaceFinished = { project, workspace, tab in
       let content = UNMutableNotificationContent()
       content.title = workspace.name
-      content.body = "\(project.name) finished."
+      // Which tab, because a workspace with three agents in it finishing is
+      // three different pieces of news and the banner is the only place that
+      // can say which one this is.
+      content.body = "\(project.name) · tab \(tab) finished."
       content.userInfo = [Self.workspaceKey: String(workspace.id)]
       centre.add(
         UNNotificationRequest(
-          identifier: "workspace-\(workspace.id)", content: content, trigger: nil))
+          // Per tab, so a second shell finishing does not replace the banner
+          // the first one raised.
+          identifier: "workspace-\(workspace.id)-tab-\(tab)", content: content, trigger: nil))
     }
   }
 
@@ -275,6 +292,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
       windowController?.reveal(workspace: workspace)
     }
     completionHandler()
+  }
+
+  /// Hands the mouse back to the program in the terminal, or takes it away.
+  ///
+  /// Off by default, because a drag that selects text is what people expect of a
+  /// terminal and an agent CLI holding the mouse takes that away. On for the
+  /// session where scrolling a TUI matters more. Not saved: it is a thing you
+  /// reach for while one program is running, not a preference.
+  @objc private func toggleMouseReporting(_ sender: NSMenuItem) {
+    let allowed = sender.state != .on
+    SwiftTermTerminalView.setMouseReporting(allowed, in: windowController?.terminals ?? [])
+    sender.state = allowed ? .on : .off
+  }
+
+  @objc private func searchProject() {
+    windowController?.beginProjectSearch()
   }
 
   @objc private func toggleFileBrowser(_ sender: NSMenuItem) {
