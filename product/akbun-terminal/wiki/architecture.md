@@ -56,6 +56,10 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 
 **Opening the Git tree.** The right pane asks the core for a bounded, topologically ordered log across branches, remotes and tags. The shell assigns graph lanes to that ordered list and draws the commit lines beside refs, subject, author, time and short hash. A three-second refresh only reloads the Git view while it is visible.
 
+**Clicking a commit.** The tree hands the hash to `git_show`. The core reads the commit's own fields and its patch, splits the patch per file and counts each file's added and removed lines from that same piece, so a row and the lines under it cannot disagree. The shell draws the file list and colours one file's diff through `GitDiff`, which is in the core package and tested without a window. A merge is shown against its first parent, because that is the change the branch brought in. A reload puts the selection back by hash rather than by row: a commit made since has pushed every row down by one.
+
+**Looking at what is waiting.** The Staged pane asks `git_working`, which reads the same porcelain as the status colours but keeps the two columns apart as two lists of files, and adds `git stash list`. A file staged and then edited again is in both lists, because that is the state it is in. Nothing in the pane writes to the repository; the shell in the middle of the window is where staging happens, and a second way to do it could disagree with the first.
+
 **Opening HTML.** HTML has no internal Render mode. `Open in Browser` is an independent action that hands the saved local file to the system browser. A dirty buffer first offers Save and Open, Open Saved Version or Cancel. The app never executes document JavaScript in its own process.
 
 **Clicking a Markdown link.** The preview cancels WebKit navigation. A relative file opens in an app tab, http and https go to the system browser, and every other scheme is ignored.
@@ -80,6 +84,8 @@ Moving this to a socket later means replacing `CoreBridge` and adding a transpor
 | `read_directory` | `entries` | one level, hidden entries included, links left as leaves |
 | `git_status` | `git` | what git makes of a folder, directories included; not being a repository is an answer |
 | `git_log` | `git_log` | latest 200 commits across branches, remotes and tags in topological order |
+| `git_show` | `git_detail` | one commit's message body and its patch, split per file; absent for a hash this repository does not have |
+| `git_working` | `git_working` | the index, the working tree and the stash as three lists |
 | `read_file`, `write_file` | `file`, `ok` | the shell handles text, never a path on disk |
 | `themes` | `themes` | the known palettes as hex |
 | `load_rules` | `ok` | reads one JSON file per agent, seeding the shipped ones |

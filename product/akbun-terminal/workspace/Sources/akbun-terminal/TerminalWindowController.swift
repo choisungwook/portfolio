@@ -190,6 +190,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     tabBar.onClose = { [weak self] content in self?.closeTab(content) }
     browser.onOpenFile = { [weak self] entry in self?.open(entry) }
     browser.onOpenHit = { [weak self] hit in self?.open(hit) }
+    browser.onOpenPath = { [weak self] path in self?.openDocument(at: path) }
     browser.onError = { [weak self] error in self?.present(error, whileDoing: "That folder could not be read") }
   }
 

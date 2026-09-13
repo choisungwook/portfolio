@@ -184,6 +184,12 @@ impl App {
             Command::GitLog { path } => Response::GitLog {
                 log: crate::git::log(&path),
             },
+            Command::GitShow { path, hash } => Response::GitDetail {
+                detail: crate::git::show(&path, &hash),
+            },
+            Command::GitWorking { path } => Response::GitWorking {
+                working: crate::git::working(&path),
+            },
             Command::ReadFile { path } => match crate::browse::read_file(&path) {
                 Ok(text) => Response::File { text },
                 Err(message) => Response::Error { message },

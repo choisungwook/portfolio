@@ -21,7 +21,10 @@ pub mod url;
 pub use agent::Rule;
 pub use app::App;
 pub use browse::Entry;
-pub use git::{FileStatus, GitCommit, GitEntry, GitLog, GitStatus};
+pub use git::{
+    FileStatus, GitCommit, GitCommitDetail, GitDiffFile, GitEntry, GitLog, GitStashEntry,
+    GitStatus, GitWorking,
+};
 pub use screen::Screen;
 pub use search::Match;
 pub use shortcuts::Shortcut;

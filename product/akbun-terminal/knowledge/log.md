@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-13
+
+- **Creation**: [Git 패널은 읽기만 하고 저장소를 바꾸지 않는다](decisions/2026-09-git-panel-reads-and-never-writes.md) 기록. commit 상세와 작업 트리 패널을 추가하면서 쓰기 동작을 넣지 않은 이유.
+
 ## 2026-09-11
 
 - **Creation**: [.app은 번들이 아니라 실행파일에 서명한다](decisions/2026-09-app-bundle-is-signed-at-the-executable.md) 기록. v0.10.0부터 release job이 codesign에서 실패해 두 버전이 사용자에게 도달하지 못한 원인과 해결.

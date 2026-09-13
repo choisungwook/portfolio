@@ -1,6 +1,6 @@
 # akbun-terminal
 
-A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files or Git history on the right, and colours each workspace with what the CLI agent inside it is doing.
+A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files, Git history or what is waiting in the index, the working tree and the stash on the right, and colours each workspace with what the CLI agent inside it is doing.
 
 ## Directory
 

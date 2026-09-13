@@ -6,11 +6,17 @@ import AkbunTerminalCore
 /// lines and rows.
 @MainActor
 final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
+  /// A commit row was selected, or the selection was lost because the commit
+  /// it named is no longer in the bounded log.
+  var onSelectCommit: ((CoreGitCommit?) -> Void)?
+
   private let core: CoreBridge
   private let table = NSTableView()
   private let empty = NSTextField(wrappingLabelWithString: "")
   private var root: String?
   private var log = CoreGitLog.none
+  /// The hash of the commit being read, so a reload can find it again.
+  private var selected: String?
   private var graph = GitGraph.layout([])
 
   var zoom = Zoom() {
@@ -44,6 +50,7 @@ final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     table.delegate = self
     table.backgroundColor = .clear
     table.menu = commitMenu()
+    table.allowsEmptySelection = true
 
     let scroll = NSScrollView()
     scroll.documentView = table
@@ -79,8 +86,19 @@ final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     log = next
     updateVisibility()
     guard changed else { return }
+    // Reloading drops the selection, so the commit that was being read is put
+    // back by hash rather than by row: a commit made since pushed every row
+    // down by one, and following the row number would quietly change the
+    // subject of the pane beside this one.
+    let reading = selected
     graph = GitGraph.layout(log.commits)
     table.reloadData()
+    guard let reading, let row = log.commits.firstIndex(where: { $0.hash == reading }) else {
+      selected = nil
+      onSelectCommit?(nil)
+      return
+    }
+    table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
   }
 
   private func updateVisibility() {
@@ -126,6 +144,13 @@ final class GitTreeView: NSView, NSTableViewDataSource, NSTableViewDelegate {
 
   func numberOfRows(in tableView: NSTableView) -> Int {
     log.commits.count
+  }
+
+  func tableViewSelectionDidChange(_ notification: Notification) {
+    let row = table.selectedRow
+    let commit = row >= 0 && row < log.commits.count ? log.commits[row] : nil
+    selected = commit?.hash
+    onSelectCommit?(commit)
   }
 
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {

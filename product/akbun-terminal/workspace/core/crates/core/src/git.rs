@@ -157,6 +157,64 @@ impl GitStatus {
     }
 }
 
+/// One file inside a commit, with the patch for that file alone.
+///
+/// The patch is split per file here rather than handed over as one blob,
+/// because the panel draws a list of files and lets a reader open one of them.
+/// Splitting once in the core is what keeps the shell from parsing a diff.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitDiffFile {
+    pub path: String,
+    pub status: FileStatus,
+    pub additions: usize,
+    pub deletions: usize,
+    pub patch: String,
+}
+
+/// What one commit did. `body` is the message below the subject, which the log
+/// panel has no room for and a commit view is the place for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitCommitDetail {
+    pub commit: GitCommit,
+    pub body: String,
+    pub files: Vec<GitDiffFile>,
+}
+
+/// One stash, named the way `git stash apply` wants it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitStashEntry {
+    /// The selector, such as stash@{0}.
+    pub name: String,
+    pub subject: String,
+}
+
+/// What is waiting in the repository right now: the index, the working tree,
+/// and the stash.
+///
+/// Kept apart from `GitStatus` even though both read the same porcelain. Status
+/// answers "what colour is this row" and rolls directories up; this answers
+/// "what would a commit capture", which is a list of files and nothing above
+/// them. A file staged and then edited again is in both lists, because that is
+/// the state it is actually in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GitWorking {
+    pub repository: bool,
+    pub staged: Vec<GitEntry>,
+    pub unstaged: Vec<GitEntry>,
+    pub stash: Vec<GitStashEntry>,
+}
+
+impl GitWorking {
+    fn none() -> Self {
+        Self {
+            repository: false,
+            staged: Vec::new(),
+            unstaged: Vec::new(),
+            stash: Vec::new(),
+        }
+    }
+}
+
 /// Every changed path under the repository holding `path`, directories included.
 ///
 /// Never an error. git missing, a folder that is not a repository and a
@@ -347,6 +405,266 @@ fn classify(code: &str) -> FileStatus {
             FileStatus::Modified
         }
     }
+}
+
+/// What one commit did, or nothing when `hash` names no commit here.
+///
+/// The hash is checked against hex before it reaches git, because it arrives
+/// from the shell and a value starting with a dash would otherwise be read as
+/// an option rather than a revision.
+pub fn show(path: &str, hash: &str) -> Option<GitCommitDetail> {
+    if !is_revision(hash) {
+        return None;
+    }
+    repository_root(path)?;
+    let header = run(
+        path,
+        &[
+            "show",
+            "--quiet",
+            "--date=format:%Y-%m-%d %H:%M",
+            "--format=%H%x1f%P%x1f%an%x1f%ad%x1f%D%x1f%s%x1f%b",
+            hash,
+        ],
+    )?;
+    let commit = parse_commit_header(&header)?;
+    // A merge shows nothing by default, so the diff is asked for against the
+    // first parent: that is the change the branch brought in, which is what a
+    // reader clicking a merge row is looking for.
+    let patch = run(
+        path,
+        &[
+            "show",
+            "--format=",
+            "--no-color",
+            "--first-parent",
+            "-m",
+            hash,
+        ],
+    )
+    .unwrap_or_default();
+    Some(GitCommitDetail {
+        files: split_patch(&patch),
+        body: commit.1,
+        commit: commit.0,
+    })
+}
+
+/// The index, the working tree and the stash as they stand.
+///
+/// Never an error, for the same reason `status` is not: a pane that cannot ask
+/// git still has to draw something, and "nothing waiting" is the honest answer
+/// for a folder that is not a repository.
+pub fn working(path: &str) -> GitWorking {
+    let Some(root) = repository_root(path) else {
+        return GitWorking::none();
+    };
+    let Some(porcelain) = run(path, &["status", "--porcelain", "-z", "--untracked-files=all"])
+    else {
+        return GitWorking::none();
+    };
+    let (staged, unstaged) = halves(&root, &porcelain);
+    GitWorking {
+        repository: true,
+        staged,
+        unstaged,
+        stash: stash(path),
+    }
+}
+
+fn stash(path: &str) -> Vec<GitStashEntry> {
+    let Some(output) = run(path, &["stash", "list", "--format=%gd%x1f%gs"]) else {
+        return Vec::new();
+    };
+    output
+        .lines()
+        .filter_map(|line| {
+            let (name, subject) = line.split_once('\u{1f}')?;
+            (!name.is_empty()).then(|| GitStashEntry {
+                name: name.to_string(),
+                subject: subject.to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Splits the porcelain into the two lists a commit would and would not
+/// capture. Each column of the code is read on its own, because a file added
+/// and then edited again is `A` in one list and `M` in the other, and reading
+/// only the louder half loses one of them.
+fn halves(root: &Path, porcelain: &str) -> (Vec<GitEntry>, Vec<GitEntry>) {
+    let mut staged = Vec::new();
+    let mut unstaged = Vec::new();
+    let mut records = porcelain.split('\0').filter(|record| !record.is_empty());
+    while let Some(record) = records.next() {
+        if record.len() < 4 {
+            continue;
+        }
+        let code = &record[..2];
+        let path = root.join(&record[3..]).to_string_lossy().to_string();
+        // A rename carries its old path as the record after it, which is not a
+        // status line of its own.
+        if code.starts_with('R') || code.starts_with('C') {
+            records.next();
+        }
+        if is_conflict(code) {
+            // A conflict is not resolved by staging half of it, so it is shown
+            // in the half a reader has to act in.
+            unstaged.push(GitEntry {
+                path,
+                status: FileStatus::Conflicted,
+                stage: Stage::Both,
+            });
+            continue;
+        }
+        let mut letters = code.chars();
+        let index = letters.next().unwrap_or(' ');
+        let worktree = letters.next().unwrap_or(' ');
+        if index != ' ' && index != '?' {
+            staged.push(GitEntry {
+                path: path.clone(),
+                status: letter(index),
+                stage: Stage::Staged,
+            });
+        }
+        if worktree != ' ' {
+            unstaged.push(GitEntry {
+                path,
+                status: letter(worktree),
+                stage: Stage::Unstaged,
+            });
+        }
+    }
+    staged.sort_by(|left, right| left.path.cmp(&right.path));
+    unstaged.sort_by(|left, right| left.path.cmp(&right.path));
+    (staged, unstaged)
+}
+
+fn letter(code: char) -> FileStatus {
+    match code {
+        '?' => FileStatus::Untracked,
+        'D' => FileStatus::Deleted,
+        'A' => FileStatus::Added,
+        'R' | 'C' => FileStatus::Renamed,
+        _ => FileStatus::Modified,
+    }
+}
+
+/// A hash the shell can send. Only what `git log` hands out, which is hex, so
+/// nothing that looks like an option or a path reaches the command line.
+fn is_revision(hash: &str) -> bool {
+    (4..=64).contains(&hash.len()) && hash.chars().all(|letter| letter.is_ascii_hexdigit())
+}
+
+/// The commit and its message body, from the seven fields `show` was asked for.
+fn parse_commit_header(output: &str) -> Option<(GitCommit, String)> {
+    let fields: Vec<&str> = output.trim_matches(['\n', '\r']).split('\u{1f}').collect();
+    if fields.len() != 7 || fields[0].is_empty() {
+        return None;
+    }
+    let commit = GitCommit {
+        hash: fields[0].to_string(),
+        parents: fields[1].split_whitespace().map(str::to_string).collect(),
+        author: fields[2].to_string(),
+        date: fields[3].to_string(),
+        refs: fields[4]
+            .split(", ")
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .collect(),
+        subject: fields[5].to_string(),
+    };
+    Some((commit, fields[6].trim_matches(['\n', '\r']).to_string()))
+}
+
+/// Cuts a unified diff at each `diff --git` line and reads each piece.
+///
+/// The counts come from the piece rather than from a second `--numstat` call,
+/// so the numbers on a row and the lines under it can never disagree.
+fn split_patch(patch: &str) -> Vec<GitDiffFile> {
+    let mut files: Vec<GitDiffFile> = Vec::new();
+    let mut current: Option<Vec<&str>> = None;
+    for line in patch.lines() {
+        if line.starts_with("diff --git ") {
+            if let Some(lines) = current.take() {
+                files.extend(read_patch(&lines));
+            }
+            current = Some(vec![line]);
+            continue;
+        }
+        if let Some(lines) = current.as_mut() {
+            lines.push(line);
+        }
+    }
+    if let Some(lines) = current {
+        files.extend(read_patch(&lines));
+    }
+    files
+}
+
+fn read_patch(lines: &[&str]) -> Option<GitDiffFile> {
+    let mut status = FileStatus::Modified;
+    let mut before: Option<String> = None;
+    let mut after: Option<String> = None;
+    let mut additions = 0;
+    let mut deletions = 0;
+    let mut in_body = false;
+    for line in lines {
+        if line.starts_with("@@") {
+            in_body = true;
+        }
+        if !in_body {
+            if line.starts_with("new file mode") {
+                status = FileStatus::Added;
+            } else if line.starts_with("deleted file mode") {
+                status = FileStatus::Deleted;
+            } else if line.starts_with("rename from") {
+                status = FileStatus::Renamed;
+            } else if let Some(path) = line.strip_prefix("--- ") {
+                before = strip_side(path);
+            } else if let Some(path) = line.strip_prefix("+++ ") {
+                after = strip_side(path);
+            }
+            continue;
+        }
+        if line.starts_with('+') {
+            additions += 1;
+        } else if line.starts_with('-') {
+            deletions += 1;
+        }
+    }
+    // A deleted file has no `+++` side, and a binary change has neither; the
+    // `diff --git` line is the last thing that still names it.
+    let path = after.or(before).or_else(|| header_path(lines.first()?))?;
+    Some(GitDiffFile {
+        path,
+        status,
+        additions,
+        deletions,
+        patch: lines.join("\n"),
+    })
+}
+
+/// `a/src/main.rs` as `src/main.rs`. `/dev/null` is the missing side of an add
+/// or a delete and names no file.
+fn strip_side(path: &str) -> Option<String> {
+    let path = path.split('\t').next().unwrap_or(path);
+    if path == "/dev/null" {
+        return None;
+    }
+    Some(
+        path.strip_prefix("a/")
+            .or_else(|| path.strip_prefix("b/"))
+            .unwrap_or(path)
+            .to_string(),
+    )
+}
+
+/// The second half of `diff --git a/x b/x`, for a piece that carries no `+++`.
+fn header_path(header: &str) -> Option<String> {
+    let rest = header.strip_prefix("diff --git ")?;
+    let (_, second) = rest.split_once(" b/")?;
+    Some(second.to_string())
 }
 
 #[cfg(test)]
@@ -588,6 +906,117 @@ mod tests {
         let history = log(path);
         assert!(!history.repository);
         assert!(history.commits.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_commit_carries_its_body_and_one_patch_per_file() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        fs::write(directory.join("kept.txt"), "two\n").unwrap();
+        fs::write(directory.join("fresh.txt"), "new\n").unwrap();
+        run(path, &["add", "-A"]).unwrap();
+        run(path, &["commit", "-m", "second", "-m", "why it happened"]).unwrap();
+        let head = run(path, &["rev-parse", "HEAD"]).unwrap();
+
+        let detail = show(path, head.trim()).unwrap();
+        assert_eq!(detail.commit.subject, "second");
+        assert_eq!(detail.body, "why it happened");
+        let mut paths: Vec<&str> = detail.files.iter().map(|file| file.path.as_str()).collect();
+        paths.sort();
+        assert_eq!(paths, vec!["fresh.txt", "kept.txt"]);
+        let fresh = detail.files.iter().find(|file| file.path == "fresh.txt").unwrap();
+        assert_eq!(fresh.status, FileStatus::Added);
+        assert_eq!((fresh.additions, fresh.deletions), (1, 0));
+        assert!(fresh.patch.contains("+new"));
+        let kept = detail.files.iter().find(|file| file.path == "kept.txt").unwrap();
+        assert_eq!((kept.additions, kept.deletions), (1, 1));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_hash_that_is_not_a_hash_never_reaches_git() {
+        // The shell sends this, so a value that would be read as an option has
+        // to be refused before it becomes a command line argument.
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        assert!(show(path, "--help").is_none());
+        assert!(show(path, "HEAD").is_none());
+        assert!(show(path, "0123456789abcdef0123456789abcdef01234567").is_none());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_deleted_file_is_named_by_the_side_that_still_has_it() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        fs::remove_file(directory.join("kept.txt")).unwrap();
+        run(path, &["add", "-A"]).unwrap();
+        run(path, &["commit", "-m", "gone"]).unwrap();
+        let head = run(path, &["rev-parse", "HEAD"]).unwrap();
+
+        let detail = show(path, head.trim()).unwrap();
+        assert_eq!(detail.files.len(), 1);
+        assert_eq!(detail.files[0].path, "kept.txt");
+        assert_eq!(detail.files[0].status, FileStatus::Deleted);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn each_half_of_the_repository_is_listed_on_its_own() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        fs::write(directory.join("kept.txt"), "two\n").unwrap();
+        fs::write(directory.join("staged.txt"), "new\n").unwrap();
+        fs::write(directory.join("both.txt"), "new\n").unwrap();
+        fs::write(directory.join("loose.txt"), "new\n").unwrap();
+        run(path, &["add", "staged.txt", "both.txt"]).unwrap();
+        fs::write(directory.join("both.txt"), "changed again\n").unwrap();
+
+        let working = working(path);
+        assert!(working.repository);
+        let staged: Vec<&str> = working.staged.iter().map(|entry| entry.path.as_str()).collect();
+        let unstaged: Vec<&str> = working
+            .unstaged
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect();
+        let name = |file: &str| directory.join(file).to_string_lossy().to_string();
+        assert_eq!(staged, vec![name("both.txt"), name("staged.txt")]);
+        assert_eq!(unstaged, vec![name("both.txt"), name("kept.txt"), name("loose.txt")]);
+        // The file added and then edited again is in both lists, and each list
+        // says what that half of git holds.
+        let both = working.staged.iter().find(|entry| entry.path == name("both.txt")).unwrap();
+        assert_eq!(both.status, FileStatus::Added);
+        let loose = working.unstaged.iter().find(|entry| entry.path == name("loose.txt")).unwrap();
+        assert_eq!(loose.status, FileStatus::Untracked);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_stash_is_listed_by_the_name_that_applies_it() {
+        let Some(directory) = repository() else { return };
+        let path = directory.to_str().unwrap();
+        fs::write(directory.join("kept.txt"), "two\n").unwrap();
+        run(path, &["stash", "push", "-m", "later"]).unwrap();
+
+        let working = working(path);
+        assert_eq!(working.stash.len(), 1);
+        assert_eq!(working.stash[0].name, "stash@{0}");
+        assert!(working.stash[0].subject.contains("later"));
+        // Stashing put the working tree back, so neither half holds anything.
+        assert!(working.staged.is_empty());
+        assert!(working.unstaged.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_folder_outside_a_repository_has_nothing_waiting() {
+        let directory = temp_directory();
+        let working = working(directory.to_str().unwrap());
+        assert!(!working.repository);
+        assert!(working.staged.is_empty());
+        assert!(working.stash.is_empty());
         fs::remove_dir_all(directory).unwrap();
     }
 
