@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::browse::Entry;
-use crate::git::{GitLog, GitStatus};
+use crate::git::{GitCommitDetail, GitLog, GitStatus, GitWorking};
 use crate::search::Match;
 use crate::shortcuts::Shortcut;
 use crate::theme::Theme;
@@ -101,6 +101,17 @@ pub enum Command {
     GitLog {
         path: String,
     },
+    /// What one commit did: its message body and the patch, split per file.
+    /// Absent when the hash names no commit in that repository.
+    GitShow {
+        path: String,
+        hash: String,
+    },
+    /// The index, the working tree and the stash as they stand. Answered for a
+    /// folder that is not a repository too, as nothing waiting.
+    GitWorking {
+        path: String,
+    },
     WriteFile {
         path: String,
         text: String,
@@ -183,6 +194,9 @@ pub enum Response {
     Entries { entries: Vec<Entry> },
     Git { status: GitStatus },
     GitLog { log: GitLog },
+    /// Absent when the hash names no commit here.
+    GitDetail { detail: Option<GitCommitDetail> },
+    GitWorking { working: GitWorking },
     File { text: String },
     Themes { themes: Vec<Theme> },
     Shortcuts { shortcuts: Vec<Shortcut> },
@@ -452,6 +466,55 @@ mod tests {
         );
         let json = r#"{"v":2,"command":{"type":"git_log","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitLog { .. })));
+    }
+
+    #[test]
+    fn git_show_and_git_working_keep_their_wire_names() {
+        let response = serde_json::to_string(&Response::GitDetail {
+            detail: Some(crate::git::GitCommitDetail {
+                commit: crate::git::GitCommit {
+                    hash: "abc".to_string(),
+                    parents: vec![],
+                    author: "A".to_string(),
+                    date: "2026-09-13 10:00".to_string(),
+                    refs: vec![],
+                    subject: "message".to_string(),
+                },
+                body: "why".to_string(),
+                files: vec![crate::git::GitDiffFile {
+                    path: "a.txt".to_string(),
+                    status: crate::git::FileStatus::Modified,
+                    additions: 1,
+                    deletions: 2,
+                    patch: "@@".to_string(),
+                }],
+            }),
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"git_detail","detail":{"commit":{"hash":"abc","parents":[],"author":"A","date":"2026-09-13 10:00","refs":[],"subject":"message"},"body":"why","files":[{"path":"a.txt","status":"modified","additions":1,"deletions":2,"patch":"@@"}]}}"#
+        );
+        let working = serde_json::to_string(&Response::GitWorking {
+            working: crate::git::GitWorking {
+                repository: true,
+                staged: vec![],
+                unstaged: vec![],
+                stash: vec![crate::git::GitStashEntry {
+                    name: "stash@{0}".to_string(),
+                    subject: "WIP".to_string(),
+                }],
+            },
+        })
+        .unwrap();
+        assert_eq!(
+            working,
+            r#"{"type":"git_working","working":{"repository":true,"staged":[],"unstaged":[],"stash":[{"name":"stash@{0}","subject":"WIP"}]}}"#
+        );
+        let json = r#"{"v":2,"command":{"type":"git_show","path":"/tmp","hash":"abc"}}"#;
+        assert!(matches!(parse_request(json), Ok(Command::GitShow { .. })));
+        let json = r#"{"v":2,"command":{"type":"git_working","path":"/tmp"}}"#;
+        assert!(matches!(parse_request(json), Ok(Command::GitWorking { .. })));
     }
 
     #[test]

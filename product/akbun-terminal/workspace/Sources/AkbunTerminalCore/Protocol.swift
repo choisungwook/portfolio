@@ -27,6 +27,10 @@ public enum CoreCommand: Encodable {
   case readDirectory(path: String)
   case gitStatus(path: String)
   case gitLog(path: String)
+  /// What one commit did. `hash` is one the core itself handed over in a log.
+  case gitShow(path: String, hash: String)
+  /// The index, the working tree and the stash as they stand.
+  case gitWorking(path: String)
   case readFile(path: String)
   case writeFile(path: String, text: String)
   case themes
@@ -48,7 +52,7 @@ public enum CoreCommand: Encodable {
 
   private enum Key: String, CodingKey {
     case type, cwd, cols, rows, session, bytes, directory, name, path, project, text
-    case workspace, line, column, command, key, root, query, limit
+    case workspace, line, column, command, key, root, query, limit, hash
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -107,6 +111,13 @@ public enum CoreCommand: Encodable {
       try container.encode(path, forKey: .path)
     case .gitLog(let path):
       try container.encode("git_log", forKey: .type)
+      try container.encode(path, forKey: .path)
+    case .gitShow(let path, let hash):
+      try container.encode("git_show", forKey: .type)
+      try container.encode(path, forKey: .path)
+      try container.encode(hash, forKey: .hash)
+    case .gitWorking(let path):
+      try container.encode("git_working", forKey: .type)
       try container.encode(path, forKey: .path)
     case .readFile(let path):
       try container.encode("read_file", forKey: .type)
@@ -175,6 +186,9 @@ public enum CoreResponse: Equatable, Sendable {
   case entries([CoreEntry])
   case git(CoreGitStatus)
   case gitLog(CoreGitLog)
+  /// Nothing when the hash names no commit in that repository.
+  case gitDetail(CoreGitCommitDetail?)
+  case gitWorking(CoreGitWorking)
   case file(text: String)
   case themes([CoreTheme])
   case shortcuts([CoreShortcut])
@@ -409,6 +423,82 @@ public struct CoreGitCommit: Decodable, Equatable, Sendable {
   }
 }
 
+/// What one commit did. The patch arrives split per file, so the panel draws a
+/// file list without reading a diff itself.
+public struct CoreGitCommitDetail: Decodable, Equatable, Sendable {
+  public let commit: CoreGitCommit
+  /// The message below the subject. Empty for a commit that has none.
+  public let body: String
+  public let files: [CoreGitDiffFile]
+
+  public init(commit: CoreGitCommit, body: String, files: [CoreGitDiffFile]) {
+    self.commit = commit
+    self.body = body
+    self.files = files
+  }
+}
+
+public struct CoreGitDiffFile: Decodable, Equatable, Sendable {
+  /// Relative to the repository root, which is how a diff spells it.
+  public let path: String
+  public let status: CoreFileStatus
+  public let additions: Int
+  public let deletions: Int
+  /// The unified diff for this file alone, `diff --git` line included.
+  public let patch: String
+
+  public init(
+    path: String, status: CoreFileStatus, additions: Int, deletions: Int, patch: String
+  ) {
+    self.path = path
+    self.status = status
+    self.additions = additions
+    self.deletions = deletions
+    self.patch = patch
+  }
+}
+
+public struct CoreGitStashEntry: Decodable, Equatable, Sendable {
+  /// The selector, such as stash@{0}.
+  public let name: String
+  public let subject: String
+
+  public init(name: String, subject: String) {
+    self.name = name
+    self.subject = subject
+  }
+}
+
+/// What is waiting in the repository: the index, the working tree, the stash.
+///
+/// A file staged and then edited again is in both lists, because that is the
+/// state it is in and a panel that shows it once hides half of it.
+public struct CoreGitWorking: Decodable, Equatable, Sendable {
+  public let repository: Bool
+  public let staged: [CoreGitEntry]
+  public let unstaged: [CoreGitEntry]
+  public let stash: [CoreGitStashEntry]
+
+  public init(
+    repository: Bool, staged: [CoreGitEntry], unstaged: [CoreGitEntry],
+    stash: [CoreGitStashEntry]
+  ) {
+    self.repository = repository
+    self.staged = staged
+    self.unstaged = unstaged
+    self.stash = stash
+  }
+
+  public static let none = CoreGitWorking(
+    repository: false, staged: [], unstaged: [], stash: [])
+
+  /// Nothing staged, nothing edited, nothing stashed. What a clean checkout
+  /// looks like, and the one case the panel has a sentence for.
+  public var isEmpty: Bool {
+    staged.isEmpty && unstaged.isEmpty && stash.isEmpty
+  }
+}
+
 public enum CoreFileStatus: String, Decodable, Equatable, Sendable {
   case conflicted
   case deleted
@@ -468,7 +558,7 @@ public enum CoreEvent: Equatable, Sendable {
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
     case type, `protocol`, session, state, message, entries, text, themes
-    case statuses, url, status, shortcuts, matches, log, hits
+    case statuses, url, status, shortcuts, matches, log, hits, detail, working
   }
 
   public init(from decoder: Decoder) throws {
@@ -488,6 +578,10 @@ extension CoreResponse: Decodable {
       self = .git(try container.decode(CoreGitStatus.self, forKey: .status))
     case "git_log":
       self = .gitLog(try container.decode(CoreGitLog.self, forKey: .log))
+    case "git_detail":
+      self = .gitDetail(try container.decodeIfPresent(CoreGitCommitDetail.self, forKey: .detail))
+    case "git_working":
+      self = .gitWorking(try container.decode(CoreGitWorking.self, forKey: .working))
     case "file":
       self = .file(text: try container.decode(String.self, forKey: .text))
     case "themes":

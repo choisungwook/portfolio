@@ -230,6 +230,53 @@ struct ProtocolTests {
     #expect(log.commits.first?.refs == ["HEAD -> main"])
   }
 
+  @Test func readsWhatOneCommitDid() throws {
+    #expect(
+      try json(.gitShow(path: "/p", hash: "abc1234"))
+        == #"{"command":{"hash":"abc1234","path":"\/p","type":"git_show"},"v":2}"#)
+    let json =
+      #"{"type":"git_detail","detail":{"commit":{"hash":"abc","parents":[],"author":"A","date":"2026-09-13 10:00","refs":[],"subject":"message"},"body":"why","files":[{"path":"a.txt","status":"modified","additions":2,"deletions":1,"patch":"@@ -1 +1,2 @@"}]}}"#
+    guard case .gitDetail(let detail) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(json.utf8))
+    else {
+      Issue.record("expected a commit detail")
+      return
+    }
+    #expect(detail?.body == "why")
+    #expect(detail?.files.first?.path == "a.txt")
+    #expect(detail?.files.first?.additions == 2)
+    // A hash the core will not answer for arrives as an absent detail rather
+    // than as an error, which is what a row clicked twice looks like.
+    let missing = #"{"type":"git_detail"}"#
+    guard case .gitDetail(let none) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(missing.utf8))
+    else {
+      Issue.record("expected a commit detail")
+      return
+    }
+    #expect(none == nil)
+  }
+
+  @Test func readsWhatIsWaitingInTheRepository() throws {
+    #expect(
+      try json(.gitWorking(path: "/p"))
+        == #"{"command":{"path":"\/p","type":"git_working"},"v":2}"#)
+    let json =
+      #"{"type":"git_working","working":{"repository":true,"staged":[{"path":"/p/a.txt","status":"added","stage":"staged"}],"unstaged":[{"path":"/p/a.txt","status":"modified","stage":"unstaged"}],"stash":[{"name":"stash@{0}","subject":"WIP on main"}]}}"#
+    guard case .gitWorking(let working) = try JSONDecoder().decode(
+      CoreResponse.self, from: Data(json.utf8))
+    else {
+      Issue.record("expected a working state")
+      return
+    }
+    // One file staged and then edited again is in both halves.
+    #expect(working.staged.first?.status == .added)
+    #expect(working.unstaged.first?.status == .modified)
+    #expect(working.stash.first?.name == "stash@{0}")
+    #expect(!working.isEmpty)
+    #expect(CoreGitWorking.none.isEmpty)
+  }
+
   @Test func aThemeDressesEverySurfaceInTheWindow() throws {
     // The mixing is here rather than in the views, so it is checked here too.
     let dark = try theme(background: "#1e1e2e", foreground: "#cdd6f4", blue: "#89b4fa")

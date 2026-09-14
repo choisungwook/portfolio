@@ -28,6 +28,8 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 - **Finished is a transition, and it belongs to a shell.** It is only reachable from working or asking, and `clear_status` is what ends it. That is what makes the same idle screen mean nothing at launch and mean "look at me" after a run. Judging is per session; the workspace takes the most blocked of its shells, with finished reported last so one tab going green never hides another still working. `clear_status` names the tab that was looked at, so its siblings keep their bells, and the controller remembers what each shell was last judged to be — the core resends every shell in a workspace whenever any one of them moves, so trusting that list alone would ring the same bell on every tick.
 - **A split view owns its subviews' widths.** Panes are placed with `setPosition` and limited by the delegate. A width constraint is a second opinion about the same number, and whichever one loses is either a pane that opens at nothing or a divider that snaps back.
 - **A thin divider is one point wide.** Nobody can aim at that, which is what made the panes look fixed. `splitView(_:effectiveRect:forDrawnRect:ofDividerAt:)` grows what answers the mouse without touching what is drawn.
+- **A tree of subjects is half an answer.** Clicking a commit asks `git_show` for that commit alone, and the core splits the patch per file so the shell never parses a diff. The counts come from the same piece the lines do rather than from a second `--numstat` call, which is what keeps a row from disagreeing with what is under it. Only the pane that is on screen asks git anything.
+- **The status pane reads and never writes.** Staged, not staged and the stash are three lists over one porcelain read plus `git stash list`. Staging from a pane beside a terminal would be a second way to do what the shell already does, and the two could disagree about what happened.
 - **Git is asked, never inferred.** `git.rs` runs porcelain status and rolls it up the directory tree, so the colours in the file pane agree with the shell in the middle of the window. The paths are built from `--show-prefix` rather than `--show-toplevel`: a symlink above the project makes the resolved root a different string from the one the browser holds, and a status keyed by a path no row has never shows up. It runs on the run loop every three seconds, the same bet `detect` makes with `ps`; a repository big enough for `git status` to take a visible moment is what would make that wrong.
 - **One palette, or the window looks broken.** A theme reaches every pane through `Palette`, mixed once from the theme's three colours in `Theme.swift`. A view reads colours and never asks which mode it is in; following the system is a palette like any other. Anything drawn by AppKit itself follows `window.appearance`, which is set alongside.
 - **Ids are never reused.** `next_id` in the state file is a high water mark. Tabs, the agent colour and the finished notification are all keyed by workspace id, so a reused one shows a deleted workspace's state on a new row.
@@ -46,7 +48,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `core/crates/core/src/session.rs` | one shell under a pty, its reader thread and its reaping |
 | `core/crates/core/src/tree.rs` | project/workspace model, chosen theme, atomic JSON persistence |
 | `core/crates/core/src/browse.rs` | one directory level, and the link rule that keeps it out of cycles |
-| `core/crates/core/src/git.rs` | porcelain status, the stage beside it, and the roll up that gives a folder a colour |
+| `core/crates/core/src/git.rs` | porcelain status, the stage beside it, the roll up that gives a folder a colour, one commit's patch and the stash |
 | `core/crates/core/src/theme.rs` | the known colour schemes as a hex table, dark and light |
 | `core/crates/core/src/shortcuts.rs` | the menu commands, their default keys and the rule about clashes |
 | `core/crates/core/src/search.rs` | the project file index and the score that ranks a query's matches |
@@ -72,7 +74,10 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/AkbunTerminalCore/DocumentSearch.swift` | Command F over the file on screen: the matches and which one is next |
 | `Sources/AkbunTerminalCore/MarkdownPage.swift` | the sandboxed Markdown page, its CSP and source escaping |
 | `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
-| `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened |
+| `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened, and the four panes over one project |
+| `Sources/akbun-terminal/GitCommitDetailView.swift` | what the clicked commit changed: its files and one diff |
+| `Sources/akbun-terminal/GitStatusPanelView.swift` | staged, not staged and the stash, read only |
+| `Sources/AkbunTerminalCore/GitDiff.swift` | a unified diff as drawable lines with the numbers down the side |
 | `Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
 | `Sources/akbun-terminal/MarkdownPreviewView.swift` | bundled renderer loading, WebKit navigation policy and preview search |
 | `Sources/akbun-terminal/CommandPaletteView.swift` | the Command O sheet: the list, the keyboard and the marks |

@@ -121,6 +121,25 @@ public final class CoreBridge {
     return log
   }
 
+  /// What one commit did, or nothing when the core will not answer for that
+  /// hash. Like the log, absence is ordinary rather than an error: a row can be
+  /// clicked while the repository is being rewritten underneath it.
+  public func gitShow(in directory: String, hash: String) -> CoreGitCommitDetail? {
+    guard case .gitDetail(let detail) = try? send(.gitShow(path: directory, hash: hash)) else {
+      return nil
+    }
+    return detail
+  }
+
+  /// What is waiting in the index, the working tree and the stash. Never
+  /// throws; a folder outside a repository has nothing waiting.
+  public func gitWorking(in directory: String) -> CoreGitWorking {
+    guard case .gitWorking(let working) = try? send(.gitWorking(path: directory)) else {
+      return .none
+    }
+    return working
+  }
+
   public func text(ofFile path: String) throws -> String {
     let response = try send(.readFile(path: path))
     switch response {
