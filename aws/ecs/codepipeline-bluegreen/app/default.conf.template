@@ -1,0 +1,20 @@
+server {
+  listen 80;
+
+  root /usr/share/nginx/html;
+
+  location / {
+    sub_filter '__APP_VERSION__' '${APP_VERSION}';
+    sub_filter_once off;
+  }
+
+  location = /env {
+    default_type text/plain;
+    return 200 "APP_VERSION=${APP_VERSION}\nAPP_MESSAGE=${APP_MESSAGE}\n";
+  }
+
+  location = /health {
+    default_type text/plain;
+    return ${APP_HEALTH_STATUS} "health=${APP_HEALTH_STATUS}\n";
+  }
+}
