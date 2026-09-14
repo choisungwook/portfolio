@@ -938,10 +938,19 @@ mod tests {
     fn a_hash_that_is_not_a_hash_never_reaches_git() {
         // The shell sends this, so a value that would be read as an option has
         // to be refused before it becomes a command line argument.
+        assert!(!is_revision("--help"));
+        assert!(!is_revision("HEAD"));
+        assert!(!is_revision("../etc/passwd"));
+        assert!(!is_revision("abc"));
+        assert!(is_revision("0123456789abcdef0123456789abcdef01234567"));
+    }
+
+    #[test]
+    fn a_hash_this_repository_does_not_have_is_no_commit() {
+        // Well spelled and still absent. This one does reach git, and the
+        // answer is nothing rather than an error.
         let Some(directory) = repository() else { return };
         let path = directory.to_str().unwrap();
-        assert!(show(path, "--help").is_none());
-        assert!(show(path, "HEAD").is_none());
         assert!(show(path, "0123456789abcdef0123456789abcdef01234567").is_none());
         fs::remove_dir_all(directory).unwrap();
     }

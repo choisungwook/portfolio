@@ -14,8 +14,9 @@ import AkbunTerminalCore
 /// in the core package, where they are tested without a window.
 @MainActor
 final class GitCommitDetailView: NSView, NSTableViewDataSource, NSTableViewDelegate {
-  /// A file in the commit was double clicked. Carries the path as the diff
-  /// spells it, relative to the repository root.
+  /// A file in the commit was double clicked. Carries an absolute path: the
+  /// diff spells a path from the repository root, and resolving that to a file
+  /// on disk is this view's job rather than its caller's.
   var onOpenFile: ((String) -> Void)?
 
   private let core: CoreBridge
@@ -186,7 +187,10 @@ final class GitCommitDetailView: NSView, NSTableViewDataSource, NSTableViewDeleg
     }
     diff.textStorage?.setAttributedString(text)
     diff.sizeToFit()
-    diffScroll.documentView?.scroll(.zero)
+    // The text view is not flipped, so scrolling its clip view to the origin
+    // lands at the bottom of the diff. Asking the text view for the first
+    // character is the same thing the document view does.
+    diff.scrollRangeToVisible(NSRange(location: 0, length: 0))
   }
 
   /// A four wide column, or four spaces for the side that has no line there.
@@ -224,8 +228,30 @@ final class GitCommitDetailView: NSView, NSTableViewDataSource, NSTableViewDeleg
   }
 
   @objc private func openClickedFile() {
-    guard let file = file(at: files.clickedRow), let root else { return }
-    onOpenFile?(root + "/" + file.path)
+    // A file the commit deleted has nothing left on disk to open.
+    guard let file = file(at: files.clickedRow), file.status != .deleted,
+      let path = onDisk(file.path)
+    else { return }
+    onOpenFile?(path)
+  }
+
+  /// Where the file a diff names actually is.
+  ///
+  /// A diff spells its paths from the repository root, and the folder a project
+  /// was opened at is not always that root: a project can be any folder inside
+  /// a repository. Walking up from it until the file is there finds the same
+  /// file the diff means, and finds nothing rather than a wrong path when the
+  /// file is not in the checkout at all.
+  private func onDisk(_ relative: String) -> String? {
+    guard let root else { return nil }
+    var folder = URL(fileURLWithPath: root)
+    while true {
+      let candidate = folder.appendingPathComponent(relative)
+      if FileManager.default.fileExists(atPath: candidate.path) { return candidate.path }
+      let parent = folder.deletingLastPathComponent()
+      guard parent.path != folder.path else { return nil }
+      folder = parent
+    }
   }
 
   private func file(at row: Int) -> CoreGitDiffFile? {
