@@ -2,13 +2,12 @@
 
 `knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.1을 따르는 지식 번들이다. 스펙 원문은 [templates/knowledge/references/okf-spec-0.1.md](../../templates/knowledge/references/okf-spec-0.1.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
 
-## MANDATORY: 읽는 시점
+## 읽는 시점
 
-**CRITICAL**: 이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. `wiki/`나 `adr/`가 있으면 그 index도 읽는다.
+이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. `wiki/`나 `adr/`가 있으면 그 index도 읽는다. 여기에 있는 것은 코드와 git history가 기록하지 못한 결정의 이유라서, 읽지 않으면 이미 버려진 방법을 다시 고른다.
 
-- index를 읽고 이번 작업에 걸리는 concept가 있으면 그 파일까지 읽는다. index의 한 줄 제목만으로 판단하지 않는다.
-- 읽지 않고 고친 코드는 이미 버려진 방법을 다시 고른다. 여기에 있는 것은 코드와 git history가 기록하지 못한 결정의 이유이고, 그것이 이 번들의 존재 이유다.
-- 기록만 하고 읽지 않으면 번들은 쓰기 전용 로그가 된다. 쓰는 비용만 남고 얻는 것이 없다.
+- index에서 이번 작업에 걸리는 concept가 있으면 그 파일까지 읽는다. 한 줄 제목만으로 판단하지 않는다.
+- 걸리는 concept가 없으면 index만 읽고 넘어간다. 번들 전체를 읽지 않는다.
 
 읽은 내용이 지금 아는 사실과 어긋나면 그 자리에서 고친다.
 

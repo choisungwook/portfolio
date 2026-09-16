@@ -1,5 +1,5 @@
 ---
-description: 핸즈온 workspace를 만든다. 다정한 말투 docs + knowledge 번들 + 로컬 실행 환경
+description: 새 핸즈온 workspace를 만든다. 기존 핸즈온을 고칠 때는 쓰지 않는다
 argument-hint: <workspace 경로> <주제>
 ---
 
@@ -37,21 +37,12 @@ workspace 루트에 `AGENTS.md`를 만들고 다음을 담는다.
 
 - 이 핸즈온이 무엇인지 한 줄.
 - `@../../AGENTS.md`(루트까지의 상대 경로) 링크. 글로벌 규칙은 여기를 따른다.
-- knowledge 읽기와 갱신 규칙. 아래 문단을 그대로 넣는다.
+- knowledge 포인터. 아래 문단을 그대로 넣는다. 읽고 쓰는 규칙은 루트 규칙에 이미 있으므로 여기서 반복하지 않는다.
 
 ```markdown
 ## knowledge
 
-이 workspace를 고치기 전에 `knowledge/index.md`를 먼저 읽는다. 걸리는 concept가 있으면 그 파일까지 읽는다. 읽지 않으면 이미 버려진 방법을 다시 고른다.
-
-이 workspace의 작업에서 얻은 지식은 `knowledge/`에 계속 반영한다. 추가만이 아니라 수정과 삭제까지 포함한다.
-
-- 새로 알게 된 의사결정, 반복 절차, 도메인 통찰은 concept로 추가한다.
-- 기존 concept와 어긋나는 사실을 알게 되면 그 concept를 고친다. 새 파일을 만들어 두 개를 남기지 않는다.
-- 더 이상 맞지 않는 concept는 지운다. 틀린 기록을 남겨 두면 다음 작업이 그것을 믿는다.
-- 추가·수정·삭제 뒤에는 해당 `index.md`와 `log.md`를 같은 commit에서 갱신한다.
-
-작성 형식은 [.claude/rules/knowledge.md](../../.claude/rules/knowledge.md)를 따른다.
+이 workspace의 결정 이유는 `knowledge/index.md`에 있다. 고치기 전에 읽고, 어긋나는 concept는 고치거나 지운다. 새로 얻은 결정과 절차는 같은 곳에 남긴다. 형식은 [.claude/rules/knowledge.md](../../.claude/rules/knowledge.md)를 따른다.
 ```
 
 ## 로컬 테스트
