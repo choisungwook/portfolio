@@ -1,5 +1,6 @@
 mod ai;
 mod ai_edit;
+mod ai_workflow;
 mod commands;
 mod playback;
 mod store;
@@ -55,6 +56,7 @@ pub fn run() {
             });
             app.manage(ai::AiRuntime::default());
             app.manage(ai_edit::AiEditRuntime::default());
+            app.manage(ai_workflow::SamplingRuntime::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,6 +77,13 @@ pub fn run() {
             commands::start_waveforms,
             commands::edit_state,
             commands::edit_apply,
+            ai_workflow::ai_preview_plan,
+            ai_workflow::ai_apply_plan,
+            ai_workflow::ai_load_library,
+            ai_workflow::ai_save_library,
+            ai_workflow::ai_sample_asset,
+            ai_workflow::ai_asset_fingerprints,
+            ai_workflow::ai_cancel_sampling,
             commands::edit_undo,
             commands::edit_redo,
             commands::describe_asset,

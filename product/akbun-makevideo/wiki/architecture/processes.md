@@ -12,10 +12,11 @@ One Tauri window and an optional external Codex App Server process. There is no 
 | The present crate (`src-tauri/crates/present/`) | When a frame is shown, and the swapchain it is shown on |
 | The time crate (`src-tauri/crates/time/`) | Rates and times: what a frame index means and every conversion out of one. `src/time.js` is the same model for the page |
 | The shared AI crate (`../../../../crates/akbun-ai/`) | The Codex child process, bounded session directories, and generated image validation |
-| Codex App Server | An optional user-installed process using the Codex CLI ChatGPT login; it receives only the project digest and AI prompt |
+| Codex App Server | ChatGPT 로그인으로 대화와 Astra 편집 제안·선택한 B-roll 표본 분석 수행 |
 
 None of these crates depends on tauri or on anything that needs a webview, which is what lets the pull request job test them on Linux in seconds. Testing the app crate instead would mean installing GTK and WebKit on the runner. The two that talk to hardware keep that behind a feature for the same reason: `--no-default-features` builds a compositor that has never heard of wgpu and an audio engine that has never heard of cpal, and each still runs everything that does not need the hardware. The verify job runs both crates twice, once each way, because the tests behind the feature are the ones the first run cannot reach.
 
 The stack goes one way: time, then edit, then render and the compositor, then present, then the app. The edit crate is the one every other part reads, so it is also the one that must not be able to pull any of them back in.
 
-The AI path is separate from the edit stack. The page streams App Server events through the Tauri bridge and saves app-owned conversation JSON through `akbun-ai`; applying AI output as edit commands belongs to Issue #678.
+- 일반 대화는 akbun-ai의 앱 소유 세션에 저장
+- [편집 스튜디오](./astra-editing.md)는 Rust 검증과 snapshot 검사 후 단일 transaction으로 편집 적용

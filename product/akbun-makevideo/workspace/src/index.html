@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style-monitors.css" />
   <link rel="stylesheet" href="style-timeline.css" />
   <link rel="stylesheet" href="style-overlays.css" />
+  <link rel="stylesheet" href="style-ai-studio.css" />
 </head>
 <body>
   <!-- The hidden attribute does not take an svg out of the layout on its own,
@@ -398,8 +399,64 @@
         </section>
         <section id="ai-view" class="selected-panel-view" hidden>
           <div class="ai-section-tabs" aria-label="AI panel">
+            <button type="button" data-ai-section="studio" aria-pressed="false">Edit studio</button>
             <button type="button" data-ai-section="conversations" aria-pressed="true">Conversations</button>
             <button type="button" data-ai-section="captions" aria-pressed="false">Captions</button>
+          </div>
+          <div id="ai-workflow-view" class="ai-studio" hidden>
+            <header class="ai-studio-header"><h3>Edit with Astra</h3><span>GPT-6 Astra</span></header>
+            <nav class="ai-workflow-steps" aria-label="Editing workflow">
+              <button type="button" data-studio-step="prepare" aria-pressed="true">1 Prepare</button>
+              <button type="button" data-studio-step="story" aria-pressed="false">2 Story</button>
+              <button type="button" data-studio-step="layers" aria-pressed="false">3 Layers</button>
+              <button type="button" data-studio-step="finish" aria-pressed="false">4 Finish</button>
+            </nav>
+            <div class="ai-studio-scroll">
+              <section data-studio-page="prepare">
+                <h4>Give Astra context</h4>
+                <p>Transcribe speech first, then describe the B-roll you want to use.</p>
+                <button id="studio-transcribe" type="button">Transcribe &amp; edit captions</button>
+                <label for="studio-asset">B-roll asset</label><select id="studio-asset"></select>
+                <div class="ai-studio-range"><label>From (s)<input id="studio-from" type="number" min="0" value="0" step="0.1"></label><label>To (s)<input id="studio-to" type="number" min="0" value="30" step="0.1"></label></div>
+                <p class="dim">Analyze up to 60 seconds at a time. Eight sampled frames are sent to OpenAI through your Codex account; audio is not sent.</p>
+                <button id="studio-analyze" type="button">Analyze selected interval</button>
+                <label for="studio-search">Find B-roll</label><input id="studio-search" type="search" placeholder="Cat, desk, outdoors…">
+                <div id="studio-observations" class="ai-studio-list"></div>
+              </section>
+              <section data-studio-page="story" hidden>
+                <h4>Get the story right</h4><p>Review the cuts before adding graphics. Use captions to find repeated takes and unnecessary phrases.</p>
+                <button type="button" data-studio-prompt="Use the transcript to remove repeated takes and filler phrases. Preserve complete sentences and explain each removed interval. Do not add overlays yet.">Clean up talking head</button>
+                <button type="button" data-studio-prompt="Using existing captions, condense the narrative to approximately 60 seconds. Preserve the strongest opening, essential points and conclusion. Explain the removed intervals.">Make a 60-second cut</button>
+                <button id="studio-silence" type="button">Remove silence locally…</button>
+              </section>
+              <section data-studio-page="layers" hidden>
+                <h4>Build on the edit</h4><p>Astra can place imported B-roll, animate editable graphics and mix your music.</p>
+                <button type="button" data-studio-prompt="Match the analyzed B-roll observations to the voiceover captions. Add relevant video overlays without replacing the speech. Use only analyzed sample times and imported assets.">Match B-roll to speech</button>
+                <button type="button" data-studio-prompt="Create an editable animated title at the playhead. Use text and shapes with easing keyframes. Describe your design before the operation list.">Create a motion graphic</button>
+                <button type="button" data-studio-prompt="Add suitable imported music and sound effects to audio tracks, keeping speech intelligible. Use volume and fades; do not invent assets.">Layer music &amp; sound</button>
+              </section>
+              <section data-studio-page="finish" hidden>
+                <h4>Polish and reuse</h4>
+                <button type="button" data-studio-prompt="Style existing captions for clear reading. Keep their original wording and timestamps, use a consistent high-contrast style and stay within the canvas.">Style captions</button>
+                <button type="button" data-studio-prompt="Add a subtle animated zoom using a video overlay of the selected clip or an existing visual item. Preserve audio and use easing. Keep the effect within the selected interval.">Add a subtle zoom</button>
+                <h4>Saved graphics &amp; caption styles</h4><p>Select a text or shape in the timeline to save its design and animation.</p>
+                <label for="studio-template-name">Template name</label><input id="studio-template-name" maxlength="80" placeholder="Opening title">
+                <button id="studio-save-template" type="button">Save selected design</button>
+                <div id="studio-templates" class="ai-studio-list"></div>
+              </section>
+              <section id="studio-review" hidden>
+                <div class="ai-studio-review-heading"><h4>Review proposed edits</h4><button id="studio-discard" type="button">Discard</button></div>
+                <p id="studio-summary"></p><ol id="studio-operations"></ol>
+                <p class="dim">Applies as one undo step. If the project changes, request a new proposal.</p>
+                <button id="studio-apply" type="button" class="primary">Apply edits</button>
+              </section>
+            </div>
+            <div class="ai-studio-composer">
+              <p id="studio-context" class="dim"></p>
+              <label for="studio-prompt">Describe your edit</label><textarea id="studio-prompt" rows="3" maxlength="12000" placeholder="Keep only the parts about…"></textarea>
+              <div class="ai-studio-actions"><button id="studio-cancel" type="button" hidden>Stop</button><button id="studio-propose" type="button" class="primary">Propose edits</button></div>
+              <p id="studio-status" role="status" aria-live="polite"></p>
+            </div>
           </div>
           <div id="ai-conversations-view">
           <div id="ai-list-view" class="ai-panel-page">
@@ -787,7 +844,10 @@
   <script src="api.js"></script>
   <script src="ai.js"></script>
   <script src="ai-edit-panel.js"></script>
+  <script src="ai-structured.js"></script>
   <script src="ai-panel.js"></script>
+  <script src="ai-workflow.js"></script>
+  <script src="ai-studio.js"></script>
   <script src="time.js"></script>
   <script src="geometry.js"></script>
   <script src="timeline.js"></script>

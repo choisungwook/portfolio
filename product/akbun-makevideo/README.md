@@ -11,6 +11,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
 - Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel
 - AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; choose an available subscription model and reasoning effort; conversations stay in app-owned bounded storage
+- [Astra edit studio](./wiki/architecture/astra-editing.md): 단계별 컷·B-roll·모션 그래픽·음악·자막 편집 제안과 검토 후 일괄 적용
+- B-roll 구간의 시각 표본 분석과 검색, text/shape 애니메이션·자막 스타일 재사용 라이브러리
 - AI captions: extract timeline audio as mono 16 kHz 48 kbps MP3, transcribe it through OpenAI, LiteLLM, Google Cloud Speech-to-Text, Azure Speech or a compatible endpoint, then edit timestamped subtitles in the right panel
 - Silence removal: detect configurable quiet ranges with ffmpeg and ripple-delete them across every track as one undoable edit
 - Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties

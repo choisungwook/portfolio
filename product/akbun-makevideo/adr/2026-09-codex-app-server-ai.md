@@ -4,11 +4,11 @@
 
 The app starts a separately installed `codex app-server --listen stdio://` process and accepts only its ChatGPT account login. It does not bundle Codex, copy credentials or support API key authentication.
 
-Each Codex thread is ephemeral and runs with approval disabled, network access off and no shell, web, MCP, plugin, app, hook, memory or multi-agent tools. The model receives only a measured project summary; asset paths and media contents stay outside the prompt.
+Each Codex thread is ephemeral and runs with approval disabled, network access off and no shell, web, MCP, plugin, app, hook, memory or multi-agent tools. Ordinary conversations receive a measured project summary. The [editing studio](../wiki/architecture/astra-editing.md) additionally sends path-redacted timeline and caption data, or explicitly selected B-roll samples.
 
 The app owns at most three durable sessions of 128 MiB each. Closed and restored sessions are read-only. Generated images are copied into the session and can be saved elsewhere, but are not imported into the project because projects reference media paths and deleting a session would break such a reference.
 
-Applying model output to timeline edits remains part of Issue #678.
+- Model output is validated as an allowlisted proposal and applied through a snapshot-checked transaction after user review.
 This authentication path replaces the provider API key storage direction in Issue #772.
 
 ## Reason

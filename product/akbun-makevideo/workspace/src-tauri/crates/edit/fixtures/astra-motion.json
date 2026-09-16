@@ -1,0 +1,62 @@
+[
+  {
+    "op": "addOverlayVisualItem",
+    "id": "blue-rectangle-1",
+    "content": {
+      "kind": "shape",
+      "shape": "rectangle",
+      "fill": "#2f6df0"
+    },
+    "start": 0,
+    "duration": 60,
+    "transform": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "rotation": 0,
+      "opacity": 1
+    },
+    "zIndex": 0
+  },
+  {
+    "op": "addOverlayVisualItem",
+    "id": "hello-title-1",
+    "content": {
+      "kind": "text",
+      "text": "Hello",
+      "style": {
+        "fontFamily": "sans-serif",
+        "fontSize": 64,
+        "color": "#ffffff"
+      }
+    },
+    "start": 0,
+    "duration": 60,
+    "transform": {
+      "x": 800,
+      "y": 480,
+      "width": 320,
+      "height": 120,
+      "rotation": 0,
+      "opacity": 0
+    },
+    "zIndex": 0
+  },
+  {
+    "op": "setVisualKeyframe",
+    "itemId": "hello-title-1",
+    "property": "opacity",
+    "frame": 0,
+    "value": 0,
+    "easing": "linear"
+  },
+  {
+    "op": "setVisualKeyframe",
+    "itemId": "hello-title-1",
+    "property": "opacity",
+    "frame": 15,
+    "value": 1,
+    "easing": "linear"
+  }
+]

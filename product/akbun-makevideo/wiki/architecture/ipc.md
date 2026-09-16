@@ -1,6 +1,7 @@
 # The IPC surface
 
-Every command is in `src-tauri/src/commands.rs`. The page picks paths with native dialogs and hands them over, so nothing here blocks on UI.
+- 일반 편집 명령은 commands.rs, AI 명령은 ai.rs·ai_edit.rs·ai_workflow.rs에 위치
+- 페이지에서 경로를 선택한 뒤 Rust에 전달하며 command 안에서 native dialog를 열지 않음
 
 | Command | What it does |
 |---|---|
@@ -26,16 +27,24 @@ Every command is in `src-tauri/src/commands.rs`. The page picks paths with nativ
 | `ai_runtime_directory` | Returns the app-owned writable root used by restricted Codex turns |
 | `ai_list_sessions`, `ai_load_session`, `ai_save_session`, `ai_delete_session` | Reads and writes bounded app-owned conversation JSON |
 | `ai_attach_image`, `ai_copy_image` | Copies a validated generated image into a session or a user-picked path |
+| `ai_preview_plan`, `ai_apply_plan` | 편집 제안 사전 검증, snapshot·revision 검사 후 일괄 적용 |
+| `ai_sample_asset`, `ai_cancel_sampling`, `ai_asset_fingerprints` | 선택한 B-roll 구간 표본 추출·취소·파일 변경 감지 |
+| `ai_load_library`, `ai_save_library` | B-roll 설명과 재사용 디자인의 제한된 로컬 저장 |
 
-## Nothing carries a project across
+## Document ownership
 
 `edit_apply` sends commands and `preview_frame` and `start_render` send neither a project nor a timeline. There is one copy of the edit, in `AppState.document`, and everything reads that. The [edit model record](../../adr/2026-08-edit-model-in-rust.md) has the reasoning; the practical effect is that the compositor decides what to decode by reading the timeline rather than by being handed a snapshot taken when somebody pressed a button.
 
 A render takes its own copy and remembers the revision it took, because the app stays editable while it runs. When it finishes, `render:done` carries `edited` if the revision moved, and the dialog says the file is the timeline as it was when the render started.
 
-## AI stays outside the document
+## AI proposals use the edit boundary
 
 The AI panel sends JSON-RPC through the App Server lifecycle commands. Its project digest contains canvas size, frame rate and asset, marker, track and clip counts, but no file paths or media content. The Codex thread is ephemeral; the app saves only its own bounded session JSON and copied generated images.
+
+- 위 요약은 일반 Conversations에 해당
+- Edit studio는 경로를 제거한 프로젝트·자막 또는 선택한 B-roll 프레임을 별도 요청에 전달
+- ai_apply_plan의 expected 프로젝트는 stale 검사 전용이며 실제 편집 모델을 대체하지 않음
+- 적용 전 원본 전체와 revision 검사, 허용 명령만 단일 transaction으로 실행
 
 Generated images are offered through Save rather than imported as project assets. A project references media paths, while deleting an AI session deletes its images, so linking those two lifetimes would create a broken project.
 

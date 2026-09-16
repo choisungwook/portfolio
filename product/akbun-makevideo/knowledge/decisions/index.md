@@ -2,6 +2,8 @@
 
 ## 목록
 
+* [Astra 편집 제안과 표본 B-roll 설명](2026-09-astra-proposals-and-sampled-broll.md) - 검토·원자적 적용·디자인 재사용 경계.
+
 * [AI media 작업이 분석부터 편집 적용까지 소유한다](2026-09-ai-media-jobs-own-the-apply-boundary.md) - 전사와 무음 분석의 취소, revision 검사, 단일 undo 적용 경계를 정한 결정.
 * [Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다](2026-09-codex-ai-sessions-are-app-owned.md) - Codex thread와 앱의 로컬 대화 저장 경계를 분리한 결정.
 * [PIP와 디졸브는 기존 compositor placement로 합성한다](2026-09-overlays-and-transitions-share-the-compositor.md) - PIP와 디졸브를 기존 preview/export 합성 경로에 연결하는 결정.

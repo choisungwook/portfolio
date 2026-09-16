@@ -1,5 +1,10 @@
 # Knowledge Update Log
 
+## 2026-09-17
+
+* [Astra 편집 제안과 표본 B-roll 설명](decisions/2026-09-astra-proposals-and-sampled-broll.md) 기록.
+* Codex 문맥 규칙을 일반 대화와 편집·시각 분석으로 구분.
+
 ## 2026-09-05
 
 * [Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다](decisions/2026-09-codex-ai-sessions-are-app-owned.md) 결정 기록. Codex thread와 앱의 세션·이미지 보관 경계를 분리함.
