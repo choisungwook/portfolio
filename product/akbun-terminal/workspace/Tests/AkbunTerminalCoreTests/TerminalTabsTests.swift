@@ -44,6 +44,30 @@ struct TerminalTabsTests {
     #expect(tabs.activeSession(in: 10) == 2)
   }
 
+  @Test func renamingATabKeepsItsPlaceAndItsContent() {
+    var tabs = TerminalTabs()
+    [1, 2].forEach { tabs.add(session: UInt32($0), to: 10) }
+    tabs.select(.shell(session: 1), in: 10)
+
+    tabs.rename(.shell(session: 1), to: "build", in: 10)
+    #expect(tabs.tabs(in: 10).map(\.title) == ["build", "Shell 2"])
+    #expect(tabs.tabs(in: 10).map(\.content) == [.shell(session: 1), .shell(session: 2)])
+    #expect(tabs.activeSession(in: 10) == 1)
+
+    // A rename in another workspace, or of a tab that is not there, changes nothing.
+    tabs.rename(.shell(session: 1), to: "other", in: 20)
+    tabs.rename(.shell(session: 9), to: "ghost", in: 10)
+    #expect(tabs.tabs(in: 10).map(\.title) == ["build", "Shell 2"])
+    #expect(tabs.tabs(in: 20).isEmpty)
+  }
+
+  @Test func aDocumentKeepsItsFileName() {
+    var tabs = TerminalTabs()
+    tabs.add(document: "/p/README.md", title: "README.md", to: 10)
+    tabs.rename(.document(path: "/p/README.md"), to: "notes", in: 10)
+    #expect(tabs.tabs(in: 10).map(\.title) == ["README.md"])
+  }
+
   @Test func documentsShareTheStripWithShells() {
     var tabs = TerminalTabs()
     tabs.add(session: 1, to: 10)

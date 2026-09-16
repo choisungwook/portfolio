@@ -188,6 +188,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     tabBar.onNew = { [weak self] in self?.openTab() }
     tabBar.onSelect = { [weak self] content in self?.selectTab(content) }
     tabBar.onClose = { [weak self] content in self?.closeTab(content) }
+    tabBar.onRename = { [weak self] content in self?.renameTab(content) }
     browser.onOpenFile = { [weak self] entry in self?.open(entry) }
     browser.onOpenHit = { [weak self] hit in self?.open(hit) }
     browser.onOpenPath = { [weak self] path in self?.openDocument(at: path) }
@@ -321,6 +322,18 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     tabBar.setStatuses([session: .idle])
     lastSessionStatuses[session] = .idle
     sidebar.setStatus(.idle, for: workspace)
+  }
+
+  /// Names live in the arrangement, not the core: a session has no name of its
+  /// own, and the strip is the only place the name is ever read.
+  private func renameTab(_ content: TerminalTabs.Content) {
+    guard let workspace = selection?.workspace.id,
+      let tab = tabs.tabs(in: workspace).first(where: { $0.content == content }),
+      let name = askName(
+        title: "Rename Tab", placeholder: tab.title, initial: tab.title, confirm: "Rename")
+    else { return }
+    tabs.rename(content, to: name, in: workspace)
+    showActiveTab()
   }
 
   private func closeTab(_ content: TerminalTabs.Content) {

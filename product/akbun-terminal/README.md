@@ -65,6 +65,7 @@ cargo test --manifest-path core/Cargo.toml
 - Wears a known colour scheme picked from Settings, or follows the system appearance, and dresses every pane in it rather than the terminal alone. A dozen dark schemes and seven light ones, one of which is called Light.
 - Puts any menu command on any keystroke from Settings, refusing a key another command already has, and remembers only what was changed.
 - Renames and deletes a project or a workspace from the sidebar, ending the shells under it and leaving the folder on disk alone.
+- Renames a shell tab from a right click on it, so a strip of three shells can say which one is the build and which one is the agent. A document tab keeps its file name.
 - Zooms the whole window with Command plus and minus, and back to the default size with Command zero: the terminal, the tab strip, the project tree, the file list and the rendered document all follow one size.
 - Lets the sidebar and the file pane be dragged to any width, and folded away entirely.
 - Colours a workspace by what the agent in it is doing: orange while it works, red when it is waiting for an answer, green when it has finished and nobody has looked. Opening that tab takes the green away.
