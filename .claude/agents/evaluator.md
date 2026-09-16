@@ -22,10 +22,10 @@ A GitHub Issue with the work specification and the Generator's progress comments
 - 기능성: 의도한 대로 동작하는가? 빌드/테스트가 통과하는가? 가능하면 실제로 실행하여 확인한다.
 - 코드 품질: 읽기 쉽고 유지보수 가능한가? 불필요한 복잡성은 없는가?
 
-PR이 열려 있으면 PR body도 채점한다. 기준은 [.github/pull_request_template.md](../../.github/pull_request_template.md)다.
+PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rules/workflow.md](../rules/workflow.md)의 "Issue와 PR 공통 작성 규칙"이 기준이다.
 
 - 섹션 구성: 구현, 어려웠던 점, 리스크 순서인가? 쓸 내용이 없는 섹션은 헤더째 지웠는가?
-- 항목 형식: 섹션마다 요약 한 줄과 근거 최대 1개인가? 개조식이고 backtick이 없는가?
+- 항목 형식: 섹션마다 요약 한 줄과 근거 최대 1개인가? 개조식이고 backtick이 없는가? (workflow.md 공통 작성 규칙)
 - 역할 분리: 목표와 의사결정은 Issue에만 있고 PR은 Issue 링크로 대체했는가?
 - 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
 </rubrics>
@@ -43,9 +43,9 @@ PR이 열려 있으면 PR body도 채점한다. 기준은 [.github/pull_request_
 ## 평가
 
 ### 문서 (philosophy.md, AGENTS.md 문서 작성 규칙 기준)
-- 내 말로 쓰여 있는가: [PASS/NEEDS_WORK/FAIL] — (근거)
-- "왜"가 먼저 나오는가: [PASS/NEEDS_WORK/FAIL] — (근거)
-- 재현할 수 있는가: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 내 말로 쓰여 있는가 (philosophy.md): [PASS/NEEDS_WORK/FAIL] — (근거)
+- 결론이 먼저 나오는가 (AGENTS.md 문서 작성 규칙): [PASS/NEEDS_WORK/FAIL] — (근거)
+- 재현할 수 있는가 (philosophy.md): [PASS/NEEDS_WORK/FAIL] — (근거)
 
 ### 코드 (해당 시)
 - 기능성: [PASS/NEEDS_WORK/FAIL] — (근거)
