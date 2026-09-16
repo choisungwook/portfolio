@@ -16,6 +16,7 @@ One page per part, because this grew out of a single file. Read [processes.md](.
 | [render.md](./render.md) | The ffmpeg filter graph, line by line, and the render presets |
 | [acceleration.md](./acceleration.md) | GPU encoding: detection by trial, and the fallback |
 | [ipc.md](./ipc.md) | The command surface, the asset protocol, and the key flows |
+| [local-mcp.md](./local-mcp.md) | 외부 AI의 로컬 제어와 복구 지점 |
 | [astra-editing.md](./astra-editing.md) | Astra 편집 제안, B-roll 분석, 재사용 디자인 |
 
 Three things are easy to break by accident and hard to notice:

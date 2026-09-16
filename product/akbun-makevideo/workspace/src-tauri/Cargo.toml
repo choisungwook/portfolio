@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/time",
+  "crates/control",
   "crates/edit",
   "crates/render",
   "crates/compositor",
@@ -33,6 +34,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+makevideo-control = { path = "crates/control" }
 # The editing model. The app owns one Document made of these types and every
 # change to the project goes through a command on it, so this crate is where
 # the timeline actually lives.

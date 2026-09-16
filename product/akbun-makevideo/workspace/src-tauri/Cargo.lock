@@ -35,6 +35,7 @@ dependencies = [
  "makevideo-analysis",
  "makevideo-audio",
  "makevideo-compositor",
+ "makevideo-control",
  "makevideo-edit",
  "makevideo-present",
  "makevideo-proxy",
@@ -2174,6 +2175,16 @@ dependencies = [
  "serde",
  "serde_json",
  "wgpu",
+]
+
+[[package]]
+name = "makevideo-control"
+version = "0.1.0"
+dependencies = [
+ "makevideo-edit",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

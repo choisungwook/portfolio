@@ -2,6 +2,7 @@ mod ai;
 mod ai_edit;
 mod ai_workflow;
 mod commands;
+mod mcp;
 mod playback;
 mod store;
 mod viewport;
@@ -57,6 +58,7 @@ pub fn run() {
             app.manage(ai::AiRuntime::default());
             app.manage(ai_edit::AiEditRuntime::default());
             app.manage(ai_workflow::SamplingRuntime::default());
+            mcp::setup(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

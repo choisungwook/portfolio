@@ -1,6 +1,6 @@
 # Processes
 
-One Tauri window and an optional external Codex App Server process. There is no node runtime and no bundler; `src/` is served as it is, so the source that runs is the source in the repository.
+One Tauri window, an optional external Codex App Server process, and optional Node stdio MCP processes for external AI clients. The editor itself has no Node runtime and no bundler; `src/` is served as it is, so the source that runs is the source in the repository.
 
 | Side | Owns |
 |---|---|
@@ -20,3 +20,5 @@ The stack goes one way: time, then edit, then render and the compositor, then pr
 
 - 일반 대화는 akbun-ai의 앱 소유 세션에 저장
 - [편집 스튜디오](./astra-editing.md)는 Rust 검증과 snapshot 검사 후 단일 transaction으로 편집 적용
+
+External Codex/Claude clients use [local MCP](./local-mcp.md) to reach the same Rust Document through a user-only Unix socket.

@@ -400,6 +400,9 @@ window.api = {
   // needs. The path also has to have been granted a scope in Rust first.
   fileUrl: (path) => convertFileSrc(path),
 
+  onMcpChanged: (handler) => listen('mcp:changed', (event) => handler(event.payload)),
+  onMcpOpened: (handler) => listen('mcp:opened', (event) => handler(event.payload)),
+  onMcpSaved: (handler) => listen('mcp:saved', (event) => handler(event.payload)),
   onRenderProgress: (handler) => listen('render:progress', (event) => handler(event.payload)),
   onRenderDone: (handler) => listen('render:done', (event) => handler(event.payload)),
   // The hardware encoder failed on this file and the CPU is taking over.

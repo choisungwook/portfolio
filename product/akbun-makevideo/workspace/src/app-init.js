@@ -36,6 +36,7 @@
       insertSourceAt,
       isDirty,
       liveSelection,
+      loadDocument,
       onProxyStatus,
       onRenderDone,
       onRenderFallback,
@@ -44,6 +45,7 @@
       openProjectPath,
       persistSettingsInBackground,
       playbackPath,
+      prepareDerivedMedia,
       probePaths,
       qualitySmokeConfig,
       rate,
@@ -276,6 +278,27 @@
       wireSheets();
       shortcutController.wire();
 
+      if (window.api.onMcpChanged) {
+        subscribe('events:mcp-changed', window.api.onMcpChanged, async () => {
+          const assets = JSON.stringify(state.project.assets);
+          adopt(await window.api.editState());
+          refresh();
+          await preview.seek(preview.position());
+          preview.redraw();
+          if (assets !== JSON.stringify(state.project.assets)) prepareDerivedMedia();
+        });
+        subscribe('events:mcp-opened', window.api.onMcpOpened, async (event) => {
+          loadDocument(await window.api.editState(), event.path);
+          state.savedRevision = event.saved ? event.document.revision : -1;
+          refresh();
+        });
+        subscribe('events:mcp-saved', window.api.onMcpSaved, (event) => {
+          state.path = event.path;
+          state.savedRevision = event.revision;
+          refresh();
+          prepareDerivedMedia();
+        });
+      }
       subscribe('events:render-progress', window.api.onRenderProgress, onRenderProgress);
       subscribe('events:render-done', window.api.onRenderDone, onRenderDone);
       subscribe('events:render-fallback', window.api.onRenderFallback, onRenderFallback);

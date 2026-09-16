@@ -2417,18 +2417,26 @@ pub fn start_render(
     path: String,
     preset: String,
 ) -> Result<(), String> {
+    let snapshot = {
+        let document = state.document.lock().unwrap();
+        (document.project().clone(), document.revision())
+    };
+    render_snapshot(app, state, ai_runtime, path, preset, snapshot)
+}
+
+pub(crate) fn render_snapshot(
+    app: AppHandle,
+    state: State<AppState>,
+    ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
+    path: String,
+    preset: String,
+    snapshot: (Project, u64),
+) -> Result<(), String> {
     crate::ai_edit::ensure_editable(&ai_runtime)?;
     if state.render.lock().unwrap().is_some() {
         return Err("a render is already running".into());
     }
-    // The timeline as it stands now, and the revision it stands at. A render
-    // takes minutes and the app stays editable throughout, so what goes into
-    // the file is this copy and the number is how the end of the job finds out
-    // whether it is still what the user is looking at.
-    let (project, started_at) = {
-        let document = state.document.lock().unwrap();
-        (document.project().clone(), document.revision())
-    };
+    let (project, started_at) = snapshot;
     let preset = ffmpeg::Preset::parse(&preset)?;
     // Only the progress bar wants this; every decision below is in frames.
     let total_ms = project.duration().to_millis().max(0) as u64;
