@@ -92,6 +92,14 @@ impl Document {
         }
     }
 
+    pub fn restore_checkpoint(&mut self, project: Project) -> Result<(), String> {
+        project.validate()?;
+        let revision = self.revision + 1;
+        *self = Self::opened(project);
+        self.revision = revision;
+        Ok(())
+    }
+
     pub fn project(&self) -> &Project {
         &self.project
     }

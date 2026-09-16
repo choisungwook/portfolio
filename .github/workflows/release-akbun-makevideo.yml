@@ -34,6 +34,12 @@ jobs:
       - name: Run page tests
         run: npm test
 
+      - name: Run local MCP protocol tests
+        run: |
+          npm ci --prefix mcp
+          npm test --prefix mcp
+          cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-control
+
       - name: Run shared AI runtime tests
         run: cargo test --manifest-path ../../../crates/akbun-ai/Cargo.toml
 

@@ -2,6 +2,8 @@
 
 ## 2026-09-17
 
+* [로컬 MCP와 복구 지점](decisions/2026-09-local-mcp-checkpoints.md) 기록.
+
 * [Astra 편집 제안과 표본 B-roll 설명](decisions/2026-09-astra-proposals-and-sampled-broll.md) 기록.
 * Codex 문맥 규칙을 일반 대화와 편집·시각 분석으로 구분.
 

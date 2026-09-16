@@ -108,3 +108,9 @@ Build the installable app:
 ```bash
 npm run dist
 ```
+
+## AI 제어
+
+- [Codex·Claude 로컬 MCP 연결](./docs/01-mcp-setup.md)
+- [MCP 편집과 롤백](./docs/02-mcp-editing.md)
+- [Computer Use용 AI 매뉴얼](./ai-manal.md)
