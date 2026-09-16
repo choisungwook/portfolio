@@ -95,7 +95,7 @@ AI에게 다음 문장을 전달.
 - 기본 연결 파일: ~/.akbun-makevideo/control.sock
 - 개발용 별도 연결: 앱과 MCP 프로세스 양쪽에 동일한 AKBUN_MAKEVIDEO_SOCKET 절대 경로 지정
 - [편집과 복구 사용법](./02-mcp-editing.md)
-- [Computer Use용 AI 매뉴얼](../ai-manal.md)
+- [MCP·Computer Use용 AI 매뉴얼](../ai-manual.md)
 
 ## 참고
 

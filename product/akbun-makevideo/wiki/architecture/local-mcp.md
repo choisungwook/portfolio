@@ -36,7 +36,7 @@
 ## 실행·검증
 
 - [클라이언트 연결](../../docs/01-mcp-setup.md)
-- [Computer Use용 매뉴얼](../../ai-manal.md)
+- [AI 매뉴얼](../../ai-manual.md)
 - node --test mcp/server.test.mjs: 공식 SDK client↔stdio↔로컬 socket 계약 검증
 - cargo test -p makevideo-control: 스냅샷 영속성·저장 실패·원자적 편집·상태 토큰 검증
 

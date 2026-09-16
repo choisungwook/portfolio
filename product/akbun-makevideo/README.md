@@ -109,8 +109,10 @@ Build the installable app:
 npm run dist
 ```
 
-## AI 제어
+## 사용 매뉴얼과 AI 제어
+
+- [사용자 매뉴얼과 현재 기능](./user-manal.md)
 
 - [Codex·Claude 로컬 MCP 연결](./docs/01-mcp-setup.md)
 - [MCP 편집과 롤백](./docs/02-mcp-editing.md)
-- [Computer Use용 AI 매뉴얼](./ai-manal.md)
+- [MCP·Computer Use용 AI 매뉴얼](./ai-manual.md)
