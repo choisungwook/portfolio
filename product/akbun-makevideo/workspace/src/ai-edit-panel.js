@@ -141,9 +141,11 @@
   }
 
   function showSection(section) {
-    selectedSection = section === 'captions' ? 'captions' : 'conversations';
+    selectedSection = ['captions', 'studio'].includes(section) ? section : 'conversations';
     $('ai-conversations-view').hidden = selectedSection !== 'conversations';
     $('ai-captions-view').hidden = selectedSection !== 'captions';
+    $('ai-workflow-view').hidden = selectedSection !== 'studio';
+    if (selectedSection === 'studio') globalThis.makevideoAiStudio?.refresh();
     for (const button of document.querySelectorAll('[data-ai-section]')) {
       button.setAttribute('aria-pressed', String(button.dataset.aiSection === selectedSection));
     }

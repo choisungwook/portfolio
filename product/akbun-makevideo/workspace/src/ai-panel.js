@@ -31,6 +31,14 @@
     detail: 'Looking for Codex CLI and ChatGPT authentication.',
   };
 
+  const structured = globalThis.makevideoAiStructured.createClient({
+    ensureThread, rpc,
+    getThread: () => threadId,
+    setThread: (value) => { threadId = value; },
+    connection: () => connection,
+    hasPending: () => Boolean(pendingTurn),
+  });
+
   const DEVELOPER_INSTRUCTIONS = [
     'You are embedded in akbun-makevideo, a desktop video editor.',
     'Do not run shell commands, inspect files, use web search, modify files, call MCP tools, or delegate work.',
@@ -144,6 +152,7 @@
     listenersReady = Promise.all([
       window.api.onAiServerMessage(handleServerMessage),
       window.api.onAiServerState(() => {
+        structured.disconnected();
         rejectRpcRequests(new Error('Codex App Server stopped.'));
         connectionPromise = null;
         isolatedConfigPromise = null;
@@ -205,6 +214,7 @@
   }
 
   function handleNotification(method, params) {
+    if (structured.handleNotification(method, params)) return;
     if (method === 'account/updated') {
       if (params.authMode === 'chatgpt') void refreshStatus();
       else {
@@ -413,6 +423,7 @@
   }
 
   function newConversation() {
+    if (structured.isBusy()) return;
     if (sessions.length >= A.MAX_SESSIONS) return;
     currentSession = null;
     currentImageRoot = '';
@@ -424,6 +435,7 @@
   }
 
   async function openSavedSession(id) {
+    if (structured.isBusy()) return;
     try {
       const loaded = await window.api.aiLoadSession(id);
       currentSession = A.normalizeSession(loaded.session);
@@ -659,7 +671,7 @@
   }
 
   async function sendPrompt() {
-    if (pendingTurn || currentSession?.status === 'readonly') return;
+    if (pendingTurn || structured.isBusy() || currentSession?.status === 'readonly') return;
     const prompt = $('ai-prompt').value.trim();
     if (!prompt) return;
     try {
@@ -845,6 +857,7 @@
   }
 
   async function closeConversation() {
+    if (structured.isBusy()) return;
     if (pendingTurn) await stopTurn();
     if (currentSession?.id && currentSession.status !== 'readonly') {
       currentSession.status = 'readonly';
@@ -930,5 +943,5 @@
     await loadSessionList();
   }
 
-  return { initialize, open, refreshStatus, fillSettings };
+  return { initialize, open, refreshStatus, fillSettings, requestStructured: structured.requestStructured, cancelStructured: structured.cancelStructured };
 });

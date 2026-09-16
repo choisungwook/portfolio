@@ -27,6 +27,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
     'program-monitor-ui.js', 'inspector-ui.js', 'keyboard-ui.js',
     'timeline-interactions.js', 'app-init.js', 'renderer-assets-ui.js',
     'renderer-timeline-ui.js', 'renderer-project-ui.js', 'renderer-wiring.js',
+    'ai.js', 'ai-edit-panel.js', 'ai-structured.js', 'ai-panel.js', 'ai-workflow.js', 'ai-studio.js',
   ];
   for (const name of names) {
     const file = path.join(__dirname, '..', 'src', name);

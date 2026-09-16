@@ -1,0 +1,34 @@
+.ai-section-tabs { grid-template-columns: repeat(3, 1fr); }
+.ai-studio { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.ai-studio[hidden] { display: none; }
+.ai-studio-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; gap: 8px; }
+.ai-studio-header h3 { margin: 0; font-size: 13px; }
+.ai-studio-header span { color: var(--accent); font-size: 10px; }
+.ai-workflow-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
+.ai-workflow-steps button { padding: 5px 2px; font-size: 10px; }
+.ai-workflow-steps [aria-pressed='true'] { background: var(--accent); color: var(--accent-fg); }
+.ai-studio-scroll { flex: 1; min-height: 80px; overflow: auto; padding: 12px; }
+.ai-studio h4 { margin: 0 0 8px; font-size: 12px; }
+.ai-studio p { font-size: 11px; line-height: 1.5; margin: 6px 0 10px; overflow-wrap: anywhere; }
+.ai-studio label { display: block; margin: 8px 0 4px; font-size: 11px; }
+.ai-studio input, .ai-studio select, .ai-studio textarea { box-sizing: border-box; width: 100%; min-width: 0; }
+.ai-studio section > button { margin: 3px 0; width: 100%; text-align: left; }
+.ai-studio-range { display: flex; gap: 8px; }
+.ai-studio-range label { flex: 1; min-width: 0; }
+.ai-studio-list { margin: 10px 0; font-size: 11px; color: var(--dim); }
+.ai-studio-list article { border-top: 1px solid var(--border); padding: 10px 0; }
+.ai-studio-list strong { display: block; color: var(--fg); overflow-wrap: anywhere; }
+.ai-studio-list button { font-size: 10px; margin: 4px 4px 0 0; }
+.ai-studio-composer { flex: none; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel-2); }
+.ai-studio-composer textarea { resize: vertical; min-height: 56px; max-height: 180px; font: inherit; }
+.ai-studio-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.ai-studio[data-step='prepare'] .ai-studio-composer > :not(#studio-status):not(.ai-studio-actions) { display: none; }
+.ai-studio[data-step='prepare'] #studio-propose { display: none; }
+#studio-status { margin-bottom: 0; }
+#studio-review { margin-top: 16px; border-top: 2px solid var(--accent); padding-top: 12px; }
+.ai-studio-review-heading { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+#studio-operations { margin: 8px 0; padding-left: 20px; font-size: 11px; }
+#studio-operations li { padding: 4px 0 8px; border-bottom: 1px solid var(--border); }
+#studio-operations button { margin: 2px; font-size: 10px; }
+#studio-operations pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; }
+.ai-studio button:focus-visible, .ai-studio input:focus-visible, .ai-studio textarea:focus-visible, .ai-studio select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

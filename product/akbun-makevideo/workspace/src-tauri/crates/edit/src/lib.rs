@@ -21,6 +21,7 @@
 //! that matters.
 
 pub mod animation;
+pub mod ai_plan;
 pub mod command;
 pub mod document;
 pub mod migrate;

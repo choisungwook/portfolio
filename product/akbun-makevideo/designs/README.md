@@ -14,6 +14,9 @@
 - Global Action Bar: Inspector / Shape / Marker / Debug
 - Panel Tab Bar: Video / Audio / Effects / Transition / Image / File
 - Timeline: 편집 툴바 / ruler와 tracks
+- AI Edit studio: Prepare / Story / Layers / Finish 단계, 스크롤 가능한 내용과 하단 요청 입력
+- 편집 제안: 실제 적용 전에 변경 목록 표시, 컷 구간 버튼으로 원본 위치 탐색
+- 기존 색상 token과 시스템 글꼴 유지, 준비 단계에서는 입력창을 접어 분석 영역 확보
 
 ## Interaction
 
