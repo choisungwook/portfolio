@@ -58,7 +58,8 @@
     }
 
     function handleNotification(method, params) {
-      if (workflowTurn && (!params.threadId || params.threadId === deps.getThread())) {
+      const related = ['turn/started', 'turn/completed', 'item/completed'].includes(method);
+      if (workflowTurn && related && params.threadId === deps.getThread()) {
         if (method === 'turn/started') workflowTurn.id = params.turn?.id;
         if (method === 'item/completed' && params.item?.type === 'agentMessage' && params.item.phase !== 'commentary') workflowTurn.text = params.item.text || '';
         if (method === 'turn/completed' && (!workflowTurn.id || workflowTurn.id === params.turn?.id)) {

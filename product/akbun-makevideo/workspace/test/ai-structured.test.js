@@ -94,3 +94,27 @@ test('server exit rejects an active structured request without waiting for timeo
   fixture.stopped();
   await rejection;
 });
+
+test('structured requests leave global notifications and other threads to the caller', async () => {
+  const { createClient } = require('../src/ai-structured.js');
+  let thread = 'conversation';
+  const structured = createClient({
+    hasPending: () => false,
+    getThread: () => thread,
+    setThread: (value) => { thread = value; },
+    ensureThread: async () => { thread = 'structured'; return thread; },
+    connection: () => ({ models: [{ id: 'gpt-6-astra' }], server: {} }),
+    rpc: async () => ({ turn: { id: 'turn-1' } }),
+  });
+  const pending = structured.requestStructured('Edit', {});
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(structured.handleNotification('account/updated', { authMode: null }), false);
+  assert.equal(structured.handleNotification('error', { error: { message: 'Global error' } }), false);
+  assert.equal(structured.handleNotification('thread/updated', { threadId: 'structured' }), false);
+  assert.equal(structured.handleNotification('turn/completed', { threadId: 'other', turn: { id: 'turn-1', status: 'completed' } }), false);
+  assert.equal(structured.handleNotification('turn/completed', { turn: { id: 'turn-1', status: 'completed' } }), false);
+  structured.handleNotification('item/completed', { threadId: 'structured', item: { type: 'agentMessage', text: '{}' } });
+  structured.handleNotification('turn/completed', { threadId: 'structured', turn: { id: 'turn-1', status: 'completed' } });
+  assert.equal(await pending, '{}');
+  assert.equal(thread, 'conversation');
+});
