@@ -55,6 +55,9 @@ final class FileBrowserView: NSView {
   /// the segments of the control in the header, so the two cannot drift.
   private enum Panel: Int { case files, git, status, search }
   private var panel = Panel.files
+  /// Whether the divider between the tree and the detail has been placed. Once
+  /// is enough: after that the position is the user's.
+  private var gitDividerPlaced = false
   /// What git said the last time it was asked, by absolute path. Empty for a
   /// project that is not in a repository, which draws every name plainly.
   private var git: [String: CoreGitEntry] = [:]
@@ -128,6 +131,14 @@ final class FileBrowserView: NSView {
     let header = NSStackView(views: [title, NSView(), panels, refresh])
     header.orientation = .horizontal
     header.alignment = .centerY
+    // One row tall, whatever the panes under it ask for. A hidden pane's
+    // constraints are still live, and the split view under the Git segment
+    // holds its halves at the size they last had, which is no size before it
+    // has ever been shown. At the stack's default priority that pull tied with
+    // the header's own, and the header could win: it grew to fill the pane,
+    // put the title and the control in the vertical middle, and left the list
+    // beneath it no height at all.
+    header.setHuggingPriority(.defaultHigh, for: .vertical)
     header.translatesAutoresizingMaskIntoConstraints = false
 
     let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("file"))
@@ -158,7 +169,11 @@ final class FileBrowserView: NSView {
     gitPanes.dividerStyle = .thin
     gitPanes.addArrangedSubview(gitTree)
     gitPanes.addArrangedSubview(gitDetail)
-    gitPanes.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+    // The tree flexes and the detail keeps its height: a list of commits is any
+    // length, a diff wants the room it was given. The split view's default is
+    // already the low priority, so the tree's has to be lower still to say so.
+    gitPanes.setHoldingPriority(.init(249), forSubviewAt: 0)
+    gitPanes.setHoldingPriority(.defaultLow, forSubviewAt: 1)
     gitTree.onSelectCommit = { [weak self] commit in
       guard let self else { return }
       gitDetail.show(root: root, hash: commit?.hash)
@@ -275,6 +290,22 @@ final class FileBrowserView: NSView {
     panels.selectedSegment = panel.rawValue
     loadVisiblePanel()
     showMode()
+    placeGitDivider()
+  }
+
+  /// Puts the divider between the tree and the detail where it starts, the
+  /// first time the Git pane has a height to divide. The window places its own
+  /// dividers the same way and for the same reason: a constraint cannot say
+  /// "start here and then leave it alone". Without this the two halves were
+  /// held at the height they had before the pane was ever shown, which was
+  /// none, and the detail could come up with no room at all.
+  private func placeGitDivider() {
+    guard panel == .git, !gitDividerPlaced else { return }
+    layoutSubtreeIfNeeded()
+    let height = gitPanes.bounds.height
+    guard height > 0 else { return }
+    gitPanes.setPosition(height * 0.55, ofDividerAt: 0)
+    gitDividerPlaced = true
   }
 
   /// Reads the project into whichever pane is now in front. A pane that is
