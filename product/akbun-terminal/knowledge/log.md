@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-16
+
+- **Creation**: [숨긴 패널의 constraint는 살아 있으므로 헤더의 hugging을 명시한다](decisions/2026-09-hidden-panes-still-pull-on-the-header.md) 기록. v0.13.0 오른쪽 패널 헤더가 세로 가운데로 늘어나 파일 목록이 사라진 원인.
+
 ## 2026-09-13
 
 - **Creation**: [Git 패널은 읽기만 하고 저장소를 바꾸지 않는다](decisions/2026-09-git-panel-reads-and-never-writes.md) 기록. commit 상세와 작업 트리 패널을 추가하면서 쓰기 동작을 넣지 않은 이유.
