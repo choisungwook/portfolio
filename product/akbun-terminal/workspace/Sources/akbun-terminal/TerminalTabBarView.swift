@@ -10,6 +10,7 @@ import AkbunTerminalCore
 final class TerminalTabBarView: NSView {
   var onSelect: ((TerminalTabs.Content) -> Void)?
   var onClose: ((TerminalTabs.Content) -> Void)?
+  var onRename: ((TerminalTabs.Content) -> Void)?
   var onNew: (() -> Void)?
 
   /// The strip grows with everything else, so a zoomed window does not draw
@@ -142,7 +143,8 @@ final class TerminalTabBarView: NSView {
           zoom: zoom,
           palette: palette,
           select: { [weak self] in self?.onSelect?(content) },
-          close: { [weak self] in self?.onClose?(content) }
+          close: { [weak self] in self?.onClose?(content) },
+          rename: { [weak self] in self?.onRename?(content) }
         ))
     }
     let add = NSButton(
@@ -161,12 +163,22 @@ final class TerminalTabBarView: NSView {
 
 private final class TabButton: NSView {
   private let select: () -> Void
+  private let close: () -> Void
+  private let rename: () -> Void
+  /// A shell can be called anything, because "Shell 3" says nothing about what
+  /// runs in it. A document tab keeps the file's name: a name that was not the
+  /// file's would hide which file the tab is about to write.
+  private let isRenamable: Bool
 
   init(
     tab: TerminalTabs.Tab, isActive: Bool, status: CoreWorkspaceStatus, zoom: Zoom,
-    palette: Palette, select: @escaping () -> Void, close: @escaping () -> Void
+    palette: Palette, select: @escaping () -> Void, close: @escaping () -> Void,
+    rename: @escaping () -> Void
   ) {
     self.select = select
+    self.close = close
+    self.rename = rename
+    self.isRenamable = tab.documentPath == nil
     super.init(frame: .zero)
     // The row is the control, so it has to say so itself; VoiceOver has no other
     // way to find a tab drawn as a plain view.
@@ -216,6 +228,27 @@ private final class TabButton: NSView {
 
   override func mouseDown(with event: NSEvent) {
     select()
+  }
+
+  /// A right click offers what the strip has no room to draw on every tab. The
+  /// tab comes forward first, so the name being asked for is the one on screen.
+  override func rightMouseDown(with event: NSEvent) {
+    select()
+    let menu = NSMenu()
+    if isRenamable {
+      menu.addItem(withTitle: "Rename Tab…", action: #selector(runRename), keyEquivalent: "")
+        .target = self
+    }
+    menu.addItem(withTitle: "Close Tab", action: #selector(runClose), keyEquivalent: "").target = self
+    NSMenu.popUpContextMenu(menu, with: event, for: self)
+  }
+
+  @objc private func runRename() {
+    rename()
+  }
+
+  @objc private func runClose() {
+    close()
   }
 
   override func accessibilityPerformPress() -> Bool {

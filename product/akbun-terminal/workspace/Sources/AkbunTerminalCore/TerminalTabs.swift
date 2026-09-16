@@ -91,6 +91,16 @@ public struct TerminalTabs: Equatable, Sendable {
     append(Tab(content: content, title: title), to: workspace)
   }
 
+  /// Gives a tab the name the user typed. Only the title moves: the content is
+  /// the tab's identity, and a rename that touched it would be a close and an
+  /// open as far as every map keyed on it is concerned.
+  public mutating func rename(_ content: Content, to title: String, in workspace: UInt64) {
+    var tabs = self.tabs(in: workspace)
+    guard let index = tabs.firstIndex(where: { $0.content == content }) else { return }
+    tabs[index] = Tab(content: content, title: title)
+    byWorkspace[workspace] = tabs
+  }
+
   public mutating func select(_ content: Content, in workspace: UInt64) {
     guard tabs(in: workspace).contains(where: { $0.content == content }) else { return }
     activeByWorkspace[workspace] = content
