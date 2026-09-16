@@ -61,6 +61,13 @@ struct TerminalTabsTests {
     #expect(tabs.tabs(in: 20).isEmpty)
   }
 
+  @Test func aDocumentKeepsItsFileName() {
+    var tabs = TerminalTabs()
+    tabs.add(document: "/p/README.md", title: "README.md", to: 10)
+    tabs.rename(.document(path: "/p/README.md"), to: "notes", in: 10)
+    #expect(tabs.tabs(in: 10).map(\.title) == ["README.md"])
+  }
+
   @Test func documentsShareTheStripWithShells() {
     var tabs = TerminalTabs()
     tabs.add(session: 1, to: 10)

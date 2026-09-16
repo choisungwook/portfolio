@@ -231,9 +231,10 @@ private final class TabButton: NSView {
   }
 
   /// A right click offers what the strip has no room to draw on every tab. The
-  /// tab comes forward first, so the name being asked for is the one on screen.
+  /// tab is not selected here: selecting redraws the strip, and this view would
+  /// be gone before the menu it is asked to anchor could open. The menu
+  /// actions select instead, once the menu has closed.
   override func rightMouseDown(with event: NSEvent) {
-    select()
     let menu = NSMenu()
     if isRenamable {
       menu.addItem(withTitle: "Rename Tab…", action: #selector(runRename), keyEquivalent: "")
@@ -244,6 +245,7 @@ private final class TabButton: NSView {
   }
 
   @objc private func runRename() {
+    select()
     rename()
   }
 

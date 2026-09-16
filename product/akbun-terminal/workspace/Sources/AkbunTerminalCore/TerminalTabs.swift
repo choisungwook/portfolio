@@ -91,10 +91,13 @@ public struct TerminalTabs: Equatable, Sendable {
     append(Tab(content: content, title: title), to: workspace)
   }
 
-  /// Gives a tab the name the user typed. Only the title moves: the content is
-  /// the tab's identity, and a rename that touched it would be a close and an
-  /// open as far as every map keyed on it is concerned.
+  /// Gives a shell the name the user typed. Only the title moves: the content
+  /// is the tab's identity, and a rename that touched it would be a close and
+  /// an open as far as every map keyed on it is concerned. A document keeps the
+  /// file's name, because a title that was not the file's would hide which
+  /// file the tab is about to write; the rule sits here so no caller can miss it.
   public mutating func rename(_ content: Content, to title: String, in workspace: UInt64) {
+    guard case .shell = content else { return }
     var tabs = self.tabs(in: workspace)
     guard let index = tabs.firstIndex(where: { $0.content == content }) else { return }
     tabs[index] = Tab(content: content, title: title)
