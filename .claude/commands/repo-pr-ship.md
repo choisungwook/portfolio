@@ -1,5 +1,5 @@
 ---
-description: Issue와 PR 생성부터 Copilot 리뷰, 리뷰 반영, squash merge, Issue close까지 한 번에 진행한다
+description: 작업이 끝난 branch를 master에 넣는다. Issue와 PR 생성, Copilot 리뷰, merge, Issue close까지
 argument-hint: [resume] [PR 번호]
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 ---

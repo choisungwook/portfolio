@@ -1,5 +1,5 @@
 ---
-description: 아이디어, 목표, 버그를 듣고 기록용 Issue로 만든다. 불명확한 결정은 인터뷰로 확정하고, 큰 작업은 실행 순서 번호를 붙인 여러 Issue로 쪼갠다
+description: 기록용 Issue를 만든다. PR 없이 Issue만 필요할 때 쓴다
 argument-hint: [아이디어, 목표, 버그 설명]
 allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 ---
