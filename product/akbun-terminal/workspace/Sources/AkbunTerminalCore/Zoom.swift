@@ -1,12 +1,5 @@
 import Foundation
 
-/// How large the window draws itself.
-///
-/// Zoom used to be the terminal's font size and nothing else, which is why the
-/// tab strip, the project list and the file browser stayed put while the text
-/// under them grew. One value that every view reads is what makes the whole
-/// window one size, and keeping it here rather than in the window controller is
-/// what lets the steps and the limits be checked without opening a window.
 public struct Zoom: Equatable, Sendable {
   /// The terminal's point size at the default zoom. Every other size in the
   /// window is expressed as a multiple of its own default against this one.

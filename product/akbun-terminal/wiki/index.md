@@ -67,7 +67,7 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 | `Sources/akbun-terminal/SwiftTermTerminalView.swift` | the emulator behind that seam |
 | `Sources/akbun-terminal/TerminalTabBarView.swift` | the tab strip for the selected workspace |
 | `Sources/AkbunTerminalCore/TerminalTabs.swift` | which shell and which document belong to which workspace, and which is on screen |
-| `Sources/AkbunTerminalCore/Zoom.swift` | the one size the whole window is drawn at |
+| `Sources/AkbunTerminalCore/Zoom.swift` | bounded size scaling, independently used by content and panels |
 | `Sources/AkbunTerminalCore/TerminalKeys.swift` | the keystrokes this app encodes itself, shift and return so far |
 | `Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
 | `Sources/AkbunTerminalCore/ShortcutKey.swift` | a core shortcut string to a key equivalent and a modifier mask, and back |
