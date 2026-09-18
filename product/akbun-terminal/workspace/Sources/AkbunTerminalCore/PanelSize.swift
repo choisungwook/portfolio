@@ -9,7 +9,7 @@ public struct PanelSize {
 
   public init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
-    let saved = defaults.object(forKey: Self.key) as? Double ?? 100
+    let saved = (defaults.object(forKey: Self.key) as? NSNumber)?.doubleValue ?? 100
     percent = Self.clamp(saved)
   }
 
