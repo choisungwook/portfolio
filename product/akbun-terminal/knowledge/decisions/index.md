@@ -1,5 +1,7 @@
 # Decisions
 
+- [콘텐츠 확대와 주변 패널 크기 분리](2026-09-content-and-panel-zoom.md)
+
 - [Git 패널은 읽기만 하고 저장소를 바꾸지 않는다](2026-09-git-panel-reads-and-never-writes.md)
 - [렌더링은 LSP 없이 외부 엔진에 위임](2026-08-rendering-is-delegated-without-lsp.md)
 - [.app은 번들이 아니라 실행파일에 서명한다](2026-09-app-bundle-is-signed-at-the-executable.md)

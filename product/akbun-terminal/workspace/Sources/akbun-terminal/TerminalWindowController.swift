@@ -43,7 +43,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   /// alone, which left a system coloured sidebar, tab strip and file list around
   /// it; one palette handed to every view is what makes the window one surface.
   private var palette = Palette.system
-  /// Applies to every pane in the window, and to the next terminal opened.
+  private(set) var panelSize = PanelSize()
   private var zoomLevel = Zoom()
   /// What each shell was last judged to be, so a finish is reported once rather
   /// than on every tick that repeats it.
@@ -83,6 +83,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
     layOut(in: window)
     connect()
+    applyPanelSize()
   }
 
   required init?(coder: NSCoder) {
@@ -537,7 +538,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       backing: .buffered,
       defer: false)
     sheet.appearance = palette.appearance
-    let view = CommandPaletteView(core: core, root: root, palette: palette, zoom: zoomLevel)
+    let view = CommandPaletteView(core: core, root: root, palette: palette, zoom: panelSize.zoom)
     view.onClose = { [weak self, weak sheet] in
       guard let sheet else { return }
       self?.window?.endSheet(sheet)
@@ -576,12 +577,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   // MARK: Zoom
 
-  /// Steps the whole window up or down, or back to the default at zero.
-  ///
-  /// Zoom was the terminal's font size alone, which left the tab titles, the
-  /// project list and the file names at their original size while the terminal
-  /// grew — readable in one pane and not in the others. One value drives all of
-  /// them now.
   func zoom(by steps: Double) {
     zoomLevel.step(by: steps)
     applyZoom()
@@ -596,10 +591,19 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     for document in documents.values {
       document.zoom = zoomLevel
     }
-    sidebar.zoom = zoomLevel
-    browser.zoom = zoomLevel
-    tabBar.zoom = zoomLevel
-    placeholder.font = .systemFont(ofSize: zoomLevel.size(13))
+  }
+
+  func setPanelSize(percent: Double) {
+    panelSize.set(percent: percent)
+    applyPanelSize()
+  }
+
+  private func applyPanelSize() {
+    let zoom = panelSize.zoom
+    sidebar.zoom = zoom
+    browser.zoom = zoom
+    tabBar.zoom = zoom
+    placeholder.font = .systemFont(ofSize: zoom.size(13))
   }
 
   // MARK: Links

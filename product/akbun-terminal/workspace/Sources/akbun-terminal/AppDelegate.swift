@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
   private var core: CoreBridge?
   private var windowController: TerminalWindowController?
   /// Kept so the settings window is the same one every time it is opened.
+  private var generalWindow: GeneralSettingsWindowController?
   private var shortcutsWindow: ShortcutsWindowController?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -110,6 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     // because the theme list used to be buried in View where nobody looking for
     // it would think to open it.
     let settingsMenu = NSMenu(title: "Settings")
+    settingsMenu.addItem(
+      withTitle: "General…", action: #selector(openGeneral), keyEquivalent: ","
+    ).target = self
     let themeItem = settingsMenu.addItem(withTitle: "Theme", action: nil, keyEquivalent: "")
     themeItem.submenu = themeMenu(for: controller)
     settingsMenu.addItem(
@@ -231,6 +235,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
 
   @objc private func toggleEditMode() {
     windowController?.toggleEditMode()
+  }
+
+  @objc private func openGeneral() {
+    guard let controller = windowController, let parent = controller.window else { return }
+    if generalWindow == nil {
+      generalWindow = GeneralSettingsWindowController(percent: controller.panelSize.percent)
+      generalWindow?.onChange = { [weak controller] percent in
+        controller?.setPanelSize(percent: percent)
+      }
+    }
+    guard let sheet = generalWindow?.window, sheet.sheetParent == nil else { return }
+    parent.beginSheet(sheet)
   }
 
   @objc private func zoomIn() {

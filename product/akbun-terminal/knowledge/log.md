@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-18
+
+- **Creation**: [콘텐츠 확대와 주변 패널 크기 분리](decisions/2026-09-content-and-panel-zoom.md) 결정 기록
+
 ## 2026-09-16
 
 - **Creation**: [숨긴 패널의 constraint는 살아 있으므로 헤더의 hugging을 명시한다](decisions/2026-09-hidden-panes-still-pull-on-the-header.md) 기록. v0.13.0 오른쪽 패널 헤더가 세로 가운데로 늘어나 파일 목록이 사라진 원인.

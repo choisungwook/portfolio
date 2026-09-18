@@ -2,8 +2,6 @@ import Testing
 
 @testable import AkbunTerminalCore
 
-/// Zoom is one number the whole window reads, so its steps and its limits are
-/// checked here rather than by watching text grow.
 struct ZoomTests {
   @Test func stepsUpAndDownFromTheDefault() {
     var zoom = Zoom()
@@ -31,7 +29,7 @@ struct ZoomTests {
     #expect(zoom.terminalFontSize == Zoom.smallest)
   }
 
-  @Test func everyOtherSizeFollowsTheTerminal() {
+  @Test func sizesFollowTheScale() {
     var zoom = Zoom()
     // Unzoomed, a control asking for its own default gets exactly that back.
     #expect(zoom.size(12) == 12)
