@@ -24,6 +24,8 @@ v1.99.1에서 토큰 1000개씩으로 측정한 값이다.
 | cache 단가만 지정 | $0.00000000 | $0.00000000 |
 | 네 단가 모두 지정 | $0.00330000 | $0.01650000 |
 
+사용자가 준 단가는 적용 전에 기본 가격표와 대조한다. 위 표의 custom 값은 기본 대비 10% 높은데 의도한 마진이 아니었다. 차이가 있으면 적용과 함께 알린다.
+
 `input_cost_per_token`이 설정돼 있을 때만 `_inherit_builtin_cache_pricing`이 동작해 `cache_creation_input_token_cost_above_1hr` 같은 미지정 cache 항목을 기본 가격표에서 상속한다. cache 단가만 주면 이 상속도 걸리지 않는다.
 
 검증은 `/model/info`로 한다. `/spend/calculate`는 provider 모델명으로 기본 가격표를 조회하므로 custom pricing이 반영되지 않는다.
