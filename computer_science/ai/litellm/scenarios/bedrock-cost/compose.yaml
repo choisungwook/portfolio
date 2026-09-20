@@ -1,0 +1,106 @@
+# docker compose down 은 named volume을 지우지 않는다. spend log(Postgres)와 응답 캐시(Redis)가 남는다.
+# 전부 지우려면 docker compose down -v
+# 시나리오마다 project 이름과 host port가 다르다. 동시에 띄워도 컨테이너·볼륨·포트가 겹치지 않는다.
+name: litellm-bedrock-cost
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.99.1
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4020:4000"   # host 4020 → 컨테이너 4000
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@db:5432/litellm
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION_NAME: ${AWS_REGION_NAME}
+      # 이미지에 들어 있는 가격표만 쓴다. 끄면 기동할 때 GitHub main의 가격표를 받아와 실행 시점마다 단가가 달라질 수 있다.
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    # proxy가 응답하지 않으면 docker compose ps가 unhealthy로 표시한다.
+    # 이것이 없으면 이벤트 루프가 막혀도 Up으로만 보여서 멈춘 줄 모른다.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --max-time 5 http://localhost:4000/health/liveliness || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litellm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+
+  # LiteLLM 장부를 Prometheus 형식으로 긁는다. exporter 컨테이너가 따로 없고
+  # proxy 자신이 /metrics 를 연다. config.yaml의 callbacks: ["prometheus"]가 이 엔드포인트를 붙인다.
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    depends_on:
+      - litellm
+    restart: unless-stopped
+
+  # Bedrock 장부. CloudWatch 지표를 Prometheus metric으로 바꾼다.
+  # AWS API 호출이라 돈이 든다. scrape 주기는 observability/prometheus.yml에서 5분으로 묶어 뒀다.
+  cloudwatch-exporter:
+    image: prom/cloudwatch-exporter:v0.18.0
+    # 이미지 entrypoint가 포트 9106을 이미 넘긴다. 여기에는 config 경로만 준다.
+    command: ["/config/cloudwatch.yml"]
+    volumes:
+      - ./observability/cloudwatch.yml:/config/cloudwatch.yml:ro
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION_NAME}
+    restart: unless-stopped
+
+  # Prometheus에 모인 두 장부를 그림으로 본다. 로컬 lab이라 로그인을 끈다.
+  grafana:
+    image: grafana/grafana:13.2.2
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  promdata:
+  grafanadata:

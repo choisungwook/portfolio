@@ -4,7 +4,7 @@
 
 ## spend log: 모든 호출이 DB에 남는다
 
-[set-model/config.yaml](../install/set-model/config.yaml)의 `store_prompts_in_spend_logs: true` 덕분에, 모든 요청이 어떤 key로 어떤 모델에 얼마를 썼는지 Postgres에 기록된다. 이건 별도 로깅 시스템을 붙인 게 아니라 gateway가 지나는 트래픽을 그대로 적는 것이다.
+[set-model/config.yaml](../scenarios/set-model/config.yaml)의 `store_prompts_in_spend_logs: true` 덕분에, 모든 요청이 어떤 key로 어떤 모델에 얼마를 썼는지 Postgres에 기록된다. 이건 별도 로깅 시스템을 붙인 게 아니라 gateway가 지나는 트래픽을 그대로 적는 것이다.
 
 key별 사용 내역은 spend 관련 endpoint로 조회한다.
 

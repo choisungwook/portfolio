@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # LiteLLM 장부. 로컬 호출이라 비용이 없다.
+  - job_name: litellm
+    static_configs:
+      - targets: ["litellm:4000"]
+
+  # Bedrock 장부. CloudWatch API는 호출당 과금이므로 5분마다만 긁는다.
+  - job_name: bedrock-cloudwatch
+    scrape_interval: 300s
+    scrape_timeout: 60s
+    static_configs:
+      - targets: ["cloudwatch-exporter:9106"]

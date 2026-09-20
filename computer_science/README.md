@@ -16,3 +16,4 @@
 | 8 | JVM 웜업 실습 | [링크](./jvm_warmup/) |
 | 9 | yum/dnf lock 로컬 재현 핸즈온 | [링크](./yum_dnf_lock/) |
 | 10 | git credential helper 원리와 CodeBuild connection 학습지 (핸즈온 포함) | [링크](./git/git_credential_helper/) |
+| 11 | LiteLLM spend와 Bedrock 청구가 다른 이유 (응답 캐시, prompt caching, 스트림 중단) | [링크](./ai/litellm/scenarios/bedrock-cost/) |

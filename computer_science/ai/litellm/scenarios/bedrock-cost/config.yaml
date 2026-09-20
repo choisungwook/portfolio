@@ -1,0 +1,26 @@
+model_list:
+  - model_name: claude-sonnet
+    litellm_params:
+      # global. 접두사가 Bedrock global inference profile이다. 요청을 받은 리전(source region) 요금으로 청구된다.
+      model: bedrock/global.anthropic.claude-sonnet-4-6
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      aws_region_name: os.environ/AWS_REGION_NAME
+
+litellm_settings:
+  # proxy가 /metrics 를 연다. 이 줄이 없으면 엔드포인트 자체가 붙지 않는다.
+  callbacks: ["prometheus"]
+  # 로컬 lab이라 /metrics 를 인증 없이 연다. Prometheus가 토큰 없이 긁을 수 있다.
+  # 운영에서는 true로 두고 Prometheus 쪽에 bearer 토큰을 준다.
+  require_auth_for_metrics_endpoint: false
+  cache: true            # LiteLLM 응답 캐시. 같은 요청은 Bedrock을 부르지 않고 Redis에서 돌려준다.
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+    ttl: 86400
+  num_retries: 0         # 재시도가 Bedrock 호출 수를 늘리지 않도록 끈다.
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

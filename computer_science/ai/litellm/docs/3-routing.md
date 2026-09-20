@@ -4,7 +4,7 @@
 
 ## 별칭 뒤에 provider를 숨긴다
 
-라우팅의 뼈대는 [set-model/config.yaml](../install/set-model/config.yaml)의 `model_list`다. 학습자가 부르는 이름(`model_name`)과 실제 provider 모델(`litellm_params.model`)을 분리하는 게 핵심이다.
+라우팅의 뼈대는 [set-model/config.yaml](../scenarios/set-model/config.yaml)의 `model_list`다. 학습자가 부르는 이름(`model_name`)과 실제 provider 모델(`litellm_params.model`)을 분리하는 게 핵심이다.
 
 ```yaml
 model_list:

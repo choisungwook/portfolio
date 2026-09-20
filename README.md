@@ -113,6 +113,7 @@
 99. OpenAI Codex 평가 게이트와 개선 루프 핸즈온 (26.8.25) - [링크](./computer_science/ai/codex-eval-loop/)
 100. STS·AgentCore Memory를 public NLB 고정 IP로 호출하는 hosts·Route 53·프록시 시나리오 (26.9.5) - [링크](./aws/vpc_endpoint/agentcore-memory-static-ip/)
 101. IAM Roles Anywhere 30분 컨셉: 사설 CA 인증·CN 거부·교체·CRL 폐기 (26.9.6) - [링크](./aws/iam/roles-anywhere/)
+102. LiteLLM spend와 Bedrock 청구(Cost Explorer)가 다른 이유: 응답 캐시·prompt caching·스트림 중단 시나리오 (26.9.20) - [링크](./computer_science/ai/litellm/scenarios/bedrock-cost/)
 
 ## 직접 만든 제품
 

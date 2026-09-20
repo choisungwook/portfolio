@@ -9,7 +9,7 @@ services:
   litellm:                     # gateway proxy
     image: ghcr.io/berriai/litellm:v1.91.1
     ports:
-      - "4000:4000"
+      - "4010:4000"
   db:                          # 상태 저장소
     image: postgres:16
 ```

@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: bedrock-cost
+    type: file
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

@@ -4,12 +4,12 @@
 
 ## 무엇이 뜨는가
 
-[set-model/docker-compose.yaml](../install/set-model/docker-compose.yaml)가 두 컨테이너를 띄운다.
+[set-model/docker-compose.yaml](../scenarios/set-model/docker-compose.yaml)가 두 컨테이너를 띄운다.
 
-- litellm: gateway proxy. 포트 4000. [set-model/config.yaml](../install/set-model/config.yaml)을 마운트하고 `.env`에서 key를 주입받는다.
+- litellm: gateway proxy. 포트 4000. [set-model/config.yaml](../scenarios/set-model/config.yaml)을 마운트하고 `.env`에서 key를 주입받는다.
 - db: Postgres 16. virtual key·spend log 등 gateway 상태를 저장한다. virtual key와 사용량 추적에 DB가 필요해 한 쌍으로 띄운다.
 
-compose 파일의 각 줄(이미지 태그·config mount·env 주입·DB 연결)이 무엇을 하는지는 [manual/docker-compose.md](../install/manual/docker-compose.md)에 정리돼 있다.
+compose 파일의 각 줄(이미지 태그·config mount·env 주입·DB 연결)이 무엇을 하는지는 [manual/docker-compose.md](../scenarios/manual/docker-compose.md)에 정리돼 있다.
 
 ## 사전 준비
 
@@ -21,7 +21,7 @@ compose 파일의 각 줄(이미지 태그·config mount·env 주입·DB 연결)
 `.env`를 만들고 값을 채운다.
 
 ```bash
-cd install/set-model
+cd scenarios/set-model
 cp .env.example .env
 ```
 

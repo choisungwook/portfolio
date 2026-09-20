@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiteLLM과 Bedrock의 token 장부</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --card: #ffffff; --ink: #1f2430; --muted: #5b6373; --line: #dcd9d0;
+    --gw: #1d4ed8; --gw-soft: #dbe6ff;
+    --br: #b45309; --br-soft: #fdebd0;
+    --cread: #0f766e; --cwrite: #6d28d9; --replay: #64748b; --warn: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161b; --card: #1d2028; --ink: #e8eaf0; --muted: #a0a8b8; --line: #343946;
+      --gw: #7aa2ff; --gw-soft: #1e2b4d; --br: #f2a24a; --br-soft: #3d2a12;
+      --cread: #4fd1c5; --cwrite: #b794f6; --replay: #94a3b8; --warn: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6;
+         font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.7rem; line-height: 1.3; margin: 0 0 8px; }
+  h2 { font-size: 1.25rem; margin: 48px 0 8px; line-height: 1.35; }
+  p { margin: 8px 0; } .lead { color: var(--muted); }
+  code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 1px 5px; border-radius: 4px; }
+  .gw { color: var(--gw); } .br { color: var(--br); } .num { font-variant-numeric: tabular-nums; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 20px; }
+  .tile h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); font-weight: 600; }
+  .tile .pair { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tile .pair b { font-size: 1.35rem; } .tile small { color: var(--muted); display: block; margin-top: 6px; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .tabs button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+                 background: var(--card); color: var(--ink); cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .flow { display: grid; grid-template-columns: 1fr 1.3fr 1.3fr; gap: 12px; align-items: stretch; }
+  .node { border-radius: 12px; padding: 14px; border: 2px solid var(--line); background: var(--card); position: relative; }
+  .node h3 { margin: 0 0 6px; font-size: 1rem; }
+  .node.gwn { border-color: var(--gw); background: var(--gw-soft); }
+  .node.brn { border-color: var(--br); background: var(--br-soft); }
+  .node ol { margin: 0; padding-left: 20px; font-size: .92rem; }
+  .node li + li { margin-top: 4px; }
+  .node .skip { color: var(--warn); font-weight: 600; }
+  .flow .node:not(:last-child)::after { content: "→"; position: absolute; right: -14px; top: 50%; transform: translateY(-50%);
+                                         font-size: 1.1rem; color: var(--muted); z-index: 1; }
+  .ledgers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .ledger h3 { margin: 0 0 10px; font-size: .95rem; }
+  .row { display: grid; grid-template-columns: 120px 1fr 70px; gap: 8px; align-items: center; font-size: .88rem; margin: 6px 0; }
+  .row .lbl { color: var(--muted); } .row .val { text-align: right; }
+  .track { height: 16px; background: var(--line); border-radius: 4px; overflow: hidden; display: flex; }
+  .track i { display: block; height: 100%; min-width: 2px; }
+  .verdict { margin-top: 12px; border-left: 4px solid var(--ink); padding: 8px 14px; }
+
+  .stack { display: flex; height: 44px; border-radius: 8px; overflow: hidden; margin: 14px 0 6px; }
+  .stack i { display: block; min-width: 4px; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; font-size: .9rem; margin-top: 10px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; background: var(--c); vertical-align: -1px; }
+  .callout { font-size: .9rem; color: var(--muted); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--gw); }
+  .big { font-size: 2rem; font-weight: 700; }
+  @media (max-width: 720px) {
+    .flow, .ledgers, .two { grid-template-columns: 1fr; }
+    .flow .node:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -20px; transform: translateX(50%); }
+    .row { grid-template-columns: 96px 1fr 60px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>같은 호출, 두 개의 token 장부</h1>
+  <p class="lead">client가 요청 하나를 보내면 <b class="gw">LiteLLM(AI gateway)</b>과 <b class="br">Bedrock(AI provider)</b>이 각자 token을 적습니다.
+    두 장부는 세는 대상과 묶는 방식이 달라서 숫자가 어긋납니다. 아래 값은 2026-09-20에 <code>global.anthropic.claude-sonnet-4-6</code>으로
+    시나리오 4개(요청 23건)를 돌려 LiteLLM spend log와 CloudWatch <code>AWS/Bedrock</code> 지표를 대조한 실측입니다.</p>
+
+  <div class="tiles">
+    <div class="card tile"><h3>input token 합계</h3>
+      <div class="pair"><span class="gw">LiteLLM <code>prompt_tokens</code></span><b class="num gw">53,156</b></div>
+      <div class="pair"><span class="br">Bedrock <code>InputTokenCount</code></span><b class="num br">406</b></div>
+      <small>LiteLLM이 131배. 캐시 token을 더하느냐의 차이입니다.</small></div>
+    <div class="card tile"><h3>output token 합계</h3>
+      <div class="pair"><span class="gw">LiteLLM <code>completion_tokens</code></span><b class="num gw">2,294</b></div>
+      <div class="pair"><span class="br">Bedrock <code>OutputTokenCount</code></span><b class="num br">2,689</b></div>
+      <small>합계는 비슷해 보이지만 +1,800과 −2,195가 상쇄된 값입니다.</small></div>
+    <div class="card tile"><h3>호출 수</h3>
+      <div class="pair"><span class="gw">LiteLLM 요청</span><b class="num gw">23</b></div>
+      <div class="pair"><span class="br">Bedrock Invocations</span><b class="num br">14</b></div>
+      <small>9건은 Redis에서 끝나 Bedrock에 닿지 않았습니다.</small></div>
+    <div class="card tile"><h3>금액</h3>
+      <div class="pair"><span class="gw">LiteLLM spend</span><b class="num gw">$0.0606</b></div>
+      <div class="pair"><span class="br">Bedrock token × 단가</span><b class="num br">$0.0935</b></div>
+      <small>차이 $0.033은 전부 끊긴 스트림(시나리오 4)에서 나왔습니다.</small></div>
+  </div>
+
+  <h2>요청 하나가 두 장부에 적히는 과정</h2>
+  <p class="lead">시나리오를 고르면 각 구간이 하는 일과 그 결과로 적히는 token이 바뀝니다.</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="flow" id="flow"></div>
+  <div class="ledgers">
+    <div class="card ledger"><h3 class="gw">LiteLLM 장부 (<code>LiteLLM_SpendLogs</code>)</h3><div id="lg"></div></div>
+    <div class="card ledger"><h3 class="br">Bedrock 장부 (CloudWatch, Cost Explorer)</h3><div id="lb"></div></div>
+  </div>
+  <div class="card verdict" id="verdict"></div>
+
+  <h2>input: LiteLLM은 세 종류를 더하고, Bedrock은 셋으로 나눕니다</h2>
+  <p>LiteLLM <code>prompt_tokens</code> 53,156을 Bedrock의 기준으로 쪼갠 막대입니다. Cost Explorer의 input token 줄에 해당하는 것은 맨 왼쪽의 얇은 조각 하나입니다.</p>
+  <div class="card">
+    <div class="stack" role="img" aria-label="prompt_tokens 53,156의 구성: 청구 대상 입력 403, 캐시 읽기 42,008, 캐시 쓰기 10,502, 응답 캐시 재기록 243">
+      <i style="flex:403;background:var(--br)"></i><i style="flex:42008;background:var(--cread)"></i>
+      <i style="flex:10502;background:var(--cwrite)"></i><i style="flex:243;background:var(--replay)"></i>
+    </div>
+    <div class="legend">
+      <span style="--c:var(--br)"><b class="num">403</b> 청구 대상 입력 (0.8%). Bedrock <code>InputTokenCount</code> 406에 대응, $3.00</span>
+      <span style="--c:var(--cread)"><b class="num">42,008</b> Bedrock 캐시 읽기 (79.0%). 별도 지표, $0.30</span>
+      <span style="--c:var(--cwrite)"><b class="num">10,502</b> Bedrock 캐시 쓰기 (19.8%). 별도 지표, $3.75</span>
+      <span style="--c:var(--replay)"><b class="num">243</b> LiteLLM 응답 캐시 hit의 usage 재기록 (0.5%). Bedrock에는 없음</span>
+    </div>
+    <p class="callout">단가는 100만 token당입니다. LiteLLM은 <code>prompt_tokens = inputTokens + cacheReadInputTokens + cacheWriteInputTokens</code>로 적지만
+      비용은 세 값에 각각의 단가를 곱합니다. 그래서 금액은 맞고 token 수만 큽니다. 실패한 요청이 있으면 LiteLLM이 추정한 <code>prompt_tokens</code>가 다섯 번째 조각으로 붙습니다.</p>
+  </div>
+
+  <h2>output: 방향이 두 가지입니다</h2>
+  <p>output은 LiteLLM이 많을 때도, 적을 때도 있습니다. 원인이 서로 다릅니다.</p>
+  <div class="two">
+    <div class="card"><h3 style="margin-top:0">응답 캐시 hit: LiteLLM이 많습니다</h3>
+      <div id="o2"></div>
+      <p class="callout">같은 요청 10건 중 9건은 Redis가 저장된 응답을 <code>usage</code>째로 돌려줍니다. LiteLLM은 10건 모두에 200을 적고 spend만 0으로 둡니다. Bedrock은 1건만 생성했습니다. 금액은 같습니다.</p></div>
+    <div class="card"><h3 style="margin-top:0">끊긴 스트림: Bedrock이 많습니다</h3>
+      <div id="o4"></div>
+      <p class="callout">client가 2초에 끊으면 LiteLLM은 그때까지 받은 chunk로 token을 추정합니다. Bedrock <code>OutputTokenCount</code>는 3건 모두 <code>max_tokens</code> 800까지 올라갔습니다. 금액이 어긋나는 유일한 경우입니다.</p></div>
+  </div>
+
+  <h2>LiteLLM input이 40% 많다면 무엇이 섞인 것인가</h2>
+  <p>LiteLLM <code>prompt_tokens</code> 중 Bedrock의 input 줄에 없는 token(캐시 읽기, 캐시 쓰기, 응답 캐시 재기록, 실패 추정)의 비중을 움직여 봅니다.</p>
+  <div class="card">
+    <label for="share">Bedrock input 줄에 없는 token의 비중: <b class="num" id="sv"></b></label>
+    <input id="share" type="range" min="0" max="95" value="29">
+    <p>LiteLLM input이 Bedrock input보다 <span class="big num gw" id="over"></span> 많게 보입니다.</p>
+    <p class="callout">비중 29%가 40% 차이에 해당합니다. 이 실험은 99.2%였습니다. 어느 조각이 그 29%인지는 <code>scripts/report-input-gap.sh</code>가 spend log에서 쪼개 줍니다.</p>
+  </div>
+
+  <h2>두 장부를 비교할 때의 기준</h2>
+  <div class="card">
+    <table>
+      <tr><th>항목</th><th class="gw">LiteLLM</th><th class="br">Bedrock</th></tr>
+      <tr><td>적는 단위</td><td>proxy가 받은 요청 전부. 캐시 hit, 실패 포함</td><td>모델이 처리한 호출</td></tr>
+      <tr><td>input의 범위</td><td>일반 + 캐시 읽기 + 캐시 쓰기를 한 컬럼에</td><td>세 가지를 서로 다른 지표와 usage type으로</td></tr>
+      <tr><td>응답 캐시 hit</td><td>token은 원래 usage를 다시 적고 spend는 0</td><td>호출이 없으므로 기록 없음</td></tr>
+      <tr><td>끊긴 스트림</td><td>받은 chunk에서 추정</td><td>서버가 생성한 만큼</td></tr>
+      <tr><td>단가</td><td>기동 시점의 <code>model_prices_and_context_window.json</code></td><td>AWS 요금표</td></tr>
+    </table>
+    <p class="callout">금액은 LiteLLM <code>spend</code> 컬럼으로 집계하면 청구서와 같은 기준입니다. token은 <code>cache_hit</code>과 <code>status</code>로 거르고 캐시 token을 빼야 Bedrock의 input과 맞습니다. 근거는 <a href="4-why-different.md">4-why-different.md</a>, 실측 표는 <a href="3-scenarios.md">3-scenarios.md</a>에 있습니다. Cost Explorer 금액 대조는 데이터가 하루 뒤에 나와 아직 하지 않았습니다.</p>
+  </div>
+</main>
+
+<script>
+const S = [
+  { name: "1. 기준선", req: 5, inv: 5,
+    gw: ["요청 5건을 받습니다.", "Redis에 cache key가 없습니다. 5건 모두 Bedrock으로 보냅니다.", "응답의 <code>usage</code>를 그대로 적습니다."],
+    br: ["Converse 5건을 처리합니다.", "입력과 출력을 셉니다. 캐시 token은 0입니다."],
+    gIn: [["prompt_tokens", 145, "gw"]], bIn: [["InputTokenCount", 145, "br"]],
+    gOut: 59, bOut: 59, gCost: 0.001320, bCost: 0.001320,
+    v: "캐시도 중단도 없으면 호출 수, input, output, 금액이 모두 같습니다. 뒤 시나리오의 차이를 캐시와 중단 탓으로 돌릴 수 있는 근거입니다." },
+  { name: "2. LiteLLM 응답 캐시", req: 10, inv: 1,
+    gw: ["같은 요청 10건을 받습니다.", "첫 1건만 Bedrock으로 보내고 응답을 Redis에 저장합니다.", "<span class='skip'>나머지 9건은 Redis에서 응답합니다. Bedrock을 부르지 않습니다.</span>", "hit 9건에도 원래 <code>usage</code>(27 / 200)를 적고 spend만 0으로 둡니다."],
+    br: ["Converse 1건만 처리합니다.", "입력 27, 출력 200을 셉니다.", "<span class='skip'>나머지 9건은 존재를 모릅니다.</span>"],
+    gIn: [["prompt_tokens", 270, "gw"]], bIn: [["InputTokenCount", 27, "br"]],
+    gOut: 2000, bOut: 200, gCost: 0.003081, bCost: 0.003081,
+    v: "LiteLLM token이 input, output 모두 10배입니다. 금액은 같습니다. LiteLLM의 token 합계는 provider 사용량이 아니라 client에게 제공한 양입니다." },
+  { name: "3. Bedrock prompt caching", req: 5, inv: 5,
+    gw: ["<code>cache_control</code>이 붙은 큰 system prompt 요청 5건을 받습니다.", "<code>cache_control</code>을 Bedrock <code>cachePoint</code>로 바꿔 5건 모두 보냅니다.", "<code>prompt_tokens = inputTokens + cacheRead + cacheWrite</code>로 더해서 적습니다.", "비용은 세 값에 각각의 단가를 곱합니다."],
+    br: ["1번째 호출: system prompt 10,502 token을 캐시에 씁니다.", "2~5번째 호출: 같은 10,502 token을 캐시에서 읽습니다.", "<code>inputTokens</code>에는 캐시되지 않은 27 token만 셉니다."],
+    gIn: [["prompt_tokens", 52645, "gw"]],
+    bIn: [["InputTokenCount", 135, "br"], ["CacheRead", 42008, "cread"], ["CacheWrite", 10502, "cwrite"]],
+    gOut: 30, bOut: 30, gCost: 0.052840, bCost: 0.052840,
+    v: "LiteLLM input이 Bedrock <code>InputTokenCount</code>의 390배입니다. Bedrock의 세 지표를 더하면 52,645로 같습니다. 비교 대상을 input 줄 하나로 잡으면 LiteLLM이 많아 보입니다." },
+  { name: "4. 스트림 중단", req: 3, inv: 3,
+    gw: ["<code>stream: true</code>, <code>max_tokens: 800</code> 요청 3건을 받습니다.", "client가 2초에 연결을 끊습니다. <code>usage</code>가 실린 마지막 chunk를 받지 못합니다.", "<span class='skip'>받은 chunk로 부분 응답을 조립하고 token을 로컬 tokenizer로 추정합니다.</span>"],
+    br: ["ConverseStream 3건을 처리합니다.", "<span class='skip'>3건 모두 800 token까지 생성한 것으로 셉니다.</span>", "원인이 proxy가 upstream을 닫지 않아서인지는 확인하지 못했습니다."],
+    gIn: [["prompt_tokens", 96, "gw"]], bIn: [["InputTokenCount", 99, "br"]],
+    gOut: 205, bOut: 2400, gCost: 0.003363, bCost: 0.036297,
+    v: "output이 LiteLLM 205, Bedrock 2,400입니다. 금액도 10.8배 어긋납니다. 스트림을 자주 끊는 client가 많으면 <code>max_tokens</code>가 청구를 좌우합니다." }
+];
+const fmt = n => n.toLocaleString("en-US");
+const bar = (label, segs, max) => {
+  const total = segs.reduce((a, s) => a + s[1], 0);
+  return `<div class="row"><span class="lbl">${label}</span><div class="track" style="width:${Math.max(total / max * 100, 1.5)}%">` +
+    segs.map(s => `<i style="flex:${s[1]};background:var(--${s[2]})" title="${s[0]} ${fmt(s[1])}"></i>`).join("") +
+    `</div><span class="val num">${fmt(total)}</span></div>`;
+};
+function render(i) {
+  const s = S[i];
+  document.querySelectorAll("#tabs button").forEach((b, j) => b.setAttribute("aria-selected", j === i));
+  document.getElementById("flow").innerHTML =
+    `<div class="node"><h3>client</h3><ol><li>${s.req}건을 <code>/v1/chat/completions</code>로 보냅니다.</li></ol></div>` +
+    `<div class="node gwn"><h3 class="gw">LiteLLM + Redis</h3><ol>${s.gw.map(x => `<li>${x}</li>`).join("")}</ol></div>` +
+    `<div class="node brn"><h3 class="br">Bedrock</h3><ol>${s.br.map(x => `<li>${x}</li>`).join("")}</ol></div>`;
+  const sum = a => a.reduce((t, x) => t + x[1], 0);
+  const inMax = Math.max(sum(s.gIn), sum(s.bIn)), outMax = Math.max(s.gOut, s.bOut), rMax = Math.max(s.req, s.inv);
+  document.getElementById("lg").innerHTML = bar("요청 수", [["요청", s.req, "gw"]], rMax) + bar("input", s.gIn, inMax) +
+    bar("output", [["completion_tokens", s.gOut, "gw"]], outMax) + `<div class="row"><span class="lbl">spend</span><span class="num">$${s.gCost.toFixed(6)}</span><span></span></div>`;
+  document.getElementById("lb").innerHTML = bar("Invocations", [["Invocations", s.inv, "br"]], rMax) + bar("input", s.bIn, inMax) +
+    bar("output", [["OutputTokenCount", s.bOut, "br"]], outMax) + `<div class="row"><span class="lbl">token × 단가</span><span class="num">$${s.bCost.toFixed(6)}</span><span></span></div>` +
+    (s.bIn.length > 1 ? `<p class="callout">input 막대: <span style="color:var(--br)">■</span> 일반 135 <span style="color:var(--cread)">■</span> 캐시 읽기 42,008 <span style="color:var(--cwrite)">■</span> 캐시 쓰기 10,502</p>` : "");
+  document.getElementById("verdict").innerHTML = s.v;
+}
+document.getElementById("tabs").innerHTML = S.map((s, i) => `<button role="tab" onclick="render(${i})">${s.name}</button>`).join("");
+render(2);
+document.getElementById("o2").innerHTML = bar("LiteLLM", [["completion_tokens", 2000, "gw"]], 2000) + bar("Bedrock", [["OutputTokenCount", 200, "br"]], 2000);
+document.getElementById("o4").innerHTML = bar("LiteLLM", [["completion_tokens", 205, "gw"]], 2400) + bar("Bedrock", [["OutputTokenCount", 2400, "br"]], 2400);
+const sh = document.getElementById("share");
+const upd = () => { const x = sh.value / 100; document.getElementById("sv").textContent = sh.value + "%";
+  document.getElementById("over").textContent = "+" + Math.round(x / (1 - x) * 100).toLocaleString("en-US") + "%"; };
+sh.oninput = upd; upd();
+</script>
+</body>
+</html>

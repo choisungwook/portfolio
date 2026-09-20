@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiteLLM과 Bedrock의 token 장부</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #7a8399;
+      --color-accent:  #eb6c36;
+      --color-link:    #2e5aa8;
+      --color-rule:    rgba(45,49,66,0.12);
+      --font-sans:     'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1240px; width: 100%; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      line-height: 1.6;
+      max-width: 62ch;
+      margin-bottom: 1.75rem;
+    }
+
+    svg.diagram { width: 100%; min-width: 900px; display: block; }
+    .scroll { overflow-x: auto; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.9fr;
+      gap: 1rem;
+      margin-top: 2.5rem;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--color-rule);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+    .card .eyebrow { margin-bottom: 0.4rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+    .card-dot.coral { background: var(--color-accent); }
+    .card-dot.ink   { background: var(--color-ink); }
+    .card-dot.muted { background: var(--color-muted); }
+    .card h3 { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; }
+    .card ul { list-style: none; display: grid; gap: 0.5rem; }
+    .card li { font-size: 0.85rem; line-height: 1.5; color: var(--color-muted); }
+    .card li b { color: var(--color-ink); font-weight: 600; }
+    .card li .n { font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--color-rule);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      color: var(--color-soft);
+      line-height: 1.7;
+    }
+    footer a { color: var(--color-link); text-decoration: none; }
+
+    @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · LiteLLM × Bedrock</p>
+    <h1>같은 호출을 두 곳이 따로 적는다</h1>
+    <p class="subtitle">client 요청 하나가 LiteLLM의 spend log와 Bedrock의 계량에 각각 기록됩니다. 두 장부는 세는 대상이 달라서 token 수가 어긋납니다. 캐시가 두 군데에 있고, 그중 하나는 Bedrock에 호출을 만들지 않습니다.</p>
+
+    <div class="scroll">
+    <svg class="diagram" viewBox="0 0 1240 488" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="token-ledger-title token-ledger-desc">
+      <title id="token-ledger-title">LiteLLM과 Bedrock의 token 장부</title>
+      <desc id="token-ledger-desc">client가 LiteLLM proxy를 거쳐 Bedrock을 호출하는 구조. LiteLLM은 Redis 응답 캐시를 두고 요청마다 spend log에 한 줄을 남기고, Bedrock은 prompt cache를 두고 처리한 호출만 CloudWatch와 청구에 기록한다. 두 장부의 input token이 53,156과 406으로 어긋난다.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- ── zones ── -->
+      <rect x="240" y="56" width="424" height="320" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <rect x="388" y="60" width="128" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="452" y="69" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">LOCAL · DOCKER COMPOSE</text>
+
+      <rect x="776" y="56" width="424" height="320" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <rect x="944" y="60" width="88" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="988" y="69" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">AWS · US-EAST-1</text>
+
+      <!-- ── connectors (drawn before nodes) ── -->
+      <line x1="200" y1="132" x2="340" y2="132" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="564" y1="132" x2="876" y2="132" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <path d="M 416,176 V 214 Q 416,222 408,222 H 360 Q 352,222 352,230 V 268" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 488,176 V 214 Q 488,222 496,222 H 544 Q 552,222 552,230 V 268" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+      <path d="M 952,176 V 214 Q 952,222 944,222 H 896 Q 888,222 888,230 V 268" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 1024,176 V 214 Q 1024,222 1032,222 H 1080 Q 1088,222 1088,230 V 268" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- ── connector labels ── -->
+      <rect x="238" y="112" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="270" y="121" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">23 REQUESTS</text>
+
+      <rect x="692" y="112" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="720" y="121" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">14 CALLS</text>
+
+      <rect x="356" y="202" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="384" y="211" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CACHE KEY</text>
+
+      <rect x="488" y="202" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="520" y="211" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">1 ROW / REQ</text>
+
+      <rect x="888" y="202" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="920" y="211" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CACHEPOINT</text>
+
+      <rect x="1028" y="202" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="1056" y="211" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PER CALL</text>
+
+      <!-- ── nodes ── -->
+      <!-- client -->
+      <rect x="40" y="92" width="160" height="80" rx="6" fill="#f5f5f5"/>
+      <rect x="40" y="92" width="160" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+      <rect x="48" y="98" width="32" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8"/>
+      <text x="64" y="107" fill="rgba(122,131,153,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">APP</text>
+      <text x="120" y="140" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">client</text>
+      <text x="120" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">/v1/chat/completions</text>
+
+      <!-- LiteLLM proxy -->
+      <rect x="340" y="88" width="224" height="88" rx="6" fill="#f5f5f5"/>
+      <rect x="340" y="88" width="224" height="88" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <rect x="348" y="94" width="32" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+      <text x="364" y="103" fill="rgba(45,49,66,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GW</text>
+      <text x="452" y="140" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">LiteLLM proxy</text>
+      <text x="452" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">v1.99.1 · num_retries 0</text>
+
+      <!-- Redis -->
+      <rect x="264" y="268" width="176" height="84" rx="6" fill="#f5f5f5"/>
+      <rect x="264" y="268" width="176" height="84" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="272" y="274" width="40" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.40)" stroke-width="0.8"/>
+      <text x="292" y="283" fill="rgba(79,93,117,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CACHE</text>
+      <text x="352" y="312" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" text-anchor="middle">응답 캐시 (Redis)</text>
+      <text x="352" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">key = model + messages</text>
+      <text x="352" y="344" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">hit 9 · no bedrock call</text>
+
+      <!-- LiteLLM ledger (focal) -->
+      <rect x="464" y="268" width="176" height="84" rx="6" fill="#f5f5f5"/>
+      <rect x="464" y="268" width="176" height="84" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <rect x="472" y="274" width="44" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="494" y="283" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LEDGER</text>
+      <text x="552" y="312" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" text-anchor="middle">LiteLLM 장부</text>
+      <text x="552" y="330" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">input 53,156</text>
+      <text x="552" y="344" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">output 2,294 · $0.0606</text>
+
+      <!-- Bedrock -->
+      <rect x="876" y="88" width="224" height="88" rx="6" fill="#f5f5f5"/>
+      <rect x="876" y="88" width="224" height="88" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+      <rect x="884" y="94" width="32" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <text x="900" y="103" fill="rgba(45,49,66,0.70)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LLM</text>
+      <text x="988" y="140" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Bedrock</text>
+      <text x="988" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">global.anthropic.claude-sonnet-4-6</text>
+
+      <!-- Bedrock prompt cache -->
+      <rect x="800" y="268" width="176" height="84" rx="6" fill="#f5f5f5"/>
+      <rect x="800" y="268" width="176" height="84" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <rect x="808" y="274" width="40" height="12" rx="2" fill="transparent" stroke="rgba(79,93,117,0.40)" stroke-width="0.8"/>
+      <text x="828" y="283" fill="rgba(79,93,117,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CACHE</text>
+      <text x="888" y="312" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">prompt cache</text>
+      <text x="888" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">cachePoint · TTL 5m</text>
+      <text x="888" y="344" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">write 10,502 · read 42,008</text>
+
+      <!-- Bedrock ledger (focal) -->
+      <rect x="1000" y="268" width="176" height="84" rx="6" fill="#f5f5f5"/>
+      <rect x="1000" y="268" width="176" height="84" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <rect x="1008" y="274" width="44" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8"/>
+      <text x="1030" y="283" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LEDGER</text>
+      <text x="1088" y="312" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" text-anchor="middle">Bedrock 장부</text>
+      <text x="1088" y="330" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">input 406</text>
+      <text x="1088" y="344" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">output 2,689 · $0.0935</text>
+
+      <!-- ── legend ── -->
+      <line x1="40" y1="424" x2="1200" y2="424" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="40" y="444" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+      <rect x="140" y="434" width="12" height="12" rx="3" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="158" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">장부 (비교 대상)</text>
+
+      <rect x="340" y="434" width="12" height="12" rx="3" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="358" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">게이트웨이</text>
+
+      <rect x="540" y="434" width="12" height="12" rx="3" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+      <text x="558" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">캐시</text>
+
+      <rect x="740" y="434" width="12" height="12" rx="3" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+      <text x="758" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">AWS 서비스</text>
+
+      <rect x="940" y="434" width="12" height="12" rx="3" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+      <text x="958" y="444" fill="#4f5d75" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">클라이언트</text>
+    </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">INPUT</p>
+        <div class="card-header"><span class="card-dot coral"></span><h3>LiteLLM input이 131배인 이유</h3></div>
+        <ul>
+          <li><span class="n">42,008</span> 캐시 읽기 — Bedrock은 별도 usage type으로 셉니다</li>
+          <li><span class="n">10,502</span> 캐시 쓰기 — 역시 별도입니다</li>
+          <li><span class="n">243</span> 응답 캐시 hit의 usage 재기록 — Bedrock에는 호출이 없습니다</li>
+          <li><span class="n">403</span> 청구 대상 입력 — <b>이것만</b> Bedrock의 input 406에 대응합니다</li>
+        </ul>
+      </div>
+      <div class="card">
+        <p class="eyebrow">OUTPUT</p>
+        <div class="card-header"><span class="card-dot ink"></span><h3>output은 방향이 반대입니다</h3></div>
+        <ul>
+          <li>응답 캐시 hit: LiteLLM <span class="n">2,000</span> 대 Bedrock <span class="n">200</span>. 저장된 응답을 usage째로 돌려줍니다</li>
+          <li>끊긴 스트림: LiteLLM <span class="n">205</span> 대 Bedrock <span class="n">2,400</span>. client가 2초에 끊어도 Bedrock은 <b>max_tokens</b>까지 생성했습니다</li>
+        </ul>
+      </div>
+      <div class="card">
+        <p class="eyebrow">COST</p>
+        <div class="card-header"><span class="card-dot muted"></span><h3>금액은 대부분 맞습니다</h3></div>
+        <ul>
+          <li>시나리오 1~3은 소수 여섯째 자리까지 같습니다. token만 다릅니다</li>
+          <li>끊긴 스트림만 <span class="n">$0.0034</span> 대 <span class="n">$0.0363</span>입니다</li>
+          <li>Cost Explorer 금액 대조는 데이터가 하루 뒤에 나와 아직 하지 않았습니다</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      2026-09-20 실측 · 요청 23건 · Bedrock 호출 14건 · Bedrock 금액은 CloudWatch token × v1.99.1 가격표 단가<br>
+      근거 <a href="4-why-different.md">4-why-different.md</a> · 실측표 <a href="3-scenarios.md">3-scenarios.md</a> · 슬라이드 <a href="visual-v2.html">visual-v2.html</a>
+    </footer>
+  </div>
+</body>
+</html>
