@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs::{create_dir_all, read_to_string, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -46,10 +46,13 @@ pub fn read_image_file(path: String) -> Result<String, String> {
         _ => return Err("Select an image file (PNG, JPEG, GIF, SVG, WebP, or BMP).".into()),
     };
     let file = File::open(&path).map_err(|error| error.to_string())?;
-    if file.metadata().map_err(|error| error.to_string())?.len() > 50_000_000 {
-        return Err("Image files must be 50 MB or smaller.".into());
+    let mut bytes = Vec::new();
+    file.take(10_000_001)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() > 10_000_000 {
+        return Err("Image files must be 10 MB or smaller.".into());
     }
-    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
     Ok(format!(
         "data:{mime};base64,{}",
         base64::engine::general_purpose::STANDARD.encode(bytes)

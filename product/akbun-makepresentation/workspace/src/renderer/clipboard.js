@@ -59,10 +59,30 @@ document.addEventListener('cut', (event) => {
   void cutSelection();
 });
 
+const MAX_IMAGE_FILE_BYTES = 10_000_000;
+const IMAGE_MIME_BY_EXTENSION = Object.freeze({
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  svg: 'image/svg+xml', webp: 'image/webp', bmp: 'image/bmp',
+});
+
+function imageFileMime(file) {
+  const mime = String(file.type || '').toLowerCase();
+  if (Object.values(IMAGE_MIME_BY_EXTENSION).includes(mime)) return mime;
+  if (mime && mime !== 'application/octet-stream') return null;
+  return IMAGE_MIME_BY_EXTENSION[String(file.name || '').split('.').pop().toLowerCase()] || null;
+}
+
 function readFileDataUrl(file) {
+  const mime = imageFileMime(file);
+  if (!mime) return Promise.reject(new Error('Unsupported image format.'));
+  if (file.size > MAX_IMAGE_FILE_BYTES) return Promise.reject(new Error('Image files must be 10 MB or smaller.'));
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      const encoded = String(reader.result).split('base64,')[1];
+      if (!encoded) reject(new Error('cannot read image data'));
+      else resolve(`data:${mime};base64,${encoded}`);
+    };
     reader.onerror = () => reject(reader.error || new Error('cannot read clipboard image'));
     reader.readAsDataURL(file);
   });
@@ -137,9 +157,10 @@ canvas.addEventListener('drop', (event) => {
   if (!event.dataTransfer?.files.length) return;
   event.preventDefault();
   const point = imageDropPoint(event.clientX, event.clientY);
+  if (!point) return;
   const targetDeck = state.deck;
   const targetSlide = slide();
-  const files = [...event.dataTransfer.files].filter((file) => file.type.startsWith('image/'));
+  const files = [...event.dataTransfer.files].filter(imageFileMime);
   void Promise.all(files.map(readFileDataUrl)).then(
     (sources) => insertDroppedImages(sources, point, targetDeck, targetSlide),
     (error) => window.api.message(String(error), { title: 'Cannot import image', kind: 'error' })
@@ -158,7 +179,7 @@ void window.api.onImageFilesDropped(async ({ paths, position }) => {
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot import image', kind: 'error' });
   }
-});
+}).catch((error) => window.api.message(String(error), { title: 'Cannot enable image drop', kind: 'error' }));
 
 document.addEventListener('paste', async (event) => {
   if (isFormField(event.target) || event.target.isContentEditable || !event.clipboardData) return;
@@ -168,7 +189,7 @@ document.addEventListener('paste', async (event) => {
     .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
     .map((item) => item.getAsFile()).filter(Boolean);
   const directFiles = Array.from(event.clipboardData.files || [])
-    .filter((file) => file.type.startsWith('image/'));
+    .filter(imageFileMime);
   const imageFiles = [...new Set([...itemFiles, ...directFiles])];
   event.preventDefault();
   const targetDeck = state.deck;

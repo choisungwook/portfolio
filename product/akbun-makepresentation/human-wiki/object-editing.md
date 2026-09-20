@@ -72,6 +72,7 @@
 - SVG의 기존 채우기와 분리된 선 색상은 각각 편집. 색상 변경은 PPTX 저장본에도 반영.
 - Finder의 이미지 파일을 슬라이드 위로 드롭하면 해당 위치에 이미지 추가. HTML 파일 드롭도 같은 이미지 생성 경로 사용.
 - 드롭 위치가 슬라이드 밖이면 가져오지 않음. 이미지가 너무 크면 슬라이드의 80% 이내로 축소.
+- 가져오는 이미지 파일은 최대 10 MB.
 
 - 근거: [clipboard.js:109](../workspace/src/renderer/clipboard.js), [commands.rs:33](../workspace/src-tauri/src/commands.rs).
 

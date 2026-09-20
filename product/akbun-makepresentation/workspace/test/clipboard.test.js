@@ -74,6 +74,19 @@ test('image drop does not insert into a deck opened during file reading', async 
   assert.equal(inserted.length, 0);
 });
 
+test('browser drop skips files outside the slide and recognizes an image without MIME metadata', () => {
+  const { context, canvasEvents, inserted } = editorContext();
+  assert.equal(context.imageFileMime({ name: 'photo.JPG', type: '' }), 'image/jpeg');
+  let prevented = false;
+  canvasEvents.drop({
+    clientX: 900, clientY: 200,
+    dataTransfer: { files: [{ name: 'photo.JPG', type: '', size: 100 }] },
+    preventDefault() { prevented = true; },
+  });
+  assert.equal(prevented, true);
+  assert.equal(inserted.length, 0);
+});
+
 test('copy writes native PNG, text and editable object data together', async () => {
   const { context, writes } = editorContext();
   assert.equal(await context.copySelection(), true);

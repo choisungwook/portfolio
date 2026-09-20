@@ -162,7 +162,7 @@ $('btn-settings-ok').addEventListener('click', async () => {
   const editorDefaults = editorDefaultsFromFields();
   const headingSizes = headingSizesFromFields();
   if (!editorDefaults || !headingSizes) {
-    $('general-settings-status').textContent = 'Border width must be 1–30 and text sizes 6–200.';
+    $('general-settings-status').textContent = 'Border width must be 1–30 and text sizes whole numbers from 6–200.';
     setSettingsPage('general');
     return;
   }
