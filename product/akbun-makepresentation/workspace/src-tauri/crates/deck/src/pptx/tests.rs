@@ -19,7 +19,8 @@ fn imports_table_cells_and_rounded_shapes() {
 <p:graphicFrame><p:xfrm><a:off x=\"952500\" y=\"1905000\"/></p:xfrm>\
 <a:graphic><a:graphicData><a:tbl><a:tblGrid><a:gridCol w=\"952500\"/><a:gridCol w=\"952500\"/></a:tblGrid>\
 <a:tr h=\"381000\"><a:tc><a:txBody><a:p><a:r><a:rPr sz=\"1300\" b=\"1\"><a:solidFill><a:srgbClr val=\"FFFFFF\"/></a:solidFill></a:rPr><a:t>사용자</a:t></a:r></a:p></a:txBody>\
-<a:tcPr><a:solidFill><a:srgbClr val=\"1E2A4A\"/></a:solidFill></a:tcPr></a:tc>\
+<a:tcPr><a:solidFill><a:srgbClr val=\"1E2A4A\"/></a:solidFill>\
+<a:lnT w=\"38100\"><a:solidFill><a:srgbClr val=\"ABCDEF\"/></a:solidFill></a:lnT></a:tcPr></a:tc>\
 <a:tc><a:txBody><a:p><a:pPr algn=\"r\"/><a:r><a:t>120K</a:t></a:r></a:p></a:txBody>\
 <a:tcPr><a:solidFill><a:srgbClr val=\"F3F4F6\"/></a:solidFill></a:tcPr></a:tc></a:tr>\
 </a:tbl></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld></p:sld>";
@@ -33,10 +34,39 @@ fn imports_table_cells_and_rounded_shapes() {
     assert_eq!(shapes[1].text, "사용자");
     assert_eq!(shapes[1].fill, "#1e2a4a");
     assert_eq!(shapes[1].text_color, "#ffffff");
+    assert_eq!(shapes[1].stroke, "#abcdef");
+    assert!((shapes[1].stroke_width - 4.0).abs() < 0.1);
     assert!(shapes[1].bold);
     assert_eq!(shapes[2].text, "120K");
     assert_eq!(shapes[2].text_align, "right");
     assert!((shapes[2].x - 200.0).abs() < 0.1);
+}
+
+#[test]
+fn grouped_table_cells_follow_the_group_transform() {
+    let xml = "<p:sld xmlns:p=\"p\" xmlns:a=\"a\"><p:cSld><p:spTree><p:grpSp>\
+<p:nvGrpSpPr><p:cNvPr id=\"7\" name=\"Table group\"/></p:nvGrpSpPr>\
+<p:grpSpPr><a:xfrm><a:off x=\"952500\" y=\"1905000\"/>\
+<a:ext cx=\"1905000\" cy=\"1905000\"/><a:chOff x=\"0\" y=\"0\"/>\
+<a:chExt cx=\"952500\" cy=\"952500\"/></a:xfrm></p:grpSpPr>\
+<p:graphicFrame><p:xfrm><a:off x=\"95250\" y=\"95250\"/></p:xfrm>\
+<a:graphic><a:graphicData><a:tbl><a:tblGrid><a:gridCol w=\"190500\"/></a:tblGrid>\
+<a:tr h=\"95250\"><a:tc><a:txBody><a:p><a:r><a:t>cell</a:t></a:r></a:p></a:txBody>\
+<a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>\
+</p:grpSp></p:spTree></p:cSld></p:sld>";
+    let empty = HashMap::new();
+    let rels = HashMap::new();
+    let defaults = HashMap::new();
+    let ctx = SlideCtx { scheme: &empty, clr_map: &empty, rels: &rels, defaults: &defaults };
+    let shapes = parse_part(xml, &ctx, true).unwrap().visible;
+    assert_eq!(shapes.len(), 1);
+    let cell = &shapes[0];
+    assert_eq!(cell.group_id, "Table group");
+    assert_eq!(cell.text, "cell");
+    assert!((cell.x - 120.0).abs() < 0.1);
+    assert!((cell.y - 220.0).abs() < 0.1);
+    assert!((cell.w - 40.0).abs() < 0.1);
+    assert!((cell.h - 20.0).abs() < 0.1);
 }
 
 fn sample_deck() -> Deck {

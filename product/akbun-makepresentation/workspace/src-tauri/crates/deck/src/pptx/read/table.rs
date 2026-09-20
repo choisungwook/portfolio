@@ -8,6 +8,7 @@ use quick_xml::Reader;
 struct Cell {
     shape: Shape,
     span: usize,
+    stroke_width: Option<f64>,
 }
 
 impl Cell {
@@ -21,6 +22,7 @@ impl Cell {
                 ..Shape::default()
             },
             span: 1,
+            stroke_width: None,
         }
     }
 }
@@ -102,6 +104,9 @@ pub(super) fn parse_table_frame(
                         current.shape.y = px(origin.1 + row_y);
                         current.shape.w = px(width);
                         current.shape.h = px(row_h);
+                        if let Some(width) = current.stroke_width {
+                            current.shape.stroke_width = width;
+                        }
                         shapes.push(current.shape);
                         column += current.span;
                     }
@@ -177,8 +182,11 @@ fn read_cell_element(
                 }
             }
         }
-        "lnL" if stack.last().map(String::as_str) == Some("tcPr") => {
-            cell.shape.stroke_width = px(number(element, b"w"));
+        "lnL" | "lnT" | "lnR" | "lnB"
+            if stack.last().map(String::as_str) == Some("tcPr") => {
+            if let Some(width) = attr(element, b"w").and_then(|value| value.parse::<i64>().ok()) {
+                cell.stroke_width = Some(cell.stroke_width.unwrap_or(0.0).max(px(width)));
+            }
         }
         _ => {}
     }

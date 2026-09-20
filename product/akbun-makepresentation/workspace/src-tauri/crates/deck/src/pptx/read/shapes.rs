@@ -103,7 +103,13 @@ pub(in crate::pptx) fn parse_part(
                         ..GroupTransform::default()
                     });
                 } else if local == "graphicFrame" && !empty {
-                    part.visible.extend(parse_table_frame(&mut reader, ctx)?);
+                    for mut shape in parse_table_frame(&mut reader, ctx)? {
+                        apply_group_transforms(&mut shape, &groups);
+                        if let Some(group) = groups.last() {
+                            shape.group_id = group.id.clone();
+                        }
+                        part.visible.push(shape);
+                    }
                     continue;
                 } else if (local == "sp" || local == "cxnSp" || local == "pic") && !empty
                 {
