@@ -62,6 +62,7 @@
     return {
       version: SETTINGS_VERSION,
       snapping: { enabled: true },
+      pngExport: { transparent: false },
       guidelines: { ...DEFAULT_GUIDELINES },
       editorDefaults: normalizeEditorDefaults(),
       headingSizes: { ...DEFAULT_HEADING_SIZES },
@@ -166,6 +167,14 @@
     return { enabled: source.enabled !== false };
   }
 
+  // Off unless the user turned it on: a PNG dropped into a document should
+  // look like the slide did, and a missing background surprises more than a
+  // present one.
+  function normalizePngExport(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return { transparent: source.transparent === true };
+  }
+
   function normalizeSystemPrompt(value, mode) {
     const prompt = typeof value === 'string' ? value.trim() : '';
     if (!prompt || prompt === LEGACY_AI_SYSTEM_PROMPTS[mode]) {
@@ -196,6 +205,7 @@
     return {
       version: SETTINGS_VERSION,
       snapping: normalizeSnapping(source.snapping),
+      pngExport: normalizePngExport(source.pngExport),
       guidelines: normalizeGuidelines(source.guidelines),
       editorDefaults,
       headingSizes: normalizeHeadingSizes(source.headingSizes),
@@ -269,6 +279,7 @@
     normalizeHeadingSizes,
     creationStyle,
     normalizeSnapping,
+    normalizePngExport,
     normalizeAiSystemPrompts,
     normalizeCustomPresets,
     normalizeAppSettings,

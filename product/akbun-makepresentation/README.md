@@ -14,7 +14,7 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Text written inside a rectangle, ellipse or speech bubble, centered, with the same font controls
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
 - Right-click Lock/Unlock: keep selection while preventing object edits, including moves and style changes
-- Settings → General: new-object fill, text color, borders (including none), and arrowhead defaults
+- Settings → General: new-object fill, text color, borders (including none), arrowhead defaults, and whether Export PNG drops the slide background for a transparent image
 - Editable code blocks fit their source and keep the frame and text in proportion when resized
 - Multi-object group and ungroup from the right-click menu or the panel, with grouped move and duplicate
 - Its own File, Edit and View menus in the window rather than in the system menu bar

@@ -127,6 +127,13 @@ test('settings comparison ignores object key order', () => {
   assert.ok(!S.settingsEqual(left, right));
 });
 
+test('png export is opaque unless the user asks for transparency', () => {
+  assert.deepStrictEqual(S.normalizeAppSettings({}).pngExport, { transparent: false });
+  assert.deepStrictEqual(S.normalizeAppSettings({ pngExport: { transparent: 'yes' } }).pngExport, { transparent: false });
+  assert.deepStrictEqual(S.normalizeAppSettings({ pngExport: { transparent: true } }).pngExport, { transparent: true });
+  assert.deepStrictEqual(S.defaultAppSettings().pngExport, { transparent: false });
+});
+
 test('settings keep snapping enabled unless the user turns it off', () => {
   assert.deepStrictEqual(S.normalizeAppSettings({}).snapping, { enabled: true });
   assert.deepStrictEqual(

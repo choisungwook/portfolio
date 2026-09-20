@@ -489,9 +489,14 @@ function renderSlideSvg(slide, options) {
   if (options && options.number) {
     shapes += renderShapeSvg(slideNumberShape(options.number, width, height));
   }
+  // No background rect at all when asked: a PNG made from this SVG is then
+  // transparent wherever no shape is drawn.
+  const background = options && options.transparent
+    ? ''
+    : `<rect width="${width}" height="${height}" fill="${slideBackground(slide)}"/>`;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">` +
-    `<rect width="${width}" height="${height}" fill="${slideBackground(slide)}"/>${shapes}</svg>`
+    `${background}${shapes}</svg>`
   );
 }
 

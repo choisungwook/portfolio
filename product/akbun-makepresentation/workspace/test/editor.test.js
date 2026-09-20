@@ -27,6 +27,16 @@ test('slide size supports presets, custom pixels, and centimeters', () => {
   assert.deepStrictEqual(L.slideSize({ slides: [] }), { width: 1920, height: 1080 });
 });
 
+test('renderSlideSvg leaves the background out when asked for transparency', () => {
+  const deck = L.createDeck();
+  deck.slides[0].background = '#123456';
+  const opaque = L.renderSlideSvg(deck.slides[0], { width: 1920, height: 1080 });
+  assert.match(opaque, /<rect width="1920" height="1080" fill="#123456"\/>/);
+  const transparent = L.renderSlideSvg(deck.slides[0], { width: 1920, height: 1080, transparent: true });
+  assert.doesNotMatch(transparent, /#123456/);
+  assert.doesNotMatch(transparent, /<rect width="1920"/);
+});
+
 test('renderSlideSvg uses the requested slide dimensions', () => {
   const svg = L.renderSlideSvg(L.createSlide(), { width: 720, height: 1280, number: 2 });
   assert.ok(svg.includes('viewBox="0 0 720 1280"'));

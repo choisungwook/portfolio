@@ -155,11 +155,11 @@ function slideRasterSize() {
   };
 }
 
-function rasterizeSlideCanvas(s, number) {
+function rasterizeSlideCanvas(s, number, transparent = false) {
   return new Promise((resolve, reject) => {
     const slideDimensions = deckSize();
     const rasterSize = slideRasterSize();
-    const svg = L.renderSlideSvg(s, { ...slideDimensions, number });
+    const svg = L.renderSlideSvg(s, { ...slideDimensions, number, transparent });
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const image = new Image();
     image.onload = () => {
@@ -217,9 +217,12 @@ async function exportPng() {
   const path = await window.api.pickSave(suggestSlideImageName(), 'png');
   if (!path) return;
   try {
+    // PDF pages are JPEG and cannot be transparent, so only the PNG reads
+    // this setting.
     const raster = await rasterizeSlideCanvas(
       slide(),
-      state.showNumbers ? state.current + 1 : 0
+      state.showNumbers ? state.current + 1 : 0,
+      appSettings.pngExport.transparent
     );
     await window.api.savePng(path, raster.toDataURL('image/png'));
     await window.api.message('PNG saved.', { title: 'akbun-makepresentation' });
