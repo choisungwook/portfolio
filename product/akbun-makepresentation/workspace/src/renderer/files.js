@@ -33,7 +33,9 @@ async function openFile() {
   if (!path) return;
   try {
     if (window.api.isDesktop) {
+      if (!state.filePath && !(await confirmDiscard())) return;
       await window.api.launchDocument(path);
+      if (!state.filePath) await window.api.closeWindow();
       return;
     }
     if (!(await confirmDiscard())) return;

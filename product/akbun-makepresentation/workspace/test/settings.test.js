@@ -14,8 +14,9 @@ test('settings use the smaller guideline margins by default', () => {
     arrowStart: 'none',
     arrowEnd: 'triangle',
     shapeBorder: { color: '#e03131', width: 2, dash: 'solid' },
-    imageBorder: { color: '#000000', width: 2, dash: 'solid' },
+    imageBorder: { color: 'none', width: 2, dash: 'solid' },
   });
+  assert.deepStrictEqual(settings.headingSizes, { h1: 64, h2: 40, h3: 24, h4: 18 });
   assert.deepStrictEqual(settings.snapping, { enabled: true });
   assert.deepStrictEqual(settings.aiSystemPrompts, S.DEFAULT_AI_SYSTEM_PROMPTS);
   assert.deepStrictEqual(settings.guidelines, {
@@ -80,7 +81,7 @@ test('settings normalize guidelines and custom presets', () => {
     arrowStart: 'none',
     arrowEnd: 'triangle',
     shapeBorder: { color: '#abcdef', width: 3.5, dash: 'dot' },
-    imageBorder: { color: '#000000', width: 2, dash: 'solid' },
+    imageBorder: { color: 'none', width: 2, dash: 'solid' },
   });
   assert.deepStrictEqual(settings.aiSystemPrompts, {
     text: 'Custom text prompt',
@@ -132,6 +133,19 @@ test('settings keep snapping enabled unless the user turns it off', () => {
     S.normalizeAppSettings({ snapping: { enabled: false } }).snapping,
     { enabled: false }
   );
+});
+
+test('heading sizes keep valid saved values and reject out of range values', () => {
+  assert.deepStrictEqual(S.normalizeHeadingSizes({ h1: 72, h2: 0, h3: 26, h4: 201 }), {
+    h1: 72, h2: 40, h3: 26, h4: 18,
+  });
+});
+
+test('legacy untouched image border becomes none without changing custom borders', () => {
+  const old = { version: 5, editorDefaults: { imageBorder: { color: '#000000', width: 2, dash: 'solid' } } };
+  assert.equal(S.normalizeAppSettings(old).editorDefaults.imageBorder.color, 'none');
+  old.editorDefaults.imageBorder.width = 3;
+  assert.equal(S.normalizeAppSettings(old).editorDefaults.imageBorder.color, '#000000');
 });
 
 test('an untouched legacy AI prompt is refreshed but a written one is kept', () => {

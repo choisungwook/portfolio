@@ -34,12 +34,12 @@ test('renderSlideSvg uses the requested slide dimensions', () => {
   assert.ok(svg.includes('>2<'));
 });
 
-test('new shapes use a red stroke, Noto Sans KR, and dark text', () => {
+test('new shapes use a red stroke, borderless images, Noto Sans KR, and dark text', () => {
   const rect = L.createShape('rect', 0, 0, {});
   const text = L.createShape('text', 0, 0, {});
   const image = L.createShape('image', 0, 0, {});
   assert.strictEqual(rect.stroke, '#e03131');
-  assert.strictEqual(image.stroke, '#000000');
+  assert.strictEqual(image.stroke, 'none');
   assert.strictEqual(text.textColor, '#1a1a1a');
   assert.strictEqual(text.fontFamily, 'Noto Sans KR');
 });

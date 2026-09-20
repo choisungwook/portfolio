@@ -19,12 +19,19 @@
 ## 생성 기본값
 
 - Settings → General에서 도형 채우기·글자 색상·도형 및 이미지 테두리 설정.
+- 새 이미지의 테두리는 none이 기본값. 기존의 기본 검정 테두리 설정도 자동 전환.
+- H1 제목·H2 부제목·H3 본문·H4 캡션의 크기를 Settings → General에서 지정.
+- 텍스트를 선택한 뒤 Inspector → Text level에서 단계별 크기 적용. 직접 크기를 입력하면 Custom으로 표시.
 - 테두리와 채우기의 none은 색상이 없는 상태.
 - Arrow defaults에서 새 화살표의 Start end·Finish end 설정.
 - 선과 펜은 끝 모양 없이 생성하고 Inspector에서 개별 변경.
 - Inspector에서 바꾼 색상은 선택 객체에만 적용.
 - 기존 객체·붙여넣기·프리셋은 자신이 가진 스타일 유지.
 - 저장된 설정은 이후 생성하는 객체에 적용.
+
+제목 단계는 텍스트 상자의 글자 크기 프리셋으로 적용됨. PPTX에는 결과 글자 크기를 저장하므로 다른 앱에서도 모양을 유지하고, 단계 이름은 문서에 별도로 기록하지 않음.
+
+- 근거: [settings.js:139](../workspace/src/settings.js), [properties.js:130](../workspace/src/renderer/properties.js), [render.js:398](../workspace/src/renderer/render.js).
 
 - 근거: [settings.js:137](../workspace/src/settings.js).
 - 결정: [편집 기본값은 객체 종류별 로컬 설정으로 관리](../knowledge/decisions/2026-08-editor-defaults-are-local-settings.md).
@@ -63,6 +70,11 @@
 - 상단 Preset → Person icon에서 SVG 사람 아이콘 추가.
 - SVG 이미지의 Inspector → SVG fill에서 색상 변경. `original`을 선택하면 원본 색상 표시.
 - SVG의 기존 채우기와 분리된 선 색상은 각각 편집. 색상 변경은 PPTX 저장본에도 반영.
+- Finder의 이미지 파일을 슬라이드 위로 드롭하면 해당 위치에 이미지 추가. HTML 파일 드롭도 같은 이미지 생성 경로 사용.
+- 드롭 위치가 슬라이드 밖이면 가져오지 않음. 이미지가 너무 크면 슬라이드의 80% 이내로 축소.
+- 가져오는 이미지 파일은 최대 10 MB.
+
+- 근거: [clipboard.js:109](../workspace/src/renderer/clipboard.js), [commands.rs:33](../workspace/src-tauri/src/commands.rs).
 
 - 근거: [table.rs:28](../workspace/src-tauri/crates/deck/src/pptx/read/table.rs), [shapes.rs:664](../workspace/src-tauri/crates/deck/src/pptx/read/shapes.rs), [svg.js:42](../workspace/src/editor/svg.js), [files.js:86](../workspace/src/renderer/files.js).
 - 결정: [PPTX 표는 셀별 도형으로 가져온다](../knowledge/decisions/2026-09-import-tables-as-cell-shapes.md).
@@ -71,6 +83,6 @@
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?
 2. 전체 선택 후 색상을 바꾸면 잠긴 객체에도 적용되는가?
-3. Inspector에서 바꾼 색상이 다음 객체에 적용되지 않는 이유는 무엇인가?
+3. H1 크기를 바꾸면 이미 만든 텍스트도 바뀌는가?
 4. 코드 블록의 리사이즈와 Crop은 어떻게 다른가?
-5. PPTX 표를 가져왔을 때 행과 열을 편집할 수 있는가?
+5. 슬라이드 밖으로 드롭한 이미지는 어떻게 처리되는가?

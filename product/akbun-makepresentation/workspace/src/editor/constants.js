@@ -41,7 +41,7 @@ const DEFAULT_STYLE = {
   verticalAlign: 'top',
 };
 const DEFAULT_IMAGE_STYLE = Object.freeze({
-  stroke: '#000000',
+  stroke: 'none',
   strokeWidth: 2,
   dash: 'solid',
 });

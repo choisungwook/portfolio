@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs::{create_dir_all, read_to_string, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -27,6 +27,36 @@ pub fn list_system_fonts() -> Vec<String> {
 pub fn open_deck(path: String) -> Result<Deck, String> {
     let file = File::open(&path).map_err(|e| format!("cannot open {path}: {e}"))?;
     pptx::read(file)
+}
+
+#[tauri::command]
+pub fn read_image_file(path: String) -> Result<String, String> {
+    let extension = std::path::Path::new(&path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => return Err("Select an image file (PNG, JPEG, GIF, SVG, WebP, or BMP).".into()),
+    };
+    let file = File::open(&path).map_err(|error| error.to_string())?;
+    let mut bytes = Vec::new();
+    file.take(10_000_001)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() > 10_000_000 {
+        return Err("Image files must be 10 MB or smaller.".into());
+    }
+    Ok(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
 }
 
 #[tauri::command]

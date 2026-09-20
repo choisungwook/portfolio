@@ -20,8 +20,11 @@ if (!window.__TAURI__) {
     pickOpen: unavailable,
     pickSave: unavailable,
     openDeck: async () => null,
+    readImageFile: async () => null,
+    onImageFilesDropped: () => Promise.resolve(() => {}),
     initialDocument: async () => null,
     launchDocument: unavailable,
+    closeWindow: async () => {},
     readShapeClipboard: async () => null,
     saveDeck: async () => {},
     exportPdf: async () => {},
@@ -77,6 +80,7 @@ if (!window.__TAURI__) {
   const { listen } = window.__TAURI__.event;
   const { open: openDialog, save: saveDialog, message, ask } = window.__TAURI__.dialog;
   const { getCurrentWindow } = window.__TAURI__.window;
+  const { getCurrentWebview } = window.__TAURI__.webview;
   const currentWindow = getCurrentWindow();
 
   async function checkUpdate() {
@@ -118,8 +122,13 @@ if (!window.__TAURI__) {
       }),
 
     openDeck: (path) => invoke('open_deck', { path }),
+    readImageFile: (path) => invoke('read_image_file', { path }),
+    onImageFilesDropped: (handler) => getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === 'drop') handler(event.payload);
+    }),
     initialDocument: () => invoke('initial_document'),
     launchDocument: (path) => invoke('launch_document', { path: path || null }),
+    closeWindow: () => currentWindow.close(),
     writeShapeClipboard: (shapes, text, dataUrl) => invoke('write_shape_clipboard', { shapes, text, dataUrl }),
     readShapeClipboard: () => invoke('read_shape_clipboard'),
     saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
