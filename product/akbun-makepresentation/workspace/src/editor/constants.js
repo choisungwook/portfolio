@@ -108,6 +108,7 @@ const DEFAULT_PRESET_IDS = [
   'numbered-circle',
   'right-open-arrow',
   'left-open-arrow',
+  'person-icon',
 ];
 const PRESET_KIND_LABELS = {
   rect: 'Rectangle',

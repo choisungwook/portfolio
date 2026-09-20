@@ -36,6 +36,7 @@ function createShape(kind, x, y, style) {
     y,
     w: 0,
     h: 0,
+    cornerRadius: 0,
     points: kind === 'pen' ? [[x, y]] : [],
     stroke: s.stroke,
     strokeWidth: s.strokeWidth,
@@ -116,6 +117,9 @@ function normalizeClipboardShape(value) {
   const shape = createShape(value.kind, value.x, value.y, {});
   shape.w = value.w;
   shape.h = value.h;
+  if (isFiniteInRange(value.cornerRadius, 0, MAX_GEOMETRY)) {
+    shape.cornerRadius = value.cornerRadius;
+  }
   if (value.kind === 'pen') shape.points = value.points.map((point) => [...point]);
   shape.stroke = safeColor(value.stroke, shape.stroke);
   shape.fill = safeColor(value.fill, shape.fill);

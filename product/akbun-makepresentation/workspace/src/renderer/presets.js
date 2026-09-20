@@ -50,6 +50,7 @@ const DEFAULT_PRESET_LABELS = {
   'numbered-circle': 'Numbered circle',
   'right-open-arrow': 'Right open arrow',
   'left-open-arrow': 'Left open arrow',
+  'person-icon': 'Person icon',
 };
 
 function shapeBounds(shapes) {

@@ -87,11 +87,16 @@ function deckForSave() {
   const hasCode = state.deck.slides.some(
     (target) => target.shapes.some((shape) => shape.kind === 'code')
   );
-  if (!state.showNumbers && !hasCode) return state.deck;
+  const hasRecoloredSvg = state.deck.slides.some(
+    (target) => target.shapes.some((shape) => shape.kind === 'image' && shape.fill !== 'none' &&
+      /^data:image\/svg\+xml;base64,/i.test(shape.src || ''))
+  );
+  if (!state.showNumbers && !hasCode && !hasRecoloredSvg) return state.deck;
   const copy = structuredClone(state.deck);
   for (const target of copy.slides) {
     for (const shape of target.shapes) {
       if (shape.kind === 'code') shape.src = codeShapeDataUrl(shape);
+      if (shape.kind === 'image') shape.src = L.recoloredSvgSource(shape);
     }
   }
   const { width, height } = deckSize();

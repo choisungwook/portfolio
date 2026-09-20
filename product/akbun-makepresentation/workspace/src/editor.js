@@ -94,6 +94,7 @@
     fitCodeBlock: Svg.fitCodeBlock,
     rotateSvg: Svg.rotateSvg,
     renderShapeSvg: Svg.renderShapeSvg,
+    recoloredSvgSource: Svg.recoloredSvgSource,
     renderSlideSvg: Svg.renderSlideSvg,
     renderShapesSvg: Svg.renderShapesSvg,
   };

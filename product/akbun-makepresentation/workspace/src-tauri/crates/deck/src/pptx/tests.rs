@@ -10,6 +10,65 @@ use std::io::{Cursor, Write};
 // A 1x1 red PNG.
 const TINY_PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
+#[test]
+fn imports_table_cells_and_rounded_shapes() {
+    let xml = "<p:sld xmlns:p=\"p\" xmlns:a=\"a\"><p:cSld><p:spTree>\
+<p:sp><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"952500\" cy=\"952500\"/></a:xfrm>\
+<a:prstGeom prst=\"roundRect\"><a:avLst><a:gd name=\"adj\" fmla=\"val 50000\"/></a:avLst></a:prstGeom>\
+<a:solidFill><a:srgbClr val=\"1E2A4A\"/></a:solidFill></p:spPr></p:sp>\
+<p:graphicFrame><p:xfrm><a:off x=\"952500\" y=\"1905000\"/></p:xfrm>\
+<a:graphic><a:graphicData><a:tbl><a:tblGrid><a:gridCol w=\"952500\"/><a:gridCol w=\"952500\"/></a:tblGrid>\
+<a:tr h=\"381000\"><a:tc><a:txBody><a:p><a:r><a:rPr sz=\"1300\" b=\"1\"><a:solidFill><a:srgbClr val=\"FFFFFF\"/></a:solidFill></a:rPr><a:t>사용자</a:t></a:r></a:p></a:txBody>\
+<a:tcPr><a:solidFill><a:srgbClr val=\"1E2A4A\"/></a:solidFill>\
+<a:lnT w=\"38100\"><a:solidFill><a:srgbClr val=\"ABCDEF\"/></a:solidFill></a:lnT></a:tcPr></a:tc>\
+<a:tc><a:txBody><a:p><a:pPr algn=\"r\"/><a:r><a:t>120K</a:t></a:r></a:p></a:txBody>\
+<a:tcPr><a:solidFill><a:srgbClr val=\"F3F4F6\"/></a:solidFill></a:tcPr></a:tc></a:tr>\
+</a:tbl></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld></p:sld>";
+    let empty = HashMap::new();
+    let rels = HashMap::new();
+    let defaults = HashMap::new();
+    let ctx = SlideCtx { scheme: &empty, clr_map: &empty, rels: &rels, defaults: &defaults };
+    let shapes = parse_part(xml, &ctx, true).unwrap().visible;
+    assert_eq!(shapes.len(), 3);
+    assert!((shapes[0].corner_radius - 50.0).abs() < 0.1);
+    assert_eq!(shapes[1].text, "사용자");
+    assert_eq!(shapes[1].fill, "#1e2a4a");
+    assert_eq!(shapes[1].text_color, "#ffffff");
+    assert_eq!(shapes[1].stroke, "#abcdef");
+    assert!((shapes[1].stroke_width - 4.0).abs() < 0.1);
+    assert!(shapes[1].bold);
+    assert_eq!(shapes[2].text, "120K");
+    assert_eq!(shapes[2].text_align, "right");
+    assert!((shapes[2].x - 200.0).abs() < 0.1);
+}
+
+#[test]
+fn grouped_table_cells_follow_the_group_transform() {
+    let xml = "<p:sld xmlns:p=\"p\" xmlns:a=\"a\"><p:cSld><p:spTree><p:grpSp>\
+<p:nvGrpSpPr><p:cNvPr id=\"7\" name=\"Table group\"/></p:nvGrpSpPr>\
+<p:grpSpPr><a:xfrm><a:off x=\"952500\" y=\"1905000\"/>\
+<a:ext cx=\"1905000\" cy=\"1905000\"/><a:chOff x=\"0\" y=\"0\"/>\
+<a:chExt cx=\"952500\" cy=\"952500\"/></a:xfrm></p:grpSpPr>\
+<p:graphicFrame><p:xfrm><a:off x=\"95250\" y=\"95250\"/></p:xfrm>\
+<a:graphic><a:graphicData><a:tbl><a:tblGrid><a:gridCol w=\"190500\"/></a:tblGrid>\
+<a:tr h=\"95250\"><a:tc><a:txBody><a:p><a:r><a:t>cell</a:t></a:r></a:p></a:txBody>\
+<a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>\
+</p:grpSp></p:spTree></p:cSld></p:sld>";
+    let empty = HashMap::new();
+    let rels = HashMap::new();
+    let defaults = HashMap::new();
+    let ctx = SlideCtx { scheme: &empty, clr_map: &empty, rels: &rels, defaults: &defaults };
+    let shapes = parse_part(xml, &ctx, true).unwrap().visible;
+    assert_eq!(shapes.len(), 1);
+    let cell = &shapes[0];
+    assert_eq!(cell.group_id, "Table group");
+    assert_eq!(cell.text, "cell");
+    assert!((cell.x - 120.0).abs() < 0.1);
+    assert!((cell.y - 220.0).abs() < 0.1);
+    assert!((cell.w - 40.0).abs() < 0.1);
+    assert!((cell.h - 20.0).abs() < 0.1);
+}
+
 fn sample_deck() -> Deck {
     Deck {
         slides: vec![
@@ -21,6 +80,7 @@ fn sample_deck() -> Deck {
                         y: 80.0,
                         w: 300.0,
                         h: 160.0,
+                        corner_radius: 12.0,
                         fill: "#ffd43b".into(),
                         stroke: "#e03131".into(),
                         stroke_width: 3.0,
@@ -123,6 +183,7 @@ fn round_trip_preserves_shapes() {
             assert_eq!(a.stroke, b.stroke);
             assert_eq!(a.dash, b.dash);
             assert_eq!(a.fill, b.fill);
+            assert!(close(a.corner_radius, b.corner_radius));
             assert_eq!(a.text, b.text);
             assert_eq!(a.group_id, b.group_id);
             assert!(close(a.stroke_width, b.stroke_width));

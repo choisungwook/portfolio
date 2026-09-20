@@ -81,6 +81,8 @@ pub struct Shape {
     #[serde(default)]
     pub h: f64,
     #[serde(default)]
+    pub corner_radius: f64,
+    #[serde(default)]
     pub points: Vec<[f64; 2]>,
     #[serde(default = "default_stroke")]
     pub stroke: String,
@@ -201,6 +203,7 @@ impl Default for Shape {
             y: 0.0,
             w: 0.0,
             h: 0.0,
+            corner_radius: 0.0,
             points: Vec::new(),
             stroke: default_stroke(),
             stroke_width: default_stroke_width(),

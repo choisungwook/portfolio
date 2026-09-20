@@ -23,3 +23,4 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다](2026-08-quick-chips-are-toggles-not-macros.md)
 * [잘라내기는 시스템 복사 성공 후 원본을 지운다](2026-09-cut-runs-the-copy-handler.md)
 * [슬라이드의 배열 순서가 곧 z 순서다](2026-09-array-order-is-z-order.md)
+* [PPTX 표는 셀별 도형으로 가져온다](2026-09-import-tables-as-cell-shapes.md)

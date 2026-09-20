@@ -17,6 +17,17 @@
 
 function defaultPresetShapes(id) {
   const red = '#e03131';
+  if (id === 'person-icon') {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><path fill="#0B2B50" d="M256 24a130 130 0 1 1 0 260 130 130 0 1 1 0-260ZM24 468c0-102 104-178 232-178s232 76 232 178v2c0 10-8 18-18 18H42c-10 0-18-8-18-18Z"/></svg>';
+    const base64 = typeof Buffer === 'undefined'
+      ? btoa(svg)
+      : Buffer.from(svg).toString('base64');
+    const shape = createShape('image', 0, 0, { stroke: 'none', fill: '#0b2b50' });
+    shape.w = 120;
+    shape.h = 120;
+    shape.src = `data:image/svg+xml;base64,${base64}`;
+    return [shape];
+  }
   if (id === 'red-filled-rectangle' || id === 'red-outline-rectangle') {
     const shape = createShape('rect', 0, 0, {
       stroke: red,
