@@ -181,6 +181,8 @@ AWS가 제시하는 관찰 수단은 셋입니다.
 AWS_PROFILE=<프로파일> scripts/cloudwatch-dashboard.sh
 ```
 
+`report-aws.sh`의 시각 계산은 macOS의 BSD date와 Linux의 GNU date에서 옵션이 달라 둘 다 받도록 감싸 두었습니다.
+
 `max_tokens`에 대한 AWS의 설명은 시나리오 4와 직접 이어집니다. 요청을 받을 때 `전체 입력 token + max_tokens`가 먼저 쿼터에서 빠지고, 끝난 뒤에 실제 사용량으로 조정됩니다. 그래서 `max_tokens`를 크게 잡으면 청구는 실제 사용량만 되더라도 쿼터는 미리 잠깁니다. AWS는 `max_tokens`를 실제 응답 길이에 맞춰 줄이라고 권합니다.
 
 ## 이 실습으로 확인되지 않는 것

@@ -4,8 +4,14 @@
 # 청구 금액은 Cost Explorer에 하루쯤 뒤에 나온다. 맨 아래 명령으로 확인한다(호출당 $0.01).
 set -euo pipefail
 REGION=${AWS_REGION_NAME:-us-east-1}
+
+# date 옵션이 BSD(macOS)와 GNU(대부분의 Linux)에서 다르다. 둘 다에서 도는 형태로 감싼다.
+# $1 = 기준 시각에서 더할 오프셋. 예: -3H, +2d
+shift_time() {
+  date -u -v"$1" +"$2" 2>/dev/null || date -u -d "${1/H/ hours}" +"$2" 2>/dev/null ||   date -u -d "$(echo "$1" | sed 's/^-/- /; s/^+/+ /; s/H$/ hours/; s/d$/ days/')" +"$2"
+}
 MODEL=global.anthropic.claude-sonnet-4-6
-START=${1:-$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ)}
+START=${1:-$(shift_time -3H %Y-%m-%dT%H:%M:%SZ)}
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # 지표 이름을 하드코딩하지 않고 이 모델에 실제로 쌓인 것 중 호출 수와 token 지표만 고른다.
 METRICS=$(aws cloudwatch list-metrics --region "$REGION" --namespace AWS/Bedrock \
@@ -19,7 +25,7 @@ done
 cat <<EOF
 
 # 하루 뒤 청구 금액 (usage type별)
-aws ce get-cost-and-usage --time-period Start=$(date -u +%Y-%m-%d),End=$(date -u -v+2d +%Y-%m-%d) \\
+aws ce get-cost-and-usage --time-period Start=$(date -u +%Y-%m-%d),End=$(shift_time +2d %Y-%m-%d) \\
   --granularity DAILY --metrics UnblendedCost UsageQuantity \\
   --group-by Type=DIMENSION,Key=SERVICE Type=DIMENSION,Key=USAGE_TYPE \\
   --query 'ResultsByTime[].Groups[?contains(Keys[0], \`Claude\`) || contains(Keys[0], \`Bedrock\`)][]'
