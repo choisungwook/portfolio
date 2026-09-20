@@ -63,7 +63,9 @@ function showFontMenu(scope = 'selection', anchor = null) {
   fontMenuAnchor = anchor;
   fontMenu.hidden = false;
   $('font-menu-scope').hidden = scope !== 'deck';
-  $('prop-font-family').setAttribute('aria-expanded', String(scope === 'selection'));
+  // The listbox is the same element whichever entry opened it, so the control
+  // that owns the popup says it is expanded either way.
+  $('prop-font-family').setAttribute('aria-expanded', 'true');
   fontSearch.value = '';
   renderFontOptions();
   positionFontMenu();

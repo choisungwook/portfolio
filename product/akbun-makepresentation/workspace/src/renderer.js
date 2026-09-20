@@ -139,20 +139,17 @@ async function renderAiSlideImage(index) {
 }
 
 // The operating system can ask this process to open a file at any time: on
-// macOS a double-click in Finder arrives this way. Listening starts before the
-// startup document is fetched, so nothing sent in between is lost.
+// macOS a double-click in Finder arrives this way.
 async function initialize() {
   populateCodeOptions();
-  const startup = (async () => {
-    try {
-      const path = await window.api.initialDocument();
-      if (path) await loadDocument(path);
-    } catch (error) {
-      await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
-    }
-  })();
-  // A request that lands while the startup document is still loading waits
-  // for it, or it would find an empty window and take the file over.
+  // Both listeners go on before the startup document is asked for. Rust stops
+  // absorbing files into the startup document the moment it is asked, so a
+  // request sent between that call and a later registration would reach
+  // nobody. A request that arrives while the startup deck is still loading
+  // waits on the barrier instead, or it would find an empty window and take
+  // the file over.
+  let startupLoaded;
+  const startup = new Promise((resolve) => { startupLoaded = resolve; });
   await window.api.onDocumentOpenRequest(async (path) => {
     if (!path) return;
     await startup;
@@ -162,7 +159,18 @@ async function initialize() {
       await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
     }
   });
-  await startup;
+  // A file the shell could not hand over at all. Without this the failure
+  // would be silent, since nothing else on the page hears about it.
+  await window.api.onDocumentOpenError((error) => {
+    if (error) window.api.message(error, { title: 'Cannot open file', kind: 'error' });
+  });
+  try {
+    const path = await window.api.initialDocument();
+    if (path) await loadDocument(path);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
+  }
+  startupLoaded();
   try {
     await loadPersistentSettings();
   } catch (error) {

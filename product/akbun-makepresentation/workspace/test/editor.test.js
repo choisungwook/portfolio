@@ -4,6 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert');
 const L = require('../src/editor.js');
 
+// Computed heights come out of non-integer multipliers, so they are compared
+// with a tolerance rather than exactly.
+function assertClose(actual, expected, tolerance = 1e-6) {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `expected ${actual} to be within ${tolerance} of ${expected}`
+  );
+}
+
 test('createDeck starts with one empty slide', () => {
   const deck = L.createDeck();
   assert.strictEqual(deck.slides.length, 1);
@@ -358,11 +367,11 @@ test('resizing a text box sets its width and refits the height to the wrapped te
   assert.strictEqual(shape.w, 200);
   const lines = L.wrapTextLines(shape.text, 200, 20).length;
   assert.ok(lines > 1);
-  assert.strictEqual(shape.h, lines * 20 * 1.35);
+  assertClose(shape.h, lines * 20 * 1.35);
 
   L.resizeShape(shape, from, 'e', 400, 0);
   assert.strictEqual(shape.w, 1000);
-  assert.strictEqual(shape.h, 28);
+  assertClose(shape.h, 28);
 });
 
 test('the height handles of a text box do nothing', () => {
@@ -373,12 +382,11 @@ test('the height handles of a text box do nothing', () => {
   const from = structuredClone(shape);
   L.resizeShape(shape, from, 's', 0, 300);
   L.resizeShape(shape, from, 'n', 0, -300);
-  assert.deepStrictEqual(
-    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
-    { x: 10, y: 10, w: 200, h: 28 }
-  );
+  assert.deepStrictEqual({ x: shape.x, y: shape.y, w: shape.w }, { x: 10, y: 10, w: 200 });
+  assertClose(shape.h, 28);
   L.resizeShape(shape, from, 'se', 100, 300);
-  assert.deepStrictEqual({ w: shape.w, h: shape.h }, { w: 300, h: 28 });
+  assert.strictEqual(shape.w, 300);
+  assertClose(shape.h, 28);
 });
 
 test('fitTextHeight only grows a box opened from a file', () => {
@@ -390,7 +398,7 @@ test('fitTextHeight only grows a box opened from a file', () => {
   assert.strictEqual(shape.h, 400);
   shape.h = 10;
   L.fitTextHeight(shape, true);
-  assert.strictEqual(shape.h, L.wrapTextLines(shape.text, 100, 20).length * 20 * 1.35);
+  assertClose(shape.h, L.wrapTextLines(shape.text, 100, 20).length * 20 * 1.35);
 });
 
 test('resizeShape moves a line endpoint', () => {

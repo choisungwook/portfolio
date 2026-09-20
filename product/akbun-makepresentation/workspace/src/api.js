@@ -26,6 +26,7 @@ if (!window.__TAURI__) {
     adoptDocument: async (path) => path,
     launchDocument: unavailable,
     onDocumentOpenRequest: () => Promise.resolve(() => {}),
+    onDocumentOpenError: () => Promise.resolve(() => {}),
     readShapeClipboard: async () => null,
     saveDeck: async () => {},
     exportPdf: async () => {},
@@ -132,6 +133,8 @@ if (!window.__TAURI__) {
     launchDocument: (path) => invoke('launch_document', { path: path || null }),
     onDocumentOpenRequest: (handler) =>
       listen('document-open-request', (event) => handler(String(event.payload || ''))),
+    onDocumentOpenError: (handler) =>
+      listen('document-open-error', (event) => handler(String(event.payload || ''))),
     writeShapeClipboard: (shapes, text, dataUrl) => invoke('write_shape_clipboard', { shapes, text, dataUrl }),
     readShapeClipboard: () => invoke('read_shape_clipboard'),
     saveDeck: (path, deck) => invoke('save_deck', { path, deck }),
