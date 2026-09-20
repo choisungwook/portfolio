@@ -239,7 +239,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_cache_hits_metric_total[2m]))",
+          "expr": "clamp_min(sum(litellm_cache_hits_metric_total) - sum(litellm_cache_hits_metric_total offset $__interval), 0)",
           "legendFormat": "Redis hit (LiteLLM에서 끝남)",
           "refId": "A",
           "instant": false,
@@ -324,7 +324,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "type": "timeseries",
@@ -346,7 +347,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_output_tokens_metric_total[2m]))",
+          "expr": "clamp_min(sum(litellm_output_tokens_metric_total) - sum(litellm_output_tokens_metric_total offset $__interval), 0)",
           "legendFormat": "LiteLLM output (재기록 포함)",
           "refId": "A",
           "instant": false,
@@ -431,7 +432,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     }
   ],
   "editable": true

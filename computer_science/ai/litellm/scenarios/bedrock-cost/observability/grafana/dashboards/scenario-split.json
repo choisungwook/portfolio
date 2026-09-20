@@ -1,7 +1,7 @@
 {
   "uid": "scenario-split",
   "title": "4. 지표 하나에 패널 하나",
-  "description": "시나리오 1을 검증하는 화면이다. 왼쪽 열이 LiteLLM, 오른쪽 열이 Bedrock이고 같은 행끼리 짝이다. 시나리오 1에서는 두 열의 숫자가 같아야 하고, 캐시 패널은 시나리오 2와 3에서 채워진다.",
+  "description": "시나리오 1을 검증하는 화면이다. 3번 행까지는 왼쪽 열이 LiteLLM, 오른쪽 열이 Bedrock이고 같은 행끼리 짝이며, 전부 그 구간에 실제로 일어난 양을 막대로 그린다. 시나리오 1에서는 같은 행의 두 값이 같아야 한다. 4번 행은 LiteLLM 캐시 token을 누적으로 다시 본다. TTL 동안 캐시에 얼마가 쌓여 있는지는 누적 선으로만 보인다. 캐시 패널은 시나리오 2와 3에서 채워진다.",
   "tags": [
     "litellm",
     "bedrock",
@@ -34,7 +34,7 @@
       "id": 1,
       "type": "timeseries",
       "title": "client → LiteLLM 요청 수",
-      "description": "client가 proxy에 보낸 요청 수. 캐시 hit도 여기에 센다. LiteLLM counter 누적. 실험 직전에 proxy를 다시 띄우면 오른쪽 끝 값이 실험 전체의 합이다.",
+      "description": "client가 proxy에 보낸 요청 수. 캐시 hit도 여기에 센다. counter 누적이 아니라 구간마다 늘어난 값이다. 막대 하나가 그 시간대에 실제로 일어난 건수다. increase()는 구간 양 끝을 보고 추정해 값이 흔들리므로, offset으로 뺀 차분을 쓴다.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -51,8 +51,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(litellm_proxy_total_requests_metric_total)",
-          "legendFormat": "요청 수",
+          "expr": "clamp_min(sum(litellm_proxy_total_requests_metric_total) - sum(litellm_proxy_total_requests_metric_total offset $__interval), 0)",
+          "legendFormat": "요청 수 (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -67,10 +67,9 @@
             "fixedColor": "#5286E0"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
             "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": true,
@@ -89,7 +88,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "last"
+            "sum",
+            "max"
           ],
           "showLegend": true
         },
@@ -97,7 +97,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "id": 2,
@@ -185,7 +186,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "LiteLLM input token",
-      "description": "proxy가 적은 prompt_tokens. 캐시 읽기·쓰기가 합쳐져 있다. LiteLLM counter 누적. 실험 직전에 proxy를 다시 띄우면 오른쪽 끝 값이 실험 전체의 합이다.",
+      "description": "proxy가 적은 prompt_tokens. 캐시 읽기·쓰기가 합쳐져 있다. counter 누적이 아니라 구간마다 늘어난 값이다. 막대 하나가 그 시간대에 실제로 일어난 건수다. increase()는 구간 양 끝을 보고 추정해 값이 흔들리므로, offset으로 뺀 차분을 쓴다.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -202,8 +203,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(litellm_input_tokens_metric_total)",
-          "legendFormat": "prompt_tokens",
+          "expr": "clamp_min(sum(litellm_input_tokens_metric_total) - sum(litellm_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "prompt_tokens (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -218,10 +219,9 @@
             "fixedColor": "#5286E0"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
             "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": true,
@@ -240,7 +240,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "last"
+            "sum",
+            "max"
           ],
           "showLegend": true
         },
@@ -248,7 +249,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "id": 4,
@@ -323,7 +325,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "LiteLLM output token",
-      "description": "proxy가 적은 completion_tokens. 캐시 hit이면 저장해 둔 값을 다시 적는다. LiteLLM counter 누적. 실험 직전에 proxy를 다시 띄우면 오른쪽 끝 값이 실험 전체의 합이다.",
+      "description": "proxy가 적은 completion_tokens. 캐시 hit이면 저장해 둔 값을 다시 적는다. counter 누적이 아니라 구간마다 늘어난 값이다. 막대 하나가 그 시간대에 실제로 일어난 건수다. increase()는 구간 양 끝을 보고 추정해 값이 흔들리므로, offset으로 뺀 차분을 쓴다.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -340,8 +342,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(litellm_output_tokens_metric_total)",
-          "legendFormat": "completion_tokens",
+          "expr": "clamp_min(sum(litellm_output_tokens_metric_total) - sum(litellm_output_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "completion_tokens (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -356,10 +358,9 @@
             "fixedColor": "#5286E0"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
             "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": true,
@@ -378,7 +379,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "last"
+            "sum",
+            "max"
           ],
           "showLegend": true
         },
@@ -386,7 +388,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "id": 6,
@@ -473,8 +476,8 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "LiteLLM 캐시 쓰기 token",
-      "description": "Bedrock이 응답에 적어 보낸 cache_creation_input_tokens를 그대로 받아 적은 값이다. LiteLLM counter 누적. 실험 직전에 proxy를 다시 띄우면 오른쪽 끝 값이 실험 전체의 합이다.",
+      "title": "LiteLLM 캐시 쓰기 token (구간)",
+      "description": "Bedrock이 응답에 적어 보낸 cache_creation_input_tokens를 그대로 받아 적은 값이다. counter 누적이 아니라 구간마다 늘어난 값이다. 막대 하나가 그 시간대에 실제로 일어난 건수다. increase()는 구간 양 끝을 보고 추정해 값이 흔들리므로, offset으로 뺀 차분을 쓴다.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -491,8 +494,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(litellm_provider_cache_creation_input_tokens_metric_total)",
-          "legendFormat": "캐시 쓰기",
+          "expr": "clamp_min(sum(litellm_provider_cache_creation_input_tokens_metric_total) - sum(litellm_provider_cache_creation_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "캐시 쓰기 (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -507,10 +510,9 @@
             "fixedColor": "#5286E0"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
             "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": true,
@@ -529,7 +531,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "last"
+            "sum",
+            "max"
           ],
           "showLegend": true
         },
@@ -537,7 +540,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "id": 8,
@@ -611,8 +615,8 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "LiteLLM 캐시 읽기 token",
-      "description": "cache_read_input_tokens를 받아 적은 값이다. 단가가 입력의 10분의 1이다. LiteLLM counter 누적. 실험 직전에 proxy를 다시 띄우면 오른쪽 끝 값이 실험 전체의 합이다.",
+      "title": "LiteLLM 캐시 읽기 token (구간)",
+      "description": "cache_read_input_tokens를 받아 적은 값이다. 단가가 입력의 10분의 1이다. counter 누적이 아니라 구간마다 늘어난 값이다. 막대 하나가 그 시간대에 실제로 일어난 건수다. increase()는 구간 양 끝을 보고 추정해 값이 흔들리므로, offset으로 뺀 차분을 쓴다.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -629,8 +633,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(litellm_provider_cache_read_input_tokens_metric_total)",
-          "legendFormat": "캐시 읽기",
+          "expr": "clamp_min(sum(litellm_provider_cache_read_input_tokens_metric_total) - sum(litellm_provider_cache_read_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "캐시 읽기 (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -645,10 +649,9 @@
             "fixedColor": "#5286E0"
           },
           "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "fillOpacity": 8,
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
             "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": true,
@@ -667,7 +670,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "last"
+            "sum",
+            "max"
           ],
           "showLegend": true
         },
@@ -675,7 +679,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "id": 10,
@@ -737,6 +742,157 @@
           "placement": "bottom",
           "calcs": [
             "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "4. 캐시 token 누적",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "LiteLLM 캐시 쓰기 token 누적",
+      "description": "왼쪽 위 패널과 같은 지표를 누적으로 본다. 구간 막대가 '그때 몇 개'라면 이 선은 '지금까지 몇 개'다. Bedrock prompt cache의 TTL은 5분이고 읽을 때마다 리셋되므로, 이 선이 계단처럼 한 번만 오르고 평평하면 캐시가 살아 있다는 뜻이다. 다시 오르면 만료돼 새로 쓴 것이다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(litellm_provider_cache_creation_input_tokens_metric_total)",
+          "legendFormat": "캐시 쓰기 (누적)",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5286E0"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "pointSize": 8,
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "LiteLLM 캐시 읽기 token 누적",
+      "description": "왼쪽 아래 패널을 누적으로 본 것이다. TTL 5분 안에 같은 prefix를 다시 부르면 이 선만 오르고 쓰기 선은 평평하다. 단가가 입력의 10분의 1이라 이 선이 가파를수록 아낀 금액이 크다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(litellm_provider_cache_read_input_tokens_metric_total)",
+          "legendFormat": "캐시 읽기 (누적)",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5286E0"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "pointSize": 8,
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0,
+            "gradientMode": "none",
+            "lineInterpolation": "stepAfter"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "last"
           ],
           "showLegend": true
         },

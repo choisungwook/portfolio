@@ -6,6 +6,14 @@ model_list:
       aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       aws_region_name: os.environ/AWS_REGION_NAME
+      # cache token 단가를 config에 드러낸다. 값은 기본 가격표와 같다(마진 없음).
+      # input/output도 함께 적는 이유는 custom pricing을 하나라도 주면 Router가 이
+      # deployment를 독립된 가격표 항목으로 등록하고 기본 가격표와 병합하지 않기 때문이다.
+      # 적지 않은 항목은 0이 되어 spend가 0으로 찍힌다.
+      input_cost_per_token: 0.000003            # $3.00 / MTok
+      output_cost_per_token: 0.000015           # $15.00 / MTok
+      cache_read_input_token_cost: 0.0000003    # $0.30 / MTok (입력의 0.1배)
+      cache_creation_input_token_cost: 0.00000375  # $3.75 / MTok (입력의 1.25배)
 
 litellm_settings:
   # proxy가 /metrics 를 연다. 이 줄이 없으면 엔드포인트 자체가 붙지 않는다.

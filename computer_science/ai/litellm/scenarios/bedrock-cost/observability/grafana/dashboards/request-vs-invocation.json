@@ -188,7 +188,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_proxy_total_requests_metric_total[2m]))",
+          "expr": "clamp_min(sum(litellm_proxy_total_requests_metric_total) - sum(litellm_proxy_total_requests_metric_total offset $__interval), 0)",
           "legendFormat": "client → LiteLLM 요청",
           "refId": "A",
           "instant": false,
@@ -273,7 +273,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "type": "timeseries",
@@ -295,7 +296,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (status_code) (increase(litellm_proxy_total_requests_metric_total[2m]))",
+          "expr": "clamp_min(sum by (status_code) (litellm_proxy_total_requests_metric_total) - sum by (status_code) (litellm_proxy_total_requests_metric_total offset $__interval), 0)",
           "legendFormat": "{{status_code}}",
           "refId": "A",
           "instant": false,
@@ -354,7 +355,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     }
   ],
   "editable": true
