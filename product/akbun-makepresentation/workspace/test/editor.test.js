@@ -44,6 +44,25 @@ test('new shapes use a red stroke, Noto Sans KR, and dark text', () => {
   assert.strictEqual(text.fontFamily, 'Noto Sans KR');
 });
 
+test('rounded imported rectangles keep their radius in SVG and clipboard data', () => {
+  const rect = L.createShape('rect', 10, 20, { fill: '#123456' });
+  rect.w = 100;
+  rect.h = 80;
+  rect.cornerRadius = 40;
+  assert.match(L.renderShapeSvg(rect), /rx="40"/);
+  assert.strictEqual(L.parseClipboardShapes(JSON.stringify([rect]))[0].cornerRadius, 40);
+});
+
+test('person preset is an SVG whose fill can be changed', () => {
+  const [person] = L.defaultPresetShapes('person-icon');
+  assert.strictEqual(person.kind, 'image');
+  assert.match(person.src, /^data:image\/svg\+xml;base64,/);
+  person.fill = '#e03131';
+  const colored = Buffer.from(L.recoloredSvgSource(person).split(',')[1], 'base64').toString();
+  assert.match(colored, /<path fill="#e03131"/);
+  assert.match(L.renderShapeSvg(person), /data:image\/svg\+xml;base64,/);
+});
+
 test('parseClipboardShapes normalizes valid shapes with safe defaults', () => {
   const rect = L.createShape('rect', 10, 20, { fill: '#abcdef' });
   rect.w = 100;

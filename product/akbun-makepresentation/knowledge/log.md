@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-20
+
+* **Creation**: [PPTX 표는 셀별 도형으로 가져온다](decisions/2026-09-import-tables-as-cell-shapes.md) 결정 기록.
+
 ## 2026-09-06
 
 * **Creation**: [시안의 화면 언어는 영어 기본과 한국어 선택](decisions/2026-09-proposal-ui-language.md) 결정 기록.

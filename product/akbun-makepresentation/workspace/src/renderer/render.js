@@ -347,11 +347,15 @@ function renderProps() {
   const source = selection.find((shape) => !shape.locked) || shape || state.defaults;
   const kind = shape ? shape.kind : 'defaults';
 
-  const showFill = L.TEXTUAL.has(kind) || kind === 'defaults';
+  const isSvgImage = kind === 'image' &&
+    /^data:image\/svg\+xml;base64,/i.test(shape?.src || '');
+  const showFill = L.TEXTUAL.has(kind) || kind === 'defaults' || isSvgImage;
   const showStroke = kind !== 'text';
   const showText = kind === 'text' || L.TEXTUAL.has(kind) || kind === 'defaults';
 
   $('props-fill').hidden = !showFill;
+  $('prop-fill-label').textContent = isSvgImage ? 'SVG fill' : 'Shape fill';
+  $('prop-fill-none-label').textContent = isSvgImage ? 'original' : 'none';
   $('props-stroke').hidden = !showStroke || kind === 'code';
   $('props-text').hidden = !showText;
   $('props-code').hidden = kind !== 'code';

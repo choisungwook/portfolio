@@ -1,6 +1,7 @@
 //! PPTX package traversal, relationships, themes, and slide assembly.
 
 mod shapes;
+mod table;
 mod xml;
 
 use super::common::mime_for_ext;

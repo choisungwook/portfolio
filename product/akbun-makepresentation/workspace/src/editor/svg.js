@@ -39,6 +39,36 @@ function escapeXml(text) {
     .replace(/"/g, '&quot;');
 }
 
+function recoloredSvgSource(shape) {
+  const src = String(shape.src || '');
+  if (shape.kind !== 'image' || shape.fill === 'none' ||
+      !/^data:image\/svg\+xml;base64,/i.test(src) ||
+      !/^#[0-9a-f]{6}$/i.test(shape.fill || '')) return src;
+  try {
+    const encoded = src.split(',')[1];
+    const binary = typeof Buffer === 'undefined'
+      ? atob(encoded)
+      : Buffer.from(encoded, 'base64').toString('binary');
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const xml = new TextDecoder().decode(bytes);
+    const color = shape.fill;
+    const updated = xml.replace(/(<(?:svg|g|path|rect|circle|ellipse|polygon|polyline)\b[^>]*?)(\sfill=["'])([^"']+)(["'])/gi,
+      (match, start, prefix, value, quote) => value === 'none' ? match : `${start}${prefix}${color}${quote}`
+    ).replace(/(<svg\b)(?![^>]*\sfill=)/i, `$1 fill="${color}"`);
+    const output = new TextEncoder().encode(updated);
+    let raw = '';
+    for (let index = 0; index < output.length; index += 0x8000) {
+      raw += String.fromCharCode(...output.subarray(index, index + 0x8000));
+    }
+    const base64 = typeof Buffer === 'undefined'
+      ? btoa(raw)
+      : Buffer.from(raw, 'binary').toString('base64');
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch (_) {
+    return src;
+  }
+}
+
 function codeCommentMarkers(language) {
   if (['python', 'hcl', 'bash', 'yaml'].includes(language)) return ['#'];
   if (language === 'html') return ['<!--'];
@@ -333,7 +363,8 @@ function renderShapeSvg(shape, options) {
     }
     case 'rect': {
       const b = shapeBBox(shape);
-      const outline = `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
+      const radius = Math.max(0, Math.min(shape.cornerRadius || 0, b.w / 2, b.h / 2));
+      const outline = `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${radius}" fill="${shape.fill}" ${strokeAttrs(shape)}/>`;
       return rotateSvg(shape, outline + (hideText ? '' : shapeTextSvg(shape)));
     }
     case 'ellipse': {
@@ -356,7 +387,7 @@ function renderShapeSvg(shape, options) {
       return rotateSvg(shape, shapeTextSvg(shape));
     }
     case 'image': {
-      const src = String(shape.src || '');
+      const src = recoloredSvgSource(shape);
       const href = src.startsWith('data:image/') ? escapeXml(src) : '';
       const left = Math.max(0, Math.min(0.999, shape.cropLeft || 0));
       const top = Math.max(0, Math.min(0.999, shape.cropTop || 0));
@@ -576,5 +607,6 @@ function renderShapesSvg(shapes) {
     renderShapeSvg,
     renderSlideSvg,
     renderShapesSvg,
+    recoloredSvgSource,
   };
 });

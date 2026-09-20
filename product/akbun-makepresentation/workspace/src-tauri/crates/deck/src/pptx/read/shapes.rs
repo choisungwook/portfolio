@@ -2,6 +2,7 @@
 
 use super::super::common::{px, read_arrow_end};
 use super::xml::{attr, in_ctx, mod_color};
+use super::table::parse_table_frame;
 use super::{ParsedPart, SlideCtx};
 use crate::{Shape, EMU_PER_PX};
 use base64::Engine;
@@ -26,6 +27,7 @@ struct Pending {
     rotation: f64,
     locked: bool,
     prst: Option<String>,
+    corner_adjustment: Option<f64>,
     has_custgeom: bool,
     path_pts: Vec<(i64, i64)>,
     stroke_declared: bool,
@@ -100,6 +102,9 @@ pub(in crate::pptx) fn parse_part(
                         id: format!("group-{group_sequence}"),
                         ..GroupTransform::default()
                     });
+                } else if local == "graphicFrame" && !empty {
+                    part.visible.extend(parse_table_frame(&mut reader, ctx)?);
+                    continue;
                 } else if (local == "sp" || local == "cxnSp" || local == "pic") && !empty
                 {
                     pending = Some(Pending {
@@ -300,6 +305,10 @@ fn handle_element(
             }
         }
         "prstGeom" => p.prst = get(b"prst"),
+        "gd" if in_ctx(stack, "avLst") && get(b"name").as_deref() == Some("adj") => {
+            p.corner_adjustment = get(b"fmla")
+                .and_then(|value| value.strip_prefix("val ").and_then(|value| value.parse().ok()));
+        }
         "custGeom" => p.has_custgeom = true,
         "pt" if in_ctx(stack, "pathLst") => {
             let x = get(b"x").and_then(|v| v.parse().ok()).unwrap_or(0);
@@ -651,6 +660,10 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
     if p.saw_ext && shape.kind != "line" && shape.kind != "arrow" {
         shape.w = px(p.cx);
         shape.h = px(p.cy);
+    }
+    if p.prst.as_deref() == Some("roundRect") {
+        shape.corner_radius = shape.w.min(shape.h) *
+            p.corner_adjustment.unwrap_or(16667.0).clamp(0.0, 50000.0) / 100000.0;
     }
 
     if let Some(color) = p.fill {

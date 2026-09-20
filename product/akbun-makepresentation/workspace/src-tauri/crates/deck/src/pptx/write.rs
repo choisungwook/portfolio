@@ -531,7 +531,20 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
         }
         // rect and ellipse
         _ => {
-            let prst = if shape.kind == "ellipse" { "ellipse" } else { "rect" };
+            let prst = if shape.kind == "ellipse" {
+                "ellipse"
+            } else if shape.corner_radius > 0.0 {
+                "roundRect"
+            } else {
+                "rect"
+            };
+            let adjustment = if prst == "roundRect" {
+                let short_side = shape.w.min(shape.h).max(1.0);
+                let value = (shape.corner_radius / short_side * 100000.0).clamp(0.0, 50000.0);
+                format!("<a:gd name=\"adj\" fmla=\"val {}\"/>", value.round() as i64)
+            } else {
+                String::new()
+            };
             // Text written inside the outline goes in the shape's own txBody,
             // which is what PowerPoint puts there too, so it stays attached to
             // the shape instead of becoming a box sitting on top of it.
@@ -542,7 +555,7 @@ fn shape_xml(shape: &Shape, id: u64) -> String {
             };
             format!(
                 "<p:sp><p:nvSpPr><p:cNvPr id=\"{id}\" name=\"Shape {id}\"/><p:cNvSpPr>{locks}</p:cNvSpPr><p:nvPr/></p:nvSpPr>\
-<p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>{}{}</p:spPr>{text}</p:sp>",
+<p:spPr>{}<a:prstGeom prst=\"{prst}\"><a:avLst>{adjustment}</a:avLst></a:prstGeom>{}{}</p:spPr>{text}</p:sp>",
                 xfrm(shape.x, shape.y, shape.w, shape.h, false, false, shape.rotation),
                 fill_xml(&shape.fill),
                 line_xml(shape)

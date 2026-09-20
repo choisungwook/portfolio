@@ -55,9 +55,22 @@
 
 - 근거: [geometry.js:99](../workspace/src/editor/geometry.js), [svg.js:327](../workspace/src/editor/svg.js).
 
+## PPTX 표와 SVG 아이콘
+
+- PPTX의 표는 셀별 사각형으로 가져와 텍스트와 색상을 편집할 수 있음.
+- 표 전용 행·열 추가와 셀 병합은 지원하지 않음.
+- 둥근 사각형은 모서리 반경을 유지하며 다시 PPTX로 저장됨.
+- 상단 Preset → Person icon에서 SVG 사람 아이콘 추가.
+- SVG 이미지의 Inspector → SVG fill에서 색상 변경. `original`을 선택하면 원본 색상 표시.
+- SVG의 기존 채우기와 분리된 선 색상은 각각 편집. 색상 변경은 PPTX 저장본에도 반영.
+
+- 근거: [table.rs:28](../workspace/src-tauri/crates/deck/src/pptx/read/table.rs), [shapes.rs:664](../workspace/src-tauri/crates/deck/src/pptx/read/shapes.rs), [svg.js:42](../workspace/src/editor/svg.js), [files.js:86](../workspace/src/renderer/files.js).
+- 결정: [PPTX 표는 셀별 도형으로 가져온다](../knowledge/decisions/2026-09-import-tables-as-cell-shapes.md).
+
 ## 확인 질문
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?
 2. 전체 선택 후 색상을 바꾸면 잠긴 객체에도 적용되는가?
 3. Inspector에서 바꾼 색상이 다음 객체에 적용되지 않는 이유는 무엇인가?
 4. 코드 블록의 리사이즈와 Crop은 어떻게 다른가?
+5. PPTX 표를 가져왔을 때 행과 열을 편집할 수 있는가?
