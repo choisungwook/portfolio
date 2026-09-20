@@ -23,14 +23,17 @@ LiteLLM은 `config.yaml`의 `callbacks: ["prometheus"]` 한 줄로 `/metrics`를
 docker compose up -d
 ```
 
-Grafana는 `http://localhost:3000`이고 로컬 lab이라 로그인이 꺼져 있습니다. 대시보드 네 개가 미리 들어 있습니다.
+Grafana는 `http://localhost:3000`이고 로컬 lab이라 로그인이 꺼져 있습니다. 대시보드 다섯 개가 미리 들어 있습니다.
 
 | 대시보드 | 보는 것 |
 |---|---|
 | 1. 두 장부 비교 | 같은 호출을 LiteLLM과 Bedrock이 각각 어떻게 세는지 |
 | 2. 요청과 호출 | client가 보낸 요청 수와 Bedrock 호출 수의 차이 |
 | 3. 같은 요청은 Bedrock을 부르지 않는다 | 캐시 hit이 호출을 막는 구간 |
+| 4. 지표 하나에 패널 하나 | 왼쪽 열 LiteLLM, 오른쪽 열 Bedrock을 같은 행끼리 짝지어 하나씩 |
 | LiteLLM Prod v2 (공식) | LiteLLM 저장소가 유지하는 운영 대시보드 |
+
+4번은 시나리오 1을 눈으로 확인하려고 만들었습니다. 왼쪽 열은 counter 누적이라 오른쪽 끝 값이 실험 전체의 합이고, 오른쪽 열은 최근 10분 구간의 합이라 봉우리 값이 그 구간의 총량입니다. 시나리오 1은 캐시가 걸리지 않으므로 같은 행의 두 값이 같아야 하고, 캐시 패널 네 개는 0으로 남습니다.
 
 Prometheus는 `http://localhost:9090`입니다. 두 대상이 모두 붙었는지 먼저 확인합니다. `litellm`은 `up`이고, `bedrock-cloudwatch`는 첫 수집 전까지 `unknown`입니다.
 
@@ -175,7 +178,7 @@ AWS가 제시하는 관찰 수단은 셋입니다.
 
 첫 번째가 가장 빠릅니다. CloudWatch 콘솔에서 **Dashboards → Automatic dashboards → Bedrock**으로 들어가면 됩니다. 다만 여기에는 캐시 token 위젯이 없어서 이 실습이 보려는 네 종류가 한 화면에 모이지 않습니다.
 
-그래서 네 종류를 모은 대시보드를 따로 만듭니다. 위젯 4개이고 CloudWatch 대시보드는 계정당 3개까지 무료입니다.
+그래서 네 종류를 모은 대시보드를 따로 만듭니다. 위젯 8개이고 CloudWatch 대시보드는 계정당 3개까지 무료입니다. 앞의 5개는 지표 하나에 위젯 하나이고, 뒤의 3개에서만 지표를 섞습니다.
 
 ```bash
 AWS_PROFILE=<프로파일> scripts/cloudwatch-dashboard.sh
