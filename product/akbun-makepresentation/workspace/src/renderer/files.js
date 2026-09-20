@@ -28,25 +28,47 @@ async function newDeck() {
   renderAll();
 }
 
+// A window that shows no file takes the one being opened; anything else gets
+// its own process. Closing this window after spawning the other used to leave
+// both on screen for a moment, and sometimes for good.
+async function openDocument(path) {
+  if (state.filePath && window.api.isDesktop) {
+    await window.api.launchDocument(path);
+    return;
+  }
+  if (!(await confirmDiscard())) return;
+  const adopted = await window.api.adoptDocument(path);
+  await loadDocument(adopted || path);
+  // Settings and conversations live with the document's profile, which this
+  // window has just switched to.
+  await loadPersistentSettings();
+  await AiPanel.reloadDocument();
+}
+
 async function openFile() {
   const path = await window.api.pickOpen();
   if (!path) return;
   try {
-    if (window.api.isDesktop) {
-      if (!state.filePath && !(await confirmDiscard())) return;
-      await window.api.launchDocument(path);
-      if (!state.filePath) await window.api.closeWindow();
-      return;
-    }
-    if (!(await confirmDiscard())) return;
-    await loadDocument(path);
+    await openDocument(path);
   } catch (error) {
     await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
   }
 }
 
+// PowerPoint measured the file's text boxes with its own font metrics; this
+// editor wraps by an estimate, so a line that fit there can wrap here and run
+// out of the bottom of its box. The box grows to hold what it wraps into.
+function fitOpenedTextBoxes(deck) {
+  for (const target of deck.slides) {
+    for (const shape of target.shapes) {
+      if (shape.kind === 'text') L.fitTextHeight(shape, true);
+    }
+  }
+  return deck;
+}
+
 async function loadDocument(path) {
-  state.deck = await window.api.openDeck(path);
+  state.deck = fitOpenedTextBoxes(await window.api.openDeck(path));
   state.current = 0;
   setSlideSelection([0]);
   clearSelection();
@@ -133,11 +155,11 @@ function slideRasterSize() {
   };
 }
 
-function rasterizeSlideCanvas(s, number) {
+function rasterizeSlideCanvas(s, number, transparent = false) {
   return new Promise((resolve, reject) => {
     const slideDimensions = deckSize();
     const rasterSize = slideRasterSize();
-    const svg = L.renderSlideSvg(s, { ...slideDimensions, number });
+    const svg = L.renderSlideSvg(s, { ...slideDimensions, number, transparent });
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const image = new Image();
     image.onload = () => {
@@ -195,9 +217,12 @@ async function exportPng() {
   const path = await window.api.pickSave(suggestSlideImageName(), 'png');
   if (!path) return;
   try {
+    // PDF pages are JPEG and cannot be transparent, so only the PNG reads
+    // this setting.
     const raster = await rasterizeSlideCanvas(
       slide(),
-      state.showNumbers ? state.current + 1 : 0
+      state.showNumbers ? state.current + 1 : 0,
+      appSettings.pngExport.transparent
     );
     await window.api.savePng(path, raster.toDataURL('image/png'));
     await window.api.message('PNG saved.', { title: 'akbun-makepresentation' });

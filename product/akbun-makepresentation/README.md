@@ -4,16 +4,17 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 
 ## What it does
 
-- Open each file in a separate app process, with independent settings, undo history and AI conversations
+- Open each file in a separate app process, with independent settings, undo history and AI conversations. A window that shows no file takes the file being opened instead of spawning a second window
 - Find text and code across all slides with Cmd+F, then jump to the matching object
 - Slides: add, delete, duplicate, switch, reorder by drag or by Cmd+Up/Down, thumbnail panel
 - Per-slide background color from its own panel card, with presets, a custom color and apply-to-all
 - Shapes: rectangle, ellipse, speech bubble, line, arrow, freehand pen
-- Text boxes with font family, size, color, bold, italic, underline and alignment
+- Text boxes with font family, size, color, bold, italic, underline and alignment. A text box is as tall as its wrapped text: resizing sets the width and the height follows
+- Slides → Font for all slides… changes the font family of every text box and every shape text in the deck at once
 - Text written inside a rectangle, ellipse or speech bubble, centered, with the same font controls
 - Per-shape line color, width, style (solid/dashed/dotted) and fill
 - Right-click Lock/Unlock: keep selection while preventing object edits, including moves and style changes
-- Settings → General: new-object fill, text color, borders (including none), and arrowhead defaults
+- Settings → General: new-object fill, text color, borders (including none), arrowhead defaults, and whether Export PNG drops the slide background for a transparent image
 - Editable code blocks fit their source and keep the frame and text in proportion when resized
 - Multi-object group and ungroup from the right-click menu or the panel, with grouped move and duplicate
 - Its own File, Edit and View menus in the window rather than in the system menu bar
@@ -33,7 +34,7 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - AI panel backed by a separately installed Codex CLI and its ChatGPT subscription login
 - Streaming text, generated images, and non-destructive slide edits from an app-owned conversation
 - Slide mode sends the model a measured reading of the slide and a rendered picture of it, so it works from what is there rather than from a guess
-- Quick chips above the composer: draw an IT architecture diagram, tidy an existing one, polish or summarise the wording, and four image styles (webtoon, watercolour, flat, 3D)
+- Quick chips above the composer: draw an IT architecture diagram, tidy an existing one, polish or summarise the wording, generate an icon for what the slide says, and four image styles (webtoon, watercolour, flat, 3D)
 - Six diagram layouts and ten colour palettes, chosen independently
 - Generated images land on the current slide straight away; Cmd+Z takes one back
 - Up to three local, read-only conversation archives per document; each archive including images is capped at 128 MiB
@@ -49,7 +50,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Cmd+X | Cut the selected objects to the clipboard |
 | Cmd+D | Duplicate the selected objects, or the whole slide when nothing is selected |
 | Cmd+S | Save |
-| Cmd+N, Cmd+O | New deck or open a deck in a separate process |
+| Cmd+N, Cmd+O | New deck in a separate process, or open a deck: in this window when it shows no file, otherwise in a separate process |
 | Cmd+F | Search text and code across all slides; Enter / Shift+Enter moves between results |
 | Cmd+Up / Cmd+Down | Move the current slide one place earlier or later |
 | Cmd+B, Cmd+I, Cmd+U | Bold, italic, underline the selected unlocked text box |

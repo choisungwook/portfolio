@@ -52,6 +52,7 @@
         <button data-command="numbers">Slide numbers</button>
         <hr />
         <button data-command="slide-size">Slide size…</button>
+        <button data-command="deck-font">Font for all slides…</button>
       </div>
     </div>
     <div class="menu">
@@ -204,6 +205,7 @@
               <span aria-hidden="true">⌄</span>
             </button>
             <div id="font-menu" hidden>
+              <p id="font-menu-scope" hidden>Applies to every text on every slide</p>
               <input id="font-search" type="search" placeholder="Search fonts" autocomplete="off" />
               <div id="font-options" role="listbox"></div>
             </div>
@@ -550,6 +552,10 @@
             <label for="settings-snapping">Shape snapping</label>
             <label class="settings-checkbox">
               <input id="settings-snapping" type="checkbox" /> Snap matching object edges while dragging
+            </label>
+            <label for="settings-png-transparent">PNG export</label>
+            <label class="settings-checkbox">
+              <input id="settings-png-transparent" type="checkbox" /> Transparent background instead of the slide colour
             </label>
           </div>
           <fieldset class="settings-border-fields">

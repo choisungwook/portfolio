@@ -276,6 +276,35 @@ test('text mode is given the slide, image mode is not', () => {
   assert.doesNotMatch(A.composeTurn({ ...options, mode: 'image' }), /Only on this slide/);
 });
 
+test('the icon chip hands image mode the slide words and nothing else about it', () => {
+  const slide = slideWith(
+    sized('rect', 0, 0, 100, 100, { text: 'Kubernetes  cluster\nupgrade' }),
+    sized('text', 0, 200, 100, 40, { text: '   ' }),
+    sized('code', 0, 300, 100, 40, { text: 'kubectl get nodes' })
+  );
+  const options = { mode: 'image', prompt: 'go', slide, size: { width: 1920, height: 1080 } };
+  const plain = A.composeTurn(options);
+  assert.doesNotMatch(plain, /Text on the current slide/);
+  const icon = A.composeTurn({ ...options, chipIds: ['icon-draw'] });
+  assert.match(icon, /^\$imagegen /);
+  assert.match(icon, /Generate one icon, not a picture/);
+  assert.match(icon, /Text on the current slide:\n- Kubernetes cluster upgrade\n/);
+  assert.doesNotMatch(icon, /kubectl/);
+  assert.doesNotMatch(icon, /Canvas 1920x1080/);
+});
+
+test('the icon chip on an empty slide says so instead of listing nothing', () => {
+  const turn = A.composeTurn({
+    mode: 'image',
+    prompt: 'a database',
+    chipIds: ['icon-draw'],
+    slide: L.createSlide(),
+    size: { width: 1920, height: 1080 },
+  });
+  assert.match(turn, /the slide has no text/);
+  assert.match(turn, /User request: a database/);
+});
+
 test('a chip reaches the prompt only through its instructions, never as a label', () => {
   const turn = A.composeTurn({
     mode: 'slide',

@@ -7,7 +7,7 @@
 })(globalThis, function createEditorGeometry(C, Shapes) {
   'use strict';
 
-  const { BOXY, DEFAULT_STYLE } = C;
+  const { BOXY, DEFAULT_STYLE, SLIDE_W } = C;
   const { nextGroupId } = Shapes;
 
 function dragShape(shape, x0, y0, x, y, constrain) {
@@ -412,6 +412,75 @@ function setShapeBox(shape, from, x0, y0, x1, y1) {
   }
 }
 
+const TEXT_CHAR_WIDTH = 0.52;
+
+function wrapTextLines(text, width, fontSize) {
+  if (!(width > 0)) return String(text || '').split('\n');
+  const max = Math.max(1, Math.floor(width / Math.max(fontSize * TEXT_CHAR_WIDTH, 1)));
+  const lines = [];
+  for (const paragraph of String(text || '').split('\n')) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      lines.push('');
+      continue;
+    }
+    let line = '';
+    for (let word of words) {
+      while (word.length > max) {
+        if (line) {
+          lines.push(line);
+          line = '';
+        }
+        lines.push(word.slice(0, max));
+        word = word.slice(max);
+      }
+      if (!word) continue;
+      if (!line) {
+        line = word;
+      } else if (`${line} ${word}`.length <= max) {
+        line += ` ${word}`;
+      } else {
+        lines.push(line);
+        line = word;
+      }
+    }
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+
+function fitTextBox(shape, text, maxWidth) {
+  if (!shape || shape.kind !== 'text') return shape;
+  const content = String(text || '');
+  const fontSize = Math.max(1, Number(shape.fontSize) || DEFAULT_STYLE.fontSize);
+  const available = Number.isFinite(maxWidth)
+    ? maxWidth
+    : SLIDE_W - Math.max(0, Number(shape.x) || 0);
+  const widthLimit = Math.max(1, available);
+  const minWidth = Math.min(120, widthLimit);
+  const longest = Math.max(1, ...content.split('\n').map((line) => line.length));
+  shape.w = Math.min(
+    widthLimit,
+    Math.max(minWidth, longest * fontSize * TEXT_CHAR_WIDTH + 4)
+  );
+  const lines = wrapTextLines(content, shape.w, fontSize);
+  shape.h = Math.max(fontSize * 1.4, lines.length * fontSize * 1.35);
+  return shape;
+}
+
+// A text box is nothing but its text, so its height follows the lines the
+// text wraps into at the current width. Resizing sets the width, and the
+// height comes from here; a box opened from a file only grows, because a
+// taller box in the file was placed on purpose.
+function fitTextHeight(shape, growOnly) {
+  if (!shape || shape.kind !== 'text') return shape;
+  const fontSize = Math.max(1, Number(shape.fontSize) || DEFAULT_STYLE.fontSize);
+  const lines = wrapTextLines(shape.text, shape.w, fontSize);
+  const needed = Math.max(fontSize * 1.4, lines.length * fontSize * 1.35);
+  shape.h = growOnly ? Math.max(Number(shape.h) || 0, needed) : needed;
+  return shape;
+}
+
 // Resize by dragging a handle. `from` is the shape as it was when the drag
 // started, so repeated calls with a growing delta do not compound.
 function resizeShape(shape, from, handle, dx, dy) {
@@ -425,13 +494,19 @@ function resizeShape(shape, from, handle, dx, dy) {
     return;
   }
 
+  // A text box has no height of its own to drag: only the width handles do
+  // anything, and the height is refitted to the wrapped text afterwards.
+  const sides = shape.kind === 'text' ? handle.replace(/[ns]/g, '') : handle;
+  if (!sides) return;
+
   const b = shapeBBox(from);
   let x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
-  if (handle.includes('w')) x0 = Math.min(x0 + dx, x1 - MIN_SIZE);
-  if (handle.includes('e')) x1 = Math.max(x1 + dx, x0 + MIN_SIZE);
-  if (handle.includes('n')) y0 = Math.min(y0 + dy, y1 - MIN_SIZE);
-  if (handle.includes('s')) y1 = Math.max(y1 + dy, y0 + MIN_SIZE);
+  if (sides.includes('w')) x0 = Math.min(x0 + dx, x1 - MIN_SIZE);
+  if (sides.includes('e')) x1 = Math.max(x1 + dx, x0 + MIN_SIZE);
+  if (sides.includes('n')) y0 = Math.min(y0 + dy, y1 - MIN_SIZE);
+  if (sides.includes('s')) y1 = Math.max(y1 + dy, y0 + MIN_SIZE);
   setShapeBox(shape, from, x0, y0, x1, y1);
+  fitTextHeight(shape, false);
 }
 
 // Shift-resizing keeps the proportions the shape already has, so a 400x100
@@ -460,6 +535,7 @@ function resizeProportional(shape, from, handle, dx, dy) {
   const x0 = handle.includes('w') ? fixedX - width : fixedX;
   const y0 = handle.includes('n') ? fixedY - height : fixedY;
   setShapeBox(shape, from, x0, y0, x0 + width, y0 + height);
+  fitTextHeight(shape, false);
 }
 
 // A line keeps its original axis, including the opposite direction after the
@@ -546,6 +622,9 @@ function rotatedBBox(box, degrees) {
     handlesFor,
     resizeShape,
     resizeShapeConstrained,
+    wrapTextLines,
+    fitTextBox,
+    fitTextHeight,
     rotationHandleFor,
     rotationTowards,
     unrotateDelta,

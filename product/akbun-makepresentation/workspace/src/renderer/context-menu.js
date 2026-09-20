@@ -12,6 +12,12 @@ function rememberFontFamily(family) {
   }
 }
 
+// The font list serves two callers: the property panel, which changes the
+// selection, and the Slides menu, which changes every text in the deck. The
+// list is the same; what a click does is decided by where it was opened from.
+let fontMenuScope = 'selection';
+let fontMenuAnchor = null;
+
 function renderFontOptions() {
   const selected = selectedShape()?.fontFamily || state.defaults.fontFamily;
   const matching = L.filterFonts(fontFamilies, fontSearch.value);
@@ -38,7 +44,7 @@ function renderFontOptions() {
 }
 
 function positionFontMenu() {
-  const trigger = $('prop-font-family').getBoundingClientRect();
+  const trigger = (fontMenuAnchor || $('prop-font-family')).getBoundingClientRect();
   const bounds = fontMenu.getBoundingClientRect();
   const left = Math.max(
     4,
@@ -52,8 +58,13 @@ function positionFontMenu() {
   fontMenu.style.top = `${top}px`;
 }
 
-function showFontMenu() {
+function showFontMenu(scope = 'selection', anchor = null) {
+  fontMenuScope = scope;
+  fontMenuAnchor = anchor;
   fontMenu.hidden = false;
+  $('font-menu-scope').hidden = scope !== 'deck';
+  // The listbox is the same element whichever entry opened it, so the control
+  // that owns the popup says it is expanded either way.
   $('prop-font-family').setAttribute('aria-expanded', 'true');
   fontSearch.value = '';
   renderFontOptions();
@@ -63,7 +74,36 @@ function showFontMenu() {
 
 function hideFontMenu() {
   fontMenu.hidden = true;
+  fontMenuScope = 'selection';
+  fontMenuAnchor = null;
   $('prop-font-family').setAttribute('aria-expanded', 'false');
+}
+
+function openDeckFontMenu() {
+  showFontMenu('deck', $('menubar').querySelector('[data-menu="slides"]'));
+}
+
+async function applyDeckFont(family) {
+  const confirmed = await window.api.ask(
+    `Use "${family}" for every text on every slide?`,
+    { title: 'Font for all slides', kind: 'warning' }
+  );
+  if (!confirmed) return;
+  if (state.editingIndex >= 0) textEditor.blur();
+  if (!L.setDeckFontFamily(state.deck, family)) return;
+  markDirty();
+  renderAll();
+}
+
+async function chooseFont(family) {
+  const scope = fontMenuScope;
+  hideFontMenu();
+  if (scope === 'deck') {
+    await applyDeckFont(family);
+    return;
+  }
+  applyProp({ fontFamily: family });
+  $('prop-font-family').focus();
 }
 
 async function loadSystemFonts() {
@@ -310,10 +350,7 @@ fontSearch.addEventListener('keydown', (event) => {
 });
 fontOptions.addEventListener('click', (event) => {
   const option = event.target.closest('[data-font]');
-  if (!option) return;
-  applyProp({ fontFamily: option.dataset.font });
-  hideFontMenu();
-  $('prop-font-family').focus();
+  if (option) void chooseFont(option.dataset.font);
 });
 
 // --- property panel -------------------------------------------------------------------

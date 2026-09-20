@@ -1169,5 +1169,15 @@
     await connect();
   }
 
-  globalThis.makepresentationAiPanel = { initialize, refreshStatus, setRightPanel };
+  // The window adopted another document, so the conversations on screen and
+  // the App Server's working directory both belong to a profile that is no
+  // longer this one. Restarting the server points it at the new profile.
+  async function reloadDocument() {
+    if (pendingTurn) await stopTurn();
+    showList();
+    isolatedConfigPromise = null;
+    await connect(true);
+  }
+
+  globalThis.makepresentationAiPanel = { initialize, refreshStatus, setRightPanel, reloadDocument };
 })();

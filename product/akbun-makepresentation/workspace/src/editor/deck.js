@@ -1,10 +1,14 @@
 (function registerEditorDeck(root, factory) {
   const api = typeof module !== 'undefined' && module.exports
-    ? factory(require('./constants.js'), require('./shapes.js'))
-    : factory(root.makepresentationEditorConstants, root.makepresentationEditorShapes);
+    ? factory(require('./constants.js'), require('./shapes.js'), require('./geometry.js'))
+    : factory(
+      root.makepresentationEditorConstants,
+      root.makepresentationEditorShapes,
+      root.makepresentationEditorGeometry
+    );
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.makepresentationEditorDeck = api;
-})(globalThis, function createEditorDeck(C, Shapes) {
+})(globalThis, function createEditorDeck(C, Shapes, Geometry) {
   'use strict';
 
   const {
@@ -16,8 +20,10 @@
     SLIDE_H,
     SLIDE_SIZE_PRESETS,
     SLIDE_W,
+    TEXTUAL,
   } = C;
   const { createShape } = Shapes;
+  const { fitTextBox } = Geometry;
 
 function createDeck() {
   return { slideWidth: SLIDE_W, slideHeight: SLIDE_H, slides: [createSlide()] };
@@ -142,6 +148,27 @@ function duplicateSlide(deck, index) {
 
 // The page number as an ordinary text shape rather than a special case, so it
 // draws, rasterizes and exports to pptx through the paths that already exist.
+// One family for every text in the deck: text boxes and the text a rect, an
+// ellipse or a callout holds. Locked shapes keep theirs, the way every other
+// edit leaves them alone, and a text box is refitted because a different face
+// takes a different width. Returns how many shapes changed.
+function setDeckFontFamily(deck, family) {
+  const name = String(family || '').trim();
+  if (!name) return 0;
+  const { width } = slideSize(deck);
+  let changed = 0;
+  for (const slide of deck.slides) {
+    for (const shape of slide.shapes) {
+      if (shape.locked || !(shape.kind === 'text' || TEXTUAL.has(shape.kind))) continue;
+      if (shape.fontFamily === name) continue;
+      shape.fontFamily = name;
+      if (shape.kind === 'text') fitTextBox(shape, shape.text, width - Math.max(0, Number(shape.x) || 0));
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
 function slideNumberShape(number, width = SLIDE_W, height = SLIDE_H) {
   const shape = createShape('text', width - 110, height - 52, {
     fontSize: 18,
@@ -171,6 +198,7 @@ function slideNumberShape(number, width = SLIDE_W, height = SLIDE_H) {
     moveSlideAtEdge,
     moveSlideSelection,
     duplicateSlide,
+    setDeckFontFamily,
     slideNumberShape,
   };
 });

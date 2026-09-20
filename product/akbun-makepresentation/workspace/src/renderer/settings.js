@@ -68,6 +68,7 @@ function renderGeneralSettings() {
     select.value = defaults[end === 'start' ? 'arrowStart' : 'arrowEnd'];
   }
   $('settings-snapping').checked = appSettings.snapping.enabled;
+  $('settings-png-transparent').checked = appSettings.pngExport.transparent;
   setBorderSettingsFields('shape', defaults.shapeBorder);
   setBorderSettingsFields('image', defaults.imageBorder);
   $('general-settings-status').textContent = '';
@@ -170,6 +171,7 @@ $('btn-settings-ok').addEventListener('click', async () => {
     await persistAppSettings({
       ...appSettings,
       snapping: { enabled: $('settings-snapping').checked },
+      pngExport: { transparent: $('settings-png-transparent').checked },
       editorDefaults,
       headingSizes,
       aiSystemPrompts: aiSystemPromptsFromFields(),
