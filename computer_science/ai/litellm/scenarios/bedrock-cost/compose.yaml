@@ -28,8 +28,10 @@ services:
     restart: unless-stopped
     # proxy가 응답하지 않으면 docker compose ps가 unhealthy로 표시한다.
     # 이것이 없으면 이벤트 루프가 막혀도 Up으로만 보여서 멈춘 줄 모른다.
+    # 이미지에 curl이 없어서 python으로 찌른다. curl을 쓰면 명령 자체가 실패해
+    # 프록시가 멀쩡해도 항상 unhealthy로 보인다.
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf --max-time 5 http://localhost:4000/health/liveliness || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=5).status==200 else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 3

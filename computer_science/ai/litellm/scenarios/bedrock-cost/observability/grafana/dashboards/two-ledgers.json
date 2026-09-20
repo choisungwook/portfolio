@@ -240,8 +240,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_input_tokens_metric_total[2m]))",
-          "legendFormat": "LiteLLM (2분 증가분)",
+          "expr": "clamp_min(sum(litellm_input_tokens_metric_total) - sum(litellm_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "LiteLLM (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -325,7 +325,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "type": "timeseries",
@@ -347,8 +348,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_output_tokens_metric_total[2m]))",
-          "legendFormat": "LiteLLM (2분 증가분)",
+          "expr": "clamp_min(sum(litellm_output_tokens_metric_total) - sum(litellm_output_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "LiteLLM (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -432,7 +433,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     },
     {
       "type": "timeseries",
@@ -454,8 +456,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_provider_cache_creation_input_tokens_metric_total[2m]))",
-          "legendFormat": "캐시 쓰기 · LiteLLM",
+          "expr": "clamp_min(sum(litellm_provider_cache_creation_input_tokens_metric_total) - sum(litellm_provider_cache_creation_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "캐시 쓰기 · LiteLLM (구간 증가분)",
           "refId": "A",
           "instant": false,
           "range": true
@@ -465,8 +467,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(litellm_provider_cache_read_input_tokens_metric_total[2m]))",
-          "legendFormat": "캐시 읽기 · LiteLLM",
+          "expr": "clamp_min(sum(litellm_provider_cache_read_input_tokens_metric_total) - sum(litellm_provider_cache_read_input_tokens_metric_total offset $__interval), 0)",
+          "legendFormat": "캐시 읽기 · LiteLLM (구간 증가분)",
           "refId": "B",
           "instant": false,
           "range": true
@@ -591,7 +593,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "interval": "1m"
     }
   ],
   "editable": true
