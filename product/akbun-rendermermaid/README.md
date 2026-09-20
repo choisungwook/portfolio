@@ -10,6 +10,7 @@ Deployed at [mermaid.akbun.com](https://mermaid.akbun.com).
 |---|---|
 | Render | The diagram redraws 400 ms after you stop typing. Ctrl or Cmd + Enter and the Render button skip the wait |
 | Refresh | Throws the drawn diagram away and renders it again from the code, back at the fitted zoom. The button next to Render |
+| Clear | Erases the code and the diagram together and leaves the editor empty. The empty state is stored too, so a reload does not bring the sample back |
 | Zoom | The preview zooms with its own buttons, with Ctrl or Cmd and +, - or 0, and with Ctrl or Cmd and the wheel. Fit re-fits it to the pane |
 | Errors | A failed parse leaves the last good diagram on screen and prints the mermaid message, with its line and caret, under the editor. Nothing flashes away while you are mid-edit |
 | Save PNG | Rasterizes the rendered SVG at 2x onto a white background and downloads it as `mermaid-<type>-<date>-<time>.png`. The export is the diagram's own size whatever the preview zoom is, and a diagram too wide for a canvas is exported at a lower scale instead of failing |

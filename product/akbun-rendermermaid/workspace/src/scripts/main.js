@@ -35,6 +35,7 @@ const previewEl = document.querySelector('#preview');
 const statusEl = document.querySelector('#status');
 const renderBtn = document.querySelector('#render');
 const refreshBtn = document.querySelector('#refresh');
+const clearBtn = document.querySelector('#clear');
 const pngBtn = document.querySelector('#save-png');
 const copyPngBtn = document.querySelector('#copy-png');
 const largeBtn = document.querySelector('#large');
@@ -187,6 +188,21 @@ function refresh() {
   setDiagramActions(false);
   previewZoomPinned = false;
   render();
+}
+
+/**
+ * Erases the code as well as the diagram. The empty value is stored rather
+ * than the key removed, because a missing key is what restore() reads as a
+ * first visit and answers with the sample.
+ */
+function clearAll() {
+  window.clearTimeout(renderTimer);
+  codeEl.value = '';
+  window.localStorage.setItem(STORAGE_CODE, '');
+  previewZoomPinned = false;
+  showEmpty();
+  setStatus('Cleared.');
+  codeEl.focus();
 }
 
 /* ===== PNG export ===== */
@@ -400,6 +416,7 @@ codeEl.addEventListener('keydown', (event) => {
 
 renderBtn.addEventListener('click', renderNow);
 refreshBtn.addEventListener('click', refresh);
+clearBtn.addEventListener('click', clearAll);
 pngBtn.addEventListener('click', savePng);
 copyPngBtn.addEventListener('click', copyPng);
 largeBtn.addEventListener('click', openLargeView);
