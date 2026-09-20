@@ -2,6 +2,8 @@
 
 ## 2026-09-20
 
+* **Creation**: [텍스트 상자 높이는 글이 정한다](decisions/2026-09-text-boxes-are-as-tall-as-their-text.md) 결정 기록.
+* **Update**: [문서 프로세스와 프로필 분리](decisions/2026-09-document-process-and-profile-isolation.md)에 파일 없는 창의 제자리 열기와 macOS Opened 이벤트 처리 추가.
 * **Update**: 이미지 테두리 없음과 제목 단계별 글자 크기 프리셋을 편집 기본값 결정에 반영.
 * **Creation**: [PPTX 표는 셀별 도형으로 가져온다](decisions/2026-09-import-tables-as-cell-shapes.md) 결정 기록.
 

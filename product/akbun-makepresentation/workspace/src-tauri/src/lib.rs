@@ -92,6 +92,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             documents::initial_document,
+            documents::adopt_document,
             documents::launch_document,
             clipboard::write_shape_clipboard,
             clipboard::read_shape_clipboard,
@@ -127,13 +128,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
+            // Finder hands a double-clicked file over here, not as an argument.
+            // Spawning a second process for it left this one showing an empty
+            // deck, which is where the "two windows per file" came from.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
-                        if let Err(error) =
-                            documents::launch_document(Some(path.to_string_lossy().into()))
-                        {
+                        if let Err(error) = documents::open_requested(_app, path) {
                             use tauri::Emitter;
                             let _ = _app.emit("document-open-error", error);
                         }

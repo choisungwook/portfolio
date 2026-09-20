@@ -76,6 +76,21 @@ const QUICK_CHIPS = Object.freeze([
     ],
   },
   {
+    id: 'icon-draw',
+    mode: 'image',
+    label: '아이콘 생성',
+    title: 'Generate one icon that stands for what the current slide says',
+    usesSlideText: true,
+    instructions: [
+      'Generate one icon, not a picture: a single symbol that stands for the subject of the current slide.',
+      'Read the subject from the slide text listed below and from the user request. When the request names the subject, the request wins.',
+      'Draw one object only, in flat vector style: bold simplified silhouette, even stroke weight, no perspective, no scene, no background objects.',
+      'Use at most three flat colours on a plain solid white background. No gradients, no shadows, no outlines around the canvas.',
+      'Centre the symbol with generous padding on every side, and keep it readable when scaled down to 64 pixels.',
+      'No text, letters, numbers, labels or watermarks anywhere in the image.',
+    ],
+  },
+  {
     id: 'style-webtoon',
     mode: 'image',
     label: '웹툰',
@@ -120,6 +135,16 @@ function selectedChips(mode, ids) {
 
 function usesDiagramStyle(mode, ids) {
   return selectedChips(mode, ids).some((item) => item.usesDiagramStyle);
+}
+
+// Image generation gets no measured reading: coordinates and strokes say
+// nothing about what to draw. A chip that wants the slide's subject gets its
+// words instead, one line per shape, in the order they are stacked.
+function slideTextLines(slide) {
+  const shapes = Array.isArray(slide?.shapes) ? slide.shapes : [];
+  return shapes
+    .filter((shape) => shape.kind !== 'code' && String(shape.text || '').trim())
+    .map((shape) => `- ${String(shape.text).replace(/\s+/g, ' ').trim().slice(0, 200)}`);
 }
 
 // --- reading a slide ---------------------------------------------------------------------------
@@ -351,6 +376,14 @@ function composeTurn(options = {}) {
   if (mode !== 'image' && options.slide) {
     sections.push('', 'Current slide reading:', slideDigest(options.slide, options));
   }
+  if (mode === 'image' && options.slide && chips.some((item) => item.usesSlideText)) {
+    const lines = slideTextLines(options.slide);
+    sections.push(
+      '',
+      'Text on the current slide:',
+      ...(lines.length ? lines : ['- (the slide has no text; take the subject from the user request)'])
+    );
+  }
   if (mode === 'slide' && (chips.some((item) => item.usesDiagramStyle) || options.forceDiagramStyle)) {
     sections.push(...diagramStyleLines(options.style, options.size, options.geometry));
   }
@@ -382,6 +415,7 @@ return {
   chipsForMode,
   selectedChips,
   usesDiagramStyle,
+  slideTextLines,
   slideDigest,
   composeTurn,
   retryTurn,

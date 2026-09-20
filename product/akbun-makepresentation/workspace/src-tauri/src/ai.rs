@@ -15,18 +15,21 @@ pub struct LoadedSession {
 }
 
 fn store(app: &AppHandle) -> Result<AiStore, String> {
-    Ok(AiStore::new(
-        app.state::<makepresentation_desktop::Profile>()
-            .directory
-            .clone(),
-    ))
+    Ok(AiStore::new(crate::documents::profile_directory(app)?))
+}
+
+/// Lets the page show the images saved under the active profile's sessions.
+/// Runs at startup and again whenever the window adopts another document.
+pub fn allow_profile_images(app: &AppHandle) -> Result<(), String> {
+    let store = store(app)?;
+    store.ensure()?;
+    app.asset_protocol_scope()
+        .allow_directory(store.sessions_root(), true)
+        .map_err(|error| format!("cannot allow AI session images: {error}"))
 }
 
 pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let store = store(app.handle())?;
-    store.ensure()?;
-    app.asset_protocol_scope()
-        .allow_directory(store.sessions_root(), true)?;
+    allow_profile_images(app.handle())?;
     Ok(())
 }
 

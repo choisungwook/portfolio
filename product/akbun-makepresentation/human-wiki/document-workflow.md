@@ -2,8 +2,9 @@
 
 ## 파일별 독립 실행
 
-- File → Open 또는 Cmd+O로 열면 별도 앱 프로세스 생성.
-- 빈 문서에서 파일을 열면 새 프로세스가 열린 뒤 빈 창을 닫음. 편집 중인 빈 문서라면 내용 폐기 여부 확인.
+- 문서를 보고 있는 창에서 File → Open 또는 Cmd+O로 열면 별도 앱 프로세스 생성.
+- 파일이 없는 창에서 열면 그 창이 파일을 맡음. 프로필을 파일 것으로 바꾸고 설정과 AI 대화를 다시 읽음. 편집 중인 빈 문서라면 내용 폐기 여부 확인.
+- Finder 더블클릭은 macOS가 실행 인자가 아니라 Opened 이벤트로 전달. 페이지가 시작 문서를 묻기 전이면 그 파일이 시작 문서가 되고, 뒤면 페이지가 위 규칙으로 처리. 예전에는 이 이벤트가 두 번째 프로세스를 띄워 빈 창과 파일 창이 함께 남았음.
 - Cmd+N도 별도 프로세스에서 빈 문서 시작.
 - 기존 문서의 편집 내용·선택·실행 취소·확대·실행 중 AI 유지.
 - 설정·프리셋·AI 대화는 파일별 로컬 프로필에 저장.
@@ -16,7 +17,7 @@
 
 프로세스가 다르면 한 앱의 종료나 실행 취소가 다른 앱의 메모리를 바꾸지 않음. 저장 공간도 별도로 두어 AI 대화를 종료·복원하는 동작이 다른 앱의 대화를 끝내지 않게 함.
 
-- 근거: [documents.rs:31](../workspace/src-tauri/src/documents.rs), [desktop/lib.rs:34](../workspace/src-tauri/crates/desktop/src/lib.rs).
+- 근거: [documents.rs:66](../workspace/src-tauri/src/documents.rs), [files.js:34](../workspace/src/renderer/files.js), [desktop/lib.rs:34](../workspace/src-tauri/crates/desktop/src/lib.rs).
 - 결정: [문서 프로세스와 프로필 분리](../knowledge/decisions/2026-09-document-process-and-profile-isolation.md).
 
 ## 전체 슬라이드 검색

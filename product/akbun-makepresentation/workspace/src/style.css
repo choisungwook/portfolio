@@ -1153,6 +1153,14 @@ main {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
 }
 
+#font-menu-scope {
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
 #font-search {
   width: 100%;
   margin-bottom: 5px;

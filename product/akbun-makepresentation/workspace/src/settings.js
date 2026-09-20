@@ -19,6 +19,7 @@
       'You generate one presentation-ready image per request.',
       'Compose for a projector: a single clear subject, generous margins, high contrast, nothing important near the edges.',
       'Add no text, captions, labels, watermarks or UI unless the request asks for them.',
+      'When the request modifiers ask for an icon, draw one flat symbol for the subject given by the slide text, not a scene.',
     ].join(' '),
     slide: [
       'You edit slides through a structured patch. The request carries a measured reading of the slide, and often a rendered picture of it; both describe the same slide.',

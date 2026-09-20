@@ -28,7 +28,7 @@
     TEXTUAL,
   } = C;
   const { normalizeLineNumbers } = Shapes;
-  const { rotatedBBox, shapeBBox } = Geometry;
+  const { fitTextBox, fitTextHeight, rotatedBBox, shapeBBox, wrapTextLines } = Geometry;
   const { slideBackground, slideNumberShape } = Deck;
 
 function escapeXml(text) {
@@ -244,62 +244,6 @@ function strokeAttrs(shape) {
 
 function fontAttr(shape) {
   return `font-family="${escapeXml(shape.fontFamily || DEFAULT_STYLE.fontFamily)}, sans-serif"`;
-}
-
-const TEXT_CHAR_WIDTH = 0.52;
-
-function wrapTextLines(text, width, fontSize) {
-  if (!(width > 0)) return String(text || '').split('\n');
-  const max = Math.max(1, Math.floor(width / Math.max(fontSize * TEXT_CHAR_WIDTH, 1)));
-  const lines = [];
-  for (const paragraph of String(text || '').split('\n')) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    if (words.length === 0) {
-      lines.push('');
-      continue;
-    }
-    let line = '';
-    for (let word of words) {
-      while (word.length > max) {
-        if (line) {
-          lines.push(line);
-          line = '';
-        }
-        lines.push(word.slice(0, max));
-        word = word.slice(max);
-      }
-      if (!word) continue;
-      if (!line) {
-        line = word;
-      } else if (`${line} ${word}`.length <= max) {
-        line += ` ${word}`;
-      } else {
-        lines.push(line);
-        line = word;
-      }
-    }
-    if (line) lines.push(line);
-  }
-  return lines;
-}
-
-function fitTextBox(shape, text, maxWidth) {
-  if (!shape || shape.kind !== 'text') return shape;
-  const content = String(text || '');
-  const fontSize = Math.max(1, Number(shape.fontSize) || DEFAULT_STYLE.fontSize);
-  const available = Number.isFinite(maxWidth)
-    ? maxWidth
-    : SLIDE_W - Math.max(0, Number(shape.x) || 0);
-  const widthLimit = Math.max(1, available);
-  const minWidth = Math.min(120, widthLimit);
-  const longest = Math.max(1, ...content.split('\n').map((line) => line.length));
-  shape.w = Math.min(
-    widthLimit,
-    Math.max(minWidth, longest * fontSize * TEXT_CHAR_WIDTH + 4)
-  );
-  const lines = wrapTextLines(content, shape.w, fontSize);
-  shape.h = Math.max(fontSize * 1.4, lines.length * fontSize * 1.35);
-  return shape;
 }
 
 function rotateSvg(shape, markup) {
@@ -600,6 +544,7 @@ function renderShapesSvg(shapes) {
     tokenizeCodeLine,
     wrapTextLines,
     fitTextBox,
+    fitTextHeight,
     codeBlockLayout,
     fitCodeBlock,
     rotateSvg,

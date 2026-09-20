@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::fs::{create_dir_all, read_to_string, File};
 use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 #[tauri::command]
 pub fn list_system_fonts() -> Vec<String> {
@@ -63,8 +63,7 @@ pub fn read_image_file(path: String) -> Result<String, String> {
 pub fn save_deck(app: AppHandle, path: String, deck: Deck) -> Result<(), String> {
     let file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
     pptx::write(&deck, BufWriter::new(file))?;
-    app.state::<makepresentation_desktop::Profile>()
-        .remember_saved_document(std::path::Path::new(&path))
+    crate::documents::remember_saved_document(&app, std::path::Path::new(&path))
 }
 
 #[derive(Deserialize)]
@@ -112,10 +111,7 @@ pub fn save_png(path: String, data_url: String) -> Result<(), String> {
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app
-        .state::<makepresentation_desktop::Profile>()
-        .directory
-        .join("settings.json"))
+    Ok(crate::documents::profile_directory(app)?.join("settings.json"))
 }
 
 #[tauri::command]

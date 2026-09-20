@@ -24,3 +24,4 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [잘라내기는 시스템 복사 성공 후 원본을 지운다](2026-09-cut-runs-the-copy-handler.md)
 * [슬라이드의 배열 순서가 곧 z 순서다](2026-09-array-order-is-z-order.md)
 * [PPTX 표는 셀별 도형으로 가져온다](2026-09-import-tables-as-cell-shapes.md)
+* [텍스트 상자 높이는 글이 정한다](2026-09-text-boxes-are-as-tall-as-their-text.md)

@@ -25,6 +25,7 @@ const MENU_COMMANDS = {
   guidelines: openGuidelinesDialog,
   numbers: toggleNumbers,
   'slide-size': openSlideSizeDialog,
+  'deck-font': openDeckFontMenu,
   'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
   'zoom-out': () => setZoom(L.zoomOut(state.zoom)),
   'zoom-fit': () => setZoom(L.ZOOM_FIT),
@@ -137,14 +138,31 @@ async function renderAiSlideImage(index) {
   );
 }
 
+// The operating system can ask this process to open a file at any time: on
+// macOS a double-click in Finder arrives this way. Listening starts before the
+// startup document is fetched, so nothing sent in between is lost.
 async function initialize() {
   populateCodeOptions();
-  try {
-    const path = await window.api.initialDocument();
-    if (path) await loadDocument(path);
-  } catch (error) {
-    await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
-  }
+  const startup = (async () => {
+    try {
+      const path = await window.api.initialDocument();
+      if (path) await loadDocument(path);
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
+    }
+  })();
+  // A request that lands while the startup document is still loading waits
+  // for it, or it would find an empty window and take the file over.
+  await window.api.onDocumentOpenRequest(async (path) => {
+    if (!path) return;
+    await startup;
+    try {
+      await openDocument(path);
+    } catch (error) {
+      await window.api.message(String(error), { title: 'Cannot open file', kind: 'error' });
+    }
+  });
+  await startup;
   try {
     await loadPersistentSettings();
   } catch (error) {

@@ -337,6 +337,52 @@ test('resizing a code block scales its type instead of cropping it', () => {
   assert.ok(L.renderShapeSvg(shape).includes('height="18" fill="#2b2d30"'));
 });
 
+test('resizing a text box sets its width and refits the height to the wrapped text', () => {
+  const shape = L.createShape('text', 10, 10, { fontSize: 20 });
+  shape.text = 'one two three four five six seven eight nine ten';
+  shape.w = 600;
+  shape.h = 28;
+  const from = structuredClone(shape);
+
+  L.resizeShape(shape, from, 'e', -400, 0);
+  assert.strictEqual(shape.w, 200);
+  const lines = L.wrapTextLines(shape.text, 200, 20).length;
+  assert.ok(lines > 1);
+  assert.strictEqual(shape.h, lines * 20 * 1.35);
+
+  L.resizeShape(shape, from, 'e', 400, 0);
+  assert.strictEqual(shape.w, 1000);
+  assert.strictEqual(shape.h, 28);
+});
+
+test('the height handles of a text box do nothing', () => {
+  const shape = L.createShape('text', 10, 10, { fontSize: 20 });
+  shape.text = 'hello';
+  shape.w = 200;
+  shape.h = 28;
+  const from = structuredClone(shape);
+  L.resizeShape(shape, from, 's', 0, 300);
+  L.resizeShape(shape, from, 'n', 0, -300);
+  assert.deepStrictEqual(
+    { x: shape.x, y: shape.y, w: shape.w, h: shape.h },
+    { x: 10, y: 10, w: 200, h: 28 }
+  );
+  L.resizeShape(shape, from, 'se', 100, 300);
+  assert.deepStrictEqual({ w: shape.w, h: shape.h }, { w: 300, h: 28 });
+});
+
+test('fitTextHeight only grows a box opened from a file', () => {
+  const shape = L.createShape('text', 0, 0, { fontSize: 20 });
+  shape.text = 'a b c d e f g h i j k l m n o p q r s t u v w x y z';
+  shape.w = 100;
+  shape.h = 400;
+  L.fitTextHeight(shape, true);
+  assert.strictEqual(shape.h, 400);
+  shape.h = 10;
+  L.fitTextHeight(shape, true);
+  assert.strictEqual(shape.h, L.wrapTextLines(shape.text, 100, 20).length * 20 * 1.35);
+});
+
 test('resizeShape moves a line endpoint', () => {
   const shape = L.createShape('line', 0, 0, {});
   L.dragShape(shape, 0, 0, 100, 50);
@@ -437,6 +483,31 @@ test('addSlide inserts after the current one', () => {
   assert.strictEqual(at, 1);
   assert.strictEqual(deck.slides.length, 2);
   assert.strictEqual(deck.slides[1].shapes.length, 0);
+});
+
+test('setDeckFontFamily changes every unlocked text on every slide and refits text boxes', () => {
+  const deck = L.createDeck();
+  L.addSlide(deck, 0);
+  const box = L.createShape('text', 10, 10, { fontFamily: 'Helvetica', fontSize: 20 });
+  box.text = 'hello there';
+  box.w = 5;
+  const rect = L.createShape('rect', 0, 0, { fontFamily: 'Helvetica' });
+  rect.text = 'in a box';
+  const locked = L.createShape('text', 0, 0, { fontFamily: 'Helvetica' });
+  locked.text = 'keep';
+  locked.locked = true;
+  const line = L.createShape('line', 0, 0, { fontFamily: 'Helvetica' });
+  deck.slides[0].shapes.push(box, locked);
+  deck.slides[1].shapes.push(rect, line);
+
+  assert.strictEqual(L.setDeckFontFamily(deck, 'Noto Sans KR'), 2);
+  assert.strictEqual(box.fontFamily, 'Noto Sans KR');
+  assert.strictEqual(rect.fontFamily, 'Noto Sans KR');
+  assert.strictEqual(locked.fontFamily, 'Helvetica');
+  assert.strictEqual(line.fontFamily, 'Helvetica');
+  assert.ok(box.w > 5, 'the text box is refitted to its text');
+  assert.strictEqual(L.setDeckFontFamily(deck, 'Noto Sans KR'), 0);
+  assert.strictEqual(L.setDeckFontFamily(deck, '  '), 0);
 });
 
 test('deleteSlide never leaves an empty deck', () => {
