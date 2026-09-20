@@ -4,4 +4,4 @@
 
 ## 목록
 
-* [OKF v0.1 스펙 사본](okf-spec-0.1.md) - knowledge 번들이 따르는 Open Knowledge Format 스펙 원문.
+사본을 추가할 때마다 `* [제목](파일명.md) - 한 문장 요약.` 형식으로 여기에 한 줄 추가한다.

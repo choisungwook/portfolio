@@ -41,7 +41,7 @@
 다음은 안전한 작업이므로 단계마다 허락을 묻지 않고 실행한다.
 
 - workspace의 테스트, lint, 타입 검사. 실패하면 이번 변경이 만든 것만 고치고 다시 돈다.
-- 핸즈온 workspace의 `docker compose up`과 `down`. 일회용 컨테이너라 밖에 영향이 없다.
+- 핸즈온 workspace의 `docker compose up`과 `down`. 일회용 컨테이너라 밖에 영향이 없다. 다만 컨테이너 안의 측정값을 근거로 문서나 knowledge를 남겼으면 `down -v` 전에 그 값을 파일로 뽑는다. 그 시점부터 컨테이너가 그 근거의 유일한 원본이다.
 - `product/` 앱을 로컬 정적 서버나 dev 서버로 띄우는 것.
 - GitHub 조회. Issue, PR, 리뷰, CI 결과를 읽는 것.
 
@@ -102,6 +102,6 @@ computer use까지 왔으면 허락을 묻지 않고 진행한다.
 
 PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓸 때 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
 
-작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다.
+작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 Copilot 리뷰 요청과 Issue close 같은 중간 단계를 뺀 것이 아니다.
 
 GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.

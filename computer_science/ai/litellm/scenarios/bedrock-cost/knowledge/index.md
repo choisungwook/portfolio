@@ -4,7 +4,7 @@ okf_version: "0.1"
 
 # Knowledge
 
-bedrock-cost workspace의 지식 번들이다. Google이 제안한 Open Knowledge Format(OKF) 0.1을 따른다. 스펙 사본은 저장소 루트의 [templates/knowledge/references/okf-spec-0.1.md](../../../../../../templates/knowledge/references/okf-spec-0.1.md)에 있다.
+bedrock-cost workspace의 지식 번들이다. Google이 제안한 Open Knowledge Format(OKF) 0.1을 따른다.
 
 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 

@@ -1,7 +1,8 @@
 # Topics
 
-핸즈온을 반복하며 얻은 도메인 통찰을 기록한다. 개별 핸즈온 문서가 "이번 실습에서 한 일"이라면 topic은 "여러 실습을 관통하는 이해"를 담는다.
+여러 핸즈온을 관통하는 도메인 통찰을 기록한다.
 
 ## 목록
 
-concept를 추가할 때마다 `* [제목](파일명.md) - 한 문장 요약.` 형식으로 여기에 한 줄 추가한다. 수정하면 요약을 고치고, 삭제하면 줄을 지운다.
+* [LiteLLM 응답 캐시와 Bedrock prompt cache는 다른 것이다](litellm-cache-vs-bedrock-prompt-cache.md) - 같은 "캐시"가 단가를 매길 수 없는 쪽과 spend에 잡히는 쪽 둘을 가리킨다.
+* [LiteLLM 집계 엔드포인트별 캐시 노출 범위](litellm-spend-endpoint-cache-coverage.md) - spend 계열은 합계만 주고 캐시 토큰은 daily activity 계열에서만 나온다.
