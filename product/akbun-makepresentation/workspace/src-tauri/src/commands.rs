@@ -30,6 +30,33 @@ pub fn open_deck(path: String) -> Result<Deck, String> {
 }
 
 #[tauri::command]
+pub fn read_image_file(path: String) -> Result<String, String> {
+    let extension = std::path::Path::new(&path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => return Err("Select an image file (PNG, JPEG, GIF, SVG, WebP, or BMP).".into()),
+    };
+    let file = File::open(&path).map_err(|error| error.to_string())?;
+    if file.metadata().map_err(|error| error.to_string())?.len() > 50_000_000 {
+        return Err("Image files must be 50 MB or smaller.".into());
+    }
+    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+    Ok(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
+#[tauri::command]
 pub fn save_deck(app: AppHandle, path: String, deck: Deck) -> Result<(), String> {
     let file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
     pptx::write(&deck, BufWriter::new(file))?;

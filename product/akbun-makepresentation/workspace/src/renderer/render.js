@@ -395,6 +395,8 @@ function renderProps() {
   $('prop-width').value = source.strokeWidth;
   $('prop-dash').value = source.dash;
   $('prop-font-size').value = source.fontSize;
+  $('prop-heading-level').value = Object.keys(appSettings.headingSizes)
+    .find((level) => appSettings.headingSizes[level] === Number(source.fontSize)) || 'custom';
   $('prop-text-color').value = source.textColor;
   $('prop-bold').classList.toggle('active', !!source.bold);
   $('prop-italic').classList.toggle('active', !!source.italic);

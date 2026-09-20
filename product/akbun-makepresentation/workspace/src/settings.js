@@ -5,8 +5,9 @@
     ? require('./editor.js')
     : globalThis.slidesLib;
 
-  const SETTINGS_VERSION = 5;
+  const SETTINGS_VERSION = 6;
   const DEFAULT_FONT_FAMILY = 'Noto Sans KR';
+  const DEFAULT_HEADING_SIZES = Object.freeze({ h1: 64, h2: 40, h3: 24, h4: 18 });
   const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
   const DEFAULT_AI_SYSTEM_PROMPTS = Object.freeze({
     text: [
@@ -43,7 +44,7 @@
     dash: 'solid',
   });
   const DEFAULT_IMAGE_BORDER = Object.freeze({
-    color: '#000000',
+    color: 'none',
     width: 2,
     dash: 'solid',
   });
@@ -62,6 +63,7 @@
       snapping: { enabled: true },
       guidelines: { ...DEFAULT_GUIDELINES },
       editorDefaults: normalizeEditorDefaults(),
+      headingSizes: { ...DEFAULT_HEADING_SIZES },
       aiSystemPrompts: { ...DEFAULT_AI_SYSTEM_PROMPTS },
       customPresets: [],
     };
@@ -134,6 +136,14 @@
     };
   }
 
+  function normalizeHeadingSizes(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return Object.fromEntries(Object.entries(DEFAULT_HEADING_SIZES).map(([level, fallback]) => {
+      const size = Number(source[level]);
+      return [level, Number.isInteger(size) && size >= 6 && size <= 200 ? size : fallback];
+    }));
+  }
+
   function creationStyle(kind, defaults) {
     const value = normalizeEditorDefaults(defaults);
     const border = kind === 'image' ? value.imageBorder : value.shapeBorder;
@@ -175,11 +185,19 @@
 
   function normalizeAppSettings(value) {
     const source = value && typeof value === 'object' ? value : {};
+    const editorDefaults = normalizeEditorDefaults(source.editorDefaults);
+    if (Number(source.version) < SETTINGS_VERSION &&
+        editorDefaults.imageBorder.color === '#000000' &&
+        editorDefaults.imageBorder.width === 2 &&
+        editorDefaults.imageBorder.dash === 'solid') {
+      editorDefaults.imageBorder.color = 'none';
+    }
     return {
       version: SETTINGS_VERSION,
       snapping: normalizeSnapping(source.snapping),
       guidelines: normalizeGuidelines(source.guidelines),
-      editorDefaults: normalizeEditorDefaults(source.editorDefaults),
+      editorDefaults,
+      headingSizes: normalizeHeadingSizes(source.headingSizes),
       aiSystemPrompts: normalizeAiSystemPrompts(source.aiSystemPrompts),
       customPresets: normalizeCustomPresets(source.customPresets),
     };
@@ -237,6 +255,7 @@
     SETTINGS_VERSION,
     DEFAULT_GUIDELINES,
     DEFAULT_FONT_FAMILY,
+    DEFAULT_HEADING_SIZES,
     DEFAULT_SHAPE_BORDER,
     DEFAULT_IMAGE_BORDER,
     DEFAULT_AI_SYSTEM_PROMPTS,
@@ -246,6 +265,7 @@
     normalizeGuidelines,
     normalizeBorder,
     normalizeEditorDefaults,
+    normalizeHeadingSizes,
     creationStyle,
     normalizeSnapping,
     normalizeAiSystemPrompts,

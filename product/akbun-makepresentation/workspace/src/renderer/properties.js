@@ -127,6 +127,10 @@ $('btn-crop').addEventListener('click', toggleCrop);
 $('prop-font-size').addEventListener('input', (e) =>
   applyProp({ fontSize: Math.max(6, Number(e.target.value) || 24) })
 );
+$('prop-heading-level').addEventListener('change', (event) => {
+  const size = appSettings.headingSizes[event.target.value];
+  if (size) applyProp({ fontSize: size });
+});
 $('prop-text-color').addEventListener('input', (e) => applyProp({ textColor: e.target.value }));
 $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
 

@@ -107,6 +107,7 @@ pub fn run() {
             ai::ai_save_slide_image,
             ai::ai_copy_image,
             commands::open_deck,
+            commands::read_image_file,
             commands::save_deck,
             commands::export_pdf,
             commands::save_png,

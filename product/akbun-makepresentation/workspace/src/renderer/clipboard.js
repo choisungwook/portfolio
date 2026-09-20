@@ -86,6 +86,10 @@ function pastedTextShape(text) {
 
 async function pastedImageShape(file, index) {
   const src = await readFileDataUrl(file);
+  return imageShapeFromSource(src, index);
+}
+
+async function imageShapeFromSource(src, index) {
   const size = await readImageSize(src);
   const slideDimensions = deckSize();
   const scale = Math.min(
@@ -101,6 +105,60 @@ async function pastedImageShape(file, index) {
   shape.src = src;
   return shape;
 }
+
+function imageDropPoint(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+  return toPoint({ clientX, clientY });
+}
+
+async function insertDroppedImages(sources, point, targetDeck, targetSlide) {
+  if (!point || !sources.length) return;
+  try {
+    const shapes = await Promise.all(sources.map((source, index) => imageShapeFromSource(source, index)));
+    if (state.deck !== targetDeck || slide() !== targetSlide) return;
+    for (const shape of shapes) {
+      shape.x = Math.max(0, Math.min(deckSize().width - shape.w, point.x - shape.w / 2));
+      shape.y = Math.max(0, Math.min(deckSize().height - shape.h, point.y - shape.h / 2));
+    }
+    insertShapes(shapes, 0);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot import image', kind: 'error' });
+  }
+}
+
+canvas.addEventListener('dragover', (event) => {
+  if (!event.dataTransfer?.types.includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+});
+
+canvas.addEventListener('drop', (event) => {
+  if (!event.dataTransfer?.files.length) return;
+  event.preventDefault();
+  const point = imageDropPoint(event.clientX, event.clientY);
+  const targetDeck = state.deck;
+  const targetSlide = slide();
+  const files = [...event.dataTransfer.files].filter((file) => file.type.startsWith('image/'));
+  void Promise.all(files.map(readFileDataUrl)).then(
+    (sources) => insertDroppedImages(sources, point, targetDeck, targetSlide),
+    (error) => window.api.message(String(error), { title: 'Cannot import image', kind: 'error' })
+  );
+});
+
+void window.api.onImageFilesDropped(async ({ paths, position }) => {
+  const point = imageDropPoint(position.x / window.devicePixelRatio, position.y / window.devicePixelRatio);
+  if (!point) return;
+  const targetDeck = state.deck;
+  const targetSlide = slide();
+  const images = paths.filter((path) => /\.(png|jpe?g|gif|svg|webp|bmp)$/i.test(path));
+  try {
+    const sources = await Promise.all(images.map(window.api.readImageFile));
+    await insertDroppedImages(sources, point, targetDeck, targetSlide);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot import image', kind: 'error' });
+  }
+});
 
 document.addEventListener('paste', async (event) => {
   if (isFormField(event.target) || event.target.isContentEditable || !event.clipboardData) return;

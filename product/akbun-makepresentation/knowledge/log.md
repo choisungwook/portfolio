@@ -2,6 +2,7 @@
 
 ## 2026-09-20
 
+* **Update**: 이미지 테두리 없음과 제목 단계별 글자 크기 프리셋을 편집 기본값 결정에 반영.
 * **Creation**: [PPTX 표는 셀별 도형으로 가져온다](decisions/2026-09-import-tables-as-cell-shapes.md) 결정 기록.
 
 ## 2026-09-06

@@ -59,6 +59,9 @@ function renderGeneralSettings() {
   $('settings-fill').value = defaults.fill === 'none' ? '#ffffff' : defaults.fill;
   $('settings-fill').disabled = defaults.fill === 'none';
   $('settings-text-color').value = defaults.textColor;
+  for (const level of Object.keys(S.DEFAULT_HEADING_SIZES)) {
+    $(`settings-heading-${level}`).value = appSettings.headingSizes[level];
+  }
   for (const end of ['start', 'end']) {
     const select = $(`settings-arrow-${end}`);
     select.innerHTML = $(`prop-arrow-${end}`).innerHTML;
@@ -109,6 +112,14 @@ function editorDefaultsFromFields() {
   };
 }
 
+function headingSizesFromFields() {
+  const sizes = Object.fromEntries(Object.keys(S.DEFAULT_HEADING_SIZES).map((level) => [
+    level, Number($(`settings-heading-${level}`).value),
+  ]));
+  return Object.values(sizes).every((size) => Number.isInteger(size) && size >= 6 && size <= 200)
+    ? sizes : null;
+}
+
 for (const prefix of ['shape-border', 'image-border', 'fill']) {
   $(`settings-${prefix}-none`).addEventListener('change', (event) => {
     $(prefix === 'fill' ? 'settings-fill' : `settings-${prefix}-color`).disabled = event.target.checked;
@@ -149,8 +160,9 @@ $('settings-presets').addEventListener('click', (event) => {
 $('btn-settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
 $('btn-settings-ok').addEventListener('click', async () => {
   const editorDefaults = editorDefaultsFromFields();
-  if (!editorDefaults) {
-    $('general-settings-status').textContent = 'Border width must be from 1 to 30.';
+  const headingSizes = headingSizesFromFields();
+  if (!editorDefaults || !headingSizes) {
+    $('general-settings-status').textContent = 'Border width must be 1–30 and text sizes 6–200.';
     setSettingsPage('general');
     return;
   }
@@ -159,6 +171,7 @@ $('btn-settings-ok').addEventListener('click', async () => {
       ...appSettings,
       snapping: { enabled: $('settings-snapping').checked },
       editorDefaults,
+      headingSizes,
       aiSystemPrompts: aiSystemPromptsFromFields(),
       customPresets: settingsPresetDraft,
     });

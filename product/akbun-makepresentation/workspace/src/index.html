@@ -187,6 +187,16 @@
       </div>
       <div id="props-text">
         <div class="prop-row">
+          <label for="prop-heading-level">Text level</label>
+          <select id="prop-heading-level">
+            <option value="custom">Custom</option>
+            <option value="h1">H1 · Title</option>
+            <option value="h2">H2 · Subtitle</option>
+            <option value="h3">H3 · Body</option>
+            <option value="h4">H4 · Caption</option>
+          </select>
+        </div>
+        <div class="prop-row">
           <label for="prop-font-family">Font</label>
           <div id="font-picker" class="font-picker">
             <button id="prop-font-family" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -529,6 +539,14 @@
             <span><label><input id="settings-fill-none" type="checkbox" /> none</label> <input id="settings-fill" type="color" /></span>
             <label for="settings-text-color">Text color</label>
             <input id="settings-text-color" type="color" />
+            <label for="settings-heading-h1">H1 · Title size</label>
+            <input id="settings-heading-h1" type="number" min="6" max="200" />
+            <label for="settings-heading-h2">H2 · Subtitle size</label>
+            <input id="settings-heading-h2" type="number" min="6" max="200" />
+            <label for="settings-heading-h3">H3 · Body size</label>
+            <input id="settings-heading-h3" type="number" min="6" max="200" />
+            <label for="settings-heading-h4">H4 · Caption size</label>
+            <input id="settings-heading-h4" type="number" min="6" max="200" />
             <label for="settings-snapping">Shape snapping</label>
             <label class="settings-checkbox">
               <input id="settings-snapping" type="checkbox" /> Snap matching object edges while dragging
