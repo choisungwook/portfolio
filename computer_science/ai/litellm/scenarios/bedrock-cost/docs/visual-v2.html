@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>token 장부 애니메이션</title>
+<style>
+  :root {
+    --bg: #ecebe6; --slide: #fbfaf7; --ink: #1f2430; --muted: #5b6373; --line: #cfccc2;
+    --gw: #1d4ed8; --gw-soft: #dbe6ff; --br: #b45309; --br-soft: #fdebd0;
+    --cache: #0f766e; --cache-soft: #d5f0ec; --warn: #b91c1c; --pkt: #111827;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1014; --slide: #191c23; --ink: #e8eaf0; --muted: #a0a8b8; --line: #3a4050;
+      --gw: #7aa2ff; --gw-soft: #1e2b4d; --br: #f2a24a; --br-soft: #3d2a12;
+      --cache: #4fd1c5; --cache-soft: #12332f; --warn: #f87171; --pkt: #f3f4f6;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); overflow: hidden; color: var(--ink);
+    font: 18px/1.5 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; transform-origin: 0 0;
+    background: var(--slide); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.18); overflow: hidden; }
+  code { font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--line); padding: 1px 5px; border-radius: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+  h1 { position: absolute; left: 48px; top: 26px; margin: 0; font-size: 30px; line-height: 1.25; max-width: 1180px; }
+  .kicker { position: absolute; left: 48px; top: 6px; font-size: 14px; color: var(--muted); letter-spacing: .04em; }
+
+  svg#wires { position: absolute; inset: 0; }
+  svg#wires path { stroke: var(--line); stroke-width: 3; fill: none; }
+  svg#wires path.dash { stroke-dasharray: 6 6; }
+  .node { position: absolute; border-radius: 14px; border: 2.5px solid var(--line); background: var(--slide);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    transition: opacity .4s, box-shadow .3s; }
+  .node b { font-size: 21px; } .node small { color: var(--muted); font-size: 13.5px; }
+  .node.gw { border-color: var(--gw); background: var(--gw-soft); } .node.gw b { color: var(--gw); }
+  .node.br { border-color: var(--br); background: var(--br-soft); } .node.br b { color: var(--br); }
+  .node.ch { border-color: var(--cache); background: var(--cache-soft); border-style: dashed; } .node.ch b { color: var(--cache); font-size: 18px; }
+  .node.idle { opacity: .28; } .node.on { box-shadow: 0 0 0 6px rgba(127,127,127,.18); }
+
+  #pkt { position: absolute; width: 0; height: 0; transition: left .7s ease-in-out, top .7s ease-in-out, opacity .3s; z-index: 5; }
+  #pkt span { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; background: var(--pkt); color: var(--slide);
+    font-size: 14px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
+  #pkt.cut span { background: var(--warn); color: #fff; }
+
+  .bubble { position: absolute; top: 96px; width: 392px; min-height: 120px; padding: 12px 16px; border-radius: 14px; font-size: 15.5px; line-height: 1.5;
+    border: 2.5px solid; background: var(--slide); opacity: 0; transform: translateY(8px) scale(.97); transition: opacity .35s, transform .35s; z-index: 4; }
+  .bubble.show { opacity: 1; transform: none; }
+  .bubble::after { content: ""; position: absolute; bottom: -14px; left: 50%; margin-left: -12px; border: 12px solid transparent; border-bottom: 0; border-top-color: currentColor; }
+  .bubble h3 { margin: 0 0 4px; font-size: 14px; letter-spacing: .02em; }
+  .bubble .l { display: flex; justify-content: space-between; gap: 10px; color: var(--ink); }
+  .bubble .l b { font-variant-numeric: tabular-nums; } .bubble .hot b, .bubble .hot { color: var(--warn); }
+  .bubble .note { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+  #bgw { left: 394px; color: var(--gw); } #bbr { left: 836px; color: var(--br); }
+
+  #cap { position: absolute; left: 48px; right: 48px; bottom: 62px; min-height: 74px; padding: 12px 18px; border-left: 5px solid var(--ink);
+    background: rgba(127,127,127,.09); border-radius: 6px; font-size: 18px; }
+  #cap .step { color: var(--muted); font-size: 13.5px; display: block; }
+  #bar { position: absolute; left: 48px; right: 48px; bottom: 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+  #bar button { font: inherit; font-size: 15px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--slide); color: var(--ink); cursor: pointer; }
+  #bar button.pri { background: var(--ink); color: var(--slide); border-color: var(--ink); }
+  #bar .sp { flex: 1; } #dots { display: flex; gap: 6px; } #dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); cursor: pointer; }
+  #dots i.cur { background: var(--ink); }
+
+  #text { position: absolute; left: 48px; right: 48px; top: 100px; bottom: 70px; display: none; font-size: 17px; }
+  #text table { width: 100%; border-collapse: collapse; } #text th, #text td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #text th { color: var(--muted); font-size: 14px; } #text .tag { font-size: 12.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  #text .tag.m { border-color: var(--cache); color: var(--cache); }
+  .textmode #diagram, .textmode #cap { display: none; } .textmode #text { display: block; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="kicker" id="kick"></div>
+  <h1 id="title"></h1>
+  <div id="diagram">
+    <svg id="wires" viewBox="0 0 1280 720">
+      <path d="M280 345 H470"/><path d="M710 345 H900"/>
+      <path class="dash" d="M590 400 V470"/><path class="dash" d="M1030 400 V470"/>
+    </svg>
+    <div class="node" id="n-client" style="left:80px;top:290px;width:200px;height:110px"><b>client</b><small>/v1/chat/completions</small></div>
+    <div class="node gw" id="n-gw" style="left:470px;top:290px;width:240px;height:110px"><b>LiteLLM</b><small>AI gateway · spend log</small></div>
+    <div class="node ch" id="n-redis" style="left:470px;top:470px;width:240px;height:76px"><b>Redis 응답 캐시</b><small>응답을 <code>usage</code>째로 저장</small></div>
+    <div class="node br" id="n-br" style="left:900px;top:290px;width:260px;height:110px"><b>Bedrock</b><small>AI provider · CloudWatch, 청구</small></div>
+    <div class="node ch" id="n-pc" style="left:900px;top:470px;width:260px;height:76px"><b>Bedrock prompt cache</b><small>입력 앞부분을 5분간 저장</small></div>
+    <div class="bubble" id="bgw"></div><div class="bubble" id="bbr"></div>
+    <div id="pkt"><span></span></div>
+  </div>
+  <div id="text"></div>
+  <div id="cap"></div>
+  <div id="bar">
+    <button id="prev">◀ 이전</button><button id="step" class="pri">다음 단계 (Space)</button><button id="replay">↻ 다시</button><button id="next">다음 ▶</button>
+    <span class="sp"></span><span id="dots"></span><span id="count" class="num"></span>
+  </div>
+</div>
+
+<script>
+const P = { client: [180, 345], gw: [590, 345], redis: [590, 508], br: [1030, 345], pc: [1030, 508] };
+const NODE = { client: "n-client", gw: "n-gw", redis: "n-redis", br: "n-br", pc: "n-pc" };
+const L = (k, v, hot) => `<div class="l${hot ? " hot" : ""}"><span>${k}</span><b>${v}</b></div>`;
+const GW = (rows, note) => `<h3>LiteLLM이 spend log에 적는 것</h3>${rows}${note ? `<div class="note">${note}</div>` : ""}`;
+const BR = (rows, note) => `<h3>Bedrock이 세는 것</h3>${rows}${note ? `<div class="note">${note}</div>` : ""}`;
+
+const SLIDES = [
+  { k: "구조", t: "client의 요청 하나를 두 곳이 따로 적습니다", idle: [],
+    steps: [
+      { at: "client", p: "요청", c: "client가 LiteLLM에 요청을 보냅니다. 이 뒤로 token을 적는 곳은 두 군데입니다." },
+      { at: "gw", p: "요청", c: "LiteLLM은 받은 요청마다 <code>LiteLLM_SpendLogs</code>에 한 줄을 씁니다. token 수는 Bedrock 응답의 <code>usage</code>에서, 단가는 자기 가격표에서 가져옵니다.",
+        gw: GW(L("prompt_tokens", "?") + L("completion_tokens", "?") + L("spend", "token × 가격표")) },
+      { at: "br", p: "Converse", c: "Bedrock은 자기가 처리한 호출만 셉니다. 입력, 출력, 캐시 읽기, 캐시 쓰기를 서로 다른 지표와 usage type으로 나눕니다.",
+        br: BR(L("InputTokenCount", "?") + L("OutputTokenCount", "?") + L("CacheRead / CacheWrite", "?")) },
+      { at: "client", p: "응답", c: "캐시는 두 군데에 있습니다. LiteLLM 앞의 Redis 응답 캐시와 Bedrock 안의 prompt cache입니다. 두 캐시가 두 장부를 서로 다른 방향으로 어긋나게 합니다." } ] },
+
+  { k: "1. 기준선", t: "캐시가 없으면 두 장부는 같습니다", idle: ["pc"],
+    steps: [
+      { at: "client", p: "요청", c: "짧은 질문 하나를 보냅니다. (실측: 시나리오 1의 첫 요청)" },
+      { at: "gw", p: "요청", c: "LiteLLM이 Redis에서 cache key를 찾습니다." },
+      { at: "redis", p: "조회", c: "miss입니다. 저장된 응답이 없습니다." },
+      { at: "gw", p: "miss", c: "요청을 Bedrock으로 보냅니다." },
+      { at: "br", p: "Converse", c: "Bedrock이 입력 29 token을 읽고 출력 13 token을 생성합니다.",
+        br: BR(L("Invocations", "+1") + L("InputTokenCount", "+29") + L("OutputTokenCount", "+13")) },
+      { at: "gw", p: "응답 + usage", c: "LiteLLM이 응답의 <code>usage</code>를 그대로 적고 가격표 단가를 곱합니다. 응답은 Redis에 저장합니다.",
+        gw: GW(L("prompt_tokens", "29") + L("completion_tokens", "13") + L("spend", "$0.000282")) },
+      { at: "client", p: "응답", c: "두 장부가 같습니다. 5건 합계도 input 145, output 59, $0.001320으로 일치했습니다." } ] },
+
+  { k: "2. LiteLLM 응답 캐시", t: "Redis hit: LiteLLM은 token을 다시 적고, Bedrock은 요청을 모릅니다", idle: ["br", "pc"],
+    steps: [
+      { at: "client", p: "같은 요청", c: "방금과 같은 요청을 다시 보냅니다. (실측: 시나리오 2의 2~10번째 요청)" },
+      { at: "gw", p: "같은 요청", c: "LiteLLM이 Redis에서 cache key를 찾습니다." },
+      { at: "redis", p: "조회", c: "hit입니다. Redis가 저장해 둔 응답을 <code>usage</code>(27 / 200)째로 돌려줍니다." },
+      { at: "gw", p: "hit", c: "LiteLLM은 Bedrock을 부르지 않습니다. 그런데 spend log에는 새 행을 쓰고, token 컬럼에 원래 usage를 다시 적습니다. spend만 0입니다.",
+        gw: GW(L("prompt_tokens", "27", 1) + L("completion_tokens", "200", 1) + L("spend", "$0") + L("cache_hit", "True")),
+        br: BR(L("Invocations", "+0") + L("InputTokenCount", "+0") + L("OutputTokenCount", "+0"), "요청이 도착하지 않았습니다.") },
+      { at: "client", p: "응답", c: "10건 합계: LiteLLM input 270, output 2,000. Bedrock input 27, output 200. input과 output 모두 LiteLLM이 10배입니다. 금액은 $0.003081로 같습니다." } ] },
+
+  { k: "3. Bedrock prompt cache (쓰기)", t: "첫 호출: Bedrock은 캐시 쓰기를 input과 따로 셉니다", idle: [],
+    steps: [
+      { at: "client", p: "요청 + cache_control", c: "10,502 token짜리 system prompt에 <code>cache_control</code>을 붙여 보냅니다. Claude Code 같은 agent는 이 표시를 스스로 붙입니다." },
+      { at: "gw", p: "요청", c: "Redis는 miss입니다. LiteLLM이 <code>cache_control</code>을 Bedrock <code>cachePoint</code>로 바꿔 보냅니다." },
+      { at: "br", p: "Converse + cachePoint", c: "Bedrock이 system prompt를 처리합니다." },
+      { at: "pc", p: "쓰기 10,502", c: "Bedrock이 system prompt 10,502 token을 prompt cache에 씁니다. 단가는 $3.75로 일반 입력($3.00)보다 비쌉니다.",
+        br: BR(L("InputTokenCount", "+27") + L("CacheWriteInputTokenCount", "+10,502", 1) + L("OutputTokenCount", "+6"), "input 줄에는 27만 들어갑니다.") },
+      { at: "br", p: "완료", c: "응답의 usage에는 <code>inputTokens 27</code>, <code>cacheWriteInputTokens 10,502</code>가 따로 실립니다." },
+      { at: "gw", p: "응답 + usage", c: "LiteLLM은 세 값을 더해 <code>prompt_tokens</code> 하나로 적습니다. 비용은 값마다 다른 단가를 곱하므로 금액은 맞습니다.",
+        gw: GW(L("prompt_tokens", "10,529", 1) + L("= 27 + 0 + 10,502", "") + L("completion_tokens", "6") + L("spend", "$0.039554")) },
+      { at: "client", p: "응답", c: "같은 호출인데 LiteLLM input은 10,529, Bedrock <code>InputTokenCount</code>는 27입니다." } ] },
+
+  { k: "3. Bedrock prompt cache (읽기)", t: "다음 호출: 캐시 읽기도 LiteLLM에서는 input입니다", idle: [],
+    steps: [
+      { at: "client", p: "요청 + cache_control", c: "같은 system prompt에 질문만 바꿔 보냅니다. (실측: 시나리오 3의 2~5번째 요청)" },
+      { at: "gw", p: "요청", c: "질문이 달라서 Redis는 miss입니다. Bedrock으로 보냅니다." },
+      { at: "br", p: "Converse + cachePoint", c: "Bedrock이 system prompt가 캐시에 있는지 봅니다." },
+      { at: "pc", p: "읽기 10,502", c: "hit입니다. 10,502 token을 다시 계산하지 않고 캐시에서 읽습니다. 단가는 $0.30으로 일반 입력의 10분의 1입니다.",
+        br: BR(L("InputTokenCount", "+27") + L("CacheReadInputTokenCount", "+10,502", 1) + L("OutputTokenCount", "+6")) },
+      { at: "gw", p: "응답 + usage", c: "LiteLLM은 이번에도 더해서 적습니다.",
+        gw: GW(L("prompt_tokens", "10,529", 1) + L("= 27 + 10,502 + 0", "") + L("completion_tokens", "6") + L("spend", "$0.003322")) },
+      { at: "client", p: "응답", c: "5건 합계: LiteLLM input 52,645. Bedrock <code>InputTokenCount</code> 135, 캐시 읽기 42,008, 캐시 쓰기 10,502. Cost Explorer에서 input 줄만 보면 LiteLLM이 390배로 보입니다. 금액은 $0.052840으로 같습니다." } ] },
+
+  { k: "엣지 케이스 1", t: "끊긴 스트림: output은 Bedrock이 더 많습니다", idle: ["pc"],
+    steps: [
+      { at: "client", p: "stream: true", c: "<code>max_tokens: 800</code>으로 스트리밍 요청을 보냅니다. (실측: 시나리오 4)" },
+      { at: "gw", p: "요청", c: "Redis는 miss입니다. Bedrock으로 보냅니다." },
+      { at: "br", p: "ConverseStream", c: "Bedrock이 생성을 시작하고 chunk를 흘려보냅니다." },
+      { at: "gw", p: "chunk …", c: "LiteLLM이 chunk를 client로 중계합니다. <code>usage</code>는 마지막 chunk에만 실려 옵니다." },
+      { at: "client", p: "✕ 2초에 끊음", cut: 1, c: "client가 2초 만에 연결을 끊습니다. LiteLLM은 마지막 chunk를 받지 못했습니다." },
+      { at: "gw", p: "✕", cut: 1, c: "LiteLLM v1.99.1은 그때까지 받은 chunk로 부분 응답을 조립하고 token을 로컬 tokenizer로 추정합니다.",
+        gw: GW(L("prompt_tokens (추정)", "32") + L("completion_tokens (추정)", "약 68", 1) + L("spend", "$0.0011"), "3건 합계 205 token, $0.003363") },
+      { at: "br", p: "생성 계속", c: "Bedrock <code>OutputTokenCount</code>는 3건 모두 <code>max_tokens</code>인 800까지 올라갔습니다. proxy가 upstream을 닫지 않아서인지는 확인하지 못했습니다.",
+        br: BR(L("InputTokenCount", "+33") + L("OutputTokenCount", "+800", 1), "3건 합계 2,400 token, $0.036297") },
+      { at: "br", p: "", c: "output이 LiteLLM 205, Bedrock 2,400입니다. 네 시나리오 중 금액까지 어긋난 유일한 경우이고, Bedrock 쪽이 10.8배입니다." } ] },
+
+  { k: "엣지 케이스 2", t: "실패한 요청: LiteLLM에만 token이 남습니다", idle: ["pc"],
+    steps: [
+      { at: "client", p: "요청", c: "요청을 보냅니다. (실측: 잘못된 AWS 키로 시나리오 1 실행)" },
+      { at: "gw", p: "요청", c: "Redis는 miss입니다. Bedrock으로 보냅니다." },
+      { at: "br", p: "Converse", c: "Bedrock이 호출을 거부합니다. 인증 오류, throttling이 여기에 해당합니다. 모델이 돌지 않았으므로 청구가 없습니다.",
+        br: BR(L("InputTokenCount", "+0") + L("OutputTokenCount", "+0"), "403. 모델에 닿지 않았습니다.") },
+      { at: "gw", p: "✕ 403", cut: 1, c: "LiteLLM은 실패한 요청도 spend log에 씁니다. usage가 없으므로 <code>prompt_tokens</code>를 추정해서 적습니다.",
+        gw: GW(L("prompt_tokens (추정)", "26", 1) + L("completion_tokens", "0") + L("spend", "$0") + L("status", "failure")) },
+      { at: "client", p: "✕ 오류", cut: 1, c: "token 합계를 낼 때 <code>status = 'failure'</code>를 거르지 않으면 실패가 많은 날에 LiteLLM input이 부풀려집니다." } ] },
+
+  { k: "엣지 케이스 3", t: "재시도와 fallback: 요청 1건이 호출 여러 건이 됩니다", idle: ["pc"],
+    steps: [
+      { at: "client", p: "요청", c: "요청 1건을 보냅니다. (미실측. 이 핸즈온은 <code>num_retries: 0</code>으로 꺼 두었습니다)" },
+      { at: "gw", p: "요청", c: "LiteLLM이 Bedrock으로 보냅니다." },
+      { at: "br", p: "Converse #1", c: "첫 호출이 timeout이나 5xx로 실패합니다. 모델이 입력을 이미 읽었다면 Bedrock은 그만큼을 셀 수 있습니다(확인 필요).",
+        br: BR(L("Invocations", "+1")) },
+      { at: "gw", p: "✕ 재시도", cut: 1, c: "LiteLLM이 같은 요청을 다시 보냅니다." },
+      { at: "br", p: "Converse #2", c: "두 번째 호출이 성공합니다. Bedrock에는 호출이 2건입니다.",
+        br: BR(L("Invocations", "+2", 1) + L("token", "두 호출의 합")) },
+      { at: "gw", p: "응답 + usage", c: "LiteLLM spend log에는 성공한 응답의 usage로 1건이 남습니다.",
+        gw: GW(L("요청", "1건") + L("token", "마지막 호출의 usage")) },
+      { at: "client", p: "응답", c: "이 경우는 Bedrock 쪽이 많아지는 방향입니다. 40% 차이를 볼 때는 반대 방향의 원인도 섞여 있다는 점을 같이 봅니다." } ] },
+
+  { k: "엣지 케이스 정리", t: "어느 쪽 token이 많아지는가", text: `
+    <table>
+      <tr><th>경우</th><th>input</th><th>output</th><th>금액</th><th>근거</th></tr>
+      <tr><td>LiteLLM 응답 캐시 hit</td><td>LiteLLM이 많음</td><td>LiteLLM이 많음</td><td>같음</td><td><span class="tag m">실측</span> 270 대 27, 2,000 대 200</td></tr>
+      <tr><td>Bedrock prompt cache</td><td>LiteLLM이 많음 (input 줄만 비교할 때)</td><td>같음</td><td>같음</td><td><span class="tag m">실측</span> 52,645 대 135</td></tr>
+      <tr><td>실패한 요청</td><td>LiteLLM이 많음 (추정값)</td><td>같음</td><td>같음</td><td><span class="tag m">실측</span> 요청당 26</td></tr>
+      <tr><td>끊긴 스트림</td><td>거의 같음 (96 대 99)</td><td>Bedrock이 많음</td><td>Bedrock이 많음</td><td><span class="tag m">실측</span> 205 대 2,400</td></tr>
+      <tr><td>재시도, fallback</td><td>Bedrock이 많음</td><td>Bedrock이 많음</td><td>Bedrock이 많음</td><td><span class="tag">미실측</span> 설정으로 끔</td></tr>
+      <tr><td>가격표와 AWS 요금표의 차이</td><td>같음</td><td>같음</td><td>어긋남</td><td><span class="tag">코드</span> 기동 시 GitHub main의 JSON을 받아옴</td></tr>
+      <tr><td><code>us.</code> 등 geo profile</td><td>같음</td><td>같음</td><td>LiteLLM이 10% 적을 수 있음</td><td><span class="tag">이슈</span> #30768 (open)</td></tr>
+      <tr><td>조회 시점</td><td colspan="3">LiteLLM은 수 초 뒤, Cost Explorer는 하루쯤 뒤, UTC 일 단위</td><td><span class="tag">문서</span></td></tr>
+    </table>
+    <p style="margin-top:18px">LiteLLM input이 Bedrock보다 많게 보이는 원인은 위 세 줄입니다. 금액은 어긋나지 않습니다. 금액이 어긋나는 쪽은 끊긴 스트림과 재시도이고, 방향은 반대입니다. 어느 조각이 큰지는 <code>scripts/report-input-gap.sh</code>가 spend log에서 쪼개 줍니다.</p>` },
+
+  { k: "합계", t: "23건을 돌린 뒤의 두 장부", text: `
+    <table>
+      <tr><th></th><th style="color:var(--gw)">LiteLLM spend log</th><th style="color:var(--br)">Bedrock (CloudWatch)</th><th>차이의 출처</th></tr>
+      <tr><td>요청, 호출</td><td class="num">23</td><td class="num">14</td><td>Redis hit 9건</td></tr>
+      <tr><td>input</td><td class="num">53,156</td><td class="num">406</td><td>캐시 읽기 42,008 + 캐시 쓰기 10,502 + hit 재기록 243 − 추정 오차 3</td></tr>
+      <tr><td>output</td><td class="num">2,294</td><td class="num">2,689</td><td>hit 재기록 +1,800, 끊긴 스트림 −2,195</td></tr>
+      <tr><td>금액</td><td class="num">$0.060604</td><td class="num">$0.093538</td><td>전부 끊긴 스트림</td></tr>
+    </table>
+    <p style="margin-top:18px">Bedrock 금액은 CloudWatch token에 v1.99.1 가격표 단가를 곱한 값입니다. Cost Explorer 금액과 usage type 분리는 데이터가 하루 뒤에 나와 아직 대조하지 않았습니다(확인 필요). 표로 보는 버전은 <a href="visual.html">visual.html</a>, 근거는 <a href="4-why-different.md">4-why-different.md</a>에 있습니다.</p>` }
+];
+
+let si = 0, st = -1;
+const $ = id => document.getElementById(id);
+function fit() { const k = Math.min(innerWidth / 1280, innerHeight / 720) * .97;
+  $("stage").style.transform = `scale(${k}) translate(${-640}px, ${-360}px)`; }
+addEventListener("resize", fit); fit();
+
+function place(at, label, cut, instant) {
+  const p = $("pkt"); if (instant) p.style.transition = "none";
+  p.style.left = P[at][0] + "px"; p.style.top = (P[at][1] + (at === "gw" || at === "br" || at === "client" ? 72 : 52)) + "px";
+  p.className = cut ? "cut" : ""; p.firstChild.textContent = label; p.style.opacity = label ? 1 : 0;
+  if (instant) { p.offsetWidth; p.style.transition = ""; }
+  Object.values(NODE).forEach(n => $(n).classList.remove("on")); $(NODE[at]).classList.add("on");
+}
+function showSlide(i) {
+  si = (i + SLIDES.length) % SLIDES.length; st = -1; const s = SLIDES[si];
+  $("kick").textContent = s.k; $("title").innerHTML = s.t;
+  $("stage").classList.toggle("textmode", !!s.text); $("text").innerHTML = s.text || "";
+  $("bgw").classList.remove("show"); $("bbr").classList.remove("show");
+  Object.entries(NODE).forEach(([k, n]) => $(n).classList.toggle("idle", (s.idle || []).includes(k)));
+  $("count").textContent = `${si + 1} / ${SLIDES.length}`;
+  [...$("dots").children].forEach((d, j) => d.classList.toggle("cur", j === si));
+  $("step").style.visibility = s.text ? "hidden" : "visible"; $("replay").style.visibility = s.text ? "hidden" : "visible";
+  if (!s.text) { $("pkt").style.opacity = 0; $("cap").innerHTML = ""; stepOnce(true); }
+}
+function stepOnce(instant) {
+  const s = SLIDES[si]; if (s.text) return showSlide(si + 1);
+  if (st >= s.steps.length - 1) return showSlide(si + 1);
+  const x = s.steps[++st]; place(x.at, x.p, x.cut, instant);
+  const reveal = () => {
+    $("cap").innerHTML = `<span class="step">단계 ${st + 1} / ${s.steps.length}</span>${x.c}`;
+    if (x.gw) { $("bgw").innerHTML = x.gw; $("bgw").classList.add("show"); }
+    if (x.br) { $("bbr").innerHTML = x.br; $("bbr").classList.add("show"); }
+    $("step").textContent = st >= s.steps.length - 1 ? "다음 슬라이드 (Space)" : "다음 단계 (Space)";
+  };
+  instant ? reveal() : setTimeout(reveal, 550);
+}
+$("dots").innerHTML = SLIDES.map(() => "<i></i>").join("");
+[...$("dots").children].forEach((d, j) => d.onclick = () => showSlide(j));
+$("prev").onclick = () => showSlide(si - 1); $("next").onclick = () => showSlide(si + 1);
+$("step").onclick = () => stepOnce(); $("replay").onclick = () => showSlide(si);
+addEventListener("keydown", e => {
+  if (e.key === " " || e.key === "Enter") { e.preventDefault(); stepOnce(); }
+  else if (e.key === "ArrowRight" || e.key === "PageDown") showSlide(si + 1);
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") showSlide(si - 1);
+});
+showSlide(0);
+</script>
+</body>
+</html>

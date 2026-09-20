@@ -4,9 +4,9 @@
 
 ## 콘솔 로그인 준비
 
-콘솔은 gateway와 같은 포트의 `/ui` 경로에 있다. 로그인 계정은 master key가 아니라 별도의 `UI_USERNAME`·`UI_PASSWORD`다. [set-model/docker-compose.yaml](../install/set-model/docker-compose.yaml)이 이 두 값을 `.env`에서 컨테이너로 주입한다.
+콘솔은 gateway와 같은 포트의 `/ui` 경로에 있다. 로그인 계정은 master key가 아니라 별도의 `UI_USERNAME`·`UI_PASSWORD`다. [set-model/docker-compose.yaml](../scenarios/set-model/docker-compose.yaml)이 이 두 값을 `.env`에서 컨테이너로 주입한다.
 
-`.env`에 두 값을 채운다(예시는 [set-model/.env.example](../install/set-model/.env.example)에 있다).
+`.env`에 두 값을 채운다(예시는 [set-model/.env.example](../scenarios/set-model/.env.example)에 있다).
 
 ```bash
 UI_USERNAME=admin
@@ -41,7 +41,7 @@ Usage(또는 Spend) 화면은 [6-audit-guardrails.md](6-audit-guardrails.md)에�
 
 ## 요청 로그로 개별 호출을 추적한다
 
-Logs 화면에서는 개별 요청을 하나씩 들여다본다. [set-model/config.yaml](../install/set-model/config.yaml)의 `store_prompts_in_spend_logs: true` 덕분에 언제, 어떤 key로, 어떤 모델에, 어떤 프롬프트가 나갔고 토큰·비용이 얼마였는지가 행 단위로 남는다. 사고가 났을 때 "누가 무엇을 보냈나"를 되짚는 audit의 실제 도구다.
+Logs 화면에서는 개별 요청을 하나씩 들여다본다. [set-model/config.yaml](../scenarios/set-model/config.yaml)의 `store_prompts_in_spend_logs: true` 덕분에 언제, 어떤 key로, 어떤 모델에, 어떤 프롬프트가 나갔고 토큰·비용이 얼마였는지가 행 단위로 남는다. 사고가 났을 때 "누가 무엇을 보냈나"를 되짚는 audit의 실제 도구다.
 
 ## OSS와 enterprise 경계
 

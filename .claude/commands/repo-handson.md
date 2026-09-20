@@ -18,7 +18,7 @@ argument-hint: <workspace 경로> <주제>
 - 파일명 앞에 순서를 붙인다. 예: `1-problem.md`, `2-handson.md`, `3-cleanup.md`
 - `setup.md`를 따로 만들고 설치 관련 내용은 전부 여기에만 쓴다. 다른 문서는 설치가 필요할 때 `setup.md`를 링크한다.
 - `setup.md`는 up과 down 두 스텝으로 끝낸다. up/down은 `docker compose up -d`, `docker compose down -v`처럼 한 줄 명령으로 만든다.
-- 본문 말투는 `/akbun-writing:akbun-writing-style-warm` 스킬을 따른다. 독자는 이 주제를 처음 시작하는 사람이다.
+- 본문은 `/akbun-writing:akbun-writing` 스킬로 쓴다. 독자는 실무 엔지니어다.
 - markdown 규칙은 [.claude/rules/markdown.md](../rules/markdown.md)를 따른다.
 
 ## knowledge 복사

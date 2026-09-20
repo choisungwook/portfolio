@@ -1,0 +1,31 @@
+# AWS/Bedrock 네임스페이스의 모델별 지표를 Prometheus metric으로 바꾼다.
+# period_seconds 60: CloudWatch가 1분 단위로 집계한 값을 읽는다.
+# range_seconds 600: 최근 10분 구간을 본다. 지표가 늦게 들어오므로 구간을 넉넉히 잡는다.
+# delay_seconds 120: 최근 2분은 아직 채워지는 중이라 건너뛴다.
+region: us-east-1
+period_seconds: 60
+range_seconds: 600
+delay_seconds: 120
+set_timestamp: false
+
+metrics:
+  - aws_namespace: AWS/Bedrock
+    aws_metric_name: Invocations
+    aws_dimensions: [ModelId]
+    aws_statistics: [Sum]
+  - aws_namespace: AWS/Bedrock
+    aws_metric_name: InputTokenCount
+    aws_dimensions: [ModelId]
+    aws_statistics: [Sum]
+  - aws_namespace: AWS/Bedrock
+    aws_metric_name: OutputTokenCount
+    aws_dimensions: [ModelId]
+    aws_statistics: [Sum]
+  - aws_namespace: AWS/Bedrock
+    aws_metric_name: CacheReadInputTokenCount
+    aws_dimensions: [ModelId]
+    aws_statistics: [Sum]
+  - aws_namespace: AWS/Bedrock
+    aws_metric_name: CacheWriteInputTokenCount
+    aws_dimensions: [ModelId]
+    aws_statistics: [Sum]
