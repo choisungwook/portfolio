@@ -24,7 +24,7 @@ allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 
 ## Issue 구성
 
-- [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 Goal을 채운다. 결정이 있으면 ADR을 채우고, 없으면 ADR 섹션을 헤더째 지운다.
+- [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 Why, Goal, 완료 조건을 채운다. 버린 대안이 있는 결정이 있으면 ADR을 채우고, 없으면 ADR 섹션을 헤더째 지운다.
 - 새 product나 큰 기능은 구현 관점의 큰 묶음으로 나눠 Issue 여러 개를 만들고, 제목 앞에 실행 순서 번호를 붙인다. 예: 1. 프로젝트 골격과 재생 코어. 그룹에 이미 번호 붙은 하위 issue가 있으면 번호를 이어 간다.
 - 실행 순서는 리스크가 가장 큰 검증이 앞 번호에 오도록 정하고, 그 검증을 해당 Issue의 Goal에 명시한다.
 - 사용자가 잘 모르는 기술 영역이면 Goal과 ADR 아래에 배경 지식 섹션을 추가한다. 그 Issue를 구현할 때 필요한 용어와 동작 원리를 개조식으로 풀고, 어디가 어려운지 지목한다.

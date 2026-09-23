@@ -75,10 +75,10 @@ workflow를 만들거나 수정할 때 버전을 오래된 값으로 하드코�
 
 같은 내용을 두 곳에 쓰지 않는다.
 
-- Issue: 목표와 의사결정. 왜 이 작업을 하는가.
-- PR: 어려웠던 점과 감수하는 리스크. 구현하면서 실제로 겪은 것.
+- Issue: 왜 하나, 무엇이면 끝인가, 무엇을 골랐고 무엇을 버렸나.
+- PR: 무엇이 달라졌나, 어떻게 증명했나, 무엇을 감수하나.
 
-PR에는 목표와 의사결정을 다시 쓰지 않고 issue 링크로 대체한다.
+PR에는 issue 내용을 다시 쓰지 않고 issue 링크로 대체한다. 두 문서는 issue의 완료 조건과 PR의 검증 절에서 연결된다.
 
 ## Issue 계층
 
@@ -110,8 +110,7 @@ gh auth refresh -s project
 PR을 생성할 때 기록용 GitHub Issue를 함께 만들고 PR body에서 링크한다.
 
 - 템플릿: [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따른다.
-- **Goal**: 작업의 목표를 번호 리스트 3개 이내로 작성한다.
-- **ADR**: 의사결정 한 줄, 그 아래 이유 한 줄로 항목화한다.
+- 섹션 구성과 항목 형식은 템플릿에서 읽는다. 이 규칙 파일에 중복해 적지 않는다.
 
 ## PR 작성 규칙
 
@@ -120,7 +119,6 @@ body 형식의 기준은 [.github/pull_request_template.md](../../.github/pull_r
 - PR을 쓰기 전에 템플릿을 읽고 그 섹션과 형식을 그대로 따른다.
 - PR을 만들기 직전에 현재 branch 이름을 확인한다. `<type>/<short-description>` 형식이 아니면 그 형식으로 바꾸고 push한 뒤 PR을 만든다. 도구가 만든 이름은 작업 내용을 설명하지 않으므로 이 시점에만 손댄다.
   - 실행 환경이 지정한 branch에만 push하도록 제한하면(클라우드 세션 등) 이름을 바꾸지 않고 결과 보고에 건너뛴 단계로 남긴다.
-- 섹션마다 요약 한 줄과 근거 최대 1개다. 쓸 내용이 없는 섹션은 헤더째 지운다.
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
 - 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
