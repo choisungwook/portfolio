@@ -1,0 +1,17 @@
+{
+  "name": "akbun-ai-useage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Menu bar app that shows Claude Code, Codex and Kiro usage: subscription limits, tokens and organization cost",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml -p usage-core",
+    "dist": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5"
+  }
+}

@@ -1,0 +1,42 @@
+[workspace]
+members = ["crates/core"]
+
+[package]
+name = "akbun-ai-useage"
+version = "0.1.0"
+description = "Menu bar app for Claude Code, Codex and Kiro usage"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. The number here is not read by the bundler.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_ai_useage_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+usage-core = { path = "crates/core" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+# generate_context! expands to code that names serde_json.
+serde_json = "1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+
+# Size over speed: the app wakes every few minutes to parse a few files.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
