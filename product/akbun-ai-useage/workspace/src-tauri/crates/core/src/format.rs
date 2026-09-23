@@ -3,18 +3,30 @@
 use crate::tokens::Totals;
 use crate::Section;
 
+/// Rounding happens before the unit is fixed, so 999,960 shows as 1.0M
+/// instead of 1000K.
 pub fn tokens(n: u64) -> String {
-    for (size, suffix) in [(1e9, "B"), (1e6, "M"), (1e3, "K")] {
-        let value = n as f64 / size;
-        if value >= 1.0 {
-            return if value >= 100.0 {
-                format!("{value:.0}{suffix}")
+    if n < 1000 {
+        return n.to_string();
+    }
+    let mut value = n as f64;
+    for suffix in ["K", "M", "B"] {
+        value /= 1000.0;
+        let whole = value.round() >= 100.0;
+        let rounded = if whole {
+            value.round()
+        } else {
+            (value * 10.0).round() / 10.0
+        };
+        if rounded < 1000.0 || suffix == "B" {
+            return if whole {
+                format!("{rounded:.0}{suffix}")
             } else {
-                format!("{value:.1}{suffix}")
+                format!("{rounded:.1}{suffix}")
             };
         }
     }
-    n.to_string()
+    unreachable!()
 }
 
 /// Local wall clock time for the "Updated" line.
@@ -152,6 +164,9 @@ mod tests {
         assert_eq!(tokens(1234), "1.2K");
         assert_eq!(tokens(123_456_789), "123M");
         assert_eq!(tokens(2_500_000_000), "2.5B");
+        assert_eq!(tokens(99_960), "100K");
+        assert_eq!(tokens(999_960), "1.0M");
+        assert_eq!(tokens(999_960_000), "1.0B");
     }
 
     #[test]

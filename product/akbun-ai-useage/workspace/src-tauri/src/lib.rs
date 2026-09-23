@@ -19,18 +19,15 @@ const TRAY_ID: &str = "usage";
 /// Wakes the refresh thread early, for Refresh Now.
 struct Refresh(Sender<()>);
 
+/// Resolved once in setup. Without a config dir the app refuses to start
+/// rather than read and write settings.json in the working directory.
+struct SettingsFile(PathBuf);
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
-}
-
-fn settings_path(app: &AppHandle) -> PathBuf {
-    app.path()
-        .app_config_dir()
-        .unwrap_or_default()
-        .join("settings.json")
 }
 
 fn build_menu(
@@ -100,13 +97,13 @@ fn show(app: &AppHandle, sections: &[Section], updated: i64) {
 
 /// Collects on a worker thread, since log parsing and HTTP block. Settings
 /// are reread each round, so an edited file applies on the next refresh.
-fn start_refresh_loop(app: AppHandle) -> Sender<()> {
+fn start_refresh_loop(app: AppHandle, settings_file: PathBuf) -> Sender<()> {
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || {
         let mut collector = Collector::default();
         let env = Env::from_process();
         loop {
-            let settings = settings::load(&settings_path(&app));
+            let settings = settings::load(&settings_file);
             let now = now_ms();
             let sections = collector.collect(&settings, &env, now);
             let handle = app.clone();
@@ -184,7 +181,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             let _ = app.state::<Refresh>().0.send(());
         }
         "settings" => {
-            let path = settings_path(app);
+            let path = app.state::<SettingsFile>().0.clone();
             settings::load(&path);
             if let Err(error) = app.opener().open_path(path.to_string_lossy(), None::<&str>) {
                 message(
@@ -214,6 +211,9 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            let settings_file = app.path().app_config_dir()?.join("settings.json");
+            app.manage(SettingsFile(settings_file.clone()));
+
             let handle = app.handle().clone();
             let mut tray = TrayIconBuilder::with_id(TRAY_ID)
                 .menu(&build_menu(&handle, &[], None)?)
@@ -229,7 +229,7 @@ pub fn run() {
             }
             tray.build(app)?;
 
-            app.manage(Refresh(start_refresh_loop(handle)));
+            app.manage(Refresh(start_refresh_loop(handle, settings_file)));
             Ok(())
         })
         .build(tauri::generate_context!())
