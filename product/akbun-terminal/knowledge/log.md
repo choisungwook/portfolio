@@ -2,6 +2,7 @@
 
 ## 2026-09-23
 
+- **Update**: [숨긴 패널의 constraint는 살아 있으므로 헤더의 hugging을 명시한다](decisions/2026-09-hidden-panes-still-pull-on-the-header.md)에 접힌 패널 divider 숨김 규칙 추가
 - **Creation**: [세션 이름은 테마 파랑의 보색으로, 대비를 채울 때까지 명도를 옮긴다](decisions/2026-09-session-names-in-the-complement.md) 결정 기록
 
 ## 2026-09-18
