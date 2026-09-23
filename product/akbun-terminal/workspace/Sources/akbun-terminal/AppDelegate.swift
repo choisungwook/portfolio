@@ -168,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     "zoom_in": #selector(AppDelegate.zoomIn),
     "zoom_out": #selector(AppDelegate.zoomOut),
     "zoom_reset": #selector(AppDelegate.zoomReset),
+    "toggle_sidebar": #selector(AppDelegate.toggleSidebar),
     "toggle_file_browser": #selector(AppDelegate.toggleFileBrowser),
     "search_project": #selector(AppDelegate.searchProject),
   ]
@@ -326,9 +327,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
     windowController?.beginProjectSearch()
   }
 
-  @objc private func toggleFileBrowser(_ sender: NSMenuItem) {
-    guard let hidden = windowController?.toggleFileBrowser() else { return }
-    sender.title = hidden ? "Show File Browser" : "Hide File Browser"
+  /// The title says "toggle" rather than following the pane, because the
+  /// title bar buttons fold the same panes without passing through the menu.
+  @objc private func toggleSidebar() {
+    windowController?.toggleSidebar()
+  }
+
+  @objc private func toggleFileBrowser() {
+    windowController?.toggleFileBrowser()
   }
 
   @objc private func chooseTheme(_ sender: NSMenuItem) {

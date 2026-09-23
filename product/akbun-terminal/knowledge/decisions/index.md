@@ -1,5 +1,6 @@
 # Decisions
 
+- [세션 이름은 테마 파랑의 보색으로, 대비를 채울 때까지 명도를 옮긴다](2026-09-session-names-in-the-complement.md)
 - [콘텐츠 확대와 주변 패널 크기 분리](2026-09-content-and-panel-zoom.md)
 
 - [Git 패널은 읽기만 하고 저장소를 바꾸지 않는다](2026-09-git-panel-reads-and-never-writes.md)

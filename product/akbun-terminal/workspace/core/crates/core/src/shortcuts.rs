@@ -53,7 +53,8 @@ const ROWS: &[Row] = &[
     Row { command: "zoom_in", title: "Bigger", menu: "View", key: "cmd+plus" },
     Row { command: "zoom_out", title: "Smaller", menu: "View", key: "cmd+minus" },
     Row { command: "zoom_reset", title: "Default Size", menu: "View", key: "cmd+0" },
-    Row { command: "toggle_file_browser", title: "Hide File Browser", menu: "View", key: "cmd+b" },
+    Row { command: "toggle_sidebar", title: "Toggle Projects Panel", menu: "View", key: "cmd+shift+b" },
+    Row { command: "toggle_file_browser", title: "Toggle Files Panel", menu: "View", key: "cmd+b" },
 ];
 
 /// The commands with any saved override applied. Unknown ids in the saved map

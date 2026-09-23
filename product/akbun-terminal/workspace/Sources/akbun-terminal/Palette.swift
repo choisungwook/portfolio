@@ -28,6 +28,9 @@ struct Palette {
   let accent: NSColor
   let selection: NSColor
   let separator: NSColor
+  /// A workspace name in the project panel: the complement of the accent, so
+  /// the sessions are the first thing found in the list.
+  let session: NSColor
   /// The closest Highlight.js theme shipped by HighlighterSwift.
   let syntaxTheme: String
   /// Nothing was chosen, so AppKit is left to follow dark and light mode on its
@@ -43,6 +46,7 @@ struct Palette {
     accent: .controlAccentColor,
     selection: .selectedContentBackgroundColor,
     separator: .separatorColor,
+    session: NSColor(name: nil, dynamicProvider: systemSessionColor),
     syntaxTheme: "system",
     followsSystem: true
   )
@@ -53,7 +57,8 @@ struct Palette {
     guard let background = theme.backgroundRGB, let text = theme.foregroundRGB,
       let panel = theme.panelBackground, let secondary = theme.secondaryForeground,
       let accent = theme.rgbPalette?[4],
-      let selection = theme.selectionBackground, let separator = theme.separator
+      let selection = theme.selectionBackground, let separator = theme.separator,
+      let session = theme.sessionForeground
     else { return nil }
     self.background = NSColor(background)
     self.panel = NSColor(panel)
@@ -62,13 +67,14 @@ struct Palette {
     self.accent = NSColor(accent)
     self.selection = NSColor(selection)
     self.separator = NSColor(separator)
+    self.session = NSColor(session)
     self.syntaxTheme = Self.syntaxTheme(for: theme.name, dark: theme.isDark)
     self.followsSystem = false
   }
 
   private init(
     background: NSColor, panel: NSColor, text: NSColor, secondaryText: NSColor,
-    accent: NSColor, selection: NSColor, separator: NSColor, syntaxTheme: String,
+    accent: NSColor, selection: NSColor, separator: NSColor, session: NSColor, syntaxTheme: String,
     followsSystem: Bool
   ) {
     self.background = background
@@ -78,6 +84,7 @@ struct Palette {
     self.accent = accent
     self.selection = selection
     self.separator = separator
+    self.session = session
     self.syntaxTheme = syntaxTheme
     self.followsSystem = followsSystem
   }
@@ -124,6 +131,18 @@ struct Palette {
     default: return dark ? "github-dark" : "github"
     }
   }
+}
+
+/// The complement of the system blue. The plain orange is too pale on a light
+/// panel, so light mode takes a darker one.
+///
+/// A free function rather than a closure in `Palette.system`: AppKit calls it
+/// from whichever thread is drawing, and a closure written inside the main
+/// actor type would be taken as main actor code.
+private func systemSessionColor(_ appearance: NSAppearance) -> NSColor {
+  appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    ? .systemOrange
+    : NSColor(srgbRed: 0.66, green: 0.33, blue: 0.0, alpha: 1)
 }
 
 extension NSColor {

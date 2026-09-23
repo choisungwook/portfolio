@@ -185,8 +185,11 @@ final class ProjectSidebarView: NSView {
     let isSelected = workspace.id == selected
     let dot = StatusDot(status: statuses[workspace.id] ?? workspace.status, size: zoom.size(8))
     let label = NSTextField(labelWithString: workspace.name)
-    label.font = .systemFont(ofSize: zoom.size(12))
-    label.textColor = isSelected ? palette.selectedText : palette.text
+    // Larger and bolder than the project above it, in a colour nothing else in
+    // the panel uses. The selected row keeps the text colour, because the
+    // complement is not guaranteed to read on the selection's blue.
+    label.font = .systemFont(ofSize: zoom.size(14), weight: .semibold)
+    label.textColor = isSelected ? palette.selectedText : palette.session
     label.lineBreakMode = .byTruncatingTail
     let rename = ActionButton(
       symbol: "pencil", help: "Rename workspace", tint: palette.secondaryText
