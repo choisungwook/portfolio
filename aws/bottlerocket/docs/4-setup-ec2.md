@@ -34,6 +34,13 @@ aws ssm get-parameters-by-path --region ap-northeast-2 \
 export TF_VAR_bottlerocket_version="<이전 버전>"
 ```
 
+- 인스턴스는 `ignore_changes = [ami]`라서 이미 떠 있을 때 버전을 바꾸면 `apply`만으로는 교체되지 않는다. latest가 새로 게시될 때마다 인스턴스가 교체되는 것을 막으려는 설정이다
+- 떠 있는 인스턴스의 버전을 바꾸려면 `-replace`로 교체한다
+
+```bash
+terraform -chdir=terraform/ec2 apply -auto-approve -replace=aws_instance.bottlerocket
+```
+
 admin container SSH 비교 실습을 할 때만 공개키를 넘긴다.
 
 ```bash
