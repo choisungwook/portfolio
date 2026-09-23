@@ -959,7 +959,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   /// A divider dragged all the way folds a pane too, and the title bar buttons
   /// have to say so.
+  /// The width is also taken here, so a pane dragged shut comes back at the
+  /// width it had before the drag rather than the default.
   func splitViewDidResizeSubviews(_ notification: Notification) {
+    for pane in [sidebar, browser] as [NSView] where !isFolded(pane) && pane.frame.width > 0 {
+      paneWidths[ObjectIdentifier(pane)] = pane.frame.width
+    }
     syncPaneToggles()
   }
 

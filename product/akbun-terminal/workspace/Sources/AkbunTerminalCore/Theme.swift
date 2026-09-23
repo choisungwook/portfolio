@@ -103,15 +103,18 @@ extension CoreTheme {
     let vivid = max(saturation, 0.6)
     // Walk the lightness away from the panel until the name is readable on it.
     // Towards white on a dark panel, towards black on a light one.
+    // A theme whose panel no complement reads on gets its own text colour,
+    // which is readable by construction; nil would drop the whole theme.
     let dark = isDark
     var lightness = dark ? 0.55 : 0.45
-    var colour = Self.rgb(hue: complement, saturation: vivid, lightness: lightness)
-    while Self.contrast(colour, panel) < Self.sessionContrast {
+    while lightness > 0, lightness < 1 {
+      let colour = Self.rgb(hue: complement, saturation: vivid, lightness: lightness)
+      if Self.contrast(colour, panel) >= Self.sessionContrast {
+        return colour
+      }
       lightness += dark ? 0.05 : -0.05
-      guard lightness > 0, lightness < 1 else { break }
-      colour = Self.rgb(hue: complement, saturation: vivid, lightness: lightness)
     }
-    return colour
+    return foregroundRGB
   }
 
   /// WCAG contrast ratio, from 1 (the same colour) to 21 (black on white).

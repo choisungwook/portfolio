@@ -1,19 +1,18 @@
-import Foundation
 import Testing
 
 @testable import AkbunTerminalCore
 
 struct SessionColorTests {
-  private func theme(background: String, foreground: String, blue: String) throws -> CoreTheme {
-    var palette = Array(repeating: "\"#808080\"", count: 16)
-    palette[4] = "\"\(blue)\""
-    let json = #"{"name":"T","background":""# + background + #"","foreground":""# + foreground
-      + #"","cursor":""# + foreground + #"","palette":["# + palette.joined(separator: ",") + "]}"
-    return try JSONDecoder().decode(CoreTheme.self, from: Data(json.utf8))
+  private func theme(background: String, foreground: String, blue: String) -> CoreTheme {
+    var palette = Array(repeating: "#808080", count: 16)
+    palette[4] = blue
+    return CoreTheme(
+      name: "T", background: background, foreground: foreground, cursor: foreground,
+      palette: palette)
   }
 
   @Test func aDarkThemeGetsAReadableComplementOfItsBlue() throws {
-    let nord = try theme(background: "#2e3440", foreground: "#d8dee9", blue: "#81a1c1")
+    let nord = theme(background: "#2e3440", foreground: "#d8dee9", blue: "#81a1c1")
     let session = try #require(nord.sessionForeground)
     let panel = try #require(nord.panelBackground)
     #expect(CoreTheme.contrast(session, panel) >= CoreTheme.sessionContrast)
@@ -22,7 +21,7 @@ struct SessionColorTests {
   }
 
   @Test func aLightThemeGoesDarkerRatherThanLighter() throws {
-    let light = try theme(background: "#ffffff", foreground: "#24292f", blue: "#0969da")
+    let light = theme(background: "#ffffff", foreground: "#24292f", blue: "#0969da")
     let session = try #require(light.sessionForeground)
     let panel = try #require(light.panelBackground)
     #expect(CoreTheme.contrast(session, panel) >= CoreTheme.sessionContrast)
@@ -35,8 +34,8 @@ struct SessionColorTests {
     #expect(back == (0x26, 0x8b, 0xd2))
   }
 
-  @Test func anUnreadableBlueGivesNoColour() throws {
-    let broken = try theme(background: "#000000", foreground: "#ffffff", blue: "blue")
+  @Test func anUnreadableBlueGivesNoColour() {
+    let broken = theme(background: "#000000", foreground: "#ffffff", blue: "blue")
     #expect(broken.sessionForeground == nil)
   }
 }
