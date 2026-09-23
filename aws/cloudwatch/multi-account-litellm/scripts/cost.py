@@ -113,7 +113,7 @@ def common_costs(w: Workload) -> dict[str, float]:
   stored_gb = (w.dev_log_gb_per_day + w.prod_log_gb_per_day) * w.retention_days * w.log_storage_ratio
   return {
     "LiteLLM 로그 수집": ingest_gb * PRICE["cw_logs_ingest_gb"],
-    "LiteLLM 로그 보관(90일)": stored_gb * PRICE["cw_logs_storage_gb"],
+    f"LiteLLM 로그 보관({w.retention_days}일)": stored_gb * PRICE["cw_logs_storage_gb"],
     "로그 조회(Logs Insights)": w.log_scan_gb_per_month * PRICE["cw_logs_insights_gb"],
     "계정별 수집기 task 2개": 2 * fargate_monthly(0.25, 0.5),
   }

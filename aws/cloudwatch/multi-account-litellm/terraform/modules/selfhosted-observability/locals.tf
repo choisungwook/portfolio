@@ -1,5 +1,5 @@
 locals {
-  namespace    = "monitoring.litellm.internal"
+  namespace    = "${var.name}.internal"
   vm_dns       = "victoriametrics.${local.namespace}"
   grafana_path = "/tmp/grafana"
 

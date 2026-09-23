@@ -1,6 +1,7 @@
 locals {
-  name          = "${var.project_name}-${var.env}"
-  namespace     = "${var.env}.litellm.internal"
+  name = "${var.project_name}-${var.env}"
+  # 같은 VPC에 스택을 여러 번 띄워도 namespace가 겹치지 않도록 project 이름을 넣는다.
+  namespace     = "${var.env}.${var.project_name}.internal"
   litellm_dns   = "litellm.${local.namespace}"
   db_dns        = "db.${local.namespace}"
   database_url  = "postgresql://litellm:${var.db_password}@${local.db_dns}:5432/litellm"

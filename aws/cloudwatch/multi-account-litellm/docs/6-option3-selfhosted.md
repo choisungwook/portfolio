@@ -30,7 +30,7 @@ flowchart LR
 
 수집:
 
-- 계정마다 수집기(ADOT collector) task 1개가 Cloud Map 이름 `litellm.<env>.litellm.internal`의 A 레코드로 replica를 하나씩 찾는다. replica마다 `instance` label이 달라 series가 섞이지 않는다
+- 계정마다 수집기(ADOT collector) task 1개가 Cloud Map 이름 `litellm.<env>.<project_name>.internal`(예: `litellm.prod.litellm-mon.internal`)의 A 레코드로 replica를 하나씩 찾는다. replica마다 `instance` label이 달라 series가 섞이지 않는다
 - 계정 구분은 수집기의 `external_labels.account`가 붙인다
 - `/metrics`는 `/metrics/`로 307 redirect하고, 기본값으로 인증을 요구한다. 수집기는 `/metrics/`를 master key로 긁는다
 - OTel collector의 remote write는 기본값에서 이름 중간의 `total`을 지운다. `litellm_proxy_total_requests_metric_total`이 `litellm_proxy_requests_metric_total`로 바뀌어 대시보드가 비게 된다. `add_metric_suffixes: false`로 원래 이름을 유지한다
