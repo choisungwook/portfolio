@@ -1,0 +1,26 @@
+# provider를 부르지 않는 mock 모델 3개. 응답과 token 수가 고정이라 비용 없이 metric과 spend가 쌓인다.
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: fake-key
+      mock_response: "mock answer from gpt-4o"
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: fake-key
+      mock_response: "mock answer from claude-sonnet"
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: fake-key
+      mock_response: "mock answer from gpt-4o-mini"
+
+litellm_settings:
+  callbacks: ["prometheus"]
+  # 로컬 lab이라 /metrics를 인증 없이 연다. 운영에서는 true로 두고 수집기에 bearer 토큰을 준다.
+  require_auth_for_metrics_endpoint: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

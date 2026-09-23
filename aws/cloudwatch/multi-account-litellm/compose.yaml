@@ -1,0 +1,161 @@
+# 방안 3(중앙 Prometheus 호환 저장소 + Grafana)을 로컬에서 축소 재현한다.
+# network 3개가 계정 3개다. 중앙(central)은 LiteLLM에 닿지 못하고, 계정 안의 vmagent가 밀어 넣는 값만 받는다.
+# docker compose down -v 로 저장된 metric과 DB까지 지운다.
+name: litellm-multi-account
+
+x-litellm: &litellm
+  image: ghcr.io/berriai/litellm:v1.102.1
+  command: ["--config", "/app/config.yaml", "--port", "4000"]
+  volumes:
+    - ./local/litellm/config.yaml:/app/config.yaml:ro
+  environment: &litellm-env
+    LITELLM_MASTER_KEY: sk-local-master
+    # 로그를 JSON 한 줄로 찍는다. CloudWatch Logs Insights가 필드를 바로 읽는다.
+    JSON_LOGS: "True"
+    LITELLM_LOCAL_MODEL_COST_MAP: "True"
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=5).status==200 else 1)\""]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 90s
+
+x-vmagent: &vmagent
+  image: victoriametrics/vmagent:v1.152.0
+  restart: unless-stopped
+  depends_on:
+    - victoriametrics
+
+services:
+  # ---------- dev 계정 ----------
+  db-dev:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - pg-dev:/var/lib/postgresql/data
+    networks: [dev]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      retries: 10
+
+  litellm-dev:
+    <<: *litellm
+    environment:
+      <<: *litellm-env
+      DATABASE_URL: postgresql://litellm:litellm@db-dev:5432/litellm
+    ports:
+      - "4101:4000"
+    networks: [dev]
+    depends_on:
+      db-dev:
+        condition: service_healthy
+
+  vmagent-dev:
+    <<: *vmagent
+    command:
+      - -promscrape.config=/etc/vmagent/scrape.yml
+      - -remoteWrite.url=http://victoriametrics:8428/api/v1/write
+    volumes:
+      - ./local/vmagent/scrape-dev.yml:/etc/vmagent/scrape.yml:ro
+    networks: [dev, central]
+
+  # ---------- prod 계정: replica 2개 ----------
+  db-prod:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - pg-prod:/var/lib/postgresql/data
+    networks: [prod]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      retries: 10
+
+  litellm-prod:
+    <<: *litellm
+    environment:
+      <<: *litellm-env
+      DATABASE_URL: postgresql://litellm:litellm@db-prod:5432/litellm
+    deploy:
+      replicas: 2
+    ports:
+      - "4102-4103:4000"
+    networks: [prod]
+    depends_on:
+      db-prod:
+        condition: service_healthy
+
+  vmagent-prod:
+    <<: *vmagent
+    command:
+      - -promscrape.config=/etc/vmagent/scrape.yml
+      - -remoteWrite.url=http://victoriametrics:8428/api/v1/write
+    volumes:
+      - ./local/vmagent/scrape-prod.yml:/etc/vmagent/scrape.yml:ro
+    networks: [prod, central]
+
+  # ---------- 중앙(모니터링) 계정 ----------
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.152.0
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=90d
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/storage
+    networks: [central]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    ports:
+      - "3100:3000"
+    volumes:
+      - ./local/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./local/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      # 로컬 lab이라 로그인 없이 Viewer로 연다. 맥락 없는 사람이 링크만으로 보는 상황을 흉내 낸다.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    networks: [central]
+    depends_on:
+      - victoriametrics
+    restart: unless-stopped
+
+  # ---------- 트래픽 ----------
+  loadgen:
+    image: python:3.13-slim
+    command: ["python", "/app/loadgen.py"]
+    volumes:
+      - ./local/loadgen/loadgen.py:/app/loadgen.py:ro
+    environment:
+      TARGETS: dev=litellm-dev:4000,prod=litellm-prod:4000
+      LITELLM_MASTER_KEY: sk-local-master
+      INTERVAL_SECONDS: "0.5"
+    networks: [dev, prod]
+    depends_on:
+      - litellm-dev
+      - litellm-prod
+    restart: unless-stopped
+
+networks:
+  dev:
+  prod:
+  central:
+
+volumes:
+  pg-dev:
+  pg-prod:
+  vm-data:
+  grafana-data:

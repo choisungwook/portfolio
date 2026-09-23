@@ -1,0 +1,10 @@
+# ~/.aws/config 에 만들어 둔 profile 이름
+monitoring_profile = "lab-monitoring"
+dev_profile        = "lab-dev"
+prod_profile       = "lab-prod"
+
+# 방안을 켜고 끈다. 방안 1(계정별 대시보드)은 항상 만든다.
+enable_oam        = true
+enable_selfhosted = false
+enable_amp        = false
+enable_amg        = false

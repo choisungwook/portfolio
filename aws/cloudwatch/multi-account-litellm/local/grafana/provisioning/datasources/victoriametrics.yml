@@ -1,0 +1,10 @@
+apiVersion: 1
+datasources:
+  # VictoriaMetrics는 Prometheus 질의 API를 그대로 연다. Grafana에는 Prometheus 타입으로 붙인다.
+  # AMP로 바꿀 때도 대시보드는 그대로 두고 이 datasource의 url과 인증만 바꾼다.
+  - name: metrics
+    type: prometheus
+    uid: metrics
+    access: proxy
+    url: http://victoriametrics:8428
+    isDefault: true
