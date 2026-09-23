@@ -86,6 +86,27 @@ data "aws_ami" "al2023" {
 }
 ```
 
+## 검증
+
+`validate`는 타입만 보고 값은 보지 않는다. AWS 자격 증명 없이 값까지 보려면 `tests/*.tftest.hcl`에 `mock_provider`와 `command = plan`으로 테스트를 둔다. 이름 길이 제한, apply 뒤에 정해지는 값으로 정한 `count` 같은 오류를 잡는다.
+
+- `aws_iam_policy_document`는 mock이 JSON이 아닌 문자열을 만든다. `mock_data`로 빈 정책 JSON을 기본값으로 준다.
+- plan에서 정해지지 않는 ARN·ID로 assert하지 않는다.
+
+registry.terraform.io에 접근할 수 없는 환경은 releases.hashicorp.com에서 provider zip을 받아 filesystem mirror로 init한다.
+
+```hcl
+# TF_CLI_CONFIG_FILE로 지정할 CLI 설정. <mirror>/registry.terraform.io/hashicorp/<name>/ 아래에 zip을 둔다
+provider_installation {
+  filesystem_mirror {
+    path    = "/path/to/mirror"
+    include = ["registry.terraform.io/hashicorp/*"]
+  }
+}
+```
+
+이렇게 만든 `.terraform.lock.hcl`은 한 플랫폼 해시만 담으므로 커밋하지 않는다.
+
 ## VPC 및 네트워킹
 
 - **기본 VPC 사용을 우선**한다 (비용 절약).

@@ -4,6 +4,7 @@ GitHub를 건드리는 command는 두 환경 중 하나에서 돈다. 절차는 
 
 - **CLI 환경**: shell과 gh CLI가 있다. Claude Code CLI, Claude Desktop, Codex CLI, 터미널이 열리는 IDE가 여기에 든다.
 - **MCP 환경**: shell이 없고 GitHub MCP 서버 도구만 있다. Claude mobile, ChatGPT mobile, 브라우저 세션이 여기에 든다.
+- **혼합 환경**: shell과 git은 있지만 gh가 없고 GitHub MCP 도구가 있다. Claude Code 클라우드 세션이 여기에 든다. commit과 push는 shell로, GitHub 조작은 MCP 도구로 한다. sleep 대기는 MCP 환경 규칙을 따른다.
 
 ## 환경 판별
 
@@ -23,7 +24,7 @@ MCP 도구 이름은 GitHub MCP 서버 버전마다 다르다. 아래는 공식 
 
 | 하는 일 | CLI 환경 | MCP 환경 |
 |---|---|---|
-| Issue 생성 | `gh issue create` | `create_issue` |
+| Issue 생성 | `gh issue create` | `create_issue` 또는 `issue_write`(method create). `parent_issue_number`를 주면 생성과 sub-issue 등록이 한 번에 된다 |
 | Issue 조회 | `gh issue list`, `gh issue view` | `list_issues`, `get_issue` |
 | Issue close | `gh issue close` | `update_issue` (state closed) |
 | Issue comment | `gh issue comment` | `add_issue_comment` |
@@ -43,6 +44,13 @@ MCP 도구 이름은 GitHub MCP 서버 버전마다 다르다. 아래는 공식 
 - **GraphQL mutation**: Copilot 재요청(`requestReviewsByLogin`)이 안 된다. 최초 요청만 된다.
 - **project 담기**: `gh project item-add`에 해당하는 도구가 없다.
 - **local branch 정리**: merge 후 `git pull --rebase`를 대신할 수단이 없다.
+
+## MCP로 만든 PR의 자동 footer
+
+일부 MCP 서버는 PR body 끝에 claude session 링크 footer를 자동으로 붙인다. PR body에 session 링크를 넣지 않는 규칙을 기본 동작이 어긴다.
+
+- PR을 만든 직후 body를 다시 읽는다.
+- footer가 붙었으면 원래 body로 한 번 더 update한다. update에는 footer가 다시 붙지 않는다.
 
 ## sub-issue 등록
 
