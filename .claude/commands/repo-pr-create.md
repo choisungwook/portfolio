@@ -37,7 +37,7 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 ## 작성 규칙
 
 - commit message는 영어로, Issue와 PR body는 한글 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
-- Goal은 번호 리스트 3개 이내로 쪼갠다. 근거는 마크다운 리스트 최대 1개다. backtick을 쓰지 않는다.
+- Goal은 번호 리스트 3개 이내로 쪼갠다. 요약형과 목록형 절의 항목 규칙은 템플릿 상단 주석을 따른다. backtick을 쓰지 않는다.
 - 왜, 완료 조건, 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다.
 - PR의 검증 절은 Issue의 완료 조건마다 한 줄로 답한다. 실행하지 않은 조건은 검증하지 않음으로 적는다.
 - PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
