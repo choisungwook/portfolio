@@ -82,3 +82,98 @@ extension CoreTheme {
     return Self.blend(background, blue, amount: 0.55)
   }
 }
+
+/// The colour of a workspace name in the project panel.
+///
+/// Every other surface is mixed from the background and the text, so a session
+/// name in the text colour sat among folders and buttons of the same colour and
+/// had to be searched for. The complement of the theme's own blue is the one
+/// hue nothing else in the window is drawn in, which is what lets the names
+/// stand out in every theme rather than in the few where the text happens to be
+/// bright.
+extension CoreTheme {
+  /// Contrast against the panel, WCAG's threshold for ordinary text.
+  public static let sessionContrast = 4.5
+
+  public var sessionForeground: RGB? {
+    guard let panel = panelBackground, let blue = Self.rgb(palette.count > 4 ? palette[4] : "")
+    else { return nil }
+    let (hue, saturation, _) = Self.hsl(blue)
+    let complement = (hue + 0.5).truncatingRemainder(dividingBy: 1)
+    let vivid = max(saturation, 0.6)
+    // Walk the lightness away from the panel until the name is readable on it.
+    // Towards white on a dark panel, towards black on a light one.
+    // A theme whose panel no complement reads on gets its own text colour,
+    // which is readable by construction; nil would drop the whole theme.
+    let dark = isDark
+    var lightness = dark ? 0.55 : 0.45
+    while lightness > 0, lightness < 1 {
+      let colour = Self.rgb(hue: complement, saturation: vivid, lightness: lightness)
+      if Self.contrast(colour, panel) >= Self.sessionContrast {
+        return colour
+      }
+      lightness += dark ? 0.05 : -0.05
+    }
+    return foregroundRGB
+  }
+
+  /// WCAG contrast ratio, from 1 (the same colour) to 21 (black on white).
+  public static func contrast(_ left: RGB, _ right: RGB) -> Double {
+    let a = relativeLuminance(left)
+    let b = relativeLuminance(right)
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+  }
+
+  static func relativeLuminance(_ colour: RGB) -> Double {
+    func linear(_ channel: UInt8) -> Double {
+      let value = Double(channel) / 255
+      return value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(colour.red) + 0.7152 * linear(colour.green)
+      + 0.0722 * linear(colour.blue)
+  }
+
+  /// Hue, saturation and lightness, each from 0 to 1.
+  static func hsl(_ colour: RGB) -> (hue: Double, saturation: Double, lightness: Double) {
+    let red = Double(colour.red) / 255
+    let green = Double(colour.green) / 255
+    let blue = Double(colour.blue) / 255
+    let high = max(red, green, blue)
+    let low = min(red, green, blue)
+    let lightness = (high + low) / 2
+    let delta = high - low
+    guard delta > 0 else { return (0, 0, lightness) }
+    let saturation = delta / (1 - abs(2 * lightness - 1))
+    var hue: Double
+    if high == red {
+      hue = ((green - blue) / delta).truncatingRemainder(dividingBy: 6)
+    } else if high == green {
+      hue = (blue - red) / delta + 2
+    } else {
+      hue = (red - green) / delta + 4
+    }
+    hue /= 6
+    if hue < 0 { hue += 1 }
+    return (hue, min(saturation, 1), lightness)
+  }
+
+  static func rgb(hue: Double, saturation: Double, lightness: Double) -> RGB {
+    let chroma = (1 - abs(2 * lightness - 1)) * saturation
+    let sector = hue * 6
+    let second = chroma * (1 - abs(sector.truncatingRemainder(dividingBy: 2) - 1))
+    let (red, green, blue): (Double, Double, Double)
+    switch Int(sector) % 6 {
+    case 0: (red, green, blue) = (chroma, second, 0)
+    case 1: (red, green, blue) = (second, chroma, 0)
+    case 2: (red, green, blue) = (0, chroma, second)
+    case 3: (red, green, blue) = (0, second, chroma)
+    case 4: (red, green, blue) = (second, 0, chroma)
+    default: (red, green, blue) = (chroma, 0, second)
+    }
+    let offset = lightness - chroma / 2
+    func byte(_ value: Double) -> UInt8 {
+      UInt8(min(255, max(0, ((value + offset) * 255).rounded())))
+    }
+    return (byte(red), byte(green), byte(blue))
+  }
+}

@@ -28,6 +28,14 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   private let contentArea = NSView()
   private let browser: FileBrowserView
   private let panes = NSSplitView()
+  /// The two buttons in the title bar that fold the side panes. The title bar
+  /// rather than the panes' own headers, because a button inside a folded pane
+  /// is gone along with it.
+  private let sidebarToggle = NSButton()
+  private let browserToggle = NSButton()
+  /// What each side pane was last shown at, so bringing one back puts it where
+  /// it was rather than wherever the split view's proportions land.
+  private var paneWidths: [ObjectIdentifier: CGFloat] = [:]
   private let placeholder = NSTextField(
     labelWithString: "Select a workspace on the left to open a terminal.")
   private var tabs = TerminalTabs()
@@ -82,6 +90,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     window.delegate = self
 
     layOut(in: window)
+    installPaneToggles(in: window)
     connect()
     applyPanelSize()
   }
@@ -487,7 +496,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
   func beginProjectSearch() {
     // The pane can be folded away, and a search that answered into a hidden
     // pane would look like a keystroke that did nothing.
-    if browser.isHidden {
+    if isFolded(browser) {
       toggleFileBrowser()
     }
     browser.beginSearch()
@@ -745,15 +754,92 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     // The title bar and any menu drawn over the window are AppKit's to paint,
     // and they follow the appearance rather than a colour anyone sets.
     window?.appearance = palette.appearance
+    syncPaneToggles()
   }
 
-  /// Folds the file pane away and back. Returns whether it is now hidden, which
-  /// is what the menu item's own wording is.
+  /// Folds the file pane away and back. Returns whether it is now hidden.
   @discardableResult
   func toggleFileBrowser() -> Bool {
-    browser.isHidden.toggle()
-    panes.adjustSubviews()
-    return browser.isHidden
+    toggle(browser)
+  }
+
+  /// Folds the project pane away and back. Returns whether it is now hidden.
+  @discardableResult
+  func toggleSidebar() -> Bool {
+    toggle(sidebar)
+  }
+
+  /// A hidden arranged subview is collapsed by the split view, so the terminal
+  /// takes the room it leaves.
+  /// A pane dragged shut is collapsed without being hidden, so both count as
+  /// folded; otherwise the first click on it would fold it a second time.
+  private func toggle(_ pane: NSView) -> Bool {
+    if isFolded(pane) {
+      pane.isHidden = false
+      panes.adjustSubviews()
+      restoreWidth(of: pane)
+    } else {
+      paneWidths[ObjectIdentifier(pane)] = pane.frame.width
+      pane.isHidden = true
+      panes.adjustSubviews()
+    }
+    syncPaneToggles()
+    return isFolded(pane)
+  }
+
+  private func isFolded(_ pane: NSView) -> Bool {
+    pane.isHidden || panes.isSubviewCollapsed(pane)
+  }
+
+  private func restoreWidth(of pane: NSView) {
+    let fallback: CGFloat = pane === sidebar ? 240 : 260
+    let width = max(paneWidths[ObjectIdentifier(pane)] ?? fallback, Self.minimumPaneSize)
+    if pane === sidebar {
+      panes.setPosition(width, ofDividerAt: 0)
+    } else {
+      panes.setPosition(panes.bounds.width - width - panes.dividerThickness, ofDividerAt: 1)
+    }
+  }
+
+  private func installPaneToggles(in window: NSWindow) {
+    let sides: [(NSButton, String, String, NSLayoutConstraint.Attribute, Selector)] = [
+      (sidebarToggle, "sidebar.left", "Show or hide the projects panel", .left,
+       #selector(sidebarToggleClicked)),
+      (browserToggle, "sidebar.right", "Show or hide the files panel", .right,
+       #selector(browserToggleClicked)),
+    ]
+    for (button, symbol, help, side, action) in sides {
+      button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)
+      button.toolTip = help
+      button.isBordered = false
+      button.imagePosition = .imageOnly
+      button.target = self
+      button.action = action
+      button.frame = NSRect(x: 6, y: 2, width: 24, height: 24)
+      button.autoresizingMask = [.minYMargin, .maxYMargin]
+      let holder = NSView(frame: NSRect(x: 0, y: 0, width: 36, height: 28))
+      holder.addSubview(button)
+      let accessory = NSTitlebarAccessoryViewController()
+      accessory.view = holder
+      accessory.layoutAttribute = side
+      window.addTitlebarAccessoryViewController(accessory)
+    }
+    syncPaneToggles()
+  }
+
+  @objc private func sidebarToggleClicked() {
+    toggleSidebar()
+  }
+
+  @objc private func browserToggleClicked() {
+    toggleFileBrowser()
+  }
+
+  /// The accent while the pane is open, the quiet colour while it is folded, so
+  /// the button says which way the next click goes.
+  private func syncPaneToggles() {
+    sidebarToggle.contentTintColor = isFolded(sidebar) ? palette.secondaryText : palette.accent
+    browserToggle.contentTintColor = isFolded(browser) ? palette.secondaryText : palette.accent
   }
 
   // MARK: Tree
@@ -869,6 +955,17 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
 
   func windowDidBecomeKey(_ notification: Notification) {
     showActiveTab()
+  }
+
+  /// A divider dragged all the way folds a pane too, and the title bar buttons
+  /// have to say so.
+  /// The width is also taken here, so a pane dragged shut comes back at the
+  /// width it had before the drag rather than the default.
+  func splitViewDidResizeSubviews(_ notification: Notification) {
+    for pane in [sidebar, browser] as [NSView] where !isFolded(pane) && pane.frame.width > 0 {
+      paneWidths[ObjectIdentifier(pane)] = pane.frame.width
+    }
+    syncPaneToggles()
   }
 
   /// Everything but the middle folds away. The tabs are the app.

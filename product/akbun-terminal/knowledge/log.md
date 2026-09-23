@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-09-23
+
+- **Creation**: [세션 이름은 테마 파랑의 보색으로, 대비를 채울 때까지 명도를 옮긴다](decisions/2026-09-session-names-in-the-complement.md) 결정 기록
+
 ## 2026-09-18
 
 - **Creation**: [콘텐츠 확대와 주변 패널 크기 분리](decisions/2026-09-content-and-panel-zoom.md) 결정 기록
