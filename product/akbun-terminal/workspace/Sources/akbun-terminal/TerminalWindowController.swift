@@ -783,6 +783,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       pane.isHidden = true
       panes.adjustSubviews()
     }
+    // The divider's hidden state is asked for while drawing, so the line left
+    // where the pane ended is only cleared by drawing again.
+    panes.needsDisplay = true
     syncPaneToggles()
     return isFolded(pane)
   }
@@ -966,6 +969,18 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
       paneWidths[ObjectIdentifier(pane)] = pane.frame.width
     }
     syncPaneToggles()
+  }
+
+  /// A folded pane's divider stays drawn by default, which leaves a one point
+  /// line where the pane used to end. The first divider belongs to the project
+  /// pane and the second to the file pane.
+  func splitView(_ splitView: NSSplitView, shouldHideDividerAt dividerIndex: Int) -> Bool {
+    guard splitView === panes else { return false }
+    switch dividerIndex {
+    case 0: return isFolded(sidebar)
+    case 1: return isFolded(browser)
+    default: return false
+    }
   }
 
   /// Everything but the middle folds away. The tabs are the app.
