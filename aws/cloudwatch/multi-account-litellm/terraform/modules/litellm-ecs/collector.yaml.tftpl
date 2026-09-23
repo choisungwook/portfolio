@@ -1,0 +1,84 @@
+# 계정마다 1개 뜨는 수집기(ADOT collector) 설정.
+# Cloud Map A 레코드로 LiteLLM replica를 하나씩 찾아 긁고, 켜진 방안에 따라 목적지를 고른다.
+extensions:
+  health_check: {}
+%{ if amp != null ~}
+  # 방안 4. 모니터링 계정 role을 assume해서 AMP에 SigV4로 쓴다.
+  sigv4auth:
+    region: ${region}
+    service: aps
+    assume_role:
+      arn: ${amp.role_arn}
+      sts_region: ${region}
+%{ endif ~}
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: litellm
+          scrape_interval: ${scrape_interval}
+          # LiteLLM은 /metrics를 /metrics/로 307 redirect한다.
+          metrics_path: /metrics/
+          # require_auth_for_metrics_endpoint 기본값이 true라 master key를 보낸다.
+          authorization:
+            credentials: $${env:LITELLM_MASTER_KEY}
+          dns_sd_configs:
+            - names: [${litellm_dns}]
+              type: A
+              port: 4000
+
+processors:
+  batch: {}
+  # CloudWatch로는 counter 5개만 보낸다. 나머지까지 보내면 EMF 로그로 전부 기록되어 로그 수집 비용이 붙는다.
+  filter/emf:
+    error_mode: ignore
+    metrics:
+      metric:
+        - 'not IsMatch(name, "^litellm_(proxy_total_requests|proxy_failed_requests|spend|input_tokens|output_tokens)_metric")'
+
+exporters:
+  # 방안 1, 2. EMF 로그로 쓰면 CloudWatch가 custom metric으로 뽑는다.
+  # dimension 조합 하나가 custom metric 하나다. key·user label은 넣지 않는다.
+  awsemf:
+    namespace: LiteLLM
+    region: ${region}
+    log_group_name: ${emf_log_group}
+    log_stream_name: collector
+    dimension_rollup_option: NoDimensionRollup
+    metric_declarations:
+      - dimensions: [[requested_model], [team_alias], []]
+        metric_name_selectors: [".*"]
+%{ if selfhosted_endpoint != null ~}
+  # 방안 3. PrivateLink endpoint를 거쳐 중앙 VictoriaMetrics로 보낸다.
+  # add_metric_suffixes를 끄지 않으면 이름 중간의 total을 지워 litellm_proxy_total_requests_metric_total이
+  # litellm_proxy_requests_metric_total로 바뀐다. 끄면 LiteLLM이 낸 이름 그대로 저장되어 대시보드를 공유할 수 있다.
+  prometheusremotewrite/selfhosted:
+    endpoint: ${selfhosted_endpoint}
+    add_metric_suffixes: false
+    external_labels:
+      account: ${env}
+%{ endif ~}
+%{ if amp != null ~}
+  prometheusremotewrite/amp:
+    endpoint: ${amp.endpoint}
+    add_metric_suffixes: false
+    auth:
+      authenticator: sigv4auth
+    external_labels:
+      account: ${env}
+%{ endif ~}
+
+service:
+  extensions: [health_check${amp != null ? ", sigv4auth" : ""}]
+  pipelines:
+    metrics/cloudwatch:
+      receivers: [prometheus]
+      processors: [filter/emf, batch]
+      exporters: [awsemf]
+%{ if selfhosted_endpoint != null || amp != null ~}
+    metrics/remote:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [${join(", ", compact([selfhosted_endpoint != null ? "prometheusremotewrite/selfhosted" : "", amp != null ? "prometheusremotewrite/amp" : ""]))}]
+%{ endif ~}

@@ -1,0 +1,16 @@
+# dev 계정 안에서 도는 수집기 설정. LiteLLM replica를 각각 긁어 중앙으로 보낸다.
+global:
+  scrape_interval: 30s
+  # 중앙 저장소에서 계정을 가르는 label. 계정마다 이 값만 다르다.
+  external_labels:
+    account: dev
+
+scrape_configs:
+  - job_name: litellm
+    # LiteLLM은 /metrics를 /metrics/로 307 redirect한다. 처음부터 /metrics/를 긁는다.
+    metrics_path: /metrics/
+    # 서비스 이름 하나가 replica 수만큼 A 레코드를 돌려준다. ECS의 Cloud Map service discovery와 같은 구조다.
+    dns_sd_configs:
+      - names: [litellm-dev]
+        type: A
+        port: 4000
