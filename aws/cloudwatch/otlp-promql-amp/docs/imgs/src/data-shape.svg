@@ -1,0 +1,23 @@
+<svg width="100%" viewBox="0 0 680 360" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>histogram 저장 모양</title>
+<desc>같은 histogram이 AMP에서는 bucket마다 series로 펼쳐지고, CloudWatch에서는 native histogram 한 series가 된다.</desc>
+<defs><style>@import url(style.css);</style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#888780"/></marker></defs>
+<g class="n-gray"><rect x="30" y="130" width="160" height="72" rx="4"/><text class="th" x="110" y="156" text-anchor="middle">수집기</text><text class="ts" x="110" y="176" text-anchor="middle">histogram 1개</text><text class="ts" x="110" y="192" text-anchor="middle">model-a, replica A</text></g>
+<rect class="b" x="260" y="30" width="390" height="140" rx="8"/><text class="ts" x="274" y="50">AMP: series 9개</text>
+<g class="n-coral"><rect x="276" y="62" width="112" height="26" rx="4"/><text class="ts" x="332" y="80" text-anchor="middle">_bucket le=0.25</text></g>
+<g class="n-coral"><rect x="396" y="62" width="112" height="26" rx="4"/><text class="ts" x="452" y="80" text-anchor="middle">_bucket le=0.5</text></g>
+<g class="n-coral"><rect x="516" y="62" width="118" height="26" rx="4"/><text class="ts" x="575" y="80" text-anchor="middle">_bucket le=1</text></g>
+<g class="n-coral"><rect x="276" y="96" width="112" height="26" rx="4"/><text class="ts" x="332" y="114" text-anchor="middle">_bucket le=2</text></g>
+<g class="n-coral"><rect x="396" y="96" width="112" height="26" rx="4"/><text class="ts" x="452" y="114" text-anchor="middle">_bucket le=4</text></g>
+<g class="n-coral"><rect x="516" y="96" width="118" height="26" rx="4"/><text class="ts" x="575" y="114" text-anchor="middle">_bucket le=8</text></g>
+<g class="n-coral"><rect x="276" y="130" width="112" height="26" rx="4"/><text class="ts" x="332" y="148" text-anchor="middle">_bucket le=+Inf</text></g>
+<g class="n-coral"><rect x="396" y="130" width="112" height="26" rx="4"/><text class="ts" x="452" y="148" text-anchor="middle">_count</text></g>
+<g class="n-coral"><rect x="516" y="130" width="118" height="26" rx="4"/><text class="ts" x="575" y="148" text-anchor="middle">_sum</text></g>
+<rect class="b" x="260" y="200" width="390" height="92" rx="8"/><text class="ts" x="274" y="220">CloudWatch: series 1개</text>
+<g class="n-coral"><rect x="276" y="232" width="358" height="44" rx="4"/><text class="th" x="455" y="252" text-anchor="middle">demo_request_duration_seconds</text><text class="ts" x="455" y="268" text-anchor="middle">bucket·count·sum을 한 값에 담음</text></g>
+<line class="w" x1="190" y1="152" x2="258" y2="100" marker-end="url(#a)"/><text class="ts" x="198" y="112">RW</text>
+<line class="w" x1="190" y1="180" x2="258" y2="246" marker-end="url(#a)"/><text class="ts" x="198" y="236">OTLP</text>
+<text class="ts" x="30" y="322">그래서 p95 쿼리가 다르다. AMP는 rate(x_bucket) + le, CloudWatch는 rate(x)만 쓴다</text>
+<text class="ts" x="30" y="344">replica label도 다르다. AMP는 instance, CloudWatch는 @resource.service.instance.id</text>
+</svg>

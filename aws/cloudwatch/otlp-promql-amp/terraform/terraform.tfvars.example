@@ -1,0 +1,5 @@
+# 조회 화면을 고른다. ecs(기본): ECS에 Grafana 직접 운영, amg: Amazon Managed Grafana, none: CloudWatch 대시보드만
+grafana = "ecs"
+
+# grafana = "amg"일 때 Admin으로 배정할 IAM Identity Center 사용자 ID. 비워 두면 콘솔에서 배정한다
+amg_admin_user_ids = []

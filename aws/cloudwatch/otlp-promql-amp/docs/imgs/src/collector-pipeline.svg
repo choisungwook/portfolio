@@ -1,0 +1,19 @@
+<svg width="100%" viewBox="0 0 680 290" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>수집기 파이프라인</title>
+<desc>prometheus receiver가 긁은 데이터가 두 파이프라인으로 갈라진다. CloudWatch 쪽만 metric_start_time processor를 거친다.</desc>
+<defs><style>@import url(style.css);</style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#888780"/></marker></defs>
+<rect class="b" x="30" y="30" width="620" height="210" rx="8"/><text class="ts" x="44" y="50">수집기 하나 · config.yaml 하나</text>
+<g class="n-gray"><rect x="48" y="112" width="120" height="60" rx="4"/><text class="th" x="108" y="136" text-anchor="middle">prometheus</text><text class="ts" x="108" y="156" text-anchor="middle">replica를 DNS로</text></g>
+<g class="n-teal"><rect x="216" y="64" width="150" height="60" rx="4"/><text class="th" x="291" y="88" text-anchor="middle">metric_start_time</text><text class="ts" x="291" y="108" text-anchor="middle">시작 시각 채움</text></g>
+<g class="n-teal"><rect x="390" y="64" width="90" height="60" rx="4"/><text class="th" x="435" y="88" text-anchor="middle">batch</text><text class="ts" x="435" y="108" text-anchor="middle">≤ 1,000개</text></g>
+<g class="n-coral"><rect x="504" y="64" width="130" height="60" rx="4"/><text class="th" x="569" y="88" text-anchor="middle">otlp_http</text><text class="ts" x="569" y="108" text-anchor="middle">CloudWatch</text></g>
+<g class="n-teal"><rect x="390" y="162" width="90" height="60" rx="4"/><text class="th" x="435" y="186" text-anchor="middle">batch</text><text class="ts" x="435" y="206" text-anchor="middle">같은 설정</text></g>
+<g class="n-coral"><rect x="504" y="162" width="130" height="60" rx="4"/><text class="th" x="569" y="186" text-anchor="middle">remote write</text><text class="ts" x="569" y="206" text-anchor="middle">AMP</text></g>
+<line class="w" x1="168" y1="132" x2="214" y2="100" marker-end="url(#a)"/>
+<line class="w" x1="366" y1="94" x2="388" y2="94" marker-end="url(#a)"/>
+<line class="w" x1="480" y1="94" x2="502" y2="94" marker-end="url(#a)"/>
+<line class="w" x1="168" y1="152" x2="388" y2="192" marker-end="url(#a)"/>
+<line class="w" x1="480" y1="192" x2="502" y2="192" marker-end="url(#a)"/>
+<text class="ts" x="30" y="268">CloudWatch는 시작 시각 없는 counter를 버리고 요청당 datapoint 1,000개까지만 받는다</text>
+</svg>

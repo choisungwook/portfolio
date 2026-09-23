@@ -1,0 +1,29 @@
+<svg width="100%" viewBox="0 0 680 380" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>OTLP와 AMP 실습 구조</title>
+<desc>ECS의 수집기가 demo app 두 개를 긁어 CloudWatch에는 OTLP로, AMP에는 remote write로 보낸다. CloudWatch 대시보드, ECS Grafana, AMG가 각자 role로 조회한다.</desc>
+<defs><style>@import url(style.css);</style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#888780"/></marker></defs>
+<rect class="b" x="30" y="30" width="220" height="270" rx="8"/><text class="ts" x="44" y="50">ECS Fargate</text>
+<g class="n-gray"><rect x="50" y="68" width="180" height="60" rx="4"/><text class="th" x="140" y="92" text-anchor="middle">demo app × 2</text><text class="ts" x="140" y="112" text-anchor="middle">/metrics · Cloud Map</text></g>
+<g class="n-teal"><rect x="50" y="196" width="180" height="64" rx="4"/><text class="th" x="140" y="220" text-anchor="middle">수집기</text><text class="ts" x="140" y="240" text-anchor="middle">task role: 쓰기</text></g>
+<line class="w" x1="140" y1="194" x2="140" y2="130" marker-end="url(#a)"/><text class="ts" x="150" y="166">긁기</text>
+<rect class="b" x="280" y="30" width="170" height="270" rx="8"/><text class="ts" x="294" y="50">AWS 저장소</text>
+<g class="n-coral"><rect x="296" y="68" width="138" height="64" rx="4"/><text class="th" x="365" y="94" text-anchor="middle">CloudWatch</text><text class="ts" x="365" y="114" text-anchor="middle">OTLP · 15개월</text></g>
+<g class="n-coral"><rect x="296" y="196" width="138" height="64" rx="4"/><text class="th" x="365" y="222" text-anchor="middle">AMP</text><text class="ts" x="365" y="242" text-anchor="middle">remote write</text></g>
+<line class="w" x1="230" y1="214" x2="294" y2="112" marker-end="url(#a)"/><text class="ts" x="240" y="150">OTLP</text>
+<line class="w" x1="230" y1="228" x2="294" y2="228" marker-end="url(#a)"/><text class="ts" x="238" y="220">RW</text>
+<rect class="b" x="480" y="30" width="170" height="270" rx="8"/><text class="ts" x="494" y="50">조회</text>
+<g class="n-gray"><rect x="496" y="64" width="138" height="54" rx="4" stroke-dasharray="4 3"/><text class="th" x="565" y="86" text-anchor="middle">CW 대시보드</text><text class="ts" x="565" y="104" text-anchor="middle">PromQL 위젯</text></g>
+<g class="n-teal"><rect x="496" y="138" width="138" height="60" rx="4"/><text class="th" x="565" y="162" text-anchor="middle">ECS Grafana</text><text class="ts" x="565" y="182" text-anchor="middle">grafana = ecs (기본)</text></g>
+<g class="n-gray"><rect x="496" y="218" width="138" height="60" rx="4" stroke-dasharray="4 3"/><text class="th" x="565" y="242" text-anchor="middle">AMG</text><text class="ts" x="565" y="262" text-anchor="middle">grafana = amg</text></g>
+<line class="r" x1="494" y1="91" x2="436" y2="96" marker-end="url(#a)"/>
+<line class="r" x1="494" y1="160" x2="436" y2="110" marker-end="url(#a)"/>
+<line class="r" x1="494" y1="176" x2="436" y2="216" marker-end="url(#a)"/>
+<line class="r" x1="494" y1="236" x2="436" y2="122" marker-end="url(#a)"/>
+<line class="r" x1="494" y1="252" x2="436" y2="240" marker-end="url(#a)"/>
+<g class="n-teal"><rect x="30" y="326" width="14" height="14" rx="2"/></g><text class="ts" x="52" y="338">직접 운영</text>
+<g class="n-coral"><rect x="130" y="326" width="14" height="14" rx="2"/></g><text class="ts" x="152" y="338">저장소</text>
+<rect x="220" y="326" width="14" height="14" rx="2" fill="#F1EFE8" stroke="#5F5E5A" stroke-dasharray="3 2"/><text class="ts" x="242" y="338">AWS가 운영</text>
+<text class="ts" x="340" y="338">실선: 쓰기 · 점선: PromQL 조회</text>
+<text class="ts" x="30" y="364">Grafana는 변수 grafana로 둘 중 하나만 만든다. 조회 role은 쓰기 권한이 없다</text>
+</svg>
