@@ -7,7 +7,7 @@
       "name": "akbun-ai-useage",
       "description": "Claude Code, Codex, Kiro의 구독 한도, 토큰, 조직 비용을 메뉴바에 표시하는 macOS 메뉴바 앱",
       "kind": "desktop",
-      "tags": ["electron", "claude", "codex", "kiro", "menubar"],
+      "tags": ["tauri", "rust", "claude", "codex", "kiro", "menubar"],
       "released": "2026-09-23"
     },
     {

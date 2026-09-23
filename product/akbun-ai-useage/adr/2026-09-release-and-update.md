@@ -2,10 +2,10 @@
 
 ## Decision
 
-A master push builds an unsigned arm64 dmg, tags `akbun-ai-useage-v<version>` from `workspace/package.json`, and publishes a release with the `xattr -cr` note. Check for Updates… in the tray menu swaps the bundle with the dmg, ported from akbun-screenshot.
+A master push builds an unsigned arm64 dmg with tauri-action, which creates the release and tag `akbun-ai-useage-v<version>`. The updater plugin reads `latest.json` from the fixed tag `akbun-ai-useage-updater`, and Check for Updates… in the tray menu installs and restarts.
 
 ## Reason
 
-- Same workflow as akbun-screenshot: build, then tag, then release, so a failed build leaves no tag.
-- Squirrel.Mac cannot install an unsigned build. The ported dmg swap keeps all three temp cleanup points and the test that fails if one disappears.
-- Only macOS ships now. Windows would use electron-updater with `verifyUpdateCodeSignature: false` instead of the dmg path, and the menu already falls back to opening the release page on other platforms.
+- Same workflow as akbun-awsviewer, a macOS Tauri app already shipping: the version is computed from the latest tag and package.json, and an existing tag fails the job instead of republishing over a release.
+- Several products release from this repository, so `releases/latest` belongs to whichever shipped last. A fixed tag per product keeps the manifest reachable.
+- The app has its own signing key, stored as `TAURI_SIGNING_PRIVATE_KEY_AIUSEAGE`, like the other products.

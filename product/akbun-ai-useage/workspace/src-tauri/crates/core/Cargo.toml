@@ -1,0 +1,15 @@
+[package]
+name = "usage-core"
+version = "0.1.0"
+description = "Usage sources, aggregation and menu text for akbun-ai-useage"
+edition = "2021"
+license = "MIT"
+
+# No tauri here, so the pull request job tests this crate on Linux without
+# installing GTK and WebKit.
+
+[dependencies]
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "3", features = ["json"] }

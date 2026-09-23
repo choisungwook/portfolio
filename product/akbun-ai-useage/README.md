@@ -12,7 +12,7 @@ Menu bar app that shows how much Claude Code, Codex and Kiro have been used. The
 
 Local logs count usage on this machine under any plan, subscription or API key. The Admin API sources count the whole organization, which is the only view of Enterprise or API usage that did not go through this machine.
 
-The app is macOS first. The code runs on Windows and Linux, but only a macOS build ships for now.
+Built with Tauri and Rust, with no webview UI: the tray menu is native on every platform. The release binary is about 7 MB. The app is macOS first; the code builds on Windows and Linux, but only a macOS dmg ships for now.
 
 ## Directory layout
 
@@ -25,7 +25,7 @@ The app is macOS first. The code runs on Windows and Linux, but only a macOS bui
 
 ## Quick start
 
-Install dependencies and launch the app:
+Install the Tauri CLI and launch the app. Rust stable is required:
 
 ```bash
 cd workspace
