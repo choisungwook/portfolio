@@ -1,0 +1,31 @@
+# 로컬 확인용. AWS 자격 증명 없이 app과 수집기 설정만 검증한다.
+# 수집기는 ECS와 같은 config.yaml을 쓰고, 두 파이프라인의 목적지만 debug(stdout)로 바꾼다.
+services:
+  app:
+    image: python:3.13-slim
+    command: sh -c "pip install -q prometheus-client==0.26.0 && python -u /app/app.py"
+    volumes:
+      - ./app:/app:ro
+    deploy:
+      replicas: 2
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command:
+      - --config=/etc/otelcol/config.yaml
+      - "--config=yaml:exporters::debug::verbosity: basic"
+      - "--config=yaml:service::pipelines::metrics/cloudwatch::exporters: [debug]"
+      - "--config=yaml:service::pipelines::metrics/amp::exporters: [debug]"
+    environment:
+      AWS_REGION: ap-northeast-2
+      # sigv4auth는 쓰이지 않아도 기동할 때 자격 증명을 찾는다. 검증만 통과시키는 가짜 값이고 AWS로는 아무것도 보내지 않는다.
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AMP_REMOTE_WRITE_URL: http://unused.local
+      SCRAPE_DNS_NAME: app
+    volumes:
+      - ./collector/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      # 수집기 자체 metric. 파이프라인별 전송 수를 본다.
+      - "8888:8888"
+    depends_on: [app]

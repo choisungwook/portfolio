@@ -1,0 +1,30 @@
+<svg width="100%" viewBox="0 0 680 420" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Grafana 직접 운영과 AMG</title>
+<desc>위는 ECS에 Grafana를 직접 띄워 ALB와 IP 제한으로 여는 구조, 아래는 AMG가 Identity Center 로그인을 받고 workspace role로 조회하는 구조다.</desc>
+<defs><style>@import url(style.css);</style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#888780"/></marker></defs>
+<text class="th" x="30" y="28">① grafana = ecs: 직접 운영 (기본)</text>
+<g class="n-gray"><rect x="30" y="72" width="90" height="56" rx="4"/><text class="th" x="75" y="96" text-anchor="middle">사용자</text><text class="ts" x="75" y="114" text-anchor="middle">내 IP</text></g>
+<rect class="b" x="150" y="42" width="300" height="116" rx="8"/><text class="ts" x="164" y="62">내 계정 VPC</text>
+<g class="n-teal"><rect x="166" y="72" width="100" height="56" rx="4"/><text class="th" x="216" y="96" text-anchor="middle">ALB</text><text class="ts" x="216" y="114" text-anchor="middle">IP 제한</text></g>
+<g class="n-teal"><rect x="290" y="72" width="144" height="56" rx="4"/><text class="th" x="362" y="96" text-anchor="middle">Grafana task</text><text class="ts" x="362" y="114" text-anchor="middle">task role</text></g>
+<line class="w" x1="120" y1="100" x2="164" y2="100" marker-end="url(#a)"/>
+<line class="w" x1="266" y1="100" x2="288" y2="100" marker-end="url(#a)"/>
+<g class="n-coral"><rect x="500" y="50" width="150" height="44" rx="4"/><text class="th" x="575" y="77" text-anchor="middle">AMP</text></g>
+<g class="n-coral"><rect x="500" y="106" width="150" height="44" rx="4"/><text class="th" x="575" y="133" text-anchor="middle">CloudWatch</text></g>
+<line class="r" x1="434" y1="92" x2="498" y2="72" marker-end="url(#a)"/>
+<line class="r" x1="434" y1="108" x2="498" y2="128" marker-end="url(#a)"/>
+<text class="th" x="30" y="208">② grafana = amg: AWS 관리형</text>
+<g class="n-gray"><rect x="30" y="252" width="90" height="56" rx="4"/><text class="th" x="75" y="276" text-anchor="middle">사용자</text><text class="ts" x="75" y="294" text-anchor="middle">어디서나</text></g>
+<rect class="b" x="150" y="222" width="300" height="116" rx="8"/><text class="ts" x="164" y="242">AWS가 운영</text>
+<g class="n-gray"><rect x="166" y="252" width="100" height="56" rx="4" stroke-dasharray="4 3"/><text class="th" x="216" y="276" text-anchor="middle">Identity</text><text class="ts" x="216" y="294" text-anchor="middle">Center 로그인</text></g>
+<g class="n-gray"><rect x="290" y="252" width="144" height="56" rx="4" stroke-dasharray="4 3"/><text class="th" x="362" y="276" text-anchor="middle">AMG</text><text class="ts" x="362" y="294" text-anchor="middle">workspace role</text></g>
+<line class="w" x1="120" y1="280" x2="164" y2="280" marker-end="url(#a)"/>
+<line class="w" x1="266" y1="280" x2="288" y2="280" marker-end="url(#a)"/>
+<g class="n-coral"><rect x="500" y="230" width="150" height="44" rx="4"/><text class="th" x="575" y="257" text-anchor="middle">AMP</text></g>
+<g class="n-coral"><rect x="500" y="286" width="150" height="44" rx="4"/><text class="th" x="575" y="313" text-anchor="middle">CloudWatch</text></g>
+<line class="r" x1="434" y1="272" x2="498" y2="252" marker-end="url(#a)"/>
+<line class="r" x1="434" y1="288" x2="498" y2="308" marker-end="url(#a)"/>
+<text class="ts" x="30" y="372">바뀌는 것은 가운데 경계뿐이다. datasource 정의와 대시보드 JSON, 조회 권한은 같다</text>
+<text class="ts" x="30" y="396">실선: 접속 · 점선: PromQL 조회</text>
+</svg>

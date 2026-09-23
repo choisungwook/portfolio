@@ -1,0 +1,28 @@
+# 같은 plugin(Amazon Managed Service for Prometheus)으로 두 저장소를 붙인다.
+# 차이는 URL과 SigV4 서비스 이름(aps, monitoring)뿐이다. 자격 증명은 Grafana task role이다.
+apiVersion: 1
+
+datasources:
+  - name: AMP
+    uid: amp
+    type: grafana-amazonprometheus-datasource
+    url: ${AMP_QUERY_URL}
+    access: proxy
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      sigV4Auth: true
+      sigV4AuthType: default
+      sigV4Region: ${AWS_REGION}
+
+  - name: CloudWatch PromQL
+    uid: cloudwatch
+    type: grafana-amazonprometheus-datasource
+    url: https://monitoring.${AWS_REGION}.amazonaws.com
+    access: proxy
+    jsonData:
+      httpMethod: POST
+      sigV4Auth: true
+      sigV4AuthType: default
+      sigV4Region: ${AWS_REGION}
+      sigv4Service: monitoring

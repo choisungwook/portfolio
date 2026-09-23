@@ -116,6 +116,7 @@
 102. LiteLLM spend와 Bedrock 청구(Cost Explorer)가 다른 이유: 응답 캐시·prompt caching·스트림 중단 시나리오 (26.9.20) - [링크](./computer_science/ai/litellm/scenarios/bedrock-cost/)
 103. LiteLLM(ECS) 멀티 계정 모니터링 방안 비교: 계정별 CloudWatch, OAM, VictoriaMetrics+Grafana, AMP+AMG와 비용 계산 (26.9.23) - [링크](./aws/cloudwatch/multi-account-litellm/)
 104. Bottlerocket 원리와 EKS 노드 긴급 접속 3가지 경로, EC2 단독 실습과 운영 주의사항 (26.9.23) - [링크](./aws/bottlerocket/)
+105. CloudWatch OTLP+PromQL과 AMP에 같은 metric을 넣고 비교: ECS 수집기, label·histogram·p95 차이, ECS Grafana와 AMG (26.9.23) - [링크](./aws/cloudwatch/otlp-promql-amp/)
 
 ## 직접 만든 제품
 

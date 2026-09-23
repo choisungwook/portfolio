@@ -1,0 +1,70 @@
+# demo app replica를 하나씩 긁어 같은 데이터를 두 저장소로 보낸다.
+# - CloudWatch: OTLP HTTP endpoint, SigV4 service monitoring
+# - AMP: Prometheus remote write, SigV4 service aps
+# 자격 증명은 ECS task role에서 받는다. 키를 설정이나 환경 변수에 두지 않는다.
+extensions:
+  sigv4auth/cloudwatch:
+    service: monitoring
+    region: ${env:AWS_REGION}
+  sigv4auth/amp:
+    service: aps
+    region: ${env:AWS_REGION}
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: demo
+          scrape_interval: 30s
+          # 이름 하나로 replica 전부를 A 레코드로 찾는다. replica마다 instance label이 다르다.
+          # 로컬은 compose 서비스 이름(app), ECS는 Cloud Map 이름(app.<namespace>)이다.
+          # flow 문법([...]) 안에 ${env:...}를 쓰면 --config=env: 로 읽을 때 YAML 파싱이 깨진다.
+          dns_sd_configs:
+            - names:
+                - ${env:SCRAPE_DNS_NAME}
+              type: A
+              port: 8000
+
+processors:
+  # CloudWatch OTLP endpoint는 요청당 datapoint 1,000개를 넘으면 400으로 거절한다.
+  batch:
+    send_batch_size: 500
+    send_batch_max_size: 1000
+    timeout: 10s
+  # CloudWatch는 cumulative datapoint에 StartTimeUnixNano가 없으면 버린다(partial success).
+  # Prometheus 형식에서 _created가 없는 counter(process_*, python_gc_* 등)는 시작 시각이 비어 있다.
+  # 처음 본 값을 기준점으로 삼아 시작 시각을 채운다. AMP(remote write)는 시작 시각이 필요 없다.
+  metric_start_time:
+    strategy: true_reset_point
+
+exporters:
+  otlp_http/cloudwatch:
+    metrics_endpoint: https://monitoring.${env:AWS_REGION}.amazonaws.com/v1/metrics
+    compression: gzip
+    auth:
+      authenticator: sigv4auth/cloudwatch
+  prometheus_remote_write/amp:
+    endpoint: ${env:AMP_REMOTE_WRITE_URL}
+    auth:
+      authenticator: sigv4auth/amp
+
+service:
+  # 수집기 자체 metric(otelcol_exporter_sent_metric_points 등)을 호스트에서 볼 수 있게 연다.
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  extensions: [sigv4auth/cloudwatch, sigv4auth/amp]
+  pipelines:
+    metrics/cloudwatch:
+      receivers: [prometheus]
+      processors: [metric_start_time, batch]
+      exporters: [otlp_http/cloudwatch]
+    metrics/amp:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [prometheus_remote_write/amp]

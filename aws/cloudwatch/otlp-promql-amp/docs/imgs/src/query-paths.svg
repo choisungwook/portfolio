@@ -1,0 +1,19 @@
+<svg width="100%" viewBox="0 0 680 330" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>PromQL 조회 경로</title>
+<desc>CLI, CloudWatch 대시보드, Grafana가 같은 PromQL API를 부른다. AMP는 aps, CloudWatch는 monitoring으로 서명한다.</desc>
+<defs><style>@import url(style.css);</style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#888780"/></marker></defs>
+<rect class="b" x="30" y="30" width="230" height="250" rx="8"/><text class="ts" x="44" y="50">조회하는 쪽 · 서명 주체</text>
+<g class="n-gray"><rect x="46" y="64" width="198" height="52" rx="4"/><text class="th" x="145" y="86" text-anchor="middle">scripts/promql.sh</text><text class="ts" x="145" y="104" text-anchor="middle">내 AWS_PROFILE</text></g>
+<g class="n-gray"><rect x="46" y="130" width="198" height="52" rx="4" stroke-dasharray="4 3"/><text class="th" x="145" y="152" text-anchor="middle">CW 대시보드</text><text class="ts" x="145" y="170" text-anchor="middle">콘솔 로그인 사용자</text></g>
+<g class="n-teal"><rect x="46" y="196" width="198" height="64" rx="4"/><text class="th" x="145" y="220" text-anchor="middle">Grafana</text><text class="ts" x="145" y="240" text-anchor="middle">ECS task role 또는 AMG role</text></g>
+<rect class="b" x="420" y="30" width="230" height="250" rx="8"/><text class="ts" x="434" y="50">/api/v1/query</text>
+<g class="n-coral"><rect x="436" y="72" width="198" height="72" rx="4"/><text class="th" x="535" y="100" text-anchor="middle">AMP</text><text class="ts" x="535" y="120" text-anchor="middle">SigV4 service = aps</text></g>
+<g class="n-coral"><rect x="436" y="172" width="198" height="72" rx="4"/><text class="th" x="535" y="200" text-anchor="middle">CloudWatch</text><text class="ts" x="535" y="220" text-anchor="middle">SigV4 service = monitoring</text></g>
+<line class="r" x1="244" y1="84" x2="434" y2="100" marker-end="url(#a)"/>
+<line class="r" x1="244" y1="96" x2="434" y2="196" marker-end="url(#a)"/>
+<line class="r" x1="244" y1="156" x2="434" y2="210" marker-end="url(#a)"/>
+<line class="r" x1="244" y1="220" x2="434" y2="116" marker-end="url(#a)"/>
+<line class="r" x1="244" y1="236" x2="434" y2="226" marker-end="url(#a)"/>
+<text class="ts" x="30" y="312">CW 대시보드만 CloudWatch 전용이다. 나머지는 서명 서비스 이름만 바꿔 두 저장소를 모두 조회한다</text>
+</svg>
