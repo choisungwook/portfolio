@@ -1,7 +1,6 @@
 # LLM gateway를 흉내 내는 demo app. 스스로 요청을 만들어 counter와 histogram을 /metrics로 노출한다.
 # 외부 호출이 없어 비용 없이 model·team·status 조합의 series가 쌓인다.
 import random
-import threading
 import time
 
 from prometheus_client import Counter, Histogram, start_http_server
