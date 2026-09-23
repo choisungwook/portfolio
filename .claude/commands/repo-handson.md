@@ -53,13 +53,6 @@ workspace 루트에 `AGENTS.md`를 만들고 다음을 담는다.
 - 기본은 docker compose. `compose.yaml`을 workspace 루트에 둔다.
 - compose까지 필요 없으면 macOS 기준 CLI 명령으로 대체한다. (brew, 기본 유틸)
 
-## 이미지를 받을 수 없는 환경
-
-네트워크 정책으로 docker image pull이 막히면 compose를 띄우지 못한다. 이때 compose가 쓰는 설정 파일을 그대로 두고 같은 버전의 프로그램을 PyPI나 GitHub release 바이너리로 직접 띄워 검증한다.
-
-- compose 서비스 이름은 `/etc/hosts`에 loopback 주소(127.0.2.x)로 적어 흉내 낸다. replica 여러 개는 같은 이름에 주소를 여러 줄 적는다.
-- compose 자체를 띄우지 못했다는 사실은 workspace AGENTS.md의 검증 상태에 남긴다.
-
 ## VM이 필요할 때
 
 - AWS EC2를 쓰고 기본은 arm 인스턴스(t4g.medium)로 한다. 사용자가 x86을 요청하면 t3.medium을 쓰고 AMI 아키텍처도 함께 바꾼다.
