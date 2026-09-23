@@ -119,6 +119,7 @@ body 형식의 기준은 [.github/pull_request_template.md](../../.github/pull_r
 
 - PR을 쓰기 전에 템플릿을 읽고 그 섹션과 형식을 그대로 따른다.
 - PR을 만들기 직전에 현재 branch 이름을 확인한다. `<type>/<short-description>` 형식이 아니면 그 형식으로 바꾸고 push한 뒤 PR을 만든다. 도구가 만든 이름은 작업 내용을 설명하지 않으므로 이 시점에만 손댄다.
+  - 실행 환경이 지정한 branch에만 push하도록 제한하면(클라우드 세션 등) 이름을 바꾸지 않고 결과 보고에 건너뛴 단계로 남긴다.
 - 섹션마다 요약 한 줄과 근거 최대 1개다. 쓸 내용이 없는 섹션은 헤더째 지운다.
 - 본문 끝에 기록용 issue를 `Issue #<number>` 형식으로 링크한다.
 - target branch는 `master`로 설정한다.
