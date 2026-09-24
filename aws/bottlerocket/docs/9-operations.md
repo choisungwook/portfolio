@@ -1,10 +1,10 @@
 # Bottlerocket 운영 주의사항
 
-Bottlerocket을 EKS 노드로 운영할 때 AL2023 노드와 판단이 달라지는 지점을 모았다. 원리는 [1-concepts.md](1-concepts.md)에 있고, 이 문서는 실습에서 겪은 것이 쌓이면 갱신한다.
+Bottlerocket을 EKS 노드로 운영할 때 AL2023 노드와 판단이 달라지는 지점을 모았다. 원리는 [2-concepts.md](2-concepts.md)에 있고, 이 문서는 실습에서 겪은 것이 쌓이면 갱신한다.
 
 ## 업데이트는 노드그룹 AMI 교체를 기본으로 한다
 
-업데이트 수단은 세 가지다. 노드를 누가 관리하느냐에 따라 고른다.
+업데이트 수단은 3가지다. 노드를 누가 관리하느냐에 따라 고른다.
 
 | 수단 | 방식 | 맞는 노드 |
 |---|---|---|
@@ -42,10 +42,10 @@ sysctl을 TOML로 넣는 형태는 다음과 같다. 키에 점이 들어가므�
 - 이 핸즈온이 쓰는 terraform_practice EKS 모듈은 `/dev/xvda`만 잡는다. 그래서 데이터 볼륨은 AMI 기본 20GiB 그대로다
 - 볼륨을 키운 뒤 재부팅하면 데이터 파티션이 늘어난다
 
-## SELinux 때문에 AL2023에서 되던 hostPath 쓰기가 막힐 수 있다
+## SELinux 때문에 AL2023에서 되던 hostPath 쓰기가 거부될 수 있다
 
 - SELinux는 enforcing이고 끌 수 없다. root 권한이나 privileged 컨테이너도 정책을 따른다
-- 정책의 목표는 세 가지다. API 설정 직접 수정 금지, 디스크에 저장된 컨테이너 이미지 수정 금지, 다른 컨테이너 layer 수정 금지
+- 정책의 목표는 3가지다. API 설정 직접 수정 금지, 디스크에 저장된 컨테이너 이미지 수정 금지, 다른 컨테이너 layer 수정 금지
 - hostPath로 host 경로에 쓰는 워크로드는 Bottlerocket 노드로 옮기기 전에 먼저 돌려 본다. AL2023에서 permissive라 드러나지 않던 거부가 여기서 나온다
 - 로그 에이전트처럼 host 로그를 읽어야 하는 DaemonSet은 벤더가 Bottlerocket 지원을 명시했는지 확인한다
 
@@ -76,7 +76,7 @@ kubectl get --raw "/api/v1/nodes/$NODE/proxy/logs/support/bottlerocket-logs.tar.
 
 ## TOML 오류는 진단이 느리다
 
-- TOML 문법이 틀리면 노드가 조인하지 않는다. 원인을 볼 수단은 EC2 시리얼 콘솔 출력과 SSM 세션뿐이다
+- TOML 문법이 틀리면 노드가 조인하지 않는다. 원인을 볼 수단은 EC2 시리얼 콘솔 출력과 SSM 세션뿐이다. 진단 절차는 [7-setup-eks.md](7-setup-eks.md)의 "노드가 조인하지 않을 때"에 있다
 - user data는 작은 단위로 늘리며 검증한다. 한 번에 여러 섹션을 넣고 조인이 실패하면 어느 줄인지 찾기 어렵다
 - 넣기 전에 로컬 TOML 파서로 먼저 검사한다
 
