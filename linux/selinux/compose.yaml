@@ -1,0 +1,7 @@
+# 커널 dm-verity 없이 veritysetup의 사용자 공간 검증만 쓴다. privileged가 필요 없다
+services:
+  verity:
+    build: .
+    command: sleep infinity
+    volumes:
+      - ./scripts:/scripts:ro
