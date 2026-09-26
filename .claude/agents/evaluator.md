@@ -24,9 +24,10 @@ A GitHub Issue with the work specification and the Generator's progress comments
 
 PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rules/workflow.md](../rules/workflow.md)의 "Issue와 PR 공통 작성 규칙"이 기준이다.
 
-- 섹션 구성: 구현, 어려웠던 점, 리스크 순서인가? 쓸 내용이 없는 섹션은 헤더째 지웠는가?
-- 항목 형식: 섹션마다 요약 한 줄과 근거 최대 1개인가? 개조식이고 backtick이 없는가? (workflow.md 공통 작성 규칙)
-- 역할 분리: 목표와 의사결정은 Issue에만 있고 PR은 Issue 링크로 대체했는가?
+- 섹션 구성: 구현, 검증, 어려웠던 점, 리스크 순서인가? 쓸 내용이 없는 섹션은 헤더째 지웠는가? body가 40줄 이내인가?
+- 검증: Issue의 완료 조건마다 한 줄씩 답했는가? 실행하지 않은 조건을 검증하지 않음으로 적었는가?
+- 항목 형식: 요약형 절(구현, 어려웠던 점, 리스크)은 요약 한 줄과 근거 항목 최대 2개, 목록형 절(검증)은 요약 없이 항목 하나에 확인 하나인가? 개조식이고 backtick이 없는가? (workflow.md 공통 작성 규칙)
+- 역할 분리: 왜, 완료 조건, 의사결정은 Issue에만 있고 PR은 Issue 링크로 대체했는가?
 - 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
 </rubrics>
 
@@ -54,6 +55,7 @@ PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_r
 
 ### PR body (PR이 열려 있을 때)
 - 섹션 구성: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 검증: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 항목 형식: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 역할 분리: [PASS/NEEDS_WORK/FAIL] — (근거)
 - target branch / label: [PASS/NEEDS_WORK/FAIL] — (근거)
