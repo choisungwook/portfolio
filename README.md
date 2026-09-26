@@ -117,6 +117,7 @@
 103. LiteLLM(ECS) 멀티 계정 모니터링 방안 비교: 계정별 CloudWatch, OAM, VictoriaMetrics+Grafana, AMP+AMG와 비용 계산 (26.9.23) - [링크](./aws/cloudwatch/multi-account-litellm/)
 104. Bottlerocket 입문 핸즈온: 원리, EC2 단독 접속·설정·A/B 업데이트, EKS NotReady 노드 긴급 접속 3가지 경로 (26.9.23) - [링크](./aws/bottlerocket/)
 105. CloudWatch OTLP+PromQL과 AMP에 같은 metric을 넣고 비교: ECS 수집기, label·histogram·p95 차이, ECS Grafana와 AMG (26.9.23) - [링크](./aws/cloudwatch/otlp-promql-amp/)
+106. SELinux와 dm-verity 이론과 핸즈온: label·boolean·포트 거부 재현, 해시 트리 변조 탐지, Bottlerocket 적용 방식 (26.9.24) - [링크](./linux/selinux/)
 
 ## 직접 만든 제품
 

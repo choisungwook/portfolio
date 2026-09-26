@@ -1,0 +1,719 @@
+<title>SELinux와 dm-verity 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f3f5f4;
+  --panel: #ffffff;
+  --ink: #18222d;
+  --muted: #5b6874;
+  --line: #d5dcdf;
+  --accent: #0f6e74;
+  --accent-soft: #dcefef;
+  --allow: #2b7a3b;
+  --allow-soft: #e1f2e3;
+  --deny: #b3261e;
+  --deny-soft: #f8e1df;
+  --warn: #9a6700;
+  --warn-soft: #fbefd5;
+  --code-bg: #eef1f0;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #11171c;
+    --panel: #182129;
+    --ink: #e3e9ec;
+    --muted: #93a2ad;
+    --line: #2c3a45;
+    --accent: #4fb8bd;
+    --accent-soft: #173a3d;
+    --allow: #6cc47c;
+    --allow-soft: #1a3322;
+    --deny: #f08a80;
+    --deny-soft: #3d1f1d;
+    --warn: #e0b04a;
+    --warn-soft: #3a2f16;
+    --code-bg: #0e1418;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11171c;
+  --panel: #182129;
+  --ink: #e3e9ec;
+  --muted: #93a2ad;
+  --line: #2c3a45;
+  --accent: #4fb8bd;
+  --accent-soft: #173a3d;
+  --allow: #6cc47c;
+  --allow-soft: #1a3322;
+  --deny: #f08a80;
+  --deny-soft: #3d1f1d;
+  --warn: #e0b04a;
+  --warn-soft: #3a2f16;
+  --code-bg: #0e1418;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+  display: grid;
+  gap: 36px;
+}
+header h1 {
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1.25;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+header p { margin: 0; color: var(--muted); max-width: 68ch; }
+nav.jump { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+nav.jump a {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+}
+section { display: grid; gap: 16px; }
+section > h2 { margin: 0; font-size: 22px; text-wrap: balance; }
+section > .lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.grid2 { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.field { display: grid; gap: 6px; }
+.field > label, .field > .label {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 500;
+}
+select {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+}
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 6px;
+  border: 0;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); font-weight: 500; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible, .blk:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.ctx {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.ctx b { color: var(--accent); font-weight: 600; }
+.ctx i { color: var(--warn); font-style: normal; }
+ol.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: s; }
+ol.flow li {
+  counter-increment: s;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+ol.flow li::before {
+  content: counter(s);
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--line);
+  color: var(--ink);
+}
+ol.flow li.skip { opacity: 0.45; }
+ol.flow .t { font-weight: 500; font-size: 14px; }
+ol.flow .d { font-size: 13px; color: var(--muted); }
+.pill {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.pill.ok { background: var(--allow-soft); color: var(--allow); }
+.pill.no { background: var(--deny-soft); color: var(--deny); }
+.pill.lg { background: var(--warn-soft); color: var(--warn); }
+.pill.na { background: var(--code-bg); color: var(--muted); }
+.verdict {
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+}
+.verdict.ok { background: var(--allow-soft); border-color: var(--allow); }
+.verdict.no { background: var(--deny-soft); border-color: var(--deny); }
+.verdict.lg { background: var(--warn-soft); border-color: var(--warn); }
+.verdict strong { font-size: 16px; }
+.verdict span { font-size: 13.5px; }
+pre.log {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink);
+}
+.fix { font-size: 13.5px; margin: 0; }
+.fix code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+/* dm-verity */
+.tree-wrap { overflow-x: auto; }
+svg.tree { display: block; width: 100%; min-width: 620px; height: auto; }
+svg.tree text { font-family: var(--mono); fill: var(--ink); }
+svg.tree .lvl { fill: var(--muted); font-size: 11px; }
+svg.tree .edge { stroke: var(--line); stroke-width: 1.5; fill: none; }
+svg.tree .edge.hot { stroke: var(--accent); stroke-width: 2.5; }
+svg.tree .edge.bad { stroke: var(--deny); stroke-width: 2.5; }
+svg.tree .node rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+svg.tree .node.hot rect { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+svg.tree .node.bad rect { stroke: var(--deny); stroke-width: 2; fill: var(--deny-soft); }
+svg.tree .node.root rect { stroke: var(--warn); stroke-width: 2; }
+svg.tree .node text { font-size: 10.5px; }
+svg.tree .node .nm { font-size: 11px; font-weight: 600; }
+svg.tree .blk { cursor: pointer; }
+svg.tree .blk.corrupt rect { fill: var(--deny-soft); stroke: var(--deny); stroke-dasharray: 4 3; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 500; }
+.btn.danger { color: var(--deny); border-color: var(--deny); }
+.roots { display: grid; gap: 6px; font-size: 13px; }
+.roots div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; align-items: center; }
+.roots .mono { overflow-wrap: anywhere; }
+.roots .mismatch { color: var(--deny); font-weight: 600; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+.cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cmp th, .cmp td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+.cmp th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+.tbl { overflow-x: auto; }
+footer { font-size: 12.5px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Bottlerocket 보안 기능 실습 보조</div>
+    <h1>SELinux와 dm-verity 시뮬레이터</h1>
+    <p>SELinux는 실행 중인 프로세스가 무엇을 할 수 있는지 제한하고, dm-verity는 디스크의 OS 이미지가 빌드한 그대로인지 블록마다 검증합니다. 두 기능을 직접 조작해 판정 과정을 따라가 봅니다.</p>
+    <nav class="jump">
+      <a href="#selinux">SELinux 접근 판정</a>
+      <a href="#verity">dm-verity 해시 트리</a>
+      <a href="#compare">둘의 역할 비교</a>
+    </nav>
+  </header>
+
+  <section id="selinux">
+    <div class="eyebrow">1 · Type Enforcement와 MCS</div>
+    <h2>이 접근은 허용될까?</h2>
+    <p class="lede">프로세스(subject)와 대상(object)의 label을 고르면 커널이 거치는 검사 순서와 결과, 거부될 때 audit.log에 남는 AVC 한 줄을 보여 줍니다. 규칙은 RHEL 계열 targeted 정책과 container-selinux 정책을 단순화했습니다.</p>
+    <div class="grid2">
+      <div class="panel">
+        <div class="field">
+          <label for="subj">프로세스 (subject)</label>
+          <select id="subj"></select>
+          <div class="ctx" id="subjCtx"></div>
+        </div>
+        <div class="field">
+          <label for="obj">대상 (object)</label>
+          <select id="obj"></select>
+          <div class="ctx" id="objCtx"></div>
+        </div>
+        <div class="field">
+          <span class="label">SELinux 모드</span>
+          <div class="seg" role="group" aria-label="SELinux 모드">
+            <button type="button" id="modeEnf" aria-pressed="true">enforcing</button>
+            <button type="button" id="modePerm" aria-pressed="false">permissive</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="bool"> boolean httpd_can_network_connect</label>
+        <label class="check"><input type="checkbox" id="dac" checked> DAC(rwx 권한) 통과</label>
+      </div>
+      <div class="panel">
+        <ol class="flow" id="flow"></ol>
+        <div class="verdict" id="verdict"></div>
+        <pre class="log" id="avc" hidden></pre>
+        <p class="fix" id="fix"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="verity">
+    <div class="eyebrow">2 · Merkle 해시 트리</div>
+    <h2>블록 하나가 바뀌면 어디서 탐지될까?</h2>
+    <p class="lede">데이터 블록 8개로 만든 해시 트리입니다. 블록을 눌러 변조한 뒤 읽기를 실행하면 커널이 그 블록에서 root hash까지 올라가며 비교하는 경로를 표시합니다. 실제 dm-verity는 4KiB 블록과 SHA-256을 쓰고 해시 블록 하나에 해시 128개를 담습니다.</p>
+    <div class="panel">
+      <div class="tree-wrap"><svg class="tree" id="tree" viewBox="0 0 880 400" role="img" aria-label="dm-verity 해시 트리"></svg></div>
+      <div class="legend">
+        <span><i class="sw" style="border-color:var(--warn)"></i>root hash</span>
+        <span><i class="sw" style="border-color:var(--accent);background:var(--accent-soft)"></i>이번 읽기의 검증 경로</span>
+        <span><i class="sw" style="border-color:var(--deny);background:var(--deny-soft)"></i>불일치</span>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="readBlk">읽을 블록</label>
+          <select id="readBlk"></select>
+          <span class="label">변조 시 동작</span>
+          <div class="seg" role="group" aria-label="변조 시 동작">
+            <button type="button" data-mode="eio" aria-pressed="true">EIO (기본)</button>
+            <button type="button" data-mode="restart" aria-pressed="false">restart</button>
+            <button type="button" data-mode="ignore" aria-pressed="false">ignore</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="btnrow">
+            <button type="button" class="btn primary" id="doRead">블록 읽기</button>
+            <button type="button" class="btn danger" id="forge">공격자: 해시 트리 재생성</button>
+            <button type="button" class="btn" id="reset">원래 이미지로</button>
+          </div>
+          <div class="roots">
+            <div><span class="label">신뢰하는 root hash</span><span class="mono" id="trusted"></span></div>
+            <div><span class="label">디스크의 root hash</span><span class="mono" id="ondisk"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="verdict" id="vVerdict"></div>
+      <pre class="log" id="vLog"></pre>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="eyebrow">3 · Bottlerocket에서</div>
+    <h2>둘은 서로 다른 공격을 막는다</h2>
+    <div class="tbl">
+      <table class="cmp">
+        <thead><tr><th></th><th>SELinux</th><th>dm-verity</th></tr></thead>
+        <tbody>
+          <tr><td>보호 대상</td><td>실행 중인 프로세스의 행동</td><td>디스크에 있는 OS 이미지 블록</td></tr>
+          <tr><td>판정 시점</td><td>syscall마다 LSM hook에서</td><td>블록을 읽을 때마다</td></tr>
+          <tr><td>기준</td><td>부팅 때 로드한 정책의 allow 규칙</td><td>서명된 부트 체인이 넘긴 root hash</td></tr>
+          <tr><td>위반 시</td><td>EACCES, AVC 로그</td><td>EIO, Bottlerocket은 재부팅</td></tr>
+          <tr><td>못 막는 것</td><td>정책이 허용한 행동, 커널 취약점</td><td>쓰기 가능한 파티션, 메모리 변조</td></tr>
+          <tr><td>Bottlerocket 설정</td><td>enforcing 고정, container_t · control_t · super_t</td><td>루트 파티션 전체, restart_on_corruption</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>규칙과 해시는 학습용 단순화입니다. 실제 정책 판정은 <code>sesearch</code>와 <code>audit2why</code>로, 실제 해시 트리는 <code>veritysetup format</code>으로 확인합니다.</footer>
+</div>
+
+<script>
+(() => {
+  const SUBJECTS = {
+    httpd: { name: "nginx worker", ctx: ["system_u", "system_r", "httpd_t", "s0"] },
+    c12: { name: "컨테이너 A 프로세스", ctx: ["system_u", "system_r", "container_t", "s0:c1,c2"] },
+    c34: { name: "컨테이너 B 프로세스", ctx: ["system_u", "system_r", "container_t", "s0:c3,c4"] },
+    unconf: { name: "root 로그인 셸", ctx: ["unconfined_u", "unconfined_r", "unconfined_t", "s0-s0:c0.c1023"] }
+  };
+  const OBJECTS = {
+    web: { name: "/usr/share/nginx/html/index.html (read)", ctx: ["system_u", "object_r", "httpd_sys_content_t", "s0"], cls: "file", perm: "read", nm: "index.html" },
+    moved: { name: "/root에서 mv한 moved.html (read)", ctx: ["unconfined_u", "object_r", "admin_home_t", "s0"], cls: "file", perm: "read", nm: "moved.html" },
+    cf12: { name: "컨테이너 A의 파일 (read)", ctx: ["system_u", "object_r", "container_file_t", "s0:c1,c2"], cls: "file", perm: "read", nm: "app.conf" },
+    cf34: { name: "컨테이너 B의 파일 (read)", ctx: ["system_u", "object_r", "container_file_t", "s0:c3,c4"], cls: "file", perm: "read", nm: "app.conf" },
+    port: { name: "TCP 8765 포트에 listen (name_bind)", ctx: ["system_u", "object_r", "unreserved_port_t", "s0"], cls: "tcp_socket", perm: "name_bind", nm: "src=8765" },
+    conn: { name: "127.0.0.1:9999로 proxy 연결 (name_connect)", ctx: ["system_u", "object_r", "unreserved_port_t", "s0"], cls: "tcp_socket", perm: "name_connect", nm: "dest=9999" }
+  };
+
+  function teRule(s, o, boolOn) {
+    const t = SUBJECTS[s].ctx[2];
+    const ot = OBJECTS[o].ctx[2];
+    if (t === "unconfined_t") return { ok: true, rule: "unconfined_t는 거의 모든 type에 허용 규칙이 있음" };
+    if (t === "httpd_t") {
+      if (o === "web") return { ok: true, rule: "allow httpd_t httpd_sys_content_t:file { read open getattr };" };
+      if (o === "conn") return boolOn
+        ? { ok: true, rule: "if (httpd_can_network_connect) allow httpd_t port_type:tcp_socket name_connect;" }
+        : { ok: false, rule: "httpd_can_network_connect가 off라 조건부 allow가 비활성" };
+      return { ok: false, rule: `httpd_t → ${ot}:${OBJECTS[o].cls} ${OBJECTS[o].perm} 허용 규칙 없음` };
+    }
+    if (t === "container_t") {
+      if (ot === "container_file_t") return { ok: true, rule: "allow container_t container_file_t:file { read open getattr ... };" };
+      if (OBJECTS[o].cls === "tcp_socket") return { ok: true, rule: "container-selinux는 컨테이너의 네트워크 bind·connect를 허용" };
+      return { ok: false, rule: `container_t → ${ot}:file read 허용 규칙 없음` };
+    }
+    return { ok: false, rule: "규칙 없음" };
+  }
+
+  function mcsCheck(s, o) {
+    const st = SUBJECTS[s].ctx[2];
+    if (st !== "container_t") return { apply: false, why: "이 type은 MCS 제약 대상이 아님" };
+    const sl = SUBJECTS[s].ctx[3];
+    const ol = OBJECTS[o].ctx[3];
+    if (ol === "s0") return { apply: true, ok: true, why: `대상 level s0는 모든 category가 읽을 수 있음` };
+    return sl === ol
+      ? { apply: true, ok: true, why: `category ${sl.slice(3)}가 서로 같음` }
+      : { apply: true, ok: false, why: `프로세스 ${sl.slice(3)}가 대상 ${ol.slice(3)}를 포함하지 않음` };
+  }
+
+  const $ = id => document.getElementById(id);
+  const state = { enforcing: true };
+
+  function fmtCtx(c) {
+    return `${c[0]}:${c[1]}:<b>${c[2]}</b>:<i>${c[3]}</i>`;
+  }
+
+  function fill(sel, map) {
+    for (const [k, v] of Object.entries(map)) {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = v.name;
+      sel.appendChild(opt);
+    }
+  }
+
+  function li(title, desc, pillCls, pillText, skip) {
+    return `<li class="${skip ? "skip" : ""}"><div><div class="t">${title}</div><div class="d">${desc}</div></div><span class="pill ${pillCls}">${pillText}</span></li>`;
+  }
+
+  function renderSe() {
+    const s = $("subj").value, o = $("obj").value;
+    const S = SUBJECTS[s], O = OBJECTS[o];
+    $("subjCtx").innerHTML = fmtCtx(S.ctx);
+    $("objCtx").innerHTML = fmtCtx(O.ctx);
+    const boolOn = $("bool").checked;
+    const dacOk = $("dac").checked;
+    const te = teRule(s, o, boolOn);
+    const mcs = mcsCheck(s, o);
+    const macOk = te.ok && (!mcs.apply || mcs.ok);
+
+    let html = li("syscall 진입", `${O.cls === "file" ? "open()/read()" : O.perm === "name_bind" ? "bind()" : "connect()"} 호출`, "na", "진입");
+    html += li("DAC 검사", "소유자·그룹·rwx 비트. root는 대부분 통과", dacOk ? "ok" : "no", dacOk ? "통과" : "EACCES");
+    const macRun = dacOk;
+    html += li("LSM hook → SELinux", "커널이 security server에 판정을 물음. 결과는 AVC 캐시에 남음", macRun ? "na" : "na", macRun ? "질의" : "생략", !macRun);
+    html += li("Type Enforcement", te.rule, te.ok ? "ok" : "no", te.ok ? "allow" : "deny", !macRun);
+    html += li("MCS 제약", mcs.why, !mcs.apply ? "na" : mcs.ok ? "ok" : "no", !mcs.apply ? "해당 없음" : mcs.ok ? "통과" : "deny", !macRun || !mcs.apply);
+    $("flow").innerHTML = html;
+
+    const v = $("verdict");
+    const avc = $("avc");
+    avc.hidden = true;
+    if (!dacOk) {
+      v.className = "verdict no";
+      v.innerHTML = `<strong>거부 · EACCES</strong><span>DAC에서 먼저 거부되어 SELinux까지 가지 않습니다. AVC 로그도 남지 않습니다.</span>`;
+      $("fix").innerHTML = "SELinux와 무관한 권한 문제입니다. <code>ls -l</code>로 소유자와 rwx를 봅니다.";
+      return;
+    }
+    if (macOk) {
+      v.className = "verdict ok";
+      v.innerHTML = `<strong>허용</strong><span>DAC와 SELinux 정책을 모두 통과했습니다.</span>`;
+      $("fix").innerHTML = "";
+      return;
+    }
+    const denyAvc = `type=AVC msg=audit(1727165000.123:412): avc:  denied  { ${O.perm} } for  pid=2481 comm="${s === "httpd" ? "nginx" : s === "unconf" ? "bash" : "app"}" ${O.cls === "file" ? `name="${O.nm}"` : O.nm} scontext=${S.ctx.join(":")} tcontext=${O.ctx.join(":")} tclass=${O.cls} permissive=${state.enforcing ? 0 : 1}`;
+    avc.textContent = denyAvc;
+    avc.hidden = false;
+    if (state.enforcing) {
+      v.className = "verdict no";
+      v.innerHTML = `<strong>거부 · EACCES</strong><span>DAC는 통과했지만 SELinux 정책이 거부했습니다. root 프로세스라도 결과는 같습니다.</span>`;
+    } else {
+      v.className = "verdict lg";
+      v.innerHTML = `<strong>허용 · 로그만 기록</strong><span>permissive라 실제로는 허용하고 거부했을 내용만 기록합니다. <code>permissive=1</code>로 구분합니다.</span>`;
+    }
+    const fixes = {
+      moved: "label 문제입니다. <code>mv</code>는 원래 label을 유지합니다. <code>restorecon -v 파일</code>로 경로 규칙의 label로 되돌립니다.",
+      port: "포트 label 문제입니다. <code>semanage port -a -t http_port_t -p tcp 8765</code>",
+      conn: "boolean으로 켜는 동작입니다. <code>setsebool -P httpd_can_network_connect on</code>",
+      cf12: "다른 컨테이너의 파일입니다. MCS가 컨테이너끼리 격리하는 동작이라 고칠 대상이 아닙니다.",
+      cf34: "다른 컨테이너의 파일입니다. MCS가 컨테이너끼리 격리하는 동작이라 고칠 대상이 아닙니다."
+    };
+    $("fix").innerHTML = fixes[o] || "정책이 의도적으로 막는 접근입니다. <code>audit2why</code>로 이유를 먼저 봅니다.";
+  }
+
+  fill($("subj"), SUBJECTS);
+  fill($("obj"), OBJECTS);
+  $("subj").value = "httpd";
+  $("obj").value = "moved";
+  ["subj", "obj", "bool", "dac"].forEach(id => $(id).addEventListener("change", renderSe));
+  function setMode(enf) {
+    state.enforcing = enf;
+    $("modeEnf").setAttribute("aria-pressed", String(enf));
+    $("modePerm").setAttribute("aria-pressed", String(!enf));
+    renderSe();
+  }
+  $("modeEnf").addEventListener("click", () => setMode(true));
+  $("modePerm").addEventListener("click", () => setMode(false));
+  renderSe();
+
+  // dm-verity
+  const N = 8;
+  const ORIGINAL = ["bin/sh", "bin/containerd", "bin/runc", "lib/libc.so", "etc/os-release", "usr/kubelet", "usr/apiserver", "boot/modules"];
+  const v = { data: ORIGINAL.slice(), tree: null, trusted: null, mode: "eio", path: null, badAt: null, lastRead: null };
+
+  function h(str) {
+    let a = 0x811c9dc5, b = 0x01000193 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      a = Math.imul(a ^ c, 0x01000193) >>> 0;
+      b = Math.imul(b + c, 0x85ebca6b) >>> 0;
+      b ^= b >>> 13;
+    }
+    return (a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0"));
+  }
+
+  function build(data) {
+    const levels = [data.map((d, i) => h("blk" + i + ":" + d))];
+    while (levels[levels.length - 1].length > 1) {
+      const prev = levels[levels.length - 1];
+      const next = [];
+      for (let i = 0; i < prev.length; i += 2) next.push(h(prev[i] + prev[i + 1]));
+      levels.push(next);
+    }
+    return levels;
+  }
+
+  v.tree = build(v.data);
+  v.trusted = v.tree[v.tree.length - 1][0];
+
+  const W = 880, TOP = 46, GAP = 86, BW = 96, BH = 40;
+  function nodeX(level, idx, count) {
+    const slot = (W - 40) / count;
+    return 20 + slot * idx + slot / 2;
+  }
+
+  function renderTree() {
+    const svg = $("tree");
+    const L = v.tree.length;
+    const rows = [];
+    for (let lv = L - 1; lv >= 0; lv--) rows.push(lv);
+    let out = "";
+    const pos = {};
+    rows.forEach((lv, r) => {
+      const y = TOP + r * GAP;
+      v.tree[lv].forEach((_, i) => { pos[lv + ":" + i] = { x: nodeX(lv, i, v.tree[lv].length), y }; });
+    });
+    const dataY = TOP + L * GAP;
+    v.data.forEach((_, i) => { pos["d:" + i] = { x: nodeX(0, i, N), y: dataY }; });
+
+    const onPath = new Set(v.path || []);
+    const badSet = new Set(v.badAt ? [v.badAt] : []);
+    for (let lv = 1; lv < L; lv++) {
+      v.tree[lv].forEach((_, i) => {
+        [2 * i, 2 * i + 1].forEach(c => {
+          const p = pos[lv + ":" + i], q = pos[(lv - 1) + ":" + c];
+          const k1 = lv + ":" + i, k2 = (lv - 1) + ":" + c;
+          const cls = onPath.has(k1) && onPath.has(k2) ? (badSet.has(k1) || badSet.has(k2) ? "edge bad" : "edge hot") : "edge";
+          out += `<path class="${cls}" d="M${p.x} ${p.y + BH / 2} L${q.x} ${q.y - BH / 2}"></path>`;
+        });
+      });
+    }
+    v.data.forEach((_, i) => {
+      const p = pos["0:" + i], q = pos["d:" + i];
+      const cls = onPath.has("d:" + i) ? (badSet.has("0:" + i) || badSet.has("d:" + i) ? "edge bad" : "edge hot") : "edge";
+      out += `<path class="${cls}" d="M${q.x} ${q.y - BH / 2} L${p.x} ${p.y + BH / 2}"></path>`;
+    });
+
+    const labels = ["root", "level 2", "level 1", "leaf hash"];
+    rows.forEach((lv, r) => {
+      out += `<text class="lvl" x="4" y="${TOP + r * GAP - BH / 2 - 6}">${labels[r] || "level"}</text>`;
+      v.tree[lv].forEach((hash, i) => {
+        const p = pos[lv + ":" + i];
+        const k = lv + ":" + i;
+        let cls = "node";
+        if (lv === L - 1) cls += " root";
+        if (onPath.has(k)) cls += badSet.has(k) ? " bad" : " hot";
+        const nm = lv === L - 1 ? "root" : lv === 0 ? `H${i}` : `H${lv}.${i}`;
+        out += `<g class="${cls}"><rect x="${p.x - BW / 2}" y="${p.y - BH / 2}" width="${BW}" height="${BH}" rx="6"></rect>`;
+        out += `<text class="nm" x="${p.x}" y="${p.y - 3}" text-anchor="middle">${nm}</text>`;
+        out += `<text x="${p.x}" y="${p.y + 12}" text-anchor="middle">${hash.slice(0, 10)}…</text></g>`;
+      });
+    });
+    out += `<text class="lvl" x="4" y="${dataY - BH / 2 - 6}">data block (클릭해 변조)</text>`;
+    v.data.forEach((d, i) => {
+      const p = pos["d:" + i];
+      const corrupt = d !== ORIGINAL[i];
+      let cls = "node blk" + (corrupt ? " corrupt" : "");
+      if (onPath.has("d:" + i)) cls += badSet.has("d:" + i) ? " bad" : " hot";
+      out += `<g class="${cls}" data-i="${i}" tabindex="0" role="button" aria-label="블록 ${i} 변조 전환"><rect x="${p.x - BW / 2}" y="${p.y - BH / 2}" width="${BW}" height="${BH}" rx="6"></rect>`;
+      out += `<text class="nm" x="${p.x}" y="${p.y - 3}" text-anchor="middle">D${i}</text>`;
+      out += `<text x="${p.x}" y="${p.y + 12}" text-anchor="middle">${corrupt ? "변조됨" : d.split("/")[1].slice(0, 12)}</text></g>`;
+    });
+    svg.setAttribute("viewBox", `0 0 ${W} ${dataY + BH / 2 + 8}`);
+    svg.innerHTML = out;
+    svg.querySelectorAll(".blk").forEach(g => {
+      const act = () => toggleCorrupt(+g.dataset.i);
+      g.addEventListener("click", act);
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } });
+    });
+
+    const disk = v.tree[L - 1][0];
+    $("trusted").textContent = v.trusted;
+    $("ondisk").textContent = disk;
+    $("ondisk").className = "mono" + (disk !== v.trusted ? " mismatch" : "");
+  }
+
+  function toggleCorrupt(i) {
+    v.data[i] = v.data[i] === ORIGINAL[i] ? ORIGINAL[i] + "#backdoor" : ORIGINAL[i];
+    v.path = null; v.badAt = null;
+    renderTree();
+    setVerdict("na", "대기", `D${i}를 ${v.data[i] === ORIGINAL[i] ? "원래대로 돌렸습니다" : "변조했습니다. 해시 트리는 그대로라 아직 아무도 모릅니다. 읽을 때 탐지됩니다"}.`);
+    $("vLog").textContent = "";
+  }
+
+  function setVerdict(kind, title, text) {
+    const el = $("vVerdict");
+    el.className = "verdict " + (kind === "na" ? "" : kind);
+    el.innerHTML = `<strong>${title}</strong><span>${text}</span>`;
+  }
+
+  function doRead() {
+    const i = +$("readBlk").value;
+    const L = v.tree.length;
+    const logs = [];
+    const path = ["d:" + i];
+    let bad = null;
+    const leaf = h("blk" + i + ":" + v.data[i]);
+    logs.push(`read D${i}: hash(D${i}) = ${leaf.slice(0, 16)}  stored H${i} = ${v.tree[0][i].slice(0, 16)}`);
+    path.push("0:" + i);
+    if (leaf !== v.tree[0][i]) bad = "d:" + i;
+    let idx = i;
+    for (let lv = 1; lv < L && !bad; lv++) {
+      const parent = idx >> 1;
+      const left = v.tree[lv - 1][parent * 2], right = v.tree[lv - 1][parent * 2 + 1];
+      const calc = h(left + right);
+      path.push(lv + ":" + parent);
+      const nm = lv === L - 1 ? "root" : `H${lv}.${parent}`;
+      const expect = lv === L - 1 ? v.trusted : v.tree[lv][parent];
+      logs.push(`verify ${nm}: hash(children) = ${calc.slice(0, 16)}  expected = ${expect.slice(0, 16)}`);
+      if (calc !== expect) bad = lv + ":" + parent;
+      idx = parent;
+    }
+    v.path = path;
+    v.badAt = bad;
+    renderTree();
+    if (!bad) {
+      setVerdict("ok", "읽기 성공", `D${i}에서 root까지 모든 해시가 신뢰하는 root hash와 이어집니다.`);
+      logs.push("=> 블록을 페이지 캐시에 올리고 반환");
+    } else {
+      const where = bad === "d:" + i ? `data block ${i}` : bad.endsWith(":0") && bad.startsWith(String(L - 1)) ? "root hash" : "hash block";
+      logs.push(`device-mapper: verity: 7:0: ${where === "data block " + i ? `data block ${i}` : "metadata block"} is corrupted`);
+      if (v.mode === "eio") {
+        setVerdict("no", "읽기 실패 · EIO", `${where}에서 불일치를 찾았습니다. 프로세스는 Input/output error를 받고 시스템은 계속 돕니다.`);
+        logs.push("=> read() 반환값 -EIO");
+      } else if (v.mode === "restart") {
+        setVerdict("no", "즉시 재부팅", `${where} 불일치. Bottlerocket처럼 restart_on_corruption이면 변조된 상태로 계속 돌지 않고 커널이 재시작합니다.`);
+        logs.push("=> kernel_restart(\"dm-verity device corrupted\")");
+      } else {
+        setVerdict("lg", "로그만 남기고 반환", `${where} 불일치를 기록만 하고 변조된 데이터를 그대로 돌려줍니다. 디버깅 외에는 쓰지 않는 모드입니다.`);
+        logs.push("=> 변조된 블록을 그대로 반환");
+      }
+    }
+    v.lastRead = i;
+    $("vLog").textContent = logs.join("\n");
+  }
+
+  function forge() {
+    v.tree = build(v.data);
+    v.path = null; v.badAt = null;
+    renderTree();
+    setVerdict("na", "해시 트리 재생성", "공격자가 변조한 데이터로 해시 트리를 다시 만들었습니다. 트리 안에서는 앞뒤가 맞지만 root hash가 신뢰하는 값과 다릅니다. 아무 블록이나 읽어 보세요.");
+    $("vLog").textContent = "";
+  }
+
+  function reset() {
+    v.data = ORIGINAL.slice();
+    v.tree = build(v.data);
+    v.path = null; v.badAt = null;
+    renderTree();
+    setVerdict("na", "원래 이미지", "빌드 때 만든 이미지와 해시 트리입니다. 블록을 눌러 변조해 보세요.");
+    $("vLog").textContent = "";
+  }
+
+  for (let i = 0; i < N; i++) {
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = `D${i} · /${ORIGINAL[i]}`;
+    $("readBlk").appendChild(o);
+  }
+  document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => {
+    v.mode = b.dataset.mode;
+    document.querySelectorAll("[data-mode]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    if (v.lastRead !== null && v.path) doRead();
+  }));
+  $("doRead").addEventListener("click", doRead);
+  $("forge").addEventListener("click", forge);
+  $("reset").addEventListener("click", reset);
+
+  v.data[2] = ORIGINAL[2] + "#backdoor";
+  $("readBlk").value = "2";
+  renderTree();
+  doRead();
+})();
+</script>
