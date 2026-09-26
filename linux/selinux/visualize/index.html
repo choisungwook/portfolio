@@ -1,0 +1,646 @@
+<title>SELinux · dm-verity Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --surface-2: #f6f8fa;
+    --ink: #16202a;
+    --muted: #586674;
+    --line: #d5dce3;
+    --accent: #0e6a73;
+    --accent-soft: #d8eef0;
+    --allow: #22784a;
+    --allow-soft: #dcf1e4;
+    --deny: #b3261e;
+    --deny-soft: #fbe2df;
+    --warn: #9a6408;
+    --warn-soft: #f8ebd0;
+    --path: #3656b8;
+    --path-soft: #e0e7fb;
+    --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0e1418;
+      --surface: #151d23;
+      --surface-2: #1b252c;
+      --ink: #e3e9ee;
+      --muted: #97a5b2;
+      --line: #2a3640;
+      --accent: #5bbcc3;
+      --accent-soft: #173a3e;
+      --allow: #62c48c;
+      --allow-soft: #173427;
+      --deny: #f07a70;
+      --deny-soft: #3e1c1a;
+      --warn: #e2b04e;
+      --warn-soft: #3a2e14;
+      --path: #8ea8f5;
+      --path-soft: #1f2a4a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e1418;
+    --surface: #151d23;
+    --surface-2: #1b252c;
+    --ink: #e3e9ee;
+    --muted: #97a5b2;
+    --line: #2a3640;
+    --accent: #5bbcc3;
+    --accent-soft: #173a3e;
+    --allow: #62c48c;
+    --allow-soft: #173427;
+    --deny: #f07a70;
+    --deny-soft: #3e1c1a;
+    --warn: #e2b04e;
+    --warn-soft: #3a2e14;
+    --path: #8ea8f5;
+    --path-soft: #1f2a4a;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    padding-inline: 16px;
+    padding-block: 28px 56px;
+  }
+  .wrap { max-width: 1080px; margin-inline: auto; display: grid; gap: 28px; }
+  header { display: grid; gap: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--accent); text-transform: uppercase; }
+  h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 0; font-weight: 700; text-wrap: balance; }
+  h2 { font-size: 21px; margin: 0; font-weight: 700; text-wrap: balance; }
+  h3 { font-size: 14px; margin: 0; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+  p { margin: 0; max-width: 68ch; }
+  .lede { color: var(--muted); }
+  code, .mono { font-family: var(--mono); font-size: .92em; }
+
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+  .tab {
+    font: inherit; font-weight: 600; color: var(--muted);
+    background: none; border: 0; border-bottom: 3px solid transparent;
+    padding: 8px 12px 10px; cursor: pointer;
+  }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section.panel { display: grid; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+  .field { display: grid; gap: 6px; }
+  .field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button {
+    font: inherit; font-size: 13px; cursor: pointer;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+  .opt-list { display: grid; gap: 6px; }
+  .opt {
+    text-align: left; font: inherit; cursor: pointer; display: grid; gap: 2px;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  .opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .opt .t { font-size: 13px; font-weight: 600; }
+  .opt .ctx { font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .ctx b { color: var(--accent); font-weight: 700; }
+
+  .pipeline { display: grid; gap: 8px; }
+  .step {
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: start;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface-2);
+  }
+  .step .n { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+  .step .body { display: grid; gap: 2px; min-width: 0; }
+  .step .name { font-weight: 600; font-size: 14px; }
+  .step .why { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .step.skip { opacity: .45; }
+  .pill { font-family: var(--mono); font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .pill.allow { background: var(--allow-soft); color: var(--allow); }
+  .pill.deny { background: var(--deny-soft); color: var(--deny); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.none { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+  .step.is-deny { border-color: var(--deny); }
+  .step.is-warn { border-color: var(--warn); }
+
+  .verdict { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; padding: 12px 14px; border-radius: 8px; }
+  .verdict.allow { background: var(--allow-soft); }
+  .verdict.deny { background: var(--deny-soft); }
+  .verdict.warn { background: var(--warn-soft); }
+  .verdict strong { font-family: var(--mono); font-size: 16px; }
+  .log {
+    font-family: var(--mono); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; color: var(--ink);
+  }
+  .log .dim { color: var(--muted); }
+
+  /* dm-verity tree */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn {
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    border-radius: 6px; padding: 7px 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .tree-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .tree { display: grid; gap: 14px; min-width: 700px; }
+  .level { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .level-name { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+  .row { display: grid; gap: 8px; }
+  .row.l-root, .row.l1 { grid-template-columns: repeat(4, 1fr); }
+  .row.l0 { grid-template-columns: repeat(4, 1fr); }
+  .row.data { grid-template-columns: repeat(16, 1fr); gap: 4px; }
+  .hblock { border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); padding: 4px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+  .hblock.span-all { grid-column: 1 / -1; }
+  .slot { font-family: var(--mono); font-size: 10.5px; text-align: center; padding: 3px 0; border-radius: 3px; background: var(--surface); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .root-box { grid-column: 1 / -1; justify-self: center; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; }
+  .rootcell { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; background: var(--surface-2); }
+  .rootcell .k { color: var(--muted); font-size: 10.5px; display: block; }
+  .dblock {
+    font: inherit; font-family: var(--mono); font-size: 11px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink);
+    padding: 8px 0; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .dblock[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .on-path { background: var(--path-soft) !important; border-color: var(--path) !important; color: var(--ink) !important; }
+  .tampered { background: var(--deny-soft) !important; border-color: var(--deny) !important; color: var(--deny) !important; }
+  .ok-mark { background: var(--allow-soft) !important; border-color: var(--allow) !important; color: var(--allow) !important; }
+  .bad-mark { background: var(--deny-soft) !important; border-color: var(--deny) !important; color: var(--deny) !important; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
+  .lg-path::before { background: var(--path-soft); border-color: var(--path) !important; }
+  .lg-bad::before { background: var(--deny-soft); border-color: var(--deny) !important; }
+  .lg-ok::before { background: var(--allow-soft); border-color: var(--allow) !important; }
+  .note { font-size: 13px; color: var(--muted); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .fact { border-top: 2px solid var(--line); padding-top: 8px; display: grid; gap: 4px; }
+  .fact .v { font-family: var(--mono); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fact .d { font-size: 13px; color: var(--muted); }
+
+  /* bottlerocket */
+  .exec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .table-scroll { overflow-x: auto; }
+  footer { font-size: 12.5px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .step, .slot, .dblock, .hblock { transition: background-color .18s, border-color .18s, color .18s; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">linux/selinux · hands-on companion</div>
+    <h1>SELinux 판정과 dm-verity 검증을 직접 돌려 보기</h1>
+    <p class="lede">왼쪽에서 프로세스, 파일, 모드를 고르면 커널이 거치는 검사 순서와 audit 로그가 바뀝니다. dm-verity 탭에서는 블록을 변조하고 읽어서 어느 해시에서 검증이 실패하는지 확인합니다. 정책은 AL2023 targeted와 container-selinux를 단순화한 모델입니다.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="실습 선택">
+    <button class="tab" role="tab" id="tab-selinux" aria-controls="panel-selinux" aria-selected="true">SELinux 판정</button>
+    <button class="tab" role="tab" id="tab-verity" aria-controls="panel-verity" aria-selected="false">dm-verity 해시 트리</button>
+    <button class="tab" role="tab" id="tab-br" aria-controls="panel-br" aria-selected="false">Bottlerocket에서 두 기술</button>
+  </div>
+
+  <!-- SELinux -->
+  <section class="panel" id="panel-selinux" role="tabpanel" aria-labelledby="tab-selinux">
+    <div class="cols">
+      <div class="card">
+        <div class="field">
+          <label>프로세스 (source)</label>
+          <div class="opt-list" id="procList"></div>
+        </div>
+        <div class="field">
+          <label>컨테이너 안의 uid</label>
+          <div class="seg" id="uidSeg"></div>
+        </div>
+        <div class="field">
+          <label>대상 파일 (target)</label>
+          <div class="opt-list" id="fileList"></div>
+        </div>
+        <div class="field">
+          <label>권한</label>
+          <div class="seg" id="permSeg"></div>
+        </div>
+        <div class="field">
+          <label>모드 (getenforce)</label>
+          <div class="seg" id="modeSeg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>open() 한 번이 거치는 검사</h2>
+        <div class="pipeline" id="pipeline"></div>
+        <div class="verdict" id="verdict"></div>
+        <div class="field">
+          <h3>ausearch -m AVC -ts recent</h3>
+          <pre class="log" id="avcLog"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- dm-verity -->
+  <section class="panel" id="panel-verity" role="tabpanel" aria-labelledby="tab-verity" hidden>
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn primary" id="btnRead">선택한 블록 읽기</button>
+        <button class="btn" id="btnTamper">선택한 블록 변조</button>
+        <button class="btn" id="btnRehash">공격자가 해시 트리까지 다시 계산</button>
+        <button class="btn" id="btnReset">초기 상태로</button>
+      </div>
+      <p class="note" id="treeHint">데이터 블록을 누르면 선택됩니다. 해시는 브라우저에서 <code>sha256(salt || block)</code>을 계산해 앞 6자리만 표시합니다. 블록 내용은 설명용 짧은 문자열입니다.</p>
+      <div class="tree-scroll">
+        <div class="tree" id="tree"></div>
+      </div>
+      <div class="legend">
+        <span class="lg-path">검증 경로</span>
+        <span class="lg-ok">일치</span>
+        <span class="lg-bad">불일치 · 변조</span>
+      </div>
+      <div class="field">
+        <h3>dmesg</h3>
+        <pre class="log" id="verityLog"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>화면의 트리와 실제 크기</h2>
+      <div class="facts">
+        <div class="fact"><span class="v">4 → 128</span><span class="d">해시 블록 하나에 담는 해시 수. 화면은 보기 좋게 4개, 실제는 4096 ÷ 32 = 128개</span></div>
+        <div class="fact"><span class="v">1,000 블록 → 9</span><span class="d">4MB 이미지의 해시 블록 수. level 0이 8개, level 1이 1개 (docs/4 실측)</span></div>
+        <div class="fact"><span class="v">1 GiB → 3단</span><span class="d">블록 하나를 읽을 때 검증하는 해시 블록 수. 트리가 128배씩 줄어서</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottlerocket -->
+  <section class="panel" id="panel-br" role="tabpanel" aria-labelledby="tab-br" hidden>
+    <div class="card">
+      <h2>누가 무엇을 실행할 수 있나</h2>
+      <p class="lede">Bottlerocket 정책의 <code>rules.cil</code>은 host 구성 요소(verified_s)가 dm-verity가 보호하는 immutable 파일만 실행하게 합니다. 파일 위치를 고르면 두 기술 중 어느 쪽이 거부하는지 표시됩니다.</p>
+      <div class="field">
+        <label>바이너리가 있는 곳</label>
+        <div class="seg" id="brLoc"></div>
+      </div>
+      <div class="exec-grid" id="brGrid"></div>
+    </div>
+    <div class="card">
+      <h2>정책 type 대응표</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Bottlerocket</th><th>누구·무엇</th><th>AL2023 targeted</th></tr></thead>
+          <tbody>
+            <tr><td><code>container_t</code></td><td>일반 컨테이너 프로세스</td><td><code>container_t</code></td></tr>
+            <tr><td><code>control_t</code></td><td>privileged 컨테이너, control container</td><td><code>spc_t</code> (별칭)</td></tr>
+            <tr><td><code>super_t</code></td><td>admin 같은 superpowered host container</td><td>없음</td></tr>
+            <tr><td><code>runtime_t</code></td><td>containerd, runc</td><td><code>container_runtime_t</code></td></tr>
+            <tr><td><code>os_t</code></td><td>dm-verity 루트 파일시스템의 파일</td><td>여러 type으로 나뉨</td></tr>
+            <tr><td><code>local_t</code></td><td><code>/local</code> 데이터 파티션 파일</td><td><code>container_file_t</code> (별칭)</td></tr>
+            <tr><td><code>cache_t</code></td><td>컨테이너 이미지 layer</td><td><code>container_ro_file_t</code> (별칭)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>문서: linux/selinux/docs · 정책 출처: bottlerocket-core-kit/packages/selinux-policy</footer>
+</div>
+
+<script>
+(() => {
+  // ---------- tabs ----------
+  const tabs = [...document.querySelectorAll('.tab')];
+  function selectTab(id) {
+    tabs.forEach(t => {
+      const on = t.id === id;
+      t.setAttribute('aria-selected', on);
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(t => t.addEventListener('click', () => selectTab(t.id)));
+  const hashMap = { selinux: 'tab-selinux', verity: 'tab-verity', bottlerocket: 'tab-br' };
+  const h = location.hash.replace('#', '');
+  if (hashMap[h]) selectTab(hashMap[h]);
+
+  // ---------- SELinux model ----------
+  const procs = [
+    { id: 'c12', t: '일반 컨테이너 A', type: 'container_t', cats: ['c1', 'c2'] },
+    { id: 'c34', t: '일반 컨테이너 B', type: 'container_t', cats: ['c3', 'c4'] },
+    { id: 'spc', t: '--privileged 컨테이너', type: 'spc_t', cats: [] },
+  ];
+  const files = [
+    { id: 'var', t: '/srv/lab/file.txt (라벨 그대로)', type: 'var_t', cats: [], mode: '644' },
+    { id: 'Z', t: '/srv/lab/file.txt (-v :Z, 컨테이너 A)', type: 'container_file_t', cats: ['c1', 'c2'], mode: '644' },
+    { id: 'z', t: '/srv/lab/file.txt (-v :z, 공유)', type: 'container_file_t', cats: [], mode: '644' },
+    { id: 'shadow', t: '/etc/shadow', type: 'shadow_t', cats: [], mode: '000' },
+  ];
+  const state = { proc: 'c12', file: 'var', uid: 'root', perm: 'read', mode: 'enforcing' };
+
+  function ctx(user, role, type, cats) {
+    const lvl = cats.length ? `s0:${cats.join(',')}` : 's0';
+    return `${user}:${role}:<b>${type}</b>:${lvl}`;
+  }
+  function plain(s) { return s.replace(/<\/?b>/g, ''); }
+
+  function renderOpts(el, list, key, ctxFn) {
+    el.innerHTML = '';
+    list.forEach(o => {
+      const b = document.createElement('button');
+      b.className = 'opt';
+      b.type = 'button';
+      b.setAttribute('aria-pressed', state[key] === o.id);
+      b.innerHTML = `<span class="t">${o.t}</span><span class="ctx">${ctxFn(o)}</span>`;
+      b.addEventListener('click', () => { state[key] = o.id; renderAll(); });
+      el.appendChild(b);
+    });
+  }
+  function renderSeg(el, items, key) {
+    el.innerHTML = '';
+    items.forEach(([val, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('aria-pressed', state[key] === val);
+      b.addEventListener('click', () => { state[key] = val; renderAll(); });
+      el.appendChild(b);
+    });
+  }
+
+  function teAllowed(p, f, perm) {
+    if (p.type === 'spc_t') return { ok: true, rule: `allow spc_t ${f.type}:file { ${perm} … }  (unconfined)` };
+    if (p.type === 'container_t' && f.type === 'container_file_t')
+      return { ok: true, rule: `allow container_t container_file_t:file { open read write … };` };
+    return { ok: false, rule: `sesearch -A -s container_t -t ${f.type} -c file -p ${perm}  → 결과 없음` };
+  }
+  function mcsAllowed(p, f) {
+    if (p.type !== 'container_t') return { ok: true, why: 'MCS 제약 대상 아님' };
+    if (!f.cats.length) return { ok: true, why: `파일이 s0 (category 없음) → 모든 컨테이너 공유` };
+    const ok = f.cats.every(c => p.cats.includes(c));
+    return ok
+      ? { ok: true, why: `프로세스 {${p.cats}} ⊇ 파일 {${f.cats}}` }
+      : { ok: false, why: `프로세스 {${p.cats}} 가 파일 {${f.cats}} 를 포함하지 않음` };
+  }
+  function dacAllowed(f, uid, perm) {
+    if (uid === 'root') return { ok: true, why: `uid 0 + CAP_DAC_OVERRIDE → 권한 비트 ${f.mode} 무시` };
+    if (perm === 'read') {
+      const ok = f.mode[2] === '4' || f.mode[2] === '6';
+      return { ok, why: `uid 1000, other 권한 ${f.mode[2]} → ${ok ? '읽기 가능' : '읽기 불가'}` };
+    }
+    return { ok: false, why: `uid 1000, 소유자가 아니고 other 쓰기 권한 없음 (${f.mode})` };
+  }
+
+  function renderSelinux() {
+    const p = procs.find(x => x.id === state.proc);
+    const f = files.find(x => x.id === state.file);
+    renderOpts(document.getElementById('procList'), procs, 'proc', o => ctx('system_u', 'system_r', o.type, o.cats));
+    renderOpts(document.getElementById('fileList'), files, 'file', o => ctx('system_u', 'object_r', o.type, o.cats) + ` · ${o.mode}`);
+    renderSeg(document.getElementById('uidSeg'), [['root', 'uid 0 (root)'], ['user', 'uid 1000']], 'uid');
+    renderSeg(document.getElementById('permSeg'), [['read', 'read'], ['write', 'write']], 'perm');
+    renderSeg(document.getElementById('modeSeg'), [['enforcing', 'Enforcing'], ['permissive', 'Permissive']], 'mode');
+
+    const steps = [];
+    const dac = dacAllowed(f, state.uid, state.perm);
+    steps.push({ name: 'DAC · uid와 권한 비트', why: dac.why, res: dac.ok ? 'allow' : 'deny' });
+
+    let selDenied = false;
+    let reason = '';
+    if (dac.ok) {
+      steps.push({ name: 'LSM hook · selinux_file_open', why: `(${p.type}, ${f.type}, file, ${state.perm}) 조합으로 판정 요청`, res: 'none', label: '호출' });
+      const te = teAllowed(p, f, state.perm);
+      steps.push({ name: 'Type Enforcement · allow 규칙', why: te.rule, res: te.ok ? 'allow' : 'deny' });
+      if (!te.ok) { selDenied = true; reason = 'Missing type enforcement (TE) allow rule.'; }
+      const mcs = mcsAllowed(p, f);
+      if (te.ok) {
+        steps.push({ name: 'MCS · category 비교', why: mcs.why, res: mcs.ok ? 'allow' : 'deny' });
+        if (!mcs.ok) { selDenied = true; reason = 'Constraint violation (MCS).'; }
+      } else {
+        steps.push({ name: 'MCS · category 비교', why: 'TE에서 이미 거부', res: 'none', label: '생략', skip: true });
+      }
+      if (selDenied) {
+        const perm = state.mode === 'permissive';
+        steps.push({ name: `모드 · ${state.mode}`, why: perm ? '거부 판정을 적용하지 않고 로그만 남김' : '거부 판정 적용', res: perm ? 'warn' : 'deny', label: perm ? '통과+로그' : '적용' });
+      } else {
+        steps.push({ name: `모드 · ${state.mode}`, why: '거부 판정이 없어 모드와 무관', res: 'none', label: '무관', skip: true });
+      }
+    } else {
+      ['LSM hook · selinux_file_open', 'Type Enforcement · allow 규칙', 'MCS · category 비교', '모드'].forEach(n =>
+        steps.push({ name: n, why: 'DAC에서 먼저 거부되어 SELinux까지 오지 않음', res: 'none', label: '생략', skip: true }));
+    }
+
+    const pipe = document.getElementById('pipeline');
+    pipe.innerHTML = '';
+    steps.forEach((s, i) => {
+      const d = document.createElement('div');
+      d.className = 'step' + (s.skip ? ' skip' : '') + (s.res === 'deny' ? ' is-deny' : '') + (s.res === 'warn' ? ' is-warn' : '');
+      const text = s.label || (s.res === 'allow' ? '허용' : s.res === 'deny' ? '거부' : '-');
+      d.innerHTML = `<span class="n">${String(i + 1).padStart(2, '0')}</span><span class="body"><span class="name">${s.name}</span><span class="why">${s.why}</span></span><span class="pill ${s.res}">${text}</span>`;
+      pipe.appendChild(d);
+    });
+
+    const v = document.getElementById('verdict');
+    const log = document.getElementById('avcLog');
+    const cmd = state.perm === 'read' ? 'cat' : 'sh';
+    const pctx = plain(ctx('system_u', 'system_r', p.type, p.cats));
+    const fctx = plain(ctx('system_u', 'object_r', f.type, f.cats));
+    const fname = f.id === 'shadow' ? 'shadow' : 'file.txt';
+
+    if (!dac.ok) {
+      v.className = 'verdict deny';
+      v.innerHTML = `<strong>EACCES</strong><span>DAC가 거부. SELinux 로그는 남지 않음</span>`;
+      log.innerHTML = '<span class="dim">&lt;no matches&gt;</span>';
+    } else if (selDenied && state.mode === 'enforcing') {
+      v.className = 'verdict deny';
+      v.innerHTML = `<strong>EACCES</strong><span>SELinux가 거부. ${reason}</span>`;
+      log.textContent = `type=AVC msg=audit(1790254738.201:412): avc:  denied  { ${state.perm} } for  pid=4812 comm="${cmd}" name="${fname}"\n  scontext=${pctx}\n  tcontext=${fctx} tclass=file permissive=0`;
+    } else if (selDenied) {
+      v.className = 'verdict warn';
+      v.innerHTML = `<strong>성공</strong><span>permissive라 통과. enforcing으로 바꾸면 이 요청이 실패함</span>`;
+      log.textContent = `type=AVC msg=audit(1790254738.201:412): avc:  denied  { ${state.perm} } for  pid=4812 comm="${cmd}" name="${fname}"\n  scontext=${pctx}\n  tcontext=${fctx} tclass=file permissive=1`;
+    } else {
+      v.className = 'verdict allow';
+      v.innerHTML = `<strong>성공</strong><span>DAC와 SELinux 모두 허용</span>`;
+      log.innerHTML = '<span class="dim">&lt;no matches&gt;</span>';
+    }
+  }
+
+  // ---------- dm-verity model ----------
+  const N_DATA = 16, FAN = 4;
+  const SALT = 'akbun-selinux-handson';
+  const enc = new TextEncoder();
+  const vstate = { sel: 5, data: [], l0: [], l1: '', root: '', trustedRoot: '', mark: {}, path: new Set(), log: [] };
+  const origBlock = i => `block ${String(i).padStart(2, '0')} · /usr/bin/app-${i}`;
+
+  async function sha(str) {
+    if (window.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest('SHA-256', enc.encode(SALT + '|' + str));
+      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let h1 = 0x811c9dc5;
+    const s = SALT + '|' + str;
+    for (let i = 0; i < s.length; i++) { h1 ^= s.charCodeAt(i); h1 = Math.imul(h1, 16777619) >>> 0; }
+    return h1.toString(16).padStart(8, '0').repeat(8);
+  }
+  async function buildTree(data) {
+    const l0 = [];
+    for (const d of data) l0.push(await sha(d));
+    const l0Blocks = [];
+    for (let i = 0; i < l0.length; i += FAN) l0Blocks.push(l0.slice(i, i + FAN).join(''));
+    const l1 = [];
+    for (const b of l0Blocks) l1.push(await sha(b));
+    const root = await sha(l1.join(''));
+    return { l0, l1, root };
+  }
+  async function resetVerity() {
+    vstate.data = Array.from({ length: N_DATA }, (_, i) => origBlock(i));
+    const t = await buildTree(vstate.data);
+    vstate.l0 = t.l0; vstate.l1 = t.l1; vstate.root = t.root; vstate.trustedRoot = t.root;
+    vstate.mark = {}; vstate.path = new Set();
+    vstate.log = ['veritysetup open data.img verity-lab hash.img ' + t.root.slice(0, 16) + '…', '<span class="dim">열 때는 아무것도 검증하지 않음. 읽는 블록만 검증</span>'];
+    renderTree();
+  }
+  const short = x => x.slice(0, 6);
+
+  function renderTree() {
+    const tree = document.getElementById('tree');
+    const m = vstate.mark, P = vstate.path;
+    const cls = (key) => (m[key] ? ` ${m[key]}` : P.has(key) ? ' on-path' : '');
+    let html = '';
+    html += `<div class="level"><div class="level-name">root hash</div><div class="row l-root"><div class="root-box">
+      <div class="rootcell${cls('trusted')}"><span class="k">커널 cmdline (신뢰)</span>${short(vstate.trustedRoot)}</div>
+      <div class="rootcell${cls('root')}"><span class="k">hash.img 기준 계산값</span>${short(vstate.root)}</div>
+    </div></div></div>`;
+    html += `<div class="level"><div class="level-name">level 1<br>해시 블록 1개</div><div class="row l1"><div class="hblock span-all">`;
+    vstate.l1.forEach((hx, i) => { html += `<div class="slot${cls('l1-' + i)}">${short(hx)}</div>`; });
+    html += `</div></div></div>`;
+    html += `<div class="level"><div class="level-name">level 0<br>해시 블록 4개</div><div class="row l0">`;
+    for (let b = 0; b < N_DATA / FAN; b++) {
+      html += `<div class="hblock">`;
+      for (let j = 0; j < FAN; j++) { const i = b * FAN + j; html += `<div class="slot${cls('l0-' + i)}">${short(vstate.l0[i])}</div>`; }
+      html += `</div>`;
+    }
+    html += `</div></div>`;
+    html += `<div class="level"><div class="level-name">data<br>블록 16개</div><div class="row data">`;
+    vstate.data.forEach((d, i) => {
+      const t = d !== origBlock(i);
+      html += `<button type="button" class="dblock${t ? ' tampered' : ''}${cls('d-' + i)}" data-i="${i}" aria-pressed="${vstate.sel === i}" aria-label="데이터 블록 ${i}${t ? ' 변조됨' : ''}">${i}</button>`;
+    });
+    html += `</div></div>`;
+    tree.innerHTML = html;
+    tree.querySelectorAll('.dblock').forEach(b => b.addEventListener('click', () => {
+      vstate.sel = +b.dataset.i; vstate.path = new Set(); vstate.mark = {}; renderTree();
+    }));
+    document.getElementById('verityLog').innerHTML = vstate.log.join('\n');
+    document.getElementById('btnTamper').textContent = vstate.data[vstate.sel] !== origBlock(vstate.sel) ? '선택한 블록 되돌리기' : '선택한 블록 변조';
+  }
+
+  async function readBlock() {
+    const i = vstate.sel, b = Math.floor(i / FAN);
+    vstate.mark = {}; vstate.path = new Set(['d-' + i, 'l0-' + i, 'l1-' + b, 'root', 'trusted']);
+    const sector = i * 8;
+    const dHash = await sha(vstate.data[i]);
+    if (dHash !== vstate.l0[i]) {
+      vstate.mark['d-' + i] = 'bad-mark'; vstate.mark['l0-' + i] = 'bad-mark';
+      vstate.log.push(`$ dd if=/dev/mapper/verity-lab bs=4096 skip=${i} count=1`, `device-mapper: verity: 7:0: data block ${i} is corrupted`, `dd: error reading '/dev/mapper/verity-lab': Input/output error`);
+      renderTree(); return;
+    }
+    vstate.mark['d-' + i] = 'ok-mark'; vstate.mark['l0-' + i] = 'ok-mark';
+    const blk = vstate.l0.slice(b * FAN, b * FAN + FAN).join('');
+    if (await sha(blk) !== vstate.l1[b]) {
+      vstate.mark['l1-' + b] = 'bad-mark';
+      vstate.log.push(`$ dd if=/dev/mapper/verity-lab bs=4096 skip=${i} count=1`, `device-mapper: verity: 7:1: metadata block ${b + 1} is corrupted`, `dd: error reading '/dev/mapper/verity-lab': Input/output error`);
+      renderTree(); return;
+    }
+    vstate.mark['l1-' + b] = 'ok-mark';
+    const r = await sha(vstate.l1.join(''));
+    if (r !== vstate.trustedRoot) {
+      vstate.mark['root'] = 'bad-mark'; vstate.mark['trusted'] = 'bad-mark';
+      vstate.log.push(`$ dd if=/dev/mapper/verity-lab bs=4096 skip=${i} count=1`, `device-mapper: verity: 7:1: metadata block 0 is corrupted`, `<span class="dim">해시 트리 전체가 앞뒤는 맞지만 커널이 받은 root hash와 다름</span>`, `dd: error reading '/dev/mapper/verity-lab': Input/output error`);
+      renderTree(); return;
+    }
+    vstate.mark['root'] = 'ok-mark'; vstate.mark['trusted'] = 'ok-mark';
+    vstate.log.push(`$ dd if=/dev/mapper/verity-lab bs=4096 skip=${i} count=1`, `<span class="dim">block ${i} (sector ${sector}) 검증 통과: data → level 0 → level 1 → root</span>`);
+    renderTree();
+  }
+
+  function toggleTamper() {
+    const i = vstate.sel;
+    const t = vstate.data[i] !== origBlock(i);
+    vstate.data[i] = t ? origBlock(i) : origBlock(i).replace('app', 'bkd');
+    vstate.mark = {}; vstate.path = new Set();
+    vstate.log.push(t ? `<span class="dim">block ${i} 원래 바이트로 복구</span>` : `$ printf 'X' | dd of=data.img bs=1 seek=$((4096*${i}+14)) conv=notrunc`);
+    renderTree();
+  }
+  async function rehash() {
+    const t = await buildTree(vstate.data);
+    vstate.l0 = t.l0; vstate.l1 = t.l1; vstate.root = t.root;
+    vstate.mark = {}; vstate.path = new Set();
+    vstate.log.push('$ veritysetup format data.img hash.img   # 공격자가 변조된 데이터로 트리 재생성', `<span class="dim">새 root ${short(t.root)}… · 커널 cmdline의 root ${short(vstate.trustedRoot)}…는 그대로</span>`);
+    renderTree();
+  }
+
+  document.getElementById('btnRead').addEventListener('click', readBlock);
+  document.getElementById('btnTamper').addEventListener('click', toggleTamper);
+  document.getElementById('btnRehash').addEventListener('click', rehash);
+  document.getElementById('btnReset').addEventListener('click', resetVerity);
+
+  // ---------- Bottlerocket exec ----------
+  const brLocs = [
+    ['os', '/usr/bin (dm-verity, os_t)'],
+    ['os-tampered', '/usr/bin 오프라인 변조'],
+    ['local', '/local (쓰기 가능, local_t)'],
+  ];
+  const brSubjects = [
+    { name: 'host daemon', ctx: 'system_t · verified_s' },
+    { name: '일반 컨테이너', ctx: 'container_t' },
+    { name: 'privileged 컨테이너', ctx: 'control_t (= spc_t)' },
+  ];
+  const brState = { loc: 'local' };
+  function brResult(subject, loc) {
+    if (loc === 'os-tampered') return { res: 'deny', t: 'dm-verity', why: '바이너리 블록을 읽는 순간 해시 불일치 → 커널 재시작' };
+    if (loc === 'os') return { res: 'allow', t: '허용', why: '루트 파일시스템 바이너리는 모든 subject가 실행 가능' };
+    if (subject.ctx.includes('verified_s')) return { res: 'deny', t: 'SELinux', why: 'verified_s는 mutable 객체를 실행할 수 없음' };
+    return { res: 'allow', t: '허용', why: '컨테이너는 public 파일 실행 가능. 쓰기 가능한 곳에서 도는 코드는 컨테이너 권한에 갇힘' };
+  }
+  function renderBr() {
+    const seg = document.getElementById('brLoc');
+    seg.innerHTML = '';
+    brLocs.forEach(([v, l]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', brState.loc === v);
+      b.addEventListener('click', () => { brState.loc = v; renderBr(); });
+      seg.appendChild(b);
+    });
+    const g = document.getElementById('brGrid');
+    g.innerHTML = '';
+    brSubjects.forEach(s => {
+      const r = brResult(s, brState.loc);
+      const d = document.createElement('div');
+      d.className = 'step' + (r.res === 'deny' ? ' is-deny' : '');
+      d.style.gridTemplateColumns = 'minmax(0,1fr) auto';
+      d.innerHTML = `<span class="body"><span class="name">${s.name}</span><span class="why mono">${s.ctx}</span><span class="why">${r.why}</span></span><span class="pill ${r.res}">${r.t}</span>`;
+      g.appendChild(d);
+    });
+  }
+
+  function renderAll() { renderSelinux(); }
+  renderAll();
+  renderBr();
+  resetVerity();
+})();
+</script>

@@ -1,0 +1,10 @@
+services:
+  verity-lab:
+    build: ./dm-verity-lab
+    container_name: verity-lab
+    command: ["sleep", "infinity"]
+    volumes:
+      - verity-work:/work
+
+volumes:
+  verity-work:
