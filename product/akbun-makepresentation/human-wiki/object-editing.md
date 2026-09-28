@@ -79,6 +79,16 @@
 - 근거: [table.rs:28](../workspace/src-tauri/crates/deck/src/pptx/read/table.rs), [shapes.rs:664](../workspace/src-tauri/crates/deck/src/pptx/read/shapes.rs), [svg.js:42](../workspace/src/editor/svg.js), [files.js:86](../workspace/src/renderer/files.js).
 - 결정: [PPTX 표는 셀별 도형으로 가져온다](../knowledge/decisions/2026-09-import-tables-as-cell-shapes.md).
 
+## 정렬과 균등 분배
+
+- 두 개 이상 선택하면 Align objects에 Left·Center·Right·Top·Middle·Bottom 표시.
+- 기준은 선택 전체의 바깥 경계. Center는 그 경계의 가로 중앙, Middle은 세로 중앙.
+- 세 개 이상 선택하면 Distribute 표시. 양 끝 객체는 고정하고 사이 객체만 옮겨 보이는 상자 사이 간격을 같게 맞춤.
+- 회전한 객체는 회전 후 보이는 상자 기준. 잠긴 객체는 기준 계산에 포함되지만 움직이지 않음.
+
+- 근거: [geometry.js:246](../workspace/src/editor/geometry.js).
+- 결정: [도형 정렬과 자석은 보이는 바깥 경계를 사용](../knowledge/decisions/2026-08-shape-alignment-uses-visual-bounds.md).
+
 ## 확인 질문
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?
@@ -86,3 +96,4 @@
 3. H1 크기를 바꾸면 이미 만든 텍스트도 바뀌는가?
 4. 코드 블록의 리사이즈와 Crop은 어떻게 다른가?
 5. 슬라이드 밖으로 드롭한 이미지는 어떻게 처리되는가?
+6. 균등 분배에서 양 끝 객체를 움직이지 않는 이유는 무엇인가?

@@ -5,6 +5,7 @@
 //! into editable deck shapes.
 
 mod common;
+mod notes;
 mod read;
 mod write;
 

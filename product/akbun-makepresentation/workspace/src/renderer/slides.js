@@ -1,5 +1,16 @@
 'use strict';
 
+// --- speaker notes -------------------------------------------------------------
+//
+// Typing writes straight into the slide; the undo step is taken once when the
+// box loses focus, the way the text overlay commits, rather than per keystroke.
+slideNotes.addEventListener('input', () => {
+  slide().notes = slideNotes.value;
+  state.dirty = true;
+  updateTitle();
+});
+slideNotes.addEventListener('change', markDirty);
+
 function selectAdjacentSlide(direction) {
   const next = Math.max(0, Math.min(state.current + direction, state.deck.slides.length - 1));
   if (next !== state.current) {

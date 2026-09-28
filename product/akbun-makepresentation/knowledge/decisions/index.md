@@ -25,3 +25,4 @@ akbun-makepresentation 작업 중 내린 의사결정과 이유.
 * [슬라이드의 배열 순서가 곧 z 순서다](2026-09-array-order-is-z-order.md)
 * [PPTX 표는 셀별 도형으로 가져온다](2026-09-import-tables-as-cell-shapes.md)
 * [텍스트 상자 높이는 글이 정한다](2026-09-text-boxes-are-as-tall-as-their-text.md)
+* [발표자 노트는 PPTX notes page로 저장](2026-09-speaker-notes-are-notes-pages.md)

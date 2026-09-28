@@ -1,6 +1,7 @@
 //! PPTX package and DrawingML serialization.
 
 use super::common::{emu, ext_for_mime, hex, xml_escape, ARROW_ENDS, IMAGE_FORMATS, NS};
+use super::notes;
 use crate::{Deck, Shape, Slide};
 use base64::Engine;
 use std::collections::HashMap;
@@ -16,13 +17,30 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     };
 
     let n = deck.slides.len().max(1);
-    add("[Content_Types].xml", content_types(n).as_bytes())?;
+    // 1-based slide numbers with notes. With none, the package carries no
+    // notes parts at all, the same bytes as before notes existed.
+    let with_notes: Vec<usize> = deck
+        .slides
+        .iter()
+        .enumerate()
+        .filter(|(_, slide)| !slide.notes.trim().is_empty())
+        .map(|(i, _)| i + 1)
+        .collect();
+    add("[Content_Types].xml", content_types(n, &with_notes).as_bytes())?;
     add("_rels/.rels", ROOT_RELS.as_bytes())?;
     add(
         "ppt/presentation.xml",
-        presentation(n, deck.slide_width, deck.slide_height).as_bytes(),
+        presentation(n, deck.slide_width, deck.slide_height, !with_notes.is_empty()).as_bytes(),
     )?;
-    add("ppt/_rels/presentation.xml.rels", presentation_rels(n).as_bytes())?;
+    add(
+        "ppt/_rels/presentation.xml.rels",
+        presentation_rels(n, !with_notes.is_empty()).as_bytes(),
+    )?;
+    if !with_notes.is_empty() {
+        add(notes::MASTER_PATH, notes::master_xml().as_bytes())?;
+        add(notes::MASTER_RELS_PATH, notes::master_rels().as_bytes())?;
+        add(notes::THEME_PATH, THEME.as_bytes())?;
+    }
     add("ppt/slideMasters/slideMaster1.xml", MASTER.as_bytes())?;
     add(
         "ppt/slideMasters/_rels/slideMaster1.xml.rels",
@@ -39,7 +57,21 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     let mut media = MediaStore::default();
     for i in 0..n {
         let slide = deck.slides.get(i).unwrap_or(&empty);
-        let (xml, rels) = slide_xml(slide, &mut media, deck.slide_width, deck.slide_height);
+        let (xml, mut rels) = slide_xml(slide, &mut media, deck.slide_width, deck.slide_height);
+        if with_notes.contains(&(i + 1)) {
+            rels = rels.replace(
+                "</Relationships>",
+                &format!("{}</Relationships>", notes::slide_relationship(i + 1)),
+            );
+            add(
+                &format!("ppt/notesSlides/notesSlide{}.xml", i + 1),
+                notes::notes_slide_xml(&slide.notes).as_bytes(),
+            )?;
+            add(
+                &format!("ppt/notesSlides/_rels/notesSlide{}.xml.rels", i + 1),
+                notes::notes_slide_rels(i + 1).as_bytes(),
+            )?;
+        }
         add(&format!("ppt/slides/slide{}.xml", i + 1), xml.as_bytes())?;
         add(
             &format!("ppt/slides/_rels/slide{}.xml.rels", i + 1),
@@ -87,7 +119,7 @@ pub(super) fn decode_data_url(src: &str) -> Option<(&'static str, Vec<u8>)> {
     Some((ext, bytes))
 }
 
-pub(super) fn content_types(slides: usize) -> String {
+pub(super) fn content_types(slides: usize, with_notes: &[usize]) -> String {
     let mut overrides = String::new();
     for i in 1..=slides {
         overrides.push_str(&format!(
@@ -96,6 +128,7 @@ pub(super) fn content_types(slides: usize) -> String {
     }
     // Every writable picture format needs its extension declared here, or
     // the package is invalid for readers that check.
+    overrides.push_str(&notes::content_type_overrides(with_notes));
     let mut images = String::new();
     for (ext, mime) in IMAGE_FORMATS {
         images.push_str(&format!(
@@ -121,7 +154,17 @@ const ROOT_RELS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"y
 <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"ppt/presentation.xml\"/>\
 </Relationships>";
 
-fn presentation(slides: usize, width: f64, height: f64) -> String {
+// The notes master takes the relationship id after the last slide.
+fn notes_master_rid(slides: usize) -> String {
+    format!("rId{}", slides + 2)
+}
+
+fn presentation(slides: usize, width: f64, height: f64, has_notes: bool) -> String {
+    let notes_master = if has_notes {
+        notes::master_id_list(&notes_master_rid(slides))
+    } else {
+        String::new()
+    };
     let mut ids = String::new();
     for i in 0..slides {
         ids.push_str(&format!(
@@ -134,7 +177,7 @@ fn presentation(slides: usize, width: f64, height: f64) -> String {
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
 <p:presentation{NS}>\
 <p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>\
-<p:sldIdLst>{ids}</p:sldIdLst>\
+{notes_master}<p:sldIdLst>{ids}</p:sldIdLst>\
 <p:sldSz cx=\"{}\" cy=\"{}\"/>\
 <p:notesSz cx=\"6858000\" cy=\"9144000\"/>\
 </p:presentation>",
@@ -143,7 +186,7 @@ fn presentation(slides: usize, width: f64, height: f64) -> String {
     )
 }
 
-fn presentation_rels(slides: usize) -> String {
+fn presentation_rels(slides: usize, has_notes: bool) -> String {
     let mut rels = String::from(
         "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"slideMasters/slideMaster1.xml\"/>",
     );
@@ -153,6 +196,9 @@ fn presentation_rels(slides: usize) -> String {
             i + 2,
             i + 1
         ));
+    }
+    if has_notes {
+        rels.push_str(&notes::master_relationship(&notes_master_rid(slides)));
     }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
