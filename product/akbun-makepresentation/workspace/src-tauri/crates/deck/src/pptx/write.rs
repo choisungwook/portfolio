@@ -58,7 +58,7 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     for i in 0..n {
         let slide = deck.slides.get(i).unwrap_or(&empty);
         let (xml, mut rels) = slide_xml(slide, &mut media, deck.slide_width, deck.slide_height);
-        if with_notes.contains(&(i + 1)) {
+        if !slide.notes.trim().is_empty() {
             rels = rels.replace(
                 "</Relationships>",
                 &format!("{}</Relationships>", notes::slide_relationship(i + 1)),

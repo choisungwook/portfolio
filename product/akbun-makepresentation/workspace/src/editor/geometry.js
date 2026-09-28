@@ -242,9 +242,10 @@ function alignShapes(shapes, indices, edge) {
 }
 
 // The first and last objects along the axis stay put; the ones between move
-// so every gap between neighbouring visible boxes is the same.
+// so every gap between neighbouring visible boxes is the same. Locked objects
+// take no part: counted in, they would hold a gap open that nothing can close.
 function distributeShapes(shapes, indices, axis) {
-  const selected = validShapeIndices(shapes, indices);
+  const selected = validShapeIndices(shapes, indices).filter((index) => !shapes[index].locked);
   if (selected.length < 3 || !['x', 'y'].includes(axis)) return false;
   const size = axis === 'x' ? 'w' : 'h';
   const items = selected
@@ -257,7 +258,7 @@ function distributeShapes(shapes, indices, axis) {
   let cursor = start;
   for (const { index, box } of items) {
     const delta = cursor - box[axis];
-    if (!shapes[index].locked) moveShape(shapes[index], axis === 'x' ? delta : 0, axis === 'y' ? delta : 0);
+    moveShape(shapes[index], axis === 'x' ? delta : 0, axis === 'y' ? delta : 0);
     cursor += box[size] + gap;
   }
   return true;

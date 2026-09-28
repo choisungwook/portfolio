@@ -84,7 +84,8 @@
 - 두 개 이상 선택하면 Align objects에 Left·Center·Right·Top·Middle·Bottom 표시.
 - 기준은 선택 전체의 바깥 경계. Center는 그 경계의 가로 중앙, Middle은 세로 중앙.
 - 세 개 이상 선택하면 Distribute 표시. 양 끝 객체는 고정하고 사이 객체만 옮겨 보이는 상자 사이 간격을 같게 맞춤.
-- 회전한 객체는 회전 후 보이는 상자 기준. 잠긴 객체는 기준 계산에 포함되지만 움직이지 않음.
+- 회전한 객체는 회전 후 보이는 상자 기준.
+- 정렬에서 잠긴 객체는 기준 계산에 포함되지만 움직이지 않음. 분배에서는 잠긴 객체를 빼고 나머지만으로 간격 계산. 포함하면 움직일 수 없는 객체가 간격 하나를 고정해 균등해지지 않음.
 
 - 근거: [geometry.js:246](../workspace/src/editor/geometry.js).
 - 결정: [도형 정렬과 자석은 보이는 바깥 경계를 사용](../knowledge/decisions/2026-08-shape-alignment-uses-visual-bounds.md).

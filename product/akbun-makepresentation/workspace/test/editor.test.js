@@ -313,8 +313,11 @@ test('distributeShapes keeps the ends and evens the gaps between visible boxes',
   // ends 0..320, boxes 40 + 10 + 20 wide, so each gap is (320 - 70) / 2.
   assert.deepStrictEqual(shapes.slice(0, 3).map((shape) => shape.x), [300, 0, 165]);
 
+  // The locked box between them neither moves nor changes the spacing.
   assert.ok(L.distributeShapes(shapes, [0, 1, 2, 3], 'x'));
   assert.strictEqual(shapes[3].x, 150);
+  assert.deepStrictEqual(shapes.slice(0, 3).map((shape) => shape.x), [300, 0, 165]);
+  assert.strictEqual(L.distributeShapes(shapes, [0, 1, 3], 'x'), false);
 });
 
 test('alignShapes follows the visible outside edge of rotated shapes', () => {

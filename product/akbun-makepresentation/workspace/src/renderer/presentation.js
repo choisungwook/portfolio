@@ -149,6 +149,15 @@ function presentKey(event) {
     overviewKey(key);
     return;
   }
+  const letter = key.length === 1 ? key.toLowerCase() : '';
+  // A blanked screen comes back on the next key without also acting on it,
+  // so the audience sees the slide they left rather than the one after it.
+  if (presentView.blank && key !== 'Escape' && letter !== 'b' && letter !== 'w') {
+    presentView.blank = '';
+    presentView.jump = '';
+    renderPresentChrome();
+    return;
+  }
   if (/^[0-9]$/.test(key)) {
     presentView.jump = (presentView.jump + key).slice(-4);
     renderPresentChrome();
@@ -166,16 +175,11 @@ function presentKey(event) {
     renderPresentChrome();
     return;
   }
-  const letter = key.length === 1 ? key.toLowerCase() : '';
   if (key === 'Escape') {
     exitPresent();
     return;
   }
-  // A blanked screen comes back on the next key without also moving on,
-  // so the audience sees the slide they left rather than the one after it.
-  if (presentView.blank && letter !== 'b' && letter !== 'w') {
-    presentView.blank = '';
-  } else if (letter === 'b' || letter === 'w') {
+  if (letter === 'b' || letter === 'w') {
     const color = letter === 'b' ? 'black' : 'white';
     presentView.blank = presentView.blank === color ? '' : color;
   } else if (letter === 'l') {
