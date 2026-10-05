@@ -1,0 +1,5 @@
+github_repository   = "example-owner/ecs-deploy-lab"
+github_branch       = "main"
+source_directory    = "."
+bootstrap_image_tag = "v1"
+desired_count       = 1
