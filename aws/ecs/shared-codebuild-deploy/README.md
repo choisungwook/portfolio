@@ -25,6 +25,7 @@ flowchart LR
 | `deploy/diff-taskdef.sh` | 운영 중 task definition과 Git JSON 비교. PR comment에서도 사용 |
 | `deploy/task-definitions/*.json` | 서비스별 설정. image는 `__IMAGE__` |
 | `deploy/deploy.sh` | JSON + 이미지 digest로 revision 등록, service 갱신, 결과 판정 |
+| `github-workflow/` | PR diff GitHub Actions 워크플로 (참고용, 실행 안 됨) |
 | `scripts/` | 이미지 준비, Pipeline 실행, 서비스 상태 조회 |
 
 ## 실습

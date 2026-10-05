@@ -1,6 +1,7 @@
 # PR에서 ECS task definition diff 보기
 
-- 상태: 참고용. 워크플로 `.github/workflows/ecs-task-diff.yml`은 전체 주석 처리되어 실행되지 않음.
+- 상태: 참고용. 워크플로는 [github-workflow/ecs-task-diff.yml](../github-workflow/ecs-task-diff.yml)에 보관.
+- `.github/workflows/` 밖에 있어 실행되지 않음. 전체 주석 처리한 파일을 그 안에 두면 push마다 실패 run이 생김.
 
 ## 목적
 
@@ -36,5 +37,5 @@ flowchart LR
 ## 다시 켜기
 
 1. `workload/github-diff.tf`의 role이 있는지 확인 (`terraform -chdir=workload output github_task_diff_role_arn`).
-2. 워크플로 파일의 주석을 풀고 `ROLE_ARN`을 1번 값으로 바꿈.
+2. 워크플로 파일을 저장소 루트 `.github/workflows/`로 복사하고 `ROLE_ARN`을 1번 값으로 바꿈.
 3. comment 트리거는 기본 branch에 merge한 뒤부터 동작.
