@@ -12,3 +12,8 @@ output "shared_codebuild_project" {
   description = "두 Pipeline이 공유하는 유일한 CodeBuild project"
   value       = aws_codebuild_project.shared_deployer.name
 }
+
+output "github_task_diff_role_arn" {
+  description = "PR diff 워크플로가 assume할 role"
+  value       = aws_iam_role.github_task_diff.arn
+}

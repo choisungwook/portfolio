@@ -12,10 +12,6 @@ arn=$(aws ecs describe-services --cluster "$cluster" --services "$service" \
 
 # 읽기 전용 필드 제거, 이미지는 자리표시자로, 빈 값은 PR diff를 줄이려고 제거
 aws ecs describe-task-definition --task-definition "$arn" --output json \
-  | jq '.taskDefinition
-    | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities,
-          .registeredAt, .registeredBy, .deregisteredAt)
-    | .containerDefinitions[0].image = "__IMAGE__"
-    | del(.. | select(. == [] or . == {}))' \
+  | jq -f "$(dirname "$0")/normalize.jq" \
   > "$(dirname "$0")/task-definitions/${service}.json"
 echo "exported: $arn -> deploy/task-definitions/${service}.json"

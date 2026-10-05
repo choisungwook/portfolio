@@ -22,6 +22,7 @@ flowchart LR
 | `foundation/` | VPC, ECR, ECS cluster, IAM, GitHub connection, S3 |
 | `workload/` | 최초 task definition·service, CodeBuild, CodePipeline |
 | `deploy/export-taskdef.sh` | service가 쓰는 task definition을 Git JSON으로 추출 |
+| `deploy/diff-taskdef.sh` | 운영 중 task definition과 Git JSON 비교. PR comment에서도 사용 |
 | `deploy/task-definitions/*.json` | 서비스별 설정. image는 `__IMAGE__` |
 | `deploy/deploy.sh` | JSON + 이미지 digest로 revision 등록, service 갱신, 결과 판정 |
 | `scripts/` | 이미지 준비, Pipeline 실행, 서비스 상태 조회 |

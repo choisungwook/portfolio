@@ -9,6 +9,7 @@ okf_version: "0.1"
 - [Terraform으로 최초 생성, 추출한 JSON을 Git에서 관리](decisions/2026-10-git-task-template.md).
 - [배포 완료는 rolloutState를 직접 조회해 판정](decisions/2026-10-deployment-guard-scope.md).
 - [모노레포 소스 전달을 clone 참조로 전환](decisions/2026-10-source-clone-reference.md).
+- [task definition 변경 미리 보기는 PR comment로](decisions/2026-10-pr-task-diff.md).
 
 ## 디렉터리
 

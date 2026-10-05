@@ -47,3 +47,15 @@ variable "desired_count" {
     error_message = "배포 안정화 검증을 위해 desired_count는 1 이상 정수여야 합니다."
   }
 }
+
+variable "github_default_branch" {
+  description = "issue_comment 워크플로가 실행되는 저장소 기본 branch"
+  type        = string
+  default     = "main"
+}
+
+variable "existing_github_oidc_provider_arn" {
+  description = "계정에 이미 있는 GitHub OIDC provider ARN. null이면 새로 생성"
+  type        = string
+  default     = null
+}

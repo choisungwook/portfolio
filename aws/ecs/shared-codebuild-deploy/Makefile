@@ -16,4 +16,4 @@ validate:
 	terraform -chdir=workload validate
 	terraform -chdir=foundation test
 	terraform -chdir=workload test
-	bash -n scripts/bootstrap-images.sh scripts/start-pipeline.sh scripts/show-service.sh deploy/deploy.sh deploy/export-taskdef.sh
+	bash -n scripts/bootstrap-images.sh scripts/start-pipeline.sh scripts/show-service.sh deploy/deploy.sh deploy/export-taskdef.sh deploy/diff-taskdef.sh

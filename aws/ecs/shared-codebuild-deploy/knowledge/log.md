@@ -2,6 +2,8 @@
 
 ## 2026-10-05
 
+* **Creation**: [PR diff](decisions/2026-10-pr-task-diff.md) - PR comment로 task definition 변경 미리 보기.
+
 * **Update**: [Git JSON](decisions/2026-10-git-task-template.md) - 블로그 설계 순서(Terraform → 추출)로 전환, KEEP_CURRENT 제거.
 * **Update**: [완료 판정](decisions/2026-10-deployment-guard-scope.md) - wait services-stable 조기 종료 확인, rolloutState 조회로 교체.
 
