@@ -1,0 +1,10 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - git rev-parse HEAD
+      - test "$(git rev-parse HEAD)" = "$CODEBUILD_RESOLVED_SOURCE_VERSION"
+  build:
+    commands:
+      - bash "$CODEBUILD_SRC_DIR/$SOURCE_DIRECTORY/deploy/deploy.sh"

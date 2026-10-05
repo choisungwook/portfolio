@@ -1,0 +1,7 @@
+github_repository   = "example-owner/ecs-deploy-lab"
+github_branch       = "main"
+source_directory    = "."
+bootstrap_image_tag = "v1"
+desired_count       = 1
+github_default_branch = "main"
+# existing_github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"

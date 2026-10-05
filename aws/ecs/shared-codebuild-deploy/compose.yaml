@@ -1,0 +1,19 @@
+services:
+  hello:
+    platform: linux/amd64
+    build:
+      context: ./app
+      args:
+        IMAGE_VERSION: v1
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVICE_NAME: hello-local
+      MESSAGE: Hello locally
+      APP_ENV: dev
+      LOG_LEVEL: debug
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 3

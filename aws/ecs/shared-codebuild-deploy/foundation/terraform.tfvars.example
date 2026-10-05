@@ -1,0 +1,6 @@
+aws_region   = "ap-northeast-2"
+project_name = "ecs-shared-build"
+allowed_cidr = "203.0.113.10/32"
+
+existing_connection_arn = null
+log_retention_days      = 7

@@ -1,0 +1,68 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "hello",
+      "image": "__IMAGE__",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "SERVICE_NAME",
+          "value": "hello-alpha"
+        },
+        {
+          "name": "MESSAGE",
+          "value": "Hello from alpha"
+        },
+        {
+          "name": "APP_ENV",
+          "value": "dev"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "debug"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ecs-shared-build/hello-alpha",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "app"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"
+        ],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      }
+    }
+  ],
+  "family": "ecs-shared-build-hello-alpha",
+  "taskRoleArn": "arn:aws:iam::467606240901:role/ecs-shared-build-task",
+  "executionRoleArn": "arn:aws:iam::467606240901:role/ecs-shared-build-execution",
+  "networkMode": "awsvpc",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}
