@@ -35,6 +35,8 @@ flowchart LR
 3. [롤백](docs/3-rollback.md)
 4. [PR에서 task definition diff 보기 (참고용)](docs/4-pr-diff.md)
 
+다른 프로젝트에 이 아키텍처를 적용할 때 AI agent에게 줄 지침: [docs/5-ai-adoption-guide.md](docs/5-ai-adoption-guide.md)
+
 ## 로컬 테스트
 
 AWS 호출 없이 스크립트와 Terraform 계약 확인:
