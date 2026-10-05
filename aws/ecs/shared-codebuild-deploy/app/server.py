@@ -21,7 +21,7 @@ class HelloHandler(BaseHTTPRequestHandler):
     elif self.path == "/":
       self.send_json(200, {
         "service_name": os.environ.get("SERVICE_NAME", "hello-local"),
-        "message": os.environ.get("MESSAGE", "Hello locally! How are you?"),
+        "message": os.environ.get("MESSAGE", "Hello locally!"),
         "image_version": IMAGE_VERSION,
         "app_env": APP_ENV,
         "log_level": LOG_LEVEL.lower(),
