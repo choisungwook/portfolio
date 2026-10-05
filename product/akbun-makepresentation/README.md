@@ -25,11 +25,13 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Zoom from 50% to 400%, from the status bar or the keyboard
 - Slide numbers, toggled from the Slides menu
 - Undo and redo, multi-object selection, cut, copy and paste, duplicate
+- Align selected objects on their left, center, right, top, middle or bottom, and spread three or more evenly across or down
 - Stacking order from the Edit menu or the right-click menu: bring to front, bring forward, send backward, send to back. A new object starts in front
 - Copy objects to the system clipboard as PNG, text and editable object data; paste across independent instances or into other apps
 - Paste text and images from the system clipboard
 - Open and save .pptx, export every slide as a .pdf
-- Presentation mode (fullscreen, arrow keys)
+- Speaker notes for each slide in a box under the canvas, saved as the notes pages PowerPoint and Keynote read
+- Presentation mode: fullscreen with arrow keys, jump to a slide by number, black or white screen, a laser pointer and an all-slides grid
 - Self update from Settings, Updates
 - AI panel backed by a separately installed Codex CLI and its ChatGPT subscription login
 - Streaming text, generated images, and non-destructive slide edits from an app-owned conversation
@@ -68,6 +70,19 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Delete, Backspace | Delete the selection when the editor has focus; otherwise delete the current slide. Inside a text box being edited they delete a character instead |
 | Shift while rotating | Quarter turns only |
 | Double click on a shape | Edit its text |
+
+While presenting:
+
+| Key | What it does |
+|---|---|
+| →, ↓, Space, Enter, PageDown, click | Next slide |
+| ←, ↑, Backspace, PageUp | Previous slide |
+| Home / End | First / last slide |
+| Number, then Enter | Go to that slide |
+| B / W | Black or white screen; any key brings the slide back |
+| L | Laser pointer on or off |
+| O | All slides as a grid; arrows and Enter or a click pick one |
+| Esc | Leave the presentation, or the grid |
 | Typing over a selected shape | Starts writing in it. The tool letters come back once nothing is selected |
 
 ## Directory layout

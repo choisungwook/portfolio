@@ -50,6 +50,14 @@ $('props-shape-align').addEventListener('click', (event) => {
   if (button) alignSelection(button.dataset.shapeAlign);
 });
 
+$('props-shape-distribute').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-shape-distribute]');
+  if (!button || !L.distributeShapes(slide().shapes, state.selection, button.dataset.shapeDistribute)) return;
+  markDirty();
+  renderAll();
+  canvas.focus({ preventScroll: true });
+});
+
 // --- slide background --------------------------------------------------------
 //
 // Deliberately not part of applyProp: it writes to the slide, never to a
