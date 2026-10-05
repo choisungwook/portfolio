@@ -32,6 +32,7 @@ flowchart LR
 1. [AWS 환경 준비와 정리](docs/1-setup.md)
 2. [이미지 배포와 설정 변경](docs/2-deploy.md)
 3. [롤백](docs/3-rollback.md)
+4. [PR에서 task definition diff 보기 (참고용)](docs/4-pr-diff.md)
 
 ## 로컬 테스트
 

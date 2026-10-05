@@ -42,11 +42,7 @@ bash scripts/start-pipeline.sh ecs-shared-build-hello-alpha v1
 
 ## 3. PR에서 변경 내용 미리 보기
 
-- PR에서 `deploy/task-definitions/` JSON이 바뀌면 GitHub Actions가 운영 중 task definition과의 diff를 PR comment로 남김.
-- PR에 `/ecs-diff` comment를 남기면 다시 실행. 저장소 owner·member·collaborator만 가능. 기본 branch에 workflow가 있어야 동작.
-- 워크플로: 저장소 루트 `.github/workflows/ecs-task-diff.yml`. AWS는 OIDC로 읽기 전용 role만 사용.
-
-로컬에서 같은 diff 보기:
+운영 중 task definition과 Git JSON의 차이를 로컬에서 확인. PR comment로 보여 주는 설계는 [PR diff](4-pr-diff.md):
 
 ```bash
 CLUSTER_NAME=ecs-shared-build-cluster SERVICE_NAME=hello-alpha \

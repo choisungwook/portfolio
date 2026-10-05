@@ -15,6 +15,7 @@ timestamp: 2026-10-05T00:00:00Z
 - role trust의 sub는 `pull_request`와 기본 branch ref만 허용.
 - issue_comment는 owner·member·collaborator만, 스크립트는 기본 branch 것을 쓰고 PR에서는 JSON만 가져옴.
 - fork PR은 실행하지 않음.
+- 2026-10-05 동작 검증 후 워크플로는 전체 주석 처리. 참고용으로만 보관.
 
 ## 이유
 
