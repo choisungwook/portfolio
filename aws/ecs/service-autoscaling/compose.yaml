@@ -1,0 +1,14 @@
+# Same image, default.conf and health check as the ECS task definition.
+services:
+  web:
+    image: public.ecr.aws/nginx/nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
