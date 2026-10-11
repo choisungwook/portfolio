@@ -140,6 +140,15 @@ data "aws_subnets" "default" {
 - Security Group: ElastiCache는 퍼블릭에 노출하지 않는다. 접속하는 app security group에서만 port 6379 ingress를 허용한다. `aws_vpc_security_group_ingress_rule`에 CIDR 대신 `referenced_security_group_id`로 app security group을 지정한다.
 - 이미 떠 있는 AUTH token 클러스터를 RBAC/IAM으로 무중단 전환할 때는 `default` user의 password를 기존 AUTH token으로 둔 채 다리로 삼고, IAM user로 트래픽을 옮긴 뒤 `default` user를 user group에서 뺀다. AUTH는 연결이 맺어질 때 한 번만 검사하므로 이미 붙어 있는 연결은 전환 중에도 끊기지 않는다.
 
+## ECS 규칙
+
+- ECS 클러스터를 만들면 event capture(콘솔 Event history)와 Action Logs를 함께 켠다. 콘솔 기본 화면은 멈춘 task를 1시간, service events를 100개까지만 보여줘서 실습 중 task가 왜 뜨고 죽었는지 나중에 볼 수 없다.
+- 둘 다 Terraform으로 만들고 log group 보존은 1일(`retention_in_days = 1`)로 한다. 콘솔 버튼으로 켜면 rule과 log group이 Terraform 밖에 생겨 `terraform destroy` 뒤에 남는다.
+- event capture: log group 이름은 콘솔이 조회하는 `/aws/events/ecs/containerinsights/<cluster>/performance`로 한다. EventBridge rule은 `source = ["aws.ecs"]`에 `resources` prefix(`task/<cluster>/`, `service/<cluster>/`, `container-instance/<cluster>/`)로 이 클러스터만 받는다.
+- 이렇게 만들면 클러스터 Configuration 탭의 ECS events는 꺼짐으로 표시되지만 Event history 조회는 된다. 콘솔은 자기가 만든 rule 이름으로 켜짐을 판단한다.
+- Action Logs: `aws_cloudwatch_log_delivery_source`(`log_type = "ACTION_LOGS"`, `resource_arn` = 클러스터 ARN) → `aws_cloudwatch_log_delivery_destination`(`/aws/vendedlogs/ecs/action-logs/<cluster>`) → `aws_cloudwatch_log_delivery`. 배포 단위로만 기록되므로 desired count만 바꾸면 남는 것이 없다.
+- 두 log group의 쓰기 권한은 전용 `aws_cloudwatch_log_resource_policy` 하나에 담고, event target과 delivery가 `depends_on`으로 그 정책을 기다린다. 정책이 없으면 CreateDelivery가 계정 공용 `AWSLogDeliveryWrite20150319` 정책에 log group을 덧붙이고, destroy는 그 수정을 되돌리지 않는다.
+
 ## Security Group 규칙
 
 - EC2 원격 접속은 SSM Session Manager를 사용하므로 SSH(port 22) ingress를 열지 않는다.

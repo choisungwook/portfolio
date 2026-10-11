@@ -3,9 +3,9 @@ description: 새 핸즈온 workspace를 만든다. 기존 핸즈온을 고칠 �
 argument-hint: <workspace 경로> <주제>
 ---
 
-핸즈온 workspace를 만든다. 대상 workspace는 `$1`(루트가 아닌 하위 디렉터리), 주제는 `$2` 이후 인자다. 인자가 없으면 대화 맥락에서 정한다.
+핸즈온 workspace를 만든다. 대상 workspace(루트가 아닌 하위 디렉터리)와 주제는 `$ARGUMENTS` 전체에서 정하고, 인자가 없으면 대화 맥락에서 정한다. 인자는 자유 문장으로 오는 경우가 많아 위치 인자로 나누면 문장 조각이 경로가 된다.
 
-- `$1`에 `/`가 없으면 경로가 아니라 주제 문장의 첫 단어다. 인자 전체를 주제로 보고 경로는 대화 맥락에서 정한다.
+- 인자에 `/`가 들어간 경로가 있으면 그것을 workspace로 쓰고, 없으면 인자 전체를 주제로 보고 경로를 정한다.
 - 경로는 기존 구조를 따른다. AWS 서비스 중심이면 `aws/<서비스>/<주제>`, AI·일반 주제면 `computer_science/<분야>/<주제>`다.
 
 ## 순서
@@ -22,6 +22,7 @@ argument-hint: <workspace 경로> <주제>
 - `setup.md`를 따로 만들고 설치 관련 내용은 전부 여기에만 쓴다. 다른 문서는 설치가 필요할 때 `setup.md`를 링크한다.
 - `setup.md`는 up과 down 두 스텝으로 끝낸다. up/down은 `docker compose up -d`, `docker compose down -v`처럼 한 줄 명령으로 만든다.
 - 본문은 `/akbun-writing:akbun-writing` 스킬로 쓴다. 독자는 실무 엔지니어다. 스킬이 없는 환경이면 [philosophy.md](../rules/philosophy.md)와 루트 AGENTS.md의 문서 작성 규칙으로 쓰고 결과 보고에 남긴다.
+- 작업 디렉터리에 의존하는 명령(`-chdir`, 상대 경로)이 있으면 첫 코드블록에 `cd <workspace 경로>`를 넣는다. 위치를 산문으로만 적으면 독자는 명령만 복사해 다른 디렉터리에서 실행한다.
 - markdown 규칙은 [.claude/rules/markdown.md](../rules/markdown.md)를 따른다.
 
 ## knowledge 복사
@@ -29,7 +30,7 @@ argument-hint: <workspace 경로> <주제>
 `templates/knowledge/`를 통째로 workspace에 복사한다. workspace는 각각 독립이므로 자기 knowledge를 갖는다.
 
 ```bash
-cp -R templates/knowledge "$1/knowledge"
+cp -R templates/knowledge "<workspace>/knowledge"
 ```
 
 복사한 index.md와 log.md의 자리 표시 예시 줄은 첫 concept를 쓸 때 실제 항목으로 바꾼다.
