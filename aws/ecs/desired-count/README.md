@@ -6,5 +6,5 @@ ECS Service의 desiredCount, runningCount, pendingCount 차이를 콘솔, CLI, T
 | --- | --- |
 | [docs/setup.md](./docs/setup.md) | 환경 생성과 삭제 |
 | [docs/1-concept.md](./docs/1-concept.md) | desired, running, pending과 두 health check, Kubernetes 대응표 |
-| [docs/2-handson.md](./docs/2-handson.md) | 실습 7단계 |
+| [docs/2-handson.md](./docs/2-handson.md) | 실습 8단계: desired count 변경, drift, self-healing, 이벤트 이력 |
 | [docs/3-review.md](./docs/3-review.md) | 정리 질문과 답 |
