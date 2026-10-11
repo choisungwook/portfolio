@@ -33,6 +33,7 @@ const canvas = $('canvas');
 const stageInner = $('stage-inner');
 const textEditor = $('text-editor');
 const present = $('present');
+const slideNotes = $('slide-notes');
 const contextMenu = $('context-menu');
 const slideContextMenu = $('slide-context-menu');
 const presetMenu = $('preset-menu');
@@ -374,6 +375,7 @@ function renderProps() {
   $('props-crop-label').textContent = kind === 'code' ? 'Code block crop' : 'Image crop';
   $('btn-crop').classList.toggle('active', !!state.cropping);
   $('props-shape-align').hidden = state.selection.length < 2;
+  $('props-shape-distribute').hidden = state.selection.length < 3;
   $('props-hint').textContent = state.selection.length > 1
     ? `Selected: ${state.selection.length} objects`
     : shape
@@ -439,7 +441,13 @@ function renderAll() {
   renderThumbs();
   renderProps();
   renderBackground();
+  renderNotes();
   updateTitle();
+}
+
+// A focused box is left alone, so a redraw while typing cannot move the caret.
+function renderNotes() {
+  if (document.activeElement !== slideNotes) slideNotes.value = slide().notes || '';
 }
 
 // --- undo history -------------------------------------------------------------

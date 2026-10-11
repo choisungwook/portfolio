@@ -67,6 +67,7 @@
     visualShapeBBox: Geometry.visualShapeBBox,
     boundsForShapes: Geometry.boundsForShapes,
     alignShapes: Geometry.alignShapes,
+    distributeShapes: Geometry.distributeShapes,
     snapMove: Geometry.snapMove,
     groupShapes: Geometry.groupShapes,
     ungroupShapes: Geometry.ungroupShapes,

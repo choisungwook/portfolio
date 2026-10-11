@@ -5,6 +5,7 @@ mod table;
 mod xml;
 
 use super::common::mime_for_ext;
+use super::notes::parse_notes;
 use crate::{Deck, Shape, Slide, EMU_PER_PX, SLIDE_H, SLIDE_W};
 use base64::Engine;
 use quick_xml::events::Event;
@@ -174,7 +175,11 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
                 i += 1;
             }
         }
-        deck.slides.push(Slide { shapes, background });
+        let notes = relation_target(&rels, "/notesSlide")
+            .and_then(|path| part(&mut archive, &path))
+            .map(|xml| parse_notes(&xml))
+            .unwrap_or_default();
+        deck.slides.push(Slide { shapes, background, notes });
     }
 
     Ok(deck)
