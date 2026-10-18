@@ -32,7 +32,7 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 - 리뷰어는 copilot-instructions.md의 finding 형식과 요약 형식을 그대로 따른다. Copilot이 PR에서 하는 리뷰와 같은 기준이어야 PR에서 새 지적이 줄어든다.
 - Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. Nit은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다.
 - 리뷰는 1회다. 고친 뒤 다시 돌리지 않는다. 고친 것은 Copilot이 PR에서 다시 본다.
-- 결과는 PR 검증 절의 마지막 항목에 건수로 적는다. 예: 서브에이전트 리뷰: Important 2건 모두 고침, Nit 1건 반영.
+- 결과는 PR 검증 표의 마지막 행에 건수로 적는다. 예: Important 2건 모두 고침, Nit 1건 반영.
 
 ## 제품 카탈로그 갱신
 
@@ -49,7 +49,7 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 - commit message는 영어로, Issue와 PR body는 한글 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
 - Goal은 번호 리스트 3개 이내로 쪼갠다. 요약형과 목록형 절의 항목 규칙은 템플릿 상단 주석을 따른다. backtick을 쓰지 않는다. 예외는 PR 구현 절의 mermaid 코드블록이다.
 - 왜, 완료 조건, 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다.
-- PR의 검증 절은 Issue의 완료 조건마다 한 줄로 답한다. 항목마다 실행한 명령이나 CI job과 본 결과를 적는다. 실행하지 않은 조건은 검증하지 않음으로 적는다.
+- PR의 검증 절은 표다. Issue의 완료 조건마다 행 하나, 실행 열에 명령이나 CI job, 결과 열에 본 것을 적는다. 실행하지 않은 조건은 실행 열에 검증하지 않음으로 적는다.
 - PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
 - 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
 

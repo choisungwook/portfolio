@@ -82,9 +82,9 @@ jobs:
             echo "::error::PR body 끝에 'Issue #<번호>' 링크가 없음"
             fail=1
           fi
-          # 검증 절에 항목이 하나도 없으면 증거가 없는 것이다.
-          if ! printf '%s\n' "$body" | awk '/^# 검증$/{on=1; next} /^# /{on=0} on && /^- /{found=1} END{exit !found}'; then
-            echo "::error::검증 절에 항목이 없음. 실행한 명령과 본 결과를 항목으로 적을 것"
+          # 검증 절은 표다. 헤더와 구분선 아래 행이 하나도 없으면 증거가 없는 것이다.
+          if ! printf '%s\n' "$body" | awk '/^# 검증$/{on=1; next} /^# /{on=0} on && /^\|/{n++} END{exit !(n>=3)}'; then
+            echo "::error::검증 절에 표 행이 없음. 완료 조건, 실행, 결과 열로 행을 적을 것"
             fail=1
           fi
           # 구현 절의 mermaid 블록은 줄 수에서 뺀다.
