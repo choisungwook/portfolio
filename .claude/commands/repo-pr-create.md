@@ -51,7 +51,6 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 - Goal은 번호 리스트 3개 이내로 쪼갠다. 요약형과 목록형 절의 항목 규칙은 템플릿 상단 주석을 따른다. backtick을 쓰지 않는다.
 - 왜, 완료 조건, 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다.
 - PR의 검증 절은 Issue의 완료 조건마다 한 줄로 답한다. 항목마다 실행한 명령이나 CI job과 본 결과를 적는다. 실행하지 않은 조건은 검증하지 않음으로 적는다.
-- PR의 리스크 절은 비우지 않는다. 어느 검사가 못 잡는지를 적고, 없으면 없음과 근거를 적는다.
 - PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
 - 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
 

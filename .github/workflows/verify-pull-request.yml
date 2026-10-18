@@ -38,39 +38,28 @@ jobs:
         with:
           node-version: '24'
 
+      # 파일 목록은 xargs -r로 넘긴다. 목록이 비면 아무것도 실행하지 않는다.
       - name: markdownlint
         run: |
-          added=$(grep -E '\.md$' added.txt || true)
-          modified=$(grep -E '\.md$' modified.txt || true)
-          if [ -n "$added" ]; then
-            npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json $added
-          fi
-          if [ -n "$modified" ]; then
-            npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json $modified \
-              || echo "::warning::고친 Markdown 파일에 기존 lint 오류가 있음. PR을 막지는 않음"
-          fi
+          grep -E '\.md$' added.txt \
+            | xargs -r npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json
+          grep -E '\.md$' modified.txt \
+            | xargs -r npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json \
+            || echo "::warning::고친 Markdown 파일에 기존 lint 오류가 있음. PR을 막지는 않음"
 
       - uses: hashicorp/setup-terraform@v4
 
       - name: terraform fmt
         run: |
-          added=$(grep -E '\.tf$' added.txt || true)
-          modified=$(grep -E '\.tf$' modified.txt || true)
-          if [ -n "$added" ]; then
-            terraform fmt -check -diff $added
-          fi
-          if [ -n "$modified" ]; then
-            terraform fmt -check -diff $modified \
-              || echo "::warning::고친 Terraform 파일에 기존 fmt 차이가 있음. PR을 막지는 않음"
-          fi
+          grep -E '\.tf$' added.txt | xargs -r terraform fmt -check -diff
+          grep -E '\.tf$' modified.txt | xargs -r terraform fmt -check -diff \
+            || echo "::warning::고친 Terraform 파일에 기존 fmt 차이가 있음. PR을 막지는 않음"
 
       # workflow는 모든 PR에 돌므로 추가든 수정이든 실패로 막는다.
       - name: actionlint
         run: |
-          files=$(grep -E '^\.github/workflows/.*\.ya?ml$' added.txt modified.txt --no-filename || true)
-          if [ -n "$files" ]; then
-            docker run --rm -v "$PWD:/repo" -w /repo "rhysd/actionlint:$ACTIONLINT_VERSION" -color $files
-          fi
+          grep -hE '^\.github/workflows/.*\.ya?ml$' added.txt modified.txt \
+            | xargs -r docker run --rm -v "$PWD:/repo" -w /repo "rhysd/actionlint:$ACTIONLINT_VERSION" -color
 
   pr-body:
     runs-on: ubuntu-latest
@@ -80,23 +69,25 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          # 웹 UI에서 쓴 body는 줄 끝이 CRLF라 먼저 CR을 지운다.
+          body=$(printf '%s\n' "$PR_BODY" | tr -d '\r')
           fail=0
           for header in '# 구현' '# 검증' '# 리스크'; do
-            if ! printf '%s\n' "$PR_BODY" | grep -qx "$header"; then
+            if ! printf '%s\n' "$body" | grep -qx "$header"; then
               echo "::error::PR body에 '$header' 절이 없음. .github/pull_request_template.md를 따를 것"
               fail=1
             fi
           done
-          if ! printf '%s\n' "$PR_BODY" | grep -qE '^Issue #[0-9]+'; then
+          if ! printf '%s\n' "$body" | grep -qE '^Issue #[0-9]+'; then
             echo "::error::PR body 끝에 'Issue #<번호>' 링크가 없음"
             fail=1
           fi
           # 검증 절에 항목이 하나도 없으면 증거가 없는 것이다.
-          if ! printf '%s\n' "$PR_BODY" | awk '/^# 검증$/{on=1; next} /^# /{on=0} on && /^- /{found=1} END{exit !found}'; then
+          if ! printf '%s\n' "$body" | awk '/^# 검증$/{on=1; next} /^# /{on=0} on && /^- /{found=1} END{exit !found}'; then
             echo "::error::검증 절에 항목이 없음. 실행한 명령과 본 결과를 항목으로 적을 것"
             fail=1
           fi
-          lines=$(printf '%s\n' "$PR_BODY" | grep -cv '^[[:space:]]*$')
+          lines=$(printf '%s\n' "$body" | grep -cv '^[[:space:]]*$')
           if [ "$lines" -gt 40 ]; then
             echo "::warning::PR body가 ${lines}줄로 40줄을 넘음. 요약형 절의 근거부터 줄일 것"
           fi

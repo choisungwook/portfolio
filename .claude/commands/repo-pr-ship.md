@@ -49,7 +49,7 @@ merge는 되돌리기 어렵고 master를 바꾼다. 이 command를 호출한 �
 
 - PR의 mergeable 상태가 충돌 없음이다.
 - 걸려 있는 CI check가 모두 통과했다. 아직 도는 중이면 끝날 때까지 기다린다. verify-pull-request.yml이 PR body 형식에서 실패했으면 body를 고치면 다시 돈다.
-- Important 태그의 review thread가 열려 있지 않다. 거부(틀림)으로 답한 thread는 열려 있어도 된다.
+- Important 태그의 review thread 중 답글 없이 열린 것이 없다. 거부로 답한 thread는 열려 있어도 된다.
 
 ```bash
 TITLE=$(gh pr view "$PR" --json title -q .title)
