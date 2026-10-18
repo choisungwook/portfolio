@@ -1,0 +1,103 @@
+name: verify-pull-request
+
+# 모든 PR에 도는 공통 검사. product별 테스트는 verify-<product>.yml이 맡고,
+# 이 workflow는 바뀐 파일의 lint와 PR body 형식만 본다.
+# 새로 추가한 파일의 lint 실패는 PR을 막고, 고친 기존 파일의 실패는 경고로만
+# 남긴다. 이 저장소의 오래된 문서와 yaml은 lint를 거치지 않고 쌓였기 때문이다.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+env:
+  MARKDOWNLINT_CLI_VERSION: 0.49.1
+  ACTIONLINT_VERSION: 1.7.12
+
+jobs:
+  lint-changed-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 추가된 파일과 고친 파일을 나눠 둔다. 아래 단계들이 추가는 실패, 수정은 경고로 다룬다.
+      - name: List changed files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" > added.txt
+          git diff --name-only --diff-filter=MR "$BASE_SHA...$HEAD_SHA" > modified.txt
+          echo "added:"; cat added.txt
+          echo "modified:"; cat modified.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: markdownlint
+        run: |
+          added=$(grep -E '\.md$' added.txt || true)
+          modified=$(grep -E '\.md$' modified.txt || true)
+          if [ -n "$added" ]; then
+            npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json $added
+          fi
+          if [ -n "$modified" ]; then
+            npx --yes "markdownlint-cli@$MARKDOWNLINT_CLI_VERSION" --config .markdownlint.json $modified \
+              || echo "::warning::고친 Markdown 파일에 기존 lint 오류가 있음. PR을 막지는 않음"
+          fi
+
+      - uses: hashicorp/setup-terraform@v4
+
+      - name: terraform fmt
+        run: |
+          added=$(grep -E '\.tf$' added.txt || true)
+          modified=$(grep -E '\.tf$' modified.txt || true)
+          if [ -n "$added" ]; then
+            terraform fmt -check -diff $added
+          fi
+          if [ -n "$modified" ]; then
+            terraform fmt -check -diff $modified \
+              || echo "::warning::고친 Terraform 파일에 기존 fmt 차이가 있음. PR을 막지는 않음"
+          fi
+
+      # workflow는 모든 PR에 돌므로 추가든 수정이든 실패로 막는다.
+      - name: actionlint
+        run: |
+          files=$(grep -E '^\.github/workflows/.*\.ya?ml$' added.txt modified.txt --no-filename || true)
+          if [ -n "$files" ]; then
+            docker run --rm -v "$PWD:/repo" -w /repo "rhysd/actionlint:$ACTIONLINT_VERSION" -color $files
+          fi
+
+  pr-body:
+    runs-on: ubuntu-latest
+    steps:
+      # body는 외부 입력이라 환경 변수로만 받고 스크립트에 직접 넣지 않는다.
+      - name: Check PR body follows the template
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          fail=0
+          for header in '# 구현' '# 검증' '# 리스크'; do
+            if ! printf '%s\n' "$PR_BODY" | grep -qx "$header"; then
+              echo "::error::PR body에 '$header' 절이 없음. .github/pull_request_template.md를 따를 것"
+              fail=1
+            fi
+          done
+          if ! printf '%s\n' "$PR_BODY" | grep -qE '^Issue #[0-9]+'; then
+            echo "::error::PR body 끝에 'Issue #<번호>' 링크가 없음"
+            fail=1
+          fi
+          # 검증 절에 항목이 하나도 없으면 증거가 없는 것이다.
+          if ! printf '%s\n' "$PR_BODY" | awk '/^# 검증$/{on=1; next} /^# /{on=0} on && /^- /{found=1} END{exit !found}'; then
+            echo "::error::검증 절에 항목이 없음. 실행한 명령과 본 결과를 항목으로 적을 것"
+            fail=1
+          fi
+          lines=$(printf '%s\n' "$PR_BODY" | grep -cv '^[[:space:]]*$')
+          if [ "$lines" -gt 40 ]; then
+            echo "::warning::PR body가 ${lines}줄로 40줄을 넘음. 요약형 절의 근거부터 줄일 것"
+          fi
+          exit $fail

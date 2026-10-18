@@ -69,6 +69,10 @@ mutation($pr:ID!) {
 gh pr view "$PR" --json reviewRequests -q '.reviewRequests[].login'
 ```
 
+## 리뷰 기준
+
+Copilot은 head branch의 [.github/copilot-instructions.md](../../.github/copilot-instructions.md)와 루트 AGENTS.md를 읽고 리뷰한다. 리뷰가 엉뚱한 것을 지적하거나 봐야 할 것을 놓치면 요청 방식이 아니라 그 파일을 고친다. head branch 기준이라 같은 PR에서 고치고 다시 요청하면 바로 반영된다.
+
 ## 주의
 
 - 리뷰 본문을 조회하거나 polling하지 않는다. 올라온 comment를 읽고 고치는 것은 [/repo-pr-fix](./repo-pr-fix.md)가 한다.

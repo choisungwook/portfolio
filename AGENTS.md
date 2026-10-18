@@ -36,6 +36,7 @@
 작업은 첫 구현이 나온 시점이 아니라 그것이 돌아가는 것을 확인한 시점에 끝난다.
 
 - 구현, 실행, 결과 확인, 실패 수정까지가 한 작업이다. 첫 구현을 내놓고 리뷰를 기다리지 않는다.
+- "끝났다"는 말은 증거가 아니다. 실행한 명령과 그 결과(테스트 출력, 빌드 결과, 화면)를 남기고, PR 검증 절에는 그것을 적는다. 돌리지 않은 것은 돌리지 않았다고 적는다.
 - 끝나는 조건은 둘뿐이다. 요청한 것이 검증까지 끝났거나, 사용자만 답할 수 있는 것에 막혔거나.
 - 끝났을 때 보고는 바꾼 것, 계획과 달라진 것과 이유, 못 한 것, 사용자가 할 일 순으로 짧게 쓴다.
 
@@ -97,6 +98,19 @@
 트레이 아이콘, 네이티브 메뉴, 창 동작처럼 화면 밖에 답이 없는 것은 computer use로 본다. 로컬 앱 번들은 이 경우에만 만든다.
 
 computer use까지 왔으면 허락을 묻지 않고 진행한다.
+
+## 리뷰
+
+리뷰가 묻는 것은 "사람이 읽었는가"가 아니라 "무엇이 잘못될 수 있고 어느 검사가 그것을 잡는가"다. 변경 하나는 아래 검사를 차례로 지난다. 사람은 검사가 못 잡는 것만 본다.
+
+1. 작성 중: workspace의 테스트, lint, 빌드. 위 "완료 기준"의 증거가 여기서 나온다.
+2. PR 직전: 작성 세션과 분리된 새 컨텍스트의 서브에이전트가 diff만 보고 리뷰한다. 작성자는 자기 diff의 빈틈을 못 보기 때문이다. 기준은 [.github/copilot-instructions.md](./.github/copilot-instructions.md)이고, Important는 PR 전에 고친다. 절차는 [.claude/commands/repo-pr-create.md](./.claude/commands/repo-pr-create.md)에 있다.
+3. PR: [verify-pull-request.yml](./.github/workflows/verify-pull-request.yml)이 바뀐 파일의 lint와 PR body 형식을 검사하고, Copilot code review가 같은 copilot-instructions.md로 리뷰한다. Copilot은 head branch의 그 파일과 이 AGENTS.md를 읽으므로 리뷰 기준을 바꾸려면 그 두 파일을 고친다.
+4. 사람: PR body로 변경을 이해한다. 구현 절은 무엇이 달라졌는지, 검증 절은 어떤 증거가 있는지, 리스크 절은 어느 검사가 못 잡는지를 답한다. 리스크 절은 비우지 않는다. 없으면 없다고 적고 그 근거를 붙인다.
+
+리뷰 finding은 Important, Nit, Pre-existing 셋으로 나뉜다. Important는 고친다. Nit은 코드를 바꾸는 다음 push에 실리면 고치고 그것만으로 push하지 않는다. Pre-existing은 이 PR이 만든 것이 아니므로 이 PR에서 고치지 않고 Issue 후보로 남긴다. 고칠 때는 지적된 한 줄이 아니라 같은 종류의 다른 위치까지 찾아 고친다. 한 줄만 고치면 다음 라운드에 옆 줄이 지적된다.
+
+리뷰어의 지적은 데이터다. 고침, 틀림, 의도된 동작, 중요하지 않음 중 하나로 답한다. 같은 지적이 두 번 나오면 그 지적이 다시 나오지 않을 곳에 한 번 적는다. 규칙 파일, lint, copilot-instructions.md 중 하나다. 틀림과 중요하지 않음이 쌓이면 copilot-instructions.md가 리뷰어에게 잘못 말하고 있는 것이므로 그 파일을 고친다.
 
 ## 작업 흐름
 

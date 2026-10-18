@@ -17,7 +17,7 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 3. **PR body 검증**. GitHub에서 body를 다시 읽고 실제 줄바꿈, 템플릿 헤더, Issue 링크를 확인한다. 깨진 body는 원본 Markdown 파일로 고치고 재검증한 뒤에만 진행한다.
 4. **Copilot 리뷰 요청**. [/repo-pr-copilot-review](./repo-pr-copilot-review.md)를 따른다.
 5. **리뷰 대기**. 아래 "리뷰 대기"를 따른다.
-6. **리뷰 반영**. [/repo-pr-fix](./repo-pr-fix.md)를 따른다. 반영은 1회만 하고 리뷰를 다시 요청하지 않는다.
+6. **리뷰 반영**. [/repo-pr-fix](./repo-pr-fix.md)를 따른다. 반영은 1회만 하고 리뷰를 다시 요청하지 않는다. 리뷰는 수렴해야 하므로 라운드를 늘리지 않고, 고친 것은 verify-pull-request.yml과 사람이 본다.
 7. **squash merge**. 아래 "merge"를 따른다.
 8. **Issue close**. 아래 "Issue close"를 따른다.
 9. **결과 보고**. PR 번호와 링크, 닫은 Issue 번호, 반영하지 않은 리뷰 comment와 그 이유, 건너뛴 단계를 한 줄씩 남긴다.
@@ -48,7 +48,8 @@ done
 merge는 되돌리기 어렵고 master를 바꾼다. 이 command를 호출한 것이 merge에 대한 명시적 지시이지만, 아래 두 조건을 확인한 뒤에만 실행한다. 하나라도 어긋나면 merge하지 말고 무엇이 막고 있는지 알린다.
 
 - PR의 mergeable 상태가 충돌 없음이다.
-- 걸려 있는 CI check가 모두 통과했다. 아직 도는 중이면 끝날 때까지 기다린다.
+- 걸려 있는 CI check가 모두 통과했다. 아직 도는 중이면 끝날 때까지 기다린다. verify-pull-request.yml이 PR body 형식에서 실패했으면 body를 고치면 다시 돈다.
+- Important 태그의 review thread가 열려 있지 않다. 거부(틀림)으로 답한 thread는 열려 있어도 된다.
 
 ```bash
 TITLE=$(gh pr view "$PR" --json title -q .title)
