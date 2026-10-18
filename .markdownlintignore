@@ -1,0 +1,7 @@
+# slash command와 agent 파일은 frontmatter 뒤에 H1 없이 본문이 시작하고,
+# PR 템플릿은 H1 네 개가 구조다. 둘 다 .claude/rules/markdown.md의 대상이 아니다.
+.claude/commands/
+.claude/agents/
+.github/pull_request_template.md
+.github/ISSUE_TEMPLATE/
+unused/

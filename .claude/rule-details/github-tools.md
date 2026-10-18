@@ -44,7 +44,6 @@ gh auth status
 - **commit과 push**: shell이 없으므로 코드 변경 자체가 불가능하다. 코드 수정이 필요한 단계는 CLI 환경에서만 돈다.
 - **대기와 polling**: sleep이 없다. 시간이 걸리는 단계는 거기서 끊고, 사용자가 나중에 다시 호출하게 한다.
 - **GraphQL mutation**: Copilot 재요청(`requestReviewsByLogin`)이 안 된다. 최초 요청만 된다.
-- **project 담기**: `gh project item-add`에 해당하는 도구가 없다.
 - **local branch 정리**: merge 후 `git pull --rebase`를 대신할 수단이 없다.
 
 ## MCP로 만든 PR의 자동 footer
