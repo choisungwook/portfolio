@@ -120,6 +120,7 @@
 106. ECS 서비스별 CodePipeline 2개와 공용 CodeBuild 1개: 설정 배포·이미지 보호·롤백 (26.10.4) - [링크](./aws/ecs/shared-codebuild-deploy/)
 107. ECS Service desired count 변경 실습 (26.10.11) - [링크](./aws/ecs/desired-count/)
 108. ECS Service Auto Scaling: target tracking scale-out·scale-in 관찰과 scaling 알림 (26.10.11) - [링크](./aws/ecs/service-autoscaling/)
+109. ECS circuit breaker: blue/green 배포에서 이미지 pull 실패, health check 실패, 미사용 비교 (26.10.18) - [링크](./aws/ecs/circuit-breaker/)
 
 ## 직접 만든 제품
 
