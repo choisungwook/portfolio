@@ -18,7 +18,7 @@ Copilot code review와 PR 직전 서브에이전트 리뷰가 같이 읽는다. 
 - GitHub Actions(.github/workflows/): permissions 없음. PR 제목이나 body 같은 외부 입력을 run 스크립트에 직접 넣음. action이나 도구 버전이 같은 디렉터리의 다른 workflow보다 낮음.
 - product/: workspace/ 아래를 고쳤는데 버전을 안 올림. 새 디렉터리를 만들었는데 product/README.md, 루트 README.md, products.json 중 하나라도 안 고침.
 - 규칙 파일(AGENTS.md, .claude/, .github/*.md): 같은 규칙이 두 파일에 적힘. 다른 규칙 파일과 모순됨. 링크 대상 파일이 없음. 모델이 알아서 하는 일을 지시함.
-- PR body: 검증 절이 Issue의 완료 조건에 답하지 않음. 실행하지 않은 검증을 통과로 적음. 리스크 절이 없거나, 있는데 어느 검사가 못 잡는지가 없음.
+- PR body: 공부 절이 없거나 알게 된 것 대신 기능 설명으로 채워짐. 검증 절이 Issue의 완료 조건에 답하지 않음. 실행하지 않은 검증을 통과로 적음. 리스크 절이 없거나, 있는데 어느 검사가 못 잡는지가 없음.
 
 ## 깊이 보는 경로
 

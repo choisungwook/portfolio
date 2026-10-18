@@ -72,7 +72,7 @@ jobs:
           # 웹 UI에서 쓴 body는 줄 끝이 CRLF라 먼저 CR을 지운다.
           body=$(printf '%s\n' "$PR_BODY" | tr -d '\r')
           fail=0
-          for header in '# 구현' '# 검증' '# 리스크'; do
+          for header in '# 공부' '# 구현' '# 검증' '# 리스크'; do
             if ! printf '%s\n' "$body" | grep -qx "$header"; then
               echo "::error::PR body에 '$header' 절이 없음. .github/pull_request_template.md를 따를 것"
               fail=1
