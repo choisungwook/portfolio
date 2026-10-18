@@ -87,7 +87,8 @@ jobs:
             echo "::error::검증 절에 항목이 없음. 실행한 명령과 본 결과를 항목으로 적을 것"
             fail=1
           fi
-          lines=$(printf '%s\n' "$body" | grep -cv '^[[:space:]]*$')
+          # 구현 절의 mermaid 블록은 줄 수에서 뺀다.
+          lines=$(printf '%s\n' "$body" | awk '/^```/{fence=!fence; next} !fence && NF{n++} END{print n+0}')
           if [ "$lines" -gt 40 ]; then
             echo "::warning::PR body가 ${lines}줄로 40줄을 넘음. 요약형 절의 근거부터 줄일 것"
           fi

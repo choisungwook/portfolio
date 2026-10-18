@@ -68,7 +68,7 @@ workflow를 만들거나 수정할 때 버전을 오래된 값으로 하드코�
   - 개조식: `길어서 읽지 않게 되는 PR body 축소`
 - Goal은 번호 리스트 3개 이내로 쪼갠다. 문단으로 잇지 않는다.
 - 절은 요약형과 목록형으로 나뉜다. 절마다 항목 수와 전체 줄 수 상한은 각 템플릿 상단 주석을 따른다.
-- backtick을 사용하지 않는다.
+- backtick을 사용하지 않는다. 예외는 PR 구현 절의 mermaid 코드블록 하나다.
 - label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
 
 ## Issue와 PR의 역할 분리
@@ -90,20 +90,6 @@ PR에는 issue 내용을 다시 쓰지 않고 issue 링크로 대체한다. 두 
 - root issue는 닫지 않는다. 그룹이 살아 있는 한 열어 둔다.
 
 하위 issue 등록은 GitHub sub-issue API로 한다. 호출 형식과 gh CLI가 없는 환경의 대체 도구는 [github-tools.md](../rule-details/github-tools.md)에 있다.
-
-## GitHub Project
-
-root issue와 하위 issue는 저장소 project에 담아 칸반으로 본다.
-
-```bash
-gh project item-add <project번호> --owner choisungwook --url <issue URL>
-```
-
-`read:project` scope가 없으면 이 단계는 실패한다. 실패하면 아래를 사용자에게 안내하고 issue 생성 자체는 그대로 진행한다.
-
-```bash
-gh auth refresh -s project
-```
 
 ## Issue 작성 규칙
 
