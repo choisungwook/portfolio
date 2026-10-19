@@ -1,0 +1,74 @@
+version: 0.2
+
+# 두 파이프라인이 같은 buildspec을 쓴다. DEPLOY_MODE가 갈림길이다.
+#   image  : ECR source의 imageDetail.json에서 tag를 읽어 container image만 바꾼다.
+#   config : S3 source의 env.json으로 container environment만 바꾼다. image는 그대로 둔다.
+# 나머지(현재 task definition 복제 -> 새 revision 등록 -> update-service -> 배포 완료 대기)는 공통이다.
+
+env:
+  shell: bash
+
+phases:
+  build:
+    commands:
+      - |
+        set -euo pipefail
+
+        current=$(aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --query taskDefinition)
+
+        case "$DEPLOY_MODE" in
+          image)
+            cat imageDetail.json
+            tag=$(jq -r '[.ImageTags[] | select(. != "latest")][0] // empty' imageDetail.json)
+            repository=$(jq -r '.ImageURI | split("@")[0]' imageDetail.json)
+            if [ -n "$tag" ]; then
+              image="$repository:$tag"
+            else
+              image=$(jq -r '.ImageURI' imageDetail.json)
+            fi
+            echo "image -> $image"
+            new=$(echo "$current" | jq --arg name "$CONTAINER_NAME" --arg image "$image" \
+              '(.containerDefinitions[] | select(.name == $name) | .image) = $image')
+            ;;
+          config)
+            cat env.json
+            new=$(echo "$current" | jq --arg name "$CONTAINER_NAME" --slurpfile env env.json \
+              '(.containerDefinitions[] | select(.name == $name) | .environment) = $env[0]')
+            ;;
+          *)
+            echo "unknown DEPLOY_MODE: $DEPLOY_MODE" >&2
+            exit 1
+            ;;
+        esac
+
+        # describe 결과에는 register 입력으로 쓸 수 없는 읽기 전용 필드가 섞여 있다.
+        new=$(echo "$new" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)')
+
+        task_definition=$(aws ecs register-task-definition --cli-input-json "$new" \
+          --query taskDefinition.taskDefinitionArn --output text)
+        echo "registered $task_definition"
+
+        aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
+          --task-definition "$task_definition" --query service.serviceArn --output text
+
+        deployment=""
+        until [ -n "$deployment" ] && [ "$deployment" != "None" ]; do
+          sleep 5
+          deployment=$(aws ecs list-service-deployments --cluster "$CLUSTER" --service "$SERVICE" \
+            --status PENDING IN_PROGRESS --query 'serviceDeployments[0].serviceDeploymentArn' --output text)
+        done
+        echo "watching $deployment"
+
+        while true; do
+          read -r status stage <<< "$(aws ecs describe-service-deployments --service-deployment-arns "$deployment" \
+            --query 'serviceDeployments[0].[status, lifecycleStage]' --output text)"
+          echo "$(date +%T) $status $stage"
+          case "$status" in
+            SUCCESSFUL) exit 0 ;;
+            STOPPED|ROLLBACK_SUCCESSFUL|ROLLBACK_FAILED)
+              aws ecs describe-service-deployments --service-deployment-arns "$deployment" \
+                --query 'serviceDeployments[0].[statusReason, rollback.reason]' --output text
+              exit 1 ;;
+          esac
+          sleep 15
+        done

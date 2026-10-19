@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      context: ./app
+      args:
+        APP_VERSION: local
+    environment:
+      APP_MESSAGE: hello-from-compose
+      APP_HEALTH_STATUS: "200"
+    ports:
+      - "8080:80"
