@@ -287,6 +287,39 @@ test('alignShapes uses the outside edge of the complete selection', () => {
   assert.deepStrictEqual(shapes.map((shape) => shape.x + shape.w), [180, 180]);
 });
 
+test('alignShapes centers on the middle of the complete selection', () => {
+  const first = L.createShape('rect', 0, 0, {});
+  const second = L.createShape('rect', 100, 100, {});
+  first.w = 100;
+  first.h = 40;
+  second.w = 20;
+  second.h = 100;
+  const shapes = [first, second];
+
+  assert.ok(L.alignShapes(shapes, [0, 1], 'center'));
+  assert.deepStrictEqual(shapes.map((shape) => shape.x + shape.w / 2), [60, 60]);
+  assert.ok(L.alignShapes(shapes, [0, 1], 'middle'));
+  assert.deepStrictEqual(shapes.map((shape) => shape.y + shape.h / 2), [100, 100]);
+  assert.strictEqual(L.alignShapes(shapes, [0, 1], 'diagonal'), false);
+});
+
+test('distributeShapes keeps the ends and evens the gaps between visible boxes', () => {
+  const make = (x, w) => Object.assign(L.createShape('rect', x, 0, {}), { w, h: 10 });
+  const shapes = [make(300, 20), make(0, 40), make(60, 10)];
+  shapes.push(Object.assign(make(150, 10), { locked: true }));
+
+  assert.strictEqual(L.distributeShapes(shapes, [0, 1], 'x'), false);
+  assert.ok(L.distributeShapes(shapes, [0, 1, 2], 'x'));
+  // ends 0..320, boxes 40 + 10 + 20 wide, so each gap is (320 - 70) / 2.
+  assert.deepStrictEqual(shapes.slice(0, 3).map((shape) => shape.x), [300, 0, 165]);
+
+  // The locked box between them neither moves nor changes the spacing.
+  assert.ok(L.distributeShapes(shapes, [0, 1, 2, 3], 'x'));
+  assert.strictEqual(shapes[3].x, 150);
+  assert.deepStrictEqual(shapes.slice(0, 3).map((shape) => shape.x), [300, 0, 165]);
+  assert.strictEqual(L.distributeShapes(shapes, [0, 1, 3], 'x'), false);
+});
+
 test('alignShapes follows the visible outside edge of rotated shapes', () => {
   const rotated = L.createShape('rect', 0, 0, {});
   rotated.w = 100;

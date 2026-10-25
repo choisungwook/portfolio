@@ -216,28 +216,51 @@ function validShapeIndices(shapes, indices) {
   );
 }
 
+// Each edge is an axis plus where along the box it sits: 0 is the start,
+// 0.5 the middle, 1 the end. The target comes from the bounds of the whole
+// selection, so "center" lines everything up on the selection's middle.
+const ALIGN_EDGES = {
+  left: ['x', 0], center: ['x', 0.5], right: ['x', 1],
+  top: ['y', 0], middle: ['y', 0.5], bottom: ['y', 1],
+};
+
 function alignShapes(shapes, indices, edge) {
   const selected = validShapeIndices(shapes, indices);
-  if (selected.length < 2 || !['top', 'bottom', 'left', 'right'].includes(edge)) return false;
-  const boxes = selected.map((index) => visualShapeBBox(shapes[index]));
-  const target = edge === 'top'
-    ? Math.min(...boxes.map((box) => box.y))
-    : edge === 'bottom'
-    ? Math.max(...boxes.map((box) => box.y + box.h))
-    : edge === 'left'
-    ? Math.min(...boxes.map((box) => box.x))
-    : Math.max(...boxes.map((box) => box.x + box.w));
-  selected.forEach((index, offset) => {
+  const spec = ALIGN_EDGES[edge];
+  if (selected.length < 2 || !spec) return false;
+  const [axis, at] = spec;
+  const size = axis === 'x' ? 'w' : 'h';
+  const bounds = boundsForShapes(selected.map((index) => shapes[index]));
+  const target = bounds[axis] + bounds[size] * at;
+  selected.forEach((index) => {
     if (shapes[index].locked) return;
-    const box = boxes[offset];
-    const current = edge === 'top' ? box.y
-      : edge === 'bottom' ? box.y + box.h
-      : edge === 'left' ? box.x
-      : box.x + box.w;
-    const dx = edge === 'left' || edge === 'right' ? target - current : 0;
-    const dy = edge === 'top' || edge === 'bottom' ? target - current : 0;
-    moveShape(shapes[index], dx, dy);
+    const box = visualShapeBBox(shapes[index]);
+    const delta = target - (box[axis] + box[size] * at);
+    moveShape(shapes[index], axis === 'x' ? delta : 0, axis === 'y' ? delta : 0);
   });
+  return true;
+}
+
+// The first and last objects along the axis stay put; the ones between move
+// so every gap between neighbouring visible boxes is the same. Locked objects
+// take no part: counted in, they would hold a gap open that nothing can close.
+function distributeShapes(shapes, indices, axis) {
+  const selected = validShapeIndices(shapes, indices).filter((index) => !shapes[index].locked);
+  if (selected.length < 3 || !['x', 'y'].includes(axis)) return false;
+  const size = axis === 'x' ? 'w' : 'h';
+  const items = selected
+    .map((index) => ({ index, box: visualShapeBBox(shapes[index]) }))
+    .sort((a, b) => a.box[axis] - b.box[axis]);
+  const start = items[0].box[axis];
+  const end = Math.max(...items.map(({ box }) => box[axis] + box[size]));
+  const occupied = items.reduce((sum, { box }) => sum + box[size], 0);
+  const gap = (end - start - occupied) / (items.length - 1);
+  let cursor = start;
+  for (const { index, box } of items) {
+    const delta = cursor - box[axis];
+    moveShape(shapes[index], axis === 'x' ? delta : 0, axis === 'y' ? delta : 0);
+    cursor += box[size] + gap;
+  }
   return true;
 }
 
@@ -615,6 +638,7 @@ function rotatedBBox(box, degrees) {
     visualShapeBBox,
     boundsForShapes,
     alignShapes,
+    distributeShapes,
     snapMove,
     groupShapes,
     ungroupShapes,
