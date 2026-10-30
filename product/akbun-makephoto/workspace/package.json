@@ -1,0 +1,20 @@
+{
+  "name": "akbun-makephoto",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Photo catalog and editor for beginners: tags, straighten, crop, light, color, film looks, auto mode, and a CLI",
+  "author": "akbun",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "test": "node --test test/*.test.js",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p makephoto-core -p makephoto-cli",
+    "cli": "cargo run --quiet --manifest-path src-tauri/Cargo.toml -p makephoto-cli --",
+    "dist": "tauri build",
+    "tauri": "tauri",
+    "build:app": "tauri build --debug --bundles app --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,39 @@
+[workspace]
+members = ["crates/core", "crates/cli"]
+
+[package]
+name = "akbun-makephoto"
+version = "0.1.0"
+description = "Photo catalog and editor: tags, straighten, crop, light, color, film looks, auto mode"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. The number here is not read by the bundler and is only present
+# because cargo requires it.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_makephoto_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+makephoto-core = { path = "crates/core" }
+# The app binary is also the CLI: main.rs hands known subcommands to it.
+makephoto-cli = { path = "crates/cli" }
+# protocol-asset serves the cached thumbnails to <img>.
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rayon = "1"
+image = "0.25"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"

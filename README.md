@@ -156,6 +156,7 @@
 - [Google AdSense 수익을 사이트·글·URL 채널별로 보는 로컬 전용 macOS 데스크톱 앱 (akbun-adsenseview)](./product/akbun-adsenseview/) (26.9.9)
 - [reader 원본을 graphify LLM wiki로 만들어 API로 제공하는 서비스 (akbun-wiki)](./product/akbun-wiki/) (26.9.9)
 - [Claude, Codex, Kiro 사용량을 보여주는 macOS 메뉴바 앱 (akbun-ai-useage)](./product/akbun-ai-useage/) (26.9.23)
+- [사진 카탈로그와 초보자용 자동 보정, AI용 CLI를 갖춘 macOS 사진 편집 앱 (akbun-makephoto)](./product/akbun-makephoto/) (26.10.31)
 
 ## Dockerfile
 

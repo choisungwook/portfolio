@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>akbun-makephoto</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style-edit.css" />
+</head>
+<body data-mode="library">
+  <header id="menubar">
+    <nav id="menus">
+      <div class="menu">
+        <button class="menu-title" data-menu="file">File</button>
+        <ul class="menu-list" data-list="file">
+          <li><button data-action="import-folder">Import Folder…<kbd>⇧⌘I</kbd></button></li>
+          <li><button data-action="import-photos">Import Photos…<kbd>⌘I</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="export">Export Selected…<kbd>⌘E</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="remove">Remove from Catalog…<kbd>⌫</kbd></button></li>
+        </ul>
+      </div>
+      <div class="menu">
+        <button class="menu-title" data-menu="edit">Edit</button>
+        <ul class="menu-list" data-list="edit">
+          <li><button data-action="undo">Undo<kbd>⌘Z</kbd></button></li>
+          <li><button data-action="redo">Redo<kbd>⇧⌘Z</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="select-all">Select All<kbd>⌘A</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="copy-edit">Copy Edit<kbd>⇧⌘C</kbd></button></li>
+          <li><button data-action="paste-edit">Paste Edit to Selected<kbd>⇧⌘V</kbd></button></li>
+          <li><button data-action="reset-edit">Reset Edit</button></li>
+        </ul>
+      </div>
+      <div class="menu">
+        <button class="menu-title" data-menu="photo">Photo</button>
+        <ul class="menu-list" data-list="photo">
+          <li><button data-action="auto-all">Auto Fix<kbd>⇧A</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="rotate-left">Rotate Left<kbd>[</kbd></button></li>
+          <li><button data-action="rotate-right">Rotate Right<kbd>]</kbd></button></li>
+          <li><button data-action="crop">Crop<kbd>C</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="rate-0">No Stars<kbd>0</kbd></button></li>
+          <li><button data-action="rate-3">3 Stars<kbd>3</kbd></button></li>
+          <li><button data-action="rate-5">5 Stars<kbd>5</kbd></button></li>
+        </ul>
+      </div>
+      <div class="menu">
+        <button class="menu-title" data-menu="view">View</button>
+        <ul class="menu-list" data-list="view">
+          <li><button data-action="mode-library">Library<kbd>G</kbd></button></li>
+          <li><button data-action="mode-edit">Edit<kbd>E</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="before-after">Show Original<kbd>\</kbd></button></li>
+          <li><button data-action="prev-photo">Previous Photo<kbd>←</kbd></button></li>
+          <li><button data-action="next-photo">Next Photo<kbd>→</kbd></button></li>
+          <li class="sep"></li>
+          <li><button data-action="toggle-theme">Switch Light or Dark</button></li>
+        </ul>
+      </div>
+      <div class="menu">
+        <button class="menu-title" data-menu="settings">Settings</button>
+        <ul class="menu-list" data-list="settings">
+          <li><button data-action="app-settings">Preferences…<kbd>⌘,</kbd></button></li>
+          <li><button data-action="cli-info">Command Line Tool…</button></li>
+          <li class="sep"></li>
+          <li><button data-action="check-update">Check for Updates…</button></li>
+          <li><button data-action="about">About</button></li>
+        </ul>
+      </div>
+    </nav>
+    <span class="menubar-gap"></span>
+    <div class="mode-switch" role="tablist">
+      <button data-action="mode-library" data-mode-button="library">Library</button>
+      <button data-action="mode-edit" data-mode-button="edit">Edit</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <aside id="sidebar">
+      <h3>Catalog</h3>
+      <button id="nav-all" class="nav-item">All Photos <span class="count" id="count-all">0</span></button>
+      <button id="nav-edited" class="nav-item">Edited <span class="count" id="count-edited">0</span></button>
+      <h3>Folders</h3>
+      <ul id="folder-list"></ul>
+      <h3>Tags</h3>
+      <ul id="tag-list"></ul>
+      <p class="hint">Double-click a tag to rename it.</p>
+    </aside>
+
+    <section id="library-view">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search names and tags" />
+        <select id="rating-filter" title="Show photos rated at least">
+          <option value="0">Any rating</option>
+          <option value="1">★ and up</option>
+          <option value="3">★★★ and up</option>
+          <option value="5">★★★★★</option>
+        </select>
+        <span id="filter-label" class="dim"></span>
+        <span class="menubar-gap"></span>
+        <label class="dim">Size <input id="thumb-size" type="range" min="120" max="320" value="180" /></label>
+      </div>
+      <div id="grid" tabindex="0"></div>
+      <div id="empty" hidden>
+        <h2>Start by importing photos</h2>
+        <p>Photos stay where they are, on this Mac or an external drive. Nothing is copied and the originals are never changed.</p>
+        <div class="row">
+          <button class="primary" data-action="import-folder">Import a Folder…</button>
+          <button data-action="import-photos">Import Photos…</button>
+        </div>
+        <p class="dim">You can also drop photos or folders onto this window.</p>
+      </div>
+    </section>
+
+    <section id="edit-view">
+      <div id="stage">
+        <img id="preview" alt="" />
+        <div id="crop-layer" hidden>
+          <div id="crop-rect">
+            <span class="crop-grid"></span>
+            <span class="handle" data-handle="nw"></span>
+            <span class="handle" data-handle="ne"></span>
+            <span class="handle" data-handle="sw"></span>
+            <span class="handle" data-handle="se"></span>
+          </div>
+        </div>
+        <div id="level-grid" hidden></div>
+        <div id="stage-badge" hidden></div>
+        <div id="stage-message" hidden></div>
+      </div>
+      <div id="crop-bar" hidden>
+        <div id="crop-aspects" class="seg" title="Hold Shift while dragging a corner to keep the shape">
+          <button data-aspect="free" class="active">Free</button>
+          <button data-aspect="original">Original</button>
+          <button data-aspect="1">1:1</button>
+          <button data-aspect="1.3333">4:3</button>
+          <button data-aspect="1.5">3:2</button>
+          <button data-aspect="1.7778">16:9</button>
+          <button data-aspect="0.8">4:5</button>
+        </div>
+        <button id="crop-reset">Whole Photo</button>
+        <span class="menubar-gap"></span>
+        <button id="crop-cancel">Cancel</button>
+        <button id="crop-done" class="primary">Done</button>
+      </div>
+      <div id="level-bar" hidden>
+        <button id="level-auto" class="primary" title="Find the horizon or a vertical line and level it">Auto Level</button>
+        <div id="level-slider"></div>
+        <span id="level-note" class="dim"></span>
+        <span class="menubar-gap"></span>
+        <button id="level-cancel">Cancel</button>
+        <button id="level-ok" class="primary">OK</button>
+      </div>
+      <div id="stage-tools">
+        <button data-action="undo" class="icon" title="Undo (⌘Z)" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+        <button data-action="redo" class="icon" title="Redo (⇧⌘Z)" aria-label="Redo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+        <span class="tool-sep"></span>
+        <button id="before-after" class="icon" title="Hold to see the original (\)" aria-label="Hold for Original"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button data-action="rotate-left" class="icon" title="Rotate left ([)" aria-label="Rotate left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+        <button data-action="rotate-right" class="icon" title="Rotate right (])" aria-label="Rotate right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+        <button data-action="level" class="icon" title="Straighten (L)" aria-label="Straighten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18"/><path d="M4 15 20 8"/><path d="M16 19a6 6 0 0 0-1.6-4.6"/></svg></button>
+        <button data-action="crop" class="icon" title="Crop (C)" aria-label="Crop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg></button>
+        <span class="menubar-gap"></span>
+        <button data-action="reset-edit">Reset All</button>
+      </div>
+      <div id="strip-info">
+        <span id="strip-label"></span>
+        <span class="menubar-gap"></span>
+        <span id="strip-stars" class="stars"></span>
+      </div>
+      <div id="filmstrip"></div>
+    </section>
+
+
+    <aside id="inspector">
+      <div id="info-panel">
+        <h2 id="info-name">No photo selected</h2>
+        <p id="info-path" class="dim path"></p>
+        <p id="info-missing" class="warn" hidden>The file is not reachable. If it is on an external drive, connect it.</p>
+        <div class="field">
+          <span class="label">Rating</span>
+          <div id="stars" class="stars"></div>
+        </div>
+        <div class="field">
+          <span class="label">Tags</span>
+          <div id="tag-chips" class="chips"></div>
+          <input id="tag-input" list="tag-options" placeholder="Add a tag and press Enter" />
+          <datalist id="tag-options"></datalist>
+        </div>
+        <button id="open-edit" class="primary wide">Edit Photo</button>
+      </div>
+
+      <div id="edit-panel">
+        <details class="panel" open>
+          <summary>Histogram</summary>
+          <canvas id="histogram" width="256" height="80" title="How much of the photo is dark (left) to bright (right)"></canvas>
+        </details>
+
+        <details class="panel" open>
+          <summary>Auto</summary>
+          <button id="auto-all" class="primary wide" data-action="auto-all">✨ Auto Fix</button>
+          <div class="auto-grid">
+            <button data-auto="brightness" title="Brighten or darken to a comfortable level">Brightness</button>
+            <button data-auto="contrast" title="Give a flat photo some depth">Contrast</button>
+            <button data-auto="light" title="Recover bright sky and open dark areas">Light &amp; Shadow</button>
+            <button data-auto="color" title="Remove a yellow or blue cast">Color</button>
+            <button data-auto="vivid" title="Make dull colors livelier">Vivid</button>
+          </div>
+          <p id="auto-note" class="hint"></p>
+        </details>
+
+        <details class="panel" open>
+          <summary>Light</summary>
+          <div id="light-sliders"></div>
+        </details>
+
+        <details class="panel" open>
+          <summary>Color</summary>
+          <div id="color-sliders"></div>
+        </details>
+
+        <details class="panel" open>
+          <summary>Film Looks</summary>
+          <div id="look-grid" class="look-list"></div>
+          <div id="look-amount-row"></div>
+        </details>
+        <p class="hint">Double-click a slider's name to reset it.</p>
+      </div>
+    </aside>
+  </main>
+
+  <div id="app-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h2>Preferences</h2>
+      <label class="field">Appearance
+        <select id="setting-theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="system">Follow the system</option>
+        </select>
+      </label>
+      <label class="field">Export JPEG quality <span id="setting-quality-value"></span>
+        <input id="setting-quality" type="range" min="50" max="100" />
+      </label>
+      <div class="field">
+        <span class="label">Catalog</span>
+        <code id="setting-catalog" class="path"></code>
+        <p class="hint">Holds imports, tags and edits. Photos themselves are never copied here.</p>
+      </div>
+      <div class="actions">
+        <button data-close="app-settings">Cancel</button>
+        <button id="settings-save" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cli-info" class="overlay" hidden>
+    <div class="sheet wide-sheet">
+      <h2>Command Line Tool</h2>
+      <p>The app's own binary is also a command line tool. It works on the same catalog, with or without the app open, and prints JSON. Changes appear in the open app within two seconds.</p>
+      <p class="label">Make it available as <code>makephoto</code>:</p>
+      <pre id="cli-link"></pre>
+      <p class="label">Then, for example:</p>
+      <pre>makephoto list --tag trip
+makephoto auto 12 --kind brightness --kind contrast
+makephoto edit 12 --set exposure=0.4 --look golden-hour
+makephoto export 12 13 --dir ~/Desktop/out
+makephoto --help</pre>
+      <div class="actions">
+        <button id="cli-copy">Copy Link Command</button>
+        <button data-close="cli-info" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+  <button id="theme-toggle" data-action="toggle-theme" title="Switch between light and dark" aria-label="Switch between light and dark"><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+
+  <script src="lib.js"></script>
+  <script src="api.js"></script>
+  <script src="library.js"></script>
+  <script src="histogram.js"></script>
+  <script src="editor.js"></script>
+  <script src="crop.js"></script>
+  <script src="level.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

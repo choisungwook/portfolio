@@ -1,7 +1,15 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-09-23",
+  "updated": "2026-10-31",
   "products": [
+    {
+      "id": "akbun-makephoto",
+      "name": "akbun-makephoto",
+      "description": "폴더 카탈로그, 태그, 수평·자르기·밝기·색, 필름 룩, 자동 보정 버튼과 AI용 CLI를 갖춘 초보자용 macOS 사진 편집 앱",
+      "kind": "desktop",
+      "tags": ["tauri", "rust", "cli", "photo"],
+      "released": "2026-10-31"
+    },
     {
       "id": "akbun-ai-useage",
       "name": "akbun-ai-useage",

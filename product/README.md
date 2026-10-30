@@ -6,6 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
+| [akbun-makephoto](./akbun-makephoto/) | 폴더 카탈로그, 태그, 수평·자르기·밝기·색, 필름 룩, 자동 보정 버튼과 AI용 CLI를 갖춘 초보자용 macOS 사진 편집 앱 |
 | [akbun-ai-useage](./akbun-ai-useage/) | Claude Code, Codex, Kiro의 구독 한도, 토큰, 조직 비용을 메뉴바에 표시하는 macOS 메뉴바 앱 |
 | [akbun-adsenseview](./akbun-adsenseview/) | Google AdSense 수익을 사이트, 글, URL 채널별로 보여주는 로컬 전용 macOS Tauri 데스크톱 앱 |
 | [akbun-snspublisher](./akbun-snspublisher/) | 한 번 쓴 글을 채널별로 검증하고 예약해 X, LinkedIn, Threads, Instagram에 발행하는 Worker 웹 앱 |
