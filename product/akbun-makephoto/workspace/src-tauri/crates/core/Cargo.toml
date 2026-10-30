@@ -1,0 +1,15 @@
+[package]
+name = "makephoto-core"
+version = "0.1.0"
+description = "Catalog, non-destructive edits, auto analysis and rendering for akbun-makephoto"
+edition = "2021"
+license = "MIT"
+
+# No tauri here. The CLI and the app both link this crate, and CI tests it
+# without a webview or any system packages.
+[dependencies]
+image = "0.25"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
