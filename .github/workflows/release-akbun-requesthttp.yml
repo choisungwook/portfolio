@@ -97,16 +97,8 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="akbun-requesthttp-v${VERSION}"
-          PREV=$(gh release list --limit 100 --json tagName \
-            --jq "[.[].tagName | select(startswith(\"akbun-requesthttp-v\")) | select(. != \"$TAG\")] | first // empty")
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
-          if [ -n "$PREV" ]; then
-            gh api "repos/${{ github.repository }}/releases/generate-notes" \
-              -f tag_name="$TAG" -f previous_tag_name="$PREV" --jq .body >> "$RUNNER_TEMP/notes.md"
-          else
-            gh api "repos/${{ github.repository }}/releases/generate-notes" \
-              -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-requesthttp >> "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
       # Several products release from this repository, so the GitHub-wide

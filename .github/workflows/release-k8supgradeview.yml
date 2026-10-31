@@ -102,9 +102,9 @@ jobs:
           - Unsigned build, so the first launch fails with "damaged and can't be opened".
           - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-k8supgradeview.app`
           EOF
-          # --generate-notes appends the "What's Changed" commit list under the notes file.
+          # Only PRs that touched this product; --generate-notes lists the whole monorepo.
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-k8supgradeview >> release-notes.md
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
-            --generate-notes \
             product/akbun-k8supgradeview/workspace/release/*.dmg

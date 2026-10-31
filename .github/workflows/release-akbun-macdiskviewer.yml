@@ -148,8 +148,9 @@ jobs:
           - Apple Silicon (arm64) only.
           - Unsigned build. After copying the app to Applications, run `xattr -cr /Applications/akbun-macdiskviewer.app`.
           EOF
+          # Only PRs that touched this product; --generate-notes lists the whole monorepo.
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-macdiskviewer >> release-notes.md
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
-            --generate-notes \
             product/akbun-macdiskviewer/workspace/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
