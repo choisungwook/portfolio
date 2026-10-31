@@ -95,9 +95,9 @@ jobs:
           - The binary is linux x86_64 only. Other architectures build from source.
           - Running it needs the terraform CLI and a GitHub webhook. See docs/user-guide.md.
           EOF
-          # --generate-notes appends the "What's Changed" commit list under the notes file.
+          # Only PRs that touched this product; --generate-notes lists the whole monorepo.
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-terraform-apply-remote >> release-notes.md
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
-            --generate-notes \
             product/akbun-terraform-apply-remote/target/release/akbun-terraform-apply-remote

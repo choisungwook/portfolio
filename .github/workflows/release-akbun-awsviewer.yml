@@ -132,8 +132,7 @@ jobs:
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
-          gh api "repos/${{ github.repository }}/releases/generate-notes" \
-            -f tag_name="$TAG" --jq .body >> "$RUNNER_TEMP/notes.md"
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-awsviewer >> "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
       # Several products release from this repository, so the GitHub-wide

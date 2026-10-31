@@ -69,9 +69,9 @@ jobs:
           - The zip contains skin.html, style.css, index.xml and the images directory.
           - Upload it from the Tistory skin editor. No build step needed.
           EOF
-          # --generate-notes appends the "What's Changed" commit list under the notes file.
+          # Only PRs that touched this product; --generate-notes lists the whole monorepo.
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "${{ steps.version.outputs.tag }}" product/tistory-skin >> release-notes.md
           gh release create "${{ steps.version.outputs.tag }}" akbun-skin.zip \
             --target "${{ github.sha }}" \
             --title "tistory-${{ steps.version.outputs.version }}" \
-            --notes-file release-notes.md \
-            --generate-notes
+            --notes-file release-notes.md

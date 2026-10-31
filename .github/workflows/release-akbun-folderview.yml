@@ -94,14 +94,14 @@ jobs:
       # tauri-action has no --generate-notes equivalent, so the commit list is
       # generated and appended to the body the action already wrote.
       - name: Append the change list to the release notes
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $version = node -p "require('./package.json').version"
-          $tag = "akbun-folderview-v$version"
-          gh release view $tag --json body --jq .body --repo ${{ github.repository }} > notes.md
-          gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name=$tag --jq .body >> notes.md
-          gh release edit $tag --notes-file notes.md --repo ${{ github.repository }}
+          TAG="akbun-folderview-v$(node -p "require('./package.json').version")"
+          gh release view "$TAG" --json body --jq .body --repo ${{ github.repository }} > notes.md
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-folderview >> notes.md
+          gh release edit "$TAG" --notes-file notes.md --repo ${{ github.repository }}
 
       # releases/latest is repository-wide, so any other product's release
       # steals it and installed copies silently see the wrong latest.json.
