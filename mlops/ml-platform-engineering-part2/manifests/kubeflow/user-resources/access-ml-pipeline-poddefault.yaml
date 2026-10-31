@@ -1,0 +1,28 @@
+# 노트북에서 kfp.Client()로 파이프라인을 제출할 때 필요한 설정이다.
+# audience가 pipelines.kubeflow.org인 ServiceAccount 토큰을 파드에 넣고, kfp SDK가 KF_PIPELINES_SA_TOKEN_PATH로 그 토큰을 찾는다.
+apiVersion: kubeflow.org/v1alpha1
+kind: PodDefault
+metadata:
+  name: access-ml-pipeline
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  desc: Kubeflow Pipelines 접근 권한
+  selector:
+    matchLabels:
+      access-ml-pipeline: "true"
+  volumes:
+  - name: volume-kf-pipeline-token
+    projected:
+      sources:
+      - serviceAccountToken:
+          path: token
+          expirationSeconds: 7200
+          audience: pipelines.kubeflow.org
+  volumeMounts:
+  - mountPath: /var/run/secrets/kubeflow/pipelines
+    name: volume-kf-pipeline-token
+    readOnly: true
+  env:
+  - name: KF_PIPELINES_SA_TOKEN_PATH
+    value: /var/run/secrets/kubeflow/pipelines/token

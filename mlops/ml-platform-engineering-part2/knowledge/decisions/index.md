@@ -13,3 +13,4 @@
 * [Argo CD Application은 app-of-apps 없이 ApplicationSet으로만 만든다](2026-10-applicationset-only.md) - 구성요소 Application이 경로와 namespace만 달라서.
 * [노트북은 Kubeflow Notebook으로 만들고 접속 정보는 PodDefault로 넣는다](2026-10-kubeflow-notebook-poddefault.md) - 노트북 코드에 주소와 계정을 두지 않으려고.
 * [Redis는 PVC 없이, PostgreSQL 비밀번호는 Git에 실습 값으로 둔다](2026-10-lab-only-state-and-secrets.md) - 미리보기 namespace가 Secret 없이 뜨지 못하는 문제 회피.
+* [Lab 1의 Kubeflow 예제는 KFP 파이프라인으로 만들고 모델 버전은 MLflow 레지스트리에 둔다](2026-10-kubeflow-examples-kfp-with-mlflow-registry.md) - 책 5장 흐름이고 레지스트리를 둘로 만들지 않으려고.

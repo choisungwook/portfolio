@@ -9,6 +9,8 @@ metadata:
     app: income-notebook
     # PodDefault mlflow-access의 selector. UI에서 Configurations를 고르면 붙는 label과 같다.
     mlflow-access: "true"
+    # PodDefault access-ml-pipeline의 selector. 노트북에서 KFP 파이프라인을 제출할 때 필요하다.
+    access-ml-pipeline: "true"
 spec:
   template:
     spec:

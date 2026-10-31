@@ -14,6 +14,7 @@ ML 플랫폼은 데이터 사이언티스트가 일하는 환경까지 제공합
 | Notebook 리소스 | 노트북 한 개의 이미지, CPU, 메모리, GPU, 디스크를 적은 선언 |
 | notebook-controller | Notebook 리소스를 보고 StatefulSet, Service, Istio VirtualService를 만듦 |
 | PodDefault `mlflow-access` | 노트북을 만들 때 고르는 설정. 파드에 MLflow와 object storage 접속 정보를 넣음 |
+| PodDefault `access-ml-pipeline` | 노트북을 만들 때 고르는 설정. 노트북에서 Kubeflow Pipelines에 파이프라인을 제출할 토큰을 넣음 |
 | PVC | `/home/jovyan`에 붙는 디스크. 파드가 다시 떠도 노트북 파일이 남음 |
 | profile namespace `kubeflow-user-example-com` | 사용자 `user@example.com`의 작업 공간 |
 
@@ -46,7 +47,7 @@ flowchart LR
 | CPU, Memory | 기본값 |
 | GPUs | Number 1, Vendor NVIDIA |
 | Workspace Volume | 기본값(새 PVC) |
-| Configurations | **MLflow와 object storage(SeaweedFS) 접속 정보** |
+| Configurations | **MLflow와 object storage(SeaweedFS) 접속 정보**, **Kubeflow Pipelines 접근 권한** |
 
 ### 1-B. kubectl로 노트북을 만듭니다
 

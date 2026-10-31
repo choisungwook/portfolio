@@ -7,3 +7,4 @@ namespace: kubeflow-user-example-com
 resources:
 - mlflow-access-secret.yaml
 - mlflow-access-poddefault.yaml
+- access-ml-pipeline-poddefault.yaml

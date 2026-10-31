@@ -21,9 +21,17 @@
 - [x] 8-3. Kubeflow 배포판(kustomize), MLflow와 GPU device plugin(Helm)으로 재설치. k3s --default-runtime=nvidia, time-slicing 4. 노트북 3개를 Kubeflow Notebook에서 검증
 - [x] 8-4. docs 재작성(입문자 기준, 시나리오 3분, 부록), troubleshooting 11~18, NetworkPolicy 결정 갱신
 - [ ] 8-5. Helm 기반 MLflow로 PR 미리보기 클러스터 재검증(렌더링만 확인)
+- [x] 8-6. Lab 1 Kubeflow 예제: notebooks/pipelines(EDA, 학습 3개, 등록·검증) KFP 파이프라인
+  - [x] PodDefault access-ml-pipeline, 노트북 label, kfp-kubernetes 추가. 노트북에서 kfp.Client 호출 확인
+  - [x] 파이프라인 3개 로컬 컴파일 확인
+  - [x] SeaweedFS mlpipeline 버킷 정책 복구 후 3개 실행 검증. 점수와 EDA 숫자가 MLflow 예제와 같음, register는 v2 등록·champion v1 유지
+  - [x] 7, 8, 9번 문서에 MLflow 예제와 Kubeflow 예제 H2 분리, 6번 Configurations에 access-ml-pipeline 추가, troubleshooting 19
 - [ ] 9. merge 전: targetRevision을 master로 되돌리고 이 상태 파일 삭제
 
 ## 다음 세션이 알아야 할 것
+
+- mlpipeline 버킷에 bucket policy가 없음. profile controller가 namespace access key를 07:19에 만들 때 create-buckets Job(07:26)보다 먼저라 정책 설정이 실패했고 다시 시도하지 않음. user namespace의 Secret mlpipeline-minio-artifact를 지우면 새 key와 정책을 다시 만듦(2026-10-31에 실행해 복구함, troubleshooting 19)
+- access-ml-pipeline PodDefault와 노트북 label은 kubectl로만 적용함. push 후 Argo CD가 user-resources를 sync해야 Git과 맞음
 
 - platform-applicationset.yaml의 targetRevision과 kubeflow-applicationset.yaml의 wrapper 3개 revision, 6-lab1-kubeflow-notebook.md의 --branch 안내는 검증용으로 feat/ml-platform-part2-lab0. merge 전에 master로 되돌린다.
 - Istio보다 먼저 뜬 kubeflow 파드는 kubectl -n kubeflow delete pod --all로 다시 만든다(troubleshooting 11). RollingSync로 자동화하는 것은 아직 안 함.

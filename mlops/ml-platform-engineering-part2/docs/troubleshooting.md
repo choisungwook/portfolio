@@ -172,3 +172,33 @@ argocd app terminate-op argocd/kf-pipelines --core
 - 해결방법
   - oauth2-proxy가 로그인하지 않은 요청에 Sign In 화면과 함께 403을 돌려주는 정상 동작
   - 브라우저로 열고 **Sign In**을 누르면 Dex 로그인 화면으로 넘어감
+
+## 19 KFP 파이프라인이 다음 단계에서 아티팩트를 내려받지 못함
+
+- 증상
+  - 첫 컴포넌트는 성공하고, 다음 컴포넌트가 `failed to download input artifact ... ListObjectsV2 ... 403 AccessDenied`로 실패함
+  - `mlpipeline` 버킷에 bucket policy가 없음
+- 해결방법
+  - KFP profile controller는 namespace의 S3 access key를 처음 만들 때 한 번만 `mlpipeline` 버킷에 ListBucket 정책을 넣음
+  - access key가 `create-buckets` Job이 버킷을 만들기 전에 만들어져 정책 설정이 실패했고, controller는 다시 시도하지 않음
+  - 사용자 namespace의 Secret을 지우면 controller가 새 key를 만들면서 정책도 다시 넣음
+
+namespace의 KFP용 S3 Secret을 지워 다시 만들게 하는 명령입니다.
+
+```bash
+kubectl -n kubeflow-user-example-com delete secret mlpipeline-minio-artifact
+```
+
+## 20 Notebook에 label을 더했는데 PodDefault가 적용되지 않음
+
+- 증상
+  - Notebook 리소스에 `access-ml-pipeline: "true"`를 더하고 파드를 지웠는데 `/var/run/secrets/kubeflow/pipelines/token`이 없음
+- 해결방법
+  - notebook-controller는 StatefulSet을 만들 때만 Notebook의 label을 파드 템플릿에 복사함
+  - StatefulSet을 지우면 controller가 새 label로 다시 만듦. PVC는 그대로 남음
+
+notebook-controller가 StatefulSet을 새 label로 다시 만들게 하는 명령입니다.
+
+```bash
+kubectl -n kubeflow-user-example-com delete sts income-notebook
+```

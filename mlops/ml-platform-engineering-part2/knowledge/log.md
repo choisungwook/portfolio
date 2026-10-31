@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-10-31
 
+* **Creation**: [Kubeflow 예제는 KFP와 MLflow 레지스트리](decisions/2026-10-kubeflow-examples-kfp-with-mlflow-registry.md) 결정 기록.
 * **Update**: SeaweedFS NetworkPolicy 결정을 [label 기반 허용](decisions/2026-10-seaweedfs-networkpolicy-label-allow.md)으로 바꾸고 파일 이름 변경. 배포판의 기본 정책 때문에 정책 삭제로는 풀리지 않음.
 * **Creation**: [Kubeflow 배포판 구성요소](decisions/2026-10-kubeflow-distribution-components.md), [GPU time-slicing](decisions/2026-10-gpu-time-slicing.md) 결정 기록. standalone KFP와 일반 JupyterLab을 대체.
 * **Deletion**: KFP env/platform-agnostic 결정. 배포판의 multi-user overlay를 쓰면서 더 이상 맞지 않음.
