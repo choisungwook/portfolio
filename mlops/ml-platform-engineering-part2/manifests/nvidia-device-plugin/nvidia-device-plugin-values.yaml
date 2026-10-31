@@ -1,0 +1,21 @@
+# GPU 한 장(RTX 5060 Ti 16GB)을 time-slicing으로 nvidia.com/gpu 4개처럼 나눈다.
+# 노트북, KServe 서빙, 파이프라인이 각각 nvidia.com/gpu: 1을 요청해도 한 장의 GPU를 같이 쓴다.
+# time-slicing은 메모리를 격리하지 않으므로 16GB를 모든 파드가 나눠 쓴다.
+# DRA 대신 time-slicing을 쓰는 이유: Kubeflow Notebook UI와 KServe가 GPU를 nvidia.com/gpu limit으로 요청한다.
+config:
+  map:
+    default: |-
+      version: v1
+      sharing:
+        timeSlicing:
+          resources:
+          - name: nvidia.com/gpu
+            replicas: 4
+  default: default
+# 단일 노드이고 GPU가 있는 노드가 하나라 Node Feature Discovery 없이 모든 노드에 띄운다.
+gfd:
+  enabled: false
+nfd:
+  enabled: false
+# chart 기본 affinity는 NFD가 붙이는 label(nvidia.com/gpu.present 등)이 있는 노드만 고른다. NFD를 쓰지 않으므로 지운다.
+affinity: null

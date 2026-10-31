@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 배포판의 KServe는 Knative 기반 Serverless 모드가 기본이다. Knative를 설치하지 않고 Standard 모드로 바꾼다.
+resources:
+- https://github.com/kubeflow/community-distribution//applications/kserve/kserve?ref=release-26.03.1
+
+patches:
+- path: inferenceservice-config-patch.yaml

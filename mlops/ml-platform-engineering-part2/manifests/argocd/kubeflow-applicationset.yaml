@@ -1,0 +1,135 @@
+# Kubeflow Community Distribution 26.03.1에서 이 실습이 쓰는 구성요소만 Application으로 만든다.
+# 배포판 example/kustomization.yaml의 resources 한 줄이 elements 한 줄이다. 고친 구성요소는 이 저장소의 wrapper를 가리킨다.
+# 빠진 구성요소: Knative, Katib, Trainer, Spark Operator, Model Registry(Kubeflow Hub). Part 2에서 쓰지 않는다.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kubeflow
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - list:
+      elements:
+      - name: kf-cert-manager
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/cert-manager/base
+      - name: kf-cert-manager-issuer
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/cert-manager/overlays/kubeflow
+      - name: kf-istio-crds
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/istio/istio-crds/base
+      - name: kf-istio-namespace
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/istio/istio-namespace/base
+      - name: kf-istio
+        repoURL: https://github.com/choisungwook/portfolio.git
+        # 검증 중 임시값. merge 전 master로 되돌린다.
+        revision: feat/ml-platform-part2-lab0
+        path: mlops/ml-platform-engineering-part2/manifests/kubeflow/istio-install
+      - name: kf-oauth2-proxy
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/oauth2-proxy/overlays/m2m-dex-only
+      - name: kf-dex
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/dex/overlays/oauth2-proxy
+      - name: kf-namespace
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/kubeflow-namespace/base
+      - name: kf-roles
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/kubeflow-roles/base
+      - name: kf-istio-resources
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/istio/kubeflow-istio-resources/base
+      - name: kf-pipelines
+        repoURL: https://github.com/choisungwook/portfolio.git
+        # 검증 중 임시값. merge 전 master로 되돌린다.
+        revision: feat/ml-platform-part2-lab0
+        path: mlops/ml-platform-engineering-part2/manifests/kubeflow/pipelines
+      - name: kf-dashboard
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: applications/dashboard/overlays/istio
+      - name: kf-notebooks
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: applications/notebooks-v1/overlays/istio
+      - name: kf-user-namespace
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: common/user-namespace/base
+      - name: kf-kserve
+        repoURL: https://github.com/choisungwook/portfolio.git
+        # 검증 중 임시값. merge 전 master로 되돌린다.
+        revision: feat/ml-platform-part2-lab0
+        path: mlops/ml-platform-engineering-part2/manifests/kubeflow/kserve
+      - name: kf-kserve-ui
+        repoURL: https://github.com/kubeflow/community-distribution.git
+        revision: release-26.03.1
+        path: applications/kserve/kserve-ui
+  template:
+    metadata:
+      name: '{{ .name }}'
+      labels:
+        app.kubernetes.io/part-of: mlops-part2
+      # Application을 지우면 그 리소스도 지운다. setup.md의 down이 이 동작을 쓴다.
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: '{{ .repoURL }}'
+        targetRevision: '{{ .revision }}'
+        path: '{{ .path }}'
+      destination:
+        server: https://kubernetes.default.svc
+      # 다른 controller가 채우는 필드라 Git과 영원히 다르게 보이는 곳이다.
+      ignoreDifferences:
+      # aggregationRule이 있는 ClusterRole의 rules는 clusterrole-aggregation-controller가 채운다.
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+        managedFieldsManagers:
+        - clusterrole-aggregation-controller
+      # istiod(pilot-discovery)가 validating webhook의 caBundle과 failurePolicy를 갱신한다.
+      - group: admissionregistration.k8s.io
+        kind: ValidatingWebhookConfiguration
+        managedFieldsManagers:
+        - pilot-discovery
+      # CRD의 preserveUnknownFields: false는 API 서버가 저장하지 않아 live에 없다.
+      - group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+        jqPathExpressions:
+        - .spec.preserveUnknownFields
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        # Istio, KFP, KServe, Argo CD CRD가 커서 client-side apply의 annotation 크기 제한(262KB)을 넘는다.
+        - ServerSideApply=true
+        # 같은 sync 안에서 만들 CRD를 쓰는 리소스가 dry-run에서 실패하지 않게 한다.
+        - SkipDryRunOnMissingResource=true
+        # 아래 ignoreDifferences 필드를 sync할 때도 덮어쓰지 않는다. 덮어쓰면 controller와 Argo CD가 번갈아 값을 바꾼다.
+        - RespectIgnoreDifferences=true
+        # ApplicationSet은 Application 사이의 순서를 보장하지 않는다.
+        # cert-manager, Istio, profile controller가 먼저 떠야 하는 Application은 재시도로 순서를 맞춘다.
+        retry:
+          limit: 20
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m

@@ -1,0 +1,36 @@
+# Kubeflow Notebook UI의 New Notebook 폼과 같은 결과를 kubectl로 만드는 Notebook 리소스다.
+# Argo CD가 관리하지 않는다. notebook-controller가 이 리소스로 StatefulSet, Service, Istio VirtualService를 만든다.
+apiVersion: kubeflow.org/v1
+kind: Notebook
+metadata:
+  name: income-notebook
+  namespace: kubeflow-user-example-com
+  labels:
+    app: income-notebook
+    # PodDefault mlflow-access의 selector. UI에서 Configurations를 고르면 붙는 label과 같다.
+    mlflow-access: "true"
+    # PodDefault access-ml-pipeline의 selector. 노트북에서 KFP 파이프라인을 제출할 때 필요하다.
+    access-ml-pipeline: "true"
+spec:
+  template:
+    spec:
+      serviceAccountName: default-editor
+      containers:
+      - name: income-notebook
+        image: ghcr.io/kubeflow/kubeflow/notebook-servers/jupyter-scipy:v1.11.0
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+            # time-slicing으로 나눈 GPU 4개 중 1개. UI의 GPUs 항목과 같다.
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: workspace
+          mountPath: /home/jovyan
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: income-notebook-workspace
