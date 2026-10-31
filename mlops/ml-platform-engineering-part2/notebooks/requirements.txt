@@ -1,0 +1,5 @@
+# JupyterLab 파드가 시작할 때 설치한다. pandas, matplotlib, scikit-learn은 이미지(scipy-notebook)에 있다.
+mlflow==3.17.2
+xgboost==3.4.1
+plotnine==0.15.8
+boto3==1.43.123

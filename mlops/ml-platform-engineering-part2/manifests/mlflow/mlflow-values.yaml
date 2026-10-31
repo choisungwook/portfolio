@@ -1,0 +1,64 @@
+# chart 기본 이미지(burakince/mlflow) 대신 MLflow 공식 이미지를 쓴다. -full에 PostgreSQL 드라이버와 boto3가 들어 있다.
+image:
+  repository: ghcr.io/mlflow/mlflow
+  tag: v3.17.2-full
+
+# DB migration init container도 서버와 같은 버전이어야 스키마 버전이 맞는다. 기본값은 chart의 burakince/mlflow 3.16.0이다.
+initImages:
+  mlflowDbMigration:
+    repository: ghcr.io/mlflow/mlflow
+    tag: v3.17.2-full
+
+# Service와 Deployment 이름을 mlflow-service로 고정한다. 노트북과 KFP 컴포넌트가 이 이름으로 접속한다.
+fullnameOverride: mlflow-service
+service:
+  port: 5000
+
+# 메타데이터는 같은 namespace의 PostgreSQL에 저장한다.
+backendStore:
+  databaseMigration: true
+  postgres:
+    enabled: true
+    host: mlflow-postgres
+    port: 5432
+    database: mlflow
+  existingDatabaseSecret:
+    name: mlflow-postgres
+    usernameKey: POSTGRES_USER
+    passwordKey: POSTGRES_PASSWORD
+
+# 아티팩트 업로드와 다운로드를 MLflow 서버가 중계한다(--serve-artifacts). 노트북은 S3 계정 없이 아티팩트를 쓴다.
+artifactRoot:
+  proxiedArtifactStorage: true
+  s3:
+    enabled: true
+    bucket: mlflow-artifacts
+    existingSecret:
+      name: mlflow-s3-credentials
+
+extraEnvVars:
+  MLFLOW_S3_ENDPOINT_URL: http://seaweedfs.kubeflow.svc.cluster.local:8333
+  # 기본으로 켜진 server job 실행 기능이 Huey consumer 프로세스를 따로 띄워 메모리를 1Gi 넘게 쓴다. 책 4~6장은 쓰지 않는다.
+  MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
+
+# 기본 uvicorn worker 4개가 각각 MLflow 전체를 import해 메모리를 많이 쓴다. 단일 사용자 실습이라 1개로 둔다.
+extraArgs:
+  workers: "1"
+
+# MLflow 3.x는 기본으로 localhost와 사설 IP Host 헤더만 받는다. 클러스터 안 클라이언트는 Service DNS로 접속한다.
+serverAllowedHosts:
+- localhost
+- localhost:*
+- 127.0.0.1
+- 127.0.0.1:*
+- mlflow-service
+- mlflow-service:*
+- mlflow-service.*
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

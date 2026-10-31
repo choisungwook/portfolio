@@ -1,0 +1,9 @@
+# mlops-part2/s3-access label은 kubeflow namespace의 seaweedfs-allow-s3-clients NetworkPolicy가 S3 접근을 허용하는 조건이다.
+# PR 미리보기 namespace도 이 리소스로 만들어지므로 같은 label을 갖는다.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlflow
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+    mlops-part2/s3-access: "true"
