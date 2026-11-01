@@ -1,209 +1,176 @@
-# 시나리오 2. 트래픽을 firewall endpoint로 보내기
+# 시나리오 2. 트래픽을 Firewall Endpoint로 유도하기
 
-## 이 시나리오의 목표
+## 시나리오 개요 및 목표
 
-| 항목 | 내용 |
+VPC 내부의 Private Subnet에 위치한 애플리케이션이 외부 인터넷으로 나갈 때, 기존에는 NAT Gateway를 통해 직접 통신했습니다. 이 아웃바운드(Egress) 경로 중간에 AWS Network Firewall을 무중단으로 배치하여 모든 트래픽이 검사 지점을 거치도록 라우팅을 재구성해야 합니다.
+
+이번 시나리오의 핵심 목표는 **서비스 중단 없이 기존 트래픽 경로를 방화벽 엔드포인트(Firewall Endpoint)로 전환하고, 트래픽을 차단하지 않는 감사(Audit) 모드로 전수 로깅을 확보하는 것**입니다.
+
+| 구분 | 주요 내용 |
 | --- | --- |
-| 기능 | VPC의 트래픽을 검사 지점에 끼워 넣기 |
-| 쓰는 도구 | Network Firewall의 firewall endpoint, VPC route table |
-| 입력 | NAT로 나가는 EC2 2대(AZ a, c), 아무것도 막지 않는 firewall policy |
-| 작업 | 실습 1~8단계: firewall 자리 확인, probe, policy와 firewall 생성, 로깅과 monitoring dashboard, 설정 확인, route 전환, 롤백 |
-| 달성할 것 | 서비스가 끊기지 않은 채 양방향 트래픽이 firewall을 지나고, alert 로그에 서버 private IP와 도메인이 남음 |
+| **실습 목표** | 기존 NAT 경로 사이에 Network Firewall을 배치하여 무중단 라우팅 전환 및 전수 감사 로그(Audit) 수집 |
+| **핵심 도구** | AWS Network Firewall, Gateway Load Balancer Endpoint(GWLB-E), VPC Route Table |
+| **입력 상태** | AZ a, c의 Private Subnet에서 NAT Gateway로 인터넷에 접근 중인 EC2 2대, 실시간 연속 요청 스크립트(`egress-probe`) |
+| **최종 달성 결과** | 서비스 단절 없이 양방향 트래픽이 방화벽을 대칭적으로 경유하고, CloudWatch Logs에 출발지 서버 IP와 목적지 도메인이 기록됨 |
 
-## firewall은 서버 앞이 아니라 route table에 끼워 넣는 장비다
+---
 
-Security group은 ENI에 붙어서 붙이는 순간 동작합니다. Network Firewall은 다릅니다. firewall을 만들면 지정한 subnet마다 `vpce-`로 시작하는 firewall endpoint가 생기고, route table의 target으로 이 endpoint를 지정해야 트래픽이 firewall을 지납니다. firewall을 만들기만 하면 아무 트래픽도 검사하지 않습니다.
+## 핵심 아키텍처 원리 및 설계 판단
 
-이 기능이 다루는 것은 "어느 트래픽이 검사 지점을 지나는가"입니다. 무엇을 막을지는 시나리오 3의 policy가 정합니다.
+### 1. 방화벽 엔드포인트와 라우팅 테이블 제어
 
-### 용어
+Security Group은 EC2의 네트워크 인터페이스(ENI)에 직접 결합되어 패킷을 제어합니다. 반면 AWS Network Firewall은 ENI에 붙는 것이 아니라, 지정한 서브넷마다 `vpce-` 형식의 **Firewall Endpoint**를 생성하고 **VPC 라우팅 테이블의 다음 홉(Target)**으로 이 엔드포인트를 지정하여 트래픽을 우회시키는 방식으로 동작합니다.
 
-| 용어 | 뜻 | 이 실습의 예 |
-| --- | --- | --- |
-| Firewall | VPC의 AZ마다 endpoint를 만들고 policy 1개를 연결하는 리소스 | `nfw-lab` |
-| Firewall policy | rule group 묶음, 평가 순서, default action. firewall과 따로 만들고 공유할 수 있음 | `nfw-lab-policy` |
-| Firewall endpoint | firewall이 subnet마다 자동으로 만드는 Gateway Load Balancer endpoint. route의 target으로 쓰는 검사 지점 | AZ a, c에 하나씩 `vpce-...` |
-| Firewall subnet | endpoint만 두는 전용 subnet | `nfw-lab-firewall-ap-northeast-2a`, `-2c` |
-| 대칭 라우팅 | 나가는 패킷과 돌아오는 패킷이 같은 endpoint를 지나는 구성 | public route table의 `10.0.20.0/24 → vpce(a)` |
-| Stream exception policy | firewall이 상태를 모르는 패킷(흐름 중간부터 도착한 패킷)의 처리 | **Reject** |
+따라서 방화벽 인스턴스를 생성하더라도 라우팅 테이블을 수정하기 전까지는 실제 트래픽에 아무런 영향을 주지 않습니다.
 
-## rule group, policy, firewall, route table의 연관관계
+### 2. 방화벽 리소스 간 연관관계
 
-Network Firewall은 리소스 네 종류가 이어져 동작합니다. 무엇을 막고 기록할지는 policy가, endpoint를 어느 subnet에 둘지는 firewall이, 어떤 트래픽이 검사를 받을지는 route table이 정합니다.
+AWS Network Firewall은 단일 장비가 아니라, **설정 계층(Rule Group → Policy → Firewall)**과 **실제 트래픽 제어 계층(Firewall Endpoint ← Route Table)**이 단계적으로 결합되어 동작합니다.
+
+아래 다이어그램은 상단의 검사 규칙이 정책과 방화벽을 거쳐 가용 영역별 엔드포인트로 프로비저닝되는 **설정 흐름(실선)**과, VPC 라우팅 테이블을 통해 실제 애플리케이션 패킷이 엔드포인트로 유입되는 **트래픽 흐름(굵은 이중선)**의 관계를 나타냅니다.
 
 ```mermaid
-flowchart TB
-  subgraph RG["Rule group (독립 리소스, 여러 policy가 공유 가능)"]
-    R1["nfw-lab-egress-allow<br/>Stateful, Domain list<br/>Allow: .amazonaws.com, .github.com<br/>capacity 100"]
+flowchart TD
+  subgraph L1["1단계: Rule Group (검사 규칙 정의)"]
+    RG1["Stateful Rule Group (도메인 Allowlist)<br/>.amazonaws.com, .github.com"]
+    RG2["기타 Rule Group (선택 사항)<br/>5-tuple IP/Port 규칙, 침입 탐지 시그니처 등"]
   end
 
-  subgraph POL["Firewall policy: nfw-lab-policy"]
-    P1["Stateless default<br/>forward to stateful"]
-    P2["Stateful 엔진 설정<br/>Strict order, Stream exception Reject"]
-    P3["Stateful default action<br/>규칙에 맞지 않은 패킷에만 적용<br/>alert: Alert established<br/>drop: 시나리오 3에서 추가"]
-    P4["연결된 rule group 목록<br/>capacity 합산"]
+  subgraph L2["2단계: Firewall Policy (엔진 동작 정책)"]
+    POL["Firewall Policy: nfw-lab-policy<br/>- 평가 방식: Strict Order<br/>- 기본 액션: Application drop established<br/>- 감사 액션: Alert established<br/>- 미인식 패킷: Stream exception Reject"]
   end
 
-  subgraph FW["Firewall: nfw-lab"]
-    F1["보호 옵션<br/>Delete, Subnet change protection"]
-    F2["Logging<br/>Alert, Flow"]
+  subgraph L3["3단계: Firewall (VPC 및 서브넷 바인딩)"]
+    FW["Firewall: nfw-lab<br/>- 배치 대상 VPC: nfw-lab<br/>- 로깅 전송: CloudWatch Logs (/alert, /flow)<br/>- 서브넷 변경 보호: Enabled"]
   end
 
-  subgraph EP["Firewall endpoint (AZ마다 자동 생성)"]
-    E1["AZ a endpoint<br/>firewall subnet 10.0.10.0/28"]
-    E2["AZ c endpoint<br/>firewall subnet 10.0.10.16/28"]
+  subgraph L4["4단계: Firewall Endpoints (실제 물리적 검사 관문)"]
+    EPA["AZ a Endpoint (vpce-aaa)<br/>Firewall Subnet 10.0.10.0/28"]
+    EPC["AZ c Endpoint (vpce-ccc)<br/>Firewall Subnet 10.0.10.16/28"]
   end
 
-  R1 -- "policy에 추가" --> P4
-  POL -- "firewall 1개에 policy 1개" --> FW
-  FW -- "생성 시 subnet마다" --> EP
-  F2 -- "전달" --> CW["CloudWatch Logs<br/>alert, flow log group"]
+  subgraph L5["5단계: VPC Route Tables (실제 트래픽 유도)"]
+    RTA["App Route Table a<br/>0.0.0.0/0 → vpce-aaa"]
+    RTC["App Route Table c<br/>0.0.0.0/0 → vpce-ccc"]
+    RTP["Public Route Table (회귀 경로)<br/>10.0.20.0/24 → vpce-aaa<br/>10.0.21.0/24 → vpce-ccc"]
+  end
 
-  RTA["app route table a<br/>0.0.0.0/0"] -- "target" --> E1
-  RTC["app route table c<br/>0.0.0.0/0"] -- "target" --> E2
-  RTP["public route table<br/>10.0.20.0/24, 10.0.21.0/24"] -- "응답 target" --> E1
-  RTP -- "응답 target" --> E2
+  RG1 -->|"Policy에 바인딩 (다대일)"| POL
+  RG2 -.->|"Policy에 바인딩 (다대일)"| POL
+  POL -->|"방화벽에 1:1 연결"| FW
+  FW -->|"AZ a 서브넷에 자동 프로비저닝"| EPA
+  FW -->|"AZ c 서브넷에 자동 프로비저닝"| EPC
+
+  RTA ==>|"EC2 a 아웃바운드 패킷 검사 유도"| EPA
+  RTC ==>|"EC2 c 아웃바운드 패킷 검사 유도"| EPC
+  RTP -.->|"NAT 응답 패킷 대칭 회귀 유도"| EPA
+  RTP -.->|"NAT 응답 패킷 대칭 회귀 유도"| EPC
 ```
 
-| 관계 | 의미 |
-| --- | --- |
-| rule group → policy | rule group은 policy에 추가해야 적용되고, policy는 연결된 rule group의 capacity 합계를 예약합니다. 같은 rule group을 여러 policy가 공유할 수 있습니다 |
-| policy → firewall | firewall 하나에는 policy 하나만 연결되고, policy 하나는 여러 firewall이 공유할 수 있습니다. policy를 수정하면 firewall에 반영되기까지 약 1분이 걸립니다 |
-| firewall → endpoint | firewall을 만들 때 지정한 firewall subnet마다 endpoint가 하나씩 자동으로 생성됩니다. firewall 자체에는 보호 옵션과 로깅 설정만 있습니다 |
-| route table → endpoint | route table이 endpoint를 target으로 가리켜야 그 subnet의 트래픽이 검사를 받습니다. firewall을 만들기만 하면 아무 트래픽도 검사하지 않습니다 |
-
-strict order에서 default action은 rule group의 어떤 규칙에도 맞지 않은 패킷에만 적용됩니다. 허용 목록의 Allow 규칙에 맞은 트래픽은 default action의 alert나 drop을 거치지 않고 통과합니다.
-
-## firewall endpoint는 직접 만드는 Gateway Load Balancer가 아니다
-
-Network Firewall은 내부적으로 Gateway Load Balancer(GWLB) 위에서 동작합니다. 그래서 firewall endpoint의 정체는 GWLB endpoint이고, route table에서 target 종류를 고를 때도 **Gateway Load Balancer Endpoint**로 보입니다. 하지만 사용자가 GWLB를 설치하지는 않습니다.
-
-| 구성 요소 | 누가 만드나 | 이 실습에서 할 일 |
-| --- | --- | --- |
-| GWLB, target group, 검사 엔진 | AWS가 관리. 계정에 보이지 않음 | 없음 |
-| firewall endpoint(GWLB endpoint) | firewall을 만들 때 Network Firewall이 firewall subnet마다 자동 생성 | route의 target으로 지정 |
-| firewall subnet, route table | 사용자 | Terraform이 준비 |
-
-endpoint 요금은 firewall endpoint 시간 요금($0.395/시간)에 들어 있고 GWLB 요금이 따로 나오지 않습니다. GWLB를 직접 만드는 경우는 서드파티 방화벽 appliance를 EC2로 운영할 때이고, Network Firewall과는 다른 선택지입니다.
-
-VPC에 firewall을 붙이는 방식(**Attachment type: VPC**)에서는 AZ마다 endpoint가 반드시 있어야 합니다. 트래픽을 firewall로 보낼 입구가 endpoint뿐이기 때문입니다. 다른 방식도 있습니다.
-
-| 방식 | endpoint 위치 | 맞는 상황 |
-| --- | --- | --- |
-| VPC attachment (이 실습) | 내 VPC의 firewall subnet | VPC 하나를 검사 |
-| Transit Gateway attachment | 내 VPC에 없음. firewall이 Transit Gateway에 직접 붙음 | 여러 VPC 트래픽을 Transit Gateway에서 한곳에 모아 검사 |
-| secondary endpoint | 다른 VPC에 같은 firewall의 endpoint를 추가 | firewall 하나를 여러 VPC가 나눠 씀 |
-
-## 검사 지점을 route로 강제해야 하는 이유
-
-서버에 프록시를 설정하는 방식은 서버가 설정을 따를 때만 동작합니다. 프록시 환경변수를 무시하는 프로세스나 직접 소켓을 여는 코드는 그대로 인터넷에 나갑니다. route table은 서버가 바꿀 수 없으므로, 그 subnet의 모든 트래픽이 검사 지점을 지나게 강제할 수 있습니다.
-
-대신 route로 강제하는 만큼 route를 잘못 짜면 서비스가 끊깁니다. firewall의 stateful 엔진은 흐름 상태를 endpoint 안에 들고 있습니다. 나가는 패킷이 AZ a의 endpoint를 지났는데 돌아오는 패킷이 firewall을 우회하거나 AZ c의 endpoint로 가면, 돌아온 쪽은 이 흐름을 모르므로 stream exception policy대로 처리합니다. 그래서 이 기능의 핵심은 대칭 라우팅입니다.
-
-## 대안 비교
-
-| 방식 | 강제력 | 도메인 판단 | 운영 부담 |
+| 리소스 계층 | 핵심 질문 및 역할 | 본 실습 예시 | 왜 분리되어 있는가? (설계 이유) |
 | --- | --- | --- | --- |
-| Network Firewall (route 강제) | subnet 전체 | SNI, Host | 관리형. route 설계가 필요 |
-| 서버별 HTTP 프록시(Squid 등) | 서버 설정에 의존 | 프록시가 판단 | 프록시 서버를 직접 운영 |
-| Route 53 Resolver DNS Firewall | DNS 질의만 | 질의한 도메인 | 낮음. IP로 직접 접속하면 못 막음 |
-| Security group, NACL | ENI, subnet | 불가 | 낮음. IP 목록 유지가 필요 |
+| **1. Rule Group** | "무엇을 검사하고 허용/차단할 것인가?" | `nfw-lab-egress-allow` (도메인 Allowlist) | 검사 규칙을 독립 모듈로 분리하여 여러 정책(Policy)에서 재사용하기 위함 |
+| **2. Firewall Policy** | "규칙들을 어떤 순서와 기본 동작으로 실행할 것인가?" | `nfw-lab-policy` (Strict Order, Drop/Alert 설정) | 룰 그룹들의 실행 순서, 기본 Action(Drop/Alert), Stateless/Stateful 엔진 제어를 중앙 집중화하기 위함 |
+| **3. Firewall** | "어느 VPC, 어느 서브넷들에 방화벽을 배치할 것인가?" | `nfw-lab` (VPC 연결, 로깅 설정) | 네트워크 배치 위치와 로깅 저장소(CloudWatch), 보호 옵션(삭제/서브넷 변경 방지)을 관리하기 위함 |
+| **4. Firewall Endpoint** | 실제 네트워크 트래픽이 통과하는 L7 게이트웨이 | 가용 영역별 `vpce-...` (GWLB-E) | 가용 영역(AZ)별 독립적 장애 격리와 대칭 라우팅 경로를 제공하기 위함 |
+| **5. Route Table** | "어떤 트래픽을 검사 관문으로 보낼 것인가?" | `nfw-lab-app-*`, `nfw-lab-public` | 서버 내부 설정을 건드리지 않고, VPC 서브넷 단위로 트래픽 인스펙션을 강제하기 위함 |
 
-## firewall을 NAT 앞에 두면 로그에 서버 IP가 남는다
+### 3. Firewall Endpoint와 Gateway Load Balancer의 관계
 
-firewall을 NAT 뒤(public subnet과 IGW 사이)에 둘 수도 있습니다. 그 경우 IGW에 edge association route table을 붙여 돌아오는 트래픽을 endpoint로 보냅니다. 두 위치는 firewall이 보는 출발지 IP가 다릅니다.
+Network Firewall은 AWS 내부적으로 **Gateway Load Balancer(GWLB)** 기술을 기반으로 구현되어 있습니다. 따라서 생성된 엔드포인트의 리소스 타입도 **Gateway Load Balancer Endpoint**로 표기됩니다. 사용자가 직접 GWLB나 타깃 그룹을 배포하고 관리할 필요 없이, AWS가 완전 관리형(Managed)으로 제공합니다.
 
-| 위치 | firewall이 보는 출발지 | route 변경 대상 |
-| --- | --- | --- |
-| NAT 앞 (이 실습) | 서버의 private IP | app route table, public route table |
-| NAT 뒤 | NAT의 private IP | public route table, IGW edge route table |
+### 4. NAT Gateway 앞 배치를 통한 출발지 워크로드 IP 확보
 
-NAT 뒤에 두면 alert 로그만 보고는 어느 서버가 막혔는지 알 수 없습니다. 이 실습은 로그에서 서버를 바로 찾으려고 NAT 앞에 둡니다.
+방화벽을 배치하는 위치는 크게 두 가지가 있습니다.
 
-## 컴포넌트 역할
+- **NAT Gateway 앞 (본 실습 채택)**: 애플리케이션 서브넷과 NAT Gateway 사이에 배치합니다. 패킷이 NAT를 거치기 전이므로 방화벽 로그에 **EC2 인스턴스의 실제 Private IP**(`10.0.20.x`, `10.0.21.x`)가 출발지로 정확히 기록됩니다. 보안 감사 및 침해 사고 분석 시 어떤 인스턴스가 호출했는지 즉시 특정할 수 있습니다.
+- **NAT Gateway 뒤**: NAT Gateway와 Internet Gateway 사이에 배치합니다. 이 경우 모든 Egress 트래픽의 출발지가 NAT Gateway의 IP로 변환되어 방화벽에 도달하므로, 로그만으로는 내부 워크로드 중 누가 해당 도메인을 호출했는지 알 수 없습니다.
 
-| 컴포넌트 | 역할 |
-| --- | --- |
-| app route table (AZ별 1개) | `0.0.0.0/0`을 같은 AZ의 endpoint로 보냄. 나가는 길 |
-| firewall endpoint | 패킷을 GENEVE로 감싸 firewall 엔진으로 보냄. AZ당 최대 100 Gbps, 급증 시 확장에 몇 분이 걸리고 그동안 fail closed |
-| firewall route table | `0.0.0.0/0 → NAT`. 검사를 마친 패킷을 NAT로 보냄 |
-| NAT gateway | AZ a에 1개. 출발지 IP를 public IP로 바꿈 |
-| public route table | `app CIDR → 같은 AZ의 endpoint`. 돌아오는 길 |
+### 5. 방화벽 전용 서브넷(Firewall Subnet) 분리 이유
 
-public route table의 app CIDR route가 없으면 NAT는 응답을 VPC `local` route로 app subnet에 바로 넘기고, firewall은 나가는 패킷만 봅니다. VPC는 `local`보다 구체적인 route를 허용하므로 `10.0.20.0/24 → vpce`를 넣을 수 있습니다.
+VPC 라우팅 테이블은 서브넷 단위로 연결됩니다. Egress 트래픽 흐름에서 애플리케이션과 방화벽 엔드포인트는 동일한 `0.0.0.0/0` 목적지에 대해 서로 다른 다음 홉(Next Hop)을 가져야 합니다.
 
-NAT가 하나여도 endpoint는 AZ마다 둡니다. AZ c의 트래픽은 endpoint(c)를 지난 다음 AZ를 건너 NAT(a)로 가고, 돌아올 때도 public route table이 app(c) CIDR을 endpoint(c)로 보내므로 대칭이 유지됩니다. 그래서 app route table이 AZ마다 하나씩 필요합니다. `terraform-aws-modules/vpc`는 `single_nat_gateway = true`이면 private route table을 하나만 만들므로, app subnet은 모듈 밖에서 직접 만들었습니다.
+- **App Subnet의 라우팅**: 인터넷(`0.0.0.0/0`)으로 나갈 때 **Firewall Endpoint**를 바라보아야 합니다.
+- **Firewall Subnet의 라우팅**: 검사를 마친 패킷(`0.0.0.0/0`)을 외부로 내보내기 위해 **NAT Gateway**를 바라보아야 합니다.
 
-## firewall subnet을 따로 두는 이유는 route table이다
+만약 엔드포인트를 App Subnet에 함께 두면 루프(Loop)가 발생하거나 VPC 로컬 라우팅 때문에 방화벽을 경유할 수 없게 됩니다. 따라서 엔드포인트만을 수용하기 위한 전용 서브넷(`10.0.10.0/28`, `10.0.10.16/28`)을 최소 단위인 `/28`로 분리하여 구성합니다.
 
-route table은 subnet 단위로 붙습니다. 그런데 서버와 firewall endpoint는 같은 목적지 `0.0.0.0/0`에 서로 다른 다음 hop이 필요합니다.
+### 6. 대칭 라우팅(Symmetric Routing)과 Stream Exception Policy
 
-| subnet | route table | `0.0.0.0/0`의 target | 뜻 |
-| --- | --- | --- | --- |
-| app subnet | `nfw-lab-app-*` | firewall endpoint | 나가는 패킷을 검사받으러 보냄 |
-| firewall subnet | `nfw-lab-firewall` | NAT gateway | 검사를 마친 패킷을 NAT로 보냄 |
+AWS Network Firewall의 Stateful 엔진은 커넥션 상태를 엔드포인트 메모리에서 추적합니다. 나가는 패킷(Outbound)이 AZ a의 엔드포인트를 통과했다면, 돌아오는 응답 패킷(Inbound Return) 역시 반드시 동일한 AZ a의 엔드포인트를 거쳐야 합니다.
 
-endpoint를 다른 subnet에 섞으면 이 갈림길이 사라집니다.
+만약 나갈 때는 방화벽을 거쳤는데 돌아올 때 우회하거나 다른 AZ의 엔드포인트로 인입되면, 방화벽은 해당 패킷을 비정상적인 흐름으로 판단하고 **Stream Exception Policy**에 따라 처리합니다.
 
-- app subnet에 두면 검사를 마친 패킷도 같은 route table의 `0.0.0.0/0 → endpoint`를 따라 endpoint로 되돌아갑니다. 또 같은 subnet 안의 통신은 `local`로 바로 가므로 서버 트래픽을 route로 endpoint에 보낼 수도 없습니다.
-- public subnet에 두면 검사를 마친 패킷이 `0.0.0.0/0 → IGW`를 따라 NAT를 건너뜁니다. 출발지가 private IP라 인터넷으로 나가지 못합니다.
+- **Stream Exception Policy = Reject (권장 설정)**: 커넥션 상태를 알 수 없는 패킷을 감지하면 즉시 TCP RST(리셋)를 전송하여 클라이언트가 대기(Timeout)하지 않고 즉시 재연결을 시도하도록 합니다. 기본값인 Drop으로 둘 경우 연결이 타임아웃될 때까지 긴 지연이 발생할 수 있습니다.
 
-firewall subnet에는 endpoint ENI 하나만 들어가므로 `/28`(`10.0.10.0/28`, `10.0.10.16/28`)로 만들었습니다. 다른 리소스를 넣으면 그 리소스의 트래픽은 firewall을 지나지 않으므로 비워 둡니다. Transit Gateway attachment 방식은 내 VPC에 endpoint가 없어서 firewall subnet도 필요 없습니다.
+---
 
-## 흐름
+## 정상 Egress 트래픽 처리 흐름
 
-EC2 a(`10.0.20.61`)의 요청 하나가 지나는 경로입니다. 나갈 때는 app route table, firewall route table, public route table을 차례로 따라 올라가고, 돌아올 때는 public route table의 `/24` route가 `local`보다 구체적이라 응답이 다시 firewall endpoint를 지납니다.
+아래 시퀀스는 EC2 인스턴스(AZ a)가 외부 인터넷과 통신할 때 요청과 응답 패킷이 대칭적으로 흐르는 전체 과정입니다.
 
 ```mermaid
 sequenceDiagram
-  participant EC2 as EC2 app subnet a
-  participant VPCE as firewall endpoint a
-  participant NAT as NAT gateway
-  participant NET as Internet
-  EC2->>VPCE: app RT 0.0.0.0/0
-  VPCE->>NAT: firewall RT 0.0.0.0/0
-  NAT->>NET: 출발지를 public IP로 변환
-  NET-->>NAT: 응답
-  NAT-->>VPCE: public RT 10.0.20.0/24
-  VPCE-->>EC2: 같은 흐름으로 인식
+  autonumber
+  participant EC2 as EC2 인스턴스 (App Subnet a)
+  participant VPCE as Firewall Endpoint (AZ a)
+  participant NAT as NAT Gateway (Public Subnet)
+  participant NET as 외부 인터넷
+
+  Note over EC2,VPCE: 1. App RT (0.0.0.0/0 -> VPCE)
+  EC2->>VPCE: 외부 요청 패킷 전송 (출발지: EC2 Private IP)
+  Note over VPCE: Stateful 엔진 연결 상태 기록 (Audit Log 생성)
+  Note over VPCE,NAT: 2. Firewall RT (0.0.0.0/0 -> NAT)
+  VPCE->>NAT: 검사 통과 패킷 전달
+  Note over NAT,NET: 3. Public RT (0.0.0.0/0 -> IGW)
+  NAT->>NET: 출발지 IP를 NAT Public IP로 SNAT 후 인터넷 전송
+  NET-->>NAT: 응답 수신
+  Note over NAT,VPCE: 4. Public RT (10.0.20.0/24 -> VPCE)
+  NAT-->>VPCE: VPC Local보다 구체적인 App CIDR 라우팅을 따라 VPCE로 회귀
+  Note over VPCE: 기존 연결 상태와 대조 후 통과
+  VPCE-->>EC2: 최종 응답 전달 완료
 ```
 
-## 실습
+---
 
-[setup.md](./setup.md)의 Up을 마친 상태에서 시작합니다. 예상 시간은 2026-10-31 ap-northeast-2에서 같은 순서를 AWS CLI로 실행해 잰 값입니다.
+## 단계별 실습 가이드
 
-| 리소스 | 이름 |
-| --- | --- |
-| VPC | `nfw-lab` |
-| firewall subnet | `nfw-lab-firewall-ap-northeast-2a`, `nfw-lab-firewall-ap-northeast-2c` |
-| firewall route table | `nfw-lab-firewall` |
-| app route table | `nfw-lab-app-ap-northeast-2a`, `nfw-lab-app-ap-northeast-2c` |
-| public route table | `nfw-lab-public` |
-| EC2 | `nfw-lab-app-ap-northeast-2a`(`10.0.20.x`), `nfw-lab-app-ap-northeast-2c`(`10.0.21.x`) |
-| log group | `/aws/network-firewall/nfw-lab/alert`, `/aws/network-firewall/nfw-lab/flow` |
+본 실습은 [setup.md](./setup.md)의 배포를 완료한 상태에서 진행합니다.
 
-실습 중 `terraform apply`를 다시 실행하면 app route table의 `0.0.0.0/0`이 NAT로 돌아갑니다. 실습이 끝날 때까지 apply하지 않습니다.
+| 리소스 구분 | 이름 및 식별자 | 비고 |
+| --- | --- | --- |
+| **VPC** | `nfw-lab` (`10.0.0.0/16`) | 기본 실습 VPC |
+| **Firewall Subnet** | `nfw-lab-firewall-ap-northeast-2a`, `-2c` | 엔드포인트 배치 전용 (`/28`) |
+| **Firewall Route Table** | `nfw-lab-firewall` | `0.0.0.0/0 → NAT Gateway` |
+| **App Route Table** | `nfw-lab-app-ap-northeast-2a`, `-2c` | 전환 전: `0.0.0.0/0 → NAT Gateway` |
+| **Public Route Table** | `nfw-lab-public` | 전환 전: `0.0.0.0/0 → IGW` |
+| **EC2 인스턴스** | `nfw-lab-app-ap-northeast-2a`, `-2c` | SSM으로 접속하여 프로브 확인 |
+| **Log Groups** | `/aws/network-firewall/nfw-lab/alert`, `/flow` | 감사 및 플로우 로그 저장소 |
 
-### 1. firewall 배치 대상 subnet과 route table 사전 점검 (약 3분)
+> [!WARNING]
+> 실습 진행 중에 `terraform apply`를 다시 실행하면 라우팅 테이블이 Terraform 코드의 초기 상태(NAT 직통)로 덮어씌워집니다. 실습이 완전히 끝날 때까지 apply를 실행하지 마십시오.
 
-Terraform은 firewall을 만들지 않고 firewall이 들어갈 subnet과 route table만 준비합니다. firewall을 만들기 전에 그 준비가 맞는지 봅니다.
+---
 
-1. **VPC > Network Firewall > Firewalls**를 엽니다.
-   - firewall은 4단계에서 생성하므로 목록이 비어 있습니다.
-2. **VPC > Network Firewall > Firewall policies**와 **Network Firewall rule groups**를 엽니다.
-   - 둘 다 비어 있습니다.
-3. **VPC > Subnets**에서 검색창에 `nfw-lab-firewall`을 넣습니다.
-   - AZ a에 `10.0.10.0/28`, AZ c에 `10.0.10.16/28` subnet이 하나씩 있습니다. firewall endpoint만 두는 subnet이라 /28로 작게 만들었습니다.
-4. **VPC > Route tables > nfw-lab-firewall**의 **Routes** 탭을 엽니다.
-   - `0.0.0.0/0`의 target이 `nat-`이며, firewall이 검사를 마친 패킷을 NAT로 전달하는 경로입니다.
-5. 같은 route table의 **Subnet associations** 탭을 엽니다.
-   - firewall subnet 두 개가 연결되어 있습니다.
-6. **nfw-lab-app-ap-northeast-2a**, **nfw-lab-app-ap-northeast-2c**의 **Routes** 탭을 엽니다.
-   - 둘 다 `0.0.0.0/0`의 target이 `nat-`이며, 7단계에서 이 target을 endpoint로 전환합니다.
-7. **nfw-lab-public**의 **Routes** 탭을 엽니다.
-   - `0.0.0.0/0 → igw-`와 `local`만 있으며, 7단계에서 응답 경로용 app CIDR route를 추가합니다.
+### 1단계. 방화벽 배치 대상 서브넷 및 라우팅 테이블 점검
 
-1~7단계를 CLI로 하면 아래 명령으로 대신합니다. firewall 목록이 `[]`이고 route table 4개의 route가 위 설명과 같으면 됩니다.
+**작업 목적**: Terraform이 사전에 프로비저닝한 방화벽 전용 서브넷과 라우팅 테이블이 올바르게 준비되어 있는지 점검합니다.
+
+#### 1단계 콘솔 수행 절차
+
+1. **VPC > Subnets**로 이동하여 검색창에 `nfw-lab-firewall`을 입력합니다.
+   - `ap-northeast-2a`(`10.0.10.0/28`) 및 `ap-northeast-2c`(`10.0.10.16/28`) 서브넷 2개가 생성되어 있는지 확인합니다.
+2. **VPC > Route tables**로 이동하여 `nfw-lab-firewall`을 선택하고 **Routes** 탭을 확인합니다.
+   - `0.0.0.0/0`의 대상(Target)이 `nat-`로 지정되어 있어야 합니다. (방화벽 검사를 마친 패킷을 NAT로 보내는 경로)
+3. 같은 화면의 **Subnet associations** 탭에서 위 1번의 방화벽 서브넷 2개가 정상 연결되어 있는지 확인합니다.
+4. `nfw-lab-app-ap-northeast-2a`, `nfw-lab-app-ap-northeast-2c`의 **Routes** 탭을 확인합니다.
+   - 현재는 `0.0.0.0/0` 대상이 `nat-`로 직접 연결되어 있습니다. (7단계에서 방화벽 엔드포인트로 전환 예정)
+5. `nfw-lab-public`의 **Routes** 탭을 확인합니다.
+   - `0.0.0.0/0 → igw-` 및 로컬 라우팅만 존재하는지 확인합니다.
+
+#### 1단계 대체 CLI 명령어
+
+아래 명령을 통해 방화벽 준비 상태 및 라우팅 테이블 구성을 한 번에 조회할 수 있습니다.
 
 ```bash
 aws network-firewall list-firewalls --query 'Firewalls[].FirewallName'
@@ -211,60 +178,69 @@ aws ec2 describe-route-tables --filters Name=vpc-id,Values=$(terraform -chdir=te
   --query 'RouteTables[].{name:Tags[?Key==`Name`]|[0].Value,routes:Routes[].[DestinationCidrBlock,NatGatewayId||GatewayId]}'
 ```
 
-### 2. 기존 NAT egress 경로와 probe 상태 확인 (2분)
+---
 
-1. **EC2 > Instances**에서 `nfw-lab-app-ap-northeast-2a`를 고르고 **Connect > Session Manager > Connect**를 누릅니다.
-2. 아래 명령으로 `egress-probe` 출력을 실시간으로 확인합니다. 이 세션은 시나리오 3이 끝날 때까지 유지합니다.
-3. `nfw-lab-app-ap-northeast-2c`도 같은 방법으로 접속해 출력을 확인합니다.
+### 2단계. 기존 NAT Egress 경로 및 연속 프로브(Probe) 실행
 
-2단계에서 실행하는 명령입니다.
+**작업 목적**: 현재 서비스가 정상적으로 외부와 통신하고 있는지 확인하고, 이후 라우팅 전환 과정에서 트래픽 단절이 발생하는지 실시간으로 관측할 수 있도록 백그라운드 프로브 로그를 모니터링합니다.
+
+#### 2단계 콘솔 및 터미널 수행 절차
+
+1. **EC2 > Instances** 콘솔에서 `nfw-lab-app-ap-northeast-2a`를 선택하고 **Connect > Session Manager > Connect**를 클릭하여 세션을 엽니다.
+2. 접속된 세션 터미널에서 아래 명령을 실행하여 실시간 HTTP 통신 상태를 모니터링합니다. (시나리오 3 실습 완료 시까지 창을 유지합니다.)
+
+EC2 인스턴스에서 실행 중인 `egress-probe` 서비스의 실시간 로그를 출력합니다.
 
 ```bash
 journalctl -u egress-probe -f -o cat
 ```
 
-2초 간격으로 한 줄씩 출력되며, 시각은 실행마다 다릅니다.
+**정상 출력 예시**: 2초 간격으로 외부 도메인에 대한 HTTP 200 응답이 출력됩니다.
 
 ```text
 06:08:41 checkip.amazonaws.com=200 www.google.com=200
 06:08:43 checkip.amazonaws.com=200 www.google.com=200
 ```
 
-### 3. alert 전용 firewall policy 생성 (약 3분)
+1. 동일한 방식으로 `nfw-lab-app-ap-northeast-2c` 인스턴스에도 Session Manager로 접속하여 프로브 로그를 실행해 둡니다.
 
-policy는 firewall이 무엇을 할지 정하는 설정 묶음이고, firewall과 따로 만듭니다. 이 단계의 policy는 아무것도 차단하지 않고 모든 연결을 alert 로그에 기록하는 audit 모드입니다. 무엇이 나가는지 모르는 상태에서 차단 policy를 붙이면 route를 바꾸는 순간 정상 트래픽까지 끊기므로, audit 기록을 먼저 쌓고 시나리오 3에서 그 기록을 근거로 차단·허용 정책을 정합니다.
+---
 
-이 단계에서 지정하는 설정값입니다. 콘솔 UI 문구가 아래와 다르더라도 설정값만 일치하면 결과는 같습니다.
+### 3단계. 감사(Audit) 전용 방화벽 정책(Firewall Policy) 생성
 
-| 설정 | 값 | 이유 |
+**작업 목적**: 트래픽을 차단하지 않고 모든 외부 연결을 CloudWatch Logs에 기록하는 감사 모드 방화벽 정책을 생성합니다. 트래픽의 실제 패턴을 파악하기 전에 차단 규칙을 적용하면 정상 서비스가 중단될 위험이 있기 때문입니다.
+
+#### 핵심 정책 설정값 매트릭스
+
+| 항목 | 권장 설정값 | 설정 이유 |
 | --- | --- | --- |
-| Name | `nfw-lab-policy` | 4단계에서 firewall에 연결 |
-| Stream exception policy | **Reject** | 상태를 모르는 패킷을 조용히 버리지 않고 RST를 보내 애플리케이션이 바로 실패를 알게 함 |
-| Stateless default actions | **Forward to stateful rules** | stateless 엔진은 쓰지 않고 모든 패킷을 stateful 엔진으로 넘김 |
-| Stateless fragment default actions | **Forward to stateful rules** | 조각난 패킷도 같은 처리 |
-| Active Threat Defense | 해제 | 콘솔 기본값은 켜짐(alert 모드). 처리 데이터 1GB당 $0.005가 추가되는 관리형 위협 차단 기능이라 이 실습의 audit과 도메인 정책 범위 밖 |
-| Stateful rule evaluation order | **Strict order** | 시나리오 3에서 규칙을 순서대로 평가 |
-| Stateful default actions: drop | 모두 해제 | 이 단계는 아무것도 막지 않음 |
-| Stateful default actions: alert | **Alert established**만 선택 | 연결이 맺어진 흐름을 alert 로그에 남김 |
-| Rule groups | 없음 | 시나리오 3에서 추가 |
+| **Policy Name** | `nfw-lab-policy` | 방화벽 본체에 연결할 정책 식별자 |
+| **Stream exception policy** | **Reject** | 상태를 모르는 패킷 인입 시 즉시 TCP RST를 응답하여 빠른 재연결 유도 |
+| **Stateless default actions** | **Forward to stateful rules** | Stateless 규칙을 거치지 않고 모든 검사를 L7 Stateful 엔진에 위임 |
+| **Active Threat Defense** | **비활성화 (체크 해제)** | 추가 과금(\$0.005/GB)이 발생하는 관리형 위협 인텔리전스 방어 옵션 제외 |
+| **Rule evaluation order** | **Strict order** | 정의한 우선순위 순서대로 엄격히 평가 (생성 후 변경 불가) |
+| **Stateful default actions: drop** | **선택 안 함 (None)** | 감사 모드이므로 어떠한 트래픽도 차단하지 않음 |
+| **Stateful default actions: alert** | **Alert established 선택** | 정상 수립된 TCP 연결 흐름을 Alert 로그에 기록 |
+| **Rule groups** | 없음 | 시나리오 3에서 도메인 허용 규칙 그룹 추가 예정 |
 
-1. **VPC > Network Firewall > Firewall policies**에서 **Create firewall policy**를 누릅니다.
-2. 첫 화면의 **Firewall policy details**에서 **Name**에 `nfw-lab-policy`를 입력합니다.
-3. 같은 화면의 **Stream exception policy**를 **Reject**로 바꾸고 **Next**를 누릅니다.
-4. **Add rule groups** 화면의 **Stateless default actions**에서 **Fragmented packets**와 **Full packets** 모두 **Forward to stateful rules**인지 확인합니다.
-   - 기본값이 이미 이 값입니다.
-5. **Enable Active Threat Defense**가 선택되어 있으면 해제합니다.
-   - 2025-11부터 콘솔에서 만드는 새 policy는 이 옵션이 alert 모드로 미리 켜져 있습니다. 켜 두면 처리 데이터 1GB당 $0.005가 추가됩니다.
-6. **Stateful rule evaluation order and default actions**에서 **Rule evaluation order**를 **Strict order**로 둡니다.
-7. **Drop action**에서 선택을 모두 해제하거나 **None**을 고릅니다.
-   - 새 policy는 **Application drop established (server-directed only)**가 미리 선택되어 있습니다. 해제하지 않으면 7단계에서 route를 바꾸는 순간 모든 외부 통신이 막힙니다.
-8. **Alert action**에서 **Alert established**만 선택합니다.
-9. **Stateful rule groups**와 **Stateless rule groups**는 비워 둔 채 **Next**를 누릅니다.
-10. 다음 화면(TLS inspection, 고급 설정, 태그)은 바꾸지 않고 **Next**를 누릅니다.
-11. **Review and create**에서 7~8단계의 default action이 alert established 하나뿐인지 확인하고 **Create firewall policy**를 누릅니다.
-    - policy는 바로 만들어지고 상태가 **Active**가 됩니다.
+#### 3단계 콘솔 수행 절차
 
-1~11단계는 아래 CLI 명령으로 대체할 수 있으며, 콘솔 UI가 바뀌더라도 이 JSON이 이 단계의 기준 설정입니다.
+1. **VPC > Network Firewall > Firewall policies**로 이동하여 **Create firewall policy**를 클릭합니다.
+2. **Name**에 `nfw-lab-policy`를 입력합니다.
+3. **Stream exception policy**를 기본값(Drop)에서 **Reject**로 변경하고 **Next**를 누릅니다.
+4. **Add rule groups** 화면의 **Stateless default actions**에서 Fragmented 및 Full 패킷 모두 **Forward to stateful rules**로 설정되어 있는지 확인합니다.
+5. **Enable Active Threat Defense** 체크박스가 활성화되어 있다면 체크를 해제합니다.
+6. **Stateful rule evaluation order and default actions** 영역에서 **Rule evaluation order**를 **Strict order**로 지정합니다.
+7. **Drop action** 목록에서 선택된 항목을 모두 해제하거나 **None**을 선택합니다.
+   > [!IMPORTANT]
+   > 최신 콘솔에서는 `Application drop established (server-directed only)`가 기본 선택되어 있을 수 있습니다. 이를 반드시 해제해야 7단계 라우팅 전환 시 트래픽이 차단되지 않습니다.
+8. **Alert action** 목록에서 **Alert established**만 선택합니다.
+9. **Stateful rule groups** 및 **Stateless rule groups**는 빈 상태로 두고 **Next**를 누릅니다.
+10. 나머지 고급 설정은 기본값으로 유지하고 최종 검토 후 **Create firewall policy**를 클릭합니다.
+
+#### 3단계 대체 CLI 명령어
+
+아래 CLI 명령을 실행하면 위 1~10단계의 설정을 한 번에 생성할 수 있습니다.
 
 ```bash
 aws network-firewall create-firewall-policy --firewall-policy-name nfw-lab-policy \
@@ -276,71 +252,39 @@ aws network-firewall create-firewall-policy --firewall-policy-name nfw-lab-polic
   }'
 ```
 
-콘솔의 **Stateful rule evaluation order and default actions** 영역에는 아래 옵션이 나옵니다. default action은 어떤 stateful 규칙에도 맞지 않은 패킷을 어떻게 처리할지 정하는 값입니다. 아래 표의 "audit 모드(이 단계)"와 "차단 정책(시나리오 3)" 열이 이 핸즈온에서 고르는 값입니다.
+---
 
-| 옵션 | 의미 | audit 모드(이 단계) | 차단 정책(시나리오 3) |
-| --- | --- | --- | --- |
-| Enable Active Threat Defense | AWS가 관리하는 위협 인텔리전스 rule group을 붙여 알려진 악성 IP, 도메인과의 통신을 차단. deep threat inspection을 켜면 트래픽 정보가 AWS 위협 인텔리전스 개선에 쓰임. 콘솔 기본값은 alert 모드로 켜짐. 서울 기준 처리 데이터 1GB당 $0.005 추가 | 선택하지 않음 | 선택하지 않음 |
-| Rule evaluation order: Strict order | 규칙을 정의한 순서대로 평가. policy 생성 후 바꿀 수 없음 | 선택 | 그대로 |
-| Rule evaluation order: Action order | pass → drop → reject → alert 순서로 action별 평가(이전 이름 Default order). 아래 drop, alert default action을 쓸 수 없어 기본 차단을 별도 규칙으로 만들어야 함 | 선택하지 않음 | 선택하지 않음 |
+### 4단계. Network Firewall 생성 및 AZ별 엔드포인트 프로비저닝
 
-Drop action은 하나만 고르거나 고르지 않습니다.
+**작업 목적**: 앞서 생성한 정책(`nfw-lab-policy`)을 적용받는 방화벽 리소스를 생성하고, 가용 영역별 방화벽 서브넷에 엔드포인트를 프로비저닝합니다.
 
-| Drop action | 의미 | 이 핸즈온에서 |
-| --- | --- | --- |
-| Application drop established (server-directed only) | TCP handshake는 통과시키고, SNI나 Host 같은 애플리케이션 계층 정보를 읽은 뒤 규칙에 맞지 않으면 client→server 방향 패킷을 차단. 새 policy의 기본값 | 시나리오 3에서 선택 |
-| Application drop established (bidirectional) | 위와 같지만 server→client 방향도 차단. 서버가 먼저 말하는 프로토콜(SSH, SMTP 배너)이 막힐 수 있음 | 선택하지 않음 |
-| Drop established | handshake 직후부터 규칙에 맞지 않는 패킷을 차단. SNI를 읽기 전에 막을 수 있어 도메인 허용 목록과 맞지 않음 | 선택하지 않음 |
-| Drop all | handshake의 SYN까지 모든 패킷을 차단. SYN에는 도메인 정보가 없어 도메인 허용 목록만으로는 모든 연결이 막힘 | 선택하지 않음 |
-| None | default drop 없음. 규칙에 맞지 않아도 통과 | 이 단계에서 선택(audit 모드) |
+#### 4단계 콘솔 수행 절차
 
-Alert action은 차단 여부와 별개로, 규칙에 맞지 않은 패킷을 alert 로그에 남길지 정합니다. drop과 같은 계열(established 또는 Application established)로 맞춰야 하며 두 계열을 섞어 고를 수 없습니다.
-
-| Alert action | 의미 | 이 핸즈온에서 |
-| --- | --- | --- |
-| Application alert established (server-directed only) | 애플리케이션 계층 정보를 읽은 뒤 client→server 패킷을 기록. server→client 패킷과 TCP 제어 패킷은 기록하지 않음 | 시나리오 3에서 drop과 계열을 맞춰 선택 |
-| Application alert established (bidirectional) | 위와 같지만 양방향 패킷을 기록 | 선택하지 않음 |
-| Alert established | 연결이 맺어진 흐름의 패킷을 기록(`ALERT_ESTABLISHED`). 실측에서 SNI와 서버 private IP가 함께 남음 | 이 단계에서 선택(audit 모드) |
-| Alert all | handshake를 포함한 모든 패킷을 기록. 로그 양과 CloudWatch 수집 비용이 크게 늘어남 | 선택하지 않음 |
-
-운영에서는 이 단계처럼 drop 없이 alert만으로 audit 기록을 쌓고, 시나리오 3처럼 Application 계열 drop과 alert로 바꾸는 두 단계를 거칩니다. Active Threat Defense는 도메인 허용 목록과 별개로 알려진 악성 목적지를 막는 보완 수단이라, 운영에서 도입한다면 deep threat inspection의 데이터 활용 조건과 요금을 검토한 뒤 켭니다.
-
-### 4. firewall 생성 및 AZ별 endpoint Provisioning (약 6분)
-
-firewall을 만들면 지정한 firewall subnet마다 endpoint가 하나씩 생깁니다. route를 바꾸기 전이라 트래픽은 아직 firewall을 지나지 않고, probe도 그대로 `200`입니다.
-
-| 설정 | 값 | 이유 |
-| --- | --- | --- |
-| Name | `nfw-lab` | 대시보드와 log group 이름이 이 값을 씀 |
-| Attachment type | **VPC** | VPC 안에 endpoint를 만듦. Transit Gateway 방식은 [아래 절](#firewall-endpoint는-직접-만드는-gateway-load-balancer가-아니다) 참고 |
-| VPC | `nfw-lab` | |
-| Firewall subnets | AZ a, c의 firewall subnet 하나씩 | AZ마다 endpoint가 있어야 AZ별 대칭 라우팅이 됨 |
-| Firewall policy | `nfw-lab-policy` | 3단계에서 만든 policy |
-| Delete protection | 해제 | 실습이 끝나면 firewall을 바로 삭제해야 함. 운영에서는 켬 |
-| Subnet change protection | 선택 | 실습 중 firewall subnet을 바꿀 일이 없으므로 켜 두고 동작을 확인 |
-| Firewall policy change protection | 해제 | 실습에서는 기본값 유지. 운영에서는 켬 |
-
-1. **VPC > Network Firewall > Firewalls**에서 **Create firewall**을 누릅니다.
+1. **VPC > Network Firewall > Firewalls**에서 **Create firewall**을 클릭합니다.
 2. **Name**에 `nfw-lab`을 입력합니다.
-3. **Attachment type**에서 **VPC**를 고릅니다.
-4. **VPC**에서 `nfw-lab`을 고릅니다.
-5. **Firewall subnets**에서 AZ마다 firewall subnet을 하나씩 지정합니다.
+3. **Attachment type**에서 **VPC**를 선택합니다.
+4. **VPC** 드롭다운에서 `nfw-lab`을 선택합니다.
+5. **Firewall subnets**에서 가용 영역별로 전용 서브넷을 매핑합니다.
    - `ap-northeast-2a`: `nfw-lab-firewall-ap-northeast-2a`
    - `ap-northeast-2c`: `nfw-lab-firewall-ap-northeast-2c`
-   - app subnet이나 public subnet을 고르면 안 됩니다. endpoint와 서버가 같은 subnet에 있으면 route로 트래픽을 endpoint에 보낼 수 없습니다.
-6. **Associate firewall policy**에서 **Associate an existing firewall policy**를 고르고 `nfw-lab-policy`를 고릅니다.
-7. 보호 설정에서 **Subnet change protection**만 선택하고, **Delete protection**과 **Firewall policy change protection**은 해제합니다.
-   - 콘솔 기본값은 버전마다 다를 수 있으므로 세 항목을 직접 확인합니다.
-8. 암호화와 태그는 기본값으로 두고 **Create firewall**을 누릅니다.
-9. firewall 상태가 **Provisioning**에서 **Ready**가 될 때까지 기다립니다.
-   - 실측 5분(15:05:13 → 15:10:15 KST) 걸렸습니다.
-10. **Firewall details** 탭의 **Firewall endpoints**에서 AZ별 endpoint ID(`vpce-`)를 기록합니다. 7단계에서 씁니다.
+   - *(주의: App 서브넷이나 Public 서브넷을 선택하지 마십시오.)*
+6. **Associate firewall policy**에서 **Associate an existing firewall policy**를 선택하고 `nfw-lab-policy`를 지정합니다.
+7. 보호 설정(Protection settings)을 점검합니다.
+   - **Subnet change protection**: **선택 (Enabled)** (운영 중 서브넷 분리로 인한 엔드포인트 유실 및 트래픽 블랙홀 방지)
+   - **Delete protection**: 해제 (실습 종료 후 삭제를 위함. 실제 운영 시에는 활성화 권장)
+   - **Firewall policy change protection**: 해제
+8. **Create firewall**을 클릭합니다.
+9. 방화벽 상태가 **Provisioning**에서 **Ready**로 바뀔 때까지 기다립니다. (클라우드 환경에 따라 통상 4~6분 소요)
+10. 생성이 완료되면 **Firewall details** 탭 하단의 **Firewall endpoints** 테이블에서 AZ a와 AZ c의 엔드포인트 ID(`vpce-...`)를 확인하고 복사해 둡니다. (7단계 라우팅 테이블 변경 시 사용)
 
-1~9단계를 CLI로 하면 아래 명령으로 대신합니다. subnet ID와 VPC ID는 Terraform output에서 읽고, CLI는 보호 옵션의 기본값이 모두 꺼짐이므로 Subnet change protection만 명시합니다.
+#### 4단계 대체 CLI 명령어
+
+Terraform 출력값을 읽어 방화벽을 프로비저닝하는 CLI 명령입니다.
 
 ```bash
 POLICY_ARN=$(aws network-firewall describe-firewall-policy --firewall-policy-name nfw-lab-policy \
   --query 'FirewallPolicyResponse.FirewallPolicyArn' --output text)
+
 aws network-firewall create-firewall --firewall-name nfw-lab \
   --firewall-policy-arn "$POLICY_ARN" \
   --vpc-id $(terraform -chdir=terraform output -raw vpc_id) \
@@ -348,114 +292,138 @@ aws network-firewall create-firewall --firewall-name nfw-lab \
   --subnet-change-protection
 ```
 
-Subnet change protection은 firewall과 firewall subnet의 연결(subnet association)을 잠그는 옵션입니다. subnet association은 firewall이 어느 subnet에 endpoint를 두는지를 뜻하며, 이 실습에서는 `nfw-lab-firewall-ap-northeast-2a`, `-2c` 두 개입니다. 옵션을 켜면 동작 중인 firewall에서 subnet을 추가하거나(`AssociateSubnets`) 빼는(`DisassociateSubnets`) 요청이 거부됩니다.
+---
 
-이 옵션이 막으려는 사고는 endpoint의 의도치 않은 삭제입니다. firewall에서 subnet 하나를 빼면 그 AZ의 endpoint가 함께 사라지는데, app route table과 public route table은 여전히 사라진 `vpce-`를 target으로 가리키므로 그 AZ의 egress가 blackhole이 됩니다. 콘솔 조작 실수나 IaC 코드의 subnet 목록 변경이 곧바로 서비스 장애로 이어지지 않도록 한 번 더 막는 장치입니다.
+### 5단계. Alert 및 Flow 로깅과 모니터링 대시보드 활성화
 
-| 옵션 | 막는 것 | 막지 않는 것 |
-| --- | --- | --- |
-| Subnet change protection | firewall의 subnet 추가·제거 | subnet 자체 삭제, route table 변경, policy 내용 수정 |
-| Delete protection | firewall 삭제 | subnet 변경, policy 변경 |
-| Firewall policy change protection | firewall에 연결된 policy를 다른 policy로 교체 | 연결된 policy의 rule group, default action 수정 |
+**작업 목적**: 방화벽이 처리하는 L7 트래픽 이벤트(Alert) 및 네트워크 플로우(Flow)를 CloudWatch Logs로 전송하도록 설정하고, 콘솔 내장 모니터링 탭을 활성화합니다.
 
-AZ를 추가하는 것처럼 subnet을 바꿔야 할 때는 먼저 **Firewall details**에서 Subnet change protection을 끄고, 변경을 마친 뒤 다시 켭니다. 운영에서는 세 옵션을 모두 켜 두고, 변경할 때만 해당 옵션을 잠시 끄는 절차로 운영하는 경우가 많습니다.
+#### 5단계 콘솔 수행 절차
 
-### 5. alert 및 flow 로깅과 monitoring dashboard 활성화 (약 2분)
+1. **Firewalls > nfw-lab**의 **Firewall details** 탭에서 **Logging** 영역의 **Edit**를 클릭합니다.
+2. **Log type**에서 **Alert**와 **Flow**를 체크합니다.
+   - **Alert** 대상: **CloudWatch log group** 선택 후 `/aws/network-firewall/nfw-lab/alert` 지정
+   - **Flow** 대상: **CloudWatch log group** 선택 후 `/aws/network-firewall/nfw-lab/flow` 지정
+3. **Firewall monitoring dashboard** 옵션에서 **Enable**을 선택합니다.
+4. **Save**를 클릭합니다.
+5. 2단계의 터미널 창을 확인하여 여전히 프로브가 `200`을 정상 출력하고 있는지 확인합니다. (아직 라우팅을 바꾸지 않았으므로 트래픽 영향 없음)
 
-로깅은 firewall 생성이 끝난 뒤 활성화하며, 대상 log group은 Terraform이 미리 생성해 두었습니다. 같은 화면에서 Firewall monitoring dashboard도 함께 켭니다. 콘솔의 firewall 생성 화면(**Configure advanced settings**)에서도 같은 값을 넣을 수 있습니다.
+#### 5단계 대체 CLI 명령어
 
-Firewall monitoring dashboard는 firewall 상세 화면의 **Monitoring** 탭에서 alert와 flow 로그를 시각화하는 기능입니다. 기본값은 꺼짐이고, flow 또는 alert 로그가 CloudWatch Logs나 S3로 전달되어야 켤 수 있습니다. 대시보드 자체는 무료지만, 화면을 열거나 시간 범위를 바꿀 때마다 log group에 Logs Insights 쿼리를 실행하므로 쿼리 요금이 붙습니다. 실습 분량의 로그에서는 무시할 수준입니다.
-
-1. **nfw-lab**의 **Firewall details** 탭에서 **Logging** 영역의 **Edit**를 누릅니다.
-2. **Log type**에서 **Alert**와 **Flow**를 고릅니다.
-3. **Alert**의 destination을 **CloudWatch log group**으로 고르고 `/aws/network-firewall/nfw-lab/alert`를 지정합니다.
-4. **Flow**의 destination을 **CloudWatch log group**으로 고르고 `/aws/network-firewall/nfw-lab/flow`를 지정합니다.
-5. **Firewall monitoring dashboard**의 **Enable**을 선택합니다.
-   - 대시보드는 시나리오 4의 3단계에서 확인합니다.
-6. **Save**를 누릅니다.
-7. 2단계의 probe 창에서 출력이 그대로 `200`인지 확인합니다.
-
-1~6단계를 CLI로 하면 로그 타입을 한 번에 하나씩만 추가할 수 있습니다. Alert를 먼저 켜고, Flow를 더하는 두 번째 호출에서 `--enable-monitoring-dashboard`로 대시보드도 켭니다.
+AWS CLI의 `update-logging-configuration`은 한 번 호출 시 로그 타입을 하나씩 등록해야 하므로, Alert 등록 후 Flow와 대시보드를 추가하는 방식으로 2회 호출합니다.
 
 ```bash
+# Alert 로그 설정 등록
 aws network-firewall update-logging-configuration --firewall-name nfw-lab \
   --logging-configuration '{"LogDestinationConfigs":[{"LogType":"ALERT","LogDestinationType":"CloudWatchLogs","LogDestination":{"logGroup":"/aws/network-firewall/nfw-lab/alert"}}]}'
+
+# Flow 로그 추가 및 콘솔 모니터링 대시보드 활성화
 aws network-firewall update-logging-configuration --firewall-name nfw-lab \
   --logging-configuration '{"LogDestinationConfigs":[{"LogType":"ALERT","LogDestinationType":"CloudWatchLogs","LogDestination":{"logGroup":"/aws/network-firewall/nfw-lab/alert"}},{"LogType":"FLOW","LogDestinationType":"CloudWatchLogs","LogDestination":{"logGroup":"/aws/network-firewall/nfw-lab/flow"}}]}' \
   --enable-monitoring-dashboard
 ```
 
-### 6. firewall 및 policy 설정 검증 (약 3분)
+---
 
-route를 전환하는 순간부터 모든 외부 통신이 이 설정을 거치므로, 전환 전에 3~5단계의 설정이 의도대로 반영되었는지 다시 검증합니다.
+### 6단계. 라우팅 전환 전 방화벽 및 정책 사전 검증
 
-1. **Firewalls > nfw-lab**의 **Firewall details** 탭을 엽니다.
-   - **Firewall status**가 **Ready**입니다.
-   - **Associated firewall policy**가 `nfw-lab-policy`입니다.
-   - **Subnet change protection**이 **Enabled**, **Delete protection**이 **Disabled**입니다.
-   - **Firewall endpoints**에 AZ a, c endpoint가 하나씩 있고 둘 다 **Ready**입니다. 각 endpoint의 subnet이 `nfw-lab-firewall-...`입니다.
-   - **Logging**에 Alert, Flow가 각자 log group으로 지정되어 있고, Firewall monitoring dashboard가 켜져 있습니다.
-2. **Firewall policies > nfw-lab-policy**를 엽니다.
-   - **Stream exception policy**가 **Reject**입니다.
-   - **Stateful rule evaluation order**가 **Strict order**이고, **Default actions**가 **Alert established** 하나뿐입니다. drop 항목이 하나라도 보이면 3단계 7번으로 돌아가 해제합니다.
-   - **Stateful rule groups**가 비어 있습니다.
-3. **VPC > Endpoints**에서 **VPC** 필터를 `nfw-lab`으로 겁니다.
-   - **Type**이 **GatewayLoadBalancer**인 endpoint가 두 개 보입니다. Network Firewall이 만든 것이라 여기서 지우거나 고치지 않습니다.
+**작업 목적**: 라우팅 테이블을 변경하는 순간부터 실제 트래픽이 방화벽을 통과하므로, 의도치 않은 패킷 차단 옵션이 켜져 있지 않은지 사전에 철저히 검증합니다.
 
-1~2단계를 CLI로 하면 아래 명령으로 대신합니다.
+#### 필수 체크리스트
+
+- [ ] **Firewalls > nfw-lab**: 방화벽 상태가 **Ready**이고, AZ a/c 엔드포인트가 모두 정상 생성되었는가?
+- [ ] **Firewall policies > nfw-lab-policy**: **Drop action**이 완전히 비어 있거나 `None`인가? (Drop이 켜져 있으면 전환 즉시 서비스 통신 두절)
+- [ ] **Default alert action**에 `Alert established`가 등록되어 있는가?
+- [ ] **Stream exception policy**가 `Reject`로 설정되어 있는가?
+
+#### 6단계 대체 CLI 명령어
 
 ```bash
 aws network-firewall describe-firewall --firewall-name nfw-lab \
   --query '{status:FirewallStatus.Status,endpoints:FirewallStatus.SyncStates.*.Attachment.[SubnetId,EndpointId,Status]}'
+
 aws network-firewall describe-firewall-policy --firewall-policy-name nfw-lab-policy \
   --query 'FirewallPolicy.{default:StatefulDefaultActions,engine:StatefulEngineOptions,ruleGroups:StatefulRuleGroupReferences}'
 ```
 
-### 7. route 전환을 통한 firewall endpoint 경유 구성 (약 5분)
+---
 
-AZ 하나씩, 돌아오는 경로를 넣자마자 같은 AZ의 나가는 경로를 바꿉니다. 돌아오는 경로만 들어간 AZ는 나갈 때 NAT로 바로 가고 돌아올 때만 endpoint를 지나는 비대칭 상태가 되어 새 연결이 실패하므로, 두 변경 사이 간격을 최대한 짧게 둡니다. 이유는 [5-production-rollout.md의 2단계](./5-production-rollout.md#2단계-az-단위-순차-route-전환)에 있습니다.
+### 7단계. 라우팅 테이블 전환 및 방화벽 경유 검증
 
-1. **VPC > Route tables > nfw-lab-public > Routes > Edit routes**에서 `10.0.20.0/24` → **Gateway Load Balancer Endpoint** → AZ a의 endpoint를 추가하고 저장합니다.
-2. 곧바로 **nfw-lab-app-ap-northeast-2a > Routes > Edit routes**에서 `0.0.0.0/0`의 target을 **Gateway Load Balancer Endpoint** → AZ a의 endpoint로 바꾸고 저장합니다.
-   - 1번과 2번 사이에 실패하는 probe가 생길 수 있습니다. 실측에서 두 변경 사이 9초 동안 probe 1줄이 `000`이었고, 2번 이후로는 `200`을 유지했습니다.
-3. AZ a의 probe가 `200`을 유지하는지 확인합니다.
-4. **nfw-lab-public**에 `10.0.21.0/24` → AZ c의 endpoint를 추가하고 저장합니다.
-5. 곧바로 **nfw-lab-app-ap-northeast-2c**의 `0.0.0.0/0` target을 AZ c의 endpoint로 바꿉니다.
-   - 두 AZ의 응답 경로를 한꺼번에 먼저 넣으면 안 됩니다. 실측에서 응답 경로만 들어간 AZ c는 app route를 바꿀 때까지 55초 동안 모든 probe가 `000`이었습니다.
-6. 3~5분 기다린 뒤 **CloudWatch > Log groups > /aws/network-firewall/nfw-lab/alert**를 엽니다.
-   - `event.alert.action`이 `allowed`, `event.alert.signature`가 `aws:alert_established action`인 기록이 쌓입니다.
-   - `event.src_ip`가 NAT IP가 아니라 EC2의 private IP(`10.0.20.x`, `10.0.21.x`)입니다.
-   - `event.tls.sni`에 `checkip.amazonaws.com`, `www.google.com`이 보이고, 아직 둘 다 `allowed`입니다.
-7. **CloudWatch > Metrics > NetworkFirewall > AvailabilityZone, Engine, FirewallName**에서 `ReceivedPackets`가 AZ a, c 모두에서 올라오는지 확인합니다.
-   - 실측 AZ마다 분당 약 4천 개였습니다.
+**작업 목적**: 트래픽의 실제 경로를 Firewall Endpoint로 유도합니다. 이때 **비대칭 라우팅(Asymmetric Routing)으로 인한 패킷 유실을 막기 위해 가용 영역(AZ) 단위로 회귀 경로와 출발 경로를 연속해서 전환**해야 합니다.
 
-비대칭 구간의 실패는 firewall metric에 나타나지 않았습니다. AZ c가 끊긴 55초 동안 `ReceivedPackets`, `RejectedPackets`, `StreamExceptionPolicyPackets`가 모두 0이었으므로, 전환 중에는 firewall 지표가 아니라 probe나 서비스 지표로 실패를 감지합니다.
+> [!CAUTION] 비대칭 라우팅과 전환 순서 주의
+>
+> - Public Route Table에 응답 경로(`App CIDR → VPCE`)를 먼저 추가하지 않은 채 App Route Table만 변경하면, 응답 패킷이 방화벽을 우회하여 통신이 끊어집니다.
+> - 반대로 모든 AZ의 응답 경로를 미리 넣어두고 출발 경로 변경을 지연시키면, 나갈 때는 NAT로 가고 들어올 때만 방화벽으로 들어오는 비대칭 상태가 되어 새 연결이 즉시 실패합니다.
+> - 따라서 **AZ a의 응답 경로 추가 직후 AZ a의 출발 경로를 변경하고, 이어서 AZ c를 동일하게 순차 진행**해야 서비스 영향도를 최소화할 수 있습니다.
 
-1~5단계를 CLI로 하면 아래 명령으로 대신합니다. AZ마다 두 명령을 연달아 실행하고, `<...>` 자리는 `terraform -chdir=terraform output`과 4단계의 endpoint ID로 채웁니다.
+#### 7단계 콘솔 수행 절차
+
+1. **AZ a 경로 전환**:
+   1. **VPC > Route tables > nfw-lab-public**을 선택하고 **Routes > Edit routes**를 클릭합니다.
+   2. 대상에 `10.0.20.0/24`(App a CIDR), 타깃 종류로 **Gateway Load Balancer Endpoint**를 선택하고 **AZ a의 Firewall Endpoint ID**를 지정한 뒤 저장합니다.
+   3. **즉시** **nfw-lab-app-ap-northeast-2a** 라우팅 테이블로 이동하여 `0.0.0.0/0`의 타깃을 **Gateway Load Balancer Endpoint** → **AZ a의 Firewall Endpoint ID**로 수정하고 저장합니다.
+   4. 2단계의 AZ a 프로브 터미널을 확인합니다. 두 작업 사이 수 초의 전환 구간 동안 1~2회의 일시적 실패(`000`)가 발생할 수 있으나, 전환 즉시 `200` 정상 상태로 복구되어야 합니다.
+2. **AZ c 경로 전환**:
+   1. **nfw-lab-public** 라우팅 테이블에 `10.0.21.0/24`(App c CIDR) → **AZ c의 Firewall Endpoint ID** 경로를 추가하고 저장합니다.
+   2. **즉시** **nfw-lab-app-ap-northeast-2c** 라우팅 테이블의 `0.0.0.0/0` 타깃을 **AZ c의 Firewall Endpoint ID**로 수정하고 저장합니다.
+   3. AZ c 프로브 터미널에서 통신이 정상 유지되는지 확인합니다.
+
+#### 7단계 대체 CLI 명령어
 
 ```bash
-aws ec2 create-route --route-table-id <public_route_table_id> --destination-cidr-block 10.0.20.0/24 --vpc-endpoint-id <AZ a endpoint>
-aws ec2 replace-route --route-table-id <app a route table> --destination-cidr-block 0.0.0.0/0 --vpc-endpoint-id <AZ a endpoint>
-aws ec2 create-route --route-table-id <public_route_table_id> --destination-cidr-block 10.0.21.0/24 --vpc-endpoint-id <AZ c endpoint>
-aws ec2 replace-route --route-table-id <app c route table> --destination-cidr-block 0.0.0.0/0 --vpc-endpoint-id <AZ c endpoint>
+PUBLIC_RT_ID=$(terraform -chdir=terraform output -raw public_route_table_id)
+APP_A_RT_ID=$(terraform -chdir=terraform output -json app_route_table_ids | jq -r '."ap-northeast-2a"')
+APP_C_RT_ID=$(terraform -chdir=terraform output -json app_route_table_ids | jq -r '."ap-northeast-2c"')
+EP_A=$(aws network-firewall describe-firewall --firewall-name nfw-lab --query 'FirewallStatus.SyncStates."ap-northeast-2a".Attachment.EndpointId' --output text)
+EP_C=$(aws network-firewall describe-firewall --firewall-name nfw-lab --query 'FirewallStatus.SyncStates."ap-northeast-2c".Attachment.EndpointId' --output text)
+
+# AZ a 라우팅 연속 전환
+aws ec2 create-route --route-table-id "$PUBLIC_RT_ID" --destination-cidr-block 10.0.20.0/24 --vpc-endpoint-id "$EP_A"
+aws ec2 replace-route --route-table-id "$APP_A_RT_ID" --destination-cidr-block 0.0.0.0/0 --vpc-endpoint-id "$EP_A"
+
+# AZ c 라우팅 연속 전환
+aws ec2 create-route --route-table-id "$PUBLIC_RT_ID" --destination-cidr-block 10.0.21.0/24 --vpc-endpoint-id "$EP_C"
+aws ec2 replace-route --route-table-id "$APP_C_RT_ID" --destination-cidr-block 0.0.0.0/0 --vpc-endpoint-id "$EP_C"
 ```
 
-### 8. route 롤백 절차 (약 2분)
+#### 7단계 전환 결과 검증
 
-운영에서 문제가 생겼을 때의 롤백입니다. 시나리오 3, 4를 이어서 할 것이면 지금은 실행하지 않고, 정리할 때 [setup.md의 Down](./setup.md#down)에서 실행합니다.
+1. **감사 로그 확인 (약 3~5분 후)**:
+   - **CloudWatch > Log groups > /aws/network-firewall/nfw-lab/alert**로 이동합니다.
+   - `event.alert.action`이 `allowed`로 기록되는 로그들을 확인합니다.
+   - `event.src_ip`에 NAT IP가 아닌 실제 EC2 인스턴스의 Private IP(`10.0.20.x`, `10.0.21.x`)가 출력되는지 확인합니다.
+   - `event.tls.sni`에 프로브 대상 도메인(`checkip.amazonaws.com`, `www.google.com`)이 명확히 수집되는지 검증합니다.
+2. **CloudWatch 메트릭 확인**:
+   - **CloudWatch > Metrics > NetworkFirewall**에서 `ReceivedPackets` 지표가 AZ a와 AZ c 양쪽에서 모두 상승하는지 확인합니다.
 
-1. **nfw-lab-app-ap-northeast-2a**와 **nfw-lab-app-ap-northeast-2c**의 `0.0.0.0/0` target을 **NAT Gateway** → `nfw-lab-ap-northeast-2a`로 바꿉니다.
-   - 시나리오 3에서 막힌 도메인도 바로 `200`으로 돌아옵니다.
-2. **nfw-lab-public**에서 `10.0.20.0/24`, `10.0.21.0/24` route를 지웁니다.
+---
 
-## 부록. 실무 시사점
+### 8단계. 비상 롤백(Rollback) 절차
 
-- route 변경은 즉시 적용되고 즉시 되돌릴 수 있습니다. firewall 생성은 5분, 삭제는 4분이 걸리므로 firewall은 미리 만들어 두고 route로 켜고 끄는 것이 롤백이 빠릅니다.
-- 열린 연결을 유지한 채 route를 바꿨습니다. 100KB/s로 제한한 다운로드는 끊기지 않았고 `StreamExceptionPolicyPackets`는 0이었습니다. 문서는 이런 패킷이 stream exception policy를 따른다고 설명하므로, 실측 한 번으로 무중단을 가정하지 않습니다. 자세한 기록은 [knowledge의 topic](../knowledge/topics/route-cutover-existing-flows.md)에 있습니다.
-- 새 policy의 기본 drop이 켜진 채로 route를 바꾸면 허용 목록이 없으므로 전부 막힙니다. alert만 켠 policy로 먼저 붙이는 것이 첫 안전장치입니다.
+**작업 목적**: 라우팅 전환 후 서비스 장애가 감지되었을 때 수 초 이내에 기존 NAT 직통 경로로 되돌리는 절차를 숙지합니다.
+
+> [!NOTE]
+> 본 실습에서는 다음 시나리오(시나리오 3, 4)를 계속 진행해야 하므로 **지금은 롤백을 실행하지 마십시오**. 실습이 끝난 후 정리 단계([setup.md의 Down](./setup.md#down))에서 본 절차를 활용합니다.
+
+1. **App Route Table 원복**:
+   - `nfw-lab-app-ap-northeast-2a` 및 `nfw-lab-app-ap-northeast-2c`의 `0.0.0.0/0` 타깃을 기존 **NAT Gateway**(`nat-...`)로 변경합니다.
+2. **Public Route Table 응답 경로 제거**:
+   - `nfw-lab-public` 라우팅 테이블에서 7단계 때 추가했던 `10.0.20.0/24` 및 `10.0.21.0/24` 엔드포인트 라우팅을 삭제합니다.
+
+---
+
+## 부록: 실무 시사점 및 운영 팁
+
+- **신속한 롤백 설계**: 방화벽 리소스 자체의 생성(약 5분)과 삭제(약 4분)는 시간이 다소 걸립니다. 하지만 라우팅 테이블 변경은 수 초 이내에 즉시 반영되고 되돌릴 수 있습니다. 따라서 점검 작업 시 방화벽을 미리 배포해 둔 상태에서 라우팅 스위칭만으로 안전하게 전환 및 롤백을 통제하는 것이 실무 표준입니다.
+- **기존 활성 커넥션(Long-lived Connection) 주의**: 라우팅이 전환되는 순간 이전에 이미 연결되어 있던 장기 세션(DB 커넥션 풀 등)은 방화벽 엔진에 초기 핸드셰이크 상태가 없으므로 `Stream Exception Policy`에 걸릴 수 있습니다. 짧은 HTTP 요청 위주인 웹 서비스는 영향이 극히 드물지만, 영속 커넥션이 많은 서비스는 애플리케이션 재시작 또는 트래픽 최소화 시간대에 컷오버를 진행해야 합니다. (실측 및 세부 분석은 [knowledge topic](../knowledge/topics/route-cutover-existing-flows.md) 참고)
+- **감사 모드(Alert-only) 선행의 필수성**: 기본 폴리시 생성 시 Drop 옵션이 하나라도 켜져 있으면 라우팅을 전환하는 즉시 모든 외부 트래픽이 차단됩니다. 반드시 Alert 전용 정책으로 시작하여 베이스라인 로그를 먼저 수집해야 합니다.
+
+---
 
 ## 참고 문서
 
-1. AWS Network Firewall Developer Guide, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/>
-2. Asymmetric routing, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/asymmetric-routing.html>
-3. Stream exception policy, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/stream-exception-policy.html>
+1. [AWS Network Firewall Developer Guide](https://docs.aws.amazon.com/network-firewall/latest/developerguide/)
+2. [Asymmetric routing and AWS Network Firewall](https://docs.aws.amazon.com/network-firewall/latest/developerguide/asymmetric-routing.html)
+3. [Stream exception policy in AWS Network Firewall](https://docs.aws.amazon.com/network-firewall/latest/developerguide/stream-exception-policy.html)
