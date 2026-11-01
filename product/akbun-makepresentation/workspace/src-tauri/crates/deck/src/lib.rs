@@ -49,6 +49,10 @@ pub struct Slide {
     pub shapes: Vec<Shape>,
     #[serde(default = "default_background")]
     pub background: String,
+    /// Speaker notes as plain text, one paragraph per line. Stored in the
+    /// pptx as the slide's notes page, so PowerPoint and Keynote show them.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
 }
 
 impl Default for Slide {
@@ -56,6 +60,7 @@ impl Default for Slide {
         Slide {
             shapes: Vec::new(),
             background: default_background(),
+            notes: String::new(),
         }
     }
 }

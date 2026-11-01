@@ -346,12 +346,14 @@ main {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   background: var(--stage);
 }
 
 #stage-scroll {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   overflow: auto;
   padding: 20px;
@@ -1726,6 +1728,25 @@ button.primary {
 
 /* --- presentation mode --- */
 
+#slide-notes {
+  flex: none;
+  height: 88px;
+  min-height: 32px;
+  max-height: 50vh;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font: 13px/1.5 -apple-system, sans-serif;
+  resize: vertical;
+}
+
+#slide-notes:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-soft);
+}
+
 #present {
   position: fixed;
   inset: 0;
@@ -1740,10 +1761,98 @@ button.primary {
   display: none;
 }
 
-#present svg {
+#present-slide svg {
   width: 100vw;
   height: 100vh;
   object-fit: contain;
+}
+
+#present-blank {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+#present-blank[data-color='white'] {
+  background: #fff;
+}
+
+#present-laser {
+  display: none;
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 40, 40, 0.85);
+  box-shadow: 0 0 12px 4px rgba(255, 40, 40, 0.45);
+  pointer-events: none;
+}
+
+#present.laser #present-laser {
+  display: block;
+}
+
+#present-jump {
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 600 20px/1 -apple-system, sans-serif;
+}
+
+#present.overview {
+  cursor: default;
+}
+
+#present-overview {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-content: start;
+  gap: 20px;
+  padding: 32px;
+  overflow-y: auto;
+  background: #111;
+}
+
+#present-overview[hidden] {
+  display: none;
+}
+
+#present-overview button {
+  position: relative;
+  padding: 0;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+#present-overview button.current {
+  border-color: #4c8dff;
+}
+
+#present-overview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+#present-overview span {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font: 600 13px/1.2 -apple-system, sans-serif;
 }
 
 #canvas[data-tool='callout'] { cursor: crosshair; }

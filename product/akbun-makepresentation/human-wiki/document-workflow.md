@@ -1,4 +1,4 @@
-# 독립 문서, 검색, 클립보드
+# 독립 문서, 검색, 클립보드, 발표
 
 ## 파일별 독립 실행
 
@@ -47,6 +47,28 @@
 - 근거: [clipboard.rs:7](../workspace/src-tauri/src/clipboard.rs), [renderer/clipboard.js:19](../workspace/src/renderer/clipboard.js).
 - 결정: [시스템 복사 후 잘라내기](../knowledge/decisions/2026-09-cut-runs-the-copy-handler.md).
 
+## 발표자 노트
+
+- 캔버스 아래 입력란에 슬라이드별 노트 작성. 슬라이드를 복제하면 노트도 함께 복제.
+- 타이핑마다 되돌리기 단계를 만들지 않고 입력란에서 포커스가 빠질 때 한 단계로 기록.
+- PPTX 저장 시 노트가 있는 슬라이드만 notes page 생성. 노트가 하나도 없으면 notes 부품 없이 이전과 같은 파일.
+- notes master는 슬라이드 master와 테마를 공유하지 않고 자기 테마 부품 사용.
+- 열 때는 notes page의 본문 placeholder 글만 읽음. 노트 서식과 notes page 레이아웃은 보존 대상 아님.
+- 발표 모드에는 노트를 표시하지 않음. 한 화면에 띄우면 청중도 보게 되므로 발표자 창 작업으로 분리.
+
+- 근거: [notes.rs:99](../workspace/src-tauri/crates/deck/src/pptx/notes.rs), [write.rs:22](../workspace/src-tauri/crates/deck/src/pptx/write.rs), [slides.js:12](../workspace/src/renderer/slides.js).
+- 결정: [발표자 노트는 PPTX notes page로 저장](../knowledge/decisions/2026-09-speaker-notes-are-notes-pages.md).
+
+## 발표 모드 조작
+
+- 발표 중 모든 키는 presentKey 하나가 받음. 편집 단축키가 청중 화면 뒤에서 실행되지 않음.
+- 숫자를 입력한 뒤 Enter로 해당 슬라이드 이동. 다른 키를 누르면 입력 중인 번호 폐기.
+- B/W로 화면 가리기. 가린 상태에서 누른 다음 키는 화면만 되돌리고 슬라이드는 넘기지 않음.
+- L 레이저 포인터, O 전체 슬라이드 격자. 격자에서는 방향키와 Enter 또는 클릭으로 선택.
+- 가리기·레이저·격자는 문서가 아닌 발표 상태. 발표를 새로 시작하면 초기화.
+
+- 근거: [presentation.js:146](../workspace/src/renderer/presentation.js).
+
 ## 확인 질문
 
 1. 별도 창만 만드는 것으로 AI 상태까지 분리되지 않는 이유는 무엇인가?
@@ -54,3 +76,5 @@
 3. 검색 결과 수가 검색어 등장 횟수와 다를 수 있는 이유는 무엇인가?
 4. 개체 JSON과 PNG를 같은 클립보드 기록에 넣는 이유는 무엇인가?
 5. 비동기 복사 중 원본이 바뀌면 잘라내기가 삭제를 생략하는 이유는 무엇인가?
+6. 노트가 없는 덱에 notes 부품을 쓰지 않는 이유는 무엇인가?
+7. 가린 화면에서 방향키를 누르면 다음 슬라이드로 넘어가지 않는 이유는 무엇인가?

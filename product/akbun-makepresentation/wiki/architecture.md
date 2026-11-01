@@ -13,7 +13,7 @@ Each document runs in its own OS process with two app sides, one JSON model betw
 One JSON object, identical on both sides (serde mirrors it in Rust):
 
 ```json
-{ "slideWidth": 1920, "slideHeight": 1080, "slides": [ { "background": "#ffffff", "shapes": [ {
+{ "slideWidth": 1920, "slideHeight": 1080, "slides": [ { "background": "#ffffff", "notes": "", "shapes": [ {
   "kind": "rect | ellipse | callout | line | arrow | pen | text | image | code",
   "x": 0, "y": 0, "w": 0, "h": 0,
   "points": [[0, 0]],
@@ -29,6 +29,8 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
 ```
 
 `background` belongs to the slide rather than to a page-sized shape, so the one control that changes it cannot touch a shape and the background cannot be selected or dragged ([ADR](../adr/2026-08-background-is-a-slide-field.md)). A slide with no `background` is white, which is what a deck saved before the field existed deserializes to.
+
+`notes` is plain text, one paragraph per line, and is omitted from the JSON when empty. It is written as a notes page only for slides that have notes, so a deck without notes produces the same package as before the field existed ([decision](../knowledge/decisions/2026-09-speaker-notes-are-notes-pages.md)).
 
 `fontFamily` is one plain family name, not a CSS stack, so it maps straight onto the pptx `a:latin` typeface and survives a round trip unchanged. A generic fallback is appended when the SVG is drawn.
 
@@ -113,13 +115,13 @@ Filesystem access stays behind narrow commands. Deck and export paths come from 
 
 ## Key flows
 
-**Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates.
+**Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates. Slides with notes add a notes page each, plus one notes master with its own theme (`pptx/notes.rs`); opening reads the notes page's body placeholder back into `notes`.
 
 **Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) keep their own pixel coordinate space. Rotation on any shape, picture crop, plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. A rect or an ellipse that names no `algn` or `anchor` is read as centred, because that is where this editor writes text inside a shape, and the alternative was that text typed into an opened shape landed somewhere no shape drawn here would put it. Other presets become their bounding rectangle; unsupported tables are skipped. Once the deck is in the page, every text box grows to hold the lines its text wraps into here, because PowerPoint measured the box with its own font metrics and this editor wraps by an estimate ([decision](../knowledge/decisions/2026-09-text-boxes-are-as-tall-as-their-text.md)).
 
 **PDF export**: the page rasterizes each slide (SVG string → blob URL → Image → 1920x1080 canvas → JPEG data URL) and `export_pdf` wraps the JPEGs into PDF pages by hand — JPEG is a native PDF filter, so no PDF library is involved.
 
-**Presentation mode**: a fullscreen overlay that renders the same slide SVG; arrow keys and clicks navigate, Escape leaves.
+**Presentation mode**: a fullscreen overlay that renders the same slide SVG. `presentKey` in `renderer/presentation.js` gets every key while presenting, so no editor shortcut can fire behind the audience. Blank screen, laser, typed slide number and the overview grid live in `presentView`, which is view state only and starts fresh on every entry. Speaker notes are not shown here; a separate presenter window is tracked as its own issue.
 
 ## AI integration
 

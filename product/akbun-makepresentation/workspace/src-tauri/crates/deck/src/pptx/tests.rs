@@ -145,6 +145,7 @@ fn sample_deck() -> Deck {
                     },
                 ],
                 background: "#212022".into(),
+                ..Slide::default()
             },
             Slide {
                 shapes: vec![Shape {
@@ -528,7 +529,7 @@ fn written_file_contains_required_parts() {
 /// apart, a webp picture imported fine and then vanished on save.
 #[test]
 fn every_importable_picture_format_is_writable() {
-    let types = content_types(1);
+    let types = content_types(1, &[]);
     for (ext, mime) in IMAGE_FORMATS {
         assert_eq!(mime_for_ext(ext), Some(mime), "{ext} not importable");
         let url = format!("data:{mime};base64,AAAA");
@@ -629,4 +630,39 @@ fn callout_keeps_editable_text_outline_and_tail_after_roundtrip() {
     assert_eq!((shape.w, shape.h, shape.rotation), (300.0, 200.0, 25.0));
     assert_eq!(shape.fill, "none");
     assert!(shape.locked);
+}
+
+#[test]
+fn speaker_notes_round_trip_through_notes_pages() {
+    let deck = Deck {
+        slides: vec![
+            Slide { notes: "First point\n\nSecond <b> & \"quoted\"".into(), ..Slide::default() },
+            Slide::default(),
+            Slide { notes: "마지막 슬라이드".into(), ..Slide::default() },
+        ],
+        ..Deck::default()
+    };
+    let mut buffer = Cursor::new(Vec::new());
+    write(&deck, &mut buffer).unwrap();
+    buffer.set_position(0);
+    let mut archive = zip::ZipArchive::new(buffer.clone()).unwrap();
+    assert!(archive.by_name("ppt/notesSlides/notesSlide1.xml").is_ok());
+    assert!(archive.by_name("ppt/notesSlides/notesSlide2.xml").is_err());
+    assert!(archive.by_name("ppt/notesMasters/notesMaster1.xml").is_ok());
+    let presentation = part(&mut archive, "ppt/presentation.xml").unwrap();
+    assert!(presentation.contains("<p:notesMasterIdLst><p:notesMasterId r:id=\"rId5\"/>"));
+
+    let back = read(buffer).unwrap();
+    let notes: Vec<&str> = back.slides.iter().map(|s| s.notes.as_str()).collect();
+    assert_eq!(notes, ["First point\n\nSecond <b> & \"quoted\"", "", "마지막 슬라이드"]);
+}
+
+#[test]
+fn a_deck_without_notes_writes_no_notes_parts() {
+    let mut buffer = Cursor::new(Vec::new());
+    write(&Deck { slides: vec![Slide::default()], ..Deck::default() }, &mut buffer).unwrap();
+    let mut archive = zip::ZipArchive::new(buffer).unwrap();
+    assert!(archive.by_name("ppt/notesMasters/notesMaster1.xml").is_err());
+    let presentation = part(&mut archive, "ppt/presentation.xml").unwrap();
+    assert!(!presentation.contains("notesMasterIdLst"));
 }

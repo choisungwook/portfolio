@@ -124,6 +124,7 @@
           <textarea id="text-editor" hidden spellcheck="false"></textarea>
         </div>
       </div>
+      <textarea id="slide-notes" placeholder="Speaker notes" aria-label="Speaker notes for this slide" spellcheck="false"></textarea>
     </section>
 
     <aside id="right-panel">
@@ -267,6 +268,15 @@
           <button type="button" data-shape-align="bottom" title="Align selected objects to the bottom edge">Bottom</button>
           <button type="button" data-shape-align="left" title="Align selected objects to the left edge">Left</button>
           <button type="button" data-shape-align="right" title="Align selected objects to the right edge">Right</button>
+          <button type="button" data-shape-align="center" title="Align selected objects to their horizontal center">Center</button>
+          <button type="button" data-shape-align="middle" title="Align selected objects to their vertical middle">Middle</button>
+        </span>
+      </div>
+      <div class="prop-row" id="props-shape-distribute" hidden>
+        <label>Distribute</label>
+        <span class="btn-set shape-align-buttons">
+          <button type="button" data-shape-distribute="x" title="Space three or more objects evenly from left to right">Horizontally</button>
+          <button type="button" data-shape-distribute="y" title="Space three or more objects evenly from top to bottom">Vertically</button>
         </span>
       </div>
       <div class="btn-set">
@@ -352,7 +362,13 @@
     </div>
   </footer>
 
-  <div id="present" hidden></div>
+  <div id="present" hidden>
+    <div id="present-slide"></div>
+    <div id="present-blank" hidden></div>
+    <div id="present-laser" aria-hidden="true"></div>
+    <div id="present-jump" role="status" hidden></div>
+    <div id="present-overview" aria-label="All slides" hidden></div>
+  </div>
 
   <div id="context-menu" hidden>
     <button id="context-lock">Lock</button>

@@ -165,9 +165,7 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (state.presenting) {
-    if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') presentStep(1);
-    else if (event.key === 'ArrowLeft' || event.key === 'PageUp') presentStep(-1);
-    else if (event.key === 'Escape') exitPresent();
+    presentKey(event);
     event.preventDefault();
     return;
   }
