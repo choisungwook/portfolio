@@ -1,12 +1,14 @@
-"""Lab 1 Kubeflow 노트북 3개가 같이 쓰는 컴포넌트와 제출 함수.
+"""Lab 1 Kubeflow 노트북 3개가 같이 쓰는 컴포넌트와 등록, 제출 함수.
 
 컴포넌트 함수는 컴파일할 때 소스가 그대로 파이프라인 YAML에 들어가고, 각자 파드에서 실행된다.
 그래서 컴포넌트 안에서는 이 파일의 다른 함수나 mlflow/income.py를 import하지 않는다.
 """
+import json
+from datetime import datetime
 from typing import Callable
 
 import kfp
-from kfp import dsl
+from kfp import compiler, dsl
 from kfp.dsl import Dataset, Input, Metrics, Model, Output
 
 # 노트북과 같은 이미지. 노드에 이미 받아 둔 이미지라 컴포넌트 파드가 빨리 뜨고, pandas와 scikit-learn이 들어 있다.
@@ -76,12 +78,42 @@ def train_model(model_type: str, train: Input[Dataset], test: Input[Dataset], mo
   metrics.log_metric("test_accuracy", round(float(accuracy_score(y_test, p_test > 0.5)), 6))
 
 
-def submit(pipeline_func: Callable, run_name: str, arguments: dict | None = None) -> str:
-  """노트북에서 파이프라인을 컴파일해 experiment income-classifier에 run으로 제출하고 run ID를 돌려준다."""
+def _namespace() -> str:
+  """노트북 파드가 속한 namespace(Kubeflow 프로필)를 읽는다. 파이프라인과 run은 이 namespace에만 보인다."""
   with open(NAMESPACE_FILE) as f:
-    namespace = f.read().strip()
-  run = kfp.Client().create_run_from_pipeline_func(
-    pipeline_func, arguments=arguments or {}, run_name=run_name, experiment_name=EXPERIMENT, namespace=namespace)
+    return f.read().strip()
+
+
+def _find_pipeline_id(client: kfp.Client, name: str, namespace: str) -> str | None:
+  """namespace에 같은 이름으로 등록된 파이프라인의 ID를 찾는다. 없으면 None."""
+  name_filter = json.dumps({"predicates": [{"operation": "EQUALS", "key": "display_name", "stringValue": name}]})
+  pipelines = client.list_pipelines(filter=name_filter, namespace=namespace).pipelines or []
+  return pipelines[0].pipeline_id if pipelines else None
+
+
+def register(pipeline_func: Callable) -> tuple[str, str]:
+  """파이프라인을 컴파일해 Pipelines 메뉴에 등록한다. 이미 있으면 새 버전을 더한다. (pipeline_id, version_id)를 돌려준다."""
+  client, namespace, name = kfp.Client(), _namespace(), pipeline_func.name
+  package = f"/tmp/{name}.yaml"
+  compiler.Compiler().compile(pipeline_func, package)
+  pipeline_id = _find_pipeline_id(client, name, namespace)
+  if pipeline_id is None:
+    pipeline_id = client.upload_pipeline(package, name, namespace=namespace).pipeline_id
+    version_id = client.list_pipeline_versions(pipeline_id).pipeline_versions[0].pipeline_version_id
+  else:
+    version_name = f"{name}-{datetime.now():%Y%m%d-%H%M%S}"
+    version_id = client.upload_pipeline_version(package, version_name, pipeline_id=pipeline_id).pipeline_version_id
+  print(f"registered {name} version {version_id}")
+  return pipeline_id, version_id
+
+
+def submit(pipeline_ref: tuple[str, str], run_name: str, arguments: dict | None = None) -> str:
+  """등록한 파이프라인 버전으로 experiment income-classifier에 run을 만들고 run ID를 돌려준다."""
+  client = kfp.Client()
+  experiment = client.create_experiment(EXPERIMENT, namespace=_namespace())
+  pipeline_id, version_id = pipeline_ref
+  run = client.run_pipeline(experiment.experiment_id, run_name, params=arguments or {},
+                            pipeline_id=pipeline_id, version_id=version_id)
   print(f"submitted {run_name} {run.run_id}")
   return run.run_id
 

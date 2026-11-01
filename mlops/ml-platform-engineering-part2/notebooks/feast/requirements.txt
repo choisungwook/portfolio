@@ -1,5 +1,5 @@
 # Feast 전용 가상환경에 설치한다. feast가 pandas를 2.x로 내려서 MLflow 노트북 환경과 나눴다(13-lab1-feature-store.md).
-feast[aws,redis]==0.67.0
+feast[aws,redis,grpcio]==0.67.0
 s3fs==2026.9.0
 requests==2.34.2
 ipykernel==7.1.0

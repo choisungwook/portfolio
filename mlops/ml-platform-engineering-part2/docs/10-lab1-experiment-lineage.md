@@ -85,11 +85,12 @@ flowchart LR
 
 ### 1. run 3개를 제출합니다
 
-`kubeflow/02-experiments.ipynb`를 열고 **Run All Cells**를 실행합니다. 마지막 셀이 `model_type`을 `decision-tree`, `random-forest`, `xgboost`로 바꿔 3번 제출하고 모두 끝날 때까지 기다립니다. 3분쯤 걸립니다.
+`kubeflow/02-experiments.ipynb`를 열고 **Run All Cells**를 실행합니다. `register()` 셀이 파이프라인 `income-train`을 **Pipelines** 메뉴에 등록하고, 마지막 셀이 그 버전 하나로 `model_type`만 `decision-tree`, `random-forest`, `xgboost`로 바꿔 run 3개를 만듭니다. 3분쯤 걸립니다.
 
 run 3개가 모두 `SUCCEEDED`면 됩니다.
 
 ```text
+registered income-train version 428aca08-4f7d-46aa-b506-17d0b87e1a33
 submitted train-decision-tree 2b52708c-3927-4507-a7d7-cc3d6b50dead
 submitted train-random-forest a289f7aa-8da3-4857-b34e-332ef9749c80
 submitted train-xgboost 91298509-1b30-488d-816c-1c36a41f2fad
@@ -115,7 +116,7 @@ train-xgboost SUCCEEDED
 ## 부록. 실무에서 얻는 것
 
 - **같은 비교를 두 도구가 다르게 기록합니다.** MLflow는 run에 데이터셋을 직접 연결하고(`log_input`), KFP는 컴포넌트 사이 입출력 연결로 데이터의 출처를 남깁니다. 실무에서는 KFP 컴포넌트 안에서 MLflow에 기록해 둘을 같이 씁니다. 다음 시나리오의 Kubeflow 예제가 그렇게 합니다.
-- **파라미터만 바꾼 run은 파이프라인을 다시 만들 필요가 없습니다.** 파이프라인 정의는 하나이고 실행할 때 `model_type`만 넘깁니다. 화면에서는 run의 **Clone run**으로 `model_type`만 바꿔 실행합니다([9-lab1-eda.md](./9-lab1-eda.md)의 KFP 용어 절).
+- **파라미터만 바꾼 run은 파이프라인을 다시 만들 필요가 없습니다.** 파이프라인 정의는 하나이고 실행할 때 `model_type`만 넘깁니다. 노트북이 없어도 **Pipelines**의 `income-train`에서 **Create run**으로 `model_type`만 바꿔 실행합니다([9-lab1-eda.md](./9-lab1-eda.md)의 KFP 용어 절).
 
 - **전처리 결과도 모델과 함께 남깁니다.** `column_list.pkl`은 one-hot 인코딩 뒤 컬럼 90개의 순서입니다. 5장 추론 코드가 이 순서로 컬럼을 만들지 못하면 모델이 엉뚱한 입력을 받습니다.
 - **리니지는 데이터를 내용 해시로 식별합니다.** MLflow는 이름과 digest가 같은 데이터셋을 experiment 안에 한 번만 저장하고, 처음 기록한 경로를 계속 씁니다. 그래서 업로드 경로를 run ID가 아니라 `train-<digest>.csv`처럼 digest로 정했습니다. 경위는 [troubleshooting.md](./troubleshooting.md)의 9번에 있습니다.

@@ -12,6 +12,42 @@
 
 **MLflow 예제**는 노트북에서 사람이 최고 run을 골라 등록합니다. **Kubeflow 예제**는 학습, 등록, champion 확인을 파이프라인 하나로 묶습니다. 이 클러스터의 Kubeflow에는 모델 레지스트리가 없어서, 책 5장처럼 파이프라인은 KFP가 돌리고 모델 버전은 MLflow 레지스트리에 둡니다.
 
+## champion 선정은 운영할 모델을 바꾸는 결정입니다
+
+실험으로 모델을 여러 개 만들면 "지금 사용자에게 내보낼 모델은 무엇인가"를 정해야 합니다. 그 모델이 champion입니다. champion을 바꾸면 서빙이 바뀌고, 사용자가 받는 예측이 바뀝니다. 그래서 champion 선정은 점수 비교가 아니라 운영 변경으로 다룹니다.
+
+### 용어
+
+| 용어 | 뜻 | 이 Lab의 예 |
+|---|---|---|
+| 후보(candidate) | 새로 학습해 등록한 버전. 아직 운영 전 | Kubeflow 예제가 등록하는 v2, v3 |
+| champion | 지금 운영(서빙)하는 버전을 가리키는 alias | `income-classifier@champion` |
+| challenger | champion과 비교하는 후보에 붙이는 alias | 이 Lab은 쓰지 않음 |
+| 평가 기준(gate) | 후보가 champion이 되려면 넘어야 하는 조건 | 같은 테스트 데이터의 ROC AUC가 champion보다 높음 |
+| 승격(promotion) | champion alias를 후보 버전으로 옮기는 일 | `set_registered_model_alias` |
+| 롤백(rollback) | champion alias를 이전 버전으로 되돌리는 일 | alias만 옮김. 모델은 다시 만들지 않음 |
+
+alias와 tag의 차이, `champion`과 `challenger`라는 이름이 어디서 왔는지는 [시나리오 2](./7-lab1-model-registry.md)에 있습니다.
+
+### MLOps 플랫폼이 champion 선정을 제공해야 하는 이유
+
+- **누가 무엇을 근거로 바꿨는지 남아야 합니다.** 사람이 "이게 더 좋아 보여서" 모델 파일을 교체하면, 장애가 났을 때 왜 바뀌었는지 알 수 없습니다. 레지스트리는 버전마다 출처 run과 점수를 남기고, alias 이동이 그 버전을 가리킵니다.
+- **같은 기준으로 비교해야 합니다.** 후보와 champion을 다른 테스트 데이터로 채점하면 숫자를 비교할 수 없습니다. 이 Lab은 분할을 `random_state=42`로 고정해 모든 버전을 같은 테스트 데이터로 채점합니다.
+- **되돌리기가 빨라야 합니다.** champion이 alias라서, 새 모델이 문제를 일으키면 alias를 이전 버전으로 옮기는 것만으로 되돌립니다.
+- **판단을 규칙으로 바꿔야 반복할 수 있습니다.** Kubeflow 예제의 `register-model`은 "점수가 champion보다 높을 때만 승격"을 코드로 실행합니다. 재학습이 매주 돌아도 사람이 매번 판단하지 않습니다.
+
+### 이 Lab의 기준과 실무의 기준
+
+이 Lab은 오프라인 지표(테스트 데이터의 ROC AUC) 하나로 정합니다. 실무에서는 여기에 조건을 더하는 경우가 많습니다.
+
+| 기준 | 내용 | 이 Lab |
+|---|---|---|
+| 오프라인 지표 | 테스트 데이터 점수가 champion 이상 | 사용 |
+| 재현성 | 기록만으로 같은 모델을 다시 만들 수 있음 | 사용(MLflow 예제 3번, `verify-champion`) |
+| 서빙 검증 | 서빙한 모델의 예측값이 저장한 환경의 예측값과 같음 | 시나리오 7에서 수동 확인 |
+| 온라인 비교 | 실제 트래픽 일부를 challenger에 보내 비교(A/B, canary) | 다루지 않음 |
+| 사람 승인 | 자동 기준을 통과한 뒤 담당자가 승인 | 다루지 않음 |
+
 ## 컴포넌트 역할
 
 | 컴포넌트 | 역할 |
@@ -91,9 +127,10 @@ flowchart LR
 
 ### 1. 파이프라인을 제출합니다
 
-`kubeflow/03-registry.ipynb`를 열고 **Run All Cells**를 실행합니다. 2~3분 걸립니다. 마지막 셀에 `SUCCEEDED`가 나오면 됩니다.
+`kubeflow/03-registry.ipynb`를 열고 **Run All Cells**를 실행합니다. `register()` 셀이 파이프라인 `income-register`를 **Pipelines** 메뉴에 등록하고, 마지막 셀이 그 버전으로 run을 만듭니다. 2~3분 걸립니다. 마지막 셀에 `SUCCEEDED`가 나오면 됩니다.
 
 ```text
+registered income-register version 3b02a1f2-5aab-4d2d-b0b6-cf0c2e794591
 submitted register f26f5864-cb82-4fb8-8aa1-05dbaf2a75db
 register SUCCEEDED
 ```

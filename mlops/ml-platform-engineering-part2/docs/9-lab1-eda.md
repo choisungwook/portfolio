@@ -29,13 +29,24 @@ KFP는 ML 작업을 단계(컴포넌트)로 나누고, 단계마다 파드를 �
 - **단계마다 자원을 따로 줍니다.** 데이터 읽기는 CPU 파드로, 학습만 GPU 파드로 띄울 수 있습니다. 노트북은 탐색하는 동안 GPU를 계속 붙잡고 있습니다.
 - **같은 작업을 같은 방식으로 반복합니다.** 파라미터만 바꿔 다시 실행하고, 입력이 같은 단계는 캐시로 건너뜁니다. 화면에서 run끼리 비교하고, 정해진 주기로 실행(Recurring run)할 수도 있습니다.
 
-### KFP 용어: experiment, run, recurring run
+### MLflow로 실험하다가, 반복하거나 공유할 때 KFP에 등록합니다
 
-KFP 화면 왼쪽의 **Experiments**, **Runs**, **Recurring Runs**는 서로 포함 관계입니다.
+이 Lab은 두 도구를 쓰는 시점을 이렇게 나눕니다.
+
+1. 노트북에서 MLflow로 실험합니다. 답을 모르는 동안은 셀을 고쳐 가며 빠르게 돌립니다.
+2. 같은 실험을 반복해서 돌리거나 다른 사람에게 넘기고 싶어지면, 노트북 코드를 KFP 파이프라인으로 옮겨 **Pipelines** 메뉴에 등록합니다.
+3. 등록한 파이프라인은 버전이 쌓입니다. 노트북이 없는 동료도 화면에서 버전을 골라 **Create run**으로 같은 작업을 실행합니다.
+
+Kubeflow 노트북의 `register()`가 2번을 합니다. 파이프라인을 컴파일해 처음이면 새 파이프라인으로, 이미 있으면 같은 파이프라인의 새 버전으로 올립니다. `submit()`은 등록한 그 버전으로 run을 만듭니다.
+
+### KFP 용어: pipeline, experiment, run, recurring run
+
+KFP 화면 왼쪽의 **Pipelines**, **Experiments**, **Runs**, **Recurring Runs**는 서로 이어져 있습니다.
 
 | 용어 | 뜻 | 이 Lab의 예 |
 |---|---|---|
-| pipeline | 단계와 순서의 정의. 실행 전의 설계도 | `income-train` |
+| pipeline | 단계와 순서의 정의. **Pipelines** 메뉴에 등록한 설계도 | `income-train` |
+| pipeline version | 등록할 때마다 쌓이는 pipeline의 판. run은 버전 하나로 실행됨 | `income-train-20261101-151500`처럼 등록 시각이 붙음 |
 | run | pipeline을 파라미터 값 하나로 한 번 실행한 것 | `train-xgboost` |
 | experiment | run을 묶는 폴더. 모든 run은 experiment 하나에 속하고, 지정하지 않으면 `Default`에 들어감 | `income-classifier` |
 | recurring run | 정해진 주기(cron 또는 간격)마다 run을 새로 만드는 예약 | 이 Lab은 쓰지 않음 |
@@ -46,12 +57,12 @@ KFP 화면 왼쪽의 **Experiments**, **Runs**, **Recurring Runs**는 서로 포
 
 KFP experiment는 MLflow experiment와 이름만 같을 뿐 다른 시스템의 기록입니다. 이 Lab은 둘 다 `income-classifier`로 맞춰 찾기 쉽게 했지만, KFP run이 MLflow에 저절로 나타나지는 않습니다. MLflow에 남기려면 컴포넌트 안에서 MLflow에 기록해야 합니다(9번 시나리오의 `register-model`).
 
-화면에서 run을 실행하려면 노트북으로 한 번 제출한 run을 복제합니다. 노트북에서 제출한 파이프라인은 **Pipelines** 목록에 등록되지 않으므로 **Create run**에서는 고를 수 없습니다.
+노트북 없이 화면에서 run을 실행하는 순서입니다. [10-lab1-experiment-lineage.md](./10-lab1-experiment-lineage.md)의 Kubeflow 예제로 `income-train`을 등록한 뒤 해 봅니다.
 
-1. **Runs**에서 `train-xgboost` run을 엽니다.
-2. 오른쪽 위의 **Clone run**을 누릅니다.
-3. **Run name**을 `train-xgboost-ui`로 바꾸고, **Experiment**가 `income-classifier`인지 확인합니다.
-4. **Run parameters**의 `model_type`을 원하는 값으로 바꾸고 **Start**를 누릅니다.
+1. **Pipelines**에서 `income-train`을 열고 실행할 버전을 고릅니다.
+2. **Create run**을 누릅니다.
+3. **Run name**을 `train-xgboost-ui`로 정하고, **Experiment**에서 `income-classifier`를 고릅니다.
+4. **Run parameters**의 `model_type`에 `xgboost`를 넣고 **Start**를 누릅니다.
 
 ### 감수하는 것
 
@@ -155,14 +166,17 @@ flowchart LR
 
 ### 1. 파이프라인을 제출합니다
 
-JupyterLab에서 `kubeflow/01-eda.ipynb`를 열고 **Run All Cells**를 실행합니다. 셀에서 컴포넌트와 파이프라인을 정의하고, 마지막 셀이 experiment `income-classifier`에 run `eda`로 제출한 뒤 끝날 때까지 기다립니다. 1~2분 걸립니다.
+JupyterLab에서 `kubeflow/01-eda.ipynb`를 열고 **Run All Cells**를 실행합니다. 셀에서 컴포넌트와 파이프라인을 정의하고, `register()` 셀이 파이프라인 `income-eda`를 **Pipelines** 메뉴에 등록합니다. 마지막 셀이 등록한 버전으로 experiment `income-classifier`에 run `eda`를 만들고 끝날 때까지 기다립니다. 1~2분 걸립니다.
 
-마지막 셀 출력이 아래처럼 나오면 됩니다.
+두 셀의 출력이 아래처럼 나오면 됩니다. ID는 실행마다 다릅니다.
 
 ```text
-submitted eda d6e9a37c-52f8-4fdd-ad05-d700c666244a
+registered income-eda version b2861889-4c95-4013-992a-84162a1cb7a8
+submitted eda fee73804-6dd3-4c33-82d9-a5ef59ca9183
 eda SUCCEEDED
 ```
+
+**Pipelines** 메뉴에 `income-eda`가 생겼는지 봅니다. 노트북을 다시 실행하면 같은 파이프라인에 버전이 하나 더 쌓입니다.
 
 ### 2. KFP 화면에서 결과를 봅니다
 
