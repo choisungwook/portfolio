@@ -25,48 +25,55 @@ Security Group은 EC2의 네트워크 인터페이스(ENI)에 직접 결합되�
 
 ### 2. 방화벽 리소스 간 연관관계
 
-Network Firewall은 독립적인 4단계 리소스가 유기적으로 연결되어 동작합니다.
+AWS Network Firewall은 단일 장비가 아니라, **설정 계층(Rule Group → Policy → Firewall)**과 **실제 트래픽 제어 계층(Firewall Endpoint ← Route Table)**이 단계적으로 결합되어 동작합니다.
+
+아래 다이어그램은 상단의 검사 규칙이 정책과 방화벽을 거쳐 가용 영역별 엔드포인트로 프로비저닝되는 **설정 흐름(실선)**과, VPC 라우팅 테이블을 통해 실제 애플리케이션 패킷이 엔드포인트로 유입되는 **트래픽 흐름(굵은 이중선)**의 관계를 나타냅니다.
 
 ```mermaid
-flowchart TB
-  subgraph RG["Rule Group (규칙 정의)"]
-    R1["nfw-lab-egress-allow<br/>(시나리오 3에서 도메인 허용 규칙 추가)"]
+flowchart TD
+  subgraph L1["1단계: Rule Group (검사 규칙 정의)"]
+    RG1["Stateful Rule Group (도메인 Allowlist)<br/>.amazonaws.com, .github.com"]
+    RG2["기타 Rule Group (선택 사항)<br/>5-tuple IP/Port 규칙, 침입 탐지 시그니처 등"]
   end
 
-  subgraph POL["Firewall Policy (엔진 정책)"]
-    P1["Stateless 기본 액션: Forward to stateful"]
-    P2["Stateful 엔진 옵션: Strict order, Stream exception Reject"]
-    P3["Stateful 기본 액션: Alert established (감사 모드)"]
-    P4["연결된 Rule Group 목록"]
+  subgraph L2["2단계: Firewall Policy (엔진 동작 정책)"]
+    POL["Firewall Policy: nfw-lab-policy<br/>- 평가 방식: Strict Order<br/>- 기본 액션: Application drop established<br/>- 감사 액션: Alert established<br/>- 미인식 패킷: Stream exception Reject"]
   end
 
-  subgraph FW["Firewall (방화벽 본체)"]
-    F1["보호 설정 (Subnet Change Protection)"]
-    F2["로깅 설정 (Alert, Flow Log 전송)"]
+  subgraph L3["3단계: Firewall (VPC 및 서브넷 바인딩)"]
+    FW["Firewall: nfw-lab<br/>- 배치 대상 VPC: nfw-lab<br/>- 로깅 전송: CloudWatch Logs (/alert, /flow)<br/>- 서브넷 변경 보호: Enabled"]
   end
 
-  subgraph EP["Firewall Endpoint (가용 영역별 검사 지점)"]
-    E1["AZ a Endpoint (vpce-...)<br/>10.0.10.0/28"]
-    E2["AZ c Endpoint (vpce-...)<br/>10.0.10.16/28"]
+  subgraph L4["4단계: Firewall Endpoints (실제 물리적 검사 관문)"]
+    EPA["AZ a Endpoint (vpce-aaa)<br/>Firewall Subnet 10.0.10.0/28"]
+    EPC["AZ c Endpoint (vpce-ccc)<br/>Firewall Subnet 10.0.10.16/28"]
   end
 
-  R1 -- "Policy에 등록" --> P4
-  POL -- "방화벽에 1:1 연결" --> FW
-  FW -- "지정 서브넷마다 자동 프로비저닝" --> EP
-  F2 -- "로그 전송" --> CW["CloudWatch Logs<br/>(/alert, /flow)"]
+  subgraph L5["5단계: VPC Route Tables (실제 트래픽 유도)"]
+    RTA["App Route Table a<br/>0.0.0.0/0 → vpce-aaa"]
+    RTC["App Route Table c<br/>0.0.0.0/0 → vpce-ccc"]
+    RTP["Public Route Table (회귀 경로)<br/>10.0.20.0/24 → vpce-aaa<br/>10.0.21.0/24 → vpce-ccc"]
+  end
 
-  RTA["App Route Table (AZ a)<br/>0.0.0.0/0"] -- "Next Hop" --> E1
-  RTC["App Route Table (AZ c)<br/>0.0.0.0/0"] -- "Next Hop" --> E2
-  RTP["Public Route Table<br/>10.0.20.0/24, 10.0.21.0/24"] -- "응답 Next Hop" --> E1
-  RTP -- "응답 Next Hop" --> E2
+  RG1 -->|"Policy에 바인딩 (다대일)"| POL
+  RG2 -.->|"Policy에 바인딩 (다대일)"| POL
+  POL -->|"방화벽에 1:1 연결"| FW
+  FW -->|"AZ a 서브넷에 자동 프로비저닝"| EPA
+  FW -->|"AZ c 서브넷에 자동 프로비저닝"| EPC
+
+  RTA ==>|"EC2 a 아웃바운드 패킷 검사 유도"| EPA
+  RTC ==>|"EC2 c 아웃바운드 패킷 검사 유도"| EPC
+  RTP -.->|"NAT 응답 패킷 대칭 회귀 유도"| EPA
+  RTP -.->|"NAT 응답 패킷 대칭 회귀 유도"| EPC
 ```
 
-| 리소스 관계 | 실무적 의미와 동작 원리 |
-| --- | --- |
-| **Rule Group → Policy** | 룰 그룹은 단독으로 동작하지 않으며 폴리시에 연결되어야 활성화됩니다. 하나의 룰 그룹을 여러 폴리시에서 재사용할 수 있으며, 폴리시는 연결된 룰 그룹들의 처리 용량(Capacity) 합계를 예약합니다. |
-| **Policy → Firewall** | 방화벽 하나에는 하나의 폴리시만 연결됩니다. 폴리시 설정을 수정하면 실제 방화벽 엔드포인트에 동기화되기까지 약 1분 내외가 소요됩니다. |
-| **Firewall → Endpoint** | 방화벽 생성 시 지정한 가용 영역(AZ)별 방화벽 전용 서브넷마다 엔드포인트(`vpce-`)가 자동 생성됩니다. |
-| **Route Table → Endpoint** | 라우팅 테이블의 대상(Target)이 엔드포인트를 가리켜야 비로소 해당 서브넷의 트래픽이 방화벽 검사를 받습니다. |
+| 리소스 계층 | 핵심 질문 및 역할 | 본 실습 예시 | 왜 분리되어 있는가? (설계 이유) |
+| --- | --- | --- | --- |
+| **1. Rule Group** | "무엇을 검사하고 허용/차단할 것인가?" | `nfw-lab-egress-allow` (도메인 Allowlist) | 검사 규칙을 독립 모듈로 분리하여 여러 정책(Policy)에서 재사용하기 위함 |
+| **2. Firewall Policy** | "규칙들을 어떤 순서와 기본 동작으로 실행할 것인가?" | `nfw-lab-policy` (Strict Order, Drop/Alert 설정) | 룰 그룹들의 실행 순서, 기본 Action(Drop/Alert), Stateless/Stateful 엔진 제어를 중앙 집중화하기 위함 |
+| **3. Firewall** | "어느 VPC, 어느 서브넷들에 방화벽을 배치할 것인가?" | `nfw-lab` (VPC 연결, 로깅 설정) | 네트워크 배치 위치와 로깅 저장소(CloudWatch), 보호 옵션(삭제/서브넷 변경 방지)을 관리하기 위함 |
+| **4. Firewall Endpoint** | 실제 네트워크 트래픽이 통과하는 L7 게이트웨이 | 가용 영역별 `vpce-...` (GWLB-E) | 가용 영역(AZ)별 독립적 장애 격리와 대칭 라우팅 경로를 제공하기 위함 |
+| **5. Route Table** | "어떤 트래픽을 검사 관문으로 보낼 것인가?" | `nfw-lab-app-*`, `nfw-lab-public` | 서버 내부 설정을 건드리지 않고, VPC 서브넷 단위로 트래픽 인스펙션을 강제하기 위함 |
 
 ### 3. Firewall Endpoint와 Gateway Load Balancer의 관계
 
