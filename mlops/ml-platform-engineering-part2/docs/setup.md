@@ -100,7 +100,8 @@ up이 적용하는 파일은 ApplicationSet 3개입니다. ApplicationSet이 App
 mlops/ml-platform-engineering-part2/
 ├── scripts/up.sh                        # Argo CD 설치, --enable-helm, manifests/argocd/ 적용
 ├── notebooks/                           # Lab 1 노트북. Kubeflow Notebook 터미널에서 clone
-│   └── pipelines/                       # Lab 1 Kubeflow 예제. KFP 파이프라인 3개
+│   ├── mlflow/                          # Lab 1 MLflow 예제. 노트북 3개와 income.py
+│   └── kubeflow/                        # Lab 1 Kubeflow 예제. KFP 파이프라인 노트북 3개와 common.py
 └── manifests/
     ├── argocd/
     │   ├── kubeflow-applicationset.yaml        # Kubeflow 배포판 구성요소 16개

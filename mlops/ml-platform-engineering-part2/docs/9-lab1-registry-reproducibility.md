@@ -16,12 +16,12 @@
 
 | 컴포넌트 | 역할 |
 |---|---|
-| `03-registry-lineage.ipynb` | 최고 run을 등록하고, 리니지를 따라가고, 다시 학습해 점수를 비교 |
+| `mlflow/03-registry-lineage.ipynb` | 최고 run을 등록하고, 리니지를 따라가고, 다시 학습해 점수를 비교 |
 | Registered model `income-classifier` | 버전 목록과 alias를 가진 이름 |
 | Model version | LoggedModel 하나를 가리키는 번호. 출처 run을 기억 |
 | Alias `champion` | 모델을 쓰는 쪽이 아는 유일한 이름 |
 | Kubeflow Pipelines(Lab 3), KServe(Lab 4) | `models:/income-classifier@champion`으로 모델을 꺼내는 쪽 |
-| `pipelines/register_pipeline.py` | Kubeflow 예제. 학습 → `register-model` → `verify-champion` 파이프라인을 제출 |
+| `kubeflow/03-registry.ipynb` | Kubeflow 예제. 학습 → `register-model` → `verify-champion` 파이프라인을 제출 |
 | PodDefault `mlflow-access` | `register-model`, `verify-champion` 파드에 label `mlflow-access: "true"`를 붙여 MLflow 주소와 계정을 넣음 |
 
 ## 흐름
@@ -45,7 +45,7 @@ flowchart LR
 
 ### 1. 최고 모델을 등록합니다
 
-JupyterLab에서 `03-registry-lineage.ipynb`를 열고 **Run All Cells**를 실행합니다. 두 번째 셀이 최고 run을 등록하고 alias를 붙입니다.
+JupyterLab에서 `mlflow/03-registry-lineage.ipynb`를 열고 **Run All Cells**를 실행합니다. 두 번째 셀이 최고 run을 등록하고 alias를 붙입니다.
 
 ```text
 xgboost aa1496b3a63648318bfb6f123fe8045d 0.8737
@@ -91,13 +91,7 @@ flowchart LR
 
 ### 1. 파이프라인을 제출합니다
 
-노트북 터미널의 `pipelines` 디렉터리에서 실행합니다. 2~3분 걸립니다.
-
-```bash
-python register_pipeline.py
-```
-
-`SUCCEEDED`가 나오면 됩니다.
+`kubeflow/03-registry.ipynb`를 열고 **Run All Cells**를 실행합니다. 2~3분 걸립니다. 마지막 셀에 `SUCCEEDED`가 나오면 됩니다.
 
 ```text
 submitted register f26f5864-cb82-4fb8-8aa1-05dbaf2a75db

@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-01
+
+* **Update**: [Kubeflow 예제 결정](decisions/2026-10-kubeflow-examples-kfp-with-mlflow-registry.md)에 노트북을 `mlflow/`, `kubeflow/`로 나눈 것을 반영.
+
 ## 2026-10-31
 
 * **Creation**: [Kubeflow 예제는 KFP와 MLflow 레지스트리](decisions/2026-10-kubeflow-examples-kfp-with-mlflow-registry.md) 결정 기록.

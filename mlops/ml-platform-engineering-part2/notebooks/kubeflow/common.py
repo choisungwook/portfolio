@@ -1,7 +1,7 @@
-"""Lab 1 KFP 파이프라인 3개가 같이 쓰는 컴포넌트와 제출 함수.
+"""Lab 1 Kubeflow 노트북 3개가 같이 쓰는 컴포넌트와 제출 함수.
 
 컴포넌트 함수는 컴파일할 때 소스가 그대로 파이프라인 YAML에 들어가고, 각자 파드에서 실행된다.
-그래서 컴포넌트 안에서는 이 파일의 다른 함수나 income.py를 import하지 않는다.
+그래서 컴포넌트 안에서는 이 파일의 다른 함수나 mlflow/income.py를 import하지 않는다.
 """
 from typing import Callable
 

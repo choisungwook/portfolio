@@ -103,10 +103,17 @@ cd mlops/ml-platform-engineering-part2/notebooks && pip install -r requirements.
 
 이 실습이 master에 merge되기 전이면 `git clone`에 `--branch feat/ml-platform-part2-lab0`을 붙입니다.
 
+노트북은 도구별로 나뉩니다. 시나리오 7~9마다 같은 번호의 노트북을 MLflow 예제와 Kubeflow 예제에서 하나씩 씁니다.
+
+| 디렉터리 | 내용 |
+|---|---|
+| `mlflow/` | 셀에서 직접 학습하고 MLflow에 기록하는 노트북 3개(책 4장) |
+| `kubeflow/` | 셀에서 KFP 파이프라인을 정의해 제출하는 노트북 3개(책 5장) |
+
 데이터 로딩 함수를 점검합니다. `ok 30162`가 출력되면 다음 시나리오로 넘어갑니다.
 
 ```bash
-python income.py
+cd mlflow && python income.py
 ```
 
 ## 부록. 실무에서 얻는 것

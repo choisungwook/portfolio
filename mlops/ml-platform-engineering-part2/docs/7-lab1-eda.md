@@ -29,6 +29,30 @@ KFP는 ML 작업을 단계(컴포넌트)로 나누고, 단계마다 파드를 �
 - **단계마다 자원을 따로 줍니다.** 데이터 읽기는 CPU 파드로, 학습만 GPU 파드로 띄울 수 있습니다. 노트북은 탐색하는 동안 GPU를 계속 붙잡고 있습니다.
 - **같은 작업을 같은 방식으로 반복합니다.** 파라미터만 바꿔 다시 실행하고, 입력이 같은 단계는 캐시로 건너뜁니다. 화면에서 run끼리 비교하고, 정해진 주기로 실행(Recurring run)할 수도 있습니다.
 
+### KFP 용어: experiment, run, recurring run
+
+KFP 화면 왼쪽의 **Experiments**, **Runs**, **Recurring Runs**는 서로 포함 관계입니다.
+
+| 용어 | 뜻 | 이 Lab의 예 |
+|---|---|---|
+| pipeline | 단계와 순서의 정의. 실행 전의 설계도 | `income-train` |
+| run | pipeline을 파라미터 값 하나로 한 번 실행한 것 | `train-xgboost` |
+| experiment | run을 묶는 폴더. 모든 run은 experiment 하나에 속하고, 지정하지 않으면 `Default`에 들어감 | `income-classifier` |
+| recurring run | 정해진 주기(cron 또는 간격)마다 run을 새로 만드는 예약 | 이 Lab은 쓰지 않음 |
+
+**Runs** 메뉴는 모든 experiment의 run을 한 목록으로 보여 주고, **Experiments**에서 experiment 하나를 열면 그 안의 run만 보입니다. 같은 run을 다른 경로로 보는 것입니다.
+
+실험할 때는 run을 씁니다. 파라미터를 바꿔 가며 한 번씩 돌리고 결과를 비교하는 작업이라 주기가 없습니다. recurring run은 비교가 끝나고 할 일이 정해진 뒤, 매일 새 데이터로 재학습하거나 배치 추론을 돌릴 때 씁니다.
+
+KFP experiment는 MLflow experiment와 이름만 같을 뿐 다른 시스템의 기록입니다. 이 Lab은 둘 다 `income-classifier`로 맞춰 찾기 쉽게 했지만, KFP run이 MLflow에 저절로 나타나지는 않습니다. MLflow에 남기려면 컴포넌트 안에서 MLflow에 기록해야 합니다(9번 시나리오의 `register-model`).
+
+화면에서 run을 실행하려면 노트북으로 한 번 제출한 run을 복제합니다. 노트북에서 제출한 파이프라인은 **Pipelines** 목록에 등록되지 않으므로 **Create run**에서는 고를 수 없습니다.
+
+1. **Runs**에서 `train-xgboost` run을 엽니다.
+2. 오른쪽 위의 **Clone run**을 누릅니다.
+3. **Run name**을 `train-xgboost-ui`로 바꾸고, **Experiment**가 `income-classifier`인지 확인합니다.
+4. **Run parameters**의 `model_type`을 원하는 값으로 바꾸고 **Start**를 누릅니다.
+
 ### 감수하는 것
 
 - **느립니다.** 단계마다 파드를 새로 띄우고 `packages_to_install`의 패키지를 매번 설치합니다. 노트북 셀 하나면 몇 초인 작업이 파이프라인으로는 1~2분 걸립니다.
@@ -53,11 +77,11 @@ EDA 결과가 노트북 출력에만 있으면 커널을 다시 시작하는 순
 
 | 컴포넌트 | 역할 |
 |---|---|
-| `01-eda.ipynb` | 데이터를 읽고 그래프 8개를 그린 뒤 `eda` run으로 기록 |
+| `mlflow/01-eda.ipynb` | 데이터를 읽고 그래프 8개를 그린 뒤 `eda` run으로 기록 |
 | MLflow | run과 데이터셋 정보를 PostgreSQL에 저장하고, 그래프 파일을 object storage로 넘김 |
 | object storage `mlflow-artifacts` 버킷 | 그래프 파일. MLflow 서버만 씀 |
 | object storage `mlflow-datasets` 버킷 | 원본 데이터 CSV. 노트북이 직접 씀 |
-| `pipelines/eda_pipeline.py` | Kubeflow 예제. 컴포넌트 `load-data`, `eda-report`로 된 파이프라인을 노트북에서 제출 |
+| `kubeflow/01-eda.ipynb` | Kubeflow 예제. 컴포넌트 `load-data`, `eda-report`로 된 파이프라인을 노트북에서 제출 |
 | Kubeflow Pipelines | 컴포넌트마다 파드를 띄워 실행하고, 결과 파일(아티팩트)과 입출력 연결을 기록 |
 | object storage `mlpipeline` 버킷 | KFP 아티팩트. namespace마다 `private-artifacts/<namespace>/` 아래만 씀 |
 
@@ -71,7 +95,7 @@ EDA 결과가 노트북 출력에만 있으면 커널을 다시 시작하는 순
 
 ```mermaid
 sequenceDiagram
-  participant NB as 01-eda.ipynb
+  participant NB as mlflow/01-eda.ipynb
   participant S3D as mlflow-datasets 버킷
   participant ML as MLflow
   participant S3A as mlflow-artifacts 버킷
@@ -91,7 +115,7 @@ kubectl -n mlflow port-forward svc/mlflow-service 5000:5000
 
 ### 1. 노트북을 실행합니다
 
-JupyterLab에서 `01-eda.ipynb`를 열고 **Run All Cells**를 실행합니다. 셀마다 아래를 확인합니다.
+JupyterLab에서 `mlflow/01-eda.ipynb`를 열고 **Run All Cells**를 실행합니다. 셀마다 아래를 확인합니다.
 
 - 두 번째 셀: 데이터가 `(30162, 9)`입니다. 30,162행에 컬럼 9개입니다.
 - 세 번째 셀(`describe`): `Target`의 최빈값은 `<=50K`이고 22,654행입니다. 나머지 7,508행(약 25%)이 `>50K`입니다. 정답이 한쪽으로 치우쳐 있어서, 다음 시나리오는 정확도와 함께 ROC AUC를 봅니다.
@@ -120,7 +144,7 @@ artifacts: ['eda_plots/Education.png', 'eda_plots/Marital-Status.png', ...]
 
 ## Kubeflow 예제
 
-MLflow 예제와 같은 노트북 터미널에서 시작합니다. 파이프라인은 두 단계입니다. `load-data`가 데이터를 만들고, `eda-report`가 그 데이터를 입력으로 받아 요약 표와 그래프를 만듭니다. 단계마다 파드가 따로 뜨고, 단계 사이 데이터는 `mlpipeline` 버킷을 거쳐 전달됩니다.
+MLflow 예제와 같은 JupyterLab에서 `kubeflow/` 디렉터리의 노트북을 엽니다. 파이프라인은 두 단계입니다. `load-data`가 데이터를 만들고, `eda-report`가 그 데이터를 입력으로 받아 요약 표와 그래프를 만듭니다. 단계마다 파드가 따로 뜨고, 단계 사이 데이터는 `mlpipeline` 버킷을 거쳐 전달됩니다.
 
 ```mermaid
 flowchart LR
@@ -131,13 +155,9 @@ flowchart LR
 
 ### 1. 파이프라인을 제출합니다
 
-JupyterLab **Terminal**에서 실행합니다. 스크립트가 파이프라인을 컴파일하고, experiment `income-classifier`에 run `eda`로 제출한 뒤 끝날 때까지 기다립니다. 1~2분 걸립니다.
+JupyterLab에서 `kubeflow/01-eda.ipynb`를 열고 **Run All Cells**를 실행합니다. 셀에서 컴포넌트와 파이프라인을 정의하고, 마지막 셀이 experiment `income-classifier`에 run `eda`로 제출한 뒤 끝날 때까지 기다립니다. 1~2분 걸립니다.
 
-```bash
-cd pipelines && python eda_pipeline.py
-```
-
-마지막 두 줄이 아래처럼 나오면 됩니다.
+마지막 셀 출력이 아래처럼 나오면 됩니다.
 
 ```text
 submitted eda d6e9a37c-52f8-4fdd-ad05-d700c666244a

@@ -8,7 +8,7 @@ timestamp: 2026-10-31T00:00:00Z
 
 ## 결정
 
-- 시나리오 7, 8, 9의 Kubeflow 예제는 `notebooks/pipelines/`의 KFP 파이프라인 3개로 만든다. 노트북 터미널에서 `kfp.Client()`로 제출한다.
+- 시나리오 7, 8, 9의 Kubeflow 예제는 `notebooks/kubeflow/`의 노트북 3개로 만든다. 셀에서 컴포넌트와 파이프라인을 정의하고 `kfp.Client()`로 제출한다. MLflow 예제 노트북은 `notebooks/mlflow/`에 둔다. 처음에는 `.py` 스크립트였으나, 두 도구를 같은 형식(노트북)으로 나란히 비교하도록 바꿨다.
 - 실험 비교는 KFP experiment와 Metrics 아티팩트로, 등록은 MLflow 레지스트리로 한다. Katib와 Kubeflow Model Registry는 설치하지 않는다.
 - 컴포넌트 이미지는 노트북과 같은 `jupyter-scipy` 이미지에 필요한 패키지만 `packages_to_install`로 더한다.
 

@@ -21,12 +21,12 @@ run과 그 run이 쓴 데이터를 잇는 기록을 리니지(lineage)라고 합
 
 | 컴포넌트 | 역할 |
 |---|---|
-| `02-experiments.ipynb` | 같은 분할로 모델 3개를 학습하고 run 3개를 기록 |
+| `mlflow/02-experiments.ipynb` | 같은 분할로 모델 3개를 학습하고 run 3개를 기록 |
 | MLflow run | 파라미터, 점수, tag `model_uri`, 데이터셋 연결, 아티팩트 `column_list.pkl` |
 | MLflow LoggedModel | 학습한 모델 파일. run과 연결되지만 따로 저장 |
 | object storage `mlflow-datasets` 버킷 | 학습, 테스트, 피처 데이터 CSV |
 | object storage `mlflow-artifacts` 버킷 | 모델 파일과 `column_list.pkl` |
-| `pipelines/train_pipeline.py` | Kubeflow 예제. `load-data` → `prepare-data` → `train-model` 파이프라인을 run 3개로 제출 |
+| `kubeflow/02-experiments.ipynb` | Kubeflow 예제. `load-data` → `prepare-data` → `train-model` 파이프라인을 run 3개로 제출 |
 | KFP experiment `income-classifier` | 파이프라인 run을 묶는 단위. 화면에서 run끼리 점수를 비교 |
 | KFP Metrics 아티팩트 | `train-model`이 남기는 `roc_auc_score_test`, `test_accuracy` |
 
@@ -52,7 +52,7 @@ flowchart LR
 
 ### 1. 노트북을 실행합니다
 
-JupyterLab에서 `02-experiments.ipynb`를 열고 **Run All Cells**를 실행합니다. 마지막 셀이 run 3개를 점수 순으로 보여 줍니다.
+JupyterLab에서 `mlflow/02-experiments.ipynb`를 열고 **Run All Cells**를 실행합니다. 마지막 셀이 run 3개를 점수 순으로 보여 줍니다.
 
 ```text
   tags.mlflow.runName  metrics.roc_auc_score_test  metrics.test_accuracy
@@ -73,7 +73,7 @@ JupyterLab에서 `02-experiments.ipynb`를 열고 **Run All Cells**를 실행합
 
 ## Kubeflow 예제
 
-[7-lab1-eda.md](./7-lab1-eda.md)의 Kubeflow 예제처럼 노트북 터미널의 `pipelines` 디렉터리에서 시작합니다. 파이프라인 정의는 하나이고, run마다 `model_type`만 다릅니다.
+[7-lab1-eda.md](./7-lab1-eda.md)의 Kubeflow 예제처럼 `kubeflow/` 디렉터리의 노트북으로 실행합니다. 파이프라인 정의는 하나이고, run마다 `model_type`만 다릅니다.
 
 ```mermaid
 flowchart LR
@@ -85,11 +85,7 @@ flowchart LR
 
 ### 1. run 3개를 제출합니다
 
-`model_type`을 `decision-tree`, `random-forest`, `xgboost`로 바꿔 3번 제출하고 모두 끝날 때까지 기다립니다. 3분쯤 걸립니다.
-
-```bash
-python train_pipeline.py
-```
+`kubeflow/02-experiments.ipynb`를 열고 **Run All Cells**를 실행합니다. 마지막 셀이 `model_type`을 `decision-tree`, `random-forest`, `xgboost`로 바꿔 3번 제출하고 모두 끝날 때까지 기다립니다. 3분쯤 걸립니다.
 
 run 3개가 모두 `SUCCEEDED`면 됩니다.
 
@@ -119,7 +115,7 @@ train-xgboost SUCCEEDED
 ## 부록. 실무에서 얻는 것
 
 - **같은 비교를 두 도구가 다르게 기록합니다.** MLflow는 run에 데이터셋을 직접 연결하고(`log_input`), KFP는 컴포넌트 사이 입출력 연결로 데이터의 출처를 남깁니다. 실무에서는 KFP 컴포넌트 안에서 MLflow에 기록해 둘을 같이 씁니다. 다음 시나리오의 Kubeflow 예제가 그렇게 합니다.
-- **파라미터만 바꾼 run은 파이프라인을 다시 만들 필요가 없습니다.** 파이프라인 정의는 하나이고 실행할 때 `model_type`만 넘깁니다. 화면의 **Create run**에서도 같은 값을 넣어 실행할 수 있습니다.
+- **파라미터만 바꾼 run은 파이프라인을 다시 만들 필요가 없습니다.** 파이프라인 정의는 하나이고 실행할 때 `model_type`만 넘깁니다. 화면에서는 run의 **Clone run**으로 `model_type`만 바꿔 실행합니다([7-lab1-eda.md](./7-lab1-eda.md)의 KFP 용어 절).
 
 - **전처리 결과도 모델과 함께 남깁니다.** `column_list.pkl`은 one-hot 인코딩 뒤 컬럼 90개의 순서입니다. 5장 추론 코드가 이 순서로 컬럼을 만들지 못하면 모델이 엉뚱한 입력을 받습니다.
 - **리니지는 데이터를 내용 해시로 식별합니다.** MLflow는 이름과 digest가 같은 데이터셋을 experiment 안에 한 번만 저장하고, 처음 기록한 경로를 계속 씁니다. 그래서 업로드 경로를 run ID가 아니라 `train-<digest>.csv`처럼 digest로 정했습니다. 경위는 [troubleshooting.md](./troubleshooting.md)의 9번에 있습니다.
