@@ -1,6 +1,6 @@
 # Lab 0. 문제 배경: 최신 오픈소스 환경 기반의 ML 플랫폼 재구성
 
-> **검증 환경**: k3s v1.36.5 단일 노드(NVIDIA GPU 1장), Argo CD Application 20개 Synced & Healthy 상태 기준. 진행 중 발생하는 문제는 [troubleshooting.md](./troubleshooting.md)를 참고합니다.
+> **검증 환경**: k3s v1.36.5 단일 노드(NVIDIA GPU 1장), Argo CD Application 21개 Synced & Healthy 상태 기준. 진행 중 발생하는 문제는 [troubleshooting.md](./troubleshooting.md)를 참고합니다.
 
 ## 도서 원작 플랫폼 구성의 한계
 

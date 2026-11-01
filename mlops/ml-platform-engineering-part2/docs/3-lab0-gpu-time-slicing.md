@@ -54,7 +54,8 @@ kubectl get node -o jsonpath='{.items[0].status.allocatable.nvidia\.com/gpu}'; e
 
 ### 2. GPU 파드 내부의 실제 장치 및 메모리 인식 확인
 
-[8-lab1-kubeflow-notebook.md](./8-lab1-kubeflow-notebook.md)에서 GPU 1개를 요청해 생성한 노트북 파드에서 `nvidia-smi`를 실행합니다.
+> [!NOTE]
+> 본 단계는 [시나리오 3 (Kubeflow Notebooks)](./8-lab1-kubeflow-notebook.md)에서 GPU 1개를 요청해 `income-notebook` 파드를 생성한 이후에 확인합니다. (Lab 0 진행 시점에는 건너뛰고 3번 노드 자원 확인으로 진행해도 무방합니다.)
 
 ```bash
 kubectl -n kubeflow-user-example-com exec income-notebook-0 -c income-notebook -- nvidia-smi --query-gpu=name,memory.total --format=csv

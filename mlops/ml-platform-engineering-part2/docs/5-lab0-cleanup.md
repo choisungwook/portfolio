@@ -23,4 +23,4 @@ kubectl delete -f manifests/kubeflow-notebook/
 
 ## 3. 플랫폼 전체 삭제 (클러스터 초기화)
 
-실습 환경 전체를 완전히 삭제하고 초기 상태로 되돌리려면 [setup.md](./setup.md)의 Teardown 절차를 따릅니다.
+실습 환경 전체를 완전히 삭제하고 초기 상태로 되돌리려면 [setup.md](./setup.md)의 `## 리소스 회수 및 삭제 (Down)` 절차를 따릅니다.

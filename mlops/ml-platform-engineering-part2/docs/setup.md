@@ -117,7 +117,7 @@ mlops/ml-platform-engineering-part2/
 └── manifests/
     ├── argocd/
     │   ├── kubeflow-applicationset.yaml        # Kubeflow 배포판 핵심 컴포넌트 16개 관리
-    │   ├── platform-applicationset.yaml        # MLflow, Redis, GPU, 사용자 설정 등 4개 컴포넌트 관리
+    │   ├── platform-applicationset.yaml        # MLflow, Redis, GPU, Feast UI, 사용자 설정 등 5개 컴포넌트 관리
     │   └── mlflow-preview-applicationset.yaml  # PR 단위 격리 프리뷰 환경 자동 생성
     ├── kubeflow/                        # 공식 배포판을 오버라이드한 Kustomize 래퍼
     │   ├── istio-install/               # Istio CNI 호스트 경로를 k3s 환경에 맞게 패치
@@ -142,7 +142,7 @@ flowchart LR
   KF -->|공식 배포판 직접 참조 13개| UP[kubeflow/community-distribution<br/>release-26.03.1]
   KF -->|환경 패치 래퍼 3개| WR[manifests/kubeflow/*]
   WR -->|원격 Kustomize Base| UP
-  PL --> OWN[manifests/mlflow, redis,<br/>nvidia-device-plugin, user-resources]
+  PL --> OWN[manifests/mlflow, redis, feast,<br/>nvidia-device-plugin, user-resources]
   PV -.->|PR 단위 동적 배포| MF[preview 네임스페이스 격리 환경]
 ```
 
