@@ -122,6 +122,7 @@
 108. ECS Service Auto Scaling: target tracking scale-out·scale-in 관찰과 scaling 알림 (26.10.11) - [링크](./aws/ecs/service-autoscaling/)
 109. ECS circuit breaker: blue/green 배포에서 이미지 pull 실패, health check 실패, 미사용 비교 (26.10.18) - [링크](./aws/ecs/circuit-breaker/)
 110. ML Platform Engineering Part 2 Lab 0~1: k3s에 Kubeflow 배포판과 MLflow를 Argo CD ApplicationSet으로 설치, GPU time-slicing, PR 미리보기, Kubeflow Notebook에서 MLflow 실험 리니지와 재현성 (26.10.31) - [링크](./mlops/ml-platform-engineering-part2/)
+111. AWS Network Firewall: egress 트래픽 audit과 도메인 차단·허용 정책 관리, 콘솔 실습, 운영 적용 순서, 로컬 Grafana 모니터링 (26.10.31) - [링크](./aws/network-firewall/egress-filtering/)
 
 ## 직접 만든 제품
 

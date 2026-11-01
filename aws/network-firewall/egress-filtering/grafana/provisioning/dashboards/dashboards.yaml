@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: network-firewall
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

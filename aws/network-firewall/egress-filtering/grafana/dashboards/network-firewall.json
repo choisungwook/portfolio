@@ -1,0 +1,336 @@
+{
+  "uid": "network-firewall",
+  "title": "Network Firewall",
+  "schemaVersion": 41,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Stateful engine: received / passed / dropped",
+      "description": "AWS/NetworkFirewall, Engine=Stateful, Sum per minute, one series per AZ. Metrics with value 0 are not published.",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "region": "default",
+          "namespace": "AWS/NetworkFirewall",
+          "metricName": "ReceivedPackets",
+          "dimensions": {
+            "FirewallName": [
+              "nfw-lab"
+            ],
+            "AvailabilityZone": [
+              "*"
+            ],
+            "Engine": [
+              "Stateful"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Sum",
+          "period": "60",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "region": "default",
+          "namespace": "AWS/NetworkFirewall",
+          "metricName": "PassedPackets",
+          "dimensions": {
+            "FirewallName": [
+              "nfw-lab"
+            ],
+            "AvailabilityZone": [
+              "*"
+            ],
+            "Engine": [
+              "Stateful"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Sum",
+          "period": "60",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "region": "default",
+          "namespace": "AWS/NetworkFirewall",
+          "metricName": "DroppedPackets",
+          "dimensions": {
+            "FirewallName": [
+              "nfw-lab"
+            ],
+            "AvailabilityZone": [
+              "*"
+            ],
+            "Engine": [
+              "Stateful"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Sum",
+          "period": "60",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Dropped packets by AZ",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "region": "default",
+          "namespace": "AWS/NetworkFirewall",
+          "metricName": "DroppedPackets",
+          "dimensions": {
+            "FirewallName": [
+              "nfw-lab"
+            ],
+            "AvailabilityZone": [
+              "*"
+            ],
+            "Engine": [
+              "Stateful"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Sum",
+          "period": "60",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Stream exception policy packets",
+      "description": "Packets of flows the firewall has no state for (mid-stream after a route change or flow flush).",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "region": "default",
+          "namespace": "AWS/NetworkFirewall",
+          "metricName": "StreamExceptionPolicyPackets",
+          "dimensions": {
+            "FirewallName": [
+              "nfw-lab"
+            ],
+            "AvailabilityZone": [
+              "*"
+            ],
+            "Engine": [
+              "Stateful"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Sum",
+          "period": "60",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Blocked domains (alert log)",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "default",
+          "logGroupNames": [
+            "/aws/network-firewall/nfw-lab/alert"
+          ],
+          "logGroups": [],
+          "expression": "filter event.alert.action = \"blocked\"\n| fields coalesce(event.tls.sni, event.http.hostname) as domain\n| stats count(*) as hits by domain, event.src_ip\n| sort hits desc\n| limit 20",
+          "statsGroups": []
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Recent alert events",
+      "description": "",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "default",
+          "logGroupNames": [
+            "/aws/network-firewall/nfw-lab/alert"
+          ],
+          "logGroups": [],
+          "expression": "fields @timestamp, event.alert.action, event.src_ip, coalesce(event.tls.sni, event.http.hostname) as domain, event.alert.signature\n| sort @timestamp desc\n| limit 50",
+          "statsGroups": []
+        }
+      ]
+    }
+  ]
+}
