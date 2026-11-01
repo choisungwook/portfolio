@@ -1,0 +1,17 @@
+# Local Grafana that reads Network Firewall metrics and logs from CloudWatch.
+# Credentials come from the host's ~/.aws and the AWS_PROFILE exported in the shell.
+services:
+  grafana:
+    image: grafana/grafana:13.2.5
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:?export AWS_PROFILE first}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ~/.aws:/usr/share/grafana/.aws:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
