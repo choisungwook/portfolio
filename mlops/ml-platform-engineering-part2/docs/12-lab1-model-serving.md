@@ -69,7 +69,7 @@ flowchart LR
 
 ## InferenceService 하나가 Deployment, Service, 외부 경로를 만듭니다
 
-KServe에서 사람이 쓰는 리소스는 InferenceService 하나입니다. KServe 컨트롤러가 그 선언을 읽고 실제로 도는 Kubernetes 리소스를 만듭니다. 외부 요청은 Istio Gateway로 들어와, KServe가 만든 경로(HTTPRoute 또는 Ingress)를 따라 predictor로 갑니다.
+KServe에서 사람이 쓰는 리소스는 InferenceService 하나입니다. KServe 컨트롤러가 그 선언을 읽고 실제로 도는 Kubernetes 리소스를 만듭니다. 그림의 실선은 이 Lab에서 만들어지는 리소스이고, 점선(optional)은 설정을 켜면 만들어지는 외부 경로입니다.
 
 ![KServe 추상화](../imgs/mlops-kserve-abstraction.png)
 
@@ -83,7 +83,26 @@ KServe에서 사람이 쓰는 리소스는 InferenceService 하나입니다. KSe
 4. 외부 경로를 만듭니다. `inferenceservice-config`의 `enableGatewayApi`가 `true`면 Gateway API의 HTTPRoute를, 아니면 Ingress를 만듭니다.
 5. 파드가 Ready가 되면 InferenceService의 `READY`를 `True`로 바꾸고 주소를 기록합니다.
 
-이 Lab은 맥북에서 port-forward로만 부르므로 `disableIngressCreation: true`로 4번을 껐습니다. 그래서 그림의 HTTPRoute와 Istio Gateway 경로는 실제로 만들어지지 않고, Deployment, Service, HPA만 생깁니다. 클러스터 안에서는 `status.address.url`(`http://income-classifier-predictor.kubeflow-user-example-com.svc.cluster.local`)로 부릅니다.
+이 Lab은 맥북에서 port-forward로만 부르므로 `disableIngressCreation: true`로 4번을 껐습니다. 그래서 HTTPRoute는 만들어지지 않고, Deployment, Service, HPA만 생깁니다. 클러스터 안에서는 `status.address.url`(`http://income-classifier-predictor.kubeflow-user-example-com.svc.cluster.local`)로 부릅니다.
+
+### Kubeflow 화면의 게이트웨이로는 모델을 부를 수 없습니다
+
+클러스터에는 Istio Gateway `kubeflow-gateway`가 있지만, 이 게이트웨이는 Kubeflow 화면용입니다. 경로(VirtualService)가 대시보드, Pipelines UI, 노트북, Dex 같은 화면에만 연결돼 있고 `income-classifier`로 가는 경로는 없습니다. 그래서 `http://localhost:8080`(Kubeflow 화면 port-forward)으로는 모델을 부를 수 없고, predictor Service에 직접 port-forward합니다.
+
+| 요청 | 들어가는 곳 | 이 Lab에서 |
+|---|---|---|
+| Kubeflow 화면 | `istio-ingressgateway` → `kubeflow-gateway` → 화면별 VirtualService | 사용 |
+| 모델 예측 | `kubectl port-forward` → predictor Service → 파드 | 사용 |
+| 모델 예측(외부 공개) | Istio Gateway → KServe가 만든 HTTPRoute → predictor | 사용 안 함(optional) |
+
+게이트웨이와 경로가 어떻게 연결돼 있는지는 아래 명령으로 봅니다. Istio Gateway는 두 개, Gateway API CRD는 없음, VirtualService는 화면용만 있으면 지금 설정 그대로입니다.
+
+```bash
+kubectl get gateways.networking.istio.io -A
+kubectl get virtualservices.networking.istio.io -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,GATEWAY:.spec.gateways,PATH:.spec.http[0].match[0].uri.prefix
+kubectl get crd | grep gateway.networking.k8s.io || echo "Gateway API CRD 없음"
+kubectl -n kubeflow get configmap inferenceservice-config -o jsonpath='{.data.ingress}'
+```
 
 ## 런타임은 모델이 저장된 환경과 맞아야 합니다
 
