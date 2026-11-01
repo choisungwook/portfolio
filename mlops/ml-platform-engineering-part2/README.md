@@ -3,6 +3,7 @@
 책 "Machine Learning Platform Engineering"(Manning, 2026) Part 2(4~6장)를 2026년 10월 기준 오픈소스로 바꿔 k3s에서 실습합니다. Kubeflow가 제공하는 구성요소는 Kubeflow 배포판에서 가져오고, MLflow와 GPU device plugin은 Helm chart로 설치합니다.
 
 - [실습 환경 준비](./docs/setup.md)
+- [GPU Ubuntu를 다시 켠 뒤 실습 환경 되살리기](./docs/quickstart_for_myubuntugpu.md)
 - [Lab 0. 책의 플랫폼 설치 경로는 2026년에 그대로 동작하지 않습니다](./docs/1-lab0-problem.md)
 - [Lab 0 시나리오 1. 모델 수명주기의 단계마다 맡을 컴포넌트를 한 번에 세웁니다](./docs/2-lab0-platform-install.md)
 - [Lab 0 시나리오 2. GPU 한 장을 노트북과 서빙이 나눠 씁니다](./docs/3-lab0-gpu-time-slicing.md)
