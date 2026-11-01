@@ -1,0 +1,22 @@
+# MLflow 레지스트리의 champion 모델을 ServingRuntime mlflow-serve로 서빙한다.
+# KServe는 models:/ 주소를 모르므로, champion이 가리키는 object storage 경로를 storageUri에 넣는다.
+# 경로는 클러스터마다 다르다. 12-lab1-model-serving.md의 명령으로 구해 바꿔 넣는다.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: income-classifier
+  namespace: kubeflow-user-example-com
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+  annotations:
+    # 사용자 namespace는 istio-injection이 켜져 있다. port-forward로만 부르므로 sidecar를 넣지 않는다.
+    sidecar.istio.io/inject: "false"
+spec:
+  predictor:
+    serviceAccountName: kserve-s3
+    model:
+      modelFormat:
+        name: mlflow
+        version: "3"
+      runtime: mlflow-serve
+      storageUri: s3://mlflow-artifacts/1/models/m-bf03a37fb3b34de292dd57fb330c1a45/artifacts

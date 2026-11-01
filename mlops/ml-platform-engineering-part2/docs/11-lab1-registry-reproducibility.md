@@ -30,8 +30,8 @@
 
 ```mermaid
 flowchart LR
-  KFP[Kubeflow Pipelines<br/>시나리오 6] -->|models:/income-classifier@champion| Alias[alias champion]
-  KS[KServe<br/>시나리오 7] -->|models:/income-classifier@champion| Alias
+  KFP[Kubeflow Pipelines<br/>시나리오 6] -->|"models:/income-classifier@champion"| Alias[alias champion]
+  KS[KServe<br/>시나리오 7] -->|"champion 경로를 storageUri로"| Alias
   Alias --> V[version 1]
   V --> Run[run xgboost]
   Run --> DS[(train, test 데이터)]

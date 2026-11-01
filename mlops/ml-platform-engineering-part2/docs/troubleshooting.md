@@ -218,3 +218,20 @@ kubectl -n kubeflow-user-example-com delete sts income-notebook
 ```bash
 export MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false
 ```
+
+## 22 KServe MLServer가 MLflow 모델을 다른 값으로 예측함
+
+- 증상
+  - 배포판 런타임 `kserve-mlserver`로 띄운 `income-classifier`가 Ready이고 요청에도 답하지만, 같은 요청을 맥북에서 `mlflow.pyfunc.load_model`로 예측한 값과 다름
+  - 맥북 `0.3466`, MLServer `0.6169`처럼 세 행 모두 logit이 같은 크기(약 1.11)만큼 밀려 있음
+  - predictor 로그에 `Detected one or more mismatches between the model's dependencies and the current Python environment` 경고만 남고 오류는 없음
+- 해결방법
+  - `seldonio/mlserver:1.7.1` 이미지는 xgboost 3.0.2, mlflow 2.22.1, Python 3.10이고, 모델은 xgboost 3.4.1, mlflow 3.17.2, Python 3.12로 저장됨
+  - 낮은 버전 xgboost가 새 버전 모델 파일의 base score를 다르게 읽어 모든 예측에 같은 값이 더해진 것으로 보임
+  - 모델의 `requirements.txt`를 설치한 뒤 `mlflow models serve`로 띄우는 ServingRuntime `mlflow-serve`로 바꿈
+
+predictor 컨테이너의 라이브러리 버전을 확인하는 명령입니다.
+
+```bash
+kubectl -n kubeflow-user-example-com exec deploy/income-classifier-predictor -- pip list | grep -i -E "^(xgboost|mlflow) "
+```

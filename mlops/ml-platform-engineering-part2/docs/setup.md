@@ -13,9 +13,9 @@ Ubuntu(amd64, NVIDIA GPU 1장) 한 대에 k3s를 설치하고, 맥북에서 kube
 | Data Preparation, Model Development | Kubeflow Notebooks. EDA와 실험 코드 | Lab 1, 4장 |
 | Model Training | 노트북에서 sklearn, XGBoost 학습. 결과는 MLflow로 | Lab 1, 4장 |
 | Model Registry | MLflow. 메타데이터는 PostgreSQL, 모델 파일은 object storage(SeaweedFS) | Lab 1, 4장 |
-| Feature Store | Feast. 오프라인 스토어는 object storage, 온라인 스토어는 Redis | Lab 2, 4장 |
-| Repeat the process | Kubeflow Pipelines. 배치 추론과 드리프트 감지를 같은 순서로 반복 | Lab 3, 5장. Lab 5, 6장 |
-| Model Serving | KServe Standard 모드 | Lab 4, 6장 |
+| Feature Store | Feast. 오프라인 스토어는 object storage, 온라인 스토어는 Redis | Lab 1 시나리오 8, 4장 |
+| Repeat the process | Kubeflow Pipelines. EDA, 학습, 등록을 같은 순서로 반복 | Lab 1 시나리오 4~6, 5장 |
+| Model Serving | KServe Standard 모드, ServingRuntime `mlflow-serve` | Lab 1 시나리오 7, 6장 |
 | Hyperparameter Tuning | Katib. Part 2 범위 밖이라 설치하지 않음 | 없음 |
 
 맨 아래 띠는 설치 경로입니다. Argo CD ApplicationSet이 GitHub의 `manifests/`를 읽어 k3s에 올립니다. GPU(RTX 5060 Ti 16GB)는 time-slicing으로 4개처럼 나눠 노트북, 서빙, 파이프라인이 같이 씁니다.
@@ -101,7 +101,8 @@ mlops/ml-platform-engineering-part2/
 ├── scripts/up.sh                        # Argo CD 설치, --enable-helm, manifests/argocd/ 적용
 ├── notebooks/                           # Lab 1 노트북. Kubeflow Notebook 터미널에서 clone
 │   ├── mlflow/                          # Lab 1 MLflow 예제. 노트북 3개와 income.py
-│   └── kubeflow/                        # Lab 1 Kubeflow 예제. KFP 파이프라인 노트북 3개와 common.py
+│   ├── kubeflow/                        # Lab 1 Kubeflow 예제. KFP 파이프라인 노트북 3개와 common.py
+│   └── feast/                           # Lab 1 피처 스토어 노트북과 feature_repo
 └── manifests/
     ├── argocd/
     │   ├── kubeflow-applicationset.yaml        # Kubeflow 배포판 구성요소 16개
@@ -113,6 +114,7 @@ mlops/ml-platform-engineering-part2/
     │   ├── kserve/                      # Standard 모드, Ingress 생성 끔
     │   └── user-resources/              # PodDefault mlflow-access와 Secret
     ├── kubeflow-notebook/               # Argo CD 밖. kubectl로 만드는 Notebook과 PVC
+    ├── kserve-inference/                # Argo CD 밖. InferenceService와 ServingRuntime mlflow-serve
     ├── mlflow/                          # Helm chart(helmCharts) + PostgreSQL
     ├── nvidia-device-plugin/            # Helm chart(helmCharts) + time-slicing values
     └── redis/                           # Feast 온라인 스토어

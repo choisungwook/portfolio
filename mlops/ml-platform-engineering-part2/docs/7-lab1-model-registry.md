@@ -23,6 +23,24 @@
 
 다른 점이 하나 있습니다. 도커 tag는 이미지를 올리는 쪽이 정하지만, MLflow version은 레지스트리가 붙입니다. 사람이 고르는 것은 alias 하나이고, alias를 옮기면 모델을 쓰는 쪽 코드를 바꾸지 않고 모델이 바뀝니다.
 
+## alias는 배포 역할, tag는 모델의 속성을 적습니다
+
+`champion`, `challenger`는 소프트웨어 이미지 tag에서는 보기 어려운 이름입니다. 이 이름은 버전이 아니라 역할을 가리킵니다. 지금 트래픽을 받는 모델이 champion이고, 그 자리를 노리며 비교받는 후보가 challenger입니다. 소프트웨어 배포의 `stable`과 `canary`에 해당합니다.
+
+| 이름 | 종류 | 가리키는 것 | 소프트웨어 배포에서 비슷한 것 |
+|---|---|---|---|
+| `champion` | alias | 지금 서빙하는 버전. 버전 하나에만 붙음 | `stable`, `prod` tag |
+| `challenger` | alias | champion과 비교 중인 후보 버전 | `canary`, `rc` |
+| `validation_status: approved` | tag | 버전의 검증 상태. 여러 버전에 붙을 수 있음 | 이미지 label, 서명 |
+| version `1`, `2` | 레지스트리가 붙이는 번호 | 바뀌지 않는 버전 하나 | digest |
+
+이름 자체를 정한 표준은 없습니다. alias는 아무 문자열이나 쓸 수 있고, `champion`과 `challenger`는 아래 문서들이 예시로 쓰면서 관례가 됐습니다.
+
+- MLflow 공식 문서는 alias를 "버전을 가리키는 바뀔 수 있는 이름"으로 정의하고 `models:/MyModel@champion`을 예로 듭니다. tag는 `validation_status: approved`처럼 상태와 분류에 씁니다.
+- Databricks 문서는 Unity Catalog로 옮기면서 stage(`Staging`, `Production`) 대신 alias를 쓰라고 하고, 승인 뒤 CI/CD가 `Champion` alias를 옮기는 흐름을 예로 듭니다.
+
+책은 stage `Production`을 쓰지만, stage는 버전마다 하나뿐이라 "운영 중인 모델"과 "비교 중인 후보"를 동시에 표현하기 어렵습니다. 그래서 MLflow 2.9부터 alias와 tag로 나눠 쓰는 방식으로 바뀌었습니다. 이 Lab은 `champion` 하나만 쓰고, 시나리오 6의 Kubeflow 예제가 점수가 더 높을 때만 `champion`을 옮깁니다.
+
 ## 모델은 가중치와 설정이고, MLflow는 그것을 실행 환경과 함께 묶습니다
 
 모델이 "학습으로 정한 값(가중치)과 그 값을 쓰는 구조(설정)"라는 이해는 머신러닝 모델에도 맞습니다. 값의 모양만 다릅니다.
@@ -113,3 +131,9 @@ pulled models:/quickstart-model@champion (v2) predict=[0, 0, 0]
 
 - **맥북에서 MLflow를 쓸 때는 분할 다운로드를 끕니다.** MLflow 3.17 서버는 파일을 나눠 받을 object storage 주소(presigned URL)를 클라이언트에 넘깁니다. 그 주소는 클러스터 안 주소라 맥북에서 닿지 않아 다운로드가 멈춥니다. 스크립트는 `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false`로 서버 중계만 씁니다. 경위는 [troubleshooting.md](./troubleshooting.md) 21번에 있습니다.
 - **임시 모델은 다른 이름으로 올립니다.** `income-classifier`와 섞이지 않게 `quickstart-model`로 등록했습니다. 시나리오 6의 version 번호가 이 시나리오 때문에 밀리지 않습니다.
+
+## 참고 문서
+
+1. [MLflow Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) - alias와 tag의 정의, `champion` 예시
+2. [Databricks, Manage model lifecycle in Unity Catalog](https://docs.databricks.com/mlflow/models-in-uc.html) - alias로 배포 상태를 관리하는 방법
+3. [Databricks, Upgrade ML workflows to target models in Unity Catalog](https://docs.databricks.com/machine-learning/manage-model-lifecycle/upgrade-workflows.html) - stage에서 alias로 옮기는 흐름, 승인 뒤 `Champion` alias 이동

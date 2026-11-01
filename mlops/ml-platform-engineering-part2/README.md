@@ -14,5 +14,7 @@
 - [Lab 1 시나리오 4. 모델을 만들기 전에 데이터를 들여다보고 그 결과를 남깁니다](./docs/9-lab1-eda.md)
 - [Lab 1 시나리오 5. 모델 3개를 같은 조건으로 비교하고 학습 데이터까지 연결합니다](./docs/10-lab1-experiment-lineage.md)
 - [Lab 1 시나리오 6. 가장 좋은 모델을 등록하고, 기록만으로 같은 모델을 다시 만듭니다](./docs/11-lab1-registry-reproducibility.md)
+- [Lab 1 시나리오 7. 레지스트리의 champion 모델을 KServe로 HTTP API에 올립니다](./docs/12-lab1-model-serving.md)
+- [Lab 1 시나리오 8. 피처 스토어로 학습과 서빙이 같은 피처를 쓰게 합니다](./docs/13-lab1-feature-store.md)
 - [트러블슈팅](./docs/troubleshooting.md)
 - [매니페스트 인덱스](./manifests/README.md)

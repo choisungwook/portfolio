@@ -14,3 +14,5 @@
 * [노트북은 Kubeflow Notebook으로 만들고 접속 정보는 PodDefault로 넣는다](2026-10-kubeflow-notebook-poddefault.md) - 노트북 코드에 주소와 계정을 두지 않으려고.
 * [Redis는 PVC 없이, PostgreSQL 비밀번호는 Git에 실습 값으로 둔다](2026-10-lab-only-state-and-secrets.md) - 미리보기 namespace가 Secret 없이 뜨지 못하는 문제 회피.
 * [Lab 1의 Kubeflow 예제는 KFP 파이프라인으로 만들고 모델 버전은 MLflow 레지스트리에 둔다](2026-10-kubeflow-examples-kfp-with-mlflow-registry.md) - 책 5장 흐름이고 레지스트리를 둘로 만들지 않으려고.
+* [MLflow 모델은 배포판 MLServer 대신 모델의 requirements.txt를 설치하는 런타임으로 서빙한다](2026-11-kserve-mlflow-serve-runtime.md) - 고정 버전 런타임이 오류 없이 틀린 값을 예측해서.
+* [Feast는 노트북 안 전용 커널에서 쓰고, one-hot 인코딩한 피처를 저장한다](2026-11-feast-separate-kernel-encoded-features.md) - pandas 충돌을 피하고 서빙 쪽 인코딩을 없애려고.

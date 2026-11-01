@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-01
 
+* **Creation**: [Feast 전용 커널과 인코딩한 피처](decisions/2026-11-feast-separate-kernel-encoded-features.md) 결정 기록.
+* **Creation**: [KServe mlflow-serve 런타임](decisions/2026-11-kserve-mlflow-serve-runtime.md) 결정 기록. 배포판 MLServer의 버전 불일치로 예측값이 달라짐.
 * **Update**: [Kubeflow 예제 결정](decisions/2026-10-kubeflow-examples-kfp-with-mlflow-registry.md)에 노트북을 `mlflow/`, `kubeflow/`로 나눈 것을 반영.
 
 ## 2026-10-31

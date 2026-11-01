@@ -113,6 +113,7 @@ cd mlops/ml-platform-engineering-part2/notebooks && pip install -r requirements.
 |---|---|
 | `mlflow/` | 셀에서 직접 학습하고 MLflow에 기록하는 노트북 3개(책 4장) |
 | `kubeflow/` | 셀에서 KFP 파이프라인을 정의해 제출하는 노트북 3개(책 5장) |
+| `feast/` | 피처 스토어 노트북과 Feast 피처 정의(시나리오 8). 전용 커널에서 실행 |
 
 데이터 로딩 함수를 점검합니다. `ok 30162`가 출력되면 다음 시나리오로 넘어갑니다.
 
