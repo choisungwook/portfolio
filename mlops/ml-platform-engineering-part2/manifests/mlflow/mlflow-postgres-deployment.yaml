@@ -1,0 +1,47 @@
+# MLflow backend store. 실험, run, 파라미터, 메트릭, 레지스트리 메타데이터를 저장한다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-postgres
+  labels:
+    app: mlflow-postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mlflow-postgres
+  template:
+    metadata:
+      labels:
+        app: mlflow-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:18.6-alpine
+        envFrom:
+        - secretRef:
+            name: mlflow-postgres
+        ports:
+        - name: postgres
+          containerPort: 5432
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # postgres 18 이미지부터 데이터 위치가 /var/lib/postgresql/<버전>/docker로 바뀌어 상위 디렉터리를 마운트한다.
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mlflow-postgres

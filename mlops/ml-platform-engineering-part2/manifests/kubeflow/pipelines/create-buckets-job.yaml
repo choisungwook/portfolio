@@ -1,0 +1,72 @@
+# 책 4~6장이 쓰는 버킷을 object storage(SeaweedFS)에 만든다. 이미 있으면 건너뛴다.
+# KFP 리소스가 모두 Healthy가 된 뒤 Argo CD가 PostSync hook으로 실행한다.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-buckets
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: create-buckets
+    spec:
+      restartPolicy: OnFailure
+      # kubeflow namespace는 Pod Security restricted를 강제한다. 이 설정이 없으면 파드가 생성되지 않는다.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: aws-cli
+        image: amazon/aws-cli:2.38.5
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          for b in mlflow-artifacts mlflow-datasets feature-data-sets feature-registry inference-datasets; do
+            aws s3api head-bucket --bucket "$b" 2>/dev/null || aws s3 mb "s3://$b"
+          done
+          aws s3 ls
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        env:
+        # root가 아니라서 aws-cli가 설정 파일을 쓸 수 있는 HOME이 필요하다.
+        - name: HOME
+          value: /tmp
+        - name: AWS_ENDPOINT_URL
+          value: http://seaweedfs.kubeflow.svc.cluster.local:8333
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+        # aws-cli 2.23부터 기본으로 붙는 체크섬을 S3 호환 저장소가 거절하는 경우가 있어 필요할 때만 붙인다.
+        - name: AWS_REQUEST_CHECKSUM_CALCULATION
+          value: when_required
+        - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+          value: when_required
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: mlpipeline-minio-artifact
+              key: accesskey
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mlpipeline-minio-artifact
+              key: secretkey
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

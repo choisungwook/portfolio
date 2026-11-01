@@ -1,0 +1,11 @@
+# 오프라인 스토어는 object storage(SeaweedFS)의 parquet 파일, 온라인 스토어는 Redis, 레지스트리는 object storage 파일이다.
+# S3 주소와 계정은 노트북 파드의 환경 변수(PodDefault mlflow-access)에서 읽는다.
+project: income
+provider: local
+registry: s3://feature-registry/income/registry.db
+online_store:
+  type: redis
+  connection_string: redis.redis.svc.cluster.local:6379
+offline_store:
+  type: file
+entity_key_serialization_version: 3

@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# PR 미리보기 Application은 이 디렉터리를 preview-<PR 번호> namespace로 바꿔 배포한다.
+# 그래서 아래 리소스는 namespace를 직접 적지 않고, namespace 이름은 여기 한 곳에서만 정한다.
+namespace: mlflow
+
+resources:
+- mlflow-namespace.yaml
+- mlflow-postgres-secret.yaml
+- mlflow-postgres-pvc.yaml
+- mlflow-postgres-deployment.yaml
+- mlflow-postgres-service.yaml
+- mlflow-s3-credentials-secret.yaml
+
+# MLflow는 공식 Helm chart가 없어 community-charts의 chart를 쓴다. Argo CD는 kustomize --enable-helm으로 렌더링한다.
+helmCharts:
+- name: mlflow
+  repo: https://community-charts.github.io/helm-charts
+  version: 1.11.7
+  releaseName: mlflow
+  valuesFile: mlflow-values.yaml

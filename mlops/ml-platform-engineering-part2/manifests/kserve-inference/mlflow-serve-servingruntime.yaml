@@ -1,0 +1,31 @@
+# MLflow 모델을 저장할 때 함께 남긴 requirements.txt(mlflow 포함)를 설치한 뒤 mlflow models serve로 서빙하는 런타임이다.
+# 이미지는 모델의 python_env.yaml과 같은 Python 3.12다. mlflow 공식 이미지는 Python이 낮아 xgboost 3.4.1을 설치하지 못한다.
+# 배포판의 kserve-mlserver는 이미지에 xgboost 3.0.2, mlflow 2.22.1이 고정돼 있어,
+# xgboost 3.4.1로 저장한 모델을 오류 없이 불러오지만 다른 예측값을 낸다(troubleshooting 22).
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: mlflow-serve
+  namespace: kubeflow-user-example-com
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  supportedModelFormats:
+  - name: mlflow
+    version: "3"
+  containers:
+  - name: kserve-container
+    image: python:3.12.13-slim
+    command: ["sh", "-c"]
+    args:
+    - pip install --no-cache-dir -r /mnt/models/requirements.txt && exec mlflow models serve -m /mnt/models -h 0.0.0.0 -p 8080 --env-manager local
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi

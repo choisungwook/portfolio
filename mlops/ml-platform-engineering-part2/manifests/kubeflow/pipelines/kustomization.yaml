@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 배포판의 Kubeflow Pipelines(multi-user, object storage는 SeaweedFS)에 두 가지를 더한다.
+resources:
+- https://github.com/kubeflow/community-distribution//applications/pipeline/overlays?ref=release-26.03.1
+- create-buckets-job.yaml
+- seaweedfs-allow-s3-clients-networkpolicy.yaml

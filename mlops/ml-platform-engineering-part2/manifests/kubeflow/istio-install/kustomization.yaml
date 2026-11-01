@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 배포판의 Istio(oauth2-proxy overlay)를 그대로 쓰고, istio-cni-node의 CNI 경로만 k3s 경로로 바꾼다.
+# k3s는 CNI 바이너리와 설정을 /opt/cni/bin, /etc/cni/net.d가 아니라 아래 경로에 둔다.
+resources:
+- https://github.com/kubeflow/community-distribution//common/istio/istio-install/overlays/oauth2-proxy?ref=release-26.03.1
+
+patches:
+- target:
+    kind: DaemonSet
+    name: istio-cni-node
+    namespace: kube-system
+  patch: |-
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: istio-cni-node
+      namespace: kube-system
+    spec:
+      template:
+        spec:
+          volumes:
+          - name: cni-bin-dir
+            hostPath:
+              path: /var/lib/rancher/k3s/data/cni
+          - name: cni-net-dir
+            hostPath:
+              path: /var/lib/rancher/k3s/agent/etc/cni/net.d

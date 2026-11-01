@@ -1,0 +1,6 @@
+# JupyterLab 터미널에서 설치한다. pandas, matplotlib, scikit-learn, kfp는 이미지(jupyter-scipy)에 있다.
+mlflow==3.17.2
+xgboost==3.4.1
+plotnine==0.15.8
+boto3==1.43.123
+kfp-kubernetes==2.16.1

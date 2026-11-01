@@ -1,0 +1,31 @@
+# feast-feature-server chart를 UI 모드로 띄운다. 노트북이 등록한 레지스트리를 읽어 엔티티, 피처 뷰, 리니지를 보여 준다.
+fullnameOverride: feast-ui
+feast_mode: ui
+
+# notebooks/feast/feature_repo/feature_store.yaml을 base64로 바꾼 값이다. 그 파일을 고치면 아래 명령으로 다시 만든다.
+#   grep -v '^#' notebooks/feast/feature_repo/feature_store.yaml | base64
+feature_store_yaml_base64: cHJvamVjdDogaW5jb21lCnByb3ZpZGVyOiBsb2NhbApyZWdpc3RyeTogczM6Ly9mZWF0dXJlLXJlZ2lzdHJ5L2luY29tZS9yZWdpc3RyeS5kYgpvbmxpbmVfc3RvcmU6CiAgdHlwZTogcmVkaXMKICBjb25uZWN0aW9uX3N0cmluZzogcmVkaXMucmVkaXMuc3ZjLmNsdXN0ZXIubG9jYWw6NjM3OQpvZmZsaW5lX3N0b3JlOgogIHR5cGU6IGZpbGUKZW50aXR5X2tleV9zZXJpYWxpemF0aW9uX3ZlcnNpb246IDMK
+
+extraEnvs:
+- name: AWS_ENDPOINT_URL
+  value: http://seaweedfs.kubeflow.svc.cluster.local:8333
+- name: AWS_DEFAULT_REGION
+  value: us-east-1
+- name: AWS_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: feast-s3
+      key: AWS_ACCESS_KEY_ID
+- name: AWS_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: feast-s3
+      key: AWS_SECRET_ACCESS_KEY
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

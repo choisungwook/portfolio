@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: feast
+
+resources:
+- feast-namespace.yaml
+- feast-s3-secret.yaml
+
+# Feast 공식 chart. 노트북의 Feast SDK와 같은 0.67.0이다. Argo CD는 kustomize --enable-helm으로 렌더링한다.
+helmCharts:
+- name: feast-feature-server
+  repo: https://feast-helm-charts.storage.googleapis.com
+  version: 0.67.0
+  releaseName: feast-ui
+  valuesFile: feast-ui-values.yaml

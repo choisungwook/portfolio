@@ -1,0 +1,23 @@
+# 배포판은 kubeflow namespace의 모든 파드에 default-allow-same-namespace NetworkPolicy를 걸고,
+# seaweedfs NetworkPolicy로 kubeflow-profile namespace(노트북)와 istio-system만 S3 포트(8333)에 들인다.
+# mlflow namespace의 MLflow도 아티팩트를 써야 하므로, 아래 label이 붙은 namespace를 추가로 허용한다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-allow-s3-clients
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  podSelector:
+    matchLabels:
+      app: seaweedfs
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          mlops-part2/s3-access: "true"
+    ports:
+    - port: 8333

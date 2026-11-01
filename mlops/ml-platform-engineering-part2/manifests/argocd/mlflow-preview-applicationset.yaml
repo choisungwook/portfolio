@@ -1,0 +1,47 @@
+# preview label이 붙은 열린 PR마다 manifests/mlflow를 preview-<PR 번호> namespace에 배포한다.
+# PR이 닫히거나 merge되면 generator가 Application을 지우고, finalizer가 namespace까지 지운다.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: mlflow-preview
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - pullRequest:
+      github:
+        owner: choisungwook
+        repo: portfolio
+        labels:
+        - preview
+      # 기본값은 1800초. Ubuntu로 webhook을 받을 수 없어 폴링 주기를 줄인다.
+      # public 저장소라 토큰 없이 호출한다. 익명 GitHub API 한도는 IP당 시간당 60회라 180초(시간당 약 20회)로 둔다.
+      requeueAfterSeconds: 180
+  template:
+    metadata:
+      name: 'mlflow-preview-{{ .number }}'
+      labels:
+        app.kubernetes.io/part-of: mlops-part2
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/choisungwook/portfolio.git
+        targetRevision: '{{ .head_sha }}'
+        path: mlops/ml-platform-engineering-part2/manifests/mlflow
+        # kustomization의 namespace를 덮어쓴다. Namespace 리소스의 이름도 같이 바뀌어 Application이 namespace를 소유한다.
+        kustomize:
+          namespace: 'preview-{{ .number }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'preview-{{ .number }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - ServerSideApply=true

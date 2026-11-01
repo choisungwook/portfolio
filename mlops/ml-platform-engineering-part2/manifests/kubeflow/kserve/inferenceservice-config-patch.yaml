@@ -1,0 +1,28 @@
+# deploy: Knative 없이 Deployment와 Service로 서빙하는 Standard 모드로 바꾼다.
+# ingress: 값이 JSON 문자열이라 키 하나만 바꿀 수 없어 배포판 값 전체를 옮기고 disableIngressCreation만 true로 바꿨다.
+#          Ingress를 만들지 않고 predictor Service에 port-forward로 접근한다.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceservice-config
+  namespace: kubeflow
+data:
+  deploy: |-
+    {
+      "defaultDeploymentMode": "Standard"
+    }
+  ingress: |-
+    {
+      "enableGatewayApi": false,
+      "kserveIngressGateway": "kserve/kserve-ingress-gateway",
+      "ingressGateway": "kubeflow/kubeflow-gateway",
+      "localGateway": "knative-serving/knative-local-gateway",
+      "localGatewayService": "knative-local-gateway.istio-system.svc.cluster.local",
+      "ingressDomain": "example.com",
+      "ingressClassName": "istio",
+      "domainTemplate": "{{ .Name }}-{{ .Namespace }}.{{ .IngressDomain }}",
+      "urlScheme": "http",
+      "disableIstioVirtualHost": false,
+      "disableIngressCreation": true,
+      "pathTemplate": "/serving/{{ .Namespace }}/{{ .Name }}"
+    }

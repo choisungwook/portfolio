@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# NVIDIA device plugin이 노드에 nvidia.com/gpu 리소스를 알린다. Argo CD는 kustomize --enable-helm으로 chart를 렌더링한다.
+namespace: nvidia-device-plugin
+
+resources:
+- nvidia-device-plugin-namespace.yaml
+
+helmCharts:
+- name: nvidia-device-plugin
+  repo: https://nvidia.github.io/k8s-device-plugin
+  version: 0.20.1
+  releaseName: nvidia-device-plugin
+  namespace: nvidia-device-plugin
+  valuesFile: nvidia-device-plugin-values.yaml

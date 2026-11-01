@@ -1,0 +1,28 @@
+# Kubeflow Notebook을 만들 때 UI의 Configurations에서 고르는 설정이다.
+# 고른 노트북 파드에 MLflow와 object storage 접속 정보를 환경 변수로 넣는다. 노트북 코드에는 주소와 계정이 없다.
+apiVersion: kubeflow.org/v1alpha1
+kind: PodDefault
+metadata:
+  name: mlflow-access
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+spec:
+  desc: MLflow와 object storage(SeaweedFS) 접속 정보
+  selector:
+    matchLabels:
+      mlflow-access: "true"
+  env:
+  - name: MLFLOW_TRACKING_URI
+    value: http://mlflow-service.mlflow.svc.cluster.local:5000
+  - name: AWS_ENDPOINT_URL
+    value: http://seaweedfs.kubeflow.svc.cluster.local:8333
+  - name: AWS_DEFAULT_REGION
+    value: us-east-1
+  # boto3 1.36부터 기본으로 붙는 체크섬을 S3 호환 저장소가 거절하는 경우가 있어 필요할 때만 붙인다.
+  - name: AWS_REQUEST_CHECKSUM_CALCULATION
+    value: when_required
+  - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+    value: when_required
+  envFrom:
+  - secretRef:
+      name: mlflow-access
