@@ -12,6 +12,7 @@
 | MLflow 기록(PostgreSQL), KFP 기록(MySQL), object storage(SeaweedFS), 노트북 홈 디렉터리 | 그대로 남음 | 모두 PVC(local-path)에 저장 |
 | Feast 전용 커널(`~/.venvs/feast`) | 그대로 남음 | 노트북 홈 디렉터리(PVC) 안에 있음 |
 | Redis(Feast 온라인 스토어) | 빔 | PVC 없이 띄움. materialize로 다시 채움 |
+| Feast UI(`feast` namespace) | 자동으로 다시 뜸 | 상태가 없고, 레지스트리 파일(object storage)을 다시 읽음 |
 | KServe `income-classifier` | 다시 뜨는 데 2분쯤 걸림 | 파드가 뜰 때마다 모델의 `requirements.txt`를 설치 |
 | 맥북의 port-forward | 끊김 | 다시 띄워야 함 |
 
@@ -87,7 +88,13 @@ kubectl -n istio-system port-forward svc/istio-ingressgateway 8080:80
 kubectl -n mlflow port-forward svc/mlflow-service 5000:5000
 ```
 
-`http://localhost:8080`에서 Notebooks와 Pipelines가, `http://localhost:5000`에서 experiment `income-classifier`의 run이 보이면 기록이 남아 있는 것입니다.
+피처 스토어를 볼 때는 터미널 하나에서 Feast UI도 엽니다.
+
+```bash
+kubectl -n feast port-forward svc/feast-ui 8889:80
+```
+
+`http://localhost:8080`에서 Notebooks와 Pipelines가, `http://localhost:5000`에서 experiment `income-classifier`의 run이, `http://localhost:8889`에서 프로젝트 **Income**의 `income_features`가 보이면 기록이 남아 있는 것입니다.
 
 ### 7. 하던 시나리오에 따라 추가로 되살립니다
 
