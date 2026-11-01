@@ -1,4 +1,4 @@
-# Lab 1 시나리오 2. 모델을 만들기 전에 데이터를 들여다보고 그 결과를 남깁니다
+# Lab 1 시나리오 4. 모델을 만들기 전에 데이터를 들여다보고 그 결과를 남깁니다
 
 ## EDA란
 
@@ -20,7 +20,7 @@ KFP는 ML 작업을 단계(컴포넌트)로 나누고, 단계마다 파드를 �
 | 리니지 | `log_input`으로 run에 데이터셋을 직접 연결 | 어느 단계의 출력이 어느 단계의 입력이 됐는지 자동으로 남음 |
 | 모델 레지스트리 | 있음(버전, alias) | 없음. 이 클러스터에는 Kubeflow Model Registry도 설치하지 않음 |
 
-그래서 둘은 대체 관계가 아닙니다. 책 5장처럼 KFP 컴포넌트 안에서 MLflow에 기록하면 실행은 KFP가, 기록과 모델 버전은 MLflow가 맡습니다. [9-lab1-registry-reproducibility.md](./9-lab1-registry-reproducibility.md)의 Kubeflow 예제가 이 구조입니다.
+그래서 둘은 대체 관계가 아닙니다. 책 5장처럼 KFP 컴포넌트 안에서 MLflow에 기록하면 실행은 KFP가, 기록과 모델 버전은 MLflow가 맡습니다. [11-lab1-registry-reproducibility.md](./11-lab1-registry-reproducibility.md)의 Kubeflow 예제가 이 구조입니다.
 
 ### Kubeflow 안에서 KFP를 쓰면 얻는 것
 
@@ -107,7 +107,7 @@ sequenceDiagram
 
 ## MLflow 예제
 
-[6-lab1-kubeflow-notebook.md](./6-lab1-kubeflow-notebook.md)에서 노트북 코드를 받은 상태에서 시작합니다. 맥북에서 MLflow 화면도 엽니다.
+[8-lab1-kubeflow-notebook.md](./8-lab1-kubeflow-notebook.md)에서 노트북 코드를 받은 상태에서 시작합니다. 맥북에서 MLflow 화면도 엽니다.
 
 ```bash
 kubectl -n mlflow port-forward svc/mlflow-service 5000:5000

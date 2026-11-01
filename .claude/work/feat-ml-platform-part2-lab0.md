@@ -26,6 +26,14 @@
   - [x] 파이프라인 3개 로컬 컴파일 확인
   - [x] SeaweedFS mlpipeline 버킷 정책 복구 후 3개 실행 검증. 점수와 EDA 숫자가 MLflow 예제와 같음, register는 v2 등록·champion v1 유지
   - [x] 7, 8, 9번 문서에 MLflow 예제와 Kubeflow 예제 H2 분리, 6번 Configurations에 access-ml-pipeline 추가, troubleshooting 19
+- [ ] 8-7. Lab 1을 MLOps 플랫폼 기능 중심으로 재구성 (2026-11-01 요청, 레지스트리 실습을 맨 앞에)
+  - [x] 6 MLOps 플랫폼 기능 지도(mermaid)와 모델 레지스트리가 필요한 이유
+  - [x] 7 모델 레지스트리 push/pull. 맥북에서 port-forward로 임시 모델 등록과 꺼내기
+  - [x] 기존 6~9를 8~11로 이동, 기능 중심 도입부로 수정
+  - [ ] 12 모델 배포. KServe InferenceService로 champion 서빙
+  - [ ] 13 피처 스토어. Feast(S3 offline, Redis online)로 학습과 추론의 피처를 맞춤
+  - [-] 14 파이프라인을 YAML로 관리 — 건너뜀: 사용자가 하지 않기로 함(2026-11-01). 이 클러스터 KFP는 DB 모드라 Pipeline CRD가 없음
+  - [ ] 인덱스, setup, knowledge 갱신과 lint
 - [ ] 9. merge 전: targetRevision을 master로 되돌리고 이 상태 파일 삭제
 
 ## 다음 세션이 알아야 할 것
@@ -33,6 +41,6 @@
 - mlpipeline 버킷에 bucket policy가 없음. profile controller가 namespace access key를 07:19에 만들 때 create-buckets Job(07:26)보다 먼저라 정책 설정이 실패했고 다시 시도하지 않음. user namespace의 Secret mlpipeline-minio-artifact를 지우면 새 key와 정책을 다시 만듦(2026-10-31에 실행해 복구함, troubleshooting 19)
 - access-ml-pipeline PodDefault와 노트북 label은 kubectl로만 적용함. push 후 Argo CD가 user-resources를 sync해야 Git과 맞음
 
-- platform-applicationset.yaml의 targetRevision과 kubeflow-applicationset.yaml의 wrapper 3개 revision, 6-lab1-kubeflow-notebook.md의 --branch 안내는 검증용으로 feat/ml-platform-part2-lab0. merge 전에 master로 되돌린다.
+- platform-applicationset.yaml의 targetRevision과 kubeflow-applicationset.yaml의 wrapper 3개 revision, 8-lab1-kubeflow-notebook.md의 --branch 안내는 검증용으로 feat/ml-platform-part2-lab0. merge 전에 master로 되돌린다.
 - Istio보다 먼저 뜬 kubeflow 파드는 kubectl -n kubeflow delete pod --all로 다시 만든다(troubleshooting 11). RollingSync로 자동화하는 것은 아직 안 함.
 - 플래닝 문서는 고치지 않는다. 달라진 결정은 knowledge/decisions에 남긴다.

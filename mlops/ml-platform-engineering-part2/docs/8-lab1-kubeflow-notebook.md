@@ -1,6 +1,10 @@
-# Lab 1 시나리오 1. 노트북 환경도 플랫폼이 제공합니다
+# Lab 1 시나리오 3. 노트북 환경도 플랫폼이 제공합니다
 
 ## 이 시나리오의 목표
+
+[시나리오 2](./7-lab1-model-registry.md)는 이미 있는 작은 모델을 레지스트리에 올렸습니다. 레지스트리에 올릴 만한 모델을 만들려면 먼저 데이터를 보고 실험할 환경이 있어야 합니다. 이 시나리오부터 시나리오 6까지가 그 모델을 만드는 과정입니다.
+
+![MLOps 플랫폼이 제공하는 실험 환경](../imgs/mlops-notebook-experiment-env.png)
 
 책 4장 노트북은 맥북의 Jupyter에서 돌고, 첫 셀에 MinIO 계정과 MLflow 주소를 직접 적습니다. 혼자 공부할 때는 괜찮지만, 노트북을 동료에게 넘기거나 5장 파이프라인으로 옮기면 주소와 계정을 다시 고쳐야 합니다.
 
@@ -103,7 +107,7 @@ cd mlops/ml-platform-engineering-part2/notebooks && pip install -r requirements.
 
 이 실습이 master에 merge되기 전이면 `git clone`에 `--branch feat/ml-platform-part2-lab0`을 붙입니다.
 
-노트북은 도구별로 나뉩니다. 시나리오 7~9마다 같은 번호의 노트북을 MLflow 예제와 Kubeflow 예제에서 하나씩 씁니다.
+노트북은 도구별로 나뉩니다. 시나리오 4~6마다 같은 번호의 노트북을 MLflow 예제와 Kubeflow 예제에서 하나씩 씁니다.
 
 | 디렉터리 | 내용 |
 |---|---|

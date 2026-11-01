@@ -202,3 +202,19 @@ notebook-controller가 StatefulSet을 새 label로 다시 만들게 하는 명�
 ```bash
 kubectl -n kubeflow-user-example-com delete sts income-notebook
 ```
+
+## 21 맥북에서 MLflow 모델을 내려받을 때 멈춤
+
+- 증상
+  - port-forward로 `models:/quickstart-model@champion`을 `load_model`하면 파일 7개는 받는데 끝나지 않음
+  - 멈춘 스레드는 `mlflow/store/artifact/http_artifact_repo.py`의 `_multipart_download`에서 기다림
+- 해결방법
+  - MLflow 서버가 분할 다운로드를 켜 두면 클라이언트는 서버에서 presigned URL을 받아 object storage에서 직접 받음
+  - 그 URL은 클러스터 안 주소(`seaweedfs.kubeflow`)라 맥북에서 닿지 않음. 클러스터 안의 노트북과 KFP 파드는 문제없음
+  - 맥북 클라이언트에서 분할 다운로드를 끄면 서버 중계로 받음. `scripts/registry_quickstart.py`는 이 값을 기본으로 넣음
+
+맥북에서 분할 다운로드를 끄는 환경 변수입니다.
+
+```bash
+export MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false
+```

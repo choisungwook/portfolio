@@ -1,4 +1,4 @@
-# Lab 1 시나리오 4. 가장 좋은 모델을 등록하고, 기록만으로 같은 모델을 다시 만듭니다
+# Lab 1 시나리오 6. 가장 좋은 모델을 등록하고, 기록만으로 같은 모델을 다시 만듭니다
 
 ## 이 시나리오의 목표
 
@@ -8,7 +8,7 @@
 | 작업 | 1. 점수가 가장 높은 run의 모델을 레지스트리에 등록 2. 별칭(alias) `champion`을 붙임 3. alias에서 출발해 학습 데이터까지 거꾸로 따라감 4. 기록된 데이터로 다시 학습해 점수 비교 |
 | 달성할 것 | 모델을 쓰는 쪽이 `models:/income-classifier@champion` 하나로 모델을 꺼내고, 기록만으로 같은 모델을 다시 만들 수 있음을 확인. 등록과 확인을 Kubeflow Pipelines로 자동화 |
 
-모델 레지스트리는 "지금 쓸 모델이 무엇인가"를 정하는 곳입니다. 책 5장 추론 파이프라인과 6장 서빙은 run ID가 아니라 레지스트리에서 모델을 꺼냅니다. 책은 `Production` stage를 쓰지만 MLflow 3에서는 stage 대신 alias를 씁니다.
+[시나리오 2](./7-lab1-model-registry.md)에서 레지스트리를 써 봤으니, 이번에는 실험으로 고른 모델을 올립니다. 모델 레지스트리는 "지금 쓸 모델이 무엇인가"를 정하는 곳입니다. 책 5장 추론 파이프라인과 6장 서빙은 run ID가 아니라 레지스트리에서 모델을 꺼냅니다. 책은 `Production` stage를 쓰지만 MLflow 3에서는 stage 대신 alias를 씁니다.
 
 **MLflow 예제**는 노트북에서 사람이 최고 run을 골라 등록합니다. **Kubeflow 예제**는 학습, 등록, champion 확인을 파이프라인 하나로 묶습니다. 이 클러스터의 Kubeflow에는 모델 레지스트리가 없어서, 책 5장처럼 파이프라인은 KFP가 돌리고 모델 버전은 MLflow 레지스트리에 둡니다.
 
@@ -20,7 +20,7 @@
 | Registered model `income-classifier` | 버전 목록과 alias를 가진 이름 |
 | Model version | LoggedModel 하나를 가리키는 번호. 출처 run을 기억 |
 | Alias `champion` | 모델을 쓰는 쪽이 아는 유일한 이름 |
-| Kubeflow Pipelines(Lab 3), KServe(Lab 4) | `models:/income-classifier@champion`으로 모델을 꺼내는 쪽 |
+| Kubeflow Pipelines(시나리오 6), KServe(시나리오 7) | `models:/income-classifier@champion`으로 모델을 꺼내는 쪽 |
 | `kubeflow/03-registry.ipynb` | Kubeflow 예제. 학습 → `register-model` → `verify-champion` 파이프라인을 제출 |
 | PodDefault `mlflow-access` | `register-model`, `verify-champion` 파드에 label `mlflow-access: "true"`를 붙여 MLflow 주소와 계정을 넣음 |
 
@@ -30,8 +30,8 @@
 
 ```mermaid
 flowchart LR
-  KFP[Kubeflow Pipelines<br/>Lab 3] -->|models:/income-classifier@champion| Alias[alias champion]
-  KS[KServe<br/>Lab 4] -->|models:/income-classifier@champion| Alias
+  KFP[Kubeflow Pipelines<br/>시나리오 6] -->|models:/income-classifier@champion| Alias[alias champion]
+  KS[KServe<br/>시나리오 7] -->|models:/income-classifier@champion| Alias
   Alias --> V[version 1]
   V --> Run[run xgboost]
   Run --> DS[(train, test 데이터)]
@@ -41,7 +41,7 @@ flowchart LR
 
 ## MLflow 예제
 
-[8-lab1-experiment-lineage.md](./8-lab1-experiment-lineage.md)의 run 3개가 있는 상태에서 시작합니다.
+[10-lab1-experiment-lineage.md](./10-lab1-experiment-lineage.md)의 run 3개가 있는 상태에서 시작합니다.
 
 ### 1. 최고 모델을 등록합니다
 

@@ -50,7 +50,7 @@ kubectl get node -o jsonpath='{.items[0].status.allocatable.nvidia\.com/gpu}'; e
 
 ### 2. GPU를 쓰는 파드에서 GPU가 보이는지 봅니다
 
-[6-lab1-kubeflow-notebook.md](./6-lab1-kubeflow-notebook.md)에서 GPU 1개를 요청한 노트북을 만든 뒤 실행합니다.
+[8-lab1-kubeflow-notebook.md](./8-lab1-kubeflow-notebook.md)에서 GPU 1개를 요청한 노트북을 만든 뒤 실행합니다.
 
 ```bash
 kubectl -n kubeflow-user-example-com exec income-notebook-0 -c income-notebook -- nvidia-smi --query-gpu=name,memory.total --format=csv
