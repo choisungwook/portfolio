@@ -13,7 +13,7 @@ Ubuntu(amd64, NVIDIA GPU 1장) 한 대에 k3s를 설치하고, 맥북에서 kube
 | Data Preparation, Model Development | Kubeflow Notebooks. EDA와 실험 코드 | Lab 1, 4장 |
 | Model Training | 노트북에서 sklearn, XGBoost 학습. 결과는 MLflow로 | Lab 1, 4장 |
 | Model Registry | MLflow. 메타데이터는 PostgreSQL, 모델 파일은 object storage(SeaweedFS) | Lab 1, 4장 |
-| Feature Store | Feast. 오프라인 스토어는 object storage, 온라인 스토어는 Redis | Lab 1 시나리오 8, 4장 |
+| Feature Store | Feast. 오프라인 스토어는 object storage, 온라인 스토어는 Redis, UI는 Helm chart | Lab 1 시나리오 8, 4장 |
 | Repeat the process | Kubeflow Pipelines. EDA, 학습, 등록을 같은 순서로 반복 | Lab 1 시나리오 4~6, 5장 |
 | Model Serving | KServe Standard 모드, ServingRuntime `mlflow-serve` | Lab 1 시나리오 7, 6장 |
 | Hyperparameter Tuning | Katib. Part 2 범위 밖이라 설치하지 않음 | 없음 |
@@ -117,7 +117,8 @@ mlops/ml-platform-engineering-part2/
     ├── kserve-inference/                # Argo CD 밖. InferenceService와 ServingRuntime mlflow-serve
     ├── mlflow/                          # Helm chart(helmCharts) + PostgreSQL
     ├── nvidia-device-plugin/            # Helm chart(helmCharts) + time-slicing values
-    └── redis/                           # Feast 온라인 스토어
+    ├── redis/                           # Feast 온라인 스토어
+    └── feast/                           # Feast UI. Helm chart(helmCharts)
 ```
 
 ### ApplicationSet 세 개가 Application을 만듭니다

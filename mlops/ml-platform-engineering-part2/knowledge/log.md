@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-01
 
+* **Update**: [Feast 결정](decisions/2026-11-feast-separate-kernel-encoded-features.md)에 Feast UI를 Helm chart로 상시 설치하는 것을 반영.
 * **Update**: [Kubeflow 예제 결정](decisions/2026-10-kubeflow-examples-kfp-with-mlflow-registry.md)에 파이프라인을 Pipelines 메뉴에 등록한 뒤 실행하는 방식을 반영.
 * **Creation**: [Feast 전용 커널과 인코딩한 피처](decisions/2026-11-feast-separate-kernel-encoded-features.md) 결정 기록.
 * **Creation**: [KServe mlflow-serve 런타임](decisions/2026-11-kserve-mlflow-serve-runtime.md) 결정 기록. 배포판 MLServer의 버전 불일치로 예측값이 달라짐.

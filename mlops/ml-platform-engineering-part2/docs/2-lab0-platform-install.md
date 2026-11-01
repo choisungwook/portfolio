@@ -4,7 +4,7 @@
 
 ML 플랫폼은 도구 하나가 아닙니다. 모델 하나가 실험에서 서빙까지 가는 동안 단계마다 다른 컴포넌트가 질문 하나씩을 맡습니다. 이 시나리오에서는 그 컴포넌트들을 Argo CD로 한 번에 설치하고, 어떤 컴포넌트가 어떤 질문을 맡는지 확인합니다.
 
-책 4~6장은 모두 이 플랫폼이 떠 있다는 전제로 시작합니다. 끝나면 Argo CD Application 20개가 Synced, Healthy이고 Kubeflow 화면에 로그인할 수 있습니다.
+책 4~6장은 모두 이 플랫폼이 떠 있다는 전제로 시작합니다. 끝나면 Argo CD Application 21개가 Synced, Healthy이고 Kubeflow 화면에 로그인할 수 있습니다.
 
 ## 컴포넌트 역할
 
@@ -24,23 +24,23 @@ Istio, cert-manager, oauth2-proxy는 Kubeflow가 동작하려고 함께 설치�
 
 ## 흐름
 
-GitHub에서 클러스터까지 설치가 흐르는 길입니다. ApplicationSet 3개가 Application 20개를 만듭니다.
+GitHub에서 클러스터까지 설치가 흐르는 길입니다. ApplicationSet 3개가 Application 21개를 만듭니다.
 
 ```mermaid
 flowchart LR
   Git[GitHub] -->|폴링| AC[Argo CD]
   AC --> KF[ApplicationSet kubeflow<br/>Application 16개]
-  AC --> PL[ApplicationSet platform<br/>Application 4개]
+  AC --> PL[ApplicationSet platform<br/>Application 5개]
   AC --> PV[ApplicationSet mlflow-preview<br/>PR마다 1개]
   KF --> K1[Notebooks, Pipelines,<br/>KServe, object storage]
-  PL --> P1[MLflow, Redis,<br/>GPU device plugin]
+  PL --> P1[MLflow, Redis, Feast UI,<br/>GPU device plugin]
 ```
 
 ## 실습
 
 [setup.md](./setup.md)의 up을 끝낸 뒤 맥북에서 실행합니다. 이미지 pull을 포함해 약 20분 걸립니다.
 
-### 1. Application 20개가 Synced, Healthy인지 봅니다
+### 1. Application 21개가 Synced, Healthy인지 봅니다
 
 KFP가 설치하는 `applications.app.k8s.io` CRD와 짧은 이름 `app`이 겹쳐서, 전체 리소스 이름으로 조회합니다.
 
@@ -57,6 +57,7 @@ kf-dashboard              Synced        Healthy
 kf-istio                  Synced        Healthy
 kf-kserve                 Synced        Healthy
 kf-notebooks              Synced        Healthy
+feast                     Synced        Healthy
 kf-pipelines              Synced        Healthy
 ...
 kubeflow-user-resources   Synced        Healthy

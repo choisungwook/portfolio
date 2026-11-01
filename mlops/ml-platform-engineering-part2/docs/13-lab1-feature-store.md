@@ -68,7 +68,7 @@
 | `feast/feature_repo/feature_store.yaml` | 레지스트리, 온라인 스토어, 오프라인 스토어 주소 |
 | `feast/feature_repo/features.py` | Entity `person`과 FeatureView `income_features` 정의 |
 | `feast/01-feature-store.ipynb` | 피처 테이블을 만들어 등록하고, materialize하고, 서빙과 학습 양쪽에서 꺼냄 |
-| Feast UI(`feast ui`) | 레지스트리에 등록한 엔티티, 피처 뷰, 피처, 데이터 소스, 리니지를 웹 화면으로 보여 줌 |
+| Feast UI(`feast` namespace) | 레지스트리에 등록한 엔티티, 피처 뷰, 피처, 데이터 소스, 리니지를 웹 화면으로 보여 줌. Helm chart로 상시 설치 |
 | Redis(`redis.redis.svc.cluster.local:6379`) | 온라인 스토어. Lab 0에서 설치 |
 
 ## 흐름
@@ -117,18 +117,12 @@ offline == online: True
 
 ### 3. Feast UI에서 등록한 피처를 봅니다
 
-Feast UI는 따로 설치한 서버가 아니라 Feast SDK의 `feast ui` 명령입니다. 노트북 파드 안에서 띄우고 맥북으로 port-forward합니다. Jupyter가 8888 포트를 쓰므로 8889로 띄웁니다.
+Feast UI는 Lab 0에서 플랫폼 구성요소로 설치돼 있습니다. Argo CD Application `feast`가 공식 Helm chart `feast-feature-server`를 UI 모드로 띄우고, 노트북과 같은 레지스트리 파일(`s3://feature-registry/income/registry.db`)을 읽습니다. 그래서 2번에서 `apply`한 피처가 따로 배포하지 않아도 화면에 나타납니다.
 
-JupyterLab **Terminal**의 `notebooks/feast/feature_repo` 디렉터리에서 실행합니다. 터미널을 닫으면 UI도 꺼집니다.
-
-```bash
-~/.venvs/feast/bin/feast ui -h 0.0.0.0 -p 8889
-```
-
-맥북 터미널에서 노트북 파드의 8889 포트를 엽니다.
+맥북 터미널에서 Feast UI Service를 엽니다.
 
 ```bash
-kubectl -n kubeflow-user-example-com port-forward pod/income-notebook-0 8889:8889
+kubectl -n feast port-forward svc/feast-ui 8889:80
 ```
 
 `http://localhost:8889`를 열고 프로젝트 **Income**을 고릅니다. 첫 화면에 Feature Views 1, Features 90, Data Sources 1이 보입니다. 왼쪽 메뉴에서 보면 좋은 곳은 세 군데입니다.
@@ -141,5 +135,6 @@ kubectl -n kubeflow-user-example-com port-forward pod/income-notebook-0 8889:888
 
 - **인코딩한 값을 피처로 저장했습니다.** 원본 컬럼 8개를 저장하고 요청마다 인코딩하는 방법도 있습니다. 그 방법은 인코딩 코드를 서빙 쪽에도 둬야 해서, 이 Lab은 인코딩을 피처를 만들 때 한 번만 하도록 골랐습니다. 대신 범주가 새로 생기면 피처 테이블을 다시 만들고 모델도 다시 학습해야 합니다.
 - **schema를 코드에 적지 않았습니다.** `income_features`는 schema 없이 정의해서 Feast가 parquet 컬럼에서 피처 90개를 읽습니다. 컬럼 이름을 두 곳에 적지 않는 대신, parquet이 바뀌면 `apply`를 다시 실행해야 피처 목록이 바뀝니다.
+- **UI는 레지스트리만 읽습니다.** Feast UI 파드는 `feature_store.yaml`의 레지스트리 경로로 object storage를 읽을 뿐, 피처 값이나 Redis에는 접근하지 않습니다. 노트북이 `apply`하면 UI가 레지스트리를 다시 읽어 새 피처 뷰를 보여 줍니다.
 - **Redis는 다시 채울 수 있는 캐시입니다.** Lab 0의 Redis는 PVC가 없어 파드가 재시작하면 비지만, 노트북의 materialize 셀을 다시 실행하면 오프라인 스토어에서 같은 값이 채워집니다. 실무에서는 materialize를 파이프라인이나 스케줄러로 주기 실행합니다.
-- **피처 스토어 S3 주소는 파드 환경 변수에서 읽습니다.** 레지스트리는 `AWS_ENDPOINT_URL`을 읽는 boto3로, 오프라인 스토어는 `FileSource`의 `s3_endpoint_override`로 SeaweedFS에 접속합니다. 오프라인 스토어를 읽으려면 `s3fs`가, `feast ui`를 띄우려면 `grpcio` extra가 따로 필요합니다.
+- **피처 스토어 S3 주소는 파드 환경 변수에서 읽습니다.** 레지스트리는 `AWS_ENDPOINT_URL`을 읽는 boto3로, 오프라인 스토어는 `FileSource`의 `s3_endpoint_override`로 SeaweedFS에 접속합니다. 오프라인 스토어를 읽으려면 `s3fs`가 따로 필요합니다.

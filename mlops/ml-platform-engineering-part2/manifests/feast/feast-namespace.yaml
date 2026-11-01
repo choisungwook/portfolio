@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: feast
+  labels:
+    app.kubernetes.io/part-of: mlops-part2
+    # object storage(SeaweedFS) NetworkPolicy seaweedfs-allow-s3-clients가 이 label의 namespace만 8333 포트로 받는다.
+    mlops-part2/s3-access: "true"

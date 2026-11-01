@@ -41,7 +41,7 @@ kubectl get nodes
 
 ### 3. Argo CD Application이 모두 Healthy인지 봅니다
 
-파드가 한꺼번에 다시 뜨므로 몇 분 걸립니다. 20개가 모두 `Synced`, `Healthy`가 될 때까지 기다립니다.
+파드가 한꺼번에 다시 뜨므로 몇 분 걸립니다. 21개가 모두 `Synced`, `Healthy`가 될 때까지 기다립니다.
 
 ```bash
 kubectl -n argocd get applications.argoproj.io

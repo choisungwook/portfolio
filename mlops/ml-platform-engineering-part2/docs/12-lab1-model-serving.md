@@ -14,6 +14,10 @@
 
 ## 모델 서빙은 모델을 다른 시스템이 부를 수 있는 API로 바꾸는 일입니다
 
+사용자의 요청은 서빙 엔진이 받고, 서빙 엔진이 모델로 추론한 결과를 돌려줍니다. 서빙 엔진은 모델 레지스트리에서 모델을 받아(pull) 메모리에 올려 둡니다.
+
+![MLOps 플랫폼의 서빙 추상화](../imgs/mlops-serving-abstraction.png)
+
 학습이 끝난 모델은 파일입니다. 노트북에서는 `load_model(...).predict(...)`로 부르면 되지만, 웹 서비스나 다른 팀의 애플리케이션은 Python 객체를 부를 수 없습니다. 모델 서빙은 이 파일을 HTTP API 뒤에 올려, 요청을 받으면 예측값을 돌려주게 만드는 일입니다.
 
 ### 용어
@@ -63,6 +67,24 @@ flowchart LR
   Client[curl] -->|"POST /invocations"| Srv
 ```
 
+## InferenceService 하나가 Deployment, Service, 외부 경로를 만듭니다
+
+KServe에서 사람이 쓰는 리소스는 InferenceService 하나입니다. KServe 컨트롤러가 그 선언을 읽고 실제로 도는 Kubernetes 리소스를 만듭니다. 외부 요청은 Istio Gateway로 들어와, KServe가 만든 경로(HTTPRoute 또는 Ingress)를 따라 predictor로 갑니다.
+
+![KServe 추상화](../imgs/mlops-kserve-abstraction.png)
+
+적용하면 이 순서로 진행됩니다.
+
+1. KServe 컨트롤러가 InferenceService를 읽고 `modelFormat: mlflow`와 `runtime: mlflow-serve`로 ServingRuntime을 고릅니다.
+2. ServingRuntime의 컨테이너 정의와 InferenceService의 `storageUri`를 합쳐 Deployment를 만듭니다. 이 파드는 컨테이너가 두 개입니다.
+   - init 컨테이너 `storage-initializer`: ServiceAccount `kserve-s3`에 연결된 Secret의 계정과 주소로 `storageUri`의 모델 파일을 `/mnt/models`에 내려받습니다.
+   - `kserve-container`: 패키지를 설치한 뒤 `/mnt/models`를 읽어 8080 포트로 서빙합니다.
+3. 같은 이름의 ClusterIP Service와 HPA를 만듭니다.
+4. 외부 경로를 만듭니다. `inferenceservice-config`의 `enableGatewayApi`가 `true`면 Gateway API의 HTTPRoute를, 아니면 Ingress를 만듭니다.
+5. 파드가 Ready가 되면 InferenceService의 `READY`를 `True`로 바꾸고 주소를 기록합니다.
+
+이 Lab은 맥북에서 port-forward로만 부르므로 `disableIngressCreation: true`로 4번을 껐습니다. 그래서 그림의 HTTPRoute와 Istio Gateway 경로는 실제로 만들어지지 않고, Deployment, Service, HPA만 생깁니다. 클러스터 안에서는 `status.address.url`(`http://income-classifier-predictor.kubeflow-user-example-com.svc.cluster.local`)로 부릅니다.
+
 ## 런타임은 모델이 저장된 환경과 맞아야 합니다
 
 배포판 KServe에는 mlflow 모델을 받는 런타임 `kserve-mlserver`가 이미 있습니다. 처음에는 이 런타임으로 띄웠고, 파드는 Ready가 되고 요청에도 답했습니다. 그런데 같은 요청을 노트북 환경에서 예측한 값과 비교하니 달랐습니다.
@@ -111,7 +133,31 @@ Ready가 될 때까지 기다립니다. Python 이미지를 받고 패키지를 
 kubectl -n kubeflow-user-example-com wait isvc/income-classifier --for=condition=Ready --timeout=15m
 ```
 
-### 3. 모델과 함께 저장된 요청 예시로 예측합니다
+### 3. InferenceService가 만든 리소스를 봅니다
+
+InferenceService가 만든 리소스를 label로 한 번에 조회합니다.
+
+```bash
+kubectl -n kubeflow-user-example-com get deploy,pod,svc,hpa -l serving.kserve.io/inferenceservice=income-classifier
+```
+
+Deployment, Pod, Service, HPA가 하나씩 보이면 됩니다. 외부 경로는 만들지 않으므로 아래 명령은 `No resources found`를 출력합니다. 이 클러스터에는 Gateway API CRD도 설치하지 않아서 HTTPRoute는 조회 대상조차 없습니다.
+
+```bash
+kubectl -n kubeflow-user-example-com get ingress -l serving.kserve.io/inferenceservice=income-classifier
+```
+
+predictor 파드의 init 컨테이너와 서빙 컨테이너 이름을 봅니다.
+
+```bash
+kubectl -n kubeflow-user-example-com get pod -l serving.kserve.io/inferenceservice=income-classifier -o jsonpath='{range .items[*]}init={.spec.initContainers[*].name} main={.spec.containers[*].name}{"\n"}{end}'
+```
+
+```text
+init=storage-initializer main=kserve-container
+```
+
+### 4. 모델과 함께 저장된 요청 예시로 예측합니다
 
 predictor Service를 맥북의 8085 포트로 엽니다. 8080은 Kubeflow 화면이 쓰고 있을 수 있어 피했습니다.
 
