@@ -13,6 +13,10 @@
 
 ## 도커 레지스트리와 모델 레지스트리는 같은 일을 다른 단위로 합니다
 
+IDE(노트북)에서 학습한 모델을 레지스트리에 올리고(push), 다른 IDE와 서빙 엔진은 레지스트리에서 꺼냅니다(pull). 이 시나리오는 ①과 ②를, [시나리오 7](./12-lab1-model-serving.md)은 ③을 실습합니다.
+
+![모델 레지스트리에 모델을 올리고 꺼내는 흐름](../imgs/mlops-model-registry-push-pull.png)
+
 | 도커 레지스트리 | MLflow Model Registry |
 |---|---|
 | 이미지 저장소 이름 `myapp` | registered model 이름 `quickstart-model` |
