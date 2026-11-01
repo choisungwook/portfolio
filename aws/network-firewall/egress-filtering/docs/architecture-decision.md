@@ -1,100 +1,130 @@
 # Network Firewall 배치 아키텍처 의사결정
 
-Network Firewall을 도입할 때 정해야 하는 것은 크게 두 가지입니다. 하나는 VPC 안에서 firewall을 경로의 어느 지점에 두는가이고, 다른 하나는 VPC가 여러 개일 때 firewall을 VPC마다 둘지 한곳으로 모을지입니다. 이 핸즈온은 VPC 하나에 NAT 앞 배치를 골랐고, 이 문서는 그 선택의 근거와 VPC가 늘어났을 때 Transit Gateway(TGW) 구성을 검토하는 기준을 정리합니다. 정답이 정해진 문제가 아니라서, 아래 기준은 비용과 운영 조건에 따라 판단을 돕는 용도입니다.
+## 의사결정 배경
 
-## 결정 요약
+AWS Network Firewall을 인프라에 도입할 때 엔지니어가 반드시 결정해야 하는 핵심 아키텍처 질문은 크게 두 가지입니다.
 
-| 결정 | 이 핸즈온의 선택 | 다른 선택지 | 선택이 바뀌는 조건 |
+1. **단일 VPC 내부에서 방화벽을 트래픽 경로의 어느 지점(NAT Gateway 앞 vs 뒤)에 배치할 것인가?**
+2. **다중 VPC 환경에서 방화벽을 VPC마다 분산 배치할 것인가, Transit Gateway(TGW)를 통해 중앙 집중형으로 통합할 것인가?**
+
+본 핸즈온은 단일 VPC 환경에서 **NAT Gateway 앞(App Subnet과 NAT Gateway 사이) 배치**를 선택했습니다. 이 문서는 해당 아키텍처를 선택한 기술적 판단 근거와 함께, 향후 VPC가 확장되었을 때 TGW 중앙 집중 구성을 검토하기 위한 비용 및 운영 손익분기 기준을 제시합니다.
+
+---
+
+## 의사결정 요약
+
+| 의사결정 항목 | 본 핸즈온의 선택 | 대안 구성 | 대안 선택이 권장되는 조건 |
 | --- | --- | --- | --- |
-| VPC 안의 위치 | NAT 앞(app subnet과 NAT 사이) | NAT 뒤(public subnet과 IGW 사이) | audit에 서버 IP가 필요 없고 inbound까지 한 지점에서 검사할 때 |
-| VPC가 여러 개일 때 | VPC 하나라 VPC별 분산 | firewall 공유(secondary endpoint), TGW 중앙 집중 | VPC가 2개 이상이거나 east-west 트래픽까지 audit할 때 |
-| attachment 방식 | VPC attachment | TGW attachment | TGW 중앙 구성을 고를 때 |
+| **VPC 내부 검사 위치** | **NAT Gateway 앞** (App Subnet과 NAT 사이) | **NAT Gateway 뒤** (Public Subnet과 IGW 사이) | 출발지 워크로드 IP 식별이 필요 없고, 인바운드와 아웃바운드를 단일 엔드포인트에서 동시에 검사하고자 할 때 |
+| **다중 VPC 배치 모델** | **VPC별 분산 배치** | **TGW 중앙 집중형** 또는 Secondary Endpoint 공유 | 관리 대상 VPC가 다수(3개 이상)이거나, VPC 간(East-West) 및 온프레미스 통신까지 중앙 감사해야 할 때 |
+| **방화벽 Attachment 방식** | **VPC Attachment** | **TGW Attachment** | TGW 중앙 집중형 아키텍처를 구성할 때 |
 
-## VPC 안의 위치: NAT 앞 배치
+---
 
-audit 목표에서는 로그의 출발지가 실제 서버여야 합니다. firewall을 NAT 뒤에 두면 firewall이 보는 출발지는 NAT의 private IP라 alert 로그만으로 어느 서버가 어느 도메인을 호출했는지 알 수 없습니다. NAT 앞에 두면 `event.src_ip`가 서버의 private IP로 남으므로 이 핸즈온은 NAT 앞을 골랐습니다. 대가로 AZ마다 app route table을 따로 두고, public route table에 응답 경로(app CIDR → 같은 AZ endpoint)를 넣어 대칭 라우팅을 직접 맞춰야 합니다. 세부 구성은 [2-traffic-inspection.md](./2-traffic-inspection.md#firewall을-nat-앞에-두면-로그에-서버-ip가-남는다)에 있습니다.
+## VPC 내부 위치 선정: NAT Gateway 앞 배치
 
-## VPC가 여러 개일 때의 선택지
-
-| 구성 | 트래픽 경로 | 맞는 상황 |
-| --- | --- | --- |
-| VPC별 분산 (이 핸즈온) | VPC마다 firewall과 AZ별 endpoint | VPC가 적거나 VPC마다 정책과 담당 팀이 다름 |
-| firewall 공유 (secondary endpoint) | firewall 하나에 다른 VPC의 endpoint를 추가로 연결 | TGW 없이 여러 VPC가 같은 정책을 써야 함 |
-| TGW 중앙 집중 | spoke VPC → TGW → inspection VPC의 firewall → NAT → IGW | VPC가 많고 보안팀이 audit과 정책을 한곳에서 관리 |
-
-TGW 중앙 집중에는 구현이 두 가지 있습니다. inspection VPC를 직접 만들고 그 안의 firewall subnet에 endpoint를 두는 방식과, Network Firewall을 TGW에 직접 붙이는 TGW attachment 방식입니다. TGW attachment 방식은 inspection VPC와 firewall subnet을 만들지 않아도 되고 대칭 라우팅도 AWS가 처리하므로, 새로 구성한다면 먼저 검토할 만합니다.
+보안 감사(Audit)의 핵심 가치는 **"침해되거나 외부와 통신한 워크로드의 실체(출발지 IP)를 명확히 규명할 수 있는가"**에 있습니다.
 
 ```mermaid
 flowchart LR
-  subgraph Spokes["spoke VPC들"]
-    A["VPC A"]
-    B["VPC B"]
-    C["VPC C"]
+  subgraph BeforeNAT["NAT Gateway 앞 배치 (본 실습 채택)"]
+    EC2_1["EC2 (10.0.20.x)"] --> FW_1["Network Firewall<br/>(출발지: 10.0.20.x 기록)"] --> NAT_1["NAT Gateway"] --> NET_1(("인터넷"))
   end
-  A --> TGW["Transit Gateway"]
-  B --> TGW
-  C --> TGW
-  TGW --> FW["Network Firewall<br/>inspection VPC 또는 TGW attachment"]
-  FW --> NAT["NAT gateway<br/>egress VPC"]
-  NAT --> IGW["Internet gateway"]
+
+  subgraph AfterNAT["NAT Gateway 뒤 배치"]
+    EC2_2["EC2 (10.0.20.x)"] --> NAT_2["NAT Gateway<br/>(IP 변환)"] --> FW_2["Network Firewall<br/>(출발지: NAT IP만 기록)"] --> NET_2(("인터넷"))
+  end
 ```
+
+- **NAT Gateway 뒤 배치의 한계**: 패킷이 이미 NAT Gateway를 거치면서 출발지 IP가 NAT의 Private IP로 변환(SNAT)된 상태로 방화벽에 도달합니다. 따라서 방화벽 Alert 로그에는 오직 NAT IP만 남아, 내부의 수많은 인스턴스 중 누가 외부 도메인을 호출했는지 추적할 수 없습니다.
+- **NAT Gateway 앞 배치의 이점 (본 실습)**: 패킷이 NAT를 거치기 전에 방화벽 엔드포인트를 먼저 통과하므로, 로그의 `event.src_ip`에 실제 워크로드의 Private IP(`10.0.20.x`, `10.0.21.x`)가 온전히 보존됩니다.
+- **트레이드오프(Trade-off)**: 출발지 IP를 확보하는 대가로, 가용 영역(AZ)별 App Route Table을 분리하고 Public Route Table에 응답 복귀 경로(`App CIDR → VPCE`)를 명시하여 대칭 라우팅(Symmetric Routing)을 직접 설계해야 합니다. (세부 구현은 [2-traffic-inspection.md](./2-traffic-inspection.md#4-nat-gateway-앞-배치를-통한-출발지-워크로드-ip-확보) 참고)
+
+---
+
+## 다중 VPC 환경에서의 배치 아키텍처 비교
+
+VPC가 2개 이상으로 늘어나는 환경에서는 세 가지 배치 모델을 검토할 수 있습니다.
+
+```mermaid
+flowchart LR
+  subgraph Distributed["1. VPC별 분산 배치"]
+    VPC1["VPC A (Firewall 내장)"]
+    VPC2["VPC B (Firewall 내장)"]
+  end
+
+  subgraph Centralized["2. Transit Gateway 중앙 집중형"]
+    Spoke1["VPC A"] --> TGW["Transit Gateway"]
+    Spoke2["VPC B"] --> TGW
+    TGW --> InspVPC["중앙 Inspection VPC<br/>(Network Firewall + NAT GW)"]
+    InspVPC --> IGW["Internet Gateway"]
+  end
+```
+
+| 아키텍처 모델 | 트래픽 경로 | 적합한 운영 환경 | 주요 고려사항 |
+| --- | --- | --- | --- |
+| **VPC별 분산 배치** (본 핸즈온 기준) | VPC마다 전용 방화벽과 AZ별 엔드포인트 배치 | VPC 수가 적거나(1~2개), VPC마다 독립적인 보안 정책과 담당 팀이 분리된 환경 | 장애 반경이 개별 VPC로 격리되나, VPC 수에 비례하여 방화벽 시간 비용이 선형 증가 |
+| **TGW 중앙 집중형** | Spoke VPC → TGW → 중앙 검사 VPC(또는 TGW 방화벽) → NAT → IGW | 다수의 VPC(3개 이상)를 운영하며 보안팀이 전사 정책을 중앙에서 일괄 통제하는 환경 | 방화벽 엔드포인트 수를 1세트로 고정할 수 있으나, TGW 데이터 처리 비용 및 아키텍처 복잡성 증가 |
+| **Secondary Endpoint 공유** | 하나의 방화벽 정책에 다른 VPC의 엔드포인트를 추가 바인딩 | TGW가 없으며 2~4개 수준의 소규모 VPC가 동일한 정책을 공유할 때 | TGW 없이 엔드포인트 비용을 절감할 수 있는 중간 선택지 (시간당 \$0.158) |
+
+> [!NOTE]
+> Transit Gateway 중앙 집중형 아키텍처에서는 중앙 Inspection VPC를 별도로 두는 방식 외에도, Network Firewall을 TGW에 직접 연결하는 **TGW Attachment** 방식을 활용할 수 있습니다. TGW Attachment 방식을 적용하면 Inspection VPC 서브넷 관리 부담이 줄어들고 대칭 라우팅을 AWS가 자동으로 처리합니다.
+
+---
 
 ## VPC 수에 따른 비용 손익분기
 
-비용만 보면 TGW 중앙 구성은 생각보다 이른 시점에 유리해집니다. firewall endpoint 시간 요금($0.395)이 TGW attachment 시간 요금($0.07)보다 5배 이상 비싸서, endpoint 수를 고정하는 효과가 TGW 추가 비용을 빠르게 넘어서기 때문입니다.
+비용 측면만 고려할 경우, TGW 중앙 집중형 구성은 생각보다 이른 시점에 분산 배치보다 경제적으로 유리해집니다. 방화벽 엔드포인트의 시간당 고정 요금(\$0.395/hr)이 TGW Attachment 요금(\$0.07/hr)보다 5배 이상 높기 때문입니다.
 
-아래 표는 2026-11-01 AWS Price List API로 조회한 서울 리전 단가로 계산한 한 달(730시간) 고정비입니다. 계산 가정은 다음과 같습니다.
+아래 표는 서울 리전(ap-northeast-2) 단가를 기준으로 AZ 2개를 사용하는 VPC 환경의 월간(730시간) 고정 비용을 비교한 결과입니다.
 
-- 모든 VPC는 AZ 2개를 쓰고, 분산 구성은 VPC마다 endpoint 2개를 둡니다.
-- TGW 중앙 구성은 inspection VPC 하나에 endpoint 2개, TGW attachment는 VPC 수 + 1개입니다.
-- firewall의 GB당 처리 요금($0.065)과 NAT 요금(endpoint만큼 면제)은 두 구성에서 같아 계산에서 뺍니다.
-- secondary endpoint는 $0.158/시간으로 고정비만 반영했고, 데이터 처리 요금 체계는 확인하지 않았습니다.
+| 관리 대상 VPC 수 | VPC별 분산 배치 고정비 | TGW 중앙 집중형 고정비 (트래픽 제외) | Secondary Endpoint 공유 고정비 |
+| :---: | :---: | :---: | :---: |
+| **2개** | \$1,153 | **\$730** | \$807 |
+| **3개** | \$1,730 | **\$781** | \$1,038 |
+| **5개** | \$2,884 | **\$883** | \$1,499 |
+| **10개** | \$5,767 | **\$1,139** | \$2,653 |
 
-| VPC 수 | VPC별 분산 | TGW 중앙 (트래픽 제외) | firewall 공유 (secondary endpoint) |
-| --- | --- | --- | --- |
-| 2 | $1,153 | $730 | $807 |
-| 3 | $1,730 | $781 | $1,038 |
-| 5 | $2,884 | $883 | $1,499 |
-| 10 | $5,767 | $1,139 | $2,653 |
+> 참고 가정: 각 VPC당 AZ 2개 사용, TGW 중앙 구성은 중앙 방화벽 엔드포인트 2개 운영 기준
 
-TGW는 처리한 데이터 GB당 $0.02를 받으므로 egress 트래픽이 많을수록 손익분기가 뒤로 밀립니다. egress 1GB에 TGW 처리 요금을 한 번 붙여 계산한 손익분기는 다음과 같습니다. 응답 트래픽에도 처리 요금이 붙는 경우까지 넣으면 손익분기는 조금 더 늦어집니다.
+### 트래픽 처리 비용(GB당 요금)에 따른 실제 손익분기
 
-| 월 egress 트래픽 | TGW 중앙 구성이 더 저렴해지는 VPC 수 |
-| --- | --- |
-| 거의 없음 | 2개 |
-| 10TB | 2개 |
-| 50TB | 4개 |
-| 100TB | 5개 |
+다만 Transit Gateway는 통과하는 데이터 1GB당 \$0.02의 처리 수수료가 발생합니다. 따라서 아웃바운드 트래픽 용량이 매우 큰 환경에서는 TGW 데이터 비용이 엔드포인트 절감액을 상쇄할 수 있습니다.
 
-VPC 사이 연결 때문에 이미 TGW를 운영 중이라면 attachment 비용은 원래 내던 비용이므로 중앙 구성이 더 일찍 유리해집니다. 반대로 AZ를 3개 쓰는 VPC가 많으면 분산 구성의 endpoint 수가 1.5배로 늘어 손익분기가 더 앞당겨집니다.
+| 월간 Egress 트래픽 볼륨 | TGW 중앙 집중형 구성이 더 저렴해지는 VPC 수 임계점 |
+| --- | :--- |
+| **일반적 수준 (< 10 TB)** | **VPC 2개 이상부터 즉시 유리** |
+| **50 TB** | **VPC 4개 이상부터 유리** |
+| **100 TB 이상** | **VPC 5개 이상부터 유리** |
 
-## 비용 외에 고민해야 하는 조건
+이미 사내에 VPC 간 통신이나 온프레미스 연동을 위해 TGW를 운영 중이라면 Attachment 비용은 기투자 비용이므로, VPC 2개 시점부터 중앙 집중형 구성이 압도적으로 유리합니다.
 
-비용 손익분기가 VPC 2~3개에서 넘어가더라도, 실제 선택은 아래 운영 조건에서 갈리는 경우가 많습니다.
+---
 
-| 조건 | 분산 구성이 맞는 경우 | TGW 중앙 구성이 맞는 경우 |
+## 비용 외 아키텍처 의사결정 체크리스트
+
+실제 엔지니어링 환경에서는 비용 외에도 조직 구조와 운영 복잡성에 따라 최적의 아키텍처가 달라집니다.
+
+| 평가 기준 | 분산 배치가 유리한 경우 | TGW 중앙 집중형이 유리한 경우 |
 | --- | --- | --- |
-| 장애 반경 | firewall이나 route 실수의 영향이 VPC 하나에 그쳐야 함 | 중앙 변경 하나가 모든 VPC egress에 영향을 주는 것을 운영 절차로 통제할 수 있음 |
-| 정책 관리 주체 | 서비스 팀마다 자기 VPC의 허용 목록을 관리 | 보안팀 한 곳이 audit과 차단·허용 정책을 관리 |
-| 검사 범위 | 인터넷 egress만 audit | VPC 사이(east-west), 온프레미스(VPN, Direct Connect) 트래픽까지 audit |
-| 대칭 라우팅 | AZ별 route table로 직접 맞춤 | inspection VPC 방식이면 TGW attachment에 appliance mode를 켜야 함. 켜지 않으면 요청과 응답이 다른 AZ endpoint를 지나 stream exception으로 끊김 |
-| 지연과 데이터 전송 | 경로가 짧음 | TGW hop이 하나 늘고, AZ를 맞추지 않으면 AZ 간 전송 요금이 붙음 |
-| 계정 구조 | 계정 하나 또는 소수 | AWS Organizations의 여러 계정. 분산 firewall에 정책을 일괄 배포하는 Firewall Manager도 함께 비교 |
+| **장애 격리 반경 (Blast Radius)** | 특정 방화벽 장애나 라우팅 변경 실수가 다른 서비스 VPC로 전파되지 않아야 하는 환경 | 변경 영향도를 엄격한 배포 파이프라인과 승인 절차로 통제할 수 있는 환경 |
+| **보안 거버넌스 및 정책 주체** | 서비스 개발팀이 자기 도메인의 허용 목록(Allowlist)을 자율적으로 관리 | 전사 CISO 및 중앙 보안팀이 모든 아웃바운드 정책을 단일 창구에서 일괄 통제 |
+| **트래픽 검사 범위** | 외부 인터넷 아웃바운드(Egress)만 검사 | VPC 간 통신(East-West) 및 온프레미스(VPN/Direct Connect) 연동 트래픽까지 통합 검사 |
+| **네트워크 지연 시간 (Latency)** | 추가 네트워크 홉(Hop) 없이 최소 지연을 유지해야 하는 고성능 워크로드 | TGW 경유로 인한 1~2ms 수준의 추가 홉 지연을 허용할 수 있는 일반 워크로드 |
 
-어느 구성이든 audit 목표를 유지하려면 firewall이 NAT보다 앞에 있어야 합니다. TGW는 NAT를 하지 않으므로, 중앙 구성에서 firewall을 egress VPC의 NAT 앞에 두면 spoke VPC 서버의 private IP가 그대로 alert 로그에 남습니다.
+---
 
-## 판단 기준
+## 종합 판단 가이드
 
-- VPC 1개이고 인터넷 egress audit이 목적이면 이 핸즈온처럼 VPC별 분산 구성으로 충분합니다.
-- VPC가 2개 이상이고 이미 TGW를 운영 중이며 보안팀이 정책을 관리하면 TGW 중앙 구성(가능하면 TGW attachment 방식)을 우선 검토합니다.
-- TGW가 없고 VPC가 2~4개 수준이면 secondary endpoint로 firewall 하나를 공유하는 구성이 중간 선택지입니다.
-- 서비스 중요도가 높아 장애 반경을 VPC 단위로 끊어야 하면 비용이 더 들더라도 분산 구성을 유지하고, 정책 일관성은 Firewall Manager로 보완합니다.
+1. **단일 VPC 환경**: 추가적인 네트워크 복잡성을 피하고 본 핸즈온처럼 VPC 내부 분산 배치(NAT 앞)를 적용합니다.
+2. **다중 VPC 환경 (2~3개 이상)**: 이미 TGW를 사용 중이거나 중앙 보안팀 중심의 통합 거버넌스가 필요하다면 **TGW 중앙 집중형 아키텍처(TGW Attachment 방식 권장)**를 최우선으로 검토합니다.
+3. **도메인 자율 관리 및 장애 격리 우선**: 비용이 다소 증가하더라도 서비스별 독립성이 최우선이라면 분산 배치를 유지하고, AWS Firewall Manager를 도입하여 전사 공통 기본 정책(차단 룰 등)을 중앙에서 배포하는 하이브리드 방식을 적용합니다.
 
-중앙 구성으로 옮길 때도 [5-production-rollout.md](./5-production-rollout.md)의 단계 구성은 그대로 적용됩니다. 다만 전환 단위를 AZ 하나에서 VPC 하나로 키우고, VPC마다 audit 모드 → 허용 목록 도출 → drop 전환 순서를 반복합니다.
+---
 
 ## 참고 문서
 
-1. AWS Network Firewall deployment models, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/architectures.html>
-2. AWS Network Firewall pricing, <https://aws.amazon.com/network-firewall/pricing/>
-3. AWS Transit Gateway pricing, <https://aws.amazon.com/transit-gateway/pricing/>
-4. Transit Gateway appliance mode, <https://docs.aws.amazon.com/vpc/latest/tgw/transit-gateway-appliance-scenarios.html>
+1. [AWS Network Firewall deployment models](https://docs.aws.amazon.com/network-firewall/latest/developerguide/architectures.html)
+2. [AWS Network Firewall pricing](https://aws.amazon.com/network-firewall/pricing/)
+3. [AWS Transit Gateway pricing](https://aws.amazon.com/transit-gateway/pricing/)
+4. [Transit Gateway appliance mode for stateful inspection](https://docs.aws.amazon.com/vpc/latest/tgw/transit-gateway-appliance-scenarios.html)

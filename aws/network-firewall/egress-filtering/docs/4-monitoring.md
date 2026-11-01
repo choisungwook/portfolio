@@ -1,139 +1,100 @@
-# 시나리오 4. 막힌 트래픽을 로컬 Grafana로 관측하기
+# 시나리오 4. 차단된 트래픽 관측 및 로컬 Grafana 대시보드 구축
 
-## 이 시나리오의 목표
+## 시나리오 개요 및 목표
 
-| 항목 | 내용 |
+도메인 기반 Egress 차단 정책을 운영할 때 가장 주의해야 할 문제는 "서비스에 필요한 정상 외부 통신이 실수로 차단되는 상황"입니다. 외부 서비스 연결 실패 시 애플리케이션에는 단순한 타임아웃(Timeout) 오류만 발생하므로, 네트워크 방화벽이 실제로 패킷을 차단했는지 즉시 확인할 수 있는 관측성(Observability)이 반드시 확보되어야 합니다.
+
+이번 시나리오의 핵심 목표는 **AWS Network Firewall이 제공하는 CloudWatch 메트릭과 L7 Alert 로그를 통합하여, 차단된 트래픽의 수량과 구체적인 도메인 및 출발지 서버 IP를 로컬 Grafana 대시보드를 통해 실시간으로 관측하는 것**입니다.
+
+| 구분 | 주요 내용 |
 | --- | --- |
-| 기능 | firewall이 무엇을 얼마나 막았는지, 어느 서버가 어느 도메인에서 막혔는지 관측 |
-| 쓰는 도구 | CloudWatch metric(`AWS/NetworkFirewall`), alert 로그(CloudWatch Logs), 로컬 Docker Grafana |
-| 입력 | 시나리오 3에서 drop을 켠 firewall `nfw-lab`, alert log group |
-| 작업 | 실습 1~5단계: AWS 콘솔에서 metric과 로그 확인, Network Firewall Monitoring 탭 확인, Grafana 대시보드 접속과 패널 해석 |
-| 달성할 것 | AZ별 처리량과 drop, 막힌 도메인과 출발지 서버 IP를 AWS 콘솔과 Grafana에서 확인 |
+| **실습 목표** | 방화벽 메트릭과 상세 감사 로그를 연계 분석하고, 로컬 Grafana를 통해 통합 모니터링 대시보드 운영 |
+| **핵심 도구** | CloudWatch Metrics (`AWS/NetworkFirewall`), CloudWatch Logs Insights, 로컬 Docker Grafana 13.x |
+| **입력 상태** | 시나리오 3에서 도메인 차단(Drop)이 활성화된 방화벽(`nfw-lab`)과 CloudWatch 로그 그룹 |
+| **최종 달성 결과** | AZ별 실시간 패킷 처리량 및 Drop 추이를 확인하고, 상위 차단 도메인과 출발지 인스턴스 IP를 대시보드에서 분석 |
 
-## 관측은 metric과 로그가 나눠서 맡는다
+---
 
-firewall은 두 종류의 기록을 남깁니다. metric은 "얼마나"를, alert 로그는 "누가 어디로"를 답합니다. metric에는 도메인 정보가 없어서, 어느 도메인이 막혔는지는 로그에서 셉니다.
+## 핵심 아키텍처 원리 및 관측 체계
 
-### 용어
+### 1. 메트릭(Metric)과 로그(Log)의 역할 분담
 
-| 용어 | 뜻 | 이 실습의 예 |
-| --- | --- | --- |
-| `AWS/NetworkFirewall` | firewall metric의 CloudWatch namespace. `FirewallName`, `AvailabilityZone`, `Engine` 세 dimension 조합으로만 기록하고 값이 0이면 기록하지 않음 | `FirewallName=nfw-lab`, `Engine=Stateful` |
-| Alert 로그 | alert, drop, reject 규칙에 걸린 흐름. `event.alert.action`이 `allowed` 또는 `blocked` | `/aws/network-firewall/nfw-lab/alert` |
-| Flow 로그 | stateful 엔진이 본 모든 흐름의 netflow 기록. 방향마다 한 줄 | `/aws/network-firewall/nfw-lab/flow` |
-| Logs Insights | CloudWatch Logs의 쿼리 언어. Grafana CloudWatch data source가 그대로 실행함 | 막힌 도메인 패널 |
+Network Firewall의 모니터링은 메트릭과 로그의 상호 보완적인 결합으로 완성됩니다.
 
-## firewall을 관측해야 하는 이유
+- **CloudWatch Metrics ("얼마나 차단되었는가?")**:
+  - `AWS/NetworkFirewall` 네임스페이스를 통해 가용 영역(AZ)별 처리량(`ReceivedPackets`), 통과량(`PassedPackets`), 차단량(`DroppedPackets`)을 수치로 제공합니다.
+  - 초단위 추이와 급격한 이상 징후를 감지하고 알람을 설정하는 용도로 적합하지만, 패킷의 구체적인 URL이나 도메인 정보는 포함되지 않습니다.
+- **CloudWatch Logs ("누가, 어디로 가려다 차단되었는가?")**:
+  - Alert 로그 그룹에 개별 차단 이벤트의 L7 상세 정보가 기록됩니다.
+  - L7 정보(출발지 Private IP, 목적지 IP, TLS SNI, HTTP Host, 프로토콜, 차단 사유 등)를 전수 기록하므로, Logs Insights 쿼리를 통해 "어떤 서버가 어떤 도메인을 호출했는지" 완벽하게 역추적할 수 있습니다.
 
-허용 목록 방식은 "막지 말아야 할 것을 막는" 실패가 기본 위험입니다. 새 외부 의존성이 생기면 서비스는 timeout으로만 실패하고, 애플리케이션 로그에는 firewall이라는 단서가 없습니다. `DroppedPackets`와 막힌 도메인 목록이 보여야 timeout을 firewall과 연결할 수 있습니다. 시나리오 2에서 본 대칭 라우팅 실패도 `StreamExceptionPolicyPackets`로만 드러납니다.
+### 2. Grafana의 CloudWatch Pull 아키텍처
 
-## 대안 비교
-
-| 방식 | 장점 | 이 실습에서 고르지 않은 이유 |
-| --- | --- | --- |
-| 로컬 Docker Grafana + CloudWatch data source | metric과 로그를 한 대시보드에, 대시보드를 JSON으로 저장소에 둠 | 고름 |
-| CloudWatch 콘솔 대시보드 | 설치 없음 | 대시보드를 코드로 저장소에 두기 번거로움 |
-| Network Firewall monitoring dashboard | 설치 없음, 로그 기반 top flow와 도메인 집계를 바로 제공 | 패널이 고정되어 있고 화면 갱신마다 Logs Insights 쿼리 요금 발생. 실습 3단계에서 함께 확인 |
-| Amazon Managed Grafana | 운영용 인증과 공유 | 실습 하나에 workspace 비용과 SSO 설정이 과함 |
-
-## 컴포넌트 역할
-
-| 컴포넌트 | 역할 |
-| --- | --- |
-| firewall logging 설정 | alert, flow 로그를 CloudWatch Logs로 보냄. 도착까지 3~6분 |
-| log resource policy `nfw-lab-firewall-logs` | `delivery.logs.amazonaws.com`이 log group에 쓰도록 허용. Terraform이 만들어 계정 공유 policy를 건드리지 않음 |
-| `compose.yaml` | Grafana 13.2.5를 `127.0.0.1:3000`에 띄우고 호스트 `~/.aws`를 읽기 전용으로 마운트 |
-| CloudWatch data source | `authType: default`. AWS SDK 기본 자격 증명 체인이 export한 `AWS_PROFILE`을 찾음 |
-| `grafana/dashboards/network-firewall.json` | provisioning으로 올라가는 대시보드 |
-
-`compose.yaml`의 인증 설정이며, 액세스 키를 Grafana 설정이나 저장소에 기록하지 않는 구조입니다.
-
-```yaml
-environment:
-  AWS_PROFILE: ${AWS_PROFILE:?export AWS_PROFILE first}
-volumes:
-  - ~/.aws:/usr/share/grafana/.aws:ro
-```
-
-`AWS_PROFILE`을 export하지 않고 `docker compose up`을 실행하면 compose가 바로 실패합니다. 프로파일에 필요한 권한은 `cloudwatch:GetMetricData`, `cloudwatch:ListMetrics`, `logs:StartQuery`, `logs:GetQueryResults`, `logs:DescribeLogGroups`입니다.
-
-## Grafana는 CloudWatch API를 호출해 값을 가져온다
-
-firewall은 Grafana로 아무것도 보내지 않습니다. firewall endpoint가 metric과 로그를 CloudWatch에 쌓고, Grafana는 패널을 그릴 때마다 CloudWatch API를 호출해 그 값을 읽어 옵니다(pull 방식). 그래서 Grafana에는 agent나 exporter가 없고 data source 하나만 있습니다.
-
-| 패널 종류 | Grafana가 호출하는 API | 쿼리에 들어가는 값 |
-| --- | --- | --- |
-| metric 패널 | `cloudwatch:GetMetricData` | namespace `AWS/NetworkFirewall`, metric 이름, dimension 3개, statistic `Sum`, period `60` |
-| 로그 패널 | `logs:StartQuery`, `logs:GetQueryResults` | log group `/aws/network-firewall/nfw-lab/alert`, Logs Insights 쿼리 |
-
-API를 호출할 자격 증명은 Grafana 컨테이너 안의 AWS SDK가 찾습니다. data source의 `authType: default`는 SDK 기본 자격 증명 체인을 쓰라는 뜻이고, 체인은 compose가 넘긴 `AWS_PROFILE`과 마운트한 `~/.aws`에서 그 프로파일을 읽습니다.
-
-대시보드의 metric 패널 쿼리입니다. `AvailabilityZone`을 `*`로 두어 AZ마다 series가 하나씩 나옵니다.
-
-```json
-{
-  "namespace": "AWS/NetworkFirewall",
-  "metricName": "ReceivedPackets",
-  "dimensions": { "FirewallName": ["nfw-lab"], "AvailabilityZone": ["*"], "Engine": ["Stateful"] },
-  "statistic": "Sum",
-  "period": "60"
-}
-```
-
-data source가 두 API에 모두 접근하는지는 Grafana API로 확인합니다. firewall을 만들기 전에도 확인할 수 있습니다.
-
-```bash
-curl -s localhost:3000/api/datasources/uid/cloudwatch/health
-```
-
-실측 결과이며, 둘 중 하나라도 실패하면 프로파일의 IAM 권한을 점검합니다.
-
-```text
-1. Successfully queried the CloudWatch metrics API.
-2. Successfully queried the CloudWatch logs API.
-```
-
-## 흐름
+본 핸즈온의 Grafana 환경은 방화벽이나 AWS 리소스에 별도의 에이전트(Agent)나 익스포터(Exporter)를 설치하지 않습니다.
 
 ```mermaid
 flowchart LR
-  VPCE["firewall endpoint a, c"] -- "metric 1분" --> CWM["CloudWatch metric"]
-  VPCE -- "로그 3~6분 지연" --> CWL["CloudWatch Logs alert, flow"]
-  CWM --> DS["Grafana CloudWatch data source"]
-  CWL -- "Logs Insights" --> DS
-  AWS["호스트 ~/.aws 읽기 전용"] --> DS
-  DS --> DASH["대시보드 Network Firewall"]
+  VPCE["Firewall Endpoint (AZ a, c)"] -- "1분 단위 메트릭" --> CWM["CloudWatch Metrics"]
+  VPCE -- "L7 상세 이벤트 전송" --> CWL["CloudWatch Logs<br/>(/alert, /flow)"]
+
+  subgraph Docker["로컬 Docker 환경"]
+    DS["Grafana CloudWatch Data Source"]
+    DASH["통합 모니터링 대시보드"]
+    DS --> DASH
+  end
+
+  CWM -- "GetMetricData API (Pull)" --> DS
+  CWL -- "StartQuery / GetQueryResults API (Pull)" --> DS
+  HOST["호스트 ~/.aws (읽기 전용 볼륨 마운트)"] -. "AWS_PROFILE 자격 증명 주입" .-> DS
 ```
 
-## 실습
+- 방화벽 엔드포인트가 메트릭과 로그를 CloudWatch로 지속 전송합니다.
+- 로컬 Docker로 실행된 Grafana의 CloudWatch Data Source가 AWS SDK를 통해 주기적으로 CloudWatch API를 직접 호출(Pull)하여 차트와 테이블을 렌더링합니다.
+- 호스트의 `~/.aws` 디렉터리를 컨테이너 내부에 읽기 전용으로 마운트하고, 환경변수로 지정한 `AWS_PROFILE`을 활용하므로 소스 코드나 설정 파일에 AWS 시크릿 키가 노출되지 않습니다.
 
-[setup.md](./setup.md)의 Up이 Grafana 컨테이너도 함께 기동합니다. 시나리오 3의 2단계까지 마친 상태에서 시작합니다. 1~3단계는 Grafana 없이 AWS 콘솔에서 같은 값을 확인하고, 4~5단계는 Grafana에서 확인합니다.
+---
 
-### 1. CloudWatch 콘솔에서 metric 확인 (약 3분)
+## 단계별 실습 가이드
+
+본 실습은 시나리오 3을 완료하여 `www.google.com` 등 미인가 도메인의 차단 로그가 발생한 상태에서 진행합니다.
+
+---
+
+### 1단계. CloudWatch 콘솔에서 방화벽 메트릭 확인
+
+**작업 목적**: AWS 기본 콘솔에서 Network Firewall의 패킷 통과 및 차단 메트릭을 가용 영역별로 확인합니다.
+
+#### 1단계 콘솔 수행 절차
 
 1. **CloudWatch > Metrics > All metrics**로 이동합니다.
-2. **Browse** 탭에서 **NetworkFirewall**을 누릅니다.
-3. **AvailabilityZone, Engine, FirewallName**을 누릅니다.
-   - dimension 조합이 이것 하나뿐입니다. firewall을 만든 뒤 트래픽이 지나가야 목록에 나타납니다.
-4. 검색창에 `nfw-lab Stateful`을 넣고 `ReceivedPackets`, `PassedPackets`, `DroppedPackets`를 AZ a, c 모두 체크합니다.
-5. **Graphed metrics** 탭에서 **Statistic**을 `Sum`, **Period**를 `1 minute`으로 바꿉니다.
-   - drop을 켠 시각부터 `DroppedPackets`가 생깁니다.
-   - 값이 0인 구간은 점이 찍히지 않습니다. `AWS/NetworkFirewall`은 0을 기록하지 않기 때문입니다.
-6. 검색창을 `nfw-lab StreamExceptionPolicyPackets`로 바꿔 이 metric이 없거나 0인지 확인합니다.
+2. **Browse** 탭에서 **NetworkFirewall** 네임스페이스를 클릭합니다.
+3. **AvailabilityZone, Engine, FirewallName** 차원을 선택합니다.
+   > [!NOTE]
+   > Network Firewall 메트릭은 이 세 가지 차원 조합으로만 제공됩니다. 트래픽이 한 번도 흐르지 않은 방화벽은 목록에 나타나지 않습니다.
+4. 검색창에 `nfw-lab Stateful`을 입력하고, AZ a와 AZ c 양쪽에 대해 `ReceivedPackets`, `PassedPackets`, `DroppedPackets`를 체크합니다.
+5. 상단의 **Graphed metrics** 탭을 클릭한 뒤 통계 방식을 조정합니다.
+   - **Statistic**: **Sum**
+   - **Period**: **1 minute**
+6. 그래프 확인 포인트:
+   - 시나리오 2에서 라우팅을 전환한 시점부터 `ReceivedPackets`가 상승합니다.
+   - 시나리오 3에서 Default Drop을 활성화한 시점부터 `DroppedPackets` 수치가 나타납니다.
+   - `StreamExceptionPolicyPackets` 지표를 검색하여 값이 0인지 확인합니다. (값이 0이어야 대칭 라우팅이 정상 유지되고 있음을 의미)
 
-### 2. Network Firewall 로그 설정과 CloudWatch Logs 확인 (약 5분)
+---
 
-1. **VPC > Network Firewall > Firewalls > nfw-lab**의 **Firewall details** 탭에서 **Logging configuration**을 확인합니다.
-   - `Alert`와 `Flow`가 각각 `/aws/network-firewall/nfw-lab/alert`, `/aws/network-firewall/nfw-lab/flow`로 전달되도록 설정되어 있는지 확인합니다.
-2. **CloudWatch > Logs > Log groups > /aws/network-firewall/nfw-lab/alert**를 엽니다.
-   - log stream은 endpoint마다 하나씩 생성되며, 로깅 활성화 후 3~6분이 지나야 첫 stream이 나타납니다.
-3. **Search all log streams**를 누르고 필터에 `blocked`를 넣습니다.
-   - `event.alert.action`이 `blocked`이고 `event.tls.sni`가 `www.google.com`인 줄이 보입니다.
-4. **CloudWatch > Logs > Logs Insights**로 이동해 log group으로 `/aws/network-firewall/nfw-lab/alert`를 고릅니다.
-5. 아래 쿼리를 넣고 **Run query**를 누릅니다.
-   - 막힌 도메인과 출발지 EC2 private IP가 횟수 순으로 나옵니다. 5단계의 Blocked domains 패널과 같은 결과입니다.
+### 2단계. CloudWatch Logs Insights를 통한 차단 도메인 쿼리
 
-5단계에 넣는 Logs Insights 쿼리입니다.
+**작업 목적**: Alert 로그 그룹에 쌓인 대량의 이벤트에서 실제 차단된 도메인과 요청한 인스턴스의 Private IP를 집계하여 확인합니다.
+
+#### 2단계 콘솔 수행 절차
+
+1. **CloudWatch > Logs > Log groups**로 이동하여 `/aws/network-firewall/nfw-lab/alert` 로그 그룹을 선택합니다.
+2. 상단의 **Search all log streams**를 클릭하고 필터 검색창에 `blocked`를 입력하여 개별 차단 로그가 인입되고 있는지 확인합니다.
+3. 좌측 메뉴에서 **Logs Insights**로 이동합니다.
+4. 상단 로그 그룹 선택창에서 `/aws/network-firewall/nfw-lab/alert`를 지정합니다.
+5. 아래 쿼리를 입력하고 우측의 **Run query**를 클릭합니다.
+
+차단(Blocked)된 트래픽에서 목적지 도메인(TLS SNI 또는 HTTP Host)과 출발지 서버 IP를 추출하여 횟수별로 집계합니다.
 
 ```text
 filter event.alert.action = "blocked"
@@ -143,63 +104,88 @@ filter event.alert.action = "blocked"
 | limit 20
 ```
 
-flow 로그는 `/aws/network-firewall/nfw-lab/flow`에서 같은 방법으로 조회합니다. 허용된 흐름까지 모두 남아 alert 로그보다 줄이 훨씬 많습니다.
+1. 쿼리 결과 확인:
+   - `domain` 컬럼에 차단된 `www.google.com`, `example.com` 등이 집계됩니다.
+   - `event.src_ip` 컬럼에 요청을 발생시킨 내부 EC2의 Private IP(`10.0.20.x`, `10.0.21.x`)가 명확히 출력되는지 확인합니다.
 
-### 3. Network Firewall Monitoring 탭 대시보드 확인 (약 3분)
+---
 
-시나리오 2의 5단계에서 켠 Firewall monitoring dashboard는 별도 설치 없이 콘솔에서 alert와 flow 로그를 집계해 보여 줍니다. 화면을 열거나 범위를 바꿀 때마다 log group에 Logs Insights 쿼리가 실행되므로, 같은 화면을 반복해서 새로 고치지 않습니다.
+### 3단계. Network Firewall 콘솔 내장 모니터링 탭 확인
 
-1. **VPC > Network Firewall > Firewalls > nfw-lab**의 **Monitoring** 탭을 엽니다.
-   - 대시보드가 꺼져 있다는 안내가 보이면 이 화면에서 바로 켜거나, 시나리오 2의 5단계로 돌아가 켭니다.
-2. 시간 범위 선택기에서 drop을 켠 시각이 포함되도록 최근 1시간을 고릅니다.
-3. **Top traffic flows**에서 출발지 EC2 private IP(`10.0.20.x`, `10.0.21.x`)와 목적지별 트래픽 양을 확인합니다.
-4. **TLS SNI** 영역에서 `checkip.amazonaws.com`, `www.google.com` 같은 목적지 도메인이 집계되는지 확인합니다.
-   - 2단계의 Logs Insights 쿼리 결과와 같은 도메인이 보이면 됩니다.
-5. **TCP handshake 실패 흐름**과 **장시간 유지된 TCP 흐름** 영역을 확인합니다.
-   - 차단한 도메인과 연결 실패가 함께 보이면, 정책 변경이 어떤 서버의 연결에 영향을 줬는지 추적하는 단서가 됩니다.
-6. 출발지 IP 입력란에 AZ a EC2의 private IP를 넣어 서버 한 대의 통신만 걸러 봅니다.
+**작업 목적**: AWS 콘솔이 제공하는 기본 내장 모니터링 탭을 통해 별도의 대시보드 설치 없이도 제공되는 L7 트래픽 분석 뷰를 확인합니다.
 
-콘솔 대시보드는 설치 없이 바로 쓸 수 있지만 패널 구성이 고정되어 있습니다. 4~5단계의 Grafana는 대시보드를 JSON으로 저장소에 두고 패널과 쿼리를 직접 정할 수 있습니다.
+#### 3단계 콘솔 수행 절차
 
-### 4. Grafana 대시보드 접속 (1분)
+1. **VPC > Network Firewall > Firewalls**에서 `nfw-lab`을 선택합니다.
+2. 상세 화면에서 **Monitoring** 탭을 클릭합니다.
+   - (시나리오 2의 5단계에서 모니터링 대시보드를 켜두었으므로 차트가 표시됩니다.)
+3. 시간 범위를 **최근 1시간 (1h)**으로 설정합니다.
+4. 주요 패널 확인:
+   - **Top traffic flows**: 내부 워크로드별 전체 통신량 및 상위 목적지 확인
+   - **TLS SNI**: 감지된 도메인 리스트 및 통신 비율 확인
+   - **출발지 IP 필터링**: 필터 입력란에 AZ a의 EC2 Private IP를 입력하여 특정 서버 하나의 Egress 패턴만 분리 조회해 봅니다.
 
-1. 브라우저에서 `http://localhost:3000`을 엽니다. 로그인 없이 열립니다.
-2. **Dashboards > Network Firewall**을 엽니다.
+---
+
+### 4단계. 로컬 Docker Grafana 대시보드 접속
+
+**작업 목적**: [setup.md](./setup.md)에서 프로비저닝된 로컬 Grafana 컨테이너에 접속하여 코드로 관리되는 통합 모니터링 대시보드를 확인합니다.
+
+#### 4단계 사전 자격 증명 점검
+
+Grafana가 호스트의 AWS 권한을 정상적으로 참조하고 있는지 터미널에서 API 헬스체크를 수행합니다.
+
+Grafana Data Source의 CloudWatch 메트릭 및 로그 API 연결 상태를 점검합니다.
+
+```bash
+curl -s localhost:3000/api/datasources/uid/cloudwatch/health
+```
+
+**정상 출력**:
+
+```text
+1. Successfully queried the CloudWatch metrics API.
+2. Successfully queried the CloudWatch logs API.
+```
+
+#### 4단계 대시보드 접속
+
+1. 웹 브라우저에서 `http://localhost:3000`에 접속합니다. (별도 로그인 없이 바로 접근 가능)
+2. 좌측 메뉴에서 **Dashboards > Network Firewall**을 클릭합니다.
 
 ![Network Firewall 대시보드](./images/grafana-dashboard.jpg)
 
-### 5. 패널별 지표 해석 (약 3분)
+---
 
-| 패널 | 출처 | 보는 것 |
+### 5단계. Grafana 대시보드 패널별 핵심 지표 해석
+
+**작업 목적**: 대시보드의 각 패널이 의미하는 네트워크 상태와 장애 징후를 명확히 해석합니다.
+
+| 대시보드 패널명 | 데이터 출처 | 정상 상태 기준 및 모니터링 핵심 |
 | --- | --- | --- |
-| Stateful engine: received / passed / dropped | `AWS/NetworkFirewall`, `Engine=Stateful` | AZ별 처리량. endpoint 두 개가 각자 트래픽을 받는지 |
-| Dropped packets by AZ | `DroppedPackets` | drop을 켠 뒤 막힌 양 |
-| Stream exception policy packets | `StreamExceptionPolicyPackets` | 상태 없는 패킷. route 변경, flow flush, 비대칭 라우팅 신호 |
-| Blocked domains (alert log) | alert log group, Logs Insights | 막힌 도메인과 출발지 서버 IP |
-| Recent alert events | alert log group, Logs Insights | 최근 alert 기록 50개 |
+| **Stateful engine: received / passed / dropped** | CloudWatch Metrics (`Engine=Stateful`) | AZ a와 AZ c 양쪽 엔드포인트 모두에서 패킷이 고르게 유입되고 처리되는지 확인합니다. 한쪽 AZ의 수치가 0이면 라우팅 누락을 의미합니다. |
+| **Dropped packets by AZ** | CloudWatch Metrics (`DroppedPackets`) | 시나리오 3에서 Default Drop을 적용한 이후 차단된 패킷 추이를 보여줍니다. 정상 운영 중 수치가 급증하면 새 외부 의존성(API 등)이 추가되었는지 점검해야 합니다. |
+| **Stream exception policy packets** | CloudWatch Metrics (`StreamExceptionPolicyPackets`) | **정상 상태에서는 반드시 0이어야 합니다.** 이 수치가 발생하면 비대칭 라우팅이나 라우팅 테이블 불일치가 발생하고 있다는 강력한 경고입니다. |
+| **Blocked domains (alert log)** | CloudWatch Logs Insights (Alert Log Group) | 2단계에서 콘솔로 실행했던 쿼리를 Grafana 테이블 패널에 실시간 렌더링한 것으로, 차단된 도메인과 출발지 서버 IP를 즉시 확인합니다. |
+| **Recent alert events** | CloudWatch Logs Insights (Alert Log Group) | 최근 발생한 세부 감사/차단 이벤트 50건을 최신순으로 출력합니다. |
 
-1. **Stateful engine** 패널에서 route를 바꾼 시각부터 AZ a, c 모두 `ReceivedPackets`가 올라오는지 확인합니다.
-   - 실측 15:11(KST)에 route를 바꾸자 AZ마다 분당 약 4천 개로 올라왔습니다.
-2. **Dropped packets by AZ**에서 drop을 켠 시각부터 값이 생기는지 확인합니다.
-   - 실측 15:14에 drop을 켜자 나타났습니다.
-3. **Stream exception policy packets**가 0인지 확인합니다.
-   - 실측 실습 내내 0이었습니다.
-4. **Blocked domains** 표에서 막힌 도메인과 서버 IP를 확인합니다.
-   - 실측 `www.google.com`, `example.com`, domain이 빈 줄(NTP)이 보였고, `event.src_ip`는 EC2의 private IP였습니다.
+> [!NOTE]
+> CloudWatch Logs는 스트림 인입 및 인덱싱까지 약 3~5분의 지연이 발생할 수 있습니다. 메트릭 패널에는 Drop이 즉시 찍히지만 로그 패널에는 약간 늦게 반영될 수 있으므로, 실시간 대시보드 조회 시 이를 감안하시기 바랍니다.
 
-Blocked domains 패널은 2단계에서 콘솔로 실행한 Logs Insights 쿼리를 그대로 실행합니다.
+모든 확인을 마친 후 실습 환경을 정리하려면 [setup.md의 Down](./setup.md#down) 절차를 진행합니다.
 
-로그는 3~6분 늦게 도착합니다. metric 패널에 drop이 보이는데 로그 패널이 비어 있으면 몇 분 뒤 다시 조회합니다. 확인이 끝나면 [setup.md의 Down](./setup.md#down)으로 정리합니다.
+---
 
-## 부록. 실무 시사점
+## 부록: 실무 시사점 및 운영 팁
 
-- metric 쿼리는 `FirewallName`, `AvailabilityZone`, `Engine` 세 dimension을 모두 지정해야 값이 나옵니다. `AvailabilityZone`을 `*`로 두면 AZ마다 series가 하나씩 나옵니다.
-- NAT가 AZ a에 하나뿐이어도 endpoint는 AZ마다 자기 subnet의 트래픽을 받는 것이 metric에서 바로 보입니다.
-- 대시보드에는 firewall 이름 `nfw-lab`과 log group 이름 `/aws/network-firewall/nfw-lab/alert`가 고정되어 있습니다. 다른 firewall에 쓰려면 이 두 값을 바꿉니다. 리전을 바꿨으면 `grafana/provisioning/datasources/cloudwatch.yaml`의 `defaultRegion`도 같은 값으로 바꾸고, `docker compose up` 전에 `AWS_REGION`을 export합니다.
-- 운영에서 알람을 걸 metric은 [5-production-rollout.md의 5단계](./5-production-rollout.md#5단계-핵심-지표-알람-구성)에 있습니다.
+- **정확한 CloudWatch Metric Dimension 구성**: `AWS/NetworkFirewall` 메트릭을 쿼리할 때는 반드시 `FirewallName`, `AvailabilityZone`, `Engine` 3개의 Dimension이 모두 포함되어야 정상 조회됩니다. 하나라도 누락되면 CloudWatch는 빈 결과를 반환합니다.
+- **다중 가용 영역 처리 확인**: NAT Gateway가 특정 AZ(예: AZ a)에만 하나 존재하더라도, 방화벽 엔드포인트는 AZ a와 AZ c 각각의 애플리케이션 서브넷에서 발생하는 트래픽을 독립적으로 받아 처리하고 있음을 대시보드의 AZ별 메트릭을 통해 직접 입증할 수 있습니다.
+- **로그 저장 비용 최적화**: Flow 로그는 모든 네트워크 패킷을 기록하므로 대규모 트래픽 환경에서는 로그 저장 비용이 급증할 수 있습니다. 운영 환경에서는 Alert 로그만 CloudWatch Logs로 실시간 수집하고, Flow 로그는 S3 버킷으로 직접 내보내어 Athena로 주기적 감사하는 구성을 권장합니다.
+
+---
 
 ## 참고 문서
 
-1. Network Firewall CloudWatch metrics, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/monitoring-cloudwatch.html>
-2. Network Firewall logging, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-logging.html>
-3. Firewall monitoring in the Network Firewall console, <https://docs.aws.amazon.com/network-firewall/latest/developerguide/nwfw-detailed-monitoring.html>
+1. [Monitoring AWS Network Firewall with Amazon CloudWatch](https://docs.aws.amazon.com/network-firewall/latest/developerguide/monitoring-cloudwatch.html)
+2. [Logging network traffic from AWS Network Firewall](https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-logging.html)
+3. [Firewall monitoring in the Network Firewall console](https://docs.aws.amazon.com/network-firewall/latest/developerguide/nwfw-detailed-monitoring.html)
