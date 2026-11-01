@@ -1,112 +1,87 @@
-# Lab 1 시나리오 8. 피처 스토어로 학습과 서빙이 같은 피처를 쓰게 합니다
+# Lab 1 시나리오 8. 피처 스토어(Feast): 학습-서빙 간 피처 일관성 보장 및 왜곡(Skew) 방지
 
 ## 이 시나리오의 목표
 
 | 항목 | 내용 |
 |---|---|
-| 플랫폼 기능 | 피처 스토어 |
-| 오픈소스 | Feast 0.67.0, Redis(온라인 스토어), object storage(오프라인 스토어와 레지스트리) |
-| 입력 | [시나리오 7](./12-lab1-model-serving.md)의 InferenceService `income-classifier` |
-| 작업 | 1. one-hot 인코딩한 피처 90개를 사람(`person_id`)마다 Feast에 등록 2. Redis로 옮김 3. `person_id`만으로 피처를 꺼내 KServe에 예측 요청 4. 학습용으로 꺼낸 값과 서빙용으로 꺼낸 값이 같은지 확인 5. Feast UI에서 등록한 피처를 봄 |
-| 달성할 것 | API를 부르는 쪽이 인코딩 코드 없이 `person_id`만으로 예측을 받고, 학습과 서빙이 같은 값을 받는다는 것을 확인 |
+| **플랫폼 기능** | 피처 스토어 (Feature Store) |
+| **활용 오픈소스** | Feast 0.67.0, Redis (온라인 스토어), SeaweedFS S3 (오프라인 스토어 및 중앙 레지스트리) |
+| **입력 리소스** | [시나리오 7](./12-lab1-model-serving.md)에서 배포한 KServe `income-classifier` 추론 엔드포인트 |
+| **주요 작업** | 1. One-Hot 인코딩된 90개 피처를 식별자(`person_id`)와 타임스탬프 기준으로 Feast에 등록<br/>2. 오프라인 스토어(Parquet)의 최신 피처를 실시간 온라인 스토어(Redis)로 동기화(`materialize`)<br/>3. API 호출 클라이언트가 90개 컬럼을 몰라도 오직 `person_id`만 전달하여 KServe 추론 수행<br/>4. 학습 시점에 추출된 피처 값과 서빙 시점에 조회된 피처 값이 100% 동일함을 검증 (`offline == online: True`)<br/>5. Feast 웹 UI를 통해 등록된 피처 카탈로그와 데이터 계보 탐색 |
+| **달성 결과** | 전처리 로직의 중복 구현을 제거하고, 실무 MLOps의 최대 난제인 **학습-서빙 왜곡(Training-Serving Skew)**을 아키텍처적으로 방지 |
 
-## 피처 스토어는 데이터가 아니라 피처를 관리합니다
+---
 
-모델 품질은 학습에 쓴 데이터가 정합니다. 그래서 "학습 데이터를 관리하는 곳이 피처 스토어"라고 이해하기 쉽습니다. 방향은 맞지만 관리하는 대상이 조금 다릅니다. 피처 스토어는 원본 데이터가 아니라, 원본을 모델 입력 모양으로 가공한 **피처**를 관리합니다.
+## 핵심 이론: 피처 스토어(Feature Store)는 왜 필요한가?
 
-| 단계 | 이 Lab의 예 | 관리하는 곳 |
+머신러닝 모델의 예측 품질은 학습에 사용된 피처의 품질이 결정합니다. 흔히 "데이터 레이크나 웨어하우스가 있는데 굳이 피처 스토어가 왜 필요한가?"라는 의문을 갖기 쉽습니다. 
+
+데이터 레이크는 가공되지 않은 **원본 데이터(Raw Data)**를 저장하는 곳이고, 피처 스토어는 원본 데이터를 가공하여 모델 입력 규격에 맞춘 **정제된 피처(Feature)**를 관리하는 곳입니다.
+
+| 구분 | 본 핸즈온 실습 예시 | 담당 인프라 |
 |---|---|---|
-| 원본 데이터(raw data) | UCI Adult CSV. `Workclass` 값이 `State-gov` 같은 문자열 | 데이터 레이크, 웨어하우스, object storage |
-| 피처 엔지니어링 | 범주형 컬럼 8개를 one-hot 인코딩 | 피처를 만드는 코드 |
-| 피처(feature) | `Workclass_ State-gov = 1.0` 같은 숫자 90개 | **피처 스토어** |
-| 모델 | 피처 90개를 받아 `>50K` 확률을 냄 | 모델 레지스트리 |
+| **원본 데이터 (Raw Data)** | UCI Adult 원본 CSV (`Workclass="State-gov"`, `Education="Bachelors"` 등) | 데이터 레이크, 오브젝트 스토리지 (SeaweedFS) |
+| **피처 엔지니어링** | 범주형 컬럼을 수치화하는 One-Hot 인코딩 전처리 파이프라인 | 데이터 파이프라인 (Spark, KFP) |
+| **피처 (Feature)** | `Workclass_State-gov=1.0`, `Education_Bachelors=1.0` 등 90개 수치형 벡터 | **피처 스토어 (Feast)** |
+| **학습된 모델** | 90개 피처 입력을 받아 연소득 5만 달러 초과 확률을 계산하는 알고리즘 | 모델 레지스트리 (MLflow) |
 
-원본 데이터의 버전 관리(어느 날짜의 CSV로 학습했나)는 [시나리오 5](./10-lab1-experiment-lineage.md)의 MLflow 데이터셋 리니지가 맡았습니다. 피처 스토어는 그다음 단계, "모델이 실제로 받는 입력값"을 학습과 서빙 양쪽에 같은 값으로 제공하는 일을 맡습니다.
-
-플랫폼 안에서 피처 스토어가 놓이는 자리는 아래와 같습니다. EDA로 고른 피처를 피처 스토어에 저장하고, 학습은 피처 스토어에서 특정 버전의 피처를 받아 실험합니다. 가장 좋은 모델을 레지스트리에 등록할 때 어떤 피처 버전으로 학습했는지도 함께 남겨, 모델에서 피처까지 거슬러 갈 수 있게 합니다.
-
-![피처 스토어에서 학습 데이터를 가져와 실험하고 등록하는 흐름](../imgs/mlops-feature-store-training-flow.png)
-
-이 Lab의 학습 노트북(시나리오 5)은 아직 이 흐름이 아니라 원본 CSV를 직접 인코딩합니다. 이 시나리오는 피처 스토어의 저장과 조회까지 다루고, 학습을 피처 스토어에 연결하는 일은 실무에서 더할 단계로 남깁니다.
-
-## 용어
-
-| 용어 | 뜻 | 이 Lab의 예 |
-|---|---|---|
-| 피처(feature) | 모델에 들어가는 입력값 하나 | `Marital-Status_ Married-civ-spouse` |
-| 엔티티(entity) | 피처의 주인. 피처를 찾는 기준 | 사람 `person` |
-| 엔티티 키(join key) | 엔티티를 구분하는 값 | `person_id` |
-| 데이터 소스(data source) | 피처 값이 저장된 원천 | `feature-data-sets` 버킷의 `income/features.parquet` |
-| 피처 뷰(feature view) | 같은 엔티티의 피처를 묶은 단위. 테이블 하나에 해당 | `income_features`(피처 90개) |
-| 오프라인 스토어(offline store) | 과거 값을 모두 보관하는 저장소. 학습용 | object storage의 parquet |
-| 온라인 스토어(online store) | 엔티티마다 최신 값만 두는 빠른 저장소. 서빙용 | Redis |
-| materialize | 오프라인 스토어의 최신 값을 온라인 스토어로 옮기는 작업 | `materialize_incremental` |
-| 레지스트리(registry) | 어떤 피처가 어디 있는지 적은 목록 | `feature-registry` 버킷의 `income/registry.db` |
-| point-in-time join | 학습 데이터를 만들 때 각 행의 시각보다 앞선 피처 값만 붙이는 조회 | `get_historical_features` |
-| training-serving skew | 학습 때와 서빙 때 모델이 받는 입력이 달라지는 문제 | 아래 절 |
-
-## MLOps 플랫폼이 피처 스토어를 제공해야 하는 이유
-
-### 1. 학습과 서빙이 같은 피처를 받아야 합니다
-
-[시나리오 7](./12-lab1-model-serving.md)의 API는 원본 컬럼 8개가 아니라 one-hot 인코딩한 컬럼 90개를 받습니다. 피처 스토어가 없으면 API를 부르는 서비스가 인코딩을 다시 구현해야 합니다. 학습 코드는 노트북에, 인코딩을 다시 구현한 코드는 서비스에 있으면, 한쪽만 바뀌는 순간 모델은 학습 때와 다른 입력을 받습니다.
-
-이 어긋남이 training-serving skew입니다. 서비스는 오류 없이 돌아가고 예측값만 틀어집니다. 시나리오 7에서 런타임 버전이 달라 예측이 틀어진 문제와 같은 종류라서, 발견하기 어렵습니다. 피처 스토어는 피처를 한 번만 만들고 학습과 서빙이 같은 값을 꺼내게 해서 이 문제를 구조로 막습니다.
-
-### 2. 학습 데이터에 미래 값이 섞이지 않아야 합니다
-
-"작년 3월에 대출을 신청한 사람이 연체할까"를 학습하려면, 작년 3월 시점의 피처만 써야 합니다. 신청 뒤에 바뀐 소득이나 연체 기록이 섞이면 모델은 학습 때만 잘 맞고 실제로는 틀립니다. 이것을 데이터 누수(leakage)라고 합니다.
-
-오프라인 스토어는 피처 값을 시각과 함께 쌓아 두고, `get_historical_features`가 행마다 그 시각보다 앞선 값만 붙입니다. 사람이 SQL로 매번 시각 조건을 맞추지 않아도 됩니다.
-
-### 3. 서빙은 빠르게, 학습은 많이 읽습니다
-
-학습은 수만 행을 한 번에 읽고, 서빙은 요청 하나에 한 사람의 값을 수 밀리초 안에 읽어야 합니다. 한 저장소로 두 요구를 다 맞추기 어려워서 오프라인 스토어(parquet)와 온라인 스토어(Redis)를 나누고, materialize로 같은 값을 옮깁니다.
-
-| 저장소 | 쓰는 곳 | 담는 값 |
-|---|---|---|
-| 오프라인 스토어 | 학습 | 키마다 과거 값 전부(시각과 함께, 행 여러 개) |
-| 온라인 스토어 | 서빙 | 키마다 지금 값 하나(행 1개) |
-
-온라인 스토어가 쓸모 있는 것은 **예측 요청에 모델이 쓰는 값이 다 들어 있지 않을 때**입니다. 아래는 카드 결제 예입니다. 결제 요청에는 카드 번호와 금액만 있고, 모델이 학습에 쓴 "최근 7일 평균 결제액(`avg_7d`)"은 없습니다. 스케줄러가 오프라인 스토어의 최신 값을 주기적으로 온라인 스토어에 옮겨 두고, 예측 서버가 카드 번호로 그 값을 찾아 요청 값과 함께 모델에 넘깁니다. 초 단위로 최신 값이 필요하면 이벤트 스트림이 온라인 스토어에 바로 넣습니다.
-
-![오프라인 스토어 값을 주기적으로 온라인 스토어에 옮기고 서빙이 꺼내 쓰는 흐름](../imgs/mlops-feature-store-materialize.png)
-
-이 Lab의 소득 데이터는 요청하는 쪽이 8개 값을 모두 알 수 있어서, 요청에 값을 담아 보내면 온라인 스토어 없이도 서빙됩니다([시나리오 7](./12-lab1-model-serving.md)). 실습의 `predict(person_id)`는 온라인 스토어가 하는 일을 보이려고 키만 받게 만든 구성입니다.
-
-### 4. 다른 팀과 다른 모델이 피처를 다시 씁니다
-
-`income_features`를 만든 팀이 아니어도, 레지스트리와 UI에서 어떤 피처가 있는지 찾아 자기 모델에 씁니다. 피처를 팀마다 새로 만들면 같은 이름의 피처가 서로 다른 값을 갖게 됩니다.
-
-## 컴포넌트 역할
-
-| 컴포넌트 | 역할 |
-|---|---|
-| `feast/feature_repo/feature_store.yaml` | 레지스트리, 온라인 스토어, 오프라인 스토어 주소 |
-| `feast/feature_repo/features.py` | Entity `person`과 FeatureView `income_features` 정의 |
-| `feast/01-feature-store.ipynb` | 피처 테이블을 만들어 등록하고, materialize하고, 서빙과 학습 양쪽에서 꺼냄 |
-| Feast UI(`feast` namespace) | 레지스트리에 등록한 엔티티, 피처 뷰, 피처, 데이터 소스, 리니지를 웹 화면으로 보여 줌. Helm chart로 상시 설치 |
-| Redis(`redis.redis.svc.cluster.local:6379`) | 온라인 스토어. Lab 0에서 설치 |
-
-## 흐름
+원본 데이터의 스냅샷 버전 관리는 [시나리오 5](./10-lab1-experiment-lineage.md)의 MLflow 데이터셋 계보가 담당했습니다. 피처 스토어는 그 다음 단계로, **모델이 실제로 입력받는 피처 벡터를 오프라인(학습)과 온라인(서빙) 양쪽에 단일한 진실 공급원(Single Source of Truth)으로 일관되게 제공**하는 역할을 전담합니다.
 
 ```mermaid
 flowchart LR
-  Raw[원본 컬럼 8개] -->|"one-hot 인코딩 한 번"| Off[(오프라인 스토어<br/>parquet, 피처 90개)]
-  Off -->|"get_historical_features"| Train[학습]
-  Off -->|"materialize"| On[(온라인 스토어<br/>Redis)]
-  Client["요청: person_id"] --> App[predict 함수]
-  App -->|"get_online_features"| On
-  App -->|"피처 90개"| KS[KServe<br/>income-classifier]
+  Raw[원본 데이터 8개 컬럼] -->|"One-Hot 인코딩 (단 1회 수행)"| FS[(오프라인 피처 스토어<br/>Parquet: 90개 피처)]
+  FS -->|"get_historical_features (시점 조인)"| Train[배치 모델 학습]
+  FS -->|"materialize (최신값 동기화)"| Redis[(온라인 피처 스토어<br/>Redis 인메모리 DB)]
+  User[클라이언트 요청: person_id] --> App[서빙 애플리케이션]
+  App -->|"get_online_features (초저지연 조회)"| Redis
+  App -->|"조회된 90개 피처 주입"| KServe[KServe income-classifier API]
 ```
 
-## 실습
+---
 
-[시나리오 3](./8-lab1-kubeflow-notebook.md)의 노트북에서 실행합니다. 시나리오 7의 InferenceService가 떠 있어야 합니다.
+## MLOps 플랫폼이 피처 스토어로 해결하는 4대 실무 난제
 
-### 1. Feast 전용 커널을 만듭니다
+### 1. 학습-서빙 왜곡 (Training-Serving Skew) 원천 차단
+[시나리오 7](./12-lab1-model-serving.md)의 서빙 API는 원본 8개 컬럼이 아니라 One-Hot 인코딩된 90개 컬럼을 요구합니다. 피처 스토어가 없다면 API를 호출하는 서비스 개발팀이 클라이언트 언어(Java, Go, Node.js 등)로 인코딩 로직을 다시 구현해야 합니다. 
 
-Feast 0.67.0은 pandas를 2.3으로 내립니다. MLflow 노트북의 환경(pandas 3.0)을 건드리지 않으려고 가상환경과 Jupyter 커널을 따로 만듭니다. JupyterLab **Terminal**의 `notebooks` 디렉터리에서 실행합니다.
+만약 데이터 사이언티스트의 파이썬 코드와 서비스 개발팀의 인코딩 코드가 공백 처리나 범주 순서에서 단 하나라도 어긋나는 순간 모델은 잘못된 입력을 받게 됩니다. 서비스는 에러(HTTP 500) 없이 200 OK를 반환하지만 예측 결과만 조용히 빗나가게 되는데, 이를 **Training-Serving Skew**라고 부릅니다. 피처 스토어는 피처 가공을 중앙에서 1회만 수행하고 양쪽이 동일한 값을 읽어가게 함으로써 이 문제를 근본적으로 방지합니다.
+
+### 2. 시점 기반 조인 (Point-in-Time Join)을 통한 데이터 누수(Leakage) 방지
+과거 시점의 대출 연체 여부를 예측하는 모델을 학습할 때, 대출 신청 이후에 발생한 소득 변화나 후속 연체 기록이 학습 데이터셋에 포함되면 모델이 미래 정보를 훔쳐보는 **데이터 누수(Data Leakage)**가 발생합니다. 오프라인 피처 스토어는 모든 피처에 이벤트 발생 시각(`event_timestamp`)을 함께 기록하여, 학습 시점 이전의 유효한 피처 값만을 정확히 조인해 추출합니다.
+
+### 3. 이원화된 워크로드 최적화 (Dual-Storage 아키텍처)
+- **오프라인 스토어 (학습)**: 수십만~수억 건의 과거 이력을 처리량(Throughput) 중심으로 대량 조회 (Parquet 파일 기반 S3 스토리지)
+- **온라인 스토어 (서빙)**: 단일 사용자 요청에 대해 수 밀리초(ms) 이내의 초저지연(Latency)으로 최신 피처를 단건 조회 (Redis 인메모리 DB)
+- **Materialization**: 오프라인 스토어에 적재된 최신 피처 스냅샷을 백그라운드에서 주기적으로 온라인 스토어(Redis)로 동기화합니다.
+
+### 4. 피처 카탈로그 공유 및 재사용
+동일한 사용자 피처(예: '최근 7일 구매액')를 추천팀, 이상탐지(FDS)팀, 마케팅팀이 각자 중복 개발하지 않고, 중앙 레지스트리 및 UI에서 검색하여 재사용합니다.
+
+---
+
+## 핵심 용어 정의
+
+| 용어 | 정의 및 플랫폼에서의 의미 | 본 핸즈온 실습 예시 |
+|---|---|---|
+| **Entity (엔티티)** | 피처가 귀속되는 주체이자 조회의 기준 키 | 사람 (`person`) |
+| **Join Key** | 특정 엔티티 인스턴스를 식별하는 고유 ID | `person_id` |
+| **Feature View** | 동일한 엔티티에 속한 논리적 피처 컬럼들의 묶음 (테이블 단위) | `income_features` (90개 피처 묶음) |
+| **Offline Store** | 학습용 시계열 이력 데이터를 보관하는 대용량 스토리지 | S3 `feature-data-sets/income/features.parquet` |
+| **Online Store** | 실시간 서빙 시 ms 단위로 최신값을 읽기 위한 인메모리 스토리지 | Redis (`redis.redis.svc.cluster.local:6379`) |
+| **Materialize** | 오프라인 스토어의 최신 피처 상태를 온라인 스토어로 동기화하는 작업 | `materialize_incremental()` |
+| **Central Registry** | 엔티티, 피처 뷰, 데이터 소스의 메타데이터 스키마 명세 목록 | S3 `feature-registry/income/registry.db` |
+
+---
+
+## 단계별 실습 절차
+
+[시나리오 3](./8-lab1-kubeflow-notebook.md)의 Kubeflow 노트북 환경에서 진행합니다. ([시나리오 7](./12-lab1-model-serving.md)의 KServe InferenceService가 정상 가동 중이어야 합니다.)
+
+### 1. Feast 전용 독립 가상환경 및 Jupyter 커널 생성
+
+Feast 라이브러리는 하위 버전의 Pandas와 의존성을 가집니다. 기존 MLflow 실습 환경(Pandas 3.x)과의 충돌을 방지하기 위해 전용 가상환경과 Jupyter 커널을 분리 생성합니다.
+
+JupyterLab의 **Terminal**을 열고 `notebooks` 디렉터리에서 실행합니다.
 
 ```bash
 python -m venv ~/.venvs/feast
@@ -114,44 +89,44 @@ python -m venv ~/.venvs/feast
 ~/.venvs/feast/bin/python -m ipykernel install --user --name feast --display-name "Python (feast)"
 ```
 
-### 2. 노트북을 실행합니다
+### 2. Feast 피처 등록 및 온라인 스토어 동기화 실습
 
-`feast/01-feature-store.ipynb`를 열고 오른쪽 위 커널을 **Python (feast)** 로 바꾼 뒤 **Run All Cells**를 실행합니다. 셀마다 아래를 확인합니다.
+JupyterLab 파일 탐색기에서 `feast/01-feature-store.ipynb`를 열고, 우측 상단 커널을 **Python (feast)** 로 선택한 후 **Run All Cells**를 실행합니다.
 
-- 피처 테이블이 `(30162, 92)`입니다. 피처 90개에 `person_id`, `event_timestamp`를 더한 것입니다.
-- `apply`와 `materialize` 뒤 FeatureView `income_features`의 피처가 90개입니다.
-- `predict([0, 1, 2])`가 확률 3개를 돌려줍니다. 이 함수에는 인코딩 코드가 없고, Redis에서 꺼낸 피처를 그대로 KServe에 보냅니다.
+각 셀의 핵심 검증 사항:
+- **피처 테이블 형태**: 30,162행에 대해 90개 피처 + 엔티티 키(`person_id`) + 이벤트 시각(`event_timestamp`)으로 구성된 `(30162, 92)` 테이블 생성
+- **스키마 등록 및 동기화**: `store.apply()`로 S3 중앙 레지스트리에 90개 피처가 등록되고, `store.materialize()`를 통해 Redis 온라인 스토어로 최신 피처가 즉시 적재됨
+- **인코딩 코드 없는 실시간 추론**: `predict([0, 1, 2])` 함수는 복잡한 One-Hot 인코딩 로직 없이 오직 `person_id`만을 받아 Redis에서 피처 벡터를 조회한 후 KServe 서빙 API로 전달하여 즉시 확률 예측을 반환
 
 ```text
 [0.04711442440748215, 0.6031464338302612, 0.017158422619104385]
 ```
 
-- 마지막 셀에서 학습용(오프라인)으로 꺼낸 값과 서빙용(온라인)으로 꺼낸 값이 같습니다.
+- **학습-서빙 피처 일치 검증**: 오프라인 스토어(학습용)에서 추출한 피처 벡터와 온라인 스토어(서빙용)에서 조회한 피처 벡터를 상호 비교한 결과가 완벽히 일치함을 확인
 
 ```text
 offline == online: True
 ```
 
-### 3. Feast UI에서 등록한 피처를 봅니다
+### 3. Feast 웹 UI를 통한 피처 카탈로그 확인
 
-Feast UI는 Lab 0에서 플랫폼 구성요소로 설치돼 있습니다. Argo CD Application `feast`가 공식 Helm chart `feast-feature-server`를 UI 모드로 띄우고, 노트북과 같은 레지스트리 파일(`s3://feature-registry/income/registry.db`)을 읽습니다. 그래서 2번에서 `apply`한 피처가 따로 배포하지 않아도 화면에 나타납니다.
+Argo CD가 Lab 0에서 배포한 `feast-ui` 서비스는 노트북과 동일한 S3 중앙 레지스트리 파일(`s3://feature-registry/income/registry.db`)을 공유하므로, 노트북에서 `apply`한 피처가 UI에 즉시 반영됩니다.
 
-맥북 터미널에서 Feast UI Service를 엽니다.
+로컬 터미널에서 Feast UI 포트 포워딩을 실행합니다.
 
 ```bash
 kubectl -n feast port-forward svc/feast-ui 8889:80
 ```
 
-`http://localhost:8889`를 열고 프로젝트 **Income**을 고릅니다. 첫 화면에 Feature Views 1, Features 90, Data Sources 1이 보입니다. 왼쪽 메뉴에서 보면 좋은 곳은 세 군데입니다.
+브라우저에서 `http://localhost:8889`에 접속하고 프로젝트 목록에서 **Income**을 선택합니다.
+- **Feature Views**: `income_features`를 열어 엔티티(`person`) 및 90개 피처의 스키마와 데이터 소스 연결 확인
+- **Features**: 개별 피처의 타입(`DOUBLE`) 및 설명 카탈로그 탐색
+- **Lineage**: 데이터 소스(Parquet) → 피처 뷰 → 엔티티로 이어지는 데이터 흐름 시각화 확인
 
-- **Feature Views** → `income_features`: 엔티티 `person`과 피처 90개, 데이터 소스 경로
-- **Features**: 피처 이름과 타입(`DOUBLE`). 다른 팀은 여기서 쓸 피처를 찾습니다.
-- **Lineage**: 데이터 소스 → 피처 뷰 → 엔티티의 연결
+---
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 플랫폼 운영 관점의 시사점
 
-- **인코딩한 값을 피처로 저장했습니다.** 원본 컬럼 8개를 저장하고 요청마다 인코딩하는 방법도 있습니다. 그 방법은 인코딩 코드를 서빙 쪽에도 둬야 해서, 이 Lab은 인코딩을 피처를 만들 때 한 번만 하도록 골랐습니다. 대신 범주가 새로 생기면 피처 테이블을 다시 만들고 모델도 다시 학습해야 합니다.
-- **schema를 코드에 적지 않았습니다.** `income_features`는 schema 없이 정의해서 Feast가 parquet 컬럼에서 피처 90개를 읽습니다. 컬럼 이름을 두 곳에 적지 않는 대신, parquet이 바뀌면 `apply`를 다시 실행해야 피처 목록이 바뀝니다.
-- **UI는 레지스트리만 읽습니다.** Feast UI 파드는 `feature_store.yaml`의 레지스트리 경로로 object storage를 읽을 뿐, 피처 값이나 Redis에는 접근하지 않습니다. 노트북이 `apply`하면 UI가 레지스트리를 다시 읽어 새 피처 뷰를 보여 줍니다.
-- **Redis는 다시 채울 수 있는 캐시입니다.** Lab 0의 Redis는 PVC가 없어 파드가 재시작하면 비지만, 노트북의 materialize 셀을 다시 실행하면 오프라인 스토어에서 같은 값이 채워집니다. 실무에서는 materialize를 파이프라인이나 스케줄러로 주기 실행합니다.
-- **피처 스토어 S3 주소는 파드 환경 변수에서 읽습니다.** 레지스트리는 `AWS_ENDPOINT_URL`을 읽는 boto3로, 오프라인 스토어는 `FileSource`의 `s3_endpoint_override`로 SeaweedFS에 접속합니다. 오프라인 스토어를 읽으려면 `s3fs`가 따로 필요합니다.
+- **피처 중앙 계산의 장단점**: 본 실습에서는 원본 컬럼 8개를 One-Hot 인코딩한 90개 피처를 오프라인 스토어에 직접 저장했습니다. 이 방식은 서빙 애플리케이션의 실시간 연산 부하와 전처리 코드 중복을 완전히 없애주지만, 새로운 범주(Category)가 등장할 경우 피처 테이블 재생성 및 모델 재학습이 필요합니다.
+- **캐시로서의 Redis 온라인 스토어**: 인메모리 Redis는 일종의 고속 서빙 캐시입니다. 만약 Redis 노드가 재시작되어 데이터가 유실되더라도, 백업된 영구 Parquet 오프라인 스토어로부터 `materialize` 명령을 재실행하여 수 초 내에 완벽하게 복구할 수 있습니다.
+- **클러스터 내부 S3 엔드포인트 연동**: Feast는 레지스트리 조회 시 `AWS_ENDPOINT_URL` 환경 변수를 활용하고, 오프라인 Parquet 조회 시 `FileSource`의 `s3_endpoint_override` 설정을 통해 클러스터 내부의 S3 호환 스토리지(SeaweedFS)와 안전하게 통신합니다.

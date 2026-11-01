@@ -1,206 +1,156 @@
-# 실습 환경 준비
+# 실습 환경 준비 및 전체 배포
 
-Ubuntu(amd64, NVIDIA GPU 1장) 한 대에 k3s를 설치하고, 맥북에서 kubectl로 Argo CD를 설치합니다. 플랫폼 구성요소는 Argo CD가 GitHub에서 읽어 설치합니다.
+Ubuntu(amd64, NVIDIA GPU 1장 탑재) 단일 서버에 경량 쿠버네티스(k3s)를 구성하고, 로컬 PC에서 `kubectl`과 Argo CD를 통해 GitOps 방식으로 MLOps 플랫폼 컴포넌트를 선언적으로 배포합니다.
 
-## 아키텍처
+## 전체 아키텍처 및 ML 수명주기
 
 ![MLOps lifecycle 아키텍처](../imgs/mlops-lifecycle-architecture.png)
 
-그림은 Kubeflow 공식 문서의 AI lifecycle 그림과 같은 구도입니다. 가운데 줄이 모델 하나가 데이터 준비부터 서빙까지 가는 단계이고, 위쪽은 단계들이 함께 쓰는 저장소, 아래쪽은 단계를 반복 실행하는 오케스트레이터입니다.
+위 다이어그램은 Kubeflow 공식 AI 수명주기 모델을 기반으로 설계되었습니다. 중앙 라인은 모델이 데이터 준비부터 서빙까지 거치는 단계이며, 상단은 단계 간 공유 스토리지, 하단은 재현 가능한 실행을 지원하는 오케스트레이션 레이어입니다.
 
-| lifecycle 단계 | 이 실습의 구성요소 | Lab, 책 |
+| 수명주기 단계 | 플랫폼 컴포넌트 | 연계 실습 |
 |---|---|---|
-| Data Preparation, Model Development | Kubeflow Notebooks. EDA와 실험 코드 | Lab 1, 4장 |
-| Model Training | 노트북에서 sklearn, XGBoost 학습. 결과는 MLflow로 | Lab 1, 4장 |
-| Model Registry | MLflow. 메타데이터는 PostgreSQL, 모델 파일은 object storage(SeaweedFS) | Lab 1, 4장 |
-| Feature Store | Feast. 오프라인 스토어는 object storage, 온라인 스토어는 Redis, UI는 Helm chart | Lab 1 시나리오 8, 4장 |
-| Repeat the process | Kubeflow Pipelines. EDA, 학습, 등록을 같은 순서로 반복 | Lab 1 시나리오 4~6, 5장 |
-| Model Serving | KServe Standard 모드, ServingRuntime `mlflow-serve` | Lab 1 시나리오 7, 6장 |
-| Hyperparameter Tuning | Katib. Part 2 범위 밖이라 설치하지 않음 | 없음 |
+| **Data Preparation & Model Development** | Kubeflow Notebooks (탐색적 데이터 분석 및 실험 코드 작성) | Lab 1-3, 도서 4장 |
+| **Model Training** | 노트북 및 파이프라인 상의 scikit-learn, XGBoost 모델 학습 (MLflow 로깅) | Lab 1-4, 도서 4장 |
+| **Model Registry** | MLflow Model Registry (PostgreSQL 메타데이터 + SeaweedFS 아티팩트) | Lab 1-2, 6, 도서 4장 |
+| **Feature Store** | Feast (오프라인: S3 Parquet, 온라인: Redis, 웹 UI: Helm 차트) | Lab 1-8, 도서 4장 |
+| **Workflow Orchestration** | Kubeflow Pipelines (EDA, 학습, 모델 승격을 DAG로 자동 반복) | Lab 1-4~6, 도서 5장 |
+| **Model Serving** | KServe (Standard 모드, `mlflow-serve` 전용 ServingRuntime) | Lab 1-7, 도서 6장 |
+| **Hyperparameter Tuning** | Katib (Part 2 학습 범위 밖이므로 리소스 최적화를 위해 미설치) | 범위 외 |
 
-맨 아래 띠는 설치 경로입니다. Argo CD ApplicationSet이 GitHub의 `manifests/`를 읽어 k3s에 올립니다. GPU(RTX 5060 Ti 16GB)는 time-slicing으로 4개처럼 나눠 노트북, 서빙, 파이프라인이 같이 씁니다.
+인프라 하단은 GitOps 배포 경로를 나타냅니다. Argo CD ApplicationSet이 Git 저장소의 `manifests/`를 읽어 k3s 클러스터에 배포하며, 단일 GPU(RTX 5060 Ti 16GB)는 타임슬라이싱을 통해 4개의 가상 슬롯으로 분할되어 노트북, 서빙, 파이프라인 파드가 충돌 없이 공유합니다.
 
-## 사전 준비
+---
 
-Ubuntu에 NVIDIA 드라이버와 NVIDIA Container Toolkit이 설치돼 있어야 합니다. 호스트에서 `nvidia-smi`가 GPU를 보여 주는지 먼저 확인합니다.
+## 사전 준비 (Ubuntu 호스트)
+
+### 1. NVIDIA 드라이버 및 컨테이너 툴킷 확인
+Ubuntu 서버에 NVIDIA 드라이버와 NVIDIA Container Toolkit이 사전 설치되어 있어야 합니다. 호스트 터미널에서 GPU 인식이 정상적인지 확인합니다.
 
 ```bash
 nvidia-smi --query-gpu=name,memory.total --format=csv
 ```
 
-k3s를 설치합니다. 옵션마다 이유가 있습니다.
+### 2. k3s 클러스터 설치 (GPU 런타임 활성화)
+아래 명령으로 k3s v1.36.5 버전을 설치합니다. 옵션별 적용 이유는 다음과 같습니다.
 
-| 옵션 | 이유 |
+| 설치 옵션 | 적용 사유 |
 |---|---|
-| `--disable=traefik` | Kubeflow는 Istio ingress gateway를 씀 |
-| `--tls-san <Ubuntu IP>` | 맥북에서 API 서버에 접속할 수 있게 IP를 인증서에 넣음 |
-| `--write-kubeconfig-mode=644` | sudo 없이 kubeconfig를 복사함 |
-| `--default-runtime=nvidia` | Kubeflow Notebook과 KServe 파드는 `runtimeClassName`을 지정하지 않음. 기본 런타임이 nvidia여야 GPU를 씀 |
+| `--disable=traefik` | Kubeflow 플랫폼이 자체 Istio Ingress Gateway를 사용하므로 기본 인그레스 비활성화 |
+| `--tls-san <Ubuntu IP>` | 외부 로컬 PC에서 쿠버네티스 API 서버에 안전하게 접속할 수 있도록 서버 IP를 TLS 인증서에 포함 |
+| `--write-kubeconfig-mode=644` | 비루트(Non-root) 사용자도 `kubeconfig` 파일을 읽을 수 있도록 권한 부여 |
+| `--default-runtime=nvidia` | Kubeflow Notebook과 KServe 파드가 `runtimeClassName` 명시 없이도 GPU를 자동 인식하도록 기본 런타임 지정 |
 
 ```bash
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.5+k3s1 sh -s - server --disable=traefik --tls-san <Ubuntu IP> --write-kubeconfig-mode=644 --default-runtime=nvidia
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.5+k3s1 sh -s - server \
+  --disable=traefik \
+  --tls-san <Ubuntu IP> \
+  --write-kubeconfig-mode=644 \
+  --default-runtime=nvidia
 ```
 
-맥북에서 kubeconfig를 가져오고 `server` 주소를 Ubuntu IP로 바꿉니다.
+### 3. 로컬 PC의 kubeconfig 설정
+로컬 PC(맥북 등)에서 Ubuntu의 kubeconfig 파일을 복사해 오고, 엔드포인트 주소를 서버 외부 IP로 치환합니다.
 
 ```bash
 ssh <Ubuntu 사용자>@<Ubuntu IP> cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/<Ubuntu IP>/' > ~/.kube/config-k3s
 ```
 
-kubeconfig의 컨텍스트 이름은 `default`라서 다른 클러스터와 헷갈립니다. 기본 kubeconfig와 함께 읽게 하고 이름을 바꿉니다. `export`는 `~/.zshrc`에 넣어 둡니다.
+기존 클러스터와의 컨텍스트 이름 충돌을 방지하기 위해 컨텍스트 명칭을 `k3s-ubuntu`로 변경하고 접속을 확인합니다.
 
 ```bash
 export KUBECONFIG=~/.kube/config:~/.kube/config-k3s
 kubectl config rename-context default k3s-ubuntu
-```
-
-kubectx로 k3s 클러스터를 고르고 노드가 보이는지 확인합니다.
-
-```bash
 kubectx k3s-ubuntu && kubectl get nodes
 ```
 
-## up
+---
 
-`scripts/up.sh`가 Argo CD v3.5.6을 설치하고, kustomize가 Helm chart를 렌더링하도록 `--enable-helm`을 켠 뒤 `manifests/argocd/`의 ApplicationSet 3개를 적용합니다.
+## 플랫폼 전체 배포 (Up)
+
+`scripts/up.sh` 스크립트를 실행하면 Argo CD v3.5.6을 설치하고, Kustomize가 Helm 차트를 파싱할 수 있도록 `--enable-helm` 플래그를 활성화한 뒤, `manifests/argocd/`에 정의된 3개의 ApplicationSet을 클러스터에 배포합니다.
 
 ```bash
 cd mlops/ml-platform-engineering-part2 && ./scripts/up.sh
 ```
 
-ApplicationSet은 master 브랜치를 읽습니다. master에 merge되기 전이면 `kubeflow-applicationset.yaml`과 `platform-applicationset.yaml`에서 이 저장소를 가리키는 `revision`, `targetRevision`을 작업 브랜치로 바꿉니다.
+> [!NOTE]
+> ApplicationSet은 기본적으로 원격 `master` 브랜치를 바라봅니다. 머지 전 개발 브랜치에서 테스트하려면 `kubeflow-applicationset.yaml`과 `platform-applicationset.yaml` 매니페스트 내의 `targetRevision`을 해당 작업 브랜치명으로 지정하세요.
 
-Argo CD 화면은 port-forward로 엽니다. `https://localhost:8081`에 ID `admin`으로 로그인합니다.
+### Argo CD 관리자 대시보드 접속
+포트 포워딩을 열고 웹 브라우저에서 `https://localhost:8081`에 접속하여 관리자 ID `admin`으로 로그인합니다.
 
 ```bash
 kubectl -n argocd port-forward svc/argocd-server 8081:443
 ```
 
-초기 admin 비밀번호는 다른 터미널에서 직접 읽습니다.
-
+초기 관리자 비밀번호 확인:
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-## down
+---
 
-ApplicationSet을 지우면 Application이 지워지고, 각 Application의 finalizer가 그 리소스를 지웁니다. k3s까지 지우려면 Ubuntu에서 `/usr/local/bin/k3s-uninstall.sh`를 실행합니다.
+## 리소스 회수 및 삭제 (Down)
+
+배포된 ApplicationSet을 삭제하면 Argo CD의 Finalizer에 의해 연관된 하위 Application 및 쿠버네티스 리소스들이 역순으로 자동 정리됩니다.
 
 ```bash
 cd mlops/ml-platform-engineering-part2 && kubectl delete -f manifests/argocd/
 ```
 
-## 부록. Argo CD가 설치하는 것과 kustomize 구조
+호스트 상의 k3s 클러스터 자체를 완전히 삭제하려면 Ubuntu 서버에서 `/usr/local/bin/k3s-uninstall.sh`를 실행합니다.
 
-up이 적용하는 파일은 ApplicationSet 3개입니다. ApplicationSet이 Application을 만들고, 각 Application이 kustomization 하나를 렌더링해 설치합니다.
+---
 
-### 디렉터리 구조
+## 부록: 선언적 매니페스트 및 GitOps 아키텍처
+
+### 저장소 디렉터리 구조
 
 ```text
 mlops/ml-platform-engineering-part2/
-├── scripts/up.sh                        # Argo CD 설치, --enable-helm, manifests/argocd/ 적용
-├── notebooks/                           # Lab 1 노트북. Kubeflow Notebook 터미널에서 clone
-│   ├── mlflow/                          # Lab 1 MLflow 예제. 노트북 3개와 income.py
-│   ├── kubeflow/                        # Lab 1 Kubeflow 예제. KFP 파이프라인 노트북 3개와 common.py
-│   └── feast/                           # Lab 1 피처 스토어 노트북과 feature_repo
+├── scripts/up.sh                        # Argo CD 초기화 및 ApplicationSet 일괄 적용 스크립트
+├── notebooks/                           # Lab 1 핸즈온 주피터 노트북
+│   ├── mlflow/                          # MLflow 기반 학습 및 실험 추적 예제 (도서 4장)
+│   ├── kubeflow/                        # Kubeflow Pipelines 파이프라인 자동화 예제 (도서 5장)
+│   └── feast/                           # Feast 피처 스토어 정의 및 연동 예제 (시나리오 8)
 └── manifests/
     ├── argocd/
-    │   ├── kubeflow-applicationset.yaml        # Kubeflow 배포판 구성요소 16개
-    │   ├── platform-applicationset.yaml        # MLflow, Redis, GPU, 사용자 설정 4개
-    │   └── mlflow-preview-applicationset.yaml  # PR마다 manifests/mlflow
-    ├── kubeflow/                        # 배포판을 고쳐 쓰는 wrapper kustomization
-    │   ├── istio-install/               # Istio CNI 경로를 k3s 경로로 patch
-    │   ├── pipelines/                   # KFP + 버킷 생성 Job + object storage 접근 허용 NetworkPolicy
-    │   ├── kserve/                      # Standard 모드, Ingress 생성 끔
-    │   └── user-resources/              # PodDefault mlflow-access와 Secret
-    ├── kubeflow-notebook/               # Argo CD 밖. kubectl로 만드는 Notebook과 PVC
-    ├── kserve-inference/                # Argo CD 밖. InferenceService와 ServingRuntime mlflow-serve
-    ├── mlflow/                          # Helm chart(helmCharts) + PostgreSQL
-    ├── nvidia-device-plugin/            # Helm chart(helmCharts) + time-slicing values
-    ├── redis/                           # Feast 온라인 스토어
-    └── feast/                           # Feast UI. Helm chart(helmCharts)
+    │   ├── kubeflow-applicationset.yaml        # Kubeflow 배포판 핵심 컴포넌트 16개 관리
+    │   ├── platform-applicationset.yaml        # MLflow, Redis, GPU, Feast UI, 사용자 설정 등 5개 컴포넌트 관리
+    │   └── mlflow-preview-applicationset.yaml  # PR 단위 격리 프리뷰 환경 자동 생성
+    ├── kubeflow/                        # 공식 배포판을 오버라이드한 Kustomize 래퍼
+    │   ├── istio-install/               # Istio CNI 호스트 경로를 k3s 환경에 맞게 패치
+    │   ├── pipelines/                   # KFP 스토리지 버킷 생성 Job 및 S3 NetworkPolicy 추가
+    │   ├── kserve/                      # KServe Standard 모드 전환 및 불필요 인그레스 비활성화
+    │   └── user-resources/              # 사용자 네임스페이스용 PodDefault(mlflow-access) 및 Secret
+    ├── kubeflow-notebook/               # 사용자가 직접 생성/관리하는 Notebook 및 PVC 스펙
+    ├── kserve-inference/                # KServe InferenceService 및 mlflow-serve ServingRuntime 스펙
+    ├── mlflow/                          # 커뮤니티 Helm 차트 기반 MLflow + PostgreSQL 구성
+    ├── nvidia-device-plugin/            # 타임슬라이싱(4분할) 설정이 포함된 NVIDIA Device Plugin
+    ├── redis/                           # Feast 실시간 온라인 스토어 매니페스트
+    └── feast/                           # Feast 웹 UI 배포용 Helm 차트 매니페스트
 ```
 
-### ApplicationSet 세 개가 Application을 만듭니다
-
-| ApplicationSet | generator | 만드는 Application |
-|---|---|---|
-| `kubeflow` | list. 배포판 저장소의 경로 16개 | `kf-cert-manager`, `kf-istio`, `kf-dex`, `kf-dashboard`, `kf-notebooks`, `kf-pipelines`, `kf-kserve` 등 |
-| `mlops-part2-platform` | list. 이 저장소의 디렉터리 4개 | `nvidia-device-plugin`, `mlflow`, `redis`, `kubeflow-user-resources` |
-| `mlflow-preview` | pullRequest. `preview` label이 붙은 열린 PR | `mlflow-preview-<PR 번호>` |
+### ApplicationSet을 통한 계층적 배포 구조
 
 ```mermaid
 flowchart LR
-  up[scripts/up.sh] --> KF[ApplicationSet kubeflow]
-  up --> PL[ApplicationSet mlops-part2-platform]
-  up --> PV[ApplicationSet mlflow-preview]
-  KF -->|배포판 경로 그대로 13개| UP[kubeflow/community-distribution<br/>release-26.03.1]
-  KF -->|wrapper 3개| WR[manifests/kubeflow/*]
-  WR -->|원격 base| UP
-  PL --> OWN[manifests/mlflow, redis,<br/>nvidia-device-plugin, kubeflow/user-resources]
-  PV -.->|PR마다| MF[manifests/mlflow<br/>preview-번호 namespace]
+  up[scripts/up.sh] --> KF[ApplicationSet: kubeflow]
+  up --> PL[ApplicationSet: mlops-part2-platform]
+  up --> PV[ApplicationSet: mlflow-preview]
+  KF -->|공식 배포판 직접 참조 13개| UP[kubeflow/community-distribution<br/>release-26.03.1]
+  KF -->|환경 패치 래퍼 3개| WR[manifests/kubeflow/*]
+  WR -->|원격 Kustomize Base| UP
+  PL --> OWN[manifests/mlflow, redis, feast,<br/>nvidia-device-plugin, user-resources]
+  PV -.->|PR 단위 동적 배포| MF[preview 네임스페이스 격리 환경]
 ```
 
-배포판의 `example/kustomization.yaml`은 구성요소 경로를 `resources`에 한 줄씩 나열합니다. `kubeflow` ApplicationSet은 그 한 줄을 `elements` 한 줄로 옮겼습니다. 배포판을 그대로 쓰는 경로는 배포판 저장소를 직접 가리키고, 고쳐야 하는 경로만 이 저장소의 wrapper를 가리킵니다. wrapper는 배포판 경로를 원격 base로 불러 patch를 겹칩니다.
+### 공식 배포판 오버라이드(Patch) 주요 내역
 
-ApplicationSet은 Application 사이의 순서를 보장하지 않습니다. cert-manager, Istio, profile controller가 먼저 떠야 하는 Application은 `retry`(최대 20회, backoff 최대 5분)로 순서를 맞춥니다.
-
-### 배포판을 고친 곳
-
-| wrapper | 바꾼 것 | 이유 |
+| Kustomize 래퍼 | 변경 사항 | 적용 사유 |
 |---|---|---|
-| `kubeflow/istio-install` | DaemonSet `istio-cni-node`의 hostPath를 `/var/lib/rancher/k3s/data/cni`, `/var/lib/rancher/k3s/agent/etc/cni/net.d`로 | k3s는 CNI 바이너리와 설정을 `/opt/cni/bin`, `/etc/cni/net.d`에 두지 않음 |
-| `kubeflow/pipelines` | 버킷 생성 PostSync Job과 NetworkPolicy `seaweedfs-allow-s3-clients` 추가 | 책 코드의 버킷 5개. `mlops-part2/s3-access: "true"` label namespace(MLflow)가 8333 포트에 접근 |
-| `kubeflow/kserve` | ConfigMap `inferenceservice-config`의 `deploy`를 Standard로, `ingress`의 `disableIngressCreation`을 true로 | Knative를 설치하지 않음. 값이 JSON 문자열이라 `ingress` 전체를 옮기고 한 키만 바꿈 |
-| `kubeflow/user-resources` | PodDefault `mlflow-access`와 Secret 추가. 배포판 경로가 아니라 `mlops-part2-platform`이 설치 | 노트북 파드에 MLflow와 object storage 접속 정보를 넣음 |
-
-wrapper 하나는 아래처럼 생겼습니다. 배포판 경로를 원격 resource로 불러오고 patch 하나를 겹칩니다.
-
-```yaml
-resources:
-- https://github.com/kubeflow/community-distribution//common/istio/istio-install/overlays/oauth2-proxy?ref=release-26.03.1
-
-patches:
-- target:
-    kind: DaemonSet
-    name: istio-cni-node
-    namespace: kube-system
-  patch: |-
-    ...
-          volumes:
-          - name: cni-bin-dir
-            hostPath:
-              path: /var/lib/rancher/k3s/data/cni
-          - name: cni-net-dir
-            hostPath:
-              path: /var/lib/rancher/k3s/agent/etc/cni/net.d
-```
-
-### Helm chart도 kustomize로 감쌉니다
-
-MLflow와 NVIDIA device plugin은 Helm chart를 kustomize의 `helmCharts`로 불러옵니다. Argo CD에서 Helm Application과 kustomize Application을 섞지 않고, PR 미리보기가 `kustomize.namespace` 한 줄로 namespace를 바꾸게 하려는 선택입니다. Argo CD가 렌더링하려면 `argocd-cm`에 `kustomize.buildOptions: --enable-helm`이 있어야 하고, `up.sh`가 켭니다.
-
-```yaml
-namespace: mlflow
-resources:
-- mlflow-namespace.yaml
-- mlflow-postgres-deployment.yaml
-helmCharts:
-- name: mlflow
-  repo: https://community-charts.github.io/helm-charts
-  version: 1.11.7
-  releaseName: mlflow
-  valuesFile: mlflow-values.yaml
-```
-
-Helm chart가 만드는 리소스에는 namespace가 없습니다. 그래서 `mlops-part2-platform` ApplicationSet은 템플릿에 `destination.namespace`를 둡니다.
-
-### 모든 Application에 같은 sync 설정
-
-| 설정 | 이유 |
-|---|---|
-| `automated.prune`, `automated.selfHeal` | Git에서 지운 리소스는 클러스터에서도 지우고, 손으로 바꾼 값은 Git 값으로 되돌림 |
-| `ServerSideApply=true` | Istio, KFP, KServe CRD가 client-side apply의 annotation 크기 제한(262KB)을 넘음 |
-| `SkipDryRunOnMissingResource=true` | 같은 sync에서 만들 CRD의 리소스가 dry-run에서 실패하지 않게 함 |
-| `ignoreDifferences`와 `RespectIgnoreDifferences=true` | 다른 controller가 채우는 필드(aggregated ClusterRole의 rules, istiod가 고치는 webhook)를 차이로 보지 않고 덮어쓰지도 않음 |
-| finalizer `resources-finalizer.argocd.argoproj.io` | Application을 지우면 그 리소스도 지움. down이 이 동작을 씀 |
+| `kubeflow/istio-install` | `istio-cni-node`의 볼륨 마운트 경로를 k3s 전용 경로(`/var/lib/rancher/k3s/...`)로 수정 | k3s는 기본 CNI 바이너리 위치가 표준 쿠버네티스와 다름 |
+| `kubeflow/pipelines` | 버킷 생성 Job 및 S3 접근 허용 `NetworkPolicy` 추가 | 원작 코드 버킷 5개 자동 생성 및 MLflow 네임스페이스 간 스토리지 통신 허용 |
+| `kubeflow/kserve` | `inferenceservice-config`의 배포 모드를 `Standard`로 설정하고 Ingress 생성 억제 | Knative 의존성을 제거하고 경량 쿠버네티스 자원 최적화 |
+| `kubeflow/user-resources` | PodDefault(`mlflow-access`, `access-ml-pipeline`) 추가 | 노트북 파드에 MLflow 접속 주소와 파이프라인 인증 토큰을 자동 주입 |

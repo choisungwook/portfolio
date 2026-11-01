@@ -1,8 +1,10 @@
-# 트러블슈팅
+# 실습 문제 해결 (트러블슈팅 가이드)
 
-Lab 0과 Lab 1을 k3s v1.36.5에서 진행하며 만난 문제와 해결 방법입니다. 1~10번은 처음 구성(KFP standalone, 일반 JupyterLab)에서, 11번부터는 Kubeflow 배포판으로 다시 설치하며 만났습니다. 지금 구성에 맞지 않는 내용은 고쳐 두었습니다.
+k3s v1.36.5 및 단일 GPU 노드 환경에서 Lab 0(플랫폼 인프라 배포)과 Lab 1(수명주기 실습)을 진행하며 겪었던 실제 문제와 단계별 해결 가이드입니다. 1~10번은 초기 KFP 단독 배포 환경에서, 11번부터는 Kubeflow 공식 배포판 기반 통합 환경에서 발생한 이슈입니다.
 
-## 1 MLflow 파드가 OOMKilled로 계속 재시작됨
+---
+
+## 1. MLflow 파드가 OOMKilled로 무한 재시작되는 현상
 
 - 증상
   - `mlflow` Application이 `Degraded`이고 MLflow 파드가 `OOMKilled`로 재시작을 반복함
