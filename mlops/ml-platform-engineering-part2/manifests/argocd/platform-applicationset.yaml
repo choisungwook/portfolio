@@ -35,8 +35,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/choisungwook/portfolio.git
-        # 검증 중 임시값. merge 전 master로 되돌린다.
-        targetRevision: feat/ml-platform-part2-lab0
+        targetRevision: master
         path: 'mlops/ml-platform-engineering-part2/manifests/{{ if hasKey . "path" }}{{ .path }}{{ else }}{{ .name }}{{ end }}'
       # Helm chart가 만드는 리소스는 namespace가 비어 있다. Argo CD가 이 값으로 채운다.
       destination:

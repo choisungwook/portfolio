@@ -32,8 +32,7 @@ spec:
         path: common/istio/istio-namespace/base
       - name: kf-istio
         repoURL: https://github.com/choisungwook/portfolio.git
-        # 검증 중 임시값. merge 전 master로 되돌린다.
-        revision: feat/ml-platform-part2-lab0
+        revision: master
         path: mlops/ml-platform-engineering-part2/manifests/kubeflow/istio-install
       - name: kf-oauth2-proxy
         repoURL: https://github.com/kubeflow/community-distribution.git
@@ -57,8 +56,7 @@ spec:
         path: common/istio/kubeflow-istio-resources/base
       - name: kf-pipelines
         repoURL: https://github.com/choisungwook/portfolio.git
-        # 검증 중 임시값. merge 전 master로 되돌린다.
-        revision: feat/ml-platform-part2-lab0
+        revision: master
         path: mlops/ml-platform-engineering-part2/manifests/kubeflow/pipelines
       - name: kf-dashboard
         repoURL: https://github.com/kubeflow/community-distribution.git
@@ -74,8 +72,7 @@ spec:
         path: common/user-namespace/base
       - name: kf-kserve
         repoURL: https://github.com/choisungwook/portfolio.git
-        # 검증 중 임시값. merge 전 master로 되돌린다.
-        revision: feat/ml-platform-part2-lab0
+        revision: master
         path: mlops/ml-platform-engineering-part2/manifests/kubeflow/kserve
       - name: kf-kserve-ui
         repoURL: https://github.com/kubeflow/community-distribution.git

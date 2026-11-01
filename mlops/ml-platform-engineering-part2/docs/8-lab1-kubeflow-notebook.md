@@ -105,8 +105,6 @@ cd portfolio && git sparse-checkout set mlops/ml-platform-engineering-part2/note
 cd mlops/ml-platform-engineering-part2/notebooks && pip install -r requirements.txt
 ```
 
-이 실습이 master에 merge되기 전이면 `git clone`에 `--branch feat/ml-platform-part2-lab0`을 붙입니다.
-
 노트북은 도구별로 나뉩니다. 시나리오 4~6마다 같은 번호의 노트북을 MLflow 예제와 Kubeflow 예제에서 하나씩 씁니다.
 
 | 디렉터리 | 내용 |
