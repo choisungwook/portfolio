@@ -1,0 +1,79 @@
+model_list:
+  # Bedrock 경로. 서울 리전의 Nova Micro는 inference profile(apac.)로만 호출된다
+  - model_name: nova-micro
+    litellm_params:
+      model: bedrock/apac.amazon.nova-micro-v1:0
+      aws_region_name: os.environ/AWS_REGION
+  # 비Bedrock 경로. 호스트에서 도는 Ollama
+  - model_name: local-qwen
+    litellm_params:
+      model: ollama_chat/qwen2.5:1.5b
+      api_base: os.environ/OLLAMA_API_BASE
+  # 비Bedrock 경로(선택). OPENAI_API_KEY가 있을 때만 호출된다
+  - model_name: gpt
+    litellm_params:
+      model: openai/gpt-6-luna
+      api_key: os.environ/OPENAI_API_KEY
+
+# LiteLLM guardrail 다섯 개가 같은 Bedrock guardrail 하나를 가리킨다.
+# 검사 시점(mode)과 스트리밍 방식만 다르므로, 요청의 guardrails 필드로 골라 쓰면 재시작 없이 시나리오를 오갈 수 있다
+guardrails:
+  # input과 output을 모두 검사한다. 시나리오 2~4, 7, 10~12
+  - guardrail_name: guardrails-handson
+    litellm_params:
+      guardrail: bedrock
+      mode: [pre_call, post_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+      # ANONYMIZE 결과로 바꾼 입력을 모델에 전달한다
+      mask_request_content: true
+      # contextual_grounding_from_messages는 켜지 않는다. 켜면 system 프롬프트가 있는
+      # 모든 요청이 grounding 검사를 받고, 서울의 Classic tier는 한국어 점수가 낮아 정상 응답도 막힌다
+
+  # input guardrail만. 시나리오 5, 6, 8
+  - guardrail_name: guardrails-input
+    litellm_params:
+      guardrail: bedrock
+      mode: [pre_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+      mask_request_content: true
+
+  # input guardrail만, 마지막 user 메시지만 검사한다. 멀티턴 비교용. 시나리오 6
+  - guardrail_name: guardrails-input-latest
+    litellm_params:
+      guardrail: bedrock
+      mode: [pre_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+      mask_request_content: true
+      experimental_use_latest_role_message_only: true
+
+  # output guardrail만. 스트리밍은 응답 전체를 모아 한 번 검사한다(buffered). 시나리오 7, 9
+  - guardrail_name: guardrails-output
+    litellm_params:
+      guardrail: bedrock
+      mode: [post_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+
+  # output guardrail만. 스트리밍은 5청크마다 누적 텍스트를 검사하고 통과분을 내보낸다(release). 시나리오 9
+  - guardrail_name: guardrails-output-release
+    litellm_params:
+      guardrail: bedrock
+      mode: [post_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+      streaming_buffer_release_on_scan: true
+      streaming_sampling_rate: 5
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # spend log는 DB에 남기되(비용, guardrail 판정, 지연) request와 response 본문은 저장하지 않는다.
+  # 기본값도 false지만, 실수로 켜지 않도록 명시한다. false면 guardrail_response 같은 프롬프트가 든 필드도 가린다
+  store_prompts_in_spend_logs: false
