@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf install -y mariadb105
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh
+
+mkdir -p /opt/app
+curl -fsSL -o /opt/app/rds-ca.pem https://truststore.pki.rds.amazonaws.com/${region}/${region}-bundle.pem
+echo '${app_py}' | base64 -d > /opt/app/app.py
+
+cat > /etc/app.env <<ENV
+AWS_REGION=${region}
+APP_PORT=${app_port}
+DB_HOST=${db_host}
+DB_NAME=${db_name}
+PW_USER=${pw_user}
+IAM_USER=${iam_user}
+MODE_PARAM=${mode_param}
+PASSWORD_PARAM=${password_param}
+CA_PATH=/opt/app/rds-ca.pem
+UV_CACHE_DIR=/var/cache/uv
+UV_PYTHON_INSTALL_DIR=/opt/uv-python
+ENV
+
+cat > /etc/systemd/system/app.service <<UNIT
+[Unit]
+Description=aurora iam lab app
+After=network-online.target
+
+[Service]
+EnvironmentFile=/etc/app.env
+ExecStart=/usr/local/bin/uv run --script /opt/app/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now app
