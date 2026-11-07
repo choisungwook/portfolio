@@ -21,5 +21,5 @@ timestamp: 2026-11-07T00:00:00Z
 
 ## Citations
 
-1. https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/application-status-checks.html
-2. https://github.com/hashicorp/terraform-provider-aws/pull/49487
+1. <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/application-status-checks.html>
+2. <https://github.com/hashicorp/terraform-provider-aws/pull/49487>

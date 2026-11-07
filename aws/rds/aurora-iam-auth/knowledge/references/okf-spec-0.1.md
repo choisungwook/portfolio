@@ -6,6 +6,8 @@ tags: [okf, spec]
 timestamp: 2026-07-10T00:00:00Z
 source: github.com/google/knowledge-catalog (okf/SPEC.md, Apache License 2.0)
 ---
+<!-- markdownlint-disable-file -->
+<!-- 외부 스펙 원문의 사본이라 lint 규칙에 맞춰 고치지 않는다. -->
 
 # Open Knowledge Format (OKF)
 
