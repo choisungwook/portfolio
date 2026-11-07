@@ -103,10 +103,10 @@
 93. Amazon Bedrock 모델 호출(Runtime, Mantle, Playground) (26.8.16) - [링크](./aws/bedrock/model-inference/)
 94. Web search tool 실행 위치 비교(Client, LiteLLM, Bedrock, vLLM) (26.8.17) - [링크](./computer_science/ai/web-search-tool/)
 95. LLM serving challenge와 essential optimization Chapter 5-6 핸즈온 (26.8.22) - [링크](./computer_science/ai/study-llmserving/ch5-6/)
-  - [문서 인덱스](./computer_science/ai/study-llmserving/ch5-6/docs/) - chapter별로 무엇을 어떤 순서로 볼지
-  - [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](./computer_science/ai/study-llmserving/ch5-6/docs/02-ch5-theory.md) - weight 외 KV cache·activation 계산
-  - [배치와 시퀀스를 흔들어 KV cache가 차는 과정](./computer_science/ai/study-llmserving/ch5-6/docs/handson/03-kv-cache-batch-sequence.md) - 책 공식과 vLLM 실측 pool 대조
-  - [내 GPU의 crossover를 직접 재고 병목을 만들기](./computer_science/ai/study-llmserving/ch5-6/docs/handson/04-roofline-bottleneck.md) - roofline 실측과 대역폭 병목 증명
+    - [문서 인덱스](./computer_science/ai/study-llmserving/ch5-6/docs/) - chapter별로 무엇을 어떤 순서로 볼지
+    - [16GB GPU에 7B 모델이 올라가도 serving이 어려운 이유](./computer_science/ai/study-llmserving/ch5-6/docs/02-ch5-theory.md) - weight 외 KV cache·activation 계산
+    - [배치와 시퀀스를 흔들어 KV cache가 차는 과정](./computer_science/ai/study-llmserving/ch5-6/docs/handson/03-kv-cache-batch-sequence.md) - 책 공식과 vLLM 실측 pool 대조
+    - [내 GPU의 crossover를 직접 재고 병목을 만들기](./computer_science/ai/study-llmserving/ch5-6/docs/handson/04-roofline-bottleneck.md) - roofline 실측과 대역폭 병목 증명
 96. SearXNG 프로덕션 주의사항과 봇 탐지 핸즈온 (26.8.23) - [링크](./computer_science/ai/searxng-production/)
 97. Amazon Bedrock Web Search와 AgentCore 핸즈온 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/)
 98. Amazon Bedrock Web Search 유해콘텐스 검색 테스트 (26.8.23) - [링크](./aws/bedrock/agentcore-web-search/docs/5-safety-test.md)
@@ -124,6 +124,7 @@
 110. ML Platform Engineering Part 2 Lab 0~1: k3s에 Kubeflow 배포판과 MLflow를 Argo CD ApplicationSet으로 설치, GPU time-slicing, PR 미리보기, Kubeflow Notebook에서 MLflow 실험 리니지와 재현성 (26.10.31) - [링크](./mlops/ml-platform-engineering-part2/)
 111. AWS Network Firewall: egress 트래픽 audit과 도메인 차단·허용 정책 관리, 콘솔 실습, 운영 적용 순서, 로컬 Grafana 모니터링 (26.10.31) - [링크](./aws/network-firewall/egress-filtering/)
 112. (아직 실습안함) Aurora MySQL IAM DB 인증: token 로그인과 실패 원인 추적, password에서 IAM으로 무중단 전환과 로그·metric 검증, 중단 전환, EC2 application status check (26.11.7) - [링크](./aws/rds/aurora-iam-auth/)
+113. Amazon Bedrock Guardrails와 LiteLLM: 정책 판정, input·output guardrail 시점과 지연, 스트리밍 유출, text unit 비용, LiteLLM 콘솔 모니터링과 고객 문의 대응 (26.11.7) - [링크](./aws/bedrock/guardrails/)
 
 ## 직접 만든 제품
 

@@ -1,0 +1,47 @@
+services:
+  litellm:
+    # 1.107.0은 공급망 공격으로 PyPI에서 내려간 버전이라 쓰지 않는다
+    image: ghcr.io/berriai/litellm:v1.108.2
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file:
+      - path: .env
+        required: false
+      - path: .runtime.env
+        required: true
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      # Admin UI 로그인과 요청 로그는 DB가 있어야 동작한다
+      DATABASE_URL: postgresql://litellm:litellm@postgres:5432/litellm
+      OLLAMA_API_BASE: http://host.docker.internal:11434
+      # DEBUG로 올리면 ApplyGuardrail 호출마다 로그가 남는다
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+      - ${HOME}/.aws:/root/.aws:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litellm"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
