@@ -6,8 +6,6 @@ tags: [bedrock, guardrails, litellm]
 timestamp: 2026-11-07T00:00:00Z
 ---
 
-# LiteLLM에 붙일 Bedrock guardrail 기본 구성
-
 ## 결정
 
 - input guardrail은 `pre_call` + `mask_request_content`로 둔다. `during_call`은 쓰지 않는다.

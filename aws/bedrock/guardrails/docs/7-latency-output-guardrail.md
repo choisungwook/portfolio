@@ -123,7 +123,7 @@ guardrails-handson total 1.759637s
 | output guardrail만(`guardrails-output`) | 0.51~0.80초 | 1회 |
 | 둘 다(`guardrails-handson`) | 0.9~1.0초 | 2회 |
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 응답 시간 예산이 빠듯하면 output guardrail이 필요한 경로인지 먼저 따집니다. 사용자 입력만 검사하면 되는 경로라면 `mode: [pre_call]` 하나로 왕복이 한 번 줄어듭니다.
 - output guardrail로만 막는 정책은 차단될 때마다 모델 요금을 냅니다. input에서 막을 수 있는 정책(유해 질문, 입력 PII)은 input guardrail에 두는 편이 비용과 시간 모두 유리합니다.

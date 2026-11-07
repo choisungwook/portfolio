@@ -53,7 +53,7 @@ PII를 ANONYMIZE로 가린 요청은 Bedrock이 `GUARDRAIL_INTERVENED`를 돌려
 
 ## 대안 비교
 
-| 관측 수단 | 단위 | 통과, 차단 구분 | 비용 | 요청 본문 |
+| 모니터링 및 Observability 수단 | 단위 | 통과, 차단 구분 | 비용 | 요청 본문 |
 |---|---|---|---|---|
 | CloudWatch `AWS/Bedrock/Guardrails` | Bedrock guardrail, 방향(Input, Output) | `InvocationsIntervened`. 마스킹도 개입으로 셈 | unit만 | 없음 |
 | LiteLLM 콘솔 Guardrails Monitor | LiteLLM guardrail 이름 | blocked, passed. 마스킹은 passed | 정책별 단가로 계산한 추정치 | `store_prompts_in_spend_logs`가 정함 |
@@ -224,7 +224,7 @@ content filter의 `PROMPT_ATTACK`, `MISCONDUCT`와 word filter가 함께 걸렸�
 400: {'error': 'Violated guardrail policy', ..., 'assessments': [{'policy': 'contentPolicy', 'matches': [{'category': 'filters', 'type': 'PROMPT_ATTACK', 'confidence': 'MEDIUM', 'filterStrength': 'HIGH', 'action': 'BLOCKED'}, {'category': 'filters', 'type': 'MISCONDUCT', 'confidence': 'HIGH', 'filterStrength': 'HIGH', 'action': 'BLOCKED'}]}, {'policy': 'wordPolicy', 'matches': [{'category': 'customWords', 'match': '[REDACTED]', 'action': 'BLOCKED'}]}], 'guardrail_name': 'guardrails-input', 'guardrail_mode': ['pre_call']}
 ```
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 차단 근거 분석은 `error_information`의 `policy`와 `type`으로 합니다. 원문 없이도 "어느 정책이 얼마나 막았나"는 요청 단위로 집계할 수 있습니다. 클라이언트도 같은 근거를 400 본문의 `provider_specific_fields.assessments`로 받습니다.
 - 판정 모니터링에는 본문이 필요 없습니다. 차단율, 지연, 비용은 모두 `store_prompts_in_spend_logs: false`에서도 남으므로, 본문 저장은 디버깅이 필요한 짧은 기간에만 켭니다. 켜면 guardrail이 가린 PII도 원문으로 DB에 들어갑니다.

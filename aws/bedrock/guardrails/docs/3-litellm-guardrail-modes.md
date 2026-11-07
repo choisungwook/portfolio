@@ -165,7 +165,7 @@ chat nova-micro guardrails-handson "PROJECT와 ORION을 하이픈(-)으로 이�
 응답이 정책에 의해 차단되었습니다.
 ```
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 개인정보 보호가 목적이면 `pre_call`과 `mask_request_content`가 필수입니다. `post_call`의 마스킹은 사용자에게 보이는 응답만 가립니다.
 - input guardrail과 output guardrail을 모두 걸면 요청마다 ApplyGuardrail 왕복이 두 번 붙습니다. 측정은 [시나리오 5](./5-latency-input-guardrail.md)와 [시나리오 7](./7-latency-output-guardrail.md)에 있습니다.

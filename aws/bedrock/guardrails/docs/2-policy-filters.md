@@ -235,7 +235,7 @@ DRAFT: {"action":"GUARDRAIL_INTERVENED","hits":["WORD:PROJECT-APOLLO"]}
 terraform -chdir=terraform apply
 ```
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 운영은 번호 버전으로 고정하고, 정책 수정은 `DRAFT`에서 시험한 뒤 새 버전으로 배포합니다.
 - 한국어는 판정이 맞아도 confidence가 흔들려서, strength를 낮추는 튜닝은 여러 번 측정한 뒤에 정합니다.

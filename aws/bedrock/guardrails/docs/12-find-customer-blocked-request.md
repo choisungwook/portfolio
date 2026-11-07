@@ -223,7 +223,7 @@ curl -s -G localhost:4000/spend/logs/ui -H "Authorization: Bearer $LITELLM_MASTE
 
 문의 유형별 해결 순서(오탐, guardrail 이름 오타, PII 전달, 스트리밍 도중 차단)는 [사용자 문의 대응 런북](./support-runbook.md)에 모았습니다.
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 고객 문의 대응은 요청을 받기 전에 설계가 끝나야 합니다. 고객마다 virtual key를 나누고 `key_alias`를 붙이지 않으면, 나중에는 시간대만으로 추측할 수밖에 없습니다.
 - 고객 서비스에 `user` 필드를 보내 달라고 요구하면 사람 단위 추적이 됩니다. 이 값은 spend log에 남는 식별자이므로, 이메일 대신 고객 서비스 내부 ID처럼 개인정보가 아닌 값을 쓰게 합니다.

@@ -7,9 +7,7 @@ timestamp: 2026-07-10T00:00:00Z
 source: github.com/google/knowledge-catalog (okf/SPEC.md, Apache License 2.0)
 ---
 
-# Open Knowledge Format (OKF)
-
-**Version 0.1 — Draft**
+Version 0.1 — Draft
 
 OKF is an open, human- and agent-friendly format for representing
 *knowledge* — the metadata, context, and curated insight that surrounds
@@ -83,7 +81,7 @@ A bundle is a directory tree of markdown files. The directory structure
 is independent of the domain — producers organize concepts however makes
 sense for the knowledge being captured.
 
-```
+```text
 path/to/bundle/
 ├── index.md                      # Optional. Directory listing for progressive disclosure.
 ├── log.md                        # Optional. Chronological history of updates.
@@ -408,7 +406,7 @@ consumption rather than refusing the bundle.
 
 ## Appendix A — Minimal example bundle
 
-```
+```text
 my_bundle/
 ├── index.md
 ├── datasets/

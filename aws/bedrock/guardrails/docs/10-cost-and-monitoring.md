@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 기능 | guardrail 비용을 계산하고, 동작과 정책 변경을 관측하는 것 |
+| 기능 | guardrail 비용을 계산하고, 동작과 정책 변경에 대한 모니터링 및 Observability를 확보하는 것 |
 | 쓰는 도구 | CloudWatch `AWS/Bedrock/Guardrails`, CloudTrail event history, AWS Pricing API |
 | 입력 | 시나리오 2~9에서 발생한 guardrail 호출 |
 | 작업 | 1. text unit 경계 확인 2. 메트릭 조회와 비용 계산 3. CloudTrail 이벤트 확인 |
@@ -31,7 +31,7 @@ LiteLLM 1.108.2는 Bedrock guardrail 응답의 `usage`에 정책별 단가를 �
 
 ## 대안 비교
 
-| 관측 수단 | 볼 수 있는 것 | 볼 수 없는 것 |
+| 모니터링 및 Observability 수단 | 볼 수 있는 것 | 볼 수 없는 것 |
 |---|---|---|
 | CloudWatch 메트릭 | 호출 수, 개입 수, 정책별 unit, 지연 | 어떤 요청이 막혔는지 |
 | CloudTrail event history | guardrail 생성, 수정, 버전 발행, Converse 호출(관리 이벤트) | ApplyGuardrail 개별 호출(데이터 이벤트) |
@@ -170,7 +170,7 @@ Converse: 43
 - 개입 비율은 `GuardrailContentSource` 차원으로 나눠 봅니다. Input 쪽 급증은 공격 시도, Output 쪽 급증은 모델 출력 문제에 가깝습니다.
 - 이 실습의 LiteLLM guardrail 다섯 개는 같은 Bedrock guardrail을 가리키므로, CloudWatch 메트릭에서는 하나로 합쳐 보입니다. LiteLLM guardrail별 요청 수와 차단율은 LiteLLM 콘솔의 guardrail 모니터에서 나눠 봅니다([시나리오 11](./11-litellm-console-monitoring.md)).
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
 - 비용 대시보드를 버전 차원의 `TextUnitCount`로 만들면 과대 계상되므로, 정책 차원으로 나누고 무료 정책을 뺍니다.
 - LiteLLM spend에는 guardrail 비용 추정치가 들어갑니다. 차단된 요청도 모델 비용 없이 guardrail 비용만으로 spend가 남습니다. Cost Explorer와 대사할 때 모델 비용과 guardrail 비용을 나눠 봅니다.
