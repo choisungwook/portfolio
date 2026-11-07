@@ -1,6 +1,6 @@
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.al2023.id
-  instance_type               = "t4g.small"
+  instance_type               = var.instance_type
   subnet_id                   = data.aws_subnet.app.id
   vpc_security_group_ids      = [aws_security_group.app.id]
   iam_instance_profile        = aws_iam_instance_profile.app.name
@@ -16,7 +16,7 @@ resource "aws_instance" "app" {
     app_py         = base64encode(file("${path.module}/../app/app.py"))
     region         = var.aws_region
     app_port       = var.app_port
-    db_host        = aws_rds_cluster.this.endpoint
+    db_host        = aws_rds_cluster.aurora.endpoint
     db_name        = var.db_name
     pw_user        = local.password_db_user
     iam_user       = local.iam_db_user

@@ -39,3 +39,21 @@ variable "db_name" {
   type        = string
   default     = "labdb"
 }
+
+variable "instance_type" {
+  description = "EC2 앱 인스턴스 타입"
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "aurora_min_acu" {
+  description = "Aurora Serverless v2 최소 ACU"
+  type        = number
+  default     = 0.5
+}
+
+variable "aurora_max_acu" {
+  description = "Aurora Serverless v2 최대 ACU"
+  type        = number
+  default     = 2
+}

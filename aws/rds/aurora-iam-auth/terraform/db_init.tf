@@ -7,9 +7,9 @@ resource "terraform_data" "db_init" {
     command = "${path.module}/../scripts/db-init.sh"
     environment = {
       AWS_REGION     = var.aws_region
-      DB_HOST        = aws_rds_cluster.this.endpoint
+      DB_HOST        = aws_rds_cluster.aurora.endpoint
       DB_NAME        = var.db_name
-      SECRET_ARN     = aws_rds_cluster.this.master_user_secret[0].secret_arn
+      SECRET_ARN     = aws_rds_cluster.aurora.master_user_secret[0].secret_arn
       PASSWORD_PARAM = aws_ssm_parameter.app_password.name
       PW_USER        = local.password_db_user
     }

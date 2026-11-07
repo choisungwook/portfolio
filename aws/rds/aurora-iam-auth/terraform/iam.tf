@@ -35,7 +35,7 @@ resource "aws_iam_role_policy" "app_params" {
 data "aws_iam_policy_document" "app_rds_connect" {
   statement {
     actions   = ["rds-db:connect"]
-    resources = ["arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_rds_cluster.this.cluster_resource_id}/${local.iam_db_user}"]
+    resources = ["arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_rds_cluster.aurora.cluster_resource_id}/${local.iam_db_user}"]
   }
 }
 

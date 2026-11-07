@@ -24,7 +24,7 @@ ERROR 2059 (HY000): Authentication plugin 'mysql_clear_password' cannot be loade
 
 원인: IAM 사용자는 token을 평문 플러그인으로 받습니다. client가 이 플러그인을 허용하지 않으면 token을 보내지 않습니다.
 
-해결: `mysql --enable-cleartext-plugin`을 붙입니다. 드라이버는 cleartext 옵션을 켭니다(PyMySQL은 `auth_plugin_map={"mysql_clear_password": None}`).
+해결: `mysql --enable-cleartext-plugin`을 붙입니다. PyMySQL은 `mysql_clear_password`를 기본으로 처리하므로 TLS만 켜면 됩니다(`app/app.py`).
 
 ## EC2 application status check 응답을 jq로 못 읽는다
 

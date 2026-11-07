@@ -111,7 +111,7 @@ terraform -chdir=terraform apply
 ```
 
 ```text
-aws_rds_cluster.this: Modifications complete after 31s [id=aurora-iam-lab]
+aws_rds_cluster.aurora: Modifications complete after 31s [id=aurora-iam-lab]
 aws_iam_role_policy.app_rds_connect[0]: Creation complete after 1s
 Apply complete! Resources: 1 added, 1 changed, 0 destroyed.
 ```
@@ -194,6 +194,14 @@ mysql -h $HOST -u app_iam --password="$TOKEN" --enable-cleartext-plugin \
 
 EC2 role의 권한 범위도 확인합니다. role에는 `app_iam`에 대한 `rds-db:connect`만 있습니다. 같은 권한의 IAM 사용자 `report_iam`을 하나 더 만들고, EC2에서 두 사용자로 로그인합니다.
 
+내 PC에서 실습 2와 같은 admin 접속으로 `report_iam`을 만듭니다.
+
+```bash
+mysql -h $HOST -u admin --ssl-mode=REQUIRED -e "CREATE USER 'report_iam'@'%' IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS' REQUIRE SSL; GRANT SELECT ON labdb.* TO 'report_iam'@'%';"
+```
+
+EC2에 접속합니다.
+
 ```bash
 INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id)
 aws ssm start-session --target $INSTANCE_ID
@@ -230,7 +238,12 @@ aws logs filter-log-events --log-group-name /aws/rds/cluster/aurora-iam-lab/iam-
 ```
 
 - client는 모든 실패에서 같은 `ERROR 1045`만 받습니다. 원인 구분은 서버 쪽 `iam-db-auth-error` 로그에서만 가능하고, 403 로그에는 거절된 role ARN과 instance ID까지 남습니다.
-- 확인한 뒤 `report_iam`은 지웁니다: `DROP USER 'report_iam'@'%';`
+
+확인한 뒤 내 PC에서 `report_iam`을 지웁니다.
+
+```bash
+mysql -h $HOST -u admin --ssl-mode=REQUIRED -e "DROP USER 'report_iam'@'%';"
+```
 
 ### 6. token이 실제로 거절되는 시점 측정
 

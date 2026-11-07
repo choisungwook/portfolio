@@ -4,13 +4,13 @@ data "aws_rds_engine_version" "aurora_mysql" {
   default_only = true
 }
 
-resource "aws_db_subnet_group" "this" {
+resource "aws_db_subnet_group" "aurora" {
   name       = var.project_name
   subnet_ids = data.aws_subnets.default.ids
 }
 
 # audit 로그로 어떤 DB 사용자가 접속했는지(CONNECT/FAILED_CONNECT)를 남긴다.
-resource "aws_rds_cluster_parameter_group" "this" {
+resource "aws_rds_cluster_parameter_group" "aurora" {
   name   = var.project_name
   family = data.aws_rds_engine_version.aurora_mysql.parameter_group_family
 
@@ -37,7 +37,7 @@ resource "aws_cloudwatch_log_group" "aurora" {
   retention_in_days = 1
 }
 
-resource "aws_rds_cluster" "this" {
+resource "aws_rds_cluster" "aurora" {
   cluster_identifier = var.project_name
   engine             = "aurora-mysql"
   engine_version     = data.aws_rds_engine_version.aurora_mysql.version_actual
@@ -49,14 +49,14 @@ resource "aws_rds_cluster" "this" {
 
   iam_database_authentication_enabled = var.iam_auth_enabled
 
-  db_subnet_group_name            = aws_db_subnet_group.this.name
+  db_subnet_group_name            = aws_db_subnet_group.aurora.name
   vpc_security_group_ids          = [aws_security_group.db.id]
-  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.this.name
+  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.aurora.name
   enabled_cloudwatch_logs_exports = keys(aws_cloudwatch_log_group.aurora)
 
   serverlessv2_scaling_configuration {
-    min_capacity = 0.5
-    max_capacity = 2
+    min_capacity = var.aurora_min_acu
+    max_capacity = var.aurora_max_acu
   }
 
   storage_encrypted   = true
@@ -66,9 +66,9 @@ resource "aws_rds_cluster" "this" {
 
 resource "aws_rds_cluster_instance" "writer" {
   identifier          = "${var.project_name}-writer"
-  cluster_identifier  = aws_rds_cluster.this.id
-  engine              = aws_rds_cluster.this.engine
-  engine_version      = aws_rds_cluster.this.engine_version
+  cluster_identifier  = aws_rds_cluster.aurora.id
+  engine              = aws_rds_cluster.aurora.engine
+  engine_version      = aws_rds_cluster.aurora.engine_version
   instance_class      = "db.serverless"
   publicly_accessible = true # 내 IP에서 직접 접속한다. 접근은 security group이 내 IP와 app으로 제한한다.
 

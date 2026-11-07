@@ -7,15 +7,15 @@ output "instance_id" {
 }
 
 output "cluster_endpoint" {
-  value = aws_rds_cluster.this.endpoint
+  value = aws_rds_cluster.aurora.endpoint
 }
 
 output "cluster_resource_id" {
-  value = aws_rds_cluster.this.cluster_resource_id
+  value = aws_rds_cluster.aurora.cluster_resource_id
 }
 
 output "master_secret_arn" {
-  value = aws_rds_cluster.this.master_user_secret[0].secret_arn
+  value = aws_rds_cluster.aurora.master_user_secret[0].secret_arn
 }
 
 output "auth_mode_param" {
