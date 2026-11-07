@@ -6,7 +6,7 @@
 |---|---|
 | 기능 | gateway가 요청의 어느 시점에, 어떤 텍스트에 guardrail을 적용하는지 |
 | 쓰는 도구 | LiteLLM Proxy 1.108.2 콘솔(Admin UI)과 API, Bedrock guardrail 버전 1, Nova Micro |
-| 입력 | [config.yaml](../litellm/config.yaml)의 LiteLLM guardrail 5개 중 `guardrails-handson` |
+| 입력 | [config.yaml](../litellm/config.yaml)의 LiteLLM guardrail 6개 중 `guardrails-handson` |
 | 작업 | 콘솔 1~4, API 1~4 |
 | 달성할 것 | 개인정보가 모델에 전달되는 경로와 output guardrail 차단을 응답과 숫자로 확인. 멀티턴은 [시나리오 6](./6-multiturn-guardrail.md). 지연은 [시나리오 5](./5-latency-input-guardrail.md)와 [시나리오 7](./7-latency-output-guardrail.md)에서 측정 |
 
@@ -79,7 +79,7 @@ sequenceDiagram
 
 ### 2. 등록된 guardrail 확인
 
-왼쪽 메뉴 **Guardrails** → **Guardrails** 탭에서 LiteLLM guardrail 다섯 개를 봅니다. 이 시나리오는 `mode`가 `pre_call`, `post_call`인 `guardrails-handson`을 씁니다.
+왼쪽 메뉴 **Guardrails** → **Guardrails** 탭에서 LiteLLM guardrail 여섯 개를 봅니다. 이 시나리오는 `mode`가 `pre_call`, `post_call`인 `guardrails-handson`을 씁니다.
 
 ### 3. 모델 없이 guardrail만 실행
 

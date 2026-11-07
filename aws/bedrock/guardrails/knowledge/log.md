@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-07
 
+* **Update**: [LiteLLM에 붙일 Bedrock guardrail 기본 구성](decisions/2026-11-litellm-guardrail-defaults.md) only_scan_new_messages 실험 결과와 guardrails-input-incremental을 별도로 둔 이유
 * **Update**: [LiteLLM에 붙일 Bedrock guardrail 기본 구성](decisions/2026-11-litellm-guardrail-defaults.md) 멀티턴 전체 검사와 latest 비교 결과, guardrail 5개. 시나리오 6 멀티턴 신설로 7~12 번호 변경
 * **Update**: [LiteLLM에 붙일 Bedrock guardrail 기본 구성](decisions/2026-11-litellm-guardrail-defaults.md) 고객 문의 대응 단서(key_alias, end_user, x-litellm-call-id)와 콘솔 시각대 함정
 * **Update**: [LiteLLM에 붙일 Bedrock guardrail 기본 구성](decisions/2026-11-litellm-guardrail-defaults.md) 차단 근거를 CloudTrail 대신 spend log error_information으로 보는 이유, trail 옵션 기본 false

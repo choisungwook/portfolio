@@ -12,7 +12,7 @@
 
 ## LiteLLM 콘솔은 spend log를 guardrail 이름별로 다시 집계합니다
 
-[시나리오 10](./10-cost-and-monitoring.md)의 CloudWatch 메트릭은 Bedrock guardrail 단위입니다. 이 핸즈온의 LiteLLM guardrail 다섯 개는 같은 Bedrock guardrail을 가리키므로, CloudWatch에서는 `guardrails-input`과 `guardrails-output`의 차단을 나눠 볼 수 없습니다. LiteLLM은 요청마다 spend log에 어떤 LiteLLM guardrail이 어느 시점에 무슨 판정을 냈는지 적고, 그 기록을 guardrail 이름별 일 단위 테이블로 다시 집계합니다. 콘솔의 **Guardrails Monitor**는 그 테이블을 보여 줍니다.
+[시나리오 10](./10-cost-and-monitoring.md)의 CloudWatch 메트릭은 Bedrock guardrail 단위입니다. 이 핸즈온의 LiteLLM guardrail 여섯 개는 같은 Bedrock guardrail을 가리키므로, CloudWatch에서는 `guardrails-input`과 `guardrails-output`의 차단을 나눠 볼 수 없습니다. LiteLLM은 요청마다 spend log에 어떤 LiteLLM guardrail이 어느 시점에 무슨 판정을 냈는지 적고, 그 기록을 guardrail 이름별 일 단위 테이블로 다시 집계합니다. 콘솔의 **Guardrails Monitor**는 그 테이블을 보여 줍니다.
 
 spend log에는 요청 본문과 응답 본문도 들어갈 수 있습니다. `general_settings.store_prompts_in_spend_logs`가 이를 정합니다.
 

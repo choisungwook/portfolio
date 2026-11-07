@@ -78,19 +78,20 @@ sed -i '' "s/^LITELLM_MASTER_KEY=.*/LITELLM_MASTER_KEY=sk-$(openssl rand -hex 24
 docker compose up -d --wait
 ```
 
-LiteLLM 컨테이너는 `~/.aws`를 읽기 전용으로 마운트하고 셸의 `AWS_PROFILE`을 그대로 넘겨받습니다. 콘솔 로그인과 요청 로그용 Postgres도 함께 뜹니다. 이어서 LiteLLM guardrail이 로드됐는지 확인합니다. LiteLLM guardrail 다섯 개가 모두 같은 Bedrock guardrail을 가리키고, 검사 시점, 검사 범위, 스트리밍 방식만 다릅니다. 시나리오마다 요청의 `guardrails` 필드로 골라 쓰므로 LiteLLM을 다시 띄우지 않습니다.
+LiteLLM 컨테이너는 `~/.aws`를 읽기 전용으로 마운트하고 셸의 `AWS_PROFILE`을 그대로 넘겨받습니다. 콘솔 로그인과 요청 로그용 Postgres도 함께 뜹니다. 이어서 LiteLLM guardrail이 로드됐는지 확인합니다. LiteLLM guardrail 여섯 개가 모두 같은 Bedrock guardrail을 가리키고, 검사 시점, 검사 범위, 스트리밍 방식만 다릅니다. 시나리오마다 요청의 `guardrails` 필드로 골라 쓰므로 LiteLLM을 다시 띄우지 않습니다.
 
 ```bash
 set -a; source .env; set +a
 curl -s localhost:4000/guardrails/list -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq -r '.guardrails[].guardrail_name'
 ```
 
-이름 다섯 개가 보이면 정상입니다.
+이름 여섯 개가 보이면 정상입니다.
 
 ```text
 guardrails-handson
 guardrails-input
 guardrails-input-latest
+guardrails-input-incremental
 guardrails-output
 guardrails-output-release
 ```

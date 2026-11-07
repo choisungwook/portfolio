@@ -13,7 +13,7 @@ LiteLLM gateway에 Bedrock guardrail을 붙여 모델과 무관하게 입력과 
 | 3 | [3-litellm-guardrail-modes.md](./docs/3-litellm-guardrail-modes.md) | LiteLLM 콘솔과 API로 연동 확인. pre, post 시점, 마스킹 경로, 멀티턴 비용, fail-closed, grounding |
 | 4 | [4-litellm-guardrail-apply.md](./docs/4-litellm-guardrail-apply.md) | guardrail을 요청 파라미터로 거는 방법과 `default_on`으로 모든 요청에 거는 방법, key 단위 예외 |
 | 5 | [5-latency-input-guardrail.md](./docs/5-latency-input-guardrail.md) | input guardrail이 모델 호출 앞에 더하는 지연과 모델을 부르지 않는 빠른 차단 |
-| 6 | [6-multiturn-guardrail.md](./docs/6-multiturn-guardrail.md) | 멀티턴 대화에서 input guardrail이 매번 대화 전체를 검사해 unit과 시간이 늘어나는 것, 마지막 메시지만 검사하는 옵션의 대가 |
+| 6 | [6-multiturn-guardrail.md](./docs/6-multiturn-guardrail.md) | 멀티턴 대화에서 input guardrail이 매번 대화 전체를 검사해 unit과 시간이 늘어나는 것, 마지막 메시지만 검사하는 옵션의 대가, 세션 기반 증분 검사(only_scan_new_messages) |
 | 7 | [7-latency-output-guardrail.md](./docs/7-latency-output-guardrail.md) | output guardrail이 모델 응답 뒤에 더하는 지연, 모델 시간을 다 쓰는 차단, 둘을 함께 건 지연 |
 | 8 | [8-streaming-input-guardrail.md](./docs/8-streaming-input-guardrail.md) | 스트리밍 요청에서 input guardrail이 첫 글자만 늦추고 리듬은 유지, 출력은 검사하지 않음 |
 | 9 | [9-streaming-output-guardrail.md](./docs/9-streaming-output-guardrail.md) | 스트리밍 output guardrail의 buffered, release 원리와 차단 신호, 제공자 내장 검사 비교 |
@@ -28,7 +28,7 @@ LiteLLM gateway에 Bedrock guardrail을 붙여 모델과 무관하게 입력과 
 | 경로 | 내용 |
 |---|---|
 | `compose.yaml` | LiteLLM Proxy v1.108.2, 콘솔용 Postgres |
-| `litellm/config.yaml` | 모델 3개, LiteLLM guardrail 5개(검사 시점, 검사 범위, 스트리밍 방식별, 모두 같은 Bedrock guardrail을 가리킴) |
+| `litellm/config.yaml` | 모델 3개, LiteLLM guardrail 6개(검사 시점, 검사 범위, 스트리밍 방식별, 모두 같은 Bedrock guardrail을 가리킴) |
 | `terraform/` | Bedrock guardrail과 버전 1. `enable_guardrail_data_events`(기본 false)로 ApplyGuardrail 데이터 이벤트 trail을 선택해 만듦 |
 | `scripts/*.sh` | 정책 판정 표, 메트릭 조회, 호출 헬퍼 |
 | `scripts/stream_probe.py` | 스트리밍 응답 측정 |

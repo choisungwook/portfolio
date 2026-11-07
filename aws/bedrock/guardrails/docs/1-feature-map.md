@@ -30,7 +30,7 @@
 | tier | 분류 모델 세대. Standard는 다국어를 지원하고 cross-region 추론이 필요 | `STANDARD` + `apac.guardrail.v1:0` |
 | ApplyGuardrail | 모델 호출 없이 텍스트만 guardrail로 평가하는 API | LiteLLM이 사용하는 API |
 | InvokeGuardrailChecks | guardrail 리소스 없이 요청에 검사 항목을 직접 적는 API. 탐지만 하고 마스킹하지 않음 | 서울 리전 AccessDenied. 실습하지 않음 |
-| LiteLLM guardrail | LiteLLM config에 등록한 호출 설정. Bedrock guardrail을 가리키고 검사 시점(`mode`)과 스트리밍 방식을 정함. 여러 개가 같은 Bedrock guardrail을 가리킬 수 있음 | `guardrails-handson`, `guardrails-input`, `guardrails-input-latest`, `guardrails-output`, `guardrails-output-release` |
+| LiteLLM guardrail | LiteLLM config에 등록한 호출 설정. Bedrock guardrail을 가리키고 검사 시점(`mode`)과 스트리밍 방식을 정함. 여러 개가 같은 Bedrock guardrail을 가리킬 수 있음 | `guardrails-handson`, `guardrails-input`, `guardrails-input-latest`, `guardrails-input-incremental`, `guardrails-output`, `guardrails-output-release` |
 
 ## 가드레일을 gateway가 제공해야 하는 이유
 

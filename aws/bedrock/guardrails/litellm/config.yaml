@@ -15,7 +15,7 @@ model_list:
       model: openai/gpt-6-luna
       api_key: os.environ/OPENAI_API_KEY
 
-# LiteLLM guardrail 다섯 개가 같은 Bedrock guardrail 하나를 가리킨다.
+# LiteLLM guardrail 여섯 개가 같은 Bedrock guardrail 하나를 가리킨다.
 # 검사 시점(mode)과 스트리밍 방식만 다르므로, 요청의 guardrails 필드로 골라 쓰면 재시작 없이 시나리오를 오갈 수 있다
 guardrails:
   # input과 output을 모두 검사한다. 시나리오 2~4, 7, 10~12
@@ -51,6 +51,16 @@ guardrails:
       aws_region_name: os.environ/AWS_REGION
       mask_request_content: true
       experimental_use_latest_role_message_only: true
+
+  # input guardrail만, 세션에서 이미 검사한 메시지는 건너뛴다. 마스킹과 함께 쓰면 무시되므로 마스킹을 끈다. 시나리오 6
+  - guardrail_name: guardrails-input-incremental
+    litellm_params:
+      guardrail: bedrock
+      mode: [pre_call]
+      guardrailIdentifier: os.environ/GUARDRAIL_ID
+      guardrailVersion: os.environ/GUARDRAIL_VERSION
+      aws_region_name: os.environ/AWS_REGION
+      only_scan_new_messages: true
 
   # output guardrail만. 스트리밍은 응답 전체를 모아 한 번 검사한다(buffered). 시나리오 7, 9
   - guardrail_name: guardrails-output

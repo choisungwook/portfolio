@@ -12,7 +12,7 @@ flowchart LR
   S2 --> S3["3. 검사 시점<br/>콘솔, API 1~4단계"]
   S3 --> S4["4. 적용 방법<br/>default_on 켰다 끄기"]
   S4 --> S5["5. input 지연<br/>guardrails-input"]
-  S5 --> S6["6. 멀티턴<br/>guardrails-input, -latest"]
+  S5 --> S6["6. 멀티턴<br/>guardrails-input, -latest, -incremental"]
   S6 --> S7["7. output 지연<br/>guardrails-output"]
   S7 --> S8["8. 스트리밍 input<br/>guardrails-input"]
   S8 --> S9["9. 스트리밍 output<br/>guardrails-output, -release"]
@@ -107,7 +107,7 @@ API 3단계와 4단계는 Terraform 변수로 guardrail을 잠시 바꾸므로, 
 
 | 경로 | 단계 | 확인할 것 |
 |---|---|---|
-| 콘솔 | [1~2. 로그인, guardrail 목록](./3-litellm-guardrail-modes.md#1-콘솔-로그인) | **Guardrails** 탭에 LiteLLM guardrail 5개 |
+| 콘솔 | [1~2. 로그인, guardrail 목록](./3-litellm-guardrail-modes.md#1-콘솔-로그인) | **Guardrails** 탭에 LiteLLM guardrail 6개 |
 | 콘솔 | [3. 모델 없이 guardrail만 실행](./3-litellm-guardrail-modes.md#3-모델-없이-guardrail만-실행) | **Test Playground**에서 유해 문장 차단, 이메일 `{EMAIL}` |
 | 콘솔 | [4. 모델에 guardrail을 붙여 대화](./3-litellm-guardrail-modes.md#4-모델에-guardrail을-붙여-대화) | **Playground**에서 차단 오류 |
 | API | [1. chat completions 호출](./3-litellm-guardrail-modes.md#1-chat-completions-api에-guardrail을-지정해-호출) | HTTP 400과 입력용 차단 메시지 |
@@ -136,13 +136,15 @@ config에 `default_on: true`를 잠시 더해 LiteLLM을 재기동하고, 끝나
 
 ## 6. 멀티턴 대화
 
-config는 바꾸지 않습니다. `guardrails-input`과 `guardrails-input-latest`를 같은 대화로 번갈아 부릅니다.
+config는 바꾸지 않습니다. `guardrails-input`, `guardrails-input-latest`, `guardrails-input-incremental`을 같은 대화로 부릅니다.
 
 | 단계 | 확인할 것 |
 |---|---|
 | [2. 두 guardrail로 호출](./6-multiturn-guardrail.md#2-전체-대화-검사와-마지막-메시지-검사로-호출) | 20턴에서 `guardrails-input`만 1.3초대로 느려짐 |
 | [3. unit과 ApplyGuardrail 시간](./6-multiturn-guardrail.md#3-spend-log에서-unit과-applyguardrail-시간-확인) | 20턴 `guardrails-input`은 10 unit, 약 0.7~0.8초. `-latest`는 1 unit |
 | [4. 조작된 과거 대화](./6-multiturn-guardrail.md#4-과거-메시지를-조작한-요청-비교) | `guardrails-input` 400(guardrail이 막음), `guardrails-input-latest` 200(guardrail 판정 `NONE`, 모델이 스스로 거절) |
+| [5. 증분 검사로 20턴](./6-multiturn-guardrail.md#5-증분-검사로-20턴-대화-이어-가기) | 20턴 내내 1 unit. session ID 없이 보내면 10 unit |
+| [6. 증분 검사와 조작된 대화](./6-multiturn-guardrail.md#6-증분-검사에-조작된-과거-대화-보내기) | 1 unit만 검사하고 400. 다시 보내도 400 |
 
 ## 7. output guardrail 지연
 

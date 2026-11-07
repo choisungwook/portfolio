@@ -1,7 +1,7 @@
 ---
 type: Decision
 title: LiteLLM에 붙일 Bedrock guardrail 기본 구성
-description: Bedrock guardrail 하나를 가리키는 LiteLLM guardrail 다섯 개(검사 시점, 검사 범위, 스트리밍 방식별)로 입력은 pre_call + 마스킹, 출력은 buffered post_call, PII는 방향별 action 명시
+description: Bedrock guardrail 하나를 가리키는 LiteLLM guardrail 여섯 개(검사 시점, 검사 범위, 스트리밍 방식별)로 입력은 pre_call + 마스킹, 출력은 buffered post_call, PII는 방향별 action 명시
 tags: [bedrock, guardrails, litellm]
 timestamp: 2026-11-07T00:00:00Z
 ---
@@ -11,7 +11,7 @@ timestamp: 2026-11-07T00:00:00Z
 - input guardrail은 `pre_call` + `mask_request_content`로 둔다. `during_call`은 쓰지 않는다.
 - 스트리밍 output guardrail은 유출 0이 필요하면 buffered(기본값), 첫 토큰도 빨라야 하면 `streaming_buffer_release_on_scan`을 쓴다. `streaming_buffer_until_moderated: false` + sampling은 쓰지 않는다.
 - guardrail은 Terraform으로 관리하고, PII와 regex 항목에는 `input_action`, `output_action`을 항상 명시한다. Terraform 코드는 AWS profile을 지정하지 않고 셸의 `AWS_PROFILE`을 따른다.
-- LiteLLM guardrail은 다섯 개를 두고 모두 같은 Bedrock guardrail을 가리킨다. 멀티턴 비교용 `guardrails-input-latest`(`experimental_use_latest_role_message_only`)를 더했다. `guardrails-handson`(`[pre_call, post_call]`), `guardrails-input`(`[pre_call]`), `guardrails-output`(`[post_call]`, buffered), `guardrails-output-release`(`[post_call]`, release). 시나리오는 요청의 `guardrails` 필드로 고른다. sampled와 eos는 측정 표로만 남긴다.
+- LiteLLM guardrail은 여섯 개를 두고 모두 같은 Bedrock guardrail을 가리킨다. 멀티턴 비교용 `guardrails-input-latest`(`experimental_use_latest_role_message_only`)와 `guardrails-input-incremental`(`only_scan_new_messages`, 마스킹 없음)을 더했다. `guardrails-handson`(`[pre_call, post_call]`), `guardrails-input`(`[pre_call]`), `guardrails-output`(`[post_call]`, buffered), `guardrails-output-release`(`[post_call]`, release). 시나리오는 요청의 `guardrails` 필드로 고른다. sampled와 eos는 측정 표로만 남긴다.
 - Bedrock guardrail은 input용과 output용으로 나누지 않는다. Terraform은 하나만 만든다.
 - `contextual_grounding_from_messages`, `checks`(InvokeGuardrailChecks), `during_call`은 기본 구성에 넣지 않는다.
 - LiteLLM 콘솔 실습을 위해 compose에 Postgres를 둔다. spend log는 남기고 `store_prompts_in_spend_logs: false`를 config에 명시해 요청과 응답 본문은 저장하지 않는다.
@@ -29,6 +29,7 @@ timestamp: 2026-11-07T00:00:00Z
 - 차단 근거는 spend log의 `error_information`에 `assessments`(policy, type, confidence, action)로 남고 `match` 원문은 `[REDACTED]`였다. 그래서 요청별 근거를 위해 CloudTrail 데이터 이벤트를 켜지 않는다. trail은 `enable_guardrail_data_events`(기본 false)로만 둔다(2026-11-07).
 - 고객 문의 대응은 고객별 virtual key(`key_alias`), 요청 본문의 `user`, 응답 헤더 `x-litellm-call-id` 세 단서로 한다. 콘솔 시각은 현지 시각인데 상세 화면은 `Z`를 붙여 보여 주므로 API의 UTC와 9시간 차이가 난다(2026-11-07).
 - 멀티턴 input 검사는 기본으로 대화 전체를 한 번의 ApplyGuardrail에 넣는다. 20턴(9,460자)에서 10 unit, ApplyGuardrail 약 0.75초였고, 마지막 메시지만 검사하면 1 unit이지만 조작된 과거 대화를 통과시켰다. 그래서 기본 guardrail에는 전체 검사를 두고 latest는 비교용으로만 둔다(2026-11-07).
+- `only_scan_new_messages`는 세션마다 통과한 메시지 해시를 기억해 20턴 내내 1 unit이었고, 조작된 과거 대화도 새 메시지로 검사해 막았다. 다만 session ID가 필수이고 마스킹과 함께 쓸 수 없어(켜면 전체 검사로 돌아감) 입력 PII 마스킹이 필요한 기본 guardrail에는 쓰지 않고 별도 guardrail로 둔다(2026-11-07).
 - `x-litellm-applied-guardrails` 헤더는 요청에 적힌 이름을 그대로 돌려줘서, 등록되지 않은 이름도 찍힌다. guardrail 실행 여부는 spend log의 `guardrail_information`이 비었는지로 판단한다. release 방식의 스트리밍 도중 차단은 9건 중 5건이 spend log에 남지 않아(원인 확인 필요) 고객 쪽 `error` 이벤트를 1차 근거로 삼는다(2026-11-07).
 - LiteLLM 콘솔은 DB가 없으면 로그인에서 `Not connected to DB!`로 실패한다.
 - `default_on: true`를 켜면 `"guardrails": []` 요청도 차단되어 시나리오 3, 4의 guardrail 없음 비교를 같은 프록시에서 할 수 없다. 예외는 key metadata(`disable_global_guardrails`, `opted_out_global_guardrails`)로만 둘 수 있었다(2026-11-07).

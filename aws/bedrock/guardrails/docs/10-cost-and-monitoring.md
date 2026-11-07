@@ -168,7 +168,7 @@ Converse: 43
 
 - 어느 정책이 막았는지는 `InvocationsIntervened`를 `Operation`, `GuardrailContentSource`, `GuardrailPolicyType` 세 차원으로 조회하면 원문 없이 건수로 나옵니다. 시나리오 2~11을 실행한 뒤 3시간 동안 Input은 ContentPolicy 15, SensitiveInformationPolicy 6, WordPolicy 3, Output은 WordPolicy 19였습니다. 마스킹도 SensitiveInformationPolicy 개입으로 셉니다.
 - 개입 비율은 `GuardrailContentSource` 차원으로 나눠 봅니다. Input 쪽 급증은 공격 시도, Output 쪽 급증은 모델 출력 문제에 가깝습니다.
-- 이 실습의 LiteLLM guardrail 다섯 개는 같은 Bedrock guardrail을 가리키므로, CloudWatch 메트릭에서는 하나로 합쳐 보입니다. LiteLLM guardrail별 요청 수와 차단율은 LiteLLM 콘솔의 guardrail 모니터에서 나눠 봅니다([시나리오 11](./11-litellm-console-monitoring.md)).
+- 이 실습의 LiteLLM guardrail 여섯 개는 같은 Bedrock guardrail을 가리키므로, CloudWatch 메트릭에서는 하나로 합쳐 보입니다. LiteLLM guardrail별 요청 수와 차단율은 LiteLLM 콘솔의 guardrail 모니터에서 나눠 봅니다([시나리오 11](./11-litellm-console-monitoring.md)).
 
 ## 부록: 실무 시사점 및 운영 팁
 
