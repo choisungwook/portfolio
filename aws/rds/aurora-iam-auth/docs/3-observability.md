@@ -1,86 +1,94 @@
-# 시나리오 3. 전환 전에 "끊기지 않았다"를 증명할 장치부터 단다
+# 시나리오 3. 무중단 전환 검증을 위한 4계층 Observability 체계 구축
 
-## 이 시나리오의 목표
+## 시나리오 개요 및 핵심 목표
 
-| 항목 | 내용 |
+| 항목 | 상세 내용 |
 | --- | --- |
-| 기능 | 인증 전환 중 클라이언트 오류, DB 로그인 사용자, IAM 인증 실패, 애플리케이션 생존을 관측 |
-| 쓰는 도구 | EventBridge Scheduler + Lambda prober(EMF), RDS `IamDbAuth*` metric, Aurora `audit` 로그, EC2 application status check |
-| 입력 | password 모드로 동작하는 앱과 1초 간격 트래픽 |
-| 작업 | 실습 1~4 |
-| 달성할 것 | 분 단위 성공·실패 수와 인증 방식별 지연을 쿼리 한 번으로 보고, 앱을 멈췄을 때 EC2 상태 검사가 `impaired`가 되는 것을 확인 |
+| **핵심 기능** | 데이터베이스 인증 전환 중 클라이언트 체감 오류, 실제 DB 접속 계정, IAM 인증 처리 결과, 인스턴스/앱 프로세스 생존 상태를 다각도로 모니터링 및 Observability 확보 |
+| **활용 도구** | EventBridge Scheduler + VPC Lambda Prober (CloudWatch EMF), RDS `IamDbAuth*` 메트릭, Aurora MySQL Audit 로그, EC2 Application Status Check |
+| **입력 자원** | 기본 패스워드 모드로 동작 중인 EC2 애플리케이션 및 1초 주기로 유입되는 연속 트래픽 |
+| **실습 작업** | 단계별 핸즈온 실습 1~4 |
+| **최종 달성 목표** | Logs Insights 쿼리를 통해 분 단위 트래픽 성공/실패율 및 인증 방식별 응답 지연을 집계하고, 프로세스 중단 시 Application Status Check가 `impaired`로 감지하는 전 과정을 검증 |
 
-## 무중단은 주장이 아니라 측정값이다
+## 무중단 검증의 핵심 원칙: 클라이언트 중심의 4계층 Observability 체계
 
-"무중단으로 바꿨다"는 말은 같은 기간에 실패한 요청이 0건이었다는 측정값이 있어야 성립합니다. 그리고 그 측정은 서버가 아니라 **클라이언트 쪽**에서 해야 합니다. DB는 들어오지 못한 연결을 모르고, 앱은 자기가 받지 못한 요청을 모릅니다.
+"무중단으로 마이그레이션을 완료했다"는 선언은 주관적 판단이 아니라 **전환 작업 시간 동안 클라이언트가 수신한 실패 요청이 0건이었다는 객관적 지표**로 증명되어야 합니다.
 
-이 핸즈온은 관측 지점을 네 층으로 나눕니다. 각 층은 다른 질문에 답합니다.
+데이터베이스 자체는 유입되지 못한 연결 실패를 인지하지 못하며, 애플리케이션 서버 역시 네트워크 문제나 사전 거절로 인해 자신에게 도달하지 못한 트래픽을 알 수 없습니다. 따라서 무중단 여부는 반드시 **호출 주체인 클라이언트 관점**에서 실시간으로 계측해야 합니다.
 
-| 층 | 도구 | 답하는 질문 |
+본 핸즈온은 인증 마이그레이션의 전 과정을 검증하기 위해 다음과 같이 네 개의 상호 보완적인 Observability 계층을 구성합니다.
+
+| Observability 계층 | 모니터링 도구 및 데이터 소스 | 검증 질문 및 목적 |
 | --- | --- | --- |
-| 클라이언트 | Lambda prober의 `Success`, `Error`, `LatencyMs` metric(`AuthMode` 차원) | 사용자가 오류를 봤는가, 지연이 늘었는가 |
-| DB 접속 | Aurora `audit` 로그 `CONNECT`, `FAILED_CONNECT` | 어떤 DB 사용자로 누가 들어왔고 누가 거절됐는가 |
-| IAM 인증 | RDS `IamDbAuthConnectionRequests`, `Success`, `Failure*` metric과 `iam-db-auth-error` 로그 | IAM 인증이 몇 번 시도됐고 왜 실패했는가 |
-| 인스턴스 | EC2 application status check, `StatusCheckFailed_Application` | 앱 프로세스가 살아서 응답하는가 |
+| **1. 클라이언트 계층** | Lambda Prober의 `Success`, `Error`, `LatencyMs` 메트릭 (`AuthMode` 차원) | 사용자가 실제로 에러를 경험했는가? 인증 방식 변경으로 지연 시간이 증가했는가? |
+| **2. DB 접속 계층** | Aurora MySQL Advanced Auditing 로그 (`CONNECT`, `FAILED_CONNECT`) | 실제 어떤 DB 계정(`app_pw` vs `app_iam`)으로 접속이 발생하고 있는가? 구 계정 접속이 완전히 소멸했는가? |
+| **3. IAM 인증 계층** | RDS CloudWatch `IamDbAuthConnection*` 메트릭 및 `iam-db-auth-error` 로그 | IAM 인증 요청이 몇 건 인입되었고, 실패 시 그 구체적 원인(토큰 오류, 권한 누락 등)은 무엇인가? |
+| **4. 인스턴스/앱 계층** | EC2 Application Status Check (`StatusCheckFailed_Application` 메트릭) | 웹 애플리케이션 프로세스가 정상 기동되어 HTTP 응답을 올바르게 반환하고 있는가? |
 
-### 용어
+### 핵심 용어 정의
 
-| 용어 | 뜻 | 이 실습의 예 |
+| 용어 | 정의 | 실습 적용 사례 |
 | --- | --- | --- |
-| prober | 실제 사용자 대신 주기적으로 API를 호출하는 합성 클라이언트 | Lambda `aurora-iam-lab-prober`, 1초 간격 약 56회/분 |
-| EMF(Embedded Metric Format) | 로그 한 줄에 metric 정의를 넣으면 CloudWatch가 metric으로 바꾸는 형식 | namespace `aurora-iam-lab`, 차원 `AuthMode` |
-| audit 로그 | Aurora MySQL Advanced Auditing이 남기는 접속, 쿼리 기록 | `server_audit_events=CONNECT` |
-| application status check | EC2가 managed ENI에서 인스턴스의 HTTP 경로를 60초마다 호출하는 상태 검사 | `GET :8080/healthz`, 기대 코드 `200` |
-| managed ENI | application status check가 probe를 보내려고 VPC에 만드는 네트워크 인터페이스 | source security group `aurora-iam-lab-healthcheck` |
+| **프로버 (Prober)** | 실제 사용자를 대신하여 일정한 주기로 API를 지속 호출하는 합성 트래픽(Synthetic Traffic) 발생기 | Lambda `aurora-iam-lab-prober` (1초 간격, 분당 약 56회 요청 전송) |
+| **EMF (Embedded Metric Format)** | 표준 JSON 로그 구조 내에 메트릭 메타데이터를 선언하여 별도 API 호출 없이 로그 스트림을 메트릭으로 자동 변환하는 CloudWatch 규격 | Namespace `aurora-iam-lab`, Dimension `AuthMode` |
+| **감사(Audit) 로그** | Aurora MySQL 엔진에서 발생하는 클라이언트 연결 및 쿼리 실행 이력을 기록하는 보안 로그 | `server_audit_events=CONNECT` 설정으로 연결 이벤트 추적 |
+| **Application Status Check** | EC2 하이퍼바이저 외부의 관리형 ENI에서 인스턴스 내부의 특정 HTTP 경로를 주기적으로 호출하여 프로세스 생존을 진단하는 EC2 기능 | `GET :8080/healthz`, 기대 HTTP 상태 코드 `200` |
+| **관리형 ENI (Managed ENI)** | Application Status Check가 인스턴스로 프로빙 패킷을 전송하기 위해 VPC 내부에 자동 생성하는 네트워크 인터페이스 | 소스 보안 그룹 `aurora-iam-lab-healthcheck` 참조 |
 
-## 앱 헬스체크는 DB를 보지 않는다
+## 헬스체크 설계 원칙: 프로세스 상태와 외부 의존성의 분리
 
-EC2 application status check는 2026년 8월에 나온 기능입니다. 기존 EC2 상태 검사(system, instance, EBS)는 하이퍼바이저와 OS까지만 보므로, 웹 서버 프로세스가 죽어도 `ok`로 남았습니다. application status check는 지정한 포트와 경로로 HTTP 요청을 보내 응답 코드를 비교하고, 그 결과를 인스턴스 상태와 Auto Scaling의 교체 판단에 더합니다.
+EC2 Application Status Check(2026년 8월 출시)는 기존 EC2 시스템/인스턴스 상태 검사가 하이퍼바이저와 OS 수준까지만 감지하여 웹 서버 프로세스가 다운되어도 `ok`로 표시되던 한계를 해결하기 위해 도입되었습니다.
 
-이 실습의 `/healthz`는 DB를 조회하지 않고 프로세스가 응답하는지만 봅니다. AWS 문서도 health 경로가 공유 의존성(DB)에 기대면 DB 문제 하나로 모든 인스턴스가 동시에 `impaired`가 되고 Auto Scaling이 모든 인스턴스를 교체할 수 있다고 경고합니다. 인증 전환에 적용하면 의미가 더 분명합니다. DB 인증이 실패한다고 인스턴스를 갈아도 인증은 고쳐지지 않습니다. DB까지 확인하는 경로는 `/readyz`로 따로 두고, 그 결과는 prober와 metric이 봅니다.
+실무에서 상태 검사를 설계할 때 가장 주의해야 할 원칙은 **기본 헬스체크 경로가 데이터베이스와 같은 공유 외부 의존성을 직접 조회해서는 안 된다는 점**입니다. 만약 헬스체크 경로(`/healthz`)가 DB 쿼리를 수행하도록 구성되어 있다면, 일시적인 DB 부하나 인증 변경 지연으로 인해 모든 웹 서버의 헬스체크가 동시에 실패하게 됩니다. 이 경우 Auto Scaling 그룹이 정상적인 인스턴스들까지 일제히 비정상(`impaired`)으로 판단하여 강제 교체(Mass Replacement)하는 연쇄 장애로 번질 수 있습니다.
 
-## 대안 비교
+따라서 다음과 같이 역할을 철저히 분리해야 합니다.
 
-| 방식 | 앱 수준 확인 | 비용 | 이 실습에서 고르지 않은 이유 |
+- **`/healthz` (Liveness / Application Status Check 대상)**: 웹 서버 프로세스가 살아있는지만 빠르게 반환(200 OK)합니다. 인스턴스 불필요 교체를 방지합니다.
+- **`/readyz` 또는 `/api/items` (Readiness / Prober 모니터링 대상)**: 실제 DB 연결 및 비즈니스 쿼리를 수행합니다. 무중단 검증 지표는 이 경로를 호출하는 Prober가 수집합니다.
+
+## 상태 검사 및 트래픽 프로빙 방식 비교
+
+| 구현 방식 | 점검 대상 | 인프라 비용 | 특성 및 이번 실습 선택 이유 |
 | --- | --- | --- | --- |
-| EC2 application status check | HTTP 응답 코드 | managed ENI당 $0.01/h + metric | 선택 |
-| ALB target group health check | HTTP 응답 코드 | ALB 시간당 과금 | 로드 밸런서를 쓰지 않는 구성 |
-| Route 53 health check | 공인 endpoint의 HTTP | health check당 월 과금 | 공인 IP에서 오는 probe를 security group에 열어야 함 |
-| Auto Scaling `set-instance-health` | 직접 구현한 검사 결과 | 무료 | 검사 주체와 스크립트를 직접 운영 |
+| **EC2 Application Status Check** | 인스턴스 내부 프로세스 응답 코드 | 관리형 ENI당 $0.01/h | **선택**: 로드 밸런서가 없는 환경에서도 인스턴스 단위의 앱 상태를 EC2 네이티브 지표로 감시 가능 |
+| **ALB Target Group Health Check** | 로드 밸런서 뒤 타깃 앱 응답 코드 | ALB 기본 시간당 요금 | 로드 밸런서를 구성하지 않는 간소화된 핸즈온 아키텍처이므로 제외 |
+| **Route 53 Health Check** | 퍼블릭 엔드포인트 HTTP 응답 | 헬스체크당 월정액 과금 | 퍼블릭 IP 개방 범위가 넓어져 보안 그룹 제어가 복잡해지므로 제외 |
+| **Lambda Prober + Scheduler** | 1초 주기 API 엔드포인트 프로빙 | Lambda 실행 비용 (Free Tier 충족) | **선택**: 1초 간격의 고밀도 트래픽을 저비용으로 안정적으로 주입하여 단절 여부를 초 단위로 검증 |
 
-prober도 같은 방식으로 골랐습니다. EventBridge Scheduler의 최소 주기는 1분이라 1초 간격 트래픽을 직접 만들 수 없습니다. Scheduler는 1분마다 Lambda를 깨우고, Lambda가 그 안에서 1초 간격으로 호출합니다. Lambda를 VPC에 넣었으므로 EC2의 security group은 IP 대역이 아니라 Lambda의 security group을 허용합니다.
+## Observability 시스템 구성 요소 및 역할
 
-## 컴포넌트 역할
-
-| 컴포넌트 | 역할 |
+| 구성 요소 | 주요 역할 |
 | --- | --- |
-| EventBridge Scheduler | `rate(1 minute)`로 prober 실행 |
-| Lambda prober | `/api/items`를 1초마다 호출하고 요청마다 EMF 로그 한 줄 기록 |
-| EC2 app | `/healthz`(프로세스), `/api/items`와 `/readyz`(DB 조회) |
-| Aurora `audit` 로그 | `CONNECT`, `FAILED_CONNECT`와 DB 사용자, 오류 코드 기록 |
-| EC2 application status check | managed ENI에서 `/healthz` 호출, `StatusCheckFailed_Application` 발행 |
+| **EventBridge Scheduler** | `rate(1 minute)` 주기로 VPC 내부의 Lambda Prober를 기동 |
+| **Lambda Prober** | 1초마다 `/api/items`를 호출하고 응답 상태, 소요 시간, 사용 계정을 EMF JSON 로그로 출력 |
+| **EC2 애플리케이션** | `/healthz`(프로세스 응답) 및 `/api/items`(실제 DB 쿼리) 엔드포인트 제공 |
+| **Aurora Advanced Auditing** | DB 세션이 수립되거나 거절될 때마다 계정명, 클라이언트 IP, 반환 코드를 CloudWatch Logs로 전송 |
+| **EC2 Application Status Check** | 60초마다 `/healthz`를 호출하고 실패 시 `StatusCheckFailed_Application` 지표 발행 |
 
-## 흐름
+## Observability 데이터 흐름 및 아키텍처
 
-트래픽 경로와, 각 지점에서 CloudWatch로 나가는 관측 데이터입니다.
+트래픽의 주입 경로와 각 계층에서 CloudWatch로 집계되는 Observability 파이프라인의 구조도입니다.
 
 ```mermaid
 flowchart LR
-  SCHED["EventBridge Scheduler<br/>rate(1 minute)"] --> PROBER["Lambda prober"]
-  PROBER -- "GET /api/items, 1초" --> APP["EC2 app"]
-  ENI["application status check<br/>managed ENI"] -- "GET /healthz, 60초" --> APP
-  APP -- "password 또는 token" --> DB[("Aurora")]
-  PROBER -- "EMF" --> CWM["CloudWatch metric<br/>Success, Error, LatencyMs"]
-  DB -- "audit, iam-db-auth-error" --> CWL["CloudWatch Logs"]
-  DB -- "IamDbAuth*" --> CWM
+  SCHED["EventBridge Scheduler<br/>rate(1 minute)"] --> PROBER["Lambda Prober"]
+  PROBER -- "GET /api/items (1초 주기)" --> APP["EC2 애플리케이션"]
+  ENI["Application Status Check<br/>(Managed ENI)"] -- "GET /healthz (60초 주기)" --> APP
+  APP -- "비밀번호 또는 IAM 토큰" --> DB[("Aurora MySQL")]
+
+  PROBER -- "EMF 로그 스트림" --> CWM["CloudWatch Metrics<br/>(Success, Error, LatencyMs)"]
+  DB -- "Audit 및 iam-db-auth-error" --> CWL["CloudWatch Logs"]
+  DB -- "IamDbAuth* 지표" --> CWM
   ENI -- "StatusCheckFailed_Application" --> CWM
 ```
 
-## 실습
+## 실습 진행: Observability 지표 및 로그 검증
 
-### 1. prober 로그 한 줄 확인
+### 1. Prober의 CloudWatch EMF 로그 구조 확인
 
-최근 2분의 prober 로그에서 성공한 요청 하나를 꺼냅니다.
+최근 실행된 Lambda Prober 로그 스트림에서 정상 처리된 요청 1건을 조회하여 EMF 메타데이터 형식을 확인합니다.
+
+CloudWatch Logs에서 성공 플래그(`Success = 1`)가 포함된 최근 Prober 이벤트를 조회합니다.
 
 ```bash
 aws logs filter-log-events --log-group-name /aws/lambda/aurora-iam-lab-prober \
@@ -88,15 +96,19 @@ aws logs filter-log-events --log-group-name /aws/lambda/aurora-iam-lab-prober \
   --max-items 1 --query 'events[0].message' --output text
 ```
 
+로그 메시지 내에 CloudWatch 지표 정의와 애플리케이션 응답 결과가 포함되어 있습니다.
+
 ```text
 {"_aws":{"CloudWatchMetrics":[{"Namespace":"aurora-iam-lab","Dimensions":[["AuthMode"],[]],"Metrics":[...]}]},"AuthMode":"password","Success":1,"Error":0,"LatencyMs":26.4,"status":200,"db_user":"app_pw@%","error":null}
 ```
 
-- Lambda 한 번 실행은 `Duration: 56008 ms`, `Max Memory Used: 50 MB`였습니다. 1분에 약 56개 요청이 나갑니다.
+- Lambda 1회 실행 시간은 약 56초(`Duration: 56008 ms`)이며, 매분 약 56회의 API 호출을 1초 간격으로 균등하게 전송합니다.
 
-### 2. 분 단위 성공·실패 집계 쿼리
+### 2. CloudWatch Logs Insights를 활용한 분 단위 성공·실패 집계
 
-CloudWatch Logs Insights에서 prober log group에 실행합니다. 마이그레이션 내내 이 쿼리 하나로 결과를 판정합니다.
+CloudWatch Logs Insights 콘솔 또는 AWS CLI를 통해 Prober 로그 그룹(`/aws/lambda/aurora-iam-lab-prober`)을 대상으로 트래픽 통계를 조회합니다. 이 쿼리는 마이그레이션 전 구간에 걸쳐 무중단 여부를 증명하는 단일 기준(Single Source of Truth)으로 사용됩니다.
+
+Logs Insights 콘솔의 쿼리 입력창에 다음 문을 실행합니다.
 
 ```text
 filter ispresent(AuthMode)
@@ -105,17 +117,24 @@ filter ispresent(AuthMode)
 | sort t asc
 ```
 
+집계 결과 예시입니다. 1분마다 약 56~57건의 요청이 인입되며 에러는 0건으로 유지됩니다.
+
 ```text
 t                    AuthMode  ok  err  avg_ms  p99_ms
 2026-11-07 04:50:00  password  57  0    49.0    230.2
 2026-11-07 04:51:00  password  56  0    48.1    223.6
 ```
 
-- 첫 apply 직후에는 오류가 보입니다. EC2가 Aurora보다 먼저 떴고(`2003 Can't connect`), 그 뒤 `db-init.sh`가 `app_pw`를 만들기 전까지 `1045`가 났습니다. 실습 판정은 오류가 0이 된 뒤부터 합니다([troubleshooting.md](./troubleshooting.md)).
+> [!NOTE]
+> 인프라를 처음 배포한 직후 1~2분 구간에는 일시적으로 에러(`Can't connect to MySQL` 또는 `Access denied for user app_pw`)가 집계될 수 있습니다. 이는 EC2 애플리케이션이 Aurora 인스턴스보다 먼저 기동되거나 초기화 스크립트 실행 직전의 일시적 현상이며, 초기화가 끝난 후 에러가 0으로 안정화된 시점부터 마이그레이션 실습을 진행합니다.
 
-### 3. audit 로그에서 DB 사용자별 접속 집계
+### 3. Aurora Audit 로그를 통한 사용자별 DB 접속 추적
 
-audit 로그 한 줄은 `시각(us),서버,DB 사용자,client,연결 ID,쿼리 ID,동작,DB,객체,반환 코드` 순서입니다. `/aws/rds/cluster/aurora-iam-lab/audit`에 실행합니다.
+클러스터 감사 로그 그룹(`/aws/rds/cluster/aurora-iam-lab/audit`)을 쿼리하여 실제 Aurora MySQL에 어떤 DB 사용자로 연결이 맺어지고 있는지 확인합니다.
+
+감사 로그 한 줄의 포맷은 `타임스탬프, 서버명, 사용자명, 클라이언트IP, 연결ID, 쿼리ID, 작업유형, DB명, 객체명, 반환코드`로 구성됩니다.
+
+Logs Insights에서 연결(`CONNECT`) 및 연결 실패(`FAILED_CONNECT`) 이벤트를 집계합니다.
 
 ```text
 parse @message "*,*,*,*,*,*,*,*,*,*" as ts, server, db_user, client, conn_id, query_id, op, db, obj, retcode
@@ -123,16 +142,20 @@ parse @message "*,*,*,*,*,*,*,*,*,*" as ts, server, db_user, client, conn_id, qu
 | stats count() as n, max(@timestamp) as last by db_user, op, retcode
 ```
 
+현재는 마이그레이션 전이므로 패스워드 사용자 `app_pw`로만 정상 접속(`retcode 0`)이 발생하고 있음을 확인할 수 있습니다.
+
 ```text
 db_user  op       retcode  n    last
 app_pw   CONNECT  0        215  2026-11-07 04:55:20.983
 ```
 
-- audit 로그는 CloudWatch에 약 2분 늦게 도착했습니다. "옛 사용자 접속이 0건"을 판정할 때는 마지막 전환 시각에서 몇 분 지난 뒤에 조회합니다.
+- Aurora Audit 로그는 버퍼링으로 인해 CloudWatch Logs에 약 1~2분 정도 지연되어 도달합니다. 따라서 전환 작업 후 "구 사용자 접속이 0건인가"를 검증할 때는 전환 완료 후 2분 이상 지난 뒤에 집계해야 정확합니다.
 
-### 4. 앱을 멈춰 application status check 상태 변화 확인
+### 4. 장애 모의 주입 및 EC2 Application Status Check 상태 전이 확인
 
-EC2에서 앱만 멈춥니다.
+EC2 인스턴스 내부의 애플리케이션 서비스를 임의로 중단시켜 Application Status Check가 이를 감지하고 인스턴스 상태를 `impaired`로 변경하는지 확인합니다.
+
+SSM Run Command를 통해 EC2 내부의 애플리케이션 서비스를 정지합니다.
 
 ```bash
 INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id)
@@ -140,43 +163,45 @@ aws ssm send-command --instance-ids $INSTANCE_ID --document-name AWS-RunShellScr
   --parameters 'commands=["systemctl stop app"]'
 ```
 
-10초마다 상태를 조회합니다.
+애플리케이션 상태 검사 결과를 실시간으로 모니터링합니다.
 
 ```bash
 aws ec2 describe-application-status --instance-ids $INSTANCE_ID --output json \
   | jq -r '.ApplicationStatuses.Instances[0].ApplicationStatus | "\(.Status) \(.Details[0].Status) \(.Details[0].Reason.Code)"'
 ```
 
-| 시각(UTC) | 상태 |
-| --- | --- |
-| 04:59:10 | `systemctl stop app` |
-| 05:01:06 | `ok passed ConnectionRefused` |
-| 05:02:10 | `impaired failed ConnectionRefused` |
-| 05:02:19 | `systemctl start app` |
-| 05:03:02 | `impaired failed ResponseCodeMatched` |
-| 05:04:05 | `ok passed ResponseCodeMatched` |
+시간 경과에 따른 상태 전이 이력입니다.
 
-같은 시각의 기존 상태 검사는 그대로입니다.
+| 시각 (UTC) | 수행 작업 및 감지 상태 | 상태 상세 설명 |
+| --- | --- | --- |
+| **04:59:10** | `systemctl stop app` 실행 | 프로세스 중단 |
+| **05:01:06** | `ok passed ConnectionRefused` | 1차 검사 실패 감지 (임계값 도달 전이므로 상태는 아직 ok 유지) |
+| **05:02:10** | `impaired failed ConnectionRefused` | 연속 2회 실패로 인해 최종 **`impaired`** 상태 확정 |
+| **05:02:19** | `systemctl start app` 실행 | 프로세스 재기동 |
+| **05:03:02** | `impaired failed ResponseCodeMatched` | 1차 검사 정상 복구 확인 |
+| **05:04:05** | `ok passed ResponseCodeMatched` | 연속 2회 성공으로 최종 **`ok`** 상태 복귀 |
+
+동일 시각에 기존 인스턴스 상태 검사(System / Instance Status Check)를 조회합니다.
 
 ```bash
 aws ec2 describe-instance-status --instance-ids $INSTANCE_ID --output json \
   | jq -c '.InstanceStatuses[0] | {system: .SystemStatus.Status, instance: .InstanceStatus.Status, app: .ApplicationStatus}'
 ```
 
+인스턴스 하이퍼바이저와 OS는 정상(`ok`)이지만 애플리케이션만 정확히 `impaired`로 분리 감지됨을 확인할 수 있습니다.
+
 ```text
 {"system":"ok","instance":"ok","app":{"Status":"impaired","ImpairedSince":"2026-11-07T05:01:08.787000+00:00"}}
 ```
 
-- 앱이 멈추고 `impaired`가 되기까지 약 2~3분, 다시 `ok`가 되기까지 약 2분 걸렸습니다. 검사 주기가 60초이고 `failure_threshold`와 `success_threshold`가 모두 2이기 때문입니다. 초 단위 장애 판정은 이 검사로 할 수 없어 prober를 함께 둡니다.
-- `StatusCheckFailed_Application` metric은 05:01, 05:02(UTC) 두 구간에 `1`이었습니다.
-- 응답 JSON은 공식 문서 예시(`ApplicationStatuses[]`)와 달리 `ApplicationStatuses.Instances[]` 아래에 있었습니다. CLI 2.36 기준입니다.
+- 상태 검사 주기가 60초이고 실패/성공 임계값(`threshold`)이 각각 2로 설정되어 있으므로, 실제 장애 발생부터 `impaired` 감지까지 약 2~3분이 소요됩니다. 따라서 초 단위 무중단 판정에는 실시간 Lambda Prober를 함께 병행하여 모니터링해야 합니다.
 
-## 부록. 실무에서 얻는 것
+## 부록: 실무 시사점 및 운영 팁
 
-- **application status check는 Terraform `hashicorp/aws` provider에 아직 없습니다**(2026-11 기준, 리소스 PR이 열려 있는 상태). 이 실습은 `awscc_ec2_application_status_check`로 검사를 만들고, 인스턴스 연결은 CloudFormation에도 리소스가 없어 `terraform_data`의 `local-exec`로 `associate-application-status-check`를 호출합니다.
-- **source security group을 지정해야 inbound를 좁힐 수 있습니다.** `health_check_paths`를 생략하면 AWS가 source를 정해 주지만, 그 경우 app security group에 무엇을 허용할지 미리 알 수 없습니다. 이 실습은 전용 security group을 source로 지정하고 app security group이 그 security group만 허용합니다.
-- **배포처럼 예정된 중단은 suppression으로 덮습니다.** `enable-application-status-check-suppression --duration-seconds`로 그 시간 동안 `suppressed` 상태가 되고 Auto Scaling이 교체하지 않습니다.
-- **prober를 상시로 돌리면 Lambda 무료 구간을 대부분 씁니다.** 1분에 한 번, 128 MB로 56초 실행이면 한 달 약 30만 GB-초입니다. 계정 무료 구간 40만 GB-초 안이지만 다른 Lambda와 나눠 씁니다. 상시 감시가 목적이면 CloudWatch Synthetics나 기존 모니터링 도구가 맞고, 이 prober는 전환 작업 기간에만 켭니다.
+- **Application Status Check의 프로비저닝 구조**: Terraform의 공식 `hashicorp/aws` 프로바이더에는 해당 리소스가 아직 머지되지 않은 상태(2026년 11월 기준)입니다. 본 실습에서는 AWS Cloud Control API 프로바이더(`awscc_ec2_application_status_check`)로 검사 객체를 생성하고, 인스턴스 연결은 AWS CLI 명령어(`associate-application-status-check`)를 로컬 프로비저너로 결합하여 자동화했습니다.
+- **보안 그룹 소스 제어**: Application Status Check가 인스턴스로 보내는 프로브 패킷은 AWS 관리형 ENI를 통과합니다. 이때 `health_check_paths`에 전용 소스 보안 그룹을 명시하지 않으면 인바운드 허용 규칙을 좁힐 수 없으므로, 반드시 전용 보안 그룹을 지정하여 최소 권한을 유지해야 합니다.
+- **예정된 배포 시 Suppression 활용**: 무중단 롤링 배포나 인스턴스 재시작 작업 중 일시적인 앱 다운으로 인해 Auto Scaling이 인스턴스를 조기 제거하지 않도록, `aws ec2 enable-application-status-check-suppression --duration-seconds <초>`를 호출하여 검사를 일시 유예할 수 있습니다.
+- **Prober 운영 비용 최적화**: 매 1초마다 Lambda Prober를 24시간 상시 가동하면 월간 무료 티어(400,000 GB-초)의 대부분을 소진할 수 있습니다. 상시 운영 환경에서는 CloudWatch Synthetics Canaries 또는 사내 모니터링 에이전트를 활용하고, 이 핸즈온 형태의 고밀도 Lambda Prober는 마이그레이션 작업 전후 검증 기간에 집중적으로 활용하는 것이 경제적입니다.
 
 ## 참고 문서
 
