@@ -6,8 +6,6 @@ tags: [makevideo, audio, ffmpeg, denoise]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-08T00:00:00Z }
 ---
 
-# 잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다
-
 ## 결정
 
 * 클립의 denoise 0..1 하나만 저장. 0은 꺼짐
