@@ -1,6 +1,7 @@
 //! Capture through the native screencapture binary. The system draws the
 //! selection, so speed and image quality match the system screenshot.
 
+use crate::settings::SettingsStore;
 use crate::windows::{self, Windows};
 use screenshot_core::capture::CaptureMode;
 use std::process::Command;
@@ -17,10 +18,11 @@ pub fn start(app: &AppHandle, mode: CaptureMode) {
         return;
     }
     let file = app.state::<Windows>().temp_png();
+    let args = mode.args(app.state::<SettingsStore>().get().capture_sound);
     let app = app.clone();
     std::thread::spawn(move || {
         let status = Command::new("/usr/sbin/screencapture")
-            .args(mode.args())
+            .args(args)
             .arg(&file)
             .status();
         app.state::<Capturing>().0.store(false, Ordering::SeqCst);

@@ -149,7 +149,7 @@ pub fn open_settings(app: &AppHandle) {
     }
     let built = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
         .title("akbun-screenshot Settings")
-        .inner_size(440.0, 640.0)
+        .inner_size(440.0, 700.0)
         .resizable(false)
         .center()
         .build();
