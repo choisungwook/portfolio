@@ -530,8 +530,6 @@ function startDebug(...args) { return assetUi.startDebug(...args); }
 function stopDebug(...args) { return assetUi.stopDebug(...args); }
 function activateSelectedPanel(...args) { return assetUi.activateSelectedPanel(...args); }
 function toggleSelectedPanel(...args) { return assetUi.toggleSelectedPanel(...args); }
-function toggleWorkspacePanel(...args) { return assetUi.toggleWorkspacePanel(...args); }
-function restoreWorkspacePanels(...args) { return assetUi.restoreWorkspacePanels(...args); }
 function prepareProxies(...args) { return assetUi.prepareProxies(...args); }
 function adoptWaveformStatuses(...args) { return assetUi.adoptWaveformStatuses(...args); }
 function prepareWaveforms(...args) { return assetUi.prepareWaveforms(...args); }
@@ -670,8 +668,7 @@ const wiring = globalThis.rendererWiringLib.createRendererWiring({
   seekTimelineEnd, updateMonitorZoomUi, startRender, fillRenderSheet, fillRenderSummary,
   persistSettingsInBackground, fillProxySheet, openSheet,
   fillProjectSheet, fillAppSheet, qualitySmokeConfig, accelerationNote, compositorNote,
-  anySheetOpen, closeTimelineContextMenu, toggleSelectedPanel, toggleWorkspacePanel,
-  restoreWorkspacePanels, refreshDebug, setSourceMark,
+  anySheetOpen, closeTimelineContextMenu, toggleSelectedPanel, refreshDebug, setSourceMark,
   placeSource, renderSourceMonitor, selectAsset, zoomToPxPerSecond, renderTimeline, relayoutTimeline,
   updatePlayhead, toggleSnap, toggleClipLink, addText, addShape, addMarker, edit,
   addSubtitle, importSrt, exportSrt, renderHeads, frameAtClientX, openTimelineContextMenu,
