@@ -181,7 +181,7 @@ pub fn parse_filler_picks(reply: &str, batch: &[TimedText], first: usize) -> Res
         }
         let index = item.get("i").and_then(Value::as_u64)? as usize;
         let word = normal(item.get("word")?.as_str()?);
-        [index, index + 1, index.wrapping_sub(1)].into_iter().find(|candidate| {
+        [index, index.wrapping_add(1), index.wrapping_sub(1)].into_iter().find(|candidate| {
             candidate
                 .checked_sub(first)
                 .and_then(|offset| batch.get(offset))
@@ -390,6 +390,25 @@ pub fn plan_chunks(
     chunks
 }
 
+/// Words seen twice because audio chunks overlap. Only a repeat that overlaps
+/// the previous word in time is dropped: a stutter ("we we") sits right after
+/// it and is exactly what filler removal has to see.
+pub fn deduplicate_words(mut words: Vec<TimedText>) -> Vec<TimedText> {
+    words.sort_by_key(|word| (word.start_ms, word.end_ms));
+    let mut answer: Vec<TimedText> = Vec::new();
+    for word in words {
+        if let Some(previous) = answer.last() {
+            if word.start_ms < previous.end_ms
+                && previous.text.trim().eq_ignore_ascii_case(word.text.trim())
+            {
+                continue;
+            }
+        }
+        answer.push(word);
+    }
+    answer
+}
+
 pub fn deduplicate_segments(mut segments: Vec<TimedText>) -> Vec<TimedText> {
     segments.sort_by_key(|segment| (segment.start_ms, segment.end_ms));
     let mut answer: Vec<TimedText> = Vec::new();
@@ -549,6 +568,17 @@ mod tests {
         assert_eq!(chunks[1].start_ms, 58_000);
         assert!(chunks.iter().all(|chunk| chunk.duration_ms() <= 60_000));
         assert_eq!(chunks.last().unwrap().end_ms, 130_000);
+    }
+
+    #[test]
+    fn a_stutter_survives_while_a_chunk_overlap_repeat_does_not() {
+        let word = |start_ms, end_ms| TimedText {
+            start_ms,
+            end_ms,
+            text: "we".into(),
+        };
+        let words = deduplicate_words(vec![word(0, 200), word(200, 400), word(350, 420)]);
+        assert_eq!(words.len(), 2);
     }
 
     #[test]

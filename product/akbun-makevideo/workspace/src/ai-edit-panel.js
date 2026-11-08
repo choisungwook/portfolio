@@ -240,11 +240,11 @@
       await window.api.aiEditApplyFillers(keep);
       await options.syncDocument?.();
       $('ai-edit-summary').textContent = `Removed ${keep.length} cuts.`;
+      $('filler-review').hidden = true;
+      $('filler-review-list').replaceChildren();
     } catch (error) {
       $('ai-edit-summary').textContent = String(error).replace(/^Error:\s*/, '');
     }
-    $('filler-review').hidden = true;
-    $('filler-review-list').replaceChildren();
   }
 
   async function refreshCredentialStatus() {

@@ -1,7 +1,7 @@
 use crate::commands::{find_tool, AppState, Settings};
 use base64::Engine;
 use makevideo_analysis::{
-    deduplicate_segments, filler_prompt, filler_ranges, parse_azure, parse_filler_picks,
+    deduplicate_segments, deduplicate_words, filler_prompt, filler_ranges, parse_azure, parse_filler_picks,
     parse_google, parse_openai, parse_openai_words, parse_silence, plan_chunks, TimeRange,
     TimedText,
 };
@@ -257,6 +257,15 @@ pub fn ai_edit_start_filler_analysis(
         .unwrap()
         .get(&settings.transcription_provider)
         .cloned();
+    if !matches!(
+        settings.transcription_provider.as_str(),
+        "openai" | "litellm" | "custom"
+    ) {
+        return Err(
+            "filler removal needs word timestamps; choose an OpenAI-compatible speech endpoint"
+                .into(),
+        );
+    }
     let (status, cancel) = begin_job(&runtime, "fillers")?;
     let locked = state.document.lock().unwrap();
     let project = locked.project().clone();
@@ -292,13 +301,13 @@ pub fn ai_edit_apply_fillers(
     keep: Vec<usize>,
 ) -> Result<(), String> {
     let (fillers, revision) = {
-        let mut locked = runtime.state.lock().unwrap();
-        let status = &mut locked.status;
+        let locked = runtime.state.lock().unwrap();
+        let status = &locked.status;
         if status.kind != "fillers" || status.stage != "done" {
             return Err("find fillers first".into());
         }
-        let result = status.result.take().ok_or("these fillers were already applied")?;
-        (result.fillers, result.base_revision)
+        let result = status.result.as_ref().ok_or("these fillers were already applied")?;
+        (result.fillers.clone(), result.base_revision)
     };
     let ranges = keep
         .iter()
@@ -308,7 +317,10 @@ pub fn ai_edit_apply_fillers(
             end_ms: filler.end_ms,
         })
         .collect::<Vec<_>>();
-    apply_ranges(&state.document, revision, &ranges, "Remove fillers")
+    apply_ranges(&state.document, revision, &ranges, "Remove fillers")?;
+    // Consumed only once it landed, so a failed apply can be retried.
+    runtime.state.lock().unwrap().status.result = None;
+    Ok(())
 }
 
 fn begin_job(
@@ -903,7 +915,11 @@ fn transcribe(
             adapter.parse(&body, chunk.start_ms)?
         });
     }
-    Ok(deduplicate_segments(captions))
+    Ok(if words {
+        deduplicate_words(captions)
+    } else {
+        deduplicate_segments(captions)
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
