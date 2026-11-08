@@ -191,6 +191,16 @@ jobs:
           bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-makevideo >> "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
+      # The MCP server as a one-file bundle an AI client installs directly.
+      - name: Attach the MCP bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm ci --prefix mcp
+          node mcp/pack.mjs "$RUNNER_TEMP/akbun-makevideo.mcpb"
+          gh release upload "akbun-makevideo-v${VERSION}" "$RUNNER_TEMP/akbun-makevideo.mcpb" --clobber
+
       # Several products release from this repository, so the GitHub-wide
       # "latest" release is whichever product shipped last. The app therefore
       # polls a fixed tag that only this step touches, instead of
