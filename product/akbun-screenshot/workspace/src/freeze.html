@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>akbun-screenshot Freeze</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: crosshair; }
+    /* The still is the display at its pixel size, so filling the window in
+       points draws it one to one on a retina screen. */
+    img { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <img id="still" alt="">
+  <script src="freeze.js"></script>
+</body>
+</html>

@@ -5,6 +5,7 @@
 //! that copies, encodes or decodes a whole image is async, which runs it off
 //! the main thread.
 
+use crate::freeze::FREEZE;
 use crate::settings::{register_shortcuts, SettingsStore};
 use crate::tray;
 use crate::update::notify;
@@ -25,6 +26,12 @@ fn owned(state: &Windows, window: &WebviewWindow, kind: &str) -> Result<PathBuf>
     state
         .file(window.label(), kind)
         .ok_or_else(|| "this window has no capture".to_string())
+}
+
+/// The window's own capture as a data URL, which keeps the CSP to data: images.
+fn image_url(state: &Windows, window: &WebviewWindow, kind: &str) -> Result<String> {
+    let bytes = fs::read(owned(state, window, kind)?).map_err(|e| e.to_string())?;
+    Ok(png::encode_data_url(&bytes))
 }
 
 fn now() -> chrono::NaiveDateTime {
@@ -140,14 +147,17 @@ pub fn open_screen_settings() -> Result<()> {
 /// a canvas taints it, and toDataURL on a tainted canvas throws.
 #[tauri::command]
 pub async fn preview_image(window: WebviewWindow, state: State<'_, Windows>) -> Result<String> {
-    let bytes = fs::read(owned(&state, &window, PREVIEW)?).map_err(|e| e.to_string())?;
-    Ok(png::encode_data_url(&bytes))
+    image_url(&state, &window, PREVIEW)
 }
 
 #[tauri::command]
 pub async fn editor_image(window: WebviewWindow, state: State<'_, Windows>) -> Result<String> {
-    let bytes = fs::read(owned(&state, &window, EDITOR)?).map_err(|e| e.to_string())?;
-    Ok(png::encode_data_url(&bytes))
+    image_url(&state, &window, EDITOR)
+}
+
+#[tauri::command]
+pub async fn freeze_image(window: WebviewWindow, state: State<'_, Windows>) -> Result<String> {
+    image_url(&state, &window, FREEZE)
 }
 
 #[tauri::command]
