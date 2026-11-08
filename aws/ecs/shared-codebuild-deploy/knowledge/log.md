@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-08
+
+* **Update**: [OKF v0.2 스펙 사본](references/okf-spec-0.2.md) 0.1 사본을 0.2 원문으로 교체. 0.2부터 timestamp와 Citations 대신 generated와 sources를 씀.
+
 ## 2026-10-05
 
 * **Creation**: [PR diff](decisions/2026-10-pr-task-diff.md) - PR comment로 task definition 변경 미리 보기.

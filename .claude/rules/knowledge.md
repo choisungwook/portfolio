@@ -55,7 +55,7 @@ tags: [kubernetes, workflow]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-07-10T00:00:00Z }
 sources:                  # 근거가 있을 때만
   - id: okf-spec
-    resource: references/okf-spec-0.2.md
+    resource: /references/okf-spec-0.2.md   # bundle root 기준
     title: OKF 0.2 스펙 사본
 ---
 ```
@@ -73,7 +73,7 @@ frontmatter 규칙:
 - Decision은 `## 결정`과 `## 이유` 섹션을 쓴다.
 - 외부 근거(PR, 블로그, 공식 문서)는 본문 목록이 아니라 frontmatter `sources`에 남긴다. 특정 문장의 근거는 `[^id]` 각주로 달고 라벨을 `sources[].id`와 맞춘다.
 - 관련 concept는 markdown 상대 링크로 연결한다. 링크 대상이 아직 없어도 괜찮다.
-- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 로컬 경로를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
+- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 `/`로 시작하는 bundle root 기준 경로(예: `/references/foo.md`)를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
 - 0.1 형식(`timestamp`, `## Citations`)으로 쓰인 기존 concept는 그대로 읽힌다. 그 concept를 고칠 때 그 파일만 새 형식으로 옮긴다.
 - 분량은 A4 반 장 이내로 짧게 쓴다.
 

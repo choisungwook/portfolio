@@ -83,7 +83,7 @@
 
 이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. 코드와 git history가 기록하지 못한 결정의 이유가 거기에 있고, 읽지 않으면 이미 버려진 방법을 다시 고른다. `wiki/`나 `adr/`가 있으면 그 index도 읽는다.
 
-작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 작업한 디렉터리 안의 `knowledge/`에 기록한다. workspace마다 자기 `knowledge/`를 가지며 루트에는 두지 않는다. 형식은 Open Knowledge Format(OKF) 0.2이고, 템플릿은 [templates/knowledge/](./templates/knowledge/index.md), 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다. 0.2부터 작성 시각과 주체는 `generated`, 근거는 `sources`에 적는다. 사람이 확인한 concept에만 `verified: { by: human:<id> }`를 붙이고, agent는 자기 글에 붙이지 않는다.
+작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 작업한 디렉터리 안의 `knowledge/`에 기록한다. workspace마다 자기 `knowledge/`를 가지며 루트에는 두지 않는다. 형식은 Open Knowledge Format(OKF) 0.2이고, 템플릿은 [templates/knowledge/](./templates/knowledge/index.md), 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
 
 ## 검증 수단
 
