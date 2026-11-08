@@ -930,14 +930,25 @@ pub fn font_available(family: String) -> bool {
 }
 
 /// Every installed font family, for the text inspector's picker.
+///
+/// The first call builds the system font database, so it runs off the main
+/// thread like every command below that reads files or spawns a process: a
+/// synchronous command runs on the main thread and freezes the window.
 #[tauri::command]
-pub fn list_fonts() -> Vec<String> {
-    makevideo_compositor::text::font_families()
+pub async fn list_fonts() -> Result<Vec<String>, String> {
+    blocking(makevideo_compositor::text::font_families).await
 }
 
 #[tauri::command]
-pub fn validate_lut(path: String) -> Result<(), String> {
-    makevideo_compositor::lut::Lut::from_cube_file(&path).map(|_| ())
+pub async fn validate_lut(path: String) -> Result<(), String> {
+    blocking(move || makevideo_compositor::lut::Lut::from_cube_file(&path).map(|_| ())).await?
+}
+
+/// Run file or process work on the blocking pool and hand back its value.
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| format!("background task failed: {error}"))
 }
 
 /// One composited frame for the preview, drawn by the same shader the render
@@ -1258,9 +1269,19 @@ async fn assess_proxy_assets(
 /// the page fills it in from the media element once it loads, so the app still
 /// works with no ffmpeg installed right up to the point of rendering.
 #[tauri::command]
-pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>) -> Vec<Asset> {
+pub async fn import_assets(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<Vec<Asset>, String> {
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let ffprobe = find_tool(&app, "ffprobe", &configured);
+    blocking(move || import_assets_blocking(&app, &configured, paths)).await
+}
+
+/// One ffprobe per file, so this belongs on a blocking thread. The MCP bridge
+/// already runs on one and calls it directly.
+pub(crate) fn import_assets_blocking(app: &AppHandle, configured: &str, paths: Vec<String>) -> Vec<Asset> {
+    let ffprobe = find_tool(app, "ffprobe", configured);
     let mut assets = Vec::new();
     for path in paths {
         let Some(kind) = AssetKind::from_path(&path) else {
@@ -1269,7 +1290,7 @@ pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>)
         if !Path::new(&path).is_file() {
             continue;
         }
-        allow_asset_file(&app, &path);
+        allow_asset_file(app, &path);
         let probed = probe_asset(ffprobe.as_ref(), &path);
         assets.push(Asset {
             id: makevideo_render::asset_id(&path),
@@ -1755,6 +1776,15 @@ fn start_waveforms_inner(
             .iter()
             .filter(|asset| wanted.contains(&asset.id))
         {
+            // Every save comes through here. A peaks file already read for this
+            // project is not parsed again; opening a project clears the map.
+            if waveforms
+                .entries
+                .get(&asset.id)
+                .is_some_and(|status| status.state == "ready")
+            {
+                continue;
+            }
             if let Some(waveform) = makevideo_waveform::read_valid(&project_path, asset) {
                 waveforms.entries.insert(
                     asset.id.clone(),
@@ -2115,32 +2145,16 @@ pub fn new_document(
 }
 
 #[tauri::command]
-pub fn open_project(
+pub async fn open_project(
     app: AppHandle,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
 ) -> Result<DocumentState, String> {
     crate::ai_edit::ensure_editable(&ai_runtime)?;
-    let text =
-        std::fs::read_to_string(&path).map_err(|error| format!("cannot open {path}: {error}"))?;
-    let mut project: Project =
-        serde_json::from_str(&text).map_err(|error| format!("{path} is not a project: {error}"))?;
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let ffprobe = find_tool(&app, "ffprobe", &configured);
-    if ffprobe.is_some() {
-        for asset in &mut project.assets {
-            let measured = probe_asset(ffprobe.as_ref(), &asset.path);
-            if measured.width > 0 && measured.height > 0 {
-                asset.width = measured.width;
-                asset.height = measured.height;
-            }
-            if measured.duration_ms > 0 {
-                asset.duration_ms = measured.duration_ms;
-            }
-            asset.has_audio = measured.has_audio;
-        }
-    }
+    let (reader_app, reader_path) = (app.clone(), path.clone());
+    let project = blocking(move || read_project(&reader_app, &configured, &reader_path)).await??;
     // The scope grant is in memory only, so a project opened in a new run has
     // to grant its media again or every preview is blank.
     for asset in &project.assets {
@@ -2153,8 +2167,49 @@ pub fn open_project(
         *document = Document::opened(project);
         document.state()
     };
+    // A reopened project checks its waveform files again; saves reuse what
+    // is already ready. Jobs still queued or running keep their entries so
+    // they are not started a second time.
+    state
+        .waveforms
+        .lock()
+        .unwrap()
+        .entries
+        .retain(|_, status| status.state != "ready");
     let _ = start_waveforms_inner(app, &state, path);
     Ok(opened)
+}
+
+/// Parse a project file and measure its media again, one ffprobe per asset
+/// spread over the cores. Opening a long edit was one probe after another.
+fn read_project(app: &AppHandle, configured: &str, path: &str) -> Result<Project, String> {
+    let text =
+        std::fs::read_to_string(path).map_err(|error| format!("cannot open {path}: {error}"))?;
+    let mut project: Project =
+        serde_json::from_str(&text).map_err(|error| format!("{path} is not a project: {error}"))?;
+    if let Some(ffprobe) = find_tool(app, "ffprobe", configured) {
+        let workers = std::thread::available_parallelism().map_or(4, |count| count.get()).min(8);
+        let chunk = project.assets.len().div_ceil(workers).max(1);
+        std::thread::scope(|scope| {
+            for assets in project.assets.chunks_mut(chunk) {
+                let ffprobe = &ffprobe;
+                scope.spawn(move || {
+                    for asset in assets {
+                        let measured = probe_asset(Some(ffprobe), &asset.path);
+                        if measured.width > 0 && measured.height > 0 {
+                            asset.width = measured.width;
+                            asset.height = measured.height;
+                        }
+                        if measured.duration_ms > 0 {
+                            asset.duration_ms = measured.duration_ms;
+                        }
+                        asset.has_audio = measured.has_audio;
+                    }
+                });
+            }
+        });
+    }
+    Ok(project)
 }
 
 /// Writes the project file and nothing else. In particular it does not copy a
@@ -2728,7 +2783,11 @@ fn process_metrics_rows(output: &str) -> Result<Vec<(u32, u32, u64, f64)>, Strin
 /// Process-tree metrics include WebView and ffmpeg children, which hold most
 /// preview memory and CPU outside the Rust process itself.
 #[tauri::command]
-pub fn process_metrics() -> Result<ProcessMetrics, String> {
+pub async fn process_metrics() -> Result<ProcessMetrics, String> {
+    blocking(read_process_metrics).await?
+}
+
+fn read_process_metrics() -> Result<ProcessMetrics, String> {
     let output = Command::new("ps")
         .args(["-axo", "pid=,ppid=,rss=,pcpu="])
         .output()

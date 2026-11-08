@@ -572,6 +572,7 @@ function renderMarkerList(...args) { return timelineUi.renderMarkerList(...args)
 function updateHistoryUi(...args) { return timelineUi.updateHistoryUi(...args); }
 function updateMonitorZoomUi(...args) { return timelineUi.updateMonitorZoomUi(...args); }
 function renderTimeline(...args) { return timelineUi.renderTimeline(...args); }
+function relayoutTimeline(...args) { return timelineUi.relayoutTimeline(...args); }
 function checkLutFiles(...args) { return timelineUi.checkLutFiles(...args); }
 function refresh(...args) {
   const result = timelineUi.refresh(...args);
@@ -668,7 +669,7 @@ const wiring = globalThis.rendererWiringLib.createRendererWiring({
   persistSettingsInBackground, fillProxySheet, openSheet,
   fillProjectSheet, fillAppSheet, qualitySmokeConfig, accelerationNote, compositorNote,
   anySheetOpen, closeTimelineContextMenu, toggleSelectedPanel, refreshDebug, setSourceMark,
-  placeSource, renderSourceMonitor, selectAsset, zoomToPxPerSecond, renderTimeline,
+  placeSource, renderSourceMonitor, selectAsset, zoomToPxPerSecond, renderTimeline, relayoutTimeline,
   updatePlayhead, toggleSnap, toggleClipLink, addText, addShape, addMarker, edit,
   addSubtitle, importSrt, exportSrt, renderHeads, frameAtClientX, openTimelineContextMenu,
   addVisualKeyframesAt, addVolumeKeyframeAt, setClipLut, addAdjustmentLayer, addPip,
@@ -740,6 +741,7 @@ const appInitializer = globalThis.appInitLib.createAppInitializer({
   rate,
   refresh,
   renderTimeline,
+  relayoutTimeline,
   reportError,
   selectAsset,
   selectedSourceAsset,

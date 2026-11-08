@@ -68,22 +68,31 @@
     }
 
 
+    const NON_TEXT_INPUTS = new Set(['range', 'checkbox', 'radio', 'button', 'color']);
+
     function wireKeyboard() {
       window.addEventListener('keydown', (event) => {
         const target = event.target;
+        // A slider or a checkbox keeps focus after a click, and it does not take
+        // text: Space and the arrows still belong to the editor there.
         const typing =
-          target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
+          target &&
+          (target.isContentEditable ||
+            target.tagName === 'SELECT' ||
+            target.tagName === 'TEXTAREA' ||
+            (target.tagName === 'INPUT' && !NON_TEXT_INPUTS.has(target.type)));
         if (event.key === 'Escape' && exitProgramMonitorFullscreen()) {
           event.preventDefault();
           return;
         }
         if (typing) return;
         if (event.key === 'Escape') {
-          closeMenus();
           closeTimelineContextMenu();
           for (const sheet of document.querySelectorAll('.overlay')) {
             if (sheet.id !== 'render-overlay' || !state.rendering) sheet.hidden = true;
           }
+          // After the sheets, so the monitor comes back once nothing covers it.
+          closeMenus();
           return;
         }
         const action = K.actionFor(event, shortcutMap());

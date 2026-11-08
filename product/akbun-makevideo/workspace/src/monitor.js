@@ -383,7 +383,7 @@ function createMonitor(options) {
             (startedNonnative && snapshotPlaying) ||
             replacementHasUnacknowledgedTransport;
           if (!needsSnapshot && !intentChanged && answer.status) {
-            takeForEpoch(answer.status, epoch);
+            takeForEpoch(answer.status, epoch, true);
           }
           if (timelineMode()) {
             // The stacked timeline elements are not what is on screen any
@@ -576,21 +576,21 @@ function createMonitor(options) {
       });
   }
 
-  function take(status) {
+  /** A tick redraws the playhead, the clock and the stage overlays, so it is
+   *  sent only when the answer moved something. Reaching the end stops the
+   *  monitor on its own, which is a change and reaches the play button. */
+  function take(status, force = false) {
     if (!status) return;
-    const wasPlaying = playing;
+    const changed = force || status.position !== position || status.playing !== playing;
     position = status.position;
     playing = status.playing;
     if (status.failure && onNotice) onNotice(status.failure);
-    if (onTick) onTick(position, playing);
-    // Reaching the end stops the monitor on its own, and the page's play button
-    // has to notice.
-    if (wasPlaying && !playing && onTick) onTick(position, false);
+    if (changed && onTick) onTick(position, playing);
   }
 
-  function takeForEpoch(status, epoch) {
+  function takeForEpoch(status, epoch, force = false) {
     if (epoch !== attachmentEpoch) return;
-    take(status);
+    take(status, force);
   }
 
   /** The box is re-measured on every animation frame, and `place()` compares
@@ -607,12 +607,18 @@ function createMonitor(options) {
    *
    *  The retry beside it is the other half: an attach that found no room is
    *  finished here rather than being a fallback for the rest of the session. */
+  const IDLE_POLL_EVERY = 15;
+  let idleFrames = 0;
   function frame() {
     const box = place();
     if (attachWanted && !attaching && GEO.isDrawable(box)) {
       void Promise.resolve(attach()).catch(() => {});
     }
-    poll();
+    // A stopped playhead only moves when the page seeks it, and the seek
+    // answers with its own status. Polling a few times a second still catches
+    // a failure notice without a sync command on every idle frame.
+    idleFrames = playing ? 0 : idleFrames + 1;
+    if (playing || idleFrames % IDLE_POLL_EVERY === 0) poll();
     requestAnimationFrame(frame);
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);

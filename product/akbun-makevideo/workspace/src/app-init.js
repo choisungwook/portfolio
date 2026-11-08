@@ -51,6 +51,7 @@
       rate,
       refresh,
       renderTimeline,
+      relayoutTimeline,
       reportError,
       selectAsset,
       selectedSourceAsset,
@@ -316,7 +317,7 @@
         window.api.closeWindow();
       });
       window.addEventListener('resize', () => {
-        renderTimeline();
+        relayoutTimeline();
         // The window moving or resizing moves the stage, and the native view is
         // placed in the window rather than laid out by the page.
         if (preview) preview.place();
