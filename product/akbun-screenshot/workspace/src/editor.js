@@ -11,6 +11,8 @@ const colorInput = document.getElementById('color');
 const fontSelect = document.getElementById('font');
 const sizeInput = document.getElementById('size');
 const strokeInput = document.getElementById('stroke');
+const redactStyleSelect = document.getElementById('redact-style');
+const redact = globalThis.akbunRedact;
 
 // The document: the shapes drawn so far over the image they sit on. Redrawing
 // from these two always reproduces the current state, so nothing else is kept.
@@ -209,6 +211,10 @@ function drawCropCorners(b) {
 function drawShape(s) {
   if (s.type === 'crop') {
     drawCrop(s);
+    return;
+  }
+  if (s.type === 'redact') {
+    redact.draw(ctx, base, s, unit);
     return;
   }
 
@@ -477,6 +483,7 @@ canvas.addEventListener('mousedown', (event) => {
     return;
   }
   draft = { type: tool, x1: point.x, y1: point.y, x2: point.x, y2: point.y, ...style() };
+  if (tool === 'redact') draft.style = redactStyleSelect.value;
 });
 
 // On window rather than on the canvas, so a drag that leaves the image still
@@ -619,6 +626,7 @@ const STYLE_EDITS = [
   [sizeInput, (s, value) => { if (s.size !== undefined) s.size = Math.max(8, Number(value) || s.size); }],
   [strokeInput, (s, value) => { s.width = Math.max(1, Number(value) || s.width); }],
   [fontSelect, (s, value) => { if (s.font && value) s.font = value; }],
+  [redactStyleSelect, (s, value) => { if (s.type === 'redact') s.style = value; }],
 ];
 
 // The box whose run of edits already has a history entry. Without it the colour
@@ -650,6 +658,7 @@ function syncStyleInputs(s) {
   if (s.color) colorInput.value = s.color;
   if (s.size !== undefined) sizeInput.value = Math.round(s.size);
   if (s.width !== undefined) strokeInput.value = Math.round(s.width);
+  if (s.type === 'redact') redactStyleSelect.value = s.style;
   if (s.font && [...fontSelect.options].some((option) => option.value === s.font)) {
     fontSelect.value = s.font;
   }

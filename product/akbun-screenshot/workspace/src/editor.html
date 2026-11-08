@@ -178,6 +178,9 @@
         <button class="tool" data-tool="pencil" title="Pencil" aria-label="Pencil">
           <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>
         </button>
+        <button class="tool" data-tool="redact" title="Redact" aria-label="Redact">
+          <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><path class="solid" d="M4 6h4v4H4zM12 6h4v4h-4zM8 10h4v4H8zM16 10h4v4h-4zM4 14h4v4H4zM12 14h4v4h-4z"/></svg>
+        </button>
         <button class="tool" data-tool="crop" title="Crop" aria-label="Crop">
           <svg viewBox="0 0 24 24"><path d="M6 2v16h16"/><path d="M2 6h16v16"/></svg>
         </button>
@@ -185,6 +188,11 @@
 
       <div class="group">
         <input type="color" id="color" value="#ff3b30">
+        <select id="redact-style" title="Redact style" aria-label="Redact style">
+          <option value="pixelate">Pixelate</option>
+          <option value="blur">Blur</option>
+          <option value="blackout">Black out</option>
+        </select>
         <select id="font"></select>
         <label for="size">Font size</label>
         <input type="number" id="size" min="8" max="300" value="24">
@@ -192,7 +200,7 @@
         <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo &middot; &#8984;S save</span>
+      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Redact: drag over what to hide, Black out is the only style nothing can be read back from &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo &middot; &#8984;S save</span>
     </div>
 
     <div class="group actions">
@@ -209,6 +217,7 @@
 
   <script src="api.js"></script>
   <script src="shapes.js"></script>
+  <script src="redact.js"></script>
   <script src="fonts.js"></script>
   <script src="editor.js"></script>
 </body>
