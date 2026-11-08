@@ -141,7 +141,9 @@ function toggleSnap() {
       dom.renderBar.style.width = '0%';
       dom.renderCancel.hidden = false;
       dom.renderClose.hidden = true;
-      dom.renderOverlay.hidden = false;
+      // Through openSheet, so the native monitor steps out of the way: it is
+      // drawn over the webview and would cover the progress and Cancel.
+      openSheet('render-overlay');
       try {
         // No project goes with the request. Rust takes its own copy of the
         // document and remembers which revision it took, so an edit made while
@@ -150,7 +152,7 @@ function toggleSnap() {
       } catch (error) {
         reportError(error, 'render:start');
         state.rendering = false;
-        dom.renderOverlay.hidden = true;
+        closeSheet('render-overlay');
         await window.api.message(String(error), { title: 'Render failed', kind: 'error' });
       }
     }
@@ -397,9 +399,10 @@ function toggleSnap() {
 
     /** Whether anything is still drawn over the stage. Sheets can be stacked —
      *  Settings opens over the project sheet — so closing one is not the same as
-     *  the stage being clear. */
+     *  the stage being clear. `hidden` sits on the overlay, never on the sheet
+     *  inside it. */
     function anySheetOpen() {
-      return Boolean(document.querySelector('.sheet:not([hidden])'));
+      return Boolean(document.querySelector('.overlay:not([hidden])'));
     }
 
     function fillProjectSheet() {

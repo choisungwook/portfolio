@@ -149,7 +149,8 @@ fn mutate(app: &AppHandle, method: &str, args: &Value) -> Result<Value, String> 
         {
             return Err("Use 1–100 absolute media paths".into());
         }
-        let assets = commands::import_assets(app.clone(), app.state(), paths.clone());
+        let configured = app.state::<AppState>().settings.lock().unwrap().ffmpeg_dir.clone();
+        let assets = commands::import_assets_blocking(app, &configured, paths.clone());
         if assets.len() != paths.len() {
             return Err(
                 "One or more paths are missing or unsupported; nothing was imported".into(),

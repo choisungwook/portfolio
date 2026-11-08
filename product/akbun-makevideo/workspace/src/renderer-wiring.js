@@ -51,6 +51,7 @@
       selectAsset,
       zoomToPxPerSecond,
       renderTimeline,
+      relayoutTimeline,
       updatePlayhead,
       toggleSnap,
       toggleClipLink,
@@ -302,10 +303,10 @@
     function wireTimeline() {
       dom.scroll.addEventListener('wheel', timelineInteractions.scrollHorizontally, { passive: false });
       dom.zoom.addEventListener('input', () => {
-        const at = preview.position();
+        const frame = preview.position();
+        const offset = L.framesToPx(frame, rate(), state.pxPerSecond) - dom.scroll.scrollLeft;
         state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
-        renderTimeline();
-        updatePlayhead(at);
+        relayoutTimeline({ frame, offset });
       });
       dom.btnSplit.addEventListener('click', splitAtPlayhead);
       dom.btnMagnet.addEventListener('click', toggleSnap);
@@ -684,9 +685,7 @@
         if (path) openProjectPath(path);
       });
       dom.renderCancel.addEventListener('click', () => window.api.cancelRender());
-      dom.renderClose.addEventListener('click', () => {
-        dom.renderOverlay.hidden = true;
-      });
+      dom.renderClose.addEventListener('click', () => closeSheet('render-overlay'));
       dom.toolWarning.addEventListener('click', () => {
         fillAppSheet();
         openSheet('app-settings');
