@@ -14,6 +14,10 @@ const strokeInput = document.getElementById('stroke');
 const redactStyleSelect = document.getElementById('redact-style');
 const redact = globalThis.akbunRedact;
 const highlight = globalThis.akbunHighlight;
+const backdrop = globalThis.akbunBackground;
+const backdropPanel = globalThis.akbunBackgroundPanel;
+const backdropPreview = document.getElementById('bg-preview');
+const backdropAside = document.getElementById('bg-panel');
 
 // The document: the shapes drawn so far over the image they sit on. Redrawing
 // from these two always reproduces the current state, so nothing else is kept.
@@ -340,6 +344,8 @@ function restore(entry) {
   measureUnit();
   dropPointers();
   redraw();
+  // The Background view shows a composed copy, which undo would leave stale.
+  if (tool === 'background') renderBackdrop();
 }
 
 // Everything holding a shape object that is about to leave the document. Both
@@ -765,7 +771,52 @@ window.addEventListener('keydown', (event) => {
   redraw();
 });
 
+// Points to image pixels for the background padding and corners. The display
+// scale rather than `unit`, which follows the window size and would make the
+// saved padding depend on how big the editor window happened to be.
+const pointScale = () => window.devicePixelRatio || 1;
+
+// The annotated image as it will be saved, backdrop included. The selection
+// outline and an unapplied crop box are on the canvas, so both go first.
+function composed() {
+  if (cropBox) applyCrop(cropBox);
+  selected = null;
+  redraw();
+  return backdrop.compose(canvas, backdropPanel.options(), pointScale());
+}
+
+// Background is a view, not a drawing tool: it swaps the canvas for a preview
+// of the composed result and shows the panel beside it.
+function showBackdrop(on) {
+  canvas.hidden = on;
+  backdropPreview.hidden = !on;
+  backdropAside.hidden = !on;
+  if (on) renderBackdrop();
+  measureUnit();
+}
+
+function renderBackdrop() {
+  const result = composed();
+  backdropPreview.width = result.width;
+  backdropPreview.height = result.height;
+  backdropPreview.getContext('2d').drawImage(result, 0, 0);
+}
+
+// A slider fires an input event per pixel dragged, and each render composes
+// the full-size image. One render per frame keeps a tall capture responsive.
+let backdropFrame = 0;
+backdropPanel.init({
+  onChange: () => {
+    if (backdropFrame) return;
+    backdropFrame = requestAnimationFrame(() => {
+      backdropFrame = 0;
+      if (tool === 'background') renderBackdrop();
+    });
+  },
+});
+
 function selectTool(name) {
+  const wasBackdrop = tool === 'background';
   tool = name;
   canvas.style.cursor = name === 'select' ? 'default' : 'crosshair';
   if (name !== 'select') selected = null;
@@ -775,6 +826,9 @@ function selectTool(name) {
   for (const button of document.querySelectorAll('[data-tool]')) {
     button.classList.toggle('active', button.dataset.tool === name);
   }
+  // Last, once the crop box is gone, so rendering the preview cannot apply a
+  // crop and re-enter this function.
+  if (wasBackdrop !== (name === 'background')) showBackdrop(name === 'background');
 }
 
 for (const button of document.querySelectorAll('[data-tool]')) {
@@ -784,15 +838,11 @@ for (const button of document.querySelectorAll('[data-tool]')) {
   });
 }
 
-// The dashed outline lives on the canvas, so it has to go before the export.
+// A framed but unapplied crop would be saved with its dimming, so composed()
+// takes the framing first: that is what the screen is promising. The
+// background, when one is picked, is applied whichever tool is active.
 function exportPng() {
-  // A framed but unapplied crop is on the canvas too, and the dimming would be
-  // saved into the png. Taking the framing is what the screen is promising, so
-  // saving with a box up crops rather than throwing the box away.
-  if (cropBox) applyCrop(cropBox);
-  selected = null;
-  redraw();
-  return canvas.toDataURL('image/png');
+  return composed().toDataURL('image/png');
 }
 
 document.getElementById('save').addEventListener('click', () => {

@@ -1,3 +1,4 @@
+mod background;
 mod capture;
 mod commands;
 mod freeze;
@@ -88,6 +89,7 @@ pub fn run() {
             commands::window_close,
             scrolling::scroll_region_select,
             scrolling::scroll_done,
+            background::background_presets_save,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

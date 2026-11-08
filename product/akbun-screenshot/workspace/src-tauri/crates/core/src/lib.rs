@@ -1,5 +1,6 @@
 //! Everything in akbun-screenshot that can be tested without a window.
 
+pub mod background;
 pub mod capture;
 pub mod gather;
 pub mod layout;

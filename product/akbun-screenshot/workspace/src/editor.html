@@ -143,6 +143,39 @@
     }
 
     .hint { opacity: 0.6; }
+
+    /* The canvas and the Background panel side by side. */
+    main { flex: 1; min-height: 0; display: flex; }
+
+    #bg-panel {
+      width: 236px;
+      flex: none;
+      overflow-y: auto;
+      padding: 10px 12px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+    }
+
+    #bg-panel h3 { margin: 12px 0 6px; font-size: 12px; opacity: 0.7; }
+    #bg-panel h3:first-child { margin-top: 0; }
+    #bg-panel .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    #bg-panel .row label { width: 64px; }
+    #bg-panel input[type='range'] { flex: 1; }
+    #bg-panel input[type='text'] { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); }
+    #bg-panel select { max-width: none; flex: 1; }
+
+    #bg-swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .swatch { width: 26px; height: 26px; padding: 0; border-radius: 6px; }
+    /* No background: a slash through an empty square. */
+    .swatch[data-bg='none'] { background: linear-gradient(to top right, transparent 46%, var(--warn) 46%, var(--warn) 54%, transparent 54%) !important; }
+    .swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    #bg-align { display: grid; grid-template-columns: repeat(3, 26px); gap: 4px; }
+    #bg-align.disabled { opacity: 0.35; pointer-events: none; }
+    .align { width: 26px; height: 26px; padding: 0; }
+    .align.active { background: var(--accent); border-color: var(--accent); }
+
+    #bg-preset-status { min-height: 16px; font-size: 12px; opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -184,6 +217,9 @@
         <button class="tool" data-tool="redact" title="Redact" aria-label="Redact">
           <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><path class="solid" d="M4 6h4v4H4zM12 6h4v4h-4zM8 10h4v4H8zM16 10h4v4h-4zM4 14h4v4H4zM12 14h4v4h-4z"/></svg>
         </button>
+        <button class="tool" data-tool="background" title="Background" aria-label="Background">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><rect class="solid" x="6" y="7" width="12" height="10" rx="1"/></svg>
+        </button>
         <button class="tool" data-tool="crop" title="Crop" aria-label="Crop">
           <svg viewBox="0 0 24 24"><path d="M6 2v16h16"/><path d="M2 6h16v16"/></svg>
         </button>
@@ -203,7 +239,7 @@
         <input type="number" id="stroke" min="1" max="60" value="3">
       </div>
 
-      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Highlighter: drag over text, Shift for a straight stroke &middot; Redact: drag over what to hide, Black out is the only style nothing can be read back from &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo &middot; &#8984;S save</span>
+      <span class="hint">Select: drag to move, dots or [ ] to resize, colour and size boxes edit it, Delete or Backspace to remove &middot; Highlighter: drag over text, Shift for a straight stroke &middot; Redact: drag over what to hide, Black out is the only style nothing can be read back from &middot; Background: pick a backdrop in the side panel, it is applied when saving &middot; Crop: drag a box, pull its corners, Enter or double click to apply &middot; Text: Enter or click away &middot; Shift: circle and straight line &middot; &#8984;Z undo &middot; &#8984;&#8679;Z redo &middot; &#8984;S save</span>
     </div>
 
     <div class="group actions">
@@ -214,14 +250,45 @@
     </div>
   </header>
 
-  <div id="wrap">
-    <canvas id="canvas"></canvas>
-  </div>
+  <main>
+    <div id="wrap">
+      <canvas id="canvas"></canvas>
+      <canvas id="bg-preview" hidden></canvas>
+    </div>
+
+    <aside id="bg-panel" hidden>
+      <h3>Background</h3>
+      <div id="bg-swatches"></div>
+
+      <h3>Layout</h3>
+      <div class="row"><label for="bg-padding">Padding</label><input type="range" id="bg-padding" min="0" max="200" step="4"></div>
+      <div class="row"><label for="bg-radius">Corners</label><input type="range" id="bg-radius" min="0" max="60"></div>
+      <div class="row"><label for="bg-shadow">Shadow</label><input type="checkbox" id="bg-shadow"></div>
+      <div class="row">
+        <label for="bg-ratio">Ratio</label>
+        <select id="bg-ratio">
+          <option value="auto">Auto</option>
+          <option value="1:1">1:1</option>
+          <option value="4:3">4:3</option>
+          <option value="3:2">3:2</option>
+          <option value="16:9">16:9</option>
+        </select>
+      </div>
+      <div class="row"><label>Align</label><div id="bg-align"></div></div>
+
+      <h3>Presets</h3>
+      <div class="row"><select id="bg-preset" aria-label="Presets"></select><button id="bg-preset-delete" disabled>Delete</button></div>
+      <div class="row"><input type="text" id="bg-preset-name" placeholder="Preset name" maxlength="40"><button id="bg-preset-save">Save</button></div>
+      <div id="bg-preset-status"></div>
+    </aside>
+  </main>
 
   <script src="api.js"></script>
   <script src="shapes.js"></script>
   <script src="redact.js"></script>
   <script src="highlight.js"></script>
+  <script src="background.js"></script>
+  <script src="background-panel.js"></script>
   <script src="fonts.js"></script>
   <script src="editor.js"></script>
 </body>
