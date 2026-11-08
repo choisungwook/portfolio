@@ -1,6 +1,6 @@
-//! settings.json on disk and the global capture shortcut it names.
+//! settings.json on disk and the global capture shortcuts it names.
 
-use crate::windows::capture_area;
+use crate::capture;
 use screenshot_core::settings::Settings;
 use std::fs;
 use std::path::PathBuf;
@@ -49,16 +49,23 @@ impl SettingsStore {
     }
 }
 
-/// Replaces whatever shortcut is registered with this one. Registering is also
-/// the validation: a string the parser or the system refuses comes back as Err.
-pub fn register_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+/// Replaces every registered shortcut with the ones these settings assign.
+/// Registering is also the validation: a string the parser or the system
+/// refuses comes back as Err. One that fails does not stop the rest, so a
+/// launch with one taken shortcut still gets the other two.
+pub fn register_shortcuts(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     let shortcuts = app.global_shortcut();
     shortcuts.unregister_all().map_err(|e| e.to_string())?;
-    shortcuts
-        .on_shortcut(shortcut, |app, _, event| {
+    let mut first_error = None;
+    for (mode, shortcut) in settings.shortcuts() {
+        let registered = shortcuts.on_shortcut(shortcut, move |app, _, event| {
             if event.state == ShortcutState::Pressed {
-                capture_area(app);
+                capture::start(app, mode);
             }
-        })
-        .map_err(|e| e.to_string())
+        });
+        if let Err(error) = registered {
+            first_error.get_or_insert(format!("Cannot register shortcut {shortcut}: {error}"));
+        }
+    }
+    first_error.map_or(Ok(()), Err)
 }

@@ -1,4 +1,4 @@
-//! Capture and the three kinds of window: preview, editor and settings.
+//! The three kinds of window: preview, editor and settings.
 
 use screenshot_core::layout::{self, Rect, PREVIEW_HEIGHT, PREVIEW_WIDTH};
 use screenshot_core::png;
@@ -6,8 +6,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Command;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -22,7 +21,6 @@ const SETTINGS: &str = "settings";
 #[derive(Default)]
 pub struct Windows {
     owned: Mutex<HashMap<String, PathBuf>>,
-    capturing: AtomicBool,
     // Two captures inside the same millisecond must not share a temp file, or
     // dismissing either would delete the other's image.
     counter: AtomicU64,
@@ -33,7 +31,7 @@ impl Windows {
         self.counter.fetch_add(1, Ordering::Relaxed)
     }
 
-    fn temp_png(&self) -> PathBuf {
+    pub fn temp_png(&self) -> PathBuf {
         let millis = chrono::Utc::now().timestamp_millis();
         // $TMPDIR on macOS is per user and mode 700, so the name being
         // guessable does not let another account plant a file there.
@@ -77,34 +75,7 @@ impl Windows {
     }
 }
 
-/// Area capture through the native screencapture binary: the system draws the
-/// drag selection, so speed and image quality match the system screenshot.
-pub fn capture_area(app: &AppHandle) {
-    let state = app.state::<Windows>();
-    if state.capturing.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    let file = state.temp_png();
-    let app = app.clone();
-    std::thread::spawn(move || {
-        // -i interactive, -s mouse selection only, -x no shutter sound.
-        let status = Command::new("/usr/sbin/screencapture")
-            .args(["-i", "-s", "-x"])
-            .arg(&file)
-            .status();
-        app.state::<Windows>()
-            .capturing
-            .store(false, Ordering::SeqCst);
-        // Esc during the selection exits without writing a file.
-        if status.is_ok() && file.exists() {
-            if let Err(error) = open_preview(&app, file) {
-                eprintln!("cannot open preview: {error}");
-            }
-        }
-    });
-}
-
-fn open_preview(app: &AppHandle, file: PathBuf) -> tauri::Result<()> {
+pub fn open_preview(app: &AppHandle, file: PathBuf) -> tauri::Result<()> {
     let state = app.state::<Windows>();
     let label = format!("{PREVIEW}{}", state.next_id());
     let (area, _) = work_area(app);
@@ -178,7 +149,7 @@ pub fn open_settings(app: &AppHandle) {
     }
     let built = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
         .title("akbun-screenshot Settings")
-        .inner_size(440.0, 500.0)
+        .inner_size(440.0, 640.0)
         .resizable(false)
         .center()
         .build();

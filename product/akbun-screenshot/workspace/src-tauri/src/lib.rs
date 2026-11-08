@@ -1,3 +1,4 @@
+mod capture;
 mod commands;
 mod settings;
 mod tray;
@@ -41,13 +42,13 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     install_menu(app)?;
 
     let store = settings::SettingsStore::load(app.handle())?;
-    let shortcut = store.get().shortcut;
+    let current = store.get();
     app.manage(store);
-    tray::install(app.handle(), &shortcut)?;
+    tray::install(app.handle(), &current)?;
     // A shortcut that will not register (taken by another app, say) must not
     // stop the app from starting. The tray menu still captures.
-    if let Err(error) = settings::register_shortcut(app.handle(), &shortcut) {
-        eprintln!("cannot register {shortcut}: {error}");
+    if let Err(error) = settings::register_shortcuts(app.handle(), &current) {
+        eprintln!("{error}");
     }
     Ok(())
 }
@@ -59,6 +60,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(windows::Windows::default())
+        .manage(capture::Capturing::default())
         .setup(setup)
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
