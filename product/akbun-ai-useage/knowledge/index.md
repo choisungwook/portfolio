@@ -4,7 +4,7 @@ okf_version: "0.1"
 
 # akbun-ai-useage Knowledge
 
-akbun-ai-useage 프로젝트의 지식 번들이다. [templates/knowledge/](../../../templates/knowledge/index.md)와 같은 OKF 0.1 형식을 따르되, 이 프로젝트에만 유효한 지식을 담는다. 데이터 소스 형식은 [wiki/architecture.md](../wiki/architecture.md), 결정은 [adr/](../adr/index.md)에 있다.
+akbun-ai-useage 프로젝트의 지식 번들이다. [templates/knowledge/](../../../templates/knowledge/index.md)와 같은 OKF 0.2 형식을 따르되, 이 프로젝트에만 유효한 지식을 담는다. 데이터 소스 형식은 [wiki/architecture.md](../wiki/architecture.md), 결정은 [adr/](../adr/index.md)에 있다.
 
 ## 디렉터리
 

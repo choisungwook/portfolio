@@ -4,7 +4,7 @@ okf_version: "0.1"
 
 # Knowledge
 
-akbun-caculatorllm의 지속적인 의사결정과 도메인 지식을 기록한다. [Open Knowledge Format(OKF) 0.1](references/okf-spec-0.1.md)을 따른다.
+akbun-caculatorllm의 지속적인 의사결정과 도메인 지식을 기록한다. [Open Knowledge Format(OKF) 0.2](references/okf-spec-0.2.md)을 따른다.
 
 ## 디렉터리
 

@@ -5,7 +5,7 @@ okf_version: "0.1"
 # Knowledge
 
 - ECS 공용 CodeBuild 배포 핸즈온의 결정 이유.
-- 형식: [Open Knowledge Format 0.1](references/okf-spec-0.1.md).
+- 형식: [Open Knowledge Format 0.2](references/okf-spec-0.2.md).
 - [Terraform으로 최초 생성, 추출한 JSON을 Git에서 관리](decisions/2026-10-git-task-template.md).
 - [배포 완료는 rolloutState를 직접 조회해 판정](decisions/2026-10-deployment-guard-scope.md).
 - [모노레포 소스 전달을 clone 참조로 전환](decisions/2026-10-source-clone-reference.md).
