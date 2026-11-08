@@ -8,11 +8,12 @@ Tauri 2 app: a Rust main process and plain JavaScript pages with no build step. 
 - `workspace/src-tauri/src/tray.rs`: the menu bar icon and its menu.
 - `workspace/src-tauri/src/capture.rs`: runs `screencapture` for a capture mode and opens the preview on the result. Holds the busy flag that ignores a second trigger mid selection.
 - `workspace/src-tauri/src/freeze.rs`: freeze screen. Takes a still of the main display and covers the display with it while the area selection runs.
+- `workspace/src-tauri/src/scrolling/`: scrolling capture. `mod.rs` holds its two commands and the Done flag, `windows.rs` the selection overlay, the frame and the panel, and `session.rs` the loop that grabs and stitches.
 - `workspace/src-tauri/src/windows.rs`: the preview, editor and settings windows. Owns the map from window label to temp png.
-- `workspace/src-tauri/src/commands.rs`: every `#[tauri::command]` the pages call.
+- `workspace/src-tauri/src/commands.rs`: the `#[tauri::command]`s the pages call, except the scrolling capture's, which live in its own module.
 - `workspace/src-tauri/src/settings.rs`: settings.json on disk and the global shortcuts it names, one per capture mode.
 - `workspace/src-tauri/src/update.rs`: Check for Updates through the updater plugin.
-- `workspace/src-tauri/crates/core/`: pure helpers (capture mode flags, filenames, settings merge, preview position, editor window size, png header and data URL checks). No tauri dependency, so `cargo test -p screenshot-core` runs anywhere in seconds.
+- `workspace/src-tauri/crates/core/`: pure helpers (capture mode flags, scrolling capture region and stitching, filenames, settings merge, preview position, editor window size, png header and data URL checks). No tauri dependency, so `cargo test -p screenshot-core` runs anywhere in seconds.
 - `workspace/src/`: three pages plus shared scripts. `api.js` exposes `window.api` over `invoke`, with the same method names the Electron preload had. `settings.html` has a General tab (shortcut, save directory, default font) and a Permissions tab; `preview.html` shows one capture with Save, Copy, Edit and Close; `editor.html` is the annotation editor. `shapes.js` holds the editor's pure geometry and `fonts.js` the font picker shared with the settings window.
 
 The Permissions tab reads the Screen Recording status through `CGPreflightScreenCaptureAccess`, shows a granted/missing badge with step-by-step guidance, and a button that opens System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus.
@@ -34,6 +35,14 @@ With `freezeScreen` on, Capture Area first takes `screencapture -m -x` of the ma
 The preview has four buttons and each one dismisses it. Save writes the capture into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy decodes the png and puts the bitmap on the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md).
 
 Every window that holds a capture is an entry in one label-keyed map, and the temp png is deleted on the window's `Destroyed` event rather than by the buttons, so Cmd+W and quitting drop it too. The run loop's `Exit` event deletes whatever is left. The temp filename carries a counter as well as a timestamp, so two captures inside the same millisecond cannot share a file. The preview loads its image as a data URL from `preview_image`, which keeps the CSP to `img-src 'self' data:` with no asset protocol to configure.
+
+## Scrolling capture
+
+`screencapture -i` never says which rectangle was picked, and a scrolling capture has to grab the same rectangle many times, so this mode draws its own selection. `scroll-select` is a transparent simple fullscreen window over the main display; the page posts the dragged box to `scroll_region_select`, which rounds it to whole points and rejects anything under 40 points either way.
+
+The session then opens two windows. `scroll-frame` is the region grown by 3 points and draws a dashed line in that margin, so the line is never inside a captured frame; it ignores cursor events, so clicks and the scroll wheel reach the page underneath as if it were not there. `scroll-panel` sits outside the region, below it or above it when there is no room, and carries Done and Cancel. Cancel closes the panel, and the loop treats a missing panel as cancelled, which also covers Cmd+W.
+
+The loop runs `screencapture -x -R<x>,<y>,<w>,<h>` about five times a second, decodes each png to RGBA, and passes it to `Gather` in the core crate, which holds off until two frames in a row are nearly identical, 95% of rows unchanged so a blinking caret does not keep it waiting, and only then hands frames to `Stitcher`. Without that wait the first frame can catch the selection overlay still fading out, and since the stitcher keeps its last frame as the reference after a miss, a dimmed first frame would make every later frame a miss too. The stitcher hashes every row and looks for the smallest upward shift where the last frame's rows from the shift down equal the new frame's rows from the top, and appends the rows below that overlap. Rows equal at the same position in both frames are a sticky header or footer: they are left out of the comparison and new rows go in above the footer, so the bar appears once. Flat single-colour rows match at any shift, so a shift needs at least eight rows of real content to count, and 95% of them must match so a blinking caret does not lose a frame. No overlap means the user scrolled more than a screen between frames; the frame is dropped and the panel says so. The image stops growing at 32768 pixels, keeping the rows that continue it rather than the newest ones. Done encodes the result into a temp png and opens the ordinary preview on it; if the screen never stood still, a playing video say, it opens the last frame instead, so Done always ends in a capture.
 
 ## Editor
 
@@ -98,6 +107,8 @@ Fonts come from the `list_fonts` command, which reads the system font directorie
 | `editor_save_as` | Ask for a path with a save dialog, write the canvas there and close the editor |
 | `editor_copy` | Put the edited canvas on the clipboard and close the editor |
 | `window_close` | Close the calling window, keeping nothing |
+| `scroll_region_select` | Take the region from the selection overlay and start the scrolling capture loop (in `scrolling/mod.rs`) |
+| `scroll_done` | End the scrolling capture and open the stitched image in a preview (in `scrolling/mod.rs`) |
 
 The settings page picks the save folder itself with the dialog plugin's `open`, because it only needs a string back.
 

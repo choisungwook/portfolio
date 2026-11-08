@@ -1,7 +1,7 @@
 //! The menu bar icon and its menu. The app has no dock icon and no main window,
 //! so this is the whole entry point.
 
-use crate::{capture, update, windows};
+use crate::{capture, scrolling, update, windows};
 use screenshot_core::capture::CaptureMode;
 use screenshot_core::settings::Settings;
 use tauri::menu::{Menu, MenuBuilder, MenuItem};
@@ -9,6 +9,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Wry};
 
 const TRAY_ID: &str = "main";
+const SCROLLING_ID: &str = "capture-scrolling";
 
 pub fn install(app: &AppHandle, settings: &Settings) -> tauri::Result<()> {
     // An emoji title instead of an image asset. Swap for a 16pt template png if
@@ -24,6 +25,7 @@ pub fn install(app: &AppHandle, settings: &Settings) -> tauri::Result<()> {
                 return capture::start(app, mode);
             }
             match id {
+                SCROLLING_ID => scrolling::start(app),
                 "settings" => windows::open_settings(app),
                 "update" => update::check(app),
                 "quit" => app.exit(0),
@@ -60,7 +62,8 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<Wry>> 
         menu = menu.item(&capture_item(app, mode, settings.shortcut_for(mode))?);
     }
     let version = format!("Version {}", app.package_info().version);
-    menu.separator()
+    menu.text(SCROLLING_ID, "Scrolling Capture")
+        .separator()
         .text("settings", "Settings…")
         .text("update", "Check for Updates…")
         .separator()

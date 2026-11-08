@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>akbun-screenshot Scrolling Capture Panel</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; font: 13px -apple-system, sans-serif; }
+    .panel {
+      box-sizing: border-box; height: 100%; display: flex; align-items: center; gap: 8px;
+      padding: 0 10px; border-radius: 10px; background: rgba(30, 30, 30, 0.92); color: #fff;
+    }
+    #status { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #status.warn { color: #ffcc00; }
+    button { padding: 5px 12px; border: none; border-radius: 6px; font: inherit; cursor: pointer; }
+    #done { background: #0a84ff; color: #fff; }
+    #cancel { background: #3a3a3c; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <span id="status">Scroll slowly through the region</span>
+    <button id="cancel">Cancel</button>
+    <button id="done">Done</button>
+  </div>
+  <script src="scroll-panel.js"></script>
+</body>
+</html>
