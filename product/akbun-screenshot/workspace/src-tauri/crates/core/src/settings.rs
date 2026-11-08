@@ -19,6 +19,9 @@ pub struct Settings {
     /// Whether Delete and Backspace remove the selected shape in the editor. A
     /// setting because Backspace is muscle memory for "go back".
     pub delete_keys: bool,
+    /// Whether a capture plays the system shutter sound. Off by default, which
+    /// is how every earlier version behaved.
+    pub capture_sound: bool,
 }
 
 impl Settings {
@@ -37,6 +40,7 @@ impl Settings {
                 .into(),
             default_font: "Apple SD Gothic Neo".into(),
             delete_keys: true,
+            capture_sound: false,
         }
     }
 
@@ -206,6 +210,13 @@ mod tests {
     }
 
     // Clearing a shortcut in the page must survive a reload.
+    #[test]
+    fn capture_sound_is_off_unless_stored() {
+        assert!(!defaults().capture_sound);
+        let stored = json!({ "captureSound": true });
+        assert!(Settings::merge(&defaults(), Some(&stored)).capture_sound);
+    }
+
     #[test]
     fn a_duplicate_shortcut_on_disk_keeps_the_save_dir() {
         let stored =
