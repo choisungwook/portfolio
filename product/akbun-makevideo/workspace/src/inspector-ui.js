@@ -183,6 +183,9 @@
           dom.clipVolume.value = String(audioClip.volume ?? 1);
           dom.clipSpeed.value = String(audioClip.speed ?? 1);
           dom.clipPreservePitch.checked = audioClip.preservePitch !== false;
+          dom.clipDenoise.checked = (audioClip.denoise || 0) > 0;
+          if (dom.clipDenoise.checked) dom.clipDenoiseStrength.value = String(audioClip.denoise);
+          dom.clipDenoiseStrength.disabled = !dom.clipDenoise.checked;
           dom.clipFadeIn.value = String(audioClip.fadeIn || 0);
           dom.clipFadeOut.value = String(audioClip.fadeOut || 0);
         }
@@ -568,6 +571,17 @@
       }).catch((error) => reportError(error, 'clip:playback'));
     }
 
+    function updateDenoise() {
+      const targets = selectedClipTargets();
+      if (!targets || !targets.audio) return;
+      const strength = Math.max(0.1, Math.min(1, Number(dom.clipDenoiseStrength.value) || 0.5));
+      edit({
+        op: 'setClipDenoise',
+        clipId: targets.audio.clip.id,
+        strength: dom.clipDenoise.checked ? strength : 0,
+      }).catch((error) => reportError(error, 'clip:denoise'));
+    }
+
     function updateLayerBlend(layerId, value) {
       if (!layerId) return;
       edit({ op: 'setLayerBlendMode', layerId, blendMode: value })
@@ -669,6 +683,8 @@
       for (const input of [dom.clipSpeed, dom.clipPreservePitch, dom.clipFadeIn, dom.clipFadeOut]) {
         input.addEventListener('change', updatePlayback);
       }
+      dom.clipDenoise.addEventListener('change', updateDenoise);
+      dom.clipDenoiseStrength.addEventListener('change', updateDenoise);
       dom.addTransformKeyframes.addEventListener('click', addTransformKeyframes);
       dom.addVolumeKeyframe.addEventListener('click', addVolumeKeyframe);
       dom.keyframeUpdate.addEventListener('click', updateKeyframe);

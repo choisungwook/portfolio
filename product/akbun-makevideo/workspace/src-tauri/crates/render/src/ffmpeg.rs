@@ -358,11 +358,12 @@ fn audio_chain(item: &Item, input: usize, rate: Rate) -> String {
     // quieter or louder than what was heard by up to 5e-4 — and round a clip
     // set below 0.0005 to silence. Six is past what an f32 in 0..1 can tell
     // apart, so the two mixes agree exactly.
+    let denoise = denoise_audio_filter(item.clip.denoise);
     let speed = speed_audio_filter(item.clip.speed, item.clip.preserve_pitch);
     let volume = volume_expression(item.clip, rate);
     format!(
         "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo\
-         {speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
+         {denoise}{speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
         item.clip.start_time(rate).to_samples(AUDIO_HZ)
     )
 }
@@ -435,6 +436,7 @@ fn volume_expression_for(
 }
 
 fn audio_placement_chain(item: &layout::AudioPlacement, input: usize, rate: Rate) -> String {
+    let denoise = denoise_audio_filter(item.denoise);
     let speed = speed_audio_filter(item.speed, item.preserve_pitch);
     let volume = volume_expression_for(
         &item.volume_keyframes,
@@ -447,7 +449,7 @@ fn audio_placement_chain(item: &layout::AudioPlacement, input: usize, rate: Rate
     );
     format!(
         "[{input}:a]aformat=sample_fmts=fltp:sample_rates={AUDIO_HZ}:channel_layouts=stereo\
-         {speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
+         {denoise}{speed},asetpts=PTS-STARTPTS,volume='{volume}':eval=frame,adelay={}S:all=1[a{input}]",
         RationalTime::new(item.start_frame, rate).to_samples(AUDIO_HZ)
     )
 }
@@ -626,6 +628,27 @@ pub struct DecodeAudio<'a> {
     pub duration: RationalTime,
     pub speed: f32,
     pub preserve_pitch: bool,
+    pub denoise: f32,
+}
+
+/// Noise reduction for one clip, shared by playback and the render so both hear
+/// the same thing. `afftdn` needs no model file. It runs before the speed
+/// change, on the source as recorded.
+///
+/// Strength raises both the reduction (12..36 dB) and the floor below which a
+/// band counts as noise (-55..-30 dB): low strength cleans room hiss, full
+/// strength cleans loud broadband noise, and speech well above the floor keeps
+/// its level. Noise tracking (`tn=1`) is left off on purpose: measured on a
+/// noisy tone it held the floor at its starting guess and removed nothing.
+// ponytail: fixed floor per strength, sample a noise profile if users need more.
+pub fn denoise_audio_filter(strength: f32) -> String {
+    if !strength.is_finite() || strength <= 0.0 {
+        return String::new();
+    }
+    let strength = strength.min(1.0);
+    let reduction = 12.0 + 24.0 * strength;
+    let floor = -55.0 + 25.0 * strength;
+    format!(",afftdn=nr={reduction:.1}:nf={floor:.1}")
 }
 
 fn speed_audio_filter(speed: f32, preserve_pitch: bool) -> String {
@@ -670,6 +693,7 @@ fn speed_audio_filter(speed: f32, preserve_pitch: bool) -> String {
 /// and leaving it out is what lets the mixer be tested on samples that are
 /// still the ones the file holds.
 pub fn audio_decoder_args(request: &DecodeAudio<'_>) -> Vec<String> {
+    let denoise = denoise_audio_filter(request.denoise);
     let speed = speed_audio_filter(request.speed, request.preserve_pitch);
     vec![
         "-hide_banner".into(),
@@ -686,7 +710,7 @@ pub fn audio_decoder_args(request: &DecodeAudio<'_>) -> Vec<String> {
         // the picture to throw it away would cost more than the mixing does.
         "-vn".into(),
         "-af".into(),
-        format!("aformat=sample_fmts=flt:sample_rates={AUDIO_HZ}:channel_layouts=stereo{speed}"),
+        format!("aformat=sample_fmts=flt:sample_rates={AUDIO_HZ}:channel_layouts=stereo{denoise}{speed}"),
         "-f".into(),
         "f32le".into(),
         "-ac".into(),
@@ -1001,6 +1025,7 @@ mod tests {
             opacity: 1.0,
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
             fade_in: 0,
             fade_out: 0,
             volume_keyframes: Default::default(),
@@ -1191,6 +1216,35 @@ mod tests {
         let args = build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap();
         assert!(!joined(&args).contains("[aout]"));
         assert!(!joined(&args).contains("-c:a"));
+    }
+
+    #[test]
+    fn denoise_is_off_at_zero_and_scales_with_strength() {
+        assert_eq!(denoise_audio_filter(0.0), "");
+        assert_eq!(denoise_audio_filter(f32::NAN), "");
+        assert_eq!(denoise_audio_filter(0.5), ",afftdn=nr=24.0:nf=-42.5");
+        assert_eq!(denoise_audio_filter(4.0), ",afftdn=nr=36.0:nf=-30.0");
+    }
+
+    #[test]
+    fn preview_and_render_apply_the_same_denoise_filter() {
+        let mut project = one_video_project();
+        project.tracks[0].clips[0].denoise = 0.5;
+        let filter = filter_of(&build_args(&project, "/out.mp4", Preset::Fhd, None, &[]).unwrap());
+        let rate = Rate::fps(30);
+        let decoder = audio_decoder_args(&DecodeAudio {
+            path: "/media/a1.mp4",
+            in_time: RationalTime::new(0, rate),
+            duration: RationalTime::new(90, rate),
+            speed: 2.0,
+            preserve_pitch: true,
+            denoise: 0.5,
+        })
+        .join(" ");
+        let expected = denoise_audio_filter(0.5);
+        assert!(filter.contains(&expected), "{filter}");
+        // Before the speed change on both sides.
+        assert!(decoder.contains(&format!("stereo{expected},atempo")), "{decoder}");
     }
 
     #[test]
@@ -1676,6 +1730,7 @@ mod tests {
             duration: RationalTime::new(90, rate),
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
         })
         .join(" ");
         assert!(

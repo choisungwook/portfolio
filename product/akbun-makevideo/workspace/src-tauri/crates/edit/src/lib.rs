@@ -995,6 +995,10 @@ pub struct Clip {
     pub speed: f32,
     #[serde(default = "true_value")]
     pub preserve_pitch: bool,
+    /// Noise reduction strength, 0 is off and 1 is the strongest. Applied by
+    /// the same ffmpeg filter in playback and in the render.
+    #[serde(default)]
+    pub denoise: f32,
     #[serde(default)]
     pub fade_in: i64,
     #[serde(default)]
@@ -1770,6 +1774,7 @@ mod tests {
             opacity: 1.0,
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
             fade_in: 0,
             fade_out: 0,
             volume_keyframes: Default::default(),

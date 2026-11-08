@@ -175,6 +175,8 @@ const dom = {
   clipBlendMode: el('clip-blend-mode'),
   clipSpeed: el('clip-speed'),
   clipPreservePitch: el('clip-preserve-pitch'),
+  clipDenoise: el('clip-denoise'),
+  clipDenoiseStrength: el('clip-denoise-strength'),
   clipFadeIn: el('clip-fade-in'),
   clipFadeOut: el('clip-fade-out'),
   addVolumeKeyframe: el('add-volume-keyframe'),

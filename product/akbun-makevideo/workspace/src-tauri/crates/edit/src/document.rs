@@ -755,6 +755,7 @@ mod tests {
                         opacity: 1.0,
                         speed: 1.0,
                         preserve_pitch: true,
+                        denoise: 0.0,
                         fade_in: 0,
                         fade_out: 0,
                         volume_keyframes: Default::default(),
@@ -781,6 +782,28 @@ mod tests {
             .unwrap();
         assert_eq!(clips(&document)[0].end_frame(), 300);
         assert!(document.project().validate().is_ok());
+    }
+
+    #[test]
+    fn noise_reduction_is_one_undo_step_and_is_clamped() {
+        let mut document = document();
+        let clip = add(&mut document, 0);
+        let before = serde_json::to_string(document.project()).unwrap();
+        document
+            .apply(Command::SetClipDenoise {
+                clip_id: clip.clone(),
+                strength: 3.0,
+            })
+            .unwrap();
+        assert_eq!(clips(&document)[0].denoise, 1.0);
+        document.undo().unwrap();
+        assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+        assert!(document
+            .apply(Command::SetClipDenoise {
+                clip_id: clip,
+                strength: f32::NAN,
+            })
+            .is_err());
     }
 
     #[test]

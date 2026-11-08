@@ -118,6 +118,7 @@ pub struct AudioPlacement {
     pub fade_out: i64,
     pub speed: f32,
     pub preserve_pitch: bool,
+    pub denoise: f32,
 }
 
 impl AudioPlacement {
@@ -229,6 +230,7 @@ pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
                     fade_out: clip.fade_out,
                     speed: clip.speed,
                     preserve_pitch: clip.preserve_pitch,
+                    denoise: clip.denoise,
                 });
             }
         }
@@ -268,6 +270,7 @@ pub fn audio_placements(project: &Project) -> Vec<AudioPlacement> {
                 fade_out: 0,
                 speed: 1.0,
                 preserve_pitch: true,
+                denoise: 0.0,
             });
         }
     }
@@ -551,6 +554,7 @@ mod tests {
             opacity: 1.0,
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
             fade_in: 0,
             fade_out: 0,
             volume_keyframes: Default::default(),

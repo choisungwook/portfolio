@@ -275,6 +275,9 @@ pub enum Command {
         #[serde(default)]
         opacity: Option<f32>,
     },
+    /// Noise reduction strength for one clip's sound, 0 to turn it off.
+    #[serde(rename_all = "camelCase")]
+    SetClipDenoise { clip_id: String, strength: f32 },
     #[serde(rename_all = "camelCase")]
     SetClipLut {
         clip_id: String,
@@ -559,6 +562,7 @@ impl Command {
             Command::RippleDeleteGap { .. } => "Ripple delete gap",
             Command::RemoveRanges { .. } => "Remove silence",
             Command::SetClipGain { .. } => "Clip levels",
+            Command::SetClipDenoise { .. } => "Noise reduction",
             Command::SetClipLut { .. } => "Clip LUT",
             Command::SetClipPlayback { .. } => "Clip playback",
             Command::SetClipVolumeKeyframe { .. } | Command::RemoveClipVolumeKeyframe { .. } => {
@@ -721,6 +725,9 @@ impl Command {
                 volume,
                 opacity,
             } => set_clip_gain(project, clip_id, volume, opacity),
+            Command::SetClipDenoise { clip_id, strength } => {
+                set_clip_denoise(project, clip_id, strength)
+            }
             Command::SetClipLut { clip_id, lut_path } => set_clip_lut(project, clip_id, lut_path),
             Command::SetClipPlayback {
                 clip_id,
@@ -1132,6 +1139,7 @@ fn add_clip(
         opacity: 1.0,
         speed: 1.0,
         preserve_pitch: true,
+        denoise: 0.0,
         fade_in: 0,
         fade_out: 0,
         volume_keyframes: Default::default(),
@@ -1356,6 +1364,7 @@ fn add_source_clips(
             opacity: 1.0,
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
             fade_in: 0,
             fade_out: 0,
             volume_keyframes: Default::default(),
@@ -1917,6 +1926,7 @@ fn split_at(
                 opacity: clip.opacity,
                 speed: clip.speed,
                 preserve_pitch: clip.preserve_pitch,
+                denoise: clip.denoise,
                 fade_in: 0,
                 fade_out: clip.fade_out,
                 volume_keyframes: right_keyframes,
@@ -2484,6 +2494,28 @@ fn set_clip_gain(
             clip_id,
             volume,
             opacity,
+        },
+    })
+}
+
+fn set_clip_denoise(project: &mut Project, clip_id: String, strength: f32) -> Result<Applied, String> {
+    if !strength.is_finite() {
+        return Err("noise reduction strength must be a number".into());
+    }
+    let (track_index, clip_index) = project
+        .locate(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let clip = &mut project.tracks[track_index].clips[clip_index];
+    let previous = clip.denoise;
+    clip.denoise = strength.clamp(0.0, 1.0);
+    Ok(Applied {
+        resolved: Command::SetClipDenoise {
+            clip_id: clip_id.clone(),
+            strength: clip.denoise,
+        },
+        inverse: Command::SetClipDenoise {
+            clip_id,
+            strength: previous,
         },
     })
 }

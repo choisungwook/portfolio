@@ -288,6 +288,9 @@
               <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
               <label class="row">Speed <input id="clip-speed" type="number" min="0.1" max="16" step="0.05" /></label>
               <label class="row"><input id="clip-preserve-pitch" type="checkbox" /> Preserve pitch</label>
+              <!-- Off stores 0; the slider is the strength used when on. -->
+              <label class="row"><input id="clip-denoise" type="checkbox" /> Reduce noise</label>
+              <label class="row">Strength <input id="clip-denoise-strength" type="range" min="0.1" max="1" step="0.05" value="0.5" /></label>
               <div class="field-pair"><label>Fade in <input id="clip-fade-in" type="number" min="0" step="1" /></label><label>Fade out <input id="clip-fade-out" type="number" min="0" step="1" /></label></div>
               <button id="add-volume-keyframe" type="button">Add volume keyframe at playhead</button>
             </div>

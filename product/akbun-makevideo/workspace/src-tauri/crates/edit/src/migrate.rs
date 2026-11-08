@@ -93,6 +93,8 @@ struct WireClip {
     #[serde(default = "true_value")]
     preserve_pitch: bool,
     #[serde(default)]
+    denoise: f32,
+    #[serde(default)]
     fade_in: i64,
     #[serde(default)]
     fade_out: i64,
@@ -167,6 +169,7 @@ impl From<WireProject> for Project {
                             opacity: clip.opacity,
                             speed: clip.speed,
                             preserve_pitch: clip.preserve_pitch,
+                            denoise: clip.denoise,
                             fade_in: clip.fade_in,
                             fade_out: clip.fade_out,
                             volume_keyframes: clip.volume_keyframes,

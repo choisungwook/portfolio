@@ -41,6 +41,7 @@ pub struct Region {
     pub fade_out_samples: i64,
     pub speed: f32,
     pub preserve_pitch: bool,
+    pub denoise: f32,
     pub rate: makevideo_render::Rate,
 }
 
@@ -95,6 +96,7 @@ fn region(placement: &AudioPlacement, rate: makevideo_render::Rate) -> Region {
         fade_out_samples: RationalTime::new(placement.fade_out, rate).to_samples(ENGINE_HZ),
         speed: placement.speed,
         preserve_pitch: placement.preserve_pitch,
+        denoise: placement.denoise,
         rate,
         clip_id: placement.clip_id.clone(),
         path: placement.path.clone(),
@@ -183,6 +185,7 @@ mod tests {
             opacity: 1.0,
             speed: 1.0,
             preserve_pitch: true,
+            denoise: 0.0,
             fade_in: 0,
             fade_out: 0,
             volume_keyframes: Default::default(),

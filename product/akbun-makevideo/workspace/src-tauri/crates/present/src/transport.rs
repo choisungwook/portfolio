@@ -798,6 +798,7 @@ mod tests {
                     opacity: 1.0,
                     speed: 1.0,
                     preserve_pitch: true,
+                    denoise: 0.0,
                     fade_in: 0,
                     fade_out: 0,
                     volume_keyframes: Default::default(),
