@@ -15,7 +15,7 @@ const {
   scaleFactorAt,
   overlaps,
   cropRect,
-} = require('../src/renderer/shapes');
+} = require('../src/shapes');
 
 test('constrain turns a lopsided ellipse drag into a circle', () => {
   const end = constrain('ellipse', 100, 100, 180, 130);

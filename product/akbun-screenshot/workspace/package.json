@@ -1,38 +1,18 @@
 {
   "name": "akbun-screenshot",
-  "version": "0.8.0",
+  "version": "0.9.0",
+  "private": true,
   "description": "macOS menu bar screenshot app with area capture, clipboard, floating preview, and an annotation editor",
   "author": "akbun",
   "license": "MIT",
-  "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "tauri dev",
     "test": "node --test test/*.test.js",
-    "dist": "electron-builder --publish never"
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml -p screenshot-core",
+    "dist": "tauri build",
+    "tauri": "tauri"
   },
   "devDependencies": {
-    "electron": "^43.0.0",
-    "electron-builder": "^26.0.0"
-  },
-  "build": {
-    "appId": "io.akbun.screenshot",
-    "productName": "akbun-screenshot",
-    "files": [
-      "src/**/*"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        }
-      ],
-      "category": "public.app-category.utilities"
-    }
+    "@tauri-apps/cli": "^2"
   }
 }

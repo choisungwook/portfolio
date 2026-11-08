@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Shared by every page. A missing entry fails at runtime, not at compile time, so each window gets only what its page calls; everything that touches files, the clipboard or the shortcut is a command in commands.rs instead.",
+  "windows": ["settings", "preview-*", "editor-*"],
+  "permissions": ["core:default"]
+}

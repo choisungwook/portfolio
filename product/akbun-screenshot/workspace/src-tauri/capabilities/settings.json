@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "The settings page picks the save folder itself; the command only stores the string.",
+  "windows": ["settings"],
+  "permissions": ["dialog:allow-open"]
+}

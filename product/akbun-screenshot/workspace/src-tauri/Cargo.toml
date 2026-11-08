@@ -1,0 +1,47 @@
+[workspace]
+members = ["crates/core"]
+
+[package]
+name = "akbun-screenshot"
+version = "0.1.0"
+description = "macOS menu bar screenshot app"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is the one in ../package.json, which tauri.conf.json
+# points at. This number is not read by the bundler and exists only because
+# cargo requires it.
+
+[lib]
+# The _lib suffix keeps the library name from colliding with the binary name,
+# which is only a problem on Windows. See rust-lang/cargo#8519.
+name = "akbun_screenshot_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# The pure helpers live in their own crate so the pull request job can test
+# them without compiling tauri, which would need GTK and WebKit on the runner.
+screenshot-core = { path = "crates/core" }
+# tray-icon for the menu bar, macos-private-api for the transparent preview,
+# image-png to decode captures for the clipboard.
+tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+fontdb = "0.23"
+
+[profile.release]
+# The point of leaving Electron was binary size, so the release build is tuned
+# for it. Nothing in this app is CPU bound enough to miss opt-level 3.
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
