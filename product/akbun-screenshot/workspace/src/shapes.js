@@ -55,12 +55,16 @@ function bounds(s) {
   // this runs inside hitTest, which runs on every shape on every redraw, which
   // is every mousemove of a drag.
   if (s.points) {
+    // A highlight is a marker many times wider than a pencil line, so its box
+    // reaches half the width past the centre line. Otherwise a click on the
+    // visible edge of a horizontal highlight would miss it.
+    const half = s.type === 'highlight' ? s.width / 2 : 0;
     const box = { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
     for (const p of s.points) {
-      box.x1 = Math.min(box.x1, p.x);
-      box.y1 = Math.min(box.y1, p.y);
-      box.x2 = Math.max(box.x2, p.x);
-      box.y2 = Math.max(box.y2, p.y);
+      box.x1 = Math.min(box.x1, p.x - half);
+      box.y1 = Math.min(box.y1, p.y - half);
+      box.x2 = Math.max(box.x2, p.x + half);
+      box.y2 = Math.max(box.y2, p.y + half);
     }
     return box;
   }
