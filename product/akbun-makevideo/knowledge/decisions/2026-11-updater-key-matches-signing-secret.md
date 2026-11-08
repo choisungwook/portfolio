@@ -6,8 +6,6 @@ tags: [tauri, updater, release]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-08T04:00:00Z }
 ---
 
-# updater 공개키는 서명 secret과 같은 키쌍에서 가져오고 release가 key id를 검사한다
-
 ## 결정
 
 - `tauri.conf.json`의 `plugins.updater.pubkey`는 `~/.tauri/akbun-makevideo.key.pub` 내용을 그대로 쓴다. 이 키쌍의 개인키가 `TAURI_SIGNING_PRIVATE_KEY_MAKEVIDEO` secret이다.
