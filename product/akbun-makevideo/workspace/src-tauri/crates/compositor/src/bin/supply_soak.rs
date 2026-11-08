@@ -45,7 +45,7 @@ fn parse(mut args: std::env::Args) -> Result<Options, String> {
         seconds: 30.0,
         depth: makevideo_compositor::source::DEFAULT_DEPTH,
         lead: makevideo_compositor::source::DEFAULT_LEAD,
-        preset: ffmpeg::Preset::Fhd,
+        preset: ffmpeg::Preset::FHD,
         seek_every_seconds: 2.0,
         report: None,
     };

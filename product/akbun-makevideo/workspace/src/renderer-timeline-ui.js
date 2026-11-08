@@ -64,6 +64,8 @@
         target.textContent = 'target';
         target.title = 'Use only this track for previous and next edit navigation';
         target.className = track.id === state.targetTrackId ? 'target on' : 'target';
+        target.setAttribute('aria-label', `${track.name} target`);
+        target.setAttribute('aria-pressed', String(track.id === state.targetTrackId));
         buttons.appendChild(target);
         if (track.kind === 'video' || track.kind === 'subtitle') {
           const hide = document.createElement('button');
@@ -71,6 +73,8 @@
           hide.textContent = 'hide';
           hide.title = 'Hide this track from the preview and the render';
           hide.className = track.hidden ? 'on' : '';
+          hide.setAttribute('aria-label', `${track.name} hide`);
+          hide.setAttribute('aria-pressed', String(Boolean(track.hidden)));
           buttons.appendChild(hide);
         }
         const mute = document.createElement('button');
@@ -78,6 +82,8 @@
         mute.textContent = 'mute';
         mute.title = 'Silence this track';
         mute.className = track.muted ? 'on' : '';
+        mute.setAttribute('aria-label', `${track.name} mute`);
+        mute.setAttribute('aria-pressed', String(Boolean(track.muted)));
         buttons.appendChild(mute);
 
         head.append(name, buttons);
@@ -205,6 +211,13 @@
       return node;
     }
 
+    // Read once per lane pass rather than once per clip: a computed style read
+    // after the lanes were just rebuilt is a style recalculation each time.
+    let waveformColor = null;
+    function themeWaveformColor() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim() || '#205f42';
+    }
+
     function drawWaveform(canvas, clip, waveform, cssWidth) {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.max(1, Math.min(4096, Math.ceil(cssWidth * ratio)));
@@ -215,9 +228,7 @@
       if (!context) return;
       const { first, last } = L.waveformBucketRange(clip, rate(), waveform.bucketsPerSecond);
       const span = Math.max(1, last - first);
-      context.strokeStyle = getComputedStyle(document.documentElement)
-        .getPropertyValue('--waveform')
-        .trim() || '#205f42';
+      context.strokeStyle = waveformColor || themeWaveformColor();
       context.lineWidth = Math.max(1, ratio);
       context.beginPath();
       for (let x = 0; x < width; x += 1) {
@@ -241,6 +252,7 @@
     }
 
     function renderLanes() {
+      waveformColor = themeWaveformColor();
       dom.lanes.textContent = '';
       const width = L.framesToPx(contentFrames(), rate(), state.pxPerSecond);
       dom.content.style.width = `${width}px`;
@@ -360,7 +372,37 @@
       updateMonitorZoomUi();
       stageController.renderStageOverlay();
       stageController.scheduleExactFrame();
-      if (preview) preview.redraw();
+      // Redraw rebuilds the stopped native pipeline, so only a new document
+      // asks for it. Zoom, resize, selection and LUT checks reach here with the
+      // same document. Identity, not revision: opening a project resets it.
+      if (preview && state.doc !== redrawnDoc) {
+        redrawnDoc = state.doc;
+        preview.redraw();
+      }
+    }
+
+    let redrawnDoc = null;
+    let layoutFrame = 0;
+    let layoutAnchor = null;
+
+    /** Only the width changed — zoom or the window — so only the ruler and the
+     *  lanes are rebuilt, at most once per animation frame. `anchor` keeps that
+     *  frame at the same distance from the left edge, so zooming does not
+     *  throw the playhead off screen. */
+    function relayoutTimeline(anchor = null) {
+      if (anchor) layoutAnchor = layoutAnchor || anchor;
+      if (layoutFrame) return;
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = 0;
+        renderRuler();
+        renderLanes();
+        if (layoutAnchor) {
+          const x = L.framesToPx(layoutAnchor.frame, rate(), state.pxPerSecond);
+          dom.scroll.scrollLeft = Math.max(0, x - layoutAnchor.offset);
+          layoutAnchor = null;
+        }
+        updatePlayhead(preview ? preview.position() : 0);
+      });
     }
 
     function checkLutFiles() {
@@ -374,13 +416,18 @@
       for (const path of Object.keys(state.lutStatus)) {
         if (!paths.has(path)) delete state.lutStatus[path];
       }
+      const checks = [];
       for (const path of paths) {
         if (state.lutStatus[path]) continue;
-          state.lutStatus[path] = 'checking';
+        state.lutStatus[path] = 'checking';
+        checks.push(
           window.api.validateLut(path)
-            .then(() => { state.lutStatus[path] = 'ready'; renderTimeline(); })
-            .catch(() => { state.lutStatus[path] = 'unavailable'; renderTimeline(); });
+            .then(() => { state.lutStatus[path] = 'ready'; })
+            .catch(() => { state.lutStatus[path] = 'unavailable'; })
+        );
       }
+      // One lane pass for the whole batch: the status only changes a clip badge.
+      if (checks.length) void Promise.all(checks).then(renderLanes);
     }
 
     function refresh() {
@@ -743,7 +790,7 @@
       inspectorController.render();
     }
 
-    return { setRuntime, renderHeads, clipElement, keyframeDot, visualElement, drawWaveform, renderLanes, renderRuler, renderMarkerList, updateHistoryUi, updateMonitorZoomUi, renderTimeline, checkLutFiles, refresh, updatePlayhead, seekPreviousEdit, seekNextEdit, seekTimelineStart, seekTimelineEnd, seekTimelineOffset, followPlayhead, closeTimelineContextMenu, openTimelineContextMenu, updateLinkUi, selectAsset, liveSelection, splitAtPlayhead, addMarker, visualTargetTrack, addVisualItem, addPip, addText, shapeTransform, addShape, addSubtitle, importSrt, exportSrt, deleteSelected, toggleClipLink, setClipLut, addAdjustmentLayer, addVisualKeyframesAt, addVolumeKeyframeAt };
+    return { setRuntime, renderHeads, clipElement, keyframeDot, visualElement, drawWaveform, renderLanes, renderRuler, renderMarkerList, updateHistoryUi, updateMonitorZoomUi, renderTimeline, relayoutTimeline, checkLutFiles, refresh, updatePlayhead, seekPreviousEdit, seekNextEdit, seekTimelineStart, seekTimelineEnd, seekTimelineOffset, followPlayhead, closeTimelineContextMenu, openTimelineContextMenu, updateLinkUi, selectAsset, liveSelection, splitAtPlayhead, addMarker, visualTargetTrack, addVisualItem, addPip, addText, shapeTransform, addShape, addSubtitle, importSrt, exportSrt, deleteSelected, toggleClipLink, setClipLut, addAdjustmentLayer, addVisualKeyframesAt, addVolumeKeyframeAt };
   }
 
   return { createRendererTimelineUi };

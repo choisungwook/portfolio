@@ -4,6 +4,7 @@ import * as z from 'zod/v4';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { request } from './bridge.mjs';
+import { status, launch } from './app.mjs';
 
 const require = createRequire(import.meta.url);
 const { guide } = require('../src/ai-workflow.js');
@@ -27,14 +28,20 @@ const definitions = [
   ['save_project', 'Atomically save as .akbunvideo. Existing valid project file gets a recovery point before replacement.', {stateToken:token,path:absolutePath}],
   ['sample_asset', 'Return up to 8 JPEG frames from an imported video interval of at most 60 seconds, or one frame for an image. Inspect these for B-roll; unsampled motion and sound are unknown.', {assetId:z.string().min(1),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}, true],
   ['get_library', 'Read saved reusable graphic templates and B-roll observations. Reuse assets only if available in the current project.', {}, true],
-  ['export_video', 'Start rendering to a NEW video path using existing ffmpeg/render settings. Poll render_status to verify success.', {stateToken:token,path:absolutePath,preset:z.enum(['fhd','4k'])}],
+  ['export_video', 'Start rendering to a NEW video path using existing ffmpeg/render settings. Poll render_status to verify success.', {stateToken:token,path:absolutePath,preset:z.enum(['hd','fhd','4k']),quality:z.enum(['high','medium','low']).optional()}],
   ['render_status', 'Read current export state and its completion result. Success requires result.ok=true.', {}, true],
   ['cancel_render', 'Request cancellation of the running export.', {}],
 ];
 
-export function createServer(call = request) {
-  const server = new McpServer({ name:'akbun-makevideo', version:require('../package.json').version }, {instructions:'Control the running local editor. Start with editing_guide and get_project. Create a named checkpoint before each user task and retain its ID. Read media/captions rather than inventing content. Apply edits directly; do not ask the user to click Apply. Read fresh state after a stale-token error. Check render_status for export success.'});
+export function createServer(call = request, { open } = {}) {
+  const server = new McpServer({ name:'akbun-makevideo', version:require('../package.json').version }, {instructions:'Control the running local editor. Call get_status first; when running is false, call launch_app. Then read editing_guide and get_project. Create a named checkpoint before each user task and retain its ID. Read media/captions rather than inventing content. Apply edits directly; do not ask the user to click Apply. Read fresh state after a stale-token error. Check render_status for export success.'});
   server.registerTool('editing_guide', {description:'Read command formats, timing rules and recovery workflow before editing.',inputSchema:z.object({}),annotations:{readOnlyHint:true}}, async () => ({content:[{type:'text',text:guide + '\nMCP: put command objects directly in apply_edits.commands (not JSON strings). Checkpoint before a multi-step task; every apply also automatically saves its immediate before-state. Create captions with addVisualItem on a subtitle track, content.kind=text. Restore a checkpoint then save_project explicitly to update the disk file.'}]}));
+  const reply = (value) => ({content:[{type:'text',text:JSON.stringify(value)}]});
+  server.registerTool('get_status', {description:'Check whether the editor is running, its version, revision, render state and proxy progress. Never fails: running=false means the app is closed.',inputSchema:z.object({}),annotations:{readOnlyHint:true,openWorldHint:false}}, async () => reply(await status(call)));
+  server.registerTool('launch_app', {description:'Open the installed editor on macOS and wait until it answers. Does nothing when it is already running.',inputSchema:z.object({}),annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}}, async () => {
+    try { return reply(await launch({ call, ...(open ? { open } : {}) })); }
+    catch (error) { return {isError:true,content:[{type:'text',text:error.message}]}; }
+  });
   for (const [name, description, shape, readOnly = false] of definitions) {
     server.registerTool(name, {description,inputSchema:z.object(shape),annotations:{readOnlyHint:readOnly,destructiveHint:!readOnly,openWorldHint:false}}, async (args) => {
       try {

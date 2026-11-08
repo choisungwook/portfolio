@@ -73,6 +73,26 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
     let state = app.state::<AppState>();
     match method {
         "get_project" => Ok(state_value(&state.document.lock().unwrap())),
+        // A cheap health check: no project JSON, so a client can poll it.
+        "get_status" => {
+            // One lock at a time, and the document lock only for its own fields.
+            let mut value = {
+                let doc = state.document.lock().unwrap();
+                let project = doc.project();
+                json!({
+                    "running": true,
+                    "appVersion": app.package_info().version.to_string(),
+                    "revision": doc.revision(),
+                    "stateToken": token(&doc),
+                    "assets": project.assets.len(),
+                    "tracks": project.tracks.len(),
+                    "durationFrames": project.duration().value(),
+                })
+            };
+            value["rendering"] = json!(state.render.lock().unwrap().is_some());
+            value["proxies"] = json!(commands::proxy_counts(&state.proxies.lock().unwrap()));
+            Ok(value)
+        }
         "list_projects" => Ok(json!(commands::list_projects(app.clone(), state))),
         "list_checkpoints" => Ok(json!(checkpoints(app)?.list()?)),
         "create_checkpoint" => {
@@ -99,6 +119,7 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
         }
         "export_video" => {
             let path = file(args)?;
+            let preset = commands::parse_preset(text(args, "preset")?, args["quality"].as_str())?;
             if path.exists() {
                 return Err("Choose a new export path; existing files are not overwritten.".into());
             }
@@ -113,7 +134,7 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
                 state,
                 app.state(),
                 path.to_string_lossy().into(),
-                text(args, "preset")?.into(),
+                preset,
                 snapshot,
             )?;
             Ok(
@@ -148,7 +169,8 @@ fn mutate(app: &AppHandle, method: &str, args: &Value) -> Result<Value, String> 
         {
             return Err("Use 1–100 absolute media paths".into());
         }
-        let assets = commands::import_assets(app.clone(), app.state(), paths.clone());
+        let configured = app.state::<AppState>().settings.lock().unwrap().ffmpeg_dir.clone();
+        let assets = commands::import_assets_blocking(app, &configured, paths.clone());
         if assets.len() != paths.len() {
             return Err(
                 "One or more paths are missing or unsupported; nothing was imported".into(),

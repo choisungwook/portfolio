@@ -101,8 +101,7 @@
       <div class="menu">
         <button class="menu-title" data-menu="render">Render</button>
         <ul class="menu-list" data-list="render">
-          <li><button data-action="render-fhd">Render FHD — 1920 long edge</button></li>
-          <li><button data-action="render-4k">Render 4K — 3840 long edge</button></li>
+          <li><button data-action="render-open">Render…</button></li>
           <li class="sep"></li>
           <li><button data-action="cancel-render">Cancel Render</button></li>
         </ul>
@@ -144,6 +143,10 @@
     <span class="menubar-gap"></span>
     <button id="tool-warning" hidden title="Rendering needs ffmpeg on this machine">ffmpeg not found</button>
     <span id="playback-warning" class="dim small-text" hidden></span>
+    <div id="workspace-toggles" role="toolbar" aria-label="Workspace panels">
+      <button class="global-action" type="button" data-workspace-toggle="assets" aria-pressed="true" title="Show or hide Assets (⌘1)">Assets</button>
+      <button class="global-action" type="button" data-workspace-toggle="source" aria-pressed="true" title="Show or hide the Source Monitor (⌘2)">Source</button>
+    </div>
     <div id="global-actions" role="toolbar" aria-label="Global panels">
       <button class="global-action" type="button" data-panel-action="inspector" aria-controls="selected-panel" aria-expanded="false" aria-pressed="false">
         <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-inspector" /></svg>
@@ -191,7 +194,7 @@
             <p id="source-hint">Select an asset to preview it before placing it.</p>
           </div>
           <div id="source-transport" class="monitor-transport">
-            <button id="source-play" title="Play or pause the source">▶</button>
+            <button id="source-play" title="Play or pause the source" aria-label="Play or pause the source">▶</button>
             <span id="source-clock" class="mono">0:00:00:00</span>
             <span class="dim mono">/</span>
             <span id="source-duration" class="mono dim">0:00:00:00</span>
@@ -235,7 +238,7 @@
             <p id="stage-hint">Drop media on the timeline below to see it here.</p>
           </div>
           <div id="transport">
-            <button id="btn-play" title="Play or pause (Space)">▶</button>
+            <button id="btn-play" title="Play or pause (Space)" aria-label="Play or pause">▶</button>
             <span id="clock" class="mono">0:00:00.00</span>
             <span class="dim mono">/</span>
             <span id="duration" class="mono dim">0:00:00.00</span>
@@ -599,15 +602,49 @@
     </div>
   </div>
 
+  <div id="render-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Render</h3>
+      <label class="row">Resolution
+        <select id="rs-preset">
+          <option value="hd">HD — 1280 long edge</option>
+          <option value="fhd">FHD — 1920 long edge</option>
+          <option value="4k">4K — 3840 long edge</option>
+        </select>
+      </label>
+      <label class="row">Quality
+        <select id="rs-quality">
+          <option value="high">High — larger file</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low — smaller, faster upload</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="rs-summary"></p>
+      <div class="sheet-actions">
+        <button data-close="render-settings">Cancel</button>
+        <button id="rs-start" class="primary">Choose File and Render</button>
+      </div>
+    </div>
+  </div>
+
   <div id="project-settings" class="overlay" hidden>
     <div class="sheet">
       <h3>Project Resolution</h3>
       <label class="row">Preset
         <select id="ps-preset">
-          <option value="1280x720">HD 1280 × 720</option>
-          <option value="1920x1080">FHD 1920 × 1080</option>
-          <option value="3840x2160">4K 3840 × 2160</option>
-          <option value="1080x1920">Vertical 1080 × 1920</option>
+          <optgroup label="Landscape">
+            <option value="1280x720">HD 1280 × 720</option>
+            <option value="1920x1080">FHD 1920 × 1080</option>
+            <option value="2560x1440">QHD 2560 × 1440</option>
+            <option value="3840x2160">UHD 4K 3840 × 2160</option>
+            <option value="4096x2160">DCI 4K 4096 × 2160</option>
+          </optgroup>
+          <optgroup label="Vertical and square">
+            <option value="1080x1920">Vertical 1080 × 1920 (9:16)</option>
+            <option value="2160x3840">Vertical 4K 2160 × 3840 (9:16)</option>
+            <option value="1080x1350">Portrait 1080 × 1350 (4:5)</option>
+            <option value="1080x1080">Square 1080 × 1080 (1:1)</option>
+          </optgroup>
           <option value="custom">Custom</option>
         </select>
       </label>

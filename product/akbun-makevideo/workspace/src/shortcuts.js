@@ -35,6 +35,10 @@ const KEY_NAMES = {
   left: 'ArrowLeft',
   arrowright: 'ArrowRight',
   right: 'ArrowRight',
+  '=': 'Equal',
+  equal: 'Equal',
+  '-': 'Minus',
+  minus: 'Minus',
 };
 
 const SHORTCUTS = [
@@ -44,6 +48,7 @@ const SHORTCUTS = [
   { action: 'save-project-as', label: 'Save Project As', keys: ['Meta+Shift+KeyS'] },
   { action: 'close-project', label: 'Close Project', keys: ['Meta+KeyW'] },
   { action: 'import-assets', label: 'Import Media', keys: ['Meta+KeyI'] },
+  { action: 'render-open', label: 'Render', keys: ['Meta+KeyE'] },
   { action: 'undo', label: 'Undo', keys: ['Meta+KeyZ'] },
   { action: 'redo', label: 'Redo', keys: ['Meta+Shift+KeyZ'] },
   { action: 'split', label: 'Split at Playhead', keys: ['Meta+KeyB', 'Meta+KeyD'] },
@@ -59,6 +64,16 @@ const SHORTCUTS = [
   { action: 'timeline-start', label: 'Timeline Start', keys: ['Home'] },
   { action: 'timeline-end', label: 'Timeline End', keys: ['End'] },
   { action: 'monitor-fullscreen', label: 'Program Monitor Full Screen', keys: ['Meta+KeyF'] },
+  { action: 'play', label: 'Play', keys: ['KeyL'] },
+  { action: 'pause', label: 'Pause', keys: ['KeyK'] },
+  { action: 'source-mark-in', label: 'Mark Source In', keys: ['KeyI'] },
+  { action: 'source-mark-out', label: 'Mark Source Out', keys: ['KeyO'] },
+  { action: 'add-marker', label: 'Add Marker at Playhead', keys: ['KeyM'] },
+  { action: 'timeline-zoom-in', label: 'Zoom Timeline In', keys: ['Equal'] },
+  { action: 'timeline-zoom-out', label: 'Zoom Timeline Out', keys: ['Minus'] },
+  { action: 'timeline-zoom-fit', label: 'Zoom Timeline to Fit', keys: ['Shift+KeyZ'] },
+  { action: 'toggle-assets-panel', label: 'Show or Hide Assets', keys: ['Meta+Digit1'] },
+  { action: 'toggle-source-monitor', label: 'Show or Hide Source Monitor', keys: ['Meta+Digit2'] },
 ];
 
 function normalizeKey(value) {
@@ -176,6 +191,8 @@ function formatChord(chord) {
     ArrowDown: '↓',
     ArrowLeft: '←',
     ArrowRight: '→',
+    Equal: '=',
+    Minus: '-',
   };
   return chord.split('+').map((part) => {
     if (names[part]) return names[part];

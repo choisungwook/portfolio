@@ -73,6 +73,10 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
+    /// The last Render sheet choices: "hd", "fhd" or "4k", and "high",
+    /// "medium" or "low". The command validates them again on every render.
+    pub render_preset: String,
+    pub render_quality: String,
     /// Whether the graphics device or CPU composites: "gpu" or "cpu". Both
     /// play through the persistent native monitor; CPU frames use a small GPU
     /// presenter only for the final upload.
@@ -143,6 +147,8 @@ impl Default for Settings {
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
+            render_preset: "fhd".into(),
+            render_quality: "medium".into(),
             compositor: "gpu".into(),
             gpu_device: String::new(),
             proxy_enabled: true,
@@ -321,6 +327,16 @@ fn proxy_status_entry(
         reason: reason.into(),
         message: message.into(),
     }
+}
+
+/// Proxy jobs counted by state, for a status line that does not need every
+/// asset: "ready", "generating", "queued" and so on.
+pub(crate) fn proxy_counts(proxies: &ProxyState) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for status in proxies.entries.values() {
+        *counts.entry(status.state.clone()).or_insert(0) += 1;
+    }
+    counts
 }
 
 fn proxy_statuses(proxies: &ProxyState) -> Vec<ProxyStatus> {
@@ -930,14 +946,25 @@ pub fn font_available(family: String) -> bool {
 }
 
 /// Every installed font family, for the text inspector's picker.
+///
+/// The first call builds the system font database, so it runs off the main
+/// thread like every command below that reads files or spawns a process: a
+/// synchronous command runs on the main thread and freezes the window.
 #[tauri::command]
-pub fn list_fonts() -> Vec<String> {
-    makevideo_compositor::text::font_families()
+pub async fn list_fonts() -> Result<Vec<String>, String> {
+    blocking(makevideo_compositor::text::font_families).await
 }
 
 #[tauri::command]
-pub fn validate_lut(path: String) -> Result<(), String> {
-    makevideo_compositor::lut::Lut::from_cube_file(&path).map(|_| ())
+pub async fn validate_lut(path: String) -> Result<(), String> {
+    blocking(move || makevideo_compositor::lut::Lut::from_cube_file(&path).map(|_| ())).await?
+}
+
+/// Run file or process work on the blocking pool and hand back its value.
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| format!("background task failed: {error}"))
 }
 
 /// One composited frame for the preview, drawn by the same shader the render
@@ -1258,9 +1285,19 @@ async fn assess_proxy_assets(
 /// the page fills it in from the media element once it loads, so the app still
 /// works with no ffmpeg installed right up to the point of rendering.
 #[tauri::command]
-pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>) -> Vec<Asset> {
+pub async fn import_assets(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<Vec<Asset>, String> {
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let ffprobe = find_tool(&app, "ffprobe", &configured);
+    blocking(move || import_assets_blocking(&app, &configured, paths)).await
+}
+
+/// One ffprobe per file, so this belongs on a blocking thread. The MCP bridge
+/// already runs on one and calls it directly.
+pub(crate) fn import_assets_blocking(app: &AppHandle, configured: &str, paths: Vec<String>) -> Vec<Asset> {
+    let ffprobe = find_tool(app, "ffprobe", configured);
     let mut assets = Vec::new();
     for path in paths {
         let Some(kind) = AssetKind::from_path(&path) else {
@@ -1269,7 +1306,7 @@ pub fn import_assets(app: AppHandle, state: State<AppState>, paths: Vec<String>)
         if !Path::new(&path).is_file() {
             continue;
         }
-        allow_asset_file(&app, &path);
+        allow_asset_file(app, &path);
         let probed = probe_asset(ffprobe.as_ref(), &path);
         assets.push(Asset {
             id: makevideo_render::asset_id(&path),
@@ -1310,12 +1347,12 @@ fn make_proxy(
     project_path: &str,
     ffmpeg_path: &str,
     asset: &Asset,
-    encoder: Option<&str>,
+    codecs: makevideo_proxy::Codecs,
     reason: &str,
 ) -> Result<String, String> {
     let output = makevideo_proxy::media_path(project_path, &asset.id)?;
     let temporary = output.with_extension("part.mp4");
-    let args = makevideo_proxy::ffmpeg_args(asset, &temporary, encoder);
+    let args = makevideo_proxy::ffmpeg_args(asset, &temporary, codecs);
     let mut child = Command::new(ffmpeg_path)
         .args(args)
         .stdin(Stdio::null())
@@ -1541,7 +1578,7 @@ pub async fn start_proxies(
     emit_proxy_status(&app, &state.proxies);
 
     let assessed = assess_proxy_assets(ffprobe_path, video_assets).await?;
-    let mut jobs = Vec::new();
+    let mut jobs: Vec<(Asset, String)> = Vec::new();
     {
         let mut proxies = state.proxies.lock().unwrap();
         if proxies.project_path != project_path {
@@ -1581,79 +1618,98 @@ pub async fn start_proxies(
     emit_proxy_status(&app, &state.proxies);
 
     if !jobs.is_empty() {
+        makevideo_proxy::order_by_first_use(&makevideo_proxy::first_use(&project), &mut jobs);
         let proxies = Arc::clone(&state.proxies);
         let worker = std::thread::spawn(move || {
-            if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
-                if let Err(error) = std::fs::create_dir_all(&dir) {
-                    for (asset, reason) in jobs {
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(
-                                asset.id,
-                                "failed",
-                                0,
-                                "",
-                                reason,
-                                error.to_string(),
-                            ),
-                        );
-                    }
-                    return;
-                }
-            }
-            for (asset, reason) in jobs {
-                if let Err(message) =
-                    wait_for_playback_pause(&app, &proxies, &project_path, &asset.id, &reason)
-                {
-                    if message == "the project changed" {
-                        return;
-                    }
-                }
-                if !set_proxy_status(
-                    &app,
-                    &proxies,
-                    &project_path,
-                    proxy_status_entry(&asset.id, "generating", 0, "", &reason, ""),
-                ) {
-                    return;
-                }
-                match make_proxy(
-                    &app,
-                    &proxies,
-                    &project_path,
-                    &ffmpeg_path,
-                    &asset,
-                    acceleration.as_ref().map(|item| item.encoder.as_str()),
-                    &reason,
-                ) {
-                    Ok(path) => {
-                        allow_asset_file(&app, &path);
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(asset.id, "ready", 100, path, reason, ""),
-                        );
-                    }
-                    Err(message) if message == "the project changed" => return,
-                    Err(message) => {
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(asset.id, "failed", 0, "", reason, message),
-                        );
-                    }
-                }
-            }
+            run_proxy_jobs(app, proxies, project_path, ffmpeg_path, acceleration, jobs)
         });
         let mut workers = state.proxy_workers.lock().unwrap();
         workers.retain(|worker| !worker.is_finished());
         workers.push(worker);
     }
     Ok(proxy_statuses(&state.proxies.lock().unwrap()))
+}
+
+/// Make queued proxies, several at once when a hardware encoder is there. The
+/// queue is shared, so a job that finishes early takes the next asset rather
+/// than waiting for a fixed half of the list.
+fn run_proxy_jobs(
+    app: AppHandle,
+    proxies: Arc<Mutex<ProxyState>>,
+    project_path: String,
+    ffmpeg_path: String,
+    acceleration: Option<makevideo_render::accel::Acceleration>,
+    jobs: Vec<(Asset, String)>,
+) {
+    if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
+        if let Err(error) = std::fs::create_dir_all(&dir) {
+            for (asset, reason) in jobs {
+                set_proxy_status(
+                    &app,
+                    &proxies,
+                    &project_path,
+                    proxy_status_entry(asset.id, "failed", 0, "", reason, error.to_string()),
+                );
+            }
+            return;
+        }
+    }
+    let codecs = makevideo_proxy::Codecs {
+        encoder: acceleration.as_ref().map(|item| item.encoder.as_str()),
+        hwaccel: acceleration.as_ref().and_then(|item| item.hwaccel.as_deref()),
+    };
+    let queue = Mutex::new(std::collections::VecDeque::from(jobs));
+    // Set when the project changes under the jobs, so every worker stops.
+    let stopped = AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        for _ in 0..makevideo_proxy::concurrent_jobs(codecs) {
+            scope.spawn(|| {
+                while !stopped.load(Ordering::Relaxed) {
+                    let Some((asset, reason)) = queue.lock().unwrap().pop_front() else {
+                        return;
+                    };
+                    if !run_proxy_job(&app, &proxies, &project_path, &ffmpeg_path, codecs, asset, reason) {
+                        stopped.store(true, Ordering::Relaxed);
+                    }
+                }
+            });
+        }
+    });
+}
+
+/// One proxy from waiting to ready or failed. False means the project changed
+/// and the remaining jobs belong to a project that is no longer open.
+fn run_proxy_job(
+    app: &AppHandle,
+    proxies: &Arc<Mutex<ProxyState>>,
+    project_path: &str,
+    ffmpeg_path: &str,
+    codecs: makevideo_proxy::Codecs,
+    asset: Asset,
+    reason: String,
+) -> bool {
+    if let Err(message) = wait_for_playback_pause(app, proxies, project_path, &asset.id, &reason) {
+        if message == "the project changed" {
+            return false;
+        }
+    }
+    if !set_proxy_status(
+        app,
+        proxies,
+        project_path,
+        proxy_status_entry(&asset.id, "generating", 0, "", &reason, ""),
+    ) {
+        return false;
+    }
+    let status = match make_proxy(app, proxies, project_path, ffmpeg_path, &asset, codecs, &reason) {
+        Ok(path) => {
+            allow_asset_file(app, &path);
+            proxy_status_entry(asset.id, "ready", 100, path, reason, "")
+        }
+        Err(message) if message == "the project changed" => return false,
+        Err(message) => proxy_status_entry(asset.id, "failed", 0, "", reason, message),
+    };
+    set_proxy_status(app, proxies, project_path, status)
 }
 
 fn set_waveform_status(
@@ -1755,6 +1811,15 @@ fn start_waveforms_inner(
             .iter()
             .filter(|asset| wanted.contains(&asset.id))
         {
+            // Every save comes through here. A peaks file already read for this
+            // project is not parsed again; opening a project clears the map.
+            if waveforms
+                .entries
+                .get(&asset.id)
+                .is_some_and(|status| status.state == "ready")
+            {
+                continue;
+            }
             if let Some(waveform) = makevideo_waveform::read_valid(&project_path, asset) {
                 waveforms.entries.insert(
                     asset.id.clone(),
@@ -2115,32 +2180,16 @@ pub fn new_document(
 }
 
 #[tauri::command]
-pub fn open_project(
+pub async fn open_project(
     app: AppHandle,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
 ) -> Result<DocumentState, String> {
     crate::ai_edit::ensure_editable(&ai_runtime)?;
-    let text =
-        std::fs::read_to_string(&path).map_err(|error| format!("cannot open {path}: {error}"))?;
-    let mut project: Project =
-        serde_json::from_str(&text).map_err(|error| format!("{path} is not a project: {error}"))?;
     let configured = state.settings.lock().unwrap().ffmpeg_dir.clone();
-    let ffprobe = find_tool(&app, "ffprobe", &configured);
-    if ffprobe.is_some() {
-        for asset in &mut project.assets {
-            let measured = probe_asset(ffprobe.as_ref(), &asset.path);
-            if measured.width > 0 && measured.height > 0 {
-                asset.width = measured.width;
-                asset.height = measured.height;
-            }
-            if measured.duration_ms > 0 {
-                asset.duration_ms = measured.duration_ms;
-            }
-            asset.has_audio = measured.has_audio;
-        }
-    }
+    let (reader_app, reader_path) = (app.clone(), path.clone());
+    let project = blocking(move || read_project(&reader_app, &configured, &reader_path)).await??;
     // The scope grant is in memory only, so a project opened in a new run has
     // to grant its media again or every preview is blank.
     for asset in &project.assets {
@@ -2153,8 +2202,49 @@ pub fn open_project(
         *document = Document::opened(project);
         document.state()
     };
+    // A reopened project checks its waveform files again; saves reuse what
+    // is already ready. Jobs still queued or running keep their entries so
+    // they are not started a second time.
+    state
+        .waveforms
+        .lock()
+        .unwrap()
+        .entries
+        .retain(|_, status| status.state != "ready");
     let _ = start_waveforms_inner(app, &state, path);
     Ok(opened)
+}
+
+/// Parse a project file and measure its media again, one ffprobe per asset
+/// spread over the cores. Opening a long edit was one probe after another.
+fn read_project(app: &AppHandle, configured: &str, path: &str) -> Result<Project, String> {
+    let text =
+        std::fs::read_to_string(path).map_err(|error| format!("cannot open {path}: {error}"))?;
+    let mut project: Project =
+        serde_json::from_str(&text).map_err(|error| format!("{path} is not a project: {error}"))?;
+    if let Some(ffprobe) = find_tool(app, "ffprobe", configured) {
+        let workers = std::thread::available_parallelism().map_or(4, |count| count.get()).min(8);
+        let chunk = project.assets.len().div_ceil(workers).max(1);
+        std::thread::scope(|scope| {
+            for assets in project.assets.chunks_mut(chunk) {
+                let ffprobe = &ffprobe;
+                scope.spawn(move || {
+                    for asset in assets {
+                        let measured = probe_asset(Some(ffprobe), &asset.path);
+                        if measured.width > 0 && measured.height > 0 {
+                            asset.width = measured.width;
+                            asset.height = measured.height;
+                        }
+                        if measured.duration_ms > 0 {
+                            asset.duration_ms = measured.duration_ms;
+                        }
+                        asset.has_audio = measured.has_audio;
+                    }
+                });
+            }
+        });
+    }
+    Ok(project)
 }
 
 /// Writes the project file and nothing else. In particular it does not copy a
@@ -2422,7 +2512,9 @@ pub fn start_render(
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
     preset: String,
+    quality: Option<String>,
 ) -> Result<(), String> {
+    let preset = parse_preset(&preset, quality.as_deref())?;
     let snapshot = {
         let document = state.document.lock().unwrap();
         (document.project().clone(), document.revision())
@@ -2430,12 +2522,19 @@ pub fn start_render(
     render_snapshot(app, state, ai_runtime, path, preset, snapshot)
 }
 
+/// The render request as the page and the MCP bridge send it: a resolution
+/// name and an optional quality, Medium when left out.
+pub(crate) fn parse_preset(preset: &str, quality: Option<&str>) -> Result<ffmpeg::Preset, String> {
+    let quality = ffmpeg::Quality::parse(quality.unwrap_or("medium"))?;
+    Ok(ffmpeg::Preset::parse(preset)?.with_quality(quality))
+}
+
 pub(crate) fn render_snapshot(
     app: AppHandle,
     state: State<AppState>,
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
-    preset: String,
+    preset: ffmpeg::Preset,
     snapshot: (Project, u64),
 ) -> Result<(), String> {
     crate::ai_edit::ensure_editable(&ai_runtime)?;
@@ -2443,7 +2542,6 @@ pub(crate) fn render_snapshot(
         return Err("a render is already running".into());
     }
     let (project, started_at) = snapshot;
-    let preset = ffmpeg::Preset::parse(&preset)?;
     // Only the progress bar wants this; every decision below is in frames.
     let total_ms = project.duration().to_millis().max(0) as u64;
     let settings = state.settings.lock().unwrap().clone();
@@ -2720,7 +2818,11 @@ fn process_metrics_rows(output: &str) -> Result<Vec<(u32, u32, u64, f64)>, Strin
 /// Process-tree metrics include WebView and ffmpeg children, which hold most
 /// preview memory and CPU outside the Rust process itself.
 #[tauri::command]
-pub fn process_metrics() -> Result<ProcessMetrics, String> {
+pub async fn process_metrics() -> Result<ProcessMetrics, String> {
+    blocking(read_process_metrics).await?
+}
+
+fn read_process_metrics() -> Result<ProcessMetrics, String> {
     let output = Command::new("ps")
         .args(["-axo", "pid=,ppid=,rss=,pcpu="])
         .output()

@@ -11,6 +11,9 @@ on:
     paths:
       - 'product/akbun-makevideo/**'
       - 'crates/akbun-ai/**'
+      # A change to this workflow is verified by the jobs it changes. Not on
+      # push: a release without a version bump would fail on the existing tag.
+      - '.github/workflows/release-akbun-makevideo.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +36,9 @@ jobs:
 
       - name: Run page tests
         run: npm test
+
+      - name: Run CLI tests
+        run: npm run test:cli
 
       - name: Run local MCP protocol tests
         run: |
@@ -113,14 +119,17 @@ jobs:
       - name: Install a software GPU
         run: sudo apt-get install -y -qq mesa-vulkan-drivers
 
+      # One test thread: lavapipe crashes now and then (SIGSEGV mid-run) when
+      # several test threads create Vulkan devices at the same time. The GPU
+      # tests take seconds, so running them one by one costs nothing.
       - name: Run compositor tests with the GPU backend
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor -- --test-threads=1
 
       # And the scheduler again with the surface half compiled in, so the
       # swapchain format choice and the offscreen sink that draws through the
       # same call the swapchain uses are both exercised against lavapipe.
       - name: Run playback scheduler tests with the surface
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present -- --test-threads=1
 
   release:
     if: github.event_name != 'pull_request'
@@ -185,6 +194,16 @@ jobs:
           bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-makevideo >> "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
+      # The MCP server as a one-file bundle an AI client installs directly.
+      - name: Attach the MCP bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm ci --prefix mcp
+          node mcp/pack.mjs "$RUNNER_TEMP/akbun-makevideo.mcpb"
+          gh release upload "akbun-makevideo-v${VERSION}" "$RUNNER_TEMP/akbun-makevideo.mcpb" --clobber
+
       # Several products release from this repository, so the GitHub-wide
       # "latest" release is whichever product shipped last. The app therefore
       # polls a fixed tag that only this step touches, instead of
@@ -195,6 +214,19 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           gh release download "akbun-makevideo-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          # A manifest signed by a key the app does not embed is rejected by
+          # every installed copy with "signature was created with a different
+          # key". Stop here instead of publishing an update nobody can install.
+          MANIFEST="$RUNNER_TEMP/latest.json" node <<'EOF'
+          const fs = require("fs");
+          const keyId = (b64) => Buffer.from(Buffer.from(b64, "base64").toString().split("\n")[1], "base64").subarray(2, 10).toString("hex");
+          const trusted = keyId(require("./src-tauri/tauri.conf.json").plugins.updater.pubkey);
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, "utf8"));
+          for (const [platform, entry] of Object.entries(manifest.platforms)) {
+            const signed = keyId(entry.signature);
+            if (signed !== trusted) throw new Error(platform + " signed by " + signed + ", app trusts " + trusted);
+          }
+          EOF
           gh release create akbun-makevideo-updater \
             --title "akbun-makevideo updater manifest" \
             --notes "Fixed tag the installed app polls for updates. Do not delete." \

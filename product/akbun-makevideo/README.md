@@ -1,6 +1,6 @@
 # akbun-makevideo
 
-Desktop video editor: a multi track timeline, a live preview, and a render to FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in Rust and every edit is an undoable command; ffmpeg does the render.
+Desktop video editor: a multi track timeline, a live preview, and a render to HD, FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in Rust and every edit is an undoable command; ffmpeg does the render.
 
 ## What it does
 
@@ -9,7 +9,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
-- Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel
+- Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel, and hide Assets or the Source Monitor to give the Program Monitor the room
 - AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; choose an available subscription model and reasoning effort; conversations stay in app-owned bounded storage
 - [Astra edit studio](./wiki/architecture/astra-editing.md): 단계별 컷·B-roll·모션 그래픽·음악·자막 편집 제안과 검토 후 일괄 적용
 - B-roll 구간의 시각 표본 분석과 검색, text/shape 애니메이션·자막 스타일 재사용 라이브러리
@@ -26,12 +26,13 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Ripple delete: take a clip out and close the gap behind it
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
-- Render to mp4 at FHD or 4K with a progress bar and a cancel button
+- Render sheet (Cmd+E): mp4 at HD, FHD or 4K long edge and High, Medium or Low quality, with the output size, encoder and length shown before the file is chosen, then a progress bar and a cancel button. The last choice is remembered
 - Renders composite on the GPU by default so the preview frame and the file agree, with a software compositor when there is no GPU and the ffmpeg filter graph as a faster route
 - GPU rendering when the machine has it: the encode moves to Apple VideoToolbox (or NVENC), detected by actually trying it, with an automatic fall back to the CPU if it fails
 - Preview quality, defaulted to Half so a few tracks at once still play
 - Light and dark, following the system unless told otherwise
 - Self update from Settings → Check for Updates
+- Local MCP server for AI clients, installable as a one-file .mcpb bundle, and a terminal CLI over the same socket: [MCP setup](./docs/01-mcp-setup.md), [CLI](./docs/03-cli.md)
 
 ## Requirements
 
@@ -60,9 +61,16 @@ Cmd on macOS, Ctrl elsewhere.
 | Key | What it does |
 |---|---|
 | Space | Play or pause the preview |
+| L / K | Play / pause |
+| I / O | Mark the source in / out point |
+| M | Add a marker at the playhead |
+| = / - | Zoom the timeline in / out (Cmd or pinch with the wheel does the same) |
+| Shift+Z | Zoom the timeline to fit the edit |
+| Cmd+1 / Cmd+2 | Show or hide Assets / the Source Monitor |
 | Cmd+B | Split at the playhead |
 | Cmd+N / Cmd+O / Cmd+S / Shift+Cmd+S | New, open, save, save as |
 | Cmd+I | Import media |
+| Cmd+E | Open the Render sheet |
 | Cmd+Z / Shift+Cmd+Z | Undo, redo |
 | Delete | Delete the selected clip |
 | Shift+Delete | Delete it and close the gap behind it |

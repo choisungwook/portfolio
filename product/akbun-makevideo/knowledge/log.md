@@ -4,6 +4,7 @@
 
 * [잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다](decisions/2026-11-denoise-strength-sets-the-noise-floor.md) 기록.
 * [AI media 작업이 분석부터 편집 적용까지 소유한다](decisions/2026-09-ai-media-jobs-own-the-apply-boundary.md) 갱신. 군더더기 말 제거는 검토 후 적용하는 예외 추가.
+* [updater 공개키는 서명 secret과 같은 키쌍에서 가져온다](decisions/2026-11-updater-key-matches-signing-secret.md) 기록.
 
 ## 2026-09-17
 

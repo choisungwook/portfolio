@@ -31,6 +31,9 @@
       seekTimelineEnd,
       updateMonitorZoomUi,
       startRender,
+      fillRenderSheet,
+      fillRenderSummary,
+      persistSettingsInBackground,
       fillProxySheet,
       openSheet,
       fillProjectSheet,
@@ -41,6 +44,8 @@
       anySheetOpen,
       closeTimelineContextMenu,
       toggleSelectedPanel,
+      toggleWorkspacePanel,
+      restoreWorkspacePanels,
       refreshDebug,
       setSourceMark,
       placeSource,
@@ -48,6 +53,7 @@
       selectAsset,
       zoomToPxPerSecond,
       renderTimeline,
+      relayoutTimeline,
       updatePlayhead,
       toggleSnap,
       toggleClipLink,
@@ -108,6 +114,26 @@
       dom.menus.querySelector(`[data-menu="${name}"]`).classList.add('open');
     }
 
+    /** The zoom slider is the one place zoom is applied, so every other way of
+     *  zooming moves it and lets its input handler keep the playhead in view. */
+    function setTimelineZoom(value) {
+      dom.zoom.value = String(Math.max(Number(dom.zoom.min), Math.min(Number(dom.zoom.max), value)));
+      dom.zoom.dispatchEvent(new Event('input'));
+    }
+
+    function stepTimelineZoom(step) {
+      setTimelineZoom(Number(dom.zoom.value) + step);
+    }
+
+    function zoomTimelineToFit() {
+      const seconds = L.projectDurationFrames(state.project) / T.rateToNumber(rate());
+      if (seconds <= 0) return;
+      // zoomToPxPerSecond is 5 * 1.04^value, solved for value.
+      const pxPerSecond = (dom.scroll.clientWidth * 0.95) / seconds;
+      setTimelineZoom(Math.floor(Math.log(pxPerSecond / 5) / Math.log(1.04)));
+      dom.scroll.scrollLeft = 0;
+    }
+
     const actions = {
       'new-project': newProject,
       'open-project': openProject,
@@ -122,6 +148,16 @@
       'delete-clip': () => deleteSelected(false),
       'ripple-delete': () => deleteSelected(true),
       'toggle-playback': () => preview.toggle(),
+      play: () => { if (!preview.isPlaying()) preview.play(); },
+      pause: () => preview.pause(),
+      'source-mark-in': () => setSourceMark('in'),
+      'source-mark-out': () => setSourceMark('out'),
+      'add-marker': () => addMarker(),
+      'timeline-zoom-in': () => stepTimelineZoom(8),
+      'timeline-zoom-out': () => stepTimelineZoom(-8),
+      'timeline-zoom-fit': zoomTimelineToFit,
+      'toggle-assets-panel': () => toggleWorkspacePanel('assets'),
+      'toggle-source-monitor': () => toggleWorkspacePanel('source'),
       'previous-frame': () => seekTimelineOffset(-1),
       'next-frame': () => seekTimelineOffset(1),
       'previous-second': () => seekTimelineOffset(-Math.round(T.rateToNumber(rate()))),
@@ -134,8 +170,10 @@
       'monitor-zoom-out': () => { preview.zoomOut(); updateMonitorZoomUi(); },
       'monitor-fit': () => { preview.fit(); updateMonitorZoomUi(); },
       'monitor-fullscreen': () => stageController.toggleFullscreen(),
-      'render-fhd': () => startRender('fhd'),
-      'render-4k': () => startRender('4k'),
+      'render-open': () => {
+        fillRenderSheet();
+        openSheet('render-settings');
+      },
       'cancel-render': () => window.api.cancelRender(),
       'proxy-media': () => {
         fillProxySheet();
@@ -238,6 +276,11 @@
         const button = event.target.closest('[data-panel-action]');
         if (button) toggleSelectedPanel(button.dataset.panelAction);
       });
+      el('workspace-toggles').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-workspace-toggle]');
+        if (button) toggleWorkspacePanel(button.dataset.workspaceToggle);
+      });
+      restoreWorkspacePanels();
       dom.btnRefreshDebug.addEventListener('click', () => void refreshDebug());
       dom.btnToggleLogs.addEventListener('click', () => {
         dom.debugLog.hidden = !dom.debugLog.hidden;
@@ -295,12 +338,27 @@
     }
 
     function wireTimeline() {
+      // Cmd or Ctrl with the wheel, and a trackpad pinch (which arrives as a
+      // Ctrl wheel), zoom the timeline instead of scrolling it.
+      // A pinch sends many small deltas and a mouse wheel a few large ones, so
+      // the step follows the delta and the remainder carries to the next event.
+      let pendingZoom = 0;
+      dom.scroll.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        pendingZoom -= event.deltaY / 25;
+        const step = Math.trunc(pendingZoom);
+        if (!step) return;
+        pendingZoom -= step;
+        stepTimelineZoom(Math.max(-8, Math.min(8, step)));
+      }, { passive: false });
       dom.scroll.addEventListener('wheel', timelineInteractions.scrollHorizontally, { passive: false });
       dom.zoom.addEventListener('input', () => {
-        const at = preview.position();
+        const frame = preview.position();
+        const offset = L.framesToPx(frame, rate(), state.pxPerSecond) - dom.scroll.scrollLeft;
         state.pxPerSecond = zoomToPxPerSecond(dom.zoom.value);
-        renderTimeline();
-        updatePlayhead(at);
+        relayoutTimeline({ frame, offset });
       });
       dom.btnSplit.addEventListener('click', splitAtPlayhead);
       dom.btnMagnet.addEventListener('click', toggleSnap);
@@ -514,6 +572,17 @@
         const close = event.target.closest('[data-close]');
         if (close) closeSheet(close.dataset.close);
       });
+      el('rs-preset').addEventListener('change', fillRenderSummary);
+      el('rs-quality').addEventListener('change', fillRenderSummary);
+      el('rs-start').addEventListener('click', () => {
+        const preset = el('rs-preset').value;
+        const quality = el('rs-quality').value;
+        closeSheet('render-settings');
+        state.settings.renderPreset = preset;
+        state.settings.renderQuality = quality;
+        persistSettingsInBackground();
+        void startRender(preset, quality);
+      });
       el('ps-preset').addEventListener('change', (event) => {
         if (event.target.value === 'custom') return;
         const [width, height] = event.target.value.split('x');
@@ -670,9 +739,7 @@
         if (path) openProjectPath(path);
       });
       dom.renderCancel.addEventListener('click', () => window.api.cancelRender());
-      dom.renderClose.addEventListener('click', () => {
-        dom.renderOverlay.hidden = true;
-      });
+      dom.renderClose.addEventListener('click', () => closeSheet('render-overlay'));
       dom.toolWarning.addEventListener('click', () => {
         fillAppSheet();
         openSheet('app-settings');

@@ -168,10 +168,9 @@
       for (const node of dom.lanes.querySelectorAll('.lane')) node.classList.remove('drop-target');
       if (!current) return;
       try {
-        if (!current.moved) {
-          renderTimeline();
-          return;
-        }
+        // A click selects, and selection already updated the class and the
+        // inspector. Nothing on the timeline moved.
+        if (!current.moved) return;
         return await edit(
           current.mode === 'move'
             ? {
@@ -249,10 +248,7 @@
       visualTimingDrag = null;
       document.body.classList.remove('dragging', 'trimming');
       if (!current) return;
-      if (!current.moved) {
-        renderTimeline();
-        return;
-      }
+      if (!current.moved) return;
       return edit({
         op: 'setVisualTiming',
         itemId: current.itemId,

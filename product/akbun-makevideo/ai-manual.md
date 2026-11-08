@@ -51,6 +51,8 @@
 
 | 도구 | 주요 입력 | 반환·효과 |
 | --- | --- | --- |
+| get_status | 없음 | 앱 실행 여부, 버전, revision, 렌더 중 여부, 프록시 상태별 개수. 앱이 닫혀 있으면 running=false |
+| launch_app | 없음 | macOS에서 설치된 앱을 열고 응답할 때까지 대기. 이미 실행 중이면 그대로 |
 | editing_guide | 없음 | 현재 명령 형식과 시간 규칙 |
 | get_project | 없음 | document와 stateToken |
 | list_projects | 없음 | workspace의 프로젝트 목록 |
@@ -66,7 +68,7 @@
 | sample_asset | assetId, startMs, endMs | 이미지 콘텐츠와 원본 시각 |
 | get_library | 없음 | 저장된 디자인 템플릿·분석 관찰 조회 |
 | save_project | stateToken, path | .akbunvideo 저장 |
-| export_video | stateToken, path, preset: fhd 또는 4k | 새 영상 출력 시작 |
+| export_video | stateToken, path, preset: hd, fhd 또는 4k, quality: high, medium 또는 low(생략 시 medium) | 새 영상 출력 시작 |
 | render_status | 없음 | running과 result |
 | cancel_render | 없음 | 진행 중 출력 취소 요청 |
 
@@ -265,12 +267,13 @@ get_project에서 받은 토큰을 아래 stateToken에 넣어 현재 타임라�
 ## 영상 출력
 
 1. Project → Save로 편집용 프로젝트 저장
-2. Render → Render FHD — 1920 long edge 또는 Render 4K — 3840 long edge
-3. 새 MP4 파일 경로 지정
+2. Render → Render…(Cmd+E)에서 Resolution(HD·FHD·4K)과 Quality(High·Medium·Low) 선택
+3. Choose File and Render로 새 MP4 파일 경로 지정
 4. Rendering 진행 창에서 완료·실패 메시지 확인
 5. 출력 파일을 재생해 첫 장면·편집점·마지막 장면과 음성 확인
 
-- FHD/4K는 긴 변 길이. 세로 영상 비율은 유지
+- HD/FHD/4K는 긴 변 길이. 세로 영상 비율은 유지
+- Quality는 CPU 인코딩의 CRF(17·20·24)와 하드웨어 인코딩의 bitrate를 함께 조정
 - 실패하면 Settings → Preview & Tools에서 ffmpeg 경로 확인
 - 취소는 Rendering 창의 Cancel 또는 Render → Cancel Render
 - 출력 버튼을 눌렀다는 사실만으로 성공 보고 금지

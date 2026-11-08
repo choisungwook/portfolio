@@ -75,7 +75,39 @@ function toggleSnap() {
 
     // --- render ----------------------------------------------------------------
 
-    async function startRender(preset) {
+    const RENDER_LONG_EDGE = { hd: 1280, fhd: 1920, '4k': 3840 };
+
+    /** The output size the Rust preset will produce: the long edge from the
+     *  preset, the other edge from the project shape, both even. */
+    function renderSize(preset) {
+      const { width, height } = state.project.settings;
+      const long = RENDER_LONG_EDGE[preset] || 1920;
+      const even = (value) => Math.max(2, Math.round(value) - (Math.round(value) % 2));
+      return width >= height
+        ? { width: even(long), height: even((long * height) / width) }
+        : { width: even((long * width) / height), height: even(long) };
+    }
+
+    function fillRenderSheet() {
+      el('rs-preset').value = RENDER_LONG_EDGE[state.settings.renderPreset] ? state.settings.renderPreset : 'fhd';
+      el('rs-quality').value = ['high', 'medium', 'low'].includes(state.settings.renderQuality)
+        ? state.settings.renderQuality
+        : 'medium';
+      fillRenderSummary();
+    }
+
+    function fillRenderSummary() {
+      const { width, height } = renderSize(el('rs-preset').value);
+      const hardware =
+        state.settings.renderAcceleration !== 'cpu' && state.boot && state.boot.acceleration && state.boot.acceleration.available;
+      const frames = L.projectDurationFrames(state.project);
+      el('rs-summary').textContent =
+        `${width} × ${height} · ${T.rateLabel(rate())} fps · ` +
+        `H.264 + AAC 192k · ${hardware ? hardware.label : 'CPU (libx264)'} · ` +
+        `${L.formatTimecode(frames, rate())} long`;
+    }
+
+    async function startRender(preset, quality = 'medium') {
       if (state.rendering) return;
       if (!state.boot || !state.boot.ffmpeg) {
         await window.api.message(
@@ -92,7 +124,7 @@ function toggleSnap() {
       // Renders land next to the project by default, so a project folder ends up
       // holding the edit and what came out of it.
       const dir = projectDir();
-      const file = `${projectName().toLowerCase().replace(/\s+/g, '-')}-${preset}.mp4`;
+      const file = `${projectName().toLowerCase().replace(/\s+/g, '-')}-${preset}-${quality}.mp4`;
       const output = await window.api.pickRenderOutput(dir ? `${dir}/${file}` : file);
       if (!output) return;
 
@@ -109,16 +141,18 @@ function toggleSnap() {
       dom.renderBar.style.width = '0%';
       dom.renderCancel.hidden = false;
       dom.renderClose.hidden = true;
-      dom.renderOverlay.hidden = false;
+      // Through openSheet, so the native monitor steps out of the way: it is
+      // drawn over the webview and would cover the progress and Cancel.
+      openSheet('render-overlay');
       try {
         // No project goes with the request. Rust takes its own copy of the
         // document and remembers which revision it took, so an edit made while
         // this runs cannot half reach the file being written.
-        await window.api.startRender(output, preset);
+        await window.api.startRender(output, preset, quality);
       } catch (error) {
         reportError(error, 'render:start');
         state.rendering = false;
-        dom.renderOverlay.hidden = true;
+        closeSheet('render-overlay');
         await window.api.message(String(error), { title: 'Render failed', kind: 'error' });
       }
     }
@@ -365,9 +399,10 @@ function toggleSnap() {
 
     /** Whether anything is still drawn over the stage. Sheets can be stacked —
      *  Settings opens over the project sheet — so closing one is not the same as
-     *  the stage being clear. */
+     *  the stage being clear. `hidden` sits on the overlay, never on the sheet
+     *  inside it. */
     function anySheetOpen() {
-      return Boolean(document.querySelector('.sheet:not([hidden])'));
+      return Boolean(document.querySelector('.overlay:not([hidden])'));
     }
 
     function fillProjectSheet() {
@@ -576,7 +611,7 @@ function toggleSnap() {
       el('as-compositor-note').textContent = compositorNote(state.settings.compositor);
     }
 
-    return { setRuntime, persistSettings, persistSettingsInBackground, toggleSnap, startRender, onRenderProgress, onRenderFallback, onRenderDone, confirmDiscard, loadDocument, newProject, createProjectFromSheet, openProject, openProjectPath, qualitySmokeConfig, saveProject, closeProject, deleteProject, openSheet, closeSheet, anySheetOpen, fillProjectSheet, accelerationNote, staysOnCpu, compositorNote, fillGraphicsDevices, fillAppSheet, fillProxySheet, applySettings, attachMonitor };
+    return { setRuntime, persistSettings, persistSettingsInBackground, toggleSnap, renderSize, fillRenderSheet, fillRenderSummary, startRender, onRenderProgress, onRenderFallback, onRenderDone, confirmDiscard, loadDocument, newProject, createProjectFromSheet, openProject, openProjectPath, qualitySmokeConfig, saveProject, closeProject, deleteProject, openSheet, closeSheet, anySheetOpen, fillProjectSheet, accelerationNote, staysOnCpu, compositorNote, fillGraphicsDevices, fillAppSheet, fillProxySheet, applySettings, attachMonitor };
   }
 
   return { createRendererProjectUi };
