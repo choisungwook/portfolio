@@ -30,6 +30,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to HD
 - Preview quality, defaulted to Half so a few tracks at once still play
 - Light and dark, following the system unless told otherwise
 - Self update from Settings → Check for Updates
+- Local MCP server for AI clients, installable as a one-file .mcpb bundle, and a terminal CLI over the same socket: [MCP setup](./docs/01-mcp-setup.md), [CLI](./docs/03-cli.md)
 
 ## Requirements
 
