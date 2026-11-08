@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-08
+
+* **Update**: [OKF v0.2 스펙 사본](references/okf-spec-0.2.md) 0.1 사본을 0.2 원문으로 교체. 0.2부터 timestamp와 Citations 대신 generated와 sources를 씀.
+
 ## 2026-09-06
 
 * **Creation**: [30분 컨셉 범위로 축소](decisions/2026-09-thirty-minute-concept-scope.md) - 문서·코드 통합, 실제 AWS 실행 결과(정책 전파 지연, CN 거부, CRL 즉시 반영).

@@ -11,7 +11,7 @@ IAM Roles Anywhere 인증서 수명과 SDK 갱신·CRL 실습의 설계 근거�
 * [실습 CRL 관리와 정리 범위](decisions/2026-09-crl-management-ownership.md)
 * [고정 IP 경로의 Roles Anywhere 시나리오는 나중에 S01 확장으로](decisions/2026-09-fixed-ip-scenario-deferred.md)
 
-AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.1](references/okf-spec-0.1.md)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
+AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.2](references/okf-spec-0.2.md)를 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 
 ## 디렉터리
 

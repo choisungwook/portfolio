@@ -4,7 +4,7 @@ okf_version: "0.1"
 
 # akbun-makepresentation Knowledge
 
-akbun-makepresentation 구현 판단 기록. [templates/knowledge/](../../../templates/knowledge/index.md)와 같은 OKF 0.1 형식 사용.
+akbun-makepresentation 구현 판단 기록. [templates/knowledge/](../../../templates/knowledge/index.md)와 같은 OKF 0.2 형식 사용.
 
 ## 분류
 

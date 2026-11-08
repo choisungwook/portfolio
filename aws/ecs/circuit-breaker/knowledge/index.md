@@ -9,7 +9,7 @@ ECS circuit breaker 핸즈온의 결정 이유.
 - [revision과 circuit breaker는 콘솔이 소유하고 Terraform은 ignore_changes한다](decisions/2026-10-console-owned-circuit-breaker.md)
 - [circuit breaker의 FAILED 선언은 임계치 도달 직후가 아니라 다음 태스크 실행 뒤에 온다](topics/circuit-breaker-detection-delay.md)
 
-AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.1](references/okf-spec-0.1.md)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
+AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.2](references/okf-spec-0.2.md)를 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 
 ## 디렉터리
 

@@ -1,6 +1,6 @@
 # Knowledge 규칙
 
-`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.1을 따르는 지식 번들이다. 스펙 원문은 [templates/knowledge/references/okf-spec-0.1.md](../../templates/knowledge/references/okf-spec-0.1.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
+`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.2를 따르는 지식 번들이다. 스펙 원문은 [templates/knowledge/references/okf-spec-0.2.md](../../templates/knowledge/references/okf-spec-0.2.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
 
 ## 읽는 시점
 
@@ -52,16 +52,29 @@ type: Decision            # 필수. Decision | Playbook | Topic
 title: 한 줄 제목
 description: 한 문장 요약
 tags: [kubernetes, workflow]
-timestamp: 2026-07-10T00:00:00Z
+generated: { by: claude-code/claude-opus-5-5, at: 2026-07-10T00:00:00Z }
+sources:                  # 근거가 있을 때만
+  - id: okf-spec
+    resource: /references/okf-spec-0.2.md   # bundle root 기준
+    title: OKF 0.2 스펙 사본
 ---
 ```
+
+frontmatter 규칙:
+
+- `generated`는 내용을 마지막으로 의미 있게 바꾼 주체와 시각이다. 내용을 고칠 때마다 함께 갱신한다.
+- `by`는 actor 형식으로 쓴다. agent는 `<도구>/<모델>`, 사람은 `human:<id>`, 자동화는 `process:<id>`다.
+- `verified`는 사람이 내용을 확인했을 때만 `{ by: human:<id>, at: ... }`로 붙인다. agent가 자기 글에 붙이지 않는다. 신뢰 등급이 이 값의 `human:` 접두사로 정해지기 때문이다.
+- 더 이상 맞지 않지만 링크 때문에 남겨야 하는 concept는 `status: deprecated`로 표시한다. 그 외에는 `status`를 생략한다(생략하면 `stable`).
+- 시각은 UTC offset을 붙인 ISO 8601로 쓴다. 예: `2026-07-10T00:00:00Z`
 
 본문 규칙:
 
 - Decision은 `## 결정`과 `## 이유` 섹션을 쓴다.
-- 외부 근거(PR, 블로그, 공식 문서)가 있으면 `## Citations` 섹션에 번호 목록으로 남긴다.
+- 외부 근거(PR, 블로그, 공식 문서)는 본문 목록이 아니라 frontmatter `sources`에 남긴다. 특정 문장의 근거는 `[^id]` 각주로 달고 라벨을 `sources[].id`와 맞춘다.
 - 관련 concept는 markdown 상대 링크로 연결한다. 링크 대상이 아직 없어도 괜찮다.
-- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 로컬 경로로 연결한다. 외부 URL은 provenance 기록용으로 frontmatter의 source 필드나 Citations에만 남긴다.
+- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 `/`로 시작하는 bundle root 기준 경로(예: `/references/foo.md`)를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
+- 0.1 형식(`timestamp`, `## Citations`)으로 쓰인 기존 concept는 그대로 읽힌다. 그 concept를 고칠 때 그 파일만 새 형식으로 옮긴다.
 - 분량은 A4 반 장 이내로 짧게 쓴다.
 
 ## 기록 후 갱신할 파일

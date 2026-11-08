@@ -4,4 +4,4 @@
 
 ## 목록
 
-* [OKF v0.1 스펙 사본](okf-spec-0.1.md) - knowledge 번들이 따르는 Open Knowledge Format 스펙 원문.
+* [OKF v0.2 스펙 사본](okf-spec-0.2.md) - knowledge 번들이 따르는 Open Knowledge Format 스펙 원문.
