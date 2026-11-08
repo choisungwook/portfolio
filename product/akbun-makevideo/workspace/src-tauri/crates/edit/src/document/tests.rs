@@ -1,0 +1,1536 @@
+use super::*;
+use crate::{
+    Asset, AssetKind, Clip, Command, Crop, Edge, FrameRange, Paint, ProjectSettings, Rate, Stroke,
+    TextStyle, TrackKind, VisualContent, VisualStyle, VisualTransform,
+};
+
+fn asset(id: &str, kind: AssetKind, duration_ms: u64) -> Asset {
+    Asset {
+        id: id.into(),
+        path: format!("/media/{id}"),
+        name: id.into(),
+        kind,
+        duration_ms,
+        width: 1920,
+        height: 1080,
+        has_audio: true,
+    }
+}
+
+/// A project with one ten second video imported and nothing on the
+/// timeline. Ten seconds at 30 is 300 frames, which is the number every
+/// expectation below is written against.
+fn document() -> Document {
+    let mut document = Document::new(ProjectSettings::default());
+    document
+        .apply(Command::AddAssets {
+            assets: vec![asset("v", AssetKind::Video, 10_000)],
+        })
+        .unwrap();
+    document
+}
+
+fn video_track(document: &Document) -> String {
+    document.project().tracks[0].id.clone()
+}
+
+fn audio_track(document: &Document) -> String {
+    document.project().tracks[1].id.clone()
+}
+
+fn add(document: &mut Document, start: i64) -> String {
+    let track = video_track(document);
+    document
+        .apply(Command::AddClip {
+            track_id: track.clone(),
+            asset_id: "v".into(),
+            start,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+    document
+        .project()
+        .track(&track)
+        .unwrap()
+        .clips
+        .iter()
+        .find(|clip| clip.start == start || clip.end_frame() > start)
+        .map(|clip| clip.id.clone())
+        .expect("the clip that was just added")
+}
+
+fn add_linked(document: &mut Document, start: i64) -> (String, String) {
+    let video = video_track(document);
+    let audio = audio_track(document);
+    document
+        .apply_all(vec![
+            Command::AddClip {
+                track_id: video.clone(),
+                asset_id: "v".into(),
+                start,
+                id: None,
+                link_group: Some("g1".into()),
+            },
+            Command::AddClip {
+                track_id: audio.clone(),
+                asset_id: "v".into(),
+                start,
+                id: None,
+                link_group: Some("g1".into()),
+            },
+        ])
+        .unwrap();
+    (
+        document.project().track(&video).unwrap().clips[0]
+            .id
+            .clone(),
+        document.project().track(&audio).unwrap().clips[0]
+            .id
+            .clone(),
+    )
+}
+
+fn clips(document: &Document) -> Vec<Clip> {
+    document.project().tracks[0].clips.clone()
+}
+
+#[test]
+fn a_dropped_clip_takes_the_length_of_its_source() {
+    let mut document = document();
+    add(&mut document, 75);
+    let clips = clips(&document);
+    assert_eq!(clips.len(), 1);
+    assert_eq!(
+        (clips[0].start, clips[0].in_point, clips[0].out_point),
+        (75, 0, 300)
+    );
+}
+
+#[test]
+fn a_dissolve_is_a_boundary_object_with_undo_and_clip_cleanup() {
+    let mut document = document();
+    let first = add(&mut document, 0);
+    let second = add(&mut document, 300);
+    document
+        .apply(Command::AddTransition {
+            from_clip_id: first.clone(),
+            to_clip_id: second.clone(),
+            duration: 15,
+            id: None,
+        })
+        .unwrap();
+    assert_eq!(document.project().transitions.len(), 1);
+    assert_eq!(document.project().transitions[0].duration, 15);
+    let transition_id = document.project().transitions[0].id.clone();
+    let error = document
+        .apply(Command::SetTransitionDuration {
+            transition_id,
+            duration: 301,
+        })
+        .unwrap_err();
+    assert!(error.contains("fit inside both clips"), "{error}");
+    assert_eq!(document.project().transitions[0].duration, 15);
+
+    document.undo().unwrap();
+    assert!(document.project().transitions.is_empty());
+    document.redo().unwrap();
+    assert_eq!(document.project().transitions.len(), 1);
+
+    document
+        .apply(Command::RemoveClip { clip_id: second })
+        .unwrap();
+    assert!(document.project().transitions.is_empty());
+    document.undo().unwrap();
+    assert_eq!(document.project().transitions.len(), 1);
+    assert_eq!(clips(&document).len(), 2);
+}
+
+#[test]
+fn a_track_that_cannot_play_an_asset_refuses_it() {
+    let mut document = document();
+    document
+        .apply(Command::AddAssets {
+            assets: vec![asset("still", AssetKind::Image, 0)],
+        })
+        .unwrap();
+    let audio = audio_track(&document);
+    let error = document
+        .apply(Command::AddClip {
+            track_id: audio,
+            asset_id: "still".into(),
+            start: 0,
+            id: None,
+            link_group: None,
+        })
+        .unwrap_err();
+    assert!(error.contains("will not take"), "{error}");
+    assert!(document.project().tracks[1].clips.is_empty());
+}
+
+#[test]
+fn undo_puts_a_moved_clip_back_on_the_track_it_came_from() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    let audio = audio_track(&document);
+    document
+        .apply(Command::MoveClip {
+            clip_id: clip.clone(),
+            track_id: audio.clone(),
+            start: 120,
+        })
+        .unwrap();
+    assert_eq!(document.project().track(&audio).unwrap().clips.len(), 1);
+
+    document.undo().unwrap();
+    assert!(document.project().track(&audio).unwrap().clips.is_empty());
+    let back = &clips(&document)[0];
+    assert_eq!((back.id.as_str(), back.start), (clip.as_str(), 0));
+}
+
+#[test]
+fn redo_reproduces_the_same_clips_rather_than_new_ones() {
+    let mut document = document();
+    add(&mut document, 0);
+    document
+        .apply(Command::SplitAt {
+            frame: 150,
+            clip_id: None,
+            ids: Vec::new(),
+            link_groups: Vec::new(),
+        })
+        .unwrap();
+    let after_split: Vec<String> = clips(&document)
+        .iter()
+        .map(|clip| clip.id.clone())
+        .collect();
+    assert_eq!(after_split.len(), 2);
+
+    document.undo().unwrap();
+    assert_eq!(clips(&document).len(), 1);
+    document.redo().unwrap();
+    let again: Vec<String> = clips(&document)
+        .iter()
+        .map(|clip| clip.id.clone())
+        .collect();
+    assert_eq!(again, after_split, "redo has to hand back the same ids");
+    // And the cut is still where it was, on both halves.
+    assert_eq!(clips(&document)[0].out_point, 150);
+    assert_eq!(clips(&document)[1].in_point, 150);
+}
+
+#[test]
+fn undo_and_redo_walk_the_whole_history_both_ways() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    document
+        .apply(Command::TrimClip {
+            clip_id: clip.clone(),
+            edge: Edge::End,
+            frame: 200,
+        })
+        .unwrap();
+    document
+        .apply(Command::RemoveClip { clip_id: clip })
+        .unwrap();
+    assert!(clips(&document).is_empty());
+
+    let mut steps = 0;
+    while document.can_undo() {
+        document.undo().unwrap();
+        steps += 1;
+    }
+    // The import is an undo step too, so walking all the way back empties
+    // the asset library as well as the timeline.
+    assert_eq!(steps, 4);
+    assert!(document.project().assets.is_empty());
+    while document.can_redo() {
+        document.redo().unwrap();
+    }
+    assert_eq!(document.project().assets.len(), 1);
+    assert!(
+        clips(&document).is_empty(),
+        "and forward to after the delete"
+    );
+}
+
+#[test]
+fn a_new_edit_throws_away_the_redo_branch() {
+    let mut document = document();
+    add(&mut document, 0);
+    document.undo().unwrap();
+    assert!(document.can_redo());
+    add(&mut document, 90);
+    assert!(!document.can_redo());
+}
+
+#[test]
+fn a_split_that_crosses_nothing_is_not_an_undo_step() {
+    let mut document = document();
+    add(&mut document, 0);
+    let before = document.revision();
+    document
+        .apply(Command::SplitAt {
+            frame: 100_000,
+            clip_id: None,
+            ids: Vec::new(),
+            link_groups: Vec::new(),
+        })
+        .unwrap();
+    assert_eq!(
+        document.revision(),
+        before,
+        "nothing happened, so nothing to undo"
+    );
+}
+
+#[test]
+fn ripple_delete_closes_the_gap_and_undo_opens_it_again() {
+    let mut document = document();
+    let first = add(&mut document, 0);
+    add(&mut document, 300);
+    add(&mut document, 600);
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 300, 600]
+    );
+
+    document
+        .apply(Command::RippleDelete { clip_id: first })
+        .unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 300]
+    );
+    document.undo().unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 300, 600]
+    );
+}
+
+#[test]
+fn ripple_delete_gap_closes_only_the_selected_track_and_redoes() {
+    let mut document = document();
+    add(&mut document, 0);
+    add(&mut document, 600);
+    add(&mut document, 1_200);
+    let track_id = video_track(&document);
+
+    document
+        .apply(Command::RippleDeleteGap {
+            track_id,
+            start: 300,
+            end: 600,
+        })
+        .unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 300, 900]
+    );
+    assert_eq!(document.state().undo_label, "Ripple delete gap");
+
+    document.undo().unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 600, 1_200]
+    );
+    document.redo().unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.start)
+            .collect::<Vec<_>>(),
+        [0, 300, 900]
+    );
+}
+
+#[test]
+fn ripple_delete_gap_keeps_a_linked_clip_pair_together() {
+    let mut document = document();
+    add(&mut document, 0);
+    add_linked(&mut document, 600);
+    let track_id = video_track(&document);
+
+    document
+        .apply(Command::RippleDeleteGap {
+            track_id,
+            start: 300,
+            end: 600,
+        })
+        .unwrap();
+
+    assert_eq!(
+        document.project().tracks[0].clips[1].start,
+        300,
+        "the video clip moves into the gap"
+    );
+    assert_eq!(
+        document.project().tracks[1].clips[0].start,
+        300,
+        "its audio counterpart follows"
+    );
+}
+
+#[test]
+fn ripple_delete_gap_refuses_to_overlap_a_linked_counterpart() {
+    let mut document = document();
+    add(&mut document, 0);
+    add_linked(&mut document, 600);
+    let audio = audio_track(&document);
+    document
+        .apply(Command::AddClip {
+            track_id: audio,
+            asset_id: "v".into(),
+            start: 300,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+    let before = serde_json::to_string(document.project()).unwrap();
+
+    let error = document
+        .apply(Command::RippleDeleteGap {
+            track_id: video_track(&document),
+            start: 300,
+            end: 600,
+        })
+        .unwrap_err();
+
+    assert!(error.contains("overlap a linked clip"), "{error}");
+    assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+}
+
+#[test]
+fn a_transaction_that_fails_half_way_changes_nothing() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    let before = serde_json::to_string(document.project()).unwrap();
+    let revision = document.revision();
+
+    let error = document
+        .apply(Command::Transaction {
+            commands: vec![
+                Command::MoveClip {
+                    clip_id: clip.clone(),
+                    track_id: video_track(&document),
+                    start: 600,
+                },
+                // No such track, so the whole thing has to come back.
+                Command::MoveClip {
+                    clip_id: clip,
+                    track_id: "nowhere".into(),
+                    start: 0,
+                },
+            ],
+        })
+        .unwrap_err();
+
+    assert!(error.contains("not in this project"), "{error}");
+    assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+    assert_eq!(document.revision(), revision);
+    assert_eq!(
+        document.state().undo_label,
+        "Add clip",
+        "a failed edit is not an undo step"
+    );
+}
+
+#[test]
+fn an_edit_that_breaks_an_invariant_is_refused_whole() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    let before = serde_json::to_string(document.project()).unwrap();
+    // Restoring is a primitive with no clamping of its own, which is
+    // exactly why the document validates afterwards: this is the shape a
+    // bug in a future command would take.
+    let error = document
+        .apply(Command::RestoreClips {
+            entries: vec![crate::ClipAt {
+                track_id: video_track(&document),
+                clip: Clip {
+                    id: clip,
+                    asset_id: "v".into(),
+                    link_group: None,
+                    lut_path: None,
+                    start: 0,
+                    in_point: 0,
+                    out_point: 9_000,
+                    volume: 1.0,
+                    opacity: 1.0,
+                    speed: 1.0,
+                    preserve_pitch: true,
+                    denoise: 0.0,
+                    fade_in: 0,
+                    fade_out: 0,
+                    volume_keyframes: Default::default(),
+                    blend_mode: Default::default(),
+                },
+            }],
+        })
+        .unwrap_err();
+    assert!(error.contains("past the end"), "{error}");
+    assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+}
+
+#[test]
+fn a_trim_stops_at_the_clip_next_door_instead_of_overlapping_it() {
+    let mut document = document();
+    let first = add(&mut document, 0);
+    add(&mut document, 300);
+    document
+        .apply(Command::TrimClip {
+            clip_id: first,
+            edge: Edge::End,
+            frame: 500,
+        })
+        .unwrap();
+    assert_eq!(clips(&document)[0].end_frame(), 300);
+    assert!(document.project().validate().is_ok());
+}
+
+#[test]
+fn noise_reduction_is_one_undo_step_and_is_clamped() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    let before = serde_json::to_string(document.project()).unwrap();
+    document
+        .apply(Command::SetClipDenoise {
+            clip_id: clip.clone(),
+            strength: 3.0,
+        })
+        .unwrap();
+    assert_eq!(clips(&document)[0].denoise, 1.0);
+    document.undo().unwrap();
+    assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+    assert!(document
+        .apply(Command::SetClipDenoise {
+            clip_id: clip,
+            strength: f32::NAN,
+        })
+        .is_err());
+}
+
+#[test]
+fn playback_speed_refuses_to_overlap_the_clip_next_door() {
+    let mut document = document();
+    let first = add(&mut document, 0);
+    add(&mut document, 300);
+    let before = serde_json::to_string(document.project()).unwrap();
+    let error = document
+        .apply(Command::SetClipPlayback {
+            clip_id: first,
+            speed: Some(0.5),
+            preserve_pitch: None,
+            fade_in: None,
+            fade_out: None,
+        })
+        .unwrap_err();
+    assert!(
+        error.contains("has no room for that playback speed"),
+        "{error}"
+    );
+    assert_eq!(serde_json::to_string(document.project()).unwrap(), before);
+}
+
+#[test]
+fn a_trim_may_not_reach_past_the_end_of_the_source() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    document
+        .apply(Command::TrimClip {
+            clip_id: clip.clone(),
+            edge: Edge::Start,
+            frame: 90,
+        })
+        .unwrap();
+    document
+        .apply(Command::TrimClip {
+            clip_id: clip,
+            edge: Edge::End,
+            frame: 999_999,
+        })
+        .unwrap();
+    // 300 frames of source, 90 taken off the front, so the tail is at 300.
+    assert_eq!(clips(&document)[0].end_frame(), 300);
+    assert_eq!(clips(&document)[0].in_point, 90);
+}
+
+#[test]
+fn changing_the_timebase_holds_the_cut_where_it_was_in_time() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    document
+        .apply(Command::TrimClip {
+            clip_id: clip,
+            edge: Edge::End,
+            frame: 150,
+        })
+        .unwrap();
+    let settings = ProjectSettings {
+        rate: Rate::fps(60),
+        ..document.project().settings
+    };
+    document.apply(Command::SetSettings { settings }).unwrap();
+    // Five seconds at 30 is five seconds at 60, which is 300 frames of it.
+    assert_eq!(clips(&document)[0].out_point, 300);
+
+    document.undo().unwrap();
+    assert_eq!(document.project().rate(), Rate::fps(30));
+    assert_eq!(
+        clips(&document)[0].out_point,
+        150,
+        "and exactly back, not near it"
+    );
+}
+
+#[test]
+fn removing_an_asset_takes_its_clips_and_undo_brings_both_back() {
+    let mut document = document();
+    add(&mut document, 0);
+    add(&mut document, 300);
+    document
+        .apply(Command::AddVisualItem {
+            track_id: video_track(&document),
+            content: VisualContent::Shape {
+                shape: Default::default(),
+                visual_style: VisualStyle {
+                    fills: vec![Paint::Video {
+                        asset_id: "v".into(),
+                    }],
+                    stroke: None,
+                    shadow: None,
+                },
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
+            start: 0,
+            duration: 30,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: None,
+        })
+        .unwrap();
+    document
+        .apply(Command::RemoveAsset {
+            asset_id: "v".into(),
+        })
+        .unwrap();
+    assert!(document.project().assets.is_empty());
+    assert!(clips(&document).is_empty());
+    assert!(document.project().tracks[0].visual_items.is_empty());
+
+    document.undo().unwrap();
+    assert_eq!(document.project().assets.len(), 1);
+    assert_eq!(clips(&document).len(), 2);
+    assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+}
+
+#[test]
+fn removing_a_track_takes_its_clips_and_undo_brings_them_back() {
+    let mut document = document();
+    document
+        .apply(Command::AddTrack {
+            track_kind: TrackKind::Video,
+            id: None,
+        })
+        .unwrap();
+    let second = document
+        .project()
+        .tracks_of(TrackKind::Video)
+        .nth(1)
+        .unwrap()
+        .id
+        .clone();
+    document
+        .apply(Command::AddClip {
+            track_id: second.clone(),
+            asset_id: "v".into(),
+            start: 0,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+    document
+        .apply(Command::RemoveTrack {
+            track_id: second.clone(),
+        })
+        .unwrap();
+    assert!(document.project().track(&second).is_none());
+
+    document.undo().unwrap();
+    let back = document
+        .project()
+        .track(&second)
+        .expect("the track is back");
+    assert_eq!(back.clips.len(), 1, "and so are the clips that were on it");
+    assert_eq!(document.project().tracks[2].id, second, "in the same place");
+}
+
+#[test]
+fn only_the_last_track_of_a_kind_can_go() {
+    let mut document = document();
+    let first = video_track(&document);
+    assert!(document
+        .apply(Command::RemoveTrack {
+            track_id: first.clone()
+        })
+        .is_err());
+    document
+        .apply(Command::AddTrack {
+            track_kind: TrackKind::Video,
+            id: None,
+        })
+        .unwrap();
+    assert!(document
+        .apply(Command::RemoveTrack { track_id: first })
+        .is_err());
+}
+
+#[test]
+fn four_tracks_of_a_kind_is_as_many_as_there_are() {
+    let mut document = document();
+    for _ in 0..3 {
+        document
+            .apply(Command::AddTrack {
+                track_kind: TrackKind::Video,
+                id: None,
+            })
+            .unwrap();
+    }
+    let error = document
+        .apply(Command::AddTrack {
+            track_kind: TrackKind::Video,
+            id: None,
+        })
+        .unwrap_err();
+    assert!(error.contains("as many as"), "{error}");
+}
+
+#[test]
+fn several_commands_can_be_one_undo_step() {
+    let mut document = document();
+    let track = video_track(&document);
+    document
+        .apply_all(vec![
+            Command::AddClip {
+                track_id: track.clone(),
+                asset_id: "v".into(),
+                start: 0,
+                id: None,
+                link_group: None,
+            },
+            Command::AddClip {
+                track_id: track,
+                asset_id: "v".into(),
+                start: 300,
+                id: None,
+                link_group: None,
+            },
+        ])
+        .unwrap();
+    assert_eq!(clips(&document).len(), 2);
+    document.undo().unwrap();
+    assert!(clips(&document).is_empty(), "both went, on one undo");
+}
+
+#[test]
+fn linked_clips_are_added_moved_and_undone_as_one_edit() {
+    let mut document = document();
+    let (video, audio) = add_linked(&mut document, 0);
+    document
+        .apply(Command::MoveClip {
+            clip_id: video.clone(),
+            track_id: video_track(&document),
+            start: 60,
+        })
+        .unwrap();
+    assert_eq!(document.project().clip(&video).unwrap().start, 60);
+    assert_eq!(document.project().clip(&audio).unwrap().start, 60);
+
+    document.undo().unwrap();
+    assert_eq!(document.project().clip(&video).unwrap().start, 0);
+    assert_eq!(document.project().clip(&audio).unwrap().start, 0);
+    document.undo().unwrap();
+    assert!(document.project().clip(&video).is_none());
+    assert!(document.project().clip(&audio).is_none());
+    document.redo().unwrap();
+    assert_eq!(
+        document
+            .project()
+            .clip(&video)
+            .unwrap()
+            .link_group
+            .as_deref(),
+        Some("g1")
+    );
+    assert_eq!(
+        document
+            .project()
+            .clip(&audio)
+            .unwrap()
+            .link_group
+            .as_deref(),
+        Some("g1")
+    );
+}
+
+#[test]
+fn linked_add_fails_whole_when_either_track_is_occupied() {
+    let mut document = document();
+    document
+        .apply(Command::AddClip {
+            track_id: audio_track(&document),
+            asset_id: "v".into(),
+            start: 0,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+
+    let error = document
+        .apply_all(vec![
+            Command::AddClip {
+                track_id: video_track(&document),
+                asset_id: "v".into(),
+                start: 0,
+                id: None,
+                link_group: Some("g1".into()),
+            },
+            Command::AddClip {
+                track_id: audio_track(&document),
+                asset_id: "v".into(),
+                start: 0,
+                id: None,
+                link_group: Some("g1".into()),
+            },
+        ])
+        .unwrap_err();
+
+    assert!(error.contains("no room"), "{error}");
+    assert!(document
+        .project()
+        .track(&video_track(&document))
+        .unwrap()
+        .clips
+        .is_empty());
+    assert_eq!(
+        document
+            .project()
+            .track(&audio_track(&document))
+            .unwrap()
+            .clips
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn a_linked_move_fails_whole_when_either_track_is_occupied() {
+    let mut document = document();
+    let (video, audio) = add_linked(&mut document, 0);
+    document
+        .apply(Command::AddClip {
+            track_id: audio_track(&document),
+            asset_id: "v".into(),
+            start: 600,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+    let error = document
+        .apply(Command::MoveClip {
+            clip_id: video.clone(),
+            track_id: video_track(&document),
+            start: 600,
+        })
+        .unwrap_err();
+    assert!(error.contains("no room"), "{error}");
+    assert_eq!(document.project().clip(&video).unwrap().start, 0);
+    assert_eq!(document.project().clip(&audio).unwrap().start, 0);
+}
+
+#[test]
+fn trim_split_and_delete_keep_linked_pairs_together() {
+    let mut document = document();
+    let (video, audio) = add_linked(&mut document, 0);
+    document
+        .apply(Command::TrimClip {
+            clip_id: video.clone(),
+            edge: Edge::End,
+            frame: 240,
+        })
+        .unwrap();
+    assert_eq!(document.project().clip(&video).unwrap().out_point, 240);
+    assert_eq!(document.project().clip(&audio).unwrap().out_point, 240);
+
+    document
+        .apply(Command::SplitAt {
+            frame: 120,
+            clip_id: Some(video),
+            ids: Vec::new(),
+            link_groups: Vec::new(),
+        })
+        .unwrap();
+    let right_video = document
+        .project()
+        .track(&video_track(&document))
+        .unwrap()
+        .clips[1]
+        .clone();
+    let right_audio = document
+        .project()
+        .track(&audio_track(&document))
+        .unwrap()
+        .clips[1]
+        .clone();
+    assert_eq!(right_video.link_group, right_audio.link_group);
+    assert_ne!(right_video.link_group.as_deref(), Some("g1"));
+
+    document
+        .apply(Command::RemoveClip {
+            clip_id: right_video.id.clone(),
+        })
+        .unwrap();
+    assert!(document.project().clip(&right_video.id).is_none());
+    assert!(document.project().clip(&right_audio.id).is_none());
+    document.undo().unwrap();
+    assert!(document.project().clip(&right_video.id).is_some());
+    assert!(document.project().clip(&right_audio.id).is_some());
+}
+
+#[test]
+fn unlink_allows_one_side_to_move_and_link_restores_group_editing() {
+    let mut document = document();
+    let (video, audio) = add_linked(&mut document, 0);
+    document
+        .apply(Command::UnlinkClips {
+            clip_id: video.clone(),
+        })
+        .unwrap();
+    document
+        .apply(Command::MoveClip {
+            clip_id: video.clone(),
+            track_id: video_track(&document),
+            start: 30,
+        })
+        .unwrap();
+    assert_eq!(document.project().clip(&video).unwrap().start, 30);
+    assert_eq!(document.project().clip(&audio).unwrap().start, 0);
+    document.undo().unwrap();
+    document
+        .apply(Command::LinkClips {
+            clip_ids: vec![video.clone(), audio.clone()],
+            link_group: None,
+        })
+        .unwrap();
+    assert_eq!(
+        document.project().clip(&video).unwrap().link_group,
+        document.project().clip(&audio).unwrap().link_group
+    );
+}
+
+#[test]
+fn the_revision_moves_on_every_change_including_undo() {
+    let mut document = document();
+    let start = document.revision();
+    add(&mut document, 0);
+    assert_eq!(document.revision(), start + 1);
+    document.undo().unwrap();
+    assert_eq!(document.revision(), start + 2, "undo is a change too");
+    document.redo().unwrap();
+    assert_eq!(document.revision(), start + 3);
+}
+
+#[test]
+fn opening_a_project_pushes_the_id_counter_past_what_is_in_it() {
+    let text = r#"{
+        "version": 2,
+        "settings": {"width": 1920, "height": 1080, "rate": {"num": 30, "den": 1}},
+        "assets": [{"id": "v", "path": "/m.mp4", "kind": "video", "durationMs": 10000, "hasAudio": true}],
+        "tracks": [{"id": "t7", "kind": "video", "clips": [
+            {"id": "c9", "assetId": "v", "start": 0, "in": 0, "out": 60}
+        ]}]
+    }"#;
+    let mut document = Document::opened(serde_json::from_str(text).unwrap());
+    document
+        .apply(Command::AddClip {
+            track_id: "t7".into(),
+            asset_id: "v".into(),
+            start: 120,
+            id: None,
+            link_group: None,
+        })
+        .unwrap();
+    let made = &document.project().tracks[0].clips[1].id;
+    assert_ne!(
+        made, "c9",
+        "a new clip may not land on an id already in use"
+    );
+    assert_eq!(made, "c10");
+}
+
+#[test]
+fn a_document_opened_from_disk_has_nothing_to_undo() {
+    let document = Document::opened(Project::new(ProjectSettings::default()));
+    assert!(!document.can_undo());
+    assert!(!document.can_redo());
+    assert_eq!(document.state().undo_label, "");
+}
+
+#[test]
+fn the_state_says_what_the_menu_should_read() {
+    let mut document = document();
+    let clip = add(&mut document, 0);
+    document
+        .apply(Command::MoveClip {
+            clip_id: clip,
+            track_id: video_track(&document),
+            start: 90,
+        })
+        .unwrap();
+    assert_eq!(document.state().undo_label, "Move clip");
+    document.undo().unwrap();
+    assert_eq!(document.state().redo_label, "Move clip");
+}
+
+#[test]
+fn a_command_survives_the_trip_through_json_the_page_sends_it_on() {
+    let text = r#"{"op":"trimClip","clipId":"c1","edge":"start","frame":42}"#;
+    let command: Command = serde_json::from_str(text).unwrap();
+    assert_eq!(
+        command,
+        Command::TrimClip {
+            clip_id: "c1".into(),
+            edge: Edge::Start,
+            frame: 42
+        }
+    );
+    assert_eq!(serde_json::to_string(&command).unwrap(), text);
+
+    // The fields the page leaves out are the ones the apply fills in.
+    let split: Command = serde_json::from_str(r#"{"op":"splitAt","frame":10}"#).unwrap();
+    assert_eq!(
+        split,
+        Command::SplitAt {
+            frame: 10,
+            clip_id: None,
+            ids: Vec::new(),
+            link_groups: Vec::new()
+        }
+    );
+}
+
+#[test]
+fn visual_item_edits_are_commands_with_undo_and_stable_ids() {
+    let mut document = document();
+    let track_id = video_track(&document);
+    let initial = VisualTransform {
+        x: 100.0,
+        y: 80.0,
+        width: 640.0,
+        height: 360.0,
+        rotation: 0.0,
+        opacity: 1.0,
+    };
+    document
+        .apply(Command::AddVisualItem {
+            track_id: track_id.clone(),
+            content: VisualContent::Text {
+                text: "title".into(),
+                style: TextStyle::default(),
+            },
+            start: 30,
+            duration: 90,
+            transform: initial,
+            z_index: 2,
+            id: None,
+        })
+        .unwrap();
+    let item_id = document.project().tracks[0].visual_items[0].id.clone();
+    assert_eq!(item_id, "i3");
+
+    let moved = VisualTransform {
+        x: 320.0,
+        y: 180.0,
+        width: 800.0,
+        height: 450.0,
+        rotation: 12.5,
+        opacity: 0.6,
+    };
+    document
+        .apply(Command::SetVisualTransform {
+            item_id: item_id.clone(),
+            transform: moved,
+        })
+        .unwrap();
+    assert_eq!(
+        document.project().visual_item(&item_id).unwrap().transform,
+        moved
+    );
+
+    document.undo().unwrap();
+    assert_eq!(
+        document.project().visual_item(&item_id).unwrap().transform,
+        initial
+    );
+    document.undo().unwrap();
+    assert!(document.project().visual_item(&item_id).is_none());
+    document.redo().unwrap();
+    assert_eq!(document.project().tracks[0].visual_items[0].id, item_id);
+}
+
+#[test]
+fn invalid_visual_geometry_is_rejected_without_changing_the_project() {
+    let mut document = document();
+    let error = document
+        .apply(Command::AddVisualItem {
+            track_id: video_track(&document),
+            content: VisualContent::Shape {
+                shape: Default::default(),
+                visual_style: VisualStyle::shape_default(),
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
+            start: 0,
+            duration: 30,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 100.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: None,
+        })
+        .unwrap_err();
+    assert!(error.contains("no area"), "{error}");
+    assert!(document.project().tracks[0].visual_items.is_empty());
+}
+
+#[test]
+fn a_visual_style_without_a_fill_is_rejected_before_it_changes_the_project() {
+    let mut document = document();
+    let error = document
+        .apply(Command::AddVisualItem {
+            track_id: video_track(&document),
+            content: VisualContent::Shape {
+                shape: Default::default(),
+                visual_style: VisualStyle::default(),
+                corner_radius: 0.0,
+                start_arrow: false,
+                end_arrow: false,
+            },
+            start: 0,
+            duration: 30,
+            transform: VisualTransform {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 0,
+            id: None,
+        })
+        .unwrap_err();
+    assert!(error.contains("no fills"), "{error}");
+    assert!(document.project().tracks[0].visual_items.is_empty());
+}
+
+#[test]
+fn duplicate_visual_item_ids_are_rejected_without_changing_the_project() {
+    let mut document = document();
+    let track_id = video_track(&document);
+    let command = Command::AddVisualItem {
+        track_id,
+        content: VisualContent::Shape {
+            shape: Default::default(),
+            visual_style: VisualStyle::shape_default(),
+            corner_radius: 0.0,
+            start_arrow: false,
+            end_arrow: false,
+        },
+        start: 0,
+        duration: 30,
+        transform: VisualTransform {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+            rotation: 0.0,
+            opacity: 1.0,
+        },
+        z_index: 0,
+        id: Some("item".into()),
+    };
+    document.apply(command.clone()).unwrap();
+
+    let error = document.apply(command).unwrap_err();
+
+    assert!(error.contains("already in this project"), "{error}");
+    assert_eq!(document.project().tracks[0].visual_items.len(), 1);
+}
+
+#[test]
+fn a_video_overlay_keeps_crop_border_and_audio_as_one_visual_item() {
+    let mut document = document();
+    let track_id = video_track(&document);
+    document
+        .apply(Command::AddVisualItem {
+            track_id,
+            content: VisualContent::VideoOverlay {
+                asset_id: "v".into(),
+                in_point: 30,
+                crop: Crop {
+                    left: 0.1,
+                    top: 0.2,
+                    right: 0.1,
+                    bottom: 0.0,
+                },
+                corner_radius: 24.0,
+                border: Some(Stroke {
+                    color: "#ffffff".into(),
+                    width: 4.0,
+                }),
+                audio_enabled: true,
+            },
+            start: 60,
+            duration: 90,
+            transform: VisualTransform {
+                x: 100.0,
+                y: 100.0,
+                width: 640.0,
+                height: 360.0,
+                rotation: 0.0,
+                opacity: 1.0,
+            },
+            z_index: 1,
+            id: None,
+        })
+        .unwrap();
+
+    let item = &document.project().tracks[0].visual_items[0];
+    assert!(matches!(
+        item.content,
+        VisualContent::VideoOverlay {
+            audio_enabled: true,
+            corner_radius: 24.0,
+            ..
+        }
+    ));
+    assert!(document.project().uses_video_paint());
+    document.undo().unwrap();
+    assert!(document.project().tracks[0].visual_items.is_empty());
+}
+
+fn overlay_command(text: &str) -> Command {
+    Command::AddOverlayVisualItem {
+        content: VisualContent::Text {
+            text: text.into(),
+            style: TextStyle::default(),
+        },
+        start: 0,
+        duration: 30,
+        transform: VisualTransform {
+            x: 10.0,
+            y: 10.0,
+            width: 100.0,
+            height: 40.0,
+            rotation: 0.0,
+            opacity: 1.0,
+        },
+        z_index: 0,
+        id: None,
+    }
+}
+
+#[test]
+fn an_overlay_gets_a_top_track_and_one_undo_removes_both() {
+    let mut document = document();
+    add(&mut document, 0);
+
+    document.apply(overlay_command("title")).unwrap();
+
+    let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
+    assert_eq!(videos.len(), 2);
+    assert_eq!(videos[0].clips.len(), 1);
+    assert!(videos[1].clips.is_empty());
+    assert_eq!(videos[1].visual_items.len(), 1);
+    let item_id = videos[1].visual_items[0].id.clone();
+
+    document.undo().unwrap();
+    assert_eq!(document.project().tracks_of(TrackKind::Video).count(), 1);
+    assert!(document.project().visual_item(&item_id).is_none());
+    assert_eq!(document.project().tracks[0].clips.len(), 1);
+
+    document.redo().unwrap();
+    let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
+    assert_eq!(videos.len(), 2);
+    assert_eq!(videos[1].visual_items[0].id, item_id);
+}
+
+#[test]
+fn consecutive_overlays_reuse_the_clip_free_top_track() {
+    let mut document = document();
+    add(&mut document, 0);
+    document.apply(overlay_command("one")).unwrap();
+    document.apply(overlay_command("two")).unwrap();
+
+    let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
+    assert_eq!(videos.len(), 2);
+    assert_eq!(videos[1].visual_items.len(), 2);
+}
+
+#[test]
+fn the_track_limit_falls_back_to_the_top_video_track() {
+    let mut document = document();
+    add(&mut document, 0);
+    for _ in 1..crate::MAX_TRACKS_PER_KIND {
+        document
+            .apply(Command::AddTrack {
+                track_kind: TrackKind::Video,
+                id: None,
+            })
+            .unwrap();
+        let top = document
+            .project()
+            .tracks_of(TrackKind::Video)
+            .last()
+            .unwrap()
+            .id
+            .clone();
+        document
+            .apply(Command::AddClip {
+                track_id: top,
+                asset_id: "v".into(),
+                start: 0,
+                id: None,
+                link_group: None,
+            })
+            .unwrap();
+    }
+
+    document.apply(overlay_command("top")).unwrap();
+
+    let videos: Vec<_> = document.project().tracks_of(TrackKind::Video).collect();
+    assert_eq!(videos.len(), crate::MAX_TRACKS_PER_KIND);
+    assert_eq!(videos.last().unwrap().visual_items.len(), 1);
+}
+
+#[test]
+fn source_insert_splits_at_a_frame_boundary_and_is_one_undo_step() {
+    let mut document = document();
+    add(&mut document, 0);
+    let original = clips(&document)[0].clone();
+
+    document
+        .apply(Command::InsertSource {
+            asset_id: "v".into(),
+            video_track_id: Some(video_track(&document)),
+            audio_track_id: None,
+            start: 150,
+            in_point: 30,
+            out_point: 90,
+            ripple_all_tracks: false,
+        })
+        .unwrap();
+
+    let placed = clips(&document);
+    assert_eq!(placed.len(), 3);
+    assert_eq!(
+        placed
+            .iter()
+            .map(|clip| (clip.start, clip.in_point, clip.out_point))
+            .collect::<Vec<_>>(),
+        vec![(0, 0, 150), (150, 30, 90), (210, 150, 300)]
+    );
+    let ids: Vec<String> = placed.iter().map(|clip| clip.id.clone()).collect();
+
+    document.undo().unwrap();
+    assert_eq!(clips(&document), vec![original]);
+    document.redo().unwrap();
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| clip.id.clone())
+            .collect::<Vec<_>>(),
+        ids
+    );
+}
+
+#[test]
+fn source_overwrite_carves_the_range_and_undo_restores_the_clip() {
+    let mut document = document();
+    add(&mut document, 0);
+    let original = clips(&document)[0].clone();
+
+    document
+        .apply(Command::OverwriteSource {
+            asset_id: "v".into(),
+            video_track_id: Some(video_track(&document)),
+            audio_track_id: None,
+            start: 90,
+            in_point: 30,
+            out_point: 90,
+        })
+        .unwrap();
+
+    assert_eq!(
+        clips(&document)
+            .iter()
+            .map(|clip| (clip.start, clip.in_point, clip.out_point))
+            .collect::<Vec<_>>(),
+        vec![(0, 0, 90), (90, 30, 90), (150, 150, 300)]
+    );
+    document.undo().unwrap();
+    assert_eq!(clips(&document), vec![original]);
+}
+
+#[test]
+fn source_video_only_overwrite_preserves_linked_audio() {
+    let mut document = document();
+    add_linked(&mut document, 0);
+    let mut expected_audio = document.project().tracks[1].clips.clone();
+    expected_audio[0].link_group = None;
+
+    document
+        .apply(Command::OverwriteSource {
+            asset_id: "v".into(),
+            video_track_id: Some(video_track(&document)),
+            audio_track_id: None,
+            start: 90,
+            in_point: 30,
+            out_point: 90,
+        })
+        .unwrap();
+
+    assert_eq!(clips(&document).len(), 3);
+    assert_eq!(document.project().tracks[1].clips, expected_audio);
+}
+
+#[test]
+fn source_video_and_audio_are_linked_and_append_uses_the_sequence_end() {
+    let mut document = document();
+    add(&mut document, 0);
+    document
+        .apply(Command::AppendSource {
+            asset_id: "v".into(),
+            video_track_id: Some(video_track(&document)),
+            audio_track_id: Some(audio_track(&document)),
+            in_point: 60,
+            out_point: 120,
+        })
+        .unwrap();
+
+    let video = document.project().tracks[0].clips.last().unwrap();
+    let audio = document.project().tracks[1].clips.last().unwrap();
+    assert_eq!(
+        (video.start, video.in_point, video.out_point),
+        (300, 60, 120)
+    );
+    assert_eq!(
+        (audio.start, audio.in_point, audio.out_point),
+        (300, 60, 120)
+    );
+    assert!(video.link_group.is_some());
+    assert_eq!(video.link_group, audio.link_group);
+}
+
+#[test]
+fn markers_are_saved_edited_and_undone() {
+    let mut document = document();
+    document
+        .apply(Command::AddMarker {
+            frame: 90,
+            name: "cut here".into(),
+            color: "#ff0000".into(),
+            id: None,
+        })
+        .unwrap();
+    let marker = document.project().markers[0].clone();
+    assert_eq!((marker.frame, marker.name.as_str()), (90, "cut here"));
+
+    document
+        .apply(Command::SetMarker {
+            marker_id: marker.id.clone(),
+            frame: Some(120),
+            name: Some("review".into()),
+            color: None,
+        })
+        .unwrap();
+    assert_eq!(document.project().markers[0].frame, 120);
+    assert_eq!(document.project().markers[0].name, "review");
+
+    document.undo().unwrap();
+    assert_eq!(document.project().markers[0], marker);
+    document.undo().unwrap();
+    assert!(document.project().markers.is_empty());
+    document.redo().unwrap();
+    assert_eq!(document.project().markers[0].frame, 90);
+}
+
+#[test]
+fn removing_silence_cuts_and_ripples_every_track_as_one_undo_step() {
+    let mut document = document();
+    add_linked(&mut document, 0);
+    document
+        .apply(Command::AddMarker {
+            frame: 240,
+            name: "after silence".into(),
+            color: "#ff0000".into(),
+            id: None,
+        })
+        .unwrap();
+    let before = document.project().clone();
+
+    document
+        .apply(Command::RemoveRanges {
+            ranges: vec![FrameRange {
+                start: 90,
+                end: 150,
+            }],
+        })
+        .unwrap();
+    let after = document.project().clone();
+    for track in &after.tracks[..2] {
+        assert_eq!(track.clips.len(), 2);
+        assert_eq!(track.clips[0].end_frame(), 90);
+        assert_eq!(track.clips[1].start, 90);
+        assert_eq!(track.clips[1].in_point, 150);
+    }
+    assert_eq!(after.markers[0].frame, 180);
+    assert_eq!(document.state().undo_label, "Remove silence");
+
+    document.undo().unwrap();
+    assert_eq!(document.project(), &before);
+    document.redo().unwrap();
+    assert_eq!(document.project(), &after);
+}
