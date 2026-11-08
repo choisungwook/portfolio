@@ -2,15 +2,15 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file:; style-src 'self' 'unsafe-inline'">
   <title>akbun-screenshot Preview</title>
   <style>
+    html { background: transparent; }
+
     body {
       margin: 0;
       height: 100vh;
       background: transparent;
       font-family: -apple-system, sans-serif;
-      -webkit-app-region: drag;
     }
 
     .card {
@@ -48,7 +48,6 @@
     .card:hover .actions { opacity: 1; }
 
     button {
-      -webkit-app-region: no-drag;
       padding: 8px 10px;
       border: none;
       border-radius: 8px;
@@ -67,7 +66,9 @@
 <body>
   <div class="card">
     <img id="shot" alt="screenshot">
-    <div class="actions">
+    <!-- The overlay covers the card, so it is the drag handle. Tauri drags
+         only the element carrying the attribute, so the buttons still click. -->
+    <div class="actions" data-tauri-drag-region>
       <button id="save">Save</button>
       <button id="copy">Copy</button>
       <button id="edit">Edit</button>
@@ -75,6 +76,7 @@
     </div>
   </div>
 
+  <script src="api.js"></script>
   <script src="preview.js"></script>
 </body>
 </html>

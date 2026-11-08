@@ -1,7 +1,8 @@
 'use strict';
 
-const file = new URLSearchParams(location.search).get('file');
-document.getElementById('shot').src = `file://${encodeURI(file)}`;
+window.api.previewImage().then((dataUrl) => {
+  document.getElementById('shot').src = dataUrl;
+});
 
 document.getElementById('save').addEventListener('click', () => window.api.savePreview());
 document.getElementById('copy').addEventListener('click', () => window.api.copyPreview());

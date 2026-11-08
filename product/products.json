@@ -1,6 +1,6 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-10-31",
+  "updated": "2026-11-08",
   "products": [
     {
       "id": "akbun-makephoto",
@@ -182,7 +182,7 @@
       "name": "akbun-screenshot",
       "description": "영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 macOS 메뉴바 스크린샷 앱",
       "kind": "desktop",
-      "tags": ["electron", "macos"],
+      "tags": ["tauri", "rust", "macos"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-screenshot",
       "released": "2026-07-31"
     },

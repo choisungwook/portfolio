@@ -2,14 +2,15 @@
 
 // Font picker shared by the settings window and the editor toolbar.
 
-// macOS bundled families that cover Korean and English. Used when the local
-// font list is unavailable, so the picker is never empty.
+// macOS bundled families that cover Korean and English. Used when the font
+// list cannot be read, so the picker is never empty.
 const FALLBACK_FONTS = ['Apple SD Gothic Neo', 'AppleGothic', 'Helvetica', 'Menlo'];
 
+// WKWebView has no queryLocalFonts, so the families come from the app, which
+// reads the system font directories.
 async function loadFontFamilies() {
   try {
-    const fonts = await window.queryLocalFonts();
-    const families = [...new Set(fonts.map((font) => font.family))].sort();
+    const families = await window.api.listFonts();
     return families.length > 0 ? families : FALLBACK_FONTS;
   } catch {
     return FALLBACK_FONTS;
@@ -26,11 +27,6 @@ function fillFontSelect(select, families, current) {
   select.value = current;
 }
 
-// queryLocalFonts needs the local-fonts permission, and Chromium may still ask
-// for a user gesture before handing over the list. The load at start covers the
-// granted case; the first click in the window covers the rest.
 function wireFontSelect(select, getCurrent) {
-  const load = async () => fillFontSelect(select, await loadFontFamilies(), getCurrent());
-  void load();
-  window.addEventListener('pointerdown', () => void load(), { once: true });
+  void loadFontFamilies().then((families) => fillFontSelect(select, families, getCurrent()));
 }

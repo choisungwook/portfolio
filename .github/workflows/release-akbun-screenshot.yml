@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - 'product/akbun-screenshot/workspace/**'
+      - '.github/workflows/release-akbun-screenshot.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,8 @@ defaults:
     working-directory: product/akbun-screenshot/workspace
 
 jobs:
-  # PR 검증용. 순수 함수 테스트만 돌리므로 electron 바이너리가 필요 없다.
+  # PR 검증용. page 테스트와 tauri에 의존하지 않는 core crate 테스트만 돌리므로
+  # runner에 GTK, WebKit을 설치할 필요가 없다.
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -29,19 +31,15 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: product/akbun-screenshot/workspace/package-lock.json
+          node-version: '26'
 
-      - name: Install dependencies
-        run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-
-      - name: Run tests
+      - name: Run page tests
         run: npm test
 
-  # macOS arm64 전용 빌드. dmg 빌드가 성공해야 tag를 만들고, tag가 만들어져야 release를 만든다.
+      - name: Run core crate tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p screenshot-core
+
+  # macOS arm64 전용 빌드. tauri-action이 release를 만들고 tag는 GitHub가 함께 만든다.
   # 버전은 workspace/package.json의 version을 그대로 쓴다.
   release:
     if: github.event_name != 'pull_request'
@@ -53,60 +51,87 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           cache: npm
           cache-dependency-path: product/akbun-screenshot/workspace/package-lock.json
 
-      - name: Read version from package.json
-        id: version
-        run: |
-          version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=akbun-screenshot-v$version" >> "$GITHUB_OUTPUT"
-          echo "Version: $version"
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-screenshot/workspace/src-tauri
 
       - name: Install dependencies
         run: npm ci
 
+      # PR을 거치지 않은 push나 workflow_dispatch도 테스트를 통과해야 배포한다.
       - name: Run tests
-        run: npm test
-
-      - name: Build dmg
-        run: npm run dist
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      # 빌드가 성공한 뒤에만 tag를 만든다.
-      - name: Create tag
-        working-directory: .
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          git tag "$TAG"
-          git push origin "$TAG"
+          npm test
+          cargo test --manifest-path src-tauri/Cargo.toml -p screenshot-core
 
-      # tag 생성이 성공한 뒤에만 release를 만든다.
-      - name: Create release with dmg
-        working-directory: .
+      - uses: tauri-apps/tauri-action@action-v1.0.0
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 서명 키가 없으면 .sig가 만들어지지 않고, action은 실패 없이 latest.json을 건너뛴다.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_SCREENSHOT }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          projectPath: product/akbun-screenshot/workspace
+          tagName: akbun-screenshot-v__VERSION__
+          releaseName: akbun-screenshot-v__VERSION__
+          # draft는 updater endpoint에서 보이지 않으므로 설치본이 업데이트를 받지 못한다.
+          releaseDraft: false
+          prerelease: false
+          releaseBody: |
+            ## About
+
+            - macOS menu bar screenshot app.
+            - Area capture by drag, then a floating preview with save, copy, edit and close.
+
+            ## Install
+
+            - The dmg is Apple Silicon (arm64) only.
+            - Unsigned build, so the first launch fails with "damaged and can't be opened".
+            - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-screenshot.app`
+            - After that, Check for Updates in the menu bar fetches newer versions on its own.
+
+      # 0.8.0 이하의 Electron 설치본은 이름에 -arm64.가 들어간 dmg만 골라 스스로 교체한다.
+      # tauri-action의 dmg 이름(_aarch64.dmg)은 그 규칙에 맞지 않으므로, 이 이름으로 바꿔 올려야
+      # 기존 사용자가 Check for Updates 한 번으로 Tauri판으로 넘어온다.
+      - name: Rename the dmg for Electron installs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat > release-notes.md <<'EOF'
-          ## About
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="akbun-screenshot-v${VERSION}"
+          BUILT="akbun-screenshot_${VERSION}_aarch64.dmg"
+          RENAMED="akbun-screenshot-${VERSION}-arm64.dmg"
+          cp "src-tauri/target/release/bundle/dmg/${BUILT}" "$RUNNER_TEMP/${RENAMED}"
+          gh release upload "$TAG" "$RUNNER_TEMP/${RENAMED}" --clobber
+          gh release delete-asset "$TAG" "$BUILT" --yes
 
-          - macOS menu bar screenshot app.
-          - Area capture by drag, then a floating preview with save, copy and close.
+      # tauri-action에는 --generate-notes에 해당하는 옵션이 없으므로 이 product를 건드린 PR 목록을 붙인다.
+      - name: Append the change list to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="akbun-screenshot-v${VERSION}"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-screenshot >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
-          ## Install
-
-          - The dmg is Apple Silicon (arm64) only.
-          - Unsigned build, so the first launch fails with "damaged and can't be opened".
-          - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-screenshot.app`
-          EOF
-          # Only PRs that touched this product; --generate-notes lists the whole monorepo.
-          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-screenshot >> release-notes.md
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            product/akbun-screenshot/workspace/release/*.dmg
+      # 이 저장소는 여러 product를 release하므로 GitHub의 releases/latest는 마지막에 배포한
+      # 다른 product를 가리킬 수 있다. 그래서 앱은 이 단계만 건드리는 고정 tag를 확인한다.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release download "akbun-screenshot-v${VERSION}" --pattern latest.json --dir "$RUNNER_TEMP"
+          gh release create akbun-screenshot-updater \
+            --title "akbun-screenshot updater manifest" \
+            --notes "Fixed tag the installed app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-screenshot-updater "$RUNNER_TEMP/latest.json" --clobber

@@ -1,39 +1,74 @@
 'use strict';
 
-const { app } = require('electron');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { mergeSettings } = require('./lib');
+/* global fillFontSelect, wireFontSelect */
 
-const DEFAULTS = {
-  shortcut: 'CommandOrControl+Shift+4',
-  saveDir: path.join(os.homedir(), 'Pictures', 'akbun-screenshot'),
-  // Ships with macOS and covers Korean and English, so the editor renders both
-  // without bundling a font.
-  defaultFont: 'Apple SD Gothic Neo',
-  // Delete and Backspace remove the selected annotation in the editor. A
-  // setting because Backspace is muscle memory for "go back" and someone who
-  // keeps losing shapes to it needs a way out.
-  deleteKeys: true,
-};
+const shortcutInput = document.getElementById('shortcut');
+const saveDirInput = document.getElementById('save-dir');
+const fontSelect = document.getElementById('font');
+const deleteKeysInput = document.getElementById('delete-keys');
+const status = document.getElementById('status');
 
-function settingsPath() {
-  return path.join(app.getPath('userData'), 'settings.json');
+window.api.getSettings().then((settings) => {
+  shortcutInput.value = settings.shortcut;
+  saveDirInput.value = settings.saveDir;
+  deleteKeysInput.checked = settings.deleteKeys !== false;
+  fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
+  wireFontSelect(fontSelect, () => fontSelect.value || settings.defaultFont);
+});
+
+document.getElementById('choose-dir').addEventListener('click', async () => {
+  const dir = await window.api.chooseDir(saveDirInput.value.trim());
+  if (dir) saveDirInput.value = dir;
+});
+
+document.getElementById('save').addEventListener('click', async () => {
+  const result = await window.api.saveSettings({
+    shortcut: shortcutInput.value.trim(),
+    saveDir: saveDirInput.value.trim(),
+    defaultFont: fontSelect.value,
+    deleteKeys: deleteKeysInput.checked,
+  });
+  status.textContent = result.ok ? 'Saved' : result.error;
+});
+
+// tabs
+const tabs = [
+  { tab: document.getElementById('tab-general'), pane: document.getElementById('pane-general') },
+  { tab: document.getElementById('tab-permissions'), pane: document.getElementById('pane-permissions') },
+];
+
+for (const { tab, pane } of tabs) {
+  tab.addEventListener('click', () => {
+    for (const t of tabs) {
+      t.tab.classList.remove('active');
+      t.pane.classList.remove('active');
+    }
+    tab.classList.add('active');
+    pane.classList.add('active');
+  });
 }
 
-function loadSettings() {
-  let stored = null;
-  try {
-    stored = JSON.parse(fs.readFileSync(settingsPath(), 'utf8'));
-  } catch {
-    // first run or broken file: fall back to defaults
-  }
-  return mergeSettings(DEFAULTS, stored);
+// permissions pane
+const badge = document.getElementById('screen-badge');
+const guide = document.getElementById('screen-guide');
+const openButton = document.getElementById('open-screen-settings');
+const okNote = document.getElementById('screen-ok-note');
+
+async function refreshPermissions() {
+  const { screen } = await window.api.getPermissions();
+  const granted = screen === 'granted';
+  badge.textContent = granted ? 'granted' : screen;
+  badge.classList.toggle('granted', granted);
+  badge.classList.toggle('missing', !granted);
+  guide.hidden = granted;
+  openButton.hidden = granted;
+  okNote.hidden = !granted;
 }
 
-function saveSettings(settings) {
-  fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
-}
+document.getElementById('open-screen-settings').addEventListener('click', () => {
+  window.api.openScreenPermissionSettings();
+});
 
-module.exports = { DEFAULTS, loadSettings, saveSettings };
+// re-check when the user comes back from System Settings
+window.addEventListener('focus', refreshPermissions);
+refreshPermissions();

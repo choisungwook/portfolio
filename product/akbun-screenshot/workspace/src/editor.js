@@ -574,7 +574,7 @@ canvas.addEventListener('dblclick', () => {
   if (cropBox) applyCrop(cropBox);
 });
 
-// Inline input instead of prompt(), which Electron does not support.
+// Inline input instead of prompt(), which the webview does not support.
 function askText(event, point) {
   const rect = wrap.getBoundingClientRect();
   const input = document.createElement('input');

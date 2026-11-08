@@ -31,7 +31,7 @@
 | [akbun-visualizellm](./akbun-visualizellm/) | 모델 config.json을 읽어 LLM 아키텍처를 2D 흐름도와 3D 가중치 배치로 보여주는 웹 페이지 |
 | [akbun-productcatalog](./akbun-productcatalog/) | product 디렉터리의 제품을 카드로 모아 저장소로 보내는 카탈로그 웹 페이지 |
 | [akbun-mactaskbar](./akbun-mactaskbar/) | 메뉴바 아이콘을 구간으로 나눠 숨기고 목록으로 보는 macOS 메뉴바 관리 앱 |
-| [akbun-screenshot](./akbun-screenshot/) | 영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 macOS 메뉴바 스크린샷 앱 |
+| [akbun-screenshot](./akbun-screenshot/) | 영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 Tauri macOS 메뉴바 스크린샷 앱 |
 | [akbun-shadowing-player](./akbun-shadowing-player/) | 언어 공부(쉐도잉)용 구간 반복 오디오 플레이어 Electron 앱 |
 | [akbun-terraform-apply-remote](./akbun-terraform-apply-remote/) | GitHub PR comment로 terraform plan/apply를 실행하는 자동화 서버 |
 | [slide-reference](./slide-reference/) | AI agent용 슬라이드 레이아웃 레퍼런스 |

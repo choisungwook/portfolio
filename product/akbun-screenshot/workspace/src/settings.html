@@ -2,7 +2,6 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>akbun-screenshot Settings</title>
   <style>
     :root {
@@ -84,7 +83,7 @@
     /* The padding and border above are for text boxes too. Left on, Chromium
        stops drawing the native tick and leaves a rounded empty rectangle. */
     .check input { width: auto; margin: 0; padding: 0; border: none; }
-    .check label { margin: 0; }
+    .check label, label.inline { margin: 0; }
 
     #status { margin-left: 10px; }
 
@@ -106,7 +105,7 @@
     <div class="row">
       <label for="shortcut">Capture shortcut</label>
       <input id="shortcut" spellcheck="false">
-      <div class="hint">Electron accelerator format, e.g. CommandOrControl+Shift+4</div>
+      <div class="hint">Accelerator format, e.g. CommandOrControl+Shift+4</div>
     </div>
 
     <div class="row">
@@ -137,7 +136,7 @@
 
   <div id="pane-permissions" class="pane">
     <div class="perm-status">
-      <label style="margin: 0">Screen Recording</label>
+      <label class="inline">Screen Recording</label>
       <span id="screen-badge" class="badge missing">checking…</span>
     </div>
     <div class="hint">Required to capture the screen. Without it macOS returns an empty or black capture.</div>
@@ -152,6 +151,7 @@
     <div class="hint" id="screen-ok-note" hidden>Permission granted. Nothing to do here.</div>
   </div>
 
+  <script src="api.js"></script>
   <script src="fonts.js"></script>
   <script src="settings.js"></script>
 </body>
