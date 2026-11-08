@@ -71,6 +71,8 @@ const DEFAULT_SETTINGS = {
   silenceThresholdDb: -35,
   silenceMinDurationMs: 450,
   silencePaddingMs: 120,
+  cleanupEndpoint: 'http://127.0.0.1:11434/v1',
+  cleanupModel: 'gemma3:4b',
 };
 
 const el = (id) => document.getElementById(id);

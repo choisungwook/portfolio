@@ -89,6 +89,8 @@ if (!window.__TAURI__) {
         silenceThresholdDb: -35,
         silenceMinDurationMs: 450,
         silencePaddingMs: 120,
+        cleanupEndpoint: 'http://127.0.0.1:11434/v1',
+        cleanupModel: 'gemma3:4b',
       },
       workspace: '',
       version: '0.0.0-browser',
@@ -221,6 +223,8 @@ if (!window.__TAURI__) {
     aiEditCancel: async () => ({ id: 0, stage: 'idle', progress: 0, message: '' }),
     aiEditStartCaptions: unavailable,
     aiEditStartSilenceRemoval: unavailable,
+    aiEditStartFillerAnalysis: unavailable,
+    aiEditApplyFillers: unavailable,
     onAiEditStatus: () => Promise.resolve(() => {}),
     reportError: async (source, text) => console.error(source, text),
   };
@@ -443,6 +447,8 @@ window.api = {
   aiEditCancel: () => invoke('ai_edit_cancel'),
   aiEditStartCaptions: () => invoke('ai_edit_start_captions'),
   aiEditStartSilenceRemoval: () => invoke('ai_edit_start_silence_removal'),
+  aiEditStartFillerAnalysis: () => invoke('ai_edit_start_filler_analysis'),
+  aiEditApplyFillers: (keep) => invoke('ai_edit_apply_fillers', { keep }),
   onAiEditStatus: (handler) =>
     listen('ai-edit:status', (event) => handler(event.payload)),
 };

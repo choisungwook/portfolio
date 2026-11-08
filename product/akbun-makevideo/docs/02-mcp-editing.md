@@ -29,7 +29,7 @@
 | 클립 배치 | addClip, insertSource | 가져온 미디어로 클립 추가·원본 구간 삽입 |
 | 위치·길이 편집 | moveClip, trimClip, splitAt, removeClip | 이동·트림·분할·삭제 |
 | 구간 일괄 삭제 | removeRanges | 모든 트랙의 지정 구간 제거와 간격 닫기 |
-| 볼륨·속도 | setClipGain, setClipPlayback, setClipVolumeKeyframe | 볼륨·불투명도·속도·피치 유지·페이드·볼륨 곡선 |
+| 볼륨·속도 | setClipGain, setClipPlayback, setClipDenoise, setClipVolumeKeyframe | 볼륨·불투명도·속도·피치 유지·잡음 제거·페이드·볼륨 곡선 |
 | 그래픽·자막 추가 | addOverlayVisualItem, addVisualItem | 텍스트·도형·이미지·영상 오버레이, subtitle 트랙의 텍스트 |
 | 그래픽·자막 변경 | setVisualContent, setVisualTransform, setVisualTiming, removeVisualItem | 내용·변환·노출 구간 변경·삭제 |
 | 모션 | setVisualKeyframe | x / y / width / height / rotation / opacity |

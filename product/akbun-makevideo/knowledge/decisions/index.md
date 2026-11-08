@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다](2026-11-denoise-strength-sets-the-noise-floor.md) - afftdn 잡음 추적을 끄고 강도로 nr과 nf를 정한 측정 결과.
 * [로컬 MCP와 복구 지점](2026-09-local-mcp-checkpoints.md) - 외부 AI 편집과 앱 재시작 후 복구 경계.
 
 * [Astra 편집 제안과 표본 B-roll 설명](2026-09-astra-proposals-and-sampled-broll.md) - 검토·원자적 적용·디자인 재사용 경계.

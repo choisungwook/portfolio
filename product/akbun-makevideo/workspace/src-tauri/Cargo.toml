@@ -73,6 +73,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "rustls-no-provider"] }
+# reqwest is built without a crypto provider; ai_edit installs ring, already used by the updater.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt", "time"] }
 # Project deletion is recoverable. The whole managed project directory goes to

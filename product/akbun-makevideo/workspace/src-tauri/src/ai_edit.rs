@@ -1,8 +1,9 @@
 use crate::commands::{find_tool, AppState, Settings};
 use base64::Engine;
 use makevideo_analysis::{
-    deduplicate_segments, parse_azure, parse_google, parse_openai, parse_silence, plan_chunks,
-    TimeRange, TimedText,
+    deduplicate_segments, filler_prompt, filler_ranges, parse_azure, parse_filler_picks,
+    parse_google, parse_openai, parse_openai_words, parse_silence, plan_chunks, TimeRange,
+    TimedText,
 };
 use makevideo_edit::{
     Command as Edit, FrameRange, RationalTime, TextStyle, TrackKind, VisualContent, VisualTransform,
@@ -28,6 +29,10 @@ pub struct AiEditResult {
     pub captions: Vec<TimedText>,
     pub silence_ranges: Vec<TimeRange>,
     pub removed_duration_ms: u64,
+    /// Proposed cuts awaiting review. Applied only by `ai_edit_apply_fillers`.
+    pub fillers: Vec<TimedText>,
+    /// The revision the fillers were found on; applying refuses any other.
+    pub base_revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,6 +236,81 @@ pub fn ai_edit_start_silence_removal(
     Ok(status)
 }
 
+/// Find filler words and false starts with a local speech server and a local
+/// chat model. Ends with proposals in the result; nothing is cut until the user
+/// reviews them and calls `ai_edit_apply_fillers`.
+#[tauri::command]
+pub fn ai_edit_start_filler_analysis(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    runtime: State<'_, AiEditRuntime>,
+) -> Result<AiEditStatus, String> {
+    let settings = state.settings.lock().unwrap().clone();
+    let ffmpeg = find_tool(&app, "ffmpeg", &settings.ffmpeg_dir)
+        .ok_or("ffmpeg is required to extract speech audio")?;
+    if state.render.lock().unwrap().is_some() {
+        return Err("wait for the active render to finish before finding fillers".into());
+    }
+    let credential = runtime
+        .credentials
+        .lock()
+        .unwrap()
+        .get(&settings.transcription_provider)
+        .cloned();
+    let (status, cancel) = begin_job(&runtime, "fillers")?;
+    let locked = state.document.lock().unwrap();
+    let project = locked.project().clone();
+    let revision = locked.revision();
+    drop(locked);
+    let shared = runtime.state.clone();
+    let worker_app = app.clone();
+    let id = status.id;
+    let _ = app.emit("ai-edit:status", &status);
+    std::thread::spawn(move || {
+        let result = run_filler_job(
+            &worker_app,
+            &shared,
+            id,
+            &cancel,
+            &ffmpeg,
+            &settings,
+            credential.as_deref(),
+            project,
+            revision,
+        );
+        finish_job(&worker_app, &shared, id, result);
+    });
+    Ok(status)
+}
+
+/// Cut the reviewed fillers. `keep` lists the proposals the user left checked,
+/// by index into the finished job's result. One undo step.
+#[tauri::command]
+pub fn ai_edit_apply_fillers(
+    state: State<'_, AppState>,
+    runtime: State<'_, AiEditRuntime>,
+    keep: Vec<usize>,
+) -> Result<(), String> {
+    let (fillers, revision) = {
+        let mut locked = runtime.state.lock().unwrap();
+        let status = &mut locked.status;
+        if status.kind != "fillers" || status.stage != "done" {
+            return Err("find fillers first".into());
+        }
+        let result = status.result.take().ok_or("these fillers were already applied")?;
+        (result.fillers, result.base_revision)
+    };
+    let ranges = keep
+        .iter()
+        .filter_map(|index| fillers.get(*index))
+        .map(|filler| TimeRange {
+            start_ms: filler.start_ms,
+            end_ms: filler.end_ms,
+        })
+        .collect::<Vec<_>>();
+    apply_ranges(&state.document, revision, &ranges, "Remove fillers")
+}
+
 fn begin_job(
     runtime: &AiEditRuntime,
     kind: &str,
@@ -291,6 +371,13 @@ fn finish_job(
                 state.status.progress = 1.0;
                 state.status.message = if state.status.kind == "captions" {
                     format!("Inserted {} captions", result.captions.len())
+                } else if state.status.kind == "fillers" {
+                    format!(
+                        "Found {} cuts ({:.1} seconds). Review them before removing.",
+                        result.fillers.len(),
+                        result.fillers.iter().map(|f| f.end_ms - f.start_ms).sum::<u64>() as f64
+                            / 1000.0
+                    )
                 } else {
                     format!(
                         "Removed {:.1} seconds",
@@ -423,6 +510,12 @@ trait TranscriptionAdapter {
         credential: Option<&str>,
     ) -> Result<RequestBuilder, String>;
     fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String>;
+    fn parse_words(&self, _body: &str, _chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
+        Err(format!(
+            "{} does not return word timestamps; choose an OpenAI-compatible endpoint",
+            self.name()
+        ))
+    }
 }
 
 struct OpenAiCompatible {
@@ -466,7 +559,8 @@ impl TranscriptionAdapter for OpenAiCompatible {
             .part("file", file)
             .text("model", settings.transcription_model.clone())
             .text("response_format", "verbose_json")
-            .text("timestamp_granularities[]", "segment");
+            .text("timestamp_granularities[]", "segment")
+            .text("timestamp_granularities[]", "word");
         let language = openai_language(&settings.transcription_language);
         if !language.is_empty() {
             form = form.text("language", language);
@@ -480,6 +574,10 @@ impl TranscriptionAdapter for OpenAiCompatible {
 
     fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
         parse_openai(body, chunk_offset_ms)
+    }
+
+    fn parse_words(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
+        parse_openai_words(body, chunk_offset_ms)
     }
 }
 
@@ -628,6 +726,8 @@ fn locale_language(language: &str) -> String {
 }
 
 fn client() -> Result<Client, String> {
+    // Errors only when a provider is already installed, which is the goal.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     Client::builder()
         .connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(900))
@@ -683,6 +783,51 @@ fn run_caption_job(
     revision: u64,
     document: Arc<Mutex<makevideo_edit::Document>>,
 ) -> Result<AiEditResult, String> {
+    let captions = transcribe(
+        app, shared, id, cancel, ffmpeg, settings, credential, &project, false,
+    )?;
+    cancelled(cancel)?;
+    report(
+        app,
+        shared,
+        id,
+        "generating",
+        0.86,
+        "Building subtitle edit commands",
+    );
+    report(
+        app,
+        shared,
+        id,
+        "applying",
+        0.94,
+        "Inserting captions on S1",
+    );
+    cancelled(cancel)?;
+    apply_captions(&document, revision, id, &captions)?;
+    Ok(AiEditResult {
+        captions,
+        silence_ranges: Vec::new(),
+        removed_duration_ms: 0,
+        fillers: Vec::new(),
+        base_revision: revision,
+    })
+}
+
+/// Timeline audio to timestamped text, chunked at quiet points. `words` asks
+/// for one entry per word instead of per segment.
+#[allow(clippy::too_many_arguments)]
+fn transcribe(
+    app: &AppHandle,
+    shared: &Arc<Mutex<RuntimeState>>,
+    id: u64,
+    cancel: &AtomicBool,
+    ffmpeg: &str,
+    settings: &Settings,
+    credential: Option<&str>,
+    project: &makevideo_edit::Project,
+    words: bool,
+) -> Result<Vec<TimedText>, String> {
     let adapter = adapter(&settings.transcription_provider)?;
     let total_ms = project.duration().to_millis().max(0) as u64;
     if total_ms == 0 {
@@ -701,7 +846,7 @@ fn run_caption_job(
         0.08,
         "Extracting mono 16 kHz MP3",
     );
-    extract_analysis_audio(ffmpeg, &project, &audio_path, cancel)?;
+    extract_analysis_audio(ffmpeg, project, &audio_path, cancel)?;
     report(
         app,
         shared,
@@ -752,33 +897,13 @@ fn run_caption_job(
         let bytes = std::fs::read(&chunk_path)
             .map_err(|error| format!("cannot read temporary speech audio: {error}"))?;
         let body = send_request(adapter.request(&http, bytes, settings, credential)?, cancel)?;
-        captions.extend(adapter.parse(&body, chunk.start_ms)?);
+        captions.extend(if words {
+            adapter.parse_words(&body, chunk.start_ms)?
+        } else {
+            adapter.parse(&body, chunk.start_ms)?
+        });
     }
-    let captions = deduplicate_segments(captions);
-    cancelled(cancel)?;
-    report(
-        app,
-        shared,
-        id,
-        "generating",
-        0.86,
-        "Building subtitle edit commands",
-    );
-    report(
-        app,
-        shared,
-        id,
-        "applying",
-        0.94,
-        "Inserting captions on S1",
-    );
-    cancelled(cancel)?;
-    apply_captions(&document, revision, id, &captions)?;
-    Ok(AiEditResult {
-        captions,
-        silence_ranges: Vec::new(),
-        removed_duration_ms: 0,
-    })
+    Ok(deduplicate_segments(captions))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -852,7 +977,98 @@ fn run_silence_job(
         captions: Vec::new(),
         silence_ranges: ranges,
         removed_duration_ms,
+        fillers: Vec::new(),
+        base_revision: revision,
     })
+}
+
+/// Words per chat request. Small local models lose track of indices in long
+/// lists, and a batch boundary only risks missing a false start that spans it.
+const FILLER_BATCH: usize = 300;
+
+#[allow(clippy::too_many_arguments)]
+fn run_filler_job(
+    app: &AppHandle,
+    shared: &Arc<Mutex<RuntimeState>>,
+    id: u64,
+    cancel: &AtomicBool,
+    ffmpeg: &str,
+    settings: &Settings,
+    credential: Option<&str>,
+    project: makevideo_edit::Project,
+    revision: u64,
+) -> Result<AiEditResult, String> {
+    let words = transcribe(
+        app, shared, id, cancel, ffmpeg, settings, credential, &project, true,
+    )?;
+    if words.is_empty() {
+        return Err("the transcription contained no words".into());
+    }
+    let http = client()?;
+    let batches = words.len().div_ceil(FILLER_BATCH);
+    let mut picks = Vec::new();
+    for (batch, slice) in words.chunks(FILLER_BATCH).enumerate() {
+        cancelled(cancel)?;
+        report(
+            app,
+            shared,
+            id,
+            "generating",
+            0.8 + 0.18 * batch as f32 / batches as f32,
+            format!(
+                "Asking {} for fillers, batch {} of {batches}",
+                settings.cleanup_model,
+                batch + 1
+            ),
+        );
+        let first = batch * FILLER_BATCH;
+        let reply = ask_chat_model(&http, settings, &filler_prompt(slice, first), cancel)?;
+        picks.extend(parse_filler_picks(&reply, slice, first)?);
+    }
+    Ok(AiEditResult {
+        captions: Vec::new(),
+        silence_ranges: Vec::new(),
+        removed_duration_ms: 0,
+        fillers: filler_ranges(&words, &picks),
+        base_revision: revision,
+    })
+}
+
+/// One chat completion against an OpenAI-compatible server such as Ollama or
+/// LM Studio. Returns the reply text.
+fn ask_chat_model(
+    http: &Client,
+    settings: &Settings,
+    prompt: &str,
+    cancel: &AtomicBool,
+) -> Result<String, String> {
+    let endpoint = settings.cleanup_endpoint.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err("the language model endpoint is empty".into());
+    }
+    let url = if endpoint.ends_with("/chat/completions") {
+        endpoint.to_string()
+    } else {
+        format!("{endpoint}/chat/completions")
+    };
+    let body = send_request(
+        http.post(url).json(&json!({
+            "model": settings.cleanup_model,
+            "temperature": 0,
+            "stream": false,
+            "messages": [
+                {"role": "system", "content": "You edit spoken video transcripts. You answer with JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+        })),
+        cancel,
+    )?;
+    let value: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|error| format!("the language model response is not JSON: {error}"))?;
+    value["choices"][0]["message"]["content"]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| "the language model returned no message".into())
 }
 
 fn apply_captions(
@@ -961,11 +1177,18 @@ fn apply_silence_ranges(
     revision: u64,
     ranges: &[TimeRange],
 ) -> Result<(), String> {
+    apply_ranges(document, revision, ranges, "Remove silence")
+}
+
+fn apply_ranges(
+    document: &Arc<Mutex<makevideo_edit::Document>>,
+    revision: u64,
+    ranges: &[TimeRange],
+    label: &'static str,
+) -> Result<(), String> {
     let mut document = document.lock().unwrap();
     if document.revision() != revision {
-        return Err(
-            "the timeline changed while silence was being analyzed; no edit was applied".into(),
-        );
+        return Err("the timeline changed after the analysis; no edit was applied".into());
     }
     let rate = document.project().rate();
     let ranges = ranges
@@ -979,7 +1202,7 @@ fn apply_silence_ranges(
     if ranges.is_empty() {
         return Ok(());
     }
-    document.apply(Edit::RemoveRanges { ranges })
+    document.apply_all_named(label, vec![Edit::RemoveRanges { ranges }])
 }
 
 #[cfg(test)]
@@ -1041,5 +1264,114 @@ mod tests {
             .tracks
             .iter()
             .all(|track| track.kind != TrackKind::Subtitle));
+    }
+
+    #[test]
+    fn fillers_land_as_one_named_step_and_refuse_a_stale_timeline() {
+        let document = Arc::new(Mutex::new(Document::new(ProjectSettings::default())));
+        let caption = TimedText {
+            start_ms: 1_000,
+            end_ms: 3_000,
+            text: "um hello".into(),
+        };
+        apply_captions(&document, 0, 1, std::slice::from_ref(&caption)).unwrap();
+        let cut = [TimeRange {
+            start_ms: 1_000,
+            end_ms: 1_500,
+        }];
+        assert!(apply_ranges(&document, 0, &cut, "Remove fillers")
+            .unwrap_err()
+            .contains("timeline changed"));
+        let revision = document.lock().unwrap().revision();
+        apply_ranges(&document, revision, &cut, "Remove fillers").unwrap();
+        let mut document = document.lock().unwrap();
+        assert_eq!(document.state().undo_label, "Remove fillers");
+        let subtitle = document
+            .project()
+            .tracks
+            .iter()
+            .find(|track| track.kind == TrackKind::Subtitle)
+            .unwrap()
+            .visual_items[0]
+            .clone();
+        assert_eq!(subtitle.duration, 45, "half a second of the caption is cut");
+        document.undo().unwrap();
+    }
+
+    /// Real local servers, so opt-in:
+    /// `MAKEVIDEO_CHAT=http://127.0.0.1:11434/v1 MAKEVIDEO_CHAT_MODEL=qwen2.5:1.5b
+    /// cargo test -p akbun-makevideo --lib local_fillers -- --ignored`.
+    /// Set `MAKEVIDEO_STT` to a local whisper server to transcribe speech made
+    /// with macOS `say` instead of using a fixed word list.
+    #[test]
+    #[ignore]
+    fn local_fillers_end_to_end() {
+        let mut settings = Settings::default();
+        settings.cleanup_endpoint = std::env::var("MAKEVIDEO_CHAT").unwrap();
+        settings.cleanup_model = std::env::var("MAKEVIDEO_CHAT_MODEL").unwrap();
+        let sentence = "So um I think uh we we should start the the demo now";
+        let http = client().unwrap();
+        let cancel = AtomicBool::new(false);
+        let words = match std::env::var("MAKEVIDEO_STT") {
+            Ok(endpoint) => {
+                let dir = tempfile::tempdir().unwrap();
+                let aiff = dir.path().join("speech.aiff");
+                let mp3 = dir.path().join("speech.mp3");
+                assert!(Command::new("say").arg("-o").arg(&aiff).arg(sentence).status().unwrap().success());
+                assert!(Command::new("ffmpeg")
+                    .args(["-loglevel", "error", "-y", "-i"])
+                    .arg(&aiff)
+                    .args(["-ac", "1", "-ar", "16000"])
+                    .arg(&mp3)
+                    .status()
+                    .unwrap()
+                    .success());
+                settings.transcription_endpoint = endpoint;
+                settings.transcription_model =
+                    std::env::var("MAKEVIDEO_STT_MODEL").unwrap_or_else(|_| "whisper-1".into());
+                settings.transcription_language = "en".into();
+                let adapter = adapter("custom").unwrap();
+                let request = adapter
+                    .request(&http, std::fs::read(&mp3).unwrap(), &settings, None)
+                    .unwrap();
+                adapter.parse_words(&send_request(request, &cancel).unwrap(), 0).unwrap()
+            }
+            Err(_) => sentence
+                .split(' ')
+                .enumerate()
+                .map(|(index, word)| TimedText {
+                    start_ms: 1_000 + index as u64 * 300,
+                    end_ms: 1_000 + index as u64 * 300 + 250,
+                    text: word.into(),
+                })
+                .collect(),
+        };
+        let reply = ask_chat_model(&http, &settings, &filler_prompt(&words, 0), &cancel).unwrap();
+        let picks = parse_filler_picks(&reply, &words, 0).unwrap();
+        let cuts = filler_ranges(&words, &picks);
+        eprintln!("words: {:?}\nreply: {reply}\ncuts: {cuts:?}", words.iter().map(|w| &w.text).collect::<Vec<_>>());
+        assert!(
+            cuts.iter().any(|cut| cut.text.to_lowercase().contains("um") || cut.text.to_lowercase().contains("uh")),
+            "the model kept every filler: {reply}"
+        );
+
+        let document = Arc::new(Mutex::new(Document::new(ProjectSettings::default())));
+        let span = TimedText {
+            start_ms: 0,
+            end_ms: words.last().unwrap().end_ms + 1_000,
+            text: sentence.into(),
+        };
+        apply_captions(&document, 0, 1, std::slice::from_ref(&span)).unwrap();
+        let before = document.lock().unwrap().project().duration_frames();
+        let revision = document.lock().unwrap().revision();
+        let ranges: Vec<_> = cuts
+            .iter()
+            .map(|cut| TimeRange { start_ms: cut.start_ms, end_ms: cut.end_ms })
+            .collect();
+        apply_ranges(&document, revision, &ranges, "Remove fillers").unwrap();
+        let mut document = document.lock().unwrap();
+        assert!(document.project().duration_frames() < before);
+        document.undo().unwrap();
+        assert_eq!(document.project().duration_frames(), before);
     }
 }

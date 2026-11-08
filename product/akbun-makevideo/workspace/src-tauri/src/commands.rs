@@ -120,6 +120,10 @@ pub struct Settings {
     pub silence_threshold_db: f32,
     pub silence_min_duration_ms: u64,
     pub silence_padding_ms: u64,
+    /// OpenAI-compatible chat server that picks filler words, local by
+    /// default: Ollama on 11434, LM Studio on 1234.
+    pub cleanup_endpoint: String,
+    pub cleanup_model: String,
 }
 
 impl Default for Settings {
@@ -156,6 +160,8 @@ impl Default for Settings {
             silence_threshold_db: -35.0,
             silence_min_duration_ms: 450,
             silence_padding_ms: 120,
+            cleanup_endpoint: "http://127.0.0.1:11434/v1".into(),
+            cleanup_model: "gemma3:4b".into(),
         }
     }
 }

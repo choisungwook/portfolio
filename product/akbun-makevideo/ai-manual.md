@@ -85,7 +85,7 @@
 | 원본 구간·클립 배치 | insertSource, addClip |
 | 클립 이동·트림·분할·삭제 | moveClip, trimClip, splitAt, removeClip |
 | 여러 트랙의 구간을 제거하고 시간 당기기 | removeRanges |
-| 음량·불투명도·속도·피치 유지·페이드 | setClipGain, setClipPlayback |
+| 음량·불투명도·속도·피치 유지·페이드·잡음 제거 | setClipGain, setClipPlayback, setClipDenoise |
 | 음량 애니메이션 | setClipVolumeKeyframe |
 | 제목·도형·이미지·B-roll 추가 | addOverlayVisualItem, addVisualItem |
 | 자막 생성 | addTrack의 subtitle 트랙에 text 내용의 addVisualItem |
@@ -104,7 +104,7 @@
 
 ## MCP의 지원 한계
 
-- 음성 전사·무음 감지 시작 도구 없음. 앱의 Captions / Silence 또는 제공된 자막·구간 정보 필요
+- 음성 전사·무음 감지·군더더기 말 분석 시작 도구 없음. 앱의 Captions / Silence / Find fillers 또는 제공된 자막·구간 정보 필요
 - SRT 파일 입출력 도구 없음. 자막 항목 자체는 생성·수정 가능
 - 재생·일시정지·재생 위치 이동 도구 없음. 영상 재생 확인은 Computer Use나 별도 재생 도구 필요
 - 앱 설정 변경·프로젝트 삭제·원본 파일 수정 도구 없음

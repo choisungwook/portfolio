@@ -15,6 +15,8 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - B-roll 구간의 시각 표본 분석과 검색, text/shape 애니메이션·자막 스타일 재사용 라이브러리
 - AI captions: extract timeline audio as mono 16 kHz 48 kbps MP3, transcribe it through OpenAI, LiteLLM, Google Cloud Speech-to-Text, Azure Speech or a compatible endpoint, then edit timestamped subtitles in the right panel
 - Silence removal: detect configurable quiet ranges with ffmpeg and ripple-delete them across every track as one undoable edit
+- Noise reduction: a per-clip toggle and strength in the Inspector, applied as the same ffmpeg `afftdn` filter in preview and render; no model download
+- Filler removal: word timestamps from the speech endpoint (a local whisper server keeps it offline) and a local chat model through an OpenAI-compatible endpoint such as Ollama or LM Studio pick filler words and false starts; the cuts are reviewed in a checklist, then ripple-deleted as one undoable edit
 - Inspector: edit a selected layer's position, size, rotation and opacity, plus text, shape, subtitle or clip-specific properties
 - The older preview — stacked media elements, with the composited frame swapped in when the playhead stops — is still there as a setting and as the automatic fallback when the monitor cannot start
 - Timeline: up to four video and four audio tracks, linked picture and sound from video assets, drag to move, drag an edge to trim
@@ -44,6 +46,12 @@ Everything else works without it. An app launched from Finder does not inherit a
 Homebrew's ffmpeg is built with VideoToolbox, so GPU encoding works out of the box on a Mac. Settings → Preview & Tools says which encoder was found, or why none was.
 
 AI conversations additionally need Codex CLI on `PATH` and a ChatGPT login made with `codex login`. Speech recognition is billed separately by its provider; its credential is kept only in memory for the app session and is never stored in settings.
+
+Filler removal can run fully offline: point Speech recognition at a local OpenAI-compatible whisper server (Custom provider) and Settings → Filler removal at a local chat model. With Ollama that is:
+
+```bash
+ollama pull gemma3:4b
+```
 
 ## Shortcuts
 

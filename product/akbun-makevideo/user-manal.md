@@ -1,7 +1,7 @@
 # akbun-makevideo 사용자 매뉴얼
 
 - 로컬 영상·음성·이미지를 타임라인에서 편집하고 MP4로 출력하는 데스크톱 앱
-- 기준: 저장소의 0.45.0 구현. 설치본 버전과 기능 차이가 있으면 Settings → About에서 확인
+- 기준: 저장소의 0.46.0 구현. 설치본 버전과 기능 차이가 있으면 Settings → About에서 확인
 - 사용 방식: 직접 화면 편집, 앱 내부 Astra Studio, 외부 Codex·Claude의 MCP 제어
 - AI에게 제품 설명을 전달할 때: [ai-manual.md](./ai-manual.md)
 
@@ -15,14 +15,14 @@
 | 컷 편집 | 이동·트림·분할·삭제·Ripple Delete·스냅·영상/음성 연결 | Timeline, Edit |
 | 트랙 | 영상·오디오·자막 트랙 추가, 숨김·음소거 | Timeline |
 | 재생 | 프레임 이동·편집점 이동·전체 화면·미리보기 품질 | Program Monitor, Playback |
-| 음성 | 볼륨·속도·피치 유지·페이드·볼륨 키프레임 | Inspector → Audio |
+| 음성 | 볼륨·속도·피치 유지·잡음 제거·페이드·볼륨 키프레임 | Inspector → Audio |
 | 제목·도형 | 텍스트, 사각형·타원·선/화살표·다각형·별 등 | + Text, Shape, Inspector |
 | 레이어 | 위치·크기·회전·불투명도, 키프레임, 블렌드 | Inspector |
 | 그래픽 스타일 | 색·그라데이션·미디어 채우기·외곽선·그림자 | Inspector의 Text / Shape |
 | PIP·B-roll | 원본 영상 오버레이, 크롭·테두리·둥근 모서리·오디오 설정 | Source Monitor → Add PIP, Inspector |
 | 전환 | 인접 클립 사이 디졸브 | 타임라인의 클립 경계, Inspector |
 | 자막 | SRT 가져오기·내보내기, 문구·시각·스타일 편집 | Import SRT / Export SRT, Inspector |
-| 음성 기반 편집 | 제공자 API를 통한 자막 생성, 로컬 무음 감지·제거 | Edit → AI, AI → Captions / Silence |
+| 음성 기반 편집 | 제공자 API를 통한 자막 생성, 로컬 무음 감지·제거, 로컬 모델의 군더더기 말 검토 후 제거 | Edit → AI, AI → Captions / Silence / Find fillers |
 | Astra Studio | 자막 기반 컷 제안, B-roll 표본 분석, 그래픽·음악 배치 제안 | AI → Studio |
 | 디자인 재사용 | 선택한 텍스트·도형의 디자인·애니메이션과 자막 스타일 저장·적용 | Studio → Finish |
 | AI 대화 | Codex 기반 대화와 이미지 요청 | AI → Chat |
@@ -80,6 +80,11 @@
 - 이미 자막 파일이 있으면 Import SRT 사용
 - 음성 전사가 필요하면 AI → Captions에서 소스·제공자·언어 설정 후 Generate captions
 - 전사 결과의 고유명사·숫자·타이밍은 직접 확인
+- 잡음 제거: 클립 선택 후 Inspector → Audio의 Reduce noise와 Strength. 미리보기와 출력에 같은 ffmpeg 필터 적용, 모델 불필요
+- 군더더기 말 제거: AI → Captions의 Find fillers. 단어 시각은 Speech recognition 설정의 전사 서버, 판단은 Settings의 Filler removal 채팅 모델(Ollama·LM Studio 등 OpenAI 호환)이 담당
+- 오프라인 사용: Speech recognition을 Custom OpenAI-compatible로 두고 로컬 whisper 서버 주소 입력, 채팅 모델은 로컬 Ollama(gemma3:4b 등)
+- Find fillers는 바로 자르지 않음. Proposed cuts 목록에서 체크를 확인한 뒤 Remove checked, Undo 한 번으로 복원
+- 분석 뒤 타임라인을 고치면 적용이 거부됨. 다시 Find fillers 실행
 - Studio의 Prepare에서 자막과 B-roll 문맥 준비
 - Story에서 컷 정리, Layers에서 B-roll·그래픽·음악 배치, Finish에서 자막 스타일·디자인 재사용
 - Studio의 제안은 변경 목록 검토 후 적용
