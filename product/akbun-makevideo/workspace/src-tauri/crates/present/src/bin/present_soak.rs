@@ -77,7 +77,7 @@ fn parse(mut args: std::env::Args) -> Result<Settings, String> {
         audio_depth: AUDIO_DEPTH,
         audio_lead: AUDIO_LEAD,
         resync: DEFAULT_RESYNC,
-        preset: ffmpeg::Preset::Fhd,
+        preset: ffmpeg::Preset::FHD,
         backend: Backend::Auto,
         seek_every_seconds: 2.0,
         report: None,

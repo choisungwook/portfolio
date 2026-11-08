@@ -13,6 +13,7 @@
 pub mod accel;
 pub mod ffmpeg;
 pub mod layout;
+pub mod preset;
 pub mod probe;
 pub mod tools;
 pub mod workspace;

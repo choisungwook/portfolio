@@ -68,6 +68,8 @@ if (!window.__TAURI__) {
         workspaceDir: '',
         ffmpegDir: '',
         renderAcceleration: 'auto',
+        renderPreset: 'fhd',
+        renderQuality: 'medium',
         compositor: 'gpu',
         gpuDevice: '',
         proxyEnabled: true,
@@ -393,7 +395,7 @@ window.api = {
 
   openProject: (path) => invoke('open_project', { path }),
   saveProject: (path) => invoke('save_project', { path }),
-  startRender: (path, preset) => invoke('start_render', { path, preset }),
+  startRender: (path, preset, quality) => invoke('start_render', { path, preset, quality }),
   cancelRender: () => invoke('cancel_render'),
 
   // file:// will not load in the webview; this is what the asset protocol

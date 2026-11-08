@@ -27,7 +27,7 @@ const definitions = [
   ['save_project', 'Atomically save as .akbunvideo. Existing valid project file gets a recovery point before replacement.', {stateToken:token,path:absolutePath}],
   ['sample_asset', 'Return up to 8 JPEG frames from an imported video interval of at most 60 seconds, or one frame for an image. Inspect these for B-roll; unsampled motion and sound are unknown.', {assetId:z.string().min(1),startMs:z.number().int().nonnegative(),endMs:z.number().int().nonnegative()}, true],
   ['get_library', 'Read saved reusable graphic templates and B-roll observations. Reuse assets only if available in the current project.', {}, true],
-  ['export_video', 'Start rendering to a NEW video path using existing ffmpeg/render settings. Poll render_status to verify success.', {stateToken:token,path:absolutePath,preset:z.enum(['fhd','4k'])}],
+  ['export_video', 'Start rendering to a NEW video path using existing ffmpeg/render settings. Poll render_status to verify success.', {stateToken:token,path:absolutePath,preset:z.enum(['hd','fhd','4k']),quality:z.enum(['high','medium','low']).optional()}],
   ['render_status', 'Read current export state and its completion result. Success requires result.ok=true.', {}, true],
   ['cancel_render', 'Request cancellation of the running export.', {}],
 ];

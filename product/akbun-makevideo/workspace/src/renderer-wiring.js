@@ -31,6 +31,9 @@
       seekTimelineEnd,
       updateMonitorZoomUi,
       startRender,
+      fillRenderSheet,
+      fillRenderSummary,
+      persistSettingsInBackground,
       fillProxySheet,
       openSheet,
       fillProjectSheet,
@@ -134,8 +137,10 @@
       'monitor-zoom-out': () => { preview.zoomOut(); updateMonitorZoomUi(); },
       'monitor-fit': () => { preview.fit(); updateMonitorZoomUi(); },
       'monitor-fullscreen': () => stageController.toggleFullscreen(),
-      'render-fhd': () => startRender('fhd'),
-      'render-4k': () => startRender('4k'),
+      'render-open': () => {
+        fillRenderSheet();
+        openSheet('render-settings');
+      },
       'cancel-render': () => window.api.cancelRender(),
       'proxy-media': () => {
         fillProxySheet();
@@ -513,6 +518,17 @@
       document.addEventListener('click', (event) => {
         const close = event.target.closest('[data-close]');
         if (close) closeSheet(close.dataset.close);
+      });
+      el('rs-preset').addEventListener('change', fillRenderSummary);
+      el('rs-quality').addEventListener('change', fillRenderSummary);
+      el('rs-start').addEventListener('click', () => {
+        const preset = el('rs-preset').value;
+        const quality = el('rs-quality').value;
+        closeSheet('render-settings');
+        state.settings.renderPreset = preset;
+        state.settings.renderQuality = quality;
+        persistSettingsInBackground();
+        void startRender(preset, quality);
       });
       el('ps-preset').addEventListener('change', (event) => {
         if (event.target.value === 'custom') return;

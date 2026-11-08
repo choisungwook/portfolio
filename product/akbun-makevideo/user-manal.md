@@ -28,7 +28,7 @@
 | AI 대화 | Codex 기반 대화와 이미지 요청 | AI → Chat |
 | 마커 | 편집 위치 표시와 탐색 | Marker |
 | 재생 보조 | 프록시·파형, 그래픽 장치와 미리보기 품질 설정 | Settings → Proxy Media / Preview & Tools |
-| 영상 출력 | FHD·4K MP4, 진행 표시·취소, 지원 장치의 하드웨어 인코딩 | Render |
+| 영상 출력 | HD·FHD·4K와 High·Medium·Low 품질의 MP4, 진행 표시·취소, 지원 장치의 하드웨어 인코딩 | Render |
 | 복구 | 일반 Undo/Redo, MCP 작업의 영속 복구 지점 | Edit 또는 MCP |
 | 앱 관리 | 테마·단축키·도구 설정, 업데이트 확인 | Settings |
 
@@ -68,7 +68,7 @@
 6. + Text로 제목 추가, 선택 후 Inspector에서 문구·위치 수정
 7. Program Monitor에서 편집점 전후와 음성 확인
 8. Project → Save로 프로젝트 저장
-9. Render에서 FHD 또는 4K 선택 후 새 MP4 경로 지정
+9. Render → Render…(Cmd+E)에서 해상도와 품질 선택 후 새 MP4 경로 지정
 10. 완료 메시지와 출력 파일 재생 확인
 
 - 중요한 편집 전에는 Save As…로 작업 전 복사본 보관
