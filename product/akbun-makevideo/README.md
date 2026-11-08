@@ -9,7 +9,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to HD
 - Assets panel: drop files from Finder or import them, with kind, length and size read by ffprobe. **Importing references the file where it is — media is never copied into the project**
 - Program monitor: the render's own compositor draws straight onto a surface in the window, and the audio clock decides when each frame is shown. Playing and stopped are the same picture, so what is on screen is what will be in the file
 - Source monitor: preview an asset independently, mark frame-aligned in and out points, then insert, overwrite or append video, audio or both
-- Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel
+- Global Action Bar: toggle Inspector, Shape, Marker, AI and Debug in the shared right panel, and hide Assets or the Source Monitor to give the Program Monitor the room
 - AI panel: stream text or generated images through a separately installed Codex CLI using its ChatGPT subscription login; choose an available subscription model and reasoning effort; conversations stay in app-owned bounded storage
 - [Astra edit studio](./wiki/architecture/astra-editing.md): 단계별 컷·B-roll·모션 그래픽·음악·자막 편집 제안과 검토 후 일괄 적용
 - B-roll 구간의 시각 표본 분석과 검색, text/shape 애니메이션·자막 스타일 재사용 라이브러리
@@ -52,6 +52,12 @@ Cmd on macOS, Ctrl elsewhere.
 | Key | What it does |
 |---|---|
 | Space | Play or pause the preview |
+| L / K | Play / pause |
+| I / O | Mark the source in / out point |
+| M | Add a marker at the playhead |
+| = / - | Zoom the timeline in / out (Cmd or pinch with the wheel does the same) |
+| Shift+Z | Zoom the timeline to fit the edit |
+| Cmd+1 / Cmd+2 | Show or hide Assets / the Source Monitor |
 | Cmd+B | Split at the playhead |
 | Cmd+N / Cmd+O / Cmd+S / Shift+Cmd+S | New, open, save, save as |
 | Cmd+I | Import media |
