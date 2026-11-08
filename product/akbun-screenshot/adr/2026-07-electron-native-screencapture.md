@@ -1,5 +1,7 @@
 # Electron with native screencapture
 
+> Superseded on the runtime by [Move from Electron to Tauri](./2026-11-tauri-for-binary-size.md). Capture by screencapture still holds.
+
 ## Decision
 
 Build the app with Electron and plain JavaScript, and delegate the actual capture to the macOS screencapture binary instead of drawing a selection overlay ourselves.

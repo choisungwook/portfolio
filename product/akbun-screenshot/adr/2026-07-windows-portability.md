@@ -1,5 +1,7 @@
 # Stay on Electron, and treat Windows as a port rather than a rebuild
 
+> The runtime half is superseded by [Move from Electron to Tauri](./2026-11-tauri-for-binary-size.md). The Windows analysis still holds: capture and the tray title remain macOS only.
+
 ## Decision
 
 Keep Electron and keep the app macOS only. Do not rewrite it in Swift the way akbun-mactaskbar was, and do not carry a Windows build today. If Windows is ever wanted, plan a port of three subsystems rather than a recompile: capture, update, and the tray icon.
