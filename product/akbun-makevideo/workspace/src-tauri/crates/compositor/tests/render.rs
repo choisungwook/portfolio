@@ -33,7 +33,7 @@ fn output_size() -> (u32, u32) {
             height: CANVAS_H,
             rate: Rate::fps(30),
         },
-        ffmpeg::Preset::Fhd,
+        ffmpeg::Preset::FHD,
     )
 }
 
@@ -201,7 +201,7 @@ fn render(project: &Project, output: &str) -> Result<(), String> {
             ffmpeg: &ffmpeg_path(),
             project,
             output,
-            preset: ffmpeg::Preset::Fhd,
+            preset: ffmpeg::Preset::FHD,
             accel: None,
         },
         &slot,

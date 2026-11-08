@@ -99,6 +99,7 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
         }
         "export_video" => {
             let path = file(args)?;
+            let preset = commands::parse_preset(text(args, "preset")?, args["quality"].as_str())?;
             if path.exists() {
                 return Err("Choose a new export path; existing files are not overwritten.".into());
             }
@@ -113,7 +114,7 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
                 state,
                 app.state(),
                 path.to_string_lossy().into(),
-                text(args, "preset")?.into(),
+                preset,
                 snapshot,
             )?;
             Ok(

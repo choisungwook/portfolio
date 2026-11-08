@@ -45,6 +45,8 @@ const DEFAULT_SETTINGS = {
   workspaceDir: '',
   ffmpegDir: '',
   renderAcceleration: 'auto',
+  renderPreset: 'fhd',
+  renderQuality: 'medium',
   // Deliberately not a value the setting can hold. Before bootstrap answers
   // there is no IPC to attach a monitor over, and the first attach is triggered
   // by this differing from whatever Rust sends back — which it always does.
@@ -628,6 +630,8 @@ function persistSettings(...args) { return projectUi.persistSettings(...args); }
 function persistSettingsInBackground(...args) { return projectUi.persistSettingsInBackground(...args); }
 function toggleSnap(...args) { return projectUi.toggleSnap(...args); }
 function startRender(...args) { return projectUi.startRender(...args); }
+function fillRenderSheet(...args) { return projectUi.fillRenderSheet(...args); }
+function fillRenderSummary(...args) { return projectUi.fillRenderSummary(...args); }
 function onRenderProgress(...args) { return projectUi.onRenderProgress(...args); }
 function onRenderFallback(...args) { return projectUi.onRenderFallback(...args); }
 function onRenderDone(...args) { return projectUi.onRenderDone(...args); }
@@ -660,7 +664,8 @@ const wiring = globalThis.rendererWiringLib.createRendererWiring({
   L, T, state, dom, el, rate, reportError, newProject, openProject, saveProject,
   importViaDialog, deleteProject, closeProject, undoEdit, redoEdit, splitAtPlayhead,
   deleteSelected, seekTimelineOffset, seekPreviousEdit, seekNextEdit, seekTimelineStart,
-  seekTimelineEnd, updateMonitorZoomUi, startRender, fillProxySheet, openSheet,
+  seekTimelineEnd, updateMonitorZoomUi, startRender, fillRenderSheet, fillRenderSummary,
+  persistSettingsInBackground, fillProxySheet, openSheet,
   fillProjectSheet, fillAppSheet, qualitySmokeConfig, accelerationNote, compositorNote,
   anySheetOpen, closeTimelineContextMenu, toggleSelectedPanel, refreshDebug, setSourceMark,
   placeSource, renderSourceMonitor, selectAsset, zoomToPxPerSecond, renderTimeline,

@@ -44,6 +44,7 @@ const SHORTCUTS = [
   { action: 'save-project-as', label: 'Save Project As', keys: ['Meta+Shift+KeyS'] },
   { action: 'close-project', label: 'Close Project', keys: ['Meta+KeyW'] },
   { action: 'import-assets', label: 'Import Media', keys: ['Meta+KeyI'] },
+  { action: 'render-open', label: 'Render', keys: ['Meta+KeyE'] },
   { action: 'undo', label: 'Undo', keys: ['Meta+KeyZ'] },
   { action: 'redo', label: 'Redo', keys: ['Meta+Shift+KeyZ'] },
   { action: 'split', label: 'Split at Playhead', keys: ['Meta+KeyB', 'Meta+KeyD'] },

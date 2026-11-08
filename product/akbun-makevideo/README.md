@@ -1,6 +1,6 @@
 # akbun-makevideo
 
-Desktop video editor: a multi track timeline, a live preview, and a render to FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in Rust and every edit is an undoable command; ffmpeg does the render.
+Desktop video editor: a multi track timeline, a live preview, and a render to HD, FHD or 4K. Built on Tauri with a plain HTML/JS page, so there is no build step. The editing model lives in Rust and every edit is an undoable command; ffmpeg does the render.
 
 ## What it does
 
@@ -24,7 +24,7 @@ Desktop video editor: a multi track timeline, a live preview, and a render to FH
 - Ripple delete: take a clip out and close the gap behind it
 - Magnet: snap clips and the playhead to nearby edges, toggled from the toolbar
 - Hide and mute per track
-- Render to mp4 at FHD or 4K with a progress bar and a cancel button
+- Render sheet (Cmd+E): mp4 at HD, FHD or 4K long edge and High, Medium or Low quality, with the output size, encoder and length shown before the file is chosen, then a progress bar and a cancel button. The last choice is remembered
 - Renders composite on the GPU by default so the preview frame and the file agree, with a software compositor when there is no GPU and the ffmpeg filter graph as a faster route
 - GPU rendering when the machine has it: the encode moves to Apple VideoToolbox (or NVENC), detected by actually trying it, with an automatic fall back to the CPU if it fails
 - Preview quality, defaulted to Half so a few tracks at once still play
@@ -55,6 +55,7 @@ Cmd on macOS, Ctrl elsewhere.
 | Cmd+B | Split at the playhead |
 | Cmd+N / Cmd+O / Cmd+S / Shift+Cmd+S | New, open, save, save as |
 | Cmd+I | Import media |
+| Cmd+E | Open the Render sheet |
 | Cmd+Z / Shift+Cmd+Z | Undo, redo |
 | Delete | Delete the selected clip |
 | Shift+Delete | Delete it and close the gap behind it |

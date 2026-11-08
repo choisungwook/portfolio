@@ -73,6 +73,10 @@ pub struct Settings {
     /// to always use libx264. There is no "force GPU": if the hardware path
     /// fails there is nothing to do but use the CPU, so auto already covers it.
     pub render_acceleration: String,
+    /// The last Render sheet choices: "hd", "fhd" or "4k", and "high",
+    /// "medium" or "low". The command validates them again on every render.
+    pub render_preset: String,
+    pub render_quality: String,
     /// Whether the graphics device or CPU composites: "gpu" or "cpu". Both
     /// play through the persistent native monitor; CPU frames use a small GPU
     /// presenter only for the final upload.
@@ -139,6 +143,8 @@ impl Default for Settings {
             workspace_dir: String::new(),
             ffmpeg_dir: String::new(),
             render_acceleration: "auto".into(),
+            render_preset: "fhd".into(),
+            render_quality: "medium".into(),
             compositor: "gpu".into(),
             gpu_device: String::new(),
             proxy_enabled: true,
@@ -2416,7 +2422,9 @@ pub fn start_render(
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
     preset: String,
+    quality: Option<String>,
 ) -> Result<(), String> {
+    let preset = parse_preset(&preset, quality.as_deref())?;
     let snapshot = {
         let document = state.document.lock().unwrap();
         (document.project().clone(), document.revision())
@@ -2424,12 +2432,19 @@ pub fn start_render(
     render_snapshot(app, state, ai_runtime, path, preset, snapshot)
 }
 
+/// The render request as the page and the MCP bridge send it: a resolution
+/// name and an optional quality, Medium when left out.
+pub(crate) fn parse_preset(preset: &str, quality: Option<&str>) -> Result<ffmpeg::Preset, String> {
+    let quality = ffmpeg::Quality::parse(quality.unwrap_or("medium"))?;
+    Ok(ffmpeg::Preset::parse(preset)?.with_quality(quality))
+}
+
 pub(crate) fn render_snapshot(
     app: AppHandle,
     state: State<AppState>,
     ai_runtime: State<'_, crate::ai_edit::AiEditRuntime>,
     path: String,
-    preset: String,
+    preset: ffmpeg::Preset,
     snapshot: (Project, u64),
 ) -> Result<(), String> {
     crate::ai_edit::ensure_editable(&ai_runtime)?;
@@ -2437,7 +2452,6 @@ pub(crate) fn render_snapshot(
         return Err("a render is already running".into());
     }
     let (project, started_at) = snapshot;
-    let preset = ffmpeg::Preset::parse(&preset)?;
     // Only the progress bar wants this; every decision below is in frames.
     let total_ms = project.duration().to_millis().max(0) as u64;
     let settings = state.settings.lock().unwrap().clone();

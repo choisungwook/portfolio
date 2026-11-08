@@ -101,8 +101,7 @@
       <div class="menu">
         <button class="menu-title" data-menu="render">Render</button>
         <ul class="menu-list" data-list="render">
-          <li><button data-action="render-fhd">Render FHD — 1920 long edge</button></li>
-          <li><button data-action="render-4k">Render 4K — 3840 long edge</button></li>
+          <li><button data-action="render-open">Render…</button></li>
           <li class="sep"></li>
           <li><button data-action="cancel-render">Cancel Render</button></li>
         </ul>
@@ -588,15 +587,49 @@
     </div>
   </div>
 
+  <div id="render-settings" class="overlay" hidden>
+    <div class="sheet">
+      <h3>Render</h3>
+      <label class="row">Resolution
+        <select id="rs-preset">
+          <option value="hd">HD — 1280 long edge</option>
+          <option value="fhd">FHD — 1920 long edge</option>
+          <option value="4k">4K — 3840 long edge</option>
+        </select>
+      </label>
+      <label class="row">Quality
+        <select id="rs-quality">
+          <option value="high">High — larger file</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low — smaller, faster upload</option>
+        </select>
+      </label>
+      <p class="dim small-text" id="rs-summary"></p>
+      <div class="sheet-actions">
+        <button data-close="render-settings">Cancel</button>
+        <button id="rs-start" class="primary">Choose File and Render</button>
+      </div>
+    </div>
+  </div>
+
   <div id="project-settings" class="overlay" hidden>
     <div class="sheet">
       <h3>Project Resolution</h3>
       <label class="row">Preset
         <select id="ps-preset">
-          <option value="1280x720">HD 1280 × 720</option>
-          <option value="1920x1080">FHD 1920 × 1080</option>
-          <option value="3840x2160">4K 3840 × 2160</option>
-          <option value="1080x1920">Vertical 1080 × 1920</option>
+          <optgroup label="Landscape">
+            <option value="1280x720">HD 1280 × 720</option>
+            <option value="1920x1080">FHD 1920 × 1080</option>
+            <option value="2560x1440">QHD 2560 × 1440</option>
+            <option value="3840x2160">UHD 4K 3840 × 2160</option>
+            <option value="4096x2160">DCI 4K 4096 × 2160</option>
+          </optgroup>
+          <optgroup label="Vertical and square">
+            <option value="1080x1920">Vertical 1080 × 1920 (9:16)</option>
+            <option value="2160x3840">Vertical 4K 2160 × 3840 (9:16)</option>
+            <option value="1080x1350">Portrait 1080 × 1350 (4:5)</option>
+            <option value="1080x1080">Square 1080 × 1080 (1:1)</option>
+          </optgroup>
           <option value="custom">Custom</option>
         </select>
       </label>
