@@ -13,6 +13,7 @@ const sizeInput = document.getElementById('size');
 const strokeInput = document.getElementById('stroke');
 const redactStyleSelect = document.getElementById('redact-style');
 const redact = globalThis.akbunRedact;
+const highlight = globalThis.akbunHighlight;
 
 // The document: the shapes drawn so far over the image they sit on. Redrawing
 // from these two always reproduces the current state, so nothing else is kept.
@@ -215,6 +216,10 @@ function drawShape(s) {
   }
   if (s.type === 'redact') {
     redact.draw(ctx, base, s, unit);
+    return;
+  }
+  if (s.type === 'highlight') {
+    highlight.draw(ctx, s);
     return;
   }
 
@@ -470,6 +475,11 @@ canvas.addEventListener('mousedown', (event) => {
     draft = { type: 'pencil', points: [point], ...style() };
     return;
   }
+  if (tool === 'highlight') {
+    const pen = style();
+    draft = { type: 'highlight', points: [point], ...pen, width: pen.width * highlight.WIDTH_FACTOR };
+    return;
+  }
   if (tool === 'number') {
     push({ type: 'number', x1: point.x, y1: point.y, n: nextNumber(shapes), ...style() });
     return;
@@ -531,6 +541,18 @@ window.addEventListener('mousemove', (event) => {
     redraw();
     return;
   }
+  // Shift makes a highlight a straight stroke from where it started, snapped to
+  // 45 degrees, which is how a line of text gets marked evenly.
+  if (draft.type === 'highlight') {
+    if (event.shiftKey) {
+      const start = draft.points[0];
+      draft.points = [start, constrain('line', start.x, start.y, point.x, point.y)];
+    } else {
+      draft.points.push(point);
+    }
+    redraw();
+    return;
+  }
   const end = event.shiftKey
     ? constrain(draft.type, draft.x1, draft.y1, point.x, point.y)
     : point;
@@ -565,7 +587,7 @@ window.addEventListener('mouseup', () => {
     redraw();
     return;
   }
-  if (shape.type === 'pencil') {
+  if (shape.type === 'pencil' || shape.type === 'highlight') {
     // One sample is a click, not a stroke, and would draw nothing.
     if (shape.points.length > 1) push(shape);
     else redraw();
