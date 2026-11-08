@@ -2,6 +2,8 @@
 
 ## 목록
 
+* [updater 공개키는 서명 secret과 같은 키쌍에서 가져온다](2026-11-updater-key-matches-signing-secret.md) - 공개키 불일치로 업데이트가 조용히 실패한 뒤 release에 key id 검사를 둔 결정.
+
 * [로컬 MCP와 복구 지점](2026-09-local-mcp-checkpoints.md) - 외부 AI 편집과 앱 재시작 후 복구 경계.
 
 * [Astra 편집 제안과 표본 B-roll 설명](2026-09-astra-proposals-and-sampled-broll.md) - 검토·원자적 적용·디자인 재사용 경계.

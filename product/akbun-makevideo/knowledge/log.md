@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-08
+
+* [updater 공개키는 서명 secret과 같은 키쌍에서 가져온다](decisions/2026-11-updater-key-matches-signing-secret.md) 기록.
+
 ## 2026-09-17
 
 * [로컬 MCP와 복구 지점](decisions/2026-09-local-mcp-checkpoints.md) 기록.
