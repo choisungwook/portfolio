@@ -9,6 +9,7 @@ const saveDirInput = document.getElementById('save-dir');
 const fontSelect = document.getElementById('font');
 const deleteKeysInput = document.getElementById('delete-keys');
 const captureSoundInput = document.getElementById('capture-sound');
+const freezeScreenInput = document.getElementById('freeze-screen');
 const status = document.getElementById('status');
 
 window.api.getSettings().then((settings) => {
@@ -18,6 +19,7 @@ window.api.getSettings().then((settings) => {
   saveDirInput.value = settings.saveDir;
   deleteKeysInput.checked = settings.deleteKeys !== false;
   captureSoundInput.checked = settings.captureSound === true;
+  freezeScreenInput.checked = settings.freezeScreen === true;
   fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
   wireFontSelect(fontSelect, () => fontSelect.value || settings.defaultFont);
 });
@@ -36,6 +38,7 @@ document.getElementById('save').addEventListener('click', async () => {
     defaultFont: fontSelect.value,
     deleteKeys: deleteKeysInput.checked,
     captureSound: captureSoundInput.checked,
+    freezeScreen: freezeScreenInput.checked,
   });
   status.textContent = result.ok ? 'Saved' : result.error;
 });

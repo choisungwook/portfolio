@@ -1,5 +1,6 @@
 mod capture;
 mod commands;
+mod freeze;
 mod settings;
 mod tray;
 mod update;
@@ -78,6 +79,7 @@ pub fn run() {
             commands::preview_copy,
             commands::preview_edit,
             commands::editor_image,
+            commands::freeze_image,
             commands::editor_save,
             commands::editor_save_as,
             commands::editor_copy,

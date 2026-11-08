@@ -33,6 +33,13 @@ impl CaptureMode {
         }
     }
 
+    /// Whether freeze screen applies. Only to Area: in window selection the
+    /// still would itself be the window under the pointer, and fullscreen has
+    /// no selection to hold still for.
+    pub fn can_freeze(self) -> bool {
+        self == Self::Area
+    }
+
     /// Flags passed before the output path. -x silences the shutter, so it is
     /// added only when the capture sound is off.
     ///
@@ -71,6 +78,15 @@ mod tests {
             assert!(mode.args(false).contains(&"-x"), "{mode:?}");
             assert!(!mode.args(true).contains(&"-x"), "{mode:?}");
         }
+    }
+
+    #[test]
+    fn only_area_freezes() {
+        let frozen: Vec<_> = CaptureMode::ALL
+            .into_iter()
+            .filter(|m| m.can_freeze())
+            .collect();
+        assert_eq!(frozen, vec![CaptureMode::Area]);
     }
 
     // Fullscreen must not wait for a click, the other two must.

@@ -7,6 +7,7 @@ Tauri 2 app: a Rust main process and plain JavaScript pages with no build step. 
 - `workspace/src-tauri/src/lib.rs`: plugins, the macOS menu, setup, the command list, and the run loop that keeps the app alive when its last window closes.
 - `workspace/src-tauri/src/tray.rs`: the menu bar icon and its menu.
 - `workspace/src-tauri/src/capture.rs`: runs `screencapture` for a capture mode and opens the preview on the result. Holds the busy flag that ignores a second trigger mid selection.
+- `workspace/src-tauri/src/freeze.rs`: freeze screen. Takes a still of the main display and covers the display with it while the area selection runs.
 - `workspace/src-tauri/src/windows.rs`: the preview, editor and settings windows. Owns the map from window label to temp png.
 - `workspace/src-tauri/src/commands.rs`: every `#[tauri::command]` the pages call.
 - `workspace/src-tauri/src/settings.rs`: settings.json on disk and the global shortcuts it names, one per capture mode.
@@ -16,7 +17,7 @@ Tauri 2 app: a Rust main process and plain JavaScript pages with no build step. 
 
 The Permissions tab reads the Screen Recording status through `CGPreflightScreenCaptureAccess`, shows a granted/missing badge with step-by-step guidance, and a button that opens System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus.
 
-Each command that acts on a capture takes the calling window and looks its png up by label, checking the label's kind (`preview-` or `editor-`). The page never sends a path, so a page can only touch the file its own window owns. Capabilities are split per window: every window gets `core:default`, previews may start a drag, and only settings may open the folder picker.
+Each command that acts on a capture takes the calling window and looks its png up by label, checking the label's kind (`preview-`, `editor-` or `freeze-`). The page never sends a path, so a page can only touch the file its own window owns. Capabilities are split per window: every window gets `core:default`, previews may start a drag, and only settings may open the folder picker.
 
 ## Capture flow
 
@@ -27,6 +28,8 @@ screencapture -i -s -x <tmpfile>.png
 ```
 
 The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x, dropped when `captureSound` is on). Capture Window swaps `-s` for `-w`, window selection only, and Capture Fullscreen uses `-m -x`, the main display with no interaction. The flag sets live in `CaptureMode::args` in the core crate; see [Window and fullscreen capture](../adr/2026-11-capture-modes.md). When the user finishes the drag, Rust opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
+
+With `freezeScreen` on, Capture Area first takes `screencapture -m -x` of the main display and shows it in a `freeze-` window: frameless, always on top, and in simple fullscreen so it covers the menu bar without the Space animation native fullscreen plays. The page emits `freeze-ready` once the still is decoded, and the capture thread waits for that event, at most two seconds, before starting the selection, so the drag never begins over the live screen. The selection then captures the still's pixels. The window closes when `screencapture` returns, and its temp png goes through the same label map as a preview's. Only Area freezes: in window selection the still would be the window under the pointer, and fullscreen has nothing to hold still for. Other displays stay live.
 
 The preview has four buttons and each one dismisses it. Save writes the capture into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy decodes the png and puts the bitmap on the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md).
 
@@ -90,6 +93,7 @@ Fonts come from the `list_fonts` command, which reads the system font directorie
 | `preview_copy` | Put the capture on the clipboard and close the preview |
 | `preview_edit` | Hand the capture to a new editor and close the preview |
 | `editor_image` | Return the editor's image as a data URL |
+| `freeze_image` | Return the freeze window's still as a data URL |
 | `editor_save` | Write the edited canvas to the save directory and close the editor |
 | `editor_save_as` | Ask for a path with a save dialog, write the canvas there and close the editor |
 | `editor_copy` | Put the edited canvas on the clipboard and close the editor |
@@ -109,4 +113,4 @@ macOS only, by decision rather than by accident. Capture shells out to the `scre
 
 ## Settings
 
-`settings.json` lives at `~/Library/Application Support/akbun-screenshot/settings.json`, the path the Electron build used, so settings survive the move. It holds seven keys: `shortcut` (accelerator string, default `CommandOrControl+Shift+4`), `windowShortcut` and `fullscreenShortcut` (default empty, meaning unassigned; a non-empty default would return after the user cleared it, since merge keeps the default over an empty stored string), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor) and `captureSound` (default false, whether `-x` is left off so `screencapture` plays its shutter). Unknown keys are dropped on load, a stored value has to match the type of the default it replaces, and a relative `saveDir` falls back to the default, so a broken or hand-edited file cannot turn the boolean into a string or point saves at the process working directory. Saving rejects a relative `saveDir` with a message instead.
+`settings.json` lives at `~/Library/Application Support/akbun-screenshot/settings.json`, the path the Electron build used, so settings survive the move. It holds eight keys: `shortcut` (accelerator string, default `CommandOrControl+Shift+4`), `windowShortcut` and `fullscreenShortcut` (default empty, meaning unassigned; a non-empty default would return after the user cleared it, since merge keeps the default over an empty stored string), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor) `captureSound` (default false, whether `-x` is left off so `screencapture` plays its shutter) and `freezeScreen` (default false, whether Capture Area runs over a still). Unknown keys are dropped on load, a stored value has to match the type of the default it replaces, and a relative `saveDir` falls back to the default, so a broken or hand-edited file cannot turn the boolean into a string or point saves at the process working directory. Saving rejects a relative `saveDir` with a message instead.

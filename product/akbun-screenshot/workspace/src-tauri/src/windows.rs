@@ -46,6 +46,15 @@ impl Windows {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// Gives a temp png to a new window label of this kind and returns the
+    /// label. Owned before the window is built, so a window that fails half way
+    /// still has its file cleaned up by `release`.
+    pub fn adopt(&self, kind: &str, file: PathBuf) -> String {
+        let label = format!("{kind}{}", self.next_id());
+        self.lock().insert(label.clone(), file);
+        label
+    }
+
     /// The temp png behind a window, only if it is the expected kind. A preview
     /// asking for an editor command gets nothing.
     pub fn file(&self, label: &str, kind: &str) -> Option<PathBuf> {
@@ -77,12 +86,9 @@ impl Windows {
 
 pub fn open_preview(app: &AppHandle, file: PathBuf) -> tauri::Result<()> {
     let state = app.state::<Windows>();
-    let label = format!("{PREVIEW}{}", state.next_id());
     let (area, _) = work_area(app);
     let (x, y) = layout::preview_position(area, state.count(PREVIEW));
-    // Owned before the build, so a window that fails half way still has its
-    // file cleaned up below rather than leaking it.
-    state.lock().insert(label.clone(), file);
+    let label = state.adopt(PREVIEW, file);
 
     let built = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("preview.html".into()))
         .title("akbun-screenshot Preview")
@@ -149,7 +155,7 @@ pub fn open_settings(app: &AppHandle) {
     }
     let built = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
         .title("akbun-screenshot Settings")
-        .inner_size(440.0, 700.0)
+        .inner_size(440.0, 760.0)
         .resizable(false)
         .center()
         .build();
@@ -177,6 +183,21 @@ fn read_png_size(file: &PathBuf) -> Option<(u32, u32)> {
     let mut head = [0u8; 24];
     File::open(file).ok()?.read_exact(&mut head).ok()?;
     png::size(&head)
+}
+
+/// The whole primary display in points, menu bar included, for windows that
+/// cover the screen.
+pub fn main_display(app: &AppHandle) -> tauri::Result<Rect> {
+    let monitor = app.primary_monitor()?.ok_or(tauri::Error::WindowNotFound)?;
+    let scale = monitor.scale_factor();
+    let position = monitor.position().to_logical::<f64>(scale);
+    let size = monitor.size().to_logical::<f64>(scale);
+    Ok(Rect {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+    })
 }
 
 /// The primary display's work area in points, and its scale factor.

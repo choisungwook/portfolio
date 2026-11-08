@@ -22,6 +22,9 @@ pub struct Settings {
     /// Whether a capture plays the system shutter sound. Off by default, which
     /// is how every earlier version behaved.
     pub capture_sound: bool,
+    /// Whether Capture Area shows a still of the main display while the
+    /// selection runs, so menus and tooltips hold still.
+    pub freeze_screen: bool,
 }
 
 impl Settings {
@@ -41,6 +44,7 @@ impl Settings {
             default_font: "Apple SD Gothic Neo".into(),
             delete_keys: true,
             capture_sound: false,
+            freeze_screen: false,
         }
     }
 
