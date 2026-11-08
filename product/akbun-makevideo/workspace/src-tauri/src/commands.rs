@@ -1331,12 +1331,12 @@ fn make_proxy(
     project_path: &str,
     ffmpeg_path: &str,
     asset: &Asset,
-    encoder: Option<&str>,
+    codecs: makevideo_proxy::Codecs,
     reason: &str,
 ) -> Result<String, String> {
     let output = makevideo_proxy::media_path(project_path, &asset.id)?;
     let temporary = output.with_extension("part.mp4");
-    let args = makevideo_proxy::ffmpeg_args(asset, &temporary, encoder);
+    let args = makevideo_proxy::ffmpeg_args(asset, &temporary, codecs);
     let mut child = Command::new(ffmpeg_path)
         .args(args)
         .stdin(Stdio::null())
@@ -1562,7 +1562,7 @@ pub async fn start_proxies(
     emit_proxy_status(&app, &state.proxies);
 
     let assessed = assess_proxy_assets(ffprobe_path, video_assets).await?;
-    let mut jobs = Vec::new();
+    let mut jobs: Vec<(Asset, String)> = Vec::new();
     {
         let mut proxies = state.proxies.lock().unwrap();
         if proxies.project_path != project_path {
@@ -1602,79 +1602,98 @@ pub async fn start_proxies(
     emit_proxy_status(&app, &state.proxies);
 
     if !jobs.is_empty() {
+        makevideo_proxy::order_by_first_use(&makevideo_proxy::first_use(&project), &mut jobs);
         let proxies = Arc::clone(&state.proxies);
         let worker = std::thread::spawn(move || {
-            if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
-                if let Err(error) = std::fs::create_dir_all(&dir) {
-                    for (asset, reason) in jobs {
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(
-                                asset.id,
-                                "failed",
-                                0,
-                                "",
-                                reason,
-                                error.to_string(),
-                            ),
-                        );
-                    }
-                    return;
-                }
-            }
-            for (asset, reason) in jobs {
-                if let Err(message) =
-                    wait_for_playback_pause(&app, &proxies, &project_path, &asset.id, &reason)
-                {
-                    if message == "the project changed" {
-                        return;
-                    }
-                }
-                if !set_proxy_status(
-                    &app,
-                    &proxies,
-                    &project_path,
-                    proxy_status_entry(&asset.id, "generating", 0, "", &reason, ""),
-                ) {
-                    return;
-                }
-                match make_proxy(
-                    &app,
-                    &proxies,
-                    &project_path,
-                    &ffmpeg_path,
-                    &asset,
-                    acceleration.as_ref().map(|item| item.encoder.as_str()),
-                    &reason,
-                ) {
-                    Ok(path) => {
-                        allow_asset_file(&app, &path);
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(asset.id, "ready", 100, path, reason, ""),
-                        );
-                    }
-                    Err(message) if message == "the project changed" => return,
-                    Err(message) => {
-                        set_proxy_status(
-                            &app,
-                            &proxies,
-                            &project_path,
-                            proxy_status_entry(asset.id, "failed", 0, "", reason, message),
-                        );
-                    }
-                }
-            }
+            run_proxy_jobs(app, proxies, project_path, ffmpeg_path, acceleration, jobs)
         });
         let mut workers = state.proxy_workers.lock().unwrap();
         workers.retain(|worker| !worker.is_finished());
         workers.push(worker);
     }
     Ok(proxy_statuses(&state.proxies.lock().unwrap()))
+}
+
+/// Make queued proxies, several at once when a hardware encoder is there. The
+/// queue is shared, so a job that finishes early takes the next asset rather
+/// than waiting for a fixed half of the list.
+fn run_proxy_jobs(
+    app: AppHandle,
+    proxies: Arc<Mutex<ProxyState>>,
+    project_path: String,
+    ffmpeg_path: String,
+    acceleration: Option<makevideo_render::accel::Acceleration>,
+    jobs: Vec<(Asset, String)>,
+) {
+    if let Ok(dir) = makevideo_proxy::proxy_dir(&project_path) {
+        if let Err(error) = std::fs::create_dir_all(&dir) {
+            for (asset, reason) in jobs {
+                set_proxy_status(
+                    &app,
+                    &proxies,
+                    &project_path,
+                    proxy_status_entry(asset.id, "failed", 0, "", reason, error.to_string()),
+                );
+            }
+            return;
+        }
+    }
+    let codecs = makevideo_proxy::Codecs {
+        encoder: acceleration.as_ref().map(|item| item.encoder.as_str()),
+        hwaccel: acceleration.as_ref().and_then(|item| item.hwaccel.as_deref()),
+    };
+    let queue = Mutex::new(std::collections::VecDeque::from(jobs));
+    // Set when the project changes under the jobs, so every worker stops.
+    let stopped = AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        for _ in 0..makevideo_proxy::concurrent_jobs(codecs) {
+            scope.spawn(|| {
+                while !stopped.load(Ordering::Relaxed) {
+                    let Some((asset, reason)) = queue.lock().unwrap().pop_front() else {
+                        return;
+                    };
+                    if !run_proxy_job(&app, &proxies, &project_path, &ffmpeg_path, codecs, asset, reason) {
+                        stopped.store(true, Ordering::Relaxed);
+                    }
+                }
+            });
+        }
+    });
+}
+
+/// One proxy from waiting to ready or failed. False means the project changed
+/// and the remaining jobs belong to a project that is no longer open.
+fn run_proxy_job(
+    app: &AppHandle,
+    proxies: &Arc<Mutex<ProxyState>>,
+    project_path: &str,
+    ffmpeg_path: &str,
+    codecs: makevideo_proxy::Codecs,
+    asset: Asset,
+    reason: String,
+) -> bool {
+    if let Err(message) = wait_for_playback_pause(app, proxies, project_path, &asset.id, &reason) {
+        if message == "the project changed" {
+            return false;
+        }
+    }
+    if !set_proxy_status(
+        app,
+        proxies,
+        project_path,
+        proxy_status_entry(&asset.id, "generating", 0, "", &reason, ""),
+    ) {
+        return false;
+    }
+    let status = match make_proxy(app, proxies, project_path, ffmpeg_path, &asset, codecs, &reason) {
+        Ok(path) => {
+            allow_asset_file(app, &path);
+            proxy_status_entry(asset.id, "ready", 100, path, reason, "")
+        }
+        Err(message) if message == "the project changed" => return false,
+        Err(message) => proxy_status_entry(asset.id, "failed", 0, "", reason, message),
+    };
+    set_proxy_status(app, proxies, project_path, status)
 }
 
 fn set_waveform_status(

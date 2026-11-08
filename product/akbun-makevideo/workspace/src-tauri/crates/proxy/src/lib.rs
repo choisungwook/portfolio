@@ -209,12 +209,47 @@ pub fn progress_percent_changed(previous: &mut u8, current: u8) -> bool {
     true
 }
 
-pub fn ffmpeg_args(asset: &Asset, output: &Path, encoder: Option<&str>) -> Vec<String> {
-    let mut args = vec![
-        "-hide_banner".into(),
-        "-y".into(),
-        "-threads".into(),
-        DECODE_THREADS.to_string(),
+/// The encoder and decoder a proxy is made with. Both come from the
+/// acceleration probe, so a name here is one this machine already ran.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Codecs<'a> {
+    pub encoder: Option<&'a str>,
+    pub hwaccel: Option<&'a str>,
+}
+
+/// How many proxies are made at once. A media engine runs several sessions
+/// side by side, so two jobs roughly halve the wait. The CPU path stays at one
+/// so making proxies does not starve the editor.
+pub fn concurrent_jobs(codecs: Codecs) -> usize {
+    if codecs.encoder.is_some() { 2 } else { 1 }
+}
+
+/// The first frame each asset is used at on the timeline.
+pub fn first_use(project: &Project) -> HashMap<String, i64> {
+    let mut first: HashMap<String, i64> = HashMap::new();
+    for clip in project.tracks.iter().flat_map(|track| &track.clips) {
+        let start = first.entry(clip.asset_id.clone()).or_insert(clip.start);
+        *start = (*start).min(clip.start);
+    }
+    first
+}
+
+/// Proxies for media on the timeline first, earliest use first, then the rest
+/// of the bin. What is about to be played is what needs one soonest.
+pub fn order_by_first_use<T>(first_use: &HashMap<String, i64>, jobs: &mut [(Asset, T)]) {
+    jobs.sort_by_key(|(asset, _)| first_use.get(&asset.id).copied().unwrap_or(i64::MAX));
+}
+
+pub fn ffmpeg_args(asset: &Asset, output: &Path, codecs: Codecs) -> Vec<String> {
+    let mut args: Vec<String> = vec!["-hide_banner".into(), "-y".into()];
+    match codecs.hwaccel {
+        // The media engine decodes HEVC, ProRes and 4K H.264, which is most of
+        // why a proxy is needed in the first place. Frames come back to system
+        // memory, so the scale filter below is unchanged.
+        Some(hwaccel) => args.extend(["-hwaccel".into(), hwaccel.into()]),
+        None => args.extend(["-threads".into(), DECODE_THREADS.to_string()]),
+    }
+    args.extend([
         "-i".into(),
         asset.path.clone(),
         "-map".into(),
@@ -226,8 +261,8 @@ pub fn ffmpeg_args(asset: &Asset, output: &Path, encoder: Option<&str>) -> Vec<S
             "scale='if(gte(iw,ih),min(iw,{}),-2)':'if(gte(iw,ih),-2,min(ih,{}))'",
             LONG_EDGE, LONG_EDGE
         ),
-    ];
-    if let Some(encoder) = encoder {
+    ]);
+    if let Some(encoder) = codecs.encoder {
         args.extend([
             "-c:v".into(),
             encoder.into(),
@@ -348,7 +383,7 @@ mod tests {
         let args = ffmpeg_args(
             &asset(AssetKind::Video, 3840, 2160),
             Path::new("proxy.mp4"),
-            None,
+            Codecs::default(),
         );
         assert!(args.iter().any(|arg| arg.contains("1920")));
         assert!(args.windows(2).any(|pair| {
@@ -368,13 +403,30 @@ mod tests {
         let args = ffmpeg_args(
             &asset(AssetKind::Video, 3840, 2160),
             Path::new("proxy.mp4"),
-            Some("h264_videotoolbox"),
+            Codecs { encoder: Some("h264_videotoolbox"), hwaccel: Some("videotoolbox") },
         );
         assert!(args
             .windows(2)
             .any(|pair| pair == ["-c:v", "h264_videotoolbox"]));
         assert!(args.windows(2).any(|pair| pair == ["-b:v", "4M"]));
         assert!(!args.iter().any(|arg| arg == "libx264"));
+        // Hardware decode goes before the input and replaces the thread cap.
+        let hw = args.iter().position(|arg| arg == "-hwaccel").unwrap();
+        let input = args.iter().position(|arg| arg == "-i").unwrap();
+        assert!(hw < input && args[hw + 1] == "videotoolbox");
+        assert!(!args.iter().any(|arg| arg == "-threads"));
+        assert_eq!(concurrent_jobs(Codecs { encoder: Some("h264_videotoolbox"), hwaccel: None }), 2);
+        assert_eq!(concurrent_jobs(Codecs::default()), 1);
+    }
+
+    #[test]
+    fn proxies_for_timeline_media_come_first() {
+        let named = |id: &str| Asset { id: id.into(), ..asset(AssetKind::Video, 3840, 2160) };
+        let first = HashMap::from([("late".to_string(), 300), ("early".to_string(), 10)]);
+        let mut jobs = vec![(named("unused"), ()), (named("late"), ()), (named("early"), ())];
+        order_by_first_use(&first, &mut jobs);
+        let order: Vec<&str> = jobs.iter().map(|(asset, _)| asset.id.as_str()).collect();
+        assert_eq!(order, ["early", "late", "unused"]);
     }
 
     #[test]
