@@ -6,8 +6,6 @@ tags: [tauri, rust, update, release]
 timestamp: 2026-11-08T00:00:00Z
 ---
 
-# Move from Electron to Tauri because the dmg was 113 MB
-
 ## Decision
 
 Rewrite the main process in Rust on Tauri 2 and keep the three pages. A `src/api.js` bridge exposes the same `window.api` the Electron preload did, so editor, preview and settings changed only where Electron leaked through: the preview loads its image as a data URL, the font list comes from a command, and the drag region is `data-tauri-drag-region`.
