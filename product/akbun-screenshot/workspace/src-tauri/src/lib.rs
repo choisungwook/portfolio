@@ -1,6 +1,7 @@
 mod capture;
 mod commands;
 mod freeze;
+mod scrolling;
 mod settings;
 mod tray;
 mod update;
@@ -62,6 +63,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(windows::Windows::default())
         .manage(capture::Capturing::default())
+        .manage(scrolling::Scrolling::default())
         .setup(setup)
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
@@ -84,6 +86,8 @@ pub fn run() {
             commands::editor_save_as,
             commands::editor_copy,
             commands::window_close,
+            scrolling::scroll_region_select,
+            scrolling::scroll_done,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

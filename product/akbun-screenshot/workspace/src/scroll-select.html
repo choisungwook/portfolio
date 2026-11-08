@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>akbun-screenshot Scrolling Capture</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; cursor: crosshair; background: rgba(0, 0, 0, 0.25); }
+    #hint {
+      position: fixed; top: 40%; left: 50%; transform: translateX(-50%);
+      padding: 10px 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.75); color: #fff;
+      font: 14px -apple-system, sans-serif; pointer-events: none;
+    }
+    /* The box shadow dims everything outside the selection. */
+    #box { position: fixed; display: none; outline: 2px dashed #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25); }
+  </style>
+</head>
+<body>
+  <div id="hint">Drag over the part that scrolls. Esc cancels.</div>
+  <div id="box"></div>
+  <script src="scroll-select.js"></script>
+</body>
+</html>
