@@ -64,6 +64,8 @@
         target.textContent = 'target';
         target.title = 'Use only this track for previous and next edit navigation';
         target.className = track.id === state.targetTrackId ? 'target on' : 'target';
+        target.setAttribute('aria-label', `${track.name} target`);
+        target.setAttribute('aria-pressed', String(track.id === state.targetTrackId));
         buttons.appendChild(target);
         if (track.kind === 'video' || track.kind === 'subtitle') {
           const hide = document.createElement('button');
@@ -71,6 +73,8 @@
           hide.textContent = 'hide';
           hide.title = 'Hide this track from the preview and the render';
           hide.className = track.hidden ? 'on' : '';
+          hide.setAttribute('aria-label', `${track.name} hide`);
+          hide.setAttribute('aria-pressed', String(Boolean(track.hidden)));
           buttons.appendChild(hide);
         }
         const mute = document.createElement('button');
@@ -78,6 +82,8 @@
         mute.textContent = 'mute';
         mute.title = 'Silence this track';
         mute.className = track.muted ? 'on' : '';
+        mute.setAttribute('aria-label', `${track.name} mute`);
+        mute.setAttribute('aria-pressed', String(Boolean(track.muted)));
         buttons.appendChild(mute);
 
         head.append(name, buttons);

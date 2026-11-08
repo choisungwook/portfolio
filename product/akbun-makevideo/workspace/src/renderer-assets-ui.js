@@ -235,6 +235,44 @@
       activateSelectedPanel(P.toggledPanel(state.activePanel, panel));
     }
 
+    // Hiding the Assets panel or the Source Monitor gives the Program Monitor
+    // the room. A layout preference of this window, so it is kept in the
+    // browser storage of this app rather than in the project or settings file.
+    const WORKSPACE_CLASSES = { assets: 'hide-assets', source: 'hide-source' };
+    const WORKSPACE_KEY = 'makevideo.workspacePanels';
+
+    function setWorkspacePanel(name, visible) {
+      document.body.classList.toggle(WORKSPACE_CLASSES[name], !visible);
+      const button = document.querySelector(`[data-workspace-toggle="${name}"]`);
+      if (button) button.setAttribute('aria-pressed', String(visible));
+      window.requestAnimationFrame(() => {
+        if (preview) preview.layout();
+        if (sourcePreview) sourcePreview.layout();
+      });
+    }
+
+    function toggleWorkspacePanel(name) {
+      if (!WORKSPACE_CLASSES[name]) return;
+      const visible = document.body.classList.contains(WORKSPACE_CLASSES[name]);
+      setWorkspacePanel(name, visible);
+      try {
+        const saved = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || '{}');
+        localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ ...saved, [name]: visible }));
+      } catch {
+        // Storage can be unavailable; the toggle still works for this window.
+      }
+    }
+
+    function restoreWorkspacePanels() {
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || '{}') || {};
+      } catch {
+        saved = {};
+      }
+      for (const name of Object.keys(WORKSPACE_CLASSES)) setWorkspacePanel(name, saved[name] !== false);
+    }
+
     async function prepareProxies() {
       if (!state.path || !window.api.available) return;
       try {
@@ -459,7 +497,17 @@
      *  import and the clips into one undo step. */
     async function probePaths(paths) {
       if (!paths || !paths.length) return [];
-      const found = await window.api.importAssets(paths);
+      // Each file is measured with ffprobe, which takes a moment per file.
+      const label = dom.btnImport.textContent;
+      dom.btnImport.disabled = true;
+      dom.btnImport.textContent = `Importing ${paths.length}…`;
+      let found;
+      try {
+        found = await window.api.importAssets(paths);
+      } finally {
+        dom.btnImport.disabled = false;
+        dom.btnImport.textContent = label;
+      }
       if (!found.length) {
         await window.api.message('None of those files are video, audio or images.', {
           title: 'Nothing imported',
@@ -477,7 +525,7 @@
       for (const asset of found) hydrateDuration(asset);
     }
 
-    return { setRuntime, assetSummary, playbackPath, adoptProxyStatuses, proxySummary, renderProxySummary, renderProxyProgress, byteText, millisecondsText, playbackDebugLines, clipDragDebugLines, refreshDebug, startDebug, stopDebug, activateSelectedPanel, toggleSelectedPanel, prepareProxies, adoptWaveformStatuses, prepareWaveforms, prepareDerivedMedia, onProxyStatus, onWaveformStatus, renderAssets, selectedSourceAsset, sourceTime, renderSourceMonitor, setSourceMark, sourceDragPayload, insertSourceAt, placeSource, hydrateDuration, probePaths, importViaDialog };
+    return { setRuntime, assetSummary, playbackPath, adoptProxyStatuses, proxySummary, renderProxySummary, renderProxyProgress, byteText, millisecondsText, playbackDebugLines, clipDragDebugLines, refreshDebug, startDebug, stopDebug, activateSelectedPanel, toggleSelectedPanel, toggleWorkspacePanel, restoreWorkspacePanels, prepareProxies, adoptWaveformStatuses, prepareWaveforms, prepareDerivedMedia, onProxyStatus, onWaveformStatus, renderAssets, selectedSourceAsset, sourceTime, renderSourceMonitor, setSourceMark, sourceDragPayload, insertSourceAt, placeSource, hydrateDuration, probePaths, importViaDialog };
   }
 
   return { createRendererAssetsUi };

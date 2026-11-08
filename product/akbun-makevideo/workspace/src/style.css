@@ -396,10 +396,60 @@ select {
   padding: 2px 8px;
 }
 
-#global-actions {
+#global-actions,
+#workspace-toggles {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+#workspace-toggles {
+  padding-right: 6px;
+  margin-right: 4px;
+  border-right: 1px solid var(--border);
+}
+
+/* Both panels are shown by default, so "on" is an outline rather than the
+   filled accent the right-panel buttons use for the one open panel. */
+#workspace-toggles .global-action[aria-pressed='true'] {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--fg);
+}
+
+#workspace-toggles .global-action[aria-pressed='false'] {
+  color: var(--dim);
+  opacity: 0.6;
+}
+
+/* Keyboard focus is visible everywhere, not only in the menus that had it. */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+body.hide-assets #assets-panel,
+body.hide-source #source-panel {
+  display: none;
+}
+
+body.hide-assets #upper {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.hide-assets #upper.panel-open {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+body.hide-source #monitor-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.hide-source #preview-panel {
+  grid-column: 1;
 }
 
 .global-action {
