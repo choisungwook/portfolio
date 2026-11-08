@@ -1,3 +1,4 @@
+use crate::capture::CaptureMode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -7,6 +8,10 @@ use std::path::{Path, PathBuf};
 pub struct Settings {
     /// Accelerator string, e.g. CommandOrControl+Shift+4.
     pub shortcut: String,
+    /// Window and fullscreen capture shortcuts. Empty means unassigned, which
+    /// is the default: every obvious key is already taken by macOS.
+    pub window_shortcut: String,
+    pub fullscreen_shortcut: String,
     pub save_dir: String,
     /// Ships with macOS and covers Korean and English, so the editor renders
     /// both without bundling a font.
@@ -20,6 +25,11 @@ impl Settings {
     pub fn defaults(home: &Path) -> Self {
         Self {
             shortcut: "CommandOrControl+Shift+4".into(),
+            // Must stay empty. merge drops an empty stored string and keeps the
+            // default, so a non-empty default would come back after the user
+            // cleared it.
+            window_shortcut: String::new(),
+            fullscreen_shortcut: String::new(),
             save_dir: home
                 .join("Pictures")
                 .join("akbun-screenshot")
@@ -49,7 +59,9 @@ impl Settings {
             }
         }
         let mut settings: Self = serde_json::from_value(merged).expect("settings deserialize");
-        if settings.validate().is_err() {
+        // Only the field the check is about. validate() also refuses a
+        // shortcut used twice, and that must not move the save folder.
+        if !Path::new(&settings.save_dir).is_absolute() {
             settings.save_dir = defaults.save_dir.clone();
         }
         settings
@@ -65,6 +77,17 @@ impl Settings {
         if self.default_font.trim().is_empty() {
             return Err("The default font is empty".into());
         }
+        let mut seen: Vec<String> = Vec::new();
+        for (mode, shortcut) in self.shortcuts() {
+            let key = shortcut.to_lowercase();
+            if seen.contains(&key) {
+                return Err(format!(
+                    "{} uses a shortcut already assigned: {shortcut}",
+                    mode.label()
+                ));
+            }
+            seen.push(key);
+        }
         if !Path::new(&self.save_dir).is_absolute() {
             return Err(format!(
                 "The save location must be an absolute path: {}",
@@ -72,6 +95,26 @@ impl Settings {
             ));
         }
         Ok(())
+    }
+
+    /// The shortcut assigned to a mode, empty when there is none.
+    pub fn shortcut_for(&self, mode: CaptureMode) -> &str {
+        match mode {
+            CaptureMode::Area => &self.shortcut,
+            CaptureMode::Window => &self.window_shortcut,
+            CaptureMode::Fullscreen => &self.fullscreen_shortcut,
+        }
+        .trim()
+    }
+
+    /// Every assigned shortcut with the mode it starts. Unassigned ones are
+    /// left out, so the caller registers exactly this list.
+    pub fn shortcuts(&self) -> Vec<(CaptureMode, &str)> {
+        CaptureMode::ALL
+            .into_iter()
+            .map(|mode| (mode, self.shortcut_for(mode)))
+            .filter(|(_, shortcut)| !shortcut.is_empty())
+            .collect()
     }
 
     pub fn save_dir(&self) -> PathBuf {
@@ -132,5 +175,53 @@ mod tests {
             ..defaults()
         };
         assert!(blank.validate().is_err());
+    }
+
+    #[test]
+    fn unassigned_shortcuts_are_left_out() {
+        let modes: Vec<_> = defaults().shortcuts().into_iter().map(|(m, _)| m).collect();
+        assert_eq!(modes, vec![CaptureMode::Area]);
+        let all = Settings {
+            window_shortcut: "Alt+W".into(),
+            fullscreen_shortcut: " Alt+F ".into(),
+            ..defaults()
+        };
+        assert_eq!(
+            all.shortcuts(),
+            vec![
+                (CaptureMode::Area, "CommandOrControl+Shift+4"),
+                (CaptureMode::Window, "Alt+W"),
+                (CaptureMode::Fullscreen, "Alt+F"),
+            ]
+        );
+    }
+
+    #[test]
+    fn validate_rejects_a_shortcut_used_twice() {
+        let twice = Settings {
+            fullscreen_shortcut: "commandorcontrol+shift+4".into(),
+            ..defaults()
+        };
+        assert!(twice.validate().unwrap_err().contains("Capture Fullscreen"));
+    }
+
+    // Clearing a shortcut in the page must survive a reload.
+    #[test]
+    fn a_duplicate_shortcut_on_disk_keeps_the_save_dir() {
+        let stored =
+            json!({ "saveDir": "/tmp/shots", "windowShortcut": "CommandOrControl+Shift+4" });
+        assert_eq!(
+            Settings::merge(&defaults(), Some(&stored)).save_dir,
+            "/tmp/shots"
+        );
+    }
+
+    #[test]
+    fn a_cleared_shortcut_stays_cleared() {
+        let stored = json!({ "windowShortcut": "" });
+        assert_eq!(
+            Settings::merge(&defaults(), Some(&stored)).window_shortcut,
+            ""
+        );
     }
 }

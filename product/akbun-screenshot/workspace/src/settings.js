@@ -3,6 +3,8 @@
 /* global fillFontSelect, wireFontSelect */
 
 const shortcutInput = document.getElementById('shortcut');
+const windowShortcutInput = document.getElementById('window-shortcut');
+const fullscreenShortcutInput = document.getElementById('fullscreen-shortcut');
 const saveDirInput = document.getElementById('save-dir');
 const fontSelect = document.getElementById('font');
 const deleteKeysInput = document.getElementById('delete-keys');
@@ -10,6 +12,8 @@ const status = document.getElementById('status');
 
 window.api.getSettings().then((settings) => {
   shortcutInput.value = settings.shortcut;
+  windowShortcutInput.value = settings.windowShortcut;
+  fullscreenShortcutInput.value = settings.fullscreenShortcut;
   saveDirInput.value = settings.saveDir;
   deleteKeysInput.checked = settings.deleteKeys !== false;
   fillFontSelect(fontSelect, [settings.defaultFont], settings.defaultFont);
@@ -24,6 +28,8 @@ document.getElementById('choose-dir').addEventListener('click', async () => {
 document.getElementById('save').addEventListener('click', async () => {
   const result = await window.api.saveSettings({
     shortcut: shortcutInput.value.trim(),
+    windowShortcut: windowShortcutInput.value.trim(),
+    fullscreenShortcut: fullscreenShortcutInput.value.trim(),
     saveDir: saveDirInput.value.trim(),
     defaultFont: fontSelect.value,
     deleteKeys: deleteKeysInput.checked,

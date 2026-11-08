@@ -6,11 +6,12 @@ Tauri 2 app: a Rust main process and plain JavaScript pages with no build step. 
 
 - `workspace/src-tauri/src/lib.rs`: plugins, the macOS menu, setup, the command list, and the run loop that keeps the app alive when its last window closes.
 - `workspace/src-tauri/src/tray.rs`: the menu bar icon and its menu.
-- `workspace/src-tauri/src/windows.rs`: capture, and the preview, editor and settings windows. Owns the map from window label to temp png.
+- `workspace/src-tauri/src/capture.rs`: runs `screencapture` for a capture mode and opens the preview on the result. Holds the busy flag that ignores a second trigger mid selection.
+- `workspace/src-tauri/src/windows.rs`: the preview, editor and settings windows. Owns the map from window label to temp png.
 - `workspace/src-tauri/src/commands.rs`: every `#[tauri::command]` the pages call.
-- `workspace/src-tauri/src/settings.rs`: settings.json on disk and the global shortcut it names.
+- `workspace/src-tauri/src/settings.rs`: settings.json on disk and the global shortcuts it names, one per capture mode.
 - `workspace/src-tauri/src/update.rs`: Check for Updates through the updater plugin.
-- `workspace/src-tauri/crates/core/`: pure helpers (filenames, settings merge, preview position, editor window size, png header and data URL checks). No tauri dependency, so `cargo test -p screenshot-core` runs anywhere in seconds.
+- `workspace/src-tauri/crates/core/`: pure helpers (capture mode flags, filenames, settings merge, preview position, editor window size, png header and data URL checks). No tauri dependency, so `cargo test -p screenshot-core` runs anywhere in seconds.
 - `workspace/src/`: three pages plus shared scripts. `api.js` exposes `window.api` over `invoke`, with the same method names the Electron preload had. `settings.html` has a General tab (shortcut, save directory, default font) and a Permissions tab; `preview.html` shows one capture with Save, Copy, Edit and Close; `editor.html` is the annotation editor. `shapes.js` holds the editor's pure geometry and `fonts.js` the font picker shared with the settings window.
 
 The Permissions tab reads the Screen Recording status through `CGPreflightScreenCaptureAccess`, shows a granted/missing badge with step-by-step guidance, and a button that opens System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus.
@@ -25,7 +26,7 @@ Capture is delegated to the macOS screencapture binary, so the drag selection UI
 screencapture -i -s -x <tmpfile>.png
 ```
 
-The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x). When the user finishes the drag, Rust opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
+The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x). Capture Window swaps `-s` for `-w`, window selection only, and Capture Fullscreen uses `-m -x`, the main display with no interaction. The flag sets live in `CaptureMode::args` in the core crate; see [Window and fullscreen capture](../adr/2026-11-capture-modes.md). When the user finishes the drag, Rust opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
 
 The preview has four buttons and each one dismisses it. Save writes the capture into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy decodes the png and puts the bitmap on the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md).
 
@@ -80,7 +81,7 @@ Fonts come from the `list_fonts` command, which reads the system font directorie
 | Command | Purpose |
 |---|---|
 | `settings_get` | Return current settings |
-| `settings_save` | Validate, register the new shortcut, then persist and refresh the tray menu |
+| `settings_save` | Validate (including a shortcut assigned twice), register every shortcut, then persist and refresh the tray menu |
 | `list_fonts` | Return installed font families |
 | `permissions_get` | Return the Screen Recording permission status |
 | `open_screen_settings` | Open macOS System Settings at the Screen Recording pane |
@@ -108,4 +109,4 @@ macOS only, by decision rather than by accident. Capture shells out to the `scre
 
 ## Settings
 
-`settings.json` lives at `~/Library/Application Support/akbun-screenshot/settings.json`, the path the Electron build used, so settings survive the move. It holds four keys: `shortcut` (accelerator string, default `CommandOrControl+Shift+4`), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) and `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor). Unknown keys are dropped on load, a stored value has to match the type of the default it replaces, and a relative `saveDir` falls back to the default, so a broken or hand-edited file cannot turn the boolean into a string or point saves at the process working directory. Saving rejects a relative `saveDir` with a message instead.
+`settings.json` lives at `~/Library/Application Support/akbun-screenshot/settings.json`, the path the Electron build used, so settings survive the move. It holds six keys: `shortcut` (accelerator string, default `CommandOrControl+Shift+4`), `windowShortcut` and `fullscreenShortcut` (default empty, meaning unassigned; a non-empty default would return after the user cleared it, since merge keeps the default over an empty stored string), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) and `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor). Unknown keys are dropped on load, a stored value has to match the type of the default it replaces, and a relative `saveDir` falls back to the default, so a broken or hand-edited file cannot turn the boolean into a string or point saves at the process working directory. Saving rejects a relative `saveDir` with a message instead.

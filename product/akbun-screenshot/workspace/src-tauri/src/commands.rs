@@ -5,7 +5,7 @@
 //! that copies, encodes or decodes a whole image is async, which runs it off
 //! the main thread.
 
-use crate::settings::{register_shortcut, SettingsStore};
+use crate::settings::{register_shortcuts, SettingsStore};
 use crate::tray;
 use crate::update::notify;
 use crate::windows::{self, Windows, EDITOR, PREVIEW};
@@ -76,18 +76,15 @@ pub fn settings_save(
 ) -> Result<()> {
     next.validate()?;
     let previous = store.get();
-    if let Err(error) = register_shortcut(&app, &next.shortcut) {
-        let _ = register_shortcut(&app, &previous.shortcut);
-        return Err(format!(
-            "Cannot register shortcut {}: {error}",
-            next.shortcut
-        ));
-    }
-    if let Err(error) = store.save(next.clone()) {
-        let _ = register_shortcut(&app, &previous.shortcut);
+    if let Err(error) = register_shortcuts(&app, &next) {
+        let _ = register_shortcuts(&app, &previous);
         return Err(error);
     }
-    tray::refresh(&app, &next.shortcut);
+    if let Err(error) = store.save(next.clone()) {
+        let _ = register_shortcuts(&app, &previous);
+        return Err(error);
+    }
+    tray::refresh(&app, &next);
     Ok(())
 }
 
