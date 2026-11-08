@@ -11,6 +11,9 @@ on:
     paths:
       - 'product/akbun-makevideo/**'
       - 'crates/akbun-ai/**'
+      # A change to this workflow is verified by the jobs it changes. Not on
+      # push: a release without a version bump would fail on the existing tag.
+      - '.github/workflows/release-akbun-makevideo.yml'
   workflow_dispatch:
 
 permissions:
@@ -116,14 +119,17 @@ jobs:
       - name: Install a software GPU
         run: sudo apt-get install -y -qq mesa-vulkan-drivers
 
+      # One test thread: lavapipe crashes now and then (SIGSEGV mid-run) when
+      # several test threads create Vulkan devices at the same time. The GPU
+      # tests take seconds, so running them one by one costs nothing.
       - name: Run compositor tests with the GPU backend
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-compositor -- --test-threads=1
 
       # And the scheduler again with the surface half compiled in, so the
       # swapchain format choice and the offscreen sink that draws through the
       # same call the swapchain uses are both exercised against lavapipe.
       - name: Run playback scheduler tests with the surface
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p makevideo-present -- --test-threads=1
 
   release:
     if: github.event_name != 'pull_request'
