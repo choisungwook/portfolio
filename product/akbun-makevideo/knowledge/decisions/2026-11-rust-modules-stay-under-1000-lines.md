@@ -6,8 +6,6 @@ tags: [rust, refactor, code-structure]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-08T09:00:00Z }
 ---
 
-# Rust 모듈은 테스트를 빼고 1000줄을 넘기지 않는다
-
 ## 결정
 
 * src-tauri의 테스트가 아닌 .rs 파일은 1000줄 이하로 유지한다. 넘으면 기능을 고치는 김에 나눈다.
