@@ -6,8 +6,6 @@ tags: [makevideo, proxy, playback, ffmpeg]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-08T05:00:00Z }
 ---
 
-# 프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다
-
 ## 결정
 
 * 장변 1920px 초과, H.264가 아닌 코덱, 관측된 키프레임 간격 2초 초과 중 하나면 프록시 생성

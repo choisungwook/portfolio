@@ -41,7 +41,7 @@ akbun-makevideo apply edits.json --label "첫 컷"
 ```
 
 - 파일 대신 - 를 주면 표준 입력에서 읽음
-- 적용마다 복구 지점이 먼저 저장되고 결과에 checkpointId가 옴. 되돌리기는 akbun-makevideo restore <checkpointId>
+- 적용마다 복구 지점이 먼저 저장되고 결과에 checkpointId가 옴. 되돌리기는 akbun-makevideo restore 뒤에 그 checkpointId
 
 저장하고 출력이 끝날 때까지 기다린다.
 
@@ -69,7 +69,7 @@ akbun-makevideo export ~/Movies/trip.mp4 --preset fhd --quality high --wait
 | open / new / save / import | 프로젝트 열기·새로 만들기·저장, 미디어 참조 추가 |
 | preview / apply / undo / redo | 편집 검증·적용·실행 취소·재실행 |
 | checkpoints / checkpoint / restore | 복구 지점 목록·생성·복원 |
-| sample <assetId> --start --end [--out] | 구간의 JPEG 프레임 저장 |
+| sample ASSET_ID --start --end [--out] | 구간의 JPEG 프레임 저장 |
 | library | 저장된 디자인 템플릿과 B-roll 메모 |
 | export / render-status / cancel-render | 출력 시작·상태·취소 |
 
