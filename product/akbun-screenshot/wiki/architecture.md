@@ -1,20 +1,21 @@
 # Architecture
 
-Electron app in plain JavaScript with no build step. It lives in the menu bar only: the dock icon is hidden and there is no main window.
+Tauri 2 app: a Rust main process and plain JavaScript pages with no build step. It lives in the menu bar only: the activation policy is Accessory, so there is no dock icon and no main window. See [Move from Electron to Tauri](../adr/2026-11-tauri-for-binary-size.md).
 
 ## Process structure
 
-- `workspace/src/main.js`: app bootstrap. Tray icon, tray menu, global shortcut registration, IPC handlers, settings window.
-- `workspace/src/capture.js`: capture flow. Runs the native screencapture binary and opens preview and editor windows.
-- `workspace/src/settings.js`: reads and writes settings.json under the Electron userData path.
-- `workspace/src/update.js`: update check against GitHub Releases, dmg download, and the bundle swap script.
-- `workspace/src/lib.js`: pure helpers (filename, settings merge, preview position, editor window size). No electron imports so tests run with plain node.
-- `workspace/src/preload.js`: exposes `window.api` to renderers via contextBridge.
-- `workspace/src/renderer/`: three pages plus two shared scripts. `settings.html` has a General tab (shortcut, save directory, default font) and a Permissions tab; `preview.html` shows one captured image with Save, Copy, Edit and Close buttons; `editor.html` is the annotation editor. `shapes.js` holds the editor's pure geometry and `fonts.js` the font picker shared with the settings window.
+- `workspace/src-tauri/src/lib.rs`: plugins, the macOS menu, setup, the command list, and the run loop that keeps the app alive when its last window closes.
+- `workspace/src-tauri/src/tray.rs`: the menu bar icon and its menu.
+- `workspace/src-tauri/src/windows.rs`: capture, and the preview, editor and settings windows. Owns the map from window label to temp png.
+- `workspace/src-tauri/src/commands.rs`: every `#[tauri::command]` the pages call.
+- `workspace/src-tauri/src/settings.rs`: settings.json on disk and the global shortcut it names.
+- `workspace/src-tauri/src/update.rs`: Check for Updates through the updater plugin.
+- `workspace/src-tauri/crates/core/`: pure helpers (filenames, settings merge, preview position, editor window size, png header and data URL checks). No tauri dependency, so `cargo test -p screenshot-core` runs anywhere in seconds.
+- `workspace/src/`: three pages plus shared scripts. `api.js` exposes `window.api` over `invoke`, with the same method names the Electron preload had. `settings.html` has a General tab (shortcut, save directory, default font) and a Permissions tab; `preview.html` shows one capture with Save, Copy, Edit and Close; `editor.html` is the annotation editor. `shapes.js` holds the editor's pure geometry and `fonts.js` the font picker shared with the settings window.
 
-The Permissions tab reads the Screen Recording status via `systemPreferences.getMediaAccessStatus('screen')`, shows a granted/missing badge with step-by-step guidance, and a button that deep-links into System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus, so coming back from System Settings updates the badge.
+The Permissions tab reads the Screen Recording status through `CGPreflightScreenCaptureAccess`, shows a granted/missing badge with step-by-step guidance, and a button that opens System Settings > Privacy & Security > Screen Recording. The status refreshes whenever the window regains focus.
 
-Renderers run with `nodeIntegration: false` and `contextIsolation: true` and talk to main only through IPC.
+Each command that acts on a capture takes the calling window and looks its png up by label, checking the label's kind (`preview-` or `editor-`). The page never sends a path, so a page can only touch the file its own window owns. Capabilities are split per window: every window gets `core:default`, previews may start a drag, and only settings may open the folder picker.
 
 ## Capture flow
 
@@ -24,15 +25,15 @@ Capture is delegated to the macOS screencapture binary, so the drag selection UI
 screencapture -i -s -x <tmpfile>.png
 ```
 
-The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x). When the user finishes the drag, main opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
+The flags mean: interactive (-i), mouse selection only (-s), no camera sound (-x). When the user finishes the drag, Rust opens a frameless transparent always-on-top preview window in the bottom-left corner over the temp png. Multiple captures stack upward. Pressing Esc during selection exits without a file, which the app treats as a cancel.
 
-The preview has four buttons and each one dismisses it. Save copies the temp file into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy writes the image to the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md). The temp png is removed by the window's `closed` handler rather than by the buttons, so Cmd+W from the default application menu and app quit drop it too. The clipboard does not need it, because it holds the bitmap rather than a path.
+The preview has four buttons and each one dismisses it. Save writes the capture into the configured save directory as `akbun-screenshot-YYYY-MM-DD-HHMMSS.png`. Copy decodes the png and puts the bitmap on the clipboard. Edit opens the annotation editor. Close keeps nothing. Capture itself never touches the clipboard; see [Three explicit preview buttons](../adr/2026-07-save-copy-close-buttons.md).
 
-One open preview per window, tracked in a `webContents.id` keyed map that holds the temp path and the window itself. Four details in there exist because they broke or would have. The id is read while the window is alive, since `webContents` throws once macOS has destroyed it, and the window is stored in the map rather than found by scanning a list, since scanning reads `webContents` on every entry including ones already closed. The temp filename carries a counter as well as a timestamp, so two captures inside the same millisecond cannot share a file. And temp cleanup sits in the `closed` handler because a preview closed by Cmd+W or by app quit never reaches a button handler. `workspace/test/capture.test.js` covers all four with a fake `BrowserWindow` that throws after close, so it runs on plain node with no Electron binary.
+Every window that holds a capture is an entry in one label-keyed map, and the temp png is deleted on the window's `Destroyed` event rather than by the buttons, so Cmd+W and quitting drop it too. The run loop's `Exit` event deletes whatever is left. The temp filename carries a counter as well as a timestamp, so two captures inside the same millisecond cannot share a file. The preview loads its image as a data URL from `preview_image`, which keeps the CSP to `img-src 'self' data:` with no asset protocol to configure.
 
 ## Editor
 
-Edit copies the preview's temp png, dismisses the preview, and opens an editor window sized to the image. The copy exists because dismissing a preview deletes its temp file, and the editor would otherwise race that deletion. The window content size comes from `editorWindowSize`, which divides the png size by the display scale factor, since a retina capture is twice the points it was selected in.
+Edit hands the preview's temp png to a new editor window and closes the preview. The file changes owner in the map instead of being copied, so closing the preview cannot delete it from under the editor. The png header is read before the preview closes, so a capture the editor cannot open stays on screen. The window size comes from `editor_window_size`, which divides the png size by the display scale factor, since a retina capture is twice the points it was selected in.
 
 The editor is one canvas plus a toolbar. The canvas is never edited in place: the page keeps an array of shapes and a base image, and redraws both on each change. Tools are select, rectangle, ellipse, line, one-way arrow, two-way arrow, text, numbered badge, pencil and crop, each an icon button carrying both a `title`, which is the hover tooltip a sighted user reads, and an `aria-label`, since `title` is only a last-resort accessible name and an icon-only button would otherwise be announced as nothing; holding Shift squares a drag, which turns the ellipse into a circle and snaps a line or an arrow to the nearest 45 degrees. An arrow is a line plus filled triangles whose length follows the stroke width, at seven times it and a 30 degree spread so the head still reads as a head next to a thick line. Arrows draw with a butt cap rather than the round one everything else uses, because a round cap reaches half a stroke past the endpoint and appears as a bead poking out of the tip. See [Annotation editor as one redrawn canvas](../adr/2026-07-annotation-editor.md).
 
@@ -58,59 +59,53 @@ A selected shape also carries grips. `handles` returns, for each grip, the two c
 
 The toolbar has two number boxes, Font size for text and badge glyphs and Shape line for stroke thickness, both in image pixels and both filled on load with the value that matches 24px and 3px on screen. The labels name what each one drives because a box called Size next to a box called Line reads as two names for the same thing.
 
-The window receives its image as a data URL rather than a file path. A `file://` image drawn into a canvas taints it, and `toDataURL` on a tainted canvas throws, which would break Save. Save posts the canvas data URL to main, which writes those bytes into the save directory under the usual filename.
+The window receives its image as a data URL rather than a file path. A `file://` image drawn into a canvas taints it, and `toDataURL` on a tainted canvas throws, which would break Save. Save posts the canvas data URL to `editor_save`, which decodes it, checks the png header, and writes the bytes into the save directory under the usual filename.
 
-Save as posts the same bytes to a second channel, where main opens `showSaveDialog` on the save directory with `buildEditedFilename` filling in the name: the name Save would have used plus `-edited-<timestamp>` before the extension. A capture has no name of its own before something writes it, so that generated name is the only "current filename" there is. The dialog carries a png filter, without which the panel takes a typed name verbatim and anyone replacing the suggestion gets an extensionless file full of png bytes. The dialog belongs to main rather than the renderer so a cancel writes nothing and leaves the editor open, which saving first and moving the file afterwards could not do.
+Save as posts the same bytes to `editor_save_as`, which opens the save dialog from Rust on the save directory with `edited_filename` filling in the name: the name Save would have used plus `-edited-<timestamp>` before the extension. A capture has no name of its own before something writes it, so that generated name is the only "current filename" there is. The dialog carries a png filter, without which the panel takes a typed name verbatim and anyone replacing the suggestion gets an extensionless file full of png bytes. The dialog belongs to Rust rather than the page so a cancel writes nothing and leaves the editor open, and the page never chooses a path to write.
 
-Copy posts the same bytes to a third channel, where main turns them into a `nativeImage` and puts that on the clipboard. It ends the window the way Save does: an annotated image that only had to be pasted never becomes a file. It reuses the editor's `decodePng` and then asks the decoded image whether it is empty, because `decodePng` only proves the payload claims to be a png and carries bytes; anything else comes back from `createFromBuffer` as an empty image, and writing that clears the clipboard rather than leaving it alone. What was on the clipboard belonged to whatever the user copied last, so both checks have to pass before the write. Cmd+S in the editor runs the Save button's handler. The check sits above the guard that hands a keystroke to a focused toolbar box, because no box on that toolbar has its own use for Cmd+S and a save should not depend on where the caret happens to be. It ignores `event.repeat`, since a held key would export the canvas and post another save on every repeat before the first one closed the window.
+Copy posts the same bytes to `editor_copy`, which decodes the png into an image before touching the clipboard. Bytes that are not a png fail there, so a bad payload leaves whatever the user copied last in place instead of clearing it. It ends the window the way Save does: an annotated image that only had to be pasted never becomes a file. Cmd+S in the editor runs the Save button's handler. The check sits above the guard that hands a keystroke to a focused toolbar box, because no box on that toolbar has its own use for Cmd+S. It ignores `event.repeat`, since a held key would post another save on every repeat before the first one closed the window. The macOS menu has no Undo or Redo item, because those predefined items own Cmd+Z and the editor's own undo would never see the key.
 
-Both save paths decode the data URL before touching the disk, so a malformed payload leaves no directory and no empty png behind, and both write through `writePng`, which is also the only place that creates the directory. A write that throws puts up a dialog and leaves the editor open. That matters more than it looks: the canvas holds the only copy of the annotated image, so a silent failure reads as a dead button, and the next thing clicked is Close, whose `closed` handler drops the temp png as well. `workspace/test/capture.test.js` covers it by pointing the save directory at a path where a file already sits.
+Both save paths decode the data URL before touching the disk, so a malformed payload leaves no directory and no empty png behind, and both write through `write_png`, which is also the only place that creates the directory. A write that fails puts up a dialog and leaves the editor open. That matters more than it looks: the canvas holds the only copy of the annotated image, so a silent failure reads as a dead button, and the next thing clicked is Close, whose `closed` handler drops the temp png as well.
 
-Text uses an inline input positioned over the canvas, because Electron does not implement `prompt()`. The input stops keydown propagation so Cmd+Z while typing does not undo the drawing behind it. The mousedown that creates the input calls `preventDefault`, without which the default action of that same mousedown moves focus off the input, its blur handler removes it, and the box vanishes in the frame it was created. That is why the Text tool used to look like it did nothing at all.
+Text uses an inline input positioned over the canvas, because the webview does not implement `prompt()`. The input stops keydown propagation so Cmd+Z while typing does not undo the drawing behind it. The mousedown that creates the input calls `preventDefault`, without which the default action of that same mousedown moves focus off the input, its blur handler removes it, and the box vanishes in the frame it was created. That is why the Text tool used to look like it did nothing at all.
 
 Enter used to be the only way to commit the typing and blur threw it away, which is the opposite of what every other text tool does: clicking elsewhere read as finishing, not as cancelling. Blur now commits and only Escape discards. Both paths run through one `finish` behind a flag, since Escape removes the input and removing it blurs it, and without the flag the text would be pushed by the very keystroke that asked to drop it.
 
-Fonts come from `queryLocalFonts`, which needs the `local-fonts` permission; main grants that one and denies everything else. The picker also reloads on the first click in the window, since Chromium may want a user gesture before handing over the list. If the call fails the picker falls back to four macOS families, so it is never empty. Both the editor toolbar and the settings window use `fonts.js` for this.
+Fonts come from the `list_fonts` command, which reads the system font directories with fontdb once per launch; WKWebView has no `queryLocalFonts`. If the call fails the picker falls back to four macOS families, so it is never empty. Both the editor toolbar and the settings window use `fonts.js` for this.
 
 `shapes.js` holds the geometry that is worth testing on its own, guarded with `typeof module` so it loads both as a plain script in the editor and as a require in `workspace/test/shapes.test.js`.
 
-## IPC channels
+## Commands
 
-| Channel | Purpose |
+| Command | Purpose |
 |---|---|
-| `settings:get` | Return current settings |
-| `settings:save` | Validate the new shortcut by registering it, then persist |
-| `settings:choose-dir` | Open a directory picker |
-| `permissions:get` | Return the Screen Recording permission status |
-| `permissions:open-screen-settings` | Open macOS System Settings at the Screen Recording pane |
-| `preview:save` | Copy the temp png to the save directory and close the preview |
-| `preview:copy` | Write the image to the clipboard and close the preview |
-| `preview:close` | Close the preview, keeping nothing |
-| `preview:edit` | Open the editor on a copy of the temp png and close the preview |
-| `editor:image` | Return the editor's image as a data URL |
-| `editor:save` | Write the edited canvas to the save directory and close the editor |
-| `editor:save-as` | Ask for a path with a save dialog, write the canvas there and close the editor |
-| `editor:copy` | Write the edited canvas to the clipboard and close the editor |
-| `editor:close` | Close the editor, keeping nothing |
+| `settings_get` | Return current settings |
+| `settings_save` | Validate, register the new shortcut, then persist and refresh the tray menu |
+| `list_fonts` | Return installed font families |
+| `permissions_get` | Return the Screen Recording permission status |
+| `open_screen_settings` | Open macOS System Settings at the Screen Recording pane |
+| `preview_image` | Return the preview's capture as a data URL |
+| `preview_save` | Write the capture to the save directory and close the preview |
+| `preview_copy` | Put the capture on the clipboard and close the preview |
+| `preview_edit` | Hand the capture to a new editor and close the preview |
+| `editor_image` | Return the editor's image as a data URL |
+| `editor_save` | Write the edited canvas to the save directory and close the editor |
+| `editor_save_as` | Ask for a path with a save dialog, write the canvas there and close the editor |
+| `editor_copy` | Put the edited canvas on the clipboard and close the editor |
+| `window_close` | Close the calling window, keeping nothing |
+
+The settings page picks the save folder itself with the dialog plugin's `open`, because it only needs a string back.
 
 ## Update
 
-The tray menu has Check for Updates. It reads the GitHub Releases API, finds the newest `akbun-screenshot-v` tag, and compares it with `app.getVersion()`. On a newer version the dialog offers Update Now, which downloads the arm64 dmg into a temp directory, writes a swap script, spawns it detached, and quits. The script waits for the app to exit, mounts the dmg, replaces the `.app` bundle with `ditto`, and relaunches. If `ditto` fails it restores the bundle it moved aside.
+The tray menu has Check for Updates. `tauri-plugin-updater` reads `latest.json` from the fixed release tag `akbun-screenshot-updater`, not from `releases/latest`, because this repository releases several products and the repo-wide latest is whichever shipped last. A newer version offers Update Now, which downloads the signed `.app.tar.gz`, verifies it against the public key in tauri.conf.json, replaces the app, and relaunches. Development builds say an update exists but do not install it, since they do not run from an `.app` bundle.
 
-The dmg is unsigned, so Squirrel.Mac auto update is not an option. A file the app downloads itself carries no quarantine attribute, which is what makes the in-place swap work.
-
-Temp cleanup happens in three places, and `workspace/test/update.test.js` checks all three:
-
-- `downloadDmg` removes its temp directory when the download fails.
-- The swap script's `trap` removes the mount point and work directory on any exit.
-- `cleanupTempDirs` on app start removes directories left by a killed process.
-
-Update Now is hidden when the app is not packaged, because in development the bundle would be Electron.app. That case shows Open Release instead.
+Electron 0.8.0 installs still carry the old dmg-swap updater. It picks the release asset whose name contains `-arm64.`, so the workflow renames the dmg to `akbun-screenshot-<version>-arm64.dmg`, and one update moves those users onto Tauri.
 
 ## Platform
 
-macOS only, by decision rather than by accident. Capture shells out to the `screencapture` binary, the updater is a bash script around `hdiutil` and `ditto` on a dmg, and the menu bar icon is an emoji set through `tray.setTitle`, which is a macOS only API. About half the source is already portable, so a Windows build would be a port of those three subsystems rather than a recompile. [Windows portability](../adr/2026-07-windows-portability.md) has the reasoning and the reason the app stays on Electron rather than going native.
+macOS only, by decision rather than by accident. Capture shells out to the `screencapture` binary, the permission check is a CoreGraphics call, and the menu bar icon is an emoji tray title, which only macOS draws. [Windows portability](../adr/2026-07-windows-portability.md) has the reasoning.
 
 ## Settings
 
-`settings.json` under the userData path holds four keys: `shortcut` (Electron accelerator string, default `CommandOrControl+Shift+4`), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) and `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor). Unknown keys are dropped on load and a stored value has to match the type of the default it replaces, so a broken file falls back to defaults and a hand-edited one cannot turn the boolean into a string the editor reads as true. Before `deleteKeys` the merge kept strings only, which would have dropped the toggle on every load and left it stuck on.
+`settings.json` lives at `~/Library/Application Support/akbun-screenshot/settings.json`, the path the Electron build used, so settings survive the move. It holds four keys: `shortcut` (accelerator string, default `CommandOrControl+Shift+4`), `saveDir` (default `~/Pictures/akbun-screenshot`), `defaultFont` (default `Apple SD Gothic Neo`, which ships with macOS and covers Korean and English) and `deleteKeys` (default true, whether Delete and Backspace remove the selected shape in the editor). Unknown keys are dropped on load, a stored value has to match the type of the default it replaces, and a relative `saveDir` falls back to the default, so a broken or hand-edited file cannot turn the boolean into a string or point saves at the process working directory. Saving rejects a relative `saveDir` with a message instead.

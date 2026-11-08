@@ -6,6 +6,8 @@ tags: [electron, update]
 timestamp: 2026-07-31T00:00:00Z
 ---
 
+> Superseded by [Move from Electron to Tauri](./2026-11-tauri-for-binary-size.md). The swap script only remains in Electron 0.8.0 installs, which use it once to cross over.
+
 ## 결정
 
 메뉴바 아이콘을 누르면 나오는 메뉴에 Check for Updates 항목을 두었다. 이 항목이 GitHub Release API에서 akbun-screenshot-v 태그의 최신 버전을 찾아 현재 버전과 비교한다. 새 버전이면 dmg를 임시 디렉터리에 받아 교체 스크립트를 분리 프로세스로 띄우고 앱을 종료하며, 스크립트가 .app 번들을 통째로 바꾸고 재실행한다. 같은 저장소의 akbun-k8supgradeview 구현을 plain JavaScript로 옮겼다.
