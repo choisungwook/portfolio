@@ -275,6 +275,9 @@ pub enum Command {
         #[serde(default)]
         opacity: Option<f32>,
     },
+    /// Noise reduction strength for one clip's sound, 0 to turn it off.
+    #[serde(rename_all = "camelCase")]
+    SetClipDenoise { clip_id: String, strength: f32 },
     #[serde(rename_all = "camelCase")]
     SetClipLut {
         clip_id: String,
@@ -559,6 +562,7 @@ impl Command {
             Command::RippleDeleteGap { .. } => "Ripple delete gap",
             Command::RemoveRanges { .. } => "Remove silence",
             Command::SetClipGain { .. } => "Clip levels",
+            Command::SetClipDenoise { .. } => "Noise reduction",
             Command::SetClipLut { .. } => "Clip LUT",
             Command::SetClipPlayback { .. } => "Clip playback",
             Command::SetClipVolumeKeyframe { .. } | Command::RemoveClipVolumeKeyframe { .. } => {
@@ -721,6 +725,9 @@ impl Command {
                 volume,
                 opacity,
             } => set_clip_gain(project, clip_id, volume, opacity),
+            Command::SetClipDenoise { clip_id, strength } => {
+                set_clip_denoise(project, clip_id, strength)
+            }
             Command::SetClipLut { clip_id, lut_path } => set_clip_lut(project, clip_id, lut_path),
             Command::SetClipPlayback {
                 clip_id,

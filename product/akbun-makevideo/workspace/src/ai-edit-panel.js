@@ -196,16 +196,54 @@
     document.body.classList.toggle('ai-editing', active);
     $('btn-ai-caption-generate').disabled = active;
     $('btn-ai-silence-remove').disabled = active;
+    $('btn-ai-filler-find').disabled = active;
     $('btn-ai-edit-cancel').hidden = !active;
     $('menu-ai-cancel').disabled = !active;
     $('ai-edit-progress').hidden = !active;
     $('ai-edit-progress-bar').style.width = `${Math.round((status.progress || 0) * 100)}%`;
     $('ai-edit-status').textContent = status.message || '';
     if (!active && status.stage !== 'idle') $('ai-edit-summary').textContent = status.message || '';
+    renderFillers();
     if (status.stage === 'done' && synchronizedJobId !== status.id) {
       synchronizedJobId = status.id;
       await options.syncDocument?.();
       renderCaptions();
+    }
+  }
+
+  /** Proposed filler cuts, each checked by default, until the user applies them. */
+  function renderFillers() {
+    const fillers = status.kind === 'fillers' && status.stage === 'done' ? status.result?.fillers || [] : [];
+    const list = $('filler-review-list');
+    $('filler-review').hidden = fillers.length === 0;
+    if (list.dataset.jobId === String(status.id) && fillers.length) return;
+    list.dataset.jobId = String(status.id);
+    list.replaceChildren(...fillers.map((filler, index) => {
+      const row = document.createElement('label');
+      row.className = 'row';
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = true;
+      check.dataset.fillerIndex = String(index);
+      const text = document.createElement('span');
+      text.textContent = `${(filler.startMs / 1000).toFixed(2)}s  ${filler.text}`;
+      row.append(check, text);
+      return row;
+    }));
+  }
+
+  async function applyFillers() {
+    const keep = [...document.querySelectorAll('#filler-review-list [data-filler-index]')]
+      .filter((input) => input.checked)
+      .map((input) => Number(input.dataset.fillerIndex));
+    try {
+      await window.api.aiEditApplyFillers(keep);
+      await options.syncDocument?.();
+      $('ai-edit-summary').textContent = `Removed ${keep.length} cuts.`;
+      $('filler-review').hidden = true;
+      $('filler-review-list').replaceChildren();
+    } catch (error) {
+      $('ai-edit-summary').textContent = String(error).replace(/^Error:\s*/, '');
     }
   }
 
@@ -232,9 +270,12 @@
         await window.api.aiEditSetCredential(provider, credential);
         $('ai-edit-credential').value = '';
       }
-      const next = kind === 'silence'
-        ? await window.api.aiEditStartSilenceRemoval()
-        : await window.api.aiEditStartCaptions();
+      const start = {
+        silence: window.api.aiEditStartSilenceRemoval,
+        fillers: window.api.aiEditStartFillerAnalysis,
+        captions: window.api.aiEditStartCaptions,
+      }[kind];
+      const next = await start();
       await handleStatus(next);
     } catch (error) {
       $('ai-edit-summary').textContent = String(error).replace(/^Error:\s*/, '');
@@ -251,6 +292,8 @@
     });
     $('btn-ai-caption-generate').addEventListener('click', () => void startJob('captions'));
     $('btn-ai-silence-remove').addEventListener('click', () => void startJob('silence'));
+    $('btn-ai-filler-find').addEventListener('click', () => void startJob('fillers'));
+    $('btn-ai-filler-apply').addEventListener('click', () => void applyFillers());
     $('btn-ai-edit-cancel').addEventListener('click', () => void window.api.aiEditCancel());
     $('btn-ai-credential-clear').addEventListener('click', () => void clearCredential());
     $('caption-editor-list').addEventListener('change', (event) => {

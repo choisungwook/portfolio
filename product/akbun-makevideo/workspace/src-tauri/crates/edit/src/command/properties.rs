@@ -34,6 +34,32 @@ pub(super) fn set_clip_gain(
     })
 }
 
+pub(super) fn set_clip_denoise(
+    project: &mut Project,
+    clip_id: String,
+    strength: f32,
+) -> Result<Applied, String> {
+    if !strength.is_finite() {
+        return Err("noise reduction strength must be a number".into());
+    }
+    let (track_index, clip_index) = project
+        .locate(&clip_id)
+        .ok_or("that clip is not on the timeline")?;
+    let clip = &mut project.tracks[track_index].clips[clip_index];
+    let previous = clip.denoise;
+    clip.denoise = strength.clamp(0.0, 1.0);
+    Ok(Applied {
+        resolved: Command::SetClipDenoise {
+            clip_id: clip_id.clone(),
+            strength: clip.denoise,
+        },
+        inverse: Command::SetClipDenoise {
+            clip_id,
+            strength: previous,
+        },
+    })
+}
+
 pub(super) fn set_clip_lut(
     project: &mut Project,
     clip_id: String,

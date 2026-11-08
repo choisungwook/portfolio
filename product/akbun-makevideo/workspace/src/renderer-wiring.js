@@ -644,6 +644,8 @@
           transcriptionEndpoint: el('as-transcription-endpoint').value.trim(),
           transcriptionModel: el('as-transcription-model').value.trim(),
           transcriptionLanguage: el('as-transcription-language').value.trim(),
+          cleanupEndpoint: el('as-cleanup-endpoint').value.trim(),
+          cleanupModel: el('as-cleanup-model').value.trim(),
           silenceThresholdDb: Math.min(-5, Math.max(-80, Number(el('as-silence-threshold').value) || -35)),
           silenceMinDurationMs: Math.min(
             10000,

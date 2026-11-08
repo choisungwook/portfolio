@@ -35,6 +35,7 @@ fn clip(id: &str, asset_id: &str, start: i64, in_point: i64, out_point: i64) -> 
         opacity: 1.0,
         speed: 1.0,
         preserve_pitch: true,
+        denoise: 0.0,
         fade_in: 0,
         fade_out: 0,
         volume_keyframes: Default::default(),
@@ -225,6 +226,35 @@ fn a_silent_asset_produces_no_audio_output() {
     let args = build_args(&project, "/out.mp4", Preset::FHD, None, &[]).unwrap();
     assert!(!joined(&args).contains("[aout]"));
     assert!(!joined(&args).contains("-c:a"));
+}
+
+#[test]
+fn denoise_is_off_at_zero_and_scales_with_strength() {
+    assert_eq!(denoise_audio_filter(0.0), "");
+    assert_eq!(denoise_audio_filter(f32::NAN), "");
+    assert_eq!(denoise_audio_filter(0.5), ",afftdn=nr=24.0:nf=-42.5");
+    assert_eq!(denoise_audio_filter(4.0), ",afftdn=nr=36.0:nf=-30.0");
+}
+
+#[test]
+fn preview_and_render_apply_the_same_denoise_filter() {
+    let mut project = one_video_project();
+    project.tracks[0].clips[0].denoise = 0.5;
+    let filter = filter_of(&build_args(&project, "/out.mp4", Preset::FHD, None, &[]).unwrap());
+    let rate = Rate::fps(30);
+    let decoder = audio_decoder_args(&DecodeAudio {
+        path: "/media/a1.mp4",
+        in_time: RationalTime::new(0, rate),
+        duration: RationalTime::new(90, rate),
+        speed: 2.0,
+        preserve_pitch: true,
+        denoise: 0.5,
+    })
+    .join(" ");
+    let expected = denoise_audio_filter(0.5);
+    assert!(filter.contains(&expected), "{filter}");
+    // Before the speed change on both sides.
+    assert!(decoder.contains(&format!("stereo{expected},atempo")), "{decoder}");
 }
 
 #[test]
@@ -710,6 +740,7 @@ fn an_audio_decoder_resamples_with_the_same_filter_the_export_opens_with() {
         duration: RationalTime::new(90, rate),
         speed: 1.0,
         preserve_pitch: true,
+        denoise: 0.0,
     })
     .join(" ");
     assert!(

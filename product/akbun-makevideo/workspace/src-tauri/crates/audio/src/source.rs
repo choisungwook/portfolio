@@ -84,6 +84,7 @@ pub struct Open {
     pub frames: i64,
     pub speed: f32,
     pub preserve_pitch: bool,
+    pub denoise: f32,
 }
 
 /// Opens the readers.
@@ -114,6 +115,7 @@ impl Readers for FfmpegReaders {
             duration: request.duration,
             speed: request.speed,
             preserve_pitch: request.preserve_pitch,
+            denoise: request.denoise,
         });
         let mut child = Command::new(&self.ffmpeg)
             .args(&args)
@@ -624,6 +626,7 @@ impl MixSource {
             frames: wanted,
             speed: region.speed,
             preserve_pitch: region.preserve_pitch,
+            denoise: region.denoise,
         };
 
         stream.next = from;

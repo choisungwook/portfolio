@@ -291,6 +291,9 @@
               <label class="row">Volume <input id="clip-volume" type="range" min="0" max="1" step="0.01" /></label>
               <label class="row">Speed <input id="clip-speed" type="number" min="0.1" max="16" step="0.05" /></label>
               <label class="row"><input id="clip-preserve-pitch" type="checkbox" /> Preserve pitch</label>
+              <!-- Off stores 0; the slider is the strength used when on. -->
+              <label class="row"><input id="clip-denoise" type="checkbox" /> Reduce noise</label>
+              <label class="row">Strength <input id="clip-denoise-strength" type="range" min="0.1" max="1" step="0.05" value="0.5" /></label>
               <div class="field-pair"><label>Fade in <input id="clip-fade-in" type="number" min="0" step="1" /></label><label>Fade out <input id="clip-fade-out" type="number" min="0" step="1" /></label></div>
               <button id="add-volume-keyframe" type="button">Add volume keyframe at playhead</button>
             </div>
@@ -519,6 +522,7 @@
             <div class="ai-edit-actions">
               <button id="btn-ai-caption-generate" type="button" class="primary">Generate captions</button>
               <button id="btn-ai-silence-remove" type="button">Remove silence</button>
+              <button id="btn-ai-filler-find" type="button">Find fillers</button>
               <button id="btn-ai-edit-cancel" type="button" hidden>Cancel</button>
             </div>
             <div id="ai-edit-progress" class="ai-edit-progress" hidden>
@@ -526,6 +530,13 @@
               <p id="ai-edit-status" class="dim small-text" aria-live="polite"></p>
             </div>
             <p id="ai-edit-summary" class="ai-panel-status" aria-live="polite"></p>
+            <div id="filler-review" hidden>
+              <div class="caption-list-head">
+                <h4>Proposed cuts</h4>
+                <button id="btn-ai-filler-apply" type="button" class="primary small">Remove checked</button>
+              </div>
+              <div id="filler-review-list" class="caption-editor-list"></div>
+            </div>
             <div class="caption-list-head">
               <h4>Timeline captions</h4>
               <span id="caption-count" class="dim small-text"></span>
@@ -747,6 +758,14 @@
         </label>
         <label class="row">Speech edge padding (ms)
           <input id="as-silence-padding" type="number" min="0" max="2000" step="10" />
+        </label>
+        <h4>Filler removal</h4>
+        <p class="dim small-text">Words come from the speech recognition settings above; point them at a local whisper server to stay offline. A local chat model then picks filler words and false starts.</p>
+        <label class="row">Chat endpoint
+          <input id="as-cleanup-endpoint" type="url" placeholder="Ollama http://127.0.0.1:11434/v1 · LM Studio http://127.0.0.1:1234/v1" />
+        </label>
+        <label class="row">Chat model
+          <input id="as-cleanup-model" type="text" placeholder="gemma3:4b" />
         </label>
       </section>
       <label class="row">Preview quality

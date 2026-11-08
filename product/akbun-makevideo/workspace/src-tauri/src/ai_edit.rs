@@ -1,8 +1,9 @@
 use crate::commands::{find_tool, AppState, Settings};
 use base64::Engine;
 use makevideo_analysis::{
-    deduplicate_segments, parse_azure, parse_google, parse_openai, parse_silence, plan_chunks,
-    TimeRange, TimedText,
+    deduplicate_segments, deduplicate_words, filler_prompt, filler_ranges, parse_azure, parse_filler_picks,
+    parse_google, parse_openai, parse_openai_words, parse_silence, plan_chunks, TimeRange,
+    TimedText,
 };
 use makevideo_edit::{
     Command as Edit, FrameRange, RationalTime, TextStyle, TrackKind, VisualContent, VisualTransform,
@@ -28,6 +29,10 @@ pub struct AiEditResult {
     pub captions: Vec<TimedText>,
     pub silence_ranges: Vec<TimeRange>,
     pub removed_duration_ms: u64,
+    /// Proposed cuts awaiting review. Applied only by `ai_edit_apply_fillers`.
+    pub fillers: Vec<TimedText>,
+    /// The revision the fillers were found on; applying refuses any other.
+    pub base_revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,6 +236,93 @@ pub fn ai_edit_start_silence_removal(
     Ok(status)
 }
 
+/// Find filler words and false starts with a local speech server and a local
+/// chat model. Ends with proposals in the result; nothing is cut until the user
+/// reviews them and calls `ai_edit_apply_fillers`.
+#[tauri::command]
+pub fn ai_edit_start_filler_analysis(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    runtime: State<'_, AiEditRuntime>,
+) -> Result<AiEditStatus, String> {
+    let settings = state.settings.lock().unwrap().clone();
+    let ffmpeg = find_tool(&app, "ffmpeg", &settings.ffmpeg_dir)
+        .ok_or("ffmpeg is required to extract speech audio")?;
+    if state.render.lock().unwrap().is_some() {
+        return Err("wait for the active render to finish before finding fillers".into());
+    }
+    let credential = runtime
+        .credentials
+        .lock()
+        .unwrap()
+        .get(&settings.transcription_provider)
+        .cloned();
+    if !matches!(
+        settings.transcription_provider.as_str(),
+        "openai" | "litellm" | "custom"
+    ) {
+        return Err(
+            "filler removal needs word timestamps; choose an OpenAI-compatible speech endpoint"
+                .into(),
+        );
+    }
+    let (status, cancel) = begin_job(&runtime, "fillers")?;
+    let locked = state.document.lock().unwrap();
+    let project = locked.project().clone();
+    let revision = locked.revision();
+    drop(locked);
+    let shared = runtime.state.clone();
+    let worker_app = app.clone();
+    let id = status.id;
+    let _ = app.emit("ai-edit:status", &status);
+    std::thread::spawn(move || {
+        let result = run_filler_job(
+            &worker_app,
+            &shared,
+            id,
+            &cancel,
+            &ffmpeg,
+            &settings,
+            credential.as_deref(),
+            project,
+            revision,
+        );
+        finish_job(&worker_app, &shared, id, result);
+    });
+    Ok(status)
+}
+
+/// Cut the reviewed fillers. `keep` lists the proposals the user left checked,
+/// by index into the finished job's result. One undo step.
+#[tauri::command]
+pub fn ai_edit_apply_fillers(
+    state: State<'_, AppState>,
+    runtime: State<'_, AiEditRuntime>,
+    keep: Vec<usize>,
+) -> Result<(), String> {
+    let (fillers, revision) = {
+        let locked = runtime.state.lock().unwrap();
+        let status = &locked.status;
+        if status.kind != "fillers" || status.stage != "done" {
+            return Err("find fillers first".into());
+        }
+        let result = status.result.as_ref().ok_or("these fillers were already applied")?;
+        (result.fillers.clone(), result.base_revision)
+    };
+    let ranges = keep
+        .iter()
+        .filter_map(|index| fillers.get(*index))
+        .map(|filler| TimeRange {
+            start_ms: filler.start_ms,
+            end_ms: filler.end_ms,
+        })
+        .collect::<Vec<_>>();
+    apply_ranges(&state.document, revision, &ranges, "Remove fillers")?;
+    // Consumed only once it landed, so a failed apply can be retried.
+    runtime.state.lock().unwrap().status.result = None;
+    Ok(())
+}
+
 fn begin_job(
     runtime: &AiEditRuntime,
     kind: &str,
@@ -291,6 +383,13 @@ fn finish_job(
                 state.status.progress = 1.0;
                 state.status.message = if state.status.kind == "captions" {
                     format!("Inserted {} captions", result.captions.len())
+                } else if state.status.kind == "fillers" {
+                    format!(
+                        "Found {} cuts ({:.1} seconds). Review them before removing.",
+                        result.fillers.len(),
+                        result.fillers.iter().map(|f| f.end_ms - f.start_ms).sum::<u64>() as f64
+                            / 1000.0
+                    )
                 } else {
                     format!(
                         "Removed {:.1} seconds",
@@ -423,211 +522,17 @@ trait TranscriptionAdapter {
         credential: Option<&str>,
     ) -> Result<RequestBuilder, String>;
     fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String>;
-}
-
-struct OpenAiCompatible {
-    credential_required: bool,
-    label: &'static str,
-}
-
-impl TranscriptionAdapter for OpenAiCompatible {
-    fn name(&self) -> &'static str {
-        self.label
+    fn parse_words(&self, _body: &str, _chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
+        Err(format!(
+            "{} does not return word timestamps; choose an OpenAI-compatible endpoint",
+            self.name()
+        ))
     }
-
-    fn maximum_chunk_ms(&self) -> u64 {
-        3_000_000
-    }
-
-    fn request(
-        &self,
-        client: &Client,
-        audio: Vec<u8>,
-        settings: &Settings,
-        credential: Option<&str>,
-    ) -> Result<RequestBuilder, String> {
-        if self.credential_required && credential.is_none() {
-            return Err(format!("{} needs a session credential", self.name()));
-        }
-        let endpoint = settings.transcription_endpoint.trim().trim_end_matches('/');
-        if endpoint.is_empty() {
-            return Err("the transcription endpoint is empty".into());
-        }
-        let url = if endpoint.ends_with("/audio/transcriptions") {
-            endpoint.to_string()
-        } else {
-            format!("{endpoint}/audio/transcriptions")
-        };
-        let file = multipart::Part::bytes(audio)
-            .file_name("analysis.mp3")
-            .mime_str("audio/mpeg")
-            .map_err(|error| error.to_string())?;
-        let mut form = multipart::Form::new()
-            .part("file", file)
-            .text("model", settings.transcription_model.clone())
-            .text("response_format", "verbose_json")
-            .text("timestamp_granularities[]", "segment");
-        let language = openai_language(&settings.transcription_language);
-        if !language.is_empty() {
-            form = form.text("language", language);
-        }
-        let mut request = client.post(url).multipart(form);
-        if let Some(secret) = credential {
-            request = request.bearer_auth(secret);
-        }
-        Ok(request)
-    }
-
-    fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
-        parse_openai(body, chunk_offset_ms)
-    }
-}
-
-struct GoogleSpeech;
-
-impl TranscriptionAdapter for GoogleSpeech {
-    fn name(&self) -> &'static str {
-        "Google Cloud Speech-to-Text"
-    }
-
-    fn maximum_chunk_ms(&self) -> u64 {
-        55_000
-    }
-
-    fn request(
-        &self,
-        client: &Client,
-        audio: Vec<u8>,
-        settings: &Settings,
-        credential: Option<&str>,
-    ) -> Result<RequestBuilder, String> {
-        let credential = credential.ok_or("Google needs an OAuth bearer token for this session")?;
-        let endpoint = settings.transcription_endpoint.trim().trim_end_matches('/');
-        if endpoint.contains("PROJECT_ID") || !endpoint.contains("/recognizers/") {
-            return Err("replace PROJECT_ID in the Google recognizer endpoint".into());
-        }
-        let url = if endpoint.ends_with(":recognize") {
-            endpoint.to_string()
-        } else {
-            format!("{endpoint}:recognize")
-        };
-        let locale = locale_language(&settings.transcription_language);
-        let body = json!({
-            "config": {
-                "autoDecodingConfig": {},
-                "languageCodes": [locale],
-                "model": settings.transcription_model,
-                "features": {
-                    "enableAutomaticPunctuation": true,
-                    "enableWordTimeOffsets": true
-                }
-            },
-            "content": base64::engine::general_purpose::STANDARD.encode(audio)
-        });
-        Ok(client.post(url).bearer_auth(credential).json(&body))
-    }
-
-    fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
-        parse_google(body, chunk_offset_ms)
-    }
-}
-
-struct AzureSpeech;
-
-impl TranscriptionAdapter for AzureSpeech {
-    fn name(&self) -> &'static str {
-        "Microsoft Azure Speech"
-    }
-
-    fn maximum_chunk_ms(&self) -> u64 {
-        6_000_000
-    }
-
-    fn request(
-        &self,
-        client: &Client,
-        audio: Vec<u8>,
-        settings: &Settings,
-        credential: Option<&str>,
-    ) -> Result<RequestBuilder, String> {
-        let credential = credential.ok_or("Azure Speech needs a resource key for this session")?;
-        let endpoint = settings.transcription_endpoint.trim().trim_end_matches('/');
-        if endpoint.contains("YOUR_RESOURCE") || endpoint.is_empty() {
-            return Err("replace YOUR_RESOURCE in the Azure Speech endpoint".into());
-        }
-        let url = if endpoint.contains("transcriptions:transcribe") {
-            endpoint.to_string()
-        } else {
-            format!("{endpoint}/speechtotext/transcriptions:transcribe?api-version=2025-10-15")
-        };
-        let file = multipart::Part::bytes(audio)
-            .file_name("analysis.mp3")
-            .mime_str("audio/mpeg")
-            .map_err(|error| error.to_string())?;
-        let definition = json!({
-            "locales": [locale_language(&settings.transcription_language)]
-        });
-        let form = multipart::Form::new()
-            .part("audio", file)
-            .text("definition", definition.to_string());
-        Ok(client
-            .post(url)
-            .header("Ocp-Apim-Subscription-Key", credential)
-            .multipart(form))
-    }
-
-    fn parse(&self, body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
-        parse_azure(body, chunk_offset_ms)
-    }
-}
-
-fn adapter(provider: &str) -> Result<Box<dyn TranscriptionAdapter>, String> {
-    match provider {
-        "openai" => Ok(Box::new(OpenAiCompatible {
-            credential_required: true,
-            label: "OpenAI transcription",
-        })),
-        "litellm" => Ok(Box::new(OpenAiCompatible {
-            credential_required: false,
-            label: "LiteLLM",
-        })),
-        "custom" => Ok(Box::new(OpenAiCompatible {
-            credential_required: false,
-            label: "OpenAI-compatible endpoint",
-        })),
-        "google" => Ok(Box::new(GoogleSpeech)),
-        "azure" => Ok(Box::new(AzureSpeech)),
-        _ => Err("choose a supported transcription provider".into()),
-    }
-}
-
-fn openai_language(language: &str) -> String {
-    language
-        .trim()
-        .split(['-', '_'])
-        .next()
-        .unwrap_or_default()
-        .to_ascii_lowercase()
-}
-
-fn locale_language(language: &str) -> String {
-    let language = language.trim();
-    if language.contains(['-', '_']) {
-        return language.replace('_', "-");
-    }
-    match language.to_ascii_lowercase().as_str() {
-        "ko" => "ko-KR",
-        "ja" => "ja-JP",
-        "zh" => "zh-CN",
-        "es" => "es-ES",
-        "fr" => "fr-FR",
-        "de" => "de-DE",
-        _ => "en-US",
-    }
-    .into()
 }
 
 fn client() -> Result<Client, String> {
+    // Errors only when a provider is already installed, which is the goal.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     Client::builder()
         .connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(900))
@@ -683,6 +588,51 @@ fn run_caption_job(
     revision: u64,
     document: Arc<Mutex<makevideo_edit::Document>>,
 ) -> Result<AiEditResult, String> {
+    let captions = transcribe(
+        app, shared, id, cancel, ffmpeg, settings, credential, &project, false,
+    )?;
+    cancelled(cancel)?;
+    report(
+        app,
+        shared,
+        id,
+        "generating",
+        0.86,
+        "Building subtitle edit commands",
+    );
+    report(
+        app,
+        shared,
+        id,
+        "applying",
+        0.94,
+        "Inserting captions on S1",
+    );
+    cancelled(cancel)?;
+    apply_captions(&document, revision, id, &captions)?;
+    Ok(AiEditResult {
+        captions,
+        silence_ranges: Vec::new(),
+        removed_duration_ms: 0,
+        fillers: Vec::new(),
+        base_revision: revision,
+    })
+}
+
+/// Timeline audio to timestamped text, chunked at quiet points. `words` asks
+/// for one entry per word instead of per segment.
+#[allow(clippy::too_many_arguments)]
+fn transcribe(
+    app: &AppHandle,
+    shared: &Arc<Mutex<RuntimeState>>,
+    id: u64,
+    cancel: &AtomicBool,
+    ffmpeg: &str,
+    settings: &Settings,
+    credential: Option<&str>,
+    project: &makevideo_edit::Project,
+    words: bool,
+) -> Result<Vec<TimedText>, String> {
     let adapter = adapter(&settings.transcription_provider)?;
     let total_ms = project.duration().to_millis().max(0) as u64;
     if total_ms == 0 {
@@ -701,7 +651,7 @@ fn run_caption_job(
         0.08,
         "Extracting mono 16 kHz MP3",
     );
-    extract_analysis_audio(ffmpeg, &project, &audio_path, cancel)?;
+    extract_analysis_audio(ffmpeg, project, &audio_path, cancel)?;
     report(
         app,
         shared,
@@ -752,32 +702,16 @@ fn run_caption_job(
         let bytes = std::fs::read(&chunk_path)
             .map_err(|error| format!("cannot read temporary speech audio: {error}"))?;
         let body = send_request(adapter.request(&http, bytes, settings, credential)?, cancel)?;
-        captions.extend(adapter.parse(&body, chunk.start_ms)?);
+        captions.extend(if words {
+            adapter.parse_words(&body, chunk.start_ms)?
+        } else {
+            adapter.parse(&body, chunk.start_ms)?
+        });
     }
-    let captions = deduplicate_segments(captions);
-    cancelled(cancel)?;
-    report(
-        app,
-        shared,
-        id,
-        "generating",
-        0.86,
-        "Building subtitle edit commands",
-    );
-    report(
-        app,
-        shared,
-        id,
-        "applying",
-        0.94,
-        "Inserting captions on S1",
-    );
-    cancelled(cancel)?;
-    apply_captions(&document, revision, id, &captions)?;
-    Ok(AiEditResult {
-        captions,
-        silence_ranges: Vec::new(),
-        removed_duration_ms: 0,
+    Ok(if words {
+        deduplicate_words(captions)
+    } else {
+        deduplicate_segments(captions)
     })
 }
 
@@ -852,6 +786,8 @@ fn run_silence_job(
         captions: Vec::new(),
         silence_ranges: ranges,
         removed_duration_ms,
+        fillers: Vec::new(),
+        base_revision: revision,
     })
 }
 
@@ -961,11 +897,18 @@ fn apply_silence_ranges(
     revision: u64,
     ranges: &[TimeRange],
 ) -> Result<(), String> {
+    apply_ranges(document, revision, ranges, "Remove silence")
+}
+
+fn apply_ranges(
+    document: &Arc<Mutex<makevideo_edit::Document>>,
+    revision: u64,
+    ranges: &[TimeRange],
+    label: &'static str,
+) -> Result<(), String> {
     let mut document = document.lock().unwrap();
     if document.revision() != revision {
-        return Err(
-            "the timeline changed while silence was being analyzed; no edit was applied".into(),
-        );
+        return Err("the timeline changed after the analysis; no edit was applied".into());
     }
     let rate = document.project().rate();
     let ranges = ranges
@@ -979,8 +922,13 @@ fn apply_silence_ranges(
     if ranges.is_empty() {
         return Ok(());
     }
-    document.apply(Edit::RemoveRanges { ranges })
+    document.apply_all_named(label, vec![Edit::RemoveRanges { ranges }])
 }
+
+mod fillers;
+mod speech;
+use fillers::*;
+use speech::*;
 
 #[cfg(test)]
 mod tests;

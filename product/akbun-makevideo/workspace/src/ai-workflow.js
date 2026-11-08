@@ -6,7 +6,7 @@
   else root.makevideoAiWorkflow = exported;
 })(globalThis, function () {
   const MAX_COMMANDS = 256;
-  const OPS = new Set(['addTrack', 'addClip', 'insertSource', 'moveClip', 'trimClip', 'splitAt', 'removeClip', 'removeRanges', 'setClipGain', 'setClipPlayback', 'setClipVolumeKeyframe', 'setVisualKeyframe', 'setVisualTransform', 'setVisualTiming', 'removeVisualItem', 'setSubtitleStyle', 'addTransition', 'addMarker', 'addOverlayVisualItem', 'addVisualItem', 'setVisualContent']);
+  const OPS = new Set(['addTrack', 'addClip', 'insertSource', 'moveClip', 'trimClip', 'splitAt', 'removeClip', 'removeRanges', 'setClipGain', 'setClipPlayback', 'setClipDenoise', 'setClipVolumeKeyframe', 'setVisualKeyframe', 'setVisualTransform', 'setVisualTiming', 'removeVisualItem', 'setSubtitleStyle', 'addTransition', 'addMarker', 'addOverlayVisualItem', 'addVisualItem', 'setVisualContent']);
   const schema = {
     type: 'object', additionalProperties: false,
     properties: {
@@ -32,7 +32,7 @@ addTrack {trackKind:video|audio|subtitle,id:new unique string}
 insertSource {assetId,videoTrackId:null|string,audioTrackId:null|string,start,inPoint,outPoint,rippleAllTracks:false}
 moveClip {clipId,trackId,start}; trimClip {clipId,edge:start|end,frame}; splitAt {frame,clipId:null|string}; removeClip {clipId}
 removeRanges {ranges:[{start,end}]} removes intervals across ALL tracks and closes gaps. Use once, with ranges in original timeline coordinates. Do not combine narrative cuts with later overlays in the same pass.
-setClipGain {clipId,volume:0..2,opacity:0..1}; setClipPlayback {clipId,speed:0.25..4,preservePitch:true,fadeIn,fadeOut}
+setClipGain {clipId,volume:0..2,opacity:0..1}; setClipPlayback {clipId,speed:0.25..4,preservePitch:true,fadeIn,fadeOut}; setClipDenoise {clipId,strength:0..1 (0 off)}
 setClipVolumeKeyframe {clipId,frame,value:0..2,easing:linear|easeIn|easeOut|easeInOut|hold}, frame relative to clip
 addOverlayVisualItem {id:new unique string,content,start,duration,transform,zIndex:0} for graphics and B-roll
 addVisualItem {trackId,id:new unique string,content,start,duration,transform,zIndex:0} for subtitle track text
@@ -115,7 +115,7 @@ Use imported audio assets on audio tracks for music/SFX. No downloading. Include
     return {
       addTrack: 'Add track', addClip: 'Add clip', insertSource: 'Insert source interval', moveClip: 'Move clip',
       trimClip: 'Trim clip', splitAt: 'Split clip', removeClip: 'Remove clip', removeRanges: 'Cut and close gaps',
-      setClipGain: 'Adjust volume or opacity', setClipPlayback: 'Adjust speed or fades', setClipVolumeKeyframe: 'Animate volume',
+      setClipGain: 'Adjust volume or opacity', setClipPlayback: 'Adjust speed or fades', setClipDenoise: 'Reduce noise', setClipVolumeKeyframe: 'Animate volume',
       setVisualKeyframe: 'Animate layer', setVisualTransform: 'Transform layer', setVisualTiming: 'Adjust layer timing',
       removeVisualItem: 'Remove layer', setSubtitleStyle: 'Style captions', addTransition: 'Add dissolve',
       addMarker: 'Add marker', addOverlayVisualItem: 'Add overlay', addVisualItem: 'Add visual item', setVisualContent: 'Update layer content',

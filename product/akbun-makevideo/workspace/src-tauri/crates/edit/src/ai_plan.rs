@@ -15,6 +15,7 @@ pub fn validate(commands: &[Command]) -> Result<(), String> {
             | Command::RemoveClip { .. }
             | Command::RemoveRanges { .. }
             | Command::SetClipGain { .. }
+            | Command::SetClipDenoise { .. }
             | Command::SetClipPlayback { .. }
             | Command::SetClipVolumeKeyframe { .. }
             | Command::SetVisualKeyframe { .. }

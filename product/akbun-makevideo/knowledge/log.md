@@ -2,6 +2,8 @@
 
 ## 2026-11-08
 
+* [잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다](decisions/2026-11-denoise-strength-sets-the-noise-floor.md) 기록.
+* [AI media 작업이 분석부터 편집 적용까지 소유한다](decisions/2026-09-ai-media-jobs-own-the-apply-boundary.md) 갱신. 군더더기 말 제거는 검토 후 적용하는 예외 추가.
 * [Rust 모듈은 테스트를 빼고 1000줄을 넘기지 않는다](decisions/2026-11-rust-modules-stay-under-1000-lines.md) 기록.
 * [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](decisions/2026-09-proxy-targets-decode-and-seek-cost.md)에 하드웨어 디코드, 동시 생성, 사용 순서 우선을 추가하고 0.2 형식으로 옮김.
 * [updater 공개키는 서명 secret과 같은 키쌍에서 가져온다](decisions/2026-11-updater-key-matches-signing-secret.md) 기록.

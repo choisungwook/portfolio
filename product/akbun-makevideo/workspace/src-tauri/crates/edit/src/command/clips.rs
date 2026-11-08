@@ -300,6 +300,7 @@ pub(super) fn split_at(
                 opacity: clip.opacity,
                 speed: clip.speed,
                 preserve_pitch: clip.preserve_pitch,
+                denoise: clip.denoise,
                 fade_in: 0,
                 fade_out: clip.fade_out,
                 volume_keyframes: right_keyframes,

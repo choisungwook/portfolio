@@ -8,6 +8,8 @@ OpenAI-compatible endpoints include direct OpenAI, LiteLLM and a custom gateway.
 
 Provider credentials are held in memory per provider and are never written to settings. ChatGPT subscription models and reasoning effort are discovered through Codex App Server and remain separate from metered speech APIs.
 
+Filler removal asks the OpenAI-compatible adapter for word timestamps (falling back to per-segment words spread by length), sends numbered words in batches to an OpenAI-compatible chat endpoint (Ollama or LM Studio locally), and keeps a pick only when the word it names is at or next to its index. The job stops at a reviewed list; a separate apply call cuts the checked ranges with `RemoveRanges` as one named undo step after the same revision check.
+
 Silence removal uses ffmpeg `silencedetect`, keeps configurable padding around speech, then removes every detected range across all tracks in one command. A running analysis locks editing, checks the starting document revision before apply, supports cancellation and cleans its temporary directory.
 
 ## Reason

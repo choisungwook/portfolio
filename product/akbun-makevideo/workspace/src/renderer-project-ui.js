@@ -549,6 +549,8 @@ function toggleSnap() {
       el('as-silence-threshold').value = state.settings.silenceThresholdDb;
       el('as-silence-duration').value = state.settings.silenceMinDurationMs;
       el('as-silence-padding').value = state.settings.silencePaddingMs;
+      el('as-cleanup-endpoint').value = state.settings.cleanupEndpoint;
+      el('as-cleanup-model').value = state.settings.cleanupModel;
       globalThis.makevideoAiPanel.fillSettings();
       globalThis.makevideoAiEditPanel.fillSettings();
       const logDir = state.boot.logDir || 'the operating system application log folder';

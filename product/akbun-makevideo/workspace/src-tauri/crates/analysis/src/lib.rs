@@ -85,6 +85,149 @@ pub fn parse_openai(body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, 
     Ok(parsed)
 }
 
+/// Word timestamps from an OpenAI-compatible verbose JSON response.
+///
+/// Reads the top-level `words` list (OpenAI), then per-segment `words` (the
+/// shape local whisper servers return). A server that only gives segments gets
+/// its words spread across the segment by length, which is close enough to cut
+/// a filler at a pause and is why the review step exists.
+pub fn parse_openai_words(body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
+    let value: Value = serde_json::from_str(body)
+        .map_err(|error| format!("the transcription response is not JSON: {error}"))?;
+    let word = |item: &Value| {
+        timed_text(
+            seconds_ms(item.get("start")?)?,
+            seconds_ms(item.get("end")?)?,
+            item.get("word").or_else(|| item.get("text"))?.as_str()?,
+            chunk_offset_ms,
+        )
+    };
+    if let Some(words) = value.get("words").and_then(Value::as_array) {
+        let parsed: Vec<_> = words.iter().filter_map(word).collect();
+        if !parsed.is_empty() {
+            return Ok(parsed);
+        }
+    }
+    let nested: Vec<_> = value
+        .get("segments")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .flat_map(|segment| segment.get("words").and_then(Value::as_array).into_iter().flatten())
+        .filter_map(word)
+        .collect();
+    if !nested.is_empty() {
+        return Ok(nested);
+    }
+    let spread: Vec<_> = parse_openai(body, chunk_offset_ms)?
+        .iter()
+        .flat_map(spread_words)
+        .collect();
+    Ok(spread)
+}
+
+fn spread_words(segment: &TimedText) -> Vec<TimedText> {
+    let words: Vec<&str> = segment.text.split_whitespace().collect();
+    let total: usize = words.iter().map(|word| word.chars().count()).sum();
+    let span = segment.end_ms - segment.start_ms;
+    let mut used = 0;
+    words
+        .iter()
+        .map(|word| {
+            let start = segment.start_ms + span * used as u64 / total.max(1) as u64;
+            used += word.chars().count();
+            let end = segment.start_ms + span * used as u64 / total.max(1) as u64;
+            TimedText {
+                start_ms: start,
+                end_ms: end.max(start + 1),
+                text: (*word).to_string(),
+            }
+        })
+        .collect()
+}
+
+/// The request a local chat model gets for one batch of words.
+pub fn filler_prompt(words: &[TimedText], first_index: usize) -> String {
+    let mut prompt = String::from(
+        "Below is a transcript, one word per line as index<TAB>word. Pick the words to cut \
+         from the video: filler words and hesitation sounds (um, uh, 어, 음, 그, 저기), \
+         stutters, repeated words, and false starts that the speaker abandons and restates. \
+         Keep every word that carries meaning. Reply with JSON only, giving each index with \
+         its word copied exactly, like {\"remove\":[{\"i\":3,\"word\":\"um\"}]}. \
+         Reply {\"remove\":[]} if nothing should be cut.\n\n",
+    );
+    for (offset, word) in words.iter().enumerate() {
+        prompt.push_str(&format!("{}\t{}\n", first_index + offset, word.text));
+    }
+    prompt
+}
+
+/// The word indices a chat model chose, from a reply that may wrap the JSON in
+/// prose, code fences or a reasoning block. `batch` is the words the prompt
+/// listed, starting at index `first`.
+///
+/// Small models miscount, so a pick that names its word is kept only if that
+/// word is at the index or right next to it, and moved there. A bare index is
+/// kept if it is inside the batch.
+pub fn parse_filler_picks(reply: &str, batch: &[TimedText], first: usize) -> Result<Vec<usize>, String> {
+    let count = batch.len();
+    let normal = |text: &str| {
+        text.trim_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase()
+    };
+    let resolve = |item: &Value| -> Option<usize> {
+        if let Some(index) = item.as_u64() {
+            return Some(index as usize).filter(|index| (first..first + count).contains(index));
+        }
+        let index = item.get("i").and_then(Value::as_u64)? as usize;
+        let word = normal(item.get("word")?.as_str()?);
+        [index, index.wrapping_add(1), index.wrapping_sub(1)].into_iter().find(|candidate| {
+            candidate
+                .checked_sub(first)
+                .and_then(|offset| batch.get(offset))
+                .is_some_and(|actual| normal(&actual.text) == word)
+        })
+    };
+    let starts: Vec<usize> = reply.match_indices('{').map(|(index, _)| index).collect();
+    let ends: Vec<usize> = reply.match_indices('}').map(|(index, _)| index).collect();
+    for &start in starts.iter().rev() {
+        for &end in ends.iter().filter(|end| **end > start) {
+            let Ok(value) = serde_json::from_str::<Value>(&reply[start..=end]) else {
+                continue;
+            };
+            let Some(list) = value.get("remove").and_then(Value::as_array) else {
+                continue;
+            };
+            let mut picks: Vec<usize> = list.iter().filter_map(resolve).collect();
+            picks.sort_unstable();
+            picks.dedup();
+            return Ok(picks);
+        }
+    }
+    Err("the language model did not reply with a remove list".into())
+}
+
+/// Picked words as ranges to cut. Neighbouring picks become one range so a
+/// false start is removed in one piece rather than leaving slivers between its
+/// words.
+pub fn filler_ranges(words: &[TimedText], picks: &[usize]) -> Vec<TimedText> {
+    let mut ranges: Vec<TimedText> = Vec::new();
+    let mut previous = None;
+    for &index in picks {
+        let Some(word) = words.get(index) else { continue };
+        match ranges.last_mut() {
+            Some(last) if previous == Some(index.wrapping_sub(1)) => {
+                last.end_ms = word.end_ms.max(last.end_ms);
+                last.text.push(' ');
+                last.text.push_str(&word.text);
+            }
+            _ => ranges.push(word.clone()),
+        }
+        previous = Some(index);
+    }
+    ranges
+}
+
 pub fn parse_azure(body: &str, chunk_offset_ms: u64) -> Result<Vec<TimedText>, String> {
     let value: Value = serde_json::from_str(body)
         .map_err(|error| format!("the Azure transcription response is not JSON: {error}"))?;
@@ -247,6 +390,25 @@ pub fn plan_chunks(
     chunks
 }
 
+/// Words seen twice because audio chunks overlap. Only a repeat that overlaps
+/// the previous word in time is dropped: a stutter ("we we") sits right after
+/// it and is exactly what filler removal has to see.
+pub fn deduplicate_words(mut words: Vec<TimedText>) -> Vec<TimedText> {
+    words.sort_by_key(|word| (word.start_ms, word.end_ms));
+    let mut answer: Vec<TimedText> = Vec::new();
+    for word in words {
+        if let Some(previous) = answer.last() {
+            if word.start_ms < previous.end_ms
+                && previous.text.trim().eq_ignore_ascii_case(word.text.trim())
+            {
+                continue;
+            }
+        }
+        answer.push(word);
+    }
+    answer
+}
+
 pub fn deduplicate_segments(mut segments: Vec<TimedText>) -> Vec<TimedText> {
     segments.sort_by_key(|segment| (segment.start_ms, segment.end_ms));
     let mut answer: Vec<TimedText> = Vec::new();
@@ -290,6 +452,61 @@ mod tests {
                 text: "hello".into(),
             }]
         );
+    }
+
+
+    #[test]
+    fn word_timestamps_come_from_any_of_the_three_shapes() {
+        let top = parse_openai_words(
+            r#"{"words":[{"word":"um","start":0.1,"end":0.3},{"word":"hi","start":0.4,"end":0.6}]}"#,
+            1000,
+        )
+        .unwrap();
+        assert_eq!((top[0].start_ms, top[0].end_ms, top[1].text.as_str()), (1100, 1300, "hi"));
+        let nested = parse_openai_words(
+            r#"{"segments":[{"start":0,"end":1,"text":"um hi","words":[{"word":" um","start":0.1,"end":0.3}]}]}"#,
+            0,
+        )
+        .unwrap();
+        assert_eq!(nested.len(), 1);
+        assert_eq!(nested[0].text, "um");
+        let spread =
+            parse_openai_words(r#"{"segments":[{"start":0,"end":1,"text":"aa bb"}]}"#, 0).unwrap();
+        assert_eq!(
+            spread.iter().map(|w| (w.start_ms, w.end_ms)).collect::<Vec<_>>(),
+            vec![(0, 500), (500, 1000)]
+        );
+    }
+
+    #[test]
+    fn model_picks_are_found_inside_prose_and_kept_in_range() {
+        let word = |text: &str| TimedText {
+            start_ms: 0,
+            end_ms: 1,
+            text: text.into(),
+        };
+        let batch: Vec<_> = ["So", "um", "I", "uh,", "go"].into_iter().map(word).collect();
+        let reply = "<think>maybe {not json}</think>\n```json\n{\"remove\": [12, 10, 10, 99, 3]}\n```";
+        assert_eq!(parse_filler_picks(reply, &batch, 10).unwrap(), vec![10, 12]);
+        // Off by one is moved onto the named word; a word that is nowhere near is dropped.
+        let named = r#"{"remove":[{"i":12,"word":"um"},{"i":13,"word":"uh"},{"i":10,"word":"banana"}]}"#;
+        assert_eq!(parse_filler_picks(named, &batch, 10).unwrap(), vec![11, 13]);
+        assert!(parse_filler_picks("no idea", &batch, 0).is_err());
+    }
+
+    #[test]
+    fn neighbouring_picks_become_one_cut() {
+        let word = |start_ms, text: &str| TimedText {
+            start_ms,
+            end_ms: start_ms + 100,
+            text: text.into(),
+        };
+        let words = vec![word(0, "I"), word(100, "I"), word(200, "um"), word(300, "go"), word(400, "uh")];
+        let ranges = filler_ranges(&words, &[1, 2, 4, 9]);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!((ranges[0].start_ms, ranges[0].end_ms, ranges[0].text.as_str()), (100, 300, "I um"));
+        assert_eq!(ranges[1].text, "uh");
+        assert!(filler_prompt(&words[..2], 7).contains("7\tI\n8\tI\n"));
     }
 
     #[test]
@@ -351,6 +568,17 @@ mod tests {
         assert_eq!(chunks[1].start_ms, 58_000);
         assert!(chunks.iter().all(|chunk| chunk.duration_ms() <= 60_000));
         assert_eq!(chunks.last().unwrap().end_ms, 130_000);
+    }
+
+    #[test]
+    fn a_stutter_survives_while_a_chunk_overlap_repeat_does_not() {
+        let word = |start_ms, end_ms| TimedText {
+            start_ms,
+            end_ms,
+            text: "we".into(),
+        };
+        let words = deduplicate_words(vec![word(0, 200), word(200, 400), word(350, 420)]);
+        assert_eq!(words.len(), 2);
     }
 
     #[test]

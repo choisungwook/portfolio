@@ -97,6 +97,7 @@ fn clip(id: &str, asset_id: &str, start: i64, in_point: i64, out_point: i64, vol
         opacity: 1.0,
         speed: 1.0,
         preserve_pitch: true,
+        denoise: 0.0,
         fade_in: 0,
         fade_out: 0,
         volume_keyframes: Default::default(),
@@ -299,4 +300,71 @@ fn a_project_with_nothing_audible_has_no_reference_to_compare_against() {
     let unused = temp_dir().join("no-reference.f32");
     assert!(ffmpeg::mix_reference_args(&project, &unused.to_string_lossy()).is_none());
     assert!(makevideo_audio::mix::regions(&project).is_empty());
+}
+
+/// One second of white noise alone, then a tone over it: the shape of a voice
+/// recorded in a noisy room, with a stretch where only the noise is heard.
+fn make_noisy_tone(name: &str, seconds: f32) -> String {
+    let path = temp_dir().join(name);
+    let text = path.to_string_lossy().to_string();
+    let status = Command::new(ffmpeg_path())
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("sine=frequency=440:sample_rate=48000:duration={}", seconds - 1.0),
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("anoisesrc=color=white:amplitude=0.02:sample_rate=48000:duration={seconds}:seed=7"),
+            "-filter_complex",
+            "[0:a]volume=3,adelay=1s:all=1[t];[t][1:a]amix=inputs=2:normalize=0:duration=longest",
+            "-ac",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+            &text,
+        ])
+        .status()
+        .expect("ffmpeg should be installed to run this test");
+    assert!(status.success(), "could not make {text}");
+    text
+}
+
+#[test]
+fn noise_reduction_sounds_the_same_in_playback_and_the_render() {
+    let noisy = make_noisy_tone("noisy-48000.wav", 4.0);
+    let mut quiet = project(Rate::fps(30), &noisy, &noisy);
+    quiet.tracks.truncate(1);
+    quiet.tracks[0].clips[0] = clip("c1", "a1", 0, 0, 90, 1.0);
+    let mut cleaned = quiet.clone();
+    cleaned.tracks[0].clips[0].denoise = 0.8;
+
+    let raw = played(&quiet);
+    let reference = reference(&cleaned, "reference-denoise.f32");
+    let played = played(&cleaned);
+    let shared = reference.len().min(played.len()).min(raw.len());
+    assert!(shared > 2 * ENGINE_HZ as usize, "the test mixed almost nothing");
+
+    // Audible: the noise-only stretch drops by more than 20 dB, while the
+    // tone keeps its level within half a dB.
+    let noise = (ENGINE_HZ as usize / 2 * CHANNELS)..(ENGINE_HZ as usize * CHANNELS);
+    let tone = (2 * ENGINE_HZ as usize * CHANNELS)..(3 * ENGINE_HZ as usize * CHANNELS);
+    let (before, after) = (rms(&raw[noise.clone()]), rms(&played[noise]));
+    assert!(after < before * 0.1, "noise went from {before} to only {after}");
+    let (before, after) = (rms(&raw[tone.clone()]), rms(&played[tone]));
+    assert!((after / before - 1.0).abs() < 0.06, "tone went from {before} to {after}");
+
+    // The same filter on the same samples on both sides.
+    let (worst, at) = worst(&reference[..shared], &played[..shared]);
+    assert!(
+        worst < 1e-3,
+        "denoised mixes differ by {worst} at sample {} of {}",
+        at / CHANNELS,
+        shared / CHANNELS
+    );
 }

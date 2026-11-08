@@ -26,6 +26,7 @@ fn clip(id: &str, start: i64, in_point: i64, out_point: i64) -> Clip {
         opacity: 1.0,
         speed: 1.0,
         preserve_pitch: true,
+        denoise: 0.0,
         fade_in: 0,
         fade_out: 0,
         volume_keyframes: Default::default(),

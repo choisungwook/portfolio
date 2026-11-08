@@ -127,6 +127,8 @@ pub fn run() {
             ai_edit::ai_edit_cancel,
             ai_edit::ai_edit_start_captions,
             ai_edit::ai_edit_start_silence_removal,
+            ai_edit::ai_edit_start_filler_analysis,
+            ai_edit::ai_edit_apply_fillers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
