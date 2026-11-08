@@ -29,3 +29,4 @@
 * [CSS viewport 원점은 native bounds origin에서 시작한다](2026-08-css-viewport-starts-at-native-bounds-origin.md) - page 좌표를 native frame으로 옮길 때 NSView bounds origin을 반영하는 결정.
 * [monitor는 패널을 채우고 source monitor는 에셋 비율로 맞춘다](2026-08-monitor-fills-the-panel.md) - stage 여백을 없애고 source monitor의 fit 기준을 에셋으로 바꾸고 두 monitor가 subgrid로 같은 행을 쓰게 한 결정.
 * [계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다](2026-08-harness-does-not-count-its-own-delay.md)
+* [Rust 모듈은 테스트를 빼고 1000줄을 넘기지 않는다](2026-11-rust-modules-stay-under-1000-lines.md) - 큰 파일을 tests.rs 분리와 주제별 하위 모듈로 나누는 상한과 방식.
