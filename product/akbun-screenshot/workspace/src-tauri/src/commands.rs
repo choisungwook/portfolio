@@ -81,8 +81,14 @@ pub fn settings_save(
     store: State<'_, SettingsStore>,
     next: Settings,
 ) -> Result<()> {
-    next.validate()?;
     let previous = store.get();
+    // Presets belong to the editor and its own command. The settings page
+    // never sends them, so saving General must not wipe them.
+    let next = Settings {
+        background_presets: previous.background_presets.clone(),
+        ..next
+    };
+    next.validate()?;
     if let Err(error) = register_shortcuts(&app, &next) {
         let _ = register_shortcuts(&app, &previous);
         return Err(error);

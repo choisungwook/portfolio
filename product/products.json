@@ -180,7 +180,7 @@
     {
       "id": "akbun-screenshot",
       "name": "akbun-screenshot",
-      "description": "영역 캡처, 클립보드 복사, 미리보기 저장을 지원하는 macOS 메뉴바 스크린샷 앱",
+      "description": "영역·창·전체화면·스크롤 캡처, 주석 편집기, 클립보드 복사를 지원하는 Tauri macOS 메뉴바 스크린샷 앱",
       "kind": "desktop",
       "tags": ["tauri", "rust", "macos"],
       "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-screenshot",

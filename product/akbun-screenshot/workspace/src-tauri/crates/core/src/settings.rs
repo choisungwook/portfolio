@@ -1,3 +1,4 @@
+use crate::background::{self, BackgroundPreset};
 use crate::capture::CaptureMode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,6 +26,10 @@ pub struct Settings {
     /// Whether Capture Area shows a still of the main display while the
     /// selection runs, so menus and tooltips hold still.
     pub freeze_screen: bool,
+    /// Saved Background tool settings, edited from the editor. Defaulted so
+    /// the settings page, which does not manage them, need not send them.
+    #[serde(default)]
+    pub background_presets: Vec<BackgroundPreset>,
 }
 
 impl Settings {
@@ -45,6 +50,7 @@ impl Settings {
             delete_keys: true,
             capture_sound: false,
             freeze_screen: false,
+            background_presets: Vec::new(),
         }
     }
 
@@ -67,6 +73,11 @@ impl Settings {
             }
         }
         let mut settings: Self = serde_json::from_value(merged).expect("settings deserialize");
+        // The loop above only carries strings and booleans. The preset list is
+        // parsed on its own so one broken entry loses only itself.
+        if let Some(Value::Object(stored)) = stored {
+            settings.background_presets = background::parse_stored(stored.get("backgroundPresets"));
+        }
         // Only the field the check is about. validate() also refuses a
         // shortcut used twice, and that must not move the save folder.
         if !Path::new(&settings.save_dir).is_absolute() {
@@ -96,6 +107,7 @@ impl Settings {
             }
             seen.push(key);
         }
+        background::validate_all(&self.background_presets)?;
         if !Path::new(&self.save_dir).is_absolute() {
             return Err(format!(
                 "The save location must be an absolute path: {}",
@@ -214,6 +226,18 @@ mod tests {
     }
 
     // Clearing a shortcut in the page must survive a reload.
+    #[test]
+    fn stored_presets_load_and_broken_ones_drop() {
+        let stored = json!({ "backgroundPresets": [
+            { "name": "Blog", "background": "g2", "padding": 64, "radius": 12,
+              "shadow": true, "ratio": "16:9", "align": "center" },
+            { "name": "broken" }
+        ] });
+        let merged = Settings::merge(&defaults(), Some(&stored));
+        assert_eq!(merged.background_presets.len(), 1);
+        assert_eq!(merged.background_presets[0].name, "Blog");
+    }
+
     #[test]
     fn capture_sound_is_off_unless_stored() {
         assert!(!defaults().capture_sound);

@@ -29,5 +29,6 @@
     saveEditorAs: (dataUrl) => invoke('editor_save_as', { dataUrl }),
     copyEditor: (dataUrl) => invoke('editor_copy', { dataUrl }),
     closeEditor: () => invoke('window_close'),
+    saveBackgroundPresets: (presets) => invoke('background_presets_save', { presets }),
   };
 })();
