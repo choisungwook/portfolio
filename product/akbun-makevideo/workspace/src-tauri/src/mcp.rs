@@ -73,6 +73,26 @@ fn dispatch(app: &AppHandle, request: Value) -> Result<Value, String> {
     let state = app.state::<AppState>();
     match method {
         "get_project" => Ok(state_value(&state.document.lock().unwrap())),
+        // A cheap health check: no project JSON, so a client can poll it.
+        "get_status" => {
+            // One lock at a time, and the document lock only for its own fields.
+            let mut value = {
+                let doc = state.document.lock().unwrap();
+                let project = doc.project();
+                json!({
+                    "running": true,
+                    "appVersion": app.package_info().version.to_string(),
+                    "revision": doc.revision(),
+                    "stateToken": token(&doc),
+                    "assets": project.assets.len(),
+                    "tracks": project.tracks.len(),
+                    "durationFrames": project.duration().value(),
+                })
+            };
+            value["rendering"] = json!(state.render.lock().unwrap().is_some());
+            value["proxies"] = json!(commands::proxy_counts(&state.proxies.lock().unwrap()));
+            Ok(value)
+        }
         "list_projects" => Ok(json!(commands::list_projects(app.clone(), state))),
         "list_checkpoints" => Ok(json!(checkpoints(app)?.list()?)),
         "create_checkpoint" => {

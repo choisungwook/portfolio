@@ -323,6 +323,16 @@ fn proxy_status_entry(
     }
 }
 
+/// Proxy jobs counted by state, for a status line that does not need every
+/// asset: "ready", "generating", "queued" and so on.
+pub(crate) fn proxy_counts(proxies: &ProxyState) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for status in proxies.entries.values() {
+        *counts.entry(status.state.clone()).or_insert(0) += 1;
+    }
+    counts
+}
+
 fn proxy_statuses(proxies: &ProxyState) -> Vec<ProxyStatus> {
     let mut statuses: Vec<ProxyStatus> = proxies.entries.values().cloned().collect();
     statuses.sort_by(|a, b| a.asset_id.cmp(&b.asset_id));

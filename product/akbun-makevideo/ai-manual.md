@@ -51,6 +51,8 @@
 
 | 도구 | 주요 입력 | 반환·효과 |
 | --- | --- | --- |
+| get_status | 없음 | 앱 실행 여부, 버전, revision, 렌더 중 여부, 프록시 상태별 개수. 앱이 닫혀 있으면 running=false |
+| launch_app | 없음 | macOS에서 설치된 앱을 열고 응답할 때까지 대기. 이미 실행 중이면 그대로 |
 | editing_guide | 없음 | 현재 명령 형식과 시간 규칙 |
 | get_project | 없음 | document와 stateToken |
 | list_projects | 없음 | workspace의 프로젝트 목록 |

@@ -15,7 +15,7 @@ export function request(method, args = {}, endpoint = socketPath) {
     socket.setEncoding('utf8');
     socket.setTimeout(120_000, () => finish(new Error('Editor request timed out. Read get_project/render_status before retrying; the operation may have completed.')));
     socket.on('connect', () => socket.write(JSON.stringify({ method, args }) + '\n'));
-    socket.on('error', (error) => finish(new Error(`Cannot reach akbun-makevideo. Open the MCP-enabled app first. ${error.message}`)));
+    socket.on('error', (error) => finish(Object.assign(new Error(`Cannot reach akbun-makevideo. Open the MCP-enabled app first. ${error.message}`), { code: 'UNREACHABLE' })));
     socket.on('data', (chunk) => {
       data += chunk;
       if (data.length > 32 * 1024 * 1024) return finish(new Error('Editor response too large'));

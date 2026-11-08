@@ -1,0 +1,116 @@
+{
+  "manifest_version": "0.3",
+  "name": "akbun-makevideo",
+  "display_name": "akbun-makevideo",
+  "version": "1.1.0",
+  "description": "Edit, check and render the running akbun-makevideo timeline from an AI client.",
+  "long_description": "Runs locally and talks to the open akbun-makevideo editor over a user-only Unix socket. No account, token or network port. Every edit is one undo step with a recovery checkpoint taken first. The editor must be installed; launch_app opens it when it is closed.",
+  "author": {
+    "name": "akbun"
+  },
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "mcp/server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/mcp/server.mjs"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "get_status",
+      "description": "Check whether the editor is running, its version, revision, render state and proxy progress."
+    },
+    {
+      "name": "launch_app",
+      "description": "Open the installed editor on macOS and wait until it answers."
+    },
+    {
+      "name": "editing_guide",
+      "description": "Read command formats, timing rules and recovery workflow before editing."
+    },
+    {
+      "name": "get_project",
+      "description": "Read the current project, asset/track/item IDs, captions, revision and stateToken."
+    },
+    {
+      "name": "list_projects",
+      "description": "List projects in the editor workspace."
+    },
+    {
+      "name": "new_project",
+      "description": "Start a blank project."
+    },
+    {
+      "name": "open_project",
+      "description": "Open an .akbunvideo file."
+    },
+    {
+      "name": "import_media",
+      "description": "Probe and reference existing local video/audio/image files in the project."
+    },
+    {
+      "name": "preview_edits",
+      "description": "Validate a command batch without changing the project."
+    },
+    {
+      "name": "apply_edits",
+      "description": "Apply a command batch immediately as one undo step."
+    },
+    {
+      "name": "create_checkpoint",
+      "description": "Remember the current project before a multi-step task."
+    },
+    {
+      "name": "list_checkpoints",
+      "description": "List the newest 100 persistent recovery points."
+    },
+    {
+      "name": "restore_checkpoint",
+      "description": "Restore a whole project from a recovery point."
+    },
+    {
+      "name": "undo",
+      "description": "Undo the most recent editor operation, including manual edits."
+    },
+    {
+      "name": "redo",
+      "description": "Redo the last undone editor operation."
+    },
+    {
+      "name": "save_project",
+      "description": "Atomically save as .akbunvideo."
+    },
+    {
+      "name": "sample_asset",
+      "description": "Return up to 8 JPEG frames from an imported video interval of at most 60 seconds, or one frame for an image."
+    },
+    {
+      "name": "get_library",
+      "description": "Read saved reusable graphic templates and B-roll observations."
+    },
+    {
+      "name": "export_video",
+      "description": "Start rendering to a NEW video path using existing ffmpeg/render settings."
+    },
+    {
+      "name": "render_status",
+      "description": "Read current export state and its completion result."
+    },
+    {
+      "name": "cancel_render",
+      "description": "Request cancellation of the running export."
+    }
+  ]
+}

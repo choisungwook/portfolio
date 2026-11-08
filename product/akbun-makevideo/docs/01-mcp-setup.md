@@ -31,6 +31,21 @@ npm start
 - 개발 실행에는 Rust와 Xcode Command Line Tools 필요
 - MCP 서버는 각 AI 앱이 자동 실행. 터미널에서 계속 켜 둘 필요 없음
 
+## Claude Desktop 번들 설치
+
+- Release 페이지의 akbun-makevideo.mcpb 내려받기
+- Claude Desktop의 Settings → Extensions에 파일을 끌어다 놓고 Install
+- node 경로나 설정 파일 수정 없음. 아래 수동 설정과 같은 서버
+- 저장소에서 직접 만들 때
+
+```bash
+cd /path/to/portfolio/product/akbun-makevideo/workspace/mcp
+npm ci
+npm run pack
+```
+
+- workspace/akbun-makevideo.mcpb 생성
+
 ## Codex
 
 ```bash
@@ -75,7 +90,7 @@ tool_timeout_sec = 120
 
 AI에게 다음 문장을 전달.
 
-> akbun-makevideo의 editing_guide를 읽고 get_project로 현재 프로젝트의 길이, 트랙, 미디어를 알려줘. 아직 편집하지 마.
+> akbun-makevideo의 get_status로 앱이 켜져 있는지 확인하고, 꺼져 있으면 launch_app으로 열어줘. 그다음 editing_guide를 읽고 get_project로 현재 프로젝트의 길이, 트랙, 미디어를 알려줘. 아직 편집하지 마.
 
 - editing_guide는 앱이 닫혀 있어도 조회 가능
 - get_project가 성공해야 실행 중인 앱과 연결된 상태
