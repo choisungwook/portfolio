@@ -53,6 +53,7 @@ ECS task와 Lambda는 만들지 않습니다. 형식 검증에서 먼저 거부�
 
 ```bash
 cd aws/ssm/inventory
+export AWS_REGION=ap-northeast-2
 uv run scripts/probe_targets.py "$(terraform -chdir=terraform output -raw instance_id)"
 ```
 

@@ -15,7 +15,10 @@
 
 ```bash
 cd aws/ssm/inventory
+export AWS_REGION=ap-northeast-2
 ```
+
+- aws CLI는 profile의 기본 리전을 쓰므로 terraform·스크립트와 같은 서울 리전으로 고정
 
 한 줄로 환경을 만듭니다.
 
@@ -28,10 +31,10 @@ terraform -chdir=terraform init && terraform -chdir=terraform apply
 
 ## Down
 
-custom inventory 타입은 terraform 밖에서 만들었으므로 먼저 지우고, 그다음 리소스를 지웁니다.
+`AWS_REGION=ap-northeast-2`가 설정된 셸에서 실행합니다. custom inventory 타입은 terraform 밖에서 만들었으므로 먼저 지우고, 그다음 리소스를 지웁니다.
 
 ```bash
-for t in Custom:AppDeployment Custom:RackLocation Custom:Probe; do aws ssm delete-inventory --type-name "$t" --schema-delete-option DeleteSchema 2>/dev/null; done; terraform -chdir=terraform destroy
+for t in Custom:AppDeployment Custom:RackLocation Custom:Probe; do aws ssm delete-inventory --type-name "$t" --schema-delete-option DeleteSchema || echo "skip $t"; done; terraform -chdir=terraform destroy
 ```
 
 - 노드가 종료되어도 Inventory 데이터는 마지막 갱신 뒤 30일 동안 남음

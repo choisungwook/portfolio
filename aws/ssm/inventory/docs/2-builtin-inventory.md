@@ -54,6 +54,7 @@ sequenceDiagram
 
 ```bash
 cd aws/ssm/inventory
+export AWS_REGION=ap-northeast-2
 INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id)
 aws ssm describe-instance-information \
   --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
@@ -88,7 +89,8 @@ Success  2026-11-10T00:05:12+00:00
 
 ```bash
 aws ssm list-inventory-entries --instance-id "$INSTANCE_ID" --type-name AWS:Application \
-  --query 'Entries[?Name==`openssl`].[Name,Version,Architecture]' --output text
+  --filters "Key=Name,Values=openssl,Type=Equal" \
+  --query 'Entries[].[Name,Version,Architecture]' --output text
 ```
 
 예상 출력(미검증):
@@ -98,6 +100,7 @@ openssl  3.2.2  aarch64
 ```
 
 - 버전은 AMI 시점에 따라 달라짐
+- ListInventoryEntries는 페이지당 최대 50행이고 CLI 자동 페이지네이션이 없음. `--query` 필터는 받아 온 페이지에만 적용되므로 `--filters`로 서버에서 거름
 
 ### 4. 조건으로 노드 찾기
 

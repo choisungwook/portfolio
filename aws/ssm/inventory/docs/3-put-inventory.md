@@ -62,6 +62,7 @@ flowchart LR
 
 ```bash
 cd aws/ssm/inventory
+export AWS_REGION=ap-northeast-2
 INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id)
 uv run scripts/put_inventory.py "$INSTANCE_ID"
 ```
@@ -112,7 +113,8 @@ BODY=$(base64 < examples/rack-location.json | tr -d '\n')
 DIR=/var/lib/amazon/ssm/$INSTANCE_ID/inventory/custom
 aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
   --parameters "commands=[\"sudo mkdir -p $DIR\",\"echo $BODY | base64 -d | sudo tee $DIR/rack.json\"]" \
-  --query 'Command.CommandId' --output text
+  --query 'Command.CommandId' --output text > /tmp/cmd-id
+aws ssm wait command-executed --command-id "$(cat /tmp/cmd-id)" --instance-id "$INSTANCE_ID"
 ```
 
 - JSON의 따옴표가 shorthand 문법과 충돌하지 않도록 base64로 감싸 전달

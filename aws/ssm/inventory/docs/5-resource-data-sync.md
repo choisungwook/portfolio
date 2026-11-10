@@ -56,6 +56,7 @@ flowchart LR
 
 ```bash
 cd aws/ssm/inventory
+export AWS_REGION=ap-northeast-2
 aws ssm list-resource-data-sync \
   --query 'ResourceDataSyncItems[].[SyncName,LastStatus,LastSuccessfulSyncTime]' --output text
 ```
@@ -91,7 +92,7 @@ aws s3 cp "s3://$BUCKET/$KEY" - | head -3
 ```
 
 - 한 줄이 Content 한 행인 JSON Lines 형식. `resourceid`, `capturetime` 같은 열이 함께 붙음
-- 시나리오 3의 6단계에서 타입을 지웠다면 3단계 전에 1단계를 다시 실행해 데이터를 만듦
+- 시나리오 3의 6단계에서 타입을 지웠다면 2단계 목록에 Custom:AppDeployment가 없음. [시나리오 3](3-put-inventory.md)의 1단계를 다시 실행하고 다음 sync를 기다린 뒤 확인
 
 ## 부록. 실무에서 얻는 것
 
