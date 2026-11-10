@@ -180,3 +180,4 @@
 - 스터디
   - [ansible](https://github.com/choisungwook/ansible_practice)
   - [테라폼](https://github.com/sungwook-practice/t101-study)
+114. (실습 미진행) AWS SSM Inventory: 기본 수집, PutInventory custom inventory, ECS·Lambda가 대상이 아닌 이유, resource data sync로 S3 집계 (26.11.10) - [링크](./aws/ssm/inventory/)

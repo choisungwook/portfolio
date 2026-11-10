@@ -1,0 +1,4 @@
+[
+  {"AppName": "order-api", "Version": "1.4.2", "Owner": "team-order", "DeployedBy": "github-actions"},
+  {"AppName": "batch-settlement", "Version": "2.0.0", "Owner": "team-billing", "DeployedBy": "jenkins"}
+]
