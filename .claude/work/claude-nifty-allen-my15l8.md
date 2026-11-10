@@ -1,6 +1,6 @@
 # SSM Inventory 핸즈온 (PutInventory, EC2/ECS/Lambda 가능 여부)
 
-- Issue: 미생성
+- Issue: #1421
 - Branch: claude/nifty-allen-my15l8
 
 ## 실행 계획
