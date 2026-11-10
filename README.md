@@ -126,6 +126,7 @@
 112. (아직 실습안함) Aurora MySQL IAM DB 인증: token 로그인과 실패 원인 추적, password에서 IAM으로 무중단 전환과 로그·metric 검증, 중단 전환, EC2 application status check (26.11.7) - [링크](./aws/rds/aurora-iam-auth/)
 113. Amazon Bedrock Guardrails와 LiteLLM: 정책 판정, input·output guardrail 시점과 지연, 스트리밍 유출, text unit 비용, LiteLLM 콘솔 모니터링과 고객 문의 대응 (26.11.7) - [링크](./aws/bedrock/guardrails/)
 114. (아직 실습안함) AWS Nitro Sandboxes: EC2 Firecracker로 confidential·direct 모드 메모리 격리 확인, EKS isolated pod과 일반 pod 비교, Gemma 2B 생성 코드를 sandbox에 가둬 막히는 것과 CloudWatch 관측 비교 (26.11.11) - [링크](./aws/nitro-sandboxes/)
+115. (아직 실습안함) AWS SSM Inventory: 기본 수집, PutInventory custom inventory, ECS·Lambda가 대상이 아닌 이유, resource data sync로 S3 집계 (26.11.10) - [링크](./aws/ssm/inventory/)
 
 ## 직접 만든 제품
 
@@ -180,4 +181,3 @@
 - 스터디
   - [ansible](https://github.com/choisungwook/ansible_practice)
   - [테라폼](https://github.com/sungwook-practice/t101-study)
-114. (실습 미진행) AWS SSM Inventory: 기본 수집, PutInventory custom inventory, ECS·Lambda가 대상이 아닌 이유, resource data sync로 S3 집계 (26.11.10) - [링크](./aws/ssm/inventory/)
