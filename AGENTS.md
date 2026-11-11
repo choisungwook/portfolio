@@ -93,7 +93,7 @@
 
 1. 데스크톱 앱(Claude Desktop, ChatGPT Desktop)의 내장 브라우저. 앱 안의 패널이라 화면과 마우스를 잡지 않는다. 페이지를 띄우고 DOM, console, network를 읽고 클릭과 입력까지 여기서 끝낸다.
 2. 내장 브라우저가 없거나 그 페이지가 내장 브라우저에서 안 돌면 computer use로 외부 브라우저(Chrome 등)를 띄워 확인한다. 로그인 세션이 필요 없으면 새 창이나 게스트 프로필로 띄우고, 사용자의 로그인 세션은 그 세션이 반드시 필요할 때만 쓴다. 사용자의 화면을 쓰므로 무엇을 확인했는지 결과 보고에 한 줄 남긴다.
-3. computer use도 없는 환경(웹 세션, CI)은 브라우저 검증을 건너뛰고 테스트 명령으로 내려간다.
+3. computer use가 없는 환경(클라우드 세션, CI)은 Playwright 같은 headless 브라우저가 설치돼 있으면 그것으로 페이지를 띄워 DOM과 console을 확인한다. 그것도 없으면 브라우저 검증을 건너뛰고 테스트 명령으로 내려간다.
 
 `product/`의 no-build-step 앱은 `workspace/src`를 정적 서버로 띄우면 브라우저에서 그대로 돈다. 화면 검증을 위해 Tauri나 Electron 번들을 빌드하지 않는다.
 
@@ -116,10 +116,10 @@ computer use까지 왔으면 허락을 묻지 않고 진행한다.
 
 ## 작업 흐름
 
-단계가 3개를 넘는 작업은 실행 계획을 `.claude/work/<branch>.md`에 남기고, 단계를 끝낸 그 인터랙션에서 체크박스를 갱신한다. 세션이 끊긴 뒤 재개하는 유일한 진입점이다. 형식과 삭제 시점은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)의 "작업 상태 파일"에 있다.
+단계가 3개 이상인 작업은 실행 계획을 `.claude/work/<branch>.md`에 남기고, 단계를 끝낸 그 인터랙션에서 체크박스를 갱신한다. 세션이 끊긴 뒤 재개하는 유일한 진입점이다. 형식과 삭제 시점은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)의 "작업 상태 파일"에 있다.
 
 PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓸 때 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
 
 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 Copilot 리뷰 요청과 Issue close 같은 중간 단계를 뺀 것이 아니다.
 
-GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.
+GitHub 조작 도구는 환경마다 다르다. shell과 gh CLI가 있는 CLI 환경, GitHub MCP 도구만 있는 MCP 환경, shell과 git은 있지만 gh 대신 MCP 도구를 쓰는 혼합 환경(Claude Code 클라우드 세션)이 있고, 절차는 같다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. 그 환경에서 불가능한 단계는 흉내 내지 않고 안내로 대체한다.

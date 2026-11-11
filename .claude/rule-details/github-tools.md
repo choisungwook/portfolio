@@ -4,7 +4,7 @@ GitHub를 건드리는 command는 세 환경 중 하나에서 돈다. 절차는 
 
 - **CLI 환경**: shell과 gh CLI가 있다. Claude Code CLI, Claude Desktop, Codex CLI, 터미널이 열리는 IDE가 여기에 든다.
 - **MCP 환경**: shell이 없고 GitHub MCP 서버 도구만 있다. Claude mobile, ChatGPT mobile, 브라우저 세션이 여기에 든다.
-- **혼합 환경**: shell과 git은 있지만 gh가 없고 GitHub MCP 도구가 있다. Claude Code 클라우드 세션이 여기에 든다. commit과 push는 shell로, GitHub 조작은 MCP 도구로 한다. sleep 대기는 MCP 환경 규칙을 따른다.
+- **혼합 환경**: shell과 git은 있지만 gh가 없고 GitHub MCP 도구가 있다. Claude Code 클라우드 세션이 여기에 든다. commit과 push는 shell로, GitHub 조작은 MCP 도구로 한다.
 
 ## 환경 판별
 
@@ -22,27 +22,29 @@ gh auth status
 
 ## 도구 대응
 
-혼합 환경은 아래 표의 MCP 환경 열을 쓴다. MCP 도구 이름은 GitHub MCP 서버 버전마다 다르다. 아래는 공식 서버 기준이고, 이름이 안 맞으면 사용 가능한 도구 목록에서 같은 일을 하는 것을 찾는다.
+혼합 환경은 아래 표의 MCP 환경 열을 쓴다. MCP 도구 이름은 GitHub MCP 서버 버전마다 다르다. 아래는 2026-11 공식 서버 기준이고, 이름이 안 맞으면 사용 가능한 도구 목록에서 같은 일을 하는 것을 찾는다.
 
 | 하는 일 | CLI 환경 | MCP 환경 |
 |---|---|---|
-| Issue 생성 | `gh issue create` | `create_issue` 또는 `issue_write`(method create). `parent_issue_number`를 주면 생성과 sub-issue 등록이 한 번에 된다 |
-| Issue 조회 | `gh issue list`, `gh issue view` | `list_issues`, `get_issue` |
-| Issue close | `gh issue close` | `update_issue` (state closed) |
+| Issue 생성 | `gh issue create` | `issue_write`(method create). `parent_issue_number`를 주면 생성과 sub-issue 등록이 한 번에 된다 |
+| Issue 조회 | `gh issue list`, `gh issue view` | `list_issues`, `issue_read` |
+| Issue close | `gh issue close` | `issue_write`(method update, state closed) |
 | Issue comment | `gh issue comment` | `add_issue_comment` |
 | PR 생성 | `gh pr create` | `create_pull_request` |
-| PR 조회 | `gh pr view` | `get_pull_request` |
-| PR comment 조회 | `gh api .../comments` | `get_pull_request_comments`, `get_pull_request_reviews` |
+| PR 조회 | `gh pr view` | `pull_request_read`(method get) |
+| PR body 수정 | `gh pr edit --body-file` | `update_pull_request` |
+| PR label | `gh pr edit --add-label` | `issue_write`(method update, issue_number에 PR 번호) |
+| PR comment 조회 | `gh api .../comments` | `pull_request_read`(method get_review_comments, get_reviews, get_comments) |
 | Copilot 리뷰 요청 | `gh pr edit --add-reviewer "@copilot"` | `request_copilot_review` |
 | squash merge | `gh pr merge --squash` | `merge_pull_request` (merge_method squash) |
-| sub-issue 등록 | `gh api .../sub_issues` | `add_sub_issue` |
+| sub-issue 등록 | `gh api .../sub_issues` | `sub_issue_write`(method add) |
 
 ## MCP 환경에서 안 되는 것
 
 되는 척하지 말고 사용자가 실행할 명령을 안내한 뒤 나머지를 진행한다. 이것들 때문에 작업 전체를 멈추지 않는다. 혼합 환경은 shell이 있어 commit·push와 local branch 정리는 되고, 나머지는 MCP 환경과 같다.
 
 - **commit과 push**: shell이 없으므로 코드 변경 자체가 불가능하다. 코드 수정이 필요한 단계는 CLI 환경에서만 돈다.
-- **대기와 polling**: sleep이 없다. 시간이 걸리는 단계는 거기서 끊고, 사용자가 나중에 다시 호출하게 한다.
+- **대기와 polling**: sleep이 없다. 시간이 걸리는 단계는 거기서 끊고, 사용자가 나중에 다시 호출하게 한다. 혼합 환경도 sleep으로 polling하지 않는다. PR 이벤트 구독 도구(`subscribe_pr_activity`)가 있으면 구독하고 턴을 끝내며, 리뷰와 CI 결과가 도착하면 세션이 다시 깨어난다.
 - **GraphQL mutation**: Copilot 재요청(`requestReviewsByLogin`)이 안 된다. 최초 요청만 된다.
 - **local branch 정리**: merge 후 `git pull --rebase`를 대신할 수단이 없다.
 
@@ -55,11 +57,11 @@ gh auth status
 
 ## sub-issue 등록
 
-두 환경 모두 issue number가 아니라 database id를 넘긴다. 이것이 가장 흔한 실패다.
+어느 환경이든 하위 issue는 issue number가 아니라 database id로 넘긴다. 이것이 가장 흔한 실패다.
 
 ```bash
 CHILD_ID=$(gh api repos/choisungwook/portfolio/issues/<하위번호> --jq .id)
 gh api --method POST repos/choisungwook/portfolio/issues/<root번호>/sub_issues -F sub_issue_id=$CHILD_ID
 ```
 
-MCP 환경에서는 `create_issue` 응답의 `id` 필드를 그대로 쓴다. 응답에 있는 `number`를 넘기면 조용히 엉뚱한 issue가 걸린다.
+MCP 환경과 혼합 환경에서는 Issue를 만들 때 `issue_write`에 `parent_issue_number`(root issue의 number)를 주면 따로 등록할 필요가 없다. 이미 있는 Issue를 걸 때만 `sub_issue_write`를 쓰고, `sub_issue_id`에는 `issue_read`로 조회한 그 Issue의 `id` 필드를 넣는다. `number`를 넘기면 조용히 엉뚱한 issue가 걸린다.

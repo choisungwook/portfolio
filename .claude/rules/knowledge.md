@@ -48,7 +48,7 @@ frontmatter 형식:
 
 ```yaml
 ---
-type: Decision            # 필수. Decision | Playbook | Topic
+type: Decision            # 필수. Decision | Playbook | Topic | Reference
 title: 한 줄 제목
 description: 한 문장 요약
 tags: [kubernetes, workflow]

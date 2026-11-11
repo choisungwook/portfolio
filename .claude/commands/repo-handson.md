@@ -26,7 +26,7 @@ argument-hint: <workspace 경로> <주제>
 
 ## 순서
 
-1. 다룰 기능과 시나리오 순서를 정하고, 단계가 3개를 넘으면 작업 상태 파일에 계획을 남긴다([workflow.md](../rules/workflow.md)).
+1. 다룰 기능과 시나리오 순서를 정하고, 단계가 3개 이상이면 작업 상태 파일에 계획을 남긴다([workflow.md](../rules/workflow.md)).
 2. workspace 아래 `docs/`에 시나리오 문서를 쓴다. 새 workspace면 `templates/knowledge/`를 복사하고 루트에 `AGENTS.md`를 만든다.
 3. 실습 코드와 설정을 만든다. 도구가 여럿이면 코드 디렉터리를 도구별로 나눈다.
 4. 실제 환경에서 모든 실습을 실행하고, 출력과 수치를 문서에 옮긴다.
