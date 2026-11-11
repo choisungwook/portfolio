@@ -72,7 +72,7 @@ jobs:
           # 웹 UI에서 쓴 body는 줄 끝이 CRLF라 먼저 CR을 지운다.
           body=$(printf '%s\n' "$PR_BODY" | tr -d '\r')
           fail=0
-          for header in '# 사람 확인' '# 의도' '# 검증' '# 리스크'; do
+          for header in '# 작업 목적' '# 방식' '# 검증' '# 리스크'; do
             if ! printf '%s\n' "$body" | grep -qx "$header"; then
               echo "::error::PR body에 '$header' 절이 없음. .github/pull_request_template.md를 따를 것"
               fail=1
@@ -82,9 +82,9 @@ jobs:
             echo "::error::PR body 끝에 'Issue #<번호>' 링크가 없음"
             fail=1
           fi
-          # 사람이 읽는 절은 사람 확인 하나라 비어 있으면 안 된다. 템플릿 주석은 내용으로 세지 않는다.
-          if ! printf '%s\n' "$body" | awk '/<!--/{c=1} c{if(/-->/)c=0; next} /^# 사람 확인$/{on=1; next} /^# /{on=0} on && NF{n++} END{exit !(n>=1)}'; then
-            echo "::error::사람 확인 절이 비어 있음. 사람이 할 일을 적거나 없음과 근거를 적을 것"
+          # 사람이 읽는 절은 작업 목적 하나이고 2줄 이내다. 템플릿 주석은 내용으로 세지 않는다.
+          if ! printf '%s\n' "$body" | awk '/<!--/{c=1} c{if(/-->/)c=0; next} /^# 작업 목적$/{on=1; next} /^# /{on=0} on && NF{n++} END{exit !(n>=1 && n<=2)}'; then
+            echo "::error::작업 목적 절은 1~2줄이어야 함. 목적 한 줄, 필요하면 사람 확인 한 줄"
             fail=1
           fi
           # 검증 절은 표다. 헤더와 구분선 아래 행이 하나도 없으면 증거가 없는 것이다.

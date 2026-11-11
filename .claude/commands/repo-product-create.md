@@ -1,11 +1,11 @@
 ---
-description: Create a new product under product/ with source, wiki, ADR, and a release workflow
+description: Create a new product under product/ with source, wiki, knowledge, and a release workflow
 argument-hint: <product-name> <what the product does>
 ---
 
 Create a complete product under product/. The product name is $1 and must start with akbun (for example akbun-screenshot). The remaining arguments describe what to build; if missing, decide from the conversation.
 
-Write everything in concise English: source comments, wiki, ADR, README, workflow, and release notes.
+Write everything in concise English: source comments, wiki, knowledge, README, workflow, and release notes.
 
 ## Directory layout
 
@@ -14,7 +14,7 @@ product/<name>/
   README.md      # what it is, directory table, quick start
   workspace/     # source code and build config, with its own .gitignore
   wiki/          # llm wiki the next agent reads before taking over
-  adr/           # decision records
+  knowledge/     # decision records and playbooks, copied from templates/knowledge
 ```
 
 ## Steps
@@ -35,14 +35,14 @@ product/<name>/
      Windows: tell the user to choose "More info" and then "Run anyway" past the SmartScreen warning.
 
 5. Write wiki/: index.md, architecture.md (process structure, key flows, IPC or API surface), development.md (build, run, test, release, caveats). No marketing language, no references to benchmarked products or PR bodies.
-6. Write adr/ with index.md plus one file per decision (YYYY-MM-<topic>.md), each with Decision and Reason sections.
+6. Copy templates/knowledge to knowledge/ and write one file per decision under knowledge/decisions/ (YYYY-MM-<topic>.md), following [.claude/rules/knowledge.md](../rules/knowledge.md). Do not create adr/; older products have one, but decisions now live only in knowledge/decisions/.
 7. Update both indexes in the same commit: the product/README.md table and the root README.md "직접 만든 제품" list.
 
 ## Choosing the stack
 
 Default to Tauri, in plain JavaScript with no build step, following .claude/rule-details/tauri.md. Reuse akbun-folderview. It ships an installer under 10 MB against roughly 90 MB for the same app in Electron, the page is ordinary HTML and CSS, and the release action produces the installer, the signature and the update manifest in one step.
 
-Choose Electron instead when one of these is true, and record which one in an ADR:
+Choose Electron instead when one of these is true, and record which one in knowledge/decisions/:
 
 - The app needs a macOS or Linux build now. Tauri renders in each platform's own webview, so the UI has to be checked on every platform shipped. Electron carries one engine everywhere.
 - The app needs a tray or menu bar icon as its primary surface. akbun-screenshot and akbun-mactaskbar are there for a reason.

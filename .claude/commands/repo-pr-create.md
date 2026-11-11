@@ -14,7 +14,7 @@ allowed-tools: Bash, Read, Glob, Grep
 5. commit할 변경이 남아 있으면 commit한다. commit message에 claude session 링크(claude.ai/code 링크, Co-Authored-By 아래 붙는 세션 URL)가 있으면 제거한다.
 6. push한다.
 7. 이번 작업의 root issue를 정한다. `product/<이름>`을 건드렸으면 그 product, `.claude`나 `.github`면 저장소 규칙과 도구, 나머지는 핸즈온이다. `gh issue list --label root --state open`으로 찾고 없으면 만든다.
-8. 기록용 Issue를 만든다. [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 Why, Goal, 완료 조건, ADR을 채운다. 변경에 목표가 다른 기능이 여럿이면 기능마다 Issue를 하나씩 만든다. 목표가 하나면 Issue도 하나다.
+8. 기록용 Issue를 만든다. [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 작업 목적, Goal, 완료 조건, ADR을 채운다. 변경에 목표가 다른 기능이 여럿이면 기능마다 Issue를 하나씩 만든다. 목표가 하나면 Issue도 하나다.
 9. 8의 Issue를 모두 7의 root issue 하위로 건다. sub-issue 등록 형식은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)에 있다.
 10. PR을 만든다. [.github/pull_request_template.md](../../.github/pull_request_template.md)를 읽고 그 섹션과 형식을 그대로 따른다. Issue가 여럿이어도 PR은 하나다. 본문 끝에 Issue #<number> 형식으로 8의 Issue를 모두 링크한다. target branch는 master다.
 11. GitHub에서 PR body를 다시 읽어 실제 줄바꿈과 Issue 링크를 검증한다. 깨졌으면 같은 body 파일로 수정하고 다시 검증한다.
@@ -47,8 +47,8 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 ## 작성 규칙
 
 - commit message는 영어로, Issue와 PR body는 한글 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
-- Goal은 번호 리스트 3개 이내로 쪼갠다. 요약형과 목록형 절의 항목 규칙은 템플릿 상단 주석을 따른다. 명령, 파일 경로, 식별자는 backtick으로 감싼다.
-- 왜, 완료 조건, 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다.
+- Goal은 번호 리스트 3개 이내로 쪼갠다. 절마다 항목 규칙은 템플릿의 주석을 따른다. 명령, 파일 경로, 식별자는 backtick으로 감싼다.
+- 완료 조건과 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다. 작업 목적 절만 양쪽에 2줄 이내로 쓴다.
 - PR의 검증 절은 표다. Issue의 완료 조건마다 행 하나, 실행 열에 명령이나 CI job, 결과 열에 본 것을 적는다. 실행하지 않은 조건은 실행 열에 검증하지 않음으로 적는다.
 - PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
 - 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
