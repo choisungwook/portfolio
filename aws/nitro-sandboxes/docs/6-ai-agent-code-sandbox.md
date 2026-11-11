@@ -26,7 +26,7 @@
 | `executor-sandbox` | `isolated-sandbox` | 있음 | Sandbox 노드 |
 | `executor-sandbox-netoff` | `isolated-sandbox` | 없음(`network-isolated`) | Sandbox 노드 |
 
-`executor-runc`도 Sandbox 노드(`c8a.large`)에 고정했습니다. 처음 실행 때는 runc가 `c6a` 노드에 올라가서 같은 CPU 과제가 runc 2.52초, sandbox 1.41초로 나왔습니다. sandbox가 빠른 것이 아니라 인스턴스 세대가 달랐기 때문입니다. 같은 타입에 두면 차이가 사라집니다(3단계).
+`executor-runc`도 `nodeSelector`로 Sandbox 노드(`c8a.large`)에 올렸습니다. 같은 노드라는 보장은 없고, 실측에서도 같은 타입의 다른 노드에 떴습니다. 처음 실행 때는 runc가 `c6a` 노드에 올라가서 같은 CPU 과제가 runc 2.52초, sandbox 1.41초로 나왔습니다. sandbox가 빠른 것이 아니라 인스턴스 세대가 달랐기 때문입니다. 같은 타입에 두면 차이가 사라집니다(3단계).
 
 ### 용어
 
@@ -58,7 +58,7 @@ Nitro Sandbox는 코드 내용을 보지 않고 실행 위치의 경계로 막�
 | 컴포넌트 | runtime | 역할 |
 |---|---|---|
 | `ollama` Deployment | runc | `gemma2:2b`(1.6GB)를 initContainer로 받아 서빙합니다 |
-| `agent` Job | runc | 과제를 Gemma에게 보내 코드를 받고, executor 셋에서 실행하고, JSON 로그를 남깁니다. 권한은 executor 3개에 대한 `pods/exec`뿐입니다 |
+| `agent` Job | runc | 과제를 Gemma에게 보내 코드를 받고, executor 셋에서 실행하고, JSON 로그를 남깁니다. 권한은 executor 3개에 대한 `pods` get(runtime 조회)과 `pods/exec`뿐입니다 |
 | executor 3개 | runc, isolated, isolated + netoff | LLM 코드를 실행합니다 |
 | `fluent-bit` | DaemonSet | 노드의 `/var/log/containers`를 CloudWatch Logs로 보냅니다 |
 | `cloudwatch-agent` | DaemonSet | Container Insights 성능 데이터를 보냅니다 |
@@ -66,9 +66,11 @@ Nitro Sandbox는 코드 내용을 보지 않고 실행 위치의 경계로 막�
 
 ## 흐름
 
+구성 요소 사이의 흐름은 다음과 같습니다.
+
 ```mermaid
 flowchart TB
-  A["agent Job (runc)"] -->|"1. 과제 프롬프트"| O["ollama: gemma2:2b (runc)"]
+  A["agent Job (runc)"] -->|"1. 과제 프롬프트, 코드 오류면 traceback 포함"| O["ollama: gemma2:2b (runc)"]
   O -->|"2. Python 코드"| A
   A -->|"3. pods/exec: 같은 코드"| ER["executor-runc"]
   A -->|"3. pods/exec"| ES["executor-sandbox (isolated)"]
@@ -84,6 +86,8 @@ flowchart TB
 명령은 workspace 루트(`aws/nitro-sandboxes`)에서 실행합니다. 환경 준비는 [4-setup-eks.md](4-setup-eks.md)에 있습니다.
 
 ### 1. 모델 서버와 executor 배포
+
+다음 명령을 실행합니다.
 
 ```bash
 kubectl apply -f manifests/ai-agent/namespace.yaml
@@ -110,6 +114,8 @@ hostPath와 `hostPID`를 준 isolated pod도 문제없이 Running이 됐습니�
 
 ### 2. agent Job 실행
 
+다음 명령을 실행합니다.
+
 ```bash
 kubectl delete -n ai-agent job/agent --ignore-not-found
 kubectl apply -f manifests/ai-agent/agent-job.yaml
@@ -120,6 +126,8 @@ kubectl logs -n ai-agent job/agent | grep '^{' > agent-run.jsonl
 과제 7개, executor 3개에 2분 8초가 걸렸습니다. 대부분은 Gemma가 CPU(`c6a.xlarge`)에서 코드를 만드는 시간이고, 과제 하나에 2초에서 41초였습니다.
 
 ### 3. 과제별 판정 확인
+
+다음 명령을 실행합니다.
 
 ```bash
 python3 - <<'EOF'
@@ -165,6 +173,8 @@ for p in executor-runc executor-sandbox; do
 done
 ```
 
+출력은 다음과 같습니다.
+
 ```text
 == executor-runc
 bin boot dev etc home lib lib64 local media mnt opt proc root run sbin srv sys tmp usr var
@@ -189,6 +199,8 @@ filter kubernetes.namespace_name = "ai-agent" and kubernetes.container_name = "a
 | sort task, executor
 ```
 
+출력은 다음과 같습니다.
+
 ```text
 task=peek-node-processes    | executor=executor-runc           | last_verdict=allowed
 task=peek-node-processes    | executor=executor-sandbox        | last_verdict=blocked
@@ -205,9 +217,13 @@ CLI로 실행하려면 `aws logs start-query`에 같은 쿼리를 넘기고 `aws
 
 ### 6. kubectl top과 Container Insights 메트릭 비교
 
+다음 명령을 실행합니다.
+
 ```bash
 kubectl top pod -n ai-agent
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 NAME                      CPU(cores)   MEMORY(bytes)
@@ -227,6 +243,8 @@ filter Type = "Pod" and Namespace = "ai-agent"
 | sort PodName
 ```
 
+출력은 다음과 같습니다.
+
 ```text
 PodName=agent         | max_cpu_pct=0.2068  | max_mem_mib=87.3672   | samples=6
 PodName=executor-runc | max_cpu_pct=1.0815  | max_mem_mib=5.4414    | samples=21
@@ -237,7 +255,7 @@ PodName=ollama        | max_cpu_pct=48.8162 | max_mem_mib=3257.4062 | samples=21
 
 ### 7. sandbox pod stdout 로그 수집 확인
 
-메트릭이 빠졌으니 로그도 빠지는지 확인합니다. runc와 isolated pod을 같은 노드에 띄워 각각 5줄을 출력합니다.
+메트릭이 빠졌으니 로그도 빠지는지 확인합니다. runc와 isolated pod을 Sandbox 노드에 띄워 각각 5줄을 출력합니다.
 
 ```bash
 for rc in runc isolated-sandbox; do
@@ -253,6 +271,8 @@ done
 ```text
 filter log like /hello-from-log-probe/ | stats count(*) as lines by kubernetes.pod_name
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 kubernetes.pod_name=log-probe-isolated | lines=5

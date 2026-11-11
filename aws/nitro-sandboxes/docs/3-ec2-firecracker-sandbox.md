@@ -58,6 +58,8 @@ Firecracker는 원래 `/dev/kvm`으로 microVM을 만드는 VMM입니다. v1.18�
 
 ## 흐름
 
+구성 요소 사이의 흐름은 다음과 같습니다.
+
 ```mermaid
 sequenceDiagram
   participant U as 운영자
@@ -83,6 +85,8 @@ sequenceDiagram
 
 ### 1. 부모 인스턴스 커널과 Enclaves 디바이스 확인
 
+다음 명령을 실행합니다.
+
 ```bash
 uname -r
 ls -l /dev/nitro_enclaves
@@ -102,6 +106,8 @@ crw-rw----. 1 root root 10, 259 Nov 10 23:49 /dev/nitro_enclaves
 ```
 
 ### 2. Firecracker 설치와 guest image 빌드
+
+다음 명령을 실행합니다.
 
 ```bash
 VERSION=1.18.0; ARCH=$(uname -m)
@@ -124,6 +130,8 @@ sudo dracut --force --no-hostonly --reproducible --no-early-microcode --modules 
 sudo chown "$(id -un):" initrd.img
 ls -lh vmlinuz initrd.img
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 Firecracker v1.18.0
@@ -160,10 +168,14 @@ sudo reboot
 
 ### 5. memory pool 예약 확인
 
+다음 명령을 실행합니다.
+
 ```bash
 sudo dmesg | grep "CMA pool"
 cat /sys/class/misc/nitro_enclaves/mem_pool/total /sys/class/misc/nitro_enclaves/mem_pool/free
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 [    0.000000] nitro_enclaves: CMA pool: 2048 MiB reserved in 8 region(s), 2048 MiB requested
@@ -176,9 +188,10 @@ cat /sys/class/misc/nitro_enclaves/mem_pool/total /sys/class/misc/nitro_enclaves
 
 ### 6. TAP 디바이스와 IP forwarding 설정
 
-TAP, IP forwarding, nftables 규칙은 재부팅하면 사라집니다. 4단계에서 재부팅했으므로 여기서 다시 만듭니다.
+TAP, IP forwarding, nftables 규칙, vsock socket 디렉터리(`/run/sandbox`, tmpfs)는 재부팅하면 사라집니다. 4단계에서 재부팅했으므로 여기서 다시 만듭니다.
 
 ```bash
+sudo mkdir -p /run/sandbox
 sudo ip tuntap add dev tap0 mode tap
 sudo ip addr add 192.0.2.1/24 dev tap0
 sudo ip link set tap0 up
@@ -241,6 +254,8 @@ cat /sys/class/misc/nitro_enclaves/pcie_slots_in_use /sys/class/misc/nitro_encla
 sudo python3 find-marker.py $(pgrep -x firecracker) 2604927768 86541341
 ```
 
+출력은 다음과 같습니다.
+
 ```text
   16 MiB rw-s /dev/nitro_enclaves -> hits: 0
   16 MiB rw-s /dev/nitro_enclaves -> hits: 0
@@ -252,6 +267,8 @@ scanned 549 MiB, total marker hits: 0
 - 16MiB `rw-s` 구간 두 개가 `eth0`와 vsock의 DMB입니다. 부모가 읽고 쓸 수 있는 영역은 이 버퍼뿐이라서, 디바이스로 나가는 데이터는 guest가 암호화해야 합니다.
 
 ### 10. IMDS 차단 규칙 추가 후 Sandbox 종료
+
+다음 명령을 실행합니다.
 
 ```bash
 sudo pkill -x firecracker
@@ -287,6 +304,8 @@ grep -E "Enclave VM created|\[guest\]" fc-direct.log
 cat /sys/class/misc/nitro_enclaves/mem_pool/free
 ```
 
+출력은 다음과 같습니다.
+
 ```text
 ... Enclave VM created: slot=0x1a1c7e171a8cd3f, direct_mode=true, cpu_overcommit=true, ...
 [guest] kernel: 6.18.56-126.188.amzn2023.aarch64
@@ -308,6 +327,8 @@ cat /sys/class/misc/nitro_enclaves/mem_pool/free
 ```bash
 sudo python3 find-marker.py $(pgrep -x firecracker) 706712300 1906029754
 ```
+
+출력은 다음과 같습니다.
 
 ```text
  512 MiB rw-s /dev/nitro_enclaves -> hits: 1988
@@ -332,6 +353,8 @@ for v in 2 1; do
 done
 sudo pkill -x firecracker
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 == vcpu_count=2

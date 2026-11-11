@@ -4,7 +4,7 @@
 
 ## Firecracker가 `CMA allocation failed ... Out of memory`로 종료됨
 
-- 증상: `free -m`으로는 메모리가 충분한데 `firecracker --config-file sandbox.json`이 `Failed to allocate CMA memory: Cannot create mmap region: Out of memory (os error 12)`로 끝납니다.
+- 증상: `free -m`으로는 메모리가 충분한데 `firecracker --config-file sandbox.json`이 `CMA allocation failed: size=536870912 bytes ... Cannot create mmap region: Out of memory (os error 12)`로 끝납니다.
 - 원인: Sandbox 메모리는 부팅할 때 예약한 memory pool에서만 나옵니다. pool이 없으면 `/sys/class/misc/nitro_enclaves/mem_pool/total`이 0입니다.
 - 해결: `sudo grubby --update-kernel=ALL --args="nitro_enclaves.mempool=2G@0"` 후 재부팅하고, `sudo dmesg | grep "CMA pool"`로 예약을 확인합니다.
 
@@ -17,7 +17,7 @@
 ## 재부팅 후 Sandbox 네트워크가 안 됨
 
 - 증상: 재부팅 전에는 되던 guest의 바깥 연결이 실패합니다.
-- 원인: TAP 디바이스, `net.ipv4.ip_forward`, nftables 규칙은 재부팅하면 사라집니다.
+- 원인: TAP 디바이스, `net.ipv4.ip_forward`, nftables 규칙, `/run/sandbox` 디렉터리는 재부팅하면 사라집니다.
 - 해결: [시나리오 3](3-ec2-firecracker-sandbox.md)의 6, 7, 10단계를 다시 실행합니다.
 
 ## 두 번째 실행이 `Address in use`로 실패함

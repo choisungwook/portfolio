@@ -47,6 +47,8 @@ security group은 `apply`할 때의 공인 IP 하나만 허용합니다. 네트�
 
 ## down
 
+다음 명령을 실행합니다.
+
 ```bash
 terraform -chdir=terraform/ec2 destroy -auto-approve
 ```

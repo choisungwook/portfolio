@@ -9,7 +9,7 @@ metadata:
     runtime: runc
     app.kubernetes.io/part-of: ai-agent-sandbox
 spec:
-  # sandbox pod과 같은 노드에 둔다. CPU 비교를 공정하게 하고, 같은 노드의 sandbox pod이 runc에서 어떻게 보이는지 확인한다
+  # sandbox pod과 같은 타입의 Sandbox 노드에 둔다. 인스턴스 세대가 달라 CPU 비교가 틀어지는 것을 막는다
   nodeSelector:
     eks.amazonaws.com/nitro-sandbox: "true"
   serviceAccountName: executor

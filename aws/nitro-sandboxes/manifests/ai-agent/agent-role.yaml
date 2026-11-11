@@ -1,4 +1,4 @@
-# agent는 executor pod에 코드를 보내기만 한다. pods/exec 외의 권한은 없다
+# agent는 executor pod의 runtime을 조회하고(get) 코드를 보낸다(pods/exec). 그 외의 권한은 없다
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

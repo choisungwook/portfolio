@@ -61,6 +61,8 @@ Kubernetes에서 pod 경계는 노드 커널 하나가 지킵니다. 실습 5단
 
 ## 흐름
 
+구성 요소 사이의 흐름은 다음과 같습니다.
+
 ```mermaid
 flowchart TB
   P["Pod: runtimeClassName isolated-sandbox"] --> S["kube-scheduler: overhead 더해 계산, nodeSelector nitro-sandbox=true"]
@@ -87,11 +89,15 @@ kubectl get runtimeclass
 kubectl get runtimeclass isolated-sandbox -o yaml
 ```
 
+출력은 다음과 같습니다.
+
 ```text
 NAME                   HANDLER                AGE
 confidential-sandbox   confidential-sandbox   2m21s
 isolated-sandbox       isolated-sandbox       2m21s
 ```
+
+출력의 주요 부분은 다음과 같습니다.
 
 ```yaml
 handler: isolated-sandbox
@@ -126,6 +132,8 @@ runc-pod       1/1     Running   0          39s   10.20.11.16   i-046e3a8a428d46
 
 ### 3. 두 pod이 올라간 노드 비교
 
+다음 명령을 실행합니다.
+
 ```bash
 kubectl get nodes -L node.kubernetes.io/instance-type,eks.amazonaws.com/nitro-sandbox
 kubectl get nodes -o custom-columns='NAME:.metadata.name,MEM_ALLOC:.status.allocatable.memory,SANDBOX:.status.allocatable.eks\.amazonaws\.com/nitro-sandbox'
@@ -133,6 +141,8 @@ aws ec2 describe-instances --region us-west-2 \
   --filters Name=tag:eks:eks-cluster-name,Values=nitro-sandbox Name=instance-state-name,Values=running \
   --query 'Reservations[].Instances[].[InstanceType,EnclaveOptions.Enabled,CpuOptions.ThreadsPerCore]' --output text
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 NAME                  STATUS   ROLES    AGE   VERSION               INSTANCE-TYPE   NITRO-SANDBOX
@@ -168,6 +178,8 @@ for p in runc-pod isolated-pod; do
 done
 kubectl get nodes -o custom-columns='NAME:.metadata.name,KERNEL:.status.nodeInfo.kernelVersion,OS:.status.nodeInfo.osImage'
 ```
+
+출력은 다음과 같습니다.
 
 ```text
 ===== runc-pod
@@ -246,6 +258,8 @@ kubectl exec isolated-network-off-pod -- sh -c '
   echo "imds: $(curl -s -m3 -o /dev/null -w "%{http_code}" http://169.254.169.254/ || echo fail)"'
 kubectl get pod isolated-network-off-pod -o jsonpath='{.status.podIP}{"\n"}'
 ```
+
+출력은 다음과 같습니다.
 
 ```text
     lo
