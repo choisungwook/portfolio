@@ -24,11 +24,12 @@ A GitHub Issue with the work specification and the Generator's progress comments
 
 PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rules/workflow.md](../rules/workflow.md)의 "Issue와 PR 공통 작성 규칙"이 기준이다.
 
-- 섹션 구성: 공부, 구현, 검증, 리스크 순서로 네 절이 모두 있는가? body가 40줄 이내인가?
-- 공부: 이 작업으로 무엇을 공부하려 했는지 2~3줄로 있는가? 기능 설명이 아니라 알게 된 것인가?
+- 섹션 구성: 사람 확인, 의도, 검증, 리스크 순서로 네 절이 모두 있는가? body가 30줄 이내인가?
+- 사람 확인: 사람이 결정하거나 직접 할 일이 항목으로 있는가? 없음이면 근거가 있고, copilot-instructions.md의 "깊이 보는 경로"를 건드리지 않았는가?
+- 의도: 해결하는 문제와 방식이 3줄 이내로 있고 diff와 맞는가?
 - 검증: 표인가? Issue의 완료 조건마다 행이 있는가? 실행 열에 명령이나 CI job, 결과 열에 본 것이 있는가? 실행하지 않은 조건을 검증하지 않음으로 적었는가?
-- 리스크: 절이 있는가? 어느 검사가 못 잡는지와 어떻게 알아채는지가 있는가? 없음이면 근거가 있는가?
-- 항목 형식: 요약형 절(공부, 구현, 리스크)은 요약 한 줄과 근거 항목 최대 2개, 표형 절(검증)은 요약 없이 표 하나이고 행 하나에 확인 하나인가? 개조식이고 mermaid 블록 밖에 backtick이 없는가? (workflow.md 공통 작성 규칙)
+- 리스크: 절이 있는가? 어느 검사가 못 잡는지와 어떻게 알아채는지, 되돌리는 방법이 있는가? 없음이면 근거가 있는가?
+- 항목 형식: 절마다 템플릿 주석의 항목 수 상한을 지켰는가? 표형 절(검증)은 요약 없이 표 하나이고 행 하나에 확인 하나인가? 개조식이고 명령, 파일 경로, 식별자가 backtick으로 감싸여 있는가? (workflow.md 공통 작성 규칙)
 - 역할 분리: 왜, 완료 조건, 의사결정은 Issue에만 있고 PR은 Issue 링크로 대체했는가?
 - 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
 </rubrics>
@@ -57,7 +58,8 @@ PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_r
 
 ### PR body (PR이 열려 있을 때)
 - 섹션 구성: [PASS/NEEDS_WORK/FAIL] — (근거)
-- 공부: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 사람 확인: [PASS/NEEDS_WORK/FAIL] — (근거)
+- 의도: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 검증: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 리스크: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 항목 형식: [PASS/NEEDS_WORK/FAIL] — (근거)
