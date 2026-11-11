@@ -1,6 +1,6 @@
 <!--
 이 파일이 PR body 형식의 기준이다. slash command와 rules는 이 파일을 참조한다.
-여기는 형식만 정한다. 문체와 label 같은 공통 작성 규칙은 .claude/rules/workflow.md를 따른다.
+여기는 형식만 정한다. 문체와 label 같은 공통 작성 규칙은 .claude/rule-details/github-tools.md를 따른다.
 
 사람은 맨 위 작업 목적 절만 읽는다. 그 절은 2줄 이내다.
 나머지 절의 독자는 agent다. PR을 리뷰하는 Copilot과 서브에이전트, 그리고 나중에 이 변경의 이유를 찾는 세션이 읽는다.

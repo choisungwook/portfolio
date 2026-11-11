@@ -30,15 +30,11 @@ allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
 
 ## 작성 규칙
 
-- Issue body는 한글 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
-- Goal은 번호 리스트 3개 이내로 쪼갠다. 절마다 항목 규칙은 템플릿의 주석을 따른다. 명령, 파일 경로, 식별자는 backtick으로 감싼다.
 - 벤치마킹한 제품의 이름을 쓰지 않고 기능 서술로 대체한다. 특정 제품에 묶인 파일 형식 이름도 같은 이유로 피한다.
 - 사용자의 말을 그대로 옮기지 않고 목표 형태로 정리한다. 판단이 들어간 부분은 Issue 생성 후 사용자에게 요약해 알린다.
-- Issue body에 claude session 링크를 넣지 않는다.
-- 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
+- 문체와 나머지 규칙은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 작성 규칙"과 "Issue와 PR 문체"를 따른다.
 
 ## 주의
 
-- 이 command를 호출한 것이 Issue 생성에 대한 명시적 지시다. [.claude/rules/workflow.md](../rules/workflow.md)의 실행 승인 규칙은 이 범위 안에서 충족된다.
+- 이 command를 호출한 것이 Issue 생성에 대한 명시적 지시다. [AGENTS.md](../../AGENTS.md) "완료 기준"의 명시적 지시 조건은 이 범위 안에서 충족된다.
 - commit, push, PR 생성은 하지 않는다. 그것은 /repo-pr-create의 일이다.
-- GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)를 따른다.

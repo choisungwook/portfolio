@@ -1,4 +1,6 @@
-# GitHub 조작 도구 규칙
+# GitHub 규칙
+
+Issue와 PR 작성 규칙, GitHub Actions 작성 규칙, 환경별 조작 도구를 정한다.
 
 GitHub를 건드리는 command는 세 환경 중 하나에서 돈다. 절차는 같고 도구만 다르므로, 각 command는 절차만 쓰고 도구 대응은 이 파일을 참조한다.
 
@@ -48,9 +50,59 @@ gh auth status
 - **GraphQL mutation**: Copilot 재요청(`requestReviewsByLogin`)이 안 된다. 최초 요청만 된다.
 - **local branch 정리**: merge 후 `git pull --rebase`를 대신할 수단이 없다.
 
+## Issue와 PR 작성 규칙
+
+형식의 기준은 템플릿 2개다. 섹션 구성과 항목 형식은 [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)와 [.github/pull_request_template.md](../../.github/pull_request_template.md)에서 읽고 이 파일에 다시 적지 않는다. 생성 절차는 [repo-pr-create.md](../commands/repo-pr-create.md)에 있다.
+
+- PR을 생성할 때 기록용 Issue를 함께 만들고 PR 본문 끝에 `Issue #<number>` 형식으로 링크한다.
+- target branch는 `master`다.
+- PR을 만들기 직전에 현재 branch 이름을 확인한다. `<type>/<short-description>` 형식이 아니면 그 형식으로 바꾸고 push한 뒤 PR을 만든다. 실행 환경이 지정한 branch에만 push하도록 제한하면(클라우드 세션 등) 이름을 바꾸지 않고 결과 보고에 건너뛴 단계로 남긴다.
+- 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
+- squash merge commit 제목 끝에는 `(#<PR 번호>)`를 붙여 commit에서 PR을 추적할 수 있게 한다.
+- Issue body, PR body, commit message에 claude session 링크를 넣지 않는다.
+
+## Issue와 PR 문체
+
+- 한글 개조식으로 쓴다. 서술형 종결어미(-다, -한다, -했다, -된다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
+  - 서술형: `PR body가 길어서 읽지 않게 되는 문제를 없앤다.`
+  - 개조식: `길어서 읽지 않게 되는 PR body 축소`
+- 명령, 파일 경로, 식별자는 backtick으로 감싼다. Issue와 PR의 독자가 agent이고, agent는 그 값을 그대로 실행하거나 검색한다. 강조에는 쓰지 않는다.
+- label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
+
+## Issue와 PR의 역할 분리
+
+같은 내용을 두 곳에 쓰지 않는다.
+
+- Issue: 왜 하나, 무엇이면 끝인가, 무엇을 골랐고 무엇을 버렸나.
+- PR: 어떤 방식으로 했나, 어떻게 증명했나, 무엇을 감수하고 어떻게 되돌리나.
+
+예외는 맨 위 작업 목적 절 하나다. 사람이 두 문서에서 그 절만 읽으므로 Issue와 PR 양쪽에 2줄 이내로 적는다.
+
+그 밖의 issue 내용은 PR에 다시 쓰지 않고 issue 링크로 대체한다. 두 문서는 issue의 완료 조건과 PR의 검증 절에서 연결된다.
+
+## Issue 계층
+
+모든 기록용 issue는 root issue의 하위 issue로 등록한다. root issue 하나가 그 그룹의 작업 전체를 모으는 지도가 된다.
+
+- root issue는 그룹당 하나다. `product/<이름>`을 건드리면 그 product, `.claude`나 `.github`를 건드리면 저장소 규칙과 도구, 나머지는 핸즈온이다.
+- root issue에는 `root` label을 붙이고 제목은 그룹 이름으로 한다. 예: `akbun-screenshot`
+- root issue가 없으면 만든다. body는 그 그룹이 무엇인지 한 줄이면 된다. 하위 issue 목록은 GitHub가 자동으로 렌더링하므로 직접 적지 않는다.
+- root issue는 닫지 않는다. 그룹이 살아 있는 한 열어 둔다.
+
+하위 issue 등록 방법은 아래 "sub-issue 등록"에 있다.
+
+## GitHub Actions 작성 규칙
+
+workflow를 만들거나 수정할 때 버전을 오래된 값으로 하드코딩하지 않는다.
+
+- action(uses)은 최신 stable 메이저 버전을 확인해 사용한다. 예: actions/checkout, actions/setup-node
+- workflow가 설치하는 도구, 모듈, 라이브러리도 최신 stable 버전을 확인해 사용한다. npm 패키지는 npm view <패키지> dist-tags.latest로, 그 외는 웹 검색으로 확인한다.
+- 언어 런타임(Node 등)은 현재 LTS 버전을 사용한다.
+- 상위 도구가 특정 버전 범위만 지원하면(peer dependency 등) 그 범위 안의 최신 stable을 쓰고 이유를 남긴다.
+
 ## MCP로 만든 PR의 자동 footer
 
-일부 MCP 서버는 PR body 끝에 claude session 링크 footer를 자동으로 붙인다. PR body에 session 링크를 넣지 않는 규칙을 기본 동작이 어긴다.
+일부 MCP 서버는 PR body 끝에 claude session 링크 footer를 자동으로 붙인다.
 
 - PR을 만든 직후 body를 다시 읽는다.
 - footer가 붙었으면 원래 body로 한 번 더 update한다. update에는 footer가 다시 붙지 않는다.

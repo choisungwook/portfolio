@@ -6,17 +6,14 @@
 
 | 파일 | 읽는 시점 |
 |---|---|
-| [github-tools.md](../rule-details/github-tools.md) | Issue, PR, 리뷰, merge 등 GitHub를 건드릴 때 |
-| [product.md](../rule-details/product.md) | `product/` 아래 파일을 만들거나 고칠 때 |
+| [github-tools.md](../rule-details/github-tools.md) | Issue, PR, 리뷰, merge 등 GitHub를 건드릴 때, `.github/workflows/`를 만들거나 고칠 때 |
+| [docs.md](../rule-details/docs.md) | 핸즈온 문서(`docs/`, `README.md`)를 쓰거나 고칠 때 |
+| [product.md](../rule-details/product.md) | `product/` 아래 파일을 만들거나 고칠 때, 웹앱과 데스크톱 앱 화면을 검증할 때 |
 | [tauri.md](../rule-details/tauri.md) | `src-tauri/`가 있는 workspace를 건드릴 때, 새 데스크톱 앱의 스택을 정할 때 |
 | [electron.md](../rule-details/electron.md) | Electron workspace(`src/main/`, preload)를 건드릴 때 |
 | [terraform.md](../rule-details/terraform.md) | `.tf` 파일을 만들거나 고칠 때 |
 | [kubernetes.md](../rule-details/kubernetes.md) | `manifests/` 아래 YAML을 만들거나 고칠 때 |
 | [python.md](../rule-details/python.md) | `.py` 파일을 만들거나 고칠 때 |
-
-## workspace 지식
-
-이미 있는 workspace를 고칠 때 그 workspace의 `knowledge/index.md`를 읽는다. 세부는 [knowledge.md](knowledge.md)의 "읽는 시점"에 있다.
 
 ## 항상 주입되는 규칙
 
@@ -25,4 +22,4 @@
 | [philosophy.md](philosophy.md) | 글쓰기 철학. 모든 문서의 상위 규칙 |
 | [markdown.md](markdown.md) | Markdown 헤더와 코드블록 |
 | [knowledge.md](knowledge.md) | `knowledge/` 지식 번들 기록 |
-| [workflow.md](workflow.md) | 작업 상태 파일, Issue와 PR, GitHub Actions |
+| [workflow.md](workflow.md) | workspace 초기화, 작업 상태 파일 |

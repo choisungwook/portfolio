@@ -16,7 +16,7 @@ PR은 작업 목적만 다시 적고 나머지는 이 issue를 링크한다. PR�
 명령, 파일 경로, 식별자는 backtick으로 감싼다. agent가 그대로 실행하거나 검색하는 값이다. 강조에는 쓰지 않는다.
 목록형 절(Goal, 완료 조건, ADR)은 요약 없이 항목만 쓴다. 항목 하나에 목표·조건·결정 하나다.
 body 전체는 30줄 이내다.
-이 issue는 항상 root issue의 하위 issue로 등록한다. 등록 방법은 .claude/rules/workflow.md를 따른다.
+이 issue는 항상 root issue의 하위 issue로 등록한다. 등록 방법은 .claude/rule-details/github-tools.md를 따른다.
 -->
 
 ## 작업 목적

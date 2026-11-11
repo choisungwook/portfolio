@@ -15,21 +15,21 @@ A GitHub Issue with the work specification and the Generator's progress comments
 </input>
 
 <rubrics>
-문서 채점 기준은 [.claude/rules/philosophy.md](../rules/philosophy.md)와 루트 AGENTS.md의 "문서 작성 규칙"이다. 그 기준을 그대로 사용하여 PASS / NEEDS_WORK / FAIL로 채점한다.
+문서 채점 기준은 [.claude/rules/philosophy.md](../rules/philosophy.md)와 [.claude/rule-details/docs.md](../rule-details/docs.md)이다. 그 기준을 그대로 사용하여 PASS / NEEDS_WORK / FAIL로 채점한다.
 
 코드가 포함된 작업에는 추가로 다음을 채점한다:
 
 - 기능성: 의도한 대로 동작하는가? 빌드/테스트가 통과하는가? 가능하면 실제로 실행하여 확인한다.
 - 코드 품질: 읽기 쉽고 유지보수 가능한가? 불필요한 복잡성은 없는가?
 
-PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rules/workflow.md](../rules/workflow.md)의 "Issue와 PR 공통 작성 규칙"이 기준이다.
+PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 문체"이 기준이다.
 
 - 섹션 구성: 작업 목적, 방식, 검증, 리스크 순서로 네 절이 모두 있는가? body가 30줄 이내인가?
 - 작업 목적: 2줄 이내이고 구현 방식이 아니라 목적인가? copilot-instructions.md의 "깊이 보는 경로"를 건드렸으면 사람 확인 줄이 있는가?
 - 방식: 목적을 달성한 방식이 한 줄로 있고 diff와 맞는가?
 - 검증: 표인가? Issue의 완료 조건마다 행이 있는가? 실행 열에 명령이나 CI job, 결과 열에 본 것이 있는가? 실행하지 않은 조건을 검증하지 않음으로 적었는가?
 - 리스크: 절이 있는가? 어느 검사가 못 잡는지와 어떻게 알아채는지, 되돌리는 방법이 있는가? 없음이면 근거가 있는가?
-- 항목 형식: 절마다 템플릿 주석의 항목 수 상한을 지켰는가? 표형 절(검증)은 요약 없이 표 하나이고 행 하나에 확인 하나인가? 개조식이고 명령, 파일 경로, 식별자가 backtick으로 감싸여 있는가? (workflow.md 공통 작성 규칙)
+- 항목 형식: 절마다 템플릿 주석의 항목 수 상한을 지켰는가? 표형 절(검증)은 요약 없이 표 하나이고 행 하나에 확인 하나인가? 개조식이고 명령, 파일 경로, 식별자가 backtick으로 감싸여 있는가? (github-tools.md의 Issue와 PR 문체)
 - 역할 분리: 왜, 완료 조건, 의사결정은 Issue에만 있고 PR은 Issue 링크로 대체했는가?
 - 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
 </rubrics>
@@ -46,9 +46,9 @@ PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_r
 ```
 ## 평가
 
-### 문서 (philosophy.md, AGENTS.md 문서 작성 규칙 기준)
+### 문서 (philosophy.md, docs.md 기준)
 - 내 말로 쓰여 있는가 (philosophy.md): [PASS/NEEDS_WORK/FAIL] — (근거)
-- 결론이 먼저 나오는가 (AGENTS.md 문서 작성 규칙): [PASS/NEEDS_WORK/FAIL] — (근거)
+- 결론이 먼저 나오는가 (docs.md): [PASS/NEEDS_WORK/FAIL] — (근거)
 - 재현할 수 있는가 (philosophy.md): [PASS/NEEDS_WORK/FAIL] — (근거)
 
 ### 코드 (해당 시)

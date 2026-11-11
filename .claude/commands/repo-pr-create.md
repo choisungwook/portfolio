@@ -22,7 +22,7 @@ allowed-tools: Bash, Read, Glob, Grep
 
 ## 환경
 
-GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)를 따른다. shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으므로, 커밋되지 않은 변경이 남아 있으면 시작하지 말고 알린다.
+shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으므로, 커밋되지 않은 변경이 남아 있으면 시작하지 말고 알린다.
 
 ## PR 직전 리뷰
 
@@ -46,12 +46,8 @@ GitHub 조작 도구는 [.claude/rule-details/github-tools.md](../rule-details/g
 
 ## 작성 규칙
 
-- commit message는 영어로, Issue와 PR body는 한글 개조식으로 쓴다. 종결어미(-다, -한다, -했다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
-- Goal은 번호 리스트 3개 이내로 쪼갠다. 절마다 항목 규칙은 템플릿의 주석을 따른다. 명령, 파일 경로, 식별자는 backtick으로 감싼다.
-- 완료 조건과 의사결정은 Issue에만 쓴다. PR에는 다시 쓰지 않고 링크만 남긴다. 작업 목적 절만 양쪽에 2줄 이내로 쓴다.
-- PR의 검증 절은 표다. Issue의 완료 조건마다 행 하나, 실행 열에 명령이나 CI job, 결과 열에 본 것을 적는다. 실행하지 않은 조건은 실행 열에 검증하지 않음으로 적는다.
-- PR body와 Issue body 어디에도 claude session 링크를 넣지 않는다.
-- 나머지는 [.claude/rules/workflow.md](../rules/workflow.md)를 따른다.
+- commit message는 영어로 쓴다.
+- Issue와 PR body의 형식은 두 템플릿의 주석을, 문체와 나머지 규칙은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 작성 규칙"과 "Issue와 PR 문체"를 따른다.
 
 ## body 전달과 검증
 

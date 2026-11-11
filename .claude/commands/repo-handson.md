@@ -55,7 +55,7 @@ argument-hint: <workspace 경로> <주제>
 - 파일명 앞에 순서를 붙인다. 예: `1-problem.md`, `2-<기능>.md`. 순서를 바꾸면 파일명, 제목의 시나리오 번호, 모든 상대 링크, README 목차를 함께 고친다.
 - `setup.md`를 따로 만들고 설치 관련 내용은 전부 여기에만 쓴다. 로컬 실습이면 up과 down을 한 줄 명령으로 만든다(`docker compose up -d`, `docker compose down -v`).
 - 개인 장비를 쓰는 실습이면 장비를 다시 켠 뒤 환경을 되살리는 점검표를 따로 만든다. 무엇이 남고 무엇이 비는지 표로 먼저 쓴다.
-- 본문은 `/akbun-writing:akbun-writing` 스킬로 쓴다. 스킬이 없는 환경이면 [philosophy.md](../rules/philosophy.md)와 [AGENTS.md](../../AGENTS.md)의 문서 작성 규칙으로 쓰고 결과 보고에 남긴다.
+- 본문은 `/akbun-writing:akbun-writing` 스킬로 쓴다. 스킬이 없는 환경이면 [philosophy.md](../rules/philosophy.md)와 [docs.md](../rule-details/docs.md)로 쓰고 결과 보고에 남긴다.
 - 작업 디렉터리에 의존하는 명령이 있으면 첫 코드블록에 `cd <workspace 경로>`를 넣거나 실행 위치를 단계에 적는다.
 - markdown 규칙은 [.claude/rules/markdown.md](../rules/markdown.md)를 따른다.
 - 개인 IP, 호스트 이름, 절대 경로, 실제 자격증명은 쓰지 않는다. `<서버 IP>` 같은 자리 표시를 쓴다.
