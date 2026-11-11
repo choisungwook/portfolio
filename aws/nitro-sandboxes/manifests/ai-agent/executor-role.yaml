@@ -1,0 +1,12 @@
+# 실무에서 흔한 실수를 재현한다. 코드 실행 pod의 service account에 pod 조회 권한이 남아 있다
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: executor-pod-reader
+  namespace: ai-agent
+  labels:
+    app.kubernetes.io/part-of: ai-agent-sandbox
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]

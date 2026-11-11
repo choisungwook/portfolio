@@ -1,0 +1,25 @@
+{
+  "boot-source": {
+    "kernel_image_path": "vmlinuz",
+    "initrd_path": "initrd.img"
+  },
+  "machine-config": {
+    "vcpu_count": 1,
+    "mem_size_mib": 512
+  },
+  "drives": [],
+  "network-interfaces": [
+    {
+      "iface_id": "eth0",
+      "host_dev_name": "tap0"
+    }
+  ],
+  "vsock": {
+    "guest_cid": 3,
+    "uds_path": "/run/sandbox/v.sock"
+  },
+  "enclave": {
+    "cpu_overcommit": true,
+    "debug_mode": true
+  }
+}

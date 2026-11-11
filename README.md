@@ -125,6 +125,7 @@
 111. AWS Network Firewall: egress 트래픽 audit과 도메인 차단·허용 정책 관리, 콘솔 실습, 운영 적용 순서, 로컬 Grafana 모니터링 (26.10.31) - [링크](./aws/network-firewall/egress-filtering/)
 112. (아직 실습안함) Aurora MySQL IAM DB 인증: token 로그인과 실패 원인 추적, password에서 IAM으로 무중단 전환과 로그·metric 검증, 중단 전환, EC2 application status check (26.11.7) - [링크](./aws/rds/aurora-iam-auth/)
 113. Amazon Bedrock Guardrails와 LiteLLM: 정책 판정, input·output guardrail 시점과 지연, 스트리밍 유출, text unit 비용, LiteLLM 콘솔 모니터링과 고객 문의 대응 (26.11.7) - [링크](./aws/bedrock/guardrails/)
+114. AWS Nitro Sandboxes: EC2 Firecracker로 confidential·direct 모드 메모리 격리 확인, EKS isolated pod과 일반 pod 비교, Gemma 2B 생성 코드를 sandbox에 가둬 막히는 것과 CloudWatch 관측 비교 (26.11.11) - [링크](./aws/nitro-sandboxes/)
 
 ## 직접 만든 제품
 

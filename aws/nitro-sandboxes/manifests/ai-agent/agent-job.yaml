@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agent
+  namespace: ai-agent
+  labels:
+    app: agent
+    app.kubernetes.io/part-of: ai-agent-sandbox
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agent
+        app.kubernetes.io/part-of: ai-agent-sandbox
+    spec:
+      serviceAccountName: agent
+      restartPolicy: Never
+      containers:
+        - name: agent
+          image: public.ecr.aws/docker/library/python:3.13-slim
+          command: ["sh", "-c", "pip install --quiet --root-user-action=ignore kubernetes==37.0.2 requests==2.34.2 && python /app/agent.py"]
+          volumeMounts:
+            - name: agent-script
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: agent-script
+          configMap:
+            name: agent-script

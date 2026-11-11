@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: ai-agent
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: ai-agent-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        app.kubernetes.io/part-of: ai-agent-sandbox
+    spec:
+      # 모델 서버는 신뢰하는 쪽이라 일반 runtime(runc)으로 둔다. sandbox로 가두는 대상은 모델이 만든 코드다
+      initContainers:
+        - name: pull-model
+          image: ollama/ollama:0.40.16
+          command: ["sh", "-c", "ollama serve & sleep 5 && ollama pull gemma2:2b"]
+          env:
+            - name: OLLAMA_MODELS
+              value: /models
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.40.16
+          env:
+            - name: OLLAMA_MODELS
+              value: /models
+            - name: OLLAMA_KEEP_ALIVE
+              value: "-1"
+          ports:
+            - containerPort: 11434
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+      volumes:
+        - name: models
+          emptyDir:
+            sizeLimit: 5Gi

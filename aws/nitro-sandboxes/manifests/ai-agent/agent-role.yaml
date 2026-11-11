@@ -1,0 +1,17 @@
+# agent는 executor pod에 코드를 보내기만 한다. pods/exec 외의 권한은 없다
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-executor-exec
+  namespace: ai-agent
+  labels:
+    app.kubernetes.io/part-of: ai-agent-sandbox
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["executor-runc", "executor-sandbox", "executor-sandbox-netoff"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    resourceNames: ["executor-runc", "executor-sandbox", "executor-sandbox-netoff"]
+    verbs: ["create", "get"]
