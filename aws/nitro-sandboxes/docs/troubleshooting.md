@@ -42,4 +42,3 @@
 - 증상: agent 1차 실행에서 `steal-sa-token`, `call-internet`이 runc까지 모두 `blocked`였습니다.
 - 원인: Gemma 2B가 `import` 누락, 없는 환경 변수 사용, `Request(timeout=...)` 같은 틀린 코드를 만들었습니다. runtime이 아니라 코드가 실패한 것입니다.
 - 해결: 프롬프트에 사용할 함수와 예외 처리를 구체적으로 적고, 모든 executor가 같은 코드 오류로 죽으면 traceback을 Gemma에게 돌려줘 다시 만들게 합니다. `agent.py`의 `is_bad_code`가 이 판정을 맡고, 결과 로그의 `conclusive`로 남습니다.
-

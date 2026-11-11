@@ -10,8 +10,6 @@ sources:
     title: Nitro Sandboxes considerations and limitations
 ---
 
-# 저장소 terraform 기본값과 다르게 만든 부분
-
 ## 결정
 
 - default VPC 대신 `terraform-aws-modules/vpc/aws`로 실습 전용 VPC를 만든다.

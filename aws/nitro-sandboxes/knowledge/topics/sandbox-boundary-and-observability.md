@@ -6,8 +6,6 @@ tags: [nitro-sandboxes, eks, ai-agent, observability, rbac]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T01:10:00Z }
 ---
 
-# isolated sandbox는 노드를 지키지만 SA 토큰과 Container Insights 메트릭은 그대로가 아니다
-
 2026-11-11, EKS 1.37 Auto Mode(us-west-2), `c8a.large`에서 같은 LLM 코드를 runc와 `isolated-sandbox` executor에서 실행한 결과다. 상세는 [6-ai-agent-code-sandbox.md](../../docs/6-ai-agent-code-sandbox.md).
 
 - 막는 것: `hostPID`, hostPath(`/`)를 줘도 sandbox는 노드 프로세스와 노드 파일에 닿지 않는다. hostPath의 `/`는 sandbox guest 루트로 바뀐다.

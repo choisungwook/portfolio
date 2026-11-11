@@ -6,8 +6,6 @@ tags: [nitro-sandboxes, capacity, ec2, eks]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T00:30:00Z }
 ---
 
-# Nitro Sandbox 메모리는 공식대로 MiB 단위까지 빠진다
-
 `m7g.large`, `nitro_enclaves.mempool=2G@0`에서 512MiB Sandbox(`eth0`, vsock)를 띄우고 `mem_pool/free` 감소량을 쟀다.
 
 | 모드 | 감소량 | 구성 |

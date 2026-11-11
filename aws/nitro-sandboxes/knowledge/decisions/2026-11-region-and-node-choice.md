@@ -13,8 +13,6 @@ sources:
     title: Run a pod in isolated mode
 ---
 
-# EC2는 서울, EKS는 us-west-2 Auto Mode로 실습한다
-
 ## 결정
 
 - EC2 실습(terraform/ec2)은 저장소 기본 리전인 ap-northeast-2에 둔다.
