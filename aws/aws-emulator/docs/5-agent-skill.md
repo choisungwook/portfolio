@@ -173,19 +173,19 @@ region-from-env UNVERIFIED unclassified
 credentials-from-env UNVERIFIED unclassified
 ```
 
-- 실패(`FAILING`)한 item은 없습니다. 호출 17개 중 9개는 통과한 `direct` trace가 있습니다.
+- 실패(`FAILING`)한 item은 없습니다. 호출 17개 중 8개가 `VERIFIED`입니다.
 - `no-direct` 8개는 trace가 그 호출을 준비나 정리 단계에서만 쓰거나 다른 기능(테이블 클래스, GSI, 덮어쓰기)을 검증해서, 앱의 호출 그대로를 검증한 trace가 없었습니다.
 - `s3-list-prefix`는 `Prefix`가 `photos/`인 trace를 `direct`로 골랐지만, 판정 단계가 앱의 값 `receipts/`가 trace에 없다는 이유로 기계적으로 강등했습니다.
 - 리전과 자격 증명 assumption은 그것을 주제로 한 trace가 없어 `UNVERIFIED`입니다.
 
 ### 5. 판정과 실제 실행 결과 비교
 
-같은 앱은 [2-endpoint-switch.md](2-endpoint-switch.md)에서 emulator로 다섯 번 실행해 다섯 번 모두 결과가 맞았습니다. 판정이 `WILL NOT WORK`인 이유는 앱이 실패해서가 아니라 "통과한다는 공개 증거가 없는 호출이 있어서"입니다.
+같은 앱은 [2-endpoint-switch.md](2-endpoint-switch.md)에서 emulator로 네 번 실행해 네 번 모두 결과가 맞았습니다. 판정이 `WILL NOT WORK`인 이유는 앱이 실패해서가 아니라 "통과한다는 공개 증거가 없는 호출이 있어서"입니다.
 
 | 질문 | 직접 실행 | 호환성 점검 |
 |---|---|---|
-| 이번 입력에서 동작했나 | 예, 5회 모두 | 답하지 않음 |
-| 호출마다 실제 AWS와 같다는 근거가 있나 | 없음(실행 결과만) | 17개 중 9개 |
+| 이번 입력에서 동작했나 | 예, 4회 모두 | 답하지 않음 |
+| 호출마다 실제 AWS와 같다는 근거가 있나 | 없음(실행 결과만) | 17개 중 8개 |
 | 다음 release에서도 같은가 | 다시 실행해야 앎 | 같은 점검을 새 점수로 다시 돌림 |
 
 ### 6. skill 제거

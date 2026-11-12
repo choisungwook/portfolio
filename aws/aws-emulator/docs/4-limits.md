@@ -182,7 +182,6 @@ shasum ~/.aws/emulator/9297/emulator_credentials ~/.aws/emulator/9297/ca.pem | c
 docker restart aws-emulator
 for i in $(seq 30); do curl -sf --cacert ~/.aws/emulator/9297/ca.pem https://127.0.0.1:9297/__admin/health >/dev/null && break; sleep 1; done
 shasum ~/.aws/emulator/9297/emulator_credentials ~/.aws/emulator/9297/ca.pem | cut -c1-12
-source emulator.env
 echo "s3: [$(aws s3api list-buckets --query 'Buckets[].Name' --output text)] dynamodb: [$(aws dynamodb list-tables --query TableNames --output text)]"
 ```
 

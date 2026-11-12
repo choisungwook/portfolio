@@ -9,6 +9,8 @@
 | Docker Desktop | 29.9.2 (arm64) | emulator 실행. macOS용 설치 패키지는 없습니다 |
 | AWS CLI | 2.36.29 | emulator 호출, skill 설치(2.35.0 이상 필요) |
 | uv | 0.11.17 | `app/`, `probes/`의 Python 스크립트 실행 |
+| gh | 로그인된 GitHub CLI | 시나리오 3의 점수 파일 다운로드, 시나리오 5의 호환성 점검 |
+| jq, GNU grep(`ggrep`) | Homebrew 설치본 | 시나리오 5의 호환성 점검 |
 | 디스크 | 이미지 1.16GB | Docker 이미지 |
 | 실제 AWS 자격 증명 | 선택 | 시나리오 2~4에서 실제 AWS와 비교할 때만 필요 |
 
