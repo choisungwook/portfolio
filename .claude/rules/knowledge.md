@@ -29,10 +29,12 @@ PR을 만들기 직전에 이번 작업에서 남길 지식이 있는지 검토�
 
 | 디렉터리 | 대상 | type |
 | --- | --- | --- |
-| `knowledge/decisions/` | 작업 중 내린 의사결정과 이유. Issue의 ADR 중 앞으로의 작업에도 영향을 주는 것 | `Decision` |
+| `knowledge/decisions/` | 작업 중 내린 의사결정과 이유. Issue의 ADR 중 앞으로의 작업에도 영향을 주는 것. product의 아키텍처 결정도 여기에 둔다 | `Decision` |
 | `knowledge/playbooks/` | 두 번 이상 반복된 작업 절차 | `Playbook` |
 | `knowledge/topics/` | 여러 핸즈온을 관통하는 도메인 통찰 | `Topic` |
 | `knowledge/references/` | 외부 자료의 저장소 내 사본 | `Reference` |
+
+일부 product에 있는 `adr/`는 `knowledge/`를 쓰기 전의 결정 기록이다. 읽기만 하고 새 결정을 추가하지 않는다. `adr/`의 결정이 바뀌면 그 파일을 고치지 않고 `knowledge/decisions/`에 새 결정을 쓰고 `adr/`의 해당 파일은 지운다. `wiki/`는 결정이 아니라 현재 구조와 개발 절차를 설명하는 문서라 그대로 쓴다.
 
 기록하지 않는 것:
 
@@ -48,7 +50,7 @@ frontmatter 형식:
 
 ```yaml
 ---
-type: Decision            # 필수. Decision | Playbook | Topic
+type: Decision            # 필수. Decision | Playbook | Topic | Reference
 title: 한 줄 제목
 description: 한 문장 요약
 tags: [kubernetes, workflow]
@@ -74,13 +76,13 @@ frontmatter 규칙:
 - 외부 근거(PR, 블로그, 공식 문서)는 본문 목록이 아니라 frontmatter `sources`에 남긴다. 특정 문장의 근거는 `[^id]` 각주로 달고 라벨을 `sources[].id`와 맞춘다.
 - 관련 concept는 markdown 상대 링크로 연결한다. 링크 대상이 아직 없어도 괜찮다.
 - 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 `/`로 시작하는 bundle root 기준 경로(예: `/references/foo.md`)를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
-- 0.1 형식(`timestamp`, `## Citations`)으로 쓰인 기존 concept는 그대로 읽힌다. 그 concept를 고칠 때 그 파일만 새 형식으로 옮긴다.
+- 0.1 형식(`timestamp`, `## Citations`)으로 쓰인 기존 concept는 그대로 읽힌다. 0.2는 0.1에 선택 필드만 더한 버전이라 번들 `index.md`의 `okf_version`은 0.1 형식 concept가 남아 있어도 `"0.2"`로 적는다. 0.1 형식 concept를 고칠 때 그 파일만 새 형식으로 옮긴다.
 - 분량은 A4 반 장 이내로 짧게 쓴다.
 
 ## 기록 후 갱신할 파일
 
 1. 해당 디렉터리의 `index.md` 목록에 항목을 추가한다.
-2. 같은 `knowledge/`의 `log.md` 맨 위에 오늘 날짜(`## YYYY-MM-DD`) 섹션을 만들어 변경 내역을 남긴다. 루트에 기록했으면 루트의 `log.md`다.
+2. 같은 `knowledge/`의 `log.md` 맨 위에 오늘 날짜(`## YYYY-MM-DD`) 섹션을 만들어 변경 내역을 남긴다.
 
 ## 파일명 규칙
 

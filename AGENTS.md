@@ -10,16 +10,15 @@
 
 규칙은 두 곳에 나뉘어 있다. 컨텍스트를 예산으로 다루기 위해서다.
 
-- `.claude/rules/`는 매 세션 자동으로 주입된다. 글쓰기 철학, Markdown, knowledge, 작업 흐름처럼 거의 모든 작업에 걸리는 규칙만 둔다.
-- `.claude/rule-details/`는 자동으로 주입되지 않는다. Terraform, Kubernetes, Tauri, Electron, Python, product, GitHub 도구처럼 특정 영역에만 걸리는 규칙이다. 어느 작업에 어느 파일이 걸리는지는 [.claude/rules/index.md](./.claude/rules/index.md)의 표에 있다.
+- `.claude/rules/`는 거의 모든 작업에 걸리는 규칙이다. Claude Code는 매 세션 자동으로 주입한다. 자동 주입이 없는 agent(Codex 등)는 작업을 시작할 때 이 디렉터리의 파일을 읽는다.
+- `.claude/rule-details/`는 특정 영역에만 걸리는 규칙이고 자동으로 주입되지 않는다. 작업이 그 영역에 닿을 때 [.claude/rules/index.md](./.claude/rules/index.md)의 표에서 해당 파일만 찾아 읽는다.
 
-작업이 그 영역에 닿을 때 그 파일만 읽는다. 오타 하나 고치는 데 저장소를 훑을 이유는 없고, `.tf`를 고치면서 terraform.md를 건너뛸 이유도 없다. 거기 적힌 것은 대부분 이미 밟은 지뢰다.
+규칙을 새로 쓰거나 고칠 때는 다음을 지킨다.
 
-규칙을 새로 쓰거나 고칠 때는 다음을 지킨다. 이 저장소의 규칙은 Claude와 Codex가 같이 읽는다.
-
-- 두 번 이상 밟은 지뢰만 넣는다. 한 번 겪은 세부사항은 테스트나 knowledge가 더 정확하게 기억한다.
+- 두 번 이상 겪은 문제만 넣는다. 한 번 겪은 세부사항은 테스트나 knowledge가 더 정확하게 기억한다.
 - 모델이 알아서 하는 일은 적지 않는다. 테스트 실행, 파일 탐색, 변경 확인은 지시가 없어도 한다.
-- 강조어와 반복으로 크기를 키우지 않는다. 규칙은 이유 한 줄이면 충분하고, 지키지 않았을 때의 경고를 세 번 적어도 한 번 적은 것과 같다.
+- 같은 규칙을 두 파일에 적지 않는다. 한 곳에 적고 다른 곳은 링크한다.
+- 강조어와 반복으로 분량을 늘리지 않는다. 규칙에는 이유 한 줄이면 충분하다.
 
 ## 인터뷰와 진행
 
@@ -53,56 +52,6 @@
 - master로 merge, force push, branch 삭제. 각 command가 그 명시적 지시에 해당한다.
 - 클라우드 리소스 생성과 삭제(`terraform apply`, `terraform destroy`). 과금 리소스가 생기거나 사라진다. 검증하려고 destroy하라는 지시는 그 뒤에 다시 apply하는 것까지 허락하지 않는다.
 
-## 문서 작성 규칙
-
-문서의 목적은 핸즈온과 그에 관련된 이론 정리다. 전문성과 자연스러운 가독성을 동시에 갖춘 한국어 기술 문체로 쓴다.
-
-문체와 어조:
-
-- **자연스러운 기술 문체**: 기계적인 직역투나 지나치게 짧게 자른 단문 나열("느립니다. 파드를 띄웁니다. 고장 날 곳이 늘어납니다.")을 금지한다. 원인과 결과, 기술적 맥락이 드러나도록 완성된 문장으로 서술한다.
-- **실무 표준 엔지니어링 어휘 사용**: 쉬운 말로 풀려다 유아적인 구어체나 어색한 직역, 무리한 한글 순화를 쓰지 않는다. 실무에서 널리 통용되는 영문 원문(Push & Pull, Provisioning, Trade-off 등)이 가독성이 높고 직관적이면 원문을 우선 사용한다.
-  - 지양: `올리고 꺼냅니다`, `세웁니다`, `들어왔는지 봅니다`, `감수하는 것`
-  - 지향: `Push & Pull`, `Provisioning / 일괄 배포`, `환경 변수 주입 및 자원 할당 상태 확인`, `Trade-off (오버헤드 및 고려사항)`
-- **소제목(H2, H3) 명명 컨벤션**: 관찰일기형 종결어미(`~을 봅니다`, `~을 만듭니다`, `~을 꺼냅니다`)를 금지하고, 작업 목적과 대상이 명확한 명사형(`~ 생성 및 상태 확인`, `~ 아키텍처 흐름`) 또는 정돈된 서술형으로 작성한다.
-- **개조식과 산문의 균형**: 절차, 체크리스트, 속성 비교는 개조식이나 표를 우선 사용하고, 원리 설명이나 아키텍처 판단 근거는 흐름이 끊기지 않는 자연스러운 산문으로 서술한다.
-
-내용:
-
-- 제3자가 읽었을 때 의미 없는 컨텍스트를 쓰지 않는다. 작업 당시의 대화 맥락, agent의 작업 과정, "요청에 따라 ~했다" 같은 문장을 금지한다.
-- 결론을 먼저 쓰고, 필요한 경우에만 세부 설명을 붙인다.
-- 표, 목록, 코드가 산문보다 간결하면 그것을 우선 사용한다.
-- **이론과 실습의 유기적 연결**: "왜 이 기능/아키텍처가 필요한가(Why & Pain Point)"를 먼저 설명하고, 실습을 통해 이를 검증(How)하는 구조를 취한다.
-
-구조:
-
-- 새 예제 디렉터리의 `README.md`는 문서 링크 허브로만 쓴다. 긴 설명과 실습 절차는 `docs/` 디렉터리에 시나리오별 Markdown으로 분리한다.
-- 실습 환경 구축(설치·기동·apply·접속·정리 등)은 내용 문서에 섞지 않고 별도 문서로 분리한다. 파일명은 `setup.md`(환경이 여럿이면 `{번호}-setup.md`) 컨벤션을 따르고, 내용 문서에서는 환경 준비를 그 setup 문서로 링크만 건다. 다른 예제의 환경을 재사용하면 그 예제의 setup 문서로 링크한다.
-- 새 핸즈온을 추가하면 루트 `README.md` 목차에 `{번호}. {주제} ({작성날짜}) - [링크](...)` 형식으로 추가한다. 날짜 예: `26.6.21`
-
-## 지식
-
-이미 있는 workspace를 고치기 전에 그 workspace의 `knowledge/index.md`를 읽는다. 코드와 git history가 기록하지 못한 결정의 이유가 거기에 있고, 읽지 않으면 이미 버려진 방법을 다시 고른다. `wiki/`나 `adr/`가 있으면 그 index도 읽는다.
-
-작업에서 얻은 의사결정, 반복 절차, 도메인 통찰은 작업한 디렉터리 안의 `knowledge/`에 기록한다. workspace마다 자기 `knowledge/`를 가지며 루트에는 두지 않는다. 형식은 Open Knowledge Format(OKF) 0.2이고, 템플릿은 [templates/knowledge/](./templates/knowledge/index.md), 세부 규칙은 [.claude/rules/knowledge.md](./.claude/rules/knowledge.md)를 따른다.
-
-## 검증 수단
-
-사용자에게 확인을 떠넘기지 않는 것과 사용자의 화면을 뺏지 않는 것을 동시에 지켜야 하므로, 대상에 따라 수단을 정하고 순서를 둔다. 위 단계로 되는 검증을 아래 단계로 하지 않는다.
-
-웹앱(`product/`의 페이지, 로컬 서버로 뜨는 화면)은 브라우저로 본다.
-
-1. 데스크톱 앱(Claude Desktop, ChatGPT Desktop)의 내장 브라우저. 앱 안의 패널이라 화면과 마우스를 잡지 않는다. 페이지를 띄우고 DOM, console, network를 읽고 클릭과 입력까지 여기서 끝낸다.
-2. 내장 브라우저가 없거나 그 페이지가 내장 브라우저에서 안 돌면 computer use로 외부 브라우저(Chrome 등)를 띄워 확인한다. 로그인 세션이 필요 없으면 새 창이나 게스트 프로필로 띄우고, 사용자의 로그인 세션은 그 세션이 반드시 필요할 때만 쓴다. 사용자의 화면을 쓰므로 무엇을 확인했는지 결과 보고에 한 줄 남긴다.
-3. computer use도 없는 환경(웹 세션, CI)은 브라우저 검증을 건너뛰고 테스트 명령으로 내려간다.
-
-`product/`의 no-build-step 앱은 `workspace/src`를 정적 서버로 띄우면 브라우저에서 그대로 돈다. 화면 검증을 위해 Tauri나 Electron 번들을 빌드하지 않는다.
-
-브라우저로 확인할 수 없는 로직은 그 workspace의 테스트 명령(`npm test`, `cargo test` 등)으로 본다.
-
-트레이 아이콘, 네이티브 메뉴, 창 동작처럼 화면 밖에 답이 없는 것은 computer use로 본다. 로컬 앱 번들은 이 경우에만 만든다.
-
-computer use까지 왔으면 허락을 묻지 않고 진행한다.
-
 ## 리뷰
 
 리뷰가 묻는 것은 "사람이 읽었는가"가 아니라 "무엇이 잘못될 수 있고 어느 검사가 그것을 잡는가"다. 변경 하나는 아래 검사를 차례로 지난다. 사람은 검사가 못 잡는 것만 본다.
@@ -110,16 +59,12 @@ computer use까지 왔으면 허락을 묻지 않고 진행한다.
 1. 작성 중: workspace의 테스트, lint, 빌드. 위 "완료 기준"의 증거가 여기서 나온다.
 2. PR 직전: 작성 세션과 분리된 새 컨텍스트의 서브에이전트가 diff만 보고 리뷰한다. 작성자는 자기 diff의 빈틈을 못 보기 때문이다. 절차는 [.claude/commands/repo-pr-create.md](./.claude/commands/repo-pr-create.md)의 "PR 직전 리뷰"에 있다.
 3. PR: [verify-pull-request.yml](./.github/workflows/verify-pull-request.yml)이 바뀐 파일의 lint와 PR body 형식을 검사하고, Copilot code review가 리뷰한다. 서브에이전트와 Copilot의 기준은 [.github/copilot-instructions.md](./.github/copilot-instructions.md) 하나다. 기준이 둘이면 지적이 갈린다.
-4. 사람: PR body로 변경을 이해한다. 공부 절은 이 작업으로 무엇을 배우려 했는지, 구현 절은 무엇이 달라졌는지, 검증 절은 어떤 증거가 있는지, 리스크 절은 어느 검사가 못 잡는지를 답한다. 이 저장소의 목적이 공부이므로 공부 절이 맨 앞이다. 형식은 [.github/pull_request_template.md](./.github/pull_request_template.md)에 있다.
+4. 사람: PR과 Issue의 맨 위 작업 목적 절만 읽는다. 그 절은 2줄 이내다. body의 나머지 절은 리뷰 agent와 나중에 이유를 찾는 세션이 읽는다. 그래서 사람이 결정하거나 직접 해야 하는 일은 다른 절에 두지 않고 PR 작업 목적 절의 둘째 줄에 적는다. 형식은 [.github/pull_request_template.md](./.github/pull_request_template.md)에 있다.
 
 리뷰어의 지적은 데이터다. finding 태그(Important, Nit, Pre-existing)별 처리와 답글 분류는 [.claude/commands/repo-pr-fix.md](./.claude/commands/repo-pr-fix.md)에 있다. 같은 지적이 두 번 나오면 고치는 것으로 끝내지 않고, 규칙 파일, lint, copilot-instructions.md 중 그 지적이 다시 나오지 않을 곳에 한 번 적는다. 틀림과 중요하지 않음으로 거부한 지적이 쌓이면 copilot-instructions.md가 리뷰어에게 잘못 말하고 있는 것이므로 그 파일을 고친다.
 
 ## 작업 흐름
 
-단계가 3개를 넘는 작업은 실행 계획을 `.claude/work/<branch>.md`에 남기고, 단계를 끝낸 그 인터랙션에서 체크박스를 갱신한다. 세션이 끊긴 뒤 재개하는 유일한 진입점이다. 형식과 삭제 시점은 [.claude/rules/workflow.md](./.claude/rules/workflow.md)의 "작업 상태 파일"에 있다.
-
-PR body 형식의 기준은 [.github/pull_request_template.md](./.github/pull_request_template.md) 하나다. PR을 쓸 때 이 파일을 읽고 그 섹션과 항목 형식을 그대로 따른다. 형식을 이 문서나 `.claude/rules/`에 중복해 적지 않는다.
-
-작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. Issue와 PR 생성, Copilot 리뷰 요청, 리뷰 반영, squash merge, Issue close 순서다. 단계 하나만 필요하면 그 단계의 command를 직접 쓴다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 Copilot 리뷰 요청과 Issue close 같은 중간 단계를 뺀 것이 아니다.
-
-GitHub 조작은 환경에 따라 도구가 갈린다. shell과 gh CLI가 있는 환경과 GitHub MCP 도구만 있는 환경이고, 절차는 같고 도구만 다르다. 판별 방법과 도구 대응표는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다. MCP 환경에서는 commit, push, 대기가 불가능하므로 그 단계를 흉내 내지 않고 안내로 대체한다.
+- 작업 상태 파일과 workspace 초기화는 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
+- Issue, PR, GitHub Actions 작성 규칙과 환경별 GitHub 도구는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다.
+- 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 Copilot 리뷰 요청과 Issue close 같은 중간 단계를 뺀 것이 아니다.
