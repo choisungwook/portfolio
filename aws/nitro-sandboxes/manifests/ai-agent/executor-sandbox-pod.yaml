@@ -1,0 +1,33 @@
+# hostPID와 hostPath는 일부러 넣은 잘못된 설정이다. 같은 설정에서 runtime만 바꿔 무엇이 막히는지 비교한다
+apiVersion: v1
+kind: Pod
+metadata:
+  name: executor-sandbox
+  namespace: ai-agent
+  labels:
+    app: code-executor
+    runtime: isolated-sandbox
+    app.kubernetes.io/part-of: ai-agent-sandbox
+spec:
+  runtimeClassName: isolated-sandbox
+  serviceAccountName: executor
+  hostPID: true
+  containers:
+    - name: python
+      image: public.ecr.aws/docker/library/python:3.13-slim
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+          readOnly: true
+      resources:
+        requests:
+          cpu: 500m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 512Mi
+  volumes:
+    - name: host-root
+      hostPath:
+        path: /

@@ -1,0 +1,34 @@
+#!/bin/bash
+# Nitro Sandbox 안에서 PID 1로 실행되는 init script
+export PATH=/usr/local/bin:/usr/sbin:/usr/bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+modprobe -a virtio_pci virtio_net vmw_vsock_virtio_transport nsm
+
+ip link set lo up
+ip addr add 192.0.2.2/24 dev eth0
+ip link set eth0 up
+ip route add default via 192.0.2.1
+echo "nameserver 169.254.169.253" > /etc/resolv.conf
+
+echo "[guest] kernel: $(uname -r)"
+echo "[guest] vcpus: $(nproc), $(grep MemTotal /proc/meminfo)"
+echo "[guest] processes visible: $(ls -d /proc/[0-9]* | wc -l)"
+echo "[guest] nsm device: $(ls /dev/nsm 2>&1)"
+
+# 부모 인스턴스가 이 VM의 메모리를 읽을 수 있는지 확인할 표식.
+# console에는 조각만 찍고, 이어 붙인 문자열은 guest 메모리에만 둔다
+part_a=$RANDOM$RANDOM
+part_b=$RANDOM$RANDOM
+for i in $(seq 1 2000); do echo "NSBX${part_a}${part_b}MARK"; done > /secret.txt
+echo "[guest] marker parts: ${part_a} ${part_b}"
+
+# 바깥 IP와 부모 인스턴스 IMDS에 TCP로 닿는지 확인한다
+check_tcp() {
+  if timeout 3 bash -c "echo > /dev/tcp/$1/80" 2>/dev/null; then echo open; else echo blocked; fi
+}
+echo "[guest] tcp 1.1.1.1:80 -> $(check_tcp 1.1.1.1)"
+echo "[guest] tcp 169.254.169.254:80 (parent IMDS) -> $(check_tcp 169.254.169.254)"
+
+exec sleep infinity
