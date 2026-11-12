@@ -1,0 +1,8 @@
+{
+  "SchemaVersion": "1.0",
+  "TypeName": "Custom:RackLocation",
+  "Content": {
+    "Location": "SEOUL-IDC-01.RACK7",
+    "CostCenter": "cc-1234"
+  }
+}
