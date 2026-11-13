@@ -129,6 +129,7 @@
 115. (아직 실습안함) AWS SSM Inventory: 기본 수집, PutInventory custom inventory, ECS·Lambda가 대상이 아닌 이유, resource data sync로 S3 집계 (26.11.10) - [링크](./aws/ssm/inventory/)
 116. (아직 실습안함) AWS Emulator: 계정 없이 로컬에서 AWS API 테스트, 실제 AWS와 속도·오류 응답 비교, IAM 정책과 리전 한계, AI agent용 aws-emulator skill 호환성 점검 (26.11.12) - [링크](./aws/aws-emulator/)
 117. (아직 실습안함) Amazon Bedrock AgentCore Runtime V2: snapshot 기반 시작으로 초기화 20초 agent의 cold start를 2초로, snapshot이 복제하는 상태(handler 안의 random까지), 업데이트 중 snapshot 교체, USAGE_LOGS로 메모리 회수 확인, committed baseline과 lifecycle hook 정리 (26.11.13) - [링크](./aws/bedrock/agentcore-runtime-v2/)
+118. (아직 실습안함) AI 도구는 브라우저를 어떻게 조작하는가: Claude desktop·Claude in Chrome(CLI --chrome)·Codex·Aside가 CDP에 도달하는 경로, raw CDP 8개 명령으로 클릭·읽기·캡처 재현, Playwright가 같은 작업에 CDP 36개를 보내는 이유 (26.11.14) - [링크](./computer_science/ai/cdp-browser-access/)
 
 ## 직접 만든 제품
 

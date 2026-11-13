@@ -1,0 +1,4 @@
+.chrome-profile/
+*.png
+pw.err
+pw.out
