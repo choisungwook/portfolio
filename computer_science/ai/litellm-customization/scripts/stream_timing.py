@@ -1,6 +1,6 @@
 """스트리밍 응답의 청크마다 도착 시각과 내용을 출력한다.
 
-사용법: uv run python scripts/stream_timing.py <model> "<질문>" [--web-search]
+사용법: uv run python scripts/stream_timing.py <model> "<질문>"
 """
 
 import sys
@@ -9,12 +9,11 @@ import time
 from openai import OpenAI
 
 
-def main(model: str, question: str, web_search: bool) -> None:
+def main(model: str, question: str) -> None:
   client = OpenAI(base_url="http://localhost:4100", api_key="sk-local-master-key")
-  extra = {"tools": [{"type": "web_search"}]} if web_search else {}
   started = time.monotonic()
   stream = client.chat.completions.create(
-    model=model, messages=[{"role": "user", "content": question}], stream=True, extra_body=extra
+    model=model, messages=[{"role": "user", "content": question}], stream=True
   )
   for chunk in stream:
     delta = chunk.choices[0].delta
@@ -29,4 +28,4 @@ def main(model: str, question: str, web_search: bool) -> None:
 
 
 if __name__ == "__main__":
-  main(sys.argv[1], sys.argv[2], "--web-search" in sys.argv)
+  main(sys.argv[1], sys.argv[2])

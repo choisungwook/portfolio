@@ -1,4 +1,4 @@
-"""10단계: 모델 주도 tool 호출을 흉내 내는 결정적인 가짜 모델.
+"""7단계: 모델 주도 tool 호출을 흉내 내는 결정적인 가짜 모델.
 
 tool 결과가 없으면 litellm_web_search 호출을 요청하고, tool 결과가 있으면 그 수를 세어 답한다.
 """
@@ -9,7 +9,7 @@ import uuid
 from litellm import ModelResponse
 from litellm.llms.custom_llm import CustomLLM
 
-from gateway.keyword_router import last_user_text
+from gateway.ai_router import last_user_text
 
 WEB_SEARCH_TOOL = "litellm_web_search"
 

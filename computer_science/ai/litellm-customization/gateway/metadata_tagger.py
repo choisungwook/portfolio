@@ -3,14 +3,9 @@
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.proxy._types import UserAPIKeyAuth
 
-TRAIL_KEY = "decisions"
-
 
 def add_spend_logs_metadata(data: dict, values: dict) -> dict:
-  """요청 data의 metadata.spend_logs_metadata에 values를 남긴다.
-
-  11단계의 TrailStart 훅이 decisions 목록을 만들어 두었으면 실행 순서대로 목록에 추가하고,
-  없으면 dict에 합친다.
+  """요청 data의 metadata.spend_logs_metadata에 values를 합친다.
 
   Args:
     data: Proxy가 훅에 넘긴 요청 본문
@@ -20,13 +15,7 @@ def add_spend_logs_metadata(data: dict, values: dict) -> dict:
     같은 data 객체. 호출한 쪽이 그대로 돌려줄 수 있게 반환한다.
   """
   metadata = data.setdefault("metadata", {})
-  spend_logs_metadata = metadata.get("spend_logs_metadata") or {}
-  trail = spend_logs_metadata.get(TRAIL_KEY)
-  if isinstance(trail, list):
-    trail.extend({"hook": key, "detail": value} for key, value in values.items())
-  else:
-    spend_logs_metadata = {**spend_logs_metadata, **values}
-  metadata["spend_logs_metadata"] = spend_logs_metadata
+  metadata["spend_logs_metadata"] = {**(metadata.get("spend_logs_metadata") or {}), **values}
   return data
 
 

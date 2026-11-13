@@ -8,4 +8,5 @@ concept를 추가할 때마다 `* [제목](파일명.md) - 한 문장 요약.` �
 
 * [LiteLLM 1.109.1로 고정](2026-11-litellm-version.md) - PyPI 최신 stable 하나로 고정하고 소스 경로를 그 버전 기준으로 적는다.
 * [훅 코드를 gateway 패키지로 설치해 Proxy가 import하게 한다](2026-11-gateway-package.md) - config를 config/에 두면서 callbacks 문자열을 import하는 방법.
-* [판단 기록은 spend_logs_metadata 목록에, 질문은 해시로만 남긴다](2026-11-observe-without-raw-text.md) - jsonb가 key 순서를 잃고 안쪽 호출이 spend log에 남지 않아서.
+* [판정 모델은 로컬 Ollama gemma2:2b를 CPU 전용으로](2026-11-local-judge-model.md) - JEV는 호스팅 API라 재현이 어렵고, CPU 지연에 맞춰 시간 제한을 30초로 둔다.
+* [시나리오는 공식 기능이거나 공개 사례가 있는 것만](2026-11-scenario-scope.md) - 자체 설계 단계를 지우고 같은 일을 하는 공식 기능을 보여 준다.

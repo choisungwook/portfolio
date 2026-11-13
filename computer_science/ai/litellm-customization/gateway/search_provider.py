@@ -1,4 +1,4 @@
-"""8단계: 가짜 모델 이름(gateway-search) 뒤에서 검색 후 실제 모델로 답하는 custom provider."""
+"""6단계: 가짜 모델 이름(gateway-search) 뒤에서 검색 후 실제 모델로 답하는 custom provider."""
 
 import asyncio
 import json
@@ -9,20 +9,17 @@ from litellm import ModelResponse
 from litellm.llms.custom_llm import CustomLLM
 from litellm.types.utils import GenericStreamingChunk
 
-from gateway.decision_trail import record_from_provider
-from gateway.intent_router import proxy_router
-from gateway.keyword_router import last_user_text
-from gateway.search_fallback import search_with_code_fallback, search_with_router_fallback
+from gateway.ai_router import last_user_text, proxy_router
 
 ANSWER_MODEL = "chat-small"
 FAKE_SEARCH_SECONDS = 0.5  # 검색 지연을 흉내 낸다
-SearchFn = Callable[[str], Awaitable[tuple[list[str], str]]]  # (검색 결과, 답한 검색 도구)
+SearchFn = Callable[[str], Awaitable[list[str]]]
 
 
-async def fake_search(query: str) -> tuple[list[str], str]:
-  """8단계용 가짜 검색. 9단계에서 search_tools 기반 검색으로 바꾼다."""
+async def fake_search(query: str) -> list[str]:
+  """지연만 흉내 내는 가짜 검색. 실제 검색 도구 연동은 7단계의 websearch_interception에서 다룬다."""
   await asyncio.sleep(FAKE_SEARCH_SECONDS)
-  return [f"[fake] '{query}'에 대한 검색 결과 1", f"[fake] '{query}'에 대한 검색 결과 2"], "fake"
+  return [f"[fake] '{query}'에 대한 검색 결과 1", f"[fake] '{query}'에 대한 검색 결과 2"]
 
 
 def with_search_context(messages: list[dict], results: list[str]) -> list[dict]:
@@ -63,23 +60,21 @@ class GatewaySearchLLM(CustomLLM):
     self.search = search
     self.get_router = get_router
 
-  async def prepare(self, messages: list[dict]) -> tuple[str, list[dict]]:
-    """질문을 꺼내 검색하고, (답한 검색 도구, 검색 결과가 붙은 messages)를 돌려준다."""
-    results, answered_by = await self.search(last_user_text(messages))
-    return answered_by, with_search_context(messages, results)
+  async def prepare(self, messages: list[dict]) -> list[dict]:
+    """질문을 꺼내 검색하고, 검색 결과가 붙은 messages를 돌려준다."""
+    results = await self.search(last_user_text(messages))
+    return with_search_context(messages, results)
 
   async def acompletion(self, model: str, messages: list, *args, **kwargs) -> ModelResponse:
     """비스트리밍: 검색 후 실제 모델의 응답을 그대로 돌려준다."""
-    answered_by, augmented = await self.prepare(messages)
-    record_from_provider(kwargs, {"search_provider": f"{answered_by} -> {ANSWER_MODEL}"})
+    augmented = await self.prepare(messages)
     return await self.get_router().acompletion(model=ANSWER_MODEL, messages=augmented)
 
   async def astreaming(self, model: str, messages: list, *args, **kwargs) -> AsyncIterator[GenericStreamingChunk]:
     """스트리밍: 상태 청크를 먼저 보내고, 실제 모델 스트림을 청크 단위로 중계한다."""
     query = last_user_text(messages)
     yield status_chunk(query)
-    answered_by, augmented = await self.prepare(messages)
-    record_from_provider(kwargs, {"search_provider": f"{answered_by} -> {ANSWER_MODEL}"})
+    augmented = await self.prepare(messages)
     stream = await self.get_router().acompletion(model=ANSWER_MODEL, messages=augmented, stream=True)
     async for chunk in stream:
       yield text_chunk(chunk.choices[0].delta.content or "")
@@ -87,5 +82,3 @@ class GatewaySearchLLM(CustomLLM):
 
 
 gateway_search = GatewaySearchLLM()
-gateway_search_code_fallback = GatewaySearchLLM(search=search_with_code_fallback)
-gateway_search_router_fallback = GatewaySearchLLM(search=search_with_router_fallback)

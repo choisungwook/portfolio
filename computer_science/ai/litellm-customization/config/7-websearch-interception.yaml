@@ -1,4 +1,4 @@
-# 10단계: LiteLLM 내장 websearch_interception. 모델이 검색 tool 호출을 결정하면 LiteLLM이 검색을 실행하고 다시 모델을 부른다.
+# 7단계: LiteLLM 내장 websearch_interception. 모델이 검색 tool 호출을 결정하면 LiteLLM이 검색을 실행하고 다시 모델을 부른다.
 model_list:
   - model_name: chat-tool
     litellm_params:
