@@ -32,7 +32,7 @@ def block_body(text: str, start: int) -> str:
 
 def has_argument(body: str, name: str, value: str) -> bool:
   """블록 안에 name = value 인자가 있는지 본다."""
-  return re.search(rf"^\s*{name}\s*=\s*{value}\b", body, re.MULTILINE) is not None
+  return re.search(rf"^\s*{name}\s*=\s*{re.escape(value)}(?=\s|#|$)", body, re.MULTILINE) is not None
 
 
 def opens_ssh(resource_type: str, body: str) -> bool:

@@ -45,8 +45,9 @@ def check_name(path: str, report: Report) -> None:
 
 
 def check_index(path: str, report: Report) -> None:
-  """같은 디렉터리의 index.md가 이 concept를 링크하는지 본다."""
-  index = (REPO_ROOT / path).parent / "index.md"
+  """같은 디렉터리의 index.md가 이 concept를 링크하는지 본다. 없으면 번들 루트의 index.md를 본다."""
+  directory = (REPO_ROOT / path).parent
+  index = directory / "index.md" if (directory / "index.md").is_file() else directory.parent / "index.md"
   if not index.is_file() or Path(path).name not in index.read_text(encoding="utf-8"):
     report.add(path, f"{index.relative_to(REPO_ROOT)} 목록에 이 파일 항목을 추가할 것")
 

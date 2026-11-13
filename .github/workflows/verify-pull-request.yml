@@ -79,10 +79,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 한글이나 공백이 든 경로도 검사하도록 NUL로 구분해 두고 grep -z, xargs -0으로 읽는다.
       - name: List changed files
         run: |
-          git diff --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" > added.txt
-          git diff --name-only --diff-filter=MR "$BASE_SHA...$HEAD_SHA" > modified.txt
+          git -c core.quotePath=false diff -z --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" > added.txt
+          git -c core.quotePath=false diff -z --name-only --diff-filter=MR "$BASE_SHA...$HEAD_SHA" > modified.txt
 
       - uses: actions/setup-python@v7
         with:
@@ -111,40 +112,40 @@ jobs:
       - name: rule file links
         if: ${{ !cancelled() }}
         run: |
-          git ls-files AGENTS.md CLAUDE.md '.claude/*.md' '.github/*.md' 'templates/*.md' \
-            | xargs -r python3 "$CHECKS/check_markdown_links.py"
+          git ls-files -z AGENTS.md CLAUDE.md '.claude/*.md' '.github/*.md' 'templates/*.md' \
+            | xargs -0 -r python3 "$CHECKS/check_markdown_links.py"
 
       - name: markdown links
         if: ${{ !cancelled() }}
         run: |
-          grep -E '\.md$' added.txt | xargs -r python3 "$CHECKS/check_markdown_links.py"
-          grep -E '\.md$' modified.txt | xargs -r python3 "$CHECKS/check_markdown_links.py" --warn
+          grep -zE '\.md$' added.txt | xargs -0 -r python3 "$CHECKS/check_markdown_links.py"
+          grep -zE '\.md$' modified.txt | xargs -0 -r python3 "$CHECKS/check_markdown_links.py" --warn
 
       - name: knowledge concepts
         if: ${{ !cancelled() }}
         run: |
-          grep -E '\.md$' added.txt | xargs -r python3 "$CHECKS/check_knowledge.py"
-          grep -E '\.md$' modified.txt | xargs -r python3 "$CHECKS/check_knowledge.py" --warn
+          grep -zE '\.md$' added.txt | xargs -0 -r python3 "$CHECKS/check_knowledge.py"
+          grep -zE '\.md$' modified.txt | xargs -0 -r python3 "$CHECKS/check_knowledge.py" --warn
 
       - name: terraform rules
         if: ${{ !cancelled() }}
         run: |
-          grep -E '\.tf$' added.txt | xargs -r python3 "$CHECKS/check_terraform.py"
-          grep -E '\.tf$' modified.txt | xargs -r python3 "$CHECKS/check_terraform.py" --warn
+          grep -zE '\.tf$' added.txt | xargs -0 -r python3 "$CHECKS/check_terraform.py"
+          grep -zE '\.tf$' modified.txt | xargs -0 -r python3 "$CHECKS/check_terraform.py" --warn
 
       - name: kubernetes manifests
         if: ${{ !cancelled() }}
         run: |
-          grep -E '\.ya?ml$' added.txt | xargs -r python3 "$CHECKS/check_manifests.py"
-          grep -E '\.ya?ml$' modified.txt | xargs -r python3 "$CHECKS/check_manifests.py" --warn
+          grep -zE '\.ya?ml$' added.txt | xargs -0 -r python3 "$CHECKS/check_manifests.py"
+          grep -zE '\.ya?ml$' modified.txt | xargs -0 -r python3 "$CHECKS/check_manifests.py" --warn
 
       # 하위 디렉터리의 pyproject.toml이 설정을 덮지 않도록 루트 ruff.toml을 지정한다.
       - name: python (ruff)
         if: ${{ !cancelled() }}
         run: |
-          grep -E '\.py$' added.txt | xargs -r ruff check --config ruff.toml
-          grep -E '\.py$' added.txt | xargs -r ruff format --check --config ruff.toml
-          grep -E '\.py$' modified.txt | xargs -r ruff check --config ruff.toml \
+          grep -zE '\.py$' added.txt | xargs -0 -r ruff check --config ruff.toml
+          grep -zE '\.py$' added.txt | xargs -0 -r ruff format --check --config ruff.toml
+          grep -zE '\.py$' modified.txt | xargs -0 -r ruff check --config ruff.toml \
             || echo "::warning::고친 Python 파일에 기존 ruff 오류가 있음. PR을 막지는 않음"
 
       # 대상과 규칙은 루트 biome.json에 있다. error만 실패시키고 warning은 출력만 한다.
@@ -152,10 +153,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           pattern='^product/.*\.(js|mjs|cjs|jsx|ts|mts|tsx)$'
-          grep -E "$pattern" added.txt \
-            | xargs -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched
-          grep -E "$pattern" modified.txt \
-            | xargs -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched \
+          grep -zE "$pattern" added.txt \
+            | xargs -0 -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched
+          grep -zE "$pattern" modified.txt \
+            | xargs -0 -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched \
             || echo "::warning::고친 product 파일에 기존 biome 오류가 있음. PR을 막지는 않음"
 
   pr-body:
