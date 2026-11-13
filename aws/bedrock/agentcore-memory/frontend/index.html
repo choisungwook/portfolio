@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCore Memory Chat</title>
+<style>
+  :root { --bg: #f7f7f8; --panel: #fff; --line: #e3e3e6; --text: #1f2328; --muted: #6b7078; --accent: #2f6feb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; color: var(--text); background: var(--bg); display: grid; grid-template-columns: 240px 1fr 340px; height: 100vh; }
+  aside, main, section { overflow: auto; padding: 12px; }
+  aside { border-right: 1px solid var(--line); background: var(--panel); }
+  section { border-left: 1px solid var(--line); background: var(--panel); }
+  main { display: flex; flex-direction: column; padding: 0; }
+  h2 { font-size: 13px; color: var(--muted); margin: 16px 0 6px; }
+  input, button, textarea { font: inherit; }
+  input, textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+  button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .session { display: block; width: 100%; text-align: left; margin-bottom: 4px; font-family: ui-monospace, monospace; font-size: 12px; }
+  .session.active { border-color: var(--accent); color: var(--accent); }
+  #messages { flex: 1; overflow: auto; padding: 16px; }
+  .msg { max-width: 80%; margin: 8px 0; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; }
+  .user { margin-left: auto; background: #dbe7ff; }
+  .assistant { background: var(--panel); border: 1px solid var(--line); }
+  form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); background: var(--panel); }
+  .record { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 12px; }
+  .ns { color: var(--muted); font-family: ui-monospace, monospace; font-size: 11px; }
+  #header { padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<aside>
+  <h2>사용자 (actorId)</h2>
+  <input id="actor" value="jiwoo">
+  <h2>채팅창 (sessionId)</h2>
+  <button class="primary" id="new-chat" style="width:100%;margin-bottom:8px">+ 새 채팅</button>
+  <div id="sessions"></div>
+</aside>
+<main>
+  <div id="header">새 채팅</div>
+  <div id="messages"></div>
+  <form id="form">
+    <textarea id="question" rows="2" placeholder="메시지 입력 (Enter 전송, Shift+Enter 줄바꿈)"></textarea>
+    <button class="primary">전송</button>
+  </form>
+</main>
+<section>
+  <h2>이번 답변에 쓴 메모리</h2>
+  <div id="used">-</div>
+  <h2>장기 메모리 전체 <button id="refresh">새로고침</button></h2>
+  <div id="records"></div>
+</section>
+<script>
+const $ = (id) => document.getElementById(id);
+let sessionId = null;
+
+const actor = () => $("actor").value.trim();
+const getJson = async (url) => { const r = await fetch(url); return r.ok ? r.json() : []; };
+const escape = (text) => text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function addMessage(role, content) {
+  $("messages").insertAdjacentHTML("beforeend", `<div class="msg ${role}">${escape(content)}</div>`);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function recordHtml(record) {
+  const score = record.score == null ? "" : ` · score ${record.score.toFixed(2)}`;
+  return `<div class="record"><div class="ns">${escape(record.namespaces.join(", "))}${score}</div>${escape(record.text)}</div>`;
+}
+
+async function loadSessions() {
+  const sessions = await getJson(`/memory/${actor()}/sessions`);
+  $("sessions").innerHTML = sessions.map((s) =>
+    `<button class="session ${s.session_id === sessionId ? "active" : ""}" data-id="${s.session_id}">${s.session_id}</button>`).join("");
+}
+
+async function loadRecords() {
+  const records = await getJson(`/memory/${actor()}/records`);
+  $("records").innerHTML = records.map(recordHtml).join("") || "(아직 없음. 추출은 대화 후 1분 안팎 걸림)";
+}
+
+async function openSession(id) {
+  sessionId = id;
+  $("header").textContent = id ? `actorId=${actor()}  sessionId=${id}` : "새 채팅";
+  $("messages").innerHTML = "";
+  if (id) (await getJson(`/memory/${actor()}/sessions/${id}`)).forEach((m) => addMessage(m.role, m.content));
+  loadSessions();
+}
+
+async function send(question) {
+  addMessage("user", question);
+  const headers = { "Content-Type": "application/json" };
+  if (sessionId) headers["X-Session-Id"] = sessionId;
+  const response = await fetch("/v1/chat/completions", {
+    method: "POST", headers,
+    body: JSON.stringify({ model: "default", user: actor(), messages: [{ role: "user", content: question }] }),
+  });
+  const body = await response.json();
+  if (!response.ok) return addMessage("assistant", `오류: ${JSON.stringify(body)}`);
+  addMessage("assistant", body.choices[0].message.content);
+  $("used").innerHTML = `단기 메모리 메시지 ${body.memory.short_term_messages}개<br>` +
+    (body.memory.long_term_records.map(recordHtml).join("") || "장기 메모리 검색 결과 없음");
+  if (!sessionId) await openSession(response.headers.get("X-Session-Id"));
+}
+
+$("form").onsubmit = (e) => { e.preventDefault(); const q = $("question").value.trim(); if (q) { $("question").value = ""; send(q); } };
+$("question").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); } };
+$("new-chat").onclick = () => openSession(null);
+$("sessions").onclick = (e) => e.target.dataset.id && openSession(e.target.dataset.id);
+$("actor").onchange = () => { openSession(null); loadRecords(); };
+$("refresh").onclick = loadRecords;
+openSession(null);
+loadRecords();
+</script>
+</body>
+</html>
