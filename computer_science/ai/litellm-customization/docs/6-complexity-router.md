@@ -32,7 +32,7 @@
 
 ## 코드와 config
 
-이 단계는 Python 코드가 없다. config 두 개가 분류기만 다르다.
+이 단계는 Python 코드가 없고 config 두 개로 분류기를 비교한다.
 
 [config/5-complexity-heuristic.yaml](../config/5-complexity-heuristic.yaml)은 휴리스틱과 키워드 규칙만 쓴다.
 
@@ -54,7 +54,7 @@
       complexity_router_default_model: gemini
 ```
 
-[config/5-complexity-llm.yaml](../config/5-complexity-llm.yaml)은 분류기를 4단계의 판정 모델로 바꾼다. tier와 `claude`, `gemini`, `router-judge` 별칭은 위와 같다.
+[config/5-complexity-llm.yaml](../config/5-complexity-llm.yaml)은 분류기를 4단계의 판정 모델로 바꾼다. tier와 `claude`, `gemini` 별칭은 위와 같고, 4단계의 `router-judge` 별칭을 더했으며, 분류기 판정만 보려고 `keyword_tier_rules`는 넣지 않았다.
 
 ```yaml
         classifier_type: llm
@@ -119,9 +119,8 @@ x-litellm-complexity-router-score: 0.175
 
 첫 질문은 키워드 규칙으로 `claude`에 갔지만 tier가 REASONING이 아니라 COMPLEX다. 두 규칙 중 더 높은 tier가 이기므로 `데드락` 규칙이 걸렸다면 REASONING이어야 한다. 위 내부 표 3번대로 한글 키워드가 단어 경계로 비교되어 `데드락이`를 놓쳤고, 공백으로 떨어진 `asyncio`만 걸렸다. 한국어 키워드를 쓰려면 `"데드락이"`처럼 조사가 붙은 형태까지 나열하거나, 공백이 든 구(phrase)로 쓰거나, 임베딩 비교(`semantic_keyword_matching`)를 켜야 한다.
 
-나머지 세 질문은 휴리스틱이 정했다. 한국어 질문 둘은 같은 점수(-0.1)로 SIMPLE이 됐고, 영어 설계 질문은 "step by step"과 비교 요청이 있었는데도 MEDIUM에 그쳐 `gemini`로 갔다. 휴리스틱은 질문의 난이도가 아니라 어휘 신호를 세기 때문에, 신호어가 적은 언어나 짧은 문장에서는 거의 구분하지 못한다. 4단계의 응답 헤더와 달리 `x-litellm-model-group`은 tier의 별칭이 아니라 `smart-router`로 찍힌다. 실제 대상은 응답 내용과 tier 헤더로 확인한다.
+나머지 세 질문은 휴리스틱이 정했다. 한국어 질문 둘은 같은 점수(-0.1)로 SIMPLE이 됐고, 영어 설계 질문은 "step by step"과 비교 요청이 있었는데도 MEDIUM에 그쳐 `gemini`로 갔다. 휴리스틱은 질문의 난이도가 아니라 어휘 신호를 세기 때문에, 신호어가 적은 언어나 짧은 문장에서는 거의 구분하지 못한다.
 
-### 3. LLM 분류기 config로 다시 요청
 
 Proxy를 `Ctrl+C`로 끄고 LLM 분류기 config로 다시 띄운다.
 
@@ -150,7 +149,7 @@ x-litellm-complexity-router-tier: COMPLEX
 x-litellm-complexity-router-cause: llm_classifier
 ```
 
-이번에는 네 질문 모두 `cause`가 `llm_classifier`이고, 휴리스틱이 MEDIUM으로 본 영어 설계 질문도 COMPLEX로 `claude`에 갔다. 4단계 훅과 같은 판정 모델을 썼고 결과도 같은 방향이다. 이 실행에서 요청 하나의 총 시간은 15.8~21.6초였다. 4단계 훅보다 조금 더 걸렸는데, 내장 분류기 프롬프트가 tier 네 개를 설명하느라 4단계의 두 줄짜리 판정 프롬프트보다 길기 때문으로 보인다(원인은 측정하지 않았다).
+이 config에는 키워드 규칙이 없으므로 첫 질문도 분류기가 정했다. 네 질문 모두 `cause`가 `llm_classifier`이고, 휴리스틱이 MEDIUM으로 본 영어 설계 질문도 COMPLEX로 `claude`에 갔다. 4단계 훅과 같은 판정 모델을 썼고 결과도 같은 방향이다. 이 실행에서 요청 하나의 총 시간은 15.8~21.6초였다. 4단계 훅보다 조금 더 걸렸는데, 내장 분류기 프롬프트가 tier 네 개를 설명하느라 4단계의 두 줄짜리 판정 프롬프트보다 길기 때문으로 보인다(원인은 측정하지 않았다).
 
 ### 4. 시간 제한을 기본값으로 줄였을 때의 폴백
 
