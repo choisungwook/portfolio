@@ -202,8 +202,8 @@ aws bedrock-agentcore retrieve-memory-records --memory-id "$MEMORY_ID" --namespa
 ```
 
 ```text
-0.43743694504666464	/actor/jiwoo/summaries/chat-13eee40a6d53/
-0.4330194599955256	/actor/jiwoo/summaries/chat-fa349bffe7ee/
+0.43743694504666464    /actor/jiwoo/summaries/chat-13eee40a6d53/
+0.4330194599955256    /actor/jiwoo/summaries/chat-fa349bffe7ee/
 ```
 
 업그레이드 일정을 다룬 채팅창 두 곳의 전체 요약이 나왔습니다. `chat-13eee40a6d53`은 시나리오 3의 6단계에서 화면으로 연 채팅창입니다. 조각(`BASE`) 요약은 필터에 걸려 후보에서 빠졌습니다.

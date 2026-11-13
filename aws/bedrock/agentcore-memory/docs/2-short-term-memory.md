@@ -199,8 +199,8 @@ aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id minho --se
 
 ```text
 24 chunks: 안녕하세요, TCK-1042 프로젝트와 관련하여 도움이 될까요?
-USER	한 문장으로 인사해줘
-ASSISTANT	안녕하세요, TCK-1042 프로젝트와 관련하여 도움이 될까요?
+USER    한 문장으로 인사해줘
+ASSISTANT    안녕하세요, TCK-1042 프로젝트와 관련하여 도움이 될까요?
 ```
 
 24개 청크로 나뉘어 도착한 답변이 event에는 한 문장으로 합쳐져 저장되었습니다. 인사에 티켓 번호 `TCK-1042`가 들어간 것은 [시나리오 6](./6-other-use-cases.md)에서 `minho`의 CRM 정보를 장기 메모리에 넣은 뒤에 실행했기 때문입니다. 시나리오 순서대로 따라 하면 이 시점의 `minho`에게는 장기 메모리가 없으므로 평범한 인사가 나옵니다. 청크 수는 실행마다 달라집니다.
