@@ -122,7 +122,7 @@ gateway-search|{"decisions": [{"hook": "intent_router", "detail": "heavy via llm
 chat-large|{"decisions": [{"hook": "intent_router", "detail": "heavy via llm"}, {"hook": "response_masker", "detail": "masked 1"}], "question_chars": 17, "question_sha256": "df689ae5a2d1a63a"}
 ```
 
-날씨 질문의 행 하나에 네 단계가 순서대로 남았다. 의도 분류는 heavy였지만 표식이 `gateway-search`로 덮어썼고, 1순위 검색이 실패해 `searxng-backup`이 답했으며, 응답에서 연락처 2개를 가렸다. 마지막 `response_masker`의 기록까지 남았다는 것은 post_call 훅이 spend log 기록보다 먼저 실행된다는 뜻이다. 해시 값은 질문이 같으면 항상 같지만, 6단계 캐시 key와는 정규화 방식과 길이가 달라 값이 다르다.
+날씨 질문의 행 하나에 네 단계가 순서대로 남았다. 의도 분류는 heavy였지만 표식이 `gateway-search`로 덮어썼고, 1순위 검색이 실패해 `searxng-backup`이 답했으며, 응답에서 연락처 2개를 가렸다. 마지막 `response_masker`의 기록까지 남았다는 것은 post_call 훅이 spend log 기록보다 먼저 실행된다는 뜻이다. 해시 값은 질문이 같으면 항상 같다. 광합성 질문의 `df689ae5a2d1a63a`가 6단계 Valkey 캐시 key `intent:df689ae5...`의 앞 16자와 같은 것도 그래서다. 6단계 key는 대소문자와 연속 공백을 정규화한 뒤 해시하므로, 그런 차이가 있는 질문에서만 두 값이 달라진다.
 
 ### 4. 원문이 남지 않았는지 확인
 
@@ -161,7 +161,13 @@ EOF
 자세한 내용은 help@example.com 또는 010-1234-5678로 문의하세요.
 ```
 
-이메일과 전화번호가 그대로 나왔다. 표식을 붙인 스트리밍 요청의 spend log를 같은 방식으로 조회해도 `decisions` 목록에 `response_masker`가 없다.
+이메일과 전화번호가 그대로 나왔다. 표식을 붙인 스트리밍 요청에서도 같은지 보려고 8단계의 스트림 측정 스크립트로 날씨 질문을 보낸다.
+
+```bash
+uv run python scripts/stream_timing.py chat-small "오늘 서울 날씨 알려줘" --web-search
+```
+
+이 요청의 spend log를 3번과 같은 방식으로 조회하면 `decisions` 목록에 `response_masker`가 없다.
 
 ```text
 gateway-search|{"decisions": [{"hook": "intent_router", "detail": "heavy via cache"}, {"hook": "feature_switch", "detail": ["web_search"]}, {"hook": "search_provider", "detail": "searxng-backup -> chat-small"}], ...}

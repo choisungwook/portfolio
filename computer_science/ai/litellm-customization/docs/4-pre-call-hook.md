@@ -32,7 +32,7 @@
 
 ## 코드와 config
 
-[gateway/metadata_tagger.py](../gateway/metadata_tagger.py)는 클라이언트가 이미 보낸 `spend_logs_metadata`를 지우지 않도록 기존 값에 합친다.
+[gateway/metadata_tagger.py](../gateway/metadata_tagger.py)는 클라이언트가 이미 보낸 `spend_logs_metadata`를 지우지 않도록 기존 값에 합친다. 아래는 3단계 시점의 단순화한 발췌이고, 실제 파일의 `add_spend_logs_metadata`에는 11단계에서 추가한 `decisions` 목록 분기가 더 있다.
 
 ```python
 def add_spend_logs_metadata(data: dict, values: dict) -> dict:

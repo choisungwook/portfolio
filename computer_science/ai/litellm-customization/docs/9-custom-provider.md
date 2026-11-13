@@ -148,15 +148,15 @@ docker compose exec -T postgres psql -U litellm -tAc \
   "select model_group, metadata->'spend_logs_metadata' from \"LiteLLM_SpendLogs\" order by \"startTime\" desc limit 3"
 ```
 
-최신 행이 위에 온다. 표식 없이 보낸 `chat-small` 요청 아래로 `gateway-search` 요청 두 건이 있다.
+최신 행이 위에 온다. 3번의 표식 없는 `chat-small` 요청, 3번의 표식 요청, 2번의 `gateway-search` 직접 호출 순서다.
 
 ```text
 chat-small|null
 gateway-search|{"feature_switch": ["web_search"], "search_provider": "fake -> chat-small"}
-gateway-search|{"feature_switch": ["web_search"], "search_provider": "fake -> chat-small"}
+gateway-search|{"search_provider": "fake -> chat-small"}
 ```
 
-`search_provider`는 provider가 `record_from_provider`로 남긴 값으로(11단계에서 설명), 어느 검색이 답했고 어느 모델로 넘겼는지를 바깥 요청의 행에 남긴다. 반면 provider 안에서 부른 `chat-small` 호출은 행을 만들지 않고, spend log에는 바깥 요청(`gateway-search`)만 남는다. 6단계의 분류 모델 호출과 같은 동작이다. 실제 비용은 안쪽 호출에서 생기므로, 이 구조를 운영하면 비용이 `gateway-search` 행에 잡히지 않는 문제를 따로 풀어야 한다.
+2번의 직접 호출은 표식이 없어 `feature_switch` 훅이 아무것도 남기지 않았고, 표식 요청에만 `feature_switch`가 있다. `search_provider`는 provider가 `record_from_provider`로 남긴 값으로(11단계에서 설명), 어느 검색이 답했고 어느 모델로 넘겼는지를 바깥 요청의 행에 남긴다. 반면 provider 안에서 부른 `chat-small` 호출은 행을 만들지 않고, spend log에는 바깥 요청(`gateway-search`)만 남는다. 6단계의 분류 모델 호출과 같은 동작이다. 실제 비용은 안쪽 호출에서 생기므로, 이 구조를 운영하면 비용이 `gateway-search` 행에 잡히지 않는 문제를 따로 풀어야 한다.
 
 ## 상태 청크를 tool_calls로 보낼 때의 대가
 
