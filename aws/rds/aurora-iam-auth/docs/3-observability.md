@@ -194,6 +194,13 @@ aws ec2 describe-instance-status --instance-ids $INSTANCE_ID --output json \
 {"system":"ok","instance":"ok","app":{"Status":"impaired","ImpairedSince":"2026-11-07T05:01:08.787000+00:00"}}
 ```
 
+상태 전이 확인을 마쳤으면 다음 시나리오를 위해 애플리케이션 서비스를 다시 기동합니다.
+
+```bash
+aws ssm send-command --instance-ids $INSTANCE_ID --document-name AWS-RunShellScript \
+  --parameters 'commands=["systemctl start app"]'
+```
+
 - 상태 검사 주기가 60초이고 실패/성공 임계값(`threshold`)이 각각 2로 설정되어 있으므로, 실제 장애 발생부터 `impaired` 감지까지 약 2~3분이 소요됩니다. 따라서 초 단위 무중단 판정에는 실시간 Lambda Prober를 함께 병행하여 모니터링해야 합니다.
 
 ## 부록: 실무 시사점 및 운영 팁

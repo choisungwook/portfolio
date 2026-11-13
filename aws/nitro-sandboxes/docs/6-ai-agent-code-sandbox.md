@@ -87,7 +87,7 @@ flowchart TB
 
 ### 1. 모델 서버와 executor 배포
 
-다음 명령을 실행합니다.
+`ai-agent` 네임스페이스와 모델 서버(Ollama `gemma2:2b`), executor pod 3개를 배포하고 준비 상태를 확인합니다.
 
 ```bash
 kubectl apply -f manifests/ai-agent/namespace.yaml
@@ -114,7 +114,7 @@ hostPath와 `hostPID`를 준 isolated pod도 문제없이 Running이 됐습니�
 
 ### 2. agent Job 실행
 
-다음 명령을 실행합니다.
+이전 `agent` Job을 정리하고 새로 실행한 뒤, 완료될 때까지 대기하여 JSON 로그를 `agent-run.jsonl` 파일로 저장합니다.
 
 ```bash
 kubectl delete -n ai-agent job/agent --ignore-not-found
@@ -127,7 +127,7 @@ kubectl logs -n ai-agent job/agent | grep '^{' > agent-run.jsonl
 
 ### 3. 과제별 판정 확인
 
-다음 명령을 실행합니다.
+저장한 `agent-run.jsonl`에서 재시도 이력과 과제별 판정 결과를 추출해 출력합니다.
 
 ```bash
 python3 - <<'EOF'
@@ -217,7 +217,7 @@ CLI로 실행하려면 `aws logs start-query`에 같은 쿼리를 넘기고 `aws
 
 ### 6. kubectl top과 Container Insights 메트릭 비교
 
-다음 명령을 실행합니다.
+`metrics-server`가 수집한 `ai-agent` 네임스페이스 pod들의 CPU와 메모리 사용량을 조회합니다.
 
 ```bash
 kubectl top pod -n ai-agent

@@ -41,6 +41,8 @@ PARENT_IP=$(terraform -chdir=terraform/ec2 output -raw ssh_command | cut -d@ -f2
 scp guest/sandbox-init guest/find-marker.py guest/sandbox.json ec2-user@${PARENT_IP}:~/
 ```
 
+파일 복사가 끝나면 `ssh_command` 출력값으로 부모 인스턴스에 SSH 접속한 뒤 [시나리오 3](3-ec2-firecracker-sandbox.md)을 진행합니다.
+
 ## 접속이 막힐 때
 
 security group은 `apply`할 때의 공인 IP 하나만 허용합니다. 네트워크를 옮겨 공인 IP가 바뀌면 `apply`를 다시 실행하면 규칙이 새 IP로 바뀝니다.

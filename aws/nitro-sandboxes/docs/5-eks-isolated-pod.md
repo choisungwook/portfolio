@@ -132,7 +132,7 @@ runc-pod       1/1     Running   0          39s   10.20.11.16   i-046e3a8a428d46
 
 ### 3. 두 pod이 올라간 노드 비교
 
-다음 명령을 실행합니다.
+두 pod이 배치된 노드의 인스턴스 타입과 Sandbox 할당 가능 자원(allocatable), EC2 인스턴스의 Enclave 및 CPU 스레드 설정을 조회합니다.
 
 ```bash
 kubectl get nodes -L node.kubernetes.io/instance-type,eks.amazonaws.com/nitro-sandbox

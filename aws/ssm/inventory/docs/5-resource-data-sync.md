@@ -4,43 +4,45 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 기능 | Inventory 데이터를 S3에 계속 동기화해 30일 보관 한도 밖에서 질의 |
+| 기능 | Inventory 데이터를 S3에 계속 동기화해 30일 보관 한도 밖에서 SQL로 질의 |
 | 쓰는 도구 | Resource data sync, S3 |
-| 입력 | 시나리오 2~3에서 쌓인 inventory |
+| 입력 | 시나리오 2~3에서 수집·기록한 inventory 데이터 |
 | 작업 | 1 sync 상태 확인 → 2 S3 경로 구조 확인 → 3 custom 타입 파일 확인 |
-| 달성할 것 | 타입별 S3 경로를 확인하고 Athena 질의로 이어지는 구조 이해 |
+| 달성할 것 | 타입별 S3 파티션 경로를 확인하고 Athena 질의로 이어지는 구조를 이해합니다 |
 
-## Resource data sync가 무엇인가
+## Resource data sync의 동작 원리
 
-Inventory 저장소는 노드별 최신값만 30일 보관하고 질의 기능이 단순합니다. Resource data sync는 이 데이터를 S3 버킷에 타입별 파티션 경로로 계속 내보내는 설정입니다. 한 번 만들면 baseline을 쓰고, 이후 새 수집이 있을 때마다 해당 노드 파일을 덮어씁니다. 여러 계정·리전의 sync가 같은 버킷을 가리키면 조직 전체 inventory가 한 버킷에 모입니다.
+Inventory 저장소는 노드별 최신값만 30일간 보관하며 질의 조건이 제한적입니다. Resource data sync는 이 데이터를 S3 버킷의 타입별 파티션 경로로 지속 내보내는 기능입니다. 한 번 생성하면 초기 기준선(baseline)을 기록하고, 이후 새로운 수집이 발생할 때마다 해당 노드의 S3 파일을 덮어씁니다. 여러 계정과 리전의 sync가 하나의 중앙 S3 버킷을 가리키도록 설정하면 조직 전체의 inventory를 한곳에 모을 수 있습니다.
 
-주의할 점은 **이력 저장소가 아니라는 것**입니다. 실행 중인 노드의 파일은 덮어쓰고, 삭제된 노드의 파일만 남습니다. 변경 이력이 필요하면 버킷 버저닝(이 실습의 terraform에서 켬)이나 AWS Config의 `AWS::SSM::ManagedInstanceInventory` 기록을 씁니다.
+주의할 점은 **S3 동기화 자체가 변경 이력 저장소는 아니라는 것**입니다. 실행 중인 노드의 파일은 매 수집마다 덮어써지며, 종료된 노드의 파일만 그대로 남습니다. 변경 이력을 보존하려면 S3 버킷 버저닝(이 실습의 Terraform에서 활성화함)이나 AWS Config의 `AWS::SSM::ManagedInstanceInventory` 기록을 사용합니다.
 
 ### 용어
 
 | 용어 | 뜻 | 이 실습의 예 |
 | --- | --- | --- |
-| SyncFormat | S3에 쓰는 파일 형식. 현재 `JsonSerDe`만 지원 | `JsonSerDe` |
-| prefix | 버킷 안 최상위 경로 | `inventory` |
+| `SyncFormat` | S3에 저장하는 파일 형식. 현재 `JsonSerDe`만 지원합니다 | `JsonSerDe` |
+| `prefix` | S3 버킷 내부의 최상위 경로 | `inventory` |
 | 파티션 경로 | `<prefix>/<타입>/accountid=/region=/resourcetype=/` | `inventory/Custom:AppDeployment/accountid=123456789012/...` |
 
 ## 대안 비교
 
-| 방식 | 이력 | 질의 | 계정 통합 |
+| 방식 | 변경 이력 | 질의 수단 | 계정 통합 |
 | --- | --- | --- | --- |
-| Inventory 콘솔·`get-inventory` | 없음(30일) | 필터 몇 개 | 리전·계정별 |
-| Resource data sync + Athena | 버저닝 시 객체 버전 | SQL | 버킷 하나로 통합 |
-| AWS Config | 변경 이력 | Config advanced query(SQL 부분집합) | Aggregator |
+| Inventory 콘솔 및 `get-inventory` | 없음 (30일 보관) | 제한된 필터 | 리전·계정별 |
+| Resource data sync + Athena | 버저닝 활성화 시 객체 버전으로 보관 | 표준 SQL | 버킷 하나로 통합 |
+| AWS Config | 변경 이력 보관 | Config advanced query (SQL 부분집합) | Aggregator |
 
 ## 컴포넌트 역할
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| `aws_ssm_resource_data_sync` | 동기화 설정 |
-| S3 버킷 정책 | `ssm.amazonaws.com`에 `GetBucketAcl`, `PutObject`(계정·sync ARN 조건) 허용 |
-| Athena | S3 JSON을 테이블로 질의(이 실습 범위 밖) |
+| `aws_ssm_resource_data_sync` | Inventory 데이터를 S3로 내보내는 동기화 설정입니다 |
+| S3 버킷 정책 | `ssm.amazonaws.com` 서비스 주체에 `GetBucketAcl` 및 `PutObject`(계정·sync ARN 조건) 권한을 허용합니다 |
+| Athena | S3에 적재된 JSON 파일을 테이블로 조회합니다(이 실습 범위 밖) |
 
 ## 흐름
+
+Inventory 수집 데이터가 Resource data sync를 통해 S3 파티션 경로에 적재되고, Glue 테이블을 거쳐 Athena SQL 질의로 연결되는 흐름입니다.
 
 ```mermaid
 flowchart LR
@@ -50,9 +52,11 @@ flowchart LR
 
 ## 실습
 
-출력은 예상값이며 실제 AWS에서 확인하지 않았습니다.
+명령은 저장소 루트에서 `aws/ssm/inventory` 디렉터리로 이동해 실행합니다. 출력은 예상값이며 실제 AWS에서 실행해 검증하지 않았습니다.
 
 ### 1. sync 상태 확인
+
+Terraform으로 생성한 Resource data sync(`ssm-inventory-sync`)의 마지막 동기화 상태가 `Successful`인지 확인합니다.
 
 ```bash
 cd aws/ssm/inventory
@@ -68,6 +72,11 @@ ssm-inventory-sync  Successful  2026-11-10T00:10:00+00:00
 ```
 
 ### 2. S3 타입별 경로 확인
+
+> [!NOTE]
+> [시나리오 3](3-put-inventory.md)의 6단계에서 `Custom:AppDeployment` 타입을 삭제했다면 아래 목록과 3단계에 해당 경로가 나타나지 않습니다. [시나리오 3](3-put-inventory.md)의 1단계를 다시 실행하고 동기화가 반영될 때까지 잠시 기다린 뒤 확인하세요.
+
+Terraform 출력에서 S3 버킷 이름을 가져와 `inventory/` prefix 아래에 생성된 타입별 디렉터리 구조를 조회합니다.
 
 ```bash
 BUCKET=$(terraform -chdir=terraform output -raw sync_bucket)
@@ -86,19 +95,20 @@ PRE Custom:AppDeployment/
 
 ### 3. custom 타입 파일 내용 확인
 
+`Custom:AppDeployment/` 경로 아래에 동기화된 객체 키를 찾아 첫 3줄을 읽어 봅니다.
+
 ```bash
 KEY=$(aws s3 ls "s3://$BUCKET/inventory/Custom:AppDeployment/" --recursive | awk '{print $4}' | head -1)
 aws s3 cp "s3://$BUCKET/$KEY" - | head -3
 ```
 
-- 한 줄이 Content 한 행인 JSON Lines 형식. `resourceid`, `capturetime` 같은 열이 함께 붙음
-- 시나리오 3의 6단계에서 타입을 지웠다면 2단계 목록에 Custom:AppDeployment가 없음. [시나리오 3](3-put-inventory.md)의 1단계를 다시 실행하고 다음 sync를 기다린 뒤 확인
+- 파일 내용은 한 줄이 `Content` 한 행에 대응하는 JSON Lines 형식이며, `resourceid`나 `capturetime` 같은 메타데이터 열이 함께 붙어 저장됩니다.
 
 ## 부록. 실무에서 얻는 것
 
-- sync는 리전 단위입니다. 리전 3개를 쓰면 sync도 3개를 만들고 같은 버킷을 가리킵니다. 계정·리전당 sync는 5개까지입니다.
-- Object Lock이 켜진 버킷에는 쓰지 못합니다. 감사 목적으로 잠금 버킷을 쓰려면 sync 버킷과 보관 버킷을 나눕니다.
-- 디스크 사용량, SAP landscape 같은 AWS 블로그 사례는 모두 custom inventory → sync → Athena 순서를 따릅니다. Inventory 자체를 질의 엔진으로 쓰지 않는 구조입니다.
+- sync는 리전 단위로 생성합니다. 리전 3개를 운영한다면 sync도 리전마다 1개씩 총 3개를 만들고 모두 같은 S3 버킷을 가리키게 합니다. 계정 및 리전당 sync는 최대 5개까지 만들 수 있습니다.
+- Object Lock이 켜진 S3 버킷에는 Resource data sync를 연결하지 못합니다. 감사 목적으로 잠금 버킷을 써야 한다면 sync 대상 버킷과 장기 보관용 잠금 버킷을 분리해야 합니다.
+- 디스크 사용량이나 SAP landscape 관리 같은 AWS 블로그의 공식 사례들은 모두 custom inventory → resource data sync → Athena 순서를 따릅니다. Inventory 자체를 질의 엔진으로 쓰지 않고 S3와 Athena로 넘기는 것이 표준 패턴입니다.
 
 ## 참고 문서
 

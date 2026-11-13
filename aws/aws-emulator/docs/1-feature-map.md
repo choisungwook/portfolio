@@ -54,6 +54,8 @@ AWS Emulator는 "실제 AWS와 같은 응답"과 "로컬의 속도와 무비용"
 
 ## 기능 지도
 
+로컬 PC에서 앱과 AI agent가 AWS Emulator를 호출하고, 공개된 evaluation suite 점수(`scores.json.gz`)로 호환성을 판단하는 전체 구조입니다.
+
 ```mermaid
 flowchart TB
   subgraph PC["내 PC"]
