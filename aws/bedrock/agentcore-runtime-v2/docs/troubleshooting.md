@@ -8,7 +8,7 @@
 
 ## platform_version을 생략했는데 V2가 아님
 
-- 증상: 발표문은 서울 신규 runtime의 기본값이 V2라고 하는데, Terraform으로 `platform_version` 없이 만든 `rtv2_default`가 `V1`.
+- 증상: 발표문은 서울 신규 runtime의 기본값이 V2라고 하는데, Terraform으로 `platform_version` 없이 만든 runtime이 `V1`.
 - 원인: API(`CreateAgentRuntime`)는 `platformVersion`을 생략하면 V1을 씀. 개발자 가이드와 Terraform provider 문서도 같음(2026-11-13 기준).
 - 해결: V2가 필요하면 `platform_version = "V2"`를 명시함.
 

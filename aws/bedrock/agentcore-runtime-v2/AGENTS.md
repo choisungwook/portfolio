@@ -1,6 +1,6 @@
 # Amazon Bedrock AgentCore Runtime V2 핸즈온
 
-- 같은 agent 이미지를 platform version V1, V2 runtime에 올려 snapshot 시작, snapshot 상태 복제, V1→V2 전환, 메모리 과금을 측정하는 실습.
+- agent를 platform version V2 runtime에 올려 snapshot 시작, snapshot 상태 복제, 업데이트 시 snapshot 교체, 메모리 과금을 측정하는 실습. V1 값은 참고 측정.
 - 글로벌 규칙: @../../../AGENTS.md
 
 ## knowledge

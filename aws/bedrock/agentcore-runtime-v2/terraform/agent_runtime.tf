@@ -1,18 +1,8 @@
-locals {
-  # key: runtime 이름 접미사, value: platform_version. null이면 인자를 생략해 서비스 기본값을 따른다
-  runtimes = {
-    legacy  = var.legacy_platform_version
-    v2      = "V2"
-    default = null
-  }
-}
-
+# platformVersion을 생략하면 API가 V1으로 만들므로 V2를 명시한다
 resource "aws_bedrockagentcore_agent_runtime" "agent" {
-  for_each = local.runtimes
-
-  agent_runtime_name = "rtv2_${each.key}"
+  agent_runtime_name = "rtv2_v2"
   role_arn           = aws_iam_role.runtime.arn
-  platform_version   = each.value
+  platform_version   = "V2"
 
   agent_runtime_artifact {
     container_configuration {

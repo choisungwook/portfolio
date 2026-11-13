@@ -19,7 +19,7 @@ from functools import cache
 import boto3
 from botocore.config import Config
 
-RUNTIMES = ["legacy", "v2", "default"]
+RUNTIMES = ["v2"]
 
 
 @cache
@@ -164,15 +164,15 @@ def parse_args() -> argparse.Namespace:
   sub.add_parser("status").set_defaults(func=status)
   for mode in ["cold", "warm"]:
     timing = sub.add_parser(mode)
-    timing.add_argument("--runtime", choices=RUNTIMES, required=True)
+    timing.add_argument("--runtime", choices=RUNTIMES, default="v2")
     timing.add_argument("--count", type=int, default=5)
     timing.set_defaults(func=measure, mode=mode)
   concurrent = sub.add_parser("burst")
-  concurrent.add_argument("--runtime", choices=RUNTIMES, required=True)
+  concurrent.add_argument("--runtime", choices=RUNTIMES, default="v2")
   concurrent.add_argument("--count", type=int, default=20)
   concurrent.set_defaults(func=burst)
   timeline = sub.add_parser("memory")
-  timeline.add_argument("--runtime", choices=RUNTIMES, required=True)
+  timeline.add_argument("--runtime", choices=RUNTIMES, default="v2")
   timeline.add_argument("--mb", type=int, default=2048)
   timeline.add_argument("--phase", type=int, default=120)
   timeline.set_defaults(func=memory)
@@ -182,7 +182,7 @@ def parse_args() -> argparse.Namespace:
   report.add_argument("--bucket", type=int, default=30)
   report.set_defaults(func=usage)
   single = sub.add_parser("call")
-  single.add_argument("--runtime", choices=RUNTIMES, required=True)
+  single.add_argument("--runtime", choices=RUNTIMES, default="v2")
   single.add_argument("--session")
   single.add_argument("--action", choices=["info", "alloc", "free"], default="info")
   single.add_argument("--mb", type=int, default=512)

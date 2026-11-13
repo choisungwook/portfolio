@@ -37,7 +37,6 @@ gh auth status
 | PR body 수정 | `gh pr edit --body-file` | `update_pull_request` |
 | PR label | `gh pr edit --add-label` | `issue_write`(method update, issue_number에 PR 번호) |
 | PR comment 조회 | `gh api .../comments` | `pull_request_read`(method get_review_comments, get_reviews, get_comments) |
-| Copilot 리뷰 요청 | `gh pr edit --add-reviewer "@copilot"` | `request_copilot_review` |
 | squash merge | `gh pr merge --squash` | `merge_pull_request` (merge_method squash) |
 | sub-issue 등록 | `gh api .../sub_issues` | `sub_issue_write`(method add) |
 
@@ -47,7 +46,6 @@ gh auth status
 
 - **commit과 push**: shell이 없으므로 코드 변경 자체가 불가능하다. 코드 수정이 필요한 단계는 CLI 환경에서만 돈다.
 - **대기와 polling**: sleep이 없다. 시간이 걸리는 단계는 거기서 끊고, 사용자가 나중에 다시 호출하게 한다. 혼합 환경도 sleep으로 polling하지 않는다. PR 이벤트 구독 도구(`subscribe_pr_activity`)가 있으면 구독하고 턴을 끝내며, 리뷰와 CI 결과가 도착하면 세션이 다시 깨어난다.
-- **GraphQL mutation**: Copilot 재요청(`requestReviewsByLogin`)이 안 된다. 최초 요청만 된다.
 - **local branch 정리**: merge 후 `git pull --rebase`를 대신할 수단이 없다.
 
 ## Issue와 PR 작성 규칙

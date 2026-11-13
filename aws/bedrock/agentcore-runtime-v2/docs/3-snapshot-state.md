@@ -7,7 +7,7 @@
 | 기능 | V2 snapshot이 초기화 결과를 모든 session에 복제하는 동작 |
 | 쓰는 도구 | `InvokeAgentRuntime` API(`scripts/runtime.py call`) |
 | 입력 | 초기화 때 UUID, 난수, 시각을 기록하고 요청마다 같은 값을 다시 만드는 agent |
-| 작업 | 1. V2 새 session 3개 비교 2. V1 새 session 3개 비교 |
+| 작업 | 1. V2 새 session 3개 비교 |
 | 달성할 것 | 초기화 때 만든 값은 물론, 요청마다 호출한 `random.random()`까지 V2 session끼리 같아지는 것을 확인 |
 
 ## snapshot은 초기화 결과를 복제한다
@@ -71,12 +71,12 @@ flowchart TB
 
 ### 1. V2 runtime에 새 session 3개 호출
 
-`call`을 세 번 실행해 새 session 3개를 열고, 초기화 값과 요청 값만 골라 봅니다.
+`call`을 3번 실행해 새 session 3개를 열고, 초기화 값과 요청 값만 골라 봅니다.
 
 ```bash
 cd aws/bedrock/agentcore-runtime-v2
 for i in 1 2 3; do
-  uv run --env-file .runtime.env scripts/runtime.py call --runtime v2 |
+  uv run --env-file .runtime.env scripts/runtime.py call |
     jq -c '{init_uuid:.init_uuid[:8],init_random,request_uuid:.request_uuid[:8],request_random,wall_since_init,monotonic_since_init,hostname,pid}'
 done
 ```
@@ -90,37 +90,17 @@ done
 ```
 
 - `init_uuid`, `init_random`이 같습니다. 초기화 값이 복제되었습니다.
-- handler에서 호출한 `request_random`도 세 session 모두 `0.22408205029316564`입니다.
+- handler에서 호출한 `request_random`도 session 3개 모두 `0.22408205029316564`입니다.
 - `request_uuid`는 다릅니다. `uuid.uuid4()`는 호출할 때마다 `os.urandom`을 읽기 때문입니다.
 - `wall_since_init`은 snapshot을 찍은 뒤 흐른 실제 시간(약 20분)이고, `monotonic_since_init`은 80초에 머뭅니다.
-
-### 2. V1 runtime에 새 session 3개 호출
-
-같은 방법으로 V1인 `rtv2_default`에 새 session 3개를 엽니다.
-
-```bash
-for i in 1 2 3; do
-  uv run --env-file .runtime.env scripts/runtime.py call --runtime default |
-    jq -c '{init_uuid:.init_uuid[:8],init_random,request_random,monotonic_since_init,hostname,pid}'
-done
-```
-
-실행 결과입니다.
-
-```text
-{"init_uuid":"99a8f973","init_random":0.07851607982202058,"request_random":0.9192774517345583,"monotonic_since_init":4.11,"hostname":"localhost","pid":1}
-{"init_uuid":"e40bc3b0","init_random":0.6823978849495971,"request_random":0.00468774777232972,"monotonic_since_init":4.15,"hostname":"localhost","pid":1}
-{"init_uuid":"a9db364f","init_random":0.6567094270741511,"request_random":0.09727327161580579,"monotonic_since_init":4.16,"hostname":"localhost","pid":1}
-```
-
-- V1은 session마다 초기화를 따로 하므로 모든 값이 다릅니다.
-- hostname과 PID는 V1에서도 `localhost`, `1`입니다. 이 둘을 ID로 쓰는 코드는 V1에서도 이미 틀린 코드입니다.
+- 2026-11-13에 같은 이미지의 V1 runtime으로 잰 값은 session마다 `init_uuid`, `init_random`, `request_random`이 모두 달랐습니다. V1은 session마다 초기화를 따로 하기 때문입니다. hostname과 PID는 V1에서도 `localhost`, `1`이었으므로, 이 둘을 ID로 쓰는 코드는 V1에서도 이미 틀린 코드입니다.
 
 ## 부록. 실무에서 얻는 것
 
-- **`random` 모듈은 handler 안에서도 안전하지 않습니다.** 공식 문서는 "random 모듈은 시작 시 시드되므로 복원된 instance가 같은 순서를 반복한다"고 쓰는데, 이 문장을 "초기화 때 뽑은 값만 문제"로 읽기 쉽습니다. 실측은 handler에서 처음 호출한 값도 같았습니다. 재시도 jitter, 샘플링, A/B 분기를 `random`으로 하던 코드는 V2에서 모든 session이 같은 선택을 합니다. 요청 시작 때 `random.seed(os.urandom(16))`으로 다시 시드하거나 `secrets`를 씁니다.
+- **`random` 모듈은 handler 안에서도 안전하지 않습니다.** 공식 문서는 "random 모듈은 시작 시 시드되므로 복원된 instance가 같은 순서를 반복한다"고 쓰는데, 이 문장을 "초기화 때 뽑은 값만 문제"로 읽기 쉽습니다. 실측에서는 handler에서 처음 호출한 값도 같았습니다. 재시도 jitter, 샘플링, A/B 분기를 `random`으로 하던 코드는 V2에서 모든 session이 같은 선택을 합니다. 요청 시작 때 `random.seed(os.urandom(16))`으로 다시 시드하거나 `secrets`를 씁니다.
 - **Node.js는 handler 안의 `crypto.randomUUID()`도 겹칠 수 있다고 문서가 경고합니다.** OpenSSL 난수 상태가 snapshot에 복제되기 때문입니다. 이 실습은 파이썬만 확인했습니다.
 - **초기화에 넣으면 안 되는 "느리지만 바뀌는 값"이 있습니다.** AgentCore Gateway의 tool 목록처럼 로딩이 느린 값을 초기화 때 캐시하면, 그 runtime 버전이 사는 동안 tool 목록이 snapshot 시점에 고정됩니다.
+- **복원 직후에 실행되는 hook은 없습니다.** V2 lifecycle hook은 snapshot을 찍기 전에 호출되는 build warmup 하나뿐이라, 복원된 session마다 상태를 다시 만드는 용도로 쓸 수 없습니다. session마다 달라야 하는 값은 handler에서 만듭니다. hook은 [부록 문서](./6-more-v2-options.md#lifecycle-hook)에 정리했습니다.
 - **V1 warm pool에도 비슷한 흔적이 있습니다.** V1 pool session은 `monotonic_since_init` 4초, `wall_since_init` 228초였습니다. 초기화 후 멈춰 있다가 재개되었으므로, `time.monotonic()` 기준 경과 시간은 V1에서도 이미 믿을 수 없었습니다.
 
 ## 참고 문서

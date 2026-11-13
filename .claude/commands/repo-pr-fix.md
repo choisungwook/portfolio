@@ -9,7 +9,7 @@ PR `$1`(없으면 현재 branch의 PR)의 리뷰 comment를 처리한다.
 ## 순서
 
 1. comment를 읽는다. 일반 comment와 review thread를 모두 읽는다.
-2. comment마다 태그를 본다. Important는 고친다. Nit은 이번 push에 코드 변경이 있으면 함께 고치고, Nit만 남았으면 고치지 않는다. Pre-existing은 고치지 않고 Issue 후보로 결과 보고에 남긴다. 태그가 없으면 copilot-instructions.md의 정의로 직접 분류한다.
+2. comment마다 태그를 본다. Important는 고친다. Nit은 이번 push에 코드 변경이 있으면 함께 고치고, Nit만 남았으면 고치지 않는다. Pre-existing은 고치지 않고 Issue 후보로 결과 보고에 남긴다. 태그가 없으면 [code-review.md](../rule-details/code-review.md)의 정의로 직접 분류한다.
 3. 고칠 때는 지적된 줄만 고치지 않고 같은 종류의 다른 위치까지 찾아 고친다. 코드 변경은 저장소 규칙을 따른다.
 4. commit하고 push한다. commit message에 claude session 링크가 있으면 제거한다.
 5. 처리한 review thread에 답글을 남기고 resolve한다.
@@ -18,7 +18,7 @@ GitHub 조회와 조작 도구는 [.claude/rule-details/github-tools.md](../rule
 
 ## 답글 형식
 
-thread마다 아래 두 항목을 남긴다. 거부는 넷 중 하나로 분류한다. 이 분류가 쌓이면 리뷰어의 noise를 재는 데이터가 되고, 틀림과 중요하지 않음이 많은 종류는 [.github/copilot-instructions.md](../../.github/copilot-instructions.md)에서 빼거나 고친다.
+thread마다 아래 두 항목을 남긴다. 거부는 넷 중 하나로 분류한다. 이 분류가 쌓이면 리뷰어의 noise를 재는 데이터가 되고, 틀림과 중요하지 않음이 많은 종류는 [code-review.md](../rule-details/code-review.md)에서 빼거나 고친다.
 
 - 수락여부: 수락(고침) 또는 거부(틀림, 의도된 동작, 중요하지 않음, 기존 코드)
 - 이유: 1~2문장으로 간단명료하게 쓴다. 거부(틀림)은 리뷰어가 놓친 파일과 줄을 적는다.

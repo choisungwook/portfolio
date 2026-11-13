@@ -23,18 +23,7 @@ variable "init_seconds" {
 }
 
 variable "init_memory_mb" {
-  description = "초기화 때 적재하는 메모리(MB). 모델 가중치를 흉내 낸다"
+  description = "초기화 때 적재하는 메모리(MB). 모델 가중치를 흉내 낸다. 시나리오 4에서 바꿔 runtime 새 버전을 만든다"
   type        = number
   default     = 512
-}
-
-variable "legacy_platform_version" {
-  description = "legacy runtime의 platform version. 시나리오 4에서 V2로 바꿔 업그레이드한다"
-  type        = string
-  default     = "V1"
-
-  validation {
-    condition     = contains(["V1", "V2"], var.legacy_platform_version)
-    error_message = "V1 또는 V2만 쓸 수 있습니다."
-  }
 }
