@@ -1,0 +1,17 @@
+# 4단계: 키워드 규칙으로 모델을 바꾸는 훅.
+model_list:
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small
+      mock_response: "small 모델의 mock 응답입니다."
+  - model_name: chat-large
+    litellm_params:
+      model: openai/mock-large
+      mock_response: "large 모델의 mock 응답입니다."
+
+litellm_settings:
+  callbacks: ["gateway.keyword_router.keyword_router"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

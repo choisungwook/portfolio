@@ -1,0 +1,14 @@
+# 1단계: mock 모델 2개만 등록한 최소 config. 실제 provider를 호출하지 않는다.
+model_list:
+  - model_name: chat-small            # 클라이언트가 부르는 별칭
+    litellm_params:
+      model: openai/mock-small        # provider/모델. mock_response가 있으면 호출하지 않는다
+      mock_response: "small 모델의 mock 응답입니다."
+  - model_name: chat-large
+    litellm_params:
+      model: openai/mock-large
+      mock_response: "large 모델의 mock 응답입니다."
+      mock_delay: 1                   # 응답 전에 1초 쉰다. 느린 모델을 흉내 낸다
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

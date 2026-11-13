@@ -1,0 +1,13 @@
+# 3단계: pre_call 훅 하나를 붙여 spend_logs_metadata를 남긴다.
+model_list:
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small
+      mock_response: "small 모델의 mock 응답입니다."
+
+litellm_settings:
+  callbacks: ["gateway.metadata_tagger.metadata_tagger"]   # "모듈 경로.인스턴스 이름"
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
