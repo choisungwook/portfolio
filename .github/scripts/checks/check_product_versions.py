@@ -75,7 +75,7 @@ def check_workflow(name: str, entry: dict, changed: list[str], base: str, head: 
   old, new = version_at(base, version_file), version_at(head, version_file)
   tag = f"{entry['tag_prefix']}{new}"
   if old and version_key(new) <= version_key(old):
-    report.add(version_file, f"{touched[0]} 등 {len(touched)}개 파일이 {name}을 실행시키는데 버전이 {old} 그대로임. patch나 minor를 올릴 것")
+    report.add(version_file, f"{touched[0]} 등 {len(touched)}개 파일이 {name}을 실행시키는데 버전이 {old}에서 {new}로 올라가지 않음. patch나 minor를 올릴 것")
   elif git("tag", "--list", tag).strip():
     report.add(version_file, f"tag {tag}가 이미 있음. 머지하면 release가 새 버전을 만들지 못하므로 버전을 올릴 것")
 
