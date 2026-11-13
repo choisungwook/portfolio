@@ -32,8 +32,8 @@ curl -s http://127.0.0.1:9222/json/version
 
 ## 환경 내리기
 
-실습용 Chrome과 정적 서버를 종료하고 실습 프로필과 스크린샷을 지웁니다. `pkill -f` 패턴에 실습 프로필 경로가 들어가므로 평소 쓰는 Chrome은 종료되지 않습니다.
+올릴 때와 같은 `computer_science/ai/cdp-browser-access`에서 실행합니다. 실습용 Chrome과 정적 서버를 종료하고 실습 프로필과 스크린샷을 지웁니다. `pkill -f` 패턴에 실습 프로필 경로가 들어가므로 평소 쓰는 Chrome은 종료되지 않습니다.
 
 ```bash
-pkill -f "user-data-dir=$PWD/.chrome-profile"; pkill -f "http.server 8000"; rm -rf .chrome-profile *.png pw.err pw.out
+pkill -f "user-data-dir=$PWD/.chrome-profile"; pkill -f "http.server 8000"; rm -rf .chrome-profile cdp-raw-screenshot.png playwright-screenshot.png pw.err pw.out
 ```

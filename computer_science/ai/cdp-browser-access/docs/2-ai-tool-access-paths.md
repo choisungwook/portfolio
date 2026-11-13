@@ -80,7 +80,7 @@ sequenceDiagram
 
 ## 실습
 
-이 시나리오는 이미 설치된 제품의 파일을 읽기만 하며 Chrome 실습 환경이 필요하지 않습니다. 각 제품을 설치하지 않았다면 해당 단계의 출력이 비어 있습니다. 출력의 버전 번호는 설치 시점에 따라 다릅니다. 아래 결과는 macOS, Chrome `Default` 프로필 기준이며, 다른 프로필에 설치했다면 경로의 `Default`를 `Profile 1` 등으로 바꿉니다.
+이 시나리오는 이미 설치된 제품의 파일을 읽기만 하며 Chrome 실습 환경이 필요하지 않습니다. 설치하지 않은 제품이 있으면 해당 단계의 명령은 빈 출력이 아니라 오류(zsh의 `no matches found`, Python의 `IndexError`, grep의 `No such file`)로 끝나므로, 설치한 제품의 단계만 따라 합니다. 작업 3은 Codex를 설치하지 않았다면 for 문에서 `"$NMH"/com.openai.*.json`을 지우고 실행합니다. 출력의 버전 번호는 설치 시점에 따라 다릅니다. 아래 결과는 macOS, Chrome `Default` 프로필 기준이며, 다른 프로필에 설치했다면 경로의 `Default`를 `Profile 1` 등으로 바꿉니다.
 
 ### 1. Claude in Chrome 확장과 Codex 확장의 권한 비교
 
@@ -157,7 +157,7 @@ tail -1 ~/.claude/chrome/chrome-native-host
 exec <claude 실행 파일 경로> --chrome-native-host
 ```
 
-실제 출력에는 `<claude 실행 파일 경로>` 자리에 설치 위치가 나옵니다. 한 확장에 host가 둘 등록되어 있어서, Claude desktop이 켜져 있으면 확장이 desktop 쪽 host에 붙어 CLI의 `--chrome`이 "extension not connected"가 되는 충돌이 보고되어 있습니다. 증상과 해결은 [troubleshooting.md](troubleshooting.md)에 정리했습니다.
+실제 출력에는 `<claude 실행 파일 경로>` 자리에 설치 위치가 나옵니다. 한 확장에 host가 둘 등록되어 있어서, Claude desktop이 켜져 있으면 확장이 desktop 쪽 host에 붙어 CLI의 `--chrome`이 "Browser extension is not connected"를 보고하는 충돌이 보고되어 있습니다. 증상과 해결은 [troubleshooting.md](troubleshooting.md)에 정리했습니다.
 
 ### 4. Claude desktop 내장 브라우저의 CDP 호출 확인
 
