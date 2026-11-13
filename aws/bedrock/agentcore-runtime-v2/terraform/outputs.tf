@@ -5,14 +5,14 @@ output "repository_url" {
 
 output "runtime_arns" {
   description = "runtime 이름별 ARN"
-  value       = { for key, runtime in aws_bedrockagentcore_agent_runtime.this : key => runtime.agent_runtime_arn }
+  value       = { for key, runtime in aws_bedrockagentcore_agent_runtime.agent : key => runtime.agent_runtime_arn }
 }
 
 output "runtime_env" {
   description = "scripts가 읽는 환경 변수 파일 내용"
   value = join("\n", concat(
     ["AWS_REGION=${var.aws_region}", "USAGE_LOG_GROUP=${aws_cloudwatch_log_group.usage.name}"],
-    [for key, runtime in aws_bedrockagentcore_agent_runtime.this : "RUNTIME_${upper(key)}_ARN=${runtime.agent_runtime_arn}"],
+    [for key, runtime in aws_bedrockagentcore_agent_runtime.agent : "RUNTIME_${upper(key)}_ARN=${runtime.agent_runtime_arn}"],
   ))
 }
 

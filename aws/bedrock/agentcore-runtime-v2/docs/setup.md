@@ -2,9 +2,10 @@
 
 ## 준비물
 
-- Terraform 1.11 이상, AWS provider 6.68 이상(`platform_version` 인자가 이 버전에 추가됨)
+- Terraform 1.11 이상, AWS provider 6.73 이상(`terraform.tf`가 `~> 6.73`으로 고정. `platform_version` 인자는 6.68에 추가됨)
 - AWS CLI v2. 2.36.29는 응답에서 `platformVersion`을 버리고, 2.40.2에서는 보입니다([troubleshooting.md](./troubleshooting.md))
 - Docker(buildx로 `linux/arm64` 이미지를 빌드)
+- jq(시나리오 3, 4에서 응답 필드 추출)
 - uv(측정 스크립트 `scripts/runtime.py`가 PEP 723 머리로 boto3를 고정)
 - ECR, IAM, Bedrock AgentCore, CloudWatch Logs 권한이 있는 로컬 AWS profile
 
@@ -27,11 +28,12 @@
 
 ## 1. AWS profile 지정
 
-Terraform 코드와 스크립트에는 profile을 적지 않았습니다. 셸에서 사용할 profile을 먼저 지정합니다.
+Terraform 코드와 스크립트에는 profile을 적지 않았습니다. 셸에서 사용할 profile과 리전을 먼저 지정합니다. 이 문서와 시나리오의 `aws` 명령은 `--region` 없이 이 리전을 씁니다.
 
 ```bash
 cd aws/bedrock/agentcore-runtime-v2
 export AWS_PROFILE=<로컬 profile>
+export AWS_REGION=ap-northeast-2
 ```
 
 ## 2. ECR 저장소 생성과 이미지 push

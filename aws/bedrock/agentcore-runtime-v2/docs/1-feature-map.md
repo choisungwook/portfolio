@@ -62,6 +62,8 @@ agent 컨테이너는 점점 무거워집니다. 프레임워크 import, 로컬 
 
 ## 흐름
 
+아래 그림은 이 시나리오에서 요청과 상태가 흘러가는 순서입니다.
+
 ```mermaid
 flowchart LR
   subgraph build["create / update 시점"]

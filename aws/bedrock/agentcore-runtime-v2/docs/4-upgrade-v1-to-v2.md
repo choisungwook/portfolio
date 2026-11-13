@@ -46,6 +46,8 @@
 
 ## 흐름
 
+아래 그림은 이 시나리오에서 요청과 상태가 흘러가는 순서입니다.
+
 ```mermaid
 sequenceDiagram
   participant T as terraform apply
@@ -71,11 +73,15 @@ sequenceDiagram
 
 ### 1. 전환 전 V1 session 열기
 
+V1 상태의 `rtv2_legacy`에 session 하나를 열고 응답을 파일로 남깁니다. 3, 4단계가 이 파일에서 session ID를 읽습니다.
+
 ```bash
 cd aws/bedrock/agentcore-runtime-v2
 uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy | tee /tmp/before.json |
   jq -c '{session,seconds,init_uuid,turns}'
 ```
+
+실행 결과입니다.
 
 ```text
 {"session":"s-1a3da66af05d4e17ba455956714fa7c5","seconds":0.51,"init_uuid":"94128f84-065c-405d-88f5-2f14536cf218","turns":1}
@@ -89,20 +95,30 @@ uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy | tee /t
 terraform -chdir=terraform apply -var legacy_platform_version=V2
 ```
 
+`apply`가 끝날 때 출력되는 줄입니다.
+
 ```text
-aws_bedrockagentcore_agent_runtime.this["legacy"]: Modifications complete after 3m35s
+aws_bedrockagentcore_agent_runtime.agent["legacy"]: Modifications complete after 3m35s
 ```
 
 ### 3. 전환 중 기존 session과 새 session 호출
 
-다른 터미널에서 `apply`가 도는 동안 30초 간격으로 상태, 기존 session, 새 session을 호출합니다.
+다른 터미널을 열고, `apply`가 도는 동안 30초 간격으로 상태, 기존 session, 새 session을 호출합니다. `apply`가 끝나면 Ctrl+C로 멈춥니다.
 
 ```bash
+cd aws/bedrock/agentcore-runtime-v2
+export AWS_PROFILE=<로컬 profile>
 S=$(jq -r .session /tmp/before.json)
-uv run --env-file .runtime.env scripts/runtime.py status | grep legacy
-uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy --session "$S" | jq -c '{seconds,init:.init_uuid[:8],turns}'
-uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy | jq -c '{seconds,init:.init_uuid[:8],mono:.monotonic_since_init}'
+while true; do
+  date +%T
+  uv run --env-file .runtime.env scripts/runtime.py status | grep legacy
+  uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy --session "$S" | jq -c '{seconds,init:.init_uuid[:8],turns}'
+  uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy | jq -c '{seconds,init:.init_uuid[:8],mono:.monotonic_since_init}'
+  sleep 30
+done
 ```
+
+실행 결과입니다. 중간 반복은 생략했습니다.
 
 ```text
 18:20:30
@@ -122,11 +138,16 @@ legacy   V2               UPDATING   2
 
 ### 4. 전환 후 기존 session과 새 session 비교
 
+`status`가 `READY`가 되면 기존 session과 새 session을 다시 호출합니다. 어느 터미널에서 실행해도 되도록 session ID를 다시 읽습니다.
+
 ```bash
+S=$(jq -r .session /tmp/before.json)
 uv run --env-file .runtime.env scripts/runtime.py status
 uv run --env-file .runtime.env scripts/runtime.py call --runtime legacy --session "$S" | jq -c '{seconds,init:.init_uuid[:8],turns}'
 uv run --env-file .runtime.env scripts/runtime.py cold --runtime legacy --count 5
 ```
+
+실행 결과입니다. `cold` 출력의 3, 4번 줄은 생략했습니다.
 
 ```text
 runtime  platformVersion  status     version

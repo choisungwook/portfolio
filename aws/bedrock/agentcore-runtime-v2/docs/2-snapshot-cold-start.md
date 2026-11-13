@@ -53,6 +53,8 @@ agent 쪽에서 cold start를 줄이는 방법은 초기화를 가볍게 하거�
 
 ## 흐름
 
+아래 그림은 이 시나리오에서 요청과 상태가 흘러가는 순서입니다.
+
 ```mermaid
 sequenceDiagram
   participant C as runtime.py
@@ -78,19 +80,27 @@ sequenceDiagram
 
 ### 1. 새 session 5개 순차 호출로 V1, V2 cold start 측정
 
+`cold`는 매번 새 `runtimeSessionId`로 `InvokeAgentRuntime`을 순서대로 호출합니다.
+
 ```bash
 cd aws/bedrock/agentcore-runtime-v2
 uv run --env-file .runtime.env scripts/runtime.py cold --runtime legacy --count 5
 uv run --env-file .runtime.env scripts/runtime.py cold --runtime v2 --count 5
 ```
 
+V1(`legacy`) 결과입니다.
+
 ```text
-== legacy cold
 #   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
 1      0.54 07c86e13  d4140626  0.9503    228.39     4.21 localhost  1    1     533
 2      0.46 8f736daa  5bdd23ac  0.7995     228.8     4.18 localhost  1    1     533
 3      0.45 c0d69424  6e0f7528  0.6750    229.32     4.17 localhost  1    1     533
-== v2 cold
+```
+
+V2 결과입니다.
+
+```text
+#   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
 1       2.3 89c4bc89  132657df  0.7393    155.76    80.53 localhost  1    1     533
 2      1.92 89c4bc89  e193f015  0.7393     157.7    80.27 localhost  1    1     533
 3       2.0 89c4bc89  8b9f5ec0  0.7393    159.7    80.23 localhost  1    1     533
@@ -102,17 +112,26 @@ uv run --env-file .runtime.env scripts/runtime.py cold --runtime v2 --count 5
 
 ### 2. 같은 session 반복 호출로 warm 지연 확인
 
+`warm`은 session 하나를 만들고 그 session으로 반복 호출합니다.
+
 ```bash
 uv run --env-file .runtime.env scripts/runtime.py warm --runtime legacy --count 3
 uv run --env-file .runtime.env scripts/runtime.py warm --runtime v2 --count 3
 ```
 
+V1(`legacy`) 결과입니다.
+
 ```text
-== legacy warm
+#   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
 1       0.7 06757540  2d7e56a1  0.9532    231.16     4.11 localhost  1    1     533
 2      0.15 06757540  eccf9c17  0.9532    231.31     4.26 localhost  1    2     533
 3      0.15 06757540  c5a60aa7  0.9532    231.46     4.41 localhost  1    3     533
-== v2 warm
+```
+
+V2 결과입니다.
+
+```text
+#   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
 1      1.98 89c4bc89  39b67685  0.7393    165.68    80.23 localhost  1    1     533
 2      0.17 89c4bc89  cbc74abe  0.7393    165.91    80.46 localhost  1    2     533
 3      0.19 89c4bc89  f7cb50ae  0.7393     166.1    80.65 localhost  1    3     533
@@ -122,11 +141,17 @@ uv run --env-file .runtime.env scripts/runtime.py warm --runtime v2 --count 3
 
 ### 3. 순차 호출 12개로 V1 warm pool 소진
 
+1, 2단계에 이어 같은 V1 runtime에 새 session 12개를 순서대로 엽니다.
+
 ```bash
 uv run --env-file .runtime.env scripts/runtime.py cold --runtime legacy --count 12
 ```
 
+9번째부터의 실행 결과입니다.
+
 ```text
+#   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
+...
 9       0.41 d5442e37  8194a62a  0.5604     14.94     3.97 localhost  1    1     533
 10      0.42 91d4c3a8  b4fff4af  0.3915     14.62     4.03 localhost  1    1     533
 11     23.57 99210a68  188774b3  0.3371      0.87     0.87 localhost  1    1     533
@@ -138,11 +163,16 @@ uv run --env-file .runtime.env scripts/runtime.py cold --runtime legacy --count 
 
 ### 4. 같은 V2 runtime에 순차 호출 15개
 
+3단계와 같은 조건으로 V2 runtime에 새 session 15개를 순서대로 엽니다.
+
 ```bash
 uv run --env-file .runtime.env scripts/runtime.py cold --runtime v2 --count 15
 ```
 
+실행 결과입니다. 중간 줄은 생략했습니다.
+
 ```text
+#   seconds init_id   req_id    init_rnd wall_init mono_init hostname   pid  turns rss_mb
 1      2.18 e630b9ac  39737428  0.2631    241.45    70.01 localhost  1    1     533
 2       1.8 89c4bc89  2ab4f9d4  0.7393    243.85    80.19 localhost  1    1     533
 ...
@@ -162,12 +192,15 @@ uv run --env-file .runtime.env scripts/runtime.py burst --runtime legacy --count
 uv run --env-file .runtime.env scripts/runtime.py burst --runtime v2 --count 40
 ```
 
+실행 결과입니다. `all:` 줄의 중간 값은 생략했습니다.
+
 ```text
-runtime=v2 sessions=40
-p50=5.02 p75=5.22 max=6.12
 runtime=legacy sessions=40
 p50=4.4 p75=27.38 max=27.54
 all: [3.02, 3.44, ... 4.31, 4.4, 27.04, 27.04, ... 27.51, 27.54]
+runtime=v2 sessions=40
+p50=5.02 p75=5.22 max=6.12
+all: [3.67, 3.8, ... 5.4, 5.48, 6.12]
 ```
 
 - V1은 정확히 20개가 pool에서 3~4.4초, 나머지 20개가 27초로 갈렸습니다. 바로 전에 같은 runtime에 `--count 20`을 보냈을 때는 20개 모두 2.04~2.16초였습니다.

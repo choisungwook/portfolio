@@ -52,6 +52,8 @@ agent 코드는 메모리를 해제하는 것까지만 할 수 있습니다. 파
 
 ## 흐름
 
+아래 그림은 이 시나리오에서 요청과 상태가 흘러가는 순서입니다.
+
 ```mermaid
 flowchart LR
   agent["agent: alloc 2GB, free"] --> guest["microVM 게스트 메모리"]
@@ -75,6 +77,8 @@ cd aws/bedrock/agentcore-runtime-v2
 uv run --env-file .runtime.env scripts/runtime.py memory --runtime default
 uv run --env-file .runtime.env scripts/runtime.py memory --runtime v2
 ```
+
+두 터미널의 실행 결과입니다.
 
 ```text
 runtime=default session=s-2fb382f906f243789d2853bb89279d3e

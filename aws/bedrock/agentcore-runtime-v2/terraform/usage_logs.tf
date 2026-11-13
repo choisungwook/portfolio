@@ -37,7 +37,7 @@ resource "aws_cloudwatch_log_delivery_destination" "usage" {
 }
 
 resource "aws_cloudwatch_log_delivery_source" "usage" {
-  for_each = aws_bedrockagentcore_agent_runtime.this
+  for_each = aws_bedrockagentcore_agent_runtime.agent
 
   name         = "${var.project_name}-${each.key}-usage"
   log_type     = "USAGE_LOGS"

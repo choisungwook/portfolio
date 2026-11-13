@@ -7,7 +7,7 @@ locals {
   }
 }
 
-resource "aws_bedrockagentcore_agent_runtime" "this" {
+resource "aws_bedrockagentcore_agent_runtime" "agent" {
   for_each = local.runtimes
 
   agent_runtime_name = "rtv2_${each.key}"

@@ -52,6 +52,8 @@ snapshot 복제로 생기는 버그는 오류를 내지 않습니다. 요청 ID�
 
 ## 흐름
 
+아래 그림은 이 시나리오에서 요청과 상태가 흘러가는 순서입니다.
+
 ```mermaid
 flowchart TB
   init["초기화: init_uuid, random 시드, init_time 기록"] --> snap["V2 snapshot"]
@@ -69,6 +71,8 @@ flowchart TB
 
 ### 1. V2 runtime에 새 session 3개 호출
 
+`call`을 세 번 실행해 새 session 3개를 열고, 초기화 값과 요청 값만 골라 봅니다.
+
 ```bash
 cd aws/bedrock/agentcore-runtime-v2
 for i in 1 2 3; do
@@ -76,6 +80,8 @@ for i in 1 2 3; do
     jq -c '{init_uuid:.init_uuid[:8],init_random,request_uuid:.request_uuid[:8],request_random,wall_since_init,monotonic_since_init,hostname,pid}'
 done
 ```
+
+실행 결과입니다.
 
 ```text
 {"init_uuid":"89c4bc89","init_random":0.7393339038388318,"request_uuid":"1f1aa05c","request_random":0.22408205029316564,"wall_since_init":1215.78,"monotonic_since_init":80.09,"hostname":"localhost","pid":1}
@@ -90,12 +96,16 @@ done
 
 ### 2. V1 runtime에 새 session 3개 호출
 
+같은 방법으로 V1인 `rtv2_default`에 새 session 3개를 엽니다.
+
 ```bash
 for i in 1 2 3; do
   uv run --env-file .runtime.env scripts/runtime.py call --runtime default |
     jq -c '{init_uuid:.init_uuid[:8],init_random,request_random,monotonic_since_init,hostname,pid}'
 done
 ```
+
+실행 결과입니다.
 
 ```text
 {"init_uuid":"99a8f973","init_random":0.07851607982202058,"request_random":0.9192774517345583,"monotonic_since_init":4.11,"hostname":"localhost","pid":1}
