@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    image: agentcore-memory-backend:local
+    env_file:
+      - path: .runtime.env
+        required: true
+    environment:
+      # 코드와 문서는 default 프로파일을 쓴다. 다른 프로파일은 AWS_PROFILE을 셸에서 넘긴다
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+      MODEL: ${MODEL:-qwen2.5:3b}
+    volumes:
+      - ${HOME}/.aws:/root/.aws:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build: ./frontend
+    image: agentcore-memory-frontend:local
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:8080:80"
