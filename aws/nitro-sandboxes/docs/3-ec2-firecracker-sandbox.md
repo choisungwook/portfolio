@@ -85,7 +85,7 @@ sequenceDiagram
 
 ### 1. 부모 인스턴스 커널과 Enclaves 디바이스 확인
 
-다음 명령을 실행합니다.
+부모 인스턴스의 커널 버전과 `/dev/nitro_enclaves` 디바이스, 초기 PCIe slot 및 CPU/memory pool 상태를 확인합니다.
 
 ```bash
 uname -r
@@ -107,7 +107,7 @@ crw-rw----. 1 root root 10, 259 Nov 10 23:49 /dev/nitro_enclaves
 
 ### 2. Firecracker 설치와 guest image 빌드
 
-다음 명령을 실행합니다.
+Firecracker v1.18.0 바이너리를 내려받아 `/usr/local/bin/firecracker`에 설치하고 버전을 확인합니다.
 
 ```bash
 VERSION=1.18.0; ARCH=$(uname -m)
@@ -159,7 +159,7 @@ Error: RunWithoutApiError(BuildMicroVMFromJson(StartMicroVM(Enclave(EnclaveVm(Cm
 
 ### 4. 커널 command line에 memory pool 추가 후 재부팅
 
-pool 크기는 동시에 띄울 Sandbox 메모리 합계에 오버헤드를 더해 정합니다. 이 실습은 512MiB Sandbox를 하나씩 띄우므로 2GiB로 넉넉히 잡습니다.
+pool 크기는 동시에 띄울 Sandbox 메모리 합계에 오버헤드를 더해 정합니다. 이 실습은 512MiB Sandbox를 하나씩 띄우므로 2GiB로 넉넉히 잡습니다. 커널 부팅 인자를 갱신하고 재부팅합니다(재부팅 중 SSH 연결이 끊어지므로 약 30초 후 부모 인스턴스에 다시 접속합니다).
 
 ```bash
 sudo grubby --update-kernel=ALL --args="nitro_enclaves.mempool=2G@0"
@@ -168,7 +168,7 @@ sudo reboot
 
 ### 5. memory pool 예약 확인
 
-다음 명령을 실행합니다.
+다시 SSH 접속한 뒤, 부팅 로그와 sysfs를 통해 2GiB CMA pool이 정상 예약되었는지 확인합니다.
 
 ```bash
 sudo dmesg | grep "CMA pool"
@@ -200,7 +200,7 @@ sudo sysctl -w net.ipv4.ip_forward=1
 
 ### 7. NAT 규칙 적용 (IMDS 차단 전)
 
-먼저 NAT만 걸어 IMDS 차단이 없을 때를 봅니다.
+먼저 NAT 규칙만 적용해 IMDS가 차단되지 않은 상태의 동작을 확인합니다.
 
 ```bash
 sudo dnf install -y nftables
@@ -248,7 +248,7 @@ cat /sys/class/misc/nitro_enclaves/pcie_slots_in_use /sys/class/misc/nitro_encla
 
 ### 9. 부모에서 confidential guest 메모리 검사
 
-[find-marker.py](../guest/find-marker.py)는 Firecracker 프로세스의 `/proc/<pid>/maps` 구간을 권한 비트와 상관없이 전부 읽어 `NSBX<part_a><part_b>MARK`를 셉니다. guest는 이 문자열을 2,000번 메모리(initramfs의 `/secret.txt`)에 썼고, console에는 조각만 찍었으므로 Firecracker의 console 버퍼에서는 이어진 문자열이 나오지 않습니다.
+[find-marker.py](../guest/find-marker.py)는 Firecracker 프로세스의 `/proc/<pid>/maps` 구간을 권한 비트와 상관없이 전부 읽어 `NSBX<part_a><part_b>MARK`를 셉니다. guest는 이 문자열을 2,000번 메모리(initramfs의 `/secret.txt`)에 썼고, console에는 조각만 찍었으므로 Firecracker의 console 버퍼에서는 이어진 문자열이 나오지 않습니다. 아래 명령의 마지막 두 인자에는 8단계 출력에서 확인한 `marker parts` 숫자를 그대로 넣습니다.
 
 ```bash
 sudo python3 find-marker.py $(pgrep -x firecracker) 2604927768 86541341
@@ -268,7 +268,7 @@ scanned 549 MiB, total marker hits: 0
 
 ### 10. IMDS 차단 규칙 추가 후 Sandbox 종료
 
-다음 명령을 실행합니다.
+실행 중인 confidential 모드 Firecracker를 종료하고, `tap0`에서 부모 IMDS(`169.254.169.254`)로 향하는 포워딩 패킷을 차단하는 nftables 규칙을 추가한 뒤 반환된 slot과 메모리를 확인합니다.
 
 ```bash
 sudo pkill -x firecracker

@@ -47,6 +47,8 @@ AWS는 이 일치 여부를 fidelity test로 잽니다. fidelity test는 실제 
 
 ## 흐름
 
+공개된 fidelity test 채점 결과(`scores.json.gz`)와 `probes/error_cases.py`를 통한 양쪽 오류 응답 대조 흐름입니다.
+
 ```mermaid
 flowchart LR
   T["fidelity test (실제 AWS 2개 계정에서 검증)"] --> R["release마다 emulator에 실행"]
@@ -63,6 +65,8 @@ flowchart LR
 
 ### 1. emulator에서 오류 요청 7개 실행
 
+emulator 셸에서 `probes/error_cases.py`를 실행해 7가지 오류 응답을 파일(`err-emulator.txt`)로 저장합니다.
+
 ```bash
 source emulator.env
 uv run probes/error_cases.py > err-emulator.txt
@@ -77,6 +81,8 @@ uv run probes/error_cases.py > err-aws.txt
 ```
 
 ### 3. 두 결과 대조
+
+`diff`로 emulator와 실제 AWS에서 받은 오류 응답 파일 두 개를 비교합니다.
 
 ```bash
 diff err-emulator.txt err-aws.txt

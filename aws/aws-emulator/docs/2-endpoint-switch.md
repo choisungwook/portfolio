@@ -50,6 +50,8 @@ AWS SDK는 요청을 보낼 주소를 코드 인자, 환경 변수, config 파�
 
 ## 흐름
 
+`AWS_ENDPOINT_URL` 환경 변수 설정 여부에 따라 같은 boto3 코드가 emulator 또는 실제 AWS로 분기되는 흐름입니다.
+
 ```mermaid
 sequenceDiagram
   participant App as order_flow.py
@@ -72,6 +74,8 @@ sequenceDiagram
 명령은 workspace 루트(`aws/aws-emulator`)에서 실행합니다. 환경 준비는 [setup.md](setup.md)에 있습니다.
 
 ### 1. emulator에서 주문 흐름 실행
+
+`emulator.env`를 불러와 endpoint와 임시 자격 증명을 설정한 뒤 `order_flow.py`를 실행합니다.
 
 ```bash
 source emulator.env

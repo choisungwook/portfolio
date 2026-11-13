@@ -53,6 +53,8 @@ AWS에서 요청 하나는 세 단계를 거칩니다. 서명으로 누가 보�
 
 ## 흐름
 
+요청이 emulator에 도달했을 때 서명 검사, 제한적인 정책 평가, 메모리 상태 저장 순으로 처리되는 흐름입니다.
+
 ```mermaid
 flowchart LR
   R["요청"] --> S{"서명 검사"}
@@ -177,6 +179,8 @@ done
 
 ### 5. 재시작 후 상태와 자격 증명 확인
 
+컨테이너 재시작 전후의 자격 증명·인증서 해시와 앞서 만든 S3·DynamoDB 리소스 잔존 여부를 확인합니다.
+
 ```bash
 shasum ~/.aws/emulator/9297/emulator_credentials ~/.aws/emulator/9297/ca.pem | cut -c1-12
 docker restart aws-emulator
@@ -199,7 +203,7 @@ s3: [] dynamodb: []
 
 ### 6. 실제 자격 증명과 서명 없는 요청 거부
 
-emulator 셸에서 endpoint는 그대로 두고 자격 증명만 실제 프로파일로 바꿉니다. 요청은 `127.0.0.1`로만 가고, SigV4 서명에는 secret key가 들어가지 않습니다.
+emulator 셸에서 endpoint는 그대로 두고, 서브셸(`(...)`) 안에서만 자격 증명을 실제 프로파일로 바꿔 호출합니다. 요청은 `127.0.0.1`로만 가고, SigV4 서명에는 secret key가 들어가지 않습니다.
 
 ```bash
 (export AWS_PROFILE=<프로파일>; unset AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE; aws sts get-caller-identity)

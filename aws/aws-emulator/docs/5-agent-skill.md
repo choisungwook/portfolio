@@ -58,6 +58,8 @@ agent에게 "emulator를 설치해 줘"라고만 하면 agent는 인터넷의 �
 
 ## 흐름
 
+AI agent가 `aws-emulator` skill의 5단계 절차에 따라 앱의 AWS 호출을 추출하고 `scores.json.gz`를 근거로 호환성을 판정하는 흐름입니다.
+
 ```mermaid
 flowchart TB
   Q["사용자: 이 앱이 emulator에서 동작하나?"] --> S1["1. 입력 수집: 최신 release, 설치 버전, scores.json.gz, evaluation suite 클론"]
@@ -75,6 +77,8 @@ flowchart TB
 명령은 workspace 루트(`aws/aws-emulator`)에서 실행합니다. agent-toolkit 명령은 AWS API를 부르므로 실제 AWS 자격 증명이 있는 셸에서 실행합니다.
 
 ### 1. 설치 전에 skill 파일 목록 확인
+
+`aws agent-toolkit`으로 `aws-emulator` skill에 포함된 파일 목록을 먼저 조회합니다.
 
 ```bash
 aws agent-toolkit get-skill-metadata --skill-name aws-emulator --region us-east-1 --query 'files[].path'
@@ -143,6 +147,8 @@ agent는 skill에 따라 다음을 실행했습니다.
 
 ### 4. 판정 결과 확인
 
+3단계에서 agent가 생성한 `app/.aws-emulator/check/verdict.json` 파일에서 최종 판정과 item별 상태를 출력합니다.
+
 ```bash
 jq -r '.verdict, (.reasons|join(",")), (.items[] | "\(.item) \(.status) \(.sub_reason // "")")' app/.aws-emulator/check/verdict.json
 ```
@@ -189,6 +195,8 @@ credentials-from-env UNVERIFIED unclassified
 | 다음 release에서도 같은가 | 다시 실행해야 앎 | 같은 점검을 새 점수로 다시 돌림 |
 
 ### 6. skill 제거
+
+실습이 끝나면 설치한 `aws-emulator` skill을 제거하고 설치 목록이 비었는지 확인합니다.
 
 ```bash
 aws agent-toolkit remove-skill --skill-name aws-emulator --agent claude-code --region us-east-1
