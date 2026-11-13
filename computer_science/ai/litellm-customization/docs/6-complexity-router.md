@@ -121,6 +121,7 @@ x-litellm-complexity-router-score: 0.175
 
 나머지 세 질문은 휴리스틱이 정했다. 한국어 질문 둘은 같은 점수(-0.1)로 SIMPLE이 됐고, 영어 설계 질문은 "step by step"과 비교 요청이 있었는데도 MEDIUM에 그쳐 `gemini`로 갔다. 휴리스틱은 질문의 난이도가 아니라 어휘 신호를 세기 때문에, 신호어가 적은 언어나 짧은 문장에서는 거의 구분하지 못한다.
 
+### 3. LLM 분류기 config로 다시 요청
 
 Proxy를 `Ctrl+C`로 끄고 LLM 분류기 config로 다시 띄운다.
 
