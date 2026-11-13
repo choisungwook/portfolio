@@ -1,0 +1,11 @@
+[project]
+name = "agentcore-memory-chat-backend"
+version = "0.1.0"
+description = "AgentCore Memory를 단기, 장기 메모리로 쓰는 OpenAI 호환 채팅 백엔드"
+requires-python = ">=3.13"
+dependencies = [
+  "boto3[crt]==1.44.2",
+  "fastapi==0.162.6",
+  "httpx==0.28.1",
+  "uvicorn==0.54.0",
+]

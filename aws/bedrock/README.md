@@ -6,6 +6,7 @@ Amazon Bedrock 실습의 진입점입니다. 각 하위 디렉터리는 독립�
 
 | 디렉터리 | 내용 |
 | --- | --- |
+| [agentcore-memory](./agentcore-memory/) | AgentCore Memory. Ollama 채팅 backend의 단기·장기 메모리, 채팅창 여러 개, CLI 조회, IngestData, episode, 비용 |
 | [agentcore-runtime-v2](./agentcore-runtime-v2/) | AgentCore Runtime V2. snapshot 시작, 상태 복제, 업데이트 시 snapshot 교체, 메모리 과금 |
 | [guardrails](./guardrails/) | LiteLLM Proxy에 Bedrock Guardrails를 붙여 검사 시점, 스트리밍, 비용 측정과 운영 모니터링, 사용자 문의 대응 |
 | [knowledge-base-s3-vectors](./knowledge-base-s3-vectors/) | Bedrock Knowledge Bases와 S3 Vectors로 구성한 RAG |

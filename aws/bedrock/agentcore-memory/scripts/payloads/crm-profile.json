@@ -1,0 +1,19 @@
+{
+  "inline": {
+    "payload": [
+      {
+        "json": {
+          "content": {
+            "source": "crm",
+            "customer": "minho",
+            "plan": "Enterprise",
+            "region": "ap-northeast-2",
+            "contract_renewal": "2027-03-31",
+            "preferred_contact": "슬랙 DM, 이메일은 확인이 늦음",
+            "open_tickets": [{"id": "TCK-1042", "title": "RDS 스토리지 자동 확장 문의"}]
+          }
+        }
+      }
+    ]
+  }
+}

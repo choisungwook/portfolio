@@ -131,6 +131,7 @@
 117. (아직 실습안함) Amazon Bedrock AgentCore Runtime V2: snapshot 기반 시작으로 초기화 20초 agent의 cold start를 2초로, snapshot이 복제하는 상태(handler 안의 random까지), 업데이트 중 snapshot 교체, USAGE_LOGS로 메모리 회수 확인, committed baseline과 lifecycle hook 정리 (26.11.13) - [링크](./aws/bedrock/agentcore-runtime-v2/)
 118. (아직 실습안함) AI 도구는 브라우저를 어떻게 조작하는가: Claude desktop·Claude in Chrome(CLI --chrome)·Codex·Aside가 CDP에 도달하는 경로, raw CDP 8개 명령으로 클릭·읽기·캡처 재현, Playwright가 같은 작업에 CDP 36개를 보내는 이유 (26.11.14) - [링크](./computer_science/ai/cdp-browser-access/)
 119. (아직 실습안함) LiteLLM Proxy 확장 지점: Router 내부 동작, pre_call 훅, 로컬 소형 모델(gemma2) 판정 라우팅, complexity_router, custom provider 스트리밍 중계, websearch_interception 비교 (26.11.13) - [링크](./computer_science/ai/litellm-customization/)
+120. Amazon Bedrock AgentCore Memory: Ollama 로컬 모델과 OpenAI 호환 backend로 채팅창 여러 개의 단기·장기 메모리, 추출 지연과 병합, SQL처럼 CLI 조회, IngestData·episode·사용자 기억 삭제, 비용 계산 (26.11.14) - [링크](./aws/bedrock/agentcore-memory/)
 
 ## 직접 만든 제품
 
