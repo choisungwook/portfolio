@@ -1,0 +1,42 @@
+# 11단계: 단계별 판단을 spend_logs_metadata.decisions에 순서대로 남기고, 사용자 원문은 남기지 않는다.
+model_list:
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small
+      mock_response: "자세한 내용은 help@example.com 또는 010-1234-5678로 문의하세요."
+  - model_name: chat-large
+    litellm_params:
+      model: openai/mock-large
+      mock_response: "large 모델 답변입니다. 담당자 메일은 owner@example.com입니다."
+  - model_name: intent-classifier
+    litellm_params:
+      model: openai/mock-classifier
+      mock_response: '{"intent": "heavy"}'
+  - model_name: gateway-search
+    litellm_params:
+      model: gateway/search
+
+search_tools:
+  - search_tool_name: searxng-primary
+    litellm_params:
+      search_provider: searxng
+      api_base: http://localhost:8899     # 1순위 장애
+  - search_tool_name: searxng-backup
+    litellm_params:
+      search_provider: searxng
+      api_base: http://localhost:8890     # scripts/mock_searxng.py
+
+litellm_settings:
+  custom_provider_map:
+    - provider: gateway
+      custom_handler: gateway.search_provider.gateway_search_code_fallback
+  callbacks:
+    - gateway.decision_trail.trail_start                 # 1. 질문 지문과 빈 decisions 목록
+    - gateway.intent_router.intent_router_memory         # 2. 의도 분류로 chat-small/large 결정
+    - gateway.feature_switch.feature_switch_to_search    # 3. web_search 표식이 있으면 gateway-search로 덮어쓴다
+    - gateway.decision_trail.response_masker             # post_call: 응답의 연락처를 가린다
+  turn_off_message_logging: true                         # 로깅 콜백에 messages와 응답 원문을 넘기지 않는다
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

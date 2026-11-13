@@ -1,0 +1,19 @@
+# 3단계 이후 spend log를 저장할 Postgres와 6단계 분류 캐시용 Valkey.
+name: litellm-customization
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    ports:
+      - "5433:5432"   # 로컬에 이미 있을 수 있는 5432와 겹치지 않게 한다
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litellm"]
+      interval: 2s
+      retries: 15
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "6380:6379"

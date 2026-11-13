@@ -1,0 +1,37 @@
+# 2단계: 같은 별칭에 deployment 여러 개를 묶어 load balancing, retries, fallbacks를 관찰한다.
+model_list:
+  # load balancing: chat-small 별칭 하나에 deployment 2개
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small-a
+      mock_response: "small-a deployment의 응답입니다."
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small-b
+      mock_response: "small-b deployment의 응답입니다."
+
+  # retries: 같은 별칭 안에 항상 실패하는 deployment와 정상 deployment
+  - model_name: chat-large
+    litellm_params:
+      model: openai/mock-large-broken
+      mock_response: "litellm.InternalServerError"   # 매번 500 오류를 던진다
+  - model_name: chat-large
+    litellm_params:
+      model: openai/mock-large-ok
+      mock_response: "large-ok deployment의 응답입니다."
+
+  # fallbacks: 정상 deployment가 하나도 없는 별칭
+  - model_name: chat-broken
+    litellm_params:
+      model: openai/mock-broken
+      mock_response: "litellm.InternalServerError"
+
+router_settings:
+  routing_strategy: simple-shuffle   # 기본값. deployment를 무작위로 고른다
+  num_retries: 2                     # 같은 별칭 안에서 다시 시도하는 횟수
+  retry_after: 0                     # 재시도 사이 대기(초). 관찰을 빠르게 하려고 0
+  fallbacks:
+    - chat-broken: ["chat-small"]    # chat-broken이 재시도까지 실패하면 chat-small로 넘긴다
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

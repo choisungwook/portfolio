@@ -1,0 +1,13 @@
+# 7단계: tools 표식을 해석하는 훅 뒤에 관찰용 훅을 붙여, 다음 단계가 받는 요청을 확인한다.
+model_list:
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small
+      mock_response: "small 모델의 mock 응답입니다."
+
+litellm_settings:
+  callbacks: ["gateway.feature_switch.feature_switch", "gateway.feature_switch.tools_audit"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

@@ -1,0 +1,19 @@
+# 8단계: custom provider로 가짜 모델 gateway-search를 등록한다.
+model_list:
+  - model_name: chat-small
+    litellm_params:
+      model: openai/mock-small
+      mock_response: "검색 결과를 바탕으로 한 small 모델의 답변입니다."
+  - model_name: gateway-search
+    litellm_params:
+      model: gateway/search            # "gateway" provider의 search 모델. provider 이름이 custom_provider_map과 같아야 한다
+
+litellm_settings:
+  custom_provider_map:
+    - provider: gateway
+      custom_handler: gateway.search_provider.gateway_search
+  callbacks: ["gateway.feature_switch.feature_switch_to_search"]   # web_search 표식이 있으면 gateway-search로 보낸다
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
