@@ -1,0 +1,29 @@
+# 5단계(heuristic): LiteLLM 내장 complexity_router. 분류 호출 없이 로컬 점수와 키워드 규칙으로 tier를 정한다.
+model_list:
+  - model_name: claude
+    litellm_params:
+      model: openai/mock-claude
+      mock_response: "claude 별칭의 mock 응답입니다."
+  - model_name: gemini
+    litellm_params:
+      model: openai/mock-gemini
+      mock_response: "gemini 별칭의 mock 응답입니다."
+  - model_name: smart-router              # 클라이언트가 부르는 별칭
+    litellm_params:
+      model: auto_router/complexity_router
+      complexity_router_config:
+        tiers:                            # tier마다 보낼 별칭
+          SIMPLE: gemini
+          MEDIUM: gemini
+          COMPLEX: claude
+          REASONING: claude
+        keyword_tier_rules:               # 점수 계산보다 먼저 본다. 여러 규칙이 걸리면 더 높은 tier가 이긴다
+          - keywords: ["데드락"]          # 한글은 단어 경계로 비교되어 "데드락이"와 일치하지 않는다
+            tier: REASONING
+          - keywords: ["asyncio"]
+            tier: COMPLEX
+      complexity_router_default_model: gemini
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

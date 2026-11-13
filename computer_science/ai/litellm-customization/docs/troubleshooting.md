@@ -22,13 +22,14 @@ uv run prisma generate --schema .venv/lib/python3.*/site-packages/litellm/proxy/
 - 증상: 테스트마다 `litellm.callbacks = [새 recorder]`로 바꾸면 첫 테스트만 기록되고 다음 테스트의 recorder는 비어 있다.
 - 해결: 모듈 수준에서 recorder 하나만 등록하고 테스트마다 기록만 비운다([tests/test_2_router.py](../tests/test_2_router.py)). 원인 코드는 추적하지 않았다.
 
-## 한글 문장에서 이메일·전화번호 마스킹이 틀림
+## complexity_router의 한글 키워드 규칙이 걸리지 않음
 
-- 증상: `owner@example.com입니다.`가 `[email]`로 바뀌며 "입니다."가 사라지고, `010-1234-5678로`는 가려지지 않는다.
-- 원인: Python `re`의 `\w`와 `\b`가 한글을 단어 문자로 본다.
-- 해결: 이메일은 ASCII 문자 집합으로, 전화번호는 `(?<!\d)`, `(?!\d)` lookaround로 바꿨다. 자세한 내용은 [12-observability.md](12-observability.md#실습에서-걸린-함정-한글과-정규식-경계).
+- 증상: `keyword_tier_rules`에 `데드락`을 넣었는데 "데드락이 나는 원인"이 그 tier로 가지 않는다.
+- 원인: LiteLLM 1.109.1의 키워드 비교는 CJK 문자가 든 키워드만 부분 문자열로 비교하고, 그 판정 정규식에 한글이 없다. 한글 키워드는 단어 경계(`\b`)로 비교되어 조사가 붙으면 일치하지 않는다.
+- 해결: 조사가 붙은 형태까지 나열하거나, 공백이 든 구로 쓰거나, `semantic_keyword_matching`을 켠다. 자세한 내용은 [6-complexity-router.md](6-complexity-router.md).
 
-## Proxy 기동 직후 `/v1/search/searxng-primary`가 `Search tool ... not found` 반환
+## complexity_router가 LLM 분류기를 부르지 않고 휴리스틱으로만 정함
 
-- 증상: `config/9-search-code.yaml`로 띄운 직후 한 번 `Search tool 'searxng-primary' not found in router.search_tools`(500)가 나왔다.
-- 상태: 같은 순서로 세 번 다시 실행했지만 재현되지 않았고, 이후 `/v1/search/tools`에는 두 도구가 모두 보였다. liveness가 응답한 뒤 search tools 등록이 끝나기 전의 짧은 구간으로 추정하지만 확인하지 않았다. 기동 직후 실패하면 몇 초 뒤 다시 호출한다.
+- 증상: `classifier_type: llm`인데 응답 헤더 `x-litellm-complexity-router-cause`가 계속 `heuristic_scorer`다.
+- 원인: CPU 전용 판정이 `timeout_ms` 기본값(3000)을 넘겨 한 번 실패하면 circuit이 열리고, `circuit_breaker_cooldown_seconds`(기본 30초) 동안 분류기를 부르지 않는다. Proxy 로그에 `LLM classifier circuit is open`이 남는다.
+- 해결: `classifier_llm_config.timeout_ms`를 판정 시간보다 길게 둔다. 이 실습은 30000으로 두었다.

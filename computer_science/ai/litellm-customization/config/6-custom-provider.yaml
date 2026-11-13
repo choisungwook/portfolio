@@ -1,4 +1,4 @@
-# 8단계: custom provider로 가짜 모델 gateway-search를 등록한다.
+# 6단계: custom provider로 가짜 모델 gateway-search를 등록한다.
 model_list:
   - model_name: chat-small
     litellm_params:
@@ -12,7 +12,6 @@ litellm_settings:
   custom_provider_map:
     - provider: gateway
       custom_handler: gateway.search_provider.gateway_search
-  callbacks: ["gateway.feature_switch.feature_switch_to_search"]   # web_search 표식이 있으면 gateway-search로 보낸다
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

@@ -1,0 +1,35 @@
+# 5단계(llm): complexity_router의 분류기를 4단계와 같은 로컬 gemma2:2b(CPU 전용)로 바꾼다.
+model_list:
+  - model_name: claude
+    litellm_params:
+      model: openai/mock-claude
+      mock_response: "claude 별칭의 mock 응답입니다."
+  - model_name: gemini
+    litellm_params:
+      model: openai/mock-gemini
+      mock_response: "gemini 별칭의 mock 응답입니다."
+  - model_name: router-judge
+    litellm_params:
+      model: ollama_chat/gemma2:2b
+      api_base: http://localhost:11434
+      num_gpu: 0
+      temperature: 0
+  - model_name: smart-router
+    litellm_params:
+      model: auto_router/complexity_router
+      complexity_router_config:
+        tiers:
+          SIMPLE: gemini
+          MEDIUM: gemini
+          COMPLEX: claude
+          REASONING: claude
+        classifier_type: llm
+        classifier_llm_config:
+          model: router-judge
+          timeout_ms: 30000               # CPU 판정이 10초를 넘으므로 기본값(3000)보다 길게 둔다
+        classifier_fallback: heuristic    # 분류 호출이 실패하거나 시간을 넘기면 로컬 점수로 정한다
+      complexity_router_default_model: gemini
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

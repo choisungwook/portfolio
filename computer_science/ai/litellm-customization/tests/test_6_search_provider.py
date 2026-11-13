@@ -1,4 +1,4 @@
-"""8단계: custom provider가 검색 결과를 붙여 실제 모델을 부르고, 스트림 첫 청크로 상태를 보내는지 확인한다."""
+"""6단계: custom provider가 검색 결과를 붙여 실제 모델을 부르고, 스트림 첫 청크로 상태를 보내는지 확인한다."""
 
 import json
 from types import SimpleNamespace
@@ -30,7 +30,7 @@ class FakeRouter:
 def build(events: list[str]) -> tuple[GatewaySearchLLM, FakeRouter]:
   async def search(query: str) -> list[str]:
     events.append("search")
-    return [f"result for {query}"], "fake"
+    return [f"result for {query}"]
 
   router = FakeRouter(events)
   return GatewaySearchLLM(search=search, get_router=lambda: router), router

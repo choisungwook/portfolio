@@ -32,13 +32,12 @@
 
 ## 코드와 config
 
-[gateway/metadata_tagger.py](../gateway/metadata_tagger.py)는 클라이언트가 이미 보낸 `spend_logs_metadata`를 지우지 않도록 기존 값에 합친다. 아래는 3단계 시점의 단순화한 발췌이고, 실제 파일의 `add_spend_logs_metadata`에는 11단계에서 추가한 `decisions` 목록 분기가 더 있다.
+[gateway/metadata_tagger.py](../gateway/metadata_tagger.py)는 클라이언트가 이미 보낸 `spend_logs_metadata`를 지우지 않도록 기존 값에 합친다. 4단계 이후의 훅도 판단 근거를 남길 때 이 함수를 재사용한다.
 
 ```python
 def add_spend_logs_metadata(data: dict, values: dict) -> dict:
   metadata = data.setdefault("metadata", {})
-  spend_logs_metadata = metadata.get("spend_logs_metadata") or {}
-  metadata["spend_logs_metadata"] = {**spend_logs_metadata, **values}
+  metadata["spend_logs_metadata"] = {**(metadata.get("spend_logs_metadata") or {}), **values}
   return data
 
 
@@ -112,7 +111,7 @@ docker compose exec -T postgres psql -U litellm -tAc \
 chatcmpl-11e50a21-5ea8-492b-9fbe-6459fe90f729|openai/mock-small|chat-small|{"chatbot": "qa-bot", "tagged_by": "metadata_tagger"}
 ```
 
-`request_id`는 응답 본문의 `id`와 같으므로, 사용자가 받은 응답과 spend log를 잇는 key가 된다. 같은 행의 `messages`, `response` 컬럼은 `{}`인데, 기본 설정에서는 프롬프트와 응답 원문을 spend log에 저장하지 않기 때문이다. 11단계에서 이 기본값을 이용한다.
+`request_id`는 응답 본문의 `id`와 같으므로, 사용자가 받은 응답과 spend log를 잇는 key가 된다. 같은 행의 `messages`, `response` 컬럼은 `{}`인데, 기본 설정에서는 프롬프트와 응답 원문을 spend log에 저장하지 않기 때문이다. 그래서 이후 단계의 훅도 질문 원문 대신 판단 결과만 `spend_logs_metadata`에 남긴다.
 
 ### 5. 잘못된 인스턴스 이름으로 기동할 때의 오류
 
