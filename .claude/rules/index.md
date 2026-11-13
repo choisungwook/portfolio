@@ -14,6 +14,7 @@
 | [terraform.md](../rule-details/terraform.md) | `.tf` 파일을 만들거나 고칠 때 |
 | [kubernetes.md](../rule-details/kubernetes.md) | `manifests/` 아래 YAML을 만들거나 고칠 때 |
 | [python.md](../rule-details/python.md) | `.py` 파일을 만들거나 고칠 때 |
+| [code-review.md](../rule-details/code-review.md) | PR 직전 서브에이전트 리뷰를 하거나 리뷰 comment를 분류할 때 |
 
 ## 항상 주입되는 규칙
 

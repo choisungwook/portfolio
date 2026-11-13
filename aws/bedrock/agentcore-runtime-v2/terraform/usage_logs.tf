@@ -37,17 +37,13 @@ resource "aws_cloudwatch_log_delivery_destination" "usage" {
 }
 
 resource "aws_cloudwatch_log_delivery_source" "usage" {
-  for_each = aws_bedrockagentcore_agent_runtime.agent
-
-  name         = "${var.project_name}-${each.key}-usage"
+  name         = "${var.project_name}-usage"
   log_type     = "USAGE_LOGS"
-  resource_arn = each.value.agent_runtime_arn
+  resource_arn = aws_bedrockagentcore_agent_runtime.agent.agent_runtime_arn
 }
 
 resource "aws_cloudwatch_log_delivery" "usage" {
-  for_each = aws_cloudwatch_log_delivery_source.usage
-
-  delivery_source_name     = each.value.name
+  delivery_source_name     = aws_cloudwatch_log_delivery_source.usage.name
   delivery_destination_arn = aws_cloudwatch_log_delivery_destination.usage.arn
 
   depends_on = [aws_cloudwatch_log_resource_policy.usage_delivery]

@@ -1,6 +1,6 @@
 # 코드 리뷰 지침
 
-Copilot code review와 PR 직전 서브에이전트 리뷰가 같이 읽는다. 저장소가 무엇인지와 작성 규칙은 [AGENTS.md](../AGENTS.md)에 있다. 이 파일은 리뷰어가 무엇을 찾고, 무엇을 버리고, 어떤 형식으로 올리는지만 정한다.
+PR 직전 서브에이전트 리뷰가 읽는다. 저장소가 무엇인지와 작성 규칙은 [AGENTS.md](../../AGENTS.md)에 있다. 이 파일은 리뷰어가 무엇을 찾고, 무엇을 버리고, 어떤 형식으로 올리는지만 정한다.
 
 ## 우선순위
 
@@ -26,7 +26,7 @@ Copilot code review와 PR 직전 서브에이전트 리뷰가 같이 읽는다. 
 
 - .github/workflows/: 모든 PR과 release에 돈다.
 - product/products.json: master에 들어가는 순간 사이트에 반영된다.
-- AGENTS.md, .claude/rules/, .claude/rule-details/, 이 파일: 이후 모든 세션이 읽는다.
+- AGENTS.md, .claude/rules/, .claude/rule-details/: 이후 모든 세션이 읽는다.
 
 ## 건너뛸 경로
 
@@ -41,7 +41,6 @@ Copilot code review와 PR 직전 서브에이전트 리뷰가 같이 읽는다. 
 - Nit은 PR당 3개까지만 올린다. 넘치면 영향이 큰 순으로 자른다.
 - Pre-existing은 작성자 탓으로 쓰지 않는다. 별도 Issue 후보라고 표시하고 이 PR에서 고치라고 하지 않는다.
 - 같은 종류의 문제가 여러 곳이면 하나로 묶어 한 번만 올리고, 다른 위치는 그 아래 목록으로 붙인다.
-- 재요청된 리뷰는 지난 리뷰 이후 바뀐 diff만 본다. 이미 올린 지적은 반복하지 않는다.
 
 ## 요약 형식
 

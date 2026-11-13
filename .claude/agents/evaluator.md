@@ -25,7 +25,7 @@ A GitHub Issue with the work specification and the Generator's progress comments
 PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 문체"이 기준이다.
 
 - 섹션 구성: 작업 목적, 방식, 검증, 리스크 순서로 네 절이 모두 있는가? body가 30줄 이내인가?
-- 작업 목적: 2줄 이내이고 구현 방식이 아니라 목적인가? copilot-instructions.md의 "깊이 보는 경로"를 건드렸으면 사람 확인 줄이 있는가?
+- 작업 목적: 2줄 이내이고 구현 방식이 아니라 목적인가? `.claude/rule-details/code-review.md`의 "깊이 보는 경로"를 건드렸으면 사람 확인 줄이 있는가?
 - 방식: 목적을 달성한 방식이 한 줄로 있고 diff와 맞는가?
 - 검증: 표인가? Issue의 완료 조건마다 행이 있는가? 실행 열에 명령이나 CI job, 결과 열에 본 것이 있는가? 실행하지 않은 조건을 검증하지 않음으로 적었는가?
 - 리스크: 절이 있는가? 어느 검사가 못 잡는지와 어떻게 알아채는지, 되돌리는 방법이 있는가? 없음이면 근거가 있는가?

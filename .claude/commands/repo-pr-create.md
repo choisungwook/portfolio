@@ -28,10 +28,10 @@ shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으
 
 작성 세션은 자기 diff의 빈틈을 못 본다. 그래서 PR을 만들기 전에 새 컨텍스트의 리뷰어가 diff만 보고 한 번 읽는다.
 
-- `/code-review`가 있으면 그것을 쓴다. 없으면 Agent 도구로 서브에이전트를 띄우고 `git diff origin/master...HEAD`와 [.github/copilot-instructions.md](../../.github/copilot-instructions.md)를 넘긴다. 작성 과정의 대화는 넘기지 않는다.
-- 리뷰어는 copilot-instructions.md의 finding 형식과 요약 형식을 그대로 따른다. Copilot이 PR에서 하는 리뷰와 같은 기준이어야 PR에서 새 지적이 줄어든다.
+- `/code-review`가 있으면 그것을 쓴다. 없으면 Agent 도구로 서브에이전트를 띄우고 `git diff origin/master...HEAD`와 [code-review.md](../rule-details/code-review.md)를 넘긴다. 작성 과정의 대화는 넘기지 않는다.
+- 리뷰어는 code-review.md의 finding 형식과 요약 형식을 그대로 따른다. 리뷰 기준을 한 파일에 두어야 지적이 갈리지 않는다.
 - Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. Nit은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다.
-- 리뷰는 1회다. 고친 뒤 다시 돌리지 않는다. 고친 것은 Copilot이 PR에서 다시 본다.
+- 리뷰는 1회다. 고친 뒤 다시 돌리지 않는다. 고친 것은 verify-pull-request.yml과 사람이 본다.
 - 결과는 PR 검증 표의 마지막 행에 건수로 적는다. 예: Important 2건 모두 고침, Nit 1건 반영.
 
 ## 제품 카탈로그 갱신
