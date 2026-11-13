@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>CDP 실습 페이지</title></head>
+<body>
+  <h1>CDP 실습 페이지</h1>
+  <button id="add" style="position:absolute;left:40px;top:120px;width:160px;height:48px">카운트 증가</button>
+  <p style="position:absolute;top:180px;left:40px">count: <span id="count">0</span></p>
+  <script>
+    let count = 0;
+    document.getElementById("add").addEventListener("click", () => {
+      count += 1;
+      document.getElementById("count").textContent = String(count);
+    });
+  </script>
+</body>
+</html>
