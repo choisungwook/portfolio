@@ -1,0 +1,85 @@
+{
+  "release-akbun-ai-useage.yml": { "auto": "workflow가 최신 tag에서 다음 버전을 계산함" },
+  "release-akbun-awsviewer.yml": { "auto": "workflow가 최신 tag에서 다음 버전을 계산함" },
+  "deploy-slo.yml": { "unversioned": "S3 배포라 tag와 버전이 없음" },
+  "release-akbun-folderview.yml": {
+    "version_file": "product/akbun-folderview/workspace/package.json",
+    "tag_prefix": "akbun-folderview-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-gitdesktop.yml": {
+    "version_file": "product/akbun-gitdesktop/package.json",
+    "tag_prefix": "gitdesktop-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-k8supgradeview.yml": {
+    "version_file": "product/akbun-k8supgradeview/workspace/package.json",
+    "tag_prefix": "akbun-k8supgradeview-v",
+    "existing_tag": "fail"
+  },
+  "release-akbun-macdiskviewer.yml": {
+    "version_file": "product/akbun-macdiskviewer/workspace/package.json",
+    "tag_prefix": "akbun-macdiskviewer-v",
+    "existing_tag": "fail"
+  },
+  "release-akbun-mactaskbar.yml": {
+    "version_file": "product/akbun-mactaskbar/workspace/VERSION",
+    "tag_prefix": "akbun-mactaskbar-v",
+    "existing_tag": "fail"
+  },
+  "release-akbun-makephoto.yml": {
+    "version_file": "product/akbun-makephoto/workspace/package.json",
+    "tag_prefix": "akbun-makephoto-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-makepresentation.yml": {
+    "version_file": "product/akbun-makepresentation/workspace/package.json",
+    "tag_prefix": "akbun-makepresentation-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-makevideo.yml": {
+    "version_file": "product/akbun-makevideo/workspace/package.json",
+    "tag_prefix": "akbun-makevideo-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-pdf.yml": {
+    "version_file": "product/akbun-pdf/workspace/package.json",
+    "tag_prefix": "akbun-pdf-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-requesthttp.yml": {
+    "version_file": "product/akbun-requesthttp/workspace/package.json",
+    "tag_prefix": "akbun-requesthttp-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-screenshot.yml": {
+    "version_file": "product/akbun-screenshot/workspace/package.json",
+    "tag_prefix": "akbun-screenshot-v",
+    "existing_tag": "rebuild"
+  },
+  "release-akbun-shadowing-player.yml": {
+    "version_file": "product/akbun-shadowing-player/package.json",
+    "tag_prefix": "akbun-shadowing-player-v",
+    "existing_tag": "fail"
+  },
+  "release-akbun-terminal.yml": {
+    "version_file": "product/akbun-terminal/workspace/VERSION",
+    "tag_prefix": "akbun-terminal-v",
+    "existing_tag": "fail"
+  },
+  "release-akbun-terraform-apply-remote.yml": {
+    "version_file": "product/akbun-terraform-apply-remote/Cargo.toml",
+    "tag_prefix": "akbun-terraform-apply-remote-v",
+    "existing_tag": "fail"
+  },
+  "release-hprof-oom-analyzer.yml": {
+    "version_file": "product/hprof-oom-analyzer/package.json",
+    "tag_prefix": "hprof-oom-analyzer-",
+    "existing_tag": "skip"
+  },
+  "release-tistory-skin.yml": {
+    "version_file": "product/tistory-skin/akbun/src/index.xml",
+    "tag_prefix": "tistory-",
+    "existing_tag": "skip"
+  }
+}

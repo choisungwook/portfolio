@@ -1,4 +1,4 @@
-name: build-hprof-oom-analyzer
+name: release-hprof-oom-analyzer
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - master
     paths:
       - 'product/hprof-oom-analyzer/**'
-      - '.github/workflows/build-hprof-oom-analyzer.yml'
+      - '.github/workflows/release-hprof-oom-analyzer.yml'
   pull_request:
     paths:
       - 'product/hprof-oom-analyzer/**'
-      - '.github/workflows/build-hprof-oom-analyzer.yml'
+      - '.github/workflows/release-hprof-oom-analyzer.yml'
   workflow_dispatch:
 
 permissions:

@@ -2,6 +2,14 @@
 
 개인 AWS 계정(ap-northeast-2)에서 실습용으로 사용하는 Terraform 스타일 규칙이다. 비용 절약을 위해 Graviton 인스턴스와 default VPC를 우선 사용한다.
 
+## 검사가 대신 보는 규칙
+
+아래 3줄은 [check_terraform.py](../../.github/scripts/checks/check_terraform.py)가 편집 직후 hook과 PR에서 검사한다. 실패 메시지가 고치는 방법을 알려 주므로 아래 절들에서는 반복하지 않는다.
+
+- resource와 data 이름에 `main`, `this`를 쓰지 않는다.
+- EBS, RDS는 암호화한다. port 22 ingress와 key pair를 만들지 않는다.
+- CloudFront는 OAI 대신 OAC, ElastiCache 엔진은 Valkey를 쓴다.
+
 ## 파일 구조
 
 - `.tf` 파일은 역할 또는 리소스 타입별로 분리한다.
@@ -151,7 +159,6 @@ data "aws_subnets" "default" {
 
 ## Security Group 규칙
 
-- EC2 원격 접속은 SSM Session Manager를 사용하므로 SSH(port 22) ingress를 열지 않는다.
 - RDS 등 특정 사용자만 접근하는 서비스는 **현재 IP로 제한**한다.
 - 접근 범위가 모호할 때는 사용자에게 IP 제한 또는 VPC CIDR/보안 그룹 참조 중 선택을 확인한다.
 
@@ -166,7 +173,6 @@ data "http" "my_ip" {
 
 ## 보안 기본값
 
-- **EBS/RDS 암호화**: 항상 활성화 (기본 AWS 관리형 KMS 키)
 - **S3**: 버저닝 활성화, 암호화 필수(SSE-S3 `AES256` 기본, 필요 시 KMS), 퍼블릭 액세스 차단
 - 자격증명을 하드코딩하지 않는다. 민감한 output에는 `sensitive = true`를 설정한다.
 

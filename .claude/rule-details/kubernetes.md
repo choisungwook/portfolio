@@ -23,6 +23,8 @@
 
 ## YAML 작성 규칙
 
+아래 규칙과 파일명 규칙은 [check_manifests.py](../../.github/scripts/checks/check_manifests.py)가 편집 직후 hook과 PR에서 검사한다.
+
 - `apiVersion`, `kind`, `metadata`, `spec` 순서로 작성한다.
 - `metadata.labels`에 리소스를 식별할 수 있는 label을 포함한다.
 - 리소스 이름은 용도를 알 수 있도록 명확하게 작성한다.

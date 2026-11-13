@@ -1,4 +1,4 @@
-name: release-k8supgradeview
+name: release-akbun-k8supgradeview
 
 on:
   push:

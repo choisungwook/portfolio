@@ -8,6 +8,7 @@ Read this wiki and [the ADR index](../adr/index.md) before changing the product.
 |---|---|
 | [architecture.md](architecture.md) | Worker, D1, Access, API tokens, the save flow, and change-number sync |
 | [development.md](development.md) | Run, test, migrate, deploy, and caveats |
+| [features.md](features.md) | Feature map: the name and selector of each area a user acts on, and how to open the page headless |
 
 - [읽기 화면과 AI 요약](reader-ui-ai.md) - API·AI 설정·검증 범위
 - [공유 URL 본문 추출](url-extraction.md) - 추출 정책·상태·CPU 측정

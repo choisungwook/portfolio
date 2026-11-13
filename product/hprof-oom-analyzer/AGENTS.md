@@ -52,7 +52,7 @@ npm run dist         # electron-builder 패키징
 
 ## CI와 아티팩트
 
-.github/workflows/build-hprof-oom-analyzer.yml이 test job(컴파일, vitest, CLI 스모크 테스트) 통과 후 ubuntu/macos/windows에서 electron-builder로 AppImage, dmg, nsis 인스톨러를 빌드해 아티팩트로 업로드한다. master push, PR, workflow_dispatch에서 돈다.
+.github/workflows/release-hprof-oom-analyzer.yml이 test job(컴파일, vitest, CLI 스모크 테스트) 통과 후 ubuntu/macos/windows에서 electron-builder로 AppImage, dmg, nsis 인스톨러를 빌드해 아티팩트로 업로드한다. master push, PR, workflow_dispatch에서 돈다.
 
 ## 주의사항
 
