@@ -10,8 +10,6 @@ sources:
     title: Changes to remote debugging switches to improve security
 ---
 
-# AI 제품의 브라우저 접근 경로는 설치 파일로 확인한다
-
 ## 결정
 
 시나리오 2는 제품 동작을 관찰하는 대신 로컬에 설치된 파일을 읽어 검증한다. 확장 manifest의 `debugger`·`nativeMessaging` 권한, 확장 번들 안의 `chrome.debugger.sendCommand`와 CDP 메서드 문자열, `NativeMessagingHosts` 등록 파일, Claude.app `app.asar`의 `webContents.debugger` 호출이 근거다. Aside와 Codex 데스크톱 앱은 설치하지 않았으므로 2차 자료로만 쓰고 문서에 미검증이라고 적는다.
