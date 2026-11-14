@@ -4,6 +4,7 @@ mod shapes;
 mod table;
 mod xml;
 
+use super::comments;
 use super::common::mime_for_ext;
 use super::notes::parse_notes;
 use crate::{Deck, Shape, Slide, EMU_PER_PX, SLIDE_H, SLIDE_W};
@@ -155,7 +156,14 @@ pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
         }
         shapes.extend(master.visible);
         shapes.extend(layout.visible);
-        shapes.extend(slide.visible);
+        // Comments belong to the slide's own shapes, not to master artwork.
+        let mut own = slide.visible;
+        if let Some(xml) = relation_target(&rels, "2006/relationships/comments")
+            .and_then(|path| part(&mut archive, &path))
+        {
+            comments::attach(&mut own, comments::parse_comments(&xml));
+        }
+        shapes.extend(own);
 
         // Image shapes leave parse_part holding the media part path; swap
         // it for a data URL, dropping shapes whose bytes cannot be shown.

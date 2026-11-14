@@ -2,6 +2,8 @@
 
 akbun-makepresentation 작업 중 내린 의사결정과 이유.
 
+* [댓글은 도형에 속하고 작성자 없이 표준 댓글로 저장](2026-11-comments-belong-to-shapes.md)
+* [그림 배경 제거는 테두리 기준 영역 채우기](2026-11-background-removal-is-border-flood-fill.md)
 * [인스펙터는 선택을 따르고 툴바는 도구만 둔다](2026-11-inspector-follows-selection.md)
 * [새로 만드는 표는 그룹으로 묶은 셀 도형](2026-11-created-tables-are-grouped-cell-shapes.md)
 * [영역 선택은 잠긴 객체를 건너뛰고 드래그 중 실시간으로 반영](2026-11-area-selection-skips-locked-and-previews-live.md)

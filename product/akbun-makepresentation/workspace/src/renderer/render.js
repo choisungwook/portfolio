@@ -24,6 +24,7 @@ const state = {
   presentIndex: 0,
   showNumbers: false,
   showGuidelines: false,
+  showComments: true,
   cropping: null,
   zoom: L.ZOOM_FIT,
 };
@@ -85,6 +86,8 @@ const GLYPHS = {
   preset: '<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>',
   image: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="7" r="1"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3"/>',
   code: '<path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>',
+  comment: '<path d="M3.5 2.5h9A1.5 1.5 0 0 1 14 4v5.5a1.5 1.5 0 0 1-1.5 1.5H7.2L4 13.8V11h-.5A1.5 1.5 0 0 1 2 9.5V4a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 5.6h6M5 8h3.8"/>',
+  'remove-bg': '<rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke-dasharray="2 1.6"/><circle cx="8" cy="6.4" r="1.6"/><path d="M4.9 12.4a3.1 3.1 0 0 1 6.2 0"/><path d="M10.6 3.6h1.8v1.8h-1.8zM12.4 5.4h1.2v1.2h-1.2z" fill="currentColor" stroke="none"/>',
   slide: '<rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/><path d="M8 6v4M6 8h4"/>',
 };
 
@@ -361,7 +364,11 @@ function renderCanvas() {
     snapGuideSvg() +
     cropOverlay +
     (state.editingIndex < 0 ? selections : '') +
+    // Badges draw above the selection box and handles, so one is always
+    // reachable, and outside g[data-i] so they never take part in selection.
+    commentBadgesSvg() +
     marqueeSvg();
+  syncCommentPopover();
 }
 
 // Handle size follows the on-screen scale, so a resize of the window or the

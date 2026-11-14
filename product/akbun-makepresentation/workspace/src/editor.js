@@ -9,7 +9,8 @@
       require('./editor/deck.js'),
       require('./editor/presets.js'),
       require('./editor/svg.js'),
-      require('./editor/utils.js')
+      require('./editor/utils.js'),
+      require('./editor/matte.js')
     )
     : factory(
       root.makepresentationEditorConstants,
@@ -18,11 +19,12 @@
       root.makepresentationEditorDeck,
       root.makepresentationEditorPresets,
       root.makepresentationEditorSvg,
-      root.makepresentationEditorUtils
+      root.makepresentationEditorUtils,
+      root.makepresentationEditorMatte
     );
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.slidesLib = api;
-})(globalThis, function createSlidesLib(C, Shapes, Geometry, Deck, Presets, Svg, Utils) {
+})(globalThis, function createSlidesLib(C, Shapes, Geometry, Deck, Presets, Svg, Utils, Matte) {
   return {
     SLIDE_W: C.SLIDE_W,
     SLIDE_H: C.SLIDE_H,
@@ -101,5 +103,6 @@
     recoloredSvgSource: Svg.recoloredSvgSource,
     renderSlideSvg: Svg.renderSlideSvg,
     renderShapesSvg: Svg.renderShapesSvg,
+    removeBackground: Matte.removeBackground,
   };
 });

@@ -1,5 +1,6 @@
 //! PPTX package and DrawingML serialization.
 
+use super::comments;
 use super::common::{emu, ext_for_mime, hex, xml_escape, ARROW_ENDS, IMAGE_FORMATS, NS};
 use super::notes;
 use crate::{Deck, Shape, Slide};
@@ -26,7 +27,19 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
         .filter(|(_, slide)| !slide.notes.trim().is_empty())
         .map(|(i, _)| i + 1)
         .collect();
-    add("[Content_Types].xml", content_types(n, &with_notes).as_bytes())?;
+    // Same rule for comments: no commented shape, no comment parts.
+    let with_comments: Vec<usize> = deck
+        .slides
+        .iter()
+        .enumerate()
+        .filter(|(_, slide)| slide.shapes.iter().any(comments::has_comment))
+        .map(|(i, _)| i + 1)
+        .collect();
+    let has_comments = !with_comments.is_empty();
+    add(
+        "[Content_Types].xml",
+        content_types(n, &with_notes, &with_comments).as_bytes(),
+    )?;
     add("_rels/.rels", ROOT_RELS.as_bytes())?;
     add(
         "ppt/presentation.xml",
@@ -34,8 +47,9 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     )?;
     add(
         "ppt/_rels/presentation.xml.rels",
-        presentation_rels(n, !with_notes.is_empty()).as_bytes(),
+        presentation_rels(n, !with_notes.is_empty(), has_comments).as_bytes(),
     )?;
+    let mut written_comments = 0;
     if !with_notes.is_empty() {
         add(notes::MASTER_PATH, notes::master_xml().as_bytes())?;
         add(notes::MASTER_RELS_PATH, notes::master_rels().as_bytes())?;
@@ -72,6 +86,18 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
                 notes::notes_slide_rels(i + 1).as_bytes(),
             )?;
         }
+        let commented = slide.shapes.iter().filter(|s| comments::has_comment(s)).count();
+        if commented > 0 {
+            rels = rels.replace(
+                "</Relationships>",
+                &format!("{}</Relationships>", comments::slide_relationship(i + 1)),
+            );
+            add(
+                &format!("ppt/comments/comment{}.xml", i + 1),
+                comments::comments_xml(&slide.shapes, written_comments).as_bytes(),
+            )?;
+            written_comments += commented;
+        }
         add(&format!("ppt/slides/slide{}.xml", i + 1), xml.as_bytes())?;
         add(
             &format!("ppt/slides/_rels/slide{}.xml.rels", i + 1),
@@ -80,6 +106,9 @@ pub fn write<W: Write + Seek>(deck: &Deck, out: W) -> Result<(), String> {
     }
     for (name, bytes) in &media.files {
         add(&format!("ppt/media/{name}"), bytes)?;
+    }
+    if has_comments {
+        add(comments::AUTHORS_PATH, comments::authors_xml(written_comments).as_bytes())?;
     }
 
     zip.finish().map_err(|e| e.to_string())?;
@@ -119,7 +148,7 @@ pub(super) fn decode_data_url(src: &str) -> Option<(&'static str, Vec<u8>)> {
     Some((ext, bytes))
 }
 
-pub(super) fn content_types(slides: usize, with_notes: &[usize]) -> String {
+pub(super) fn content_types(slides: usize, with_notes: &[usize], with_comments: &[usize]) -> String {
     let mut overrides = String::new();
     for i in 1..=slides {
         overrides.push_str(&format!(
@@ -129,6 +158,7 @@ pub(super) fn content_types(slides: usize, with_notes: &[usize]) -> String {
     // Every writable picture format needs its extension declared here, or
     // the package is invalid for readers that check.
     overrides.push_str(&notes::content_type_overrides(with_notes));
+    overrides.push_str(&comments::content_type_overrides(with_comments));
     let mut images = String::new();
     for (ext, mime) in IMAGE_FORMATS {
         images.push_str(&format!(
@@ -186,7 +216,12 @@ fn presentation(slides: usize, width: f64, height: f64, has_notes: bool) -> Stri
     )
 }
 
-fn presentation_rels(slides: usize, has_notes: bool) -> String {
+// The comment authors part takes the id after the notes master's.
+fn comment_authors_rid(slides: usize) -> String {
+    format!("rId{}", slides + 3)
+}
+
+fn presentation_rels(slides: usize, has_notes: bool, has_comments: bool) -> String {
     let mut rels = String::from(
         "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"slideMasters/slideMaster1.xml\"/>",
     );
@@ -199,6 +234,9 @@ fn presentation_rels(slides: usize, has_notes: bool) -> String {
     }
     if has_notes {
         rels.push_str(&notes::master_relationship(&notes_master_rid(slides)));
+    }
+    if has_comments {
+        rels.push_str(&comments::authors_relationship(&comment_authors_rid(slides)));
     }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
@@ -389,6 +427,9 @@ fn pic_xml(shape: &Shape, id: u64, rid: u64) -> String {
     let (name, description) = if shape.kind == "code" {
         let mut source = shape.clone();
         source.src.clear();
+        // The comment has its own part; keeping a copy here would make the
+        // reader see one comment twice.
+        source.comment.clear();
         let encoded = serde_json::to_vec(&source)
             .ok()
             .map(|json| base64::engine::general_purpose::STANDARD.encode(json))

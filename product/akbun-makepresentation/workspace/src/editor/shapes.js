@@ -66,6 +66,8 @@ function createShape(kind, x, y, style) {
     codeHighlights: [],
     codeCallouts: [],
     showLineNumbers: true,
+    // One plain-text note per shape, shown as a badge in the editor only.
+    comment: '',
   };
 }
 
@@ -161,6 +163,7 @@ function normalizeClipboardShape(value) {
   shape.codeHighlights = normalizeLineNumbers(value.codeHighlights);
   shape.codeCallouts = normalizeLineNumbers(value.codeCallouts);
   if (typeof value.showLineNumbers === 'boolean') shape.showLineNumbers = value.showLineNumbers;
+  if (typeof value.comment === 'string' && value.comment.length <= 100_000) shape.comment = value.comment;
   return shape;
 }
 

@@ -34,6 +34,14 @@
   --shadow-1: 0 1px 2px rgba(16, 20, 32, 0.06), 0 2px 8px rgba(16, 20, 32, 0.08);
   --shadow-2: 0 10px 32px rgba(16, 20, 32, 0.18);
   --ease: 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* Comment badges sit on the slide, so they follow its background and not the
+     app theme: amber on light slides, bright yellow with a white outline on
+     dark ones. The ink is dark on both. */
+  --comment-light-fill: #f2a900;
+  --comment-light-edge: #8a5a00;
+  --comment-dark-fill: #ffe14d;
+  --comment-dark-edge: #ffffff;
+  --comment-ink: #2b1d00;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -174,7 +182,8 @@ body {
      the tools capsule (which wraps) before Zoom and Present. */
   grid-template-columns: 1fr auto minmax(max-content, 1fr);
   align-items: center;
-  gap: 8px;
+  /* 10px matches the gap between the capsules inside the right column. */
+  gap: 10px;
   padding: 6px 10px;
   background: var(--stage);
 }
@@ -2439,4 +2448,86 @@ button.primary {
   width: 18px;
   height: 18px;
   place-items: center;
+}
+
+/* --- comments --- */
+
+.toolbar-glyph {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.comment-badge {
+  cursor: pointer;
+}
+
+/* Widths are set per badge in markup, from the on-screen scale. */
+.comment-badge > rect {
+  stroke-linejoin: round;
+}
+
+.comment-badge > g path {
+  fill: none;
+  stroke: var(--comment-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.comment-badge.on-light > rect {
+  fill: var(--comment-light-fill);
+  stroke: var(--comment-light-edge);
+}
+
+.comment-badge.on-dark > rect {
+  fill: var(--comment-dark-fill);
+  stroke: var(--comment-dark-edge);
+}
+
+.comment-badge.selected > rect {
+  stroke: var(--accent);
+}
+
+#comment-popover {
+  position: fixed;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-2);
+}
+
+#comment-popover[hidden] {
+  display: none;
+}
+
+#comment-text {
+  width: 100%;
+  min-height: 4.5em;
+  max-height: 9em;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Delete is a ghost that stays quiet until the pointer is on it. */
+.comment-delete {
+  margin-right: auto;
+  border-color: transparent;
+  background: transparent;
+}
+
+.comment-delete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
 }

@@ -152,6 +152,10 @@ pub struct Shape {
     pub code_callouts: Vec<u32>,
     #[serde(default = "default_true")]
     pub show_line_numbers: bool,
+    /// One plain-text comment per shape. Saved as a legacy presentation
+    /// comment and matched back to the shape by position on open.
+    #[serde(default)]
+    pub comment: String,
 }
 
 pub fn default_arrow_end() -> String {
@@ -238,6 +242,7 @@ impl Default for Shape {
             code_highlights: Vec::new(),
             code_callouts: Vec::new(),
             show_line_numbers: true,
+            comment: String::new(),
         }
     }
 }
