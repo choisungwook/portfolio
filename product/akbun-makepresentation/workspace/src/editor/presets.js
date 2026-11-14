@@ -74,6 +74,8 @@ function customPresetFromSelection(shapes, existingPresets, id) {
   const bounds = shapeBBox(copy);
   moveShape(copy, -bounds.x, -bounds.y);
   delete copy.groupId;
+  // A comment is about this one shape on this one slide, not about the preset.
+  copy.comment = '';
 
   const baseName = PRESET_KIND_LABELS[shape.kind] || 'Preset';
   const usedNames = new Set(

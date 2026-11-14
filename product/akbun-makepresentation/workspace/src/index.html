@@ -60,6 +60,7 @@
       <div class="menu-panel" data-menu-panel="view" hidden>
         <button data-command="guidelines">Guidelines…</button>
         <button data-command="inspector">Inspector</button>
+        <button data-command="comments">Comments</button>
         <hr />
         <button data-command="zoom-in">Zoom in<span class="accel">⌘+</span></button>
         <button data-command="zoom-out">Zoom out<span class="accel">⌘-</span></button>
@@ -103,6 +104,12 @@
       </button>
     </div>
     <div class="toolbar-end">
+    <!-- Comments are a view toggle too, so they get a capsule between the tools and Zoom. -->
+    <div class="group">
+      <button id="btn-comments" title="Show or hide comments" aria-label="Comments" aria-pressed="true" class="active">
+        <span class="toolbar-glyph" data-glyph="comment"></span>
+      </button>
+    </div>
     <!-- Zoom changes only the view, so it is a capsule of its own, apart from the slide-editing tools. -->
     <div class="group">
       <button id="btn-zoom-level" title="Zoom — double-click for 100%" aria-label="Zoom" aria-haspopup="true" aria-expanded="false"><span id="zoom-value">100%</span><span class="chevron" aria-hidden="true">⌄</span></button>
@@ -412,8 +419,20 @@
     <button id="context-group" role="menuitem"><span class="menu-glyph" data-glyph="group"></span>Group</button>
     <button id="context-ungroup" role="menuitem"><span class="menu-glyph" data-glyph="ungroup"></span>Ungroup</button>
     <hr />
+    <button id="context-comment" role="menuitem"><span class="menu-glyph" data-glyph="comment"></span><span class="menu-label">Add Comment</span></button>
+    <button id="context-remove-bg" role="menuitem"><span class="menu-glyph" data-glyph="remove-bg"></span>Remove Background</button>
+    <hr />
     <button id="context-save-preset" role="menuitem"><span class="menu-glyph" data-glyph="preset"></span>Save as Preset</button>
     <button id="context-save-image" role="menuitem"><span class="menu-glyph" data-glyph="image"></span>Save as Image</button>
+  </div>
+
+  <!-- Text is only ever set through .value, never as markup. -->
+  <div id="comment-popover" role="dialog" aria-label="Comment" hidden>
+    <textarea id="comment-text" rows="4" placeholder="Add a comment" aria-label="Comment" spellcheck="false"></textarea>
+    <div class="comment-actions">
+      <button id="comment-delete" type="button" class="comment-delete">Delete</button>
+      <button id="comment-done" type="button" class="primary">Done</button>
+    </div>
   </div>
 
   <div id="slide-context-menu" role="menu" aria-label="Slide actions" hidden>
@@ -696,6 +715,7 @@
   <script src="editor/svg.js"></script>
   <script src="editor/utils.js"></script>
   <script src="editor/search.js"></script>
+  <script src="editor/matte.js"></script>
   <script src="editor.js"></script>
   <script src="settings.js"></script>
   <script src="ai/styles.js"></script>
@@ -719,6 +739,8 @@
   <script src="renderer/slides.js"></script>
   <script src="renderer/files.js"></script>
   <script src="renderer/presentation.js"></script>
+  <script src="renderer/comments.js"></script>
+  <script src="renderer/background-removal.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

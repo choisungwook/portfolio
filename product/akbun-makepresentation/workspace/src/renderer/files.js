@@ -62,6 +62,8 @@ function fitOpenedTextBoxes(deck) {
   for (const target of deck.slides) {
     for (const shape of target.shapes) {
       if (shape.kind === 'text') L.fitTextHeight(shape, true);
+      // Decks written before comments existed have no field.
+      if (typeof shape.comment !== 'string') shape.comment = '';
     }
   }
   return deck;

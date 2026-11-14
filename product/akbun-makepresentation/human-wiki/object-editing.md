@@ -138,6 +138,44 @@
 - 근거: [geometry.js:337](../workspace/src/editor/geometry.js)의 `createTableShapes`, [code.js:151](../workspace/src/renderer/code.js)의 `insertTable`.
 - 결정: [새로 만드는 표는 그룹으로 묶은 셀 도형](../knowledge/decisions/2026-11-created-tables-are-grouped-cell-shapes.md).
 
+## 댓글
+
+- 객체 하나에 댓글 하나. 작성자·로그인·스레드는 없음.
+- 툴바의 Comments 버튼, View → Comments, 객체 우클릭 → Add Comment / Edit Comment로 켜고 편집. 버튼을 켤 때 잠기지 않은 객체가 하나만 선택돼 있으면 그 객체의 편집창이 바로 열림.
+- 댓글이 있는 객체는 왼쪽 위 바깥에 18px 배지 표시. 크기는 줌과 무관하고, 슬라이드 배경이 밝으면 호박색, 어두우면 노란색에 흰 테두리.
+- 배지를 누르면 그 객체를 선택하고 편집창을 엶. 같은 배지를 다시 누르면 닫힘. 배지 위에서 시작한 드래그는 영역 선택도 객체 이동도 시작하지 않음.
+- Done·바깥 클릭·Cmd/Ctrl+Enter로 저장, Esc로 취소. 저장은 undo 한 번. 내용을 비우면 댓글 삭제.
+- 잠긴 객체의 댓글은 읽을 수만 있고 수정·삭제 불가.
+- 이동·복제·복사·붙여넣기·그룹·undo에서 객체를 따라다님. 프리셋 저장에서는 제외.
+- 썸네일·발표 모드·PDF·PNG·AI 패널로 보내는 슬라이드 그림에는 나타나지 않음. 모두 `renderSlideSvg`로 그리고 배지는 `renderCanvas`만 그리기 때문.
+- PPTX에는 표준 댓글(`commentAuthors.xml`, `comments/commentN.xml`)로 저장. 작성자는 고정 이름 Comment 하나, 시각은 고정값이라 사용자나 저장 시각이 파일에 남지 않음.
+- 위치는 객체 왼쪽 위(1/576인치 단위, 1px = 6)로 기록하고, 열 때 왼쪽 위 모서리가 2px 이내인 첫 번째 댓글 없는 객체에 붙임. 외부 파일의 댓글은 그 점을 포함한 가장 위 객체에 붙이고, 붙일 곳이 없으면 버림.
+
+한계:
+- 왼쪽 위 모서리가 2px 이내로 겹치는 객체 둘 중 뒤의 객체만 댓글이 있으면, 열 때 앞의 객체에 붙음. 표준 댓글에 객체 id가 없기 때문.
+- 객체 하나에 댓글 하나뿐이며 서식과 답글은 없음.
+- 깨진 댓글 부품은 파일 열기를 막지 않고 건너뜀.
+
+- 근거: [comments.js:52](../workspace/src/renderer/comments.js), [comments.js:97](../workspace/src/renderer/comments.js), [canvas.js:86](../workspace/src/renderer/canvas.js), [comments.rs:22](../workspace/src-tauri/crates/deck/src/pptx/comments.rs), [comments.rs:170](../workspace/src-tauri/crates/deck/src/pptx/comments.rs).
+- 결정: [댓글은 도형에 속한다](../knowledge/decisions/2026-11-comments-belong-to-shapes.md).
+
+## 그림 배경 제거
+
+- 래스터 그림(PNG·JPEG·WebP·GIF·BMP)을 우클릭 → Remove Background. SVG 그림과 잠긴 그림에는 항목이 없음.
+- 그림 테두리 한 줄에서 가장 많은 색을 배경으로 추정. 그 색과 비슷하고 테두리에서 이어진 영역만 투명하게 만듦. 피사체에 둘러싸인 같은 색 영역은 그대로 남음.
+- 경계 한 줄은 배경이 섞인 정도를 계산해 반투명으로 만들고 배경색 성분을 뺌.
+- 크롭·크기·회전·댓글은 그대로. 결과는 PNG로 저장되고 undo 한 번이 원본을 복원.
+- 배경이 이미 투명하면 아무것도 바꾸지 않고 상태 줄에 안내.
+- 긴 변이 4096px를 넘으면 그 크기로 줄여 처리.
+
+한계:
+- 단색이거나 완만한 그러데이션이 테두리에 닿은 배경만 지움. 피사체 분리가 아님.
+- 피사체와 배경 색이 비슷하면 피사체도 지워짐. 복잡한 배경은 거의 지워지지 않음.
+- 완만하다는 기준은 추정 배경색에서 채널당 약 12 이내(색 거리 허용치 36). 그보다 벗어나는 그러데이션은 일부만 지워짐.
+
+- 근거: [matte.js:79](../workspace/src/editor/matte.js), [background-removal.js:44](../workspace/src/renderer/background-removal.js).
+- 결정: [그림 배경 제거는 테두리 기준 영역 채우기](../knowledge/decisions/2026-11-background-removal-is-border-flood-fill.md).
+
 ## 확인 질문
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?
@@ -149,3 +187,6 @@
 7. 영역 드래그가 잠긴 배경을 선택하지 않는 이유는 무엇인가?
 8. Alt 드래그와 Alt+클릭은 각각 무엇을 선택하는가?
 9. 만든 표의 셀을 채우지 않으면 셀 글 편집이 막히는 이유는 무엇인가?
+10. 댓글이 썸네일과 PDF에 나타나지 않는 구조적 이유는 무엇인가?
+11. 표준 댓글을 열 때 어떤 객체에 붙이며, 어떤 경우에 틀린 객체에 붙을 수 있는가?
+12. 그림의 흰 배경 안에 갇힌 흰 영역이 지워지지 않는 이유는 무엇인가?

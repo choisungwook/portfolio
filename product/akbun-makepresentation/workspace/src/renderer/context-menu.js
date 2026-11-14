@@ -151,6 +151,13 @@ function showContextMenu(x, y) {
     button.disabled = shapes.every((shape) => shape.locked);
   }
   $('context-save-preset').hidden = shapes.length !== 1 || shapes[0].kind === 'image';
+  // One comment per shape, so the item needs exactly one shape. A locked
+  // shape can only show the comment it already has.
+  const single = shapes.length === 1 ? shapes[0] : null;
+  $('context-comment').hidden = !single || (single.locked && !single.comment);
+  $('context-comment').querySelector('.menu-label').textContent =
+    single?.comment ? (single.locked ? 'View Comment' : 'Edit Comment') : 'Add Comment';
+  $('context-remove-bg').hidden = !(single && canRemoveBackground(single));
   tidySeparators(contextMenu);
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;

@@ -529,7 +529,7 @@ fn written_file_contains_required_parts() {
 /// apart, a webp picture imported fine and then vanished on save.
 #[test]
 fn every_importable_picture_format_is_writable() {
-    let types = content_types(1, &[]);
+    let types = content_types(1, &[], &[]);
     for (ext, mime) in IMAGE_FORMATS {
         assert_eq!(mime_for_ext(ext), Some(mime), "{ext} not importable");
         let url = format!("data:{mime};base64,AAAA");
@@ -665,4 +665,96 @@ fn a_deck_without_notes_writes_no_notes_parts() {
     assert!(archive.by_name("ppt/notesMasters/notesMaster1.xml").is_err());
     let presentation = part(&mut archive, "ppt/presentation.xml").unwrap();
     assert!(!presentation.contains("notesMasterIdLst"));
+}
+
+fn commented(x: f64, y: f64, comment: &str) -> Shape {
+    Shape { kind: "rect".into(), x, y, w: 100.0, h: 60.0, comment: comment.into(), ..Shape::default() }
+}
+
+fn written(deck: &Deck) -> Cursor<Vec<u8>> {
+    let mut buffer = Cursor::new(Vec::new());
+    write(deck, &mut buffer).unwrap();
+    buffer.set_position(0);
+    buffer
+}
+
+#[test]
+fn comments_round_trip_onto_their_own_shapes() {
+    let deck = Deck {
+        slides: vec![
+            Slide {
+                shapes: vec![
+                    commented(100.0, 100.0, "Tom & Jerry <b> \"quoted\"\nsecond line"),
+                    commented(400.0, 300.0, ""),
+                    commented(700.0, 500.0, "한글 댓글"),
+                    // Two shapes sharing a corner, both commented: told apart by order.
+                    commented(900.0, 200.0, "first at corner"),
+                    commented(900.0, 200.0, "second at corner"),
+                ],
+                ..Slide::default()
+            },
+            Slide { shapes: vec![commented(50.0, 60.0, "on slide two")], ..Slide::default() },
+        ],
+        ..Deck::default()
+    };
+    let buffer = written(&deck);
+    let mut archive = zip::ZipArchive::new(buffer.clone()).unwrap();
+    let authors = part(&mut archive, "ppt/commentAuthors.xml").unwrap();
+    assert!(authors.contains("name=\"Comment\"") && authors.contains("lastIdx=\"5\""));
+    let comments = part(&mut archive, "ppt/comments/comment1.xml").unwrap();
+    assert!(comments.contains("<p:pos x=\"600\" y=\"600\"/>"), "{comments}");
+    assert!(comments.contains("dt=\"2000-01-01T00:00:00.000\""));
+    assert!(archive.by_name("ppt/comments/comment2.xml").is_ok());
+    let rels = part(&mut archive, "ppt/_rels/presentation.xml.rels").unwrap();
+    assert!(rels.contains("commentAuthors.xml"));
+
+    let back = read(buffer).unwrap();
+    let texts = |i: usize| -> Vec<&str> {
+        back.slides[i].shapes.iter().map(|s| s.comment.as_str()).collect()
+    };
+    assert_eq!(
+        texts(0),
+        ["Tom & Jerry <b> \"quoted\"\nsecond line", "", "한글 댓글", "first at corner", "second at corner"]
+    );
+    assert_eq!(texts(1), ["on slide two"]);
+}
+
+#[test]
+fn a_deck_without_comments_writes_no_comment_parts() {
+    let deck = Deck { slides: vec![Slide { shapes: vec![commented(0.0, 0.0, "  ")], ..Slide::default() }], ..Deck::default() };
+    let buffer = written(&deck);
+    let mut archive = zip::ZipArchive::new(buffer).unwrap();
+    assert!(archive.by_name("ppt/commentAuthors.xml").is_err());
+    assert!(archive.by_name("ppt/comments/comment1.xml").is_err());
+    let rels = part(&mut archive, "ppt/_rels/presentation.xml.rels").unwrap();
+    assert!(!rels.contains("commentAuthors"));
+    let types = part(&mut archive, "[Content_Types].xml").unwrap();
+    assert!(!types.contains("comment"));
+}
+
+#[test]
+fn a_malformed_comments_part_does_not_fail_the_open() {
+    let deck = Deck {
+        slides: vec![Slide { shapes: vec![commented(10.0, 10.0, "kept out")], ..Slide::default() }],
+        ..Deck::default()
+    };
+    let mut source = zip::ZipArchive::new(written(&deck)).unwrap();
+    let mut out = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default();
+    for i in 0..source.len() {
+        let mut file = source.by_index(i).unwrap();
+        let name = file.name().to_string();
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut file, &mut bytes).unwrap();
+        if name == "ppt/comments/comment1.xml" {
+            bytes = b"<p:cmLst><p:cm><p:pos x=\"60\" y=\"60\"/><p:text>broken</p:cmLst>".to_vec();
+        }
+        out.start_file(name, opts).unwrap();
+        out.write_all(&bytes).unwrap();
+    }
+    let mut broken = out.finish().unwrap();
+    broken.set_position(0);
+    let back = read(broken).unwrap();
+    assert_eq!(back.slides[0].shapes.len(), 1);
+    assert_eq!(back.slides[0].shapes[0].comment, "");
 }

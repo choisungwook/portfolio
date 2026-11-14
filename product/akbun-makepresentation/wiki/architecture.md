@@ -24,13 +24,16 @@ One JSON object, identical on both sides (serde mirrors it in Rust):
   "textAlign": "left | center | right", "verticalAlign": "top | center | bottom",
   "rotation": 0,
   "arrowStart": "none | triangle | arrow | oval | diamond",
-  "arrowEnd": "none | triangle | arrow | oval | diamond"
+  "arrowEnd": "none | triangle | arrow | oval | diamond",
+  "comment": ""
 } ] } ] }
 ```
 
 `background` belongs to the slide rather than to a page-sized shape, so the one control that changes it cannot touch a shape and the background cannot be selected or dragged ([ADR](../adr/2026-08-background-is-a-slide-field.md)). A slide with no `background` is white, which is what a deck saved before the field existed deserializes to.
 
 `notes` is plain text, one paragraph per line, and is omitted from the JSON when empty. It is written as a notes page only for slides that have notes, so a deck without notes produces the same package as before the field existed ([decision](../knowledge/decisions/2026-09-speaker-notes-are-notes-pages.md)).
+
+`comment` is one plain-text note per shape. The page shows it as a badge drawn by `renderCanvas` only, never through `renderSlideSvg`, so thumbnails, presentation mode, PDF/PNG export and the AI picture never carry it. It is written as a standard presentation comment (`pptx/comments.rs`) and matched back to a shape by its top-left position on open ([decision](../knowledge/decisions/2026-11-comments-belong-to-shapes.md)).
 
 `fontFamily` is one plain family name, not a CSS stack, so it maps straight onto the pptx `a:latin` typeface and survives a round trip unchanged. A generic fallback is appended when the SVG is drawn.
 
@@ -55,6 +58,7 @@ src/
     presets.js
     svg.js
     utils.js
+    matte.js
   renderer.js
   renderer/
     render.js
@@ -72,6 +76,8 @@ src/
     slides.js
     files.js
     presentation.js
+    comments.js
+    background-removal.js
   settings.js
   api.js
   ai.js
@@ -82,7 +88,7 @@ src/
 ```
 
 - `editor.js` — facade that preserves the `slidesLib` browser and CommonJS API.
-- `editor/` — pure model code split into constants, shape data, geometry, deck operations, presets, SVG output, and small UI-independent utilities. Each file registers one browser namespace and also supports `require`, so Node tests use the same implementation.
+- `editor/` — pure model code split into constants, shape data, geometry, deck operations, presets, SVG output, background removal on raw pixels (`matte.js`), and small UI-independent utilities. Each file registers one browser namespace and also supports `require`, so Node tests use the same implementation.
 - `renderer/render.js` — page state, DOM references, selection overlays, canvas, thumbnails, and property-panel rendering.
 - `renderer/` — interactions and workflows split by feature. The files intentionally share the existing page scope and run in the order declared by `index.html`.
 - `renderer.js` — menu commands, AI panel integration, and application initialization.
@@ -115,7 +121,7 @@ Filesystem access stays behind narrow commands. Deck and export paths come from 
 
 ## Key flows
 
-**Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates. Slides with notes add a notes page each, plus one notes master with its own theme (`pptx/notes.rs`); opening reads the notes page's body placeholder back into `notes`.
+**Save**: page hands the deck JSON to `save_deck`; the deck crate writes a zip with the OOXML parts (presentation, one master, one blank layout, one theme, one part per slide) from string templates. Slides with notes add a notes page each, plus one notes master with its own theme (`pptx/notes.rs`); opening reads the notes page's body placeholder back into `notes`. Slides with commented shapes add a comments part each plus one `commentAuthors.xml` with a fixed neutral author (`pptx/comments.rs`); a deck without comments writes neither. Opening skips a comments part that does not parse.
 
 **Open**: the deck crate follows each slide's layout, master and theme relationships, then walks those parts with a pull parser. It keeps preset rects/ellipses/lines, custom-geometry paths (read back as pen), text boxes, pictures (read into the deck as data URLs), flattened groups, and visible master/layout artwork. Theme colors (schemeClr plus lumMod/lumOff/shade/tint) resolve through the matching theme and master clrMap. Placeholders inherit their box and text style from the layout, master and master text styles. A non-white solid slide/layout/master background becomes the slide's `background`, while a background picture stays a page-sized image shape, and foreign page sizes (4:3, portrait, custom) keep their own pixel coordinate space. Rotation on any shape, picture crop, plus text alignment and emphasis (bold, italic, underline) survive save/open round trips. A rect or an ellipse that names no `algn` or `anchor` is read as centred, because that is where this editor writes text inside a shape, and the alternative was that text typed into an opened shape landed somewhere no shape drawn here would put it. Other presets become their bounding rectangle; unsupported tables are skipped. Once the deck is in the page, every text box grows to hold the lines its text wraps into here, because PowerPoint measured the box with its own font metrics and this editor wraps by an estimate ([decision](../knowledge/decisions/2026-09-text-boxes-are-as-tall-as-their-text.md)).
 

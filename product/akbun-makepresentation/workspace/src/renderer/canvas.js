@@ -83,6 +83,15 @@ $('stage-scroll').addEventListener('pointerdown', (event) => {
 
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
+  // A comment badge is a button, not part of the slide: pressing it opens or
+  // closes its popover and must not start a marquee or a shape drag. It is
+  // handled before any tool or handle logic for that reason.
+  const badge = event.target.closest('[data-comment]');
+  if (badge) {
+    event.preventDefault();
+    pressCommentBadge(Number(badge.dataset.comment));
+    return;
+  }
   const handleEl = event.target.closest('[data-handle]');
   const cropHandle = event.target.closest('[data-crop-handle]');
   const group = event.target.closest('g[data-i]');

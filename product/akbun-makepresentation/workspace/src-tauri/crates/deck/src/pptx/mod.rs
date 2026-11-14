@@ -4,6 +4,7 @@
 //! `read` follows slide relationships and converts supported DrawingML back
 //! into editable deck shapes.
 
+mod comments;
 mod common;
 mod notes;
 mod read;

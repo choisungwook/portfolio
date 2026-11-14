@@ -24,6 +24,7 @@ const MENU_COMMANDS = {
   settings: openSettings,
   guidelines: openGuidelinesDialog,
   numbers: toggleNumbers,
+  comments: toggleComments,
   inspector: toggleInspector,
   'slide-size': openSlideSizeDialog,
   'deck-font': openDeckFontMenu,
@@ -58,6 +59,8 @@ function openMenu(name) {
     .classList.toggle('checked', state.showGuidelines);
   $('menubar').querySelector('[data-command="numbers"]')
     .classList.toggle('checked', state.showNumbers);
+  $('menubar').querySelector('[data-command="comments"]')
+    .classList.toggle('checked', state.showComments);
   $('menubar').querySelector('[data-command="inspector"]')
     .classList.toggle('checked', appSettings.inspectorVisible);
 }

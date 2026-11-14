@@ -33,6 +33,8 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Copy objects to the system clipboard as PNG, text and editable object data; paste across independent instances or into other apps
 - Paste text and images from the system clipboard
 - Open and save .pptx, export every slide as a .pdf
+- Comments: one note per shape, shown as a badge beside the shape in the editor only and saved as standard presentation comments. Toggle from the toolbar or View → Comments, add from the right-click menu
+- Remove Background for raster pictures from the right-click menu: clears the background that touches the picture's border, in one undo step
 - Speaker notes for each slide in a box under the canvas, saved as the notes pages PowerPoint and Keynote read
 - Presentation mode: fullscreen with arrow keys, jump to a slide by number, black or white screen, a laser pointer and an all-slides grid
 - Self update from Settings, Updates
@@ -76,6 +78,7 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Delete, Backspace | Delete the selection when the editor has focus; otherwise delete the current slide. Inside a text box being edited they delete a character instead |
 | Shift while rotating | Quarter turns only |
 | Double click on a shape | Edit its text |
+| Click a comment badge | Open or close that shape's comment; Cmd+Enter saves it, Esc discards it |
 
 While presenting:
 
