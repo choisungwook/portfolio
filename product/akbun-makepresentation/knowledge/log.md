@@ -2,6 +2,7 @@
 
 ## 2026-11-14
 
+* **Creation**: [화면 색은 inline style 속성이 아니라 CSSOM으로 칠한다](decisions/2026-11-ui-colors-go-through-cssom.md) 결정 기록.
 * **Creation**: [열린 덱은 경계에서 검증](decisions/2026-11-opened-decks-are-validated-at-the-boundary.md) 결정 기록.
 * **Creation**: [캔버스는 바뀐 도형만 고쳐 그리고 이동 중에는 프레임당 한 번 그림](decisions/2026-11-canvas-patches-only-changed-shapes.md) 결정 기록.
 * **Creation**: [댓글은 도형에 속하고 작성자 없이 표준 댓글로 저장](decisions/2026-11-comments-belong-to-shapes.md) 결정 기록.
