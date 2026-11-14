@@ -18,7 +18,7 @@
 * [Source monitor의 in-out은 재생 경계다](2026-09-source-monitor-range-is-playback-boundary.md) - asset preview를 선택 구간 안으로 제한하고 scrub bar에서 구간 밖을 구분한 결정.
 * [타임라인 드래그 중 compositor 상태 전환을 미룬다](2026-09-timeline-drag-defers-compositor.md) - drag 시작 경로에서 exact frame 재합성과 반복 배치 읽기를 제외한 결정.
 * [프록시는 해상도뿐 아니라 decode와 seek 비용을 줄인다](2026-09-proxy-targets-decode-and-seek-cost.md) - 코덱과 키프레임 간격을 해상도와 함께 판정하고 프록시에 짧은 GOP를 강제한 결정.
-* [Inspector는 타임라인에서 선택한 미디어 트랙을 따른다](2026-08-inspector-follows-timeline-media.md) - 연결된 clip의 속성을 Video와 Audio 탭으로 분리하고 선택한 트랙 탭을 먼저 보여 주는 결정.
+* [Inspector는 타임라인에서 선택한 대상의 속성만 표시한다](2026-08-inspector-follows-timeline-media.md) - 연결된 clip의 Video와 Audio를 분리하고 선택이 가진 묶음만 tab으로 만드는 결정.
 * [native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다](2026-08-native-monitor-is-a-window-overlay.md) - GPU surface를 WebKit hierarchy에서 분리하고 실제 view 사이 좌표 변환을 AppKit에 맡긴 결정.
 * [첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다](2026-08-first-video-defines-default-canvas-shape.md) - 첫 영상 비율을 채택하되 기본 긴 변 해상도를 유지하는 결정.
 * [native view 좌표는 superview에게 원점을 물어본다](2026-08-native-view-asks-its-superview-for-the-origin.md) - WKWebView가 flipped view라 bottom-left 가정이 monitor를 뒤집힌 위치에 놓은 뒤 정한 규칙.

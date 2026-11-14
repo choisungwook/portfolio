@@ -2,6 +2,7 @@
 
 ## 2026-11-14
 
+* [Inspector는 타임라인에서 선택한 대상의 속성만 표시한다](decisions/2026-08-inspector-follows-timeline-media.md) 갱신. 선택이 가진 묶음만 tab으로 만들고 Effects, Image, File tab을 삭제. 0.2 형식으로 옮김.
 * [화면 token은 akbun-makepresentation과 같은 이름과 값을 쓴다](decisions/2026-11-ui-follows-makepresentation-visual-system.md) 기록.
 
 ## 2026-11-08
