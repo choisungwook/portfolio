@@ -24,7 +24,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   const names = [
     'time.js', 'geometry.js', 'timeline.js', 'shortcuts.js', 'quality.js',
     'preview.js', 'transform.js', 'guides.js', 'monitor.js', 'panel.js', 'latest.js',
-    'program-monitor-ui.js', 'inspector-ui.js', 'keyboard-ui.js',
+    'program-monitor-ui.js', 'inspector-ui.js', 'keyboard-ui.js', 'tooltip.js',
     'timeline-interactions.js', 'app-init.js', 'renderer-assets-ui.js',
     'renderer-timeline-ui.js', 'renderer-project-ui.js', 'renderer-wiring.js',
     'ai.js', 'ai-edit-panel.js', 'ai-structured.js', 'ai-panel.js', 'ai-workflow.js', 'ai-studio.js',
@@ -46,6 +46,7 @@ test('classic page scripts do not leak conflicting declarations', () => {
   assert.ok(context.programMonitorUiLib);
   assert.ok(context.inspectorUiLib);
   assert.ok(context.keyboardUiLib);
+  assert.ok(context.tooltipLib);
   assert.ok(context.timelineInteractionsLib);
   assert.ok(context.appInitLib);
   assert.ok(context.rendererAssetsUiLib);
@@ -86,6 +87,7 @@ test('every library the page loads is a script tag on the page', () => {
   assert.ok(loaded.indexOf('program-monitor-ui.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('inspector-ui.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('keyboard-ui.js') < loaded.indexOf('renderer.js'));
+  assert.ok(loaded.indexOf('tooltip.js') < loaded.indexOf('app-init.js'));
   assert.ok(loaded.indexOf('timeline-interactions.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('app-init.js') < loaded.indexOf('renderer.js'));
   assert.ok(loaded.indexOf('renderer-assets-ui.js') < loaded.indexOf('renderer.js'));

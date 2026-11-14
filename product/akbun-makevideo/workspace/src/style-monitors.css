@@ -106,6 +106,81 @@
   font-size: 11px;
 }
 
+#source-actions button.icon,
+.monitor-transport button.icon {
+  padding: 0;
+}
+
+#source-actions button.icon svg,
+.monitor-transport button.icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* The checkbox stays in the page for keyboard focus and `.checked`; the label
+   draws the state. */
+#source-actions .toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border-radius: var(--radius);
+  background-color: var(--control);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color var(--ease), color var(--ease);
+}
+
+#source-actions .toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#source-actions .toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#source-actions .toggle:has(input:checked) {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+#source-actions .toggle:hover:not(:has(input:disabled)) {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+
+#source-actions .toggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#source-actions .toggle:has(input:disabled) {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#source-actions .scope svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 #source-range {
   flex: 1 1 100%;
 }
@@ -327,10 +402,6 @@ audio.stage-media {
   background: var(--panel);
   min-width: 0;
   flex-wrap: wrap;
-}
-
-#btn-play {
-  min-width: 42px;
 }
 
 .inline {

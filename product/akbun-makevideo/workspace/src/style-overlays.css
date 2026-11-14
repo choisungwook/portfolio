@@ -192,3 +192,21 @@
   font-size: 12px;
   word-break: break-all;
 }
+
+#tooltip {
+  position: fixed;
+  z-index: 500;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: var(--fg);
+  color: var(--panel);
+  box-shadow: var(--shadow-1);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+#tooltip[hidden] {
+  display: none;
+}

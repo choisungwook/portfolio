@@ -25,9 +25,9 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 원칙:
 
 - 시각의 중심은 monitor의 영상이다. 편집기 장식은 줄인다.
-- 영역은 테두리보다 배경 차이와 그림자로 구분한다. 1px `--border`는 큰 영역 사이(Assets, monitor, Selected Panel, timeline)에만 남긴다.
-- control은 테두리 없는 버튼이 기본이다. 채움은 `--control`, hover는 `--hover`, 켜진 상태는 `--accent-soft` 배경에 `--accent` 글자다.
-- 색은 CSS 변수로만 지정한다. 규칙 본문에 hex나 rgba를 직접 쓰지 않는다. 예외는 monitor 위에 얹는 hint와 mode badge다. 영상 위에 그리므로 앱 테마를 따르지 않는다.
+- 영역은 테두리보다 배경 차이와 그림자로 구분한다. 1px `--border`는 큰 영역 사이(Assets, monitor, Selected Panel, timeline)와 반복되는 행 사이(track, 목록, sheet의 묶음)에만 남긴다.
+- control은 테두리 없는 버튼이 기본이다. 채움은 `--control`, hover는 `--hover`, 켜진 상태는 `--accent-soft` 배경에 `--accent` 글자다. track head의 target은 예외로 `--accent` 채움을 쓴다. 10px 글자라 `--accent-soft` 위에서는 켜짐이 구분되지 않는다.
+- 색은 CSS 변수로만 지정한다. 규칙 본문에 hex나 rgba를 직접 쓰지 않는다. 예외는 monitor 위에 얹는 hint와 mode badge다. 영상 위에 그리므로 앱 테마를 따르지 않는다. sheet 뒤를 가리는 색은 `--backdrop`이다.
 - 글자는 시스템 글꼴 13px이다. 대문자 변환과 자간 조정을 쓰지 않는다.
 - 전환은 `--ease`(140ms) 하나만 쓰고 `prefers-reduced-motion`에서는 없앤다.
 
@@ -65,7 +65,7 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 - 메뉴와 context menu: 행 높이 28px, hover와 keyboard focus 행은 `--accent` 배경에 `--on-accent` 글자, 묶음 사이 구분선.
 - Global Action Bar: 열린 패널의 버튼은 `--accent-soft` 배경에 `--accent` 글자. Assets와 Source 토글은 둘 다 기본으로 켜져 있어 켜짐을 `--control` 채움으로, 꺼짐을 `--muted` 글자로만 표시한다.
 - Panel head: 12px 굵은 `--muted` 제목. 아래 테두리 없음.
-- Timeline toolbar: `--stage` 띠 위에 `--panel` capsule을 10px 간격으로 둔다. 묶음은 편집 도구(split, snap, delete, ripple delete) / clip(Link Clips, + Text) / track(+ Video, + Audio, + Subtitle) / 자막(Import SRT, Export SRT) / 오른쪽 끝 Zoom. capsule 안 버튼은 투명하고 hover에서 `--hover`.
+- Timeline toolbar: `--stage` 띠 위에 높이가 같은 `--panel` capsule을 10px 간격으로 둔다. 좁은 창에서 줄이 바뀌어도 Zoom은 오른쪽 끝에 둔다. 묶음은 편집 도구(split, snap, delete, ripple delete) / clip(Link Clips, + Text) / track(+ Video, + Audio, + Subtitle) / 자막(Import SRT, Export SRT) / 오른쪽 끝 Zoom. capsule 안 버튼은 투명하고 hover에서 `--hover`.
 - 분할 control(`.segmented`, Panel Tab Bar, AI section tab, AI workflow step): `--control` 바탕에 선택 칸만 `--chip` 배경과 `--shadow-1`.
 - Sheet: 테두리 없이 `--shadow-2`. dark에서는 배경과 겹치지 않도록 1px `--border`를 남긴다.
 
