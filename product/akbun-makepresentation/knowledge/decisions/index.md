@@ -2,6 +2,7 @@
 
 akbun-makepresentation 작업 중 내린 의사결정과 이유.
 
+* [캔버스는 바뀐 도형만 고쳐 그리고 이동 중에는 프레임당 한 번 그림](2026-11-canvas-patches-only-changed-shapes.md)
 * [댓글은 도형에 속하고 작성자 없이 표준 댓글로 저장](2026-11-comments-belong-to-shapes.md)
 * [그림 배경 제거는 테두리 기준 영역 채우기](2026-11-background-removal-is-border-flood-fill.md)
 * [인스펙터는 선택을 따르고 툴바는 도구만 둔다](2026-11-inspector-follows-selection.md)
