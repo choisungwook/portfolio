@@ -4,16 +4,37 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-  background: var(--bg);
+  background: var(--stage);
 }
 
+/* A band of the stage colour with a floating capsule per group of tools. */
 #timeline-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--stage);
+}
+
+.capsule {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  border-radius: 999px;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+}
+
+.capsule button {
+  border-radius: 999px;
+  background-color: transparent;
+  white-space: nowrap;
+}
+
+.capsule .inline {
+  padding: 0 6px;
 }
 
 button.icon {
@@ -35,16 +56,8 @@ button.icon svg {
 }
 
 button.icon.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
-}
-
-.sep-v {
-  width: 1px;
-  height: 20px;
-  background: var(--border);
-  margin: 0 4px;
+  background-color: var(--accent-soft);
+  color: var(--accent);
 }
 
 #timeline {
@@ -56,13 +69,12 @@ button.icon.on {
 }
 
 #timeline-heads {
-  background: var(--panel);
+  background: var(--panel-soft);
   border-right: 1px solid var(--border);
 }
 
 .ruler-spacer {
   height: var(--ruler-height);
-  border-bottom: 1px solid var(--border);
 }
 
 .head {
@@ -97,21 +109,20 @@ button.icon.on {
 }
 
 .head-buttons button {
-  padding: 0 5px;
+  padding: 0 6px;
+  border-radius: var(--radius-s);
   font-size: 10px;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 .head-buttons button.on {
-  background: var(--select);
-  border-color: var(--select);
-  color: #201800;
+  background-color: var(--select);
+  color: var(--on-select);
 }
 
 .head-buttons button.target.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--accent);
+  color: var(--on-accent);
 }
 
 #timeline-scroll {
@@ -127,8 +138,7 @@ button.icon.on {
 #ruler {
   position: relative;
   height: var(--ruler-height);
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  background: var(--panel-soft);
   cursor: ew-resize;
 }
 
@@ -140,7 +150,7 @@ button.icon.on {
   border-left: 1px solid var(--grid);
   font-size: 10px;
   line-height: var(--ruler-height);
-  color: var(--dim);
+  color: var(--muted);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -180,17 +190,18 @@ button.icon.on {
   min-height: 0;
   min-width: 0;
   border-left: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--panel-soft);
 }
 
 #panel-tab-bar {
   display: flex;
   justify-content: space-between;
-  gap: 0;
-  padding: 5px 6px;
+  gap: 2px;
+  margin: 6px 8px;
+  padding: 2px;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--control);
 }
 
 #panel-tab-bar[hidden] {
@@ -200,15 +211,15 @@ button.icon.on {
 #panel-tab-bar button {
   flex: 0 0 auto;
   padding: 2px 4px;
-  border-color: transparent;
-  background: transparent;
+  background-color: transparent;
   font-size: 9px;
 }
 
-#panel-tab-bar button[aria-pressed='true'] {
-  border-color: var(--border);
-  background: var(--panel);
-  color: var(--accent);
+#panel-tab-bar button[aria-pressed='true'],
+.ai-section-tabs button[aria-pressed='true'],
+.ai-workflow-steps button[aria-pressed='true'] {
+  background-color: var(--chip);
+  box-shadow: var(--shadow-1);
 }
 
 .selected-panel-view {
@@ -240,21 +251,16 @@ button.icon.on {
   display: grid;
   flex: none;
   grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-2);
+  gap: 2px;
+  margin: 6px 8px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--control);
 }
 
 .ai-section-tabs button {
-  border-color: transparent;
-  background: transparent;
+  background-color: transparent;
   font-size: 10px;
-}
-
-.ai-section-tabs button[aria-pressed='true'] {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 #ai-conversations-view,
@@ -287,7 +293,6 @@ button.icon.on {
   align-items: center;
   gap: 8px;
   padding: 10px;
-  border-bottom: 1px solid var(--border);
 }
 
 .ai-panel-header {
@@ -302,7 +307,7 @@ button.icon.on {
 .ai-panel-header p,
 .ai-chat-header p {
   margin: 2px 0 0;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -324,9 +329,8 @@ button.icon.on {
   gap: 8px;
   margin: 10px;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .ai-status-dot {
@@ -334,11 +338,11 @@ button.icon.on {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--dim);
+  background: var(--muted);
 }
 
 [data-state='available'] .ai-status-dot {
-  background: #2f9e44;
+  background: var(--mark-in);
 }
 
 [data-state='unavailable'] .ai-status-dot {
@@ -348,7 +352,7 @@ button.icon.on {
 .ai-panel-status {
   min-height: 1.2em;
   margin: 0 10px 6px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -366,7 +370,7 @@ button.icon.on {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: var(--dim);
+  color: var(--muted);
   text-align: center;
 }
 
@@ -384,8 +388,7 @@ button.icon.on {
 
 .ai-session-open {
   min-width: 0;
-  border-color: transparent;
-  background: transparent;
+  background-color: transparent;
   text-align: left;
 }
 
@@ -399,7 +402,7 @@ button.icon.on {
 
 .ai-session-open span {
   margin-top: 2px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 10px;
 }
 
@@ -455,9 +458,8 @@ button.icon.on {
 
 .caption-editor-row {
   padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .caption-editor-heading {
@@ -465,7 +467,7 @@ button.icon.on {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 5px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 10px;
 }
 
@@ -510,7 +512,7 @@ body.ai-editing .caption-editor-row textarea {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 3px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 9px;
   text-transform: uppercase;
 }
@@ -518,8 +520,8 @@ body.ai-editing .caption-editor-row textarea {
 .ai-message-body {
   margin: 0;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius);
+  background: var(--panel);
   line-height: 1.45;
   overflow-wrap: anywhere;
   user-select: text;
@@ -527,8 +529,7 @@ body.ai-editing .caption-editor-row textarea {
 }
 
 .ai-message[data-role='user'] .ai-message-body {
-  border-color: var(--accent);
-  background: var(--panel-2);
+  background: var(--accent-soft);
 }
 
 .ai-message-actions {
@@ -540,16 +541,15 @@ body.ai-editing .caption-editor-row textarea {
 .ai-message-actions button,
 .ai-image-card button {
   padding: 2px 6px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 10px;
 }
 
 .ai-image-card {
   margin-top: 6px;
   padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .ai-image-card img {
@@ -559,23 +559,21 @@ body.ai-editing .caption-editor-row textarea {
   margin-bottom: 5px;
   border-radius: 4px;
   object-fit: contain;
-  background: var(--stage);
+  background: var(--monitor);
 }
 
 .ai-readonly-notice {
   margin: 0 10px 10px;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  color: var(--dim);
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--panel);
   font-size: 11px;
 }
 
 .ai-composer {
   flex: none;
   padding: 8px 10px 10px;
-  border-top: 1px solid var(--border);
 }
 
 .ai-mode-picker {
@@ -586,7 +584,7 @@ body.ai-editing .caption-editor-row textarea {
 }
 
 .ai-mode-picker button.active {
-  border-color: var(--accent);
+  background-color: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -595,10 +593,6 @@ body.ai-editing .caption-editor-row textarea {
   min-height: 70px;
   padding: 6px;
   resize: vertical;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--fg);
-  background: var(--panel-2);
   font: inherit;
   user-select: text;
 }
@@ -615,7 +609,7 @@ body.ai-editing .caption-editor-row textarea {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -686,7 +680,7 @@ body.ai-editing .caption-editor-row textarea {
   display: grid;
   gap: 3px;
   font-size: 11px;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 #inspector-body .field-pair input,
@@ -745,6 +739,7 @@ body.ai-editing .caption-editor-row textarea {
 .lane {
   position: relative;
   border-bottom: 1px solid var(--border);
+  background-color: var(--stage);
   background-image: linear-gradient(var(--grid), var(--grid));
   background-size: 1px 100%;
   background-repeat: repeat-x;
@@ -780,9 +775,9 @@ body.ai-editing .caption-editor-row textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--panel-2);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow-2);
   color: var(--fg);
   font-size: 12px;
   opacity: 0.92;
@@ -807,10 +802,10 @@ body.ai-editing .caption-editor-row textarea {
   z-index: 5;
   min-width: 4px;
   overflow: hidden;
-  border: 1px solid #f0b35c;
+  border: 1px solid var(--transition-edge);
   border-radius: 3px;
-  background: repeating-linear-gradient(135deg, #704b24cc 0 4px, #ba7736cc 4px 8px);
-  color: #fff4df;
+  background: repeating-linear-gradient(135deg, var(--transition-fill) 0 4px, var(--transition-fill-alt) 4px 8px);
+  color: var(--transition-ink);
   font-size: 9px;
   line-height: 18px;
   text-align: center;
@@ -823,26 +818,26 @@ body.ai-editing .caption-editor-row textarea {
   width: 8px;
   height: 8px;
   padding: 0;
-  border: 1px solid #201600;
+  border: 1px solid var(--keyframe-edge);
   border-radius: 1px;
-  background: #f6b73c;
+  background: var(--keyframe);
   transform: translateX(-50%) rotate(45deg);
 }
 
 .clip.adjustment {
-  background: #68568a;
+  background: var(--clip-adjustment);
 }
 
 .clip.video {
   background: var(--clip-video);
   border: 1px solid var(--clip-video-edge);
-  color: #10203a;
+  color: var(--clip-video-ink);
 }
 
 .clip.audio {
   background: var(--clip-audio);
   border: 1px solid var(--clip-audio-edge);
-  color: #0f2a1a;
+  color: var(--clip-audio-ink);
 }
 
 /* A text or shape layer on a video track: a band across the lower half of the
@@ -854,7 +849,7 @@ body.ai-editing .caption-editor-row textarea {
   bottom: 3px;
   background: var(--clip-visual);
   border: 1px solid var(--clip-visual-edge);
-  color: #2a1c4e;
+  color: var(--clip-visual-ink);
   font-size: 10px;
 }
 
@@ -872,14 +867,6 @@ body.ai-editing .caption-editor-row textarea {
   pointer-events: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  .clip.video,
-  .clip.audio,
-  .clip.visual {
-    color: var(--fg);
-  }
-}
-
 .clip.selected {
   outline: 2px solid var(--select);
   outline-offset: -2px;
@@ -895,8 +882,8 @@ body.ai-editing .caption-editor-row textarea {
 
 .clip.missing,
 .clip.lut-unavailable {
-  background: repeating-linear-gradient(45deg, #b1443a, #b1443a 6px, #8f342c 6px, #8f342c 12px);
-  color: #fff;
+  background: repeating-linear-gradient(45deg, var(--clip-missing), var(--clip-missing) 6px, var(--clip-missing-stripe) 6px, var(--clip-missing-stripe) 12px);
+  color: var(--clip-missing-ink);
 }
 
 .clip-name {
@@ -951,29 +938,11 @@ body.ai-editing .caption-editor-row textarea {
   z-index: 350;
   min-width: 180px;
   padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 12px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
 }
 
 .timeline-context-menu[hidden] {
   display: none;
-}
-
-.timeline-context-menu button {
-  display: block;
-  width: 100%;
-  padding: 6px 9px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fg);
-  text-align: left;
-}
-
-.timeline-context-menu button:hover,
-.timeline-context-menu button:focus-visible {
-  background: var(--select);
-  color: #201800;
 }

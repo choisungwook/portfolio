@@ -41,6 +41,11 @@
   grid-template-rows: subgrid;
 }
 
+#source-panel .panel-head,
+#preview-panel .panel-head {
+  background: var(--panel);
+}
+
 /* The Program Monitor has nothing to put in the fourth row, so its transport
    takes both and centres itself in them rather than leaving a blank strip. */
 #transport {
@@ -54,7 +59,7 @@
   justify-content: center;
   min-height: 0;
   overflow: hidden;
-  background: var(--stage);
+  background: var(--monitor);
 }
 
 .monitor-stage {
@@ -87,7 +92,6 @@
   gap: 6px;
   padding: 6px 8px;
   background: var(--panel);
-  border-top: 1px solid var(--border);
 }
 
 #source-actions {
@@ -129,7 +133,7 @@
   position: absolute;
   top: 12px;
   bottom: 1px;
-  background: color-mix(in srgb, var(--stage) 62%, transparent);
+  background: color-mix(in srgb, var(--monitor) 62%, transparent);
   border-radius: 2px;
 }
 
@@ -184,22 +188,21 @@
 
 .segmented {
   display: flex;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--control);
 }
 
 .segmented button {
-  border: none;
-  border-radius: 0;
   padding: 2px 10px;
   font-size: 12px;
-  background: var(--panel-2);
+  background-color: transparent;
 }
 
 .segmented button.on {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--chip);
+  box-shadow: var(--shadow-1);
 }
 
 #stage-wrap {
@@ -209,7 +212,7 @@
   justify-content: center;
   min-height: 0;
   min-width: 0;
-  background: var(--stage);
+  background: var(--monitor);
   overflow: hidden;
 }
 
@@ -298,7 +301,7 @@
 
 #stage-mode.exact {
   background: var(--accent);
-  color: var(--accent-fg);
+  color: var(--on-accent);
 }
 
 audio.stage-media {
@@ -322,7 +325,6 @@ audio.stage-media {
   gap: 8px;
   padding: 6px 10px;
   background: var(--panel);
-  border-top: 1px solid var(--border);
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -335,6 +337,6 @@ audio.stage-media {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 12px;
 }

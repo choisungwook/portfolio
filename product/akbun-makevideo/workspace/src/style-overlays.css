@@ -21,7 +21,7 @@
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
 }
 
 .sheet h3 {
@@ -50,7 +50,7 @@
 
 .settings-ai-status p {
   margin: 3px 0 0;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -135,12 +135,12 @@
 
 .project-row:hover {
   background: var(--accent);
-  color: var(--accent-fg);
+  color: var(--on-accent);
 }
 
 .project-when {
   font-size: 11px;
-  color: var(--dim);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -169,7 +169,7 @@
   height: 8px;
   margin-bottom: 10px;
   border-radius: 99px;
-  background: var(--panel-2);
+  background: var(--panel-soft);
   border: 1px solid var(--border);
   overflow: hidden;
 }

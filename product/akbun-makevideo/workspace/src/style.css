@@ -5,27 +5,53 @@
    pinning a value. See .claude/rules/tauri.md. */
 
 :root {
-  --bg: #f2f3f5;
+  --bg: #f4f5f7;
   --panel: #ffffff;
-  --panel-2: #f7f8fa;
-  --fg: #1a1a1c;
-  --dim: #6a6d73;
-  --border: #dcdfe4;
+  --panel-soft: #f5f5f7;
+  --stage: #e4e5e9;
+  --fg: #1c1d21;
+  --muted: #7a808c;
+  --border: #e3e5ea;
   --grid: #e6e8ec;
-  --accent: #2f6df0;
-  --accent-fg: #ffffff;
+  --accent: #2f6fed;
+  --accent-soft: #e3ecff;
+  --on-accent: #ffffff;
+  --control: rgba(0, 0, 0, 0.05);
+  --chip: #ffffff;
+  --hover: rgba(20, 24, 40, 0.06);
+  --danger: #e03131;
+  --danger-soft: rgba(224, 49, 49, 0.12);
   --clip-video: #cfe0ff;
   --clip-video-edge: #5b8def;
   --clip-audio: #d3efdd;
   --clip-audio-edge: #41a86a;
   --clip-visual: #e4d8f8;
   --clip-visual-edge: #9a79dd;
+  --clip-video-ink: #10203a;
+  --clip-audio-ink: #0f2a1a;
+  --clip-visual-ink: #2a1c4e;
+  --clip-adjustment: #68568a;
+  --clip-missing: #b1443a;
+  --clip-missing-stripe: #8f342c;
+  --clip-missing-ink: #ffffff;
+  --transition-edge: #f0b35c;
+  --transition-fill: #704b24cc;
+  --transition-fill-alt: #ba7736cc;
+  --transition-ink: #fff4df;
+  --keyframe: #f6b73c;
+  --keyframe-edge: #201600;
   --select: #f0a52f;
-  --danger: #d0453b;
+  --on-select: #201800;
   --mark-in: #168a4d;
   --mark-out: #d46713;
-  --stage: #0b0b0d;
-  --shadow: 0 8px 30px rgba(15, 18, 25, 0.18);
+  /* Behind the picture in both monitors. The video is drawn on it, so it
+     stays dark in the light theme too. */
+  --monitor: #0b0b0d;
+  --radius: 7px;
+  --radius-s: 5px;
+  --shadow-1: 0 1px 2px rgba(16, 20, 32, 0.06), 0 2px 8px rgba(16, 20, 32, 0.08);
+  --shadow-2: 0 10px 32px rgba(16, 20, 32, 0.18);
+  --ease: 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
 
   --head-width: 132px;
   --ruler-height: 26px;
@@ -35,27 +61,38 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16171a;
-    --panel: #1e2024;
-    --panel-2: #232629;
-    --fg: #e7e9ec;
-    --dim: #92969d;
-    --border: #33363c;
+    --bg: #1b1c1f;
+    --panel: #26272b;
+    --panel-soft: #2a2b2f;
+    --stage: #1e1f22;
+    --fg: #e9eaee;
+    --muted: #9197a3;
+    --border: #37393f;
     --grid: #2a2d32;
-    --accent: #5b8def;
-    --accent-fg: #0d1117;
+    --accent: #6ea0ff;
+    --accent-soft: #24385f;
+    /* White on the lighter dark-mode accent falls below readable contrast. */
+    --on-accent: #10131a;
+    --control: rgba(255, 255, 255, 0.08);
+    --chip: #3d3f46;
+    --hover: rgba(255, 255, 255, 0.07);
+    --danger: #ff6b6b;
+    --danger-soft: rgba(255, 107, 107, 0.16);
     --clip-video: #2b3d60;
     --clip-video-edge: #5b8def;
     --clip-audio: #24412e;
     --clip-audio-edge: #4cb377;
     --clip-visual: #3d3158;
     --clip-visual-edge: #9a79dd;
+    --clip-video-ink: var(--fg);
+    --clip-audio-ink: var(--fg);
+    --clip-visual-ink: var(--fg);
     --select: #f0a52f;
-    --danger: #e2695f;
     --mark-in: #54d68c;
     --mark-out: #ff9b4a;
-    --stage: #000000;
-    --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+    --monitor: #000000;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -134,7 +171,7 @@ body.program-monitor-fullscreen #preview-panel {
 }
 
 .dim {
-  color: var(--dim);
+  color: var(--muted);
 }
 
 .small-text {
@@ -193,18 +230,34 @@ body.program-monitor-fullscreen #preview-panel {
   clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 92%, 50% 70%, 21% 92%, 32% 56%, 2% 35%, 39% 34%);
 }
 
-button {
+/* Controls have no border: a fill says "button" and the hover tint is laid
+   over it, so a filled button still reacts. */
+button,
+select,
+textarea,
+input:where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'])) {
   font: inherit;
   color: inherit;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background-color: var(--control);
+  border: 0;
+  border-radius: var(--radius-s);
+  transition: background-color var(--ease), color var(--ease);
+}
+
+button {
   padding: 4px 10px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
+select,
+textarea,
+input:where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'])) {
+  padding: 3px 6px;
+}
+
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  background-image: linear-gradient(var(--hover), var(--hover));
 }
 
 button:disabled {
@@ -213,9 +266,8 @@ button:disabled {
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--accent);
+  color: var(--on-accent);
 }
 
 button.small {
@@ -223,14 +275,20 @@ button.small {
   font-size: 12px;
 }
 
-input,
-select {
-  font: inherit;
-  color: inherit;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 6px;
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+input[type='color'] {
+  width: 36px;
+  height: 24px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background-color: var(--control);
+  cursor: pointer;
 }
 
 /* --- menu bar ------------------------------------------------------------ */
@@ -246,8 +304,7 @@ select {
 
 .brand {
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 .menubar-gap {
@@ -264,14 +321,11 @@ select {
 }
 
 .menu-title {
-  background: none;
-  border-color: transparent;
+  background-color: transparent;
 }
 
 .menu-title.open {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--hover);
 }
 
 .menu-list {
@@ -285,40 +339,46 @@ select {
   padding: 4px;
   list-style: none;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
 }
 
 .menu-list.open {
   display: block;
 }
 
-.menu-list button {
+.menu-list button,
+.timeline-context-menu button {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   width: 100%;
-  background: none;
-  border-color: transparent;
+  height: 28px;
+  padding: 0 10px;
+  background-color: transparent;
   text-align: left;
 }
 
-.menu-list button:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+.menu-list button:hover:not(:disabled),
+.menu-list button:focus-visible,
+.timeline-context-menu button:hover:not(:disabled),
+.timeline-context-menu button:focus-visible {
+  background-color: var(--accent);
+  background-image: none;
+  color: var(--on-accent);
+  outline: none;
 }
 
 /* Undo and Redo are only there to press some of the time, and a menu item that
    highlights under the pointer but does nothing is worse than a grey one. */
 .menu-list button:disabled {
-  background: none;
+  background-color: transparent;
 }
 
 .menu-list kbd {
   font: inherit;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 .shortcut-sheet {
@@ -369,9 +429,8 @@ select {
   padding: 4px;
   list-style: none;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
 }
 
 .menu-submenu:hover > .menu-submenu-list,
@@ -390,7 +449,7 @@ select {
 }
 
 #tool-warning {
-  border-color: var(--danger);
+  background-color: var(--danger-soft);
   color: var(--danger);
   font-size: 12px;
   padding: 2px 8px;
@@ -404,22 +463,18 @@ select {
 }
 
 #workspace-toggles {
-  padding-right: 6px;
-  margin-right: 4px;
-  border-right: 1px solid var(--border);
+  margin-right: 10px;
 }
 
-/* Both panels are shown by default, so "on" is an outline rather than the
-   filled accent the right-panel buttons use for the one open panel. */
+/* Both panels are shown by default, so "on" is the plain control fill rather
+   than the accent the right-panel buttons use for the one open panel. */
 #workspace-toggles .global-action[aria-pressed='true'] {
-  border-color: var(--border);
-  background: transparent;
+  background-color: var(--control);
   color: var(--fg);
 }
 
 #workspace-toggles .global-action[aria-pressed='false'] {
-  color: var(--dim);
-  opacity: 0.6;
+  color: var(--muted);
 }
 
 /* Keyboard focus is visible everywhere, not only in the menus that had it. */
@@ -457,8 +512,7 @@ body.hide-source #preview-panel {
   align-items: center;
   gap: 5px;
   padding: 3px 7px;
-  border-color: transparent;
-  background: transparent;
+  background-color: transparent;
   font-size: 12px;
 }
 
@@ -473,9 +527,8 @@ body.hide-source #preview-panel {
 }
 
 .global-action[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* --- panels -------------------------------------------------------------- */
@@ -502,7 +555,6 @@ body.hide-source #preview-panel {
 }
 
 .debug-log {
-  border-top: 1px solid var(--border);
   background: var(--stage);
   color: var(--fg);
 }
@@ -524,17 +576,13 @@ body.hide-source #preview-panel {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
 }
 
 .panel-head h2 {
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 /* --- assets -------------------------------------------------------------- */
@@ -543,7 +591,7 @@ body.hide-source #preview-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-  background: var(--panel);
+  background: var(--panel-soft);
   border-right: 1px solid var(--border);
   position: relative;
 }
@@ -571,18 +619,16 @@ body.hide-source #preview-panel {
   grid-template-rows: auto auto;
   gap: 0 6px;
   padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius);
   cursor: grab;
 }
 
 .asset:hover {
-  background: var(--panel-2);
+  background: var(--hover);
 }
 
 .asset.selected {
-  border-color: var(--accent);
-  background: var(--panel-2);
+  background: var(--accent-soft);
 }
 
 .asset-name {
@@ -597,7 +643,7 @@ body.hide-source #preview-panel {
   grid-column: 1;
   grid-row: 2;
   font-size: 11px;
-  color: var(--dim);
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -608,20 +654,28 @@ body.hide-source #preview-panel {
   grid-row: 1 / span 2;
   align-self: center;
   padding: 0 6px;
-  background: none;
-  border-color: transparent;
-  color: var(--dim);
+  background-color: transparent;
+  color: var(--muted);
 }
 
-.asset-remove:hover {
+.asset-remove:hover:not(:disabled) {
+  background-color: var(--danger-soft);
+  background-image: none;
   color: var(--danger);
-  border-color: var(--danger);
 }
 
 #asset-empty {
   margin: 0;
   padding: 18px 14px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 12px;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
 }
