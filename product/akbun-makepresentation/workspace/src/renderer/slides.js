@@ -199,5 +199,3 @@ async function deleteCurrentSlide() {
 }
 
 $('btn-del-slide').addEventListener('click', deleteCurrentSlide);
-$('btn-slide-up').addEventListener('click', () => moveSelectedSlides(-1));
-$('btn-slide-down').addEventListener('click', () => moveSelectedSlides(1));

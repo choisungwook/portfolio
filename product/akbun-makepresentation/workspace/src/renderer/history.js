@@ -55,6 +55,11 @@ function setTool(tool) {
     button.classList.toggle('active', button.dataset.tool === tool);
   }
   canvas.dataset.tool = tool;
+  // The Shapes button shows the glyph of the drawing tool in use, and the
+  // neutral one when the tool is select or text.
+  const tile = shapesMenu.querySelector(`[data-tool="${tool}"]`);
+  $('btn-shapes').classList.toggle('active', !!tile);
+  $('btn-shapes').querySelector('.current').innerHTML = tile ? tile.innerHTML : '';
 }
 
 // --- pointer interaction --------------------------------------------------------

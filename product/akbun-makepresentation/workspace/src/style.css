@@ -12,26 +12,52 @@
 }
 
 :root {
-  --bg: #f1f3f5;
+  --bg: #f4f5f7;
   --panel: #ffffff;
-  --fg: #1a1a1a;
-  --border: #dee2e6;
-  --muted: #868e96;
-  --accent: #1971c2;
-  --accent-soft: #d0ebff;
-  --stage: #e9ecef;
+  --fg: #1c1d21;
+  --border: #e3e5ea;
+  --muted: #7a808c;
+  --accent: #2f6fed;
+  --accent-soft: #e3ecff;
+  --stage: #e4e5e9;
+  --on-accent: #ffffff;
+  --danger: #e03131;
+  --danger-soft: rgba(224, 49, 49, 0.12);
+  --none-slash: var(--danger);
+  --panel-soft: #f5f5f7;
+  --control: rgba(0, 0, 0, 0.05);
+  --chip: #ffffff;
+  --slide-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --hover: rgba(20, 24, 40, 0.06);
+  --radius: 7px;
+  --radius-s: 5px;
+  --shadow-1: 0 1px 2px rgba(16, 20, 32, 0.06), 0 2px 8px rgba(16, 20, 32, 0.08);
+  --shadow-2: 0 10px 32px rgba(16, 20, 32, 0.18);
+  --ease: 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1e1e1e;
-    --panel: #2a2a2c;
-    --fg: #e8e8e8;
-    --border: #3a3a3c;
-    --muted: #909296;
-    --accent: #4dabf7;
-    --accent-soft: #1c3a52;
-    --stage: #232325;
+    --bg: #1b1c1f;
+    --panel: #26272b;
+    --fg: #e9eaee;
+    --border: #37393f;
+    --muted: #9197a3;
+    --accent: #6ea0ff;
+    --accent-soft: #24385f;
+    --stage: #1e1f22;
+    /* White on the lighter dark-mode accent falls below readable contrast. */
+    --on-accent: #10131a;
+    --danger: #ff6b6b;
+    --danger-soft: rgba(255, 107, 107, 0.16);
+    --panel-soft: #2a2b2f;
+    --control: rgba(255, 255, 255, 0.08);
+    --chip: #3d3f46;
+    /* The hairline stays in dark: a dark slide would merge with the stage. */
+    --slide-shadow: 0 0 0 1px var(--border), var(--shadow-1);
+    --hover: rgba(255, 255, 255, 0.07);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -73,13 +99,13 @@ body {
   border: 0;
   background: transparent;
   padding: 3px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-s);
 }
 
 .menu-title:hover,
 .menu-title[aria-expanded='true'],
 .menubar-command:hover {
-  background: var(--accent-soft);
+  background: var(--hover);
 }
 
 .menu-panel {
@@ -90,9 +116,9 @@ body {
   min-width: 220px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-2);
 }
 
 .menu-panel[hidden] {
@@ -120,7 +146,7 @@ body {
 
 .menu-panel button:hover,
 .menu-panel button:focus-visible {
-  background: var(--accent-soft);
+  background: var(--hover);
   outline: none;
 }
 
@@ -144,26 +170,95 @@ body {
 
 #toolbar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* The right column never gives up its width, so a narrow window squeezes
+     the tools capsule (which wraps) before Zoom and Present. */
+  grid-template-columns: 1fr auto minmax(max-content, 1fr);
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  background: var(--stage);
+}
+
+/* The line heights are fixed, so the toolbar does not jump when the status
+   line fills in. The name truncates before it can push the tools capsule. */
+#doc-title {
+  grid-column: 1;
+  min-width: 0;
+  padding-left: 2px;
+}
+
+#doc-name,
+#doc-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+#doc-name {
+  height: 17px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 17px;
+  color: var(--fg);
+}
+
+#doc-status {
+  height: 14px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
 }
 
 #toolbar .tools {
   grid-column: 2;
 }
 
-#toolbar > .group:last-child {
+/* Zoom and Present are separate capsules, with the same gap as everywhere. */
+#toolbar .toolbar-end {
   grid-column: 3;
   justify-self: end;
+  display: flex;
+  gap: 10px;
+}
+
+#btn-zoom-level {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#zoom-value {
+  min-width: 3.4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#zoom-menu {
+  width: auto;
+  min-width: 160px;
+  padding: 6px;
+  border: 0;
+  border-radius: 16px;
 }
 
 .group {
   display: flex;
   gap: 4px;
+}
+
+/* Each set of tools floats as its own capsule on the stage colour. */
+#toolbar .group {
+  flex-wrap: wrap;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+}
+
+#toolbar .group button {
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 button,
@@ -176,12 +271,29 @@ textarea {
   color: var(--fg);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-s);
   padding: 4px 10px;
+  transition: background-color var(--ease), border-color var(--ease), box-shadow var(--ease), color var(--ease);
 }
 
 button:hover {
+  background: var(--hover);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
   border-color: var(--accent);
+}
+
+select:focus,
+input[type='number']:focus,
+input[type='text']:focus,
+input[type='search']:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 button:disabled {
@@ -192,6 +304,37 @@ button:disabled {
 button.active {
   background: var(--accent-soft);
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Chrome buttons are ghosts: no box until the pointer is on them, so a row
+   of tools reads as a row of tools and not a row of frames. */
+#menubar button,
+#toolbar button,
+.slide-actions button {
+  border-color: transparent;
+  background: transparent;
+}
+
+#menubar button:hover,
+#toolbar button:hover,
+.slide-actions button:hover {
+  background: var(--hover);
+}
+
+#toolbar button.active,
+.slide-actions button.active {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
 }
 
 .tools button {
@@ -208,19 +351,106 @@ button.active {
   stroke-linejoin: round;
 }
 
-#btn-background {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+/* The Shapes button shows the neutral glyph, or the active drawing tool's. */
+#btn-shapes .shape-glyph {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
-#current-background {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 4px;
-  background: #ffffff;
+#btn-shapes .neutral {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+#btn-shapes.active .neutral,
+#btn-shapes:not(.active) .current {
+  display: none;
+}
+
+#shapes-menu {
+  width: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  gap: 8px;
+  padding: 10px;
+  border: 0;
+  border-radius: 16px;
+}
+
+#shapes-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--control);
+}
+
+#shapes-menu button:hover {
+  background: var(--hover);
+}
+
+#shapes-menu button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#shapes-menu button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+#shapes-menu .shape-glyph {
+  width: 28px;
+  height: 28px;
+}
+
+#table-menu {
+  width: auto;
+  padding: 10px;
+  border: 0;
+  border-radius: 16px;
+}
+
+#table-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 18px);
+  gap: 3px;
+}
+
+#table-grid button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--control);
+}
+
+#table-grid button.in {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+#table-grid button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+#table-caption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- layout --- */
@@ -237,8 +467,7 @@ main {
   width: 200px;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
+  background: var(--panel-soft);
 }
 
 #thumbs {
@@ -252,24 +481,26 @@ main {
 
 .thumb {
   position: relative;
-  border: 2px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
+  box-shadow: var(--shadow-1);
   cursor: pointer;
   line-height: 0;
+  transition: box-shadow var(--ease), outline-color var(--ease);
+}
+
+.thumb:hover {
+  box-shadow: var(--shadow-2);
 }
 
 .thumb svg {
   width: 100%;
-  border-radius: 2px;
+  border-radius: 6px;
 }
 
 .thumb.active,
 .thumb.selected {
-  border-color: var(--accent);
-}
-
-.thumb.selected {
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Focus is what tells Backspace to delete the slide rather than the selected
@@ -334,10 +565,32 @@ main {
   padding-inline: 6px;
 }
 
-.slide-actions .icon-action {
-  flex: 0 0 30px;
-  font-size: 16px;
-  padding: 3px;
+/* The primary action of the footer, and a quiet icon for the destructive one
+   that only turns red when the pointer is on it. */
+#btn-add-slide {
+  border-radius: 7px;
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+#btn-add-slide:hover {
+  background: var(--accent);
+  filter: brightness(0.95);
+}
+
+#btn-del-slide {
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--control);
+}
+
+#btn-del-slide:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* --- stage --- */
@@ -362,50 +615,15 @@ main {
 /* Centred with auto margins rather than justify-content, which puts the
    overflowing top-left of a zoomed-in slide out of the scroll range.
 
-   The subtracted 176px is everything the slide does not get: the toolbar,
-   the status bar, the stage padding, and breathing room around the slide.
+   The subtracted 140px is everything the slide does not get: the toolbar,
+   the stage padding, and breathing room around the slide.
    It is a hand-measured constant, so changing either bar's height means
    changing this number too. */
 #stage-inner {
   position: relative;
   margin: auto;
   flex: none;
-  width: calc(min(100%, (100vh - 176px) * var(--slide-ratio, 1.7777778)) * var(--zoom, 1));
-}
-
-/* --- status bar --- */
-
-#statusbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-}
-
-#statusbar button {
-  padding: 3px 8px;
-}
-
-#zoom {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-#zoom button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-}
-
-#btn-zoom-level {
-  min-width: 54px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  width: calc(min(100%, (100vh - 140px) * var(--slide-ratio, 1.7777778)) * var(--zoom, 1));
 }
 
 /* The background is the slide's own, set inline from the deck. The hairline
@@ -416,7 +634,7 @@ main {
   width: 100%;
   aspect-ratio: var(--slide-aspect, 16 / 9);
   background: #ffffff;
-  box-shadow: 0 0 0 1px var(--border), 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--slide-shadow);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -428,7 +646,7 @@ main {
 
 #stage:focus-visible,
 #canvas:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent), 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px var(--accent), var(--slide-shadow);
 }
 
 #canvas[data-tool='rect'],
@@ -441,6 +659,42 @@ main {
 
 #canvas[data-tool='text'] {
   cursor: text;
+}
+
+/* Shapes can be dragged, locked ones cannot; the cursor says which. */
+#canvas[data-tool='select'] g[data-i] {
+  cursor: move;
+}
+
+#canvas[data-tool='select'] g[data-i][data-locked] {
+  cursor: default;
+}
+
+#canvas[data-dragging] .rot-handle {
+  cursor: grabbing;
+}
+
+/* Hidden until the pointer is on an unselected shape, and during a drag, when
+   it would only trail behind the pointer. Thin and in the slide's own units,
+   unlike the wide stroke of the hit twin it is cut from. */
+.hover-ring {
+  display: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.hover-ring.fill {
+  stroke: var(--accent);
+}
+
+#canvas[data-tool='select']:not([data-dragging]) g[data-i]:not(.sel):hover > .hover-ring {
+  display: block;
 }
 
 /* Caps and joins are part of a stroke's shape, so both twins declare them
@@ -468,7 +722,7 @@ main {
    deaf to the pointer so it never steals a click or a drag. */
 .halo {
   stroke: var(--accent);
-  stroke-opacity: 0.35;
+  stroke-opacity: 0.22;
   pointer-events: none;
 }
 
@@ -482,36 +736,52 @@ main {
 .sel-box {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
+  stroke-opacity: 0.7;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
 
-.sel-handle {
-  /* Geometry stays in the slide SVG coordinate space. A CSS-pixel transform
-     here would make the grip ignore the slide zoom. */
-  fill: #ffffff;
+.sel-group-box {
+  fill: none;
   stroke: var(--accent);
-  stroke-width: 1.5;
-  cursor: pointer;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
-/* The rotate grip and the stem that ties it to the top of the box. Geometry is
-   in slide units like the resize handles, so both scale with the zoom. */
+/* Handles keep a constant size on screen: render.js sizes them in slide units
+   from the canvas's on-screen width, and the 1px stroke ignores the zoom. */
+.sel-handle {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.handle-hit {
+  fill: transparent;
+  stroke: none;
+}
+
+/* The rotate grip and the stem that ties it to the top of the box. */
 .rot-handle {
   cursor: grab;
 }
 
-.rot-handle circle {
+.rot-handle circle:not(.handle-hit) {
   fill: #ffffff;
   stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .rot-handle .rot-glyph {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
 }
 
@@ -522,23 +792,30 @@ main {
 
 .rot-stem {
   stroke: var(--accent);
-  stroke-width: 1.2;
-  stroke-dasharray: 3 3;
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
 
 .selection-marquee {
-  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  fill: color-mix(in srgb, var(--accent) 10%, transparent);
   stroke: var(--accent);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+/* Alt-drag selects only what lies wholly inside, so the outline turns dashed. */
+.selection-marquee.contain {
+  stroke-dasharray: 6 4;
 }
 
 .snap-guides {
   stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke-width: 1;
   stroke-dasharray: 8 6;
+  vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
 
@@ -601,7 +878,7 @@ main {
   min-width: 320px;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: var(--panel-soft);
   border-left: 1px solid var(--border);
 }
 
@@ -609,9 +886,11 @@ main {
   flex: none;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 2px;
+  margin: 8px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--control);
 }
 
 #right-panel-tabs button {
@@ -620,10 +899,14 @@ main {
   background: transparent;
 }
 
+#right-panel-tabs button {
+  border-radius: 6px;
+}
+
 #right-panel-tabs button.active {
-  color: var(--fg);
-  border-color: var(--border);
-  background: var(--accent-soft);
+  color: var(--on-accent);
+  border-color: transparent;
+  background: var(--accent);
 }
 
 .right-panel-page {
@@ -650,7 +933,7 @@ main {
 
 #ai-panel {
   overflow: hidden;
-  background: var(--panel);
+  background: var(--panel-soft);
 }
 
 .ai-view {
@@ -1048,11 +1331,161 @@ main {
   color: var(--muted);
 }
 
+/* Inspector fields are filled rather than boxed; the border only appears as
+   the focus ring. */
+#props input[type='number'],
+#props input[type='text'],
+#props select,
+#prop-font-family {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--control);
+}
+
+#props input[type='number']:focus,
+#props input[type='text']:focus,
+#props select:focus {
+  border-color: var(--accent);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Colour rows read as sections: a hairline above Fill, Line and Text, and the
+   label set heavier than the plain rows. Line width and style stay inside the
+   Line section because they live in the same container. */
+#props-fill,
+#props-stroke,
+#props-text {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+#props .prop-row:has(input[type='color']) > label:first-child {
+  font-weight: 600;
+}
+
+/* The native colour input is the well itself, filled edge to edge. */
+#props input[type='color'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 64px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-1);
+  cursor: pointer;
+}
+
+#props input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+#props input[type='color']::-webkit-color-swatch {
+  border: 0;
+  border-radius: inherit;
+}
+
+#props input[type='color']::-moz-color-swatch {
+  border: 0;
+  border-radius: inherit;
+}
+
+#props input:disabled,
+#props select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A real checkbox drawn as a small toggle with the slash glyph. */
+.prop-row label.none-toggle {
+  flex: none;
+  display: flex;
+}
+
+.none-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border-radius: 7px;
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--none-slash) calc(50% - 1px), var(--none-slash) calc(50% + 1px), transparent calc(50% + 1px))
+    center / 14px 14px no-repeat,
+    var(--control);
+  cursor: pointer;
+  transition: background-color var(--ease), box-shadow var(--ease);
+}
+
+.none-toggle input:checked {
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--none-slash) calc(50% - 1px), var(--none-slash) calc(50% + 1px), transparent calc(50% + 1px))
+    center / 14px 14px no-repeat,
+    var(--accent-soft);
+}
+
+.none-toggle input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* With none on, the well shows the slash instead of a colour. The input is
+   disabled in that state, so keep it at full strength unless the toggle
+   itself is disabled, which means the shape is locked. */
+#props .prop-row:has(.none-toggle input:checked) input[type='color'] {
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--none-slash) calc(50% - 1px), var(--none-slash) calc(50% + 1px), transparent calc(50% + 1px)),
+    var(--panel);
+}
+
+#props .prop-row:has(.none-toggle input:checked) input[type='color']::-webkit-color-swatch {
+  opacity: 0;
+}
+
+#props .prop-row:has(.none-toggle input:checked:not(:disabled)) input[type='color']:disabled {
+  opacity: 1;
+}
+
 /* --- button sets --- */
 
+/* Joined into one track; the active member is a raised chip. */
 .btn-set {
   display: flex;
-  gap: 3px;
+  gap: 0;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--control);
+}
+
+.btn-set button {
+  border-color: transparent;
+  background: transparent;
+  border-radius: 5px;
+}
+
+.btn-set button:hover {
+  background: var(--hover);
+}
+
+.btn-set button.active {
+  border-color: transparent;
+  background: var(--chip);
+  color: var(--fg);
+  box-shadow: var(--shadow-1);
 }
 
 .btn-set button {
@@ -1150,9 +1583,9 @@ main {
   max-height: 320px;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-2);
 }
 
 #font-menu-scope {
@@ -1201,14 +1634,17 @@ input[type='color'] {
 
 #context-menu,
 #slide-context-menu {
+  /* Its buttons are width 100%, which in a shrink-to-fit fixed box resolves
+     against the widest possible line and stretches the menu. */
+  width: max-content;
   position: fixed;
   z-index: 20;
   min-width: 170px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-2);
 }
 
 #context-menu button,
@@ -1237,9 +1673,9 @@ input[type='color'] {
   overflow-y: auto;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-2);
 }
 
 #preset-menu {
@@ -1250,23 +1686,12 @@ input[type='color'] {
   width: min(360px, calc(100vw - 16px));
 }
 
-.popover-heading,
 .code-menu-heading,
 .code-editor-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-}
-
-.popover-heading {
-  margin-bottom: 10px;
-}
-
-.popover-heading span {
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
 }
 
 .background-grid {
@@ -1276,8 +1701,7 @@ input[type='color'] {
   margin-bottom: 10px;
 }
 
-.swatch,
-.background-picker {
+.swatch {
   height: 34px;
   padding: 0;
   border: 1px solid var(--border);
@@ -1287,34 +1711,6 @@ input[type='color'] {
 .swatch.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-.background-picker {
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  cursor: pointer;
-  background: conic-gradient(#e03131, #f08c00, #37b24d, #1c7ed6, #7048e8, #e03131);
-}
-
-.background-picker input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.background-picker span {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  color: #111;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
 }
 
 #btn-bg-all {
@@ -1416,7 +1812,7 @@ input[type='color'] {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-2);
 }
 
 #guidelines-dialog::backdrop,
@@ -1599,7 +1995,7 @@ input[type='color'] {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-2);
 }
 
 .settings-shell {
@@ -1736,7 +2132,7 @@ button.primary {
   padding: 8px 12px;
   border: 0;
   border-top: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--panel-soft);
   color: var(--fg);
   font: 13px/1.5 -apple-system, sans-serif;
   resize: vertical;
@@ -1866,9 +2262,9 @@ button.primary {
   width: min(660px, calc(100vw - 40px));
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg);
-  box-shadow: 0 6px 24px var(--border);
+  box-shadow: var(--shadow-2);
 }
 
 .search-controls { display: flex; align-items: center; gap: 6px; }
@@ -1884,3 +2280,163 @@ button.primary {
   white-space: nowrap;
 }
 #deck-search-results button.active { border-color: var(--accent); }
+
+/* --- inspector header and slide section --- */
+
+.glyph-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#props-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#props-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+#props-actions {
+  display: flex;
+  gap: 2px;
+}
+
+#props-actions button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+
+#props-actions button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+#btn-delete-shape:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#btn-lock-shape[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#btn-lock-shape[aria-pressed='true'] .lock-open,
+#btn-lock-shape[aria-pressed='false'] .lock-closed {
+  display: none;
+}
+
+#props-slide {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#props-slide .prop-row label {
+  font-weight: 600;
+}
+
+/* --- menus ---
+   Every menu shares one panel and one row: the menubar dropdowns, the zoom and
+   Insert menus and the right-click menus. Rows with a glyph column start at
+   the edge; the menubar and zoom rows keep the seat for a checkmark. */
+
+.menu-panel,
+#context-menu,
+#slide-context-menu,
+#zoom-menu,
+#insert-menu {
+  width: max-content;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+}
+
+.menu-panel button,
+#context-menu button,
+#slide-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-panel button {
+  justify-content: space-between;
+  padding-left: 24px;
+}
+
+#insert-menu button,
+#context-menu button,
+#slide-context-menu button {
+  justify-content: flex-start;
+  padding-left: 8px;
+}
+
+.menu-panel button:hover:not(:disabled),
+.menu-panel button:focus-visible,
+#context-menu button:hover:not(:disabled),
+#context-menu button:focus-visible,
+#slide-context-menu button:hover:not(:disabled),
+#slide-context-menu button:focus-visible {
+  background: var(--accent);
+  color: var(--on-accent);
+  outline: none;
+  box-shadow: none;
+}
+
+.menu-panel button:hover:not(:disabled) .accel,
+.menu-panel button:focus-visible .accel {
+  color: inherit;
+}
+
+.menu-panel button:disabled,
+#context-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.menu-panel hr,
+#context-menu hr {
+  margin: 5px 8px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.menu-glyph {
+  display: grid;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+}

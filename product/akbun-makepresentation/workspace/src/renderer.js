@@ -24,6 +24,7 @@ const MENU_COMMANDS = {
   settings: openSettings,
   guidelines: openGuidelinesDialog,
   numbers: toggleNumbers,
+  inspector: toggleInspector,
   'slide-size': openSlideSizeDialog,
   'deck-font': openDeckFontMenu,
   'zoom-in': () => setZoom(L.zoomIn(state.zoom)),
@@ -39,7 +40,9 @@ function runCommand(command) {
 }
 
 function hideMenus() {
-  for (const panel of document.querySelectorAll('.menu-panel')) panel.hidden = true;
+  // Scoped to the menubar: the zoom popover shares the menu-panel look but
+  // lives outside it, and hiding it here closed it on the press that picks an item.
+  for (const panel of $('menubar').querySelectorAll('.menu-panel')) panel.hidden = true;
   for (const title of document.querySelectorAll('.menu-title')) {
     title.setAttribute('aria-expanded', 'false');
   }
@@ -55,6 +58,8 @@ function openMenu(name) {
     .classList.toggle('checked', state.showGuidelines);
   $('menubar').querySelector('[data-command="numbers"]')
     .classList.toggle('checked', state.showNumbers);
+  $('menubar').querySelector('[data-command="inspector"]')
+    .classList.toggle('checked', appSettings.inspectorVisible);
 }
 
 $('menubar').addEventListener('click', (event) => {
@@ -76,7 +81,7 @@ $('menubar').addEventListener('click', (event) => {
 $('menubar').addEventListener('pointerover', (event) => {
   const title = event.target.closest('.menu-title');
   if (!title) return;
-  const anyOpen = [...document.querySelectorAll('.menu-panel')].some((panel) => !panel.hidden);
+  const anyOpen = [...$('menubar').querySelectorAll('.menu-panel')].some((panel) => !panel.hidden);
   if (anyOpen) openMenu(title.dataset.menu);
 });
 
@@ -179,6 +184,8 @@ async function initialize() {
       kind: 'error',
     });
   }
+  applyGlyphs();
+  applyInspectorVisibility();
   setTool('select');
   setZoom(state.zoom);
   renderAll();

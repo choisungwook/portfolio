@@ -119,6 +119,23 @@ async function loadSystemFonts() {
   }
 }
 
+// A separator shows only between two visible items, so hiding a whole group
+// (Group, Save as Preset) never leaves a doubled or dangling line behind.
+function tidySeparators(menu) {
+  let seenItem = false;
+  let pending = null;
+  for (const child of menu.children) {
+    if (child.tagName === 'HR') {
+      child.hidden = true;
+      pending = seenItem ? child : null;
+    } else if (!child.hidden) {
+      if (pending) pending.hidden = false;
+      pending = null;
+      seenItem = true;
+    }
+  }
+}
+
 function showContextMenu(x, y) {
   // Group needs more than one object; ungroup needs one that is in a group.
   // Hiding rather than disabling keeps the menu as short as the moment allows.
@@ -127,11 +144,14 @@ function showContextMenu(x, y) {
     (index) => slide().shapes[index]?.groupId
   );
   const shapes = selectedShapes();
-  $('context-lock').textContent = shapes.every((shape) => shape.locked) ? 'Unlock' : 'Lock';
+  const allLocked = shapes.every((shape) => shape.locked);
+  $('context-lock').querySelector('.menu-label').textContent = allLocked ? 'Unlock' : 'Lock';
+  $('context-lock').querySelector('.menu-glyph').innerHTML = glyphSvg(allLocked ? 'unlock' : 'lock');
   for (const button of contextMenu.querySelectorAll('[data-order], #context-group, #context-ungroup')) {
     button.disabled = shapes.every((shape) => shape.locked);
   }
   $('context-save-preset').hidden = shapes.length !== 1 || shapes[0].kind === 'image';
+  tidySeparators(contextMenu);
   contextMenu.hidden = false;
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
@@ -187,11 +207,12 @@ document.addEventListener('pointerdown', (event) => {
   if (!contextMenu.contains(event.target) && !slideContextMenu.contains(event.target)) {
     hideContextMenu();
   }
-  if (!presetMenu.contains(event.target) && !$('btn-preset').contains(event.target)) hidePresetMenu();
-  if (!backgroundMenu.contains(event.target) && !$('btn-background').contains(event.target)) {
-    hideBackgroundMenu();
-  }
-  if (!codeBlockMenu.contains(event.target) && !$('btn-code-block').contains(event.target)) {
+  if (!presetMenu.contains(event.target) && !$('btn-insert').contains(event.target) && !insertMenu.contains(event.target)) hidePresetMenu();
+  if (!insertMenu.contains(event.target) && !$('btn-insert').contains(event.target)) hideInsertMenu();
+  if (!zoomMenu.contains(event.target) && !$('btn-zoom-level').contains(event.target)) hideZoomMenu();
+  if (!tableMenu.contains(event.target) && !$('btn-table').contains(event.target)) hideTableMenu();
+  if (!shapesMenu.contains(event.target) && !$('btn-shapes').contains(event.target)) hideShapesMenu();
+  if (!codeBlockMenu.contains(event.target) && !$('btn-insert').contains(event.target) && !insertMenu.contains(event.target)) {
     hideCodeBlockMenu();
   }
   if (!fontPicker.contains(event.target)) hideFontMenu();
@@ -307,8 +328,8 @@ contextMenu.addEventListener('click', (event) => {
   reorderSelection(button.dataset.order);
 });
 $('context-save-image').addEventListener('click', saveSelectionAsImage);
-$('context-lock').addEventListener('click', () => {
-  hideContextMenu();
+// Shared by the right-click menu and the inspector header.
+function toggleLockSelection() {
   const shapes = selectedShapes();
   if (!shapes.length) return;
   const locked = !shapes.every((shape) => shape.locked);
@@ -318,6 +339,10 @@ $('context-lock').addEventListener('click', () => {
   markDirty();
   renderAll();
   canvas.focus({ preventScroll: true });
+}
+$('context-lock').addEventListener('click', () => {
+  hideContextMenu();
+  toggleLockSelection();
 });
 $('context-save-preset').addEventListener('click', saveSelectionAsPreset);
 $('context-group').addEventListener('click', () => {

@@ -2,6 +2,10 @@
 
 ## 2026-11-14
 
+* **Creation**: [인스펙터는 선택을 따르고 툴바는 도구만 둔다](decisions/2026-11-inspector-follows-selection.md) 결정 기록.
+* **Update**: [텍스트 상자 높이는 글이 정한다](decisions/2026-09-text-boxes-are-as-tall-as-their-text.md)에 w·e 핸들만 제공하는 변경 반영.
+* **Creation**: [새로 만드는 표는 그룹으로 묶은 셀 도형](decisions/2026-11-created-tables-are-grouped-cell-shapes.md) 결정 기록.
+* **Creation**: [영역 선택은 잠긴 객체를 건너뛰고 드래그 중 실시간으로 반영](decisions/2026-11-area-selection-skips-locked-and-previews-live.md) 결정 기록.
 * **Update**: [문서 프로세스와 프로필 분리](decisions/2026-09-document-process-and-profile-isolation.md)에 setup보다 먼저 오는 Opened 이벤트 처리 추가.
 
 ## 2026-09-28

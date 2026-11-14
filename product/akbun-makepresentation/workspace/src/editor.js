@@ -70,6 +70,7 @@
     distributeShapes: Geometry.distributeShapes,
     snapMove: Geometry.snapMove,
     groupShapes: Geometry.groupShapes,
+    createTableShapes: Geometry.createTableShapes,
     ungroupShapes: Geometry.ungroupShapes,
     groupIndicesFor: Geometry.groupIndicesFor,
     cloneShapes: Shapes.cloneShapes,

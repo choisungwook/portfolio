@@ -7,8 +7,11 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Open each file in a separate app process, with independent settings, undo history and AI conversations. A window that shows no file takes the file being opened instead of spawning a second window
 - Find text and code across all slides with Cmd+F, then jump to the matching object
 - Slides: add, delete, duplicate, switch, reorder by drag or by Cmd+Up/Down, thumbnail panel
-- Per-slide background color from its own panel card, with presets, a custom color and apply-to-all
-- Shapes: rectangle, ellipse, speech bubble, line, arrow, freehand pen
+- Per-slide background color from the Inspector's Slide section (shown when nothing is selected), with presets, a custom color and apply-to-all
+- The Inspector header names the selection and holds Duplicate, Lock/Unlock and Delete; the toolbar holds tools only, plus the Insert menu (image, code block, preset), a zoom menu and an Inspector toggle that is remembered between launches
+- The toolbar shows the open file's name and whether it has unsaved changes
+- Shapes: rectangle, ellipse, speech bubble, line, arrow, freehand pen, from one Shapes popover
+- Table: pick up to 8 columns by 6 rows from the toolbar; the cells are one group of editable rectangles
 - Text boxes with font family, size, color, bold, italic, underline and alignment. A text box is as tall as its wrapped text: resizing sets the width and the height follows
 - Slides → Font for all slides… changes the font family of every text box and every shape text in the deck at once
 - Text written inside a rectangle, ellipse or speech bubble, centered, with the same font controls
@@ -22,7 +25,7 @@ Desktop slide deck editor for the slides actually used in blog posts and talks: 
 - Image borders and interactive crop handles with a shaded outside area
 - Line, arrow and freehand ends chosen per side: none, triangle, open arrow, circle, diamond
 - Rotate any object from the grip above its resize handles, in quarter turns with Shift
-- Zoom from 50% to 400%, from the status bar or the keyboard
+- Zoom from 50% to 400%, from the toolbar zoom menu or the keyboard
 - Slide numbers, toggled from the Slides menu
 - Undo and redo, multi-object selection, cut, copy and paste, duplicate
 - Align selected objects on their left, center, right, top, middle or bottom, and spread three or more evenly across or down
@@ -62,7 +65,10 @@ Cmd on macOS, Ctrl on Windows and Linux.
 | Shift while resizing | Keep the proportions the object already has; line and arrow stay on their original axis |
 | Shift while dragging | Move on one axis only |
 | Shift+click | Add an object to the selection, or drop it out. Over empty space it keeps the selection |
-| Drag on an empty slide | Select touched outlines or filled regions; hollow interiors alone do not select the enclosing shape |
+| Drag on an empty slide | Select touched outlines or filled regions as you drag; hollow interiors alone do not select the enclosing shape. Locked objects are skipped, and the drag can start outside the slide |
+| Alt+drag on an empty slide | Select only objects that lie entirely inside the area |
+| Alt+click | Select the next object underneath in a stack |
+| Tab / Shift+Tab | Select the next / previous object |
 | Cmd+drag | Drag a copy and leave the original in place |
 | Cmd+Shift+drag | Same, with the copy kept on one axis |
 | V R O B L A P T | Select, rectangle, ellipse, speech bubble, line, arrow, pen, text |

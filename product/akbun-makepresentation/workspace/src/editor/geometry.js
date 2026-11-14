@@ -156,13 +156,30 @@ function normalizeRect(x0, y0, x1, y1) {
   };
 }
 
-function shapeIndicesInRect(shapes, rect) {
+// Locked shapes are left out: a locked background sits under everything, so
+// counting it would sweep it into every area. Clicking still selects it.
+// `contain` is the Alt-drag rule: only shapes that lie wholly inside the area,
+// which is how a small object on top of a large one gets picked on its own.
+function shapeIndicesInRect(shapes, rect, options = {}) {
   return shapes.reduce((indices, shape, index) => {
-    const points = shapeOutlinePoints(shape);
-    const closed = BOXY.has(shape.kind);
-    const filled = closed && (shape.fill !== 'none' || ['text', 'image', 'code'].includes(shape.kind));
+    if (shape.locked) return indices;
     const padding = shape.stroke === 'none' ? 0 : Math.max(0, Number(shape.strokeWidth) || 0) / 2;
     const bounds = { x: rect.x - padding, y: rect.y - padding, w: rect.w + padding * 2, h: rect.h + padding * 2 };
+    // Cheap reject before the outline (96 points for an ellipse) is built.
+    const box = visualShapeBBox(shape);
+    if (
+      box.x > bounds.x + bounds.w || box.x + box.w < bounds.x ||
+      box.y > bounds.y + bounds.h || box.y + box.h < bounds.y
+    ) return indices;
+    const points = shapeOutlinePoints(shape);
+    if (options.contain) {
+      if (points.every(([x, y]) => x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h)) {
+        indices.push(index);
+      }
+      return indices;
+    }
+    const closed = BOXY.has(shape.kind);
+    const filled = closed && (shape.fill !== 'none' || ['text', 'image', 'code'].includes(shape.kind));
     const segments = closed ? points.length : points.length - 1;
     const touches = points.some((point, i) => i < segments && segmentTouchesRect(point, points[(i + 1) % points.length], bounds));
     const contains = filled && polygonContainsPoint(points, rect.x + rect.w / 2, rect.y + rect.h / 2);
@@ -310,6 +327,35 @@ function groupShapes(shapes, indices) {
   return id;
 }
 
+// A table is a grid of ordinary grouped rectangles, the same model the pptx
+// importer produces. Edges are rounded from the index rather than accumulated,
+// so neighbouring cells share them exactly and the last one ends on the box.
+// Cells are filled: an unfilled rectangle cannot be pressed in its interior,
+// and the second press is what opens a cell for typing.
+// ponytail: no row/column insert or delete and no whole-table resize; upgrade
+// path is a table shape kind with its own layout.
+function createTableShapes(columns, rows, box, style) {
+  const count = (value, max) => Math.min(max, Math.max(1, Math.round(Number(value)) || 1));
+  const cols = count(columns, 8);
+  const rws = count(rows, 6);
+  const edge = (origin, size, step, steps) => Math.round(origin + size * step / steps);
+  const cells = [];
+  for (let row = 0; row < rws; row++) {
+    for (let col = 0; col < cols; col++) {
+      const left = edge(box.x, box.w, col, cols);
+      const top = edge(box.y, box.h, row, rws);
+      const cell = Shapes.createShape('rect', left, top, {
+        ...style, fill: '#ffffff', stroke: '#868e96', strokeWidth: 1, dash: 'solid',
+      });
+      cell.w = edge(box.x, box.w, col + 1, cols) - left;
+      cell.h = edge(box.y, box.h, row + 1, rws) - top;
+      cells.push(cell);
+    }
+  }
+  groupShapes(cells, cells.map((_, index) => index));
+  return cells;
+}
+
 function ungroupShapes(shapes, indices) {
   const ids = new Set(indices.map((index) => shapes[index] && shapes[index].groupId).filter(Boolean));
   if (ids.size === 0) return false;
@@ -337,6 +383,13 @@ function handlesFor(shape) {
     ];
   }
   const b = shapeBBox(shape);
+  // A text box has no height to drag, so it offers the two width handles only.
+  if (shape.kind === 'text') {
+    return [
+      { id: 'w', x: b.x, y: b.y + b.h / 2 },
+      { id: 'e', x: b.x + b.w, y: b.y + b.h / 2 },
+    ];
+  }
   return [
     { id: 'nw', x: b.x, y: b.y },
     { id: 'ne', x: b.x + b.w, y: b.y },
@@ -517,8 +570,9 @@ function resizeShape(shape, from, handle, dx, dy) {
     return;
   }
 
-  // A text box has no height of its own to drag: only the width handles do
-  // anything, and the height is refitted to the wrapped text afterwards.
+  // A text box has no height of its own to drag: only the width handles are
+  // offered, and the height is refitted to the wrapped text afterwards. The
+  // side filter also keeps a stray corner handle from touching the height.
   const sides = shape.kind === 'text' ? handle.replace(/[ns]/g, '') : handle;
   if (!sides) return;
 
@@ -568,6 +622,11 @@ function resizeShapeConstrained(shape, from, handle, dx, dy) {
   if (shape.locked) return;
   if (shape.kind === 'line' || shape.kind === 'arrow') {
     resizeLineOnAxis(shape, from, handle, dx, dy);
+    return;
+  }
+  // Shift has nothing to keep proportional on a box that only has a width.
+  if (shape.kind === 'text') {
+    resizeShape(shape, from, handle, dx, dy);
     return;
   }
   resizeProportional(shape, from, handle, dx, dy);
@@ -641,6 +700,7 @@ function rotatedBBox(box, degrees) {
     distributeShapes,
     snapMove,
     groupShapes,
+    createTableShapes,
     ungroupShapes,
     groupIndicesFor,
     handlesFor,
