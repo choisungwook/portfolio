@@ -277,7 +277,7 @@ canvas.addEventListener('pointermove', (event) => {
     for (const item of drag.items) L.moveShape(slide().shapes[item.index], snapped.dx, snapped.dy);
     drag.moved = drag.moved || mx !== 0 || my !== 0;
   }
-  renderCanvas();
+  scheduleCanvasRender();
 });
 
 canvas.addEventListener('pointerup', () => {

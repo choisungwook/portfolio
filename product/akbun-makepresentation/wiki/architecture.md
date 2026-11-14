@@ -169,13 +169,17 @@ See [the AI integration ADR](../adr/2026-08-codex-app-server-ai.md).
 
 Editing runs in a textarea laid over the slide, styled to match the glyphs it hides. Two things about it are load-bearing.
 
-The press that opens it is detected in `pointerdown` — two presses on the same shape within 400 ms — and not from a `dblclick` event. The browser never reports one here: `pointerup` redraws the canvas from the model, so `mouseup` lands on a freshly built element rather than the one that took `mousedown`, and a click needs both. Relying on `dblclick` meant text boxes could not be reopened at all.
+The press that opens it is detected in `pointerdown` — two presses on the same shape within 400 ms — and not from a `dblclick` event. The browser never reports one here: `pointerup` redraws the canvas from the model, so `mouseup` could land on a different element than the one that took `mousedown`, and a click needs both. Shape groups now persist across renders, but handlers still must not depend on that. Relying on `dblclick` meant text boxes could not be reopened at all.
 
 That press also calls `preventDefault`, which is what keeps the focus the overlay is about to take. Without it the press hands focus back to the page, and then every keystroke reaches the global shortcuts: Backspace deletes the box being typed into, letters switch tools. The document handler carries the same rule as a backstop — while `editingIndex` is set, the keyboard belongs to the overlay — and `commitTextEdit` tolerates a shape that is already gone, since reading through it took the whole page down.
 
 ## Rendering rule
 
-Every mutation goes through the model and the page redraws from it (`renderAll`). Nothing merges partial updates into the DOM, so the canvas, thumbnails and property panel can never drift apart.
+Every mutation goes through the model and the page redraws from it (`renderAll`). The redraw is a patch, not a rebuild, but the model stays the only source: each piece of DOM is a pure function of the model, so the canvas, thumbnails and property panel can never drift apart ([decision](../knowledge/decisions/2026-11-canvas-patches-only-changed-shapes.md)).
+
+`#canvas` holds three persistent groups that `renderCanvas` creates on first use and recreates if anything wiped them: `#layer-under` (halos of selected lines, which must sit under the shapes), `#layer-shapes` (one `g[data-i]` per shape, array order is z order) and `#layer-over` (slide number, guidelines, snap guides, crop overlay, selection boxes and handles, comment badges, marquee). The two overlay layers are rewritten only when their markup string changed. A shape's `g` is rewritten only when its key changed, where the key is the shape's JSON with an image `src` summarised as length plus its first and last 32 characters, plus `hideText` and the on-screen scale the hit and hover outlines depend on. Selection and lock are not part of that markup: `sel` and `data-locked` are toggled on the existing `g` on every render, so changing the selection never re-parses a bitmap.
+
+Pointer moves update the model synchronously but call `scheduleCanvasRender`, which draws at most once per animation frame; `renderCanvas` cancels a pending frame, so `pointerup` and every direct call still render synchronously. Thumbnails follow the same rule: `renderThumbs` keeps the `.thumb` elements by position and re-assigns a thumbnail's svg only when that slide's key changed, while the active and selected classes are refreshed every time.
 
 ## Undo history
 

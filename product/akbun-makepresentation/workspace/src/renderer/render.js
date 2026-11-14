@@ -323,6 +323,10 @@ function guidelinesSvg() {
 }
 
 function renderCanvas() {
+  if (canvasFrame) {
+    cancelAnimationFrame(canvasFrame);
+    canvasFrame = 0;
+  }
   const { width, height } = deckSize();
   canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
   stageInner.style.setProperty('--slide-ratio', String(width / height));
@@ -333,14 +337,8 @@ function renderCanvas() {
   // The hover ring is hidden by css for dragging, and skipped for selected
   // shapes, which already carry the halo.
   canvas.toggleAttribute('data-dragging', !!state.drag);
-  const shapes = slide()
-    .shapes.map(
-      (shape, i) =>
-        `<g data-i="${i}"${state.selection.includes(i) ? ' class="sel"' : ''}${shape.locked ? ' data-locked' : ''}>${L.renderShapeSvg(shape, {
-          hideText: i === state.editingIndex,
-        })}${outlineSvg(shape, 'hit')}${outlineSvg(shape, 'hover')}</g>`
-    )
-    .join('');
+  ensureCanvasLayers();
+  patchShapeLayer();
   const showHandles = state.selection.length === 1 && state.editingIndex < 0;
   const selected = state.selection.map((index) => slide().shapes[index]).filter(Boolean);
   // Only lines get a glow: they have no box to show the selection. It draws
@@ -356,9 +354,9 @@ function renderCanvas() {
     : '';
   const selections = groupBox + selected.map((shape) => selectionSvg(shape, showHandles)).join('');
   const cropOverlay = state.cropping ? cropOverlaySvg() : '';
-  canvas.innerHTML =
-    halos +
-    shapes +
+  setLayerMarkup('under', halos);
+  setLayerMarkup(
+    'over',
     slideNumberSvg(state.current) +
     guidelinesSvg() +
     snapGuideSvg() +
@@ -367,8 +365,92 @@ function renderCanvas() {
     // Badges draw above the selection box and handles, so one is always
     // reachable, and outside g[data-i] so they never take part in selection.
     commentBadgesSvg() +
-    marqueeSvg();
+    marqueeSvg()
+  );
   syncCommentPopover();
+}
+
+// --- canvas layers ---------------------------------------------------------------
+//
+// #canvas holds three persistent groups: halos under the shapes, one g[data-i]
+// per shape, and everything else over them. Rebuilding the whole svg on every
+// pointermove made the browser re-parse and re-decode every image data URI
+// even when only a selection box moved, so each layer is only touched when its
+// own markup changed.
+const canvasLayers = { under: null, shapes: null, over: null };
+const lastLayerMarkup = { under: '', over: '' };
+let shapeKeys = [];
+
+// Created lazily because anything that wipes #canvas must not leave the next
+// render writing into detached groups.
+function ensureCanvasLayers() {
+  const names = ['under', 'shapes', 'over'];
+  if (names.every((name) => canvasLayers[name]?.parentNode === canvas)) return;
+  canvas.replaceChildren();
+  for (const name of names) {
+    const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    layer.id = `layer-${name}`;
+    canvas.appendChild(layer);
+    canvasLayers[name] = layer;
+  }
+  lastLayerMarkup.under = lastLayerMarkup.over = '';
+  shapeKeys = [];
+}
+
+function setLayerMarkup(name, markup) {
+  if (markup === lastLayerMarkup[name]) return;
+  lastLayerMarkup[name] = markup;
+  canvasLayers[name].innerHTML = markup;
+}
+
+// ponytail: the key assumes two different images never share their length and
+// both 32-char ends. Upgrade path: hash `src` once when the image is inserted.
+function shapeKey(shape, hideText, scale) {
+  return JSON.stringify(shape, (name, value) =>
+    name === 'src' && typeof value === 'string' && value.length > 96
+      ? `${value.length}:${value.slice(0, 32)}:${value.slice(-32)}`
+      : value) + (hideText ? '|hide|' : '|show|') + scale;
+}
+
+// A shape's markup depends only on the shape, hideText for the shape being
+// text-edited, and the on-screen scale of its hit/hover outlines. Selection and
+// lock are not baked in: they are toggled on the persistent g below, so a
+// selection change never re-parses a shape.
+function patchShapeLayer() {
+  const layer = canvasLayers.shapes;
+  const shapes = slide().shapes;
+  const scale = canvas.getBoundingClientRect().width / deckSize().width || 1;
+  const keys = shapes.map((shape, i) => shapeKey(shape, i === state.editingIndex, scale));
+  const markup = (shape, i) =>
+    L.renderShapeSvg(shape, { hideText: i === state.editingIndex }) + outlineSvg(shape, 'hit') + outlineSvg(shape, 'hover');
+  if (layer.children.length !== shapes.length) {
+    layer.innerHTML = shapes.map((shape, i) => `<g data-i="${i}">${markup(shape, i)}</g>`).join('');
+    shapeKeys = keys;
+  } else {
+    keys.forEach((key, i) => {
+      if (key === shapeKeys[i]) return;
+      layer.children[i].innerHTML = markup(shapes[i], i);
+      shapeKeys[i] = key;
+    });
+  }
+  const selected = new Set(state.selection);
+  shapes.forEach((shape, i) => {
+    layer.children[i].classList.toggle('sel', selected.has(i));
+    layer.children[i].toggleAttribute('data-locked', !!shape.locked);
+  });
+}
+
+// Pointer moves update the model synchronously but draw at most once per
+// frame; every other caller renders directly, so a pending frame is dropped
+// there because that render already shows the current model.
+let canvasFrame = 0;
+function scheduleCanvasRender() {
+  if (typeof requestAnimationFrame !== 'function') return renderCanvas();
+  if (canvasFrame) return;
+  canvasFrame = requestAnimationFrame(() => {
+    canvasFrame = 0;
+    renderCanvas();
+  });
 }
 
 // Handle size follows the on-screen scale, so a resize of the window or the
@@ -407,23 +489,40 @@ function cropOverlaySvg() {
   );
 }
 
+// Last svg key per thumb, same summarised-src key as the shape layer.
+let thumbKeys = [];
+
 function renderThumbs() {
   const thumbs = $('thumbs');
   const { width, height } = deckSize();
   // The panel takes focus so Backspace can mean "delete this slide" there and
   // keep meaning "delete this object" on the canvas.
   const focused = document.activeElement && thumbs.contains(document.activeElement);
-  thumbs.innerHTML = state.deck.slides
-    .map(
-      (s, i) =>
-        `<div class="thumb${i === state.current ? ' active' : ''}${state.slideSelection.includes(i) ? ' selected' : ''}" data-slide="${i}" draggable="true" tabindex="${i === state.current ? '0' : '-1'}">` +
-        `${L.renderSlideSvg(s, { width, height, number: state.showNumbers ? i + 1 : 0 })}` +
-        `<span class="num">${i + 1}</span></div>`
-    )
-    .join('');
-  // innerHTML threw away the element that had focus, so hand it back to the
-  // thumb that replaced it. Without this a Cmd+Arrow reorder moves focus to
-  // the body and the next press does nothing.
+  const slides = state.deck.slides;
+  // Thumb elements are kept by position. Only the svg is re-parsed, and only
+  // when this slide's key changed: every image data URI on the slide is
+  // otherwise decoded again on each renderAll.
+  while (thumbs.children.length > slides.length) thumbs.lastElementChild.remove();
+  while (thumbs.children.length < slides.length) {
+    const i = thumbs.children.length;
+    thumbs.insertAdjacentHTML('beforeend', `<div class="thumb" data-slide="${i}" draggable="true"><span class="num">${i + 1}</span></div>`);
+    thumbKeys[i] = '';
+  }
+  thumbKeys.length = slides.length;
+  slides.forEach((s, i) => {
+    const thumb = thumbs.children[i];
+    thumb.className = `thumb${i === state.current ? ' active' : ''}${state.slideSelection.includes(i) ? ' selected' : ''}`;
+    thumb.tabIndex = i === state.current ? 0 : -1;
+    const number = state.showNumbers ? i + 1 : 0;
+    const key = shapeKey(s, false, `${width}x${height}|${number}`);
+    if (key === thumbKeys[i]) return;
+    thumbKeys[i] = key;
+    thumb.querySelector('svg')?.remove();
+    thumb.insertAdjacentHTML('afterbegin', L.renderSlideSvg(s, { width, height, number }));
+  });
+  // The thumb that had focus may now stand for another slide after a reorder,
+  // so hand focus to the current one. Without this a Cmd+Arrow reorder moves
+  // focus to the body and the next press does nothing.
   if (focused) thumbs.querySelector(`[data-slide="${state.current}"]`)?.focus();
 }
 
