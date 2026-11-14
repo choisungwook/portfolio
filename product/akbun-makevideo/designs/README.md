@@ -65,6 +65,7 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 - 메뉴와 context menu: 행 높이 28px, hover와 keyboard focus 행은 `--accent` 배경에 `--on-accent` 글자, 묶음 사이 구분선.
 - Global Action Bar: 열린 패널의 버튼은 `--accent-soft` 배경에 `--accent` 글자. Assets와 Source 토글은 둘 다 기본으로 켜져 있어 켜짐을 `--control` 채움으로, 꺼짐을 `--muted` 글자로만 표시한다.
 - Panel head: 12px 굵은 `--muted` 제목. 아래 테두리 없음.
+- Monitor transport: Source Monitor와 Program Monitor의 재생 버튼과 timecode는 같은 높이의 한 줄에 둔다. Program Monitor는 아래 줄에 둘 control이 없으므로 transport가 두 줄 높이를 차지하되 내용은 첫 줄에 붙인다. Preview quality는 글자 라벨 대신 아이콘을 쓰고 같은 줄 오른쪽 끝에 둔다.
 - Timeline toolbar: `--stage` 띠 위에 높이가 같은 `--panel` capsule을 10px 간격으로 둔다. 좁은 창에서 줄이 바뀌어도 Zoom은 오른쪽 끝에 둔다. 묶음은 편집 도구(split, snap, delete, ripple delete) / clip(Link Clips, + Text) / track(+ Video, + Audio, + Subtitle) / 자막(Import SRT, Export SRT) / 오른쪽 끝 Zoom. capsule 안 버튼은 투명하고 hover에서 `--hover`.
 - 분할 control(`.segmented`, Panel Tab Bar, AI section tab, AI workflow step): `--control` 바탕에 선택 칸만 `--chip` 배경과 `--shadow-1`.
 - Sheet: 테두리 없이 `--shadow-2`. dark에서는 배경과 겹치지 않도록 1px `--border`를 남긴다.
