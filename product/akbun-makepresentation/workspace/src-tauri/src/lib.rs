@@ -60,6 +60,26 @@ fn install_menu(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+// Polls the file's path rather than watching it: other programs replace the
+// inode on write, which an open-file watcher would lose track of.
+fn watch_document(app: tauri::AppHandle) {
+    use makepresentation_desktop::{fingerprint, Tracker};
+    use std::sync::Mutex;
+    use tauri::{Emitter, Manager};
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let changed = {
+            let state = app.state::<Mutex<Tracker>>();
+            let Ok(mut tracker) = state.lock() else { return };
+            let disk = tracker.path().and_then(fingerprint);
+            tracker.poll(disk)
+        };
+        if changed {
+            let _ = app.emit_to("main", "document-changed-on-disk", ());
+        }
+    });
+}
+
 pub fn run() {
     let mut builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
@@ -77,6 +97,7 @@ pub fn run() {
 
             documents::setup(app)?;
             ai::setup(app)?;
+            watch_document(app.handle().clone());
 
             // The window is the whole app, so the webview console is where
             // almost every bug shows up first. Debug builds only.
@@ -110,6 +131,7 @@ pub fn run() {
             commands::open_deck,
             commands::read_image_file,
             commands::save_deck,
+            commands::acknowledge_disk_change,
             commands::export_pdf,
             commands::save_png,
             commands::list_system_fonts,
@@ -125,6 +147,7 @@ pub fn run() {
             }
         })
         .manage(ai::AiRuntime::default())
+        .manage(std::sync::Mutex::<makepresentation_desktop::Tracker>::default())
         .manage(std::sync::Mutex::<documents::InitialDocument>::default())
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

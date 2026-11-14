@@ -33,6 +33,22 @@ function restore(deck) {
   renderAll();
 }
 
+// A deck another program wrote becomes one undo step, so Undo brings back
+// what the user had.
+function adoptExternalDeck(deck) {
+  invalidateDeckSearch();
+  history.past.push(committed);
+  if (history.past.length > HISTORY_LIMIT) history.past.shift();
+  history.future.length = 0;
+  committed = structuredClone(deck);
+  state.deck = deck;
+  state.current = Math.min(state.current, state.deck.slides.length - 1);
+  setSlideSelection([state.current]);
+  clearSelection();
+  state.dirty = false;
+  renderAll();
+}
+
 function undo() {
   if (history.past.length === 0) return;
   history.future.push(committed);

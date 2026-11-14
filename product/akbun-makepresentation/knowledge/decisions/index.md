@@ -2,6 +2,7 @@
 
 akbun-makepresentation 작업 중 내린 의사결정과 이유.
 
+* [저장은 디스크 fingerprint가 그대로일 때만 쓴다](2026-11-saves-are-conditional-on-the-disk-fingerprint.md)
 * [화면 색은 inline style 속성이 아니라 CSSOM으로 칠한다](2026-11-ui-colors-go-through-cssom.md)
 * [열린 덱은 경계에서 검증](2026-11-opened-decks-are-validated-at-the-boundary.md)
 * [캔버스는 바뀐 도형만 고쳐 그리고 이동 중에는 프레임당 한 번 그림](2026-11-canvas-patches-only-changed-shapes.md)

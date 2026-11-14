@@ -83,6 +83,71 @@ async function loadDocument(path) {
   renderAll();
 }
 
+// --- external changes ------------------------------------------------------------------------
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const pageBusy = () => state.drag || state.editingIndex >= 0;
+let syncing = false;
+let syncAgain = false;
+
+// One run at a time; an event that arrives during a run reruns it once after.
+async function syncFromDisk() {
+  if (syncing) { syncAgain = true; return false; }
+  syncing = true;
+  let kept = false;
+  try {
+    do {
+      syncAgain = false;
+      kept = await syncOnce();
+    } while (syncAgain);
+    return kept;
+  } finally {
+    syncing = false;
+  }
+}
+
+async function syncOnce() {
+  const path = state.filePath;
+  if (!path) return false;
+  for (;;) {
+    while (pageBusy()) await sleep(500);
+    const wasDirty = state.dirty;
+    if (wasDirty && !(await window.api.ask(
+      'Another program changed this file. Loading it replaces what you see now; ' +
+      'your edits stay available through Undo.\n\nLoad the changed file?',
+      { title: 'File changed on disk', kind: 'warning' }
+    ))) {
+      await window.api.acknowledgeDiskChange();
+      return true;
+    }
+    let deck = null;
+    for (let attempt = 0; attempt < 4 && !deck; attempt++) {
+      if (attempt) await sleep(1000);
+      try {
+        deck = fitOpenedTextBoxes(L.sanitizeDeck(await window.api.openDeck(path)));
+      } catch (_) {}
+    }
+    // The fingerprint stays mismatched, so the next save asks.
+    if (!deck && wasDirty) {
+      await window.api.message('The changed file could not be read. Your version is kept.',
+        { title: 'Cannot load file', kind: 'error' });
+    }
+    if (!deck || state.filePath !== path) return false;
+    if (pageBusy() || (!wasDirty && state.dirty)) continue;
+    if (JSON.stringify(deck) === JSON.stringify(state.deck)) {
+      state.dirty = false;
+      updateTitle();
+    } else {
+      adoptExternalDeck(deck);
+      if (state.presenting) {
+        state.presentIndex = Math.min(state.presentIndex, state.deck.slides.length - 1);
+        renderPresent();
+      }
+    }
+    return false;
+  }
+}
+
 function suggestName(extension) {
   if (!state.filePath) return `deck.${extension}`;
   const base = state.filePath.split('/').pop().split('\\').pop();
@@ -139,7 +204,14 @@ async function saveFile(alwaysAsk) {
     if (!path) return;
   }
   try {
-    await window.api.saveDeck(path, deckForSave());
+    if (!(await window.api.saveDeck(path, deckForSave()))) {
+      // Another program rewrote the file; nothing was written. The one
+      // conflict path decides what happens to the two versions.
+      state.dirty = true;
+      updateTitle();
+      // Keeping the local version (declined load) means the save goes through.
+      if (!(await syncFromDisk()) || !(await window.api.saveDeck(path, deckForSave()))) return;
+    }
     state.filePath = path;
     state.dirty = false;
     updateTitle();

@@ -5,11 +5,13 @@ use base64::Engine;
 use makepresentation_deck::{pdf, pptx, Deck};
 use serde::Deserialize;
 use serde_json::Value;
+use makepresentation_desktop::{fingerprint, write_atomic, Tracker};
 use std::collections::BTreeSet;
 use std::fs::{create_dir_all, read_to_string, File};
 use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
-use tauri::AppHandle;
+use std::sync::Mutex;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub fn list_system_fonts() -> Vec<String> {
@@ -24,9 +26,26 @@ pub fn list_system_fonts() -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn open_deck(path: String) -> Result<Deck, String> {
+pub fn open_deck(tracker: State<Mutex<Tracker>>, path: String) -> Result<Deck, String> {
+    // Taken before reading: a write that lands during the read then shows up as a change.
+    let disk = fingerprint(std::path::Path::new(&path));
     let file = File::open(&path).map_err(|e| format!("cannot open {path}: {e}"))?;
-    pptx::read(file)
+    let deck = pptx::read(file)?;
+    tracker
+        .lock()
+        .map_err(|e| e.to_string())?
+        .synced_to(std::path::Path::new(&path), disk);
+    Ok(deck)
+}
+
+/// "Keep my version": the next save overwrites whatever is on disk now.
+#[tauri::command]
+pub fn acknowledge_disk_change(tracker: State<Mutex<Tracker>>) -> Result<(), String> {
+    let mut tracker = tracker.lock().map_err(|e| e.to_string())?;
+    if let Some(path) = tracker.path().map(PathBuf::from) {
+        tracker.synced_to(&path, fingerprint(&path));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -60,10 +79,22 @@ pub fn read_image_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn save_deck(app: AppHandle, path: String, deck: Deck) -> Result<(), String> {
-    let file = File::create(&path).map_err(|e| format!("cannot write {path}: {e}"))?;
-    pptx::write(&deck, BufWriter::new(file))?;
-    crate::documents::remember_saved_document(&app, std::path::Path::new(&path))
+pub fn save_deck(
+    app: AppHandle,
+    tracker: State<Mutex<Tracker>>,
+    path: String,
+    deck: Deck,
+) -> Result<bool, String> {
+    let target = std::path::Path::new(&path);
+    // Held through the write so the poller never sees our own file as a change.
+    let mut tracker = tracker.lock().map_err(|e| e.to_string())?;
+    if tracker.conflicts(target, fingerprint(target)) {
+        return Ok(false);
+    }
+    let written = write_atomic(target, |file| pptx::write(&deck, BufWriter::new(file)))?;
+    tracker.synced_to(target, written);
+    crate::documents::remember_saved_document(&app, target)?;
+    Ok(true)
 }
 
 #[derive(Deserialize)]
