@@ -10,6 +10,7 @@ Claude desktop의 내장 브라우저, Claude in Chrome(Claude CLI `--chrome`), 
 | 1 | [1-cdp-principle.md](docs/1-cdp-principle.md) | 기능 지도, CDP의 구조, Chrome 136 보안 변경, raw CDP 8개 명령으로 이동·클릭·읽기·캡처 |
 | 2 | [2-ai-tool-access-paths.md](docs/2-ai-tool-access-paths.md) | `webContents.debugger`, `chrome.debugger` + Native Messaging, Aside의 Playwright 스타일 래퍼 |
 | 3 | [3-playwright-vs-cdp.md](docs/3-playwright-vs-cdp.md) | `connect_over_cdp`, 같은 작업의 CDP 명령 36개, 클릭 한 번의 분해 |
+| 4 | [4-blog-upload-scenario.md](docs/4-blog-upload-scenario.md) | (이론) 블로그 편집기에 글과 사진을 넣는 원리, OS 파일 선택창을 우회하는 CDP 가로채기·`File` 생성·drop 세 방법 |
 | - | [troubleshooting.md](docs/troubleshooting.md) | 실습 중 겪은 문제 |
 
 ## 코드

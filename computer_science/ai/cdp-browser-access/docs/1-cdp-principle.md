@@ -46,6 +46,7 @@ flowchart LR
 | CDP 자체의 동작 원리 | `--remote-debugging-port` + raw WebSocket | 1 (이 문서) |
 | AI 제품별 CDP 전달 경로 | Chrome 확장 manifest, Native Messaging 설정, Claude.app 번들 | [2](2-ai-tool-access-paths.md) |
 | CDP 위에 올라간 자동화 라이브러리 | Playwright `connect_over_cdp` | [3](3-playwright-vs-cdp.md) |
+| CDP로 블로그 글과 사진 업로드(이론) | `Page.setInterceptFileChooserDialog`, `DOM.setFileInputFiles`, 페이지 안 `DataTransfer` | [4](4-blog-upload-scenario.md) |
 
 ## CDP가 무엇인가
 
