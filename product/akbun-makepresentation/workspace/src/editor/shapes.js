@@ -11,6 +11,7 @@
     ARROW_ENDS,
     CODE_FORMATS,
     CODE_LANGUAGES,
+    DEFAULT_BACKGROUND,
     DEFAULT_IMAGE_STYLE,
     DEFAULT_STYLE,
     MAX_CLIPBOARD_SHAPES,
@@ -80,6 +81,35 @@ function safeColor(value, fallback) {
   return /^(none|#[0-9a-f]{3}|#[0-9a-f]{4}|#[0-9a-f]{6}|#[0-9a-f]{8})$/i.test(color)
     ? color
     : fallback;
+}
+
+// The SVG builders put these strings into attributes unescaped, so a deck that
+// comes from outside the page (an opened file) is cleaned here instead of
+// relying on the CSP alone. A bad value falls back to the field's default.
+const ENUM_FIELDS = {
+  dash: ['solid', 'dash', 'dot'],
+  textAlign: ['left', 'center', 'right'],
+  verticalAlign: ['top', 'center', 'bottom'],
+  arrowStart: ARROW_ENDS,
+  arrowEnd: ARROW_ENDS,
+};
+
+function sanitizeShape(shape) {
+  shape.stroke = safeColor(shape.stroke, ['image', 'text'].includes(shape.kind) ? 'none' : DEFAULT_STYLE.stroke);
+  shape.fill = safeColor(shape.fill, DEFAULT_STYLE.fill);
+  shape.textColor = safeColor(shape.textColor, DEFAULT_STYLE.textColor);
+  for (const [name, allowed] of Object.entries(ENUM_FIELDS)) {
+    if (!allowed.includes(shape[name])) shape[name] = name.startsWith('arrow') ? 'none' : DEFAULT_STYLE[name];
+  }
+  return shape;
+}
+
+function sanitizeDeck(deck) {
+  for (const slide of deck.slides) {
+    slide.background = safeColor(slide.background, DEFAULT_BACKGROUND);
+    slide.shapes.forEach(sanitizeShape);
+  }
+  return deck;
 }
 
 function normalizeLineNumbers(value) {
@@ -268,6 +298,8 @@ function setCrop(shape, side, fraction) {
 
   return {
     createShape,
+    sanitizeShape,
+    sanitizeDeck,
     normalizeLineNumbers,
     parseClipboardShapes,
     cloneShapes,

@@ -15,7 +15,7 @@ use shapes::parse_master_text_styles;
 pub(super) use shapes::parse_part;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
-use xml::{attr, in_ctx, mod_color};
+use xml::{attr, hex_color, in_ctx, mod_color};
 
 pub fn read<R: Read + Seek>(input: R) -> Result<Deck, String> {
     let mut archive = zip::ZipArchive::new(input).map_err(|e| e.to_string())?;
@@ -307,7 +307,7 @@ fn scheme_hex(
     name: &str,
 ) -> Option<String> {
     let slot = clr_map.get(name).map(String::as_str).unwrap_or(name);
-    scheme.get(slot).map(|hex| format!("#{}", hex.to_lowercase()))
+    scheme.get(slot).and_then(|hex| hex_color(hex))
 }
 
 /// The background a slide, layout or master declares. Embedded pictures are
@@ -332,7 +332,7 @@ pub(super) fn parse_background(
                     match local.as_str() {
                         "blip" => image_id = attr(e, b"embed"),
                         "srgbClr" if color.is_none() => {
-                            color = attr(e, b"val").map(|v| format!("#{}", v.to_lowercase()));
+                            color = attr(e, b"val").and_then(|v| hex_color(&v));
                         }
                         "schemeClr" if color.is_none() => {
                             color = attr(e, b"val").and_then(|v| ctx.scheme_hex(&v));
@@ -445,12 +445,16 @@ fn parse_scheme(xml: &str) -> HashMap<String, String> {
                         current = Some(local)
                     }
                     "srgbClr" => {
-                        if let (Some(name), Some(val)) = (&current, attr(e, b"val")) {
+                        if let (Some(name), Some(val)) =
+                            (&current, attr(e, b"val").filter(|v| hex_color(v).is_some()))
+                        {
                             map.insert(name.clone(), val.to_ascii_uppercase());
                         }
                     }
                     "sysClr" => {
-                        if let (Some(name), Some(val)) = (&current, attr(e, b"lastClr")) {
+                        if let (Some(name), Some(val)) =
+                            (&current, attr(e, b"lastClr").filter(|v| hex_color(v).is_some()))
+                        {
                             map.insert(name.clone(), val.to_ascii_uppercase());
                         }
                     }

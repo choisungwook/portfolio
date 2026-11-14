@@ -758,3 +758,26 @@ fn a_malformed_comments_part_does_not_fail_the_open() {
     assert_eq!(back.slides[0].shapes.len(), 1);
     assert_eq!(back.slides[0].shapes[0].comment, "");
 }
+
+/// A colour attribute that is not six hex digits reads as a missing colour,
+/// so nothing but `#rrggbb` ever reaches the page's SVG attributes.
+#[test]
+fn non_hex_colours_read_as_missing() {
+    let xml = "<p:sld xmlns:p=\"p\" xmlns:a=\"a\"><p:cSld><p:spTree>\
+<p:sp><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"952500\" cy=\"952500\"/></a:xfrm>\
+<a:prstGeom prst=\"rect\"/>\
+<a:solidFill><a:srgbClr val='000000\" onmouseover=\"x'/></a:solidFill>\
+<a:ln w=\"9525\"><a:solidFill><a:srgbClr val=\"AbCdEf\"/></a:solidFill></a:ln></p:spPr>\
+<p:txBody><a:p><a:r><a:rPr><a:solidFill><a:srgbClr val='<b> c'/></a:solidFill></a:rPr><a:t>x</a:t></a:r></a:p></p:txBody></p:sp>\
+</p:spTree></p:cSld></p:sld>";
+    let empty = HashMap::new();
+    let rels = HashMap::new();
+    let defaults = HashMap::new();
+    let ctx = SlideCtx { scheme: &empty, clr_map: &empty, rels: &rels, defaults: &defaults };
+    let shapes = parse_part(xml, &ctx, true).unwrap().visible;
+    assert_eq!(shapes.len(), 1);
+    assert_eq!(shapes[0].stroke, "#abcdef");
+    for color in [&shapes[0].fill, &shapes[0].stroke, &shapes[0].text_color] {
+        assert!(!color.contains(['"', '<', '>', ' ']), "{color}");
+    }
+}

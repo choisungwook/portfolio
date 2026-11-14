@@ -1306,3 +1306,25 @@ test('dragging a text box width handle never scales the font, with or without Sh
   L.resizeShape(shape, from, 'e', -1000, 0);
   assert.strictEqual(shape.w, 8);
 });
+
+test('sanitizeDeck replaces payload colours and keeps valid forms', () => {
+  const payload = '#000" onmouseover="x';
+  const shape = L.createShape('rect', 0, 0, { stroke: payload, fill: payload, textColor: payload });
+  shape.text = 'hi';
+  shape.dash = 'x" y="z';
+  const deck = { slides: [{ background: payload, shapes: [shape] }] };
+  L.sanitizeDeck(deck);
+  assert.strictEqual(deck.slides[0].background, L.DEFAULT_BACKGROUND);
+  assert.strictEqual(shape.stroke, L.DEFAULT_STYLE.stroke);
+  assert.strictEqual(shape.fill, 'none');
+  assert.strictEqual(shape.textColor, L.DEFAULT_STYLE.textColor);
+  assert.strictEqual(shape.dash, 'solid');
+  const markup = L.renderShapeSvg(shape) + L.renderSlideSvg(deck.slides[0]);
+  assert.ok(!markup.includes('onmouseover'));
+
+  for (const color of ['none', '#abc', '#aabbcc', '#aabbccdd']) {
+    const kept = L.sanitizeShape(L.createShape('rect', 0, 0, { fill: color, stroke: color }));
+    assert.strictEqual(kept.fill, color);
+    assert.strictEqual(kept.stroke, color);
+  }
+});
