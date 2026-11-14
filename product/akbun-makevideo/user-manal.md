@@ -15,7 +15,7 @@
 | 컷 편집 | 이동·트림·분할·삭제·Ripple Delete·스냅·영상/음성 연결 | Timeline, Edit |
 | 트랙 | 영상·오디오·자막 트랙 추가, 숨김·음소거 | Timeline |
 | 재생 | 프레임 이동·편집점 이동·전체 화면·미리보기 품질 | Program Monitor, Playback |
-| 음성 | 볼륨·속도·피치 유지·잡음 제거·페이드·볼륨 키프레임 | Inspector → Audio |
+| 음성 | 볼륨·속도·피치 유지·잡음 제거·페이드·볼륨 키프레임 | Inspector → Audio (audio clip은 바로 표시) |
 | 제목·도형 | 텍스트, 사각형·타원·선/화살표·다각형·별 등 | + Text, Shape, Inspector |
 | 레이어 | 위치·크기·회전·불투명도, 키프레임, 블렌드 | Inspector |
 | 그래픽 스타일 | 색·그라데이션·미디어 채우기·외곽선·그림자 | Inspector의 Text / Shape |
@@ -80,7 +80,7 @@
 - 이미 자막 파일이 있으면 Import SRT 사용
 - 음성 전사가 필요하면 AI → Captions에서 소스·제공자·언어 설정 후 Generate captions
 - 전사 결과의 고유명사·숫자·타이밍은 직접 확인
-- 잡음 제거: 클립 선택 후 Inspector → Audio의 Reduce noise와 Strength. 미리보기와 출력에 같은 ffmpeg 필터 적용, 모델 불필요
+- 잡음 제거: 클립 선택 후 Inspector의 Audio(audio clip은 바로 표시)의 Reduce noise와 Strength. 미리보기와 출력에 같은 ffmpeg 필터 적용, 모델 불필요
 - 군더더기 말 제거: AI → Captions의 Find fillers. 단어 시각은 Speech recognition 설정의 전사 서버, 판단은 Settings의 Filler removal 채팅 모델(Ollama·LM Studio 등 OpenAI 호환)이 담당
 - 오프라인 사용: Speech recognition을 Custom OpenAI-compatible로 두고 로컬 whisper 서버 주소 입력, 채팅 모델은 로컬 Ollama(gemma3:4b 등)
 - Find fillers는 바로 자르지 않음. Proposed cuts 목록에서 체크를 확인한 뒤 Remove checked, Undo 한 번으로 복원

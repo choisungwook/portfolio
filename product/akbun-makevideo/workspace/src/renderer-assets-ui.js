@@ -25,6 +25,7 @@
     let sourcePreview = null;
     let timelineInteractions = null;
     let stageController = null;
+    let inspectorController = null;
     const renderLanes = (...args) => deps.renderLanes(...args);
     const refresh = (...args) => deps.refresh(...args);
     function selectMadeOnTrack(made, trackId) {
@@ -41,6 +42,7 @@
       if (Object.hasOwn(runtime, 'sourcePreview')) sourcePreview = runtime.sourcePreview;
       if (Object.hasOwn(runtime, 'timelineInteractions')) timelineInteractions = runtime.timelineInteractions;
       if (Object.hasOwn(runtime, 'stageController')) stageController = runtime.stageController;
+      if (Object.hasOwn(runtime, 'inspectorController')) inspectorController = runtime.inspectorController;
     }
 
     // --- assets ----------------------------------------------------------------
@@ -215,8 +217,9 @@
       dom.markerToolView.hidden = panel !== 'marker';
       dom.debugPanel.hidden = panel !== 'debug';
       dom.aiView.hidden = panel !== 'ai';
-      dom.panelTabBar.hidden = panel === 'ai';
+      dom.panelTabBar.hidden = panel !== 'inspector';
       dom.selectedPanelTitle.textContent = panel ? PANEL_TITLES[panel] : 'Inspector';
+      if (panel === 'inspector' && inspectorController) inspectorController.render();
       for (const button of dom.globalActions.querySelectorAll('[data-panel-action]')) {
         const active = button.dataset.panelAction === panel;
         button.setAttribute('aria-pressed', String(active));

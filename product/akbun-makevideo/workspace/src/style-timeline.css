@@ -200,7 +200,6 @@ button.icon.on {
 
 #panel-tab-bar {
   display: flex;
-  justify-content: space-between;
   gap: 2px;
   margin: 6px 8px;
   padding: 2px;
@@ -214,10 +213,10 @@ button.icon.on {
 }
 
 #panel-tab-bar button {
-  flex: 0 0 auto;
-  padding: 2px 4px;
+  flex: 1 1 0;
+  padding: 3px 6px;
   background-color: transparent;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 #panel-tab-bar button[aria-pressed='true'],

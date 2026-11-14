@@ -112,7 +112,7 @@ test('the editor exposes one toggleable selected panel from the title bar', () =
   );
   assert.deepStrictEqual(
     [...page.matchAll(/data-inspector-tab="([^"]+)"/g)].map((match) => match[1]),
-    ['video', 'audio', 'effects', 'transition', 'image', 'file'],
+    ['video', 'audio', 'transition'],
   );
   assert.doesNotMatch(page, /id="project-name"|id="btn-debug"|id="marker-panel"/);
 });

@@ -102,26 +102,6 @@
       return { kind: 'solid', color: preserveAlpha(color, paintColors(previous, color)[0]) };
     }
 
-    function inspectorMessage(tab, item, clipTargets, transition) {
-      if (tab === 'effects') return 'No effect is selected.';
-      if (tab === 'transition') return transition ? '' : 'Select a clip beside a transition.';
-      if (tab === 'image') {
-        const asset = L.findAsset(state.project, state.selectedAssetId);
-        return asset && asset.kind === 'image'
-          ? `Image — ${asset.name || baseName(asset.path)}`
-          : 'Select an image asset to inspect it.';
-      }
-      if (tab === 'file') {
-        const selected = clipTargets && clipTargets.selected;
-        const asset = selected
-          ? L.findAsset(state.project, selected.clip.assetId)
-          : L.findAsset(state.project, state.selectedAssetId);
-        return asset ? `File — ${asset.name || baseName(asset.path)}` : 'Select an asset or clip to inspect its file.';
-      }
-      if (tab === 'audio') return 'Select a clip with audio properties.';
-      return item ? 'No video properties are available.' : 'Select a clip or a layer to edit its properties.';
-    }
-
     /** The inspector beside the preview. One switch over what is selected: a text,
      *  shape or subtitle layer, else the selected clip, else the empty hint. */
     function renderInspector() {
@@ -138,7 +118,11 @@
       const transition = !item && liveSelection()
         ? L.transitionForClip(state.project, liveSelection(), getPreview().position())
         : null;
-      const tab = state.inspectorTab || 'video';
+      const tabs = I.availableTabs({ item, targets: clipTargets, transition });
+      if (tabs.length && !tabs.includes(state.inspectorTab)) {
+        state.inspectorTab = (clipTargets && I.activeTab(clipTargets)) || tabs[0];
+      }
+      const tab = tabs.includes(state.inspectorTab) ? state.inspectorTab : 'video';
       const video = tab === 'video';
       const audio = tab === 'audio';
       const selectedKeyframe = state.selectedKeyframe;
@@ -153,11 +137,15 @@
       dom.transformPanel.hidden = !video || !item;
       dom.keyframePanel.hidden = !selectedKeyframe;
       dom.inspectorEmpty.hidden = hasProperties || Boolean(transition);
-      dom.inspectorEmpty.textContent = inspectorMessage(tab, item, clipTargets, transition);
       for (const button of dom.panelTabBar.querySelectorAll('[data-inspector-tab]')) {
         const active = button.dataset.inspectorTab === tab;
+        button.hidden = !tabs.includes(button.dataset.inspectorTab);
         button.setAttribute('aria-pressed', String(active));
         button.tabIndex = active ? 0 : -1;
+      }
+      if (state.activePanel === 'inspector') {
+        dom.panelTabBar.hidden = tabs.length < 2;
+        dom.selectedPanelTitle.textContent = I.inspectorTitle({ item, subtitle, targets: clipTargets });
       }
       if (item) {
         const preview = getPreview();
@@ -627,7 +615,10 @@
     function moveInspectorTab(event) {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
       const offset = event.key === 'ArrowRight' ? 1 : -1;
-      const nextName = P.adjacentTab(event.currentTarget.dataset.inspectorTab, offset);
+      const shown = [...dom.panelTabBar.querySelectorAll('[data-inspector-tab]')]
+        .filter((button) => !button.hidden)
+        .map((button) => button.dataset.inspectorTab);
+      const nextName = P.adjacentTab(event.currentTarget.dataset.inspectorTab, offset, shown);
       const next = dom.panelTabBar.querySelector(`[data-inspector-tab="${nextName}"]`);
       activateInspectorTab(nextName);
       next.focus();

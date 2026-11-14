@@ -41,7 +41,31 @@ function activeTab(targets, preferred) {
   return targets.video ? 'video' : targets.audio ? 'audio' : null;
 }
 
-const exported = { clipTargets, activeTab };
+/** The property groups a selection has, in the order the tab bar shows them. A
+ *  layer has one; a clip has a Video and an Audio group when it carries them. */
+function availableTabs({ item, targets, transition }) {
+  if (item) return ['video'];
+  if (!targets) return [];
+  const tabs = [];
+  if (targets.video) tabs.push('video');
+  if (targets.audio) tabs.push('audio');
+  if (transition) tabs.push('transition');
+  return tabs;
+}
+
+function inspectorTitle({ item, subtitle, targets }) {
+  if (item) {
+    const kind = item.content && item.content.kind;
+    if (kind === 'text') return subtitle ? 'Subtitle' : 'Text';
+    if (kind === 'shape') return 'Shape';
+    if (kind === 'videoOverlay') return 'Picture in Picture';
+    return 'Inspector';
+  }
+  if (!targets) return 'Inspector';
+  return targets.selected.track.kind === 'audio' ? 'Audio clip' : 'Video clip';
+}
+
+const exported = { clipTargets, activeTab, availableTabs, inspectorTitle };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = exported;

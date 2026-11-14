@@ -2,7 +2,7 @@
 
 (function () {
 
-const TABS = ['video', 'audio', 'effects', 'transition', 'image', 'file'];
+const TABS = ['video', 'audio', 'transition'];
 
 function toggledPanel(active, requested) {
   return active === requested ? null : requested;
@@ -14,9 +14,9 @@ function orderedMarkers(markers) {
   );
 }
 
-function adjacentTab(current, offset) {
-  const index = Math.max(0, TABS.indexOf(current));
-  return TABS[(index + offset + TABS.length) % TABS.length];
+function adjacentTab(current, offset, tabs = TABS) {
+  const index = Math.max(0, tabs.indexOf(current));
+  return tabs[(index + offset + tabs.length) % tabs.length];
 }
 
 const exported = { TABS, toggledPanel, orderedMarkers, adjacentTab };
