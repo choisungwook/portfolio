@@ -702,7 +702,7 @@ main {
   stroke: var(--accent);
 }
 
-#canvas[data-tool='select']:not([data-dragging]) g[data-i]:not(.sel):hover > .hover-ring {
+#canvas[data-tool='select']:not([data-dragging]) g[data-i]:not(.sel):hover .hover-ring {
   display: block;
 }
 
