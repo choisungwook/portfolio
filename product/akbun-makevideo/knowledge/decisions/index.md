@@ -2,6 +2,7 @@
 
 ## 목록
 
+* [화면 token은 akbun-makepresentation과 같은 이름과 값을 쓴다](2026-11-ui-follows-makepresentation-visual-system.md) - token 이름을 맞추고 clip 선택색과 monitor 배경만 따로 둔 결정.
 * [잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다](2026-11-denoise-strength-sets-the-noise-floor.md) - afftdn 잡음 추적을 끄고 강도로 nr과 nf를 정한 측정 결과.
 * [updater 공개키는 서명 secret과 같은 키쌍에서 가져온다](2026-11-updater-key-matches-signing-secret.md) - 공개키 불일치로 업데이트가 조용히 실패한 뒤 release에 key id 검사를 둔 결정.
 * [로컬 MCP와 복구 지점](2026-09-local-mcp-checkpoints.md) - 외부 AI 편집과 앱 재시작 후 복구 경계.

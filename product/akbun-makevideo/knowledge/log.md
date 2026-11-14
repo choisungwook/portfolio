@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-14
+
+* [화면 token은 akbun-makepresentation과 같은 이름과 값을 쓴다](decisions/2026-11-ui-follows-makepresentation-visual-system.md) 기록.
+
 ## 2026-11-08
 
 * [잡음 제거 강도는 감쇠량과 잡음 바닥을 함께 올린다](decisions/2026-11-denoise-strength-sets-the-noise-floor.md) 기록.

@@ -6,7 +6,7 @@
 ## 실행 계획
 
 - [x] 1. 설계: `product/akbun-makevideo/designs/README.md`의 Visual system 절과 `tokens.tokens.json` 작성
-- [ ] 2. 구현: `workspace/src`의 CSS 5개와 `index.html` toolbar 마크업, 버전 0.50.0 → 0.51.0
+- [x] 2. 구현: `workspace/src`의 CSS 5개와 `index.html` toolbar 마크업, 버전 0.50.0 → 0.51.0
 - [ ] 3. 검증: 새 컨텍스트 리뷰, light와 dark 스크린샷, `npm test`
 - [ ] 4. knowledge decision 기록, 이 파일 삭제, PR 생성
 
