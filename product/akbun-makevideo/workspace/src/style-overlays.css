@@ -6,7 +6,7 @@
   z-index: 300;
   display: grid;
   place-items: center;
-  background: rgba(10, 12, 16, 0.45);
+  background: var(--backdrop);
 }
 
 .overlay[hidden] {
@@ -19,9 +19,16 @@
   padding: 18px 20px;
   overflow-y: auto;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border-radius: 16px;
+  box-shadow: var(--shadow-2);
+}
+
+/* The sheet is as dark as the window behind it, so the shadow alone does not
+   separate them. */
+@media (prefers-color-scheme: dark) {
+  .sheet {
+    border: 1px solid var(--border);
+  }
 }
 
 .sheet h3 {
@@ -50,7 +57,7 @@
 
 .settings-ai-status p {
   margin: 3px 0 0;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -122,8 +129,7 @@
   gap: 12px;
   width: 100%;
   padding: 8px 10px;
-  background: none;
-  border: none;
+  background-color: transparent;
   border-radius: 0;
   border-bottom: 1px solid var(--border);
   text-align: left;
@@ -133,14 +139,15 @@
   border-bottom: none;
 }
 
-.project-row:hover {
-  background: var(--accent);
-  color: var(--accent-fg);
+.project-row:hover:not(:disabled) {
+  background-color: var(--accent);
+  background-image: none;
+  color: var(--on-accent);
 }
 
 .project-when {
   font-size: 11px;
-  color: var(--dim);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -169,8 +176,7 @@
   height: 8px;
   margin-bottom: 10px;
   border-radius: 99px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
+  background: var(--control);
   overflow: hidden;
 }
 
@@ -178,11 +184,29 @@
   height: 100%;
   width: 0;
   background: var(--accent);
-  transition: width 0.15s linear;
+  transition: width var(--ease);
 }
 
 #render-status {
   margin: 0;
   font-size: 12px;
   word-break: break-all;
+}
+
+#tooltip {
+  position: fixed;
+  z-index: 500;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: var(--fg);
+  color: var(--panel);
+  box-shadow: var(--shadow-1);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+#tooltip[hidden] {
+  display: none;
 }

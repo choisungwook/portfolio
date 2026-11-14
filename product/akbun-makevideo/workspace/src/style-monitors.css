@@ -41,10 +41,18 @@
   grid-template-rows: subgrid;
 }
 
+#source-panel .panel-head,
+#preview-panel .panel-head {
+  background: var(--panel);
+}
+
 /* The Program Monitor has nothing to put in the fourth row, so its transport
-   takes both and centres itself in them rather than leaving a blank strip. */
+   takes both rows to keep the background unbroken and holds its content in the
+   first, on the same line as the Source Monitor's. */
 #transport {
   grid-row: 3 / 5;
+  flex-wrap: wrap;
+  align-content: flex-start;
 }
 
 .monitor-stage-wrap {
@@ -54,7 +62,7 @@
   justify-content: center;
   min-height: 0;
   overflow: hidden;
-  background: var(--stage);
+  background: var(--monitor);
 }
 
 .monitor-stage {
@@ -87,7 +95,6 @@
   gap: 6px;
   padding: 6px 8px;
   background: var(--panel);
-  border-top: 1px solid var(--border);
 }
 
 #source-actions {
@@ -97,9 +104,85 @@
 
 #source-actions button,
 #source-actions select,
+.monitor-transport select,
 .monitor-transport button {
   padding: 3px 7px;
   font-size: 11px;
+}
+
+#source-actions button.icon,
+.monitor-transport button.icon {
+  padding: 0;
+}
+
+#source-actions button.icon svg,
+.monitor-transport button.icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* The checkbox stays in the page for keyboard focus and `.checked`; the label
+   draws the state. */
+#source-actions .toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border-radius: var(--radius);
+  background-color: var(--control);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color var(--ease), color var(--ease);
+}
+
+#source-actions .toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#source-actions .toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#source-actions .toggle:has(input:checked) {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+#source-actions .toggle:hover:not(:has(input:disabled)) {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+
+#source-actions .toggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#source-actions .toggle:has(input:disabled) {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.inline.scope svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 #source-range {
@@ -129,7 +212,7 @@
   position: absolute;
   top: 12px;
   bottom: 1px;
-  background: color-mix(in srgb, var(--stage) 62%, transparent);
+  background: color-mix(in srgb, var(--monitor) 62%, transparent);
   border-radius: 2px;
 }
 
@@ -184,22 +267,21 @@
 
 .segmented {
   display: flex;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--control);
 }
 
 .segmented button {
-  border: none;
-  border-radius: 0;
   padding: 2px 10px;
   font-size: 12px;
-  background: var(--panel-2);
+  background-color: transparent;
 }
 
 .segmented button.on {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--chip);
+  box-shadow: var(--shadow-1);
 }
 
 #stage-wrap {
@@ -209,7 +291,7 @@
   justify-content: center;
   min-height: 0;
   min-width: 0;
-  background: var(--stage);
+  background: var(--monitor);
   overflow: hidden;
 }
 
@@ -298,7 +380,7 @@
 
 #stage-mode.exact {
   background: var(--accent);
-  color: var(--accent-fg);
+  color: var(--on-accent);
 }
 
 audio.stage-media {
@@ -316,25 +398,10 @@ audio.stage-media {
   pointer-events: none;
 }
 
-#transport {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-#btn-play {
-  min-width: 42px;
-}
-
 .inline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 12px;
 }

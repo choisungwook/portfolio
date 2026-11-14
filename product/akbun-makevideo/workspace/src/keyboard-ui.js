@@ -31,6 +31,11 @@
       }
     }
 
+    function shortcutLabel(action) {
+      const shortcut = shortcutMap().find((item) => item.action === action);
+      return shortcut && shortcut.keys.length ? K.formatKeys(shortcut.keys) : '';
+    }
+
     function fillShortcutSheet() {
       const list = el('shortcut-list');
       list.textContent = '';
@@ -108,6 +113,7 @@
       collectOverrides: collectShortcutOverrides,
       fillSheet: fillShortcutSheet,
       map: shortcutMap,
+      label: shortcutLabel,
       renderLabels: renderShortcutLabels,
       wire: wireKeyboard,
     };

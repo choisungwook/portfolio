@@ -24,6 +24,12 @@ test('markers are listed in timeline order without mutating the project', () => 
 });
 
 test('inspector tabs wrap in both directions', () => {
-  assert.equal(P.adjacentTab('video', -1), 'file');
-  assert.equal(P.adjacentTab('file', 1), 'video');
+  assert.equal(P.adjacentTab('video', -1), 'transition');
+  assert.equal(P.adjacentTab('transition', 1), 'video');
+});
+
+test('inspector tabs move only within the tabs that are shown', () => {
+  assert.equal(P.adjacentTab('video', 1, ['video', 'audio']), 'audio');
+  assert.equal(P.adjacentTab('audio', 1, ['video', 'audio']), 'video');
+  assert.equal(P.adjacentTab('video', -1, ['video', 'audio']), 'audio');
 });

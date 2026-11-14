@@ -74,6 +74,10 @@
       zoomToPxPerSecond,
     } = deps;
 
+    function setPlayIcon(button, playing) {
+      button.querySelector('use').setAttribute('href', playing ? '#icon-pause' : '#icon-play');
+    }
+
     async function start() {
       let preview = null;
       let mediaPreview = null;
@@ -101,7 +105,7 @@
         onTick: (frame, playing) => {
           dom.sourceClock.textContent = sourceTime(frame);
           dom.sourceSeek.value = String(Math.round(frame));
-          dom.sourcePlay.textContent = playing ? '❚❚' : '▶';
+          setPlayIcon(dom.sourcePlay, playing);
         },
       });
 
@@ -117,7 +121,7 @@
         onTick: (frame, playing) => {
           updatePlayhead(frame);
           followPlayhead(frame);
-          dom.btnPlay.textContent = playing ? '❚❚' : '▶';
+          setPlayIcon(dom.btnPlay, playing);
           if (playing) {
             // Playing is the stacked elements; the composited frame cannot keep up
             // and would only freeze one moment over moving video.
@@ -148,7 +152,7 @@
         onTick: (frame, playing) => {
           updatePlayhead(frame);
           followPlayhead(frame);
-          dom.btnPlay.textContent = playing ? '❚❚' : '▶';
+          setPlayIcon(dom.btnPlay, playing);
           // Nothing to schedule and nothing to badge: the monitor draws the frame
           // under a stopped playhead with the same compositor it plays with.
           stageController.setStageMode(null);
@@ -278,6 +282,11 @@
       stageController.wireTransport();
       wireSheets();
       shortcutController.wire();
+      globalThis.tooltipLib.createTooltip({
+        document,
+        shortcutLabel: shortcutController.label,
+        window,
+      }).wire();
 
       if (window.api.onMcpChanged) {
         subscribe('events:mcp-changed', window.api.onMcpChanged, async () => {

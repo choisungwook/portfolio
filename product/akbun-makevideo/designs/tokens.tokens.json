@@ -1,22 +1,52 @@
 {
   "color": {
-    "background": { "$type": "color", "$value": "#f2f3f5" },
+    "background": { "$type": "color", "$value": "#f4f5f7" },
     "panel": { "$type": "color", "$value": "#ffffff" },
-    "panelSubtle": { "$type": "color", "$value": "#f7f8fa" },
-    "text": { "$type": "color", "$value": "#1a1a1c" },
-    "textMuted": { "$type": "color", "$value": "#6a6d73" },
-    "border": { "$type": "color", "$value": "#dcdfe4" },
-    "accent": { "$type": "color", "$value": "#2f6df0" },
+    "panelSoft": { "$type": "color", "$value": "#f5f5f7" },
+    "stage": { "$type": "color", "$value": "#e4e5e9" },
+    "text": { "$type": "color", "$value": "#1c1d21" },
+    "textMuted": { "$type": "color", "$value": "#7a808c" },
+    "border": { "$type": "color", "$value": "#e3e5ea" },
+    "accent": { "$type": "color", "$value": "#2f6fed" },
+    "accentSoft": { "$type": "color", "$value": "#e3ecff" },
+    "onAccent": { "$type": "color", "$value": "#ffffff" },
+    "chip": { "$type": "color", "$value": "#ffffff" },
+    "danger": { "$type": "color", "$value": "#e03131" },
+    "select": { "$type": "color", "$value": "#f0a52f" },
     "monitor": { "$type": "color", "$value": "#0b0b0d" }
+  },
+  "colorDark": {
+    "background": { "$type": "color", "$value": "#1b1c1f" },
+    "panel": { "$type": "color", "$value": "#26272b" },
+    "panelSoft": { "$type": "color", "$value": "#2a2b2f" },
+    "stage": { "$type": "color", "$value": "#1e1f22" },
+    "text": { "$type": "color", "$value": "#e9eaee" },
+    "textMuted": { "$type": "color", "$value": "#9197a3" },
+    "border": { "$type": "color", "$value": "#37393f" },
+    "accent": { "$type": "color", "$value": "#6ea0ff" },
+    "accentSoft": { "$type": "color", "$value": "#24385f" },
+    "onAccent": { "$type": "color", "$value": "#10131a" },
+    "chip": { "$type": "color", "$value": "#3d3f46" },
+    "danger": { "$type": "color", "$value": "#ff6b6b" },
+    "select": { "$type": "color", "$value": "#f0a52f" },
+    "monitor": { "$type": "color", "$value": "#000000" }
   },
   "size": {
     "assetsPanelWidth": { "$type": "dimension", "$value": { "value": 264, "unit": "px" } },
     "selectedPanelWidth": { "$type": "dimension", "$value": { "value": 280, "unit": "px" } },
     "trackHeaderWidth": { "$type": "dimension", "$value": { "value": 132, "unit": "px" } },
-    "panelGap": { "$type": "dimension", "$value": { "value": 1, "unit": "px" } }
+    "panelGap": { "$type": "dimension", "$value": { "value": 1, "unit": "px" } },
+    "capsuleGap": { "$type": "dimension", "$value": { "value": 10, "unit": "px" } },
+    "menuRowHeight": { "$type": "dimension", "$value": { "value": 28, "unit": "px" } }
   },
   "radius": {
-    "control": { "$type": "dimension", "$value": { "value": 6, "unit": "px" } },
-    "panel": { "$type": "dimension", "$value": { "value": 8, "unit": "px" } }
+    "control": { "$type": "dimension", "$value": { "value": 7, "unit": "px" } },
+    "input": { "$type": "dimension", "$value": { "value": 5, "unit": "px" } },
+    "menu": { "$type": "dimension", "$value": { "value": 12, "unit": "px" } },
+    "sheet": { "$type": "dimension", "$value": { "value": 16, "unit": "px" } },
+    "capsule": { "$type": "dimension", "$value": { "value": 999, "unit": "px" } }
+  },
+  "duration": {
+    "ease": { "$type": "duration", "$value": { "value": 140, "unit": "ms" } }
   }
 }

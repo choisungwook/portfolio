@@ -11,15 +11,15 @@
 | --- | --- | --- |
 | 프로젝트 | 새로 만들기·열기·저장·다른 이름 저장·삭제 | Project |
 | 미디어 | 영상·음성·이미지 가져오기, 원본 경로 참조 | Assets → Import… |
-| 원본 구간 | 원본 재생, In/Out, 영상·음성 선택, Insert·Overwrite·Append | Source Monitor |
+| 원본 구간 | 원본 재생, 구간 시작·끝 표시, 영상·음성 선택, 삽입·덮어쓰기·뒤에 붙이기 (아이콘 버튼, 올리면 설명 표시) | Source Monitor |
 | 컷 편집 | 이동·트림·분할·삭제·Ripple Delete·스냅·영상/음성 연결 | Timeline, Edit |
 | 트랙 | 영상·오디오·자막 트랙 추가, 숨김·음소거 | Timeline |
 | 재생 | 프레임 이동·편집점 이동·전체 화면·미리보기 품질 | Program Monitor, Playback |
-| 음성 | 볼륨·속도·피치 유지·잡음 제거·페이드·볼륨 키프레임 | Inspector → Audio |
+| 음성 | 볼륨·속도·피치 유지·잡음 제거·페이드·볼륨 키프레임 | Inspector → Audio (audio clip은 바로 표시) |
 | 제목·도형 | 텍스트, 사각형·타원·선/화살표·다각형·별 등 | + Text, Shape, Inspector |
 | 레이어 | 위치·크기·회전·불투명도, 키프레임, 블렌드 | Inspector |
 | 그래픽 스타일 | 색·그라데이션·미디어 채우기·외곽선·그림자 | Inspector의 Text / Shape |
-| PIP·B-roll | 원본 영상 오버레이, 크롭·테두리·둥근 모서리·오디오 설정 | Source Monitor → Add PIP, Inspector |
+| PIP·B-roll | 원본 영상 오버레이, 크롭·테두리·둥근 모서리·오디오 설정 | Source Monitor → PIP 아이콘, Inspector |
 | 전환 | 인접 클립 사이 디졸브 | 타임라인의 클립 경계, Inspector |
 | 자막 | SRT 가져오기·내보내기, 문구·시각·스타일 편집 | Import SRT / Export SRT, Inspector |
 | 음성 기반 편집 | 제공자 API를 통한 자막 생성, 로컬 무음 감지·제거, 로컬 모델의 군더더기 말 검토 후 제거 | Edit → AI, AI → Captions / Silence / Find fillers |
@@ -62,10 +62,10 @@
 
 1. Project → New Project로 프로젝트 생성
 2. Assets → Import…에서 원본 파일 가져오기
-3. Assets의 영상을 타임라인으로 드래그하거나 Source Monitor에서 구간 선택 후 Insert
+3. Assets의 영상을 타임라인으로 드래그하거나 Source Monitor에서 구간 선택 후 삽입 아이콘
 4. 재생 위치를 옮기고 Cmd+B로 분할
 5. 불필요한 클립 선택 후 Delete, 간격도 닫으려면 Shift+Delete
-6. + Text로 제목 추가, 선택 후 Inspector에서 문구·위치 수정
+6. `+ Text`로 제목 추가, 선택 후 Inspector에서 문구·위치 수정
 7. Program Monitor에서 편집점 전후와 음성 확인
 8. Project → Save로 프로젝트 저장
 9. Render → Render…(Cmd+E)에서 해상도와 품질 선택 후 새 MP4 경로 지정
@@ -80,7 +80,7 @@
 - 이미 자막 파일이 있으면 Import SRT 사용
 - 음성 전사가 필요하면 AI → Captions에서 소스·제공자·언어 설정 후 Generate captions
 - 전사 결과의 고유명사·숫자·타이밍은 직접 확인
-- 잡음 제거: 클립 선택 후 Inspector → Audio의 Reduce noise와 Strength. 미리보기와 출력에 같은 ffmpeg 필터 적용, 모델 불필요
+- 잡음 제거: 클립 선택 후 Inspector의 Audio(audio clip은 바로 표시)의 Reduce noise와 Strength. 미리보기와 출력에 같은 ffmpeg 필터 적용, 모델 불필요
 - 군더더기 말 제거: AI → Captions의 Find fillers. 단어 시각은 Speech recognition 설정의 전사 서버, 판단은 Settings의 Filler removal 채팅 모델(Ollama·LM Studio 등 OpenAI 호환)이 담당
 - 오프라인 사용: Speech recognition을 Custom OpenAI-compatible로 두고 로컬 whisper 서버 주소 입력, 채팅 모델은 로컬 Ollama(gemma3:4b 등)
 - Find fillers는 바로 자르지 않음. Proposed cuts 목록에서 체크를 확인한 뒤 Remove checked, Undo 한 번으로 복원

@@ -48,3 +48,49 @@ test('an image has a video tab and no audio tab', () => {
   assert.strictEqual(targets.audio, null);
   assert.strictEqual(I.activeTab(targets, 'audio'), 'video');
 });
+
+const target = (kind) => ({ track: { kind }, clip: {} });
+
+test('a layer shows only its own group, with a title for its kind', () => {
+  const text = { content: { kind: 'text' } };
+
+  assert.deepStrictEqual(I.availableTabs({ item: text, targets: null, transition: null }), ['video']);
+  assert.equal(I.inspectorTitle({ item: text, subtitle: false, targets: null }), 'Text');
+  assert.equal(I.inspectorTitle({ item: text, subtitle: true, targets: null }), 'Subtitle');
+  assert.equal(I.inspectorTitle({ item: { content: { kind: 'shape' } }, targets: null }), 'Shape');
+  assert.equal(
+    I.inspectorTitle({ item: { content: { kind: 'videoOverlay' } }, targets: null }),
+    'Picture in Picture',
+  );
+});
+
+test('a clip shows the groups it carries, and a transition adds its own', () => {
+  const video = target('video');
+  const audio = target('audio');
+
+  assert.deepStrictEqual(
+    I.availableTabs({ item: null, targets: { selected: video, video, audio }, transition: null }),
+    ['video', 'audio'],
+  );
+  assert.deepStrictEqual(
+    I.availableTabs({ item: null, targets: { selected: audio, video: null, audio }, transition: null }),
+    ['audio'],
+  );
+  assert.deepStrictEqual(
+    I.availableTabs({ item: null, targets: { selected: video, video, audio: null }, transition: {} }),
+    ['video', 'transition'],
+  );
+});
+
+test('a clip is titled by the track it was selected on', () => {
+  const video = target('video');
+  const audio = target('audio');
+
+  assert.equal(I.inspectorTitle({ item: null, targets: { selected: video, video, audio } }), 'Video clip');
+  assert.equal(I.inspectorTitle({ item: null, targets: { selected: audio, video, audio } }), 'Audio clip');
+});
+
+test('nothing selected shows no groups and the plain title', () => {
+  assert.deepStrictEqual(I.availableTabs({ item: null, targets: null, transition: null }), []);
+  assert.equal(I.inspectorTitle({ item: null, subtitle: false, targets: null }), 'Inspector');
+});
