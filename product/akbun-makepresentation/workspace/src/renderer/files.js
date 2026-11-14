@@ -87,6 +87,12 @@ async function loadDocument(path) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const pageBusy = () => state.drag || state.editingIndex >= 0;
+// Same summary as shapeKey: a picture is compared by its length and both
+// ends, so an unchanged deck is recognised without copying every bitmap.
+const deckKey = (deck) => JSON.stringify(deck, (_, value) =>
+  typeof value === 'string' && value.length > 256
+    ? `${value.length}:${value.slice(0, 32)}:${value.slice(-32)}`
+    : value);
 let syncing = false;
 let syncAgain = false;
 
@@ -134,7 +140,7 @@ async function syncOnce() {
     }
     if (!deck || state.filePath !== path) return false;
     if (pageBusy() || (!wasDirty && state.dirty)) continue;
-    if (JSON.stringify(deck) === JSON.stringify(state.deck)) {
+    if (deckKey(deck) === deckKey(state.deck)) {
       state.dirty = false;
       updateTitle();
     } else {
@@ -142,6 +148,7 @@ async function syncOnce() {
       if (state.presenting) {
         state.presentIndex = Math.min(state.presentIndex, state.deck.slides.length - 1);
         renderPresent();
+        if (presentView.overview) openOverview();
       }
     }
     return false;
