@@ -75,6 +75,15 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 - asset 선택은 테두리 대신 `--accent-soft` 배경.
 - keyboard focus는 `--accent` 2px outline.
 
+아이콘과 tooltip:
+
+- 아이콘은 `index.html`의 `.icon-defs`에 둔 인라인 SVG symbol 한 벌을 쓴다. `currentColor` 선 굵기 1.5~1.6, 채움 없음, viewBox 20.
+- Source Monitor의 control은 글자 대신 아이콘으로 표시한다: play/pause, mark in, mark out, video와 audio 포함 토글, insert, overwrite, append, PIP. ripple 범위 select는 선택지가 글자여야 하므로 select로 두고 앞의 라벨만 아이콘으로 바꾼다.
+- video와 audio 토글은 checkbox를 그대로 두고 화면에서만 가린다. 켜짐은 `--accent-soft` 배경에 `--accent` 아이콘, 꺼짐은 `--muted` 아이콘이다.
+- 글자가 없는 control은 `data-tip`에 설명을 두고 같은 문장을 `aria-label`에 둔다. 단축키가 있으면 설명 끝에 붙인다.
+- tooltip은 pointer를 올리고 400ms 뒤, 또는 keyboard focus에서 control 아래에 표시한다. 아래 공간이 없으면 위에 표시한다. `--fg` 배경에 `--panel` 글자, 반경 `--radius-s`, 12px이다. `position: fixed`인 요소 하나를 `body`에 두어 panel의 `overflow`에 잘리지 않게 한다.
+- native `title`은 tooltip과 겹쳐 표시되므로 `data-tip`이 있는 control에는 쓰지 않는다.
+
 ## Interaction
 
 - 닫힌 Global Action을 누르면 해당 선택 패널을 연다.
