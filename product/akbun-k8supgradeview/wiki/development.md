@@ -30,7 +30,7 @@ npm run dist
 ## 릴리즈 절차
 
 1. `workspace/package.json`의 version을 올린다. 버전은 별도 태그 관리 없이 package.json에서만 관리한다.
-2. master에 머지하면 GitHub Actions `release-k8supgradeview`가 실행된다.
+2. master에 머지하면 GitHub Actions `release-akbun-k8supgradeview`가 실행된다.
 3. 워크플로우는 macOS 러너에서 arm64 dmg를 빌드하고, 빌드가 성공한 뒤에만 `akbun-k8supgradeview-v<version>` 태그를 만들고, 태그가 만들어진 뒤에만 릴리즈를 만든다.
 4. PR에서는 verify job이 ubuntu에서 tsc 컴파일만 검증한다.
 

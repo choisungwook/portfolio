@@ -1,4 +1,4 @@
-name: akbun-gitdesktop release
+name: release-akbun-gitdesktop
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - 'product/akbun-gitdesktop/**'
-      - '.github/workflows/gitdesktop-release.yml'
+      - '.github/workflows/release-akbun-gitdesktop.yml'
   workflow_dispatch:
 
 permissions:

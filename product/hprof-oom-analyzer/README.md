@@ -55,7 +55,7 @@ npm test
 
 ## 빌드와 아티팩트
 
-GitHub Actions 워크플로우 build-hprof-oom-analyzer가 PR에서는 테스트와 CLI 스모크 테스트를 실행하고, master push에서는 macos 러너에서 electron-builder로 dmg를 빌드해 아티팩트로 업로드한다. 이어서 release job이 package.json의 version을 읽어 hprof-oom-analyzer-{version} 태그로 GitHub Release를 만들고 dmg를 첨부한다. 같은 태그의 release가 이미 있으면 건너뛰므로, 새 release를 내려면 version을 올린다. 로컬 빌드는 다음 명령을 쓴다.
+GitHub Actions 워크플로우 release-hprof-oom-analyzer가 PR에서는 테스트와 CLI 스모크 테스트를 실행하고, master push에서는 macos 러너에서 electron-builder로 dmg를 빌드해 아티팩트로 업로드한다. 이어서 release job이 package.json의 version을 읽어 hprof-oom-analyzer-{version} 태그로 GitHub Release를 만들고 dmg를 첨부한다. 같은 태그의 release가 이미 있으면 건너뛰므로, 새 release를 내려면 version을 올린다. 로컬 빌드는 다음 명령을 쓴다.
 
 ```bash
 npm run dist

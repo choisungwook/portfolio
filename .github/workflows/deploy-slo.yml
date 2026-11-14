@@ -1,4 +1,4 @@
-name: Deploy SLO Calculator
+name: deploy-slo
 
 on:
   push:

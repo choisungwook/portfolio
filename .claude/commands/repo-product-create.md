@@ -26,6 +26,7 @@ product/<name>/
    - Check the latest stable major of every action (actions/checkout, actions/setup-node, tauri-apps/tauri-action) and tool before writing it; never copy old pins.
    - pull_request runs a verify job on ubuntu, tests only. Electron needs ELECTRON_SKIP_BINARY_DOWNLOAD.
    - master push builds and releases. In Electron, build then tag then release, so a failed build leaves no dangling tag. In Tauri, tauri-action creates the release and GitHub creates the tag from it, so there is no git tag step.
+   - Register the workflow in .github/scripts/checks/product-versions.json (version file, tag prefix, what happens when the tag exists). A PR check fails until it is there.
    - Unsigned builds need the platform's bypass in the release notes. macOS:
 
      ```bash
@@ -34,9 +35,9 @@ product/<name>/
 
      Windows: tell the user to choose "More info" and then "Run anyway" past the SmartScreen warning.
 
-5. Write wiki/: index.md, architecture.md (process structure, key flows, IPC or API surface), development.md (build, run, test, release, caveats). No marketing language, no references to benchmarked products or PR bodies.
+5. Write wiki/: index.md, architecture.md (process structure, key flows, IPC or API surface), development.md (build, run, test, release, caveats), features.md (feature map: the name and selector of each area a user acts on; follow product/akbun-reader/wiki/features.md). No marketing language, no references to benchmarked products or PR bodies.
 6. Copy templates/knowledge to knowledge/ and write one file per decision under knowledge/decisions/ (YYYY-MM-<topic>.md), following [.claude/rules/knowledge.md](../rules/knowledge.md). Do not create adr/; older products have one, but decisions now live only in knowledge/decisions/.
-7. Update both indexes in the same commit: the product/README.md table and the root README.md "직접 만든 제품" list.
+7. Update the three indexes in the same commit, as .claude/rule-details/product.md describes. check_product_index.py fails the PR when one is missed.
 
 ## Choosing the stack
 

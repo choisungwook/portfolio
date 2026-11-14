@@ -6,18 +6,18 @@ PR 직전 서브에이전트 리뷰가 읽는다. 저장소가 무엇인지와 �
 
 1. 돌리면 틀리는 것을 잡는다. 실행하면 실패하는 코드, 따라 하면 재현되지 않는 문서.
 2. 리뷰 라운드를 줄인다. 한 번에 다 말하고, 이미 올린 지적은 반복하지 않는다.
-3. 스타일, 정리, 취향은 올리지 않는다. lint가 잡는 것은 lint에 맡긴다.
+3. 스타일, 정리, 취향은 올리지 않는다. lint와 [.github/scripts/checks/](../../.github/scripts/checks/)의 검사가 잡는 것은 올리지 않는다. 버전 올림, product 인덱스, 링크 대상, knowledge 형식, workflow 이름이 여기에 든다.
 
 ## 실패의 모습
 
 영역마다 "틀렸다"가 다르다. 아래 모습을 찾고, 여기에 없는 종류는 올리지 않는다.
 
 - 핸즈온 문서(docs/*.md, README.md): 문서가 거짓말을 한다. 적힌 명령, 파일 경로, 변수 이름, 포트가 같은 PR의 코드와 다르다. 링크가 없는 파일을 가리킨다. setup 절차가 내용 문서에 섞여 있다.
-- Terraform(*.tf): 인스턴스 크기처럼 바뀔 값이 하드코딩됨. 리소스 이름이 main이나 this. 리전이 ap-northeast-2가 아닌데 이유가 없음.
+- Terraform(*.tf): 인스턴스 크기처럼 바뀔 값이 하드코딩됨. 리전이 ap-northeast-2가 아닌데 이유가 없음.
 - Kubernetes(manifests/): 같은 디렉터리의 다른 manifest와 label, namespace, 포트가 어긋남. 문서가 설명하는 동작과 manifest가 다름.
 - GitHub Actions(.github/workflows/): permissions 없음. PR 제목이나 body 같은 외부 입력을 run 스크립트에 직접 넣음. action이나 도구 버전이 같은 디렉터리의 다른 workflow보다 낮음.
-- product/: workspace/ 아래를 고쳤는데 버전을 안 올림. 새 디렉터리를 만들었는데 product/README.md, 루트 README.md, products.json 중 하나라도 안 고침.
-- 규칙 파일(AGENTS.md, .claude/, .github/*.md): 같은 규칙이 두 파일에 적힘. 다른 규칙 파일과 모순됨. 링크 대상 파일이 없음. 모델이 알아서 하는 일을 지시함.
+- product/: products.json과 product/README.md의 설명 문장이 서로 다름. 화면 영역을 바꿨는데 wiki/features.md가 그대로임.
+- 규칙 파일(AGENTS.md, .claude/, .github/*.md): 같은 규칙이 두 파일에 적힘. 다른 규칙 파일과 모순됨. 모델이 알아서 하는 일을 지시함. 검사 스크립트가 이미 잡는 것을 문장으로 다시 적음.
 - PR body: 작업 목적이나 방식 절이 diff와 어긋남. 작업 목적 절이 2줄을 넘음. 아래 "깊이 보는 경로"를 건드렸는데 작업 목적 절에 사람 확인 줄이 없음. 검증 절이 Issue의 완료 조건에 답하지 않음. 실행하지 않은 검증을 통과로 적음. 리스크 절에 어느 검사가 못 잡는지나 되돌리는 방법이 없음.
 
 ## 깊이 보는 경로

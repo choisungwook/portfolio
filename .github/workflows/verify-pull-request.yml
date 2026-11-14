@@ -1,7 +1,8 @@
 name: verify-pull-request
 
 # 모든 PR에 도는 공통 검사. product별 테스트는 verify-<product>.yml이 맡고,
-# 이 workflow는 바뀐 파일의 lint와 PR body 형식만 본다.
+# 이 workflow는 바뀐 파일의 lint, 저장소 규칙 검사, PR body 형식을 본다.
+# 규칙 검사는 .github/scripts/checks/에 있고 로컬에서도 같은 명령으로 돈다.
 # 새로 추가한 파일의 lint 실패는 PR을 막고, 고친 기존 파일의 실패는 경고로만
 # 남긴다. 이 저장소의 오래된 문서와 yaml은 lint를 거치지 않고 쌓였기 때문이다.
 on:
@@ -14,6 +15,9 @@ permissions:
 env:
   MARKDOWNLINT_CLI_VERSION: 0.49.1
   ACTIONLINT_VERSION: 1.7.12
+  PYYAML_VERSION: 6.0.3
+  RUFF_VERSION: 0.17.5
+  BIOME_VERSION: 2.6.7
 
 jobs:
   lint-changed-files:
@@ -60,6 +64,100 @@ jobs:
         run: |
           grep -hE '^\.github/workflows/.*\.ya?ml$' added.txt modified.txt \
             | xargs -r docker run --rm -v "$PWD:/repo" -w /repo "rhysd/actionlint:$ACTIONLINT_VERSION" -color
+
+  # 리뷰어의 판단에 맡기던 규칙을 스크립트로 검사한다. 앞 검사가 실패해도 나머지를
+  # 끝까지 돌려 한 번에 다 알려 준다.
+  repo-checks:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      CHECKS: .github/scripts/checks
+    steps:
+      # 버전 검사가 기존 tag를 조회하므로 전체 history와 tag를 받는다.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 한글이나 공백이 든 경로도 검사하도록 NUL로 구분해 두고 grep -z, xargs -0으로 읽는다.
+      - name: List changed files
+        run: |
+          git -c core.quotePath=false diff -z --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA" > added.txt
+          git -c core.quotePath=false diff -z --name-only --diff-filter=MR "$BASE_SHA...$HEAD_SHA" > modified.txt
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install check dependencies
+        run: pip install "pyyaml==$PYYAML_VERSION" "ruff==$RUFF_VERSION"
+
+      - name: product version bump
+        if: ${{ !cancelled() }}
+        run: python3 "$CHECKS/check_product_versions.py" --base "$BASE_SHA" --head "$HEAD_SHA"
+
+      - name: product index
+        if: ${{ !cancelled() }}
+        run: python3 "$CHECKS/check_product_index.py"
+
+      - name: workflow names
+        if: ${{ !cancelled() }}
+        run: python3 "$CHECKS/check_workflow_names.py"
+
+      # 규칙 파일은 이후 모든 세션이 읽으므로 바뀌지 않았어도 전부 본다.
+      - name: rule file links
+        if: ${{ !cancelled() }}
+        run: |
+          git ls-files -z AGENTS.md CLAUDE.md '.claude/*.md' '.github/*.md' 'templates/*.md' \
+            | xargs -0 -r python3 "$CHECKS/check_markdown_links.py"
+
+      - name: markdown links
+        if: ${{ !cancelled() }}
+        run: |
+          grep -zE '\.md$' added.txt | xargs -0 -r python3 "$CHECKS/check_markdown_links.py"
+          grep -zE '\.md$' modified.txt | xargs -0 -r python3 "$CHECKS/check_markdown_links.py" --warn
+
+      - name: knowledge concepts
+        if: ${{ !cancelled() }}
+        run: |
+          grep -zE '\.md$' added.txt | xargs -0 -r python3 "$CHECKS/check_knowledge.py"
+          grep -zE '\.md$' modified.txt | xargs -0 -r python3 "$CHECKS/check_knowledge.py" --warn
+
+      - name: terraform rules
+        if: ${{ !cancelled() }}
+        run: |
+          grep -zE '\.tf$' added.txt | xargs -0 -r python3 "$CHECKS/check_terraform.py"
+          grep -zE '\.tf$' modified.txt | xargs -0 -r python3 "$CHECKS/check_terraform.py" --warn
+
+      - name: kubernetes manifests
+        if: ${{ !cancelled() }}
+        run: |
+          grep -zE '\.ya?ml$' added.txt | xargs -0 -r python3 "$CHECKS/check_manifests.py"
+          grep -zE '\.ya?ml$' modified.txt | xargs -0 -r python3 "$CHECKS/check_manifests.py" --warn
+
+      # 하위 디렉터리의 pyproject.toml이 설정을 덮지 않도록 루트 ruff.toml을 지정한다.
+      - name: python (ruff)
+        if: ${{ !cancelled() }}
+        run: |
+          grep -zE '\.py$' added.txt | xargs -0 -r ruff check --config ruff.toml
+          grep -zE '\.py$' added.txt | xargs -0 -r ruff format --check --config ruff.toml
+          grep -zE '\.py$' modified.txt | xargs -0 -r ruff check --config ruff.toml \
+            || echo "::warning::고친 Python 파일에 기존 ruff 오류가 있음. PR을 막지는 않음"
+
+      # 대상과 규칙은 루트 biome.json에 있다. error만 실패시키고 warning은 출력만 한다.
+      - name: product lint (biome)
+        if: ${{ !cancelled() }}
+        run: |
+          pattern='^product/.*\.(js|mjs|cjs|jsx|ts|mts|tsx)$'
+          grep -zE "$pattern" added.txt \
+            | xargs -0 -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched
+          grep -zE "$pattern" modified.txt \
+            | xargs -0 -r npx --yes "@biomejs/biome@$BIOME_VERSION" lint --no-errors-on-unmatched \
+            || echo "::warning::고친 product 파일에 기존 biome 오류가 있음. PR을 막지는 않음"
 
   pr-body:
     runs-on: ubuntu-latest
