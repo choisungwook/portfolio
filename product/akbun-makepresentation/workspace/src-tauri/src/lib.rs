@@ -125,12 +125,14 @@ pub fn run() {
             }
         })
         .manage(ai::AiRuntime::default())
+        .manage(std::sync::Mutex::<documents::InitialDocument>::default())
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
             // Finder hands a double-clicked file over here, not as an argument.
             // Spawning a second process for it left this one showing an empty
-            // deck, which is where the "two windows per file" came from.
+            // deck, which is where the "two windows per file" came from. On a
+            // cold launch this can fire before `setup` runs.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 for url in urls {

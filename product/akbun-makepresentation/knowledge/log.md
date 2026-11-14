@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-14
+
+* **Update**: [문서 프로세스와 프로필 분리](decisions/2026-09-document-process-and-profile-isolation.md)에 setup보다 먼저 오는 Opened 이벤트 처리 추가.
+
 ## 2026-09-28
 
 * **Creation**: [발표자 노트는 PPTX notes page로 저장](decisions/2026-09-speaker-notes-are-notes-pages.md) 결정 기록.
