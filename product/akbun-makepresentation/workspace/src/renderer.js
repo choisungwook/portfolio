@@ -91,6 +91,7 @@ $('menubar').addEventListener('pointerover', (event) => {
 // The app no longer has a system menu bar, so the events it used to send now
 // come from these items. The handler stays for anything the shell still emits.
 window.api.onFileCommand(runCommand);
+window.api.onDocumentChangedOnDisk(syncFromDisk);
 $('btn-present').addEventListener('click', enterPresent);
 
 function toggleNumbers() {

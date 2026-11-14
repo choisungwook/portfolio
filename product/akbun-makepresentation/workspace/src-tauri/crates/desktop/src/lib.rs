@@ -2,7 +2,84 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::SystemTime;
 use uuid::Uuid;
+
+/// What a file looks like on disk: modified time and length. `None` when the file is missing.
+pub type Fingerprint = (SystemTime, u64);
+
+pub fn fingerprint(path: &Path) -> Option<Fingerprint> {
+    let meta = fs::metadata(path).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
+}
+
+/// The open file and the disk state the in-memory deck is based on.
+#[derive(Default)]
+pub struct Tracker {
+    path: Option<PathBuf>,
+    synced: Option<Fingerprint>,
+    seen: Option<Fingerprint>,
+    announced: Option<Fingerprint>,
+}
+
+impl Tracker {
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    pub fn synced_to(&mut self, path: &Path, disk: Option<Fingerprint>) {
+        self.path = Some(path.into());
+        self.synced = disk;
+        self.announced = None;
+    }
+
+    /// A missing file is not a conflict: atomic replacers delete it for a moment.
+    fn differs(&self, disk: Option<Fingerprint>) -> bool {
+        disk.is_some() && disk != self.synced
+    }
+
+    /// True when saving `path` would overwrite a change made by someone else.
+    pub fn conflicts(&self, path: &Path, disk: Option<Fingerprint>) -> bool {
+        self.path.as_deref() == Some(path) && self.differs(disk)
+    }
+
+    /// True once per external change, after the fingerprint held still for a tick.
+    pub fn poll(&mut self, disk: Option<Fingerprint>) -> bool {
+        let stable = disk.is_some() && disk == self.seen;
+        self.seen = disk;
+        if stable && self.differs(disk) && self.announced != disk {
+            self.announced = disk;
+            return true;
+        }
+        false
+    }
+}
+
+/// Writes to a temp file next to `path`, then renames over it, so a reader never sees half a file.
+pub fn write_atomic(
+    path: &Path,
+    write: impl FnOnce(File) -> Result<(), String>,
+) -> Result<Option<Fingerprint>, String> {
+    let name = path.file_name().ok_or("path has no file name")?.to_string_lossy();
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", Uuid::new_v4()));
+    let result = File::create(&temp)
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
+        .and_then(write)
+        .and_then(|_| {
+            // Rename keeps mtime and length, so this is the fingerprint of what lands at `path`.
+            let written = fingerprint(&temp);
+            if let Ok(meta) = fs::metadata(path) {
+                let _ = fs::set_permissions(&temp, meta.permissions());
+            }
+            fs::rename(&temp, path)
+                .map(|_| written)
+                .map_err(|e| format!("cannot write {}: {e}", path.display()))
+        });
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
+}
 
 pub struct Profile {
     pub directory: PathBuf,
@@ -130,6 +207,77 @@ fn copy_profile(source: &Path, target: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fp(n: u64) -> Option<Fingerprint> {
+        Some((SystemTime::UNIX_EPOCH, n))
+    }
+
+    #[test]
+    fn external_change_is_a_conflict_but_own_save_is_not() {
+        let path = Path::new("/a.pptx");
+        let mut tracker = Tracker::default();
+        tracker.synced_to(path, fp(1));
+        assert!(!tracker.conflicts(path, fp(1)));
+        assert!(tracker.conflicts(path, fp(2)));
+        assert!(!tracker.conflicts(Path::new("/b.pptx"), fp(2)));
+        assert!(!tracker.conflicts(path, None));
+        tracker.synced_to(path, fp(2));
+        assert!(!tracker.conflicts(path, fp(2)));
+    }
+
+    #[test]
+    fn a_change_is_announced_once_after_it_holds_still() {
+        let mut tracker = Tracker::default();
+        tracker.synced_to(Path::new("/a.pptx"), fp(1));
+        assert!(!tracker.poll(fp(1)));
+        assert!(!tracker.poll(fp(2)), "first sight: the writer may still be writing");
+        assert!(!tracker.poll(fp(3)), "still changing");
+        assert!(tracker.poll(fp(3)));
+        assert!(!tracker.poll(fp(3)), "announced once");
+        assert!(!tracker.poll(None), "a missing file is ignored");
+        assert!(!tracker.poll(fp(3)));
+    }
+
+    #[test]
+    fn acknowledge_clears_the_conflict() {
+        let path = Path::new("/a.pptx");
+        let mut tracker = Tracker::default();
+        tracker.synced_to(path, fp(1));
+        assert!(!tracker.poll(fp(2)));
+        assert!(tracker.poll(fp(2)));
+        tracker.synced_to(path, fp(2));
+        assert!(!tracker.conflicts(path, fp(2)));
+        assert!(!tracker.poll(fp(2)));
+    }
+
+    #[test]
+    fn atomic_write_replaces_the_file_and_leaves_no_temp() {
+        let root = std::env::temp_dir().join(Uuid::new_v4().to_string());
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("a.pptx");
+        fs::write(&path, "old").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let written = write_atomic(&path, |mut f| {
+            std::io::Write::write_all(&mut f, b"new").map_err(|e| e.to_string())
+        })
+        .unwrap();
+        assert!(written.is_some());
+        assert_eq!(written, fingerprint(&path));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert!(write_atomic(&path, |_| Err("boom".into())).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn documents_and_duplicate_openings_have_separate_profiles() {
