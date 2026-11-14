@@ -77,7 +77,7 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 
 아이콘과 tooltip:
 
-- 아이콘은 `index.html`의 `.icon-defs`에 둔 인라인 SVG symbol 한 벌을 쓴다. `currentColor` 선 굵기 1.5~1.6, 채움 없음, viewBox 20.
+- 아이콘은 `index.html`의 `.icon-defs`에 둔 인라인 SVG symbol 한 벌을 쓴다. 전부 20 단위 격자에 직접 그린 도형이다. 외부 아이콘 라이브러리의 path를 복사하지 않는다. 라이선스 고지 의무가 생기기 때문이다. `currentColor` 선 굵기 1.5~1.6, 채움 없음, viewBox 20.
 - Source Monitor의 control은 글자 대신 아이콘으로 표시한다: play/pause, mark in, mark out, video와 audio 포함 토글, insert, overwrite, append, PIP. ripple 범위 select는 선택지가 글자여야 하므로 select로 두고 앞의 라벨만 아이콘으로 바꾼다.
 - video와 audio 토글은 checkbox를 그대로 두고 화면에서만 가린다. 켜짐은 `--accent-soft` 배경에 `--accent` 아이콘, 꺼짐은 `--muted` 아이콘이다.
 - 글자가 없는 control은 `data-tip`에 설명을 두고 같은 문장을 `aria-label`에 둔다. 단축키는 문장에 적지 않고 `data-tip-action`에 action id를 둔다. 단축키는 Settings에서 바뀌므로 tooltip이 표시할 때 현재 키를 괄호로 붙인다.
