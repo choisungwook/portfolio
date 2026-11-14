@@ -11,7 +11,9 @@ pub struct ActiveProfile(pub RwLock<Profile>);
 
 /// The path the page loads on startup. macOS hands a double-clicked file over
 /// as an Opened event rather than an argument, and that event can arrive before
-/// the page asks; `taken` tells the two apart.
+/// the page asks; `taken` tells the two apart. On a cold launch that event can
+/// even precede `setup`, so this state is managed on the Builder, not in `setup`.
+#[derive(Default)]
 pub struct InitialDocument {
     path: Option<String>,
     taken: bool,
@@ -19,7 +21,7 @@ pub struct InitialDocument {
 
 pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    let path = args
+    let cli_path = args
         .windows(2)
         .find(|pair| pair[0] == "--deck")
         .map(|pair| pair[1].clone())
@@ -28,9 +30,16 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 .find(|arg| arg.to_lowercase().ends_with(".pptx"))
                 .cloned()
         });
+    // A command-line path wins over one an early Opened event already stored.
+    let state = app.state::<Mutex<InitialDocument>>();
+    let mut startup = state
+        .lock()
+        .map_err(|_| "cannot read the startup document".to_string())?;
+    let path = cli_path.or_else(|| startup.path.clone());
+    startup.path = path.clone();
+    drop(startup);
     let profile = Profile::open(&app.path().app_data_dir()?, path.as_deref().map(Path::new))?;
     app.manage(ActiveProfile(RwLock::new(profile)));
-    app.manage(Mutex::new(InitialDocument { path, taken: false }));
     Ok(())
 }
 
@@ -102,7 +111,9 @@ pub fn adopt_document(app: AppHandle, path: String) -> Result<String, String> {
 #[cfg(target_os = "macos")]
 /// A file the operating system asked this process to open. Before the page has
 /// asked for its startup document the file simply becomes that document; after
-/// that the page decides whether its window is free to show it.
+/// that the page decides whether its window is free to show it. On a cold
+/// launch this can run before `setup`: the path is only recorded then, and
+/// `setup` opens the profile for it.
 pub fn open_requested(app: &AppHandle, path: PathBuf) -> Result<(), String> {
     let canonical = deck_path(path.to_string_lossy().into())?;
     let state = app.state::<Mutex<InitialDocument>>();
@@ -110,7 +121,9 @@ pub fn open_requested(app: &AppHandle, path: PathBuf) -> Result<(), String> {
         .lock()
         .map_err(|_| "cannot read the startup document".to_string())?;
     if !startup.taken && startup.path.is_none() {
-        adopt_profile(app, &canonical)?;
+        if app.try_state::<ActiveProfile>().is_some() {
+            adopt_profile(app, &canonical)?;
+        }
         startup.path = Some(canonical.to_string_lossy().into());
         return Ok(());
     }
