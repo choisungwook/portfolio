@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | 프로젝트 | 새로 만들기·열기·저장·다른 이름 저장·삭제 | Project |
 | 미디어 | 영상·음성·이미지 가져오기, 원본 경로 참조 | Assets → Import… |
-| 원본 구간 | 원본 재생, In/Out, 영상·음성 선택, Insert·Overwrite·Append | Source Monitor |
+| 원본 구간 | 원본 재생, 구간 시작·끝 표시, 영상·음성 선택, 삽입·덮어쓰기·뒤에 붙이기 (아이콘 버튼, 올리면 설명 표시) | Source Monitor |
 | 컷 편집 | 이동·트림·분할·삭제·Ripple Delete·스냅·영상/음성 연결 | Timeline, Edit |
 | 트랙 | 영상·오디오·자막 트랙 추가, 숨김·음소거 | Timeline |
 | 재생 | 프레임 이동·편집점 이동·전체 화면·미리보기 품질 | Program Monitor, Playback |
@@ -19,7 +19,7 @@
 | 제목·도형 | 텍스트, 사각형·타원·선/화살표·다각형·별 등 | + Text, Shape, Inspector |
 | 레이어 | 위치·크기·회전·불투명도, 키프레임, 블렌드 | Inspector |
 | 그래픽 스타일 | 색·그라데이션·미디어 채우기·외곽선·그림자 | Inspector의 Text / Shape |
-| PIP·B-roll | 원본 영상 오버레이, 크롭·테두리·둥근 모서리·오디오 설정 | Source Monitor → Add PIP, Inspector |
+| PIP·B-roll | 원본 영상 오버레이, 크롭·테두리·둥근 모서리·오디오 설정 | Source Monitor → PIP 아이콘, Inspector |
 | 전환 | 인접 클립 사이 디졸브 | 타임라인의 클립 경계, Inspector |
 | 자막 | SRT 가져오기·내보내기, 문구·시각·스타일 편집 | Import SRT / Export SRT, Inspector |
 | 음성 기반 편집 | 제공자 API를 통한 자막 생성, 로컬 무음 감지·제거, 로컬 모델의 군더더기 말 검토 후 제거 | Edit → AI, AI → Captions / Silence / Find fillers |
@@ -62,7 +62,7 @@
 
 1. Project → New Project로 프로젝트 생성
 2. Assets → Import…에서 원본 파일 가져오기
-3. Assets의 영상을 타임라인으로 드래그하거나 Source Monitor에서 구간 선택 후 Insert
+3. Assets의 영상을 타임라인으로 드래그하거나 Source Monitor에서 구간 선택 후 삽입 아이콘
 4. 재생 위치를 옮기고 Cmd+B로 분할
 5. 불필요한 클립 선택 후 Delete, 간격도 닫으려면 Shift+Delete
 6. + Text로 제목 추가, 선택 후 Inspector에서 문구·위치 수정

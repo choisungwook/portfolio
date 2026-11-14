@@ -109,7 +109,7 @@
       }, true);
       document.addEventListener('focusin', (event) => {
         const target = tipFor(event.target);
-        if (!target || !target.matches(':focus-visible')) return;
+        if (!target || !event.target.matches(':focus-visible')) return;
         hide();
         show(target);
       });
