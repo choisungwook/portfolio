@@ -6,7 +6,7 @@
   z-index: 300;
   display: grid;
   place-items: center;
-  background: rgba(10, 12, 16, 0.45);
+  background: var(--backdrop);
 }
 
 .overlay[hidden] {
@@ -184,7 +184,7 @@
   height: 100%;
   width: 0;
   background: var(--accent);
-  transition: width 0.15s linear;
+  transition: width var(--ease);
 }
 
 #render-status {

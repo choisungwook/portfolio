@@ -21,10 +21,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  min-height: 34px;
   padding: 3px 6px;
   border-radius: 999px;
   background: var(--panel);
   box-shadow: var(--shadow-1);
+}
+
+.zoom-capsule {
+  margin-left: auto;
 }
 
 .capsule button {
@@ -514,7 +519,6 @@ body.ai-editing .caption-editor-row textarea {
   margin-bottom: 3px;
   color: var(--muted);
   font-size: 9px;
-  text-transform: uppercase;
 }
 
 .ai-message-body {
