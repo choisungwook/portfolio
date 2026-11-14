@@ -1717,6 +1717,23 @@ input[type='color'] {
   border-radius: 6px;
 }
 
+/* The preset colours are not here: they come from data-bg in properties.js. */
+.swatch-custom {
+  position: relative;
+  display: block;
+  background: conic-gradient(#ff6b6b, #ffd43b, #69db7c, #4dabf7, #b197fc, #ff6b6b);
+  cursor: pointer;
+}
+
+#props .swatch-custom input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  box-shadow: none;
+}
+
 .swatch.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);

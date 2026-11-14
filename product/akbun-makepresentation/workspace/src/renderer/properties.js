@@ -72,6 +72,9 @@ function setBackground(color, allSlides) {
   renderBackground();
 }
 
+// Painted from data-bg through the CSSOM: the app's CSP (style-src 'self')
+// drops inline style attributes, which left every preset white.
+for (const swatch of document.querySelectorAll('[data-bg]')) swatch.style.backgroundColor = swatch.dataset.bg;
 $('bg-swatches').addEventListener('click', (event) => {
   const swatch = event.target.closest('[data-bg]');
   if (swatch) setBackground(swatch.dataset.bg, false);

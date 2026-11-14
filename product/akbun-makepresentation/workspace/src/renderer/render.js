@@ -622,9 +622,16 @@ function renderBackground() {
   const color = L.slideBackground(slide());
   $('prop-background').value = color;
   $('background-value').textContent = color.toUpperCase();
+  let preset = false;
   for (const button of document.querySelectorAll('[data-bg]')) {
-    button.classList.toggle('active', button.dataset.bg.toLowerCase() === color.toLowerCase());
+    const active = button.dataset.bg.toLowerCase() === color.toLowerCase();
+    button.classList.toggle('active', active);
+    preset ||= active;
   }
+  // The custom well shows the colour it picked once that colour is not a preset.
+  const custom = document.querySelector('.swatch-custom');
+  custom.classList.toggle('active', !preset);
+  custom.style.background = preset ? '' : color;
 }
 
 function updateTitle() {

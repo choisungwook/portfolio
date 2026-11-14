@@ -11,11 +11,23 @@ function styleTextEditor(shape) {
   // when editing starts inside a rect or an ellipse.
   const box = L.textBox(shape);
   const lines = L.wrapTextLines(textEditor.value, box.w, shape.fontSize).length;
+  textEditor.style.width = `${Math.max(box.w, 1) * scale}px`;
+  textEditor.style.fontSize = `${shape.fontSize * scale}px`;
+  textEditor.style.fontFamily = `"${shape.fontFamily || S.DEFAULT_FONT_FAMILY}", sans-serif`;
+  textEditor.style.fontWeight = shape.bold ? '700' : '400';
+  textEditor.style.fontStyle = shape.italic ? 'italic' : 'normal';
+  // The line count above is a character-width estimate, and wide glyphs such
+  // as Hangul wrap sooner in the real textarea. Sized to the estimate, the
+  // overflow is hidden and scrolled to the caret, so only the last line shows.
+  // The textarea's own content height wins whenever it is taller.
+  textEditor.style.height = '0';
+  const border = textEditor.offsetHeight - textEditor.clientHeight;
+  const measured = (textEditor.scrollHeight + border) / scale;
   // The overlay has to be anchored the way the glyphs it hides are, or text
   // inside a shape is typed at the top of the box and jumps to the middle the
   // moment editing ends. A textarea cannot anchor its own content, so the box
   // is shrunk to the text and placed where that text belongs.
-  const block = Math.max(1, lines) * shape.fontSize * 1.3;
+  const block = Math.max(Math.max(1, lines) * shape.fontSize * 1.3, measured);
   const anchored = shape.verticalAlign === 'center'
     ? Math.max(0, (box.h - block) / 2)
     : shape.verticalAlign === 'bottom'
@@ -23,13 +35,8 @@ function styleTextEditor(shape) {
     : 0;
   textEditor.style.left = `${box.x * scale}px`;
   textEditor.style.top = `${(box.y + anchored) * scale}px`;
-  textEditor.style.width = `${Math.max(box.w, 1) * scale}px`;
   textEditor.style.height = `${(shape.verticalAlign === 'top' ? Math.max(box.h, block) : block) * scale}px`;
-  textEditor.style.fontSize = `${shape.fontSize * scale}px`;
-  textEditor.style.fontFamily = `"${shape.fontFamily || S.DEFAULT_FONT_FAMILY}", sans-serif`;
   textEditor.style.color = shape.textColor;
-  textEditor.style.fontWeight = shape.bold ? '700' : '400';
-  textEditor.style.fontStyle = shape.italic ? 'italic' : 'normal';
   textEditor.style.textDecoration = shape.underline ? 'underline' : 'none';
   textEditor.style.textAlign = shape.textAlign || 'left';
 }
@@ -46,8 +53,9 @@ function startTextEdit(index, seed) {
 
   textEditor.value = seed ? shape.text + seed : shape.text;
   if (seed && shape.kind === 'text') fitTextBoxForSlide(shape, textEditor.value);
-  styleTextEditor(shape);
+  // Shown before styling: a hidden textarea measures a scrollHeight of 0.
   textEditor.hidden = false;
+  styleTextEditor(shape);
   // Deferred so it wins over whatever focus change the triggering click
   // still has queued.
   setTimeout(() => {
