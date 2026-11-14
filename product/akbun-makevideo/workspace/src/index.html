@@ -550,29 +550,38 @@
 
     <section id="lower">
       <div id="timeline-toolbar">
-        <button id="btn-split" class="icon" title="Split at the playhead (⌘B)">
-          <svg viewBox="0 0 20 20"><use href="#icon-split" /></svg>
-        </button>
-        <button id="btn-magnet" class="icon" title="Snap clips to nearby edges">
-          <svg viewBox="0 0 20 20"><use href="#icon-magnet" /></svg>
-        </button>
-        <button id="btn-delete" class="icon" title="Delete the selected clip (Delete)">
-          <svg viewBox="0 0 20 20"><use href="#icon-trash" /></svg>
-        </button>
-        <button id="btn-ripple" class="icon" title="Delete the selected clip and close the gap (⇧Delete)">
-          <svg viewBox="0 0 20 20"><use href="#icon-ripple" /></svg>
-        </button>
-        <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
-        <button id="btn-add-text" class="small" title="Add a 4 second title at the playhead — or drag onto a video track">+ Text</button>
-        <span class="sep-v"></span>
-        <button id="btn-add-video" class="small">+ Video track</button>
-        <button id="btn-add-audio" class="small">+ Audio track</button>
-        <button id="btn-add-subtitle" class="small">+ Subtitle track</button>
-        <button id="btn-import-srt" class="small">Import SRT</button>
-        <button id="btn-export-srt" class="small">Export SRT</button>
+        <div class="capsule">
+          <button id="btn-split" class="icon" title="Split at the playhead (⌘B)">
+            <svg viewBox="0 0 20 20"><use href="#icon-split" /></svg>
+          </button>
+          <button id="btn-magnet" class="icon" title="Snap clips to nearby edges">
+            <svg viewBox="0 0 20 20"><use href="#icon-magnet" /></svg>
+          </button>
+          <button id="btn-delete" class="icon" title="Delete the selected clip (Delete)">
+            <svg viewBox="0 0 20 20"><use href="#icon-trash" /></svg>
+          </button>
+          <button id="btn-ripple" class="icon" title="Delete the selected clip and close the gap (⇧Delete)">
+            <svg viewBox="0 0 20 20"><use href="#icon-ripple" /></svg>
+          </button>
+        </div>
+        <div class="capsule">
+          <button id="btn-link" class="small" title="Link or unlink synchronized audio and video clips">Link Clips</button>
+          <button id="btn-add-text" class="small" title="Add a 4 second title at the playhead — or drag onto a video track">+ Text</button>
+        </div>
+        <div class="capsule">
+          <button id="btn-add-video" class="small">+ Video track</button>
+          <button id="btn-add-audio" class="small">+ Audio track</button>
+          <button id="btn-add-subtitle" class="small">+ Subtitle track</button>
+        </div>
+        <div class="capsule">
+          <button id="btn-import-srt" class="small">Import SRT</button>
+          <button id="btn-export-srt" class="small">Export SRT</button>
+        </div>
         <span class="menubar-gap"></span>
         <span id="proxy-progress" class="dim small-text" hidden></span>
-        <label class="inline">Zoom <input type="range" id="zoom" min="0" max="100" value="45" /></label>
+        <div class="capsule">
+          <label class="inline">Zoom <input type="range" id="zoom" min="0" max="100" value="45" /></label>
+        </div>
       </div>
 
       <div id="timeline">

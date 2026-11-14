@@ -19,9 +19,16 @@
   padding: 18px 20px;
   overflow-y: auto;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: var(--shadow-2);
+}
+
+/* The sheet is as dark as the window behind it, so the shadow alone does not
+   separate them. */
+@media (prefers-color-scheme: dark) {
+  .sheet {
+    border: 1px solid var(--border);
+  }
 }
 
 .sheet h3 {
@@ -122,8 +129,7 @@
   gap: 12px;
   width: 100%;
   padding: 8px 10px;
-  background: none;
-  border: none;
+  background-color: transparent;
   border-radius: 0;
   border-bottom: 1px solid var(--border);
   text-align: left;
@@ -133,8 +139,9 @@
   border-bottom: none;
 }
 
-.project-row:hover {
-  background: var(--accent);
+.project-row:hover:not(:disabled) {
+  background-color: var(--accent);
+  background-image: none;
   color: var(--on-accent);
 }
 
@@ -169,8 +176,7 @@
   height: 8px;
   margin-bottom: 10px;
   border-radius: 99px;
-  background: var(--panel-soft);
-  border: 1px solid var(--border);
+  background: var(--control);
   overflow: hidden;
 }
 

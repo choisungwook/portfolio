@@ -4,9 +4,8 @@
 .ai-studio-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; gap: 8px; }
 .ai-studio-header h3 { margin: 0; font-size: 13px; }
 .ai-studio-header span { color: var(--accent); font-size: 10px; }
-.ai-workflow-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 0 8px 8px; border-bottom: 1px solid var(--border); }
-.ai-workflow-steps button { padding: 5px 2px; font-size: 10px; }
-.ai-workflow-steps [aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+.ai-workflow-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin: 0 8px 8px; padding: 2px; border-radius: var(--radius); background: var(--control); }
+.ai-workflow-steps button { padding: 5px 2px; background-color: transparent; font-size: 10px; }
 .ai-studio-scroll { flex: 1; min-height: 80px; overflow: auto; padding: 12px; }
 .ai-studio h4 { margin: 0 0 8px; font-size: 12px; }
 .ai-studio p { font-size: 11px; line-height: 1.5; margin: 6px 0 10px; overflow-wrap: anywhere; }
@@ -19,7 +18,7 @@
 .ai-studio-list article { border-top: 1px solid var(--border); padding: 10px 0; }
 .ai-studio-list strong { display: block; color: var(--fg); overflow-wrap: anywhere; }
 .ai-studio-list button { font-size: 10px; margin: 4px 4px 0 0; }
-.ai-studio-composer { flex: none; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel-soft); }
+.ai-studio-composer { flex: none; padding: 8px 12px; background: var(--panel); }
 .ai-studio-composer textarea { resize: vertical; min-height: 56px; max-height: 180px; font: inherit; }
 .ai-studio-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 .ai-studio[data-step='prepare'] .ai-studio-composer > :not(#studio-status):not(.ai-studio-actions) { display: none; }
