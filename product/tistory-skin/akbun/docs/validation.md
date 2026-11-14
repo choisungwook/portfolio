@@ -165,7 +165,9 @@ var relativeIndex = findTistoryFooterStartIndex(markdown.slice(searchStart));
 **JS** — ToC 생성 셀렉터를 변경하면 목차가 비게 된다.
 
 ```js
-document.querySelectorAll(".post-body h1, .post-body h2")
+document.querySelectorAll('.post-body h1, .post-body h2, .post-body h3[data-ke-size="size23"]:not([id])');
+var isEditorHeading = !id && heading.hasAttribute("data-ke-size");
+if (isEditorHeading) level = level === "h2" ? "h1" : "h2";
 ```
 
 **CSS** — ToC 폰트 크기와 반응형 숨김 처리를 유지한다.
@@ -233,7 +235,8 @@ document.querySelectorAll(".post-body h1, .post-body h2")
   font-size: 1.0625rem;
 }
 
-.post-body h1 {
+.post-body h1,
+.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) {
   font-size: 1.75rem;
   color: var(--color-heading-primary) !important;
 }
@@ -241,11 +244,13 @@ document.querySelectorAll(".post-body h1, .post-body h2")
 .post-body h1 span,
 .post-body h1 a,
 .post-body h1 strong,
-.post-body h1 b {
+.post-body h1 b,
+.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) :is(span, a, strong, b) {
   color: var(--color-heading-primary) !important;
 }
 
-.post-body h2 {
+.post-body h2,
+.post-body h3[data-ke-size="size23"]:is(:not([id]), [id^="toc-heading-"]) {
   font-size: 1.3125rem;
 }
 
@@ -255,19 +260,6 @@ document.querySelectorAll(".post-body h1, .post-body h2")
 ```
 
 같은 페이지의 "티스토리 제목1 예시"가 본문 `h1`과, "티스토리 제목2 예시"가 본문 `h2`와 같은 스타일로 보이고 목차에도 각각 `h1`, `h2` 단계로 들어가는지 확인한다. 티스토리 에디터는 제목1을 `h2[data-ke-size="size26"]`, 제목2를 `h3[data-ke-size="size23"]`로 저장한다. pandoc으로 올린 마크다운 헤더도 같은 태그가 되지만 `id`가 붙어 있으므로, `id`가 없거나 목차 스크립트가 붙인 `toc-heading-` `id`인 헤더만 에디터 헤더로 본다.
-
-```css
-.post-body h1,
-.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) {
-  font-size: 1.75rem;
-  color: var(--color-heading-primary) !important;
-}
-
-.post-body h2,
-.post-body h3[data-ke-size="size23"]:is(:not([id]), [id^="toc-heading-"]) {
-  font-size: 1.3125rem;
-}
-```
 
 ## 포스트 댓글
 
