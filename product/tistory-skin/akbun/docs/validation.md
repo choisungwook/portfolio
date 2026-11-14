@@ -254,6 +254,21 @@ document.querySelectorAll(".post-body h1, .post-body h2")
 }
 ```
 
+같은 페이지의 "티스토리 제목1 예시"가 본문 `h1`과, "티스토리 제목2 예시"가 본문 `h2`와 같은 스타일로 보이고 목차에도 각각 `h1`, `h2` 단계로 들어가는지 확인한다. 티스토리 에디터는 제목1을 `h2[data-ke-size="size26"]`, 제목2를 `h3[data-ke-size="size23"]`로 저장한다. pandoc으로 올린 마크다운 헤더도 같은 태그가 되지만 `id`가 붙어 있으므로, `id`가 없거나 목차 스크립트가 붙인 `toc-heading-` `id`인 헤더만 에디터 헤더로 본다.
+
+```css
+.post-body h1,
+.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) {
+  font-size: 1.75rem;
+  color: var(--color-heading-primary) !important;
+}
+
+.post-body h2,
+.post-body h3[data-ke-size="size23"]:is(:not([id]), [id^="toc-heading-"]) {
+  font-size: 1.3125rem;
+}
+```
+
 ## 포스트 댓글
 
 `/preview-post.html`에서 댓글 제목과 댓글 영역이 표시되는지 확인한다. 댓글 블록 태그와 입력폼 토큰은 티스토리 파서가 요구하는 구조이므로 순서와 중첩을 변경하면 댓글 기능이 깨진다.
