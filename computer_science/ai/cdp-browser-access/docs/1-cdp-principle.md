@@ -14,6 +14,10 @@
 
 Claude desktop의 내장 브라우저, Claude in Chrome(Claude CLI의 `--chrome` 포함), Codex의 Chrome 확장, Aside는 겉모습이 모두 다르지만, 마지막에 브라우저 엔진으로 들어가는 명령은 같은 프로토콜입니다. 아래 그림은 도구마다 CDP에 도달하는 경로가 어떻게 다른지를 나타냅니다.
 
+![AI 도구별 CDP 전달 경로](../imgs/02-ai-tool-cdp-paths.png)
+
+아래 mermaid는 같은 구조를 텍스트로 옮긴 것입니다.
+
 ```mermaid
 flowchart LR
   subgraph agents["AI 도구"]

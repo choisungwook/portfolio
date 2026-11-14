@@ -136,3 +136,6 @@ worktree/
 
 # gradle
 **/.gradle/
+
+# cdp-browser-access 실습 Chrome을 workspace 밖에서 띄웠을 때 생기는 프로필
+/.chrome-profile/
