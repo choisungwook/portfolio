@@ -47,9 +47,12 @@
 }
 
 /* The Program Monitor has nothing to put in the fourth row, so its transport
-   takes both and centres itself in them rather than leaving a blank strip. */
+   takes both rows to keep the background unbroken and holds its content in the
+   first, on the same line as the Source Monitor's. */
 #transport {
   grid-row: 3 / 5;
+  flex-wrap: wrap;
+  align-content: flex-start;
 }
 
 .monitor-stage-wrap {
@@ -101,6 +104,7 @@
 
 #source-actions button,
 #source-actions select,
+.monitor-transport select,
 .monitor-transport button {
   padding: 3px 7px;
   font-size: 11px;
@@ -171,7 +175,7 @@
   cursor: default;
 }
 
-#source-actions .scope svg {
+.inline.scope svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -392,16 +396,6 @@ audio.stage-media {
   color: #d8dade;
   font-size: 12px;
   pointer-events: none;
-}
-
-#transport {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--panel);
-  min-width: 0;
-  flex-wrap: wrap;
 }
 
 .inline {

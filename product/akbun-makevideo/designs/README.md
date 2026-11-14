@@ -12,7 +12,7 @@
 - 기본 상태: 우측 선택 패널 닫힘
 - 열린 상태: Assets 264px / Source 1fr / Program 1fr / Selected Panel 280px
 - Global Action Bar: Inspector / Shape / Marker / Debug
-- Panel Tab Bar: Video / Audio / Effects / Transition / Image / File
+- Panel Tab Bar: 선택한 대상이 가진 속성 묶음만 표시 (Video / Audio / Transition). 묶음이 하나뿐이면 tab bar를 숨김
 - Timeline: 편집 툴바 / ruler와 tracks
 - AI Edit studio: Prepare / Story / Layers / Finish 단계, 스크롤 가능한 내용과 하단 요청 입력
 - 편집 제안: 실제 적용 전에 변경 목록 표시, 컷 구간 버튼으로 원본 위치 탐색
@@ -84,6 +84,14 @@ akbun-makepresentation 0.30.1의 화면 설정을 영상 편집기에 맞춰 옮
 - 글자가 없는 control은 `data-tip`에 설명을 두고 같은 문장을 `aria-label`에 둔다. 단축키는 문장에 적지 않고 `data-tip-action`에 action id를 둔다. 단축키는 Settings에서 바뀌므로 tooltip이 표시할 때 현재 키를 괄호로 붙인다.
 - tooltip은 pointer를 올리고 400ms 뒤, 또는 keyboard focus에서 control 아래에 표시한다. pointer가 떠나거나 누를 때, Tab이 아닌 key를 누를 때 숨긴다. 아래 공간이 없으면 위에 표시한다. `--fg` 배경에 `--panel` 글자, 반경 `--radius-s`, 12px이다. `position: fixed`인 요소 하나를 `body`에 두어 panel의 `overflow`에 잘리지 않게 한다.
 - native `title`은 tooltip과 겹쳐 표시되므로 `data-tip`이 있는 control에는 쓰지 않는다.
+
+Inspector:
+
+- Inspector는 선택한 대상의 속성만 표시한다. audio clip을 선택하면 audio 속성, video clip을 선택하면 video 속성이다.
+- tab은 선택한 대상이 가진 묶음만 만든다. 연결된 audio가 있거나 audio가 내장된 video clip은 Video와 Audio, dissolve가 걸린 clip은 Transition이 더해진다. 처음 표시하는 tab은 선택한 track의 종류다.
+- 묶음이 하나뿐이면 tab bar를 숨긴다. text, shape, subtitle, PIP layer와 audio만 있는 clip이 그렇다.
+- 패널 제목은 선택한 대상의 종류다: Video clip, Audio clip, Text, Shape, Subtitle, Picture in Picture. 선택이 없으면 Inspector다.
+- Effects, Image, File tab은 두지 않는다. 편집할 속성 없이 이름만 표시하던 자리였다.
 
 ## Interaction
 

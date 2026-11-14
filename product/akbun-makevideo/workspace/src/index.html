@@ -83,6 +83,12 @@
         <path d="M3 5h7M3 10h7M3 15h7" />
         <path d="M13 10h4.5M15.3 7.8l2.2 2.2-2.2 2.2" />
       </g>
+      <!-- A screen with a staircase of pixels inside it. -->
+      <g id="icon-quality">
+        <rect x="2.5" y="3.5" width="15" height="10.5" rx="1.5" />
+        <path d="M5.5 11.5h3v-3h3v-3h3" />
+        <path d="M7 17h6" />
+      </g>
       <g id="icon-inspector">
         <path d="M4 5h12M4 10h12M4 15h12" />
         <circle cx="8" cy="5" r="1.7" />
@@ -308,7 +314,7 @@
             <span id="stage-mode" hidden></span>
             <p id="stage-hint">Drop media on the timeline below to see it here.</p>
           </div>
-          <div id="transport">
+          <div id="transport" class="monitor-transport">
             <button id="btn-play" class="icon" data-tip="Play or pause" aria-label="Play or pause" data-tip-action="toggle-playback">
               <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-play" /></svg>
             </button>
@@ -316,9 +322,9 @@
             <span class="dim mono">/</span>
             <span id="duration" class="mono dim">0:00:00.00</span>
             <span class="menubar-gap"></span>
-            <label class="inline">
-              Preview quality
-              <select id="preview-quality">
+            <label class="inline scope" data-tip="Preview quality">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-quality" /></svg>
+              <select id="preview-quality" aria-label="Preview quality">
                 <option value="full">Full</option>
                 <option value="half">Half</option>
                 <option value="quarter">Quarter</option>
