@@ -24,8 +24,22 @@
     return { left, top: above, placement: 'above' };
   }
 
+  const KEPT_KEYS = new Set(['Tab', 'Shift', 'Control', 'Alt', 'Meta']);
+
+  function keepsTooltip(key) {
+    return KEPT_KEYS.has(key);
+  }
+
+  function isStale(target) {
+    return !target.isConnected || target.getClientRects().length === 0;
+  }
+
+  function tooltipText(tip, keys) {
+    return keys ? `${tip} (${keys})` : tip;
+  }
+
   function createTooltip(deps) {
-    const { document, window } = deps;
+    const { document, shortcutLabel = () => '', window } = deps;
     let node = null;
     let current = null;
     let suppressed = null;
@@ -51,7 +65,7 @@
       const text = target.dataset.tip;
       if (!text || !target.isConnected) return;
       const tip = ensureNode();
-      tip.textContent = text;
+      tip.textContent = tooltipText(text, target.dataset.tipAction ? shortcutLabel(target.dataset.tipAction) : '');
       tip.hidden = false;
       tip.style.left = '0px';
       tip.style.top = '0px';
@@ -80,6 +94,10 @@
       current = null;
     }
 
+    function hideStale() {
+      if (current && isStale(current)) hide();
+    }
+
     function schedule(target) {
       window.clearTimeout(showTimer);
       if (warm) show(target);
@@ -88,6 +106,7 @@
 
     function wire() {
       document.addEventListener('pointerover', (event) => {
+        hideStale();
         if (event.pointerType === 'touch') return;
         const target = tipFor(event.target);
         if (!target || target === current) return;
@@ -104,6 +123,7 @@
         if (target === current || showTimer) hide();
       });
       document.addEventListener('pointerdown', () => {
+        hideStale();
         suppressed = current || suppressed;
         hide();
       }, true);
@@ -115,7 +135,8 @@
       });
       document.addEventListener('focusout', hide);
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') hide();
+        if (!keepsTooltip(event.key)) hide();
+        else hideStale();
       });
       document.addEventListener('scroll', hide, true);
       window.addEventListener('blur', hide);
@@ -124,5 +145,5 @@
     return { hide, wire };
   }
 
-  return { createTooltip, placeTooltip };
+  return { createTooltip, isStale, keepsTooltip, placeTooltip, tooltipText };
 });

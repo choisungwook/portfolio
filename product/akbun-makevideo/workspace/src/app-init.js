@@ -282,7 +282,11 @@
       stageController.wireTransport();
       wireSheets();
       shortcutController.wire();
-      globalThis.tooltipLib.createTooltip({ document, window }).wire();
+      globalThis.tooltipLib.createTooltip({
+        document,
+        shortcutLabel: shortcutController.label,
+        window,
+      }).wire();
 
       if (window.api.onMcpChanged) {
         subscribe('events:mcp-changed', window.api.onMcpChanged, async () => {

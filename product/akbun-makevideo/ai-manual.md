@@ -194,7 +194,7 @@ get_project에서 받은 토큰을 아래 stateToken에 넣어 현재 타임라�
 | 영역 | 용도 |
 | --- | --- |
 | 좌측 Assets | 가져온 영상·오디오·이미지 목록 |
-| 가운데 Source Monitor | 선택한 원본과 In/Out 구간 확인 |
+| 가운데 Source Monitor | 선택한 원본과 사용할 구간(시작·끝 표시) 확인. 버튼은 글자 없이 아이콘이고, 마우스를 올리면 설명이 뜸 |
 | 우측 Program Monitor | 타임라인 합성 결과 확인 |
 | 하단 Timeline | 트랙, 클립, 자막, 그래픽, 재생 위치 편집 |
 | 우측 상단 Inspector | 선택한 클립·레이어 속성 |
@@ -213,12 +213,12 @@ get_project에서 받은 토큰을 아래 stateToken에 넣어 현재 타임라�
 | 프로젝트 열기 | Project → Open Project…, Cmd+O |
 | 저장 / 다른 이름 저장 | Project → Save / Save As…, Cmd+S / Shift+Cmd+S |
 | 미디어 가져오기 | Assets의 Import… 또는 Project → Import Media…, Cmd+I |
-| 영상 배치 | Assets에서 타임라인으로 드래그, 또는 Source Monitor에서 Insert / Append |
+| 영상 배치 | Assets에서 타임라인으로 드래그, 또는 Source Monitor의 삽입(Insert at the playhead…) / 뒤에 붙이기(Append after the last clip) 아이콘 |
 
 - 가져오기 후 Assets에 파일명이 실제로 나타났는지 확인
-- Source Monitor에서 원본을 선택하고 In / Out으로 사용할 구간 지정
-- Video / Audio 선택 상태를 확인한 뒤 Insert / Overwrite / Append 사용
-- Overwrite는 기존 구간에 영향을 주므로 삽입과 혼동하지 않음
+- Source Monitor에서 원본을 선택하고 시작 표시(Set the source in point)·끝 표시(Set the source out point) 아이콘으로 사용할 구간 지정
+- 영상·음성 토글(Include the source video / audio)의 켜짐(파란 배경)을 확인한 뒤 삽입(Insert at the playhead…)·덮어쓰기(Overwrite at the playhead)·뒤에 붙이기(Append after the last clip) 아이콘 사용
+- 덮어쓰기는 기존 구간에 영향을 주므로 삽입과 혼동하지 않음
 - 누락 미디어가 빨간 빗금으로 보이면 경로부터 해결
 
 ## 컷 편집
@@ -245,7 +245,7 @@ get_project에서 받은 토큰을 아래 stateToken에 넣어 현재 타임라�
 - 전사에 필요한 인증 정보가 없으면 추측 입력하지 않고 사용자에게 요청
 - 제목 추가: + Text, 재생 위치에 추가된 항목을 선택해 Inspector에서 수정
 - 도형 추가: 상단 Shape, 추가 후 Inspector에서 위치·크기·색 확인
-- B-roll/PIP: Assets에서 영상 선택 → Source Monitor 구간 지정 → Add PIP
+- B-roll/PIP: Assets에서 영상 선택 → Source Monitor 구간 지정 → PIP 아이콘(Place the selected video over the timeline at the playhead)
 - Program Monitor에서 제목 위치·자막 겹침·B-roll 노출 시간을 확인
 - AI → Studio의 Prepare / Story / Layers / Finish는 내부 Astra 편집 도구. 외부 AI가 화면을 조작할 때 반드시 사용할 필요는 없음
 

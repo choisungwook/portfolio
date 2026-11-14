@@ -250,10 +250,10 @@
             <span id="source-clock" class="mono">0:00:00:00</span>
             <span class="dim mono">/</span>
             <span id="source-duration" class="mono dim">0:00:00:00</span>
-            <button id="source-mark-in" class="icon" data-tip="Set the source in point (I)" aria-label="Set the source in point (I)">
+            <button id="source-mark-in" class="icon" data-tip="Set the source in point" aria-label="Set the source in point" data-tip-action="source-mark-in">
               <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-mark-in" /></svg>
             </button>
-            <button id="source-mark-out" class="icon" data-tip="Set the source out point (O)" aria-label="Set the source out point (O)">
+            <button id="source-mark-out" class="icon" data-tip="Set the source out point" aria-label="Set the source out point" data-tip-action="source-mark-out">
               <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-mark-out" /></svg>
             </button>
           </div>
@@ -309,7 +309,7 @@
             <p id="stage-hint">Drop media on the timeline below to see it here.</p>
           </div>
           <div id="transport">
-            <button id="btn-play" class="icon" data-tip="Play or pause (Space)" aria-label="Play or pause (Space)">
+            <button id="btn-play" class="icon" data-tip="Play or pause" aria-label="Play or pause" data-tip-action="toggle-playback">
               <svg viewBox="0 0 20 20" aria-hidden="true"><use href="#icon-play" /></svg>
             </button>
             <span id="clock" class="mono">0:00:00.00</span>
@@ -624,16 +624,16 @@
     <section id="lower">
       <div id="timeline-toolbar">
         <div class="capsule">
-          <button id="btn-split" class="icon" data-tip="Split at the playhead (⌘B)" aria-label="Split at the playhead (⌘B)">
+          <button id="btn-split" class="icon" data-tip="Split at the playhead" aria-label="Split at the playhead" data-tip-action="split">
             <svg viewBox="0 0 20 20"><use href="#icon-split" /></svg>
           </button>
           <button id="btn-magnet" class="icon" data-tip="Snap clips to nearby edges" aria-label="Snap clips to nearby edges">
             <svg viewBox="0 0 20 20"><use href="#icon-magnet" /></svg>
           </button>
-          <button id="btn-delete" class="icon" data-tip="Delete the selected clip (Delete)" aria-label="Delete the selected clip (Delete)">
+          <button id="btn-delete" class="icon" data-tip="Delete the selected clip" aria-label="Delete the selected clip" data-tip-action="delete-clip">
             <svg viewBox="0 0 20 20"><use href="#icon-trash" /></svg>
           </button>
-          <button id="btn-ripple" class="icon" data-tip="Delete the selected clip and close the gap (⇧Delete)" aria-label="Delete the selected clip and close the gap (⇧Delete)">
+          <button id="btn-ripple" class="icon" data-tip="Delete the selected clip and close the gap" aria-label="Delete the selected clip and close the gap" data-tip-action="ripple-delete">
             <svg viewBox="0 0 20 20"><use href="#icon-ripple" /></svg>
           </button>
         </div>

@@ -65,7 +65,7 @@
 3. Assets의 영상을 타임라인으로 드래그하거나 Source Monitor에서 구간 선택 후 삽입 아이콘
 4. 재생 위치를 옮기고 Cmd+B로 분할
 5. 불필요한 클립 선택 후 Delete, 간격도 닫으려면 Shift+Delete
-6. + Text로 제목 추가, 선택 후 Inspector에서 문구·위치 수정
+6. `+ Text`로 제목 추가, 선택 후 Inspector에서 문구·위치 수정
 7. Program Monitor에서 편집점 전후와 음성 확인
 8. Project → Save로 프로젝트 저장
 9. Render → Render…(Cmd+E)에서 해상도와 품질 선택 후 새 MP4 경로 지정
