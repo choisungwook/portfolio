@@ -18,7 +18,7 @@ function fileContext(filePath, dirty, discard = true) {
       openDeck: async (path) => { actions.push(['load', path]); return { slides: [] }; },
       message: async (error) => { actions.push(['message', error]); },
     } },
-    L: { fitTextHeight: () => {} },
+    L: { fitTextHeight: () => {}, sanitizeDeck: (deck) => deck },
     setSlideSelection: () => {},
     clearSelection: () => {},
     resetHistory: () => {},

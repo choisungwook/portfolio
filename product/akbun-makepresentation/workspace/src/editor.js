@@ -54,6 +54,8 @@
     normalizeLineNumbers: Shapes.normalizeLineNumbers,
     tokenizeCodeLine: Svg.tokenizeCodeLine,
     createShape: Shapes.createShape,
+    sanitizeShape: Shapes.sanitizeShape,
+    sanitizeDeck: Shapes.sanitizeDeck,
     defaultPresetShapes: Presets.defaultPresetShapes,
     customPresetFromSelection: Presets.customPresetFromSelection,
     parseClipboardShapes: Shapes.parseClipboardShapes,

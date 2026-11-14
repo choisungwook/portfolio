@@ -13,6 +13,26 @@ pub(super) fn attr(
     })
 }
 
+/// `#rrggbb` for exactly six ASCII hex digits, else None. Colours go straight
+/// into SVG attributes on the page, so a value that is not hex is treated as
+/// absent instead of being carried along as text.
+pub(super) fn hex_color(value: &str) -> Option<String> {
+    (value.len() == 6 && value.bytes().all(|b| b.is_ascii_hexdigit()))
+        .then(|| format!("#{}", value.to_ascii_lowercase()))
+}
+
+/// For colours that arrive inside an embedded Shape JSON: `none` or 3, 4, 6
+/// or 8 hex digits behind `#` (the forms the page's `safeColor` accepts).
+pub(super) fn safe_color(value: &mut String, fallback: &str) {
+    let ok = value == "none"
+        || value.strip_prefix('#').is_some_and(|hex| {
+            matches!(hex.len(), 3 | 4 | 6 | 8) && hex.bytes().all(|b| b.is_ascii_hexdigit())
+        });
+    if !ok {
+        *value = fallback.into();
+    }
+}
+
 pub(super) fn in_ctx(stack: &[String], name: &str) -> bool {
     stack.iter().any(|item| item == name)
 }

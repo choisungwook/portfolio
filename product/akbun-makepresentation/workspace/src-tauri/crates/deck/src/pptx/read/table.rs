@@ -1,5 +1,5 @@
 use super::super::common::px;
-use super::xml::attr;
+use super::xml::{attr, hex_color};
 use super::SlideCtx;
 use crate::Shape;
 use quick_xml::events::Event;
@@ -166,7 +166,7 @@ fn read_cell_element(
         }
         "srgbClr" | "schemeClr" => {
             let color = if name == "srgbClr" {
-                attr(element, b"val").map(|value| format!("#{}", value.to_lowercase()))
+                attr(element, b"val").and_then(|value| hex_color(&value))
             } else {
                 attr(element, b"val").and_then(|value| ctx.scheme_hex(&value))
             };

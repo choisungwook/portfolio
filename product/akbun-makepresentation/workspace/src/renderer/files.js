@@ -70,7 +70,7 @@ function fitOpenedTextBoxes(deck) {
 }
 
 async function loadDocument(path) {
-  state.deck = fitOpenedTextBoxes(await window.api.openDeck(path));
+  state.deck = fitOpenedTextBoxes(L.sanitizeDeck(await window.api.openDeck(path)));
   state.current = 0;
   setSlideSelection([0]);
   clearSelection();

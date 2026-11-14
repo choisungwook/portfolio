@@ -1,7 +1,7 @@
 //! DrawingML shape, text, placeholder, and group parsing.
 
 use super::super::common::{px, read_arrow_end};
-use super::xml::{attr, in_ctx, mod_color};
+use super::xml::{attr, hex_color, in_ctx, mod_color, safe_color};
 use super::table::parse_table_frame;
 use super::{ParsedPart, SlideCtx};
 use crate::{Shape, EMU_PER_PX};
@@ -326,7 +326,7 @@ fn handle_element(
             p.stroke_w = get(b"w").and_then(|v| v.parse().ok());
         }
         "srgbClr" => {
-            let color = get(b"val").map(|v| format!("#{}", v.to_lowercase()));
+            let color = get(b"val").and_then(|v| hex_color(&v));
             assign_color(p, color, stack);
         }
         "schemeClr" => {
@@ -734,6 +734,11 @@ fn finish(p: Pending, ctx: &SlideCtx, default: Option<&Shape>) -> Option<Shape> 
     }
     if let Some(mut code) = code_shape {
         code.kind = "code".into();
+        // This Shape came out of an attribute as JSON, so none of its colours
+        // went through hex_color.
+        safe_color(&mut code.stroke, "#e03131");
+        safe_color(&mut code.fill, "none");
+        safe_color(&mut code.text_color, "#1a1a1a");
         code.x = shape.x;
         code.y = shape.y;
         code.w = shape.w;
