@@ -55,8 +55,41 @@ function rulesOf(css) {
   return rules;
 }
 
+const COLOR_PROPERTY = /^(color|background(-color)?|border(-[a-z]+)*|outline(-color)?|fill|stroke|box-shadow|text-shadow|caret-color|accent-color|text-decoration(-color)?|column-rule(-color)?)$/;
+const NAMED_COLORS = [
+  'black', 'white', 'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown',
+  'gray', 'grey', 'silver', 'gold', 'cyan', 'magenta', 'lime', 'maroon', 'navy', 'olive',
+  'teal', 'aqua', 'fuchsia', 'coral', 'crimson', 'indigo', 'violet', 'tomato', 'salmon', 'khaki',
+];
+const NAMED_COLOR = new RegExp(`\\b(${NAMED_COLORS.join('|')})\\b`, 'i');
+
+function declarationsOf(body) {
+  return body.split(';').map((declaration) => {
+    const colon = declaration.indexOf(':');
+    return colon === -1
+      ? null
+      : { property: declaration.slice(0, colon).trim().toLowerCase(), value: declaration.slice(colon + 1).trim() };
+  }).filter(Boolean);
+}
+
+/** The first colour written out in a rule body instead of taken from a
+ *  variable: a hex value, rgb/hsl, or a named colour in a colour property. */
+function literalColor(body) {
+  for (const { property, value } of declarationsOf(body)) {
+    if (property.startsWith('--')) continue;
+    const bare = value.replace(/url\([^)]*\)/g, '').replace(/var\([^)]*\)/g, '');
+    const literal = bare.match(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/);
+    if (literal) return literal[0];
+    if (COLOR_PROPERTY.test(property)) {
+      const named = bare.match(NAMED_COLOR);
+      if (named) return named[0];
+    }
+  }
+  return null;
+}
+
 function tagsWith(page, attribute) {
-  return [...page.matchAll(/<[a-z][^>]*>/gi)]
+  return [...page.matchAll(/<[a-z](?:[^>"]|"[^"]*")*>/gi)]
     .map((match) => match[0])
     .filter((tag) => new RegExp(`\\s${attribute}(=|\\s|>|/)`).test(tag.replace(/"[^"]*"/g, '""')));
 }
@@ -105,7 +138,7 @@ test('rule bodies take colours from variables, except over the video', () => {
   for (const name of sourceFiles('.css')) {
     for (const rule of rulesOf(read(name))) {
       if (/(^|[\s,])(:root|html)(?![\w-])/.test(rule.selector) && /--[\w-]+\s*:/.test(rule.declarations)) continue;
-      const literal = rule.declarations.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(/);
+      const literal = literalColor(rule.declarations) && [literalColor(rule.declarations)];
       if (!literal) continue;
       const selectors = rule.selector.split(',').map((selector) => selector.trim());
       if (selectors.every((selector) => COLOR_SELECTORS_OVER_VIDEO.has(selector))) continue;
@@ -119,17 +152,31 @@ test('rule bodies take colours from variables, except over the video', () => {
 test('styles do not transform text case or spacing', () => {
   const found = [];
   for (const name of sourceFiles('.css')) {
-    const match = stripComments(read(name)).match(/text-transform\s*:|letter-spacing\s*:/);
-    if (match) found.push(`${name}: ${match[0]}`);
+    for (const rule of rulesOf(read(name))) {
+      for (const { property, value } of declarationsOf(rule.declarations)) {
+        const allowed = property === 'text-transform' ? /^none$/i : /^(normal|0(px)?)$/i;
+        if ((property === 'text-transform' || property === 'letter-spacing') && !allowed.test(value)) {
+          found.push(`${name}: ${rule.selector} sets ${property}: ${value}`);
+        }
+      }
+    }
   }
 
   assert.deepStrictEqual(found, []);
 });
 
-test('the page has no inline style attribute, which the CSP refuses', () => {
+test('the page has no inline style, script or handler, which the CSP refuses', () => {
   const page = read('index.html');
+  const inline = tagsWith(page, 'style').map((tag) => `index.html: ${tag}`);
+  for (const match of page.matchAll(/<script(?:[^>"]|"[^"]*")*>/gi)) {
+    if (!/\ssrc="/.test(match[0])) inline.push(`index.html: inline ${match[0]}`);
+  }
+  for (const tag of [...page.matchAll(/<[a-z](?:[^>"]|"[^"]*")*>/gi)].map((match) => match[0])) {
+    const handler = tag.replace(/"[^"]*"/g, '""').match(/\s(on[a-z]+)=/i);
+    if (handler) inline.push(`index.html: ${handler[1]} on ${tag.slice(0, 60)}`);
+  }
 
-  assert.deepStrictEqual(tagsWith(page, 'style').map((tag) => `index.html: ${tag}`), []);
+  assert.deepStrictEqual(inline, []);
 });
 
 test('a control with a tooltip has no title and names itself with the same sentence', () => {
