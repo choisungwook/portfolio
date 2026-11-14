@@ -59,6 +59,7 @@
       <button class="menu-title" data-menu="view" aria-haspopup="true" aria-expanded="false">View</button>
       <div class="menu-panel" data-menu-panel="view" hidden>
         <button data-command="guidelines">Guidelines…</button>
+        <button data-command="inspector">Inspector</button>
         <hr />
         <button data-command="zoom-in">Zoom in<span class="accel">⌘+</span></button>
         <button data-command="zoom-out">Zoom out<span class="accel">⌘-</span></button>
@@ -69,29 +70,51 @@
   </nav>
 
   <header id="toolbar">
+    <div id="doc-title">
+      <div id="doc-name">Untitled</div>
+      <div id="doc-status"></div>
+    </div>
     <div class="group tools">
       <button data-tool="select" title="Select (V)" aria-label="Select">
         <svg viewBox="0 0 18 18" class="toolbar-icon" aria-hidden="true">
           <path d="M3 2.5 14 10l-4.7.8 2.6 4.4-2.4 1.3-2.6-4.4-3.2 3z" />
         </svg>
       </button>
-      <button data-tool="rect" title="Rectangle (R)">▭</button>
-      <button data-tool="ellipse" title="Ellipse (O)">◯</button>
-      <button data-tool="callout" title="Speech bubble (B)" aria-label="Speech bubble">▱…</button>
-      <button data-tool="line" title="Line (L)">╱</button>
-      <button data-tool="arrow" title="Arrow (A)">➔</button>
-      <button data-tool="pen" title="Freehand (P)">✎</button>
-      <button data-tool="text" title="Text (T)">T</button>
-      <button id="btn-code-block" title="Insert an editable code block" aria-haspopup="true" aria-expanded="false">Code Block</button>
-      <button id="btn-background" title="Change the slide background" aria-haspopup="true" aria-expanded="false">
-        <span id="current-background" aria-hidden="true"></span>Background
+      <button id="btn-shapes" title="Shapes" aria-label="Shapes" aria-haspopup="true" aria-expanded="false">
+        <!-- The square sits in front: the mask cuts the circle away where the square (plus a hair of gap) covers it. -->
+        <svg viewBox="0 0 20 20" class="toolbar-icon neutral" aria-hidden="true">
+          <mask id="shapes-glyph-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+            <rect width="20" height="20" fill="#fff" stroke="none" />
+            <rect x="6.2" y="6.2" width="12.6" height="12.6" rx="3.4" fill="#000" stroke="none" />
+          </mask>
+          <circle cx="8" cy="8" r="5.5" mask="url(#shapes-glyph-mask)" />
+          <rect x="7.5" y="7.5" width="10" height="10" rx="2.5" />
+        </svg>
+        <span class="current" aria-hidden="true"></span>
       </button>
-      <!-- Named rather than drawn: two overlapping shapes look like one more
-           drawing tool, and nothing about that icon says the word preset. -->
-      <button id="btn-preset" title="Insert a shape preset" aria-haspopup="menu" aria-expanded="false">Preset</button>
+      <button id="btn-table" title="Table" aria-label="Table" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 20 20" class="toolbar-icon" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2" /><path d="M8.5 4v12M2.5 8h15M2.5 12h15" /></svg>
+      </button>
+      <button data-tool="text" title="Text (T)" aria-label="Text">
+        <svg viewBox="0 0 20 20" class="toolbar-icon" aria-hidden="true"><rect x="3" y="5" width="14" height="10" rx="2" /><path d="M7.9 12.4 10 7.6l2.1 4.8M8.7 10.9h2.6" /><circle cx="3" cy="10" r="1.1" fill="currentColor" stroke="none" /><circle cx="17" cy="10" r="1.1" fill="currentColor" stroke="none" /></svg>
+      </button>
+      <button id="btn-insert" title="Insert" aria-label="Insert" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 20 20" class="toolbar-icon" aria-hidden="true"><path d="M14.6 9.4 9.1 14.9a3.3 3.3 0 0 1-4.7-4.7l6.4-6.4a2.2 2.2 0 0 1 3.1 3.1l-6.2 6.2a1.1 1.1 0 0 1-1.6-1.6l5.3-5.3" /></svg>
+      </button>
+    </div>
+    <div class="toolbar-end">
+    <!-- Zoom changes only the view, so it is a capsule of its own, apart from the slide-editing tools. -->
+    <div class="group">
+      <button id="btn-zoom-level" title="Zoom — double-click for 100%" aria-label="Zoom" aria-haspopup="true" aria-expanded="false"><span id="zoom-value">100%</span><span class="chevron" aria-hidden="true">⌄</span></button>
     </div>
     <div class="group">
       <button id="btn-present" title="Start the presentation from the current slide">▶ Present</button>
+    </div>
+    <div class="group">
+      <button id="btn-inspector" title="Show or hide the inspector" aria-label="Inspector" aria-pressed="true" class="active">
+        <svg viewBox="0 0 20 20" class="toolbar-icon" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2" /><path d="M12.3 4v12" /><rect x="12.3" y="4.8" width="4.4" height="10.4" fill="currentColor" fill-opacity="0.25" stroke="none" /></svg>
+      </button>
+    </div>
     </div>
   </header>
 
@@ -111,9 +134,7 @@
       <div id="thumbs"></div>
       <div class="slide-actions">
         <button id="btn-add-slide" title="Add a slide after this one">+ Slide</button>
-        <button id="btn-del-slide" title="Delete this slide">Delete</button>
-        <button id="btn-slide-up" class="icon-action" title="Move selected slides up" aria-label="Move selected slides up">↑</button>
-        <button id="btn-slide-down" class="icon-action" title="Move selected slides down" aria-label="Move selected slides down">↓</button>
+        <button id="btn-del-slide" title="Delete this slide" aria-label="Delete slide"><span data-glyph="trash"></span></button>
       </div>
     </aside>
 
@@ -133,20 +154,45 @@
         <button id="right-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-right-panel="ai">AI</button>
       </div>
       <section id="props" class="right-panel-page" tabindex="-1" role="tabpanel" aria-labelledby="right-tab-inspector">
-      <p id="props-hint"></p>
+      <div id="props-header">
+        <strong id="props-hint">Slide</strong>
+        <span id="props-actions" hidden>
+          <button id="btn-duplicate-shape" type="button" title="Duplicate (Cmd+D)" aria-label="Duplicate" data-glyph="duplicate"></button>
+          <button id="btn-lock-shape" type="button" title="Lock" aria-label="Lock" aria-pressed="false"><span class="lock-closed" data-glyph="lock"></span><span class="lock-open" data-glyph="unlock"></span></button>
+          <button id="btn-delete-shape" type="button" title="Delete" aria-label="Delete" data-glyph="trash"></button>
+        </span>
+      </div>
+      <section id="props-slide" hidden>
+        <div class="prop-row">
+          <label for="prop-background">Background</label>
+          <span id="background-value" class="visually-hidden">#ffffff</span>
+          <input type="color" id="prop-background" aria-label="Slide background color" />
+        </div>
+        <div class="background-grid" id="bg-swatches">
+          <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
+          <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
+          <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
+          <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
+          <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
+          <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
+          <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
+          <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
+        </div>
+        <button id="btn-bg-all" type="button">Apply to all slides…</button>
+      </section>
       <section id="props-code" hidden>
         <div><span id="props-code-format"></span> · <span id="props-code-language"></span></div>
         <button id="btn-edit-code" type="button">Edit code block…</button>
       </section>
       <div id="props-fill" class="prop-row">
         <label id="prop-fill-label">Shape fill</label>
-        <span><input type="checkbox" id="prop-fill-none" /> <span id="prop-fill-none-label">none</span></span>
+        <label class="none-toggle"><input type="checkbox" id="prop-fill-none" /><span id="prop-fill-none-label" class="visually-hidden">No fill</span></label>
         <input type="color" id="prop-fill" />
       </div>
       <div id="props-stroke">
         <div class="prop-row">
           <label>Line color</label>
-          <label><input type="checkbox" id="prop-stroke-none" /> none</label>
+          <label class="none-toggle"><input type="checkbox" id="prop-stroke-none" /><span class="visually-hidden">No line</span></label>
           <input type="color" id="prop-stroke" />
         </div>
         <div class="prop-row">
@@ -283,7 +329,6 @@
         <button id="btn-group">Group</button>
         <button id="btn-ungroup">Ungroup</button>
       </div>
-        <button id="btn-delete-shape">Delete shape</button>
       </section>
 
       <section id="ai-panel" class="right-panel-page" role="tabpanel" aria-labelledby="right-tab-ai" hidden>
@@ -349,19 +394,6 @@
     </aside>
   </main>
 
-  <!-- Zoom changes only the view, so it stays away from slide-editing tools. -->
-  <footer id="statusbar">
-    <div id="zoom">
-      <button id="btn-zoom-out" title="Zoom out (Cmd+-)" aria-label="Zoom out (Cmd+-)">
-        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4" /></svg>
-      </button>
-      <button id="btn-zoom-level" title="Fit the slide to the window (Cmd+0)">100%</button>
-      <button id="btn-zoom-in" title="Zoom in (Cmd++)" aria-label="Zoom in (Cmd++)">
-        <svg viewBox="0 0 14 14" class="icon"><circle cx="6" cy="6" r="4.2" /><path d="M9.2 9.2 12.6 12.6M4 6h4M6 4v4" /></svg>
-      </button>
-    </div>
-  </footer>
-
   <div id="present" hidden>
     <div id="present-slide"></div>
     <div id="present-blank" hidden></div>
@@ -370,20 +402,22 @@
     <div id="present-overview" aria-label="All slides" hidden></div>
   </div>
 
-  <div id="context-menu" hidden>
-    <button id="context-lock">Lock</button>
-    <button data-order="front">Bring to Front</button>
-    <button data-order="forward">Bring Forward</button>
-    <button data-order="backward">Send Backward</button>
-    <button data-order="back">Send to Back</button>
-    <button id="context-group">Group</button>
-    <button id="context-ungroup">Ungroup</button>
-    <button id="context-save-preset">Save as Preset</button>
-    <button id="context-save-image">Save as Image</button>
+  <div id="context-menu" role="menu" aria-label="Object actions" hidden>
+    <button data-order="front" role="menuitem"><span class="menu-glyph" data-glyph="front"></span>Bring to Front</button>
+    <button data-order="forward" role="menuitem"><span class="menu-glyph" data-glyph="forward"></span>Bring Forward</button>
+    <button data-order="backward" role="menuitem"><span class="menu-glyph" data-glyph="backward"></span>Send Backward</button>
+    <button data-order="back" role="menuitem"><span class="menu-glyph" data-glyph="back"></span>Send to Back</button>
+    <hr />
+    <button id="context-lock" role="menuitem"><span class="menu-glyph" data-glyph="lock"></span><span class="menu-label">Lock</span></button>
+    <button id="context-group" role="menuitem"><span class="menu-glyph" data-glyph="group"></span>Group</button>
+    <button id="context-ungroup" role="menuitem"><span class="menu-glyph" data-glyph="ungroup"></span>Ungroup</button>
+    <hr />
+    <button id="context-save-preset" role="menuitem"><span class="menu-glyph" data-glyph="preset"></span>Save as Preset</button>
+    <button id="context-save-image" role="menuitem"><span class="menu-glyph" data-glyph="image"></span>Save as Image</button>
   </div>
 
   <div id="slide-context-menu" role="menu" aria-label="Slide actions" hidden>
-    <button id="context-new-slide" type="button" role="menuitem">New Slide</button>
+    <button id="context-new-slide" type="button" role="menuitem"><span class="menu-glyph" data-glyph="slide"></span>New Slide</button>
   </div>
 
   <div id="preset-menu" role="menu" aria-label="Shape presets" hidden>
@@ -397,27 +431,28 @@
     </section>
   </div>
 
-  <div id="background-menu" class="toolbar-popover" role="group" aria-label="Slide background" hidden>
-    <div class="popover-heading">
-      <strong>Slide background</strong>
-      <span id="background-value">#ffffff</span>
-    </div>
-    <div class="background-grid" id="bg-swatches">
-      <label class="background-picker" title="Custom color">
-        <input type="color" id="prop-background" aria-label="Custom background color" />
-        <span aria-hidden="true">＋</span>
-      </label>
-      <button class="swatch" data-bg="#ffffff" title="White" style="background-color: #ffffff"></button>
-      <button class="swatch" data-bg="#f8f9fa" title="Paper" style="background-color: #f8f9fa"></button>
-      <button class="swatch" data-bg="#fff9db" title="Cream" style="background-color: #fff9db"></button>
-      <button class="swatch" data-bg="#e7f5ff" title="Sky" style="background-color: #e7f5ff"></button>
-      <button class="swatch" data-bg="#e6fcf5" title="Mint" style="background-color: #e6fcf5"></button>
-      <button class="swatch" data-bg="#f3f0ff" title="Lilac" style="background-color: #f3f0ff"></button>
-      <button class="swatch" data-bg="#343a40" title="Charcoal" style="background-color: #343a40"></button>
-      <button class="swatch" data-bg="#212022" title="Ink" style="background-color: #212022"></button>
-    </div>
-    <button id="btn-bg-all" type="button">Apply to all slides…</button>
+  <div id="shapes-menu" class="toolbar-popover" role="group" aria-label="Shapes" hidden>
+    <button type="button" data-tool="rect" title="Rectangle (R)" aria-label="Rectangle"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3" fill="currentColor"/></svg></button>
+    <button type="button" data-tool="ellipse" title="Ellipse (O)" aria-label="Ellipse"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg></button>
+    <button type="button" data-tool="callout" title="Speech bubble (B)" aria-label="Speech bubble"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="currentColor"/></svg></button>
+    <button type="button" data-tool="line" title="Line (L)" aria-label="Line"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><path d="M5 19 19 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button type="button" data-tool="arrow" title="Arrow (A)" aria-label="Arrow"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><path d="M5 19 19 5M10 5h9v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button type="button" data-tool="pen" title="Freehand (P)" aria-label="Freehand"><svg viewBox="0 0 24 24" class="shape-glyph" aria-hidden="true"><path d="M3 15c3-8 5-8 6-2s3 6 5 0 3-5 7-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
   </div>
+
+  <div id="zoom-menu" class="toolbar-popover menu-panel" role="menu" aria-label="Zoom" hidden></div>
+
+  <div id="table-menu" class="toolbar-popover" role="group" aria-label="Table size" hidden>
+    <div id="table-grid"></div>
+    <div id="table-caption" aria-live="polite">Table</div>
+  </div>
+
+  <div id="insert-menu" class="toolbar-popover menu-panel" role="menu" aria-label="Insert" hidden>
+    <button type="button" role="menuitem" id="insert-image"><span class="menu-glyph" data-glyph="image"></span>Image…</button>
+    <button type="button" role="menuitem" id="insert-code"><span class="menu-glyph" data-glyph="code"></span>Code Block</button>
+    <button type="button" role="menuitem" id="insert-preset"><span class="menu-glyph" data-glyph="preset"></span>Preset</button>
+  </div>
+  <input id="insert-image-input" type="file" accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp,image/bmp" hidden />
 
   <div id="code-block-menu" class="toolbar-popover" role="group" aria-label="Code block formats" hidden>
     <div class="code-menu-heading">

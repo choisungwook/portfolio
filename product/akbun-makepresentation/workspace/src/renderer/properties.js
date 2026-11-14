@@ -84,7 +84,6 @@ $('btn-bg-all').addEventListener('click', async () => {
   );
   if (!confirmed) return;
   setBackground(L.slideBackground(slide()), true);
-  hideBackgroundMenu();
 });
 
 // --- zoom ---------------------------------------------------------------------
@@ -92,16 +91,18 @@ $('btn-bg-all').addEventListener('click', async () => {
 function setZoom(zoom) {
   state.zoom = zoom;
   stageInner.style.setProperty('--zoom', String(zoom));
-  $('btn-zoom-level').textContent = `${Math.round(zoom * 100)}%`;
+  $('zoom-value').textContent = `${Math.round(zoom * 100)}%`;
+  for (const item of zoomMenu.querySelectorAll('[role="menuitemradio"]')) {
+    const current = Math.abs(Number(item.dataset.zoom) - zoom) < 0.001;
+    item.classList.toggle('checked', current);
+    item.setAttribute('aria-checked', String(current));
+  }
   // The overlay textarea is placed in screen pixels, so a zoom while a text
   // box is open would leave it behind the glyphs it is meant to cover.
   if (state.editingIndex >= 0) textEditor.blur();
   renderCanvas();
 }
 
-$('btn-zoom-in').addEventListener('click', () => setZoom(L.zoomIn(state.zoom)));
-$('btn-zoom-out').addEventListener('click', () => setZoom(L.zoomOut(state.zoom)));
-$('btn-zoom-level').addEventListener('click', () => setZoom(L.ZOOM_FIT));
 
 // True when the key was a zoom command, so the caller can swallow it. Cmd+=
 // rather than Cmd+Shift+= for zooming in, which is the habit everywhere else.
@@ -141,6 +142,27 @@ $('prop-heading-level').addEventListener('change', (event) => {
 });
 $('prop-text-color').addEventListener('input', (e) => applyProp({ textColor: e.target.value }));
 $('btn-delete-shape').addEventListener('click', deleteSelectedShape);
+$('btn-duplicate-shape').addEventListener('click', duplicateSelection);
+$('btn-lock-shape').addEventListener('click', toggleLockSelection);
+
+// --- inspector visibility ------------------------------------------------------
+//
+// Hiding the panel only hides it: the AI panel inside keeps its state because
+// nothing is torn down, and the canvas observer re-renders for the new width.
+
+function applyInspectorVisibility() {
+  const visible = appSettings.inspectorVisible;
+  $('right-panel').hidden = !visible;
+  $('btn-inspector').classList.toggle('active', visible);
+  $('btn-inspector').setAttribute('aria-pressed', String(visible));
+}
+
+function toggleInspector() {
+  appSettings = { ...appSettings, inspectorVisible: !appSettings.inspectorVisible };
+  applyInspectorVisibility();
+  persistAppSettings(appSettings).catch((error) => console.error('Cannot save inspector visibility', error));
+}
+$('btn-inspector').addEventListener('click', toggleInspector);
 
 // --- text formatting -----------------------------------------------------------
 //

@@ -97,6 +97,7 @@ async function loadPersistentSettings() {
   syncConfiguredDefaults();
   customPresets = structuredClone(appSettings.customPresets);
   state.showGuidelines = appSettings.guidelines.visible;
+  applyInspectorVisibility();
   if (!hasSettingsFile || !S.settingsEqual(stored, appSettings)) {
     await window.api.saveSettings(appSettings);
   }
@@ -154,7 +155,7 @@ async function persistCustomPresets(presets) {
 }
 
 function positionPresetMenu() {
-  const trigger = $('btn-preset').getBoundingClientRect();
+  const trigger = $('btn-insert').getBoundingClientRect();
   const bounds = presetMenu.getBoundingClientRect();
   presetMenu.style.left = `${Math.max(8, Math.min(
     trigger.left,
@@ -170,20 +171,15 @@ function showPresetMenu() {
   hideToolbarPopovers();
   renderPresetMenu();
   presetMenu.hidden = false;
-  $('btn-preset').setAttribute('aria-expanded', 'true');
+  $('btn-insert').setAttribute('aria-expanded', 'true');
   positionPresetMenu();
   presetMenu.querySelector('.preset-item')?.focus();
 }
 
 function hidePresetMenu() {
   presetMenu.hidden = true;
-  $('btn-preset').setAttribute('aria-expanded', 'false');
+  $('btn-insert').setAttribute('aria-expanded', 'false');
 }
-
-$('btn-preset').addEventListener('click', () => {
-  if (presetMenu.hidden) showPresetMenu();
-  else hidePresetMenu();
-});
 
 presetMenu.addEventListener('click', (event) => {
   const button = event.target.closest('[data-preset-id]');

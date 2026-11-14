@@ -3,7 +3,7 @@ type: Decision
 title: 객체 잠금은 선택과 변경을 분리
 description: 잠긴 객체의 선택과 복사는 허용하고 편집 동작에서는 제외.
 tags: [editor, selection, lock, pptx]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T00:00:00Z }
 ---
 
 ## 결정
@@ -11,6 +11,7 @@ timestamp: 2026-09-06T00:00:00Z
 - 객체의 `locked` 필드로 위치·크기·회전·글·색상·삭제를 잠금.
 - 우클릭 Lock/Unlock과 실행 취소로 잠금 상태 변경.
 - 왼쪽 클릭은 잠긴 앞쪽 객체 아래의 잠기지 않은 객체를 우선 선택.
+- 영역 드래그 선택은 잠긴 객체를 제외([상세](2026-11-area-selection-skips-locked-and-previews-live.md)).
 - 우클릭은 실제 앞쪽 객체를 선택해 Unlock 경로 유지.
 - 다중 선택·그룹 이동·속성 변경·AI 패치에서 잠긴 객체 제외.
 - 복사본의 배치에는 일반 좌표 변환을 허용하고 잠금 상태 유지.

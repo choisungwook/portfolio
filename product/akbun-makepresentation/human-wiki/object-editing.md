@@ -3,7 +3,7 @@
 ## 잠긴 외부 객체 안에서 편집
 
 - 외부 객체 우클릭 → Lock.
-- 잠긴 객체는 선택 가능하며 Inspector에 Locked 표시.
+- 잠긴 객체는 선택 가능하며 Inspector 헤더의 잠금 버튼이 눌린 상태로 표시.
 - 이동·리사이즈·회전·글·색상·삭제·Crop 차단.
 - 겹친 내부 객체를 왼쪽 클릭하면 잠기지 않은 객체 우선 선택.
 - 잠긴 외부 객체를 우클릭 → Unlock으로 편집 재개.
@@ -54,7 +54,7 @@
 - 채우기가 none이면 윤곽선 가까이 클릭해 선택.
 - 빈 내부만 드래그하면 바깥 도형은 선택하지 않음.
 - 회전한 도형과 원도 실제 윤곽선 위치로 드래그 선택 판정.
-- Speech bubble 또는 B → 캔버스 드래그로 말풍선 생성.
+- 툴바의 Shapes → Speech bubble 또는 B → 캔버스 드래그로 말풍선 생성. 사각형·원·선·화살표·펜도 Shapes 팝오버에 모여 있고 단축키(R·O·L·A·P)는 그대로.
 - 말풍선 선택 후 글자 입력 또는 윤곽선 더블클릭으로 텍스트 편집.
 - 말풍선 꼬리도 도형 크기에 포함해 선택·리사이즈·회전 적용.
 - PPTX에는 텍스트가 붙은 편집 가능한 사용자 도형으로 저장.
@@ -67,8 +67,8 @@
 - PPTX의 표는 셀별 사각형으로 가져와 텍스트와 색상을 편집할 수 있음.
 - 표 전용 행·열 추가와 셀 병합은 지원하지 않음.
 - 둥근 사각형은 모서리 반경을 유지하며 다시 PPTX로 저장됨.
-- 상단 Preset → Person icon에서 SVG 사람 아이콘 추가.
-- SVG 이미지의 Inspector → SVG fill에서 색상 변경. `original`을 선택하면 원본 색상 표시.
+- 상단 Insert(클립) → Preset → Person icon에서 SVG 사람 아이콘 추가.
+- SVG 이미지의 Inspector → SVG fill에서 색상 변경. Original colours 토글을 켜면 원본 색상 표시.
 - SVG의 기존 채우기와 분리된 선 색상은 각각 편집. 색상 변경은 PPTX 저장본에도 반영.
 - Finder의 이미지 파일을 슬라이드 위로 드롭하면 해당 위치에 이미지 추가. HTML 파일 드롭도 같은 이미지 생성 경로 사용.
 - 드롭 위치가 슬라이드 밖이면 가져오지 않음. 이미지가 너무 크면 슬라이드의 80% 이내로 축소.
@@ -90,6 +90,54 @@
 - 근거: [geometry.js:246](../workspace/src/editor/geometry.js).
 - 결정: [도형 정렬과 자석은 보이는 바깥 경계를 사용](../knowledge/decisions/2026-08-shape-alignment-uses-visual-bounds.md).
 
+## 툴바와 인스펙터
+
+- 오른쪽 패널은 선택한 것을 보여줌. 아무것도 선택하지 않으면 Slide 섹션에서 배경 색상·프리셋·Apply to all slides 사용.
+- 객체를 선택하면 헤더에 이름과 Duplicate·Lock/Unlock·Delete 아이콘 표시. 잠긴 객체에서도 Lock 버튼은 항상 활성.
+- 툴바의 Insert(클립)에서 Image…, Code Block, Preset 실행. Image…는 붙여넣기와 같은 형식·10 MB 검사를 거침.
+- 줌 캡슐을 더블클릭하면 100%로 복귀.
+- 툴바 오른쪽 Inspector 버튼과 View → Inspector로 오른쪽 패널을 숨기거나 표시. 상태는 설정에 저장되고 AI 패널의 내용은 유지.
+- 툴바 왼쪽에 파일 이름과 저장 안 된 변경 여부(Edited) 표시. 경로는 표시하지 않음.
+
+- 근거: [render.js](../workspace/src/renderer/render.js)의 `renderProps`, [code.js](../workspace/src/renderer/code.js)의 Insert 메뉴, [properties.js](../workspace/src/renderer/properties.js)의 `toggleInspector`.
+- 결정: [인스펙터는 선택을 따른다](../knowledge/decisions/2026-11-inspector-follows-selection.md).
+
+## 텍스트 상자 크기
+
+- 텍스트 상자를 선택하면 좌우 가장자리 중앙에 핸들 두 개만 표시.
+- 핸들을 끌면 너비만 바뀌고 높이는 줄바꿈 결과에 맞춰 다시 계산. 글자 크기는 변하지 않음.
+- 회전한 상자는 회전 방향에 맞춰 커서와 이동량이 돌아감.
+
+- 근거: [geometry.js](../workspace/src/editor/geometry.js)의 `handlesFor`와 `resizeShape`.
+- 결정: [텍스트 상자 높이는 글이 정한다](../knowledge/decisions/2026-09-text-boxes-are-as-tall-as-their-text.md).
+
+## 영역 선택과 선택 이동
+
+- 영역 드래그는 잠긴 객체를 건너뜀. 잠긴 배경은 클릭으로만 선택.
+- 드래그하는 동안 선택이 바로 갱신되어 놓기 전에 결과 확인.
+- Alt를 누른 채 드래그하면 영역 안에 완전히 들어온 객체만 선택. 테두리가 점선으로 바뀜.
+- 큰 객체 위의 작은 객체는 Alt 드래그로 큰 객체 없이 선택.
+- 영역에 걸린 객체가 그룹이면 그룹 전체 선택.
+- 슬라이드 바깥 회색 여백에서 드래그를 시작해도 영역 선택.
+- Alt+클릭은 겹친 객체 중 현재 선택 바로 아래의 잠기지 않은 객체를 선택. 맨 아래에서는 맨 위로 순환. 이 방식으로 선택한 객체도 바로 드래그 가능.
+- 캔버스에 포커스가 있을 때 Tab / Shift+Tab으로 z 순서대로 다음·이전 객체 선택. 양 끝을 넘으면 선택을 해제하고 포커스가 캔버스 밖으로 이동.
+
+- 근거: [geometry.js:163](../workspace/src/editor/geometry.js), [canvas.js:48](../workspace/src/renderer/canvas.js), [canvas.js:64](../workspace/src/renderer/canvas.js), [canvas.js:18](../workspace/src/renderer/canvas.js), [text.js:284](../workspace/src/renderer/text.js).
+- 결정: [영역 선택은 잠긴 객체를 건너뛰고 드래그 중 실시간으로 반영](../knowledge/decisions/2026-11-area-selection-skips-locked-and-previews-live.md).
+
+## 표 삽입
+
+- 툴바 Table → 8 × 6 격자에서 크기를 고르면 열 × 행이 캡션에 표시. 클릭이나 Enter로 삽입, 방향키로 격자 이동.
+- 표는 슬라이드 중앙에 가로 70%로 생성. 행 높이는 H3 글자 크기의 1.6배와 슬라이드 높이의 1/14 중 큰 값이며, 표 전체는 슬라이드 높이의 80%를 넘지 않음.
+- 각 셀은 하나의 그룹으로 묶인 흰색 사각형. 클릭하면 표 전체가 선택되고 같은 셀을 한 번 더 누르면 그 셀의 글 편집.
+- 이동·복제·삭제는 그룹 단위. 우클릭 Ungroup으로 셀을 개별 도형으로 분리.
+- 행·열 추가와 삭제, 표 전체 크기 조절은 없음.
+- 삽입은 undo 한 번으로 표 전체를 제거.
+- PPTX 저장에는 그룹으로 기록되지만 다시 열면 그룹이 풀려 셀이 독립 사각형으로 열림.
+
+- 근거: [geometry.js:337](../workspace/src/editor/geometry.js)의 `createTableShapes`, [code.js:151](../workspace/src/renderer/code.js)의 `insertTable`.
+- 결정: [새로 만드는 표는 그룹으로 묶은 셀 도형](../knowledge/decisions/2026-11-created-tables-are-grouped-cell-shapes.md).
+
 ## 확인 질문
 
 1. 잠긴 객체를 선택할 수 있어야 하는 이유는 무엇인가?
@@ -98,3 +146,6 @@
 4. 코드 블록의 리사이즈와 Crop은 어떻게 다른가?
 5. 슬라이드 밖으로 드롭한 이미지는 어떻게 처리되는가?
 6. 균등 분배에서 양 끝 객체를 움직이지 않는 이유는 무엇인가?
+7. 영역 드래그가 잠긴 배경을 선택하지 않는 이유는 무엇인가?
+8. Alt 드래그와 Alt+클릭은 각각 무엇을 선택하는가?
+9. 만든 표의 셀을 채우지 않으면 셀 글 편집이 막히는 이유는 무엇인가?

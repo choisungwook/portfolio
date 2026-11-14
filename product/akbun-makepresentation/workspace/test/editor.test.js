@@ -1148,7 +1148,8 @@ test('locked shapes stay selectable and retain their lock through clipboard and 
   assert.deepEqual(L.groupIndicesFor([outer, inner], 0), [0]);
   assert.deepEqual(L.handlesFor(outer), []);
   assert.equal(L.parseClipboardShapes(JSON.stringify([outer]))[0].locked, true);
-  assert.ok(L.shapeIndicesInRect([outer, inner], { x: 0, y: 0, w: 400, h: 300 }).includes(0));
+  // Area selection skips locked shapes; clicking is what still selects them.
+  assert.deepEqual(L.shapeIndicesInRect([outer, inner], { x: 0, y: 0, w: 400, h: 300 }), [1]);
   const before = structuredClone(outer);
   L.resizeShape(outer, before, 'se', 20, 30);
   L.resizeShapeConstrained(outer, before, 'se', 20, 30);
@@ -1225,4 +1226,83 @@ test('speech bubbles preserve geometry, text and clipboard round trips', () => {
   assert.equal(L.shapeSelectionContainsPoint(shape, 200, 210), false);
   assert.equal(L.shapeSelectionContainsPoint(shape, 110, 100), true);
   assert.deepEqual(L.parseClipboardShapes(JSON.stringify([shape]))[0], shape);
+});
+
+test('area selection skips locked shapes and supports a contain mode', () => {
+  const background = Object.assign(L.createShape('rect', 0, 0, { fill: '#eeeeee' }), { w: 500, h: 400, locked: true });
+  const small = Object.assign(L.createShape('rect', 100, 100, { fill: '#ffffff' }), { w: 50, h: 50 });
+  const wide = Object.assign(L.createShape('rect', 100, 300, { fill: '#ffffff' }), { w: 300, h: 50 });
+  const shapes = [background, small, wide];
+  const area = { x: 80, y: 80, w: 100, h: 100 };
+
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, area), [1]);
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, area, { contain: true }), [1]);
+
+  // Crossing the wide shape's edge selects it by touch but not by containment.
+  const crossing = { x: 80, y: 280, w: 100, h: 100 };
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, crossing), [2]);
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, crossing, { contain: true }), []);
+  assert.deepStrictEqual(L.shapeIndicesInRect(shapes, { x: 80, y: 280, w: 400, h: 100 }, { contain: true }), [2]);
+});
+
+test('contain mode measures a rotated shape by its rotated outline', () => {
+  const shape = Object.assign(L.createShape('rect', 100, 100, { fill: '#ffffff', stroke: 'none' }), { w: 200, h: 20, rotation: 90 });
+  // Rotated a quarter turn it is 20 wide and 200 tall around (200, 110).
+  assert.deepStrictEqual(L.shapeIndicesInRect([shape], { x: 150, y: 0, w: 100, h: 220 }, { contain: true }), [0]);
+  assert.deepStrictEqual(L.shapeIndicesInRect([shape], { x: 100, y: 95, w: 200, h: 30 }, { contain: true }), []);
+});
+
+test('createTableShapes builds a row-major grouped grid that tiles its box exactly', () => {
+  const box = { x: 100, y: 50, w: 700, h: 250 };
+  const cells = L.createTableShapes(4, 3, box, {});
+  assert.equal(cells.length, 12);
+  assert.ok(cells.every((cell) => cell.kind === 'rect' && cell.text === ''));
+  assert.equal(new Set(cells.map((cell) => cell.groupId)).size, 1);
+  assert.ok(cells[0].groupId);
+  // Row-major: the second cell is to the right of the first, the fifth starts row two.
+  assert.ok(cells[1].x === cells[0].x + cells[0].w && cells[1].y === cells[0].y);
+  assert.ok(cells[4].x === cells[0].x && cells[4].y === cells[0].y + cells[0].h);
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 4; col++) {
+      const cell = cells[row * 4 + col];
+      if (col < 3) assert.equal(cell.x + cell.w, cells[row * 4 + col + 1].x);
+      if (row < 2) assert.equal(cell.y + cell.h, cells[(row + 1) * 4 + col].y);
+    }
+  }
+  assert.equal(cells[3].x + cells[3].w, box.x + box.w);
+  assert.equal(cells[11].y + cells[11].h, box.y + box.h);
+});
+
+test('createTableShapes clamps and rounds its size', () => {
+  const box = { x: 0, y: 0, w: 800, h: 400 };
+  assert.equal(L.createTableShapes(20, 20, box, {}).length, 48);
+  assert.equal(L.createTableShapes(0, -3, box, {}).length, 1);
+  assert.equal(L.createTableShapes(2.6, 1.2, box, {}).length, 3);
+  assert.equal(L.createTableShapes('x', 2, box, {}).length, 2);
+});
+
+test('a text box offers only the two width handles, at mid height', () => {
+  const shape = L.createShape('text', 10, 20, { fontSize: 20 });
+  shape.w = 200;
+  shape.h = 40;
+  assert.deepStrictEqual(L.handlesFor(shape), [
+    { id: 'w', x: 10, y: 40 },
+    { id: 'e', x: 210, y: 40 },
+  ]);
+  shape.locked = true;
+  assert.deepStrictEqual(L.handlesFor(shape), []);
+});
+
+test('dragging a text box width handle never scales the font, with or without Shift', () => {
+  const shape = L.createShape('text', 10, 10, { fontSize: 20 });
+  shape.text = 'hello world';
+  shape.w = 200;
+  shape.h = 28;
+  const from = structuredClone(shape);
+  L.resizeShape(shape, from, 'w', -50, 0);
+  assert.deepStrictEqual({ x: shape.x, w: shape.w, fontSize: shape.fontSize }, { x: -40, w: 250, fontSize: 20 });
+  L.resizeShapeConstrained(shape, from, 'e', 100, 0);
+  assert.deepStrictEqual({ x: shape.x, w: shape.w, fontSize: shape.fontSize }, { x: 10, w: 300, fontSize: 20 });
+  L.resizeShape(shape, from, 'e', -1000, 0);
+  assert.strictEqual(shape.w, 8);
 });

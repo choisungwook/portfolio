@@ -183,7 +183,7 @@ Native View accelerators forward Cmd+=, Cmd+- and Cmd+0 to the current editor. T
 
 Zoom is a view setting: it lives in `state`, not in the deck, and nothing about the model changes with it. The stage is a scroller wrapping the slide, and zoom is one CSS variable multiplying the fitted width, so the browser does the scaling and scrollbars appear on their own once the slide outgrows the window.
 
-Its control lives in the status bar along the bottom. Slide numbers are toggled from the Slides menu, away from the drawing tools.
+Its control is the zoom menu in the toolbar. Slide numbers are toggled from the Slides menu, away from the drawing tools.
 
 Nothing else has to know. Pointer positions come from `getBoundingClientRect`, which already reports the zoomed box, so clicks map onto slide coordinates at any zoom. The one exception is the overlay textarea, placed in screen pixels: zooming while a text box is open would strand it, so a zoom commits the edit first.
 
@@ -195,6 +195,6 @@ It lives outside `slide().shapes` while editing, so it cannot be selected or dra
 
 ## App settings
 
-The Tauri shell reads and writes `profiles/<profile-id>/settings.json` in the app data directory. A hash of the canonical document path maps to a profile UUID; an exclusive file lock forks the profile if the same document is already open. Save As preserves a separate snapshot for the old path and associates the active profile with the new path. The page validates the JSON and keeps guideline visibility, guideline margins and custom presets there. Guideline margins are stored as pixels while the last px/cm display unit is stored alongside them.
+The Tauri shell reads and writes `profiles/<profile-id>/settings.json` in the app data directory. A hash of the canonical document path maps to a profile UUID; an exclusive file lock forks the profile if the same document is already open. Save As preserves a separate snapshot for the old path and associates the active profile with the new path. The page validates the JSON and keeps guideline visibility, guideline margins, custom presets and whether the Inspector is shown there. Guideline margins are stored as pixels while the last px/cm display unit is stored alongside them.
 
 Older versions stored custom presets in localStorage. When no settings file exists, the page imports that list, writes `settings.json`, and removes the old key only after the new file is saved.

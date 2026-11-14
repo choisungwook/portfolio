@@ -13,47 +13,244 @@ function positionToolbarPopover(popover, trigger) {
     : Math.max(8, anchor.top - bounds.height - 6)}px`;
 }
 
-function hideBackgroundMenu() {
-  backgroundMenu.hidden = true;
-  $('btn-background').setAttribute('aria-expanded', 'false');
+function hideInsertMenu() {
+  insertMenu.hidden = true;
+  $('btn-insert').setAttribute('aria-expanded', 'false');
+}
+
+function hideShapesMenu() {
+  shapesMenu.hidden = true;
+  $('btn-shapes').setAttribute('aria-expanded', 'false');
+}
+
+function hideZoomMenu() {
+  zoomMenu.hidden = true;
+  $('btn-zoom-level').setAttribute('aria-expanded', 'false');
+}
+
+function hideTableMenu() {
+  tableMenu.hidden = true;
+  $('btn-table').setAttribute('aria-expanded', 'false');
 }
 
 function hideCodeBlockMenu() {
   codeBlockMenu.hidden = true;
-  $('btn-code-block').setAttribute('aria-expanded', 'false');
+  $('btn-insert').setAttribute('aria-expanded', 'false');
 }
 
 function hideToolbarPopovers() {
-  hideBackgroundMenu();
+  hideInsertMenu();
+  hideZoomMenu();
+  hideShapesMenu();
+  hideTableMenu();
   hideCodeBlockMenu();
-}
-
-function showBackgroundMenu() {
-  hidePresetMenu();
-  hideCodeBlockMenu();
-  renderBackground();
-  backgroundMenu.hidden = false;
-  $('btn-background').setAttribute('aria-expanded', 'true');
-  positionToolbarPopover(backgroundMenu, $('btn-background'));
 }
 
 function showCodeBlockMenu() {
   hidePresetMenu();
-  hideBackgroundMenu();
+  hideZoomMenu();
+  hideShapesMenu();
+  hideTableMenu();
   codeBlockMenu.hidden = false;
-  $('btn-code-block').setAttribute('aria-expanded', 'true');
-  positionToolbarPopover(codeBlockMenu, $('btn-code-block'));
+  $('btn-insert').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(codeBlockMenu, $('btn-insert'));
   codeBlockMenu.querySelector('[data-code-format]')?.focus();
 }
 
-$('btn-background').addEventListener('click', () => {
-  if (backgroundMenu.hidden) showBackgroundMenu();
-  else hideBackgroundMenu();
+$('btn-shapes').addEventListener('click', () => {
+  if (!shapesMenu.hidden) return hideShapesMenu();
+  hidePresetMenu();
+  hideZoomMenu();
+  hideCodeBlockMenu();
+  hideTableMenu();
+  shapesMenu.hidden = false;
+  $('btn-shapes').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(shapesMenu, $('btn-shapes'));
+  (shapesMenu.querySelector('.active') || shapesMenu.querySelector('[data-tool]')).focus();
 });
 
-$('btn-code-block').addEventListener('click', () => {
-  if (codeBlockMenu.hidden) showCodeBlockMenu();
-  else hideCodeBlockMenu();
+// The tiles are [data-tool] buttons, so renderer.js already switches the tool
+// on click; this only closes the popover and hands the keyboard to the slide.
+shapesMenu.addEventListener('click', (event) => {
+  if (!event.target.closest('[data-tool]')) return;
+  hideShapesMenu();
+  canvas.focus({ preventScroll: true });
+});
+
+// --- zoom menu ---
+
+// Only the levels the editor layer accepts are offered, so the menu cannot ask
+// for a zoom that setZoom would silently clamp.
+zoomMenu.innerHTML = L.ZOOM_STEPS.map((step) =>
+  `<button type="button" role="menuitemradio" aria-checked="false" data-zoom="${step}">${Math.round(step * 100)}%</button>`
+).join('') + `<hr /><button type="button" role="menuitem" data-zoom="${L.ZOOM_FIT}">Fit Slide</button>`;
+
+$('btn-zoom-level').addEventListener('click', () => {
+  if (!zoomMenu.hidden) return hideZoomMenu();
+  hideToolbarPopovers();
+  zoomMenu.hidden = false;
+  $('btn-zoom-level').setAttribute('aria-expanded', 'true');
+  // Aligned to the capsule's right edge, which sits at the window edge.
+  const anchor = $('btn-zoom-level').getBoundingClientRect();
+  const width = zoomMenu.getBoundingClientRect().width;
+  zoomMenu.style.left = `${Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8))}px`;
+  zoomMenu.style.top = `${anchor.bottom + 6}px`;
+  (zoomMenu.querySelector('.checked') || zoomMenu.querySelector('button')).focus();
+});
+
+// A double click is a click that opened the menu, a click that closed it, and
+// then this: reset and make sure the menu is not left open.
+$('btn-zoom-level').addEventListener('dblclick', () => {
+  setZoom(L.ZOOM_FIT);
+  hideZoomMenu();
+});
+
+zoomMenu.addEventListener('click', (event) => {
+  const item = event.target.closest('[data-zoom]');
+  if (!item) return;
+  setZoom(Number(item.dataset.zoom));
+  hideZoomMenu();
+  $('btn-zoom-level').focus();
+});
+
+zoomMenu.addEventListener('keydown', (event) => {
+  const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+  if (!step) return;
+  const items = [...zoomMenu.querySelectorAll('button')];
+  items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+  event.preventDefault();
+});
+
+// --- table picker ---
+
+const TABLE_COLUMNS = 8;
+const TABLE_ROWS = 6;
+const tableGrid = $('table-grid');
+tableGrid.innerHTML = Array.from({ length: TABLE_COLUMNS * TABLE_ROWS }, (_, i) => {
+  const column = (i % TABLE_COLUMNS) + 1;
+  const row = Math.floor(i / TABLE_COLUMNS) + 1;
+  return `<button type="button" data-column="${column}" data-row="${row}" aria-label="${column} column${column > 1 ? 's' : ''}, ${row} row${row > 1 ? 's' : ''}"></button>`;
+}).join('');
+
+// Lights the block from the top-left cell to the one under the pointer or
+// focus, and names its size as columns × rows.
+function highlightTable(column, row) {
+  for (const cell of tableGrid.children) {
+    cell.classList.toggle('in', Number(cell.dataset.column) <= column && Number(cell.dataset.row) <= row);
+  }
+  $('table-caption').textContent = column ? `${column} × ${row}` : 'Table';
+}
+
+function insertTable(columns, rows) {
+  const { width, height } = deckSize();
+  // Rows scale with the slide too, or a table on a large slide reads as a strip.
+  const rowHeight = Math.max(appSettings.headingSizes.h3 * 1.6, height / 14);
+  const w = Math.round(width * 0.7);
+  const h = Math.round(Math.min(rowHeight * rows, height * 0.8));
+  const box = { x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), w, h };
+  const cells = L.createTableShapes(columns, rows, box, {
+    ...newShapeStyle('rect'),
+    fontSize: appSettings.headingSizes.h3,
+  });
+  const first = slide().shapes.length;
+  slide().shapes.push(...cells);
+  selectMany(cells.map((_, offset) => first + offset));
+  setTool('select');
+  markDirty();
+  renderAll();
+}
+
+$('btn-table').addEventListener('click', () => {
+  if (!tableMenu.hidden) return hideTableMenu();
+  hidePresetMenu();
+  hideZoomMenu();
+  hideCodeBlockMenu();
+  hideShapesMenu();
+  highlightTable(0, 0);
+  tableMenu.hidden = false;
+  $('btn-table').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(tableMenu, $('btn-table'));
+  tableGrid.firstElementChild.focus();
+});
+
+tableGrid.addEventListener('mouseover', (event) => {
+  const cell = event.target.closest('button');
+  if (cell) highlightTable(Number(cell.dataset.column), Number(cell.dataset.row));
+});
+tableGrid.addEventListener('focusin', (event) => {
+  const cell = event.target.closest('button');
+  if (cell) highlightTable(Number(cell.dataset.column), Number(cell.dataset.row));
+});
+tableGrid.addEventListener('mouseleave', () => {
+  const focused = document.activeElement.closest?.('#table-grid button');
+  if (focused) highlightTable(Number(focused.dataset.column), Number(focused.dataset.row));
+  else highlightTable(0, 0);
+});
+tableGrid.addEventListener('keydown', (event) => {
+  const cell = event.target.closest('button');
+  const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+  if (!cell || !step) return;
+  const column = Math.min(TABLE_COLUMNS, Math.max(1, Number(cell.dataset.column) + step[0]));
+  const row = Math.min(TABLE_ROWS, Math.max(1, Number(cell.dataset.row) + step[1]));
+  tableGrid.children[(row - 1) * TABLE_COLUMNS + column - 1].focus();
+  event.preventDefault();
+});
+tableGrid.addEventListener('click', (event) => {
+  const cell = event.target.closest('button');
+  if (!cell) return;
+  hideTableMenu();
+  canvas.focus({ preventScroll: true });
+  insertTable(Number(cell.dataset.column), Number(cell.dataset.row));
+});
+
+// --- insert menu ---
+//
+// Insert gathers the three insert actions that used to sit in the toolbar. The
+// code-block formats and the preset gallery are popups of their own, so they
+// open anchored to this button instead.
+
+$('btn-insert').addEventListener('click', () => {
+  if (!insertMenu.hidden) return hideInsertMenu();
+  hideToolbarPopovers();
+  hidePresetMenu();
+  insertMenu.hidden = false;
+  $('btn-insert').setAttribute('aria-expanded', 'true');
+  positionToolbarPopover(insertMenu, $('btn-insert'));
+  insertMenu.querySelector('button').focus();
+});
+
+insertMenu.addEventListener('keydown', (event) => {
+  const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+  if (!step) return;
+  const items = [...insertMenu.querySelectorAll('button')];
+  items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+  event.preventDefault();
+});
+
+insertMenu.addEventListener('click', (event) => {
+  const item = event.target.closest('button');
+  if (!item) return;
+  hideInsertMenu();
+  if (item.id === 'insert-code') showCodeBlockMenu();
+  else if (item.id === 'insert-preset') showPresetMenu();
+  else if (item.id === 'insert-image') $('insert-image-input').click();
+});
+
+// Same path as a paste: readFileDataUrl checks type and the 10 MB cap before
+// anything lands on the slide, and the image is fitted and centred the same way.
+$('insert-image-input').addEventListener('change', async (event) => {
+  const files = [...event.target.files].filter(imageFileMime);
+  event.target.value = '';
+  if (!files.length) return;
+  const targetDeck = state.deck;
+  const targetSlide = slide();
+  try {
+    const shapes = await Promise.all(files.map(pastedImageShape));
+    if (state.deck !== targetDeck || slide() !== targetSlide) return;
+    insertShapes(shapes, 0);
+  } catch (error) {
+    await window.api.message(String(error), { title: 'Cannot import image', kind: 'error' });
+  }
 });
 
 function codeLanguageLabel(language) {

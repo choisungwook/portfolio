@@ -3,12 +3,12 @@ type: Decision
 title: 텍스트 상자 높이는 글이 정한다
 description: 리사이즈는 너비만 바꾸고 높이는 줄바꿈 결과에서 다시 계산. 파일에서 연 상자는 넘치는 만큼만 키움.
 tags: [editor, text, pptx, javascript]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T00:00:00Z }
 ---
 
 ## 결정
 
-- 텍스트 상자의 n·s 핸들은 아무것도 하지 않고, 모서리 핸들은 가로 성분만 적용.
+- 텍스트 상자는 좌우 중앙의 w·e 핸들만 제공하고 모서리·상하 핸들은 없음. 높이를 건드리는 입력은 어떤 경로로 와도 무시. Shift도 의미 없음.
 - 너비가 바뀌면 fitTextHeight가 줄 수 × 글자 크기 × 1.35로 높이를 다시 계산.
 - pptx를 열 때는 grow-only. 파일의 상자가 더 높으면 그대로 두고, 줄바꿈 결과보다 낮을 때만 키움.
 - 전체 폰트 변경도 텍스트 상자는 fitTextBox로 다시 맞춤.

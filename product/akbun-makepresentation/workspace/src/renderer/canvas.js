@@ -12,6 +12,75 @@ function shapeIndexAtPointer(event, group) {
   return index;
 }
 
+// Alt+click walks down the stack under the pointer: the unlocked shape just
+// below the selected one, wrapping to the top. It is how a shape that is
+// fully covered gets picked without moving what covers it.
+function nextShapeUnderPointer(event, fallback) {
+  const stack = [];
+  for (const element of document.elementsFromPoint(event.clientX, event.clientY)) {
+    const index = Number(element.closest('#canvas g[data-i]')?.dataset.i);
+    if (Number.isInteger(index) && !slide().shapes[index]?.locked && !stack.includes(index)) stack.push(index);
+  }
+  if (!stack.length) return fallback;
+  const at = stack.indexOf(state.selected);
+  return stack[at < 0 || at === stack.length - 1 ? 0 : at + 1];
+}
+
+// Shift over empty space keeps what is selected and adds to it. Clearing
+// instead is what made a missed Shift-click throw the selection away.
+function startMarquee(event, p) {
+  const additive = event.shiftKey && !(event.metaKey || event.ctrlKey);
+  if (!additive) clearSelection();
+  state.drag = {
+    mode: 'marquee',
+    x0: p.x,
+    y0: p.y,
+    x1: p.x,
+    y1: p.y,
+    contain: event.altKey,
+    baseSelection: additive ? [...state.selection] : [],
+  };
+  canvas.setPointerCapture(event.pointerId);
+}
+
+// The selection follows the drag, so the user sees what the area holds before
+// letting go instead of guessing and retrying.
+function applyMarqueeSelection(drag) {
+  const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
+  // A press that never travelled is a click on empty space, not an area of
+  // no size. Handing it to the touch rule would select whichever unfilled
+  // shape the pointer happened to be standing inside, so a click meant to
+  // deselect would select instead.
+  const hits = rect.w > 2 || rect.h > 2
+    ? L.shapeIndicesInRect(slide().shapes, rect, { contain: drag.contain })
+      .flatMap((index) => L.groupIndicesFor(slide().shapes, index))
+    : [];
+  selectMany([...drag.baseSelection, ...hits]);
+}
+
+// The gray gutter around the slide is empty space too. Pressing there starts
+// a marquee, so an area can begin outside the slide and sweep in the shapes
+// that touch the slide edge.
+$('stage-scroll').addEventListener('pointerdown', (event) => {
+  const scroller = event.currentTarget;
+  const box = scroller.getBoundingClientRect();
+  // The path is fixed at dispatch. The canvas handler runs first and re-renders
+  // the svg, which detaches event.target, so closest() would no longer find
+  // the canvas and every shape press would also start a marquee.
+  const path = event.composedPath();
+  if (
+    event.button !== 0 || state.tool !== 'select' || path.includes(canvas) || path.includes(textEditor) ||
+    // Scrollbars live inside the element's box but outside its client area.
+    event.clientX - box.left >= scroller.clientWidth || event.clientY - box.top >= scroller.clientHeight
+  ) return;
+  if (state.editingIndex >= 0) textEditor.blur();
+  event.preventDefault();
+  canvas.focus({ preventScroll: true });
+  startMarquee(event, toPoint(event));
+  renderCanvas();
+  renderProps();
+});
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
   const handleEl = event.target.closest('[data-handle]');
@@ -82,13 +151,15 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
 
-  const index = hitShape ? slide().shapes.indexOf(hitShape) : selectedShapeIndexAtPoint(p);
+  let index = hitShape ? slide().shapes.indexOf(hitShape) : selectedShapeIndexAtPoint(p);
+  const stackPick = event.altKey && !(event.metaKey || event.ctrlKey) && index >= 0;
+  if (stackPick) index = nextShapeUnderPointer(event, index);
   const additive = event.shiftKey && !(event.metaKey || event.ctrlKey);
   if (index >= 0) {
 
     const secondPress = isSecondPress(index);
     let editOnClick = '';
-    if (secondPress && !(event.shiftKey || event.metaKey || event.ctrlKey)) {
+    if (secondPress && !(event.shiftKey || event.metaKey || event.ctrlKey || event.altKey)) {
       if (slide().shapes[index].kind === 'code') editOnClick = 'code';
       else if (canEditText(slide().shapes[index])) editOnClick = 'text';
     }
@@ -135,18 +206,7 @@ canvas.addEventListener('pointerdown', (event) => {
     };
     canvas.setPointerCapture(event.pointerId);
   } else {
-    // Shift over empty space keeps what is selected and adds to it. Clearing
-    // instead is what made a missed Shift-click throw the selection away.
-    if (!additive) clearSelection();
-    state.drag = {
-      mode: 'marquee',
-      x0: p.x,
-      y0: p.y,
-      x1: p.x,
-      y1: p.y,
-      baseSelection: additive ? [...state.selection] : [],
-    };
-    canvas.setPointerCapture(event.pointerId);
+    startMarquee(event, p);
   }
   renderCanvas();
   renderProps();
@@ -164,6 +224,8 @@ canvas.addEventListener('pointermove', (event) => {
   } else if (drag.mode === 'marquee') {
     drag.x1 = p.x;
     drag.y1 = p.y;
+    drag.contain = event.altKey;
+    applyMarqueeSelection(drag);
   } else if (drag.mode === 'resize') {
     const shape = selectedShape();
     if (!shape) return;
@@ -224,17 +286,7 @@ canvas.addEventListener('pointerup', () => {
     }
     setTool('select');
   } else if (drag.mode === 'marquee') {
-    const rect = L.normalizeRect(drag.x0, drag.y0, drag.x1, drag.y1);
-    // A press that never travelled is a click on empty space, not an area of
-    // no size. Handing it to the touch rule would select whichever unfilled
-    // shape the pointer happened to be standing inside, so a click meant to
-    // deselect would select instead.
-    if (rect.w > 2 || rect.h > 2) {
-      selectMany([
-        ...drag.baseSelection,
-        ...L.shapeIndicesInRect(slide().shapes, rect),
-      ]);
-    }
+    applyMarqueeSelection(drag);
   } else if (drag.mode === 'move' && !drag.moved && drag.editOnClick) {
     selectOnly(drag.editIndex);
     renderCanvas();

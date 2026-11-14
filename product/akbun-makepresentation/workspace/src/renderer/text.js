@@ -139,8 +139,10 @@ const TOOL_KEYS = { v: 'select', r: 'rect', o: 'ellipse', b: 'callout', l: 'line
 document.addEventListener('keydown', (event) => {
   if (event.defaultPrevented) return;
   if (settingsDialog.open || slideSizeDialog.open || codeDialog.open || guidelinesDialog.open) return;
-  if (event.key === 'Escape' && (!backgroundMenu.hidden || !codeBlockMenu.hidden)) {
+  if (event.key === 'Escape' && (!shapesMenu.hidden || !tableMenu.hidden || !zoomMenu.hidden || !insertMenu.hidden || !codeBlockMenu.hidden)) {
+    const returnTo = !shapesMenu.hidden ? 'btn-shapes' : !tableMenu.hidden ? 'btn-table' : !zoomMenu.hidden ? 'btn-zoom-level' : !insertMenu.hidden ? 'btn-insert' : '';
     hideToolbarPopovers();
+    if (returnTo) $(returnTo).focus();
     event.preventDefault();
     return;
   }
@@ -226,6 +228,11 @@ document.addEventListener('keydown', (event) => {
     return;
   }
 
+  if (event.key === 'Tab' && !event.altKey && [canvas, $('stage')].includes(document.activeElement)) {
+    cycleSelection(event.shiftKey ? -1 : 1, event);
+    return;
+  }
+
   if (event.key === 'Delete' || event.key === 'Backspace') {
     if (editorHasFocus()) deleteSelectedShape();
     else deleteCurrentSlide();
@@ -272,3 +279,26 @@ document.addEventListener('keydown', (event) => {
   const tool = TOOL_KEYS[event.key.toLowerCase()];
   if (tool) setTool(tool);
 });
+
+// Tab walks the shapes in z order, skipping past a whole group at a time.
+// Past either end the selection clears and the key is left alone, so focus can
+// leave the canvas instead of trapping the keyboard in it.
+function cycleSelection(direction, event) {
+  const shapes = slide().shapes;
+  const current = state.selection;
+  // One stop per group (its first member) rather than stepping from the
+  // selection's highest index: a group whose members are not adjacent in z
+  // order would otherwise jump over every shape stacked between them.
+  const stops = shapes.map((_, i) => i).filter((i) => L.groupIndicesFor(shapes, i)[0] === i);
+  const at = current.length ? stops.filter((i) => i <= Math.min(...current)).length - 1 : direction > 0 ? -1 : stops.length;
+  const next = at + direction;
+  if (next < 0 || next >= stops.length) {
+    if (!current.length) return;
+    clearSelection();
+  } else {
+    selectMany(L.groupIndicesFor(shapes, stops[next]));
+    event.preventDefault();
+  }
+  renderCanvas();
+  renderProps();
+}
