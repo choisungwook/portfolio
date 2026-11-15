@@ -421,7 +421,8 @@ img {
   overflow-wrap: break-word;
 }
 
-.post-body h1 {
+.post-body h1,
+.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--color-heading-primary) !important;
@@ -433,11 +434,13 @@ img {
 .post-body h1 span,
 .post-body h1 a,
 .post-body h1 strong,
-.post-body h1 b {
+.post-body h1 b,
+.post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) :is(span, a, strong, b) {
   color: var(--color-heading-primary) !important;
 }
 
-.post-body h2 {
+.post-body h2,
+.post-body h3[data-ke-size="size23"]:is(:not([id]), [id^="toc-heading-"]) {
   font-size: 1.3125rem;
   font-weight: 700;
   margin-top: 3rem;
@@ -1135,11 +1138,13 @@ img {
     font-size: 1rem;
   }
 
-  .post-body h1 {
+  .post-body h1,
+  .post-body h2[data-ke-size="size26"]:is(:not([id]), [id^="toc-heading-"]) {
     font-size: 1.375rem;
   }
 
-  .post-body h2 {
+  .post-body h2,
+  .post-body h3[data-ke-size="size23"]:is(:not([id]), [id^="toc-heading-"]) {
     font-size: 1.1875rem;
   }
 

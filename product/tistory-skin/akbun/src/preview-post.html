@@ -96,6 +96,11 @@
           <p>PVC 상태를 확인하는 명령이다.</p>
           <pre><code>kubectl get pvc -n default</code></pre>
 
+          <h2 data-ke-size="size26">티스토리 제목1 예시</h2>
+          <p data-ke-size="size16">티스토리 에디터의 제목1은 마크다운 h1과 같은 스타일로 보여야 한다.</p>
+          <h3 data-ke-size="size23">티스토리 제목2 예시</h3>
+          <p data-ke-size="size16">티스토리 에디터의 제목2는 마크다운 h2와 같은 스타일로 보여야 한다.</p>
+
           <h1>정리</h1>
 
           <h2>원인별 빠른 판단 기준</h2>
@@ -709,13 +714,15 @@ redis-pod   1/1     Running   0          12m</code></pre>
     var tocContainer = document.getElementById("floating-toc");
     if (!tocNav || !tocContainer) return;
 
-    var headings = document.querySelectorAll(".post-body h1, .post-body h2");
+    // 티스토리 에디터의 제목1(h2 size26)과 제목2(h3 size23)는 id가 없다. 마크다운 h1, h2와 같은 단계로 목차에 넣는다.
+    var headings = document.querySelectorAll('.post-body h1, .post-body h2, .post-body h3[data-ke-size="size23"]:not([id])');
     if (headings.length === 0) return;
 
     var generatedIdIndex = 0;
 
     headings.forEach(function (heading) {
       var id = heading.id;
+      var isEditorHeading = !id && heading.hasAttribute("data-ke-size");
       if (!id) {
         do {
           id = "toc-heading-" + generatedIdIndex;
@@ -725,7 +732,9 @@ redis-pod   1/1     Running   0          12m</code></pre>
       }
 
       var li = document.createElement("li");
-      li.className = "toc-item toc-" + heading.tagName.toLowerCase();
+      var level = heading.tagName.toLowerCase();
+      if (isEditorHeading) level = level === "h2" ? "h1" : "h2";
+      li.className = "toc-item toc-" + level;
 
       var a = document.createElement("a");
       a.href = "#" + id;
