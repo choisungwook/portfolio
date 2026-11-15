@@ -2,17 +2,61 @@ import Testing
 import Foundation
 @testable import AkbunTerminalCore
 
-/// The round trip this milestone exists to prove: Swift calls into the Rust
-/// static library, a real shell runs, and its output comes back through the
-/// event queue. A broken link step or a drifted header fails here.
+/// A daemon of its own for one test: a short temp directory holding the socket
+/// and the daemon's data, so nothing touches the real data directory and tests
+/// can run side by side.
+///
+/// The directory is short because a Unix socket path is limited to about 104
+/// bytes on macOS. The daemon binary is the release build from the Cargo
+/// workspace one level above the package (scripts/build-core.sh).
+private struct TestDaemon {
+  let directory: String
+  let socket: String
+
+  static let binary: String = {
+    // …/workspace/desktop/Tests/AkbunTerminalCoreTests/BridgeTests.swift
+    var url = URL(fileURLWithPath: #filePath)
+    for _ in 0..<4 { url.deleteLastPathComponent() }
+    return url.appendingPathComponent("target/release/akbun-terminal-core").path
+  }()
+
+  init() throws {
+    let suffix = String(UUID().uuidString.prefix(8)).lowercased()
+    directory = "/tmp/akt-\(suffix)"
+    socket = directory + "/core.sock"
+    try FileManager.default.createDirectory(
+      atPath: directory, withIntermediateDirectories: true)
+  }
+
+  func bridge() throws -> CoreBridge {
+    try CoreBridge(
+      socketPath: socket, daemon: Self.binary,
+      environment: ["AKBUN_TERMINAL_HOME": directory])
+  }
+
+  /// Ends the daemon and removes its directory. The daemon would also exit on
+  /// its own once idle, but a test should not leave one behind.
+  func stop(_ core: CoreBridge) {
+    _ = try? core.send(.shutdown)
+    try? FileManager.default.removeItem(atPath: directory)
+  }
+}
+
+/// The round trip this milestone exists to prove: Swift talks to a real daemon
+/// over its socket, a real shell runs there, and its output comes back as
+/// events. A drifted protocol or a missing daemon binary fails here.
 struct BridgeTests {
   @Test func handshakeAgreesOnTheProtocolVersion() throws {
-    let core = try CoreBridge()
+    let daemon = try TestDaemon()
+    let core = try daemon.bridge()
+    defer { daemon.stop(core) }
     try core.handshake()
   }
 
   @Test func typingIntoASessionComesBackAsOutput() async throws {
-    let core = try CoreBridge()
+    let daemon = try TestDaemon()
+    let core = try daemon.bridge()
+    defer { daemon.stop(core) }
     try core.handshake()
 
     let session = try core.spawn(cwd: "", cols: 80, rows: 24, workspace: nil)
@@ -34,7 +78,9 @@ struct BridgeTests {
   }
 
   @Test func commandsForAGoneSessionReportAnError() throws {
-    let core = try CoreBridge()
+    let daemon = try TestDaemon()
+    let core = try daemon.bridge()
+    defer { daemon.stop(core) }
     #expect(throws: CoreBridge.Failure.self) {
       try core.expectOk(.close(session: 404))
     }
@@ -43,7 +89,7 @@ struct BridgeTests {
   /// The whole detection path at once: a rule file is read, a real shell writes
   /// to a real pty, the core interprets that screen and answers with a status.
   /// The pieces are unit tested in Rust; what only this can catch is them not
-  /// being wired to each other across the boundary.
+  /// being wired to each other across the socket.
   @Test func aRuleFileTurnsShellOutputIntoAWorkspaceStatus() async throws {
     let rules = URL(fileURLWithPath: NSTemporaryDirectory())
       .appendingPathComponent("akbun-terminal-rules-\(UUID().uuidString)", isDirectory: true)
@@ -59,7 +105,9 @@ struct BridgeTests {
       """
     try rule.write(to: rules.appendingPathComponent("test.json"), atomically: true, encoding: .utf8)
 
-    let core = try CoreBridge()
+    let daemon = try TestDaemon()
+    let core = try daemon.bridge()
+    defer { daemon.stop(core) }
     try core.handshake()
     try core.expectOk(.loadRules(directory: rules.path))
     let session = try core.spawn(cwd: "", cols: 80, rows: 24, workspace: 42)
