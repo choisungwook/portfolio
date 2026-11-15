@@ -23,7 +23,7 @@ SQLite runs in WAL mode with a 5 second busy timeout, so a running `serve` and a
 | `src/mcp.rs` | MCP `initialize`, `tools/list`, `tools/call`, server instructions |
 | `src/web.rs` | Routes, static files (`include_str!`), token and host checks |
 | `web/` | `index.html`, `app.js`, `style.css`. Plain JS, compiled into the binary |
-| `skill/akbun-storyboard/SKILL.md` | Agent skill, compiled in and printed by `akbun-storyboard skill` |
+| `skill/akbun-storyboard/SKILL.md` | Agent playbook, compiled in (`ops::SKILL`). `akbun-storyboard skill` prints it, `skill install` writes it to `~/.claude/skills/` and `~/.codex/skills/`, and the `agent_guide` operation returns it to MCP clients |
 
 ## Operation registry
 

@@ -8,6 +8,9 @@ use rusqlite::types::Value as Sql;
 use serde_json::{Map, Value, json};
 use std::path::Path;
 
+/// The agent playbook. Compiled in so every install carries the version that matches its operations.
+pub const SKILL: &str = include_str!("../skill/akbun-storyboard/SKILL.md");
+
 pub struct Op {
     pub name: String,
     pub description: String,
@@ -45,6 +48,12 @@ fn props(e: &Entity, with_id: bool) -> Value {
 pub fn list() -> Vec<Op> {
     let id = json!({"id": {"type": "integer"}});
     let mut ops = vec![
+        op(
+            "agent_guide",
+            "Read this first. The full playbook for working with akbun-storyboard: data model, rules, and step-by-step recipes for drafting, applying comments, reviewing, sketches, sound, export and backup.",
+            json!({}),
+            &[],
+        ),
         op("project_list", "List projects with scene count, total length and open comment count.", json!({}), &[]),
         op(
             "project_get",
@@ -140,6 +149,7 @@ pub fn call(s: &Store, name: &str, args: &Value) -> Result<Value> {
     let args = if args.is_null() { &json!({}) } else { args };
     let path = |k: &str| args.get(k).and_then(Value::as_str).map(Path::new);
     match name {
+        "agent_guide" => Ok(json!({"text": SKILL})),
         "project_list" => s.project_list(),
         "project_get" => s.project_tree(id_of(args)?),
         "project_import" => s.import_skill_json(path("path").ok_or_else(|| anyhow!("path is required"))?),
@@ -231,7 +241,7 @@ mod tests {
         for (doc, text) in [("SKILL.md", include_str!("../skill/akbun-storyboard/SKILL.md")), ("manual.md", include_str!("../../manual.md")), ("README.md", include_str!("../../README.md"))] {
             for word in text.split(|c: char| !(c.is_ascii_lowercase() || c == '_')) {
                 let verbs = ["_add", "_update", "_delete", "_get", "_list", "_import", "_export", "_save", "_load", "_move", "_view", "_gc", "_info", "_render"];
-                if word.contains('_') && verbs.iter().any(|v| word.ends_with(v)) {
+                if word.contains('_') && !word.starts_with('_') && verbs.iter().any(|v| word.ends_with(v)) {
                     assert!(names.iter().any(|n| n == word), "{doc} mentions {word}, which is not an operation");
                 }
             }

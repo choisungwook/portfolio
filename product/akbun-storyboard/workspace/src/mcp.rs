@@ -10,7 +10,8 @@ pub const INSTRUCTIONS: &str = "akbun-storyboard holds video storyboards: projec
 plus background music, ideas and comments. Read a project with project_get before editing it. \
 Open comments (comment_list open_only=true) are the person's requests: act on them, then set resolved=1 and \
 reply with comment_add author=<your agent name>. Scenes are ordered; use after_id on scene_add and scene_move. \
-Attach a sketch or photo with media_add then scene_update media_id. The person sees every change live in the web UI.";
+Attach a sketch or photo with media_add then scene_update media_id. The person sees every change live in the web UI. \
+Call agent_guide once before your first edit: it has the rules and step-by-step recipes.";
 
 pub fn run(store: &Store) -> Result<()> {
     let stdin = std::io::stdin();
@@ -65,7 +66,7 @@ fn tool_call(store: &Store, name: &str, args: &Value) -> Value {
                 {"type": "text", "text": v.to_string()}
             ]})
         }
-        Ok(v) if name == "project_render" && v["text"].is_string() => json!({"content": [{"type": "text", "text": v["text"]}]}),
+        Ok(v) if (name == "project_render" || name == "agent_guide") && v["text"].is_string() => json!({"content": [{"type": "text", "text": v["text"]}]}),
         Ok(v) => json!({"content": [{"type": "text", "text": serde_json::to_string_pretty(&v).unwrap()}]}),
         Err(e) => json!({"content": [{"type": "text", "text": e.to_string()}], "isError": true}),
     }
@@ -82,7 +83,9 @@ mod tests {
         let s = crate::store::Store::open(&dir).unwrap();
         let init = super::handle(&s, &json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})).unwrap();
         assert_eq!(init["result"]["protocolVersion"], "2025-03-26", "echo the client's version");
-        assert!(init["result"]["instructions"].as_str().unwrap().contains("comment"));
+        assert!(init["result"]["instructions"].as_str().unwrap().contains("agent_guide"));
+        let tools = super::handle(&s, &json!({"jsonrpc": "2.0", "id": 4, "method": "tools/list"})).unwrap();
+        assert_eq!(tools["result"]["tools"][0]["name"], "agent_guide", "the playbook is the first tool an agent sees");
         assert!(super::handle(&s, &json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).is_none(), "no reply to notifications");
         assert_eq!(super::handle(&s, &json!({"jsonrpc": "2.0", "id": 2, "method": "nope"})).unwrap()["error"]["code"], -32601);
         let call = |name: &str, args: serde_json::Value| super::handle(&s, &json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": name, "arguments": args}})).unwrap()["result"].clone();
@@ -90,5 +93,6 @@ mod tests {
         call("project_add", json!({"title": "M"}));
         let md = call("project_render", json!({"id": 1}));
         assert!(md["content"][0]["text"].as_str().unwrap().starts_with("# M"), "render text is returned raw");
+        assert!(call("agent_guide", json!({}))["content"][0]["text"].as_str().unwrap().contains("## Recipes"));
     }
 }

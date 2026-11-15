@@ -261,10 +261,10 @@ Claude Code는 아래 명령으로 MCP 서버를 모든 프로젝트에 등록�
 claude mcp add akbun-storyboard -s user -- akbun-storyboard mcp
 ```
 
-Claude Code가 이 도구를 잘 쓰도록 skill도 설치한다. skill 문서는 실행 파일 안에 들어 있어서 아래 명령이 꺼내 저장한다.
+AI가 따라 할 작업 지침(skill)도 설치한다. skill에는 데이터 구조, 지켜야 할 규칙, 그리고 "새 스토리보드 초안 만들기", "댓글 반영하기", "고치지 않고 검토만 하기", "스케치 붙이기", "음악·효과음", "추출·백업" 같은 작업별 순서가 들어 있다. 실행 파일 안에 들어 있어서 아래 명령 하나로 Claude Code(`~/.claude/skills/`)와 Codex(`~/.codex/skills/`) 중 설치된 쪽에 넣는다. 새 버전을 받은 뒤에도 한 번 다시 실행한다.
 
 ```bash
-mkdir -p ~/.claude/skills/akbun-storyboard && akbun-storyboard skill > ~/.claude/skills/akbun-storyboard/SKILL.md
+akbun-storyboard skill install
 ```
 
 Claude Desktop은 `~/Library/Application Support/Claude/claude_desktop_config.json`(Windows는 `%APPDATA%\Claude\claude_desktop_config.json`)에 아래 내용을 넣는다. 데스크톱 앱은 터미널의 PATH를 모르므로 `command`에 실행 파일의 전체 경로를 쓴다. 경로는 터미널에서 `which akbun-storyboard`로 확인한다.
@@ -283,11 +283,7 @@ Codex는 아래 명령으로 MCP 서버를 등록한다.
 codex mcp add akbun-storyboard -- akbun-storyboard mcp
 ```
 
-Codex용 skill은 Codex의 skills 폴더에 저장한다.
-
-```bash
-mkdir -p ~/.codex/skills/akbun-storyboard && akbun-storyboard skill > ~/.codex/skills/akbun-storyboard/SKILL.md
-```
+Codex용 skill은 위의 `akbun-storyboard skill install`이 함께 설치한다.
 
 Gemini CLI는 `~/.gemini/settings.json`에, Antigravity는 MCP 설정(Manage MCP servers → View raw config)에 아래 내용을 넣는다.
 
@@ -299,7 +295,7 @@ Gemini CLI는 `~/.gemini/settings.json`에, Antigravity는 MCP 설정(Manage MCP
 }
 ```
 
-skill을 지원하지 않는 agent는 `AGENTS.md`나 `GEMINI.md`에 "스토리보드 작업은 `akbun-storyboard skill`을 실행해 그 내용을 따른다" 한 줄을 넣으면 된다.
+skill 폴더가 없는 AI(Claude Desktop, Gemini, Antigravity)도 같은 지침을 읽는다. MCP로 연결하면 첫 도구가 `agent_guide`이고, 서버가 "처음 편집하기 전에 agent_guide를 읽으라"고 알려 주기 때문이다. 확실히 하려면 "akbun-storyboard agent_guide를 먼저 읽고 시작해"라고 말한다. MCP 없이 CLI만 쓰는 AI는 `AGENTS.md`나 `GEMINI.md`에 "스토리보드 작업은 `akbun-storyboard skill`을 실행해 그 내용을 따른다" 한 줄을 넣는다.
 
 연결이 됐는지는 AI에게 "akbun-storyboard 프로젝트 목록 보여줘"라고 물어 확인한다. 프로젝트 이름과 씬 수가 나오면 된다.
 

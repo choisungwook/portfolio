@@ -8,7 +8,6 @@ use anyhow::{Result, bail};
 use serde_json::{Map, Value};
 use std::path::PathBuf;
 
-const SKILL: &str = include_str!("../skill/akbun-storyboard/SKILL.md");
 
 const USAGE: &str = "akbun-storyboard - video storyboards for people and AI agents
 
@@ -18,6 +17,7 @@ usage:
   akbun-storyboard ops                                             list operations as JSON
   akbun-storyboard <operation> [JSON | key=value ...]              run one operation
   akbun-storyboard skill                                           print the agent skill
+  akbun-storyboard skill install                                   install it for Claude Code and Codex
   akbun-storyboard --version
 
 examples:
@@ -53,7 +53,24 @@ fn run() -> Result<()> {
     match cmd.as_str() {
         "-h" | "--help" | "help" => println!("{USAGE}"),
         "-V" | "--version" => println!("akbun-storyboard {}", env!("CARGO_PKG_VERSION")),
-        "skill" => print!("{SKILL}"),
+        "skill" if args.get(1).map(String::as_str) == Some("install") => {
+            // Each agent reads skills from its own folder; install where the agent is present.
+            let mut done = 0;
+            for agent in [".claude", ".codex"] {
+                let root = home().join(agent);
+                if root.is_dir() {
+                    let dir = root.join("skills").join("akbun-storyboard");
+                    std::fs::create_dir_all(&dir)?;
+                    std::fs::write(dir.join("SKILL.md"), ops::SKILL)?;
+                    println!("installed {}", dir.join("SKILL.md").display());
+                    done += 1;
+                }
+            }
+            if done == 0 {
+                bail!("no ~/.claude or ~/.codex folder; copy `akbun-storyboard skill` output into your agent's skills folder");
+            }
+        }
+        "skill" => print!("{}", ops::SKILL),
         "ops" => {
             let list: Vec<Value> = ops::list()
                 .into_iter()
@@ -75,7 +92,7 @@ fn run() -> Result<()> {
             let input = parse_args(&args[1..])?;
             let out = ops::call(&store::Store::open(&data)?, op, &input)?;
             match out.get("text").and_then(Value::as_str) {
-                Some(text) if op == "project_render" => print!("{text}"), // raw, so `> file.md` works
+                Some(text) if op == "project_render" || op == "agent_guide" => print!("{text}"), // raw, so `> file.md` works
                 _ => println!("{}", serde_json::to_string_pretty(&out)?),
             }
         }
