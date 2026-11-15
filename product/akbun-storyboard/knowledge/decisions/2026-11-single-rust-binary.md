@@ -6,8 +6,6 @@ tags: [architecture, rust, mcp]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-15T00:00:00Z }
 ---
 
-# One Rust binary serves the web UI, the CLI and the MCP server
-
 ## 결정
 
 `akbun-storyboard` is a single Rust binary with three entry points (`serve`, `mcp`, `<operation>`) over one SQLite file. The UI is plain HTML and JS compiled into the binary and opened in a browser. There is no desktop shell and no self update; releases are per-platform archives.

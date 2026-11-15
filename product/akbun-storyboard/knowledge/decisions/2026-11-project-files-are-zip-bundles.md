@@ -6,8 +6,6 @@ tags: [storage, interop]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-15T00:00:00Z }
 ---
 
-# A project moves as one zip that carries its images
-
 ## 결정
 
 `project_bundle` produces `project.json` and `media/<file>` for every image the project uses. The web UI downloads it as `<title>.zip` and opens a zip through a file picker; the CLI and MCP write a zip for a `.zip` path and a folder otherwise. Images are stored uncompressed, JSON is deflated. Loading looks entries up by exact name and never extracts to disk.

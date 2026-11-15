@@ -6,8 +6,6 @@ tags: [storage, media]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-15T00:00:00Z }
 ---
 
-# Images are files in a chosen folder, removed when unused, with sizes shown
-
 ## 결정
 
 Each image is `<media_root>/<id>.<ext>`, with the type taken from magic bytes. `media_root` defaults to `<data>/media` and can be changed in Settings, which moves the existing files. Replacing a scene's image, deleting a scene, idea or project deletes the files nothing else uses. Sizes are shown per image, per project and in total, and Settings can delete leftover unused images.

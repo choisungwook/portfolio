@@ -97,7 +97,7 @@ function render() {
   const open = S.p ? S.p.comments.filter((c) => !c.resolved).length : 0;
   $('#open-count').textContent = open || '';
   $('#stats').textContent = S.p ? `${S.p.scenes.length} scenes · ${fmt(S.p.total_dur)} · ${fmtBytes(S.p.media_bytes)}` : 'No project';
-  document.querySelectorAll('#view-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === S.view));
+  document.querySelectorAll('#view-tabs button').forEach((b) => { b.classList.toggle('on', b.dataset.view === S.view); });
   if (editing($('#view'))) pending.add('view'); else renderView();
   if (editing($('#inspector'))) pending.add('inspector'); else renderInspector();
 }
@@ -123,7 +123,7 @@ function renderView() {
 
 function select(sel) {
   S.sel = sel;
-  document.querySelectorAll('.card, .grid tr[data-id]').forEach((n) => n.classList.toggle('on', !!sel && Number(n.dataset.id) === sel.id && n.dataset.type === sel.type));
+  document.querySelectorAll('.card, .grid tr[data-id]').forEach((n) => { n.classList.toggle('on', !!sel && Number(n.dataset.id) === sel.id && n.dataset.type === sel.type); });
   renderInspector();
 }
 
@@ -553,7 +553,7 @@ function openMenu(t) {
   closeMenus();
   t.setAttribute('aria-expanded', 'true');
   const panel = document.querySelector(`[data-menu-panel="${t.dataset.menu}"]`);
-  panel.querySelectorAll('[data-command^="view-"]').forEach((b) => b.classList.toggle('checked', b.dataset.command === 'view-' + S.view));
+  panel.querySelectorAll('[data-command^="view-"]').forEach((b) => { b.classList.toggle('checked', b.dataset.command === 'view-' + S.view); });
   panel.querySelector('[data-command="toggle-sidebar"]')?.classList.toggle('checked', !document.body.classList.contains('no-sidebar'));
   panel.querySelector('[data-command="toggle-inspector"]')?.classList.toggle('checked', !document.body.classList.contains('no-inspector'));
   panel.querySelector('[data-command="delete-scene"]')?.toggleAttribute('disabled', S.sel?.type !== 'scene');

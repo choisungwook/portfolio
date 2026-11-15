@@ -6,8 +6,6 @@ tags: [architecture, mcp, ai]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-15T00:00:00Z }
 ---
 
-# Web UI, MCP and CLI share one operation registry and write the database directly
-
 ## 결정
 
 `ops.rs` defines every operation once (name, description, JSON schema, handler). The browser posts to `/api/op/<name>`, MCP exposes them as tools, and the CLI takes the same names with JSON or `key=value` input. Generic add, update and delete operations are generated from entity column specs. The CLI and MCP open SQLite themselves instead of calling the running server. Triggers bump a `rev` counter on every write and the browser polls it every 2 seconds.
