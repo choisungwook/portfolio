@@ -12,3 +12,4 @@ path = "src/main.rs"
 akbun-terminal-core = { path = "../core" }
 ratatui.workspace = true
 vt100.workspace = true
+unicode-width = "0.2.0"
