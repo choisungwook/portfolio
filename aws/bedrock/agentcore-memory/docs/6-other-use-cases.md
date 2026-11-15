@@ -76,6 +76,8 @@ flowchart LR
 
 ## 실습
 
+먼저 workspace 디렉터리로 이동해 환경 변수를 불러옵니다.
+
 ```bash
 cd aws/bedrock/agentcore-memory
 set -a; source .runtime.env; set +a
@@ -91,18 +93,22 @@ aws bedrock-agentcore ingest-data --memory-id "$MEMORY_ID" --actor-id minho \
   --content-timestamp "$(date -u +%FT%TZ)" --source file://scripts/payloads/crm-profile.json
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 {
     "sessionId": "3c428063-f356-4478-aa9a-d6726ffb0f6b"
 }
 ```
 
-sessionId를 넘기지 않으면 AgentCore가 UUID를 만들어 돌려주며, 값은 실행마다 다릅니다. 이 sessionId는 summaries namespace에만 쓰이고 단기 메모리 event는 생기지 않습니다. 약 80초 뒤 `minho`의 record를 봅니다.
+`sessionId`를 지정하지 않으면 AgentCore가 UUID를 생성해 반환하며, 값은 실행마다 달라집니다. 이 `sessionId`는 `summaries` namespace에만 사용되고 단기 메모리 event는 생성되지 않습니다. 약 80초 뒤 `minho`의 record를 조회합니다.
 
 ```bash
 aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-path /actor/minho/ \
   --query 'memoryRecordSummaries[?!contains(namespaces[0], `summaries`)].[namespaces[0], content.text]' --output text
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 /actor/minho/facts/ 사용자(minho)의 클라우드 서비스 리전은 ap-northeast-2이다.
@@ -135,6 +141,8 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-p
   --query 'memoryRecordSummaries[].content.text' --output text | grep -c 4111
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 테스트용 법인카드 번호는 4111-1111-1111-1111이고 유효기간은 12/29야. 결제 연동 테스트에 써.
 None
@@ -153,7 +161,7 @@ aws bedrock-agentcore create-event --memory-id "$MEMORY_ID" --actor-id jiwoo --s
   --query 'event.eventId' --output text
 ```
 
-episode는 다른 전략보다 훨씬 늦게 생깁니다. AgentCore가 대화가 더 이어질지 기다렸다가 완결을 판단하기 때문입니다. 1분마다 episode 수를 셉니다.
+episode는 다른 전략보다 훨씬 늦게 생성됩니다. AgentCore가 대화가 더 이어질지 대기한 뒤 완결 여부를 판단하기 때문입니다. 1분 간격으로 episode 생성 여부를 확인합니다.
 
 ```bash
 until aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace /actor/jiwoo/episodes/ \
@@ -167,6 +175,8 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace /
   --query 'memoryRecordSummaries[].content.text' --output text | grep OOMKilled | cut -c1-900
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 {"situation":"사용자가 결제 API를 Kubernetes에 배포했으나 파드가 계속 재시작되는 문제가 발생하여 원인 파악 및 해결을 요청한 상황이다.","intent":"파드 재시작의 근본 원인을 파악하고 문제를 해결하여 안정적인 운영 상태를 복구하는 것이다.","assessment":"Yes","justification":"kubectl describe pod 명령으로 OOMKilled(Exit Code 137) 원인을 파악하고, 메모리 limit을 256Mi에서 512Mi로 상향 조정한 후 재배포한 결과 rollout이 성공했으며 10분간 재시작이 0건으로 확인되었다. 사용자가 '해결됐네, 고마워. 이 건은 종료하자.'라고 명시적으로 종료를 선언하며 성공을 확인했다.","reflection":"진단→원인 특정→조치→검증의 단계적 접근이 효과적이었다. ...
 ```
@@ -177,12 +187,14 @@ episode는 상황(`situation`), 의도(`intent`), 성공 여부(`assessment: Yes
 
 ### 4. 여러 episode에서 만든 reflection 확인
 
-reflection namespace를 `/actor/{actorId}/`로 정했으므로 `jiwoo` 경로 바로 아래에 reflection이 쌓입니다. 정확히 일치하는 `--namespace`로 그 위치만 봅니다.
+reflection namespace를 `/actor/{actorId}/`로 지정했으므로 `jiwoo` 경로 바로 아래에 reflection이 적재됩니다. 정확히 일치하는 `--namespace`로 해당 경로만 조회합니다.
 
 ```bash
 aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace /actor/jiwoo/ \
   --query 'memoryRecordSummaries[].[createdAt, content.text]' --output text | cut -c1-200
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 2026-11-14T00:48:35.741000+09:00 {"title":"Handling Ambiguous Requests with Partial Fulfillment","use_cases":"Triggered when a user request lacks sufficient context ...
@@ -204,6 +216,8 @@ scripts/forget_actor.sh minho
 aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-path /actor/minho/ --query 'length(memoryRecordSummaries)'
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 16
 16 0
@@ -217,6 +231,8 @@ record 16건이 실패 없이 지워졌고(`16 0`은 성공, 실패 건수), eve
 ```bash
 uv run -q scripts/chat.py --user minho "내 계약 갱신일이 언제였지?"
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 session: chat-76c0987c3c2b

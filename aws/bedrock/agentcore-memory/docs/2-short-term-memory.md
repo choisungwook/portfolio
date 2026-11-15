@@ -12,7 +12,7 @@
 
 ## 단기 메모리는 채팅창의 대화 기록이다
 
-ChatGPT 채팅창 하나를 떠올리면 단기 메모리가 무엇인지 바로 보입니다. 채팅창 안에서 "아까 내가 뭐라고 했지?"라고 물으면 모델이 답할 수 있는 것은, 서비스가 그 채팅창의 이전 메시지를 다시 모델 입력에 넣어 주기 때문입니다. AgentCore Memory에서는 이 기록을 event로 저장합니다. event는 `actorId`와 `sessionId` 아래에 시간순으로 쌓이는 불변 기록이며, 한 event에 대화 메시지를 1~100개 담을 수 있습니다.
+ChatGPT 채팅창 하나를 떠올리면 단기 메모리의 역할을 직관적으로 이해할 수 있습니다. 채팅창 안에서 "아까 내가 뭐라고 했지?"라고 물으면 모델이 답할 수 있는 것은, 서비스가 그 채팅창의 이전 메시지를 다시 모델 입력에 포함해 주기 때문입니다. AgentCore Memory에서는 이 기록을 event로 저장합니다. event는 `actorId`와 `sessionId` 아래에 시간순으로 쌓이는 불변 기록이며, 한 event에 대화 메시지를 1~100개 담을 수 있습니다.
 
 이 핸즈온의 backend는 질문과 답변 한 쌍을 event 하나로 저장합니다. 다음 요청이 오면 같은 session의 event를 `ListEvents`로 읽어 최근 10개(20메시지)를 OpenAI messages 형식으로 되돌리고, 그 뒤에 새 질문을 붙여 모델에 보냅니다. frontend나 OpenAI SDK는 지금까지의 messages를 보내지 않고 새 질문 하나만 보냅니다. 대화 상태의 원본이 클라이언트가 아니라 서버에 있는 구조이며, OpenAI Responses API의 `previous_response_id`나 Conversations API가 하는 일과 같은 역할입니다.
 
@@ -88,13 +88,15 @@ export AWS_PAGER=""
 uv run -q scripts/chat.py --user jiwoo "안녕, 나는 결제팀 백엔드 개발자 지우야. 주로 Go와 PostgreSQL을 써."
 ```
 
+실행하면 다음과 같이 출력됩니다.
+
 ```text
 session: chat-1a3fe300260e
 answer : 안녕하세요 지우님. Go 언어와 PostgreSQL을 사용하여 백엔드를 개발하다니 놀라운 전공입니다. ...
 memory : short_term_messages=0 long_term_records=0
 ```
 
-`short_term_messages=0`은 이 채팅창에 이전 기록이 없어 모델에 넣은 과거 메시지가 0개라는 뜻입니다. sessionId는 실행마다 달라지므로, 이후 단계에서는 자기 출력의 값을 씁니다.
+`short_term_messages=0`은 이 채팅창에 이전 기록이 없어 모델에 전달된 과거 메시지가 0개라는 뜻입니다. `sessionId`는 실행마다 새로 발급되므로, 이후 단계에서는 실제 출력된 `session` 값을 변수에 할당해 사용합니다.
 
 ```bash
 S=chat-1a3fe300260e   # 1단계 출력의 session 값으로 바꾼다
@@ -107,6 +109,8 @@ S=chat-1a3fe300260e   # 1단계 출력의 session 값으로 바꾼다
 ```bash
 uv run -q scripts/chat.py --user jiwoo --session $S "내가 주로 쓰는 언어가 뭐라고 했지?"
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 session: chat-1a3fe300260e
@@ -125,13 +129,15 @@ uv run -q scripts/chat.py --user jiwoo --session $S "앞으로 답변은 세 줄
 uv run -q scripts/chat.py --user jiwoo --session $S "다음 주 화요일에 결제 서비스 PostgreSQL을 16에서 17로 업그레이드할 계획이야."
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 memory : short_term_messages=4 long_term_records=0
 ...
 memory : short_term_messages=6 long_term_records=0
 ```
 
-턴마다 모델에 들어가는 과거 메시지가 2개씩 늘어납니다. backend는 최근 10개 event(`SHORT_TERM_TURNS=10`)까지만 넣으므로 11번째 턴부터는 이 값이 20에서 더 늘지 않습니다. 3B 모델이라 "hiểu了"처럼 다른 언어가 섞인 답이 가끔 나오는데, 메모리 동작과는 관계없는 모델 품질 문제입니다.
+턴마다 모델에 들어가는 과거 메시지가 2개씩 늘어납니다. backend는 최근 10개 event(`SHORT_TERM_TURNS=10`)까지만 조회하므로 11번째 턴부터는 이 값이 20에서 더 늘어나지 않습니다. 3B 소형 모델 특성상 "hiểu了"처럼 타 언어 단어가 간헐적으로 섞여 나오는데, 이는 메모리 동작과는 무관한 모델 추론 품질의 한계입니다.
 
 ### 4. CLI로 저장된 event 확인
 
@@ -141,6 +147,8 @@ backend가 저장한 기록을 AWS CLI로 직접 읽어, 모델이 본 과거 �
 aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id jiwoo --session-id $S \
   --query 'events[].{time: eventTimestamp, user: payload[0].conversational.content.text}' --output table
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 +-----------------------------------+--------------------------------------------------------------------------------+
@@ -153,13 +161,15 @@ aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id jiwoo --se
 +-----------------------------------+--------------------------------------------------------------------------------+
 ```
 
-event 4개가 보이며 최신 event가 맨 위에 옵니다. `ListEvents`는 최신순으로 돌려주므로 backend는 `eventTimestamp`로 다시 정렬해 오래된 순서로 모델에 넣습니다. 정렬을 빼면 모델이 대화를 거꾸로 읽게 됩니다.
+event 4개가 조회되며 최신 event가 맨 위에 위치합니다. `ListEvents`는 최신순으로 반환하므로 backend는 `eventTimestamp` 기준으로 재정렬해 오래된 순서대로 모델에 전달합니다. 정렬을 생략하면 모델이 대화 맥락을 역순으로 읽게 됩니다.
 
-event 하나의 전체 구조를 보면 질문과 답변이 한 event의 payload 두 개로 들어 있습니다.
+event 하나의 전체 구조를 확인해 보면 질문과 답변이 한 event의 payload 두 개로 들어 있습니다.
 
 ```bash
 aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id jiwoo --session-id $S --max-items 1 --output json
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 {
@@ -196,6 +206,8 @@ EOF
 aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id minho --session-id chat-stream-test \
   --query 'events[].payload[].conversational.[role,content.text]' --output text
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 24 chunks: 안녕하세요, TCK-1042 프로젝트와 관련하여 도움이 될까요?

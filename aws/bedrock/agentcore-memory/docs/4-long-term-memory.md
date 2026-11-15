@@ -77,6 +77,8 @@ flowchart LR
 
 ## 실습
 
+먼저 workspace 디렉터리로 이동해 환경 변수를 불러옵니다.
+
 ```bash
 cd aws/bedrock/agentcore-memory
 set -a; source .runtime.env; set +a
@@ -85,12 +87,14 @@ export AWS_PAGER=""
 
 ### 1. memory에 붙은 전략 구성 확인
 
-Terraform으로 만든 전략 4개와 namespace 템플릿, 상태를 한 번에 봅니다.
+Terraform으로 생성한 전략 4개와 namespace 템플릿, 상태를 한 번에 조회합니다.
 
 ```bash
 aws bedrock-agentcore-control get-memory --memory-id "$MEMORY_ID" \
   --query 'memory.{status: status, expiry: eventExpiryDuration, strategies: strategies[].[name, type, namespaces[0], status]}' --output json
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 {
@@ -109,12 +113,14 @@ aws bedrock-agentcore-control get-memory --memory-id "$MEMORY_ID" \
 
 ### 2. 한 사용자의 장기 메모리를 전략별로 보기
 
-`--namespace-path`는 그 경로 아래의 모든 namespace를 훑습니다. 시나리오 3까지 진행한 뒤 `jiwoo`의 record를 봅니다(요약 record는 길어서 앞부분만 옮김).
+`--namespace-path`는 그 경로 아래의 모든 namespace를 스캔합니다. 시나리오 3까지 진행한 뒤 `jiwoo`의 record를 조회합니다(요약 record는 길어 앞부분만 발췌했습니다).
 
 ```bash
 aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-path /actor/jiwoo/ \
   --query 'memoryRecordSummaries[].[namespaces[0], content.text]' --output text
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 /actor/jiwoo/facts/ 사용자는 답변을 세 줄 이내로 짧게 해달라고 요청했다.
@@ -139,7 +145,7 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-p
 ...
 ```
 
-같은 대화가 전략마다 다른 노트가 되었습니다. facts는 한 문장짜리 사실 6개로 쪼개졌고, preferences는 "언제 적용하는 선호인지"를 `context`에 함께 담은 JSON이 되었습니다. summaries는 채팅창마다 따로 쌓였고, 채팅창 1에는 `<topic>` 형식과 markdown 형식의 두 요약이 생겼습니다. 두 형식의 차이는 다음 단계에서 봅니다. 시나리오 2에서 모델이 받은 질문("내가 주로 쓰는 언어가 뭐라고 했지?")처럼 기억할 가치가 없는 문장은 facts에 들어가지 않았습니다.
+같은 대화가 전략마다 다른 노트가 되었습니다. `facts`는 한 문장짜리 사실 6개로 분리되었고, `preferences`는 "언제 적용하는 선호인지"를 `context`에 함께 담은 JSON이 되었습니다. `summaries`는 채팅창마다 별도로 누적되었고, 채팅창 1에는 `<topic>` 형식과 markdown 형식의 두 요약이 생성되었습니다. 두 형식의 차이는 다음 단계에서 확인합니다. 시나리오 2에서 모델이 받은 질문("내가 주로 쓰는 언어가 뭐라고 했지?")처럼 기억할 가치가 없는 문장은 `facts`에 포함되지 않았습니다.
 
 ### 3. 채팅창 전체 요약(FULL_SESSION) 찾기
 
@@ -151,6 +157,8 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" \
   --metadata-filters '[{"left":{"metadataKey":"x-amz-agentcore-memory-recordType"},"operator":"EQUALS_TO","right":{"metadataValue":{"stringValue":"FULL_SESSION"}}}]' \
   --query 'memoryRecordSummaries[].{id: memoryRecordId, created: createdAt, metadata: metadata}' --output json
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 [
@@ -179,6 +187,8 @@ aws bedrock-agentcore retrieve-memory-records --memory-id "$MEMORY_ID" --namespa
   --query 'memoryRecordSummaries[].[score, content.text]' --output text
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 0.37976499103963546 사용자는 2026-11-17(다음 주 화요일)에 결제 서비스의 PostgreSQL을 버전 16에서 17로 업그레이드할 계획이다.
 0.35777811158882483 사용자는 코드 예시를 Go로 제공해달라고 요청했다.
@@ -195,12 +205,14 @@ aws bedrock-agentcore retrieve-memory-records --memory-id "$MEMORY_ID" --namespa
 uv run -q scripts/chat.py --user jiwoo --session chat-fa349bffe7ee "업그레이드 일정이 다음 주 목요일로 미뤄졌어. 그리고 이제부터 코드 예시는 Go 대신 Rust로 보여줘."
 ```
 
-2분 뒤 요약을 제외한 record를 생성 시각과 함께 봅니다.
+2분 뒤 요약을 제외한 record를 생성 시각과 함께 조회합니다.
 
 ```bash
 aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-path /actor/jiwoo/ \
   --query 'memoryRecordSummaries[?!contains(namespaces[0], `summaries`)].[namespaces[0], createdAt, content.text]' --output text
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 /actor/jiwoo/facts/ 2026-11-14T00:36:45.720000+09:00 사용자는 2026-11-19(다음 주 목요일)에 결제 서비스의 PostgreSQL을 버전 16에서 17로 업그레이드할 계획이다.
@@ -219,7 +231,7 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-p
 
 ### 6. 프롬프트에 넣을 record 고르기
 
-backend는 처음에 `namespacePath=/actor/{actorId}/`로 모든 전략에서 topK 5를 검색했습니다. 이렇게 하니 길이가 긴 summaries record가 topK를 대부분 차지했고, markdown 요약 5개가 들어간 프롬프트를 받은 3B 모델이 중국어로 답했습니다. 지금은 facts와 preferences namespace에서 각각 topK 3으로 검색합니다(`backend/memory.py`의 `PROMPT_NAMESPACES`).
+작은 모델(3B)은 프롬프트에 길이가 긴 markdown 요약(`summaries`)이 다수 포함되면 언어 일관성이 무너져 중국어로 응답하는 현상이 발생할 수 있습니다. 이를 방지하기 위해 backend는 `namespacePath=/actor/{actorId}/` 전체 검색 대신 `facts`와 `preferences` namespace만 지정해 각각 `topK` 3으로 검색합니다(`backend/memory.py`의 `PROMPT_NAMESPACES`).
 
 ```python
 PROMPT_NAMESPACES = ("facts", "preferences")

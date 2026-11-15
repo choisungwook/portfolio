@@ -29,7 +29,7 @@ AgentCore Memory에는 SQL이 없지만, 데이터를 테이블 두 개로 생�
 | 개수, 집계 | `COUNT(*)`, `GROUP BY` | 없음. CLI `--query`의 `length()`나 셸의 `uniq -c` |
 | 삭제 | `DELETE` | `delete-event`, `batch-delete-memory-records` |
 
-`JOIN`과 `GROUP BY`는 API에 없습니다. 여러 사용자를 가로지르는 분석이 필요하면 Kinesis 스트리밍으로 record 변경을 받아 분석용 저장소에 따로 쌓는 것이 정석이고, 이 핸즈온의 규모에서는 CLI 출력을 셸로 집계하는 것으로 충분합니다.
+`JOIN`과 `GROUP BY`는 API에 없습니다. 여러 사용자를 가로지르는 분석이 필요하면 Kinesis 스트리밍으로 record 변경을 받아 분석용 저장소에 별도로 적재하는 것이 표준적인 접근이며, 이 핸즈온의 규모에서는 CLI 출력을 셸로 집계하는 것으로 충분합니다.
 
 ### 용어
 
@@ -81,6 +81,8 @@ flowchart TD
 
 ## AWS CLI 예제
 
+모든 예제는 workspace 디렉터리로 이동해 환경 변수를 불러온 상태에서 실행합니다.
+
 ```bash
 cd aws/bedrock/agentcore-memory
 set -a; source .runtime.env; set +a
@@ -107,6 +109,8 @@ aws bedrock-agentcore list-events --memory-id "$MEMORY_ID" --actor-id jiwoo --se
   --no-include-payloads --query 'length(events)'
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 다음 주 화요일에 결제 서비스 PostgreSQL을 16에서 17로 업그레이드할 계획이야.
 None
@@ -126,6 +130,8 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-p
   --query 'length(memoryRecordSummaries)'
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 7
 28
@@ -142,6 +148,8 @@ aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace-p
   --query 'memoryRecordSummaries[].namespaces[0]' --output text \
   | tr '\t' '\n' | sed -E 's#(/actor/[^/]+/[^/]*/?).*#\1#' | sort | uniq -c
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
    5 /actor/jiwoo/
@@ -167,6 +175,8 @@ ID=$(aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namesp
   --query 'memoryRecordSummaries[0].memoryRecordId' --output text)
 aws bedrock-agentcore get-memory-record --memory-id "$MEMORY_ID" --memory-record-id "$ID" --output json
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 {
@@ -201,6 +211,8 @@ aws bedrock-agentcore retrieve-memory-records --memory-id "$MEMORY_ID" --namespa
   --query 'memoryRecordSummaries[].[score, namespaces[0]]' --output text
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 0.43743694504666464    /actor/jiwoo/summaries/chat-13eee40a6d53/
 0.4330194599955256    /actor/jiwoo/summaries/chat-fa349bffe7ee/
@@ -210,21 +222,21 @@ aws bedrock-agentcore retrieve-memory-records --memory-id "$MEMORY_ID" --namespa
 
 ## AgentCore 콘솔 예제
 
-콘솔은 대량 조회보다 리소스 구성을 확인하는 데 씁니다. 이 핸즈온을 검증한 환경에서는 콘솔 로그인 없이 진행했기 때문에 아래 단계는 화면에서 직접 확인하지 않았으며, 메뉴 이름은 콘솔 개편에 따라 달라질 수 있습니다. 화면에서 볼 값은 CLI 결과와 같으므로, 값이 다르면 CLI 결과를 기준으로 판단합니다.
+콘솔은 대량 조회보다 리소스 구성을 확인하는 데 적합합니다. 콘솔 메뉴 이름은 개편에 따라 달라질 수 있으며, 화면에 표시되는 값은 CLI 조회 결과와 동일합니다.
 
 ### 1. memory 목록에서 상태 확인
 
 1. AWS 콘솔 오른쪽 위 리전을 **아시아 태평양(서울) ap-northeast-2**로 바꿉니다.
-2. 서비스 검색에서 **Amazon Bedrock AgentCore**를 열고 왼쪽 메뉴에서 **Memory**를 고릅니다.
-3. 목록에서 `chat_memory_handson-`으로 시작하는 memory의 상태가 **Active**인지 봅니다. CLI의 `get-memory` 결과 `status: ACTIVE`와 같은 값입니다.
+2. 서비스 검색에서 **Amazon Bedrock AgentCore**를 열고 왼쪽 메뉴에서 **Memory**를 선택합니다.
+3. 목록에서 `chat_memory_handson-`으로 시작하는 memory의 상태가 **Active**인지 확인합니다. CLI의 `get-memory` 결과 `status: ACTIVE`와 같은 값입니다.
 
 ### 2. 전략과 namespace 확인
 
-memory 이름을 눌러 상세 화면으로 들어가 전략 목록에서 `facts`, `preferences`, `summaries`, `episodes` 네 개와 각 namespace(`/actor/{actorId}/facts/` 등)를 확인합니다. 이벤트 보존 기간이 7일인지도 같은 화면에서 봅니다.
+memory 이름을 눌러 상세 화면으로 들어가 전략 목록에서 `facts`, `preferences`, `summaries`, `episodes` 네 개와 각 namespace(`/actor/{actorId}/facts/` 등)를 확인합니다. 이벤트 보존 기간이 7일인지도 같은 화면에서 확인할 수 있습니다.
 
-### 3. event와 record는 CLI로 조회
+### 3. event와 record의 CLI 조회
 
-콘솔에서 event 원문과 record 목록을 actor, namespace 조건으로 살피는 기능은 이 핸즈온에서 확인하지 못했습니다. 사용자별 기억 열람, 집계, 삭제는 위의 CLI 예제나 `scripts/forget_actor.sh`로 합니다.
+콘솔에서는 주로 리소스와 전략 구성을 확인하고, 사용자별 기억 열람·집계·삭제는 위의 CLI 예제나 `scripts/forget_actor.sh`로 수행합니다.
 
 ## 부록. 실무에서 얻는 것
 

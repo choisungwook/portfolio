@@ -73,7 +73,7 @@ flowchart LR
 
 ### 1. 이 핸즈온 비용 계산
 
-검증할 때 실제로 만든 양을 기준으로 계산합니다. 채팅 턴과 CLI 호출 수는 검증 로그에서 센 근삿값입니다.
+본 핸즈온 시나리오를 한 번 완주했을 때 생성되는 리소스를 기준으로 비용을 산정합니다(채팅 턴과 CLI 호출 수는 근삿값입니다).
 
 | 항목 | 사용량 | 계산 | 비용(USD) |
 |---|---|---|---|
@@ -101,43 +101,9 @@ flowchart LR
 
 비용의 89%가 장기 메모리 검색입니다. 검색을 `namespacePath` 한 번으로 줄이면 검색 비용이 300 USD로 내려가 합계가 약 374 USD가 되고, 매 턴이 아니라 채팅창의 첫 턴에만 검색하면 더 내려갑니다. 단기 읽기도 최소 과금 때문에 쓰기보다 두 배 비쌉니다. 턴마다 최근 10 event를 다시 읽는 대신 backend가 채팅창 기록을 잠시 캐시하면 줄일 수 있습니다. 장기 저장은 record가 만료되지 않아 사용자가 그대로여도 다음 달에 더 커지므로, record TTL을 쓰거나 오래된 summaries를 정리하는 정책이 필요합니다.
 
-### 3. 컨테이너, 로컬 이미지, 빌드 캐시 정리
+### 3. 실습 리소스 정리
 
-로컬에서 빌드한 이미지와 캐시는 디스크를 차지하므로 함께 지웁니다.
-
-```bash
-cd aws/bedrock/agentcore-memory
-docker compose down --rmi local -v
-docker builder prune -f
-docker images --filter reference='agentcore-memory-*'
-```
-
-```text
- Container agentcore-memory-frontend-1 Removed
- Container agentcore-memory-backend-1 Removed
- Image agentcore-memory-backend:local Removed
- Image agentcore-memory-frontend:local Removed
- Network agentcore-memory_default Removed
-Total: 84.41MB
-IMAGE   ID             DISK USAGE   CONTENT SIZE   EXTRA
-```
-
-마지막 `docker images` 출력에 행이 없으면 이 핸즈온이 만든 이미지가 모두 지워진 것입니다. builder prune이 회수한 용량(`Total`)은 실행 환경마다 다릅니다.
-
-### 4. AgentCore Memory 삭제와 확인
-
-memory를 지우면 event와 record가 함께 지워지므로 과금 대상이 모두 사라집니다.
-
-```bash
-terraform -chdir=terraform destroy
-aws bedrock-agentcore-control list-memories --query 'memories[?starts_with(id, `chat_memory_handson`)].[id,status]' --output text
-```
-
-```text
-Destroy complete! Resources: 5 destroyed.
-```
-
-destroy도 apply처럼 전략을 하나씩 지우므로 약 12분이 걸렸습니다(2026-11-14 측정). 이어서 실행한 `list-memories` 출력은 비어 있었으며, 이것으로 이 핸즈온이 만든 과금 대상이 모두 사라진 것을 확인합니다.
+AgentCore Memory 리소스를 삭제하면 하위의 단기 메모리 event와 장기 메모리 record가 함께 삭제되어 추가 과금이 발생하지 않습니다. 로컬 Docker 이미지와 빌드 캐시를 포함한 전체 정리 절차는 [setup.md](./setup.md#정리)를 따릅니다.
 
 ## 부록. 실무에서 얻는 것
 

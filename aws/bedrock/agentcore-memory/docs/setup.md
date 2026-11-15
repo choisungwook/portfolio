@@ -1,6 +1,6 @@
 # 실습 환경 준비와 정리
 
-AWS에는 AgentCore Memory 리소스 하나만 만들고, 모델과 채팅 화면은 맥북에서 실행합니다. 모델은 Ollama의 `qwen2.5:3b`(약 1.9GB)를 쓰며 Apple M3 맥북에서 한 번 답하는 데 2~5초가 걸립니다. 모든 명령은 AWS CLI의 `default` 프로파일을 씁니다. 다른 프로파일을 쓰려면 셸에서 `export AWS_PROFILE=<프로파일>`을 먼저 실행합니다.
+AWS에는 AgentCore Memory 리소스 하나만 프로비저닝하고, 추론 모델과 채팅 화면은 로컬 환경에서 실행합니다. 모델은 Ollama의 `qwen2.5:3b`(약 1.9GB)를 사용하며, Apple M3 맥북 기준으로 응답당 2~5초가 소요됩니다. 모든 명령은 AWS CLI의 `default` 프로파일을 사용하므로, 다른 프로파일을 쓰려면 셸에서 `export AWS_PROFILE=<프로파일>`을 먼저 실행해야 합니다.
 
 ## 준비물
 
@@ -83,6 +83,8 @@ backend가 OpenAI의 `GET /v1/models` 형식으로 모델을 돌려주는지 확
 curl -s localhost:8000/v1/models
 ```
 
+정상적으로 기동되었다면 다음과 같은 JSON 응답이 반환됩니다.
+
 ```text
 {"object":"list","data":[{"id":"qwen2.5:3b","object":"model","owned_by":"ollama"}]}
 ```
@@ -141,9 +143,9 @@ aws bedrock-agentcore-control list-memories --query 'memories[?starts_with(id, `
 ollama rm qwen2.5:3b
 ```
 
-## 맥북을 다시 켠 뒤 환경 복구
+## 재부팅 후 환경 복구
 
-AWS 쪽은 그대로 남아 있고 로컬 프로세스만 멈춥니다. 맥북을 다시 켜도 단기 메모리 event(7일 보존)와 장기 메모리 record는 남아 있으므로, 그 사이에도 장기 메모리 저장 비용은 계속 나옵니다.
+호스트를 재부팅하면 로컬 프로세스만 중지되고 AWS 측 리소스는 그대로 유지됩니다. 단기 메모리 event(7일 보존)와 장기 메모리 record가 남아 있는 동안에는 장기 메모리 저장 비용이 계속 발생합니다.
 
 | 대상 | 재부팅 후 상태 | 복구 방법 |
 |---|---|---|

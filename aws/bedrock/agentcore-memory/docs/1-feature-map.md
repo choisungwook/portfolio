@@ -12,9 +12,9 @@
 
 ## AgentCore Memory가 하는 일
 
-ChatGPT나 Claude를 쓰다 보면 두 가지 기억을 경험합니다. 하나는 같은 채팅창 안에서 방금 한 말을 기억하는 것이고, 다른 하나는 새 채팅창을 열어도 "저는 Go 개발자입니다"라고 한 번 말한 사실을 기억하는 것입니다. 앞의 것은 채팅창에 쌓인 대화 기록을 다시 모델에 넣어 주는 일이고, 뒤의 것은 여러 대화에서 지속 가치가 있는 사실만 뽑아 따로 저장해 두었다가 관련 질문이 오면 꺼내 주는 일입니다.
+ChatGPT나 Claude를 쓰다 보면 두 가지 기억을 경험합니다. 하나는 같은 채팅창 안에서 방금 한 말을 기억하는 것이고, 다른 하나는 새 채팅창을 열어도 "저는 Go 개발자입니다"라고 한 번 말한 사실을 기억하는 것입니다. 전자는 채팅창에 쌓인 대화 기록을 다시 모델 입력에 포함하는 작업이고, 후자는 여러 대화에서 지속 가치가 있는 사실만 추출해 별도로 저장해 두었다가 관련 질문이 들어올 때 조회해 프롬프트에 반영하는 작업입니다.
 
-LLM은 호출과 호출 사이에 아무것도 기억하지 않는 stateless 함수라서, 이 두 기억은 모두 모델 밖의 애플리케이션이 만들어야 합니다. AgentCore Memory는 이 일을 관리형 서비스로 제공합니다. 대화 원문은 **단기 메모리(short-term memory)**에 event로 쌓고, 비동기 파이프라인이 그 event에서 사실, 선호, 요약, 작업 경험을 뽑아 **장기 메모리(long-term memory)**에 record로 저장합니다. 애플리케이션은 질문이 올 때 단기 메모리에서 최근 대화를, 장기 메모리에서 의미가 가까운 record를 꺼내 프롬프트를 조립합니다.
+LLM은 호출과 호출 사이에 상태를 유지하지 않는 stateless 함수이므로, 이 두 기억은 모두 모델 밖의 애플리케이션 계층에서 구현해야 합니다. AgentCore Memory는 이 역할을 관리형 서비스로 제공합니다. 대화 원문은 **단기 메모리(short-term memory)**에 event로 적재하고, 비동기 파이프라인이 그 event에서 사실, 선호, 요약, 작업 경험을 추출해 **장기 메모리(long-term memory)**에 record로 저장합니다. 애플리케이션은 질문이 들어올 때 단기 메모리에서 최근 대화를, 장기 메모리에서 의미가 가까운 record를 조회해 프롬프트를 조립합니다.
 
 이 기능이 다루는 것과 다루지 않는 것을 먼저 구분해 둡니다.
 
@@ -109,7 +109,7 @@ flowchart LR
 
 ### 1. 서울 리전 지원 여부와 한도 확인
 
-2026-11-14 기준 AgentCore Memory는 서울 리전(ap-northeast-2)을 지원합니다. 같은 AgentCore 안에서도 기능마다 지원 리전이 달라서, Memory는 되지만 Runtime의 Instances 컴퓨트 타입, AgentCore payments, Web Search는 서울에서 쓸 수 없습니다. 이 핸즈온이 쓰는 Memory 기능은 모두 서울에서 동작했습니다.
+2026-11-14 기준 AgentCore Memory는 서울 리전(`ap-northeast-2`)을 지원합니다. 같은 AgentCore 안에서도 세부 기능마다 지원 리전이 달라서, Memory는 지원되지만 Runtime의 Instances 컴퓨트 타입, AgentCore payments, Web Search는 서울 리전에서 사용할 수 없습니다. 이 핸즈온에서 사용하는 Memory 기능은 모두 서울 리전에서 지원됩니다.
 
 Memory 한도는 계정과 리전 단위로 걸립니다. 실습에서 부딪힐 만한 값은 다음과 같습니다. 문서의 기본값과 실제 계정에 적용된 값이 다를 수 있어서, 리소스 개수 한도는 Service Quotas로 조회한 값을 함께 적었습니다.
 
@@ -136,7 +136,7 @@ aws service-quotas list-service-quotas --service-code bedrock-agentcore \
   --query 'Quotas[?contains(QuotaName, `emor`)].[QuotaName, Value]' --output table
 ```
 
-출력에서 `Memories`와 `Memory strategies per memory` 행을 봅니다. 실습 계정에서는 각각 20과 4가 나왔습니다(일부만 옮김).
+출력 결과에서 `Memories`와 `Memory strategies per memory` 행을 확인합니다. 실습 계정에서는 각각 20과 4가 조회되었습니다(일부만 발췌).
 
 ```text
 |  Memory strategies per memory                                            |  4.0      |
@@ -145,7 +145,7 @@ aws service-quotas list-service-quotas --service-code bedrock-agentcore \
 |  Rate of RetrieveMemoryRecords requests                                  |  30.0     |
 ```
 
-같은 계정에서 us-east-1과 ap-northeast-1도 20과 4였고, `list-aws-default-service-quotas`가 돌려주는 AWS 기본값은 150과 6이었습니다. 서울 리전만의 제약이 아니라 계정에 적용된 값이 문서 기본값보다 낮은 경우입니다. memory당 전략 수는 조정할 수 없으므로 이 계정에서는 내장 전략 4개를 모두 켜면 custom 전략을 더 붙일 수 없습니다. 전략 구성을 정하기 전에 자기 계정의 값을 먼저 확인해야 합니다.
+같은 계정에서 us-east-1과 ap-northeast-1도 20과 4였고, `list-aws-default-service-quotas`가 돌려주는 AWS 기본값은 150과 6이었습니다. 서울 리전만의 제약이 아니라 계정에 적용된 값이 문서 기본값보다 낮은 경우입니다. memory당 전략 수는 조정할 수 없으므로 이 계정에서는 내장 전략 4개를 모두 켜면 custom 전략을 더 붙일 수 없습니다. 전략 구성을 정하기 전에 대상 계정의 할당량(Quota)을 먼저 확인해야 합니다.
 
 ### 2. 2026년에 추가된 기능 확인
 
@@ -167,7 +167,7 @@ aws service-quotas list-service-quotas --service-code bedrock-agentcore \
 
 - 메모리 설계의 첫 결정은 namespace입니다. 이 핸즈온은 모든 전략의 namespace를 `/actor/{actorId}/` 아래에 두어 경로 하나로 한 사용자의 기억을 모두 찾고 지울 수 있게 했습니다. 전략마다 `/strategy/{memoryStrategyId}/...` 같은 기본 템플릿을 쓰면 사용자 단위 삭제가 전략 수만큼의 호출로 늘어납니다.
 - 모델은 메모리를 모릅니다. 어떤 기억을 넣을지는 backend가 정하며, 이 결정이 답변 품질을 좌우합니다. 작은 로컬 모델일수록 넣는 양을 줄여야 했습니다([시나리오 4](./4-long-term-memory.md)).
-- 장기 메모리 추출에 쓰이는 모델은 AWS가 관리하며 그 비용은 record 저장 단가에 포함됩니다. 로컬 모델로 답하더라도 사용자 대화는 AWS의 추출 모델로 넘어간다는 점을 데이터 처리 정책에서 확인해야 합니다.
+- 장기 메모리 추출에 쓰이는 모델은 AWS가 관리하며 그 비용은 record 저장 단가에 포함됩니다. 로컬 모델로 추론하더라도 사용자 대화는 AWS의 추출 모델로 전송된다는 점을 데이터 처리 정책 관점에서 사전에 검토해야 합니다.
 
 ## 참고 문서
 
