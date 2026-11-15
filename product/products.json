@@ -3,6 +3,14 @@
   "updated": "2026-11-15",
   "products": [
     {
+      "id": "akbun-taskq",
+      "name": "akbun-taskq",
+      "description": "쌓아 둔 태스크를 여러 Claude 세션이 병렬로 처리하고, 시간대별 실행 기록과 꼭 확인할 항목을 한 화면에서 보는 개인용 에이전트 태스크 큐",
+      "kind": "backend",
+      "tags": ["typescript", "claude", "agent-sdk", "sqlite", "cli"],
+      "released": "2026-11-15"
+    },
+    {
       "id": "akbun-storyboard",
       "name": "akbun-storyboard",
       "description": "씬별 스케치·대본·배경음악·효과음·아이디어·댓글을 웹 UI와 CLI, MCP로 사람과 AI agent가 함께 편집하는 Rust 단일 바이너리 영상 스토리보드 도구",

@@ -1,0 +1,123 @@
+import type { TaskType } from '../types.ts'
+import { isReadOnlyAws, splitSegments } from './aws-guard.ts'
+import { blocked, realPath, resolvePath, under } from './paths.ts'
+
+// The single policy table. The PreToolUse hook runs before allow rules, so these decisions hold in every permission mode.
+// 'ask' sends the call to the permission prompt, where canUseTool waits for the user.
+export type Decision = 'allow' | 'deny' | 'ask'
+
+export interface GateContext {
+  cwd: string          // the worker's working directory: relative paths resolve here
+  outputs: string      // <home>/outputs
+  repo?: string        // the task's repository, for code and security_review
+  dataDir: string      // <home>/data, which holds the database
+  profile?: string     // the target AWS profile of the task
+  accessSkill?: string // the registered folder of the task's access skill (realpath)
+}
+
+interface Touch { real: string; write: boolean }
+type Input = Record<string, unknown>
+type Check = (tool: string, input: Input, roots: Roots, touches: Touch[], ctx: GateContext) => Decision
+interface Roots { cwd: string; outputs: string; repo?: string }
+
+const READ = new Set(['Read', 'Grep', 'Glob'])
+const EDIT = new Set(['Write', 'Edit', 'MultiEdit'])
+const WRITE_PATH = new Set([...EDIT, 'NotebookEdit'])
+const GIT_READ = /^(diff|log|show)$/
+const GIT_UNSAFE = ['--output', '--ext-diff', '--textconv', '--no-index']
+
+// Read tools are confined by path because an allowed Read of a credential file plus any allowed network call is an
+// exfiltration path. Bash has no text check in research and code: the sandbox (with denyRead) and auto mode are the control.
+const POLICY: Record<TaskType, Check> = {
+  research: (tool, _input, roots, touches) => {
+    if (READ.has(tool)) return 'allow'
+    if (EDIT.has(tool)) return inside(touches, [roots.outputs]) ? 'allow' : 'deny'
+    return ['Bash', 'WebFetch', 'WebSearch'].includes(tool) ? 'allow' : 'deny'
+  },
+  code: (tool, _input, roots, touches) => {
+    const repoRoots = [roots.repo, roots.outputs].filter((root): root is string => root !== undefined)
+    if (READ.has(tool) || WRITE_PATH.has(tool)) return inside(touches, repoRoots) ? 'allow' : 'deny'
+    return tool === 'Bash' ? 'allow' : 'deny'
+  },
+  ops_read: (tool, input, roots, touches, ctx) => {
+    if (READ.has(tool)) return inside(touches, [roots.cwd, roots.outputs]) ? 'allow' : 'deny'
+    if (tool === 'Skill') return 'allow'
+    return tool === 'Bash' && isReadOnlyAws(commandOf(input), { profile: ctx.profile }) ? 'allow' : 'deny'
+  },
+  ops_change: (tool, input, roots, touches, ctx) => {
+    if (READ.has(tool) && inside(touches, [roots.cwd, roots.outputs])) return 'allow'
+    if (tool === 'Skill') return 'allow'
+    return tool === 'Bash' && isReadOnlyAws(commandOf(input), { profile: ctx.profile }) ? 'allow' : 'ask'
+  },
+  security_review: (tool, input, roots, touches, ctx) => {
+    if (READ.has(tool)) return inside(touches, [roots.repo, roots.outputs].filter(isString)) ? 'allow' : 'deny'
+    if (tool === 'Write') return inside(touches, [roots.outputs]) ? 'allow' : 'deny'
+    return tool === 'Bash' && gitReadOnly(commandOf(input), ctx.repo) ? 'allow' : 'deny'
+  },
+}
+
+export function decide(type: TaskType, tool: string, input: Input, ctx: GateContext): Decision {
+  if (input.dangerouslyDisableSandbox === true || tool.startsWith('mcp__')) return 'deny'
+  const places = { dataDir: realPath(ctx.dataDir) }
+  const touches = touchesOf(tool, input, ctx)
+  if (touches.some((touch) => blocked(touch.real, touch.write, places))) return 'deny'
+  // The access skill folder is read-only for every type. Reads there are allowed; a symlink that leads out is not
+  // inside it and goes through the type's own rules.
+  if (ctx.accessSkill !== undefined && touches.length > 0 && inside(touches, [realPath(ctx.accessSkill)])) {
+    if (WRITE_PATH.has(tool)) return 'deny'
+    if (READ.has(tool)) return 'allow'
+  }
+  const roots: Roots = {
+    cwd: realPath(ctx.cwd),
+    outputs: realPath(ctx.outputs),
+    repo: ctx.repo === undefined ? undefined : realPath(ctx.repo),
+  }
+  return POLICY[type](tool, input, roots, touches, ctx)
+}
+
+// Every path a file tool touches, resolved. A read with no path reads the working directory; a grep or glob pattern
+// counts as a path when it has a slash or a tilde.
+function touchesOf(tool: string, input: Input, ctx: GateContext): Touch[] {
+  const write = WRITE_PATH.has(tool)
+  const given = ['file_path', 'notebook_path', 'path'].map((key) => input[key]).filter(isString)
+  const root = isString(input.path) ? resolvePath(ctx.cwd, input.path) : ctx.cwd
+  const paths = given.map((path) => resolvePath(ctx.cwd, path))
+  if ((tool === 'Glob' || tool === 'Grep') && isString(input.pattern) && /[/~]/.test(input.pattern)) {
+    paths.push(resolvePath(root, input.pattern))
+  }
+  if (paths.length === 0 && READ.has(tool)) paths.push(resolvePath(ctx.cwd, '.'))
+  return paths.map((real) => ({ real, write }))
+}
+
+// Every touched path must lie under one of the roots. An empty list never passes.
+function inside(touches: Touch[], roots: string[]): boolean {
+  return touches.length > 0 && touches.every((touch) => roots.some((root) => under(touch.real, root)))
+}
+
+function commandOf(input: Input): string {
+  return isString(input.command) ? input.command : ''
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+// git prefers an exact match, so --text is the flag itself and not an abbreviation of --textconv.
+function isUnsafeGitFlag(arg: string): boolean {
+  if (!arg.startsWith('--') || arg === '--text') return false
+  const name = arg.split('=')[0]
+  return GIT_UNSAFE.some((unsafe) => arg.startsWith(unsafe) || (name.length >= 5 && unsafe.startsWith(name)))
+}
+
+// One git read command: exactly one segment, run against the task's repo with -C, and none of the flags that write
+// a file or run a program. Abbreviations count, since git accepts them.
+function gitReadOnly(command: string, repo: string | undefined): boolean {
+  const segments = splitSegments(command)
+  if (repo === undefined || segments === null || segments.length !== 1) return false
+  const [git, flag, dir, sub, ...args] = segments[0]
+  if (git !== 'git' || flag !== '-C' || dir !== repo || !GIT_READ.test(sub ?? '')) return false
+  if (args.some(isUnsafeGitFlag)) return false
+  if (args.some((arg) => /^-[^-]*O/.test(arg))) return false
+  if (sub !== 'log' && !(args.includes('--no-ext-diff') && args.includes('--no-textconv'))) return false
+  return true
+}

@@ -1,0 +1,47 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import type { Config } from '../config.ts'
+
+const run = promisify(execFile)
+// The child environment is built from an allow-list. Nothing else of the parent reaches the session or its tools.
+const INHERITED = new Set([
+  'PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'TMPDIR', 'TERM', 'TZ',
+  'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy',
+  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'AWS_CONFIG_FILE', 'AWS_SHARED_CREDENTIALS_FILE', 'CLAUDE_CONFIG_DIR',
+  'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_BEDROCK_REGION_PREFIX', 'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
+])
+
+// Keys are never read into logs or storage. AWS_PROFILE is set only for bedrock, so target commands must name --profile.
+export function buildEnv(config: Config, base: NodeJS.ProcessEnv = process.env): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {}
+  for (const [name, value] of Object.entries(base)) {
+    if (value !== undefined && (INHERITED.has(name) || name.startsWith('LC_'))) env[name] = value
+  }
+  if (config.provider === 'bedrock') {
+    env.CLAUDE_CODE_USE_BEDROCK = '1'
+    env.AWS_REGION = config.awsRegion
+    env.AWS_PROFILE = config.inferenceProfile
+  } else if (config.provider === 'api_key') {
+    env.ANTHROPIC_API_KEY = base.ANTHROPIC_API_KEY
+  } else if (base.CLAUDE_CODE_OAUTH_TOKEN !== undefined) {
+    env.CLAUDE_CODE_OAUTH_TOKEN = base.CLAUDE_CODE_OAUTH_TOKEN
+  }
+  return env
+}
+
+export interface Preflight { ok: boolean; reason?: string }
+
+export async function preflight(config: Config, base: NodeJS.ProcessEnv = process.env): Promise<Preflight> {
+  if (config.provider === 'subscription') return { ok: true }
+  if (config.provider === 'api_key') {
+    return base.ANTHROPIC_API_KEY ? { ok: true } : { ok: false, reason: 'ANTHROPIC_API_KEY is not set' }
+  }
+  try {
+    await run('aws', ['sts', 'get-caller-identity', '--profile', config.inferenceProfile], { timeout: 20_000 })
+    return { ok: true }
+  } catch {
+    // stderr can hold account details, so the reason names only the profile.
+    return { ok: false, reason: `inference login failed for profile ${config.inferenceProfile}` }
+  }
+}

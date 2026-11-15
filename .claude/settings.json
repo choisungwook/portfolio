@@ -7,6 +7,25 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrail.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/prepush-scan.sh",
+            "onFailure": "block",
+            "statusMessage": "Checking what this command publishes",
+            "timeout": 300
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__terminal__run_in_terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/prepush-scan.sh",
+            "onFailure": "block",
+            "statusMessage": "Checking what this command publishes",
+            "timeout": 300
           }
         ]
       }

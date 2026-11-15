@@ -1,0 +1,57 @@
+name: verify-akbun-taskq
+
+# The tool runs from a checkout on its owner's machine, so there is nothing to
+# release. This job proves the code still type checks and passes its tests.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-taskq/**'
+      - '.github/workflows/verify-akbun-taskq.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-taskq/workspace/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-taskq/workspace
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 24 runs the TypeScript sources directly and bundles node:sqlite.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-taskq/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Nothing is emitted; the build is the type check.
+      - name: Build
+        run: npm run build
+
+      # Pull requests run only the tests marked [critical]: the invariants whose
+      # failure is an incident (approval, gating, auth, masking, claim, paths).
+      # Worker, SDK and notifier are fakes, so no credentials and no model call.
+      - name: Run critical tests
+        if: github.event_name == 'pull_request'
+        run: npm run test:critical
+        env:
+          TASKQ_NO_NOTIFY: '1'
+
+      - name: Run all tests
+        if: github.event_name != 'pull_request'
+        run: npm test
+        env:
+          TASKQ_NO_NOTIFY: '1'

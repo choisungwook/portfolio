@@ -1,0 +1,97 @@
+/* Must-check panel, dialogs, the add-task form, and run/task detail pieces. */
+.alert-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.alert-badges .badge { font-weight: 600; }
+.queue-banner {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+  background: var(--panel-soft); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px;
+}
+.queue-banner[data-state="paused"] { background: color-mix(in srgb, var(--needs-approval) 16%, var(--panel)); }
+.queue-banner p { margin: 0; font-weight: 600; }
+.operator { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.operator label { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+button.danger { color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+button.danger[data-armed="true"] { background: var(--danger); color: var(--on-accent); }
+
+.alerts { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.alert {
+  --sev: var(--muted);
+  background: var(--panel); border-radius: 10px; padding: 8px 10px 8px 13px; box-shadow: inset 3px 0 0 var(--sev), var(--shadow-1);
+}
+.alert.sev-critical { --sev: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); order: -1; }
+.alert.sev-high { --sev: var(--high); }
+.alert-head { display: flex; gap: 8px; align-items: baseline; }
+.sev-label { font-size: 12px; font-weight: 600; }
+.kind { font-size: 12px; color: var(--muted); }
+.alert-message { margin: 4px 0; overflow-wrap: anywhere; }
+.alert time { font-size: 12px; color: var(--muted); }
+.alert .actions { margin-bottom: 0; }
+
+dialog {
+  width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+  border: 0; border-radius: 14px; background: var(--panel); color: var(--fg); box-shadow: var(--shadow-2);
+}
+dialog::backdrop { background: color-mix(in srgb, var(--fg) 28%, transparent); }
+.dialog-body { padding: 16px 18px 4px; overflow: auto; max-height: calc(100vh - 120px); }
+.dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px 14px; }
+dialog h2 { margin-top: 0; }
+.status { font-weight: 600; }
+.status-needs_approval { color: var(--needs-approval); }
+.status-needs_auth { color: var(--needs-auth); }
+.status-failed { color: var(--failed); }
+.status-review { color: var(--review); }
+.status-done { color: var(--done); }
+
+.events { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+.events li { padding: 5px 8px; border-radius: var(--radius-s); }
+.events li:nth-child(odd) { background: var(--panel-soft); }
+.events .time { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.events pre { margin: 2px 0 0; }
+.runs { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.runs li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 5px 8px; border-radius: var(--radius-s); background: var(--panel-soft); }
+.resume { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.resume code { background: var(--control); padding: 3px 6px; border-radius: var(--radius-s); }
+
+.dialog-form { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.dialog-form .dialog-body { flex: 1; min-height: 0; max-height: none; padding-bottom: 12px; }
+.dialog-form .dialog-foot { flex: none; border-top: 1px solid var(--border); }
+.task-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.task-form .wide { grid-column: 1 / -1; }
+.task-form textarea { resize: vertical; }
+.task-form fieldset.kind { border: 0; margin: 0; padding: 0; min-width: 0; }
+.task-form fieldset.kind legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--muted); }
+.task-form .segmented label { display: block; cursor: pointer; }
+.task-form .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.task-form .segmented span { display: block; padding: 5px 14px; border-radius: var(--radius-s); font-size: 13px; color: var(--fg); }
+.task-form .segmented input:checked + span { background: var(--chip); box-shadow: var(--shadow-1); }
+.task-form .segmented input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft); }
+.task-form .meta { margin: 6px 0 0; }
+.task-form .more > summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.task-form .more[open] > summary { margin-bottom: 10px; }
+.task-form [hidden] { display: none; }
+@media (max-width: 560px) { .task-form { grid-template-columns: 1fr; } }
+.task-form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.task-form label.check { display: flex; align-items: center; gap: 6px; }
+.task-form input[type="checkbox"] { min-height: 0; padding: 0; width: 14px; height: 14px; accent-color: var(--accent); }
+
+/* Approval panel on the task detail. The input is shown whole; a long one scrolls inside its own box. */
+.approval-panel {
+  background: var(--panel-soft); border-radius: 10px; padding: 10px 12px; margin: 8px 0;
+  box-shadow: inset 3px 0 0 var(--needs-approval), var(--shadow-1);
+}
+.approval-panel:focus { outline: none; }
+.approval-panel h3 { margin-top: 0; }
+.approval-label { margin: 8px 0 2px; font-size: 12px; color: var(--muted); }
+.approval-command { margin: 0; }
+.approval-json { max-height: 200px; margin: 0; }
+.approval-warning {
+  margin: 6px 0; padding: 6px 8px; border-radius: var(--radius-s); font-weight: 600; color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+}
+.approval-read { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.approval-read input { min-height: 0; width: 14px; height: 14px; padding: 0; accent-color: var(--accent); }
+.hidden-char {
+  padding: 0 2px; border-radius: 3px; font-weight: 600; color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+.pending-approvals { margin-bottom: 10px; }
+.pending-approvals h3 { margin: 0 0 6px; }
