@@ -1,0 +1,139 @@
+name: release-akbun-storyboard
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-storyboard/workspace/**'
+      - '.github/workflows/release-akbun-storyboard.yml'
+  # The docs are on the PR trigger only: tests check that every operation they
+  # name exists, but a docs-only change needs no release.
+  pull_request:
+    paths:
+      - 'product/akbun-storyboard/workspace/**'
+      - 'product/akbun-storyboard/manual.md'
+      - 'product/akbun-storyboard/README.md'
+      - '.github/workflows/release-akbun-storyboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-storyboard/workspace
+
+jobs:
+  # PR only. The tests cover the store, the operation registry, the HTTP guards
+  # and endpoints on a real local socket, the MCP protocol, the exports, and
+  # that the docs name only real operations. No browser is needed.
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-storyboard/workspace
+      - name: Build
+        run: cargo build --locked
+        env:
+          RUSTFLAGS: -D warnings
+      - name: Test
+        run: cargo test --locked
+      # The web UI has no build step and no test of its own; a syntax error
+      # would otherwise ship as a blank page. node is preinstalled on ubuntu.
+      - name: Check web UI script
+        run: node --check web/app.js
+
+  # One self-contained binary per platform. The web UI and the agent skill are
+  # compiled in, so the archive holds a single file.
+  build:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/akbun-storyboard/workspace
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -C target/${{ matrix.target }}/release -czf dist/akbun-storyboard-${{ matrix.target }}.tar.gz akbun-storyboard
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target/${{ matrix.target }}/release/akbun-storyboard.exe -DestinationPath dist/akbun-storyboard-${{ matrix.target }}.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: akbun-storyboard-${{ matrix.target }}
+          path: product/akbun-storyboard/workspace/dist/*
+          if-no-files-found: error
+
+  # Tag only after every platform built, then release. The version is the one
+  # in Cargo.toml; merging without a bump fails here on the existing tag.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: product/akbun-storyboard/workspace/dist
+          merge-multiple: true
+      - name: Read version
+        id: version
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          echo "tag=akbun-storyboard-v$version" >> "$GITHUB_OUTPUT"
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+      - name: Create release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - One binary with a storyboard web UI, a CLI and an MCP server over a local SQLite file, so a person and AI agents (Claude, Codex, Gemini) edit the same storyboard.
+
+          ## Install
+
+          - Download the archive for your platform and put `akbun-storyboard` on your PATH. Then run `akbun-storyboard serve --open`.
+          - macOS builds are unsigned. After extracting, clear the quarantine flag once:
+
+            ```bash
+            xattr -cr ./akbun-storyboard
+            ```
+
+          - Windows builds are unsigned. If SmartScreen warns, choose "More info" and then "Run anyway".
+          - Agent setup (Claude Desktop, Claude Code, Codex, Gemini) is in product/akbun-storyboard/README.md.
+
+          EOF
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-storyboard >> release-notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file release-notes.md product/akbun-storyboard/workspace/dist/*

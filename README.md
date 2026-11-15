@@ -168,6 +168,7 @@
 - [reader 원본을 graphify LLM wiki로 만들어 API로 제공하는 서비스 (akbun-wiki)](./product/akbun-wiki/) (26.9.9)
 - [Claude, Codex, Kiro 사용량을 보여주는 macOS 메뉴바 앱 (akbun-ai-useage)](./product/akbun-ai-useage/) (26.9.23)
 - [사진 카탈로그와 초보자용 자동 보정, AI용 CLI를 갖춘 macOS 사진 편집 앱 (akbun-makephoto)](./product/akbun-makephoto/) (26.10.31)
+- [사람과 AI agent가 함께 편집하는 영상 스토리보드 도구 (akbun-storyboard)](./product/akbun-storyboard/) (26.11.15)
 
 ## Dockerfile
 

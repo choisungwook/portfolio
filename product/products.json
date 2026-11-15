@@ -1,7 +1,16 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-11-08",
+  "updated": "2026-11-15",
   "products": [
+    {
+      "id": "akbun-storyboard",
+      "name": "akbun-storyboard",
+      "description": "씬별 스케치·대본·배경음악·효과음·아이디어·댓글을 웹 UI와 CLI, MCP로 사람과 AI agent가 함께 편집하는 Rust 단일 바이너리 영상 스토리보드 도구",
+      "kind": "desktop",
+      "tags": ["rust", "sqlite", "mcp"],
+      "download": "https://github.com/choisungwook/portfolio/releases?q=akbun-storyboard",
+      "released": "2026-11-15"
+    },
     {
       "id": "akbun-makephoto",
       "name": "akbun-makephoto",
