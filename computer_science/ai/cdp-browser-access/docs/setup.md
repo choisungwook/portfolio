@@ -12,6 +12,12 @@
 
 검증에 쓴 버전은 Chrome 157.0.8103.78, uv로 설치되는 `websockets` 15.0.1, `playwright` 1.55.0입니다. Playwright는 브라우저를 직접 띄우지 않고 이미 떠 있는 Chrome에 붙기 때문에 `playwright install`은 필요하지 않습니다.
 
+## 실습 구성
+
+실습용 Chrome 하나가 9222번 포트로 CDP를 열고, raw CDP 클라이언트(`cdp_raw.py`)와 Playwright 스크립트가 같은 포트에 붙어 Chrome을 조작합니다. Chrome은 8000번 포트의 정적 서버에서 테스트 페이지를 읽고, 프로필은 평소 Chrome과 분리된 실습 전용 디렉터리를 씁니다.
+
+![실습 구성](../imgs/01-lab-environment.png)
+
 ## 환경 올리기
 
 아래 명령은 저장소 루트에서 시작해 workspace로 이동한 뒤 테스트 페이지 서버(8000번 포트)와 CDP를 연 Chrome(9222번 포트)을 백그라운드로 띄웁니다. `--user-data-dir`로 실습 전용 프로필을 지정하는 이유는 [시나리오 1](1-cdp-principle.md#chrome-136의-보안-변경)에서 설명합니다.

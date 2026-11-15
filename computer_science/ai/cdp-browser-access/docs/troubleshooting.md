@@ -49,3 +49,55 @@ Claude 확장 하나에 Claude desktop(`com.anthropic.claude_browser_extension`)
 ### --chrome 연결 해결
 
 Chrome과 Claude CLI를 모두 재시작한 뒤 CLI에서 `/chrome`으로 다시 연결합니다. 계속 실패하면 Claude desktop을 종료한 상태에서 다시 시도합니다.
+
+## connect_over_cdp가 `Browser context management is not supported`로 실패
+
+### 창 없는 Chrome 증상
+
+`pw_over_cdp.py`가 연결 단계에서 다음 오류로 끝납니다. raw CDP 실습은 앞에서 잘 끝났고, `curl http://127.0.0.1:9222/json/version`도 정상으로 응답합니다.
+
+```text
+playwright._impl._errors.Error: BrowserType.connect_over_cdp: Protocol error (Browser.setDownloadBehavior): Browser context management is not supported.
+```
+
+### 창 없는 Chrome 원인
+
+macOS의 Chrome은 창을 모두 닫아도 프로세스가 종료되지 않고 창 없이 떠 있습니다. 이 상태에서는 9222 포트가 열려 있어도 `/json/list`에 `page` target이 하나도 없습니다. Playwright는 연결 직후 기본 browser context를 설정하는 `Browser.setDownloadBehavior`를 보내는데, 열린 창이 없으면 Chrome이 이 명령을 거부합니다. 오류 문구는 context 기능을 말하지만 실제 원인은 열린 창이 없다는 것입니다.
+
+### 창 없는 Chrome 해결
+
+`/json/list`가 비어 있는지 확인합니다.
+
+```bash
+curl -s http://127.0.0.1:9222/json/list
+```
+
+`[  ]`처럼 빈 배열이 나오면 CDP의 HTTP 엔드포인트로 빈 탭을 하나 연 뒤 다시 실행합니다.
+
+```bash
+curl -s -X PUT "http://127.0.0.1:9222/json/new?about:blank"
+```
+
+## 환경 내리기 명령이 실습용 Chrome을 종료하지 못함
+
+### 프로필 경로 증상
+
+[setup.md](setup.md#환경-내리기)의 정리 명령을 실행해도 실습용 Chrome이 계속 떠 있고, `.chrome-profile`도 지워지지 않습니다.
+
+### 프로필 경로 원인
+
+실행 명령과 정리 명령은 모두 `$PWD/.chrome-profile`로 프로필 경로를 정합니다. Chrome을 띄울 때 `cd computer_science/ai/cdp-browser-access`를 건너뛰고 저장소 루트에서 실행하면, 프로필이 루트의 `.chrome-profile`에 만들어집니다. 이후 workspace에서 정리 명령을 실행하면 `pkill -f` 패턴의 경로가 달라서 그 Chrome을 찾지 못합니다.
+
+### 프로필 경로 해결
+
+실행 중인 실습용 Chrome의 실행 인자를 출력합니다. 경로에 공백이 있어도 잘리지 않도록 줄 전체를 봅니다.
+
+```bash
+ps -ax -o args= | grep -- '--remote-debugging-port=9222' | grep -v grep
+```
+
+출력의 `--user-data-dir=` 뒤 경로가 저장소 루트의 `.chrome-profile`이면, 저장소 루트에서 정리 명령의 Chrome 부분을 실행합니다.
+
+```bash
+pkill -f "user-data-dir=$PWD/.chrome-profile"; rm -rf .chrome-profile
+```

@@ -2,3 +2,4 @@
 *.png
 pw.err
 pw.out
+!imgs/*.png
